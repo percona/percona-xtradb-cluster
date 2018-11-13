@@ -107,10 +107,11 @@ To view usage information, run ``proxysql-admin`` without any options:
      --sync-multi-cluster-users         Sync user accounts currently configured in MySQL to ProxySQL (Don't delete ProxySQL users not in MySQL)
      --version, -v                      Print version info
    
-.. note:: Before using the ``proxysql-admin`` tool,
-   ensure that ProxySQL and |PXC| nodes you want to add are running. For
-   security purposes, please ensure to change the default user settings in
-   the ProxySQL configuration file.
+.. note::
+
+   Before using the ``proxysql-admin`` tool, ensure that ProxySQL and |PXC|
+   nodes you want to add are running. For security purposes, please ensure to
+   change the default user settings in the ProxySQL configuration file.
 
 Preparing Configuration File
 ----------------------------
@@ -267,8 +268,10 @@ The following extra options can be used:
   Sync user accounts currently configured in |PXC| to ProxySQL database
   except users with no password and the ``admin`` user.
 
-  .. note:: This option also deletes users
-     that are not in |PXC| from ProxySQL database.
+  .. note::
+
+     This option also deletes users that are not in |PXC| from ProxySQL
+     database.
 
 * ``--node-check-interval``
 
@@ -422,6 +425,11 @@ The following extra options can be used:
   .. note:: With ``loadbal`` mode slave hosts only accept read/write requests
      when all cluster nodes are down.
 
+* ``--use-slave-as-writer``
+
+  This option specifies whether or not the slave is added to the write
+  hostgroup.
+
 ProxySQL Status script
 ----------------------
 
@@ -450,17 +458,20 @@ This tutorial describes how to configure ProxySQL with three |PXC| nodes.
 | Node 4 | proxysql  | 192.168.70.64 |
 +--------+-----------+---------------+
 
-ProxySQL can be configured either using the :file:`/etc/proxysql.cnf` file
-or through the admin interface.
-Using the admin interface is preferable,
-because it allows you to change the configuration dynamically
-(without having to restart the proxy).
+ProxySQL can be configured either using the :file:`/etc/proxysql.cnf` file or
+through the admin interface.  Using the admin interface is preferable, because
+it allows you to change the configuration dynamically (without having to restart
+the proxy).
 
-To connect to the ProxySQL admin interface, you need a ``mysql`` client.
-You can either connect to the admin interface from |PXC| nodes
-that already have the ``mysql`` client installed (Node 1, Node 2, Node 3)
-or install the client on Node 4 and connect locally.
-For this tutorial, install |PXC| on Node 4:
+To connect to the ProxySQL admin interface, you need a ``mysql`` client.  You
+can either connect to the admin interface from |PXC| nodes that already have the
+``mysql`` client installed (Node 1, Node 2, Node 3) or install the client on
+Node 4 and connect locally.  For this tutorial, install |PXC| on Node 4:
+
+.. note::
+
+   Starting from version 1.4.12 of |proxysql|, scripts are compatible with
+   |PXC| hosts using IPv6.
 
 * On Debian or Ubuntu:
 
@@ -506,37 +517,37 @@ To see the ProxySQL databases and tables use the following commands:
 
 .. code-block:: text
 
-  mysql@proxysql> SHOW DATABASES;
-  +-----+---------+-------------------------------+
-  | seq | name    | file                          |
-  +-----+---------+-------------------------------+
-  | 0   | main    |                               |
-  | 2   | disk    | /var/lib/proxysql/proxysql.db |
-  | 3   | stats   |                               |
-  | 4   | monitor |                               |
-  +-----+---------+-------------------------------+
-  4 rows in set (0.00 sec)
+   mysql@proxysql> SHOW DATABASES;
+   +-----+---------+-------------------------------+
+   | seq | name    | file                          |
+   +-----+---------+-------------------------------+
+   | 0   | main    |                               |
+   | 2   | disk    | /var/lib/proxysql/proxysql.db |
+   | 3   | stats   |                               |
+   | 4   | monitor |                               |
+   +-----+---------+-------------------------------+
+   4 rows in set (0.00 sec)
 
 .. code-block:: text
 
-  mysql@proxysql> SHOW TABLES;
-  +--------------------------------------+
-  | tables                               |
-  +--------------------------------------+
-  | global_variables                     |
-  | mysql_collations                     |
-  | mysql_query_rules                    |
-  | mysql_replication_hostgroups         |
-  | mysql_servers                        |
-  | mysql_users                          |
-  | runtime_global_variables             |
-  | runtime_mysql_query_rules            |
-  | runtime_mysql_replication_hostgroups |
-  | runtime_mysql_servers                |
-  | runtime_scheduler                    |
-  | scheduler                            |
-  +--------------------------------------+
-  12 rows in set (0.00 sec)
+   mysql@proxysql> SHOW TABLES;
+   +--------------------------------------+
+   | tables                               |
+   +--------------------------------------+
+   | global_variables                     |
+   | mysql_collations                     |
+   | mysql_query_rules                    |
+   | mysql_replication_hostgroups         |
+   | mysql_servers                        |
+   | mysql_users                          |
+   | runtime_global_variables             |
+   | runtime_mysql_query_rules            |
+   | runtime_mysql_replication_hostgroups |
+   | runtime_mysql_servers                |
+   | runtime_scheduler                    |
+   | scheduler                            |
+   +--------------------------------------+
+   12 rows in set (0.00 sec)
 
 For more information about admin databases and tables,
 see `Admin Tables
@@ -544,17 +555,15 @@ see `Admin Tables
 
 .. note::
 
-  ProxySQL has 3 areas where the configuration can reside:
+   ProxySQL has 3 areas where the configuration can reside:
 
-  * MEMORY (your current working place)
+   * MEMORY (your current working place)
+   * RUNTIME (the production settings)
+   * DISK (durable configuration, saved inside an SQLITE database)
 
-  * RUNTIME (the production settings)
-
-  * DISK (durable configuration, saved inside an SQLITE database)
-
-  When you change a parameter, you change it in MEMORY area.
-  That is done by design to allow you to test the changes
-  before pushing to production (RUNTIME), or save them to disk.
+   When you change a parameter, you change it in MEMORY area.
+   That is done by design to allow you to test the changes
+   before pushing to production (RUNTIME), or save them to disk.
 
 Adding cluster nodes to ProxySQL
 --------------------------------
@@ -582,16 +591,16 @@ To see the nodes:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT * FROM mysql_servers;
+   mysql@proxysql> SELECT * FROM mysql_servers;
 
-  +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
-  | hostgroup_id | hostname      | port | status | weight | compression | max_connections | max_replication_lag | use_ssl | max_latency_ms | comment |
-  +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
-  | 0            | 192.168.70.62 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
-  | 0            | 192.168.70.63 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
-  +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
-  3 rows in set (0.00 sec)
+   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
+   | hostgroup_id | hostname      | port | status | weight | compression | max_connections | max_replication_lag | use_ssl | max_latency_ms | comment |
+   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
+   | 0            | 192.168.70.61 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+   | 0            | 192.168.70.62 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+   | 0            | 192.168.70.63 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
+   3 rows in set (0.00 sec)
 
 Creating ProxySQL Monitoring User
 ---------------------------------
@@ -604,16 +613,16 @@ The following example shows how to add a monitoring user on Node 2:
 
 .. code-block:: text
 
-  mysql@pxc2> CREATE USER 'proxysql'@'%' IDENTIFIED BY 'ProxySQLPa55';
-  mysql@pxc2> GRANT USAGE ON *.* TO 'proxysql'@'%';
+   mysql@pxc2> CREATE USER 'proxysql'@'%' IDENTIFIED BY 'ProxySQLPa55';
+   mysql@pxc2> GRANT USAGE ON *.* TO 'proxysql'@'%';
 
 The following example shows how to configure this user on the ProxySQL node:
 
 .. code-block:: text
 
-  mysql@proxysql> UPDATE global_variables SET variable_value='proxysql'
-                WHERE variable_name='mysql-monitor_username';
-  mysql@proxysql> UPDATE global_variables SET variable_value='ProxySQLPa55'
+   mysql@proxysql> UPDATE global_variables SET variable_value='proxysql'
+		WHERE variable_name='mysql-monitor_username';
+   mysql@proxysql> UPDATE global_variables SET variable_value='ProxySQLPa55'
                 WHERE variable_name='mysql-monitor_password';
 
 To load this configuration at runtime, issue a ``LOAD`` command.
@@ -631,33 +640,33 @@ check the monitoring logs:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start_us DESC LIMIT 6;
-  +---------------+------+------------------+----------------------+---------------+
-  | hostname      | port | time_start_us    | connect_success_time | connect_error |
-  +---------------+------+------------------+----------------------+---------------+
-  | 192.168.70.61 | 3306 | 1469635762434625 | 1695                 | NULL          |
-  | 192.168.70.62 | 3306 | 1469635762434625 | 1779                 | NULL          |
-  | 192.168.70.63 | 3306 | 1469635762434625 | 1627                 | NULL          |
-  | 192.168.70.61 | 3306 | 1469635642434517 | 1557                 | NULL          |
-  | 192.168.70.62 | 3306 | 1469635642434517 | 2737                 | NULL          |
-  | 192.168.70.63 | 3306 | 1469635642434517 | 1447                 | NULL          |
-  +---------------+------+------------------+----------------------+---------------+
-  6 rows in set (0.00 sec)
+   mysql@proxysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start_us DESC LIMIT 6;
+   +---------------+------+------------------+----------------------+---------------+
+   | hostname      | port | time_start_us    | connect_success_time | connect_error |
+   +---------------+------+------------------+----------------------+---------------+
+   | 192.168.70.61 | 3306 | 1469635762434625 | 1695                 | NULL          |
+   | 192.168.70.62 | 3306 | 1469635762434625 | 1779                 | NULL          |
+   | 192.168.70.63 | 3306 | 1469635762434625 | 1627                 | NULL          |
+   | 192.168.70.61 | 3306 | 1469635642434517 | 1557                 | NULL          |
+   | 192.168.70.62 | 3306 | 1469635642434517 | 2737                 | NULL          |
+   | 192.168.70.63 | 3306 | 1469635642434517 | 1447                 | NULL          |
+   +---------------+------+------------------+----------------------+---------------+
+   6 rows in set (0.00 sec)
 
 .. code-block:: text
 
-  mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start_us DESC LIMIT 6;
-  +---------------+------+------------------+-------------------+------------+
-  | hostname      | port | time_start_us    | ping_success_time | ping_error |
-  +---------------+------+------------------+-------------------+------------+
-  | 192.168.70.61 | 3306 | 1469635762416190 | 948               | NULL       |
-  | 192.168.70.62 | 3306 | 1469635762416190 | 803               | NULL       |
-  | 192.168.70.63 | 3306 | 1469635762416190 | 711               | NULL       |
-  | 192.168.70.61 | 3306 | 1469635702416062 | 783               | NULL       |
-  | 192.168.70.62 | 3306 | 1469635702416062 | 631               | NULL       |
-  | 192.168.70.63 | 3306 | 1469635702416062 | 542               | NULL       |
-  +---------------+------+------------------+-------------------+------------+
-  6 rows in set (0.00 sec)
+   mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start_us DESC LIMIT 6;
+   +---------------+------+------------------+-------------------+------------+
+   | hostname      | port | time_start_us    | ping_success_time | ping_error |
+   +---------------+------+------------------+-------------------+------------+
+   | 192.168.70.61 | 3306 | 1469635762416190 | 948               | NULL       |
+   | 192.168.70.62 | 3306 | 1469635762416190 | 803               | NULL       |
+   | 192.168.70.63 | 3306 | 1469635762416190 | 711               | NULL       |
+   | 192.168.70.61 | 3306 | 1469635702416062 | 783               | NULL       |
+   | 192.168.70.62 | 3306 | 1469635702416062 | 631               | NULL       |
+   | 192.168.70.63 | 3306 | 1469635702416062 | 542               | NULL       |
+   +---------------+------+------------------+-------------------+------------+
+   6 rows in set (0.00 sec)
 
 The previous examples show that ProxySQL is able to connect
 and ping the nodes you added.
@@ -666,7 +675,7 @@ To enable monitoring of these nodes, load them at runtime:
 
 .. code-block:: text
 
-  mysql@proxysql> LOAD MYSQL SERVERS TO RUNTIME;
+   mysql@proxysql> LOAD MYSQL SERVERS TO RUNTIME;
 
 .. _proxysql-client-user:
 
@@ -692,38 +701,38 @@ Load the user into runtime space and save these changes to disk
 
 .. code-block:: text
 
-  mysql@proxysql> LOAD MYSQL USERS TO RUNTIME;
-  mysql@proxysql> SAVE MYSQL USERS TO DISK;
+   mysql@proxysql> LOAD MYSQL USERS TO RUNTIME;
+   mysql@proxysql> SAVE MYSQL USERS TO DISK;
 
 To confirm that the user has been set up correctly, you can try to log in:
 
 .. code-block:: bash
 
-  root@proxysql:~# mysql -u sbuser -psbpass -h 127.0.0.1 -P 6033
+   root@proxysql:~# mysql -u sbuser -psbpass -h 127.0.0.1 -P 6033
 
-  Welcome to the MySQL monitor.  Commands end with ; or \g.
-  Your MySQL connection id is 1491
-  Server version: 5.1.30 (ProxySQL)
+   Welcome to the MySQL monitor.  Commands end with ; or \g.
+   Your MySQL connection id is 1491
+   Server version: 5.1.30 (ProxySQL)
 
-  Copyright (c) 2009-2016 Percona LLC and/or its affiliates
-  Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2009-2016 Percona LLC and/or its affiliates
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
-  Oracle is a registered trademark of Oracle Corporation and/or its
-  affiliates. Other names may be trademarks of their respective
-  owners.
+   Oracle is a registered trademark of Oracle Corporation and/or its
+   affiliates. Other names may be trademarks of their respective
+   owners.
 
-  Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+   Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
 To provide read/write access to the cluster for ProxySQL,
 add this user on one of the |PXC| nodes:
 
 .. code-block:: text
 
-  mysql@pxc3> CREATE USER 'sbuser'@'192.168.70.64' IDENTIFIED BY 'sbpass';
-  Query OK, 0 rows affected (0.01 sec)
+   mysql@pxc3> CREATE USER 'sbuser'@'192.168.70.64' IDENTIFIED BY 'sbpass';
+   Query OK, 0 rows affected (0.01 sec)
 
-  mysql@pxc3> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.64';
-  Query OK, 0 rows affected (0.00 sec)
+   mysql@pxc3> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.64';
+   Query OK, 0 rows affected (0.00 sec)
 
 Adding Galera Support
 ---------------------
@@ -741,7 +750,7 @@ for default ProxySQL configuration:
 
 .. code-block:: text
 
-  INSERT INTO scheduler (active,interval_ms,filename,arg1,comment)
+   INSERT INTO scheduler (active,interval_ms,filename,arg1,comment)
     VALUES (1,10000,'/usr/bin/proxysql_galera_checker','--config-file=/etc/proxysql-admin.cnf
     --write-hg=10 --read-hg=11 --writer-count=1 --mode=singlewrite 
     --priority=192.168.100.20:3306,192.168.100.40:3306,192.168.100.10:3306,192.168.100.30:3306 
@@ -904,48 +913,48 @@ ProxySQL stores collected data in the ``stats`` schema:
 
 .. code-block:: text
 
-  mysql@proxysql> SHOW TABLES FROM stats;
-  +--------------------------------+
-  | tables                         |
-  +--------------------------------+
-  | stats_mysql_query_rules        |
-  | stats_mysql_commands_counters  |
-  | stats_mysql_processlist        |
-  | stats_mysql_connection_pool    |
-  | stats_mysql_query_digest       |
-  | stats_mysql_query_digest_reset |
-  | stats_mysql_global             |
-  +--------------------------------+
+   mysql@proxysql> SHOW TABLES FROM stats;
+   +--------------------------------+
+   | tables                         |
+   +--------------------------------+
+   | stats_mysql_query_rules        |
+   | stats_mysql_commands_counters  |
+   | stats_mysql_processlist        |
+   | stats_mysql_connection_pool    |
+   | stats_mysql_query_digest       |
+   | stats_mysql_query_digest_reset |
+   | stats_mysql_global             |
+   +--------------------------------+
 
 For example, to see the number of commands that run on the cluster:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT * FROM stats_mysql_commands_counters;
-  +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
-  | Command           | Total_Time_us | Total_cnt | cnt_100us | cnt_500us | cnt_1ms | cnt_5ms | cnt_10ms | cnt_50ms | cnt_100ms | cnt_500ms | cnt_1s | cnt_5s | cnt_10s | cnt_INFs |
-  +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
-  | ALTER_TABLE       | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | ANALYZE_TABLE     | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | BEGIN             | 2212625       | 3686      | 55        | 2162      | 899     | 569     | 1        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | CHANGE_MASTER     | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | COMMIT            | 21522591      | 3628      | 0         | 0         | 0       | 1765    | 1590     | 272      | 1         | 0         | 0      | 0      | 0       | 0        |
-  | CREATE_DATABASE   | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | CREATE_INDEX      | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  ...
-  | DELETE            | 2904130       | 3670      | 35        | 1546      | 1346    | 723     | 19       | 1        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | DESCRIBE          | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  ...
-  | INSERT            | 19531649      | 3660      | 39        | 1588      | 1292    | 723     | 12       | 2        | 0         | 1         | 0      | 1      | 2       | 0        |
-  ...
-  | SELECT            | 35049794      | 51605     | 501       | 26180     | 16606   | 8241    | 70       | 3        | 4         | 0         | 0      | 0      | 0       | 0        |
-  | SELECT_FOR_UPDATE | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  ...
-  | UPDATE            | 6402302       | 7367      | 75        | 2503      | 3020    | 1743    | 23       | 3        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | USE               | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | SHOW              | 19691         | 2         | 0         | 0         | 0       | 0       | 1        | 1        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | UNKNOWN           | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
+   mysql@proxysql> SELECT * FROM stats_mysql_commands_counters;
+   +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
+   | Command           | Total_Time_us | Total_cnt | cnt_100us | cnt_500us | cnt_1ms | cnt_5ms | cnt_10ms | cnt_50ms | cnt_100ms | cnt_500ms | cnt_1s | cnt_5s | cnt_10s | cnt_INFs |
+   +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
+   | ALTER_TABLE       | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | ANALYZE_TABLE     | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | BEGIN             | 2212625       | 3686      | 55        | 2162      | 899     | 569     | 1        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | CHANGE_MASTER     | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | COMMIT            | 21522591      | 3628      | 0         | 0         | 0       | 1765    | 1590     | 272      | 1         | 0         | 0      | 0      | 0       | 0        |
+   | CREATE_DATABASE   | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | CREATE_INDEX      | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   ...
+   | DELETE            | 2904130       | 3670      | 35        | 1546      | 1346    | 723     | 19       | 1        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | DESCRIBE          | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   ...
+   | INSERT            | 19531649      | 3660      | 39        | 1588      | 1292    | 723     | 12       | 2        | 0         | 1         | 0      | 1      | 2       | 0        |
+   ...
+   | SELECT            | 35049794      | 51605     | 501       | 26180     | 16606   | 8241    | 70       | 3        | 4         | 0         | 0      | 0      | 0       | 0        |
+   | SELECT_FOR_UPDATE | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   ...
+   | UPDATE            | 6402302       | 7367      | 75        | 2503      | 3020    | 1743    | 23       | 3        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | USE               | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | SHOW              | 19691         | 2         | 0         | 0         | 0       | 0       | 1        | 1        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | UNKNOWN           | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
   45 rows in set (0.00 sec)
 
 Automatic Fail-over
@@ -958,57 +967,57 @@ You can check the status of all available nodes by running:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
-  +--------------+---------------+------+--------+
-  | hostgroup_id | hostname      | port | status |
-  +--------------+---------------+------+--------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE |
-  | 0            | 192.168.70.62 | 3306 | ONLINE |
-  | 0            | 192.168.70.63 | 3306 | ONLINE |
-  +--------------+---------------+------+--------+
-  3 rows in set (0.00 sec)
+   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
+   +--------------+---------------+------+--------+
+   | hostgroup_id | hostname      | port | status |
+   +--------------+---------------+------+--------+
+   | 0            | 192.168.70.61 | 3306 | ONLINE |
+   | 0            | 192.168.70.62 | 3306 | ONLINE |
+   | 0            | 192.168.70.63 | 3306 | ONLINE |
+   +--------------+---------------+------+--------+
+   3 rows in set (0.00 sec)
 
 To test problem detection and fail-over mechanism, shut down Node 3:
 
 .. code-block:: bash
 
-  root@pxc3:~# service mysql stop
+   root@pxc3:~# service mysql stop
 
 ProxySQL will detect that the node is down and update its status to
 ``OFFLINE_SOFT``:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
-  +--------------+---------------+------+--------------+
-  | hostgroup_id | hostname      | port | status       |
-  +--------------+---------------+------+--------------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE       |
-  | 0            | 192.168.70.62 | 3306 | ONLINE       |
-  | 0            | 192.168.70.63 | 3306 | OFFLINE_SOFT |
-  +--------------+---------------+------+--------------+
-  3 rows in set (0.00 sec)
+   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
+   +--------------+---------------+------+--------------+
+   | hostgroup_id | hostname      | port | status       |
+   +--------------+---------------+------+--------------+
+   | 0            | 192.168.70.61 | 3306 | ONLINE       |
+   | 0            | 192.168.70.62 | 3306 | ONLINE       |
+   | 0            | 192.168.70.63 | 3306 | OFFLINE_SOFT |
+   +--------------+---------------+------+--------------+
+   3 rows in set (0.00 sec)
 
 Now start Node 3 again:
 
 .. code-block:: bash
 
-  root@pxc3:~# service mysql start
+   root@pxc3:~# service mysql start
 
 The script will detect the change and mark the node as
 ``ONLINE``:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
-  +--------------+---------------+------+--------+
-  | hostgroup_id | hostname      | port | status |
-  +--------------+---------------+------+--------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE |
-  | 0            | 192.168.70.62 | 3306 | ONLINE |
-  | 0            | 192.168.70.63 | 3306 | ONLINE |
-  +--------------+---------------+------+--------+
-  3 rows in set (0.00 sec)
+   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
+   +--------------+---------------+------+--------+
+   | hostgroup_id | hostname      | port | status |
+   +--------------+---------------+------+--------+
+   | 0            | 192.168.70.61 | 3306 | ONLINE |
+   | 0            | 192.168.70.62 | 3306 | ONLINE |
+   | 0            | 192.168.70.63 | 3306 | ONLINE |
+   +--------------+---------------+------+--------+
+   3 rows in set (0.00 sec)
 
 .. _pxc-maint-mode:
 
@@ -1075,3 +1084,5 @@ but the user can still open conenctions to monitor status.
 
 .. note:: If you increase the transition period,
    the packaging script may determine it as a server stall.
+
+.. |proxysql| replace:: ProxySQL
