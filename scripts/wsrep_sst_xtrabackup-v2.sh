@@ -575,8 +575,8 @@ read_cnf()
     sdecomp=$(parse_cnf sst decompressor "")
 
     # if wsrep_node_address is not set raise a warning
-    wsrep_node_address=$(parse_cnf mysqld wsrep_node_address "")
-    wsrep_sst_receive_address=$(parse_cnf mysqld wsrep_sst_receive_address "")
+    wsrep_node_address=$(parse_cnf mysqld wsrep-node-address "")
+    wsrep_sst_receive_address=$(parse_cnf mysqld wsrep-sst-receive-address "")
     if [[ -z $wsrep_node_address && -z $wsrep_sst_receive_address ]]; then
         wsrep_log_warning "wsrep_node_address or wsrep_sst_receive_address not set." \
                           "Consider setting them if SST fails."
@@ -675,17 +675,11 @@ read_cnf()
 
     # thread options
     encrypt_threads=$(parse_cnf sst encrypt-threads -1)
-    if [[ $encrypt_threads -eq -1 ]]; then
-        encrypt_threads=$(parse_cnf sst encrypt_threads -1)
-    fi
     if [[ $encrypt_threads -le 0 ]]; then
         encrypt_threads=4
     fi
 
     backup_threads=$(parse_cnf sst backup-threads -1)
-    if [[ $backup_threads -eq -1 ]]; then
-        backup_threads=$(parse_cnf sst backup_threads -1)
-    fi
     if [[ $backup_threads -le 0 ]]; then
         backup_threads=4
     fi
@@ -704,9 +698,6 @@ read_cnf()
         bufferpoolsize=$(parse_cnf xtrabackup use-memory "")
         if [[ -z "$bufferpoolsize" ]]; then
             bufferpoolsize=$(parse_cnf mysqld innodb-buffer-pool-size "")
-        fi
-        if [[ -z "$bufferpoolsize" ]]; then
-            bufferpoolsize=$(parse_cnf mysqld innodb_buffer_pool_size "")
         fi
         if [[ -n "$bufferpoolsize" ]]; then
             iapts="$iapts --use-memory=$bufferpoolsize"
