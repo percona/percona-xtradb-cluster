@@ -119,9 +119,9 @@ It is recommended to provide connection and authentication information
 in the ProxySQL configuration file (:file:`/etc/proxysql-admin.cnf`),
 instead of specifying it on the command line.
 
-By default, the configuration file contains the following::
+By default, the configuration file contains the following:
 
-.. code-block:: text
+.. code-block:: bash
 
    # proxysql admin interface credentials.
    export PROXYSQL_USERNAME="admin"
