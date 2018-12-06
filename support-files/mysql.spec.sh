@@ -126,7 +126,7 @@
 # Disable post build checks for time being.
 BuildConflicts: post-build-checks
 
-BuildRequires: gcc-c++ ncurses-devel perl zlib-devel cmake libaio-devel bison flex
+BuildRequires: gcc-c++ ncurses-devel perl zlib-devel cmake libaio-devel bison flex pam-devel
 
 %if 0%{?rhel} == 6 || 0%{?rhel} == 7 || 0%{?fedora} == 20 || 0%{?fedora} == 21
 BuildRequires: time openssl-devel
