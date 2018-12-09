@@ -140,6 +140,7 @@ BuildRequires:  systemd-rpm-macros
 %endif
 BuildRequires:  cyrus-sasl-devel
 BuildRequires:  openldap2-devel
+BuildRequires:  pam-devel
 BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 %if 0%{?rhel} > 6
@@ -909,6 +910,7 @@ fi
 
 %dir %{_libdir}/mysql/plugin
 %attr(755, root, root) %{_libdir}/mysql/plugin/adt_null.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/auth_pam.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth_socket.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_sasl_client.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/group_replication.so
@@ -931,6 +933,7 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/plugin/version_token.so
 %dir %{_libdir}/mysql/plugin/debug
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/adt_null.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_pam.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_socket.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_ldap_sasl_client.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/group_replication.so
