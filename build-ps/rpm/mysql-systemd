@@ -45,7 +45,7 @@ install_db () {
     if [ ! -z $log ]; then
         if [ ! -e "$log" -a ! -h "$log" -a x$(dirname "$log") = "x/var/log" ]; then
             case $(basename "$log") in
-                mysql*.log) install /dev/null -m0640 -o@MYSQLD_USER@ -g@MYSQLD_USER@ "$log" ;;
+                mysql*.log) install /dev/null -m0640 -omysql -gmysql "$log" ;;
                 *) ;;
             esac
         fi
