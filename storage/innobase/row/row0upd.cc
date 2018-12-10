@@ -2490,6 +2490,7 @@ row_upd_sec_index_entry(
 					}
 					break;
 				case DB_LOCK_WAIT:
+				case DB_LOCK_WAIT_TIMEOUT:
 					err = DB_LOCK_WAIT_TIMEOUT;
 					break;
 				default:

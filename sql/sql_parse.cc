@@ -3981,16 +3981,18 @@ case SQLCOM_PREPARE:
       if (!thd->is_current_stmt_binlog_format_row() ||
           !(create_info.options & HA_LEX_CREATE_TMP_TABLE))
 
-       /* Note we are explictly opening the macro as we need to perform
-       cleanup action on TOI failure. */
-       if (WSREP(thd) &&
-           wsrep_to_isolation_begin(thd, create_table->db,
-                                    create_table->table_name, NULL))
-       {
-         if (!thd->lex->is_ignore() && thd->is_strict_mode())
-           thd->pop_internal_handler();
-         goto error;
-       }
+        /* Note we are explictly opening the macro as we need to perform
+        cleanup action on TOI failure. */
+        if (WSREP(thd) &&
+            wsrep_to_isolation_begin(thd, create_table->db,
+                                     create_table->table_name, NULL))
+        {
+          thd->pop_internal_handler();
+
+          if (!thd->lex->is_ignore() && thd->is_strict_mode())
+            thd->pop_internal_handler();
+          goto error;
+        }
 #endif /* WITH_WSREP */
         /* Regular CREATE TABLE */
         res= mysql_create_table(thd, create_table,
