@@ -2512,9 +2512,9 @@ THD *Stage_manager::Mutex_queue::fetch_and_empty()
   DBUG_RETURN(result);
 }
 
-void Stage_manager::wait_count_or_timeout(ulong count, ulong usec, StageID stage)
+void Stage_manager::wait_count_or_timeout(ulong count, long usec, StageID stage)
 {
-  ulong to_wait=
+  long to_wait=
     DBUG_EVALUATE_IF("bgc_set_infinite_delay", LONG_MAX, usec);
   /*
     For testing purposes while waiting for inifinity
@@ -2522,9 +2522,9 @@ void Stage_manager::wait_count_or_timeout(ulong count, ulong usec, StageID stage
     small intervals. Otherwise, waiting 0.1 * infinite
     is too long.
    */
-  ulong delta=
+  long delta=
     DBUG_EVALUATE_IF("bgc_set_infinite_delay", 100000,
-                     max<ulong>(1, (to_wait * 0.1)));
+                     max<long>(1, (to_wait * 0.1)));
 
   while (to_wait > 0 && (count == 0 || static_cast<ulong>(m_queue[stage].get_size()) < count))
   {
@@ -5444,7 +5444,7 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
       goto err;
     }
     DBUG_EXECUTE_IF("check_consecutive_binlog_key_versions",
-                    { static uint next_key_version = 0;
+                    { static uint next_key_version = 1;
                       DBUG_ASSERT(crypto.get_key_version() == next_key_version++);});
 
     uchar nonce[Binlog_crypt_data::BINLOG_NONCE_LENGTH];
@@ -5857,23 +5857,33 @@ int MYSQL_BIN_LOG::raw_get_current_log(LOG_INFO* linfo)
   return 0;
 }
 
+static bool check_write_error_code(uint error_code)
+{
+  return error_code == ER_TRANS_CACHE_FULL ||
+         error_code == ER_STMT_CACHE_FULL  ||
+         error_code == ER_ERROR_ON_WRITE   ||
+         error_code == ER_BINLOG_LOGGING_IMPOSSIBLE;
+}
+
 bool MYSQL_BIN_LOG::check_write_error(THD *thd)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::check_write_error");
 
-  bool checked= FALSE;
-
   if (!thd->is_error())
-    DBUG_RETURN(checked);
+    DBUG_RETURN(false);
 
-  switch (thd->get_stmt_da()->mysql_errno())
+  bool checked= check_write_error_code(thd->get_stmt_da()->mysql_errno());
+
+  if (!checked)
   {
-    case ER_TRANS_CACHE_FULL:
-    case ER_STMT_CACHE_FULL:
-    case ER_ERROR_ON_WRITE:
-    case ER_BINLOG_LOGGING_IMPOSSIBLE:
-      checked= TRUE;
-    break;
+    /* Check all conditions for one that matches the expected error */
+    const Sql_condition *err;
+    Diagnostics_area::Sql_condition_iterator it=
+      thd->get_stmt_da()->sql_conditions();
+    while ((err= it++) != NULL && !checked)
+    {
+      checked= check_write_error_code(err->mysql_errno());
+    }
   }
   DBUG_PRINT("return", ("checked: %s", YESNO(checked)));
   DBUG_RETURN(checked);
@@ -8369,14 +8379,13 @@ bool MYSQL_BIN_LOG::do_write_cache(IO_CACHE *cache, Binlog_event_writer *writer)
                     DBUG_SET("+d,simulate_file_write_error");
                   });
 
-  if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
-  {
-    DBUG_EXECUTE_IF("simulate_tmpdir_partition_full",
-                    {
-                      DBUG_SET("-d,simulate_file_write_error");
-                    });
+  int reinit_err= reinit_io_cache(cache, READ_CACHE, 0, 0, 0);
+  DBUG_EXECUTE_IF("simulate_tmpdir_partition_full",
+                  {
+                    DBUG_SET("-d,simulate_file_write_error");
+                  });
+  if (reinit_err)
     DBUG_RETURN(true);
-  }
 
   uchar *buf= cache->read_pos;
   uint32 buf_len= my_b_bytes_in_cache(cache);

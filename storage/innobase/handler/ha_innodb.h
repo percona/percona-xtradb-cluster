@@ -26,6 +26,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 system clustered index when there is no primary key. */
 extern const char innobase_index_reserve_name[];
 
+/* Deprecation warning text */
+extern const char PARTITION_IN_SHARED_TABLESPACE_WARNING[];
+
 /* "innodb_file_per_table" tablespace name  is reserved by InnoDB in order
 to explicitly create a file_per_table tablespace for the table. */
 extern const char reserved_file_per_table_space_name[];
@@ -732,6 +735,18 @@ const HA_CREATE_INFO*	create_info)
 				reserved_system_space_name)));
 }
 
+/** Check if tablespace is shared tablespace.
+@param[in]      tablespace_name Name of the tablespace
+@return true if tablespace is a shared tablespace. */
+UNIV_INLINE
+bool is_shared_tablespace(const char *tablespace_name) {
+  if (tablespace_name != NULL && tablespace_name[0] != '\0' &&
+      (strcmp(tablespace_name, reserved_file_per_table_space_name) != 0)) {
+    return true;
+  }
+  return false;
+}
+
 /** Parse hint for table and its indexes, and update the information
 in dictionary.
 @param[in]	thd		Connection thread
@@ -857,12 +872,21 @@ public:
 		const char*     name,
 		ibool           set_lower_case);
 
-	/** If encryption is requested, check for master key availability
+	/** If master key encryption is requested, check for master key availability
 	and set the encryption flag in table flags
 	@param[in,out]	table	table object
 	@return on success DB_SUCCESS else DB_UNSPPORTED on failure */
 
-	dberr_t	enable_encryption(dict_table_t*	table);
+	dberr_t	enable_master_key_encryption(dict_table_t*	table);
+
+	/** If keyring encryption is requested, check for tablespace's key availability
+	and set the encryption flag in table flags
+	@param[in,out]	table	table object
+	@param[in,out]  rotated_keys_encryption_option  contains appropriate
+			FIL_ENCRYPTION_(ON/DEFAULT/OFF)
+	@return on success DB_SUCCESS else DB_UNSPPORTED on failure */
+
+        dberr_t enable_keyring_encryption(dict_table_t *   table,fil_encryption_t &rotated_keys_encryption_option);
 
 private:
 	/** Parses the table name into normal name and either temp path or

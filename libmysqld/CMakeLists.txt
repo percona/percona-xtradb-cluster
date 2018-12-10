@@ -27,7 +27,6 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_BINARY_DIR}/libmysqld
   ${CMAKE_BINARY_DIR}/sql
   ${CMAKE_SOURCE_DIR}/regex
-  ${ZLIB_INCLUDE_DIR}
   ${SSL_INCLUDE_DIRS}
   ${SSL_INTERNAL_INCLUDE_DIRS}
   ${CMAKE_SOURCE_DIR}/sql/backup
@@ -110,6 +109,7 @@ SET(SQL_EMBEDDED_SOURCES
   ../sql/rpl_table_access.cc
   ../sql/rpl_context.cc
   ../sql/rpl_trx_boundary_parser.cc
+  ../sql/userstat.cc
   ${IMPORTED_SOURCES}
 )
 

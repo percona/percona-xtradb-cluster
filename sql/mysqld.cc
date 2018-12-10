@@ -503,7 +503,7 @@ ulonglong  max_binlog_cache_size=0;
 ulong slave_max_allowed_packet= 0;
 ulong binlog_stmt_cache_size=0;
 int32 opt_binlog_max_flush_queue_time= 0;
-ulong opt_binlog_group_commit_sync_delay= 0;
+long opt_binlog_group_commit_sync_delay= 0;
 ulong opt_binlog_group_commit_sync_no_delay_count= 0;
 ulonglong  max_binlog_stmt_cache_size=0;
 ulong query_cache_size=0;
@@ -739,7 +739,6 @@ mysql_cond_t COND_server_started;
 mysql_mutex_t LOCK_reset_gtid_table;
 mysql_mutex_t LOCK_compress_gtid_table;
 mysql_cond_t COND_compress_gtid_table;
-mysql_mutex_t LOCK_group_replication_handler;
 #if !defined (EMBEDDED_LIBRARY) && !defined(_WIN32)
 mysql_mutex_t LOCK_socket_listener_active;
 mysql_cond_t COND_socket_listener_active;
@@ -3983,8 +3982,6 @@ static int init_thread_environment()
   mysql_mutex_init(key_LOCK_global_index_stats,
                    &LOCK_global_index_stats, MY_MUTEX_INIT_FAST);
 
-  mysql_mutex_init(key_LOCK_group_replication_handler,
-                   &LOCK_group_replication_handler, MY_MUTEX_INIT_FAST);
 #ifndef EMBEDDED_LIBRARY
   Events::init_mutexes();
 #if defined(_WIN32)
@@ -4633,8 +4630,9 @@ static int init_server_components()
     */
     log_error_dest= errorlog_filename_buff;
 
-    if (open_error_log(errorlog_filename_buff))
+    if (open_error_log(errorlog_filename_buff, false))
       unireg_abort(MYSQLD_ABORT_EXIT);
+
 #ifdef _WIN32
     FreeConsole();        // Remove window
 #endif
@@ -5850,6 +5848,20 @@ int mysqld_main(int argc, char **argv)
                     " server, the initialization failed because it was not"
                     " possible to generate a new UUID.");
     unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  /* Server generates uuid after innodb is initialized. But during
+  initialization, if tablespaces like system, redo, temporary are encrypted,
+  they are initialized with "empty" UUID. Now UUID is available, fix the
+  empty UUID of such tablespaces now */
+  if (innodb_hton != NULL && innodb_hton->fix_tablespaces_empty_uuid)
+  {
+    if (innodb_hton->fix_tablespaces_empty_uuid())
+    {
+      sql_print_error("Fixing empty UUID with InnoDB Engine failed. Please"
+		      " check if keyring plugin is loaded and execute"
+		      " \"ALTER INSTANCE ROTATE INNODB MASTER KEY\"");
+    }
   }
 
   /*
@@ -10287,7 +10299,6 @@ PSI_mutex_key key_mts_gaq_LOCK;
 PSI_mutex_key key_thd_timer_mutex;
 PSI_mutex_key key_LOCK_offline_mode;
 PSI_mutex_key key_LOCK_default_password_lifetime;
-PSI_mutex_key key_LOCK_group_replication_handler;
 
 #ifdef HAVE_REPLICATION
 PSI_mutex_key key_commit_order_manager_mutex;
@@ -10378,7 +10389,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_gtid_ensure_index_mutex, "Gtid_state", PSI_FLAG_GLOBAL},
   { &key_LOCK_query_plan, "THD::LOCK_query_plan", PSI_FLAG_VOLATILITY_SESSION},
   { &key_LOCK_cost_const, "Cost_constant_cache::LOCK_cost_const",
-    PSI_FLAG_GLOBAL},  
+    PSI_FLAG_GLOBAL},
   { &key_LOCK_current_cond, "THD::LOCK_current_cond", PSI_FLAG_VOLATILITY_SESSION},
   { &key_mts_temp_table_LOCK, "key_mts_temp_table_LOCK", 0},
   { &key_LOCK_reset_gtid_table, "LOCK_reset_gtid_table", PSI_FLAG_GLOBAL},
@@ -10403,8 +10414,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_mutex_slave_worker_hash, "Relay_log_info::slave_worker_hash_lock", 0},
 #endif
   { &key_LOCK_offline_mode, "LOCK_offline_mode", PSI_FLAG_GLOBAL},
-  { &key_LOCK_default_password_lifetime, "LOCK_default_password_lifetime", PSI_FLAG_GLOBAL},
-  { &key_LOCK_group_replication_handler, "LOCK_group_replication_handler", PSI_FLAG_GLOBAL}
+  { &key_LOCK_default_password_lifetime, "LOCK_default_password_lifetime", PSI_FLAG_GLOBAL}
 };
 
 PSI_rwlock_key key_rwlock_LOCK_grant, key_rwlock_LOCK_logger,

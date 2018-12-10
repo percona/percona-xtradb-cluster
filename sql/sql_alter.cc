@@ -495,6 +495,21 @@ bool Sql_cmd_alter_table::execute(THD *thd)
         DBUG_RETURN(TRUE);
     }
   }
+
+  TABLE *find_temporary_table(THD *thd, const TABLE_LIST *tl);
+
+  if ((!thd->is_current_stmt_binlog_format_row() ||
+       !find_temporary_table(thd, first_table)))
+  {
+    if (WSREP(thd) &&
+        wsrep_to_isolation_begin(thd,
+                                 ((lex->name.str) ? select_lex->db : NULL),
+                                 ((lex->name.str) ? lex->name.str : NULL),
+                                 first_table, &alter_info)) {
+      WSREP_WARN("ALTER TABLE isolation failure");
+      DBUG_RETURN(TRUE);
+    }
+  }
 #endif /* WITH_WSREP */
 
   /* Push Strict_error_handler for alter table*/
@@ -502,37 +517,15 @@ bool Sql_cmd_alter_table::execute(THD *thd)
   if (!thd->lex->is_ignore() && thd->is_strict_mode())
     thd->push_internal_handler(&strict_handler);
 
-#ifdef WITH_WSREP
-  TABLE *find_temporary_table(THD *thd, const TABLE_LIST *tl);
-
-  if ((!thd->is_current_stmt_binlog_format_row() ||
-       !find_temporary_table(thd, first_table)))
-    {
-      WSREP_TO_ISOLATION_BEGIN_ALTER(((lex->name.str) ? select_lex->db : NULL),
-                                     ((lex->name.str) ? lex->name.str : NULL),
-                                     first_table,
-                                     &alter_info);
-    }
-#endif /* WITH_WSREP */
-
+  Partition_in_shared_ts_error_handler partition_in_shared_ts_handler;
+  thd->push_internal_handler(&partition_in_shared_ts_handler);
   result= mysql_alter_table(thd, select_lex->db, lex->name.str,
                             &create_info, first_table, &alter_info);
+  thd->pop_internal_handler();
 
   if (!thd->lex->is_ignore() && thd->is_strict_mode())
     thd->pop_internal_handler();
   DBUG_RETURN(result);
-
-#ifdef WITH_WSREP
-error:
-
-  if (!thd->lex->is_ignore() && thd->is_strict_mode())
-    thd->pop_internal_handler();
-
-  {
-    WSREP_WARN("ALTER TABLE isolation failure");
-    DBUG_RETURN(TRUE);
-  }
-#endif /* WITH_WSREP */
 }
 
 

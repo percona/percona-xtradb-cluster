@@ -1914,6 +1914,14 @@ row_merge_read_clustered_index(
 
 		mem_heap_empty(row_heap);
 
+		/* Do not continue if table pages are still encrypted */
+		if (!old_table->is_readable() ||
+		    !new_table->is_readable()) {
+			err = DB_DECRYPTION_FAILED;
+			trx->error_key_num = 0;
+			goto func_exit;
+		}
+
 		page_cur_move_to_next(cur);
 
 		stage->n_pk_recs_inc();
@@ -3851,21 +3859,27 @@ int
 row_merge_file_create_low(
 	const char*	path)
 {
-	int	fd;
+    int fd;
+    if (path == NULL) {
+      path = innobase_mysql_tmpdir();
+    }
 #ifdef UNIV_PFS_IO
 	/* This temp file open does not go through normal
 	file APIs, add instrumentation to register with
 	performance schema */
 	struct PSI_file_locker*	locker = NULL;
-	PSI_file_locker_state	state;
-	locker = PSI_FILE_CALL(get_thread_file_name_locker)(
-				&state, innodb_temp_file_key.m_value, PSI_FILE_OPEN,
-				"Innodb Merge Temp File", &locker);
-	if (locker != NULL) {
+        char *filepath = NULL;
+        filepath =
+            fil_make_filepath(path, "Innodb Merge Temp File", NO_EXT, false);
+        PSI_file_locker_state	state;
+        locker = PSI_FILE_CALL(get_thread_file_name_locker)(
+            &state, innodb_temp_file_key.m_value, PSI_FILE_OPEN, filepath,
+            &locker);
+        if (locker != NULL) {
 		PSI_FILE_CALL(start_file_open_wait)(locker,
 						__FILE__,
 						__LINE__);
-	}
+        }
 #endif
 	fd = innobase_mysql_tmpfile(path);
 #ifdef UNIV_PFS_IO
@@ -4128,7 +4142,7 @@ row_merge_rename_tables_dict(
 	renamed along with the table. */
 	if (err == DB_SUCCESS
 	    && dict_table_is_file_per_table(old_table)
-	    && !old_table->ibd_file_missing) {
+	    && !old_table->file_unreadable) {
 		/* Make pathname to update SYS_DATAFILES. */
 		char* tmp_path = row_make_new_pathname(old_table, tmp_name);
 
@@ -4559,6 +4573,15 @@ row_merge_build_indexes(
 	/* Reset the MySQL row buffer that is used when reporting
 	duplicate keys. */
 	innobase_rec_reset(table);
+
+	if (!old_table->is_readable() ||
+	    !new_table->is_readable()) {
+		error = DB_DECRYPTION_FAILED;
+		ib::warn() << "Table %s is encrypted but encryption service or"
+			" used key_id is not available. "
+			" Can't continue reading table.";
+		goto func_exit;
+	}
 
 	/* Read clustered index of the table and create files for
 	secondary index entries for merge sort */

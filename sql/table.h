@@ -599,6 +599,8 @@ struct TABLE_SHARE
   LEX_STRING comment;			/* Comment about table */
   LEX_STRING compress;			/* Compression algorithm */
   LEX_STRING encrypt_type;		/* encryption algorithm */
+  uint32_t encryption_key_id;
+  bool was_encryption_key_id_set;
   const CHARSET_INFO *table_charset;	/* Default charset of string fields */
 
   MY_BITMAP all_set;
@@ -1703,11 +1705,21 @@ typedef struct st_lex_alter {
   bool account_locked;
 } LEX_ALTER;
 
+/*
+  This structure holds the specifications related to
+  mysql user and the associated auth details.
+*/
 typedef struct	st_lex_user {
   LEX_CSTRING user;
   LEX_CSTRING host;
   LEX_CSTRING plugin;
   LEX_CSTRING auth;
+/*
+  The following flags are indicators for the SQL syntax used while
+  parsing CREATE/ALTER user. While other members are self-explanatory,
+  'uses_authentication_string_clause' signifies if the password is in
+  hash form (if the var was set to true) or not.
+*/
   bool uses_identified_by_clause;
   bool uses_identified_with_clause;
   bool uses_authentication_string_clause;
@@ -3083,6 +3095,7 @@ bool update_generated_write_fields(const MY_BITMAP *bitmap, TABLE *table);
 bool update_generated_read_fields(uchar *buf, TABLE *table,
                                   uint active_index= MAX_KEY);
 
+ulong get_form_pos(File file, uchar *head);
 #endif /* MYSQL_CLIENT */
 
 #endif /* TABLE_INCLUDED */
