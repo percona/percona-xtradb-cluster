@@ -3,36 +3,60 @@
 #
 # save the initial value
 SET @wsrep_convert_lock_to_trx_global_saved = @@global.wsrep_convert_lock_to_trx;
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 # default
 SELECT @@global.wsrep_convert_lock_to_trx;
 @@global.wsrep_convert_lock_to_trx
 0
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 
 # scope
 SELECT @@session.wsrep_convert_lock_to_trx;
 ERROR HY000: Variable 'wsrep_convert_LOCK_to_trx' is a GLOBAL variable
 SET @@global.wsrep_convert_lock_to_trx=OFF;
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_convert_lock_to_trx;
 @@global.wsrep_convert_lock_to_trx
 0
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 SET @@global.wsrep_convert_lock_to_trx=ON;
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_convert_lock_to_trx;
 @@global.wsrep_convert_lock_to_trx
 1
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 
 # valid values
 SET @@global.wsrep_convert_lock_to_trx='OFF';
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_convert_lock_to_trx;
 @@global.wsrep_convert_lock_to_trx
 0
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 SET @@global.wsrep_convert_lock_to_trx=ON;
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_convert_lock_to_trx;
 @@global.wsrep_convert_lock_to_trx
 1
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 SET @@global.wsrep_convert_lock_to_trx=default;
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_convert_lock_to_trx;
 @@global.wsrep_convert_lock_to_trx
 0
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 
 # invalid values
 SET @@global.wsrep_convert_lock_to_trx=NULL;
@@ -42,4 +66,6 @@ ERROR 42000: Variable 'wsrep_convert_LOCK_to_trx' can't be set to the value of '
 
 # restore the initial value
 SET @@global.wsrep_convert_lock_to_trx = @wsrep_convert_lock_to_trx_global_saved;
+Warnings:
+Warning	1287	'@@wsrep_convert_LOCK_to_trx' is deprecated and will be removed in a future release.
 # End of test

@@ -991,26 +991,26 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var) {
   if (check_has_super(self, thd, var)) return true;
 
 #ifdef WITH_WSREP
-
-  bool block = false;
-
   bool stmt_or_mixed =
       (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
        var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED);
 
-  if (WSREP(thd) && stmt_or_mixed && var->type == OPT_GLOBAL) {
-    /* Toggline binlog-format at GLOBAL level to MIXED/STATEMENT
-    is not allowed. pxc-string-mode check will be evaluated
-    only for SESSION level setting. */
+  if (WSREP(thd) && stmt_or_mixed &&
+      (var->type == OPT_GLOBAL || var->type == OPT_SESSION))
+  {
+    /* Setting binlog format to MIXED/STATEMENT is not allowed. */
     WSREP_ERROR(
         "Percona-XtraDB-Cluster prohibits setting"
-        " binlog_format to STATEMENT or MIXED at global level");
+        " binlog_format to STATEMENT or MIXED");
     my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
              var->save_result.ulonglong_value == BINLOG_FORMAT_STMT
                  ? "STATEMENT"
                  : "MIXED");
     return true;
   }
+
+#if 0
+  bool block = false;
 
   /* pxc-strict-mode enforcement. */
   if (WSREP(thd)) {
@@ -1051,6 +1051,7 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var) {
   }
 
   if (block) return block;
+#endif /* 0 */
 #endif /* WITH_WSREP */
 
   if (var->type == OPT_GLOBAL || var->type == OPT_PERSIST) {
