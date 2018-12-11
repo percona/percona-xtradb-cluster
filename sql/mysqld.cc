@@ -3445,6 +3445,42 @@ int init_common_variables()
     pxc_strict_mode= PXC_STRICT_MODE_DISABLED;
   }
 
+  /* wsrep_preordered is not more needed now that performance has been
+  fixed in PXC-5.7. So PXC can immediately replicate the events that it get
+  from async replication queue w/o causing significant increase in
+  replication lag. */
+  if (wsrep_preordered_opt)
+  {
+    WSREP_WARN("wsrep_preordered has been deprecated and will be removed"
+               " in future release");
+  }
+
+  if (wsrep_drupal_282555_workaround)
+  {
+    WSREP_WARN("wsrep_drupal_282555_workaround has been deprecated and will be"
+               " removed in future release");
+  }
+
+  if (wsrep_forced_binlog_format != BINLOG_FORMAT_UNSPEC)
+  {
+    WSREP_WARN("wsrep_forced_binlog_format has been deprecated and will be"
+               " removed in future release");
+  }
+
+  if (wsrep_convert_LOCK_to_trx)
+  {
+    WSREP_WARN("wsrep_convert_LOCK_to_trx has been deprecated and will be"
+               " removed in future release");
+  }
+
+  const char* WSREP_SST_MYSQLDUMP= "mysqldump";
+  if (!strcmp (wsrep_sst_method, WSREP_SST_MYSQLDUMP))
+  {
+    WSREP_WARN("Percona-XtraDB-Cluster has deprecated SST through mysqldump."
+               " Percona-XtraDB-Cluster recommends using xtrabackup."
+               " Please switch to use xtrabackup or rsync.");
+  }
+
   /* Validate if server initial settings are pxc-strict-mode compatible.*/
 
   /* wsrep_replicate_myisam (recommended value = OFF) */
@@ -3526,13 +3562,6 @@ int init_common_variables()
     return 1;
   }
 
-  const char* WSREP_SST_MYSQLDUMP= "mysqldump";
-  if (wsrep_provider_loaded && !strcmp (WSREP_SST_MYSQLDUMP, wsrep_sst_method))
-  {
-    WSREP_WARN("Percona-XtraDB-Cluster has deprecated SST through mysqldump."
-               " Percona-XtraDB-Cluster recommends using xtrabackup."
-               " Please switch to use xtrabackup or rsync.");
-  }
 #endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP

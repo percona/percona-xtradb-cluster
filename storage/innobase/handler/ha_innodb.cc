@@ -24371,6 +24371,10 @@ innobase_disallow_writes_update(
 						variable */
 	const void*		save)		/* in: temporary storage */
 {
+	ib::warn() << "innodb_disallow_writes has been deprecated and will be"
+                      " removed in future release. Consider using read_only"
+                      " instead.";
+
 	*(my_bool*)var_ptr = *(my_bool*)save;
 	ut_a(srv_allow_writes_event);
 	if (*(my_bool*)var_ptr)
@@ -24384,6 +24388,7 @@ static MYSQL_SYSVAR_BOOL(disallow_writes, innobase_disallow_writes,
   "Tell InnoDB to stop any writes to disk",
   NULL, innobase_disallow_writes_update, FALSE);
 #endif /* WITH_INNODB_DISALLOW_WRITES */
+
 static MYSQL_SYSVAR_BOOL(random_read_ahead, srv_random_read_ahead,
   PLUGIN_VAR_NOCMDARG,
   "Whether to use read ahead for random access within an extent.",
