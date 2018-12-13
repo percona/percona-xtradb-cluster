@@ -1,0 +1,9 @@
+# parallel+compact+progressfile+time
+[xtrabackup]
+parallel=4
+compact
+
+[sst]
+time=1
+streamfmt=xbstream
+progress=/tmp/progress1-conf6.log

@@ -249,57 +249,63 @@ dberr_t row_lock_table_autoinc_for_mysql(
 /** Sets a table lock on the table mentioned in prebuilt.
 @param[in,out]	prebuilt	table handle
 @return error code or DB_SUCCESS */
+#ifdef WITH_WSREP
+dberr_t row_lock_table(row_prebuilt_t *prebuilt, dict_table_t *table = NULL,
+                       enum lock_mode mode = lock_mode(LOCK_IS));
+#else
 dberr_t row_lock_table(row_prebuilt_t *prebuilt);
+#endif /* WITH_WSREP */
 
-/** Does an insert for MySQL.
-@param[in]	mysql_rec	row in the MySQL format
-@param[in,out]	prebuilt	prebuilt struct in MySQL handle
-@return error code or DB_SUCCESS*/
-dberr_t row_insert_for_mysql(const byte *mysql_rec, row_prebuilt_t *prebuilt)
-    MY_ATTRIBUTE((warn_unused_result));
+  /** Does an insert for MySQL.
+  @param[in]	mysql_rec	row in the MySQL format
+  @param[in,out]	prebuilt	prebuilt struct in MySQL handle
+  @return error code or DB_SUCCESS*/
+  dberr_t row_insert_for_mysql(const byte *mysql_rec, row_prebuilt_t *prebuilt)
+      MY_ATTRIBUTE((warn_unused_result));
 
-/** Builds a dummy query graph used in selects. */
-void row_prebuild_sel_graph(
-    row_prebuilt_t *prebuilt); /*!< in: prebuilt struct in MySQL
-                               handle */
-/** Gets pointer to a prebuilt update vector used in updates. If the update
- graph has not yet been built in the prebuilt struct, then this function
- first builds it.
- @return prebuilt update vector */
-upd_t *row_get_prebuilt_update_vector(
-    row_prebuilt_t *prebuilt); /*!< in: prebuilt struct in MySQL
-                               handle */
-/** Checks if a table is such that we automatically created a clustered
- index on it (on row id).
- @return true if the clustered index was generated automatically */
-ibool row_table_got_default_clust_index(
-    const dict_table_t *table); /*!< in: table */
+  /** Builds a dummy query graph used in selects. */
+  void row_prebuild_sel_graph(row_prebuilt_t *
+                              prebuilt); /*!< in: prebuilt struct in MySQL
+                                         handle */
+  /** Gets pointer to a prebuilt update vector used in updates. If the update
+   graph has not yet been built in the prebuilt struct, then this function
+   first builds it.
+   @return prebuilt update vector */
+  upd_t *row_get_prebuilt_update_vector(row_prebuilt_t *
+                                        prebuilt); /*!< in: prebuilt struct in
+                                                   MySQL handle */
+  /** Checks if a table is such that we automatically created a clustered
+   index on it (on row id).
+   @return true if the clustered index was generated automatically */
+  ibool row_table_got_default_clust_index(
+      const dict_table_t *table); /*!< in: table */
 
-/** Does an update or delete of a row for MySQL.
-@param[in]	mysql_rec	row in the MySQL format
-@param[in,out]	prebuilt	prebuilt struct in MySQL handle
-@return error code or DB_SUCCESS */
-dberr_t row_update_for_mysql(const byte *mysql_rec, row_prebuilt_t *prebuilt)
-    MY_ATTRIBUTE((warn_unused_result));
+  /** Does an update or delete of a row for MySQL.
+  @param[in]	mysql_rec	row in the MySQL format
+  @param[in,out]	prebuilt	prebuilt struct in MySQL handle
+  @return error code or DB_SUCCESS */
+  dberr_t row_update_for_mysql(const byte *mysql_rec, row_prebuilt_t *prebuilt)
+      MY_ATTRIBUTE((warn_unused_result));
 
-/** Delete all rows for the given table by freeing/truncating indexes.
-@param[in,out]	table	table handler */
-void row_delete_all_rows(dict_table_t *table);
+  /** Delete all rows for the given table by freeing/truncating indexes.
+  @param[in,out]	table	table handler */
+  void row_delete_all_rows(dict_table_t * table);
 
-/** This can only be used when this session is using a READ COMMITTED or READ
-UNCOMMITTED isolation level.  Before calling this function
-row_search_for_mysql() must have initialized prebuilt->new_rec_locks to store
-the information which new record locks really were set. This function removes
-a newly set clustered index record lock under prebuilt->pcur or
-prebuilt->clust_pcur.  Thus, this implements a 'mini-rollback' that releases
-the latest clustered index record lock we set.
+  /** This can only be used when this session is using a READ COMMITTED or READ
+  UNCOMMITTED isolation level.  Before calling this function
+  row_search_for_mysql() must have initialized prebuilt->new_rec_locks to store
+  the information which new record locks really were set. This function removes
+  a newly set clustered index record lock under prebuilt->pcur or
+  prebuilt->clust_pcur.  Thus, this implements a 'mini-rollback' that releases
+  the latest clustered index record lock we set.
 
-@param[in,out]	prebuilt		prebuilt struct in MySQL handle
-@param[in]	has_latches_on_recs	TRUE if called so that we have the
-                                        latches on the records under pcur
-                                        and clust_pcur, and we do not need
-                                        to reposition the cursors. */
-void row_unlock_for_mysql(row_prebuilt_t *prebuilt, ibool has_latches_on_recs);
+  @param[in,out]	prebuilt		prebuilt struct in MySQL handle
+  @param[in]	has_latches_on_recs	TRUE if called so that we have the
+                                          latches on the records under pcur
+                                          and clust_pcur, and we do not need
+                                          to reposition the cursors. */
+  void row_unlock_for_mysql(row_prebuilt_t * prebuilt,
+                            ibool has_latches_on_recs);
 #endif /* !UNIV_HOTBACKUP */
 
 /** Checks if a table name contains the string "/#sql" which denotes temporary

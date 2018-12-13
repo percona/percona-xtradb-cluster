@@ -148,6 +148,11 @@
 #include "thr_lock.h"
 #include "thr_mutex.h"
 
+#ifdef WITH_WSREP
+/* Galera replication perfschema tables. */
+#include "storage/perfschema/table_pxc_cluster_view.h"
+#endif /* WITH_WSREP */
+
 /* clang-format off */
 /**
   @page PAGE_PFS_NEW_TABLE Implementing a new performance_schema table
@@ -666,6 +671,10 @@ static PFS_engine_table_share *all_shares[] = {
     &table_variables_info::m_share,
     &table_persisted_variables::m_share,
     &table_user_defined_functions::m_share,
+
+#ifdef WITH_WSREP
+    &table_pxc_cluster_view::m_share,
+#endif /* WITH_WSREP */
 
     NULL};
 

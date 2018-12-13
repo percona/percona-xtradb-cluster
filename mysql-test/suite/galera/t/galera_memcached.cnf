@@ -1,0 +1,8 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.1]
+loose-daemon-memcached-option="-p11017"
+
+[mysqld.2]
+loose-daemon-memcached-option="-p11211"
+

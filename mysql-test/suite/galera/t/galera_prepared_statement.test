@@ -1,0 +1,62 @@
+#
+# A simple test for PREPARE / EXECUTE -style prepared statements with Galera
+#
+# C-API-level prepared-statements can not be triggered from inside mysqltest, however
+# can be exercised when running an MTR test suite with the --ps-protocol switch.
+#
+
+--source include/galera_cluster.inc
+
+CREATE TABLE t1 (f1 CHAR(5)) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 CHAR(5)) ENGINE=InnoDB;
+CREATE TABLE t3 (f1 CHAR(5)) ENGINE=InnoDB;
+CREATE TABLE t4 (f1 CHAR(5)) ENGINE=InnoDB;
+
+SET SESSION sql_mode=DEFAULT;
+
+PREPARE st1 FROM 'INSERT INTO t1 VALUES ("abc")';
+PREPARE st2 FROM 'INSERT INTO t2 VALUES ("abc")';
+PREPARE st3 FROM 'INSERT INTO t3 VALUES ("abc")';
+PREPARE st4 FROM 'INSERT INTO t4 VALUES ("abc")';
+
+EXECUTE st1;
+EXECUTE st2;
+EXECUTE st3;
+EXECUTE st4;
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1;
+SELECT COUNT(*) = 1 FROM t2;
+SELECT COUNT(*) = 1 FROM t3;
+SELECT COUNT(*) = 1 FROM t4;
+
+ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+ALTER TABLE t1 DROP COLUMN f1;
+
+--connection node_1
+--error ER_TRUNCATED_WRONG_VALUE_FOR_FIELD
+EXECUTE st1;
+
+--connection node_1
+DROP TABLE t1;
+DROP TABLE t2;
+DROP TABLE t3;
+DROP TABLE t4;
+
+#
+# Re-executing of same prepare statement multiple times with DDL involved
+# causing TOI invocation.
+#
+--connection node_2
+call mtr.add_suppression("Slave SQL: Error 'Table 'v1' already exists' on .*");
+--connection node_1
+call mtr.add_suppression("Slave SQL: Error 'Table 'v1' already exists' on .*");
+#
+use test;
+create table t1 (i int key, j blob) engine=innodb;
+prepare stmt from "create view v1 as SELECT 1 b";
+execute stmt;
+--error ER_TABLE_EXISTS_ERROR
+execute stmt;
+drop view v1;
+drop table t1;

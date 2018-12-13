@@ -1,0 +1,36 @@
+#
+# Test behavior if the user attempts to use statement-based replication
+#
+# SBR is not currently supported but we expect that no crashes or binlog-related assertions will be triggered.
+# 
+
+--source include/have_log_bin.inc
+--source include/galera_cluster.inc
+
+--connection node_1
+# Not allowed in PXC
+--error ER_WRONG_VALUE_FOR_VAR
+SET GLOBAL binlog_format = 'STATEMENT';
+# Allowed only with warning
+--disable_warnings
+SET SESSION binlog_format = 'STATEMENT';
+--enable_warnings
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+--error ER_LOCK_DEADLOCK
+INSERT INTO t1 VALUES (1);
+
+--disable_warnings
+SET SESSION binlog_format = 'MIXED';
+--enable_warnings
+
+--error ER_LOCK_DEADLOCK
+INSERT INTO t1 VALUES (2);
+
+--connection node_2
+SELECT COUNT(*) = 0 FROM t1;
+
+DROP TABLE t1;
+
+--connection node_1
+SET SESSION binlog_format = 'ROW';

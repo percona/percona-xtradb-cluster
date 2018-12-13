@@ -53,6 +53,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "trx0trx.h"
 #include "trx0undo.h"
 
+#ifdef WITH_WSREP
+#include "ha_prototypes.h" /* wsrep_is_wsrep_xid() */
+#endif /* WITH_WSREP */
+
 /** The transaction system */
 trx_sys_t *trx_sys = NULL;
 
@@ -99,7 +103,12 @@ void trx_sys_flush_max_trx_id(void) {
   mtr_t mtr;
   trx_sysf_t *sys_header;
 
+#ifdef WITH_WSREP
+  /* wsrep_fake_trx_id  violates this assert
+  Copied from trx_sys_get_new_trx_id */
+#else
   ut_ad(trx_sys_mutex_own());
+#endif /* !WITH_WSREP */
 
   if (!srv_read_only_mode) {
     mtr_start(&mtr);
@@ -122,9 +131,19 @@ void trx_sys_update_mysql_binlog_offset(
     int64_t offset,        /*!< in: position in that log file */
     ulint field,           /*!< in: offset of the MySQL log info field in
                            the trx sys header */
+#ifdef WITH_WSREP
+    trx_sysf_t *sys_header, /*!< in: trx sys header */
+#endif /* WITH_WSREP */
     mtr_t *mtr)            /*!< in: mtr */
 {
+
+#ifdef WITH_WSREP
+  /* passed as param so ignore declaring. */
+  // TODO: what happens if initiate it here than passing it.
+#else
   trx_sysf_t *sys_header;
+#endif /* WITH_WSREP */
+
 
   if (ut_strlen(file_name) >= TRX_SYS_MYSQL_LOG_NAME_LEN) {
     /* We cannot fit the name to the 512 bytes we have reserved */
@@ -132,7 +151,10 @@ void trx_sys_update_mysql_binlog_offset(
     return;
   }
 
+#ifdef WITH_WSREP
+#else
   sys_header = trx_sysf_get(mtr);
+#endif /* WITH_WSREP */
 
   if (mach_read_from_4(sys_header + field + TRX_SYS_MYSQL_LOG_MAGIC_N_FLD) !=
       TRX_SYS_MYSQL_LOG_MAGIC_N) {
@@ -207,6 +229,135 @@ page_no_t trx_sysf_rseg_find_page_no(ulint rseg_id) {
 
   return (page_no);
 }
+
+#ifdef WITH_WSREP
+
+static long long trx_sys_cur_xid_seqno = -1;
+static unsigned char trx_sys_cur_xid_uuid[16];
+
+long long read_wsrep_xid_seqno(const XID *xid) {
+  // TODO: replace this with XID provided functions.
+  long long seqno;
+  memcpy(&seqno, xid->get_data() + 24, sizeof(long long));
+  return seqno;
+}
+
+void read_wsrep_xid_uuid(const XID *xid, unsigned char *buf) {
+  // TODO: replace this with XID provided functions.
+  memcpy(buf, xid->get_data() + 8, 16);
+}
+
+void trx_sys_update_wsrep_checkpoint(
+    const XID *xid,         /*!< in: transaction XID */
+    trx_sysf_t *sys_header, /*!< in: sys_header */
+    mtr_t *mtr,             /*!< in: mtr */
+    bool recovery)          /*!< in: running recovery */
+{
+#ifndef UNIV_DEBUG
+  if (recovery)
+#endif /* !UNIV_DEBUG */
+  {
+    /* Check that seqno is monotonically increasing */
+    unsigned char xid_uuid[16];
+    long long xid_seqno = read_wsrep_xid_seqno(xid);
+    read_wsrep_xid_uuid(xid, xid_uuid);
+    if (!memcmp(xid_uuid, trx_sys_cur_xid_uuid, 8)) {
+      if (recovery) {
+        /* When recovery happens prepare transactions
+        are revived based on undo-log entries in InnoDB.
+        This order may not match with the commit order
+        logged to binlog.
+        Sequence matching is not needed for MySQL
+        as standalone. Aim is to just ensure that all
+        prepare stage transaction are marked as committed.
+        But in PXC the commit order of recover transaction
+        should be same as it would be if transaction are running
+        normally or we need to ensure that only the latest seen
+        xid is updated and persisted as wsrep recover position
+        co-ordinates. */
+        if (xid_seqno > trx_sys_cur_xid_seqno)
+          trx_sys_cur_xid_seqno = xid_seqno;
+        else
+          return;
+      } else {
+        /* DDL transaction are committed twice now.
+        Once through trans_commit_stmt and then through galera checkpoint.
+        But not all DDL are atomic so we continue to have both persist point */
+        ut_ad(xid_seqno >= trx_sys_cur_xid_seqno);
+        trx_sys_cur_xid_seqno = xid_seqno;
+      }
+    } else {
+      memcpy(trx_sys_cur_xid_uuid, xid_uuid, 16);
+      trx_sys_cur_xid_seqno = xid_seqno;
+    }
+  }
+
+  ut_ad(xid && mtr && sys_header);
+  ut_a(xid->get_format_id() == -1 || wsrep_is_wsrep_xid(xid));
+
+  if (mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO +
+                       TRX_SYS_WSREP_XID_MAGIC_N_FLD) !=
+      TRX_SYS_WSREP_XID_MAGIC_N) {
+    mlog_write_ulint(
+        sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_MAGIC_N_FLD,
+        TRX_SYS_WSREP_XID_MAGIC_N, MLOG_4BYTES, mtr);
+  }
+
+  mlog_write_ulint(
+      sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_FORMAT,
+      (int)xid->get_format_id(), MLOG_4BYTES, mtr);
+  mlog_write_ulint(
+      sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_GTRID_LEN,
+      (int)xid->get_gtrid_length(), MLOG_4BYTES, mtr);
+  mlog_write_ulint(
+      sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_BQUAL_LEN,
+      (int)xid->get_bqual_length(), MLOG_4BYTES, mtr);
+  mlog_write_string(
+      sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_DATA,
+      (const unsigned char *)xid->get_data(), XIDDATASIZE, mtr);
+}
+
+void trx_sys_read_wsrep_checkpoint(XID *xid)
+/*===================================*/
+{
+  trx_sysf_t *sys_header;
+  mtr_t mtr;
+  ulint magic;
+
+  ut_ad(xid);
+
+  mtr_start(&mtr);
+
+  sys_header = trx_sysf_get(&mtr);
+
+  if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO +
+                                TRX_SYS_WSREP_XID_MAGIC_N_FLD)) !=
+      TRX_SYS_WSREP_XID_MAGIC_N) {
+    memset(xid, 0, sizeof(*xid));
+    xid->set_format_id(-1);
+    trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
+    mtr_commit(&mtr);
+    return;
+  }
+
+  /* Make sure we first load it to int32_t so the sign bit is preserved.*/
+  int32_t format_id = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO +
+                                       TRX_SYS_WSREP_XID_FORMAT);
+  xid->set_format_id(format_id);
+
+  xid->set_gtrid_length(mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO +
+                                         TRX_SYS_WSREP_XID_GTRID_LEN));
+
+  xid->set_bqual_length(mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO +
+                                         TRX_SYS_WSREP_XID_BQUAL_LEN));
+
+  xid->set_data(sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_DATA,
+                XIDDATASIZE);
+
+  mtr_commit(&mtr);
+}
+
+#endif /* WITH_WSREP */
 
 /** Look for a free slot for a rollback segment in the trx system file copy.
 @param[in,out]	mtr		mtr

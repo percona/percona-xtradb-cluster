@@ -1,0 +1,156 @@
+#
+# SHOW commands no longer obey wsrep_sync_wait = 1 (WSREP_SYNC_WAIT_BEFORE_READ)
+# (they do not wait for the background INSERT in the applier in node_2 to
+# complete)
+#
+--source include/galera_cluster.inc
+--source include/have_binlog_format_row.inc
+--source include/have_debug_sync.inc
+
+--connection node_2
+# Make sure no signals have been leftover from previous tests to surprise us.
+SELECT @@debug_sync;
+
+SET SESSION wsrep_sync_wait = 1;
+SET GLOBAL debug = "+d,sync.wsrep_apply_cb";
+
+--connection node_1
+CREATE TABLE t_wait1 (f1 INTEGER) ENGINE=InnoDB;
+# This will complete in node_1 but will start a background apply in node_2
+# which will stop because of sync.wsrep_apply_cb we set above.
+INSERT INTO t_wait1 VALUES (1);
+
+--connection node_2
+
+SET SESSION debug_sync = "now WAIT_FOR sync.wsrep_apply_cb_reached";
+
+--disable_result_log
+
+SHOW BINARY LOGS;
+
+SHOW BINLOG EVENTS;
+
+--error ER_NO_SUCH_TABLE
+SHOW COLUMNS FROM t1;
+
+--error ER_EVENT_DOES_NOT_EXIST
+SHOW CREATE EVENT e1;
+
+--error ER_SP_DOES_NOT_EXIST
+SHOW CREATE FUNCTION f1;
+
+--error ER_SP_DOES_NOT_EXIST
+SHOW CREATE PROCEDURE p1;
+
+--error ER_NO_SUCH_TABLE
+SHOW CREATE TABLE t1;
+
+--error ER_TRG_DOES_NOT_EXIST
+SHOW CREATE TRIGGER tr1;
+
+--error ER_NO_SUCH_TABLE
+SHOW CREATE VIEW v1;
+
+SHOW DATABASES;
+
+SHOW ENGINE InnoDB STATUS;
+
+--error ER_SP_DOES_NOT_EXIST
+SHOW FUNCTION CODE f1;
+
+SHOW FUNCTION STATUS;
+
+SHOW GRANTS FOR 'root'@'localhost';
+
+--error ER_NO_SUCH_TABLE
+SHOW INDEX FROM t1;
+
+SHOW OPEN TABLES;
+
+--error ER_SP_DOES_NOT_EXIST
+SHOW PROCEDURE CODE p1;
+
+SHOW PROCEDURE STATUS;
+
+SHOW PRIVILEGES;
+
+SHOW STATUS LIKE 'wsrep_cluster_size';
+
+SHOW TABLE STATUS;
+
+SHOW TABLES;
+
+SHOW TRIGGERS;
+
+SHOW GLOBAL VARIABLES LIKE 'foo_bar';
+
+--error 0
+SHOW WARNINGS;
+
+--enable_result_log
+
+# Unblock the background INSERT and remove the sync point.
+SET GLOBAL debug = "-d,sync.wsrep_apply_cb";
+SET SESSION debug_sync = "now SIGNAL signal.wsrep_apply_cb";
+
+SET SESSION wsrep_sync_wait = default;
+
+# This will wait for the background INSERT to complete before we quit
+# from the test.
+DROP TABLE t_wait1;
+
+#----
+# Additional PXC test - See Jira PXC-2061
+# This tests to see if a SELECT (with wsrep_sync_wait=1) waits until
+# the transaction has been applied.
+#----
+--let $show_rpl_debug_info = 0
+
+--connection node_2
+--let $wsrep_provider_options_saved = `SELECT @@wsrep_provider_options`
+SET GLOBAL wsrep_provider_options = 'repl.causal_read_timeout=PT0.5S';
+
+
+--connection node_1
+--echo # Node 1
+CREATE TABLE t1(id INT PRIMARY KEY);
+
+--connection node_2
+--echo # Node 2 : block at the point right after we have left the commit monitor
+--let $galera_sync_point = sync.applier_interim_commit.after_commit_leave
+--source include/galera_set_sync_point.inc
+
+--connection node_1
+--echo # Node 1 : Perform the insert. This will succeed on node1 but will block on node2
+INSERT INTO t1 VALUES(1);
+
+--connection node_2
+--echo # Node 2 : Wait for the commit point
+SET SESSION wsrep_sync_wait = 0;
+--source include/galera_wait_sync_point.inc
+SET SESSION wsrep_sync_wait = 1;
+
+# This should timeout since we are waiting for the apply monitor to clear
+--echo # Node 2 : try a SELECT, this should timeout
+--error ER_LOCK_WAIT_TIMEOUT
+SELECT COUNT(*) FROM t1;
+
+--echo # Node 2 : Unblock the commit point
+--source include/galera_clear_sync_point.inc
+--source include/galera_signal_sync_point.inc
+
+#--echo # Node 2 : run the query
+# This should return after the INSERT has been applied
+SELECT COUNT(*) FROM t1;
+
+--connection node_2
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = "$wsrep_provider_options_saved";
+--enable_query_log
+SET SESSION wsrep_sync_wait = default;
+DROP TABLE t1;
+
+
+
+# Make sure no pending signals are leftover to surprise subsequent tests.
+SELECT @@debug_sync;

@@ -1,0 +1,220 @@
+#!/bin/bash
+
+# Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+
+#
+# summary of how this script can be called:
+#        * <new-preinst> install
+#        * <new-preinst> install <old-version>
+#        * <new-preinst> upgrade <old-version>
+#        * <old-preinst> abort-upgrade <new-version>
+#
+
+set -e
+
+. /usr/share/debconf/confmodule
+
+if [ -n "$DEBIAN_SCRIPT_DEBUG" ]; then set -v -x; DEBIAN_SCRIPT_TRACE=1; fi
+${DEBIAN_SCRIPT_TRACE:+ echo "#42#DEBUG# RUNNING $0 $*" 1>&2 }
+
+export PATH=$PATH:/sbin:/usr/sbin:/bin:/usr/bin
+MYADMIN="/usr/bin/mysqladmin --defaults-file=/etc/mysql/debian.cnf"
+DATADIR=/var/lib/mysql
+LOGDIR=/var/log/mysql
+UPGRADEDIR=/var/lib/mysql-upgrade
+
+# To avoid having hardcoded paths in the script, we do a search on the path, as suggested at:
+# https://www.debian.org/doc/manuals/developers-reference/ch06.en.html#bpp-debian-maint-scripts
+pathfind() {
+  OLDIFS="$IFS"
+  IFS=:
+  for p in $PATH; do
+    if [ -x "$p/$*" ]; then
+      IFS="$OLDIFS"
+      return 0
+    fi
+  done
+  IFS="$OLDIFS"
+  return 1
+}
+
+# Choose the proper mechanism. Ubuntu 16.04 uses systemd but still provides invoke-rc.d,
+# so the existence of systemd must be checked first.
+invoke() {
+	if pathfind systemctl; then
+		systemctl $1 "@DEB_SYSTEMD_SERVICE_NAME@"
+	elif pathfind invoke-rc.d; then
+		invoke-rc.d mysql $1
+	else
+		/etc/init.d/mysql $1
+	fi
+}
+
+# Try to stop the server in a sane way. If it does not success let the admin
+# do it himself. No database directories should be removed while the server
+# is running! Another mysqld in e.g. a different chroot is fine for us.
+stop_server() {
+    if pathfind systemctl; then
+      if systemctl list-unit-files -t service | fgrep -q "@DEB_SYSTEMD_SERVICE_NAME@" ; then
+        :  # service is known, so stopping it makes sense
+      else
+        return 0  # we cannot stop what we do not know
+      fi
+    else
+      :   # no systemd?  let's try anyways
+    fi
+
+    set +e
+    invoke stop
+    errno=$?
+    set -e
+   
+    # 0=ok, 100=no init script (fresh install)
+    if [ "$errno" != 0 -a "$errno" != 100 ]; then
+      echo "${cmd/ */} returned $errno" 1>&2
+      echo "There is a MySQL server running, but we failed in our attempts to stop it." 1>&2
+      echo "Stop it yourself and try again!" 1>&2
+      db_stop  	
+      exit 1
+    fi
+}
+
+################################ main() ##########################
+
+this_version=5.7
+
+# Abort if an NDB cluster is in use.
+if egrep -qi -r '^[^#]*ndb.connectstring|^[[:space:]]*\[[[:space:]]*ndb_mgmd' /etc/mysql/; then
+  db_fset mysql-@DEB_PRODUCTNAME@-server/no_upgrade_when_using_ndb seen false || true
+  db_input high mysql-@DEB_PRODUCTNAME@-server/no_upgrade_when_using_ndb || true
+  db_go
+  db_stop
+  exit 1
+fi
+
+# Abort if skip-bdb option is enabled, required for 5.0 -> 5.1 upgrades.
+#TODO
+
+# Safe the user from stupidities.
+show_downgrade_warning=0
+for i in `ls $DATADIR/debian-*.flag 2>/dev/null`; do
+  found_version=`echo $i | sed 's/.*debian-\([0-9\.]\+\).flag/\1/'`
+  if dpkg --compare-versions "$this_version" '<<' "$found_version"; then
+    show_downgrade_warning=1
+    break;
+  fi
+done
+if [ "$show_downgrade_warning" = 1 ]; then
+  db_fset mysql-@DEB_PRODUCTNAME@-server/really_downgrade seen false || true
+  db_input medium mysql-@DEB_PRODUCTNAME@-server/really_downgrade || true
+  db_go
+  db_get mysql-@DEB_PRODUCTNAME@-server/really_downgrade || true
+  if [ "$RET" = "true" ]; then
+    rm -f $DATADIR/debian-*.flag
+    touch $DATADIR/debian-$this_version.flag
+  else
+    echo "Aborting downgrade from (at least) $found_version to $this_version." 1>&2
+    echo "If are sure you want to downgrade to $this_version, remove the file" 1>&2
+    echo "$DATADIR/debian-*.flag and try installing again." 1>&2
+    db_stop
+    exit 1
+  fi
+fi
+
+# to be sure
+stop_server
+
+# If we use NIS then errors should be tolerated. It's up to the
+# user to ensure that the mysql user is correctly setup.
+# Beware that there are two ypwhich one of them needs the 2>/dev/null!
+if test -n "`which ypwhich 2>/dev/null`"  &&  ypwhich >/dev/null 2>&1; then
+  set +e
+fi
+
+#
+# Now we have to ensure the following state:
+# /etc/passwd: mysql:x:100:101:MySQL Server:/nonexistent:/bin/false
+# /etc/group:  mysql:x:101:
+# 
+# Sadly there could any state be present on the system so we have to
+# modify everything carefully i.e. not doing a chown before creating
+# the user etc...
+#
+
+# creating mysql group if he isn't already there
+if ! getent group mysql >/dev/null; then
+ 	# Adding system group: mysql.
+	addgroup --system mysql >/dev/null
+fi
+
+# creating mysql user if he isn't already there
+if ! getent passwd mysql >/dev/null; then
+	# Adding system user: mysql.
+	adduser \
+	  --system \
+          --disabled-login \
+	  --ingroup mysql \
+	  --no-create-home \
+	  --home /nonexistent \
+	  --gecos "MySQL Server" \
+	  --shell /bin/false \
+	  mysql  >/dev/null
+fi
+
+# end of NIS tolerance zone
+set -e
+
+# if there's a symlink, let's store where it's pointing, because otherwise
+# it's going to be lost in some situations
+for dir in DATADIR LOGDIR; do
+    checkdir=`eval echo "$"$dir`
+    if [ -L "$checkdir" ]; then
+	mkdir -p "$UPGRADEDIR"
+	cp -d "$checkdir" "$UPGRADEDIR/$dir.link"
+    fi
+done
+
+# creating mysql home directory
+if [ ! -d $DATADIR -a ! -L $DATADIR ]; then
+ 	mkdir $DATADIR
+fi
+
+# checking disc space
+if LC_ALL=C BLOCKSIZE= df --portability $DATADIR/. | tail -n 1 | awk '{ exit ($4>1000) }'; then
+  echo "ERROR: There's not enough space in $DATADIR/" 1>&2
+  db_stop
+  exit 1
+fi
+
+# Since the home directory was created before putting the user into
+# the mysql group and moreover we cannot guarantee that the 
+# permissions were correctly *before* calling this script, we fix them now.
+# In case we use NIS and no mysql user is present then this script should
+# better fail now than later..
+# The "set +e" is necessary as e.g. a ".journal" of a ext3 partition is
+# not chgrp'able (#318435).
+set +e
+chown mysql:mysql $DATADIR
+find $DATADIR -follow -not -group mysql -print0 2>/dev/null \
+  | xargs -0 --no-run-if-empty chgrp mysql
+set -e
+
+
+db_stop
+
+#DEBHELPER#
+
+exit 0

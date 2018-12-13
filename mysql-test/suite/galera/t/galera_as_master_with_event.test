@@ -1,0 +1,90 @@
+#
+# Test Galera as a master to a MySQL slave
+#
+# The galera/galera_2node_as_master_with_event.cnf describes the setup of the nodes
+#
+
+--source include/have_log_bin.inc
+--source include/galera_cluster.inc
+--source include/big_test.inc
+
+#
+# connect to async slave and start replication.
+--connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+use test;
+--replace_regex /MASTER_PORT=[0-9]{1,5}/MASTER_PORT=<PORT>/
+--eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+START SLAVE USER='root';
+--sleep 1
+
+--connection node_1
+--echo #node-1
+select @@server_id;
+#
+# create base table for firing events.
+use mysql;
+create table t (i int auto_increment, primary key pk(i)) engine=innodb;
+insert into t values (NULL);
+--replace_regex /[0-9]+/NUMBER_OF_ROWS/
+select count(*) from mysql.t;
+#
+use test;
+--replace_column 8 # 9 #
+show events;
+create event foo on schedule every 1 minute do insert into mysql.t values (NULL);
+--replace_column 8 # 9 #
+show events;
+--replace_regex /[0-9]+/NUMBER_OF_ROWS/
+select count(*) from mysql.t;
+
+--connection node_2
+--echo #node-2
+select @@server_id;
+#
+--replace_column 8 # 9 #
+show events;
+
+#
+# switch master from node-1 to node-2
+--connection node_3
+--echo #async-slave
+select @@server_id;
+#
+--replace_column 8 # 9 #
+show events;
+# check if replication has already started.
+--replace_regex /[0-9]+/NUMBER_OF_ROWS/
+select count(*) from mysql.t;
+STOP SLAVE;
+--replace_regex /MASTER_PORT=[0-9]{1,5}/MASTER_PORT=<PORT>/
+--eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_2;
+START SLAVE USER='root';
+--sleep 1
+
+#
+# restart should cause re-connection of async slave once node-2 is up
+--connection node_2
+--echo #node-2
+--source include/restart_mysqld.inc
+--replace_column 8 # 9 #
+show events;
+use mysql;
+drop table t;
+
+--connection node_3
+--echo #async-slave
+--sleep 90
+--error ER_NO_SUCH_TABLE
+show create table mysql.t;
+
+--connection node_1
+--echo #node-1
+use test;
+drop event foo;
+
+--connection node_3
+# replication lag
+--sleep 1
+STOP SLAVE;
+RESET SLAVE ALL;
+

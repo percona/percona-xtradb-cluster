@@ -1,0 +1,11 @@
+# stream-compress + encrypt3 + compact + parallel
+# v2only
+[xtrabackup]
+compact
+parallel=4
+
+[sst]
+compressor="gzip"
+encrypt=3
+tkey=/tmp/certs/node1.key
+tcert=/tmp/certs/node1.pem

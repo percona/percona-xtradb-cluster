@@ -46,8 +46,20 @@ void thd_unlock_thread_count();
 
 class Do_THD_Impl {
  public:
+#ifdef WITH_WSREP
+  /* We add this empty constructor and defne it in .cc file
+  just to avoid gcc-4.4.7 to overoptimize this class in release
+  mode that causes gcc to call pure-virtual function for operator()
+  instead of derive class function. This is compiler bug observed
+  only with Red-Hat shipped compiler and is fixed in gcc-4.8+ for sure. */
+  Do_THD_Impl();
+#endif /* WITH_WSREP */
   virtual ~Do_THD_Impl() {}
   virtual void operator()(THD *) = 0;
+#ifdef WITH_WSREP
+  virtual void reset() {}
+  virtual bool done(int) { return (true); }
+#endif /* WITH_WSREP */
 };
 
 /**
@@ -214,6 +226,22 @@ class Global_THD_manager {
     In other words, get_thd_count() to become zero.
   */
   void wait_till_no_thd();
+
+#ifdef WITH_WSREP
+  /**
+    Waits until total wsrep thd count fails below the set threshold.
+    wsrep thd to considered is filtered using func functor.
+  */
+  // void wait_till_wsrep_thd_eq(Do_THD_Impl *func, int count);
+
+  /**
+    Returns total number of THD for which operator() returns true.
+    @param func Object of class which overrides operator()
+    @return THD
+      @retval count Matching THD
+  */
+  int count_if_thd(Find_THD_Impl *func);
+#endif /* WITH_WSREP */
 
   /**
     This function calls func() for all THDs in every thd list partition

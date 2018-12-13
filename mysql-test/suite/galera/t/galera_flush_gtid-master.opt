@@ -1,0 +1,1 @@
+--query_cache_type=1 --query_cache_size=1000000 --gtid-mode=ON --log-bin --log-slave-updates --enforce-gtid-consistency --innodb_track_changed_pages=1

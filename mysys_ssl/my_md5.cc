@@ -68,3 +68,44 @@ int compute_md5_hash(char *digest, const char *buf, int len) {
   }
   return retval;
 }
+
+#ifdef WITH_WSREP
+
+/* Percona Server (in turn PXC) is build with OpenSSL.
+Leave Yassl code for merge compatibility. */
+
+/* For certification we need to identify each row uniquely.
+Generally this is done using PK but if table is created w/o PK
+then a md5-hash (16 bytes) string is generated using the complete record.
+Following functions act as helper function in generation of this md5-hash. */
+
+void *wsrep_md5_init() {
+#if defined(HAVE_YASSL)
+  TaoCrypt::MD5 *hasher = new TaoCrypt::MD5;
+  return (void *)hasher;
+#elif defined(HAVE_OPENSSL)
+  MD5_CTX *ctx = new MD5_CTX();
+  MD5_Init(ctx);
+  return (void *)ctx;
+#endif /* HAVE_YASSL */
+}
+
+void wsrep_md5_update(void *ctx, char *buf, int len) {
+#if defined(HAVE_YASSL)
+  ((TaoCrypt::MD5 *)ctx)->Update((TaoCrypt::byte *)buf, len);
+#elif defined(HAVE_OPENSSL)
+  MD5_Update((MD5_CTX *)(ctx), buf, len);
+#endif /* HAVE_YASSL */
+}
+
+void wsrep_compute_md5_hash(char *digest, void *ctx) {
+#if defined(HAVE_YASSL)
+  ((TaoCrypt::MD5 *)ctx)->Final((TaoCrypt::byte *)digest);
+  delete (TaoCrypt::MD5 *)ctx;
+#elif defined(HAVE_OPENSSL)
+  MD5_Final((unsigned char *)digest, (MD5_CTX *)ctx);
+  delete (MD5_CTX *)ctx;
+#endif /* HAVE_YASSL */
+}
+
+#endif /* WITH_WSREP */

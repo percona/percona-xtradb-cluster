@@ -55,6 +55,11 @@
 #include "sql/system_variables.h"
 #include "sql/table.h"
 
+#ifdef WITH_WSREP
+#include "sql_parse.h"
+#include "sql/sql_lex.h"
+#endif /* WITH_WSREP */
+
 /**
   Reload/resets privileges and the different caches.
 
@@ -193,6 +198,9 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
   */
   if (options & (REFRESH_TABLES | REFRESH_READ_LOCK)) {
     if ((options & REFRESH_READ_LOCK) && thd) {
+#ifdef WITH_WSREP
+      bool own_lock;
+#endif /* WITH_WSREP */
       /*
         On the first hand we need write lock on the tables to be flushed,
         on the other hand we must not try to aspire a global read lock
@@ -208,7 +216,14 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
         UNLOCK TABLES
       */
       tmp_write_to_binlog = 0;
+
+#ifdef WITH_WSREP
+      if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+        return 1;  // Killed
+#else
       if (thd->global_read_lock.lock_global_read_lock(thd)) return 1;  // Killed
+#endif /* WITH_WSREP */
+
       if (close_cached_tables(thd, tables,
                               ((options & REFRESH_FAST) ? false : true),
                               thd->variables.lock_wait_timeout)) {
@@ -223,9 +238,28 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
               thd))  // Killed
       {
         /* Don't leave things in a half-locked state */
+
+#ifdef WITH_WSREP
+        if (own_lock) thd->global_read_lock.unlock_global_read_lock(thd);
+#else
         thd->global_read_lock.unlock_global_read_lock(thd);
+#endif /* WITH_WSREP */
+
         return 1;
       }
+
+#ifdef WITH_WSREP
+      /*
+        We need to do it second time after wsrep appliers were blocked in
+        make_global_read_lock_block_commit(thd) above since they could have
+        modified the tables too.
+      */
+      if (WSREP(thd) &&
+          close_cached_tables(thd, tables,
+                              (options & REFRESH_FAST) ? false : true, true))
+        result = 1;
+#endif /* WITH_WSREP */
+
     } else {
       if (thd && thd->locked_tables_mode) {
         /*
@@ -261,6 +295,57 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
         }
       }
 
+#ifdef WITH_WSREP
+      if (WSREP(thd) && !thd->lex->no_write_to_binlog &&
+          (options & REFRESH_TABLES) &&
+          !(options & (REFRESH_FOR_EXPORT | REFRESH_READ_LOCK))) {
+        /*
+          This is done here because LOCK TABLES is not replicated in galera,
+          the upgrade of which is checked above.  Hence, done after/if we
+          are able to upgrade locks.
+
+          Also, note that, in error log with debug you may see
+          'thread holds MDL locks at TI' but since this is a flush
+          tables and is required for LOCK TABLE WRITE
+          it can be ignored there.
+        */
+        if (tables) {
+          if (wsrep_to_isolation_begin(thd, NULL, NULL, tables)) {
+            result = 1;
+            goto cleanup;
+          }
+        } else if (wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+          result = 1;
+          goto cleanup;
+        }
+      }
+
+      if (thd && (thd->wsrep_applier || thd->slave_thread)) {
+        /*
+          In case of wsrep-applier/mysql-slave thread, do not wait for table
+          share(s) to be removed from table definition cache.
+
+          This is important otherwise it can lead to a deadlock in following
+          scenario:
+          * A parallel DML workload is being carried out on node-1
+          * FLUSH TABLE is executed on node-2 which is then replicated.
+            Applier applies this action on node-1. For doing this it register
+            it with galera eco-system and get a commit order seqno assigned.
+          * FLUSH TABLE will wait for TABLE SHARE count to drop to 0.
+          * This table share count can't drop to 0 till all DML are done.
+          * Take a case where-in a DML action entered galera post FLUSH TABLE
+            got its seqno assigned and then immediately went ahead and opened
+            the table. This thread will release TABLE SHARE only on commit.
+            But commit can't proceed as its seqno is > seqno of FLUSH TABLE.
+          * FLUSH TABLE continue to wait for TABLE SHARE count to drop to 0.
+          This all leads to DEADLOCK.
+          With REFRESH_FAST, FLUSH_TABLE thread will not wait for TABLE SHARE
+          count to drop to 0 and avoiding DEADLOCK.
+        */
+        options |= REFRESH_FAST;
+      }
+#endif /* WITH_WSREP */
+
       if (close_cached_tables(
               thd, tables, ((options & REFRESH_FAST) ? false : true),
               (thd ? thd->variables.lock_wait_timeout : LONG_TIMEOUT))) {
@@ -272,6 +357,9 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
       }
     }
   }
+#ifdef WITH_WSREP
+cleanup:
+#endif /* WITH_WSREP */
   if (options & REFRESH_HOSTS) hostname_cache_refresh();
   if (thd && (options & REFRESH_STATUS)) refresh_status();
   if (options & REFRESH_THREADS)

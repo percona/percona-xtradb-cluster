@@ -1001,12 +1001,22 @@ for this page size.
 @param[in]	page_size	Page Size to evaluate
 @return an associated page_size_shift if valid, 0 if invalid. */
 inline ulong page_size_validate(ulong page_size) {
+
+#ifdef WITH_WSREP
+  /* With a 4K page_size, Galera triggers an assert upon restart.
+  This is due to dependency offset that galera uses to persist wsrep
+  co-ordinates. Switch to use 16K till this is resolved. */
+  if (page_size == UNIV_PAGE_SIZE_ORIG) return (UNIV_PAGE_SIZE_SHIFT_ORIG);
+#else
+
   for (ulong n = UNIV_PAGE_SIZE_SHIFT_MIN; n <= UNIV_PAGE_SIZE_SHIFT_MAX; n++) {
     if (page_size == static_cast<ulong>(1 << n)) {
       return (n);
     }
   }
+#endif /* WITH_WSREP */
   return (0);
+
 }
 
 #ifdef UNIV_MATERIALIZE

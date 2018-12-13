@@ -1,0 +1,47 @@
+# Systemd service file for Percona XtraDB Cluster
+
+# This service file is to start PXC just with mysqld_safe
+# Usually in the non-bootstrapping case.
+
+# For bootstrapping or passing environment file
+# Refer to mysql@.service
+
+[Unit]
+Description=Percona XtraDB Cluster
+After=network.target syslog.target
+
+[Install]
+WantedBy=multi-user.target
+Alias=mysqld.service
+
+[Service]
+# Needed to create system tables etc.
+ExecStartPre=/usr/bin/mysql-systemd start-pre
+
+EnvironmentFile=-/etc/sysconfig/mysql
+# Start main service
+ExecStart=/usr/bin/mysqld_safe --basedir=/usr
+
+# Don't signal startup success before a ping works
+ExecStartPost=/usr/bin/mysql-systemd start-post $MAINPID
+
+ExecStop=/usr/bin/mysql-systemd stop
+
+ExecStopPost=/usr/bin/mysql-systemd stop-post
+
+ExecReload=/usr/bin/mysql-systemd reload
+
+# Timeout is handled elsewhere
+# service-startup-timeout in my.cnf 
+# Default is 900 seconds
+TimeoutStartSec=0
+
+# Maximum time to stop
+TimeoutStopSec=900
+
+# Unsafe for PXC
+# mysqld_safe handles this too.
+
+PrivateTmp=false
+
+

@@ -23,6 +23,9 @@
 #include "sql/mysqld_thd_manager.h"
 
 #include "my_config.h"
+#ifdef WITH_WSREP
+#include "wsrep_sst.h"
+#endif /* WITH_WSREP */
 
 #include "mysql/components/services/psi_cond_bits.h"
 #include "mysql/components/services/psi_mutex_bits.h"
@@ -99,6 +102,10 @@ class Find_THD : public std::unary_function<THD *, bool> {
   Find_THD_Impl *m_impl;
 };
 
+#ifdef WITH_WSREP
+Do_THD_Impl::Do_THD_Impl() { /* Empty constructor */ }
+#endif /* WITH_WSREP */
+
 #ifdef HAVE_PSI_INTERFACE
 static PSI_mutex_key key_LOCK_thd_list;
 static PSI_mutex_key key_LOCK_thd_remove;
@@ -161,8 +168,28 @@ Global_THD_manager::Global_THD_manager()
   thread_ids.push_back(reserved_thread_id);
 }
 
+#ifdef WITH_WSREP
+class Print_conn : public Do_THD_Impl {
+ public:
+  Print_conn() {}
+
+  virtual void operator()(THD *thd) {
+    WSREP_INFO("THD %u applier %s exec_mode %s killed %s", thd->thread_id(),
+               thd->wsrep_applier ? "true" : "false",
+               wsrep_get_exec_mode(thd->wsrep_exec_mode),
+               thd->killed ? "true" : "false");
+  }
+};
+#endif /* WITH_WSREP */
+
 Global_THD_manager::~Global_THD_manager() {
   thread_ids.erase_unique(reserved_thread_id);
+#ifdef WITH_WSREP
+  {
+    Print_conn print_conn;
+    do_for_all_thd(&print_conn);
+  }
+#endif /* WITH_WSREP */
   for (int i = 0; i < NUM_PARTITIONS; i++) {
     DBUG_ASSERT(thd_list[i].empty());
     mysql_mutex_destroy(&LOCK_thd_list[i]);
@@ -198,6 +225,12 @@ void Global_THD_manager::add_thd(THD *thd) {
   std::pair<THD_array::iterator, bool> insert_result =
       thd_list[partition].insert_unique(thd);
   if (insert_result.second) ++atomic_global_thd_count;
+#ifdef WITH_WSREP
+  if (WSREP_ON && thd->wsrep_applier) {
+    wsrep_running_threads++;
+    WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads);
+  }
+#endif /* WITH_WSREP */
   // Adding the same THD twice is an error.
   DBUG_ASSERT(insert_result.second);
 }
@@ -219,6 +252,12 @@ void Global_THD_manager::remove_thd(THD *thd) {
 
   const size_t num_erased = thd_list[partition].erase_unique(thd);
   if (num_erased == 1) --atomic_global_thd_count;
+#ifdef WITH_WSREP
+  if (WSREP_ON && thd->wsrep_applier) {
+    wsrep_running_threads--;
+    WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads);
+  }
+#endif /* WITH_WSREP */
   // Removing a THD that was never added is an error.
   DBUG_ASSERT(1 == num_erased);
   mysql_cond_broadcast(&COND_thd_list[partition]);
@@ -258,6 +297,22 @@ void Global_THD_manager::wait_till_no_thd() {
     }
   }
 }
+
+#ifdef WITH_WSREP
+
+int Global_THD_manager::count_if_thd(Find_THD_Impl *func) {
+  int count = 0;
+
+  Find_THD find_thd(func);
+  for (int i = 0; i < NUM_PARTITIONS; i++) {
+    MUTEX_LOCK(lock, &LOCK_thd_list[i]);
+    count += std::count_if(thd_list[i].begin(), thd_list[i].end(), find_thd);
+  }
+
+  return count;
+}
+
+#endif /* WITH_WSREP */
 
 void Global_THD_manager::do_for_all_thd_copy(Do_THD_Impl *func) {
   Do_THD doit(func);

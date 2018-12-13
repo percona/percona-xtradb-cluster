@@ -1,0 +1,51 @@
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(1);
+SELECT LENGTH(@@global.gtid_executed) > 1;
+LENGTH(@@global.gtid_executed) > 1
+1
+SHOW BINARY LOGS;
+Log_name	File_size
+mysqld-bin.000001	637
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	124	Previous_gtids	1	155	
+mysqld-bin.000001	155	Gtid	1	228	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000001	228	Query	1	368	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB /* xid=# */
+mysqld-bin.000001	368	Gtid	1	443	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000001	443	Query	1	518	BEGIN
+mysqld-bin.000001	518	Table_map	1	566	table_id: # (test.t1)
+mysqld-bin.000001	566	Write_rows	1	606	table_id: # flags: STMT_END_F
+mysqld-bin.000001	606	Xid	1	637	COMMIT /* xid=# */
+gtid_executed_equal
+1
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	124	Previous_gtids	2	155	
+mysqld-bin.000001	155	Gtid	1	235	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000001	235	Query	1	375	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB /* xid=78 */
+mysqld-bin.000001	375	Gtid	1	457	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000001	457	Query	1	527	BEGIN
+mysqld-bin.000001	527	Table_map	1	575	table_id: # (test.t1)
+mysqld-bin.000001	575	Write_rows	1	615	table_id: # flags: STMT_END_F
+mysqld-bin.000001	615	Xid	1	646	COMMIT /* xid=2 */
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+gtid_executed_equal
+1
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	124	Previous_gtids	3	155	
+mysqld-bin.000001	155	Gtid	1	235	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000001	235	Query	1	375	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB /* xid=49 */
+mysqld-bin.000001	375	Gtid	1	457	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000001	457	Query	1	527	BEGIN
+mysqld-bin.000001	527	Table_map	1	575	table_id: # (test.t1)
+mysqld-bin.000001	575	Write_rows	1	615	table_id: # flags: STMT_END_F
+mysqld-bin.000001	615	Xid	1	646	COMMIT /* xid=2 */
+DROP TABLE t1;
+STOP SLAVE;
+RESET SLAVE ALL;

@@ -2301,8 +2301,14 @@ void grant_tables_setup_for_open(TABLE_LIST *tables, thr_lock_type lock_type,
          this function.
 */
 
+#ifdef WITH_WSREP
+int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables,
+                      const char *db, const char *table) {
+#else
 int open_grant_tables(THD *thd, TABLE_LIST *tables,
                       bool *transactional_tables) {
+#endif /* WITH_WSREP */
+
   DBUG_ENTER("open_grant_tables");
 
   if (!initialized) {
@@ -2332,6 +2338,28 @@ int open_grant_tables(THD *thd, TABLE_LIST *tables,
     for (auto i = 0; i < ACL_TABLES::LAST_ENTRY; i++)
       tables[i].updating = false;
   }
+
+#ifdef WITH_WSREP
+  // TODO: replication filter check
+
+  /* CREATE/DROP function/procedure implicitly grant priviliges.
+  Check for detail comment in respected switch handler in sql_parse.cc
+  Since the original statement is already replicated using TOI
+  sub-action of grant/revoke privilges doesn't need to get replicated. */
+  bool skip_toi = (thd->lex->sql_command == SQLCOM_CREATE_SPFUNCTION || 
+                   thd->lex->sql_command == SQLCOM_CREATE_PROCEDURE ||
+                   thd->lex->sql_command == SQLCOM_DROP_FUNCTION ||
+                   thd->lex->sql_command == SQLCOM_DROP_PROCEDURE);
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+  */
+  if (WSREP(thd) && !skip_toi &&
+      wsrep_to_isolation_begin(thd, db, table, NULL)) {
+    WSREP_ERROR("Fail to replicate: %s", thd->query().str);
+    DBUG_RETURN(-1);
+  }
+#endif /* WITH_WSREP */
 
   if (open_and_lock_tables(
           thd, tables,

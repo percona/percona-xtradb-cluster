@@ -350,6 +350,9 @@ extern ulong opt_server_id_mask;
 extern const char *load_default_groups[];
 extern struct my_option my_long_early_options[];
 extern bool mysqld_server_started;
+#ifdef WITH_WSREP
+extern bool mysqld_server_initialized;
+#endif /* WITH_WSREP */
 extern "C" MYSQL_PLUGIN_IMPORT int orig_argc;
 extern "C" MYSQL_PLUGIN_IMPORT char **orig_argv;
 extern my_thread_attr_t connection_attrib;
@@ -445,6 +448,12 @@ extern PSI_mutex_key key_thd_timer_mutex;
 
 extern PSI_mutex_key key_commit_order_manager_mutex;
 extern PSI_mutex_key key_mutex_slave_worker_hash;
+
+#ifdef WITH_WSREP
+extern PSI_mutex_key key_LOCK_wsrep_thd;
+extern PSI_cond_key key_COND_wsrep_thd;
+extern PSI_thread_key key_thread_handle_wsrep;
+#endif /* WITH_WSREP */
 
 extern PSI_rwlock_key key_rwlock_LOCK_logger;
 extern PSI_rwlock_key key_rwlock_channel_map_lock;
@@ -625,6 +634,38 @@ extern PSI_stage_info stage_suspending;
 extern PSI_stage_info stage_starting;
 extern PSI_stage_info stage_waiting_for_no_channel_reference;
 extern PSI_stage_info stage_restoring_secondary_keys;
+
+#ifdef WITH_WSREP
+extern PSI_stage_info stage_wsrep_writing_rows;
+extern PSI_stage_info stage_wsrep_deleting_rows;
+extern PSI_stage_info stage_wsrep_updating_rows;
+
+extern PSI_stage_info stage_wsrep_applying_writeset;
+extern PSI_stage_info stage_wsrep_applied_writeset;
+
+extern PSI_stage_info stage_wsrep_committing;
+extern PSI_stage_info stage_wsrep_committed;
+
+extern PSI_stage_info stage_wsrep_rolling_back;
+extern PSI_stage_info stage_wsrep_rolled_back;
+
+extern PSI_stage_info stage_wsrep_replicating_commit;
+extern PSI_stage_info stage_wsrep_write_set_replicated;
+extern PSI_stage_info stage_wsrep_waiting_on_replaying;
+extern PSI_stage_info stage_wsrep_replicate;
+extern PSI_stage_info stage_wsrep_pre_commit;
+extern PSI_stage_info stage_wsrep_pre_commit_cert_passed;
+
+extern PSI_stage_info stage_wsrep_preparing_for_TO_isolation;
+extern PSI_stage_info stage_wsrep_completed_TO_isolation;
+
+extern PSI_stage_info stage_wsrep_replaying_trx;
+extern PSI_stage_info stage_wsrep_applier_idle;
+extern PSI_stage_info stage_wsrep_in_rollback_thread;
+extern PSI_stage_info stage_wsrep_aborter_idle;
+extern PSI_stage_info stage_wsrep_aborter_active;
+#endif /* WITH_WSREP */
+
 #ifdef HAVE_PSI_STATEMENT_INTERFACE
 /**
   Statement instrumentation keys (sql).
@@ -768,4 +809,11 @@ NTService *get_win_service_ptr();
 extern LEX_STRING opt_mandatory_roles;
 extern bool opt_mandatory_roles_cache;
 extern bool opt_always_activate_granted_roles;
+
+#ifdef WITH_WSREP
+extern "C" void *start_wsrep_THD(void *);
+typedef void (*wsrep_thd_processor_fun)(THD *);
+void unireg_abort(int exit_code);
+#endif /* WITH_WSREP */
+
 #endif /* MYSQLD_INCLUDED */

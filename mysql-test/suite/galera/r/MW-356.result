@@ -1,0 +1,12 @@
+SET GLOBAL innodb_lock_wait_timeout = 1;
+CREATE TABLE p (i INT PRIMARY KEY, j INT) ENGINE=INNODB;
+INSERT INTO p VALUES (1, 0), (2, 0);
+CREATE TABLE c (i INT PRIMARY KEY, j INT, f INT, FOREIGN KEY(f) REFERENCES p(i)) ENGINE=INNODB;
+INSERT INTO c VALUES (1, 0, 1);
+BEGIN;
+UPDATE p SET j = 1 WHERE i = 1;
+UPDATE c SET f = 2 WHERE i = 1;
+ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+COMMIT;
+DROP TABLE c, p;
+SET GLOBAL innodb_lock_wait_timeout = default;

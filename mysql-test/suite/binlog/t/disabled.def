@@ -10,3 +10,8 @@
 #
 ##############################################################################
 binlog.binlog_xa_commit_failure: BUG#27588706 2018-02-23 Erlend Test has never worked correctly
+# Codership disabled tests begin here
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+binlog_index : codership/mysql-wsrep##71 0000-00-00 CODERSHIP Regression: Duplicate "file was not purged because it is the active log file" warning
+binlog_xa_prepared_disconnect : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+# Codership disabled tests end here

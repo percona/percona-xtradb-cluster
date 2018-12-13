@@ -1,0 +1,29 @@
+CREATE TABLE generated_virtual(f1 INTEGER, f2 INTEGER GENERATED ALWAYS AS ( f1 * 2 ) VIRTUAL);
+CREATE TABLE generated_stored(f1 INTEGER, f2 INTEGER GENERATED ALWAYS AS ( f1 * 2 ) STORED);
+INSERT INTO generated_virtual (f1) VALUES (1);
+INSERT INTO generated_stored (f1) VALUES (1);
+SELECT f1 = 1, f2 = 2 FROM generated_virtual;
+f1 = 1	f2 = 2
+1	1
+SELECT f1 = 1, f2 = 2 FROM generated_stored;
+f1 = 1	f2 = 2
+1	1
+DROP TABLE generated_virtual, generated_stored;
+CREATE TABLE conflict_virtual(f1 INTEGER, f2 INTEGER GENERATED ALWAYS AS ( f1 * 2) VIRTUAL UNIQUE);
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+INSERT INTO conflict_virtual (f1) VALUES (1);
+INSERT INTO conflict_virtual (f1) VALUES (1);
+COMMIT;
+Got one of the listed errors
+DROP TABLE conflict_virtual;
+CREATE TABLE conflict_stored(f1 INTEGER, f2 INTEGER GENERATED ALWAYS AS (0) STORED PRIMARY KEY);
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+LOCK TABLE conflict_stored WRITE;
+INSERT INTO conflict_stored (f1) VALUES (1);
+INSERT INTO conflict_stored (f1) VALUES (2);
+COMMIT;
+Got one of the listed errors
+UNLOCK TABLES;
+DROP TABLE conflict_stored;

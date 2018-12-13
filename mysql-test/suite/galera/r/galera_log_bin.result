@@ -1,0 +1,48 @@
+RESET MASTER;
+RESET MASTER;
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+CREATE TABLE t2 (id INT) ENGINE=InnoDB;
+INSERT INTO t2 VALUES (1);
+INSERT INTO t2 VALUES (1);
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 2 FROM t2;
+COUNT(*) = 2
+1
+ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+FLUSH LOGS;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 124;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000002	124	Previous_gtids	1	155	
+SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';
+COUNT(*) = 2
+1
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	124	Previous_gtids	2	155	
+mysqld-bin.000001	155	Anonymous_Gtid	1	228	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	228	Query	1	364	use `test`; CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB /* xid=# */
+mysqld-bin.000001	364	Anonymous_Gtid	1	439	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	439	Query	1	514	BEGIN
+mysqld-bin.000001	514	Table_map	1	562	table_id: # (test.t1)
+mysqld-bin.000001	562	Write_rows	1	602	table_id: # flags: STMT_END_F
+mysqld-bin.000001	602	Xid	1	633	COMMIT /* xid=# */
+mysqld-bin.000001	633	Anonymous_Gtid	1	706	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	706	Query	1	830	use `test`; CREATE TABLE t2 (id INT) ENGINE=InnoDB /* xid=# */
+mysqld-bin.000001	830	Anonymous_Gtid	1	905	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	905	Query	1	980	BEGIN
+mysqld-bin.000001	980	Table_map	1	1028	table_id: # (test.t2)
+mysqld-bin.000001	1028	Write_rows	1	1068	table_id: # flags: STMT_END_F
+mysqld-bin.000001	1068	Xid	1	1099	COMMIT /* xid=# */
+mysqld-bin.000001	1099	Anonymous_Gtid	1	1174	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	1174	Query	1	1249	BEGIN
+mysqld-bin.000001	1249	Table_map	1	1297	table_id: # (test.t2)
+mysqld-bin.000001	1297	Write_rows	1	1337	table_id: # flags: STMT_END_F
+mysqld-bin.000001	1337	Xid	1	1368	COMMIT /* xid=# */
+mysqld-bin.000001	1368	Anonymous_Gtid	1	1441	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	1441	Query	1	1563	use `test`; ALTER TABLE t1 ADD COLUMN f2 INTEGER /* xid=# */
+DROP TABLE t1;
+DROP TABLE t2;
+RESET MASTER;

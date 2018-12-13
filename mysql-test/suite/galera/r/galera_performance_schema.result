@@ -1,0 +1,42 @@
+#node-1
+use performance_schema;
+select count(*) from setup_instruments where name like '%galera%' or name like '%wsrep%';
+count(*)
+81
+#node-2
+use performance_schema;
+select count(*) from setup_instruments where name like '%galera%' or name like '%wsrep%';
+count(*)
+81
+select count(*) = 5 from performance_schema.threads where name like '%galera%' or name like '%wsrep%';
+count(*) = 5
+1
+select count(*) > 0 from performance_schema.file_instances where event_name like '%galera%' or event_name like '%wsrep%';
+count(*) > 0
+1
+#node-1
+use test;
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1), (2);
+select * from t;
+i
+1
+2
+select count(*) > PREVIOUS_COUNT from performance_schema.events_waits_history where event_name like '%LOCK%wsrep%' or event_name like '%LOCK%galera%';;
+count(*) > PREVIOUS_COUNT
+1
+#node-1
+truncate performance_schema.events_waits_current;
+use test;
+begin;
+insert into t values (3);
+#node-2
+use test;
+insert into t values (3);
+#node-1
+commit;
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+select count(*) > 0 from performance_schema.events_waits_current where event_name like '%COND_wsrep_rollback%';;
+count(*) > 0
+1
+drop table t;

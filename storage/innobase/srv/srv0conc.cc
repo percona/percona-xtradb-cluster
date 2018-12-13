@@ -56,6 +56,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "srv0srv.h"
 #include "trx0trx.h"
 
+#ifdef WITH_WSREP
+extern "C" int wsrep_trx_is_aborting(void *thd_ptr);
+extern bool wsrep_debug;
+#endif /* WITH_WSREP */
+
 /** Number of times a thread is allowed to enter InnoDB within the same
 SQL query after it has once got the ticket. */
 ulong srv_n_free_tickets_to_enter = 500;
@@ -121,6 +126,14 @@ static void srv_conc_enter_innodb_with_atomics(
 
   for (;;) {
     ulint sleep_in_us;
+
+#ifdef WITH_WSREP
+    if (wsrep_on(trx->mysql_thd) && wsrep_trx_is_aborting(trx->mysql_thd)) {
+      if (wsrep_debug) fprintf(stderr, "srv_conc_enter due to MUST_ABORT");
+      srv_conc_force_enter_innodb(trx);
+      return;
+    }
+#endif /* WITH_WSREP */
 
     if (srv_thread_concurrency == 0) {
       if (notified_mysql) {
@@ -281,3 +294,13 @@ ulint srv_conc_get_waiting_threads(void) { return (srv_conc.n_waiting); }
 
 /** Get the count of threads active inside InnoDB. */
 ulint srv_conc_get_active_threads(void) { return (srv_conc.n_active); }
+
+#ifdef WITH_WSREP
+void wsrep_srv_conc_cancel_wait(trx_t *trx) {
+  /* aborting transactions will enter innodb by force in
+  srv_conc_enter_innodb_with_atomics(). No need to cancel here,
+  thr will wake up after os_sleep and let to enter innodb */
+  if (wsrep_debug) fprintf(stderr, "WSREP: conc slot cancel, no atomics\n");
+}
+#endif /* WITH_WSREP */
+

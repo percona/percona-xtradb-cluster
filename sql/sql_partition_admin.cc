@@ -62,6 +62,10 @@
 #include "sql_string.h"
 #include "thr_lock.h"
 
+#ifdef WITH_WSREP
+#include "sql_parse.h" // WSREP_TO_ISOLATION_BEGIN_WRTCHK
+#endif /* WITH_WSREP */
+
 class partition_element;
 
 namespace dd {
@@ -107,6 +111,13 @@ bool Sql_cmd_alter_table_exchange_partition::execute(THD *thd) {
 
   /* Not allowed with EXCHANGE PARTITION */
   DBUG_ASSERT(!create_info.data_file_name && !create_info.index_file_name);
+
+#ifdef WITH_WSREP
+  if (WSREP(thd) && !thd->lex->no_write_to_binlog &&
+      wsrep_to_isolation_begin(thd, NULL, NULL, first_table)) {
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
 
   thd->set_slow_log_for_admin_command();
   DBUG_RETURN(exchange_partition(thd, first_table, &alter_info));
@@ -604,6 +615,19 @@ bool Sql_cmd_alter_table_truncate_partition::execute(THD *thd) {
   */
 
   if (check_one_table_access(thd, DROP_ACL, first_table)) DBUG_RETURN(true);
+
+#ifdef WITH_WSREP
+  TABLE *find_temporary_table(THD * thd, const TABLE_LIST *tl);
+
+  if (WSREP(thd) &&
+      (!thd->is_current_stmt_binlog_format_row() ||
+       !find_temporary_table(thd, first_table)) &&
+      wsrep_to_isolation_begin(thd, first_table->db, first_table->table_name,
+                               NULL)) {
+    WSREP_WARN("ALTER TABLE isolation failure");
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
 
   if (open_tables(thd, &first_table, &table_counter, 0)) DBUG_RETURN(true);
 

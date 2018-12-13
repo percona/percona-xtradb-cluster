@@ -1,0 +1,79 @@
+#
+# Test Galera as a slave to a MySQL master
+#
+# The galera/galera_2node_slave.cnf describes the setup of the nodes
+#
+
+--source include/have_log_bin.inc
+
+# As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
+--connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--source include/galera_cluster.inc
+
+--connection node_3
+--echo #node-3 (async slave)
+call mtr.add_suppression("Recovery from master pos");
+--disable_query_log
+--eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--enable_query_log
+START SLAVE USER='root';
+
+#
+# test if replication is working fine.
+--connection node_1
+--echo #node-1 (master)
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(1);
+
+--connection node_3
+--echo #node-3 (async slave)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1;
+--source include/wait_condition.inc
+
+#
+# restart node-3
+--echo #Restarting node-3 (async slave) ...
+--source include/restart_mysqld.inc
+# sleep for some time before checkin if replication is up and running.
+--sleep 10
+STOP SLAVE;
+START SLAVE USER='root';
+--sleep 10
+
+#
+# re-test if replication is working fine.
+--connection node_1
+--echo #node-1 (master)
+INSERT INTO t1 VALUES (2);
+
+--connection node_3
+--echo #node-3 (async slave)
+--let $wait_condition = SELECT COUNT(*) = 2 FROM t1;
+--source include/wait_condition.inc
+
+--connection node_2
+--echo #node-2 (galera replicated node non-slave)
+INSERT INTO t1 VALUES (3);
+--let $wait_condition = SELECT COUNT(*) = 3 FROM t1;
+--source include/wait_condition.inc
+
+--connection node_3
+--echo #node-3 (async slave)
+--let $wait_condition = SELECT COUNT(*) = 3 FROM t1;
+--source include/wait_condition.inc
+
+--connection node_1
+DROP TABLE t1;
+
+--connection node_3
+--sleep 1
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+STOP SLAVE;
+RESET SLAVE ALL;
+
+--connection node_1
+RESET MASTER;

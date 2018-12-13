@@ -1,0 +1,16 @@
+#
+# 5.7 Spatial types. We only test simple replication as geometry columns are 
+# essentially blobs and are not allowed to be primary or unique keys.
+#
+
+--source include/galera_cluster.inc
+
+--connection node_1
+CREATE TABLE t1 (f1 GEOMETRY);
+
+INSERT INTO t1 VALUES (ST_GeomFromText('POINT(1 1)'));
+
+--connection node_2
+SELECT ST_AsText(f1) FROM t1;
+
+DROP TABLE t1;

@@ -59,6 +59,16 @@ extern MYSQL_PLUGIN_IMPORT CHARSET_INFO *system_charset_info;
 
 static PSI_memory_key key_memory_MDL_context_acquire_locks;
 
+#ifdef WITH_WSREP
+#include "debug_sync.h"
+#include "wsrep_mysqld.h"
+#include "wsrep_thd.h"
+#include "sql/log.h"
+
+extern bool wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
+                                      MDL_ticket *ticket, const MDL_key *key);
+#endif /* WITH_WSREP */
+
 #ifdef HAVE_PSI_INTERFACE
 static PSI_mutex_key key_MDL_wait_LOCK_wait_status;
 
@@ -1813,8 +1823,21 @@ MDL_wait::enum_wait_status MDL_wait::timed_wait(
                     &old_stage);
   thd_wait_begin(NULL, THD_WAIT_META_DATA_LOCK);
   while (!m_wait_status && !owner->is_killed() && !is_timeout(wait_result)) {
-    wait_result = mysql_cond_timedwait(&m_COND_wait_status, &m_LOCK_wait_status,
-                                       abs_timeout);
+#ifdef WITH_WSREP
+    // Allow tests to block the applier thread using the DBUG facilities
+    DBUG_EXECUTE_IF("sync.wsrep_before_mdl_wait", {
+      const char act[] =
+          "now "
+          "wait_for signal.wsrep_before_mdl_wait";
+      DBUG_ASSERT(
+          !debug_sync_set_action((owner->get_thd()), STRING_WITH_LEN(act)));
+    };);
+    if (wsrep_thd_is_BF(owner->get_thd(), false))
+      wait_result = mysql_cond_wait(&m_COND_wait_status, &m_LOCK_wait_status);
+    else
+#endif /* WITH_WSREP */
+      wait_result = mysql_cond_timedwait(&m_COND_wait_status,
+                                         &m_LOCK_wait_status, abs_timeout);
   }
   thd_wait_end(NULL);
 
@@ -1872,11 +1895,53 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
     called by other threads.
   */
   DBUG_ASSERT(ticket->get_lock());
+#ifdef WITH_WSREP
+  if ((this == &(ticket->get_lock()->m_waiting)) &&
+      wsrep_thd_is_BF((void *)(ticket->get_ctx()->wsrep_get_thd()), false)) {
+    Ticket_iterator itw(ticket->get_lock()->m_waiting);
+    Ticket_iterator itg(ticket->get_lock()->m_granted);
+
+    MDL_ticket *waiting, *granted;
+    MDL_ticket *prev = NULL;
+    bool added = false;
+
+    while ((waiting = itw++) && !added) {
+      if (!wsrep_thd_is_BF((void *)(waiting->get_ctx()->wsrep_get_thd()),
+                           true)) {
+        WSREP_DEBUG("MDL add_ticket inserted before: %u %s",
+                    wsrep_thd_thread_id(waiting->get_ctx()->wsrep_get_thd()),
+                    wsrep_thd_query(waiting->get_ctx()->wsrep_get_thd()));
+        m_list.insert_after(prev, ticket);
+        added = true;
+      }
+      prev = waiting;
+    }
+    if (!added) m_list.push_back(ticket);
+
+    while ((granted = itg++)) {
+      if (granted->get_ctx() != ticket->get_ctx() &&
+          granted->is_incompatible_when_granted(ticket->get_type())) {
+        if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted,
+                                       &ticket->get_lock()->key)) {
+          WSREP_DEBUG(
+              "Adding of MDL ticket failed (at add_ticket)"
+              " as initiating thread (victim) got killed");
+        }
+      }
+    }
+  } else
+    /*
+      Add ticket to the *back* of the queue to ensure fairness
+      among requests with the same priority.
+    */
+    m_list.push_back(ticket);
+#else
   /*
     Add ticket to the *back* of the queue to ensure fairness
     among requests with the same priority.
   */
   m_list.push_back(ticket);
+#endif /* WITH_WSREP */
   m_bitmap |= MDL_BIT(ticket->get_type());
 }
 
@@ -2394,6 +2459,9 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
   bool can_grant = false;
   bitmap_t waiting_incompat_map = incompatible_waiting_types_bitmap()[type_arg];
   bitmap_t granted_incompat_map = incompatible_granted_types_bitmap()[type_arg];
+#ifdef WITH_WSREP
+  bool wsrep_can_grant = true;
+#endif /* WITH_WSREP */
 
   /*
     New lock request can be satisfied iff:
@@ -2425,6 +2493,36 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
           because of surrounding if-statement). In either case it should be
           present in m_granted list.
         */
+#ifdef WITH_WSREP
+        while ((ticket = it++)) {
+          if (ticket->get_ctx() != requestor_ctx &&
+              ticket->is_incompatible_when_granted(type_arg)) {
+            if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()),
+                                false) &&
+                key.mdl_namespace() == MDL_key::GLOBAL) {
+              WSREP_DEBUG(
+                  "Global lock granted to applier/TOI action processor:"
+                  " %u %s",
+                  wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()),
+                  wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
+              can_grant = true;
+            } else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket,
+                                                  &key)) {
+              wsrep_can_grant = false;
+              if (wsrep_log_conflicts) {
+                MDL_lock *lock = ticket->get_lock();
+                WSREP_INFO("MDL conflict db=%s table=%s ticket=%s solved by %s",
+                           lock->key.db_name(), lock->key.name(),
+                           ticket->get_type_string(), "abort");
+              }
+            } else {
+              can_grant = true;
+            }
+          }
+        } /* while */
+
+        if ((ticket == NULL) && wsrep_can_grant) can_grant = true;
+#else
         while ((ticket = it++)) {
           if (ticket->get_ctx() != requestor_ctx &&
               ticket->is_incompatible_when_granted(type_arg))
@@ -2432,6 +2530,7 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
         }
         if (ticket == NULL) /* Incompatible locks are our own. */
           can_grant = true;
+#endif /* WITH_WSREP */
       }
     } else {
       /*
@@ -2448,8 +2547,37 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
         The above means that conflicting granted "fast path" lock cannot
         belong to us and our request cannot be satisfied.
       */
+#ifdef WITH_WSREP
+      if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()), false) &&
+          key.mdl_namespace() == MDL_key::GLOBAL) {
+        WSREP_DEBUG(
+            "Global lock granted to applier/TOI action processor"
+            " (over unobstrusive locks): %u %s",
+            wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()),
+            wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
+        can_grant = true;
+      } else if (WSREP(requestor_ctx->wsrep_get_thd())) {
+        WSREP_DEBUG(
+            "Granting MDL to applier/TOI action processor over"
+            " unobstrusive locks");
+        can_grant = true;
+      }
+#endif /* WITH_WSREP */
     }
   }
+#ifdef WITH_WSREP
+  else {
+    if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()), false) &&
+        key.mdl_namespace() == MDL_key::GLOBAL) {
+      WSREP_DEBUG(
+          "Global lock granted to applier/TOI action processor"
+          " (waiting queue): %u %s",
+          wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()),
+          wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
+      can_grant = true;
+    }
+  }
+#endif /* WITH_WSREP */
   return can_grant;
 }
 
@@ -2884,7 +3012,16 @@ bool MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
     as well for MDL_object_lock::notify_conflicting_locks() to work
     properly.
   */
+#ifdef WITH_WSREP
+  /* WSREP preempt lock if thread is applier or TOTAL_ORDER and so
+  we avoid using fast path as fast path locks needs to be materalize
+  before conflict checks can be done which causes issue with preempt
+  approach WSREP uses.
+  TODO: Check if this preempt approach can be relaxed. */
+  force_slow = true;
+#else
   force_slow = !unobtrusive_lock_increment || m_needs_thr_lock_abort;
+#endif /* WITH_WSREP */
 
   /*
     If "obtrusive" lock is requested we need to "materialize" all fast
@@ -4166,6 +4303,12 @@ void MDL_context::release_locks_stored_before(enum_mdl_duration duration,
   DBUG_VOID_RETURN;
 }
 
+#ifdef WITH_WSREP
+void MDL_context::release_explicit_locks() {
+  release_locks_stored_before(MDL_EXPLICIT, NULL);
+}
+#endif /* WITH_WSREP */
+
 /**
   Release all explicit locks in the context which correspond to the
   same name/object as this lock request.
@@ -4818,3 +4961,39 @@ void MDL_ticket_store::set_materialized() {
 MDL_ticket *MDL_ticket_store::materialized_front(int di) {
   return m_durations[di].m_mat_front;
 }
+
+#ifdef WITH_WSREP
+void MDL_ticket::wsrep_report(bool debug)
+{
+  if (debug) 
+    {
+      WSREP_DEBUG("MDL ticket: type: %s space: %s db: %s name: %s",
+       	 (get_type()  == MDL_INTENTION_EXCLUSIVE)  ? "intention exclusive"  :
+       	 ((get_type() == MDL_SHARED)               ? "shared"               :
+       	 ((get_type() == MDL_SHARED_HIGH_PRIO      ? "shared high prio"     :
+       	 ((get_type() == MDL_SHARED_READ)          ? "shared read"          :
+       	 ((get_type() == MDL_SHARED_WRITE)         ? "shared write"         :
+       	 ((get_type() == MDL_SHARED_NO_WRITE)      ? "shared no write"      :
+         ((get_type() == MDL_SHARED_NO_READ_WRITE) ? "shared no read write" :
+       	 ((get_type() == MDL_EXCLUSIVE)            ? "exclusive"            :
+          "UNKNOWN")))))))),
+         (m_lock->key.mdl_namespace()  == MDL_key::GLOBAL)    ? "GLOBAL"       :
+         ((m_lock->key.mdl_namespace() == MDL_key::SCHEMA)    ? "SCHEMA"       :
+         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)     ? "TABLE"        :
+         ((m_lock->key.mdl_namespace() == MDL_key::FUNCTION)  ? "FUNCTION"     :
+         ((m_lock->key.mdl_namespace() == MDL_key::PROCEDURE) ? "PROCEDURE"    :
+         ((m_lock->key.mdl_namespace() == MDL_key::TRIGGER)   ? "TRIGGER"      :
+         ((m_lock->key.mdl_namespace() == MDL_key::EVENT)     ? "EVENT"        :
+         ((m_lock->key.mdl_namespace() == MDL_key::COMMIT)    ? "COMMIT"       :
+         (char *)"UNKNOWN"))))))),
+         m_lock->key.db_name(),
+         m_lock->key.name());
+    }
+}
+
+bool MDL_context::wsrep_has_explicit_locks() {
+  return (!m_ticket_store.is_empty(MDL_EXPLICIT));
+}
+
+#endif /* WITH_WSREP */
+

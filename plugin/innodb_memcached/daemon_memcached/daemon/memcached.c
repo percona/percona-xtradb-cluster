@@ -2968,6 +2968,25 @@ static void dispatch_bin_command(conn *c) {
         c->noreply = false;
     }
 
+#ifdef WITH_WSREP
+    /* Disable memcache API when running in cluster mode */
+    if (wsrep_is_wsrep_on() && c->cmd != PROTOCOL_BINARY_CMD_NOOP &&
+        c->cmd != PROTOCOL_BINARY_CMD_QUIT &&
+        c->cmd != PROTOCOL_BINARY_CMD_STAT &&
+        c->cmd != PROTOCOL_BINARY_CMD_VERSION &&
+        c->cmd != PROTOCOL_BINARY_CMD_VERBOSITY) {
+      if (settings.verbose) {
+        settings.extensions.logger->log(
+            EXTENSION_LOG_WARNING, c,
+            "The memcached API is disabled because WSREP (Galera replication) "
+            "is enabled.\n");
+      }
+
+      write_bin_packet(c, PROTOCOL_BINARY_RESPONSE_NOT_SUPPORTED, bodylen);
+      return;
+    }
+#endif /* WITH_WSREP */
+
     switch (c->cmd) {
         case PROTOCOL_BINARY_CMD_VERSION:
             if (extlen == 0 && keylen == 0 && bodylen == 0) {
@@ -4592,6 +4611,20 @@ static char* process_command(conn *c, char *command) {
     }
 
     ntokens = tokenize_command(command, tokens, MAX_TOKENS);
+
+#ifdef WITH_WSREP
+    if (wsrep_is_wsrep_on() && ntokens >= 1 &&
+        (strcmp(tokens[COMMAND_TOKEN].value, "quit") != 0) &&
+        (strcmp(tokens[COMMAND_TOKEN].value, "stats") != 0) &&
+        (strcmp(tokens[COMMAND_TOKEN].value, "version") != 0) &&
+        (strcmp(tokens[COMMAND_TOKEN].value, "verbosity") != 0)) {
+      out_string(c,
+                 "SERVER_ERROR The memcached api is disabled because WSREP "
+                 "(Galera replication) is enabled");
+      return NULL;
+    }
+#endif /* WITH_WSREP */
+
     if (ntokens >= 3 &&
         ((strcmp(tokens[COMMAND_TOKEN].value, "get") == 0) ||
          (strcmp(tokens[COMMAND_TOKEN].value, "bget") == 0))) {

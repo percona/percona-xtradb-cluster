@@ -1,0 +1,52 @@
+#
+# Galera test for upstream fix for lp:1470677
+#
+--source include/galera_cluster.inc
+
+--connection node_1
+CREATE TABLE t1(x VARCHAR(36), primary key pk(x)) ENGINE=InnoDB;
+
+CREATE TABLE t2(y VARCHAR(36) DEFAULT NULL,
+    FOREIGN KEY(y) REFERENCES t1(x)) ENGINE=InnoDB;
+
+INSERT INTO t1 VALUES ("foo"), ("bar");
+INSERT INTO t2 VALUES ("foo"), ("bar");
+
+SELECT * FROM t1 ORDER BY x ASC;
+SELECT * FROM t2 ORDER BY y ASC;
+
+--connection node_1
+# With the bug present this fails with ER_FK_COLUMN_CANNOT_CHANGE_CHILD
+ALTER TABLE t1 CHANGE COLUMN x x VARCHAR(36) NOT NULL;
+
+--connection node_2
+SELECT * FROM t1;
+SELECT * FROM t2;
+
+
+--connection node_1
+DROP TABLE t2, t1;
+
+--connection node_1
+# Check that we still do not allow NULL -> NOT NULL transition for FK columns
+CREATE TABLE t1 (x INT PRIMARY KEY) ENGINE=InnoDB;
+
+CREATE TABLE t2 (y INT PRIMARY KEY, z INT DEFAULT NULL,
+       FOREIGN KEY(z) REFERENCES t1(x)) ENGINE=InnoDB;
+
+INSERT INTO t1 VALUES (0);
+
+INSERT INTO t2 VALUES (0, NULL);
+
+set wsrep_on=0;
+--error ER_INVALID_USE_OF_NULL
+ALTER TABLE t2 CHANGE COLUMN z z INT NOT NULL;
+set wsrep_on=1;
+
+--connection node_2
+SELECT * FROM t1;
+SELECT * FROM t2;
+
+
+--connection node_1
+DROP TABLE t2, t1;

@@ -1,0 +1,94 @@
+#!/bin/bash
+
+. /usr/share/debconf/confmodule
+
+MYSQLDATA=$(my_print_defaults mysqld | grep datadir | cut -d= -f2)
+if [ -z "$MYSQLDATA" ];
+then
+    MYSQLDATA=/var/lib/mysql
+fi
+MYSQLFILES=/var/lib/mysql-files
+
+take_upstart_job_backup () {
+	if [ -e "/etc/init/mysql.conf" ] && [ -d "$MYSQLDATA" ];
+	then
+		mv /etc/init/mysql.conf $MYSQLDATA/.mysql.conf.backup
+	fi
+}
+
+case "$1" in
+	configure)
+
+	if [ -z "$2" ];
+	then
+
+		set -e
+
+
+		if [ ! "$(ls -A ${MYSQLDATA})" ] && [ -d ${MYSQLFILES} ];
+		then
+			db_get percona-xtradb-cluster-server-5.7/root-pass && PASSWD=${RET}
+			if [ ! -z "${PASSWD}" ];
+			then
+				SQL=/var/lib/mysql-files/SQL
+				touch ${SQL}
+				chmod 600 ${SQL}
+				chown mysql:mysql ${SQL}
+
+				db_set percona-xtradb-cluster-server-5.7/root-pass ""
+				db_set percona-xtradb-cluster-server-5.7/re-root-pass ""
+				cat << EOF > ${SQL}
+USE mysql;
+UPDATE user SET authentication_string=PASSWORD('${PASSWD}') WHERE user='root';
+EOF
+				PASSWD=""
+				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on --init-file=${SQL} 2>&1 > /dev/null"
+				rm -f ${SQL}
+			else
+				SQL=/var/lib/mysql-files/SQL
+				touch ${SQL}
+				chmod 600 ${SQL}
+				chown mysql:mysql ${SQL}
+				cat << EOF > ${SQL}
+
+INSTALL PLUGIN auth_socket SONAME 'auth_socket.so';
+USE mysql;
+UPDATE user SET plugin='auth_socket' WHERE user='root';
+EOF
+				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on --init-file=${SQL} 2>&1 > /dev/null"
+				rm -f ${SQL}
+			fi
+		fi
+
+		set +e
+
+	fi
+
+	;;
+
+	abort-upgrade|abort-remove|abort-configure)
+
+	;;
+
+	*)
+	exit 1
+	;;
+esac
+
+db_stop
+
+take_upstart_job_backup
+
+#Some postinstall info about UDF
+#
+echo -e "\n\n * Percona XtraDB Cluster is distributed with several useful UDF (User Defined Function) from Percona Toolkit."
+echo -e " * Run the following commands to create these functions:\n"
+echo -e "\tmysql -e \"CREATE FUNCTION fnv1a_64 RETURNS INTEGER SONAME 'libfnv1a_udf.so'\""
+echo -e "\tmysql -e \"CREATE FUNCTION fnv_64 RETURNS INTEGER SONAME 'libfnv_udf.so'\""
+echo -e "\tmysql -e \"CREATE FUNCTION murmur_hash RETURNS INTEGER SONAME 'libmurmur_udf.so'\""
+echo -e "\n * See http://www.percona.com/doc/percona-server/5.7/management/udf_percona_toolkit.html for more details\n\n"
+#
+
+#DEBHELPER#
+
+exit 0

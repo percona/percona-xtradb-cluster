@@ -1,0 +1,1334 @@
+#node-1
+#node-1
+set global pxc_strict_mode='DISABLED';
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of GET_LOCK");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of RELEASE_LOCK");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of GET_LOCK");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED");
+call mtr.add_suppression("WSREP: Can't change pxc_strict_mode while binlog format != ROW");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend using SERIALIZABLE isolation");
+call mtr.add_suppression("WSREP: Can't change pxc_strict_mode while isolation level is SERIALIZABLE");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits using SERIALIZABLE isolation mode");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend setting log_output to TABLE");
+call mtr.add_suppression("WSREP: Can't change pxc_strict_mode while log_output != NONE/FILE");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits setting log_output to TABLE");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication feature");
+call mtr.add_suppression("WSREP: Can't change pxc_strict_mode with wsrep_replicate_myisam turned ON");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of MyISAM table replication feature");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of DML command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of INSERT");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of DML command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of TRUNCATE command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ADMIN command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ALTER command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits changing storage engine of a table");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of INSERT");
+call mtr.add_suppression("WSREP doesn't support XA transaction");
+set global pxc_strict_mode='ENFORCING';
+#node-2
+set global pxc_strict_mode='DISABLED';
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of DML command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
+set global pxc_strict_mode='ENFORCING';
+#node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-1
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+set session wsrep_replicate_myisam=1;
+insert into tmyisam values (1), (2);
+set session wsrep_replicate_myisam=0;
+select * from tmyisam;
+i
+1
+2
+#node-2
+#2 rows expected as pxc-strict-mode = DISABLED and wsrep_replicate_myisam=1
+select * from tmyisam;
+i
+1
+2
+#node-1
+truncate table tmyisam;
+select * from tmyisam;
+i
+check table tmyisam;
+Table	Op	Msg_type	Msg_text
+test.tmyisam	check	status	OK
+repair table tmyisam;
+Table	Op	Msg_type	Msg_text
+test.tmyisam	repair	status	OK
+optimize table tmyisam;
+Table	Op	Msg_type	Msg_text
+test.tmyisam	optimize	status	OK
+analyze table tmyisam;
+Table	Op	Msg_type	Msg_text
+test.tmyisam	analyze	status	Table is already up to date
+alter table tmyisam add column j int;
+alter table tmyisam engine=myisam;
+alter table tmyisam engine=memory;
+alter table tmyisam engine=innodb;
+drop table tmyisam;
+#node-1
+create table tmem (i int, primary key pk(i)) engine=memory;
+insert into tmem values (1), (2);
+select * from tmem;
+i
+1
+2
+#node-2
+#0 rows expected as pxc doesn't replicate any other tables besides InnoDB and MyISAM
+select * from tmem;
+i
+#node-1
+truncate table tmem;
+select * from tmem;
+i
+select * from tmem;
+i
+check table tmem;
+Table	Op	Msg_type	Msg_text
+test.tmem	check	note	The storage engine for the table doesn't support check
+repair table tmem;
+Table	Op	Msg_type	Msg_text
+test.tmem	repair	note	The storage engine for the table doesn't support repair
+optimize table tmem;
+Table	Op	Msg_type	Msg_text
+test.tmem	optimize	note	The storage engine for the table doesn't support optimize
+analyze table tmem;
+Table	Op	Msg_type	Msg_text
+test.tmem	analyze	note	The storage engine for the table doesn't support analyze
+alter table tmem add column j int;
+alter table tmem engine=myisam;
+alter table tmem engine=memory;
+alter table tmem engine=innodb;
+drop table tmem;
+#node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+#node-2
+#2 rows expected with engine=innodb
+select * from tinnodb;
+i
+1
+2
+#node-1
+truncate table tinnodb;
+select * from tinnodb;
+i
+check table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	check	status	OK
+repair table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	repair	note	The storage engine for the table doesn't support repair
+optimize table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	optimize	note	Table does not support optimize, doing recreate + analyze instead
+test.tinnodb	optimize	status	OK
+analyze table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	analyze	status	OK
+alter table tinnodb add column j int;
+alter table tinnodb engine=myisam;
+alter table tinnodb engine=memory;
+alter table tinnodb engine=innodb;
+drop table tinnodb;
+#node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-1
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+set session wsrep_replicate_myisam=1;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication feature with pxc_strict_mode = PERMISSIVE
+insert into tmyisam values (1), (2);
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of DML command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+set session wsrep_replicate_myisam=0;
+select * from tmyisam;
+i
+1
+2
+#node-2
+#2 rows expected as pxc-strict-mode = DISABLED and wsrep_replicate_myisam=1
+select * from tmyisam;
+i
+1
+2
+#node-1
+truncate table tmyisam;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+select * from tmyisam;
+i
+check table tmyisam;
+Table	Op	Msg_type	Msg_text
+test.tmyisam	check	Warning	Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+test.tmyisam	check	status	OK
+repair table tmyisam;
+Table	Op	Msg_type	Msg_text
+test.tmyisam	repair	Warning	Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+test.tmyisam	repair	status	OK
+optimize table tmyisam;
+Table	Op	Msg_type	Msg_text
+test.tmyisam	optimize	Warning	Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+test.tmyisam	optimize	status	OK
+analyze table tmyisam;
+Table	Op	Msg_type	Msg_text
+test.tmyisam	analyze	Warning	Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+test.tmyisam	analyze	status	Table is already up to date
+alter table tmyisam add column j int;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of ALTER command on a table (test.tmyisam) that resides in non-transactional storage engine (except switching to transactional engine) with pxc_strict_mode = PERMISSIVE
+alter table tmyisam engine=myisam;
+alter table tmyisam engine=memory;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of ALTER command on a table (test.tmyisam) that resides in non-transactional storage engine (except switching to transactional engine) with pxc_strict_mode = PERMISSIVE
+alter table tmyisam engine=innodb;
+drop table tmyisam;
+#node-1
+create table tmem (i int, primary key pk(i)) engine=memory;
+insert into tmem values (1), (2);
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of DML command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+select * from tmem;
+i
+1
+2
+#node-2
+#0 rows expected as pxc doesn't replicate any other tables besides InnoDB and MyISAM
+select * from tmem;
+i
+#node-1
+truncate table tmem;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+select * from tmem;
+i
+check table tmem;
+Table	Op	Msg_type	Msg_text
+test.tmem	check	Warning	Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+test.tmem	check	note	The storage engine for the table doesn't support check
+repair table tmem;
+Table	Op	Msg_type	Msg_text
+test.tmem	repair	Warning	Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+test.tmem	repair	note	The storage engine for the table doesn't support repair
+optimize table tmem;
+Table	Op	Msg_type	Msg_text
+test.tmem	optimize	Warning	Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+test.tmem	optimize	note	The storage engine for the table doesn't support optimize
+analyze table tmem;
+Table	Op	Msg_type	Msg_text
+test.tmem	analyze	Warning	Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+test.tmem	analyze	note	The storage engine for the table doesn't support analyze
+alter table tmem add column j int;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of ALTER command on a table (test.tmem) that resides in non-transactional storage engine (except switching to transactional engine) with pxc_strict_mode = PERMISSIVE
+alter table tmem engine=memory;
+alter table tmem engine=myisam;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of ALTER command on a table (test.tmem) that resides in non-transactional storage engine (except switching to transactional engine) with pxc_strict_mode = PERMISSIVE
+alter table tmem engine=innodb;
+drop table tmem;
+#node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+#node-2
+#2 rows expected with engine=innodb
+select * from tinnodb;
+i
+1
+2
+#node-1
+truncate table tinnodb;
+select * from tinnodb;
+i
+check table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	check	status	OK
+repair table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	repair	note	The storage engine for the table doesn't support repair
+optimize table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	optimize	note	Table does not support optimize, doing recreate + analyze instead
+test.tinnodb	optimize	status	OK
+analyze table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	analyze	status	OK
+alter table tinnodb add column j int;
+alter table tinnodb engine=myisam;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table (test.tinnodb) from transactional to non-transactional with pxc_strict_mode = PERMISSIVE
+alter table tinnodb engine=memory;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of ALTER command on a table (test.tinnodb) that resides in non-transactional storage engine (except switching to transactional engine) with pxc_strict_mode = PERMISSIVE
+alter table tinnodb engine=innodb;
+drop table tinnodb;
+#node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-1
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+insert into tmyisam values (1), (2);
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of DML command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+select * from tmyisam;
+i
+#node-2
+#0 rows expected as write is blocked.
+select * from tmyisam;
+i
+#node-1
+truncate table tmyisam;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of TRUNCATE command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+select * from tmyisam;
+i
+check table tmyisam;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ADMIN command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+repair table tmyisam;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ADMIN command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+optimize table tmyisam;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ADMIN command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+analyze table tmyisam;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ADMIN command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+alter table tmyisam add column j int;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ALTER command on a table (test.tmyisam) that resides in non-transactional storage engine (except switching to transactional engine) with pxc_strict_mode = ENFORCING or MASTER
+alter table tmyisam engine=myisam;
+alter table tmyisam engine=memory;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ALTER command on a table (test.tmyisam) that resides in non-transactional storage engine (except switching to transactional engine) with pxc_strict_mode = ENFORCING or MASTER
+alter table tmyisam engine=innodb;
+drop table tmyisam;
+#node-1
+create table tmem (i int, primary key pk(i)) engine=memory;
+insert into tmem values (1), (2);
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of DML command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+select * from tmem;
+i
+#node-2
+#0 rows expected as write is blocked.
+select * from tmem;
+i
+#node-1
+truncate table tmem;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of TRUNCATE command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+select * from tmem;
+i
+check table tmem;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ADMIN command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+repair table tmem;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ADMIN command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+optimize table tmem;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ADMIN command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+analyze table tmem;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ADMIN command on a table (test.tmem) that resides in non-transactional storage engine with pxc_strict_mode = ENFORCING or MASTER
+alter table tmem add column j int;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ALTER command on a table (test.tmem) that resides in non-transactional storage engine (except switching to transactional engine) with pxc_strict_mode = ENFORCING or MASTER
+alter table tmem engine=memory;
+alter table tmem engine=myisam;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of ALTER command on a table (test.tmem) that resides in non-transactional storage engine (except switching to transactional engine) with pxc_strict_mode = ENFORCING or MASTER
+alter table tmem engine=innodb;
+drop table tmem;
+#node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+set global pxc_strict_mode='DISABLED';
+create table temp (i int) engine=myisam;
+insert into temp values (10), (20), (30);
+set global pxc_strict_mode='ENFORCING';
+insert into tinnodb select * from temp;
+select * from tinnodb;
+i
+1
+2
+10
+20
+30
+drop table temp;
+#node-2
+select * from tinnodb;
+i
+1
+2
+10
+20
+30
+#node-1
+truncate table tinnodb;
+select * from tinnodb;
+i
+check table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	check	status	OK
+repair table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	repair	note	The storage engine for the table doesn't support repair
+optimize table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	optimize	note	Table does not support optimize, doing recreate + analyze instead
+test.tinnodb	optimize	status	OK
+analyze table tinnodb;
+Table	Op	Msg_type	Msg_text
+test.tinnodb	analyze	status	OK
+alter table tinnodb add column j int;
+alter table tinnodb engine=myisam;
+ERROR HY000: Percona-XtraDB-Cluster prohibits changing storage engine of a table (test.tinnodb) from transactional to non-transactional with pxc_strict_mode = ENFORCING or MASTER
+alter table tinnodb engine=memory;
+ERROR HY000: Percona-XtraDB-Cluster prohibits changing storage engine of a table (test.tinnodb) from transactional to non-transactional with pxc_strict_mode = ENFORCING or MASTER
+alter table tinnodb engine=innodb;
+drop table tinnodb;
+#node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-1
+set session wsrep_replicate_myisam = 0;
+select @@wsrep_replicate_myisam;
+@@wsrep_replicate_myisam
+0
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+insert into tmyisam values (1), (2);
+select * from tmyisam;
+i
+1
+2
+#node-2
+#0 rows expected as myisam replication is off.
+select * from tmyisam;
+i
+drop table tmyisam;
+#node-1
+set session wsrep_replicate_myisam = 1;
+select @@wsrep_replicate_myisam;
+@@wsrep_replicate_myisam
+1
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+insert into tmyisam values (1), (2);
+select * from tmyisam;
+i
+1
+2
+#node-2
+#2 rows expected as myisam replication is on.
+select * from tmyisam;
+i
+1
+2
+drop table tmyisam;
+#node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-1
+set session wsrep_replicate_myisam = 0;
+select @@wsrep_replicate_myisam;
+@@wsrep_replicate_myisam
+0
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+insert into tmyisam values (1), (2);
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of DML command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+select * from tmyisam;
+i
+1
+2
+#node-2
+#0 rows expected as myisam replication is off.
+select * from tmyisam;
+i
+drop table tmyisam;
+#node-1
+set session wsrep_replicate_myisam = 1;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication feature with pxc_strict_mode = PERMISSIVE
+select @@wsrep_replicate_myisam;
+@@wsrep_replicate_myisam
+1
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+insert into tmyisam values (1), (2);
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of DML command on a table (test.tmyisam) that resides in non-transactional storage engine with pxc_strict_mode = PERMISSIVE
+select * from tmyisam;
+i
+1
+2
+#node-2
+#2 rows expected as myisam replication is on.
+select * from tmyisam;
+i
+1
+2
+drop table tmyisam;
+#node-1
+set global pxc_strict_mode = 'ENFORCING';
+ERROR HY000: Can't change pxc_strict_mode to ENFORCING as wsrep_replicate_myisam is ON
+set session wsrep_replicate_myisam = 0;
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-1
+set session wsrep_replicate_myisam = 0;
+select @@wsrep_replicate_myisam;
+@@wsrep_replicate_myisam
+0
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+set global pxc_strict_mode = 'DISABLED';
+insert into tmyisam values (1), (2);
+set global pxc_strict_mode = 'ENFORCING';
+select * from tmyisam;
+i
+1
+2
+#node-2
+#0 rows expected as myisam replication is off.
+select * from tmyisam;
+i
+drop table tmyisam;
+#node-1
+set session wsrep_replicate_myisam = 1;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of MyISAM table replication feature with pxc_strict_mode = ENFORCING or MASTER
+select @@wsrep_replicate_myisam;
+@@wsrep_replicate_myisam
+0
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+set global pxc_strict_mode = 'DISABLED';
+insert into tmyisam values (1), (2);
+set global pxc_strict_mode = 'ENFORCING';
+select * from tmyisam;
+i
+1
+2
+#node-2
+#0 rows expected as myisam replication is on.
+select * from tmyisam;
+i
+drop table tmyisam;
+# restart with wsrep_replicate_myisam=1
+"grep --count "WSREP: Percona-XtraDB-Cluster prohibits use of MyISAM table replication"
+1
+#node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-1
+set session binlog_format = 'STATEMENT';
+select @@binlog_format;
+@@binlog_format
+STATEMENT
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+select * from tinnodb;
+i
+#node-2
+#0 rows expected as as pxc-strict-mode = DISABLED
+select * from tinnodb;
+i
+drop table tinnodb;
+#node-1
+set session binlog_format = 'MIXED';
+select @@binlog_format;
+@@binlog_format
+MIXED
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+select * from tinnodb;
+i
+#node-2
+#0 rows expected as as binlog_format = MIXED
+select * from tinnodb;
+i
+drop table tinnodb;
+#node-1
+set session binlog_format = 'ROW';
+select @@binlog_format;
+@@binlog_format
+ROW
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+#node-2
+#2 rows expected as as binlog_format = ROW
+select * from tinnodb;
+i
+1
+2
+drop table tinnodb;
+#node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-1
+set session binlog_format = 'STATEMENT';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = PERMISSIVE
+select @@binlog_format;
+@@binlog_format
+STATEMENT
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+select * from tinnodb;
+i
+#node-2
+#0 rows expected as as pxc-strict-mode = DISABLED
+select * from tinnodb;
+i
+drop table tinnodb;
+#node-1
+set session binlog_format = 'MIXED';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = PERMISSIVE
+select @@binlog_format;
+@@binlog_format
+MIXED
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+select * from tinnodb;
+i
+#node-2
+#0 rows expected as as binlog_format = MIXED
+select * from tinnodb;
+i
+drop table tinnodb;
+#node-1
+set session binlog_format = 'ROW';
+select @@binlog_format;
+@@binlog_format
+ROW
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+#node-2
+#2 rows expected as as binlog_format = ROW
+select * from tinnodb;
+i
+1
+2
+drop table tinnodb;
+#node-1
+set session binlog_format = 'STATEMENT';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = PERMISSIVE
+set global pxc_strict_mode = 'ENFORCING';
+ERROR HY000: Can't change pxc_strict_mode to ENFORCING as binlog_format != ROW
+set session binlog_format = 'ROW';
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-1
+set session binlog_format = 'STATEMENT';
+ERROR HY000: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = ENFORCING or MASTER
+select @@binlog_format;
+@@binlog_format
+ROW
+set session binlog_format = 'MIXED';
+ERROR HY000: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = ENFORCING or MASTER
+select @@binlog_format;
+@@binlog_format
+ROW
+#node-1
+set session binlog_format = 'ROW';
+select @@binlog_format;
+@@binlog_format
+ROW
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+#node-2
+#2 rows expected as as binlog_format = ROW
+select * from tinnodb;
+i
+1
+2
+drop table tinnodb;
+# restart with binlog_format=STATEMENT
+"grep --count "WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level""
+1
+#node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-1
+create table tinnodb (i int) engine=innodb;
+create table tmyisam (i int) engine=innodb;
+insert into tinnodb values (1), (2);
+insert into tmyisam values (1), (2);
+select * from tinnodb;
+i
+1
+2
+select * from tmyisam;
+i
+1
+2
+drop table tmyisam;
+#node-2
+#2 rows expected as pxc-strict-mode = DISABLED
+select * from tinnodb;
+i
+1
+2
+drop table tinnodb;
+#node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-1
+create table tinnodb (i int) engine=innodb;
+create table tmyisam (i int) engine=innodb;
+insert into tinnodb values (1), (2);
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of DML command on a table (test.tinnodb) without an explicit primary key with pxc_strict_mode = PERMISSIVE
+insert into tmyisam values (1), (2);
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of DML command on a table (test.tmyisam) without an explicit primary key with pxc_strict_mode = PERMISSIVE
+select * from tinnodb;
+i
+1
+2
+select * from tmyisam;
+i
+1
+2
+drop table tmyisam;
+#node-2
+#2 rows expected as pxc-strict-mode = PERMISSIVE
+select * from tinnodb;
+i
+1
+2
+drop table tinnodb;
+#node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-1
+create table tinnodb (i int) engine=innodb;
+create table tmyisam (i int) engine=innodb;
+insert into tinnodb values (1), (2);
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of DML command on a table (test.tinnodb) without an explicit primary key with pxc_strict_mode = ENFORCING or MASTER
+insert into tmyisam values (1), (2);
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of DML command on a table (test.tmyisam) without an explicit primary key with pxc_strict_mode = ENFORCING or MASTER
+drop table tmyisam;
+#node-2
+#0 rows expected as pxc-strict-mode = ENFORCING and table is without primary key
+select * from tinnodb;
+i
+drop table tinnodb;
+#node-1
+set global general_log = 1;
+set global log_output = 'NONE';
+#node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-1
+set global log_output = 'NONE';
+select 1 from dual;
+1
+1
+#node-1
+set global log_output = 'FILE';
+select 1 from dual;
+1
+1
+# grep --count "select 1 from dual"
+1
+#node-1
+select count(*) from mysql.general_log;
+count(*)
+0
+set global log_output = 'TABLE';
+select 1 from dual;
+1
+1
+select count(*) from mysql.general_log;
+count(*)
+2
+#node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-1
+set global log_output = 'NONE';
+select 1 from dual;
+1
+1
+#node-1
+set global log_output = 'FILE';
+select 1 from dual;
+1
+1
+# grep --count "select 1 from dual"
+2
+#node-1
+select count(*) from mysql.general_log;
+count(*)
+5
+set global log_output = 'TABLE';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend setting log_output to TABLE with pxc_strict_mode = PERMISSIVE
+select 1 from dual;
+1
+1
+select count(*) from mysql.general_log;
+count(*)
+8
+#node-1
+set global pxc_strict_mode = 'ENFORCING';
+ERROR HY000: Can't change pxc_strict_mode to ENFORCING as log_output != NONE/FILE
+set global log_output = 'FILE';
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-1
+set global log_output = 'NONE';
+select 1 from dual;
+1
+1
+#node-1
+set global log_output = 'FILE';
+select 1 from dual;
+1
+1
+# grep --count "select 1 from dual"
+3
+#node-1
+select count(*) from mysql.general_log;
+count(*)
+10
+set global log_output = 'TABLE';
+ERROR HY000: Percona-XtraDB-Cluster prohibits setting log_output to TABLE with pxc_strict_mode = ENFORCING or MASTER
+select 1 from dual;
+1
+1
+select count(*) from mysql.general_log;
+count(*)
+10
+# restart with log_output=TABLE
+"grep --count "WSREP: Percona-XtraDB-Cluster prohibits setting log_output to TABLE""
+1
+#node-1
+#node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+lock table tinnodb read;
+unlock tables;
+lock table tinnodb write;
+unlock tables;
+select get_lock('a', 10);
+get_lock('a', 10)
+1
+select release_lock('a');
+release_lock('a')
+1
+flush table tinnodb with read lock;
+unlock tables;
+flush table tinnodb for export;
+unlock tables;
+set session transaction isolation level serializable;
+flush table with read lock;
+unlock tables;
+select i from tinnodb for update;
+i
+1
+2
+drop table tinnodb;
+#node-1
+set global pxc_strict_mode = 'MASTER';
+ERROR HY000: Can't change pxc_strict_mode to MASTER as isolation level is SERIALIZABLE
+set session transaction isolation level repeatable read;
+set global pxc_strict_mode = 'MASTER';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+MASTER
+#node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+lock table tinnodb read;
+unlock tables;
+lock table tinnodb write;
+unlock tables;
+select get_lock('a', 10);
+get_lock('a', 10)
+1
+select release_lock('a');
+release_lock('a')
+1
+flush table tinnodb with read lock;
+unlock tables;
+flush table tinnodb for export;
+unlock tables;
+set session transaction isolation level serializable;
+flush table with read lock;
+unlock tables;
+select i from tinnodb for update;
+i
+1
+2
+drop table tinnodb;
+#node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+lock table tinnodb read;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK with pxc_strict_mode = PERMISSIVE
+unlock tables;
+lock table tinnodb write;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK with pxc_strict_mode = PERMISSIVE
+unlock tables;
+select get_lock('a', 10);
+get_lock('a', 10)
+1
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of GET_LOCK with pxc_strict_mode = PERMISSIVE
+select release_lock('a');
+release_lock('a')
+1
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of RELEASE_LOCK with pxc_strict_mode = PERMISSIVE
+flush table tinnodb with read lock;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK with pxc_strict_mode = PERMISSIVE
+unlock tables;
+flush table tinnodb for export;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK with pxc_strict_mode = PERMISSIVE
+unlock tables;
+set session transaction isolation level serializable;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend using SERIALIZABLE isolation with pxc_strict_mode = PERMISSIVE
+flush table with read lock;
+unlock tables;
+select i from tinnodb for update;
+i
+1
+2
+drop table tinnodb;
+#node-1
+set global pxc_strict_mode = 'ENFORCING';
+ERROR HY000: Can't change pxc_strict_mode to ENFORCING as isolation level is SERIALIZABLE
+set session transaction isolation level repeatable read;
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+lock table tinnodb read;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT with pxc_strict_mode = ENFORCING
+unlock tables;
+lock table tinnodb write;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT with pxc_strict_mode = ENFORCING
+unlock tables;
+select get_lock('a', 10);
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of GET_LOCK with pxc_strict_mode = ENFORCING
+select release_lock('a');
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK with pxc_strict_mode = ENFORCING
+flush table tinnodb with read lock;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT with pxc_strict_mode = ENFORCING
+unlock tables;
+flush table tinnodb for export;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT with pxc_strict_mode = ENFORCING
+unlock tables;
+set session transaction isolation level serializable;
+ERROR HY000: Percona-XtraDB-Cluster doesn't recommend using SERIALIZABLE isolation with pxc_strict_mode = ENFORCING
+flush table with read lock;
+unlock tables;
+select i from tinnodb for update;
+i
+1
+2
+drop table tinnodb;
+set session transaction isolation level repeatable read;
+#node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+create table tinnodb2 (i int, primary key pk(i)) as (select * from tinnodb);
+select * from tinnodb2;
+i
+1
+2
+#node-2
+#2 rows expected with CTAS as pxc_strict_mode = DISABLED
+select * from tinnodb2;
+i
+1
+2
+drop table tinnodb;
+drop table tinnodb2;
+#node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+create table tinnodb2 (i int, primary key pk(i)) as (select * from tinnodb);
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT with pxc_strict_mode = PERMISSIVE
+select * from tinnodb2;
+i
+1
+2
+#node-2
+#2 rows expected with CTAS as pxc_strict_mode = PERMISSIVE
+select * from tinnodb2;
+i
+1
+2
+drop table tinnodb;
+drop table tinnodb2;
+#node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+i
+1
+2
+create table tinnodb2 (i int, primary key pk(i)) as (select * from tinnodb);
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT with pxc_strict_mode = ENFORCING or MASTER
+create temporary table tmp (i int, primary key pk(i)) as (select * from tinnodb);
+select * from tmp;
+i
+1
+2
+drop table tmp;
+#node-2
+select * from tinnodb2;
+ERROR 42S02: Table 'test.tinnodb2' doesn't exist
+drop table tinnodb;
+#node-1
+create table t (i int, j int, primary key pk(i)) engine=innodb;
+xa start 'testxa';
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+insert into t values (1, 2);
+select * from t;
+i	j
+1	2
+xa end 'testxa';
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+xa prepare 'testxa';
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+xa commit 'testxa';
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+select * from t;
+i	j
+1	2
+xa start 'testxa2';
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+insert into t values (2, 3);
+select * from t;
+i	j
+1	2
+2	3
+xa end 'testxa2';
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+xa commit 'testxa2' one phase;
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+drop table t;
+#node-2
+"Shutdown node-2"
+"Try restarting node-2 with --innodb_autoinc_lock_mode=1"
+"grep --count "WSREP: Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to"
+1
+"Try restarting node-2 with default options"
+# restart:
+#node-1
+CREATE TABLE tbl_w_pk(id INT PRIMARY KEY) engine=innodb;
+CREATE TABLE tbl_wo_pk(id INT) engine=innodb;
+CREATE VIEW  view_w_pk AS SELECT * FROM tbl_w_pk;
+CREATE VIEW  view_wo_pk AS SELECT * FROM tbl_wo_pk;
+INSERT INTO tbl_w_pk VALUES (1), (2);
+SELECT * FROM tbl_w_pk;
+id
+1
+2
+SELECT * FROM tbl_wo_pk;
+id
+#node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-1
+INSERT INTO view_w_pk VALUES(3);
+SELECT * FROM view_w_pk;
+id
+1
+2
+3
+INSERT INTO view_wo_pk VALUES (3);
+SELECT * FROM view_wo_pk;
+id
+3
+#node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-1
+INSERT INTO view_w_pk VALUES(4);
+SELECT * FROM view_w_pk;
+id
+1
+2
+3
+4
+INSERT INTO view_wo_pk VALUES (4);
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of INSERT on a view (test.view_wo_pk) that writes to a table with no explicit primary key with pxc_strict_mode = PERMISSIVE
+SELECT * FROM view_wo_pk;
+id
+3
+4
+include/assert_grep.inc [pxc_strict_mode issued warning about no primary keys]
+#node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-1
+INSERT INTO view_w_pk VALUES(5);
+SELECT * FROM view_w_pk;
+id
+1
+2
+3
+4
+5
+INSERT INTO view_wo_pk VALUES (5);
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of INSERT on a view (test.view_wo_pk) that writes to a table with no explicit primary key with pxc_strict_mode = ENFORCING or MASTER
+SELECT * FROM view_wo_pk;
+id
+3
+4
+include/assert_grep.inc [pxc_strict_mode issued error about no primary keys]
+#node-1
+DROP VIEW view_wo_pk;
+DROP VIEW view_w_pk;
+DROP TABLE tbl_wo_pk;
+DROP TABLE tbl_w_pk;
+#node-1
+set global pxc_strict_mode = DISABLED;;
+#node-2
+set global pxc_strict_mode = DISABLED;;

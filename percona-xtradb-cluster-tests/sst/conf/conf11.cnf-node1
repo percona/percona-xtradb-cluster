@@ -1,0 +1,15 @@
+# compress+compact+xbstream+nc+encrypt1+threads
+[xtrabackup]
+compress
+parallel=4
+compress-threads=4
+encrypt-threads=4
+encrypt=AES256
+encrypt-key=6F3AD9F428143F133FD7D50D77D91EA4
+compact
+
+
+[sst]
+streamfmt=xbstream
+encrypt=1
+

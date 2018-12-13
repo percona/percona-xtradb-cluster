@@ -1,0 +1,7 @@
+!include ../galera_2nodes_as_master_slave.cnf
+
+[mysqld.2]
+slave_skip_errors=1032
+
+[mysqld.4]
+slave_skip_errors=1032

@@ -66,6 +66,10 @@
 #include "sql_update.h"  // Sql_cmd_update
 #include "template_utils.h"
 
+#ifdef WITH_WSREP
+#include "sql/log.h"
+#endif /* WITH_WSREP */
+
 extern int HINT_PARSER_parse(THD *thd, Hint_scanner *scanner,
                              PT_hint_list **ret);
 
@@ -1761,6 +1765,19 @@ static int lex_one_token(YYSTYPE *yylval, THD *thd) {
               state = MY_LEX_START;
               break; /* Do not treat contents as a comment.  */
             } else {
+#ifdef WITH_WSREP
+              /* Special consistency check that would replicate DML command
+              as TOI needed for pt-table-checksum to check for cluster node
+              consistency. */
+              if (version == 99997 && thd->wsrep_exec_mode == LOCAL_STATE) {
+                WSREP_DEBUG("consistency check: %s", thd->query().str);
+                thd->wsrep_consistency_check = CONSISTENCY_CHECK_DECLARED;
+                lip->yySkipn(5);
+                lip->set_echo(true);
+                state = MY_LEX_START;
+                break; /* Do not treat contents as a comment.  */
+              }
+#endif /* WITH_WSREP */
               /*
                 Patch and skip the conditional comment to avoid it
                 being propagated infinitely (eg. to a slave).

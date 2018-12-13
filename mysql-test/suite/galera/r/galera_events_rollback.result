@@ -1,0 +1,29 @@
+# node 1
+CREATE TABLE t1(id INT PRIMARY KEY, f2 INT) ENGINE=INNODB;
+INSERT INTO t1 VALUES(1, 0);
+SET GLOBAL event_scheduler = ON;
+CREATE EVENT foo
+ON SCHEDULE AT CURRENT_TIMESTAMP
+DISABLE
+DO BEGIN
+SET DEBUG_SYNC = "ha_innobase_update_row SIGNAL before_commit WAIT_FOR commit_ok";
+SET DEBUG_SYNC = "pxc_event_worker_thread_end SIGNAL event_completed";
+UPDATE test.t1 SET f2 = 11 WHERE id = 1;
+END|
+# node 2
+# node 1
+ALTER EVENT foo
+ON SCHEDULE AT CURRENT_TIMESTAMP
+ENABLE;
+SET DEBUG_SYNC = "now WAIT_FOR before_commit";
+# node 2
+# This should cause the event on node 1 to be BF aborted
+UPDATE test.t1 SET f2 = 2222 WHERE id = 1;
+# node_1
+SET DEBUG_SYNC = "now WAIT_FOR event_completed";
+include/assert.inc [The Local Update has aborted the Event Update]
+include/assert.inc [wsrep_local_bf_aborts has been incremented once]
+DROP TABLE t1;
+DROP EVENT foo;
+SET GLOBAL event_scheduler = ON;;
+SET DEBUG_SYNC = "RESET";

@@ -1,0 +1,59 @@
+#
+# Test the mysqlpump utility with Galera
+#
+
+--source include/galera_cluster.inc
+
+CREATE TABLE ten (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
+
+CREATE DATABASE db1;
+CREATE TABLE db1.t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO db1.t1 SELECT 1 FROM test.ten AS a1, test.ten AS a2, test.ten AS a3;
+
+CREATE DATABASE db2;
+CREATE TABLE db2.t2 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO db2.t2 SELECT 1 FROM test.ten AS a1, test.ten AS a2, test.ten AS a3;
+
+--connection node_2
+call mtr.add_suppression("Slave SQL: Error 'Can't drop database");
+
+# As a single transaction
+--exec $MYSQL_PUMP --include-databases=db1,db2 --default-parallelism=1 --single-transaction > $MYSQLTEST_VARDIR/tmp/mysqlpump1.sql
+
+# With locks
+--exec $MYSQL_PUMP --include-databases=db1,db2 --default-parallelism=0 --add-locks > $MYSQLTEST_VARDIR/tmp/mysqlpump2.sql
+
+# Parallel
+--exec $MYSQL_PUMP --parallel-schemas=2:db1,db2 --default-parallelism=2 --include-databases=db1,db2 > $MYSQLTEST_VARDIR/tmp/mysqlpump3.sql
+
+--connection node_1
+DROP DATABASE db1;
+DROP DATABASE db2;
+
+--exec $MYSQL < $MYSQLTEST_VARDIR/tmp/mysqlpump1.sql
+SELECT COUNT(*) = 1000 FROM db1.t1;
+SELECT COUNT(*) = 1000 FROM db2.t2;
+
+DROP DATABASE db1;
+DROP DATABASE db2;
+
+--exec $MYSQL < $MYSQLTEST_VARDIR/tmp/mysqlpump2.sql
+SELECT COUNT(*) = 1000 FROM db1.t1;
+SELECT COUNT(*) = 1000 FROM db2.t2;
+
+DROP DATABASE db1;
+DROP DATABASE db2;
+
+--exec $MYSQL < $MYSQLTEST_VARDIR/tmp/mysqlpump3.sql
+SELECT COUNT(*) = 1000 FROM db1.t1;
+SELECT COUNT(*) = 1000 FROM db2.t2;
+
+DROP DATABASE db1;
+DROP DATABASE db2;
+
+DROP TABLE ten;
+
+--remove_file $MYSQLTEST_VARDIR/tmp/mysqlpump1.sql
+--remove_file $MYSQLTEST_VARDIR/tmp/mysqlpump2.sql
+--remove_file $MYSQLTEST_VARDIR/tmp/mysqlpump3.sql

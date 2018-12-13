@@ -214,6 +214,11 @@ using std::log2;
 using std::max;
 using std::min;
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#include "wsrep_xid.h"
+#endif /* WITH_WSREP */
+
 /**
   While we have legacy_db_type, we have this array to
   check for dups and to find handlerton from legacy_db_type.
@@ -1318,6 +1323,11 @@ void trans_register_ha(THD *thd, bool all, handlerton *ht_arg,
 */
 #ifdef HAVE_PSI_TRANSACTION_INTERFACE
   if (thd->m_transaction_psi == NULL && ht_arg->db_type != DB_TYPE_BINLOG &&
+#ifdef WITH_WSREP
+      /* Do not register transactions for WSREP engine registration should be
+      done by the base transactional storage engine (InnoDB). */
+      ht_arg->db_type != DB_TYPE_WSREP &&
+#endif /* WITH_WSREP */
       !thd->is_attachable_transaction_active()) {
     const XID *xid = trn_ctx->xid_state()->get_xid();
     bool autocommit = !thd->in_multi_stmt_transaction_mode();
@@ -1363,10 +1373,29 @@ int ha_prepare(THD *thd) {
           ha_rollback_trans(thd, true);
           DBUG_RETURN(1);
         });
+#ifdef WITH_WSREP
+        int err;
+        if ((err = ht->prepare(ht, thd, true))) {
+          if (WSREP(thd) && ht->db_type == DB_TYPE_WSREP) {
+            error = 1;
+            /* avoid sending error, if we need to replay */
+            if (thd->wsrep_conflict_state != MUST_REPLAY) {
+              char errbuf[MYSQL_ERRMSG_SIZE];
+              my_error(ER_LOCK_DEADLOCK, MYF(0), err,
+                       my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+            }
+          } else {
+            /* not wsrep hton, bail to native mysql behavior */
+            ha_rollback_trans(thd, true);
+            error = 1;
+            break;
+          }
+#else
         if (ht->prepare(ht, thd, true)) {
           ha_rollback_trans(thd, true);
           error = 1;
           break;
+#endif /* WITH_WSREP */
         }
       } else {
         push_warning_printf(thd, Sql_condition::SL_WARNING, ER_ILLEGAL_HA,
@@ -1658,8 +1687,15 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
                        MDL_INTENTION_EXCLUSIVE, MDL_EXPLICIT);
 
       DBUG_PRINT("debug", ("Acquire MDL commit lock"));
+#ifdef WITH_WSREP
+      // TODO: add comment why the mdl lock is skipped here when operating
+      // in cluster mode.
+      if (!WSREP(thd) && thd->mdl_context.acquire_lock(
+                             &mdl_request, thd->variables.lock_wait_timeout)) {
+#else
       if (thd->mdl_context.acquire_lock(&mdl_request,
                                         thd->variables.lock_wait_timeout)) {
+#endif /* WITH_WSREP */
         ha_rollback_trans(thd, all);
         DBUG_RETURN(1);
       }
@@ -1675,7 +1711,14 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
       goto end;
     }
 
+#ifdef WITH_WSREP
+    if ((!trn_ctx->no_2pc(trx_scope) &&
+         (trn_ctx->rw_ha_count(trx_scope) > 1)) ||
+        (WSREP(thd) && thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+         !trans_has_updated_trans_table(thd)))
+#else
     if (!trn_ctx->no_2pc(trx_scope) && (trn_ctx->rw_ha_count(trx_scope) > 1))
+#endif /* WITH_WSREP */
       error = tc_log->prepare(thd, all);
   }
   /*
@@ -1875,6 +1918,19 @@ int ha_rollback_low(THD *thd, bool all) {
       int err;
       handlerton *ht = ha_info->ht();
       if ((err = ht->rollback(ht, thd, all))) {  // cannot happen
+
+#ifdef WITH_WSREP
+        WSREP_INFO(
+            "rollback failed for handlerton: %d, conflict-state: %s SQL %s",
+            ht->db_type, wsrep_get_conflict_state(thd->wsrep_conflict_state),
+            thd->query().str);
+        Diagnostics_area *da = thd->get_stmt_da();
+        if (da) {
+          WSREP_INFO("stmt DA %d %s", da->status(),
+                     (da->is_error()) ? da->message_text() : "void");
+        }
+#endif /* WITH_WSREP */
+
         char errbuf[MYSQL_ERRMSG_SIZE];
         my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err,
                  my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
@@ -2189,16 +2245,102 @@ int ha_prepare_low(THD *thd, bool all) {
       */
       if (!ha_info->is_trx_read_write()) continue;
       if ((err = ht->prepare(ht, thd, all))) {
+#ifdef WITH_WSREP
+        if (WSREP(thd) && ht->db_type == DB_TYPE_WSREP) {
+          error = 1;
+          switch (err) {
+            case WSREP_TRX_SIZE_EXCEEDED: {
+              /* give user size exeeded erro from wsrep_api.h */
+              char errbuf[MYSQL_ERRMSG_SIZE];
+              my_error(
+                  ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED,
+                  my_strerror(errbuf, MYSQL_ERRMSG_SIZE, WSREP_SIZE_EXCEEDED));
+              break;
+            }
+            case WSREP_TRX_CERT_FAIL:
+            case WSREP_TRX_ERROR: {
+              /* avoid sending error, if we need to replay */
+              if (thd->wsrep_conflict_state != MUST_REPLAY) {
+                char errbuf[MYSQL_ERRMSG_SIZE];
+                my_error(ER_LOCK_DEADLOCK, MYF(0), err,
+                         my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+              }
+              break;
+            }
+          }
+        } else {
+          /* not wsrep hton, bail to native mysql behavior */
+          char errbuf[MYSQL_ERRMSG_SIZE];
+          my_error(ER_ERROR_DURING_COMMIT, MYF(0), err,
+                   my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+          error = 1;
+        }
+#else
         char errbuf[MYSQL_ERRMSG_SIZE];
         my_error(ER_ERROR_DURING_COMMIT, MYF(0), err,
                  my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
         error = 1;
+#endif /* WITH_WSREP */
       }
       DBUG_ASSERT(!thd->status_var_aggregated);
       thd->status_var.ha_prepare_count++;
     }
     DBUG_EXECUTE_IF("crash_commit_after_prepare", DBUG_SUICIDE(););
   }
+
+#ifdef WITH_WSREP
+  /* Original pre-commit hook is now split into 2 parts:
+  * replicate: this will replicate write-set on group channel there-by
+    assigning the global_seqno to replicate.
+  * pre-commit: this will mark start of execution by entering apply/commit
+    monitor (critical section)
+  Second part should be done only after the trx_prepare is called (for InnoDB)
+  as that will flush the REDO log there-by allowing REDO log flush to be carried
+  out in parallel.
+
+  Q. Then why not execute both the action post trx_prepare ?
+  A. trx_prepare will persist REDO log for the given transaction including
+     the assigned XID. XID for the transaction is updated to WSREP XID
+     only after the replication action executes and so replicate needs to
+     be done before calling trx_prepare but we want to avoid entering
+     critical section (pre-commit) as that will take away parallelism possible
+     with trx_prepare. */
+  if (error == 0 && thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED &&
+      thd->wsrep_exec_mode == LOCAL_STATE) {
+    int err;
+    err = wsrep_pre_commit(thd);
+
+    if (err) {
+      error = 1;
+      switch (err) {
+        case WSREP_TRX_SIZE_EXCEEDED: {
+          /* give user size exeeded erro from wsrep_api.h */
+          char errbuf[MYSQL_ERRMSG_SIZE];
+          my_error(ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED,
+                   my_strerror(errbuf, MYSQL_ERRMSG_SIZE, WSREP_SIZE_EXCEEDED));
+          break;
+        }
+        case WSREP_TRX_CERT_FAIL:
+        case WSREP_TRX_ERROR: {
+          /* avoid sending error, if we need to replay */
+          if (thd->wsrep_conflict_state != MUST_REPLAY) {
+            char errbuf[MYSQL_ERRMSG_SIZE];
+            my_error(ER_LOCK_DEADLOCK, MYF(0), err,
+                     my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+          }
+          break;
+        }
+      }
+    }
+  } else if (error == 0 &&
+             thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED &&
+             thd->wsrep_exec_mode == REPL_RECV) {
+    /* Pre-commit hook will start commit ordering. */
+    if (thd->wsrep_ws_handle.opaque && thd->wsrep_conflict_state != REPLAYING)
+      wsrep->applier_pre_commit(wsrep, thd->wsrep_ws_handle.opaque);
+  }
+
+#endif /* WITH_WSREP */
 
   DBUG_RETURN(error);
 }
@@ -3808,7 +3950,12 @@ int handler::update_auto_increment() {
                                           variables->auto_increment_increment);
     auto_inc_intervals_count++;
     /* Row-based replication does not need to store intervals in binlog */
+#ifdef WITH_WSREP
+    if (((WSREP_EMULATE_BINLOG(thd)) || mysql_bin_log.is_open()) &&
+        !thd->is_current_stmt_binlog_format_row())
+#else
     if (mysql_bin_log.is_open() && !thd->is_current_stmt_binlog_format_row())
+#endif /* WITH_WSREP */
       thd->auto_inc_intervals_in_cur_stmt_for_binlog.append(
           auto_inc_interval_for_cur_row.minimum(),
           auto_inc_interval_for_cur_row.values(),
@@ -4951,6 +5098,10 @@ int ha_enable_transaction(THD *thd, bool on) {
   int error = 0;
   DBUG_ENTER("ha_enable_transaction");
   DBUG_PRINT("enter", ("on: %d", (int)on));
+
+#ifdef WITH_WSREP
+  if (thd->wsrep_applier) DBUG_RETURN(0);
+#endif /* WITH_WSREP */
 
   if ((thd->get_transaction()->m_flags.enabled = on)) {
     /*
@@ -7629,7 +7780,13 @@ static bool check_table_binlog_row_based(THD *thd, TABLE *table) {
   return (thd->is_current_stmt_binlog_format_row() &&
           table->s->cached_row_logging_check &&
           (thd->variables.option_bits & OPTION_BIN_LOG) &&
+#ifdef WITH_WSREP
+          /* applier and replayer should not binlog */
+          ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) ||
+           mysql_bin_log.is_open()));
+#else
           mysql_bin_log.is_open());
+#endif
 }
 
 /** @brief
@@ -7708,6 +7865,26 @@ int binlog_log_row(TABLE *table, const uchar *before_record,
                    const uchar *after_record, Log_func *log_func) {
   bool error = 0;
   THD *const thd = table->in_use;
+
+#ifdef WITH_WSREP
+  /* enforce wsrep_max_ws_rows */
+  /* With MySQL-8.0 DDL action would result in altering of InnoDB
+  system table. Logic below should avoid considering alter of InnoDB
+  system table to increase affected rows. To cover the same logic
+  is not expanded to include binlog check. InnoDB flow suppresses
+  binlogging of the changes that it does to DDL table as part of DDL
+  execution. */
+  if (WSREP(thd) && table->s->tmp_table == NO_TMP_TABLE &&
+      check_table_binlog_row_based(thd, table)) {
+    thd->wsrep_affected_rows++;
+    if (wsrep_max_ws_rows && thd->wsrep_exec_mode != REPL_RECV &&
+        thd->wsrep_affected_rows > wsrep_max_ws_rows) {
+      trans_rollback_stmt(thd) || trans_rollback(thd);
+      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
+      return ER_ERROR_DURING_COMMIT;
+    }
+  }
+#endif /* WITH_WSREP */
 
   if (check_table_binlog_row_based(thd, table)) {
     if (thd->variables.transaction_write_set_extraction != HASH_ALGORITHM_OFF) {
@@ -7997,6 +8174,50 @@ void handler::unlock_shared_ha_data() {
   if (table_share->tmp_table == NO_TMP_TABLE)
     mysql_mutex_unlock(&table_share->LOCK_ha_data);
 }
+
+#ifdef WITH_WSREP
+/**
+  @details
+  This function makes the storage engine to force the victim transaction
+  to abort. Currently, only innodb has this functionality, but any SE
+  implementing the wsrep API should provide this service to support
+  multi-master operation.
+
+  @param bf_thd       brute force THD asking for the abort
+  @param victim_thd   victim THD to be aborted
+
+  @return
+    always 0
+*/
+
+int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, bool signal) {
+  DBUG_ENTER("ha_wsrep_abort_transaction");
+  if (!WSREP(bf_thd) && !(bf_thd->variables.wsrep_OSU_method == WSREP_OSU_RSU &&
+                          bf_thd->wsrep_exec_mode == TOTAL_ORDER)) {
+    DBUG_RETURN(0);
+  }
+
+  handlerton *hton = installed_htons[DB_TYPE_INNODB];
+  if (hton && hton->wsrep_abort_transaction) {
+    hton->wsrep_abort_transaction(hton, bf_thd, victim_thd, signal);
+  } else {
+    WSREP_WARN("cannot abort InnoDB transaction");
+  }
+
+  DBUG_RETURN(0);
+}
+
+void ha_wsrep_fake_trx_id(THD * thd) {
+  DBUG_ENTER("ha_wsrep_fake_trx_id");
+  if (!WSREP(thd)) {
+    DBUG_VOID_RETURN;
+  }
+
+  (void)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
+
+  DBUG_VOID_RETURN;
+}
+#endif /* WITH_WSREP */
 
 /**
   This structure is a helper structure for passing the length and pointer of

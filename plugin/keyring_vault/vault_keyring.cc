@@ -155,7 +155,13 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info MY_ATTRIBUTE((unused))) {
         push_warning(current_thd, Sql_condition::SL_WARNING, 42000,
                      "keyring_vault initialization failure. Please check the "
                      "server log.");
+#ifdef WITH_WSREP
+      /* TODO: this check should be done only if node is running in cluster
+       * mode. */
+      return 1;
+#else
       return 0;
+#endif /* WITH_WSREP */
     }
     is_keys_container_initialized = true;
     return 0;

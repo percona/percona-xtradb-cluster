@@ -1,0 +1,13 @@
+Killing node #2 to free ports for garbd ...
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+Variable_name	Value
+wsrep_flow_control_interval	[ 100, 100 ]
+Starting garbd ...
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+Variable_name	Value
+wsrep_flow_control_interval	[ 100, 100 ]
+Killing garbd ...
+Restarting node #2 to satisfy MTR's end-of-test checks
+# restart
+CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");

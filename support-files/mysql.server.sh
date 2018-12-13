@@ -2,7 +2,7 @@
 # Copyright Abandoned 1996 TCX DataKonsult AB & Monty Program KB & Detron HB
 # This file is public domain and comes with NO WARRANTY of any kind
 
-# MySQL (Percona Server) daemon start/stop script.
+# MySQL (Percona XtraDB Cluster) daemon start/stop script.
 
 # Usually this is put in /etc/init.d (at least on machines SYSV R4 based
 # systems) and linked to /etc/rc3.d/S99mysql and /etc/rc0.d/K01mysql.
@@ -21,9 +21,22 @@
 # Required-Stop: $local_fs $network $remote_fs
 # Default-Start:  2 3 4 5
 # Default-Stop: 0 1 6
-# Short-Description: start and stop MySQL (Percona Server)
+# Short-Description: start and stop MySQL (Percona XtraDB Cluster)
 # Description: Percona-Server is a SQL database engine with focus on high performance.
 ### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+ 
+# Prevent OpenSUSE's init scripts from calling systemd, so that
+# both 'bootstrap' and 'start' are handled entirely within this script
+
+SYSTEMD_NO_WRAP=1
+
+# Prevent Debian's init scripts from calling systemctl
+
+SYSTEMCTL_SKIP_REDIRECT=true
+_SYSTEMCTL_SKIP_REDIRECT=true
  
 # If you install MySQL on some other places than @prefix@, then you
 # have to do one of the following things for this script to work:
@@ -43,6 +56,13 @@
 # If you change base dir, you must also change datadir. These may get
 # overwritten by settings in the MySQL configuration files.
 
+# source the defauts file /etc/sysconfig/mysql if it exists for any environment variables.
+# set -a is done so that  'FOO=BAR' just be used than 'export FOO=BAR' in the /etc/sysconfig/mysql.
+# However, export FOO=BAR in that file also should work.
+set -a
+[ -r /etc/sysconfig/mysql ] && . /etc/sysconfig/mysql
+set +a
+
 basedir=
 datadir=
 
@@ -52,6 +72,7 @@ datadir=
 # 0 means don't wait at all
 # Negative numbers mean to wait indefinitely
 service_startup_timeout=900
+startup_sleep=1
 
 # Lock directory for RedHat / SuSE.
 lockdir='/var/lock/subsys'
@@ -126,17 +147,17 @@ parse_server_arguments() {
     case "$arg" in
       --basedir=*)  basedir=`echo "$arg" | sed -e 's/^[^=]*=//'`
                     bindir="$basedir/bin"
-		    if test -z "$datadir_set"; then
-		      datadir="$basedir/data"
-		    fi
-		    sbindir="$basedir/sbin"
-		    libexecdir="$basedir/libexec"
+                    if test -z "$datadir_set"; then
+                      datadir="$basedir/data"
+                    fi
+                    sbindir="$basedir/sbin"
+                    libexecdir="$basedir/libexec"
         ;;
       --datadir=*)  datadir=`echo "$arg" | sed -e 's/^[^=]*=//'`
-		    datadir_set=1
-	;;
-      --pid-file=*) mysqld_pid_file_path=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
-      --service-startup-timeout=*) service_startup_timeout=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
+                    datadir_set=1
+        ;;
+      --pid-file=*|--pid_file=*) mysqld_pid_file_path=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
+      --service-startup-timeout=*|--service_startup_timeout=*) service_startup_timeout=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
     esac
   done
 }
@@ -146,6 +167,7 @@ wait_for_pid () {
   pid="$2"            # process ID of the program operating on the pid-file
   pid_file_path="$3" # path to the PID file.
 
+  sst_progress_file=$datadir/sst_in_progress
   i=0
   avoid_race_condition="by checking again"
 
@@ -183,25 +205,51 @@ wait_for_pid () {
       fi
     fi
 
+    if (test -e $sst_progress_file || [ $mode = 'bootstrap-pxc' ]) && [ $startup_sleep -ne 10 ];then
+        echo "State transfer in progress, setting sleep higher"
+        startup_sleep=10
+    fi
+
     echo $echo_n ".$echo_c"
     i=`expr $i + 1`
-    sleep 1
+    sleep $startup_sleep
 
   done
 
   if test -z "$i" ; then
     log_success_msg
     return 0
+  elif test -e $sst_progress_file; then 
+    log_failure_msg
+    return 2
   else
     log_failure_msg
     return 1
   fi
 }
 
+install_validate_password_sql_file () {
+    local dir
+    local initfile
+    dir=/var/lib/mysql
+    initfile="$(mktemp $dir/install-validate-password-plugin.XXXXXX.sql)"
+    chown mysql:mysql "$initfile"
+    echo "INSERT INTO mysql.plugin (name, dl) VALUES ('validate_password', 'validate_password.so');" > "$initfile"
+    echo "SHUTDOWN;" >> "$initfile"
+    echo "$initfile"
+}
+
 # Get arguments from the my.cnf file,
 # the only group, which is read from now on is [mysqld]
-if test -x "$bindir/my_print_defaults";  then
+if test -x ./bin/my_print_defaults
+then
+  print_defaults="./bin/my_print_defaults"
+elif test -x $bindir/my_print_defaults
+then
   print_defaults="$bindir/my_print_defaults"
+elif test -x $bindir/mysql_print_defaults
+then
+  print_defaults="$bindir/mysql_print_defaults"
 else
   # Try to find basedir in /etc/my.cnf
   conf=/etc/my.cnf
@@ -212,10 +260,15 @@ else
     dirs=`sed -e "/$subpat/!d" -e 's//\1/' $conf`
     for d in $dirs
     do
-      d=`echo $d | sed -e 's/[ 	]//g'`
+	d=`echo $d | sed -e 's/[ 	]//g'`
       if test -x "$d/bin/my_print_defaults"
       then
         print_defaults="$d/bin/my_print_defaults"
+        break
+      fi
+      if test -x "$d/bin/mysql_print_defaults"
+      then
+        print_defaults="$d/bin/mysql_print_defaults"
         break
       fi
     done
@@ -251,20 +304,101 @@ else
   esac
 fi
 
+check_running() {
+
+    local show_msg=$1
+
+    # First, check to see if pid file exists
+    if test -s "$mysqld_pid_file_path" ; then 
+        read mysqld_pid < "$mysqld_pid_file_path"
+        if kill -0 $mysqld_pid 2>/dev/null ; then 
+            log_success_msg "MySQL (Percona XtraDB Cluster) running ($mysqld_pid)"
+            return 0
+        else
+            log_failure_msg "MySQL (Percona XtraDB Cluster) is not running, but PID file exists"
+            return 1
+        fi
+    else
+        # Try to find appropriate mysqld process
+        mysqld_pid=`pidof $libexecdir/mysqld`
+
+        # test if multiple pids exist
+        pid_count=`echo $mysqld_pid | wc -w`
+        if test $pid_count -gt 1 ; then
+            log_failure_msg "Multiple MySQL running but PID file could not be found ($mysqld_pid)"
+            return 5
+        elif test -z $mysqld_pid ; then 
+            if test -f "$lock_file_path" ; then 
+                log_failure_msg "MySQL (Percona XtraDB Cluster) is not running, but lock file ($lock_file_path) exists"
+                return 3
+            fi 
+            test $show_msg -eq 1 && log_failure_msg "MySQL (Percona XtraDB Cluster) is not running"
+            return 3
+        else
+            log_failure_msg "MySQL (Percona XtraDB Cluster) is running but PID file could not be found"
+            return 4
+        fi
+    fi
+}
+
 case "$mode" in
   'start')
+
+    check_running 0
+    ext_status=$?
+    if test $ext_status -ne 3;then 
+        exit $ext_status
+    fi
+    if [ ! -d "$datadir/mysql" ] ; then
+        # First, make sure $datadir is there with correct permissions
+        if [ ! -e "$datadir" -a ! -h "$datadir" ]
+        then
+          mkdir -p "$datadir" || exit 1
+        fi
+        if [ -f "$datadir/sst_in_progress" ]; then
+            rm -rf $datadir/*
+        fi
+        chown mysql:mysql "$datadir"
+        chmod 0751 "$datadir"
+        if [ -x /sbin/restorecon ] ; then
+          /sbin/restorecon "$datadir"
+          for dir in /var/lib/mysql-files /var/lib/mysql-keyring ; do
+            if [ -x /usr/sbin/semanage -a -d /var/lib/mysql -a -d $dir ] ; then
+              /usr/sbin/semanage fcontext -a -e /var/lib/mysql $dir >/dev/null 2>&1
+              /sbin/restorecon $dir
+            fi
+          done
+        fi
+        # Now create the database
+        action $"Initializing MySQL database: " /usr/sbin/mysqld --initialize --datadir="$datadir" --user=mysql
+        ret=$?
+        [ $ret -ne 0 ] && exit $ret
+        chown -R mysql:mysql "$datadir"
+        # Generate certs if needed
+        if [ -x /usr/bin/mysql_ssl_rsa_setup -a ! -e "${datadir}/server-key.pem" ] ; then
+          /usr/bin/mysql_ssl_rsa_setup --datadir="$datadir" --uid=mysql >/dev/null 2>&1
+        fi
+    fi
     # Start daemon
+    if test -e $datadir/sst_in_progress;then 
+        echo "Stale sst_in_progress file in datadir"
+    fi
 
     # Safeguard (relative paths, core dumps..)
     cd $basedir
 
-    echo $echo_n "Starting MySQL (Percona Server)"
+    echo $echo_n "Starting MySQL (Percona XtraDB Cluster)"
     if test -x $bindir/mysqld_safe
     then
       # Give extra arguments to mysqld with the my.cnf file. This script
       # may be overwritten at next upgrade.
       $bindir/mysqld_safe --datadir="$datadir" --pid-file="$mysqld_pid_file_path" $other_args >/dev/null &
       wait_for_pid created "$!" "$mysqld_pid_file_path"; return_value=$?
+      if [ $return_value == 1 ];then 
+          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
+      elif [ $return_value == 2 ];then
+          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed! State transfer still in progress"
+      fi
 
       # Make lock for RedHat / SuSE
       if test -w "$lockdir"
@@ -281,7 +415,7 @@ case "$mode" in
   'stop')
     # Stop daemon. We use a signal here to avoid having to know the
     # root password.
-
+    echo $echo_n "Shutting down MySQL (Percona XtraDB Cluster)"
     if test -s "$mysqld_pid_file_path"
     then
       # signal mysqld_safe that it needs to stop
@@ -291,13 +425,21 @@ case "$mode" in
 
       if (kill -0 $mysqld_pid 2>/dev/null)
       then
-        echo $echo_n "Shutting down MySQL (Percona Server)"
         kill $mysqld_pid
         # mysqld should remove the pid file when it exits, so wait for it.
         wait_for_pid removed "$mysqld_pid" "$mysqld_pid_file_path"; return_value=$?
+        if [ $return_value != 0 ];then 
+            log_failure_msg "MySQL (Percona XtraDB Cluster) server stop failed!"
+        fi
       else
-        log_failure_msg "MySQL (Percona Server) server process #$mysqld_pid is not running!"
+        log_failure_msg "MySQL (Percona XtraDB Cluster) server process #$mysqld_pid is not running!"
         rm "$mysqld_pid_file_path"
+      fi
+
+      # To avoid the race condition involved in restarts with PID file.
+      if (kill -0 $mysqld_pid 2>/dev/null)
+      then
+          sleep 2
       fi
 
       # Delete lock for RedHat / SuSE
@@ -307,7 +449,7 @@ case "$mode" in
       fi
       exit $return_value
     else
-      log_failure_msg "MySQL (Percona Server) PID file could not be found!"
+      log_failure_msg "MySQL (Percona XtraDB Cluster) PID file could not be found!"
     fi
     ;;
 
@@ -315,7 +457,24 @@ case "$mode" in
     # Stop the service and regardless of whether it was
     # running or not, start it again.
     if $0 stop  $other_args; then
-      $0 start $other_args
+      if ! $0 start $other_args; then 
+         log_failure_msg "Failed to restart server."
+         exit 1
+      fi
+    else
+      log_failure_msg "Failed to stop running server, so refusing to try to start."
+      exit 1
+    fi
+    ;;
+
+  'restart-bootstrap')
+    # Stop the service and regardless of whether it was
+    # running or not, start it again.
+    if $0 stop  $other_args; then
+      if ! $0 bootstrap-pxc $other_args;then
+         log_failure_msg "Failed to restart server with bootstrap."
+         exit 1
+      fi
     else
       log_failure_msg "Failed to stop running server, so refusing to try to start."
       exit 1
@@ -325,50 +484,33 @@ case "$mode" in
   'reload'|'force-reload')
     if test -s "$mysqld_pid_file_path" ; then
       read mysqld_pid <  "$mysqld_pid_file_path"
-      kill -HUP $mysqld_pid && log_success_msg "Reloading service MySQL (Percona Server)"
+      kill -HUP $mysqld_pid && log_success_msg "Reloading service MySQL (Percona XtraDB Cluster)"
       touch "$mysqld_pid_file_path"
     else
-      log_failure_msg "MySQL (Percona Server) PID file could not be found!"
+      log_failure_msg "MySQL (Percona XtraDB Cluster) PID file could not be found!"
       exit 1
     fi
     ;;
   'status')
-    # First, check to see if pid file exists
-    if test -s "$mysqld_pid_file_path" ; then 
-      read mysqld_pid < "$mysqld_pid_file_path"
-      if kill -0 $mysqld_pid 2>/dev/null ; then 
-        log_success_msg "MySQL (Percona Server) running ($mysqld_pid)"
-        exit 0
-      else
-        log_failure_msg "MySQL (Percona Server) is not running, but PID file exists"
-        exit 1
-      fi
-    else
-      # Try to find appropriate mysqld process
-      mysqld_pid=`@PIDOF@ $libexecdir/mysqld`
-
-      # test if multiple pids exist
-      pid_count=`echo $mysqld_pid | wc -w`
-      if test $pid_count -gt 1 ; then
-        log_failure_msg "Multiple MySQL running but PID file could not be found ($mysqld_pid)"
-        exit 5
-      elif test -z $mysqld_pid ; then 
-        if test -f "$lock_file_path" ; then 
-          log_failure_msg "MySQL (Percona Server) is not running, but lock file ($lock_file_path) exists"
-          exit 2
-        fi 
-        log_failure_msg "MySQL (Percona Server) is not running"
-        exit 3
-      else
-        log_failure_msg "MySQL (Percona Server) is running but PID file could not be found"
-        exit 4
-      fi
-    fi
+      check_running 1
+      exit $?
     ;;
+  'bootstrap-pxc')
+      # Bootstrap the Percona XtraDB Cluster, start the first node
+      # that initiate the cluster
+      echo $echo_n "Bootstrapping PXC (Percona XtraDB Cluster)"
+      $0 start $other_args --wsrep-new-cluster
+      ;;
+    'bootstrap')
+      # Bootstrap the cluster, start the first node
+      # that initiate the cluster
+      echo $echo_n "Bootstrapping the cluster"
+      $0 start $other_args --wsrep-new-cluster
+      ;;
     *)
       # usage
       basename=`basename "$0"`
-      echo "Usage: $basename  {start|stop|restart|reload|force-reload|status}  [ MySQL (Percona Server) options ]"
+      echo "Usage: $basename {start|stop|restart|restart-bootstrap|reload|force-reload|status|bootstrap-pxc}  [ MySQL (Percona XtraDB Cluster) options ]"
       exit 1
     ;;
 esac

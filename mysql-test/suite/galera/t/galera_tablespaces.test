@@ -1,0 +1,78 @@
+
+#
+# TC aims to test CREATE tablespace and related functionality.
+# especially 5.7 introduces GENERAL TABLESPACE and so it is important
+# that these tablespaces are replicated.
+#
+
+#
+# Important note/limitation: If user try to create tablespace
+# with datafile located out of data-directory then structure of file-system
+# on all nodes should be same else it may result in error on one of the node
+# Such error are logged to log file but we don't break the Galera-replication
+# link though it introduces GTID backlog on failing node.
+#
+
+--source include/galera_cluster.inc
+
+#------------------------------------------------------------------------------
+#
+# Basic scenario to create tablespace directly in data-directory.
+#
+--connection node_1
+--echo #node-1
+use test;
+
+create tablespace ts1 add datafile 'ts1.ibd' engine=innodb;
+create table t1 (i int) TABLESPACE ts1 engine=innodb;
+create table t2 (i int) engine=innodb;
+insert into t1 values (1), (2), (3);
+insert into t2 values (3), (4), (5);
+
+#--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+#--eval create tablespace ts2 add datafile '$MYSQL_TMP_DIR/n1/ts2.ibd' engine=innodb;
+#create table t3 (i int) TABLESPACE ts2 engine=innodb;
+#insert into t3 values (100), (101), (102);
+
+# check if tablespace is created
+select name from information_schema.innodb_tablespaces where name='ts1';
+select name from information_schema.innodb_tablespaces where name='ts2';
+show create table t1;
+show create table t2;
+
+# alter should put t2 into ts1 tablespace too.
+alter table t2 tablespace ts1;
+show create table t1;
+show create table t2;
+
+--connection node_2
+--echo #node-2
+use test;
+# ensure all the actions are replicated. CREATE TABLESPACE will use TOI.
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+#
+select name from information_schema.innodb_tablespaces where name='ts1';
+show create table t1;
+show create table t2;
+select * from t1;
+select * from t2;
+#
+# what happens if we try to re-alter keeping the tablespace name unchanged.
+alter table t2 tablespace ts1;
+show create table t2;
+
+# cleanup the workload
+--connection node_1
+--echo #node-1
+use test;
+show create table t2;
+drop table t1;
+drop table t2;
+drop tablespace ts1;
+
+# ensure drop action is replicated too.
+--connection node_2
+--echo #node-2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'ts1';
+--source include/wait_condition.inc

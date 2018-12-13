@@ -1,0 +1,13 @@
+USE performance_schema;
+SELECT * FROM session_variables WHERE VARIABLE_NAME LIKE "wsrep_dirty_reads";
+VARIABLE_NAME	VARIABLE_VALUE
+wsrep_dirty_reads	OFF
+SET GLOBAL wsrep_reject_queries=ALL;
+SELECT * FROM session_variables WHERE VARIABLE_NAME LIKE "wsrep_dirty_reads";
+VARIABLE_NAME	VARIABLE_VALUE
+wsrep_dirty_reads	OFF
+SET GLOBAL wsrep_reject_queries=NONE;
+SET SESSION wsrep_dirty_reads=TRUE;
+SELECT * FROM session_variables WHERE VARIABLE_NAME LIKE "wsrep_dirty_reads";
+VARIABLE_NAME	VARIABLE_VALUE
+wsrep_dirty_reads	ON

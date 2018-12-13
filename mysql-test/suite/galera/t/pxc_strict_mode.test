@@ -1,0 +1,1454 @@
+
+#
+# Test different options with different variation of pxc-strict-mode.
+#
+
+--source include/galera_cluster.inc
+--source include/force_restart.inc
+
+
+#-------------------------------------------------------------------------------
+#
+# create test-bed
+#
+# let's cache the default value first.
+--connection node_1
+--echo #node-1
+--let restartdir= $MYSQLTEST_VARDIR/tmp/restartdir
+--mkdir $restartdir
+
+--connection node_1
+--echo #node-1
+
+# save the mode that mtr is using for running test-case
+--let $pxc_strict_mode_saved1 = `SELECT @@pxc_strict_mode`
+
+# to allow insertion in add_suppression table.
+set global pxc_strict_mode='DISABLED';
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of GET_LOCK");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of RELEASE_LOCK");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of GET_LOCK");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK");
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT");
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED");
+call mtr.add_suppression("WSREP: Can't change pxc_strict_mode while binlog format != ROW");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED");
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend using SERIALIZABLE isolation");
+call mtr.add_suppression("WSREP: Can't change pxc_strict_mode while isolation level is SERIALIZABLE");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits using SERIALIZABLE isolation mode");
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend setting log_output to TABLE");
+call mtr.add_suppression("WSREP: Can't change pxc_strict_mode while log_output != NONE/FILE");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits setting log_output to TABLE");
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication feature");
+call mtr.add_suppression("WSREP: Can't change pxc_strict_mode with wsrep_replicate_myisam turned ON");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of MyISAM table replication feature");
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of DML command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of INSERT");
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of DML command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of TRUNCATE command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ADMIN command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ALTER command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits changing storage engine of a table");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of INSERT");
+
+
+call mtr.add_suppression("WSREP doesn't support XA transaction");
+
+set global pxc_strict_mode='ENFORCING';
+
+--connection node_2
+--echo #node-2
+
+# save the mode that mtr is using for running test-case
+--let $pxc_strict_mode_saved2 = `SELECT @@pxc_strict_mode`
+
+# to allow insertion in add_suppression table.
+set global pxc_strict_mode='DISABLED';
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
+
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of DML command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
+
+set global pxc_strict_mode='ENFORCING';
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-1: Engine-type
+# (supported engine-type are transactional engines like InnoDB)
+#
+
+#----------------------------
+#
+# DISABLED
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+
+#
+# base table in myisam format
+--connection node_1
+--echo #node-1
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+set session wsrep_replicate_myisam=1;
+insert into tmyisam values (1), (2);
+set session wsrep_replicate_myisam=0;
+select * from tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected as pxc-strict-mode = DISABLED and wsrep_replicate_myisam=1
+select * from tmyisam;
+#
+--connection node_1
+--echo #node-1
+truncate table tmyisam;
+select * from tmyisam;
+check table tmyisam;
+repair table tmyisam;
+optimize table tmyisam;
+analyze table tmyisam;
+alter table tmyisam add column j int;
+alter table tmyisam engine=myisam;
+alter table tmyisam engine=memory;
+alter table tmyisam engine=innodb;
+drop table tmyisam;
+
+#
+# base table in memory format
+--connection node_1
+--echo #node-1
+create table tmem (i int, primary key pk(i)) engine=memory;
+insert into tmem values (1), (2);
+select * from tmem;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as pxc doesn't replicate any other tables besides InnoDB and MyISAM
+select * from tmem;
+#
+--connection node_1
+--echo #node-1
+truncate table tmem;
+select * from tmem;
+select * from tmem;
+check table tmem;
+repair table tmem;
+optimize table tmem;
+analyze table tmem;
+alter table tmem add column j int;
+alter table tmem engine=myisam;
+alter table tmem engine=memory;
+alter table tmem engine=innodb;
+drop table tmem;
+
+
+#
+# base table in innodb format
+--connection node_1
+--echo #node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected with engine=innodb
+select * from tinnodb;
+#
+--connection node_1
+--echo #node-1
+truncate table tinnodb;
+select * from tinnodb;
+check table tinnodb;
+repair table tinnodb;
+optimize table tinnodb;
+analyze table tinnodb;
+alter table tinnodb add column j int;
+alter table tinnodb engine=myisam;
+alter table tinnodb engine=memory;
+alter table tinnodb engine=innodb;
+drop table tinnodb;
+
+
+#----------------------------
+#
+# PERMISSIVE
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+
+#
+# base table in myisam format
+--connection node_1
+--echo #node-1
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+set session wsrep_replicate_myisam=1;
+insert into tmyisam values (1), (2);
+set session wsrep_replicate_myisam=0;
+select * from tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected as pxc-strict-mode = DISABLED and wsrep_replicate_myisam=1
+select * from tmyisam;
+#
+--connection node_1
+--echo #node-1
+truncate table tmyisam;
+select * from tmyisam;
+check table tmyisam;
+repair table tmyisam;
+optimize table tmyisam;
+analyze table tmyisam;
+alter table tmyisam add column j int;
+alter table tmyisam engine=myisam;
+alter table tmyisam engine=memory;
+alter table tmyisam engine=innodb;
+drop table tmyisam;
+
+#
+# base table in memory format
+--connection node_1
+--echo #node-1
+create table tmem (i int, primary key pk(i)) engine=memory;
+insert into tmem values (1), (2);
+select * from tmem;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as pxc doesn't replicate any other tables besides InnoDB and MyISAM
+select * from tmem;
+#
+--connection node_1
+--echo #node-1
+truncate table tmem;
+select * from tmem;
+check table tmem;
+repair table tmem;
+optimize table tmem;
+analyze table tmem;
+alter table tmem add column j int;
+alter table tmem engine=memory;
+alter table tmem engine=myisam;
+alter table tmem engine=innodb;
+drop table tmem;
+
+
+#
+# base table in innodb format
+--connection node_1
+--echo #node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected with engine=innodb
+select * from tinnodb;
+#
+--connection node_1
+--echo #node-1
+truncate table tinnodb;
+select * from tinnodb;
+check table tinnodb;
+repair table tinnodb;
+optimize table tinnodb;
+analyze table tinnodb;
+alter table tinnodb add column j int;
+alter table tinnodb engine=myisam;
+alter table tinnodb engine=memory;
+alter table tinnodb engine=innodb;
+drop table tinnodb;
+
+
+#----------------------------
+#
+# ENFORCING
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+
+#
+# base table in myisam format
+--connection node_1
+--echo #node-1
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+# write is blocked as myisam is non-transactional storage engine not supported by PXC.
+--error ER_UNKNOWN_ERROR
+insert into tmyisam values (1), (2);
+select * from tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as write is blocked.
+select * from tmyisam;
+#
+--connection node_1
+--echo #node-1
+# ADMIN and ALTER commands are blocked too except changing engine to InnoDB
+--error ER_UNKNOWN_ERROR
+truncate table tmyisam;
+select * from tmyisam;
+--error ER_UNKNOWN_ERROR
+check table tmyisam;
+--error ER_UNKNOWN_ERROR
+repair table tmyisam;
+--error ER_UNKNOWN_ERROR
+optimize table tmyisam;
+--error ER_UNKNOWN_ERROR
+analyze table tmyisam;
+--error ER_UNKNOWN_ERROR
+alter table tmyisam add column j int;
+alter table tmyisam engine=myisam;
+--error ER_UNKNOWN_ERROR
+alter table tmyisam engine=memory;
+alter table tmyisam engine=innodb;
+drop table tmyisam;
+
+#
+# base table in memory format
+--connection node_1
+--echo #node-1
+create table tmem (i int, primary key pk(i)) engine=memory;
+# write is blocked as memory is non-transactional storage engine not supported by PXC.
+--error ER_UNKNOWN_ERROR
+insert into tmem values (1), (2);
+select * from tmem;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as write is blocked.
+select * from tmem;
+#
+--connection node_1
+--echo #node-1
+# ADMIN and ALTER commands are blocked too except changing engine to InnoDB
+--error ER_UNKNOWN_ERROR
+truncate table tmem;
+select * from tmem;
+--error ER_UNKNOWN_ERROR
+check table tmem;
+--error ER_UNKNOWN_ERROR
+repair table tmem;
+--error ER_UNKNOWN_ERROR
+optimize table tmem;
+--error ER_UNKNOWN_ERROR
+analyze table tmem;
+--error ER_UNKNOWN_ERROR
+alter table tmem add column j int;
+alter table tmem engine=memory;
+--error ER_UNKNOWN_ERROR
+alter table tmem engine=myisam;
+alter table tmem engine=innodb;
+drop table tmem;
+
+
+#
+# base table in innodb format
+--connection node_1
+--echo #node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+set global pxc_strict_mode='DISABLED';
+create table temp (i int) engine=myisam;
+insert into temp values (10), (20), (30);
+set global pxc_strict_mode='ENFORCING';
+insert into tinnodb select * from temp;
+select * from tinnodb;
+drop table temp;
+#
+--connection node_2
+--echo #node-2
+select * from tinnodb;
+#
+--connection node_1
+--echo #node-1
+truncate table tinnodb;
+select * from tinnodb;
+check table tinnodb;
+repair table tinnodb;
+optimize table tinnodb;
+analyze table tinnodb;
+alter table tinnodb add column j int;
+# switching from transactional to non-transactional is blocked.
+--error ER_UNKNOWN_ERROR
+alter table tinnodb engine=myisam;
+--error ER_UNKNOWN_ERROR
+alter table tinnodb engine=memory;
+alter table tinnodb engine=innodb;
+drop table tinnodb;
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-2: Test effect of pxc-strict-mode on wsrep_replicate_myisam
+#
+
+#----------------------------
+#
+# DISABLED
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+
+#
+# wsrep_replicate_myisam = 0
+--connection node_1
+--echo #node-1
+set session wsrep_replicate_myisam = 0;
+select @@wsrep_replicate_myisam;
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+insert into tmyisam values (1), (2);
+select * from tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as myisam replication is off.
+select * from tmyisam;
+drop table tmyisam;
+
+#
+# wsrep_replicate_myisam = 1
+--connection node_1
+--echo #node-1
+set session wsrep_replicate_myisam = 1;
+select @@wsrep_replicate_myisam;
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+insert into tmyisam values (1), (2);
+select * from tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected as myisam replication is on.
+select * from tmyisam;
+drop table tmyisam;
+
+#----------------------------
+#
+# PERMISSIVE
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+
+#
+# wsrep_replicate_myisam = 0
+--connection node_1
+--echo #node-1
+set session wsrep_replicate_myisam = 0;
+select @@wsrep_replicate_myisam;
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+insert into tmyisam values (1), (2);
+select * from tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as myisam replication is off.
+select * from tmyisam;
+drop table tmyisam;
+
+#
+# wsrep_replicate_myisam = 1
+--connection node_1
+--echo #node-1
+set session wsrep_replicate_myisam = 1;
+select @@wsrep_replicate_myisam;
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+insert into tmyisam values (1), (2);
+select * from tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected as myisam replication is on.
+select * from tmyisam;
+drop table tmyisam;
+
+#----------------------------
+#
+# ENFORCING
+--connection node_1
+--echo #node-1
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'ENFORCING';
+set session wsrep_replicate_myisam = 0;
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+
+#
+# wsrep_replicate_myisam = 0
+--connection node_1
+--echo #node-1
+set session wsrep_replicate_myisam = 0;
+select @@wsrep_replicate_myisam;
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+# trick insertion to myisam as enforcing will block insertion to myisam table.
+set global pxc_strict_mode = 'DISABLED';
+insert into tmyisam values (1), (2);
+set global pxc_strict_mode = 'ENFORCING';
+select * from tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as myisam replication is off.
+select * from tmyisam;
+drop table tmyisam;
+
+#
+# wsrep_replicate_myisam = 1
+--connection node_1
+--echo #node-1
+--error ER_UNKNOWN_ERROR
+set session wsrep_replicate_myisam = 1;
+select @@wsrep_replicate_myisam;
+create table tmyisam (i int, primary key pk(i)) engine=myisam;
+# trick insertion to myisam as enforcing will block insertion to myisam table.
+set global pxc_strict_mode = 'DISABLED';
+insert into tmyisam values (1), (2);
+set global pxc_strict_mode = 'ENFORCING';
+select * from tmyisam;
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as myisam replication is on.
+select * from tmyisam;
+drop table tmyisam;
+
+#
+# restart option
+--echo # restart with wsrep_replicate_myisam=1
+--error 1
+--exec $MYSQLD --no-defaults --wsrep_provider="libgalera_smm.so" --wsrep_replicate_myisam=1 > $restartdir/restart.log 2>&1
+--echo "grep --count \"WSREP: Percona-XtraDB-Cluster prohibits use of MyISAM table replication"
+--exec grep --count "WSREP: Percona-XtraDB-Cluster prohibits use of MyISAM table replication" $restartdir/restart.log
+--remove_file $restartdir/restart.log
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-3: Test effect of pxc-strict-mode on binlog_format
+#
+
+#----------------------------
+#
+# DISABLED
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+
+#
+# binlog_format=STATEMENT
+--connection node_1
+--echo #node-1
+set session binlog_format = 'STATEMENT';
+select @@binlog_format;
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+--error ER_LOCK_DEADLOCK
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as as pxc-strict-mode = DISABLED
+select * from tinnodb;
+drop table tinnodb;
+
+#
+# binlog_format=MIXED
+--connection node_1
+--echo #node-1
+set session binlog_format = 'MIXED';
+select @@binlog_format;
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+--error ER_LOCK_DEADLOCK
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as as binlog_format = MIXED
+select * from tinnodb;
+drop table tinnodb;
+
+#
+# binlog_format=ROW
+--connection node_1
+--echo #node-1
+set session binlog_format = 'ROW';
+select @@binlog_format;
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected as as binlog_format = ROW
+select * from tinnodb;
+drop table tinnodb;
+
+#----------------------------
+#
+# PERMISSIVE
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+
+#
+# binlog_format=STATEMENT
+--connection node_1
+--echo #node-1
+set session binlog_format = 'STATEMENT';
+select @@binlog_format;
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+--error ER_LOCK_DEADLOCK
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as as pxc-strict-mode = DISABLED
+select * from tinnodb;
+drop table tinnodb;
+
+#
+# binlog_format=MIXED
+--connection node_1
+--echo #node-1
+set session binlog_format = 'MIXED';
+select @@binlog_format;
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+--error ER_LOCK_DEADLOCK
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as as binlog_format = MIXED
+select * from tinnodb;
+drop table tinnodb;
+
+#
+# binlog_format=ROW
+--connection node_1
+--echo #node-1
+set session binlog_format = 'ROW';
+select @@binlog_format;
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected as as binlog_format = ROW
+select * from tinnodb;
+drop table tinnodb;
+
+#----------------------------
+#
+# ENFORCING
+--connection node_1
+--echo #node-1
+set session binlog_format = 'STATEMENT';
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'ENFORCING';
+set session binlog_format = 'ROW';
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+
+#
+# binlog_format=STATEMENT
+--connection node_1
+--echo #node-1
+--error ER_UNKNOWN_ERROR
+set session binlog_format = 'STATEMENT';
+select @@binlog_format;
+--error ER_UNKNOWN_ERROR
+set session binlog_format = 'MIXED';
+select @@binlog_format;
+
+#
+# binlog_format=ROW
+--connection node_1
+--echo #node-1
+set session binlog_format = 'ROW';
+select @@binlog_format;
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected as as binlog_format = ROW
+select * from tinnodb;
+drop table tinnodb;
+
+#
+# restart option
+--echo # restart with binlog_format=STATEMENT
+--error 1
+--exec $MYSQLD --no-defaults --wsrep_provider="libgalera_smm.so" --binlog_format=STATEMENT > $restartdir/restart.log 2>&1
+--echo "grep --count \"WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level\""
+--exec grep --count "WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level" $restartdir/restart.log
+--remove_file $restartdir/restart.log
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-4: Test effect of pxc-strict-mode on table without explicit primary key
+#
+
+#----------------------------
+#
+# DISABLED
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+create table tinnodb (i int) engine=innodb;
+create table tmyisam (i int) engine=innodb;
+insert into tinnodb values (1), (2);
+insert into tmyisam values (1), (2);
+select * from tinnodb;
+select * from tmyisam;
+drop table tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected as pxc-strict-mode = DISABLED
+select * from tinnodb;
+drop table tinnodb;
+
+#----------------------------
+#
+# PERMISSIVE
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+create table tinnodb (i int) engine=innodb;
+create table tmyisam (i int) engine=innodb;
+insert into tinnodb values (1), (2);
+insert into tmyisam values (1), (2);
+select * from tinnodb;
+select * from tmyisam;
+drop table tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected as pxc-strict-mode = PERMISSIVE
+select * from tinnodb;
+drop table tinnodb;
+
+#----------------------------
+#
+# ENFORCING
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+create table tinnodb (i int) engine=innodb;
+create table tmyisam (i int) engine=innodb;
+--error ER_UNKNOWN_ERROR
+insert into tinnodb values (1), (2);
+--error ER_UNKNOWN_ERROR
+insert into tmyisam values (1), (2);
+drop table tmyisam;
+#
+--connection node_2
+--echo #node-2
+--echo #0 rows expected as pxc-strict-mode = ENFORCING and table is without primary key
+select * from tinnodb;
+drop table tinnodb;
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-5: Test effect of pxc-strict-mode on log_output
+#
+--connection node_1
+--echo #node-1
+--let $general_log_saved = `SELECT @@general_log`
+set global general_log = 1;
+--let $general_log_file_saved = `SELECT @@general_log_file`
+set global log_output = 'NONE';
+--disable_query_log
+--eval set global general_log_file = `$restartdir/pxc.strict.mode.log`;
+--enable_query_log
+
+#----------------------------
+#
+# DISABLED
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+
+#
+# log_output=NONE
+--connection node_1
+--echo #node-1
+set global log_output = 'NONE';
+select 1 from dual;
+
+#
+# log_output=FILE
+--connection node_1
+--echo #node-1
+set global log_output = 'FILE';
+select 1 from dual;
+--sleep 1
+--echo # grep --count "select 1 from dual"
+--exec grep --count "select 1 from dual" $restartdir/pxc.strict.mode.log
+
+#
+# log_output=TABLE
+--connection node_1
+--echo #node-1
+select count(*) from mysql.general_log;
+set global log_output = 'TABLE';
+select 1 from dual;
+select count(*) from mysql.general_log;
+
+#----------------------------
+#
+# PERMISSIVE
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+
+#
+# log_output=NONE
+--connection node_1
+--echo #node-1
+set global log_output = 'NONE';
+select 1 from dual;
+
+#
+# log_output=FILE
+--connection node_1
+--echo #node-1
+set global log_output = 'FILE';
+select 1 from dual;
+--sleep 1
+--echo # grep --count "select 1 from dual"
+--exec grep --count "select 1 from dual" $restartdir/pxc.strict.mode.log
+
+#
+# log_output=TABLE
+--connection node_1
+--echo #node-1
+select count(*) from mysql.general_log;
+set global log_output = 'TABLE';
+select 1 from dual;
+select count(*) from mysql.general_log;
+
+#----------------------------
+#
+# ENFORCING
+--connection node_1
+--echo #node-1
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'ENFORCING';
+set global log_output = 'FILE';
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+
+#
+# log_output=NONE
+--connection node_1
+--echo #node-1
+set global log_output = 'NONE';
+select 1 from dual;
+
+#
+# log_output=FILE
+--connection node_1
+--echo #node-1
+set global log_output = 'FILE';
+select 1 from dual;
+--sleep 1
+--echo # grep --count "select 1 from dual"
+--exec grep --count "select 1 from dual" $restartdir/pxc.strict.mode.log
+
+#
+# log_output=TABLE
+--connection node_1
+--echo #node-1
+select count(*) from mysql.general_log;
+--error ER_UNKNOWN_ERROR
+set global log_output = 'TABLE';
+select 1 from dual;
+select count(*) from mysql.general_log;
+
+#
+# restart option
+--echo # restart with log_output=TABLE
+--error 1
+--exec $MYSQLD --no-defaults --wsrep_provider="libgalera_smm.so" --log_output=TABLE > $restartdir/restart.log 2>&1
+--echo "grep --count \"WSREP: Percona-XtraDB-Cluster prohibits setting log_output to TABLE\""
+--exec grep --count "WSREP: Percona-XtraDB-Cluster prohibits setting log_output to TABLE" $restartdir/restart.log
+--remove_file $restartdir/restart.log
+
+--disable_query_log
+--eval set global general_log = $general_log_saved;
+--eval set global general_log_file = `$general_log_file_saved`;
+--remove_file $restartdir/pxc.strict.mode.log
+--enable_query_log
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-6: Test effect of pxc-strict-mode on different kind of lock statement
+#
+--connection node_1
+--echo #node-1
+
+--let $transaction_isolation_saved = `SELECT @@session.transaction_isolation`
+
+#----------------------------
+#
+# DISABLED
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+
+#
+# Try to issue different kind of locking statements
+--connection node_1
+--echo #node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+# they will work in disabled mode.
+lock table tinnodb read;
+unlock tables;
+lock table tinnodb write;
+unlock tables;
+select get_lock('a', 10);
+select release_lock('a');
+flush table tinnodb with read lock;
+unlock tables;
+flush table tinnodb for export;
+unlock tables;
+set session transaction isolation level serializable;
+#
+# they should continue to work ir-respective of mode.
+flush table with read lock;
+unlock tables;
+select i from tinnodb for update;
+drop table tinnodb;
+
+#----------------------------
+#
+# MASTER
+--connection node_1
+--echo #node-1
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'MASTER';
+set session transaction isolation level repeatable read;
+set global pxc_strict_mode = 'MASTER';
+select @@pxc_strict_mode;
+
+#
+# Try to issue different kind of locking statements
+--connection node_1
+--echo #node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+# they will work in master mode.
+lock table tinnodb read;
+unlock tables;
+lock table tinnodb write;
+unlock tables;
+select get_lock('a', 10);
+select release_lock('a');
+flush table tinnodb with read lock;
+unlock tables;
+flush table tinnodb for export;
+unlock tables;
+set session transaction isolation level serializable;
+#
+# they should continue to work ir-respective of mode.
+flush table with read lock;
+unlock tables;
+select i from tinnodb for update;
+drop table tinnodb;
+
+#----------------------------
+#
+# PERMISSIVE
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+
+#
+# Try to issue different kind of locking statements
+--connection node_1
+--echo #node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+# they will work in permissive mode.
+lock table tinnodb read;
+unlock tables;
+lock table tinnodb write;
+unlock tables;
+select get_lock('a', 10);
+select release_lock('a');
+flush table tinnodb with read lock;
+unlock tables;
+flush table tinnodb for export;
+unlock tables;
+set session transaction isolation level serializable;
+#
+# they should continue to work ir-respective of mode.
+flush table with read lock;
+unlock tables;
+select i from tinnodb for update;
+drop table tinnodb;
+
+#----------------------------
+#
+# ENFORCING
+--connection node_1
+--echo #node-1
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'ENFORCING';
+set session transaction isolation level repeatable read;
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+
+#
+# Try to issue different kind of locking statements
+--connection node_1
+--echo #node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+#
+# they will work in permissive mode.
+--error ER_UNKNOWN_ERROR
+lock table tinnodb read;
+unlock tables;
+--error ER_UNKNOWN_ERROR
+lock table tinnodb write;
+unlock tables;
+--error ER_UNKNOWN_ERROR
+select get_lock('a', 10);
+--error ER_UNKNOWN_ERROR
+select release_lock('a');
+--error ER_UNKNOWN_ERROR
+flush table tinnodb with read lock;
+unlock tables;
+--error ER_UNKNOWN_ERROR
+flush table tinnodb for export;
+unlock tables;
+--error ER_UNKNOWN_ERROR
+set session transaction isolation level serializable;
+#
+# they should continue to work ir-respective of mode.
+flush table with read lock;
+unlock tables;
+select i from tinnodb for update;
+drop table tinnodb;
+
+set session transaction isolation level repeatable read;
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-7: Test effect of pxc-strict-mode on CTAS
+#
+
+#----------------------------
+#
+# DISABLED
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+create table tinnodb2 (i int, primary key pk(i)) as (select * from tinnodb);
+select * from tinnodb2;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected with CTAS as pxc_strict_mode = DISABLED
+select * from tinnodb2;
+drop table tinnodb;
+drop table tinnodb2;
+
+#----------------------------
+#
+# PERMISSIVE
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+create table tinnodb2 (i int, primary key pk(i)) as (select * from tinnodb);
+select * from tinnodb2;
+#
+--connection node_2
+--echo #node-2
+--echo #2 rows expected with CTAS as pxc_strict_mode = PERMISSIVE
+select * from tinnodb2;
+drop table tinnodb;
+drop table tinnodb2;
+
+#----------------------------
+#
+# ENFORCING
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+
+#
+# Try to issue different kind of locking statements
+--connection node_1
+--echo #node-1
+create table tinnodb (i int, primary key pk(i)) engine=innodb;
+insert into tinnodb values (1), (2);
+select * from tinnodb;
+--error ER_UNKNOWN_ERROR
+create table tinnodb2 (i int, primary key pk(i)) as (select * from tinnodb);
+create temporary table tmp (i int, primary key pk(i)) as (select * from tinnodb);
+select * from tmp;
+drop table tmp;
+#
+--connection node_2
+--echo #node-2
+--error ER_NO_SUCH_TABLE
+select * from tinnodb2;
+drop table tinnodb;
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-8: Checkout XA transaction. XA transaction are not supported by PXC
+# and are completely blocked now ir-respective of pxc-strict-mode.
+#
+--connection node_1
+--echo #node-1
+create table t (i int, j int, primary key pk(i)) engine=innodb;
+--error ER_NOT_SUPPORTED_YET
+xa start 'testxa';
+insert into t values (1, 2);
+select * from t;
+--error ER_NOT_SUPPORTED_YET
+xa end 'testxa';
+--error ER_NOT_SUPPORTED_YET
+xa prepare 'testxa';
+--error ER_NOT_SUPPORTED_YET
+xa commit 'testxa';
+select * from t;
+--error ER_NOT_SUPPORTED_YET
+xa start 'testxa2';
+insert into t values (2, 3);
+select * from t;
+--error ER_NOT_SUPPORTED_YET
+xa end 'testxa2';
+--error ER_NOT_SUPPORTED_YET
+xa commit 'testxa2' one phase;
+drop table t;
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-8: innodb_autoinc_lock_mode=Interleaved/2
+#
+--connection node_2
+--echo #node-2
+--echo "Shutdown node-2"
+--source include/shutdown_mysqld.inc
+#
+--let $start_mysqld_params="--innodb_autoinc_lock_mode=1 --pxc_strict_mode=ENFORCING --log-error=$restartdir/restart.log"
+--echo "Try restarting node-2 with --innodb_autoinc_lock_mode=1"
+--exec echo "try:$start_mysqld_params" > $_expect_file_name
+--sleep 30
+#
+--echo "grep --count \"WSREP: Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to"
+--exec grep --count "WSREP: Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to" $restartdir/restart.log
+--remove_file $restartdir/restart.log
+#
+--echo "Try restarting node-2 with default options"
+--let $start_mysqld_params=""
+--source include/start_mysqld.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-9: Test effect of pxc-strict-mode on view with underlying table
+#             without explicit primary key
+#
+
+#
+--connection node_1
+--echo #node-1
+CREATE TABLE tbl_w_pk(id INT PRIMARY KEY) engine=innodb;
+CREATE TABLE tbl_wo_pk(id INT) engine=innodb;
+
+CREATE VIEW  view_w_pk AS SELECT * FROM tbl_w_pk;
+CREATE VIEW  view_wo_pk AS SELECT * FROM tbl_wo_pk;
+
+INSERT INTO tbl_w_pk VALUES (1), (2);
+
+SELECT * FROM tbl_w_pk;
+SELECT * FROM tbl_wo_pk;
+
+#----------------------------
+#
+# DISABLED
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+INSERT INTO view_w_pk VALUES(3);
+SELECT * FROM view_w_pk;
+
+INSERT INTO view_wo_pk VALUES (3);
+SELECT * FROM view_wo_pk;
+
+#----------------------------
+#
+# PERMISSIVE
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+INSERT INTO view_w_pk VALUES(4);
+SELECT * FROM view_w_pk;
+
+INSERT INTO view_wo_pk VALUES (4);
+SELECT * FROM view_wo_pk;
+
+--let $assert_text = pxc_strict_mode issued warning about no primary keys
+--let $assert_select = no explicit primary key with pxc_strict_mode = PERMISSIVE
+--let $assert_count = 1
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+#----------------------------
+#
+# ENFORCING
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+INSERT INTO view_w_pk VALUES(5);
+SELECT * FROM view_w_pk;
+
+--error ER_UNKNOWN_ERROR
+INSERT INTO view_wo_pk VALUES (5);
+SELECT * FROM view_wo_pk;
+
+--let $assert_text = pxc_strict_mode issued error about no primary keys
+--let $assert_select = no explicit primary key with pxc_strict_mode = ENFORCING
+--let $assert_count = 1
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+#
+--connection node_1
+--echo #node-1
+DROP VIEW view_wo_pk;
+DROP VIEW view_w_pk;
+DROP TABLE tbl_wo_pk;
+DROP TABLE tbl_w_pk;
+
+
+#-------------------------------------------------------------------------------
+#
+# remove test-bed
+#
+--connection node_1
+--echo #node-1
+--eval set global pxc_strict_mode = $pxc_strict_mode_saved1;
+#
+--connection node_2
+--echo #node-2
+--eval set global pxc_strict_mode = $pxc_strict_mode_saved2;

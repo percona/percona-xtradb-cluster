@@ -63,7 +63,11 @@ Plugin_table table_global_variables::m_table_def(
     "global_variables",
     /* Definition */
     "  VARIABLE_NAME VARCHAR(64) not null,\n"
+#ifdef WITH_WSREP
+    "  VARIABLE_VALUE VARCHAR(2048),\n"
+#else
     "  VARIABLE_VALUE VARCHAR(1024),\n"
+#endif /* WITH_WSREP */
     "  PRIMARY KEY (VARIABLE_NAME) USING HASH\n",
     /* Options */
     " ENGINE=PERFORMANCE_SCHEMA",

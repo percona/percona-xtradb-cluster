@@ -362,6 +362,9 @@ bool run_bootstrap_thread(MYSQL_FILE *file, bootstrap_functor boot_handler,
 
   THD *thd = new THD;
   thd->system_thread = thread_type;
+#ifdef WITH_WSREP
+  thd->variables.wsrep_on = 0;
+#endif /* WITH_WSREP */
   thd->get_protocol_classic()->init_net(NULL);
   thd->security_context()->set_master_access(~(ulong)0);
 

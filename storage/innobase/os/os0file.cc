@@ -1634,6 +1634,7 @@ parameter (--tmpdir).
 @return temporary file handle, or NULL on error */
 FILE *os_file_create_tmpfile(const char *path) {
   FILE *file = NULL;
+
   int fd = innobase_mysql_tmpfile(path);
 
   if (fd >= 0) {
@@ -3185,6 +3186,7 @@ but reports the error and returns false.
                                 an error.
 @return true if call succeeds, false on error */
 bool os_file_create_directory(const char *pathname, bool fail_if_exists) {
+
   int rcode = mkdir(pathname, 0770);
 
   if (!(rcode == 0 || (errno == EEXIST && !fail_if_exists))) {
@@ -3470,6 +3472,7 @@ pfs_os_file_t os_file_create_simple_no_error_handling_func(const char *name,
 @param[out]	exist		indicate if file pre-exist
 @return true if success */
 bool os_file_delete_if_exists_func(const char *name, bool *exist) {
+
   if (!os_file_can_delete(name)) {
     return (false);
   }
@@ -3498,6 +3501,7 @@ bool os_file_delete_if_exists_func(const char *name, bool *exist) {
 @param[in]	name		file path as a null-terminated string
 @return true if success */
 bool os_file_delete_func(const char *name) {
+
   int ret = unlink(name);
 
   if (ret != 0) {
@@ -3702,6 +3706,7 @@ size of the file.
 @return true if success */
 static bool os_file_truncate_posix(const char *pathname, pfs_os_file_t file,
                                    os_offset_t size) {
+
   int res = ftruncate(file.m_file, size);
   if (res == -1) {
     bool retry;
@@ -3720,6 +3725,7 @@ static bool os_file_truncate_posix(const char *pathname, pfs_os_file_t file,
 @return true if success */
 bool os_file_set_eof(FILE *file) /*!< in: file to be truncated */
 {
+
   return (!ftruncate(fileno(file), ftell(file)));
 }
 
@@ -3954,6 +3960,7 @@ Flushes the write buffers of a given file to the disk.
 @param[in]	file		handle to a file
 @return true if success */
 bool os_file_flush_func(os_file_t file) {
+
   ++os_n_fsyncs;
 
   BOOL ret = FlushFileBuffers(file);
@@ -5172,6 +5179,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
   ut_ad(type.validate());
   ut_ad(n > 0);
 
+
   ssize_t n_bytes = os_file_pwrite(type, file, buf, n, offset, &err);
 
   if ((ulint)n_bytes != n && !os_has_said_disk_full) {
@@ -5835,6 +5843,7 @@ Requests a synchronous write operation.
 @return DB_SUCCESS if request was successful, false if fail */
 dberr_t os_file_write_func(IORequest &type, const char *name, os_file_t file,
                            const void *buf, os_offset_t offset, ulint n) {
+
   ut_ad(type.validate());
   ut_ad(type.is_write());
 

@@ -19,6 +19,16 @@ innodb_dedicated_server=OFF
 
 innodb-buffer-pool-size=24M
 innodb-log-file-size=5M
+
+#
+# This is PXC specific setting that we do here in-order to ensure
+# that all the galera test-case get to use it.
+# It is maintainance challange to keep on modifying n different
+# galera.cnf file for this setting
+pxc_strict_mode=DISABLED
+pxc_maint_transition_period=0
+log_error_verbosity=3
+
 # MAINTAINER:
 # the loose- syntax is to make sure the cnf file is also
 # valid when building without the performance schema.

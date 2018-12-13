@@ -1,0 +1,93 @@
+# default
+SELECT @@global.enforce_storage_engine;
+@@global.enforce_storage_engine
+InnoDB
+SELECT @@global.wsrep_replicate_myisam;
+@@global.wsrep_replicate_myisam
+0
+SELECT @@session.wsrep_replicate_myisam;
+@@session.wsrep_replicate_myisam
+0
+# Create MyISAM table which should be replicated due to enforce_storage_engine.
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=MyISAM;
+Warnings:
+Note	1266	Using storage engine InnoDB for table 't1'
+# The next step should crash it without the fix
+INSERT INTO t1 values (1);
+# The table should exist and be InnoDB.
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+# Values should be replicated
+SELECT * from t1;
+f1
+1
+# Make sure enforce_storage_engine works without any engine and InnoDB.
+CREATE TABLE t2 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+CREATE TABLE t3 (f1 INTEGER PRIMARY KEY);
+INSERT INTO t2 values (1);
+INSERT INTO t3 values (1);
+# The tables should exist.
+SHOW CREATE TABLE t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `f1` int(11) NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+SHOW CREATE TABLE t3;
+Table	Create Table
+t3	CREATE TABLE `t3` (
+  `f1` int(11) NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+# Values should be replicated
+SELECT * from t2;
+f1
+1
+SELECT * from t3;
+f1
+1
+# Make sure wsrep_replicate_myisam doesn't interfere
+SET @@session.wsrep_replicate_myisam = ON;
+CREATE TABLE t4 (f1 INTEGER PRIMARY KEY) ENGINE=MyISAM;
+Warnings:
+Note	1266	Using storage engine InnoDB for table 't4'
+CREATE TABLE t5 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+CREATE TABLE t6 (f1 INTEGER PRIMARY KEY);
+INSERT INTO t4 values (1);
+INSERT INTO t5 values (1);
+INSERT INTO t6 values (1);
+# The table should exist and be InnoDB.
+SHOW CREATE TABLE t4;
+Table	Create Table
+t4	CREATE TABLE `t4` (
+  `f1` int(11) NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+SHOW CREATE TABLE t5;
+Table	Create Table
+t5	CREATE TABLE `t5` (
+  `f1` int(11) NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+SHOW CREATE TABLE t6;
+Table	Create Table
+t6	CREATE TABLE `t6` (
+  `f1` int(11) NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+# Values should be replicated
+SELECT * from t4;
+f1
+1
+SELECT * from t5;
+f1
+1
+SELECT * from t6;
+f1
+1
+DROP TABLE t1, t2, t3, t4, t5, t6;
+# End of test

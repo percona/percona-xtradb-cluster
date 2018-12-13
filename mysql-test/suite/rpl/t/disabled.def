@@ -9,6 +9,15 @@
 #  Do not use any TAB characters for whitespace.
 #
 ##############################################################################
+# Codership disabled tests begin here
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+rpl_innodb_info_tbl_slave_tmp_tbl_mismatch : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl_multi_source_channel_map_stress : Issue#330 2018-07-26 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl_relay_log_recovery_positions : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl_seconds_behind_master : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl_semi_sync_ack_thread : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl_semi_sync_after_sync : Issue#330 2018-06-19 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+# Codership disabled tests end here
 
 rpl_row_create_table      : Bug#11759274 2010-02-27 andrei failed different way than earlier with bug#45576
 rpl_row_binlog_max_cache_size : BUG#14126780 May 29 2012 Vasil Dimov timeout if est number of rows is 3 instead of 4

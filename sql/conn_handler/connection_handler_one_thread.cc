@@ -94,6 +94,16 @@ bool One_thread_connection_handler::add_connection(Channel_info *channel_info) {
     }
     end_connection(thd);
   }
+
+#ifdef WITH_WSREP
+  if (WSREP(thd)) {
+    /* Update the query state to reflect EXIT of the thd. */
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    thd->wsrep_query_state = QUERY_EXITING;
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  }
+#endif /* WITH_WSREP */
+
   close_connection(thd, 0, false, false);
 
   if (unlikely(opt_userstat)) {

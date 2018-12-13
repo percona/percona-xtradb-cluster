@@ -73,10 +73,16 @@ BEGIN
 
   -- Dump all global variables except those that may change.
   -- timestamp changes if time passes. server_uuid changes if server restarts.
+  -- wsrep_start_position can change on mysqldump SST
+  -- auto_increment_offset can change on cluster reconfigurations
   SELECT * FROM performance_schema.global_variables
     WHERE variable_name NOT IN ('timestamp', 'server_uuid',
                                 'gtid_executed', 'gtid_purged',
                                 'group_replication_group_name',
+                                'wsrep_start_position',
+                                'auto_increment_offset',
+                                'auto_increment_increment',
+                                'wsrep_data_home_dir',
                                 'keyring_file_data')
   ORDER BY VARIABLE_NAME;
 
@@ -89,7 +95,10 @@ BEGIN
 
   -- Dump all databases, there should be none
   -- except those that was created during bootstrap
-  SELECT * FROM INFORMATION_SCHEMA.SCHEMATA ORDER BY SCHEMA_NAME;
+  -- and the mtr_wsrep_notify schema which is populated by the std_data/wsrep_notify.sh script
+  -- and the suite/galera/t/galera_var_notify_cmd.test
+  -- and the wsrep_schema schema that may be created by Galera
+  SELECT * FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME NOT IN ('mtr_wsrep_notify', 'wsrep_schema') ORDER BY SCHEMA_NAME;
 
   -- Dump all tablespaces, there should be none
   SELECT FILE_NAME, FILE_TYPE, TABLESPACE_NAME, ENGINE FROM INFORMATION_SCHEMA.FILES
@@ -125,16 +134,16 @@ BEGIN
          COLLATION_CONNECTION, DATABASE_COLLATION
     FROM INFORMATION_SCHEMA.TRIGGERS
       WHERE TRIGGER_NAME NOT IN ('gs_insert', 'ts_insert');
-  -- Dump all created procedures, only those in the sys schema should exist
+  -- Dump all created procedures
   -- do not select the CREATED or LAST_ALTERED columns however, as tests like mysqldump.test / mysql_ugprade.test update this
   SELECT SPECIFIC_NAME,ROUTINE_CATALOG,ROUTINE_SCHEMA,ROUTINE_NAME,ROUTINE_TYPE,DATA_TYPE,CHARACTER_MAXIMUM_LENGTH,
          CHARACTER_OCTET_LENGTH,NUMERIC_PRECISION,NUMERIC_SCALE,DATETIME_PRECISION,CHARACTER_SET_NAME,COLLATION_NAME,
          DTD_IDENTIFIER,ROUTINE_BODY,ROUTINE_DEFINITION,EXTERNAL_NAME,EXTERNAL_LANGUAGE,PARAMETER_STYLE,
          IS_DETERMINISTIC,SQL_DATA_ACCESS,SQL_PATH,SECURITY_TYPE,SQL_MODE,ROUTINE_COMMENT,DEFINER,
          CHARACTER_SET_CLIENT,COLLATION_CONNECTION,DATABASE_COLLATION
-    FROM INFORMATION_SCHEMA.ROUTINES ORDER BY ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE;
+    FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_SCHEMA != 'sys' ORDER BY ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE;
   -- Dump all views, only those in the sys schema should exist
-  SELECT * FROM INFORMATION_SCHEMA.VIEWS
+  SELECT * FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA != 'sys'
     ORDER BY TABLE_SCHEMA, TABLE_NAME;
   -- Dump all plugins, loaded with plugin-loading options or through
   -- INSTALL/UNINSTALL command
@@ -161,10 +170,14 @@ BEGIN
   -- mysql.session is used internally by plugins to access the server. We may
   -- not find consistent result in information_schema.processlist, hence
   -- excluding it from check-testcase.
-  SELECT USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-    WHERE COMMAND NOT IN ('Binlog Dump','Binlog Dump GTID','Sleep')
-      AND USER <> 'mysql.session'
-        ORDER BY COMMAND;
+  -- disabling it for PXC/WSREP for now
+  -- SELECT USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
+  --  WHERE COMMAND NOT IN ('Binlog Dump','Binlog Dump GTID','Sleep')
+  --    AND USER <> 'mysql.session'
+  --      ORDER BY COMMAND;
+
+  -- Show open connections/transactions in wsrep provider
+  SHOW STATUS LIKE 'wsrep_open%';
 
   -- Checksum system tables to make sure they have been properly
   -- restored after test.

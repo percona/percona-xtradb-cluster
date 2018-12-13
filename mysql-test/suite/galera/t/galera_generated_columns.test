@@ -1,0 +1,64 @@
+#
+# 5.7 Generated columns
+#
+
+--source include/galera_cluster.inc
+
+#
+# Simple operations on virtual and stored generated columns
+#
+
+--connection node_1
+CREATE TABLE generated_virtual(f1 INTEGER, f2 INTEGER GENERATED ALWAYS AS ( f1 * 2 ) VIRTUAL);
+CREATE TABLE generated_stored(f1 INTEGER, f2 INTEGER GENERATED ALWAYS AS ( f1 * 2 ) STORED);
+
+INSERT INTO generated_virtual (f1) VALUES (1);
+INSERT INTO generated_stored (f1) VALUES (1);
+
+--connection node_2
+SELECT f1 = 1, f2 = 2 FROM generated_virtual;
+SELECT f1 = 1, f2 = 2 FROM generated_stored;
+
+DROP TABLE generated_virtual, generated_stored;
+
+#
+# Conflict on virtual generated column
+#
+
+--connection node_1
+CREATE TABLE conflict_virtual(f1 INTEGER, f2 INTEGER GENERATED ALWAYS AS ( f1 * 2) VIRTUAL UNIQUE);
+
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+INSERT INTO conflict_virtual (f1) VALUES (1);
+
+--connection node_2
+INSERT INTO conflict_virtual (f1) VALUES (1);
+
+--connection node_1
+--error ER_LOCK_DEADLOCK,ER_ERROR_DURING_ROLLBACK
+COMMIT;
+
+DROP TABLE conflict_virtual;
+
+#
+# Conflict on stored generated column
+#
+
+--connection node_1
+CREATE TABLE conflict_stored(f1 INTEGER, f2 INTEGER GENERATED ALWAYS AS (0) STORED PRIMARY KEY);
+
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+LOCK TABLE conflict_stored WRITE;
+INSERT INTO conflict_stored (f1) VALUES (1);
+
+--connection node_2
+INSERT INTO conflict_stored (f1) VALUES (2);
+
+--connection node_1
+--error ER_LOCK_DEADLOCK,ER_ERROR_DURING_ROLLBACK
+COMMIT;
+
+UNLOCK TABLES;
+DROP TABLE conflict_stored;

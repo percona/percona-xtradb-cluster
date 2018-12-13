@@ -1,0 +1,298 @@
+#
+# Test manipulating wsrep_desync while an RSU operation is in progress
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+
+call mtr.add_suppression("WSREP: Trying to desync a node that is already paused");
+
+#-------------------------------------------------------------------------------
+#
+# Explicit desync a node and then try to an implicit desync using RSU.
+# RSU should be allowed as it is superset action.
+#
+--echo ** Test #1 **
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+SET GLOBAL wsrep_desync=1;
+SET wsrep_OSU_method=RSU;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+SET DEBUG_SYNC = 'alter_table_before_open_tables WAIT_FOR continue';
+--send ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: alter_table_before_open_tables'
+--source include/wait_condition.inc
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+SET GLOBAL wsrep_desync=0;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+--connection node_1
+--reap
+SHOW CREATE TABLE t1;
+
+--disable_query_log
+show status like 'wsrep_desync_count';
+SHOW VARIABLES LIKE 'wsrep_desync';
+--enable_query_log
+
+SET wsrep_OSU_method=TOI;
+DROP TABLE t1;
+
+#-------------------------------------------------------------------------------
+#
+# Explicit desync a node and then try to an implicit desync using FTWRL.
+# FTWRL should be allowed as it is superset action.
+#
+--echo ** Test #2 **
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+SET GLOBAL wsrep_desync=1;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+FLUSH TABLE WITH READ LOCK;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+--error ER_UNKNOWN_ERROR
+SET GLOBAL wsrep_desync=0;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+UNLOCK TABLES;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+SET GLOBAL wsrep_desync=0;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+DROP TABLE t1;
+
+
+#-------------------------------------------------------------------------------
+#
+# Implicit desync a node using RSU and then try to explicit desync.
+# Explicit desync should be blocked as it is not super-set action.
+#
+--echo ** Test #3 **
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+SET GLOBAL wsrep_desync=0;
+SET wsrep_OSU_method=RSU;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+SET DEBUG_SYNC = 'alter_table_before_create_table_no_lock WAIT_FOR continue';
+--send ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+
+--connection node_1a
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: alter_table_before_create_table_no_lock'
+--source include/wait_condition.inc
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+# wsrep_desync=1 will block
+--send SET GLOBAL wsrep_desync=1;
+
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1b
+--sleep 2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'Opening tables' and INFO = 'SET GLOBAL wsrep_desync=1'
+--source include/wait_condition.inc
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+--connection node_1
+--reap
+SHOW CREATE TABLE t1;
+
+--disable_query_log
+# The actual value of wsrep_desync is dependent on the timing
+# between the 'ALTER TABLE' and the 'SET GLOBAL wsrep_desync=1'
+# call.  So we don't check the value here since it could be ON/OFF.
+#SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+--connection node_1a
+--reap
+SET GLOBAL wsrep_desync=0;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+--connection node_1
+SET wsrep_OSU_method=TOI;
+DROP TABLE t1;
+
+#-------------------------------------------------------------------------------
+#
+# Implicit desync a node using FTWRL and then try to explicit desync.
+# Explicit desync should be blocked as it is not super-set action.
+#
+--echo ** Test #4 **
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+FLUSH TABLE WITH READ LOCK;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+--connection node_1a
+--send SET GLOBAL wsrep_desync=1;
+
+--connection node_1
+--sleep 2
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+UNLOCK TABLES;
+
+--disable_query_log
+# The actual value of wsrep_desync is dependent on the timing
+# between the 'UNLOCK TABLES' and the 'SET GLOBAL wsrep_desync=1'
+# call.  So we don't check the value here since it could be ON/OFF.
+#SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+--connection node_1a
+--reap
+SET GLOBAL wsrep_desync=0;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+DROP TABLE t1;
+
+#-------------------------------------------------------------------------------
+#
+# Let's try something more interesting.
+# Explicit desync a node -> then execute RSU (this is allowed as it does
+# implicit desync which is superset of explicit desunc) -> then execute FTWRL
+# (this should be blocked as implicit desync is active).
+#
+--echo ** Test #5 **
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+SET GLOBAL wsrep_desync=1;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+SET wsrep_OSU_method=RSU;
+SET DEBUG_SYNC = 'alter_table_before_open_tables WAIT_FOR continue';
+--send ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+
+--connection node_1a
+--echo #node-1a
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: alter_table_before_open_tables'
+--source include/wait_condition.inc
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+--send FLUSH TABLE WITH READ LOCK;
+
+--connection node_1b
+--echo #node-1b
+--sleep 2
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+--connection node_1
+--echo #node-1
+--reap
+SHOW CREATE TABLE t1;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+--connection node_1a
+--echo #node-1a
+--reap
+UNLOCK TABLES;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log
+
+--connection node_1
+--echo #node-1
+SET GLOBAL wsrep_desync=0;
+SHOW CREATE TABLE t1;
+SET wsrep_OSU_method=TOI;
+DROP TABLE t1;
+
+--disable_query_log
+SHOW VARIABLES LIKE 'wsrep_desync';
+show status like 'wsrep_desync_count';
+--enable_query_log

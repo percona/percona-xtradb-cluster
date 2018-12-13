@@ -89,6 +89,10 @@
 #include "template_utils.h"  // pointer_cast
 #include "thr_lock.h"
 
+#ifdef WITH_WSREP
+#include "sql/log.h"
+#endif /* WITH_WSREP */
+
 /**
   @page stored_programs Stored Programs
 
@@ -2177,6 +2181,14 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success) {
     */
     if (thd->rewritten_query.length()) thd->rewritten_query.mem_free();
 
+#ifdef WITH_WSREP
+    if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID) {
+      if (thd->query_id == 0) thd->set_query_id(next_query_id());
+      thd->set_wsrep_next_trx_id(thd->query_id);
+      WSREP_DEBUG("Assigned new next trx-id (%lu) to Store-Procedure execution",
+                  (long unsigned int)thd->wsrep_next_trx_id());
+    }
+#endif /* WITH_WSREP */
     err_status = i->execute(thd, &ip);
 
 #ifdef HAVE_PSI_STATEMENT_INTERFACE
@@ -2247,7 +2259,13 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success) {
   DBUG_ASSERT(thd->change_list.is_empty());
   old_change_list.move_elements_to(&thd->change_list);
   thd->lex = old_lex;
+#ifdef WITH_WSREP
+  /* Avoid updating wsrep_next_trx_id on completion of Store-Proc.
+     It should be updated only before the real action. */
+  thd->set_query_id(old_query_id, false);
+#else
   thd->set_query_id(old_query_id);
+#endif /* WITH_WSREP */
   thd->variables.sql_mode = save_sql_mode;
   thd->pop_reprepare_observer();
 

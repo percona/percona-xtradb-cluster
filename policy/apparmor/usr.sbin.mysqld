@@ -22,7 +22,7 @@
 
   network tcp,
 
-
+  /bin/dash rcx,
   /dev/dm-0 r,
   /etc/group r,
   /etc/gai.conf r,
@@ -56,6 +56,63 @@
   /var/run/mysqld/mysqld.pid w,
   /var/run/mysqld/mysqld.sock w,
 
+
+  profile /bin/dash flags=(complain) {
+    #include <abstractions/base>
+    #include <abstractions/bash>
+    #include <abstractions/mysql>
+    #include <abstractions/nameservice>
+    #include <abstractions/perl>
+
+
+
+    /bin/cat rix,
+    /bin/dash rix,
+    /bin/date rix,
+    /bin/grep rix,
+    /bin/nc.openbsd rix,
+    /bin/netstat rix,
+    /bin/ps rix,
+    /bin/rm rix,
+    /bin/sed rix,
+    /bin/sleep rix,
+    /bin/tar rix,
+    /bin/which rix,
+    /dev/tty rw,
+    /etc/ld.so.cache r,
+    /etc/my.cnf r,
+    /proc/ r,
+    /proc/*/cmdline r,
+    /proc/*/fd/ r,
+    /proc/*/net/dev r,
+    /proc/*/net/if_inet6 r,
+    /proc/*/net/tcp r,
+    /proc/*/net/tcp6 r,
+    /proc/*/stat r,
+    /proc/*/status r,
+    /proc/sys/kernel/pid_max r,
+    /proc/tty/drivers r,
+    /proc/uptime r,
+    /proc/version r,
+    /sbin/ifconfig rix,
+    /sys/devices/system/cpu/ r,
+    /tmp/* rw,
+    /usr/bin/cut rix,
+    /usr/bin/dirname rix,
+    /usr/bin/gawk rix,
+    /usr/bin/innobackupex rix,
+    /usr/bin/mysql rix,
+    /usr/bin/perl rix,
+    /usr/bin/seq rix,
+    /usr/bin/wsrep_sst* rix,
+    /usr/bin/wsrep_sst_common r,
+    /usr/bin/xtrabackup* rix,
+    /var/lib/mysql/ r,
+    /var/lib/mysql/** rw,
+    /var/lib/mysql/*.log w,
+    /var/lib/mysql/*.err w,
+
+  }
   # Site-specific additions and overrides. See local/README for details.
   #include <local/usr.sbin.mysqld>
 }

@@ -1,0 +1,75 @@
+#node-1
+use test;
+create table t (i int, primary key pk(i)) encryption='y';
+insert into t values (1), (2), (3);
+select * from t;
+i
+1
+2
+3
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ENCRYPTION='y'
+#node-2
+select * from t;
+i
+1
+2
+3
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ENCRYPTION='y'
+drop table t;
+#node-2 being killed
+Killing server ...
+#node-1
+CREATE TABLE e1 (
+id INT NOT NULL,
+text VARCHAR(10) DEFAULT NULL,
+PRIMARY KEY (id)
+) ENCRYPTION='Y';
+INSERT INTO e1 VALUES(1, 'aaaaa');
+INSERT INTO e1 VALUES(2, 'bbbbb');
+#node-2 restarted (should get encrypted table through SST)
+# restart
+select * from e1;
+id	text
+1	aaaaa
+2	bbbbb
+show create table e1;
+Table	Create Table
+e1	CREATE TABLE `e1` (
+  `id` int(11) NOT NULL,
+  `text` varchar(10) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ENCRYPTION='Y'
+drop table e1;
+#node-2 being shutdown 
+#node-1
+CREATE TABLE e1 (
+id INT NOT NULL,
+text VARCHAR(10) DEFAULT NULL,
+PRIMARY KEY (id)
+) ENCRYPTION='Y';
+INSERT INTO e1 VALUES(1, 'aaaaa');
+INSERT INTO e1 VALUES(2, 'bbbbb');
+#node-2 restarted (should get encrypted table through IST)
+# restart
+select * from e1;
+id	text
+1	aaaaa
+2	bbbbb
+show create table e1;
+Table	Create Table
+e1	CREATE TABLE `e1` (
+  `id` int(11) NOT NULL,
+  `text` varchar(10) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ENCRYPTION='Y'
+drop table e1;

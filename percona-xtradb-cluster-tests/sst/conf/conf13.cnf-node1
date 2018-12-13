@@ -1,0 +1,11 @@
+# xbstream+compress+encrypt2+threads+samecrt
+[xtrabackup]
+compress
+parallel=4
+compress-threads=4
+
+[sst]
+streamfmt=xbstream
+encrypt=2
+tca=/tmp/certs/node1.crt
+tcert=/tmp/certs/node1.pem

@@ -1,0 +1,19 @@
+#
+# wsrep_cluster_name
+#
+# save the initial value
+SET @wsrep_cluster_name_global_saved = @@global.wsrep_cluster_name;
+# default
+SELECT @@global.wsrep_cluster_name;
+@@global.wsrep_cluster_name
+my_wsrep_cluster
+
+# scope
+SELECT @@session.wsrep_cluster_name;
+ERROR HY000: Variable 'wsrep_cluster_name' is a GLOBAL variable
+SET @@global.wsrep_cluster_name='my_galera_cluster';
+ERROR HY000: Variable 'wsrep_cluster_name' is a read only variable
+SELECT @@global.wsrep_cluster_name;
+@@global.wsrep_cluster_name
+my_wsrep_cluster
+# End of test

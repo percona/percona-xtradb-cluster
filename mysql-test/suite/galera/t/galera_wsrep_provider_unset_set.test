@@ -1,0 +1,104 @@
+#
+# Test that wsrep_provider can be unset and then set back to its original value
+# and replication will continue except for any updates made while the value was 'none'
+#
+
+--source include/galera_cluster.inc
+
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+
+--connection node_2
+--echo #node-2
+--let $wsrep_provider_orig = `SELECT @@wsrep_provider`
+--let $wsrep_cluster_address_orig = `SELECT @@wsrep_cluster_address`
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+--echo #node-2a
+begin;
+insert into t1 values (101);
+select * from t1;
+commit;
+
+--connection node_2
+--echo #node-2
+#
+# Test the sceanrio where-in we try to set wsrep_provider in middle of
+# an active transaction.
+#
+call mtr.add_suppression('WSREP: Cannot modify wsrep_provider inside a transaction');
+BEGIN;
+INSERT INTO t1 VALUES (100);
+--error ER_WRONG_VALUE_FOR_VAR
+SET GLOBAL wsrep_provider='none';
+COMMIT;
+
+SET GLOBAL wsrep_provider='none';
+INSERT INTO t1 VALUES (2);
+
+--connection node_1
+--echo #node-1
+INSERT INTO t1 VALUES (3);
+
+--connection node_2a
+--echo #node-2a
+--error 2013
+select * from t1;
+
+--connection node_2
+--echo #node-2
+--disable_query_log
+--eval SET GLOBAL wsrep_provider = '$wsrep_provider_orig';
+--eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig';
+--enable_query_log
+
+--source include/wait_until_connected_again.inc
+--source include/galera_wait_ready.inc
+
+INSERT INTO t1 VALUES (4);
+
+# Node #2 has all the inserts
+SELECT COUNT(*) = 6 FROM t1;
+
+--connection node_1
+--echo #node-1
+# Node #1 is missing the insert made while Node #2 was not replicated
+SELECT COUNT(*) = 5 FROM t1;
+
+DROP TABLE t1;
+
+
+#-------------------------------------------------------------------------------
+#
+# Try to run show-status while the galera provider is toggled.
+#
+
+--connection node_2
+--echo #node-2
+--let $wsrep_provider_orig = `SELECT @@wsrep_provider`
+--let $wsrep_cluster_address_orig = `SELECT @@wsrep_cluster_address`
+call mtr.add_suppression("WSREP: gcs_caused\\(\\) returned -103 \\(Software caused connection abort\\)");
+
+#
+show status like 'wsrep_cluster_size';
+#
+SET GLOBAL wsrep_provider='none';
+show status like 'wsrep_cluster_size';
+#
+--disable_query_log
+--eval SET GLOBAL wsrep_provider = '$wsrep_provider_orig';
+--enable_query_log
+#
+--error ER_LOCK_WAIT_TIMEOUT
+show status like 'wsrep_cluster_size';
+#
+--disable_query_log
+--eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig';
+--enable_query_log
+--source include/wait_until_connected_again.inc
+--source include/galera_wait_ready.inc
+#
+show status like 'wsrep_cluster_size';

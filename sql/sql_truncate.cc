@@ -63,6 +63,11 @@
 #include "sql_string.h"
 #include "thr_lock.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#include "sql/log.h"
+#endif /* WITH_WSREP */
+
 namespace dd {
 class Table;
 }  // namespace dd
@@ -487,6 +492,13 @@ bool Sql_cmd_truncate_table::truncate_table(THD *thd, TABLE_LIST *table_ref) {
     }
   } else /* It's not a temporary table. */
   {
+#ifdef WITH_WSREP
+    if (WSREP(thd) && wsrep_to_isolation_begin(thd, table_ref->db,
+                                               table_ref->table_name, NULL)) {
+      DBUG_RETURN(true);
+    }
+#endif /* WITH_WSREP */
+
     if (mdl_locker.ensure_locked(table_ref->db)) DBUG_RETURN(true);
 
     if (lock_table(thd, table_ref, &hton)) DBUG_RETURN(true);
@@ -636,6 +648,103 @@ bool Sql_cmd_truncate_table::execute(THD *thd) {
   DBUG_ENTER("Sql_cmd_truncate_table::execute");
 
   if (check_one_table_access(thd, DROP_ACL, first_table)) DBUG_RETURN(res);
+
+#ifdef WITH_WSREP
+
+  if (WSREP_ON && !is_temporary_table(first_table)) {
+    enum legacy_db_type db_type;
+    TABLE_LIST *table = first_table;
+
+    // Acquire lock on the table as it is needed to get the instance from DD
+    MDL_request mdl_request;
+    MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db, table->table_name,
+                     MDL_SHARED, MDL_EXPLICIT);
+    thd->mdl_context.acquire_lock(&mdl_request,
+                                  thd->variables.lock_wait_timeout);
+
+    {
+      const char *schema_name = table->db;
+      const char *table_name = table->table_name;
+      dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+      const dd::Table *table_ref = NULL;
+
+      if (thd->dd_client()->acquire(schema_name, table_name, &table_ref)) {
+        thd->mdl_context.release_lock(mdl_request.ticket);
+        DBUG_RETURN(true);
+      }
+
+      if (table_ref == nullptr ||
+          table_ref->hidden() == dd::Abstract_table::HT_HIDDEN_SE) {
+        my_error(ER_NO_SUCH_TABLE, MYF(0), schema_name, table_name);
+        thd->mdl_context.release_lock(mdl_request.ticket);
+        DBUG_RETURN(true);
+      }
+
+      handlerton *hton = nullptr;
+      if (dd::table_storage_engine(thd, table_ref, &hton)) {
+        thd->mdl_context.release_lock(mdl_request.ticket);
+        DBUG_RETURN(true);
+      }
+
+      db_type = hton->db_type;
+    }
+
+    thd->mdl_context.release_lock(mdl_request.ticket);
+
+    bool is_system_db =
+        (table && ((strcmp(table->db, "mysql") == 0) ||
+                   (strcmp(table->db, "information_schema") == 0)));
+
+    /* Don't enforce check if:
+    - system table (mysql, I_S, PFS tables)
+    - resides in transactional storage engine
+    */
+    if (db_type != DB_TYPE_INNODB && db_type != DB_TYPE_UNKNOWN &&
+        db_type != DB_TYPE_PERFORMANCE_SCHEMA && !is_system_db) {
+      bool block = false;
+
+      switch (pxc_strict_mode) {
+        case PXC_STRICT_MODE_DISABLED:
+          break;
+        case PXC_STRICT_MODE_PERMISSIVE:
+          WSREP_WARN(
+              "Percona-XtraDB-Cluster doesn't recommend use of"
+              " TRUNCATE command on a table (%s.%s) that resides in"
+              " non-transactional storage engine"
+              " with pxc_strict_mode = PERMISSIVE",
+              table->db, table->table_name);
+          push_warning_printf(
+              thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+              "Percona-XtraDB-Cluster doesn't recommend use of"
+              " TRUNCATE command on a table (%s.%s) that resides in"
+              " non-transactional storage engine"
+              " with pxc_strict_mode = PERMISSIVE",
+              table->db, table->table_name);
+          break;
+        case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_MASTER:
+        default:
+          block = true;
+          WSREP_ERROR(
+              "Percona-XtraDB-Cluster prohibits use of"
+              " TRUNCATE command on a table (%s.%s) that resides in"
+              " non-transactional storage engine"
+              " with pxc_strict_mode = ENFORCING or MASTER",
+              table->db, table->table_name);
+          char message[1024];
+          sprintf(message,
+                  "Percona-XtraDB-Cluster prohibits use of"
+                  " TRUNCATE command on a table (%s.%s) that resides in"
+                  " non-transactional storage engine"
+                  " with pxc_strict_mode = ENFORCING or MASTER",
+                  table->db, table->table_name);
+          my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+          break;
+      }
+      if (block) DBUG_RETURN(true);
+    }
+  }
+#endif /* WITH_WSREP */
 
   if (!(res = truncate_table(thd, first_table))) my_ok(thd);
 

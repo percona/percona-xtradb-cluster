@@ -477,7 +477,16 @@ enum_return_status Gtid_state::generate_automatic_gtid(
   if (get_gtid_mode(GTID_MODE_LOCK_SID) >= GTID_MODE_ON_PERMISSIVE) {
     Gtid automatic_gtid = {specified_sidno, specified_gno};
 
+#ifdef WITH_WSREP
+    /* If node is running in cluster mode then get wsrep_sidno */
+    if (WSREP(thd) && thd->wsrep_trx_meta.gtid.seqno != -1 &&
+        !thd->wsrep_skip_wsrep_GTID)
+      automatic_gtid.sidno = wsrep_sidno;
+    else
+      automatic_gtid.sidno = get_server_sidno();
+#else
     if (automatic_gtid.sidno == 0) automatic_gtid.sidno = get_server_sidno();
+#endif /* WITH_WSREP */
 
     /*
       We need to lock the sidno if locked_sidno wasn't passed as paramenter

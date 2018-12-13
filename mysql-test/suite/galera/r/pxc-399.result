@@ -1,0 +1,35 @@
+DROP TABLE IF EXISTS t1, t2, t3, t4;
+SET session wsrep_sync_wait=0;
+FLUSH TABLES noexist WITH READ LOCK;
+ERROR 42S02: Table 'test.noexist' doesn't exist
+CREATE TABLE t1 (f1 INTEGER);
+INSERT INTO t1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
+SELECT COUNT(*) = 10 FROM t1;
+COUNT(*) = 10
+1
+FLUSH TABLES t1 WITH READ LOCK;
+CREATE TABLE t2 (f1 INTEGER);
+ERROR HY000: Can't execute the query because you have a conflicting read lock
+UNLOCK TABLES;
+CREATE TABLE t2 (f1 INTEGER);
+INSERT INTO t2 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
+SELECT COUNT(*) = 10 FROM t2;
+COUNT(*) = 10
+1
+FLUSH TABLES noexist2 FOR EXPORT;
+ERROR 42S02: Table 'test.noexist2' doesn't exist
+CREATE TABLE t3 (f1 INTEGER);
+INSERT INTO t3 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
+SELECT COUNT(*) = 10 FROM t3;
+COUNT(*) = 10
+1
+FLUSH TABLES t3 FOR EXPORT;
+CREATE TABLE t4 (f1 INTEGER);
+ERROR HY000: Can't execute the query because you have a conflicting read lock
+UNLOCK TABLES;
+CREATE TABLE t4 (f1 INTEGER);
+INSERT INTO t4 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
+SELECT COUNT(*) = 10 FROM t4;
+COUNT(*) = 10
+1
+DROP TABLE t1, t2, t3, t4;

@@ -546,7 +546,25 @@ ELSE()
 ENDIF()
 
 
+IF(WITH_WSREP)
+ SET(WSREP_SOURCES
+   wsrep_utils.cc
+   wsrep_xid.cc
+   wsrep_check_opts.cc
+   wsrep_hton.cc
+   wsrep_mysqld.cc
+   wsrep_notify.cc
+   wsrep_sst.cc
+   wsrep_var.cc
+   wsrep_binlog.cc
+   wsrep_applier.cc
+   wsrep_thd.cc
+ )
+ SET(WSREP_LIB wsrep)
+ENDIF()
+
 SET(SQL_SOURCE
+  ${WSREP_SOURCES}
   ${GEN_SOURCES}
   ${GEN_DIGEST_SOURCES}
   ${GEN_KEYWORD_LIST_SOURCES}
@@ -657,6 +675,7 @@ ADD_DEPENDENCIES(sql_main GenBootstrapPriv)
 ADD_DEPENDENCIES(sql_main GenSysSchema)
 TARGET_LINK_LIBRARIES(sql_main ${MYSQLD_STATIC_PLUGIN_LIBS} 
   ${MYSQLD_STATIC_COMPONENT_LIBS}  mysys mysys_ssl dbug strings vio
+  ${WSREP_LIB}
   binlogevents_static ${LIBWRAP} ${LIBCRYPT} ${LIBDL} ${SSL_LIBRARIES})
 
 ADD_CONVENIENCE_LIBRARY(sql_gis ${SQL_GIS_SOURCES})

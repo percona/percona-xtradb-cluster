@@ -103,6 +103,12 @@
 #include "template_utils.h"
 #include "thr_lock.h"
 
+
+#ifdef WITH_WSREP
+#include "sql_parse.h"                // WSREP_TO_ISOLATION
+#include "sql/log.h"
+#endif /* WITH_WSREP */
+
 namespace dd {
 class Table;
 }  // namespace dd
@@ -224,6 +230,57 @@ static bool check_insert_fields(THD *thd, TABLE_LIST *table_list,
   }
   /* Mark all generated columns for write*/
   if (table->vfield) table->mark_generated_columns(false);
+
+#ifdef WITH_WSREP
+
+  if (table_list->is_view() &&
+      lex->insert_table_leaf->table->s->primary_key == MAX_KEY) {
+    bool block = false;
+
+    switch (pxc_strict_mode) {
+      case PXC_STRICT_MODE_DISABLED:
+        break;
+      case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN(
+            "Percona-XtraDB-Cluster doesn't recommend use of"
+            " INSERT on a view (%s.%s) that writes to a table"
+            " with no explicit primary key"
+            " with pxc_strict_mode = PERMISSIVE",
+            table_list->view_db.str, table_list->view_name.str);
+        push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                            "Percona-XtraDB-Cluster doesn't recommend use of"
+                            " INSERT on a view (%s.%s) that writes to a table"
+                            " with no explicit primary key"
+                            " with pxc_strict_mode = PERMISSIVE",
+                            table_list->view_db.str, table_list->view_name.str);
+        break;
+      case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_MASTER:
+      default:
+        block = true;
+        WSREP_ERROR(
+            "Percona-XtraDB-Cluster prohibits use of"
+            " INSERT on a view (%s.%s) that writes to a table"
+            " with no explicit primary key"
+            " with pxc_strict_mode = ENFORCING or MASTER",
+            table_list->view_db.str, table_list->view_name.str);
+        char message[1024];
+        sprintf(message,
+                "Percona-XtraDB-Cluster prohibits use of"
+                " INSERT on a view (%s.%s) that writes to a table"
+                " with no explicit primary key"
+                " with pxc_strict_mode = ENFORCING or MASTER",
+                table_list->view_db.str, table_list->view_name.str);
+        my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+        break;
+    }
+
+    if (block) {
+      return true;
+    }
+  }
+
+#endif /* WITH_WSREP */
 
   if (check_key_in_view(thd, table_list, lex->insert_table_leaf) ||
       (table_list->is_view() &&
@@ -656,7 +713,11 @@ bool Sql_cmd_insert_values::execute_inner(THD *thd) {
 
     if (!has_error ||
         thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
+#ifdef WITH_WSREP
+      if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) {
+#else
       if (mysql_bin_log.is_open()) {
+#endif /* WITH_WSREP */
         int errcode = 0;
         if (!has_error) {
           /*
@@ -2104,7 +2165,15 @@ bool Query_result_insert::send_eof() {
              ("trans_table=%d, table_type='%s'",
               table->file->has_transactions(), table->file->table_type()));
 
+#ifdef WITH_WSREP
+  if (thd->wsrep_conflict_state == MUST_ABORT ||
+      thd->wsrep_conflict_state == CERT_FAILURE)
+    error = -1;
+  else
+    error = (bulk_insert_started ? table->file->ha_end_bulk_insert() : 0);
+#else
   error = (bulk_insert_started ? table->file->ha_end_bulk_insert() : 0);
+#endif /* WITH_WSREP */
   bulk_insert_started = false;
   if (!error && thd->is_error()) error = thd->get_stmt_da()->mysql_errno();
 
@@ -2124,7 +2193,11 @@ bool Query_result_insert::send_eof() {
     events are in the transaction cache and will be written when
     ha_autocommit_or_rollback() is issued below.
   */
+#ifdef WITH_WSREP
+  if ((WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) &&
+#else
   if (mysql_bin_log.is_open() &&
+#endif /* WITH_WSREP */
       (!error ||
        thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT))) {
     int errcode = 0;
@@ -2235,7 +2308,11 @@ void Query_result_insert::abort_result_set() {
     changed = (info.stats.copied || info.stats.deleted || info.stats.updated);
     transactional_table = table->file->has_transactions();
     if (thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
+#ifdef WIT_WSREP
+      if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) {
+#else
       if (mysql_bin_log.is_open()) {
+#endif /* WITH_WSREP */
         int errcode = query_error_code(thd, thd->killed == THD::NOT_KILLED);
         /* error of writing binary log is ignored */
         (void)thd->binlog_query(THD::ROW_QUERY_TYPE, thd->query().str,
@@ -2705,7 +2782,11 @@ int Query_result_create::binlog_show_create_table() {
                              /* show_database */ true);
   DBUG_ASSERT(result == 0); /* store_create_info() always return 0 */
 
+#ifdef WITH_WSREP
+  if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) {
+#else
   if (mysql_bin_log.is_open()) {
+#endif /* WITH_WSREP */
     DEBUG_SYNC(thd, "create_select_before_write_create_event");
     /*
       Binary log layer has special code to handle rollback of CREATE TABLE
@@ -2721,6 +2802,9 @@ int Query_result_create::binlog_show_create_table() {
                           /* suppress_use */ false, errcode);
     DEBUG_SYNC(thd, "create_select_after_write_create_event");
   }
+#ifdef WITH_WSREP
+  ha_wsrep_fake_trx_id(thd);
+#endif
   DBUG_RETURN(result);
 }
 
@@ -2858,9 +2942,58 @@ bool Query_result_create::send_eof() {
       However this should be extremely rare.
     */
     if (!table->s->tmp_table) {
+#ifdef WITH_WSREP
+      if (WSREP(thd)) {
+        if (thd->wsrep_trx_id() == WSREP_UNDEFINED_TRX_ID) {
+          (void)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle,
+                                        thd->wsrep_next_trx_id());
+          WSREP_DEBUG("Assiging trx-id for processing CTAS");
+        }
+        DBUG_ASSERT(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
+        WSREP_DEBUG("Initiating append_key for CTAS with trx-id (%lu)",
+                    (long unsigned int)thd->wsrep_trx_id());
+
+        /*
+           append table level exclusive key for CTAS
+        */
+        wsrep_key_arr_t key_arr = {0, 0};
+        wsrep_prepare_keys_for_isolation(thd, create_table->db,
+                                         create_table->table_name, table_list,
+                                         &key_arr);
+        int rcode =
+            wsrep->append_key(wsrep, &thd->wsrep_ws_handle,
+                              key_arr.keys,  //&wkey,
+                              key_arr.keys_len, WSREP_KEY_EXCLUSIVE, false);
+        wsrep_keys_free(&key_arr);
+        if (rcode) {
+          DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
+          WSREP_ERROR("Appending table key for CTAS failed: %s, %d",
+                      (wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void",
+                      rcode);
+          return true;
+        }
+      }
+#endif /* WITH_WSREP */
+
       thd->get_stmt_da()->set_overwrite_status(true);
       commit_error = trans_commit_stmt(thd) || trans_commit_implicit(thd);
       thd->get_stmt_da()->set_overwrite_status(false);
+
+#ifdef WITH_WSREP
+      if (WSREP(thd)) {
+        mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+        if (thd->wsrep_conflict_state != NO_CONFLICT) {
+          WSREP_DEBUG("select_create commit failed, thd: %u err: %s %s",
+                      thd->thread_id(),
+                      wsrep_get_conflict_state(thd->wsrep_conflict_state),
+                      WSREP_QUERY(thd));
+          mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+          abort_result_set();
+          return true;
+        }
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      }
+#endif /* WITH_WSREP */
     }
 
     if (m_plock) {

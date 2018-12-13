@@ -1,0 +1,124 @@
+SET GLOBAL auto_increment_increment=10;
+SET GLOBAL auto_increment_offset=7;
+SET GLOBAL wsrep_auto_increment_control='OFF';
+SHOW GLOBAL VARIABLES LIKE '%auto_increment%';
+Variable_name	Value
+auto_increment_increment	10
+auto_increment_offset	7
+wsrep_auto_increment_control	OFF
+SHOW VARIABLES LIKE '%auto_increment%';
+Variable_name	Value
+auto_increment_increment	10
+auto_increment_offset	7
+wsrep_auto_increment_control	OFF
+SET GLOBAL wsrep_auto_increment_control='ON';
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+@@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size')
+1
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+@@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
+1
+SELECT @@wsrep_auto_increment_control = 1;
+@@wsrep_auto_increment_control = 1
+1
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+@@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size')
+1
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+@@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
+1
+SELECT @@wsrep_auto_increment_control = 1;
+@@wsrep_auto_increment_control = 1
+1
+SET GLOBAL wsrep_auto_increment_control='OFF';
+SHOW VARIABLES LIKE '%auto_increment%';
+Variable_name	Value
+auto_increment_increment	10
+auto_increment_offset	7
+wsrep_auto_increment_control	OFF
+SET GLOBAL wsrep_auto_increment_control='ON';
+# restart:--auto-increment-increment=7 --auto-increment-offset=5
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+@@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size')
+1
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+@@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
+1
+SELECT @@wsrep_auto_increment_control = 1;
+@@wsrep_auto_increment_control = 1
+1
+SET GLOBAL wsrep_auto_increment_control='OFF';
+SHOW VARIABLES LIKE '%auto_increment%';
+Variable_name	Value
+auto_increment_increment	7
+auto_increment_offset	5
+wsrep_auto_increment_control	OFF
+SET GLOBAL wsrep_auto_increment_control='ON';
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+@@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size')
+1
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+@@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
+1
+SELECT @@wsrep_auto_increment_control = 1;
+@@wsrep_auto_increment_control = 1
+1
+#node-1
+use test;
+create table t (i int auto_increment, c char(10), primary key pk(i));
+set global auto_increment_increment=3;
+set global auto_increment_offset=3;
+insert into t(i, c) values (27, "27");
+select * from t;
+i	c
+27	27
+#node-1a
+insert into t(c) values ("30");
+select * from t;
+i	c
+27	27
+30	30
+#node-1
+insert into t(c) values ("33");
+set global auto_increment_increment=2;
+set global auto_increment_offset=2;
+insert into t(c) values ("36");
+#node-1a
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_autoinc_val_generated SIGNAL entered1 WAIT_FOR continue1";
+insert into t(c) values ("38");;
+#node-1
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+SET DEBUG_SYNC = "pxc_autoinc_val_generated SIGNAL entered2 WAIT_FOR continue2";
+insert into t(c) values ("40");;
+#node-1b
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now SIGNAL continue1";
+select * from t;
+i	c
+27	27
+30	30
+33	33
+36	36
+38	38
+SET DEBUG_SYNC = "now SIGNAL continue2";
+#node-1a
+select * from t;
+i	c
+27	27
+30	30
+33	33
+36	36
+38	38
+#node-1
+select * from t;
+i	c
+27	27
+30	30
+33	33
+36	36
+38	38
+40	40
+set DEBUG_SYNC="RESET";
+drop table t;

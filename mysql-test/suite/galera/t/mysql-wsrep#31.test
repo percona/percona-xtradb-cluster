@@ -1,0 +1,65 @@
+--source include/galera_cluster.inc
+
+--connection node_1
+
+CREATE TABLE t1 (f1 CHAR(255)) ENGINE=InnoDB;
+INSERT INTO t1 VALUES('test');
+CREATE DATABASE db;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'db';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1
+--source include/wait_condition.inc
+
+--let $expected_position_uuid = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_uuid'`
+--let $expected_position_seqno = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+--let $expected_position = $expected_position_uuid:$expected_position_seqno
+
+--echo Shutting down server 2 ...
+--source include/shutdown_mysqld.inc
+
+--echo Recovering server 2 ...
+--let $galera_wsrep_recover_server_id=2
+--source suite/galera/include/galera_wsrep_recover.inc
+
+if ($galera_wsrep_start_position != $expected_position)
+{
+  --echo "Expected position: $expected_position, found $galera_wsrep_start_position"
+  die(The expected position does not match the wsrep_recover position);
+}
+
+#
+# Test for removal of special value used in wsrep_recover
+#
+--source include/wait_until_disconnected.inc
+
+--echo Recovering server 2 ...
+--let $galera_wsrep_recover_server_id=2
+--let $galera_wsrep_extra_cmdline_parameter = '--wsrep-start-position=00000000-0000-0000-0000-000000000000:-2'
+--source suite/galera/include/galera_wsrep_recover.inc
+
+# This should give the same result as before, it should ignore the use of this special value
+if ($galera_wsrep_start_position != $expected_position)
+{
+  --echo "Expected position: $expected_position, found $galera_wsrep_start_position"
+  die(The expected position does not match the wsrep_recover position);
+}
+
+--echo Restarting server ...
+--let $galera_wsrep_extra_cmdline_parameter=''
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+--connection node_1
+DROP TABLE t1;
+DROP DATABASE db;
+
+--remove_file $MYSQL_TMP_DIR/galera_wsrep_recover.log
+
+

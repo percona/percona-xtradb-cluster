@@ -1,0 +1,43 @@
+CREATE TABLE t1 (f1 CHAR(5)) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 CHAR(5)) ENGINE=InnoDB;
+CREATE TABLE t3 (f1 CHAR(5)) ENGINE=InnoDB;
+CREATE TABLE t4 (f1 CHAR(5)) ENGINE=InnoDB;
+SET SESSION sql_mode=DEFAULT;
+PREPARE st1 FROM 'INSERT INTO t1 VALUES ("abc")';
+PREPARE st2 FROM 'INSERT INTO t2 VALUES ("abc")';
+PREPARE st3 FROM 'INSERT INTO t3 VALUES ("abc")';
+PREPARE st4 FROM 'INSERT INTO t4 VALUES ("abc")';
+EXECUTE st1;
+EXECUTE st2;
+EXECUTE st3;
+EXECUTE st4;
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t2;
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t3;
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t4;
+COUNT(*) = 1
+1
+ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+ALTER TABLE t1 DROP COLUMN f1;
+EXECUTE st1;
+ERROR HY000: Incorrect integer value: 'abc' for column 'f2' at row 1
+DROP TABLE t1;
+DROP TABLE t2;
+DROP TABLE t3;
+DROP TABLE t4;
+call mtr.add_suppression("Slave SQL: Error 'Table 'v1' already exists' on .*");
+call mtr.add_suppression("Slave SQL: Error 'Table 'v1' already exists' on .*");
+use test;
+create table t1 (i int key, j blob) engine=innodb;
+prepare stmt from "create view v1 as SELECT 1 b";
+execute stmt;
+execute stmt;
+ERROR 42S01: Table 'v1' already exists
+drop view v1;
+drop table t1;

@@ -146,10 +146,19 @@ bool trans_begin(THD *thd, uint flags) {
   if (thd->in_multi_stmt_transaction_mode() ||
       (thd->variables.option_bits & OPTION_TABLE_LOCK)) {
     thd->variables.option_bits &= ~OPTION_TABLE_LOCK;
+
+#ifdef WITH_WSREP
+    wsrep_register_hton(thd, true);
+#endif /* WITH_WSREP */
+
     thd->server_status &=
         ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
     DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
     res = ha_commit_trans(thd, true);
+
+#ifdef WITH_WSREP
+    wsrep_post_commit(thd, true);
+#endif /* WITH_WSREP */
   }
 
   thd->variables.option_bits &= ~OPTION_BEGIN;
@@ -187,8 +196,20 @@ bool trans_begin(THD *thd, uint flags) {
 
   DBUG_EXECUTE_IF("dbug_set_high_prio_trx", {
     DBUG_ASSERT(thd->tx_priority == 0);
+
+#ifdef WITH_WSREP
+    WSREP_WARN("InnoDB High Priority being used: %d -> %d", thd->tx_priority, 1);
+#endif /* WITH_WSREP */
+
     thd->tx_priority = 1;
   });
+
+#ifdef WITH_WSREP
+  thd->wsrep_PA_safe= true;
+  if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd))
+    DBUG_RETURN(true);
+#endif /* WITH_WSREP */
+
 
   thd->variables.option_bits |= OPTION_BEGIN;
   thd->server_status |= SERVER_STATUS_IN_TRANS;
@@ -245,6 +266,10 @@ bool trans_commit(THD *thd, bool ignore_global_read_lock) {
 
   if (trans_check_state(thd)) DBUG_RETURN(true);
 
+#ifdef WITH_WSREP
+  wsrep_register_hton(thd, true);
+#endif /* WITH_WSREP */
+
   thd->server_status &=
       ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
   DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
@@ -275,6 +300,10 @@ bool trans_commit(THD *thd, bool ignore_global_read_lock) {
   DBUG_ASSERT(thd->m_transaction_psi == NULL);
 
   thd->tx_priority = 0;
+
+#ifdef WITH_WSREP
+  wsrep_post_commit(thd, true);
+#endif /* WITH_WSREP */
 
   trans_track_end_trx(thd);
 
@@ -319,10 +348,20 @@ bool trans_commit_implicit(THD *thd, bool ignore_global_read_lock) {
     /* Safety if one did "drop table" on locked tables */
     if (!thd->locked_tables_mode)
       thd->variables.option_bits &= ~OPTION_TABLE_LOCK;
+
+#ifdef WITH_WSREP
+    wsrep_register_hton(thd, true);
+#endif /* WITH_WSREP */
+
     thd->server_status &=
         ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
     DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
     res = ha_commit_trans(thd, true, ignore_global_read_lock);
+
+#ifdef WITH_WSREP
+    wsrep_post_commit(thd, true);
+#endif /* WITH_WSREP */
+
   } else if (tc_log)
     tc_log->commit(thd, true);
 
@@ -364,7 +403,17 @@ bool trans_rollback(THD *thd) {
   int res;
   DBUG_ENTER("trans_rollback");
 
+#ifdef WITH_WSREP
+  thd->wsrep_PA_safe= true;
+#endif /* WITH_WSREP */
+
+
   if (trans_check_state(thd)) DBUG_RETURN(true);
+
+#ifdef WITH_WSREP
+  wsrep_register_hton(thd, true);
+#endif /* WITH_WSREP */
+
 
   thd->server_status &=
       ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
@@ -414,6 +463,10 @@ bool trans_rollback_implicit(THD *thd) {
   */
   DBUG_ASSERT(thd->get_transaction()->is_empty(Transaction_ctx::STMT) &&
               !thd->in_sub_stmt);
+
+#ifdef WITH_WSREP
+  wsrep_register_hton(thd, true);
+#endif /* WITH_WSREP */
 
   thd->server_status &=
       ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
@@ -476,9 +529,38 @@ bool trans_commit_stmt(THD *thd, bool ignore_global_read_lock) {
   thd->get_transaction()->merge_unsafe_rollback_flags();
 
   if (thd->get_transaction()->is_active(Transaction_ctx::STMT)) {
+
+#ifdef WITH_WSREP
+    /* If this is a multi-statement transaction then there would
+    be implict_commit or commit followed by this stmt_commit. */
+    wsrep_register_hton(thd, false);
+#endif /* WITH_WSREP */
+
     res = ha_commit_trans(thd, false, ignore_global_read_lock);
+
+#ifdef WITH_WSREP
+    if (!thd->in_active_multi_stmt_transaction())
+    {
+      trans_reset_one_shot_chistics(thd);
+      wsrep_post_commit(thd, false);
+    }
+
+    /* CTAS is executed as multi-statement command that has statement
+    and transaction cache both populated. Till 5.7 it was marked as
+    multi_stmt_transaction() command but starting 8.0 it is not marked
+    as multi_stmt_transaction(). Post trans_commit_stmt, stmt cache
+    will be cleared so we need to ensure it is captured and replicated
+    as part of trans_commit_stmt and once done transaction is cleared too. */
+    if (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+        thd->wsrep_exec_mode != TOTAL_ORDER) {
+      /* CREATE table AS SELECT use case */
+      wsrep_post_commit(thd, false);
+      thd->wsrep_skip_wsrep_hton = true;
+    }
+#else
     if (!thd->in_active_multi_stmt_transaction())
       trans_reset_one_shot_chistics(thd);
+#endif /* WITH_WSREP */
   } else if (tc_log)
     tc_log->commit(thd, false);
   if (res == false && !thd->in_active_multi_stmt_transaction())
@@ -522,6 +604,11 @@ bool trans_rollback_stmt(THD *thd) {
   thd->get_transaction()->merge_unsafe_rollback_flags();
 
   if (thd->get_transaction()->is_active(Transaction_ctx::STMT)) {
+
+#ifdef WITH_WSREP
+    wsrep_register_hton(thd, false);
+#endif /* WITH_WSREP */
+
     ha_rollback_trans(thd, false);
     if (!thd->in_active_multi_stmt_transaction())
       trans_reset_one_shot_chistics(thd);

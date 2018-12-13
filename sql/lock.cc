@@ -111,6 +111,10 @@
 #include "sql/system_variables.h"
 #include "sql/table.h"
 #include "thr_lock.h"
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#include "sql/log.h"
+#endif /* WITH_WSREP */
 
 /**
   @defgroup Locking Locking
@@ -342,6 +346,9 @@ MYSQL_LOCK *mysql_lock_tables(THD *thd, TABLE **tables, size_t count,
   /* Copy the lock data array. thr_multi_lock() reorders its contents. */
   memcpy(sql_lock->locks + sql_lock->lock_count, sql_lock->locks,
          sql_lock->lock_count * sizeof(*sql_lock->locks));
+#ifdef WITH_WSREP
+  thd->lock_info.in_lock_tables = thd->in_lock_tables;
+#endif /* WITH_WSREP */
   /* Lock on the copied half of the lock data array. */
   rc = thr_lock_errno_to_mysql[(int)thr_multi_lock(
       sql_lock->locks + sql_lock->lock_count, sql_lock->lock_count,
@@ -1007,8 +1014,14 @@ bool acquire_shared_global_read_lock(THD *thd,
   @retval True   Failure, thread was killed.
 */
 
+#ifdef WITH_WSREP
+bool Global_read_lock::lock_global_read_lock(THD *thd, bool *own_lock) {
+  DBUG_ENTER("lock_global_read_lock");
+  *own_lock = false;
+#else
 bool Global_read_lock::lock_global_read_lock(THD *thd) {
   DBUG_ENTER("lock_global_read_lock");
+#endif /* WITH_WSREP */
 
   if (!m_state) {
     MDL_request mdl_request;
@@ -1035,6 +1048,9 @@ bool Global_read_lock::lock_global_read_lock(THD *thd) {
 
     m_mdl_global_shared_lock = mdl_request.ticket;
     m_state = GRL_ACQUIRED;
+#ifdef WITH_WSREP
+    *own_lock = true;
+#endif /* WITH_WSREP */
   }
   /*
     We DON'T set global_read_lock_blocks_commit now, it will be set after
@@ -1065,6 +1081,28 @@ void Global_read_lock::unlock_global_read_lock(THD *thd) {
   if (m_mdl_blocks_commits_lock) {
     thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
     m_mdl_blocks_commits_lock = NULL;
+
+#ifdef WITH_WSREP
+    if (thd->wsrep_sst_donor) {
+      /* If this is sst_donor then it is resync internally.
+      So only resume the cluster. */
+      wsrep_resume();
+    } else if (WSREP(thd) && provider_desynced_paused) {
+      /* Function will take care of decrementing reference count
+      if it is not the last one to get called. Last one will
+      perform the resume action. */
+      wsrep_resume();
+
+      int ret = wsrep->resync(wsrep);
+      if (ret != WSREP_OK) {
+        WSREP_WARN("resync failed %d for FTWRL: db: %s, query: %s", ret,
+                   (thd->db().length ? thd->db().str : "(null)"),
+                   WSREP_QUERY(thd));
+        DBUG_VOID_RETURN;
+      }
+      provider_desynced_paused = false;
+    }
+#endif /* WITH_WSREP */
   }
   thd->mdl_context.release_lock(m_mdl_global_shared_lock);
   Global_read_lock::m_atomic_active_requests--;
@@ -1096,6 +1134,16 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
     If we didn't succeed lock_global_read_lock(), or if we already suceeded
     make_global_read_lock_block_commit(), do nothing.
   */
+
+#ifdef WITH_WSREP
+  if (WSREP(thd) && m_mdl_blocks_commits_lock) {
+    WSREP_DEBUG(
+        "GRL was in block commit mode when entering "
+        "make_global_read_lock_block_commit");
+    DBUG_RETURN(false);
+  }
+#endif /* WITH_WSREP */
+
   if (m_state != GRL_ACQUIRED) DBUG_RETURN(0);
 
   MDL_REQUEST_INIT(&mdl_request, MDL_key::COMMIT, "", "", MDL_SHARED,
@@ -1108,8 +1156,110 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
   m_mdl_blocks_commits_lock = mdl_request.ticket;
   m_state = GRL_ACQUIRED_AND_BLOCKS_COMMIT;
 
+#ifdef WITH_WSREP
+  if (thd->wsrep_sst_donor) {
+    /* If this is sst_donor then it is already desync internally.
+    So only pause the cluster */
+    if (!wsrep_pause()) {
+      WSREP_DEBUG("Trying to pause SST DONOR (GRL) failed");
+      DBUG_RETURN(true);
+    }
+  } else if (WSREP(thd) && !provider_desynced_paused) {
+    int rcode;
+    WSREP_DEBUG("Running implicit desync for node from FTWRL");
+
+    rcode = wsrep->desync(wsrep);
+
+    if (rcode == WSREP_TRX_FAIL &&
+        strcmp(wsrep_cluster_status, "Primary") != 0) {
+      WSREP_DEBUG("desync failed while non-Primary, ignoring failure");
+    } else if (rcode != WSREP_OK) {
+      WSREP_WARN("FTWRL desync failed %d for schema: %s, query: %s", rcode,
+                 (thd->db().length ? thd->db().str : "(null)"),
+                 WSREP_QUERY(thd));
+      my_message(ER_LOCK_DEADLOCK, "wsrep desync failed for FTWRL", MYF(0));
+      DBUG_RETURN(true);
+    }
+
+    if (!wsrep_pause()) {
+      /* pause failed so rollback desync action too. */
+      WSREP_DEBUG("Trying to pause a node (GRL) failed");
+      wsrep->resync(wsrep);
+      DBUG_RETURN(true);
+    }
+
+    provider_desynced_paused = true;
+  }
+#endif /* WITH_WSREP */
+
   DBUG_RETURN(false);
 }
+
+#ifdef WITH_WSREP
+/**
+  Pause the galera provider.
+  Also set wsrep_locked_seqno to sequence number returned.
+
+  @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
+  @retval True   Provider has been paused.
+*/
+bool Global_read_lock::wsrep_pause() {
+  wsrep_seqno_t ret = wsrep->pause(wsrep);
+
+  if (ret >= 0) {
+    wsrep_locked_seqno = ret;
+    pause_provider(true);
+  } else if (ret != -ENOSYS) { /* -ENOSYS - no provider */
+
+    WSREP_ERROR("Failed to pause provider: %lld (%s)", (long long)-ret,
+                strerror(-ret));
+
+    /* m_mdl_blocks_commits_lock is always NULL here */
+    wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
+    my_error(ER_LOCK_DEADLOCK, MYF(0));
+    return false;
+  }
+
+  return true;
+}
+
+/**
+  Resume the galera provider.
+  Also set wsrep_locked_seqno to sequence number returned.
+
+  @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
+  @retval True   Provider has been paused.
+*/
+wsrep_status_t Global_read_lock::wsrep_resume() {
+  wsrep_status_t ret;
+
+  wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
+  ret = wsrep->resume(wsrep);
+
+  if (ret != WSREP_OK) {
+    WSREP_WARN("failed to resume provider: %d", ret);
+  } else {
+    pause_provider(false);
+  }
+
+  return ret;
+}
+
+bool Global_read_lock::wsrep_pause_once(bool *already_paused) {
+  if (!provider_paused) {
+    *already_paused = false;
+    return wsrep_pause();
+  }
+  *already_paused = true;
+  return true;
+}
+
+wsrep_status_t Global_read_lock::wsrep_resume_once(void) {
+  if (provider_paused) return wsrep_resume();
+  return WSREP_OK;
+}
+
+#endif /* WITH_WSREP */
 
 /**
   Set explicit duration for metadata locks which are used to implement GRL.

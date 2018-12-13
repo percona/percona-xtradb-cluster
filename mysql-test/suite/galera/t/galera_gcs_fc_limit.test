@@ -1,0 +1,99 @@
+#
+# Test that under gcs.fc_limit=1 on the slave, transactions on the master can not commit.
+# Also tests wsrep_flow_control_interval is set properly
+# Also tests wsrep_flow_control_status variable is set properly
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug.inc
+
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1;
+--sleep 1
+
+--let $wsrep_provider_options_orig = `SELECT @@wsrep_provider_options`
+--let $wsrep_causal_reads_orig = `SELECT @@wsrep_causal_reads`
+
+# Turn off causal reads, otherwise the 'SHOW STATUS' will block
+--eval SET @@global.wsrep_causal_reads = 'OFF'
+
+#
+# Test that the wsrep_flow_control interval is set properly
+#
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+
+SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=100';
+SHOW STATUS LIKE 'wsrep_flow_control_interval%';
+
+SET GLOBAL wsrep_provider_options = 'gcs.fc_factor=0.5';
+SHOW STATUS LIKE 'wsrep_flow_control_interval%';
+
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig';
+--enable_query_log
+
+
+# Look at the flow control status, should be 'OFF'
+SHOW STATUS LIKE 'wsrep_flow_control_status';
+
+#
+# Test that under gcs.fc_limit=1 on the slave, transactions on the master can not commit.
+#
+SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=1';
+
+# Block the slave applier thread
+LOCK TABLE t1 WRITE;
+
+--connection node_1
+
+INSERT INTO t1 VALUES (2);
+--sleep 2
+INSERT INTO t1 VALUES (3);
+--sleep 2
+INSERT INTO t1 VALUES (4);
+--sleep 2
+
+# This query will hang because flow control will kick in
+--send
+INSERT INTO t1 VALUES (5);
+--sleep 2
+
+--let $galera_connection_name = node_1a
+--let $galera_server_number = 1
+--source include/galera_connect.inc
+--connection node_1a
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: initiating replication for write set%' AND INFO = 'INSERT INTO t1 VALUES (5)';
+--source include/wait_condition.inc
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+set session wsrep_sync_wait=0;
+# Look at the flow control status, should be 'ON'
+SHOW STATUS LIKE 'wsrep_flow_control_status';
+
+
+--connection node_2
+# Unblock the slave applier thread
+UNLOCK TABLES;
+
+--connection node_1
+--reap
+
+INSERT INTO t1 VALUES (6);
+
+--connection node_2
+# Replication catches up and continues normally
+SELECT COUNT(*) = 6 FROM t1;
+
+# Look at the flow control status, should be 'OFF'
+SHOW STATUS LIKE 'wsrep_flow_control_status';
+
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig';
+--eval SET GLOBAL wsrep_causal_reads = $wsrep_causal_reads_orig;
+--enable_query_log
+
+DROP TABLE t1;

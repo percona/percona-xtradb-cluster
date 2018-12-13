@@ -112,6 +112,31 @@ lock at the same time as multiple read locks.
 ulong locks_immediate = 0L, locks_waited = 0L;
 enum thr_lock_type thr_upgraded_concurrent_insert_lock = TL_WRITE;
 
+#ifdef WITH_WSREP
+
+/* Function pointer to be used if there is thread locking conflicts.
+Thread locking conflicts can happen if 2 trx tend to modify same set
+of data. This mainly has 2 scenarios:
+a. Both trx are applier trx coming from different nodes.
+b. One trx is local trx and other is applier trx.
+Check usage of these function to understand there importance. */
+
+static wsrep_thd_is_brute_force_func wsrep_thd_is_brute_force = NULL;
+static wsrep_abort_thd_func wsrep_abort_thd = NULL;
+static bool wsrep_debug;
+static wsrep_on_func wsrep_on = NULL;
+
+void wsrep_thr_lock_init(wsrep_thd_is_brute_force_func bf_func,
+                         wsrep_abort_thd_func abort_func, bool debug,
+                         wsrep_on_func on_func) {
+  wsrep_thd_is_brute_force = bf_func;
+  wsrep_abort_thd = abort_func;
+  wsrep_debug = debug;
+  wsrep_on = on_func;
+}
+
+#endif /* WITH_WSREP */
+
 /* The following constants are only for debug output */
 #define MAX_THREADS 100
 #define MAX_LOCKS 100
@@ -478,12 +503,97 @@ static enum enum_thr_lock_result wait_for_lock(struct st_lock_list *wait,
   DBUG_RETURN(result);
 }
 
+#ifdef WITH_WSREP
+/*
+WSREP algorithm to resolve lock conflict.
+"Applier wins and local trx is forced to rollback"
+
+If brute force applier would need to wait for a thr lock,
+it needs to make sure that it will get the lock without (too much) delay.
+
+We identify here the owners of blocking locks and ask them to
+abort. We then put our lock request in the first place in the
+wait queue. When lock holders abort (one by one) the lock release
+algorithm should grant the lock to us. We rely on this and proceed
+to wait_for_locks().
+
+wsrep_break_locks() should be called in all the cases, where lock
+wait would happen.
+
+TODO: current implementation might not cover all possible lock wait
+      situations. This needs an review still.
+TODO: lock release, might favor some other lock (instead our bf).
+      This needs an condition to check for bf locks first.
+TODO: we still have a debug fprintf, this should be removed */
+static inline bool wsrep_break_lock(THR_LOCK_DATA *data,
+                                    struct st_lock_list *lock_queue1,
+                                    struct st_lock_list *lock_queue2,
+                                    struct st_lock_list *wait_queue,
+                                    THR_LOCK_INFO *owner) {
+
+  if (wsrep_on(data->owner->mysql_thd) && wsrep_thd_is_brute_force &&
+      wsrep_thd_is_brute_force(data->owner->mysql_thd, true)) {
+    THR_LOCK_DATA *holder;
+
+    /* if locking session conversion to transaction has been enabled,
+       we know that this conflicting lock must be read lock and furthermore,
+       lock holder is read-only. It is safe to wait for him.
+    */
+    if (wsrep_debug) fprintf(stderr, "WSREP wsrep_break_lock aborting locks\n");
+
+    /* aborting lock holder(s) here */
+    for (holder = (lock_queue1) ? lock_queue1->data : NULL; holder;
+         holder = holder->next) {
+      if (!wsrep_thd_is_brute_force(holder->owner->mysql_thd, true)) {
+        wsrep_abort_thd(data->owner->mysql_thd, holder->owner->mysql_thd,
+                        false);
+      } else {
+        if (wsrep_debug)
+          fprintf(stderr, "WSREP wsrep_break_lock skipping BF lock conflict\n");
+        return false;
+      }
+    }
+    for (holder = (lock_queue2) ? lock_queue2->data : NULL; holder;
+         holder = holder->next) {
+      if (!wsrep_thd_is_brute_force(holder->owner->mysql_thd, true)) {
+        wsrep_abort_thd(data->owner->mysql_thd, holder->owner->mysql_thd,
+                        false);
+      } else {
+        if (wsrep_debug)
+          fprintf(stderr, "WSREP wsrep_break_lock skipping BF lock conflict\n");
+        return false;
+      }
+    }
+
+    /* Add our lock to the head of the wait queue */
+    if (*(wait_queue->last) == wait_queue->data) {
+      wait_queue->last = &data->next;
+      assert(wait_queue->data == 0);
+    } else {
+      assert(wait_queue->data != 0);
+      wait_queue->data->prev = &data->next;
+    }
+    data->next = wait_queue->data;
+    data->prev = &wait_queue->data;
+    wait_queue->data = data;
+    data->cond = owner->suspend;
+
+    locks_immediate++;
+    return true;
+  }
+  return false;
+}
+#endif /* WITH_WSREP */
+
 enum enum_thr_lock_result thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
                                    enum thr_lock_type lock_type,
                                    ulong lock_wait_timeout) {
   THR_LOCK *lock = data->lock;
   enum enum_thr_lock_result result = THR_LOCK_SUCCESS;
   struct st_lock_list *wait_queue;
+#ifdef WITH_WSREP
+  bool wsrep_lock_inserted = false;
+#endif /* WITH_WSREP */
   MYSQL_TABLE_WAIT_VARIABLES(locker, state) /* no ';' */
   DBUG_ENTER("thr_lock");
 
@@ -550,6 +660,13 @@ enum enum_thr_lock_result thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
         goto end;
       }
       if (lock->write.data->type == TL_WRITE_ONLY) {
+#ifdef WITH_WSREP
+        if (wsrep_break_lock(data, &lock->write, NULL, &lock->read_wait,
+                             owner)) {
+          wsrep_lock_inserted = true;
+          goto wsrep_read_wait;
+        }
+#endif /* WITH_WSREP */
         /* We are not allowed to get a READ lock in this case */
         data->type = TL_UNLOCK;
         result = THR_LOCK_ABORTED; /* Can't wait for this one */
@@ -575,6 +692,12 @@ enum enum_thr_lock_result thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
       lock but a high priority write waiting in the write_wait queue.
       In the latter case we should yield the lock to the writer.
     */
+#ifdef WITH_WSREP
+    if (wsrep_break_lock(data, &lock->write, NULL, &lock->read_wait, owner)) {
+      wsrep_lock_inserted = true;
+    }
+  wsrep_read_wait:
+#endif /* WITH_WSREP */
     wait_queue = &lock->read_wait;
   } else /* Request for WRITE lock */
   {
@@ -587,6 +710,13 @@ enum enum_thr_lock_result thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
         /* purecov: begin tested */
         /* Allow lock owner to bypass TL_WRITE_ONLY. */
         if (!thr_lock_owner_equal(data->owner, lock->write.data->owner)) {
+#ifdef WITH_WSREP
+          if (wsrep_break_lock(data, &lock->write, NULL, &lock->write_wait,
+                               owner)) {
+            wsrep_lock_inserted = true;
+            goto wsrep_write_wait;
+          }
+#endif /* WITH_WSREP */
           /* We are not allowed to get a lock in this case */
           data->type = TL_UNLOCK;
           result = THR_LOCK_ABORTED; /* Can't wait for this one */
@@ -676,9 +806,21 @@ enum enum_thr_lock_result thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
       DBUG_PRINT("lock", ("write locked 3 by thread: 0x%x  type: %d",
                           lock->read.data->owner->thread_id, data->type));
     }
+#ifdef WITH_WSREP
+    if (wsrep_break_lock(data, &lock->write, NULL, &lock->write_wait, owner)) {
+      wsrep_lock_inserted = true;
+    }
+  wsrep_write_wait:
+#endif /* WITH_WSREP */
     wait_queue = &lock->write_wait;
   }
   /* Can't get lock yet;  Wait for it */
+#ifdef WITH_WSREP
+  if (wsrep_on(data->owner->mysql_thd) && wsrep_lock_inserted) {
+    DBUG_RETURN(
+        wait_for_lock(wait_queue, data, owner, true, lock_wait_timeout));
+  }
+#endif /* WITH_WSREP */
   result = wait_for_lock(wait_queue, data, owner, 0, lock_wait_timeout);
   MYSQL_END_TABLE_LOCK_WAIT(locker);
   DBUG_RETURN(result);

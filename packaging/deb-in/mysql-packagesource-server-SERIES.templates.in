@@ -1,0 +1,88 @@
+Template: mysql-@DEB_PRODUCTNAME@-server/root-pass
+Type: password
+Description: Enter root password:
+ Please provide a strong password that will be set for the root account of your MySQL database.
+ Leave it blank to enable password less login using UNIX socket based authentication.
+
+Template: mysql-@DEB_PRODUCTNAME@-server/re-root-pass
+Type: password
+Description: Re-enter root password:
+ Now that you have selected a password for the root account, please confirm by typing it again. Do not share the password with anyone.
+
+Template: mysql-@DEB_PRODUCTNAME@-server/root-pass-mismatch
+Type: error
+Description: The two passwords did not match
+ Please try again. Make sure you type the exact same password twice.
+
+Template: mysql-@DEB_PRODUCTNAME@-server/remove-data-dir
+Type: boolean
+Default: false
+Description: Remove data directories ?
+ This operation will remove the data directory at '/var/lib/mysql' that stores all the databases, tables and related meta-data.
+ Additionally, any import or export files stored at '/var/lib/mysql-files' will be removed along with directory, as well as the contents of
+ /var/lib/mysql-keyring.
+ It is highly recommended to take data backup before removing the data directories.
+
+Template: mysql-@DEB_PRODUCTNAME@-server/data-dir
+Type: note
+Description: Data directory found when no MySQL server package is installed
+ A data directory '/var/lib/mysql' is present on this system when no MySQL server 
+ package is currently installed on the system. The directory may be under control of
+ server package received from third-party vendors. It may also be an unclaimed data
+ directory from previous removal of mysql packages.
+ .
+ It is highly recommended to take data backup. If you have not done so, now would be
+ the time to take backup in another shell. Once completed, press 'Ok' to continue.
+
+Template: mysql-@DEB_PRODUCTNAME@-server/really_downgrade
+Type: boolean
+Default: false
+_Description: Really proceed with downgrade?
+ A file named /var/lib/mysql/debian-*.flag exists on this system.
+ .
+ Such a file is an indication that a mysql-server package with a higher
+ version has been installed previously.
+ .
+ There is no guarantee that the version you're currently installing
+ will be able to use the current databases.
+
+Template: mysql-@DEB_PRODUCTNAME@-server/nis_warning
+Type: note
+_Description: Important note for NIS/YP users
+ Using MySQL under NIS/YP requires a mysql user account to be added on
+ the local system with:
+ .
+  adduser --system --group --home /var/lib/mysql mysql
+ .
+ You should also check the permissions and ownership of the
+ /var/lib/mysql directory:
+ .
+  /var/lib/mysql: drwxr-xr-x   mysql    mysql
+
+Template: mysql-@DEB_PRODUCTNAME@-server/postrm_remove_databases
+Type: boolean
+Default: false
+_Description: Remove all MySQL databases?
+ The /var/lib/mysql directory which contains the MySQL databases is about
+ to be removed.
+ .
+ This will also erase all data in /var/lib/mysql-files as well as
+ /var/lib/mysql-keyring.
+ .
+ If you're removing the MySQL package in order to later install a more
+ recent version or if a different mysql-server package is already
+ using it, the data should be kept.
+
+Template: mysql-@DEB_PRODUCTNAME@-server/start_on_boot
+Type: boolean
+Default: true
+_Description: Start the MySQL server on boot?
+ The MySQL server can be launched automatically at boot time or manually
+ with the '/etc/init.d/mysql start' command.
+
+Template: mysql-@DEB_PRODUCTNAME@-server/no_upgrade_when_using_ndb
+Type: error
+_Description: NDB Cluster seems to be in use
+ MySQL-5.7 no longer provides NDB Cluster support. Please migrate to the new
+ mysql-cluster-server package and remove all lines starting with "ndb" from
+ all config files below /etc/mysql/.

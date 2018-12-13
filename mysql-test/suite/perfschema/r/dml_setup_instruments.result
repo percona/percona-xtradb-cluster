@@ -38,6 +38,7 @@ where name like 'Wait/Synch/Cond/sql/%'
 'wait/synch/cond/sql/DEBUG_SYNC::cond',
 'wait/synch/cond/sql/COND_socket_listener_active',
 'wait/synch/cond/sql/COND_start_signal_handler')
+and name not like 'wait/synch/cond/sql/COND_wsrep_%'
 order by name limit 10;
 NAME	ENABLED	TIMED	PROPERTIES	VOLATILITY	DOCUMENTATION
 wait/synch/cond/sql/Commit_order_manager::m_workers.cond	YES	YES		0	NULL

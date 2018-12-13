@@ -49,6 +49,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <atomic>
 #include "trx0trx.h"
 
+#ifdef WITH_WSREP
+#include "trx0xa.h"
+#endif /* WITH_WSREP */
+
 #ifndef UNIV_HOTBACKUP
 typedef UT_LIST_BASE_NODE_T(trx_t) trx_ut_list_t;
 
@@ -207,12 +211,32 @@ void trx_sys_update_mysql_binlog_offset(
     int64_t offset,        /*!< in: position in that log file */
     ulint field,           /*!< in: offset of the MySQL log info field in
                            the trx sys header */
+#ifdef WITH_WSREP
+    trx_sysf_t* sys_header, /*!< in: trx sys header */
+#endif /* WITH_WSREP */
     mtr_t *mtr);           /*!< in: mtr */
 /** Prints to stderr the MySQL binlog offset info in the trx system header if
  the magic number shows it valid. */
 void trx_sys_print_mysql_binlog_offset(void);
 /** Shutdown/Close the transaction system. */
 void trx_sys_close(void);
+
+#ifdef WITH_WSREP
+/** Update WSREP checkpoint XID in sys header. */
+void
+trx_sys_update_wsrep_checkpoint(
+        const XID*      xid,         /*!< in: WSREP XID */
+        trx_sysf_t*     sys_header,  /*!< in: sys_header */
+        mtr_t*          mtr,         /*!< in: mtr       */
+        bool            recovery = false);
+                                     /*!< in: running recovery */
+
+void
+/** Read WSREP checkpoint XID from sys header. */
+trx_sys_read_wsrep_checkpoint(
+        XID* xid); /*!< out: WSREP XID */
+#endif /* WITH_WSREP */
+
 
 /** Determine if there are incomplete transactions in the system.
 @return whether incomplete transactions need rollback */
@@ -316,6 +340,20 @@ remains the same. */
   8                               /*!< low 4 bytes of the offset \
                                   within that file */
 #define TRX_SYS_MYSQL_LOG_NAME 12 /*!< MySQL log file name */
+
+#ifdef WITH_WSREP
+/* The offset to WSREP XID headers */
+#define TRX_SYS_WSREP_XID_INFO (UNIV_PAGE_SIZE - 3500)
+#define TRX_SYS_WSREP_XID_MAGIC_N_FLD 0
+#define TRX_SYS_WSREP_XID_MAGIC_N 0x77737265
+
+/* XID field: formatID, gtrid_len, bqual_len, xid_data */
+#define TRX_SYS_WSREP_XID_LEN        (4 + 4 + 4 + XIDDATASIZE)
+#define TRX_SYS_WSREP_XID_FORMAT     4
+#define TRX_SYS_WSREP_XID_GTRID_LEN  8
+#define TRX_SYS_WSREP_XID_BQUAL_LEN 12
+#define TRX_SYS_WSREP_XID_DATA      16
+#endif /* WITH_WSREP */
 
 /** Doublewrite buffer */
 /* @{ */

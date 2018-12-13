@@ -1,0 +1,306 @@
+#! /bin/bash -ue
+#
+# Scripts to run by PXC systemd service
+# 
+
+parse_cnf()
+{
+    local var=$1
+    local def=$2
+    shift
+    local groups=$*
+    reval=$(my_print_defaults $groups | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -n 1)
+    if [[ -z ${reval:-} ]];then 
+        val=$(tr ' ' '\n' <<< "$env_args" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -n 1)
+        if [[ -n ${val:-} ]];then
+            reval=$val
+        else 
+            reval=$def
+        fi
+    fi
+    echo $reval
+}
+
+install_db () {    
+    # Note: something different than datadir=/var/lib/mysql requires SELinux policy changes (in enforcing mode)
+    log=$(parse_cnf log-error server mysqld mysqld_safe)
+
+
+    # Check that pid-file directory exists and has valid permissions
+    pidfiledir=$(dirname $pid_path)
+    if [ ! -z $pidfiledir ]; then
+        [ -d "$pidfiledir" ] || install -d -m 0755 -omysql -gmysql "$pidfiledir" || exit 1
+    fi
+    
+    # Restore log, dir, perms and SELinux contexts
+    [ -d "$datadir" ] || install -d -m 0755 -omysql -gmysql "$datadir" || exit 1
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon "$datadir"
+        if [ ! -z $pidfiledir ]; then
+            /usr/sbin/restorecon "$pidfiledir"
+        fi
+    fi
+
+    # If log file is not specified it's put into datadir by default
+    if [ ! -z $log ]; then
+        if [ ! -e "$log" -a ! -h "$log" -a x$(dirname "$log") = "x/var/log" ]; then
+            case $(basename "$log") in
+                mysql*.log) install /dev/null -m0640 -o@MYSQLD_USER@ -g@MYSQLD_USER@ "$log" ;;
+                *) ;;
+            esac
+        fi
+        if [ -x /usr/sbin/restorecon ]; then
+            [ -e "$log" ] && /usr/sbin/restorecon $log
+        fi
+    fi
+
+    # If special mysql dir is in place, skip db install 
+    [ -d "$datadir/mysql" ] && exit 0
+    if [ -f "$datadir/sst_in_progress" ]; then
+        rm -rf $datadir/*
+    fi
+
+    # Create initial db
+    /usr/sbin/mysqld --initialize --datadir="$datadir" --user=mysql
+    exit 0
+}
+
+log_success_msg() {
+    echo " SUCCESS! $@"
+}
+
+log_failure_msg() {
+    echo " ERROR! $@"
+}
+
+log_info_msg() {
+    echo " INFO: $@"
+}
+
+
+log_warning_msg() {
+    echo " WARNING: $@"
+}
+
+wait_for_pid () {
+  local verb=$1          
+  local pid_file_path="$2" 
+  local mpid=0
+
+  if [[ $verb = 'removed' ]];then 
+    if [[ ! -s $pid_file_path ]];then 
+        log_success_msg
+        return 0
+    fi
+    mpid=$(cat $pid_file_path)
+  fi
+
+  local sst_progress_file=$datadir/sst_in_progress
+  i=0
+
+  while [[ $i -lt $service_startup_timeout ]]; do
+
+    set +e
+    case "$verb" in
+      'created')
+            if [[ -s "$pid_file_path" ]]; then 
+                mpid=$(cat $pid_file_path)
+                if kill -0 $mpid;then
+                    i='' 
+                    break
+                fi
+            fi
+        ;;
+      'removed')
+            if [[ ! -s "$pid_file_path" ]] && ! kill -0 $mpid;then 
+                i=''
+                break
+            fi
+        ;;
+      *)
+        echo "wait_for_pid () usage: wait_for_pid created|removed pid pid_file_path"
+        exit 1
+        ;;
+    esac
+    set -e
+
+
+    if [[ $verb = 'created' ]];then 
+        if ([[ -e $sst_progress_file ]] || grep -q -- '--wsrep-new-cluster' <<< "$env_args" ) \
+            && [[ $startup_sleep -ne 10 ]];then
+            echo "State transfer in progress, setting sleep higher"
+            startup_sleep=10
+        fi
+    fi
+
+    i=$(( i+1 ))
+    sleep $startup_sleep
+
+    if [[ $verb = 'created' ]];then 
+        if ! kill -0 $manager;then 
+            log_failure_msg "mysqld_safe with PID $manager has already exited: FAILURE"
+            exit 1
+        fi
+    fi
+
+  done
+
+  if [[ -z "$i" ]]; then
+    log_success_msg
+    return 0
+  elif [[ -e $sst_progress_file ]]; then 
+    log_info_msg
+    return 2
+  else
+    log_failure_msg
+    return 1
+  fi
+}
+
+pinger () {
+    # Wait for ping to answer to signal startup completed,
+    # might take a while in case of e.g. crash recovery
+    # MySQL systemd service will timeout script if no answer
+    datadir=$(parse_cnf datadir server mysqld)
+    if [[ -z ${datadir:-} ]]; then
+        datadir="/var/lib/mysql"
+    fi
+    socket=$(parse_cnf socket server mysqld)
+    case $socket in
+        /*) adminsocket="$socket" ;;
+        "") adminsocket="$datadir/mysql.sock" ;;
+        *) adminsocket="$datadir/$socket" ;;
+    esac
+
+    while /bin/true ; do
+        sleep 1
+        mysqladmin --no-defaults --socket="$adminsocket" --user=UNKNOWN_MYSQL_USER ping >/dev/null 2>&1 && break
+    done
+    exit 0
+}
+
+
+action=$1
+manager=${2:-0}
+service_startup_timeout=900
+startup_sleep=1
+basedir=/usr
+bindir="$basedir/bin"
+sbindir="$basedir/sbin"
+libexecdir="$basedir/libexec"
+
+env_args="${EXTRA_ARGS:-}"
+
+
+PATH="/sbin:/usr/sbin:/bin:/usr/bin:$bindir:$sbindir"
+export PATH
+
+pid_path=$(parse_cnf pid-file "" server mysqld mysqld_safe)
+datadir=$(parse_cnf datadir "" server mysqld mysqld_safe)
+service_startup_timeout=$(parse_cnf service-startup-timeout $service_startup_timeout mysqld_safe)
+
+if [[ -z ${datadir:-} ]];then
+    datadir="/var/lib/mysql"
+    if [[ ! -d $datadir ]];then 
+        echo "FATAL: datadir not found in cnf or is /var/lib/mysql"
+        exit 2
+    fi
+fi
+
+
+
+if [[ -z "${pid_path:-}" ]];then
+  pid_path=$datadir/`hostname`.pid
+else
+  case "$pid_path" in
+    /* ) ;;
+    * )  pid_path="$datadir/$pid_path" ;;
+  esac
+fi
+
+if [[ $action == 'reload' || $action == 'stop' || $action == 'stop-post' ]];then
+    if [[ ! -s $pid_path ]];then 
+        log_warning_msg "mysql pid file $pid_path empty or not readable"
+        [[ $action == 'stop' ]] && log_failure_msg "mysql already dead"
+        if [[ $action == 'stop-post' ]];then 
+            log_warning_msg "mysql may be already dead"
+            exit
+        fi
+        exit 2
+    fi
+    mysql_pid=$(cat $pid_path)
+    if [[ $action == 'stop-post' && -n ${mysql_pid:-} ]]  && ! kill -0 $mysql_pid;then 
+        log_warning_msg "mysql already dead"
+        log_failure_msg "Stale PID file: $pid_path"
+        exit 3
+    fi
+fi
+
+if [[ $action == 'start-post' ]];then 
+    if ! kill -0 $manager;then 
+        log_failure_msg "mysqld_safe with PID $manager has already exited"
+        exit 1
+    fi
+fi
+
+check_running()
+{
+    if [[ -s $pid_path ]];then
+	    mysql_pid=$(cat $pid_path)
+	    if [[ -n ${mysql_pid:-} ]]  && kill -0 $mysql_pid 2>/dev/null;then
+                mysql_existed_pid=$(ps wwaux | grep mysql | grep "wsrep-provider" | awk '{print $2}')
+                if [[ ${mysql_pid} == ${mysql_existed_pid} ]]; then
+                    log_warning_msg "PXC is in bootstrap mode.  To switch to normal operation, first stop the mysql@bootstrap.service then start the mysql service"
+                else
+                    log_warning_msg "Another instance of mysqld running on $mysql_pid, exiting.."
+                fi
+                exit 1
+
+	    fi
+    fi
+}
+
+
+
+ret=0
+
+case $action in
+    "start-pre") check_running; install_db ;;
+    "start-post") 
+      wait_for_pid created  "$pid_path"; ret=$?
+      if [[ $ret -eq 1 ]];then 
+          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
+      elif [[ $ret -eq 2 ]];then
+          log_info_msg "MySQL (Percona XtraDB Cluster) server startup failed! State transfer still in progress"
+      fi
+      exit $ret
+    ;;
+    "stop-post") 
+      wait_for_pid removed  "$pid_path"; ret=$?
+      if [[ $ret -ne 0 ]];then 
+        log_failure_msg "MySQL (Percona XtraDB Cluster) server stop failed!"
+      fi
+      exit $ret
+    ;;
+    'reload')
+        kill -HUP $mysql_pid || ret=$?
+        if [[ $ret -ne 0 ]]; then 
+            log_failure_msg "Failed to reload the server with PID: $mysql_pid with $ret status"
+            exit $ret
+        else 
+            log_success_msg "Reloaded the server"
+        fi
+        ;;
+    'stop')
+        kill -TERM $mysql_pid || ret=$?
+        if [[ $ret -ne 0 ]]; then 
+            log_failure_msg "Failed to stop the server with PID: $mysql_pid with $ret status"
+            exit $ret
+        else 
+            log_success_msg "Stopping Percona XtraDB Cluster......"
+        fi
+        ;;
+esac
+
+exit 0
+

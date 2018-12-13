@@ -1,0 +1,44 @@
+#
+--source include/have_wsrep.inc
+
+--echo #
+--echo # wsrep_rsu_commit_timeout
+--echo #
+
+--echo # save the initial value
+SET @wsrep_rsu_commit_timeout_global_saved = @@global.wsrep_rsu_commit_timeout;
+
+--echo # default
+SELECT @@global.wsrep_rsu_commit_timeout;
+
+--echo
+--echo # scope
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SELECT @@session.wsrep_rsu_commit_timeout;
+SET @@global.wsrep_rsu_commit_timeout=1;
+SELECT @@global.wsrep_rsu_commit_timeout;
+
+--echo
+--echo # valid values
+SET @@global.wsrep_rsu_commit_timeout=5000;
+SELECT @@global.wsrep_rsu_commit_timeout;
+SET @@global.wsrep_rsu_commit_timeout=10000000;
+SELECT @@global.wsrep_rsu_commit_timeout;
+SET @@global.wsrep_rsu_commit_timeout=default;
+SELECT @global.wsrep_rsu_commit_timeout;
+
+--echo
+--echo # invalid values
+--error ER_WRONG_TYPE_FOR_VAR
+SET @@global.wsrep_rsu_commit_timeout=NULL;
+--error ER_WRONG_TYPE_FOR_VAR
+SET @@global.wsrep_rsu_commit_timeout='junk';
+# expect warnings (Truncated incorrect wsrep_rsu_commit_timeout value: '-1')
+SET @@global.wsrep_rsu_commit_timeout=-1;
+SELECT @global.wsrep_rsu_commit_timeout;
+
+--echo
+--echo # restore the initial value
+SET @@global.wsrep_rsu_commit_timeout = @wsrep_rsu_commit_timeout_global_saved;
+
+--echo # End of test

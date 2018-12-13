@@ -1,0 +1,22 @@
+#
+--source include/have_wsrep.inc
+
+--echo #
+--echo # wsrep_cluster_name
+--echo #
+
+--echo # save the initial value
+SET @wsrep_cluster_name_global_saved = @@global.wsrep_cluster_name;
+
+--echo # default
+SELECT @@global.wsrep_cluster_name;
+
+--echo
+--echo # scope
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SELECT @@session.wsrep_cluster_name;
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SET @@global.wsrep_cluster_name='my_galera_cluster';
+SELECT @@global.wsrep_cluster_name;
+
+--echo # End of test

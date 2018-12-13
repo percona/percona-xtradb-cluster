@@ -1,0 +1,16 @@
+# stream-compress + compact + parallel + rlimit + progress + thread pool
+# v2only
+[mysqld]
+thread_handling=pool-of-threads
+extra_port=50102
+
+[xtrabackup]
+compact
+parallel=4
+
+[sst]
+compressor="gzip"
+rlimit=2m
+time=1
+progress=1
+use_extra=1

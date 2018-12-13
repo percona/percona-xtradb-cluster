@@ -1,0 +1,178 @@
+#!/bin/bash
+
+get_pcount () {
+	PSCOUNT=$(ps -ef | grep "/usr/sbin/mysqld" | wc -l)
+	echo "${PSCOUNT}"
+}
+
+server_stop () {
+	PSCOUNT=$(get_pcount)
+	COUNT=0
+	while :; do
+		COUNT=$(( COUNT+1 ))
+		echo -n .
+		if [ "${PSCOUNT}" -eq 1 ];
+		then
+			echo
+			break
+		fi
+		if [ "${COUNT}" -gt 15 ];
+		then
+                    if [ ! -x /etc/init.d/mysql ]; then return; fi
+
+                    set +e
+                    if [ -x /usr/sbin/invoke-rc.d ]; then
+                        cmd="invoke-rc.d mysql stop"
+                    else
+                        cmd="/etc/init.d/mysql stop"
+                    fi
+                    $cmd
+                    errno=$?
+                    set -e
+
+                    # 0=ok, 100=no init script (fresh install)
+                    if [ "$errno" != 0 ]; then
+                        set +e
+                        cmd="service mysql stop"
+                        $cmd
+                        errno=$?
+                        set -e
+                        if [ "$errno" != 0 ]; then
+                            return 1
+                        else
+                            return 0
+                        fi
+                    else
+                        return 0
+                    fi
+		fi
+		PSCOUNT=$(get_pcount)
+		sleep 1
+	done
+	return 0
+}
+
+case "$1" in
+	install)
+
+	if [ -z "$2" ];
+	then
+
+		set -e
+
+		if [ -x "/etc/init.d/mysql" ];
+		then
+			invoke-rc.d mysql stop || exit $?
+			server_stop
+		fi
+
+		MYSQLDATA=/var/lib/mysql
+		MYSQLFILES=/var/lib/mysql-files
+		MYSQLLOG=/var/log/mysql
+		MYSQLRUN=/var/run/mysqld
+		MYSQLKEYRING=/var/lib/mysql-keyring
+                MYSQLLOGFILE=/var/log/mysqld.log
+
+		if ! getent group mysql >/dev/null;
+		then
+			addgroup --system mysql >/dev/null
+		fi
+
+		if ! getent passwd mysql >/dev/null;
+		then
+			adduser --ingroup mysql --system --disabled-login --no-create-home --home ${MYSQLDATA} --shell /bin/false --gecos "MySQL Server" mysql >/dev/null
+		fi
+
+		if [ ! -d ${MYSQLDATA} -a ! -L ${MYSQLDATA} ];
+		then
+			mkdir ${MYSQLDATA}
+			chown mysql:mysql ${MYSQLDATA}
+			chmod 750 ${MYSQLDATA}
+		fi
+
+		if [ ! -d ${MYSQLFILES} -a ! -L ${MYSQLFILES} ];
+		then
+			mkdir ${MYSQLFILES}
+			chown mysql:mysql ${MYSQLFILES}
+			chmod 770 ${MYSQLFILES}
+		fi
+
+		if [ ! -d ${MYSQLKEYRING} -a ! -L ${MYSQLKEYRING} ];
+		then
+			mkdir ${MYSQLKEYRING}
+			chown mysql:mysql ${MYSQLKEYRING}
+			chmod 750 ${MYSQLKEYRING}
+		fi
+
+		if [ ! -d ${MYSQLLOG} -a ! -L ${MYSQLLOG} ];
+		then
+			mkdir ${MYSQLLOG}
+			chown mysql:adm ${MYSQLLOG}
+			chmod 750 ${MYSQLLOG}
+			touch ${MYSQLLOG}/error.log
+			chmod 640 ${MYSQLLOG}/error.log
+			chown mysql:adm ${MYSQLLOG}/error.log
+		fi
+
+                if [ ! -e ${MYSQLLOGFILE} ];
+		then
+			touch ${MYSQLLOGFILE}
+			chmod 640 ${MYSQLLOGFILE}
+			chown mysql:adm ${MYSQLLOGFILE}
+		fi
+
+		if [ ! -d ${MYSQLRUN} -a ! -L ${MYSQLRUN} ];
+		then
+			mkdir ${MYSQLRUN}
+			chown mysql:mysql ${MYSQLRUN}
+			chmod 755 ${MYSQLRUN}
+		fi
+
+		# we do this because we don't provide our own my.cnf
+		# but use the one from system mysql-common package
+		# so we need to disable options that don't work for 5.7
+		MYSQLCONFIG=/etc/mysql/my.cnf
+		if [ -f ${MYSQLCONFIG} -a ! -L ${MYSQLCONFIG} ];
+		then
+			cp -f ${MYSQLCONFIG} /etc/mysql/my.cnf.old
+			sed -e '/^key_buffer[^_-]/s/^/#/g' -i ${MYSQLCONFIG}
+			sed -e '/^myisam-recover/s/^/#/g' -i ${MYSQLCONFIG}
+		fi
+
+		set +e
+	else
+	    server_stop
+	fi
+
+	;;
+
+	upgrade)
+
+	set -e
+
+	#DEBHELPER#
+	server_stop
+	currentver=$(dpkg -l | grep percona-xtradb-cluster-server-5.7 | awk '{print $3}' | awk -F'-' '{print $1}')
+	requiredver="5.7.19"
+	if [[ $currentver < $requiredver ]]; then
+	  echo -e "\n\n * Please execute the following operations to get the full cluster updated:"
+	  echo -e "\t - Upgrade each node to current PXC version (5.7.19+)"
+	  echo -e "\t\t mysql -uroot -p < /usr/share/mysql/pxc_cluster_view.sql"
+	  echo -e "\t - Restart each cluster node, one node at a time:"
+	  echo -e "\t\t service mysql restart\n\n"
+        fi
+
+	set +e
+
+	;;
+
+	abort-upgrade)
+
+	;;
+
+	*)
+        exit 1
+        ;;
+esac
+
+exit 0

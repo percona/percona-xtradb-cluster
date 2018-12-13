@@ -1,0 +1,10 @@
+#!/bin/bash -eu
+
+if [ -x /usr/sbin/invoke-rc.d ]; then
+    invoke-rc.d mysql stop
+else
+    /etc/init.d/mysql stop
+fi
+update-rc.d -f mysql remove >/dev/null
+[ ! -L /etc/apparmor.d/disable/usr.sbin.mysqld ] || rm -rf /etc/apparmor.d/disable/usr.sbin.mysqld
+[ ! -x /etc/init.d/apparmor ] || /etc/init.d/apparmor restart

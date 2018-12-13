@@ -1,0 +1,92 @@
+#
+# Test the wsrep_desync + wsrep_on method for schema upgrades discussed at
+# http://www.slideshare.net/Severalnines/schema-upgrades-codershippresodec2013 , slide 30
+#
+
+--source include/big_test.inc
+--source include/galera_cluster.inc
+
+--connection node_1
+CREATE TABLE ten (f1 INTEGER);
+INSERT INTO ten VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9);
+
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+
+# Insert some values before the ALTER
+INSERT INTO t1 (f1) SELECT 000000 + (10000 * a1.f1) + (1000 * a2.f1) + (100 * a3.f1) + (10 * a4.f1) + a5.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;
+
+--connection node_2
+SET GLOBAL wsrep_desync = TRUE;
+SET SESSION wsrep_on = FALSE;
+--SLEEP 5
+
+ALTER TABLE t1 ADD PRIMARY KEY (f1);
+
+SET SESSION wsrep_on = TRUE;
+SET GLOBAL wsrep_desync = FALSE;
+
+# Insert even more data after the ALTER has completed
+INSERT INTO t1 (f1) SELECT 100000 + (10000 * a1.f1) + (1000 * a2.f1) + (100 * a3.f1) + (10 * a4.f1) + a5.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;
+
+SELECT COUNT(*) = 200000 FROM t1;
+SELECT MAX(f1) =  199999 FROM t1;
+
+--connection node_1
+SELECT COUNT(*) = 200000 FROM t1;
+SELECT MAX(f1) =  199999 FROM t1;
+
+SET GLOBAL wsrep_desync = TRUE;
+SET SESSION wsrep_on = FALSE;
+
+ALTER TABLE t1 ADD PRIMARY KEY (f1);
+
+SET SESSION wsrep_on = TRUE;
+SET GLOBAL wsrep_desync = FALSE;
+
+# Insert some conflicting values after the ALTER has been applied on all nodes.
+
+--connection node_2
+--error ER_DUP_ENTRY
+INSERT INTO t1 (f1) VALUES (1);
+ 
+--connection node_1
+--error ER_DUP_ENTRY
+INSERT INTO t1 (f1) VALUES (100);
+
+DROP TABLE t1;
+DROP TABLE ten;
+
+#
+# Try to set the wsrep_desync=1 as part of initial configuration.
+# Server should refuse to start.
+#
+
+--connection node_2
+
+call mtr.add_suppression("Can't desync a non-synced node.*");
+call mtr.add_suppression("Aborting");
+
+--echo #node-2
+--echo "Shutdown node-2 gracefully"
+--source include/shutdown_mysqld.inc
+
+--echo "Restart with wsrep_desync=1"
+--let $start_mysqld_params="--wsrep_desync=1"
+--exec echo "try:$start_mysqld_params" > $_expect_file_name
+# Sleep to ensure that server exited...
+--sleep 30
+#
+--echo "Restart with default options"
+--let $start_mysqld_params=
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--let $assert_text = Can't desync a non-synced node
+--let $assert_select = Can't desync a non-synced node
+--let $assert_count = 1
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+

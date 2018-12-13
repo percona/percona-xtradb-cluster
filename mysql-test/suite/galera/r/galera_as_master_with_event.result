@@ -1,0 +1,61 @@
+use test;
+CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=<PORT>;;
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+#node-1
+select @@server_id;
+@@server_id
+1
+use mysql;
+create table t (i int auto_increment, primary key pk(i)) engine=innodb;
+insert into t values (NULL);
+select count(*) from mysql.t;
+count(*)
+NUMBER_OF_ROWS
+use test;
+show events;
+Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
+create event foo on schedule every 1 minute do insert into mysql.t values (NULL);
+show events;
+Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
+test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	ENABLED	1	utf8mb4	utf8mb4_0900_ai_ci	utf8mb4_0900_ai_ci
+select count(*) from mysql.t;
+count(*)
+NUMBER_OF_ROWS
+#node-2
+select @@server_id;
+@@server_id
+2
+show events;
+Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
+test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	SLAVESIDE_DISABLED	1	utf8mb4	utf8mb4_0900_ai_ci	utf8mb4_0900_ai_ci
+#async-slave
+select @@server_id;
+@@server_id
+3
+show events;
+Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
+select count(*) from mysql.t;
+count(*)
+NUMBER_OF_ROWS
+STOP SLAVE;
+CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=<PORT>;;
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+#node-2
+# restart
+show events;
+Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
+test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	SLAVESIDE_DISABLED	1	utf8mb4	utf8mb4_0900_ai_ci	utf8mb4_0900_ai_ci
+use mysql;
+drop table t;
+#async-slave
+show create table mysql.t;
+ERROR 42S02: Table 'mysql.t' doesn't exist
+#node-1
+use test;
+drop event foo;
+STOP SLAVE;
+RESET SLAVE ALL;

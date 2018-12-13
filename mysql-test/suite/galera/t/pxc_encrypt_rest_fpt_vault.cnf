@@ -1,0 +1,28 @@
+!include ../galera_2nodes.cnf
+
+[mysqld]
+wsrep_sst_method=xtrabackup-v2
+wsrep_sst_auth="root:"
+pxc-encrypt-cluster-traffic=ON
+
+[xtrabackup]
+xtrabackup-plugin-dir=@ENV.XB_PLUGIN_DIR
+
+[sst]
+ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
+
+[mysqld.1]
+# Run the master.sh script before starting this process
+#!run-master-sh
+wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true'
+server_id=1
+early_plugin_load="keyring_vault=@ENV.KEYRING_VAULT_PLUGIN"
+keyring_vault_config=@ENV.MYSQLTEST_VARDIR/std_data/keyring_vault_confs/pxc_encrypt_rest_fpt_vault_57_1.conf
+
+[mysqld.2]
+# Run the master.sh script before starting this process
+#!run-master-sh
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;pc.ignore_sb=true'
+server_id=2
+early_plugin_load="keyring_vault=@ENV.KEYRING_VAULT_PLUGIN"
+keyring_vault_config=@ENV.MYSQLTEST_VARDIR/std_data/keyring_vault_confs/pxc_encrypt_rest_fpt_vault_57_2.conf

@@ -1,0 +1,87 @@
+
+#
+# this test exercise recovery feature. Prior to PXC#895 trx was
+# was being lost on recovery.
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug.inc
+--source include/force_restart.inc
+
+--connection node_2
+--echo #node-2
+--echo #shutdown node-2.
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+--echo #node-1
+select @@sync_binlog;
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+#-------------------------------------------------------------------------------
+#
+# Execute some workload on node-1 with induce crash.
+#
+--connection node_1
+--echo #node-1
+
+create table t1 (i int, primary key pk(i)) engine=innodb;
+insert into t1 values (1);
+insert into t1 values (2);
+insert into t1 values (3);
+set debug="+d,crash_before_trx_commit_in_memory";
+--error 2013
+insert into t1 values (4);
+
+--connection node_1
+--echo #node-1
+--echo #waiting to restart node-1
+--sleep 3
+
+--let $restart_parameters="restart:"
+--let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+#
+# continue with same table but this time insert some rows with wsrep_on=off
+# these transaction will be committed with mysql xid and not wsrep xid.
+set session wsrep_on=0;
+set debug="+d,crash_before_trx_commit_in_memory";
+--error 2013
+insert into t1 values (40);
+
+--connection node_1
+--echo #node-1
+--echo #waiting to restart node-1
+--sleep 3
+
+--let $restart_parameters="restart:"
+--let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+select * from t1;
+drop table t1;
+
+--connection node_2
+--echo #node-2
+
+--let $restart_parameters="restart:"
+--let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+call mtr.add_suppression("WSREP: Failed to prepare for incremental state transfer.*");

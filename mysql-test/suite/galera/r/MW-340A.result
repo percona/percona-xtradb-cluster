@@ -1,0 +1,9 @@
+create table t1(a int not null, b int, primary key(a)) engine=innodb;
+create table t2(d int not null, e int, primary key(d)) engine=innodb;
+set autocommit = 0;
+SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+create table t3(d int not null, e int, primary key(d)) engine=innodb
+select * from t2;
+DROP TABLE t1;
+DROP TABLE t2;
+DROP TABLE t3;

@@ -1,0 +1,143 @@
+#
+# Tests for LOAD DATA
+# rather than Galera's own implementation
+#
+
+--source include/galera_cluster.inc
+
+#
+# Empty LOAD DATA
+#
+
+--perl
+open(FILE, ">", "$ENV{'MYSQLTEST_VARDIR'}/tmp/galera_load_data_empty.csv") or die;
+close FILE;
+EOF
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+RESET MASTER;
+
+--connection node_1
+RESET MASTER;
+
+--let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+--disable_query_log
+--eval LOAD DATA INFILE "$MYSQLTEST_VARDIR/tmp/galera_load_data_empty.csv" INTO TABLE t1;
+--enable_query_log
+
+--let $wsrep_last_applied_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+# Expect no advancement in the commit counter
+
+--disable_query_log
+--eval SELECT $wsrep_last_applied_after = $wsrep_last_applied_before AS wsrep_last_applied_correct;
+--enable_query_log
+
+# Expect no recorded output
+
+SHOW BINLOG EVENTS FROM 124;
+
+#
+# One line loaded, so less than the wsrep-load-data-splitting value
+#
+
+--perl
+open(FILE, ">", "$ENV{'MYSQLTEST_VARDIR'}/tmp/galera_load_data_one.csv") or die;
+print FILE "1\n";
+close FILE;
+EOF
+
+--connection node_1
+RESET MASTER;
+
+--connection node_2
+RESET MASTER;
+
+--connection node_1
+--let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+--connection node_2
+--let $wsrep_last_applied_before_2 = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+--connection node_1
+--disable_query_log
+--eval LOAD DATA INFILE "$MYSQLTEST_VARDIR/tmp/galera_load_data_one.csv" INTO TABLE t1;
+--enable_query_log
+
+--let $wsrep_last_applied_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+# Expect one transaction
+
+--disable_query_log
+--eval SELECT $wsrep_last_applied_after = $wsrep_last_applied_before + 1 AS wsrep_last_applied_correct
+--enable_query_log
+
+--connection node_2
+# Expect one transaction
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before_2 + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied';
+--source include/wait_condition.inc
+
+--connection node_1
+SELECT COUNT(*) = 1 FROM t1;
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1;
+
+# Expect one binlog entry, identical on both nodes
+
+--connection node_1
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS FROM 124;
+
+--connection node_2
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS FROM 124;
+
+--connection node_1
+TRUNCATE TABLE t1;
+
+#
+# Error during loading
+#
+
+--perl
+open(FILE, ">", "$ENV{'MYSQLTEST_VARDIR'}/tmp/galera_load_data_duplicate.csv") or die;
+print FILE "1\n";
+print FILE "1\n";
+close FILE;
+EOF
+
+RESET MASTER;
+
+--let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+--disable_query_log
+--error ER_DUP_ENTRY
+--eval LOAD DATA INFILE "$MYSQLTEST_VARDIR/tmp/galera_load_data_duplicate.csv" INTO TABLE t1;
+--enable_query_log
+
+--let $wsrep_last_applied_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+# Expect no advancement in the commit counter
+
+--disable_query_log
+--eval SELECT $wsrep_last_applied_after = $wsrep_last_applied_before AS wsrep_last_applied_correct;
+--enable_query_log
+
+# Expect no recorded output
+
+SELECT COUNT(*) = 0 FROM t1;
+
+SHOW BINLOG EVENTS FROM 124;
+
+--connection node_1
+DROP TABLE t1;
+
+--remove_file "$MYSQLTEST_VARDIR/tmp/galera_load_data_duplicate.csv"
+--remove_file "$MYSQLTEST_VARDIR/tmp/galera_load_data_empty.csv"
+--remove_file "$MYSQLTEST_VARDIR/tmp/galera_load_data_one.csv"

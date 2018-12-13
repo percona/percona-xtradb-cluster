@@ -183,6 +183,25 @@ static srv_slot_t *lock_wait_table_reserve_slot(
   ut_error;
 }
 
+#ifdef WITH_WSREP
+/*
+check if lock timeout was for priority thread,
+as a side effect trigger lock monitor
+@return	false for regular lock timeout
+in: trx to check for lock priority
+*/
+static bool wsrep_is_BF_lock_timeout(trx_t *trx) {
+  if (wsrep_on(trx->mysql_thd) && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
+    fprintf(stderr, "WSREP: BF lock wait long\n");
+    srv_print_innodb_monitor = true;
+    srv_print_innodb_lock_monitor = true;
+    os_event_set(srv_monitor_event);
+    return true;
+  }
+  return false;
+}
+#endif /* WITH_WSREP */
+
 /** Print lock wait timeout info to stderr. It's supposed this function
 is executed in trx's THD thread as it calls some non-thread-safe
 functions to get some info from THD.
@@ -422,6 +441,20 @@ void lock_wait_suspend_thread(
     return;
   }
 
+#ifdef WITH_WSREP
+  if (lock_wait_timeout < 100000000 && wait_time > (double)lock_wait_timeout) {
+
+    if (!wsrep_on(trx->mysql_thd) ||
+        (!wsrep_is_BF_lock_timeout(trx) && trx->error_state != DB_DEADLOCK)) {
+
+      trx->error_state = DB_LOCK_WAIT_TIMEOUT;
+      if (srv_print_lock_wait_timeout_info)
+        print_lock_wait_timeout(*trx, blocking, blocking_count);
+
+      MONITOR_INC(MONITOR_TIMEOUT);
+    }
+  }
+#else
   if (lock_wait_timeout < 100000000 && wait_time > (double)lock_wait_timeout &&
       !trx_is_high_priority(trx)) {
     trx->error_state = DB_LOCK_WAIT_TIMEOUT;
@@ -430,6 +463,7 @@ void lock_wait_suspend_thread(
 
     MONITOR_INC(MONITOR_TIMEOUT);
   }
+#endif /* WITH_WSREP */
 
   if (trx_is_interrupted(trx)) {
     trx->error_state = DB_INTERRUPTED;
@@ -503,7 +537,13 @@ static void lock_wait_check_and_cancel(
     if (trx->lock.wait_lock != NULL && !trx_is_high_priority(trx)) {
       ut_a(trx->lock.que_state == TRX_QUE_LOCK_WAIT);
 
+#ifdef WITH_WSREP
+      if (!wsrep_is_BF_lock_timeout(trx)) {
+        lock_cancel_waiting_and_release(trx->lock.wait_lock, true);
+      }
+#else
       lock_cancel_waiting_and_release(trx->lock.wait_lock, false);
+#endif /* WITH_WSREP */
     }
 
     trx->owns_mutex = false;

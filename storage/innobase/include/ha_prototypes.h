@@ -413,4 +413,30 @@ InnoDB extended statistics should be collected.
 MY_NODISCARD
 trx_t *innobase_get_trx_for_slow_log(void) noexcept;
 
+#if defined(WITH_WSREP) && !defined(UNIV_INNOCHECKSUM)
+
+int wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx);
+
+int wsrep_innobase_kill_one_trx(void *thd_ptr, const trx_t *bf_trx,
+                                trx_t *victim_trx, ibool signal);
+
+bool wsrep_thd_set_PA_safe(void *thd_ptr, bool safe);
+
+int wsrep_thd_conflict_state(void *thd_ptr, bool sync);
+
+bool wsrep_thd_is_BF(void *thd_ptr, bool sync);
+
+int wsrep_trx_order_before(void *thd1, void *thd2);
+
+int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
+                              unsigned char *str, unsigned int str_length,
+                              unsigned int buf_length);
+
+int wsrep_on(void *thd_ptr);
+
+int wsrep_is_wsrep_xid(const void *);
+
+bool wsrep_safe_to_persist_xid(THD *thd);
+#endif /* WITH_WSREP && !UNIV_INNOCHECKSUM */
+
 #endif /* HA_INNODB_PROTOTYPES_H */

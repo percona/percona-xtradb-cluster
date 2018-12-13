@@ -212,6 +212,11 @@ class String {
         m_is_alloced(str.m_is_alloced) {
     str.m_is_alloced = false;
   }
+
+#ifdef WITH_WSREP
+  static void *operator new(size_t size) { return ::operator new(size); }
+#endif /* WITH_WSREP */
+
   static void *operator new(
       size_t size, MEM_ROOT *mem_root,
       const std::nothrow_t &arg MY_ATTRIBUTE((unused)) = std::nothrow) throw() {

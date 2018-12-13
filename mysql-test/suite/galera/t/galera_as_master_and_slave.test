@@ -1,0 +1,253 @@
+#
+# Check for Topological description in galera_2nodes_as_master_slave.cnf
+# TC will try to fire events on different layers
+# (MASTER, INTERMEDIATE SLAVE, SLAVE) and see if all events are properly
+# replicated with no missing GTID.
+#
+
+--source include/have_log_bin.inc
+--source include/force_restart.inc
+
+#
+# Starting galera cluster
+# As node #1 is not a Galera node, we connect to node#2 in order to run include/galera_cluster.inc
+#
+
+#
+# Step-1: Try to establish needed replication links.
+#
+--connect node_2, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2
+--echo #node-2 (galera-cluster-node acting as slave to an independent master)
+--disable_query_log
+--eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--enable_query_log
+START SLAVE USER='root';
+
+--connect node_4, 127.0.0.1, root, , test, $NODE_MYPORT_4
+--connection node_4
+--echo #node-4 (independent slave replicating from galera-node-2)
+--disable_query_log
+--eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_3;
+--enable_query_log
+START SLAVE USER='root';
+
+#
+# Step-2: Initiate some seed workload on independent master.
+#
+--connect node_1, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1
+--echo #node-1 (independent master)
+use test;
+create table t (i int, c char(10), primary key pk(i)) engine=innodb;
+insert into t values (1, 'aaaaaa'), (2, 'bbbbbb'), (3, 'cccccc'),
+                     (4, 'dddddd'), (5, 'eeeeee');
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-2', @@global.gtid_executed);
+select * from t;
+# replication lag
+--sleep 1
+
+#
+# ensure remaining nodes has the needed data.
+--connection node_2
+--echo #node-2 (galera-cluster-node acting as slave to an independent master)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t;
+--source include/wait_condition.inc
+select * from t;
+
+--connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--connection node_3
+--echo #node-3 (galera-cluster-node-2 that act as master to independent slave)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t;
+--source include/wait_condition.inc
+select * from t;
+
+--connection node_4
+--echo #node-4 (independent slave replicating from galera-node-2)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t;
+--source include/wait_condition.inc
+select * from t;
+
+
+#
+# Step-2a: Initiate some seed workload on independent master
+#          with slave-parallel-workers > 0 on slave.
+#
+
+--connection node_2
+select @@slave_parallel_workers;
+set global slave_parallel_workers=2;
+select @@slave_parallel_workers;
+#
+STOP SLAVE;
+START SLAVE USER='root';
+
+--connection node_1
+--echo #node-1 (independent master)
+use test;
+insert into t values (1000, 'aaaaaa');
+insert into t values (2000, 'bbbbbb');
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-4', @@global.gtid_executed);
+--let $master_id=`select left(@@global.gtid_executed, 36)`
+select * from t;
+# replication lag
+--sleep 1
+
+#
+# ensure remaining nodes has the needed data.
+--connection node_2
+--echo #node-2 (galera-cluster-node acting as slave to an independent master)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 7 FROM t;
+--source include/wait_condition.inc
+select * from t;
+--replace_result $master_id <master_id>
+--eval select left(@@global.gtid_executed, 36) = '$master_id';
+
+--connection node_3
+--echo #node-3 (galera-cluster-node-2 that act as master to independent slave)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 7 FROM t;
+--source include/wait_condition.inc
+select * from t;
+--replace_result $master_id <master_id>
+--eval select left(@@global.gtid_executed, 36) = '$master_id';
+
+--connection node_4
+--echo #node-4 (independent slave replicating from galera-node-2)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 7 FROM t;
+--source include/wait_condition.inc
+select * from t;
+--replace_result $master_id <master_id>
+--eval select left(@@global.gtid_executed, 36) = '$master_id';
+
+--connection node_2
+select @@slave_parallel_workers;
+set global slave_parallel_workers=0;
+select @@slave_parallel_workers;
+#
+STOP SLAVE;
+START SLAVE USER='root';
+
+#
+# Step-3: Try to perform some DML directly on galera-node-1 which is slave
+# This is not recommended action as SLAVEs are read-only but we have
+# setup where-in data is directly modified on SLAVE.
+#
+--connection node_2
+--echo #node-2 (galera-cluster-node acting as slave to an independent master)
+delete from t where i = 2;
+update t set c = 'zzzzzz' where i = 4;
+update t set c = 'pppppp', i = 50 where i = 5;
+select * from t;
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-3', @@global.gtid_executed);
+
+--connection node_4
+--echo #node-4 (independent slave replicating from galera-node-2)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t WHERE i = 50
+--source include/wait_condition.inc
+select * from t;
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-3', @@global.gtid_executed);
+
+# repeat same workload on independent master now.
+# replication will cause the re-execution of action on slave but slave
+# will raise an error as action is already executed.
+# given that we have slave_skip_errors enabled replication link will not break.
+--connection node_1
+--echo #node-1 (independent master)
+delete from t where i = 2;
+update t set c = 'zzzzzz' where i = 4;
+update t set c = 'pppppp', i = 50 where i = 5;
+select * from t;
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-7', @@global.gtid_executed);
+# replication lag
+sleep 1;
+
+
+--connection node_2
+--echo #node-2 (galera-cluster-node acting as slave to an independent master)
+select * from t;
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-7', @@global.gtid_executed);
+
+--connection node_3
+--echo #node-3 (galera-cluster-node-2 that act as master to independent slave)
+select * from t;
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-7', @@global.gtid_executed);
+
+--connection node_4
+--echo #node-4 (independent slave replicating from galera-node-2)
+select * from t;
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-7', @@global.gtid_executed);
+
+#
+# do some more transaction to rule-out existence of GTID gaps.
+#
+--connection node_1
+--echo #node-1 (independent master)
+update t set c = 'kkkkk' where i = 1;
+update t set c = 'k2', i = 100 where i = 1;
+select * from t;
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-9', @@global.gtid_executed);
+# replication lag
+--sleep 1
+
+--connection node_3
+--echo #node-3 (galera-cluster-node-2 that act as master to independent slave)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t WHERE i = 100
+--source include/wait_condition.inc
+select * from t;
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-9', @@global.gtid_executed);
+
+#
+# Step-n: Remove seed table and break all replication links as part of cleanup.
+#
+--connection node_1
+--echo #node-1 (independent master)
+DROP TABLE t;
+
+--connection node_2
+--echo #node-2 (galera-cluster-node acting as slave to an independent master)
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't'
+--source include/wait_condition.inc
+STOP SLAVE;
+RESET SLAVE ALL;
+
+--connection node_1
+--echo #node-1 (independent master)
+set session wsrep_on=off;
+RESET MASTER;
+set session wsrep_on=on;
+
+--connection node_4
+--echo #node-4 (independent slave replicating from galera-node-2)
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't'
+--source include/wait_condition.inc
+STOP SLAVE;
+RESET SLAVE ALL;
+
+--connection node_3
+--echo #node-3 (galera-cluster-node-2 that act as master to independent slave)
+set session wsrep_on=off;
+RESET MASTER;
+set session wsrep_on=on;
+

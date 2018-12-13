@@ -1,0 +1,36 @@
+# Node 1
+CREATE DATABASE database1;
+USE database1;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
+# Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 0;
+SET DEBUG_SYNC = "ha_innobase_write_row SIGNAL entered1 WAIT_FOR continue";
+INSERT INTO t1 (f1) VALUES(1);;
+# Node 1b
+USE database1;
+SET SESSION wsrep_retry_autocommit = 0;
+SET DEBUG_SYNC = "ha_innobase_write_row SIGNAL entered2 WAIT_FOR continue";
+INSERT INTO t2 (f1) VALUES(1);;
+# Node 1
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+SET DEBUG_SYNC = "now WAIT_FOR entered2";
+# Node 2
+DROP DATABASE database1;
+# Node 1
+SET DEBUG_SYNC = "now SIGNAL continue";
+# Node 1a
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+# Node 1b
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+# Node 1
+include/assert.inc [database1 has been deleted on node 1]
+USE database1;
+ERROR 42000: Unknown database 'database1'
+SET DEBUG_SYNC = "RESET";
+# Node 2
+include/assert.inc [database1 has been deleted on node 2]
+USE database1;
+ERROR 42000: Unknown database 'database1'

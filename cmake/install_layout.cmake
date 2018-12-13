@@ -319,7 +319,11 @@ SET(INSTALL_SECURE_FILE_PRIVDIR_TARGZ ${secure_file_priv_path})
 SET(INSTALL_BINDIR_RPM                  "bin")
 SET(INSTALL_SBINDIR_RPM                 "sbin")
 #
-IF(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+# WITH_WSREP
+# Deciding via system processor may give wrong answer in
+# virtual environments that see host CPU directly.
+# IF(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+IF(64BIT)
   SET(INSTALL_LIBDIR_RPM                "lib64")
   SET(INSTALL_PLUGINDIR_RPM             "lib64/mysql/plugin")
 ELSE()

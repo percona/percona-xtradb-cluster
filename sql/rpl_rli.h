@@ -948,6 +948,9 @@ class Relay_log_info : public Rpl_info {
   /* The general cleanup that slave applier may need at the end of session. */
   void cleanup_after_session() {
     if (deferred_events) delete deferred_events;
+#ifdef WITH_WSREP
+    deferred_events = NULL;
+#endif /* WITH_WSREP */
   };
 
   /**

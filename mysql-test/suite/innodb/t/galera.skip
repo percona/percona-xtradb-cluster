@@ -1,0 +1,79 @@
+innodb : deadlock, failure in UPDATE IGNORE, lp1372296
+innodb_ctype_ldml : Test contains statements unsafe to replicate in statement-based replication
+innodb-autoinc : deadlock, failure in REPLACE, lp1372296
+innodb_mysql : deadlock due to DDL
+innodb_buffer_pool_load : Test contains statements unsafe to replicate in statement-based replication
+innodb-autoinc-56228 : deadlock, lp1372301
+innodb_lock_wait_timeout_1 : Test contains statements unsafe to replicate in statement-based replication
+innodb-consistent : Test contains statements unsafe to replicate in statement-based replication
+innodb-semi-consistent : Test contains statements unsafe to replicate in statement-based replication
+innodb-index : DDL concurrent with transaction
+innodb-lock : deadlock on INSERT IGNORE, lp1372296
+innodb-status-output : Test performs server restart
+innodb-wl5522 : Test contains statements unsafe to replicate in statement-based replication
+innodb-wl6445 : Test performs server restart
+innodb_bug40360 : Test contains statements unsafe to replicate in statement-based replication
+innodb_bug40565 : Galera git bug #137 - Invalid deadlock on UPDATE to NULL without a PK
+innodb_bug42419 : Test contains statements unsafe to replicate in statement-based replication
+innodb_bug49164 : Test contains statements unsafe to replicate in statement-based replication
+innodb_bug45357 : impossible to write to binary log since BINLOG_FORMAT = STATEMENT and at least one table uses a storage engine limited to row-based logging
+innodb_bug52663 : Test contains statements unsafe to replicate in statement-based replication
+innodb_bug59733 : Test contains statements unsafe to replicate in statement-based replication
+innodb_gis : Test contains statements unsafe to replicate in statement-based replication
+innodb_prefix_index_restart_server : crash, lp1372288
+innodb_stats_external_pages : Test contains statements unsafe to replicate in statement-based replication
+innodb-2byte-collation : Unsafe statement written to the binary log
+innodb-change-buffer-recovery : Test contains statements unsafe to replicate in statement-based replication
+innodb_bug53756 : Cannot execute statement: impossible to write to binary log since BINLOG_FORMAT = STATEMENT
+innodb-alter-autoinc : AUTO_INCREMENT differences
+innodb_bug13635833 : Test contains statements unsafe to replicate in statement-based replication
+innodb_bug13867871 : mysql-wsrep#3 - innodb_bug13867871 test fails with wsrep loaded
+innodb_bug14006907 : DDL lock wait timeout
+innodb_bug38231 : Deadlock on UNLOCK TABLE
+innodb_bug-13628249 : mysql-wsrep#12 InnoDB: Failing assertion: !srv_read_only_mode with server restart 
+innodb-wl6445-1 : mysql-wsrep#12 InnoDB: Failing assertion: !srv_read_only_mode with server restart
+innodb-wl6445-2 : mysql-wsrep#12 InnoDB: Failing assertion: !srv_read_only_mode with server restart
+innodb_bug12400341 : Test does not account for applier threads when performing SHOW PROCESSLIST
+innodb-blob : 'Cannot execute statement: impossible to write to binary log since BINLOG_FORMAT = STATEMENT and at least one table uses a storage engine limited to row-based logging'
+innodb_corrupt_bit : 'Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT.'
+innodb-index-online : ALTER succeeds as it is given a higher priority
+innodb-table-online : ALTER succeeds as it is given a higher priority
+innodb-index-online-purge : ALTER succeeds as it is given a higher priority
+innodb-wl5522-debug : Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT.
+innodb_stats_table_flag_auto_recalc : Performs multiple restarts in a row which causes '1047: Unknown command' errors
+row_format_redundant : WSREP: innodb_read_only is not supported
+optimizer_temporary_table : WSREP: innodb_read_only is not supported
+readonly : WSREP: innodb_read_only is not supported
+log_file_size : WSREP: innodb_read_only is not supported
+log_file_size_1 : WSREP: innodb_read_only is not supported
+xa_recovery : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+flush-hang : Unsafe statement written to the binary log
+innodb_deadlock_with_autoinc : Test uses autoinc_lock_mode = 0
+update_time : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+alter_kill : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+innodb-index-debug : OPTIMIZE takes precedence over INSERT
+innodb-alter-debug-wl6554 : ALTER takes precedence over INSERT
+bulk_create_index_online : ALTER takes precedence over INSERT
+high_prio_trx_1 : query 'COMMIT' failed with wrong errno 1213: 'Deadlock found when trying to get lock; try restarting transaction', instead of 1180
+high_prio_trx_3 :  query 'COMMIT' failed with wrong errno 1213: 'Deadlock found when trying to get lock; try restarting transaction', instead of 1180
+high_prio_trx_4 :  query 'COMMIT' failed with wrong errno 1213: 'Deadlock found when trying to get lock; try restarting transaction', instead of 1180
+high_prio_trx_7 : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+high_prio_trx_debug : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+high_prio_trx_fk : query 'COMMIT' failed with wrong errno 1213: 'Deadlock found when trying to get lock; try restarting transaction', instead of 1180
+innodb-ac-non-locking-select : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+innodb-read-view : Test hangs
+innodb_bug59641 : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+innodb_wl6915 : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+innodb_wl6915_debug : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+partition : Wrong handler commit counter value
+virtual_debug : 1213: Deadlock found when trying to get lock; try restarting transaction
+xa_recovery_debug : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+table_encrypt_kill : Server fails to restart
+virtual_debug_purge : 1213: Deadlock found when trying to get lock; try restarting transaction
+create_tablespace_replication : Starts two servers, gcomm bind fails on second
+high_prio_trx_rpl : Starts two servers, gcomm bind fails on second
+innodb-import-partition-rpl : Starts two servers, gcomm bind fails on second
+innodb_bulk_create_index_replication : Starts two servers, gcomm bind fails on second
+innodb-isolation : InnoDB returns different results if binlog is enabled or wsrep provider is loaded
+innodb-truncate-debug : Concurrent DDL with sync points from different connections not compatible with TOI
+xa_prepare_lock_release : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'

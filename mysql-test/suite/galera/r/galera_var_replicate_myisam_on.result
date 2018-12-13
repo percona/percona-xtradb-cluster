@@ -1,0 +1,163 @@
+SET SESSION wsrep_replicate_myisam = TRUE;
+SET SESSION wsrep_replicate_myisam = TRUE;
+CREATE TABLE t1 (f1 INT PRIMARY KEY) Engine=MyISAM;
+INSERT INTO t1 VALUES (1);
+INSERT INTO t1 VALUES (2), (3);
+INSERT INTO t1 SELECT 4 FROM DUAL UNION ALL SELECT 5 FROM DUAL;
+SELECT COUNT(*) = 5 FROM t1;
+COUNT(*) = 5
+1
+DROP TABLE t1;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 VARCHAR(100)) ENGINE=MyISAM;
+INSERT INTO t1 VALUES (1, 'abc'),(2,'abc'), (3, 'xxx');
+REPLACE INTO t1 VALUES (1, 'klm'), (2,'xyz');
+REPLACE INTO t1 SELECT 3, 'yyy' FROM DUAL;
+SELECT COUNT(*) = 3 FROM t1;
+COUNT(*) = 3
+1
+SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 1 AND f2 = 'klm';
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 2 AND f2 = 'xyz';
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 3 AND f2 = 'yyy';
+COUNT(*) = 1
+1
+UPDATE t1 SET f2 = 'zzz' WHERE f2 = 'yyy';
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'zzz';
+COUNT(*) = 1
+1
+DELETE FROM t1 WHERE f2 = 'zzz';
+SELECT COUNT(*) = 0 FROM t1 WHERE f2 = 'zzz';
+COUNT(*) = 0
+1
+TRUNCATE TABLE t1;
+SELECT COUNT(*) = 0 FROM t1;
+COUNT(*) = 0
+1
+DROP TABLE t1;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=MyISAM;
+CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+INSERT INTO t1 VALUES (1);
+INSERT INTO t2 VALUES (1);
+COMMIT;
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t2;
+COUNT(*) = 1
+1
+SET AUTOCOMMIT=ON;
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+INSERT INTO t1 VALUES (2);
+INSERT INTO t2 VALUES (2);
+ROLLBACK;
+Warnings:
+Warning	1196	Some non-transactional changed tables couldn't be rolled back
+SELECT COUNT(*) = 2 FROM t1;
+COUNT(*) = 2
+1
+SELECT COUNT(*) = 1 FROM t2;
+COUNT(*) = 1
+1
+DROP TABLE t1;
+DROP TABLE t2;
+SET AUTOCOMMIT=ON;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=MyISAM;
+CREATE TABLE t2 (f2 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+INSERT INTO t1 VALUES (1);
+INSERT INTO t2 VALUES (1);
+INSERT INTO t1 VALUES (1);
+ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
+COMMIT;
+SET AUTOCOMMIT=ON;
+DROP TABLE t1;
+DROP TABLE t2;
+use test;
+create table is1 (i int) engine=myisam;
+create table is2 (i int) engine=myisam;
+create table is3 (i int) engine=innodb;
+create table is4 (i int) engine=myisam;
+insert into is1 select 1;
+insert into is1 (i) select i from is1;
+insert into is1 values (2), (3);
+insert into is1 (i) select i from is1;
+select * from is1;
+i
+1
+1
+2
+3
+1
+1
+2
+3
+insert into is2 (i) select i from is1;
+insert into is3 (i) select i from is1;
+insert into is1 (i) select i from is3;
+insert into is4 (i) select 1 from information_schema.tables;
+select count(*) from is1;
+count(*)
+16
+select count(*) from is2;
+count(*)
+8
+select count(*) from is3;
+count(*)
+8
+drop table is1;
+drop table is2;
+drop table is3;
+drop table is4;
+#node-1
+set @@global.wsrep_replicate_myisam = 1;
+set @@global.wsrep_OSU_method="TOI";
+use test;
+create table is1 (i int) engine=myisam;
+insert into is1 values (1), (2);
+#node-2
+select * from is1;
+i
+1
+2
+#node-1
+insert is1 values (3), (4);
+alter table is1 add column j int;
+#node-2
+select * from is1;
+i	j
+1	NULL
+2	NULL
+3	NULL
+4	NULL
+drop table is1;
+#node-1
+set @@global.wsrep_OSU_method="RSU";
+set @@session.wsrep_OSU_method="RSU";
+select @@global.wsrep_OSU_method;
+@@global.wsrep_OSU_method
+RSU
+select @@session.wsrep_OSU_method;
+@@session.wsrep_OSU_method
+RSU
+use test;
+create table is1 (i int) engine=myisam;
+insert into is1 values (11), (12);
+insert is1 values (13), (14);
+rename table is1 to is2;
+select * from is2;
+i
+11
+12
+13
+14
+drop table is2;
+#node-1
+set global wsrep_replicate_myisam = 0;
+set global wsrep_OSU_method = TOI;

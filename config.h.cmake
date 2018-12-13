@@ -93,6 +93,8 @@
 #cmakedefine HAVE_FEDISABLEEXCEPT 1
 #cmakedefine HAVE_FSEEKO 1
 #cmakedefine HAVE_FSYNC 1
+#cmakedefine HAVE_GETIFADDRS 1
+#cmakedefine HAVE_GETHOSTBYADDR_R 1
 #cmakedefine HAVE_GETHRTIME 1
 #cmakedefine HAVE_GETNAMEINFO 1
 #cmakedefine HAVE_GETPASS 1
@@ -180,6 +182,8 @@
 #cmakedefine HAVE_ULONG 1
 #cmakedefine HAVE_U_INT32_T 1
 
+#cmakedefine HAVE_STRUCT_TIMESPEC
+#cmakedefine HAVE_EXECVPE 1
 /* Support for tagging symbols with __attribute__((visibility("hidden"))) */
 #cmakedefine HAVE_VISIBILITY_HIDDEN 1
 
@@ -382,5 +386,10 @@
 #cmakedefine DEFAULT_EARLY_PLUGIN_LOAD @DEFAULT_EARLY_PLUGIN_LOAD@
 
 #define SO_EXT "@CMAKE_SHARED_MODULE_SUFFIX@"
+
+/*
+ * Needed by wsrep (WITH_WSREP)
+ */
+#define HAVE_GETIFADDRS 1
 
 #endif

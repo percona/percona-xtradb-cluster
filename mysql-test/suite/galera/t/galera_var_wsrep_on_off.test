@@ -1,0 +1,108 @@
+#
+# Test wsrep_on = OFF. Some events will not be replicated
+#
+
+--source include/galera_cluster.inc
+
+call mtr.add_suppression("Cannot modify @@session.wsrep_on");
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+SET SESSION wsrep_on = FALSE;
+
+# This statement will not be replicated
+INSERT INTO t1 VALUES (2);
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1;
+
+--connection node_1
+SET SESSION wsrep_on = TRUE;
+INSERT INTO t1 VALUES (3);
+
+--connection node_2
+SELECT COUNT(*) = 2 FROM t1;
+
+# Middle insert is not replicated
+SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 2;
+
+# Final insert is replicated
+SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 3;
+
+DROP TABLE t1;
+
+#
+# Use-case that try to switch-off wsrep in middle of active transaction.
+#
+
+--connection node_1
+--echo #node-1
+set session wsrep_on = TRUE;
+create table t1 (i int) engine=innodb;
+insert into t1 values (1), (2);
+
+--connection node_2
+--echo #node-2
+select * from t1;
+
+# This will be replicated as wsrep_on = true
+--connection node_1
+--echo #node-1
+set session wsrep_on = TRUE;
+begin;
+insert into t1 values (3), (4);
+commit;
+
+--connection node_2
+--echo #node-2
+select * from t1;
+
+# Setting wsrep_on to false in middle of trx is not allowed.
+--connection node_1
+--echo #node-1
+set session wsrep_on = TRUE;
+begin;
+insert into t1 values (5), (6);
+--error ER_WRONG_VALUE_FOR_VAR
+set session wsrep_on = FALSE;
+select * from t1;
+commit;
+
+--connection node_2
+--echo #node-2
+select * from t1;
+
+--connection node_1
+--echo #node-1
+set session wsrep_on = TRUE;
+begin;
+insert into t1 values (7), (8);
+--error ER_WRONG_VALUE_FOR_VAR
+set session wsrep_on = FALSE;
+select * from t1;
+rollback;
+
+--connection node_2
+--echo #node-2
+select * from t1;
+
+# Let's try opposite. Switching the replication back to ON from OFF.
+--connection node_1
+--echo #node-1
+set session wsrep_on = FALSE;
+begin;
+insert into t1 values (9), (10);
+--error ER_WRONG_VALUE_FOR_VAR
+set session wsrep_on = TRUE;
+commit;
+select * from t1;
+insert into t1 values (11), (12);
+
+--connection node_2
+--echo #node-2
+select * from t1;
+
+--connection node_1
+--echo #node-1
+set session wsrep_on = TRUE;
+drop table t1;

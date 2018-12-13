@@ -465,7 +465,12 @@ bool Rpl_filter::db_ok(const char *db, bool need_increase_counter) {
     Since the filtering criteria is not equal to "NULL" the statement should
     be logged into binlog.
   */
+#ifdef WITH_WSREP
+  // TODO: check the need for strlen(db) == 0
+  if (!db || strlen(db) == 0) DBUG_RETURN(1);
+#else
   if (!db) DBUG_RETURN(1);
+#endif /* WITH_WSREP */
 
   if (!do_db.is_empty())  // if the do's are not empty
   {

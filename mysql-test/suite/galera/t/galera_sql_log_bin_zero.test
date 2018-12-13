@@ -1,0 +1,62 @@
+#
+# Test SET SESSION sql_log_bin = 0 . We expect that unlogged updates will not be replicated
+# to the slave and that there will be no assertions in the process.
+#
+
+--source include/galera_cluster.inc
+
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+
+SET SESSION sql_log_bin = 0;
+
+CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
+
+INSERT INTO t1 VALUES (1);
+
+CREATE USER 'demo'@'localhost' IDENTIFIED BY 's3kr3t';
+
+SET SESSION sql_log_bin = 1;
+
+INSERT INTO t1 VALUES (2);
+
+SELECT @@global.gtid_executed;
+
+--connection node_2
+CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t2'' on query");
+SELECT COUNT(*) = 1 FROM t1;
+SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 1;
+SHOW TABLES;
+--error ER_CANNOT_USER
+DROP USER 'demo'@'localhost';
+
+--connection node_1
+DROP TABLE t1;
+DROP TABLE t2;
+
+
+#-------------------------------------------------------------------------------
+#
+# Setting sql_log_bin = 0 use to block DML replication but allow DDL replication
+# After fixing PXC#841 we ensure that sql_log_bin also blocks DDL replication
+# PXC#915 is regression caused during implementation of PXC#841.
+#
+
+--connection node_1
+use test;
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1);
+set sql_log_bin=0;
+alter table t add column j int;
+optimize table t;
+analyze table t;
+repair table t;
+set sql_log_bin=1;
+set sql_log_bin=0;
+insert into t values (2, 2);
+set sql_log_bin=1;
+select * from t;
+
+--connection node_2
+use test;
+select * from t;
+drop table t;

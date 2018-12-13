@@ -2053,8 +2053,17 @@ static void var_query_set(VAR *var, const char *query, const char **query_end) {
   init_dynamic_string(&ds_query, 0, (end - query) + 32, 256);
   do_eval(&ds_query, query, end, false);
 
+#ifdef WITH_WSREP
+  /* Code altered (git-hash#3c205385752f)
+  if a --let = `SELECT ...` query is interrupted, the test does not
+  fail but the error is communicated to caller */
+  if (mysql_real_query(mysql, ds_query.str,
+                       static_cast<ulong>(ds_query.length)) ||
+      !(res = mysql_store_result(mysql))) {
+#else
   if (mysql_real_query(mysql, ds_query.str,
                        static_cast<ulong>(ds_query.length))) {
+#endif /* WITH_WSREP */
     handle_error(curr_command, mysql_errno(mysql), mysql_error(mysql),
                  mysql_sqlstate(mysql), &ds_res);
     /* If error was acceptable, return empty string */
@@ -2063,8 +2072,12 @@ static void var_query_set(VAR *var, const char *query, const char **query_end) {
     DBUG_VOID_RETURN;
   }
 
+#ifdef WITH_WSREP
+  /* Do nothing */
+#else
   if (!(res = mysql_store_result(mysql)))
     die("Query '%s' didn't return a result set", ds_query.str);
+#endif /* WITH_WSREP */
   dynstr_free(&ds_query);
 
   if ((row = mysql_fetch_row(res)) && row[0]) {
@@ -7041,6 +7054,9 @@ static void validate_filename(const char *file_name) {
 
   while (*file_name && (file_name != file_name_end) &&
          (file_name[0] == '-' || file_name[0] == '_' ||
+#ifdef WITH_WSREP
+          file_name[0] == '#' ||
+#endif /* WITH_WSREP */
           my_isalnum(charset_info, file_name[0]))) {
     file_name++;
   }

@@ -1,0 +1,99 @@
+#node-1
+create table t1 (i int) engine=innodb;
+insert into t1 values (1), (2), (3);
+set wsrep_replicate_myisam = 0;
+create table t2 (j int) engine=myisam;
+insert into t2 values (10), (20), (30);
+set wsrep_replicate_myisam = 0;
+set wsrep_replicate_myisam = 1;
+create table t3 (j int) engine=myisam;
+insert into t3 values (100), (200), (300);
+set wsrep_replicate_myisam = 0;
+create compression_dictionary numbers ('percona');
+create table tdict (
+id int,
+a blob column_format compressed,
+b blob column_format compressed with compression_dictionary numbers,
+primary key pk(id)) engine=innodb;
+insert into tdict values (
+1, repeat('percona is great company', 50),
+repeat('percona is great company', 50));
+#node-2
+show tables;
+Tables_in_test
+t1
+t2
+t3
+tdict
+select * from t1;
+i
+1
+2
+3
+select * from t2;
+j
+select * from t3;
+j
+100
+200
+300
+show create table tdict;
+Table	Create Table
+tdict	CREATE TABLE `tdict` (
+  `id` int(11) NOT NULL,
+  `a` blob /*!50633 COLUMN_FORMAT COMPRESSED */,
+  `b` blob /*!50633 COLUMN_FORMAT COMPRESSED WITH COMPRESSION_DICTIONARY `numbers` */,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+# ensure dictionary is created
+select * from information_schema.xtradb_zip_dict where name like '%number%';
+id	name	zip_dict
+1	numbers	percona
+#node-1
+truncate table t1;
+truncate table t2;
+truncate table t3;
+#node-2
+show tables;
+Tables_in_test
+t1
+t2
+t3
+tdict
+select * from t1;
+i
+select * from t2;
+j
+select * from t3;
+j
+#node-1
+drop table t1;
+drop table t2;
+drop table t3;
+drop table tdict;
+drop compression_dictionary numbers;
+#node-2
+# ensure dictionary drop is replicated
+select * from information_schema.xtradb_zip_dict where name like '%number%';
+id	name	zip_dict
+#node-2
+call mtr.add_suppression("Can't create database");
+#node-1
+set global wsrep_debug=1;
+create table t (i int, primary key pk(i)) engine=innodb;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
+insert into t values (1);;
+#node-1a
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+create database test;
+ERROR HY000: Can't create database 'test'; database exists
+SET DEBUG_SYNC = "now SIGNAL continue1";
+#node-1
+select * from t;
+i
+1
+SET GLOBAL wsrep_debug = 0;
+drop table t;
+set @@wsrep_replicate_myisam = 0;;

@@ -45,6 +45,10 @@
 #include "sql/sql_const.h"
 #include "sql/system_variables.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
+
 #ifdef _WIN32
 #include <crtdbg.h>
 
@@ -84,6 +88,14 @@ extern "C" void handle_fatal_signal(int sig) {
   }
 
   segfaulted = 1;
+
+/*
+  The wsrep subsystem has their its own actions
+  which need be performed before exiting:
+*/
+#ifdef WITH_WSREP
+  wsrep_handle_fatal_signal(sig);
+#endif /* WITH_WSREP */
 
 #ifdef _WIN32
   SYSTEMTIME utc_time;
@@ -126,8 +138,8 @@ extern "C" void handle_fatal_signal(int sig) {
       "problem.\n"
       "As this is a crash and something is definitely wrong, the information\n"
       "collection process might fail.\n"
-      "Please help us make Percona Server better by reporting any\n"
-      "bugs at http://bugs.percona.com/\n\n");
+      "Please help us make Percona XtraDB Cluster better by reporting any\n"
+      "bugs at https://jira.percona.com/projects/PXC/issues\n\n");
 
   my_safe_printf_stderr("key_buffer_size=%lu\n",
                         (ulong)dflt_key_cache->key_cache_mem_size);
@@ -212,8 +224,8 @@ extern "C" void handle_fatal_signal(int sig) {
   }
   my_safe_printf_stderr(
       "%s",
-      "You may download the Percona Server operations manual by visiting\n"
-      "http://www.percona.com/software/percona-server/. You may find "
+      "You may download the Percona XtraDB Cluster operations manual by visiting\n"
+      "http://www.percona.com/software/percona-xtradb-cluster/. You may find "
       "information\n"
       "in the manual which will help you identify the cause of the crash.\n");
 

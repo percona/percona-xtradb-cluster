@@ -1,0 +1,5596 @@
+#
+# Test how replication filters affects Galera replication
+# This test tests the behavior of the repliate-wild-do-table filter.
+#
+# The galera/galera_2node_slave.cnf describes the setup of the nodes
+#
+# async master
+# PXC node 2 and async slave
+# PXC node 3
+#
+# All nodes are configured the same:
+#	[mysqld]
+#	replicate-wild-do-table=db.%
+#	replicate-wild-do-table=db1.%
+#
+# We are testing to see that nodes 2 and 3 (which are PXC nodes),
+# maintain consistency when the async slave node is using replication filters.
+#
+# Database 'db' is allowed by the filters but is meant for tracking the PXC cluster
+# Database 'db1' is allowed by the filter
+# Database 'dbx' is not allowed by the filter
+# Database 'dbx1' is not allowed by the filter
+#
+# db and dbx are meant to be used for allowed/not allowed databases.
+# db also holds some test information and should not be deleted.
+#
+# db1 and dbx1 can be used for TABLE/DATABASE testing.
+#
+
+--source include/have_log_bin.inc
+--source include/force_restart.inc
+
+--let $test_id = 0
+--let $show_rpl_debug_info = 0
+
+# Cluster setup
+# As node #1 is not a Galera node, we connect to node #2 in order to run
+# include/galera_cluster.inc
+--connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--source include/galera_cluster.inc
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--disable_query_log
+--echo # connection node_2 : starting async slave
+--eval CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--enable_query_log
+START SLAVE USER='root';
+
+#
+# Create a database called db to hold various test case tracking tables.
+#
+--echo #
+--echo # Test preparation
+--echo #
+
+--echo # connection node_1
+--connection node_1
+CREATE DATABASE db;
+USE db; CREATE TABLE db.counter(id INT PRIMARY KEY AUTO_INCREMENT, count INT);
+# Also need to reset the test_id (since we had to drop the db database)
+--let $test_id = 0
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db" AND TABLE_NAME = "counter";
+-- source include/wait_condition.inc
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db" AND TABLE_NAME = "counter";
+-- source include/wait_condition.inc
+
+
+#
+# Create a separate database on all nodes, this database is not allowed to replicate
+#
+--connection node_1
+--echo # connection node_1
+CREATE DATABASE dbx;
+
+--connection node_2
+--echo # connection node_2
+CREATE DATABASE dbx;
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx";
+--source include/wait_condition.inc
+
+
+#==============================================================
+#
+# ASYNC-GALERA replication testing
+#
+# The tests below involve async replication and galera replication.
+# The intent is to test the affect of replication filters on
+# galera replication (when a PXC node is acting as an async slave).
+#
+#==============================================================
+
+
+#
+# Table DDL
+#	CREATE TABLE
+#	DROP TABLE
+#	ALTER TABLE
+#	RENAME TABLE
+#	TRUNCATE TABLE
+#
+
+#
+# Test preparation
+# 	Create db1 and dbx1 on all nodes
+#
+--echo #
+--echo # async.tbl.ddl test preparation
+--echo #
+--echo # connection node_1
+--connection node_1
+CREATE DATABASE db1;
+CREATE DATABASE dbx1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/wait_condition.inc
+
+--let $assert_text = "db1 is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+CREATE DATABASE dbx1;
+
+--echo # connection node_2
+--connection node_2
+--let $assert_text = "db1 is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+--let $assert_text = "dbx1 is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/assert.inc
+
+#
+# Testcases async.tbl.ddl.1
+#	The default database (db) is allowed.
+#	The database of the table (db1) is allowed.
+#
+
+#
+# Test async.tbl.ddl.1.1 : CREATE TABLE
+#	The default database (db) is allowed.
+#	The database of the table (db1) is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.1.1 : CREATE TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+#
+# Test async.tbl.ddl.1.2 : ALTER TABLE
+#	The default database (db) is allowed.
+#	The database of the table (db1) is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.1.2 : ALTER TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE db; ALTER TABLE db1.t1 ADD COLUMN x3 LONGBLOB;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1.x3 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+#
+# Test async.tbl.ddl.1.3 : RENAME TABLE
+#	The default database (db) is allowed.
+#	The database of the table (db1) is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.1.3 : RENAME TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE db; RENAME TABLE db1.t1 TO db1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'db1.t1 is not on node_1'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 'db1.t2 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1.t1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 'db1.t2 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1.t1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 'db1.t2 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+#
+# Test async.tbl.ddl.1.4 : TRUNCATE TABLE
+#	The default database (db) is allowed.
+#	The database of the table (db1) is allowed.
+#
+--inc $test_id
+
+# Test preparation
+--echo #
+--echo # async.tbl.ddl.1.4 test preparation
+--echo #
+--echo # connection node_1
+--connection node_1
+USE db; INSERT INTO db1.t2(id) VALUES(1);
+
+--let $assert_text = "db1.t2 has a row on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM db1.t2
+--source include/wait_condition.inc
+
+--let $assert_text = "db1.t2 has a row on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t2
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $assert_text = "db1.t2 has a row on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t2
+--source include/assert.inc
+
+
+--echo #
+--echo # Test async.tbl.ddl.1.4 : TRUNCATE TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE db; TRUNCATE TABLE db1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'db1.t2 is truncated on node_1'
+--let $assert_cond = COUNT(*) = 0 FROM db1.t2
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1.t2 is truncated on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM db1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1.t2 is truncated on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM db1.t2
+--source include/assert.inc
+
+
+#
+# Test async.tbl.ddl.1.5 : DROP TABLE
+#	The default database (db) is allowed.
+#	The database of the table (db1) is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.1.5 : DROP TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE db; DROP TABLE db1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't2 is not on node_1'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't2 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't2 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+
+#
+# Testcases async.tbl.ddl.2
+#	The default database (db) is allowed.
+#	The database of the table (dbx1) is not allowed.
+#
+
+#
+# Test async.tbl.ddl.2.1 : CREATE TABLE
+#	The default database (db) is allowed.
+#	The database of the table (dbx1) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.2.1 : CREATE TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; CREATE TABLE dbx1.t1(id INT PRIMARY KEY);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "dbx1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+#
+# Test preparation
+#
+--echo #
+--echo # async.tbl.dll.2.2 test preparation
+--echo #
+--echo # connection node_2
+--connection node_2
+CREATE TABLE dbx1.t1(id INT PRIMARY KEY);
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "dbx1"
+--source include/assert.inc
+
+
+#
+# Test async.tbl.ddl.2.2 : ALTER TABLE
+#		The default database is allowed.
+#		The database of the table being altered is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.2.2 : ALTER TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; ALTER TABLE dbx1.t1 ADD COLUMN x3 LONGBLOB;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1.x3 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+
+#
+# Test async.tbl.ddl.2.3 : RENAME TABLE
+#		The default database is allowed.
+#		The database of the table being renamed is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.2.3 : RENAME TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; RENAME TABLE dbx1.t1 TO dbx1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is not on node_1'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "dbx1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+#
+# Test preparation
+#
+--echo #
+--echo # Test preparation for async.tbl.ddl.2.4
+--echo #
+
+# Add some data to the table to see if the truncate statement is run
+--echo # connection node_2
+--connection node_2
+RENAME TABLE dbx1.t1 TO dbx1.t2;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/wait_condition.inc
+
+--let $assert_text = 't2 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "dbx1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+INSERT INTO dbx1.t2(id) VALUES(99);
+
+--echo # connection node_3
+--connection node_3
+INSERT INTO dbx1.t2(id) VALUES(99);
+
+
+#
+# Test async.tbl.ddl.2.4 : TRUNCATE TABLE
+#		The default database is allowed.
+#		The database of the table being truncated is not allowed.
+#
+--inc $test_id
+
+
+--echo #
+--echo # Test async.tbl.ddl.2.4 : TRUNCATE TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; TRUNCATE TABLE dbx1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'dbx1.t2 is truncated on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'dbx1.t2 is not truncated on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'dbx1.t2 is not truncated on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+
+#
+# Test async.tbl.ddl.2.5 : DROP TABLE
+#		The default database is allowed.
+#		The database of the table being dropped is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.2.5 : DROP TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; DROP TABLE dbx1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't2 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't2 is on node_2 (DROP did not replicate)'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't2 is on node_3 (DROP did not replicate)'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+#
+# Test cleanup
+#
+--echo #
+--echo # async.tbl.ddl.2 test cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+DROP TABLE dbx1.t2;
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/wait_condition.inc
+
+--let $assert_text = 't2 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "dbx1"
+--source include/assert.inc
+
+
+
+
+#
+# Testcases async.tbl.ddl.3
+#	The default database (dbx) is not allowed.
+#	All operations are performed on a table in a database that is allowed (db1)
+#
+
+#
+# Test async.tbl.ddl.3.1 : CREATE TABLE
+#		The default database is not allowed.
+#		The database of the table being created is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.3.1 : CREATE TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE dbx; CREATE TABLE db1.t1(id INT PRIMARY KEY);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+
+#
+# Test async.tbl.ddl.3.2 : ALTER TABLE
+#		The default database is not allowed.
+#		The database of the table being altered is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.3.2 : ALTER TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE dbx; ALTER TABLE db1.t1 ADD COLUMN x3 LONGBLOB;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1.x3 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is on node_2 (replicated)'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is on node_3 (replicated)'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+
+#
+# Test async.tbl.ddl.3.3 : RENAME TABLE
+#		The default database is not allowed.
+#		The database of the table being renamed is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.3.3 : RENAME TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE dbx; RENAME TABLE db1.t1 TO db1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is not on node_1'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+
+--source include/assert.inc
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # restore table to original name
+--echo # connection node_1
+--connection node_1
+USE db; RENAME TABLE db1.t2 TO db1.t1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/wait_condition.inc
+
+--let $assert_text = "t1 is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $assert_text = "t1 is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+
+#
+# Test preparation
+#
+--echo #
+--echo # Test preparation for async.tbl.ddl.3.4
+--echo #
+
+# Add some data to the table to see if the truncate statement is run
+--echo # connection node_1
+--connection node_1
+USE db; INSERT INTO db1.t1(id) VALUES(99);
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT MAX(id) = 99 FROM db1.t1
+--source include/wait_condition.inc
+
+--let $assert_text = "Row added to db1.t1 on node_3"
+--let $assert_cond = MAX(id) = 99 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $assert_text = "Row added to db1.t1 on node_2"
+--let $assert_cond = MAX(id) = 99 FROM db1.t1
+--source include/assert.inc
+
+
+#
+# Test async.tbl.ddl.3.4 : TRUNCATE TABLE
+#		The default database is not allowed.
+#		The database of the table being truncated is allowed.
+#
+--inc $test_id
+
+
+--echo #
+--echo # Test async.tbl.ddl.3.4 : TRUNCATE TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE dbx; TRUNCATE TABLE db1.t1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'db1.t1 is truncated on node_1'
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1.t1 is truncated on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1.t1 is truncated on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+
+#
+# Test async.tbl.ddl.3.5 : DROP TABLE
+#		The default database is not allowed.
+#		The database of the table being dropped is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.3.5 : DROP TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE dbx; DROP TABLE db1.t1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is not on node_1'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+
+#
+# Testcases async.tbl.ddl.4
+#	The default database (dbx) is not allowed.
+#	All operations are performed on a table in a database that is not allowed (dbx)
+#
+
+#
+# Test async.tbl.ddl.4.1 : CREATE TABLE
+#		The default database is not allowed.
+#		The database of the table being created is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.4.1 : CREATE TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; CREATE TABLE dbx1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+#
+# Prepare for the rest of the tests by creating this table on all nodes
+#
+--echo #
+--echo # Test preparation for async.tbl.ddl.4.2
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; CREATE TABLE dbx1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+
+--echo # connection node_3
+--connection node_3
+# Table dbx1.t1 creation replicates due to galera replication
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/wait_condition.inc
+
+--let $assert_text = "t1 is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+
+
+#
+# Test async.tbl.ddl.4.2 : ALTER TABLE
+#		The default database is not allowed.
+#		The database of the table being altered is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.4.2 : ALTER TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; ALTER TABLE dbx1.t1 ADD COLUMN x3 LONGBLOB;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1.x3 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = "dbx1" AND TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = "dbx1" AND TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = "dbx1" AND TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+
+#
+# Test async.tbl.ddl.4.3 : RENAME TABLE
+#		The default database is not allowed.
+#		The database of the table being renamed is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.4.3 : RENAME TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; RENAME TABLE dbx1.t1 TO dbx1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is not on node_1'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_1'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # restore table to original name
+--echo # connection node_1
+--connection node_1
+# Still use dbx since we don't want this command to replicate
+USE dbx; RENAME TABLE dbx1.t2 TO dbx1.t1;
+
+
+#
+# Test preparation
+#
+--echo #
+--echo # Test preparation for async.tbl.ddl.4.4
+--echo #
+
+# Add some data to the table to see if the truncate statement is run
+--echo # connection node_1
+--connection node_1
+INSERT INTO dbx1.t1(id) VALUES(99);
+
+--echo # connection node_2
+--connection node_2
+INSERT INTO dbx1.t1(id) VALUES(99);
+
+--echo # connection node_3
+--connection node_3
+INSERT INTO dbx1.t1(id) VALUES(99);
+
+
+#
+# Test async.tbl.ddl.4.4 : TRUNCATE TABLE
+#		The default database is not allowed.
+#		The database of the table being renamed is not allowed.
+#
+--inc $test_id
+
+
+--echo #
+--echo # Test async.tbl.ddl.4.4 : TRUNCATE TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; TRUNCATE TABLE dbx1.t1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'dbx1.t1 is truncated on node_1'
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t1
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'dbx1.t1 is not truncated on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t1
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'dbx1.t1 is not truncated on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t1
+--source include/assert.inc
+
+
+
+#
+# Test async.tbl.ddl.4.5 : DROP TABLE
+#		The default database is not allowed.
+#		The database of the table being dropped is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.ddl.4.5 : DROP TABLE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; DROP TABLE dbx1.t1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is not on node_1'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "dbx1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo #
+--echo # Test cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+DROP TABLE dbx1.t1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "dbx1" AND TABLE_NAME = "t1"
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+#
+# Test cleanup
+#
+--echo #
+--echo # async.tbl.ddl test cleanup
+--echo #
+--echo # connection node_1
+--connection node_1
+DROP DATABASE db1;
+DROP DATABASE dbx1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/wait_condition.inc
+
+--let $assert_text = "db1 is not on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+DROP DATABASE dbx1;
+
+--echo # connection node_2
+--connection node_2
+--let $assert_text = "db1 is not on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+--let $assert_text = "dbx1 is not on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/assert.inc
+
+
+
+#
+# Table DML (default db allowed, default db not allowed)
+#	Insert
+#	Update
+#	Delete
+#
+
+#
+# Test preparation
+#
+--echo #
+--echo # async.tbl.dml test preparation
+--echo #
+
+--echo # connection node_1
+--connection node_1
+CREATE DATABASE db1;
+CREATE DATABASE dbx1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+CREATE DATABASE dbx1;
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+--let $assert_text = 'dbx1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/assert.inc
+
+
+--echo # connection node_1
+--connection node_1
+USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+USE db; CREATE TABLE dbx1.t2(id INT PRIMARY KEY, f2 LONGBLOB);
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/wait_condition.inc
+
+--let $assert_text = "db1.t1 is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+USE db; CREATE TABLE dbx1.t2(id INT PRIMARY KEY, f2 LONGBLOB);
+
+--echo # connection node_2
+--connection node_2
+--let $assert_text = "db1.t1 is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = "dbx1.t2 is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+
+#
+# Testcases async.tbl.dml.1
+#	The default database (db) is allowed.
+#	All table operations are performed on an allowed database (db1).
+#
+
+#
+# Test async.tbl.dml.1.1 : INSERT
+#		The default database is allowed.
+#		The database of the table being modified is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.1.1 : INSERT
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE db; INSERT INTO db1.t1(id) VALUES(1);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Insert succeeded on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert succeeded on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert succeeded on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1
+--source include/assert.inc
+
+
+#
+# Test async.tbl.dml.1.2 : UPDATE
+#		The default database is allowed.
+#		The database of the table being modified is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.1.2 : UPDATE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE db; UPDATE db1.t1 SET f2 = "abcde" WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Update succeeded on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update succeeded on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update succeeded on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1 WHERE f2 = "abcde"
+--source include/assert.inc
+
+
+#
+# Test async.tbl.dml.1.3 : DELETE
+#		The default database is allowed.
+#		The database of the table being modified is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.1.3 : DELETE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE db; DELETE FROM db1.t1 WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Delete succeeded on node_1"
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete succeeded on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete succeeded on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+--echo #
+--echo # Testcase async.tbl.dml.1 cleanup
+--echo #
+--echo # connection node_1
+--connection node_1
+USE db; TRUNCATE TABLE db1.t1;
+
+
+
+#
+# Testcases async.tbl.dml.2
+#	The default database (db) is allowed.
+#	All operations are performed on a database that is not allowed (dbx1).
+#
+
+#
+# Test async.tbl.dml.2.1 : INSERT
+#		The default database is allowed.
+#		All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.2.1 : INSERT
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; INSERT INTO dbx1.t2(id) VALUES(1);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Insert succeeded on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert not replicated to node_2"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert not replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+#
+# Test preparation
+#
+--echo #
+--echo # Test async.tbl.dml.2 test preparation
+--echo #
+--echo # connection node_2
+--connection node_2
+INSERT INTO dbx1.t2(id) VALUES(1);
+
+--echo # connection node_3
+--connection node_3
+INSERT INTO dbx1.t2(id) VALUES(1);
+
+
+#
+# Test async.tbl.dml.2.2 : UPDATE
+#		The default database is allowed.
+#		All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.2.2 : UPDATE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Update succeeded on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update not replicated to node_2"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update not replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2 WHERE f2 = "abcde"
+--source include/assert.inc
+
+
+#
+# Test async.tbl.dml.2.3 : DELETE
+#		The default database is allowed.
+#		All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.2.3 : DELETE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; DELETE FROM dbx1.t2 WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Delete succeeded on node_1"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete not replicated to node_2"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete not replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo #
+--echo # Testcase async.tbl.dml.2.3 cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; TRUNCATE TABLE dbx1.t2;
+
+--echo # connection node_3
+--connection node_3
+USE db; TRUNCATE TABLE dbx1.t2;
+
+
+
+#
+# Testcases async.tbl.dml.3
+#	The default database (dbx) is not allowed.
+#	All operations are performed on an allowed database (db1).
+#
+
+#
+# Test async.tbl.dml.3.1 : INSERT
+#	The default database (dbx) is not allowed.
+#	All operations are performed on an allowed database (db1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.3.1 : INSERT
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE dbx; INSERT INTO db1.t1(id) VALUES(1);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Insert succeeded on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert replicated to node_2"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1
+--source include/assert.inc
+
+
+#
+# Test async.tbl.dml.3.2 : UPDATE
+#	The default database (dbx) is not allowed.
+#	All operations are performed on an allowed database (db1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.3.2 : UPDATE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE dbx; UPDATE db1.t1 SET f2 = "abcde" WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Update succeeded on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update replicated to node_2"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1 WHERE f2 = "abcde"
+--source include/assert.inc
+
+
+#
+# Test async.tbl.dml.3.3 : DELETE
+#	The default database (dbx) is not allowed.
+#	All operations are performed on an allowed database (db1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.3.3 : DELETE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will replicate to node_2 and node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_1:yes  node_2:yes  node_3:yes
+#
+USE dbx; DELETE FROM db1.t1 WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Delete succeeded on node_1"
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete replicated to node_2"
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+
+
+#
+# Testcases async.tbl.dml.4
+#	The default database (db) is not allowed.
+#	All operations are performed on a database that is not allowed (dbx1).
+#
+
+#
+# Test async.tbl.dml.4.1 : INSERT
+#	The default database (db) is not allowed.
+#	All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.4.1 : INSERT
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; INSERT INTO dbx1.t2(id) VALUES(1);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Insert succeeded on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert not replicated to node_2"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert not replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+#
+# Test preparation
+#
+--echo #
+--echo # Test async.tbl.dml.4 test preparation
+--echo #
+--echo # connection node_2
+--connection node_2
+INSERT INTO dbx1.t2(id) VALUES(1);
+
+--echo # connection node_3
+--connection node_3
+INSERT INTO dbx1.t2(id) VALUES(1);
+
+
+#
+# Test async.tbl.dml.4.2 : UPDATE
+#	The default database (db) is not allowed.
+#	All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.4.2 : UPDATE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Update succeeded on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update not replicated to node_2"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update not replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2 WHERE f2 = "abcde"
+--source include/assert.inc
+
+
+#
+# Test async.tbl.dml.4.3 : DELETE
+#	The default database (db) is not allowed.
+#	All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.tbl.dml.4.3 : DELETE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 or node_3 since this
+# will not pass the table filters.
+#
+# NOTE: This statement will be blocked on node_2 and will not reach
+# node_3 at all.
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; DELETE FROM dbx1.t2 WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Delete succeeded on node_1"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete not replicated to node_2"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete not replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo #
+--echo # Testcase async.tbl.dml.4.3 cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; TRUNCATE TABLE dbx1.t2;
+
+--echo # connection node_3
+--connection node_3
+USE db; TRUNCATE TABLE dbx1.t2;
+
+
+#
+# async.tbl.dml cleanup
+#
+--echo #
+--echo # async.tbl.dml test cleanup
+--echo #
+--echo # connection node_1
+--connection node_1
+DROP DATABASE db1;
+DROP DATABASE dbx1;
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+DROP DATABASE dbx1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+--let $assert_text = 'dbx1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/assert.inc
+
+
+
+#
+# Account Management (default db allowed, default db not allowed)
+#	Create user
+#	Alter user
+#	Grant
+#	Revoke
+#	Grant all
+#	Revoke all
+#	Drop user
+#
+
+#
+# Test preparation
+#
+--echo #
+--echo # async.acct.mgmt test preparation
+--echo #
+--echo # connection node_1
+--connection node_1
+CREATE DATABASE db1;
+USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1.t1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $assert_text = 'db1.t1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+
+#
+# Testcases async.acct.mgmt.1
+#	The default database is allowed.
+#
+
+#
+# Test async.acct.mgmt.1.1 : CREATE USER
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.1.1 : CREATE USER
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not on node_2 (did not replicate)"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo"
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not on node_3 (did not replicate)"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo"
+--let $assert_debug = SELECT USER,HOST FROM mysql.user
+--source include/assert.inc
+
+
+#
+# async.acct.mgmt.1.2 test preparation
+#
+--echo #
+--echo # async.acct.mgmt.1.2 test preparation
+--echo #
+--echo # connection node_2
+--connection node_2
+
+# This will replicate to node_3 because galera replication does
+# not check replication filters for account management.
+USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+
+--let $assert_text = "User foo is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.1.2 : CHANGE PASSWORD
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.1.2 : CHANGE PASSWORD
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+--let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is altered on node_1"
+--let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+--let $assert_debug = SELECT USER,HOST,AUTHENTICATION_STRING FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not altered on node_2"
+--let $assert_cond = AUTHENTICATION_STRING = "$user_password" FROM mysql.user WHERE user = "foo"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not altered on node_3"
+--let $assert_cond = AUTHENTICATION_STRING = "$user_password" FROM mysql.user WHERE user = "foo"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.1.3 : ALTER USER
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.1.3 : ALTER USER
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+--let $assert_text = "User foo is not expired on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo" AND password_expired = "N"
+--source include/assert.inc
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; ALTER USER "foo"@"%" PASSWORD EXPIRE;
+
+--let $assert_text = "User foo is altered on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo" AND password_expired = "Y"
+--source include/assert.inc
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not altered on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE user = "foo" AND password_expired = "Y"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not altered on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE user = "foo" AND password_expired = "Y"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.1.4 : GRANT
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.1.4 : GRANT
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; GRANT SELECT ON db1.t1 TO "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+#
+# Test preparation
+#
+--echo #
+--echo # async.acct.mgmt.1.5 test preparation
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; GRANT SELECT ON db1.t1 TO "foo"@"%";
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.1.5 : REVOKE
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.1.5 : REVOKE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_1"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+#
+# Test cleanup
+#
+--echo #
+--echo # Test cleanup for async.acct.mgmt.1.5
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.1.6 : GRANT ALL
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.1.6 : GRANT ALL
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; GRANT ALL ON db1.t1 TO "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has NO access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has NO access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+
+#
+# Test preparation
+#
+--echo #
+--echo # async.acct.mgmt.1.6 test preparation
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; GRANT ALL ON db1.t1 TO "foo"@"%";
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.1.7 : REVOKE ALL
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.1.7 : REVOKE ALL
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; REVOKE ALL ON db1.t1 FROM "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo has no access on db1.t1 on node_1"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_2 (did not replicate)"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--let $assert_debug = SELECT * FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AD USER = "foo"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_3 (did not replicate)"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.1.8 : DROP USER
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.1.8 : DROP USER
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; DROP USER "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is not on node_1"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+#
+# Test cleanup async.acct.mgmt.1.7
+#
+--echo #
+--echo # async.acct.mgmt.1.7 test cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; DROP USER "foo";
+
+--let $assert_text = 'User foo is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.user WHERE USER = "foo"
+--source include/wait_condition.inc
+
+--let $assert_text = "user foo is not on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo"
+--source include/assert.inc
+
+
+#
+# Testcases async.acct.mgmt.2
+#	The default database (dbx) is not allowed.
+#
+
+#
+# Test async.acct.mgmt.2.1 : CREATE USER
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.2.1 : CREATE USER
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo";
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+#
+# Test prep for the rest of the test cases
+#
+--echo #
+--echo # Test preparation for async.acct.mgmt.2
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+
+--let $assert_text = "User foo is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.2.2 : CHANGE PASSWORD
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.2.2 : CHANGE PASSWORD
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+--let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is altered on node_1"
+--let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+--let $assert_debug = SELECT USER,HOST,AUTHENTICATION_STRING FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not altered on node_2"
+--let $assert_cond = AUTHENTICATION_STRING = "$user_password" FROM mysql.user WHERE user = "foo"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not altered on node_3"
+--let $assert_cond = AUTHENTICATION_STRING = "$user_password" FROM mysql.user WHERE user = "foo"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.2.3 : ALTER USER
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.2.3 : ALTER USER
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+--let $assert_text = "User foo is not expired on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo" AND password_expired = "N"
+--source include/assert.inc
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; ALTER USER "foo"@"%" PASSWORD EXPIRE;
+
+--let $assert_text = "User foo is altered on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo" AND password_expired = "Y"
+--source include/assert.inc
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not altered on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE user = "foo" AND password_expired = "Y"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not altered on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE user = "foo" AND password_expired = "Y"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.2.4 : GRANT
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.2.4 : GRANT
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; GRANT SELECT ON db1.t1 TO "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+
+# Test preparation
+--echo #
+--echo # Test preparation for async.acct.mgmt.2.5
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; GRANT SELECT ON db1.t1 TO "foo"@"%";
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.2.5 : REVOKE
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.2.5 : REVOKE
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_1"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+#
+# Test cleanup
+#
+--echo #
+--echo # Test cleanup for async.acct.mgmt.2.5
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.2.6 : GRANT ALL
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.2.6 : GRANT ALL
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; GRANT ALL ON db1.t1 TO "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_1"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo does not have ALL access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo does not have ALL access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+# Test preparation
+--echo #
+--echo # Test preparation for async.acct.mgmt.2.7
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; GRANT ALL ON db1.t1 TO "foo"@"%";
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $assert_text = "User foo has ALL access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.2.7 : REVOKE ALL
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.2.7 : REVOKE ALL
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; REVOKE ALL ON db1.t1 FROM "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo does not have access on db1.t1 on node_1"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+
+#
+# Test async.acct.mgmt.2.8 : DROP USER
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test async.acct.mgmt.2.8 : DROP USER
+--echo #
+
+--echo # connection node_1
+--connection node_1
+
+# EXPECTED: This will not replicate to node_2 because the table filters
+# will not allow the account management operation.
+#
+# NOTE: This statement will not replicate to node_3 (because for
+# account management, galera replication occurs after the replication filter
+# check)
+#
+# SUMMARY: node_1:yes  node_2:no  node_3:no
+#
+USE dbx; DROP USER "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is not on node_1"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo";
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+#
+# Test cleanup
+#
+--echo #
+--echo # async.acct.mgmt.2.8 test cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; DROP USER "foo";
+--let $assert_text = "user foo is not on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.user WHERE USER = "foo"
+--source include/wait_condition.inc
+
+--let $assert_text = "user foo is not on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo"
+--source include/assert.inc
+
+
+#
+# Test cleanup
+#
+--echo #
+--echo # async.acct.mgmt test cleanup
+--echo #
+--echo # connection node_1
+--connection node_1
+DROP DATABASE db1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $assert_text = 'db1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+
+
+#==============================================================
+#
+# GALERA-GALERA replication testing
+# The tests from here down do not involve async replication.
+# The purpose is to test the affect of the replication filters
+# on galera replication.
+#
+# For galera replication, replication filters are not checked
+# for statement-based replication.  However, the filters are
+# checked for row-based replication.
+#
+#==============================================================
+
+
+
+#
+# Table DDL
+#	CREATE TABLE
+#	DROP TABLE
+#	ALTER TABLE
+#	RENAME TABLE
+#	TRUNCATE TABLE
+#
+
+#
+# Test preparation
+# 	Create db1 and dbx1 on all nodes
+#
+--echo #
+--echo # galera.tbl.ddl test preparation
+--echo #
+--echo # connection node_2
+--connection node_2
+CREATE DATABASE db1;
+CREATE DATABASE dbx1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/wait_condition.inc
+
+--let $assert_text = "db1 is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+--let $assert_text = "dbx1 is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/assert.inc
+
+#
+# Testcases galera.tbl.ddl.1
+#	The default database (dbx, db1) is allowed.
+#	All operations are performed on a table in an allowed database (db)
+#
+
+#
+# Test galera.tbl.ddl.1.1 : CREATE TABLE
+#		The default database is allowed.
+#		The database of the table being created is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.1.1 : CREATE TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+INSERT INTO db1.t1(id) VALUES(1);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+#
+# Test galera.tbl.ddl.1.2 : ALTER TABLE
+#		The default database is allowed.
+#		The database of the table being altered is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.1.2 : ALTER TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; ALTER TABLE db1.t1 ADD COLUMN x3 LONGBLOB;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1.x3 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+#
+# Test galera.tbl.ddl.1.3 : RENAME TABLE
+#		The default database is allowed.
+#		The database of the table being altered is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.1.3 : RENAME TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; RENAME TABLE db1.t1 TO db1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.1.4 : TRUNCATE TABLE
+#		The default database is allowed.
+#		The database of the table being truncated is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.1.4 : TRUNCATE TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; TRUNCATE TABLE db1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'db1.t2 is truncated on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM db1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1.t2 is truncated on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM db1.t2
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.1.5 : DROP TABLE
+#		The default database is allowed.
+#		The database of the table being dropped is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.1.5 : DROP TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; DROP TABLE db1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't2 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't2 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+
+#
+# Testcases galera.tbl.ddl.2
+#	The default database (db) is allowed.
+#	All operations are performed on a table in a database that is not allowed (dbx1)
+#
+
+#
+# Test galera.tbl.ddl.2.1 : CREATE TABLE
+#		The default database is allowed.
+#		The database of the table being created is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.2.1 : CREATE TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; CREATE TABLE dbx1.t1(id INT PRIMARY KEY);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'dbx1.t1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "dbx1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'dbx1.t1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.2.2 : ALTER TABLE
+#		The default database is allowed.
+#		The database of the table being altered is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.2.2 : ALTER TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; ALTER TABLE dbx1.t1 ADD COLUMN x3 LONGBLOB;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1.x3 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.2.3 : RENAME TABLE
+#		The default database is allowed.
+#		The database of the table being renamed is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.2.3 : RENAME TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; RENAME TABLE dbx1.t1 TO dbx1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+#
+# Test preparation
+#
+--echo #
+--echo # Test preparation for galera.tbl.ddl.2.4
+--echo #
+
+# Add some data to the table to see if the truncate statement is run
+--echo # connection node_2
+--connection node_2
+INSERT INTO dbx1.t2(id) VALUES(99);
+
+--echo # connection node_3
+--connection node_3
+INSERT INTO dbx1.t2(id) VALUES(99);
+
+
+#
+# Test galera.tbl.ddl.2.4 : TRUNCATE TABLE
+#		The default database is allowed.
+#		The database of the table being truncated is not allowed.
+#
+--inc $test_id
+
+
+--echo #
+--echo # Test galera.tbl.ddl.2.4 : TRUNCATE TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; TRUNCATE TABLE dbx1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'dbx1.t2 is truncated on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'dbx1.t2 is truncated on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.2.5 : DROP TABLE
+#		The default database is allowed.
+#		The database of the table being dropped is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.2.5 : DROP TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; DROP TABLE dbx1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'dbx1.t2 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'dbx1.t2 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+
+#
+# Testcases galera.tbl.ddl.3
+#	The default database (dbx) is not allowed.
+#	All operations are performed on a table in a database that is allowed (db1)
+#
+
+#
+# Test galera.tbl.ddl.3.1 : CREATE TABLE
+#		The default database is not allowed.
+#		The database of the table being created is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.3.1 : CREATE TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.3.2 : ALTER TABLE
+#		The default database is not allowed.
+#		The database of the table being altered is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.3.2 : ALTER TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; ALTER TABLE db1.t1 ADD COLUMN x3 LONGBLOB;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1.x3 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.3.3 : RENAME TABLE
+#		The default database is not allowed.
+#		The database of the table being renamed is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.3.3 : RENAME TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; RENAME TABLE db1.t1 TO db1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+#
+# Test preparation
+#
+--echo #
+--echo # Test preparation for galera.tbl.ddl.3.4
+--echo #
+
+# Add some data to the table to see if the truncate statement is run
+--echo # connection node_2
+--connection node_2
+USE db; INSERT INTO db1.t2(id) VALUES(99);
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT MAX(id) = 99 FROM db1.t2
+--source include/wait_condition.inc
+
+--let $assert_text = "Row added to db1.t2 on node_3"
+--let $assert_cond = MAX(id) = 99 FROM db1.t2
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.3.4 : TRUNCATE TABLE
+#		The default database is not allowed.
+#		The database of the table being truncated is allowed.
+#
+--inc $test_id
+
+
+--echo #
+--echo # Test galera.tbl.ddl.3.4 : TRUNCATE TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; TRUNCATE TABLE db1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'db1.t2 is truncated on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM db1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1.t2 is truncated on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM db1.t2
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.3.5 : DROP TABLE
+#		The default database is not allowed.
+#		The database of the table being dropped is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.3.5 : DROP TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; DROP TABLE db1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't2 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't2 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+
+
+#
+# Testcases galera.tbl.ddl.4
+#	The default database (dbx) is not allowed.
+#	All operations are performed on a table in a database that is not allowed (dbx)
+#
+
+#
+# Test galera.tbl.ddl.4.1 : CREATE TABLE
+#		The default database is not allowed.
+#		The database of the table being created is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.4.1 : CREATE TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; CREATE TABLE dbx1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.4.2 : ALTER TABLE
+#		The default database is not allowed.
+#		The database of the table being altered is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.4.2 : ALTER TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; ALTER TABLE dbx1.t1 ADD COLUMN x3 LONGBLOB;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1.x3 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1.x3 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "t1" AND COLUMN_NAME="x3"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.4.3 : RENAME TABLE
+#		The default database is not allowed.
+#		The database of the table being renamed is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.4.3 : RENAME TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; RENAME TABLE dbx1.t1 TO dbx1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't1 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_2'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = 't2 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+#
+# Test preparation
+#
+--echo #
+--echo # Test preparation for galera.tbl.ddl.4.4
+--echo #
+
+# Add some data to the table to see if the truncate statement is run
+--echo # connection node_2
+--connection node_2
+INSERT INTO dbx1.t2(id) VALUES(99);
+
+--echo # connection node_3
+--connection node_3
+INSERT INTO dbx1.t2(id) VALUES(99);
+
+
+#
+# Test galera.tbl.ddl.4.4 : TRUNCATE TABLE
+#		The default database is not allowed.
+#		The database of the table being renamed is not allowed.
+#
+--inc $test_id
+
+
+--echo #
+--echo # Test galera.tbl.ddl.4.4 : TRUNCATE TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; TRUNCATE TABLE dbx1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 'dbx1.t2 is truncated on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 'dbx1.t2 is truncated on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.ddl.4.5 : DROP TABLE
+#		The default database is not allowed.
+#		The database of the table being dropped is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.ddl.4.5 : DROP TABLE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; DROP TABLE dbx1.t2;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = 't2 is not on node_2'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "dbx1"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = 't2 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+#
+# Test cleanup
+#
+--echo #
+--echo # galera.tbl.ddl test cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+DROP DATABASE db1;
+DROP DATABASE dbx1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/wait_condition.inc
+
+--let $assert_text = "db1 is not on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+--let $assert_text = "dbx1 is not on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/assert.inc
+
+
+
+#
+# Table DML (default db allowed, default db not allowed)
+#	Insert
+#	Update
+#	Delete
+#
+
+#
+# Test preparation
+#
+--echo #
+--echo # galera.tbl.dml test preparation
+--echo #
+
+--echo # connection node_2
+--connection node_2
+CREATE DATABASE db1;
+CREATE DATABASE dbx1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+--let $assert_text = 'dbx1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/assert.inc
+
+
+--echo # connection node_2
+--connection node_2
+USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+USE db; CREATE TABLE dbx1.t2(id INT PRIMARY KEY, f2 LONGBLOB);
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/wait_condition.inc
+
+--let $assert_text = "db1.t1 is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/assert.inc
+
+--let $assert_text = "dbx1.t2 is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t2"
+--source include/assert.inc
+
+
+#
+# Testcases galera.tbl.dml.1
+#	The default database (db) is allowed.
+#	All table operations are performed on an allowed database (db1).
+#
+
+#
+# Test galera.tbl.dml.1.1 : INSERT
+#		The default database is allowed.
+#		The database of the table being modified is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.1.1 : INSERT
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; INSERT INTO db1.t1(id) VALUES(1);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Insert succeeded on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert succeeded on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.dml.1.2 : UPDATE
+#		The default database is allowed.
+#		The database of the table being modified is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.1.2 : UPDATE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; UPDATE db1.t1 SET f2 = "abcde" WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Update succeeded on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update succeeded on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1 WHERE f2 = "abcde"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.dml.1.3 : DELETE
+#		The default database is allowed.
+#		The database of the table being modified is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.1.3 : DELETE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; DELETE FROM db1.t1 WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Delete succeeded on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete succeeded on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+
+
+#
+# Testcases galera.tbl.dml.2
+#	The default database (db) is allowed.
+#	All operations are performed on a database that is not allowed (dbx1).
+#
+
+#
+# Test galera.tbl.dml.2.1 : INSERT
+#		The default database is allowed.
+#		All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.2.1 : INSERT
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will not replicate to node_3 since this
+# will not pass the table filters.
+#
+# SUMMARY: node_2:yes  node_3:no
+#
+USE db; INSERT INTO dbx1.t2(id) VALUES(1);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Insert succeeded on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert not replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+#
+# Test preparation
+#
+--echo #
+--echo # Test galera.tbl.dml.2 test preparation
+--echo #
+--echo # connection node_3
+--connection node_3
+INSERT INTO dbx1.t2(id) VALUES(1);
+
+
+#
+# Test galera.tbl.dml.2.2 : UPDATE
+#		The default database is allowed.
+#		All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.2.2 : UPDATE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will not replicate to node_3 since this
+# will not pass the table filters.
+#
+# SUMMARY: node_2:yes  node_3:no
+#
+USE db; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Update succeeded on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update not replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2 WHERE f2 = "abcde"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.dml.2.3 : DELETE
+#		The default database is allowed.
+#		All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.2.3 : DELETE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will not replicate to node_3 since this
+# will not pass the table filters.
+#
+# SUMMARY: node_2:yes  node_3:no
+#
+USE db; DELETE FROM dbx1.t2 WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Delete succeeded on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete not replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo #
+--echo # Testcase galera.tbl.dml.2.3 cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; TRUNCATE TABLE dbx1.t2;
+
+--echo # connection node_3
+--connection node_3
+USE db; TRUNCATE TABLE dbx1.t2;
+
+
+
+#
+# Testcases galera.tbl.dml.3
+#	The default database (dbx) is not allowed.
+#	All operations are performed on an allowed database (db1).
+#
+
+#
+# Test galera.tbl.dml.3.1 : INSERT
+#	The default database (dbx) is not allowed.
+#	All operations are performed on an allowed database (db1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.3.1 : INSERT
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; INSERT INTO db1.t1(id) VALUES(1);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Insert replicated to node_2"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.dml.3.2 : UPDATE
+#	The default database (dbx) is not allowed.
+#	All operations are performed on an allowed database (db1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.3.2 : UPDATE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; UPDATE db1.t1 SET f2 = "abcde" WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Update succeeded on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM db1.t1 WHERE f2 = "abcde"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.dml.3.3 : DELETE
+#	The default database (dbx) is not allowed.
+#	All operations are performed on an allowed database (db1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.3.3 : DELETE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3.
+# Since there are no database filters, and the table filters
+# allow db.% and db1.% the statement will replicate.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; DELETE FROM db1.t1 WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Delete succeeded on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM db1.t1
+--source include/assert.inc
+
+
+
+#
+# Testcases galera.tbl.dml.4
+#	The default database (db) is not allowed.
+#	All operations are performed on a database that is not allowed (dbx1).
+#
+
+#
+# Test galera.tbl.dml.4.1 : INSERT
+#	The default database (db) is not allowed.
+#	All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.4.1 : INSERT
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will not replicate to node_3 since this
+# will not pass the table filters.
+#
+# SUMMARY: node_2:yes  node_3:no
+#
+USE dbx; INSERT INTO dbx1.t2(id) VALUES(1);
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Insert succeeded on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Insert not replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+#
+# Test preparation
+#
+--echo #
+--echo # Test galera.tbl.dml.4 test preparation
+--echo #
+--echo # connection node_3
+--connection node_3
+INSERT INTO dbx1.t2(id) VALUES(1);
+
+
+#
+# Test galera.tbl.dml.4.2 : UPDATE
+#	The default database (db) is not allowed.
+#	All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.4.2 : UPDATE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will not replicate to node_3 since this
+# will not pass the table filters.
+#
+# SUMMARY: node_2:yes  node_3:no
+#
+USE dbx; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Update succeeded on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2 WHERE f2 = "abcde"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Update not replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2 WHERE f2 = "abcde"
+--source include/assert.inc
+
+
+#
+# Test galera.tbl.dml.4.3 : DELETE
+#	The default database (db) is not allowed.
+#	All operations are performed on a database that is not allowed (dbx1).
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.tbl.dml.4.3 : DELETE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will not replicate to node_3 since this
+# will not pass the table filters.
+#
+# SUMMARY: node_2:yes  node_3:no
+#
+USE dbx; DELETE FROM dbx1.t2 WHERE id = 1;
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "Delete succeeded on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "Delete not replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
+
+--echo #
+--echo # Testcase galera.tbl.dml.4.3 cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+USE db; TRUNCATE TABLE dbx1.t2;
+
+--echo # connection node_3
+--connection node_3
+USE db; TRUNCATE TABLE dbx1.t2;
+
+
+#
+# galera.tbl.dml cleanup
+#
+--echo #
+--echo # galera.tbl.dml test cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+DROP DATABASE db1;
+DROP DATABASE dbx1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+--let $assert_text = 'dbx1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "dbx1"
+--source include/assert.inc
+
+
+
+#
+# Account Management (default db allowed, default db not allowed)
+#	Create user
+#	Alter user
+#	Grant
+#	Revoke
+#	Grant all
+#	Revoke all
+#	Drop user
+#
+
+#
+# Test preparation
+#
+--echo #
+--echo # galera.acct.mgmt test preparation
+--echo #
+--echo # connection node_2
+--connection node_2
+CREATE DATABASE db1;
+USE db; CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1.t1 is on node_3'
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = "db1" AND TABLE_NAME = "t1"
+--source include/assert.inc
+
+
+#
+# Testcases galera.acct.mgmt.1
+#	The default database is allowed.
+#
+
+#
+# Test galera.acct.mgmt.1.1 : CREATE USER
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.1.1 : CREATE USER
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.1.2 : CHANGE PASSWORD
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.1.2 : CHANGE PASSWORD
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+--let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is altered on node_2"
+--let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+--let $assert_debug = SELECT USER,HOST,AUTHENTICATION_STRING FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is altered on node_3"
+--let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.1.3 : ALTER USER
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.1.3 : ALTER USER
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+--let $assert_text = "User foo is not expired on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo" AND password_expired = "N"
+--source include/assert.inc
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; ALTER USER "foo"@"%" PASSWORD EXPIRE;
+
+--let $assert_text = "User foo is expired on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo" AND password_expired = "Y"
+--source include/assert.inc
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is expired on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo" AND password_expired = "Y"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.1.4 : GRANT
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.1.4 : GRANT
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; GRANT SELECT ON db1.t1 TO "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.1.5 : REVOKE
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.1.5 : REVOKE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.1.6 : GRANT ALL
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.1.6 : GRANT ALL
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; GRANT ALL ON db1.t1 TO "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.1.7 : REVOKE ALL
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.1.7 : REVOKE ALL
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; REVOKE ALL ON db1.t1 FROM "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo has no access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--let $assert_debug = SELECT * FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AD USER = "foo"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has no access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.1.8 : DROP USER
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.1.8 : DROP USER
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; DROP USER "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is not on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo";
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+
+
+#
+# Testcases galera.acct.mgmt.2
+#	The default database (dbx) is not allowed.
+#
+
+#
+# Test galera.acct.mgmt.2.1 : CREATE USER
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.2.1 : CREATE USER
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE USER = "foo";
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.2.2 : CHANGE PASSWORD
+#	The default database is allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.2.2 : CHANGE PASSWORD
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+--let $user_password = `SELECT AUTHENTICATION_STRING FROM mysql.user WHERE USER = "foo"`
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE db; SET PASSWORD FOR "foo"@"%" = "notapassword";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is altered on node_2"
+--let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+--let $assert_debug = SELECT USER,HOST,AUTHENTICATION_STRING FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is altered on node_3"
+--let $assert_cond = AUTHENTICATION_STRING != "$user_password" FROM mysql.user WHERE user = "foo"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.2.3 : ALTER USER
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.2.3 : ALTER USER
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+--let $assert_text = "User foo is not expired on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo" AND password_expired = "N"
+--source include/assert.inc
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; ALTER USER "foo"@"%" PASSWORD EXPIRE;
+
+--let $assert_text = "User foo is expired on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo" AND password_expired = "Y"
+--source include/assert.inc
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is expired on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo" AND password_expired = "Y"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.2.4 : GRANT
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.2.4 : GRANT
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; GRANT SELECT ON db1.t1 TO "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.2.5 : REVOKE
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.2.5 : REVOKE
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo does not have SELECT access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV = "Select"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.2.6 : GRANT ALL
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.2.6 : GRANT ALL
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; GRANT ALL ON db1.t1 TO "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo has ALL access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 1 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.2.7 : REVOKE ALL
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.2.7 : REVOKE ALL
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; REVOKE ALL ON db1.t1 FROM "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo does not have access on db1.t1 on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo does not have access on db1.t1 on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.tables_priv WHERE TABLE_NAME = "t1" AND USER = "foo" AND TABLE_PRIV LIKE "Select%Insert%Update%Delete%"
+--source include/assert.inc
+
+
+#
+# Test galera.acct.mgmt.2.8 : DROP USER
+#	The default database (dbx) is not allowed.
+#
+--inc $test_id
+
+--echo #
+--echo # Test galera.acct.mgmt.2.8 : DROP USER
+--echo #
+
+--echo # connection node_2
+--connection node_2
+
+# EXPECTED: This will replicate to node_3 via galera replication.
+# For statement-based replication, the galera replication thread
+# will not check with the database filters.
+#
+# NOTE: Since galera replication is not running on the async slave
+# thread, the table filters will not be checked.
+#
+# SUMMARY: node_2:yes  node_3:yes
+#
+USE dbx; DROP USER "foo"@"%";
+
+--eval INSERT INTO db.counter(count) VALUES($test_id)
+
+--let $assert_text = "User foo is not on node_2"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo";
+--let $assert_debug = SELECT USER, HOST FROM mysql.user
+--source include/assert.inc
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
+--source include/wait_condition.inc
+
+--let $assert_text = "User foo is not on node_3"
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE USER = "foo";
+--source include/assert.inc
+
+
+#
+# Test cleanup
+#
+--echo #
+--echo # galera.acct.mgmt test cleanup
+--echo #
+--echo # connection node_2
+--connection node_2
+DROP DATABASE db1;
+
+--echo # connection node_3
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/wait_condition.inc
+
+--let $assert_text = 'db1 is not on node_3'
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "db1"
+--source include/assert.inc
+
+
+
+# Reset the database
+#
+--echo #
+--echo # Overall cleanup
+--echo #
+
+--echo # connection node_2
+--connection node_2
+STOP SLAVE;
+RESET SLAVE ALL;
+
+--echo # connection node_1
+--connection node_1
+RESET MASTER;
+
+--connection node_1
+call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+
+--connection node_2
+call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+
+--connection node_3
+call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");

@@ -37,6 +37,10 @@
 #include "sql/table.h"
 #include "violite.h" /* SSL_type */
 
+#ifdef WITH_WSREP
+#include "sql/sql_parse.h"
+#endif /* WITH_WSREP */
+
 class ACL_USER;
 class ACL_PROXY_USER;
 class GRANT_NAME;
@@ -170,7 +174,13 @@ int replace_routine_table(THD *thd, GRANT_NAME *grant_name, TABLE *table,
                           const LEX_USER &combo, const char *db,
                           const char *routine_name, bool is_proc, ulong rights,
                           bool revoke_grant);
+#ifdef WITH_WSREP
+int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables,
+                      const char *db = WSREP_MYSQL_DB,
+                      const char *table = NULL);
+#else
 int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables);
+#endif /* WITH_WSREP */
 void grant_tables_setup_for_open(
     TABLE_LIST *tables, thr_lock_type lock_type = TL_WRITE,
     enum_mdl_type mdl_type = MDL_SHARED_NO_READ_WRITE);

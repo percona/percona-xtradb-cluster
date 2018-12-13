@@ -1,0 +1,35 @@
+#node-2
+#shutdown node-2.
+#node-1
+select @@sync_binlog;
+@@sync_binlog
+1
+#node-1
+create table t1 (i int, primary key pk(i)) engine=innodb;
+insert into t1 values (1);
+insert into t1 values (2);
+insert into t1 values (3);
+set debug="+d,crash_before_trx_commit_in_memory";
+insert into t1 values (4);
+ERROR HY000: Lost connection to MySQL server during query
+#node-1
+#waiting to restart node-1
+# restart:
+set session wsrep_on=0;
+set debug="+d,crash_before_trx_commit_in_memory";
+insert into t1 values (40);
+ERROR HY000: Lost connection to MySQL server during query
+#node-1
+#waiting to restart node-1
+# restart:
+select * from t1;
+i
+1
+2
+3
+4
+40
+drop table t1;
+#node-2
+# restart:
+call mtr.add_suppression("WSREP: Failed to prepare for incremental state transfer.*");

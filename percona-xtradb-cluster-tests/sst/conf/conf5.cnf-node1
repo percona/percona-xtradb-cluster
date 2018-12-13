@@ -1,0 +1,9 @@
+# encrypt2+compress
+[xtrabackup]
+compress
+
+[sst]
+streamfmt=xbstream
+encrypt=2
+tca=/tmp/certs/node2.crt
+tcert=/tmp/certs/node1.pem

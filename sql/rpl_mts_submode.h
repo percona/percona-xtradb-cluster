@@ -46,6 +46,10 @@ enum enum_mts_parallel_type {
   MTS_PARALLEL_TYPE_DB_NAME = 0,
   /* Parallel slave based on group information from Binlog group commit */
   MTS_PARALLEL_TYPE_LOGICAL_CLOCK = 1
+#ifdef WITH_WSREP
+  ,
+  MTS_PARALLEL_TYPE_WSREP
+#endif /* WITH_WSREP */
 };
 
 // Extend the following class as per requirement for each sub mode
@@ -83,6 +87,39 @@ class Mts_submode {
 
   virtual ~Mts_submode() {}
 };
+
+#ifdef WITH_WSREP
+/**
+  void submode for wsrep replication providers
+  which handle parallel applying on their own
+*/
+class Mts_submode_wsrep : public Mts_submode {
+ public:
+  Mts_submode_wsrep() { type = MTS_PARALLEL_TYPE_WSREP; }
+
+  int schedule_next_event(Relay_log_info *, Log_event *) { return 0; }
+
+  void attach_temp_tables(THD *, const Relay_log_info *, Query_log_event *) {
+    return;
+  }
+
+  void detach_temp_tables(THD *, const Relay_log_info *, Query_log_event *) {
+    return;
+  }
+
+  Slave_worker *get_least_occupied_worker(Relay_log_info *,
+                                          Slave_worker_array *, Log_event *) {
+    return NULL;
+  }
+
+  ~Mts_submode_wsrep(){};
+
+  int wait_for_workers_to_finish(Relay_log_info *,
+                                 Slave_worker *ignore = NULL) {
+    return 0;
+  }
+};
+#endif /* WITH_WSREP */
 
 /**
   DB partitioned submode

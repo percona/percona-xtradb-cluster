@@ -32,3 +32,7 @@ $list |grep $filter |while read f;
 do
 	 etags -o TAGS --append $f
 done
+(cd storage/galera && svn ls -R) | grep $filter | while read f; 
+do
+	etags -o TAGS --append storage/galera/$f
+done 

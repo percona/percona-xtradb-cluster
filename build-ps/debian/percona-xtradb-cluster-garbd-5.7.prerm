@@ -1,0 +1,13 @@
+#!/bin/sh
+config=/etc/default/garbd
+if [ -x "/etc/init.d/garbd" ]; then
+  if grep -q -E '^# REMOVE' $config; then
+    echo  "Garbd config $config is not configured yet"
+    exit 0
+  else
+    running=$(ps wwaux | grep garbd | grep -v grep | wc -l)
+    if [ $running != 0 ]; then
+      invoke-rc.d garbd stop || exit $?
+    fi
+  fi
+fi

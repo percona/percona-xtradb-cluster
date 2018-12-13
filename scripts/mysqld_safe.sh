@@ -20,6 +20,7 @@ mysqld_ld_library_path=
 load_jemalloc=1
 load_hotbackup=0
 flush_caches=0
+resume_on_fail=1
 # Change (disable) transparent huge pages (TokuDB requirement)
 thp_setting=
 
@@ -32,6 +33,8 @@ pid_file=
 pid_file_append=
 err_log=
 err_log_append=
+wsrep_data_home_dir=""
+grastate_loc=""
 timestamp_format=UTC
 
 syslog_tag_mysqld=mysqld
@@ -185,7 +188,7 @@ log_notice () {
 }
 
 eval_log_error () {
-  cmd="$1"
+  local cmd="$1"
   case $logging in
     file)
       if [ -w / -o "$USER" = "root" ]; then
@@ -225,6 +228,104 @@ shell_quote_string() {
   echo "$1" | sed -e 's,\([^a-zA-Z0-9/_.=-]\),\\\1,g'
 }
 
+# ---- WITH_WSREP
+wsrep_pick_url() {
+  [ $# -eq 0 ] && return 0
+
+  log_error "WSREP: 'wsrep_urls' is DEPRECATED! Use wsrep_cluster_address to specify multiple addresses instead."
+
+  if ! which nc >/dev/null; then
+    log_error "ERROR: nc tool not found in PATH! Make sure you have it installed."
+    return 1
+  fi
+
+  local url
+  # Assuming URL in the form scheme://host:port
+  # If host and port are not NULL, the liveness of URL is assumed to be tested
+  # If port part is absent, the url is returned literally and unconditionally
+  # If every URL has port but none is reachable, nothing is returned
+  for url in `echo $@ | sed s/,/\ /g` 0; do
+    local host=`echo $url | cut -d \: -f 2 | sed s/^\\\/\\\///`
+    local port=`echo $url | cut -d \: -f 3`
+    [ -z "$port" ] && break
+    nc -z "$host" $port >/dev/null && break
+  done
+
+  if [ "$url" == "0" ]; then
+    log_error "ERROR: none of the URLs in '$@' is reachable."
+    return 1
+  fi
+
+  echo $url
+}
+
+# Run mysqld with --wsrep-recover and parse recovered position from log.
+# Position will be stored in wsrep_start_position_opt global.
+wsrep_start_position_opt=""
+wsrep_recover_position() {
+  local mysqld_cmd="$@"
+  local ret=0
+  local uuid=""
+  local seqno=0
+
+  uuid=$(grep 'uuid:' $grastate_loc | cut -d: -f2 | tr -d ' ')
+  seqno=$(grep 'seqno:' $grastate_loc | cut -d: -f2 | tr -d ' ')
+
+  # If sequence number is not equal to -1, wsrep-recover co-ordinates aren't used.
+  # lp:1112724
+  # So, directly pass whatever is obtained from grastate.dat
+  if [ ! -z $seqno ] && [ $seqno -ne -1 ]; then
+    log_notice "Skipping wsrep-recover for $uuid:$seqno pair"
+    log_notice "Assigning $uuid:$seqno to wsrep_start_position"
+    wsrep_start_position_opt="--wsrep_start_position=$uuid:$seqno"
+    return $ret
+  fi
+
+  local euid=$(id -u)
+
+  local wr_logfile=$(mktemp $DATADIR/wsrep_recovery.XXXXXX)
+
+  [ "$euid" = "0" ] && chown $user $wr_logfile
+  chmod 600 $wr_logfile
+
+  local wr_pidfile="$DATADIR/"`@HOSTNAME@`"-recover.pid"
+
+  local wr_options="--log_error='$wr_logfile' --pid-file='$wr_pidfile'"
+
+  log_notice "WSREP: Running position recovery with $wr_options"
+
+  eval_log_error "$mysqld_cmd --wsrep_recover $wr_options"
+
+  local rp="$(grep 'WSREP: Recovered position:' $wr_logfile)"
+  if [ -z "$rp" ]; then
+    local skipped="$(grep WSREP $wr_logfile | grep 'skipping position recovery')"
+    if [ -z "$skipped" ]; then
+      log_error "WSREP: Failed to recover position: "
+      ret=2
+    else
+      log_notice "WSREP: Position recovery skipped"
+    fi
+  else
+    local start_pos="$(echo $rp | sed 's/.*WSREP\:\ Recovered\ position://' \
+        | sed 's/^[ \t]*//')"
+    log_notice "WSREP: Recovered position $start_pos"
+    wsrep_start_position_opt="--wsrep_start_position=$start_pos"
+  fi
+
+  if test -f $err_log && test $logging = 'file';then 
+      echo "Log of wsrep recovery (--wsrep-recover):" >> $err_log
+      cat $wr_logfile >> $err_log
+  elif test $logging = 'syslog';then
+      logger -t "$syslog_tag_mysqld_safe" -p "$priority" \
+          "Log of wsrep recovery (--wsrep-recover):"
+      logger -t "$syslog_tag_mysqld_safe" -p "$priority" < $wr_logfile
+  fi
+
+  rm $wr_logfile
+
+  return $ret
+}
+
 parse_arguments() {
   # We only need to pass arguments through to the server if we don't
   # handle them here.  So, we collect unrecognized options (passed on
@@ -240,10 +341,10 @@ parse_arguments() {
     # the parameter after "=", or the whole $arg if no match
     val=`echo "$arg" | sed -e 's;^--[^=]*=;;'`
     # what's before "=", or the whole $arg if no match
-    optname=`echo "$arg" | sed -e 's/^\(--[^=]*\)=.*$/\1/'`
+    optname=`echo "$arg" | sed -e 's;^\(--[^=]*\)=.*$;\1;'`
     # replace "_" by "-" ; mysqld_safe must accept "_" like mysqld does.
     optname_subst=`echo "$optname" | sed 's/_/-/g'`
-    arg=`echo $arg | sed "s/^$optname/$optname_subst/"`
+    arg=`echo $arg | sed "s;^$optname;$optname_subst;"`
     case "$arg" in
       # these get passed explicitly to mysqld
       --basedir=*) MY_BASEDIR_VERSION="$val" ;;
@@ -306,7 +407,17 @@ parse_arguments() {
       --skip-syslog) want_syslog=0 ;;
       --syslog-tag=*) syslog_tag="$val" ;;
       --timezone=*) TZ="$val"; export TZ; ;;
+      --wsrep[-_]urls=*) wsrep_urls="$val"; ;;
+      --wsrep-data-home-dir=*) wsrep_data_home_dir="$val"; ;;
       --flush-caches=*) flush_caches="$val" ;;
+      --exit-on-recover-fail) resume_on_fail=0 ;;
+      --wsrep[-_]provider=*)
+        if test -n "$val" && test "$val" != "none"
+        then
+          wsrep_restart=0
+        fi
+        append_arg_to_args "$arg"
+        ;;
 
       --help) usage ;;
 
@@ -543,6 +654,9 @@ if test -x "$MY_BASEDIR_VERSION/bin/my_print_defaults" ; then
   print_defaults="$MY_BASEDIR_VERSION/bin/my_print_defaults"
 elif test -x "@bindir@/my_print_defaults" ; then
   print_defaults="@bindir@/my_print_defaults"
+elif test -x @bindir@/mysql_print_defaults
+then
+  print_defaults="@bindir@/mysql_print_defaults"
 else
   print_defaults="my_print_defaults"
 fi
@@ -556,7 +670,7 @@ args=
 cd "$oldpwd"
 
 SET_USER=2
-parse_arguments `$print_defaults $defaults --loose-verbose mysqld server`
+parse_arguments `$print_defaults $defaults --loose-verbose mysqld server | sed 's/\s//g'`
 if test $SET_USER -eq 2
 then
   SET_USER=0
@@ -627,6 +741,34 @@ else
 fi
 plugin_dir="${plugin_dir}${PLUGIN_VARIANT}"
 
+# A pid file is created for the mysqld_safe process. This file protects the
+# server instance resources during race conditions.
+safe_pid="$DATADIR/mysqld_safe.pid"
+if test -f $safe_pid
+then
+  PID=`cat "$safe_pid"`
+  if @CHECK_PID@
+  then
+    if @FIND_PROC@
+    then
+      log_error "A mysqld_safe process already exists"
+      exit 1
+    fi
+  fi
+  if [ ! -h "$safe_pid" ]; then
+    rm -f "$safe_pid"
+  fi
+  if test -f "$safe_pid"
+  then
+    log_error "Fatal error: Can't remove the mysqld_safe pid file"
+    exit 1
+  fi
+fi
+
+# Insert pid proerply into the pid file.
+ps -e | grep  [m]ysqld_safe | awk '{print $1}' | sed -n 1p > $safe_pid
+# End of mysqld_safe pid(safe_pid) check.
+
 # Determine what logging facility to use
 
 # Ensure that 'logger' exists, if it's requested
@@ -636,6 +778,9 @@ then
   if [ $? -ne 0 ]
   then
     log_error "--syslog requested, but no 'logger' program found.  Please ensure that 'logger' is in your PATH, or do not specify the --syslog option to mysqld_safe."
+    if [ ! -h "$safe_pid" ]; then
+      rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+    fi
     exit 1
   fi
 fi
@@ -709,6 +854,8 @@ then
 
   append_arg_to_args "--log-error=$err_log_append"
 
+  # Log to err_log file
+  log_notice "Logging to '$err_log'."
   if [ $want_syslog -eq 1 ]
   then
     logging=both
@@ -782,8 +929,13 @@ safe_mysql_unix_port=${mysql_unix_port:-${MYSQL_UNIX_PORT:-@MYSQL_UNIX_ADDR@}}
 mysql_unix_port_dir=`dirname $safe_mysql_unix_port`
 if [ ! -d $mysql_unix_port_dir ]
 then
-  log_error "Directory '$mysql_unix_port_dir' for UNIX socket file don't exists."
-  exit 1
+  if [ ! -h $mysql_unix_port_dir ];
+  then
+    install -d -m 0755 -o $user $mysql_unix_port_dir
+  else
+    log_error "Directory '$mysql_unix_port_dir' for UNIX socket file don't exists."
+    exit 1
+  fi
 fi
 
 # If the user doesn't specify a binary, we assume name "mysqld"
@@ -799,6 +951,9 @@ does not exist or is not executable. Please cd to the mysql installation
 directory and restart this script from there as follows:
 ./bin/mysqld_safe&
 See http://dev.mysql.com/doc/mysql/en/mysqld-safe.html for more information"
+  if [ ! -h "$safe_pid" ]; then
+    rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+  fi
   exit 1
 fi
 
@@ -894,6 +1049,9 @@ then
     if @FIND_PROC@
     then    # The pid contains a mysqld process
       log_error "A mysqld process already exists"
+      if [ ! -h "$safe_pid" ]; then
+        rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+      fi
       exit 1
     fi
   fi
@@ -1038,7 +1196,8 @@ do
 done
 cmd="$cmd $args"
 # Avoid 'nohup: ignoring input' warning
-test -n "$NOHUP_NICENESS" && cmd="$cmd < /dev/null"
+nohup_redir=""
+test -n "$NOHUP_NICENESS" && nohup_redir=" < /dev/null"
 
 log_notice "Starting $MYSQLD daemon with databases from $DATADIR"
 
@@ -1048,15 +1207,66 @@ fast_restart=0
 max_fast_restarts=5
 # flag whether a usable sleep command exists
 have_sleep=1
+
+# maximum number of wsrep restarts
+max_wsrep_restarts=0
+
+if [ $wsrep_data_home_dir ];then 
+    grastate_loc="$wsrep_data_home_dir/grastate.dat"
+else 
+    grastate_loc="${DATADIR}/grastate.dat"
+fi
+
 while true
 do
+  # Some extra safety
+  if [ ! -h "$safe_mysql_unix_port" ]; then
+    rm -f "$safe_mysql_unix_port"
+  fi
+  if [ ! -h "$pid_file" ]; then
+    rm -f "$pid_file"
+  fi
+  if [ ! -h "$pid_file.shutdown" ]; then
+     rm -f  "$pid_file.shutdown"
+  fi
+
   start_time=`date +%M%S`
-  eval_log_error "$cmd"
-  if [ $? -eq 16 ] ; then
-    dont_restart_mysqld=false
-    echo "Restarting mysqld..."
+
+  # This file is checked for empty directory because 
+  # a) Not having this file means the wsrep-start-position is useless - lp:1112724
+  # b) Otherwise I have to check if directory is empty sans a few files like 
+  # error log and others, #a is simpler.
+  if [ -e $grastate_loc ];then
+  # this sets wsrep_start_position_opt
+  wsrep_recover_position "$cmd"
+  else 
+    log_notice "Skipping wsrep-recover for empty datadir: ${DATADIR}"
+    log_notice "Assigning 00000000-0000-0000-0000-000000000000:-1 to wsrep_start_position"
+    wsrep_start_position_opt="--wsrep_start_position='00000000-0000-0000-0000-000000000000:-1'"
+  fi
+
+  retcode=$?
+
+  if test $retcode -eq 2;then
+      if  test $resume_on_fail -eq 1;then
+        log_notice "wsrep-recovery has failed to recover, continuing with startup"
+        wsrep_start_position_opt=""
+      else 
+        log_error " --exit-on-recover-fail is provided, bailing out"
+        exit 2
+      fi
+  elif test $retcode -ne 0;then
+      log_error "Unknown error: $retcode"
+      exit $retcode
+  fi
+
+  [ -n "$wsrep_urls" ] && url=`wsrep_pick_url $wsrep_urls` # check connect address
+
+  if [ -z "$url" ]
+  then
+    eval_log_error "$cmd $wsrep_start_position_opt $nohup_redir"
   else
-    dont_restart_mysqld=true
+    eval_log_error "$cmd $wsrep_start_position_opt --wsrep_cluster_address=$url $nohup_redir"
   fi
 
   # hypothetical: log was renamed but not
@@ -1162,14 +1372,18 @@ do
       I=`expr $I + 1`
     done
   fi
-  if [ ! -h "$pid_file" ]; then
-    rm -f "$pid_file"
-  fi
-  if [ ! -h "$safe_mysql_unix_port" ]; then
-    rm -f "$safe_mysql_unix_port"
-  fi
-  if [ ! -h "$pid_file.shutdown" ]; then
-    rm -f "$pid_file.shutdown"
+
+  if [ -n "$wsrep_restart" ]
+  then
+    if [ $wsrep_restart -le $max_wsrep_restarts ]
+    then
+      wsrep_restart=`expr $wsrep_restart + 1`
+      log_notice "WSREP: sleeping 15 seconds before restart"
+      sleep 15
+    else
+      log_notice "WSREP: not restarting wsrep node automatically"
+      break
+    fi
   fi
   log_notice "mysqld restarted"
 done

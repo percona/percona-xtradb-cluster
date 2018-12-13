@@ -1,0 +1,15 @@
+# xbstream+nc+compress+progress+time+encrypt2+threads
+[xtrabackup]
+compress
+compact
+parallel=4
+compress-threads=4
+
+[sst]
+streamfmt=xbstream
+rlimit=2m
+time=1
+progress=1
+encrypt=2
+tca=/tmp/certs/node2.crt
+tcert=/tmp/certs/node1.pem

@@ -2901,7 +2901,20 @@ void Item_func_rand::seed_random(Item *arg) {
     TODO: do not do reinit 'rand' for every execute of PS/SP if
     args[0] is a constant.
   */
+#ifdef WITH_WSREP
+  uint32 tmp;
+  if (WSREP(current_thd)) {
+    /* This ensures same random value is assigned to replication transaction. */
+    if (current_thd->wsrep_exec_mode == REPL_RECV)
+      tmp = current_thd->wsrep_rand;
+    else
+      tmp = current_thd->wsrep_rand = (uint32)arg->val_int();
+  } else {
+    tmp = (uint32)arg->val_int();
+  }
+#else
   uint32 tmp = (uint32)arg->val_int();
+#endif /* WITH_WSREP */
   randominit(rand, (uint32)(tmp * 0x10001L + 55555555L),
              (uint32)(tmp * 0x10000001L));
 }
@@ -4489,6 +4502,40 @@ longlong Item_func_get_lock::val_int() {
   DBUG_ENTER("Item_func_get_lock::val_int");
 
   null_value = true;
+
+#ifdef WITH_WSREP
+  bool block = false;
+
+  switch (pxc_strict_mode) {
+    case PXC_STRICT_MODE_DISABLED:
+    case PXC_STRICT_MODE_MASTER:
+      /* Do nothing */
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN(
+          "Percona-XtraDB-Cluster doesn't recommend use of"
+          " GET_LOCK with pxc_strict_mode = PERMISSIVE");
+      push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                          "Percona-XtraDB-Cluster doesn't recommend use of"
+                          " GET_LOCK with pxc_strict_mode = PERMISSIVE");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    default:
+      block = true;
+      WSREP_ERROR(
+          "Percona-XtraDB-Cluster prohibits use of GET_LOCK"
+          " with pxc_strict_mode = ENFORCING");
+      char message[1024];
+      sprintf(message,
+              "Percona-XtraDB-Cluster prohibits use of GET_LOCK"
+              " with pxc_strict_mode = ENFORCING");
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+      break;
+  }
+
+  if (block) DBUG_RETURN(0);
+#endif /* WITH_WSREP */
+
   /*
     In slave thread no need to get locks, everything is serialized. Anyway
     there is no way to make GET_LOCK() work on slave like it did on master
@@ -4592,6 +4639,39 @@ longlong Item_func_release_lock::val_int() {
   DBUG_ENTER("Item_func_release_lock::val_int");
 
   null_value = true;
+
+#ifdef WITH_WSREP
+  bool block = false;
+
+  switch (pxc_strict_mode) {
+    case PXC_STRICT_MODE_DISABLED:
+    case PXC_STRICT_MODE_MASTER:
+      /* Do nothing */
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN(
+          "Percona-XtraDB-Cluster doesn't recommend use of"
+          " RELEASE_LOCK with pxc_strict_mode = PERMISSIVE");
+      push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                          "Percona-XtraDB-Cluster doesn't recommend use of"
+                          " RELEASE_LOCK with pxc_strict_mode = PERMISSIVE");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    default:
+      block = true;
+      WSREP_ERROR(
+          "Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK"
+          " with pxc_strict_mode = ENFORCING");
+      char message[1024];
+      sprintf(message,
+              "Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK"
+              " with pxc_strict_mode = ENFORCING");
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+      break;
+  }
+
+  if (block) DBUG_RETURN(0);
+#endif /* WITH_WSREP */
 
   if (check_and_convert_ull_name(name, res)) DBUG_RETURN(0);
 

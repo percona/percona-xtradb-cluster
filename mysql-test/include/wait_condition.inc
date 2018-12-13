@@ -46,6 +46,11 @@ if (!$explicit_default_wait_timeout)
 let $wait_condition_reps= 0;
 while ($wait_counter)
 {
+
+# WITH_WSREP
+# PXC: Post MySQL-8.0 seems like this no more needed
+#--error 0,ER_NO_SUCH_TABLE,ER_LOCK_WAIT_TIMEOUT,ER_UNKNOWN_COM_ERROR,ER_LOCK_DEADLOCK
+
     let $success= `$wait_condition`;
     inc $wait_condition_reps;
     if ($success)

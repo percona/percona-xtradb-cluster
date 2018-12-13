@@ -1,0 +1,20 @@
+CREATE TABLE t1 (
+f1 VARCHAR(255) PRIMARY KEY
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+Warnings:
+Warning	3719	'utf8' is currently an alias for the character set UTF8MB3, but will be an alias for UTF8MB4 in a future release. Please consider using UTF8MB4 in order to be unambiguous.
+INSERT INTO t1 VALUES ('abc');
+SELECT f1 = 'abc' FROM t1;
+f1 = 'abc'
+1
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+UPDATE t1 SET f1 = 'klm';
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+UPDATE t1 SET f1 = 'xyz';
+COMMIT;
+COMMIT;
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+include/assert_grep.inc [cluster conflict due to high priority abort for threads]
+DROP TABLE t1;

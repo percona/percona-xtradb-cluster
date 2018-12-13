@@ -168,6 +168,38 @@ sub if_exist {
   return $option->value();
 }
 
+# ---- WITH_WSREP
+package My::Config::Group::ENV;
+our @ISA=qw(My::Config::Group);
+
+use strict;
+use warnings;
+use Carp;
+
+sub new {
+  my ($class, $group_name)= @_;
+  bless My::Config::Group->new($group_name), $class;
+}
+
+#
+# Return value for an option in the group, fail if it does not exist
+#
+sub value {
+  my ($self, $option_name)= @_;
+  my $option= $self->option($option_name);
+
+  if (! defined($option) and defined $ENV{$option_name}) {
+    my $value= $ENV{$option_name};
+    $option= My::Config::Option->new($option_name, $value);
+  }
+
+  croak "No option named '$option_name' in group '$self->{name}'"
+    if ! defined($option);
+
+  return $option->value();
+}
+# ---- WITH_WSREP
+
 package My::Config;
 
 use strict;
@@ -181,8 +213,12 @@ sub new {
   my ($class, $path) = @_;
   my $group_name = undef;
 
-  my $self = bless { groups => [] }, $class;
+# ---- WITH_WSREP
+  my $self = bless { groups => [
+    My::Config::Group::ENV->new('ENV')
+    ] }, $class;
   my $F = IO::File->new($path, "<") or croak "Could not open '$path': $!";
+# ---- WITH_WSREP
 
   while (my $line = <$F>) {
     chomp($line);

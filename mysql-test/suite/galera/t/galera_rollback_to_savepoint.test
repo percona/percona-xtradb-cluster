@@ -1,0 +1,55 @@
+--source include/galera_cluster.inc
+
+#
+# ROLLBACK to savepoint should only rollback the said action.
+#
+
+--connection node_1
+--echo #node-1
+use test;
+
+CREATE TABLE example (id INT NOT NULL PRIMARY KEY, name VARCHAR(64));
+INSERT INTO example VALUES(0, 'zero');
+
+BEGIN;
+INSERT INTO example VALUES(1, 'first!');
+SAVEPOINT savepoint001;
+ROLLBACK TO SAVEPOINT savepoint001;
+INSERT INTO example VALUES(2, 'second');
+COMMIT;
+
+SELECT * FROM example;
+
+--connection node_2
+--echo #node-2
+SELECT * FROM example;
+
+--connection node_1
+--echo #node-1
+DROP TABLE example;
+
+#
+# ROLLBACK to savepoint leading to empty transaction
+#
+--connection node_1
+--echo #node-1
+use test;
+
+CREATE TABLE example (id INT NOT NULL PRIMARY KEY, name VARCHAR(64));
+
+BEGIN;
+SAVEPOINT savepoint001;
+INSERT INTO example VALUES(2, 'second');
+SELECT * FROM example;
+ROLLBACK TO SAVEPOINT savepoint001;
+COMMIT;
+
+SELECT * FROM example;
+
+--connection node_2
+--echo #node-2
+SELECT * FROM example;
+
+--connection node_1
+--echo #node-1
+DROP TABLE example;

@@ -1,0 +1,36 @@
+#
+# wsrep_replicate_myisam
+#
+# save the initial value
+SET @wsrep_replicate_myisam_session_saved = @@session.wsrep_replicate_myisam;
+# default
+SELECT @@global.wsrep_replicate_myisam;
+@@global.wsrep_replicate_myisam
+0
+SELECT @@session.wsrep_replicate_myisam;
+@@session.wsrep_replicate_myisam
+0
+
+# scope and valid values
+SET @@session.wsrep_replicate_myisam=OFF;
+SELECT @@session.wsrep_replicate_myisam;
+@@session.wsrep_replicate_myisam
+0
+SET @@session.wsrep_replicate_myisam=ON;
+SELECT @@session.wsrep_replicate_myisam;
+@@session.wsrep_replicate_myisam
+1
+SET @@session.wsrep_replicate_myisam=default;
+SELECT @@session.wsrep_replicate_myisam;
+@@session.wsrep_replicate_myisam
+0
+
+# invalid values
+SET @@session.wsrep_replicate_myisam=NULL;
+ERROR 42000: Variable 'wsrep_replicate_myisam' can't be set to the value of 'NULL'
+SET @@session.wsrep_replicate_myisam='junk';
+ERROR 42000: Variable 'wsrep_replicate_myisam' can't be set to the value of 'junk'
+
+# restore the initial values
+SET @@session.wsrep_replicate_myisam = @wsrep_replicate_myisam_session_saved;
+# End of test

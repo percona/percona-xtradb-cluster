@@ -1,0 +1,331 @@
+#
+# The purpose of this test is to test the gcache's PageStore cleanup() policy.
+# We will test only the node that the queries are directed to.  The other
+# nodes will also follow the policy but due to the way the protocol works, the
+# actual cleanup code may be delayed.
+#
+# So we will look at the behavior after modifying the gcache.keep_pages_size
+# and gcache.keep_pages_count variables.
+#
+
+--source include/galera_cluster.inc
+--source include/force_restart.inc
+
+--connection node_1
+
+#
+# Test setup
+#
+# cnf file sets "gcache.size=1M;gcache.page_size=1M"
+#
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY AUTO_INCREMENT, f2 LONGBLOB);
+
+--connection node_1
+--let $wsrep_provider_options_orig_1 = `SELECT @@wsrep_provider_options`
+
+--connection node_2
+--let $wsrep_provider_options_orig_2 = `SELECT @@wsrep_provider_options`
+
+--connection node_1
+--let $MYSQLD_DATADIR=`SELECT @@datadir`
+
+#
+# (1) Test default behavior (look at default values)
+#
+# keep_pages_size = 0, keep_pages_count = 0 (default)
+#
+# This will keep accumulating pages until the static limits
+# in index_purge_required() are exceeded.
+#
+
+# There should't be any pages yet
+#
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000000
+--source suite/galera/include/galera_file_should_not_exist.inc
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 4000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# We've inserted some data larger than the gcache size
+# so there should be one page
+#
+--file_exists '$MYSQLD_DATADIR/gcache.page.000000';
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 4000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 2 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# We've inserted another page larger than the gcache
+# size.  Due to the static limits in index_purge_required()
+# these pages will not be removed.
+#
+--file_exists "$MYSQLD_DATADIR/gcache.page.000000";
+--file_exists "$MYSQLD_DATADIR/gcache.page.000001";
+
+#
+# (2) keep_pages_size > 0, keep_pages_count = 0
+#
+SET GLOBAL wsrep_provider_options = 'gcache.keep_pages_size=2M;gcache.keep_pages_count=0';
+
+--connection node_2
+SET GLOBAL wsrep_provider_options = 'gcache.keep_pages_size=2M;gcache.keep_pages_count=0';
+--connection node_1
+
+# Both pages are still in use (their seqno's are still in the gcache).  To force
+# a removal, create another transaction.
+#
+INSERT INTO t1(f2) VALUES(REPEAT('x', 4));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 3 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# The two pages will meet the cleanup criteria and will be removed.
+#
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000000
+--source suite/galera/include/galera_file_should_not_exist.inc
+
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000001
+--source suite/galera/include/galera_file_should_not_exist.inc
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 4000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 4 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# Transaction larger than gcache size, creates a page
+#
+--file_exists "$MYSQLD_DATADIR/gcache.page.000002";
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 4000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# Creating another large transaction, but this will exceed
+# the limits so the first page will be deleted.
+#
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000002
+--source suite/galera/include/galera_file_should_not_exist.inc
+--file_exists "$MYSQLD_DATADIR/gcache.page.000003";
+
+#
+# (3) keep_pages_size = 0, keep_pages_count > 0
+# (3a) gcache.page_size=1M (first page will be deleted)
+# (3b) gcache.page_size=4M (multiple pages will be kept)
+#
+
+#
+# Test 3a
+#
+SET GLOBAL wsrep_provider_options = 'gcache.keep_pages_size=0;gcache.keep_pages_count=2';
+
+--connection node_2
+SET GLOBAL wsrep_provider_options = 'gcache.keep_pages_size=0;gcache.keep_pages_count=2';
+--connection node_1
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 4000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 6 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# This adds a new page
+#
+--file_exists "$MYSQLD_DATADIR/gcache.page.000003";
+--file_exists "$MYSQLD_DATADIR/gcache.page.000004";
+
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000005
+--source suite/galera/include/galera_file_should_not_exist.inc
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 4000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 7 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# This adds a new page and the first page will be deleted.
+#
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000003
+--source suite/galera/include/galera_file_should_not_exist.inc
+
+--file_exists "$MYSQLD_DATADIR/gcache.page.000004";
+--file_exists "$MYSQLD_DATADIR/gcache.page.000005";
+
+#
+# Test 3b
+#
+SET GLOBAL wsrep_provider_options = 'gcache.page_size=4M';
+
+--connection node_2
+SET GLOBAL wsrep_provider_options = 'gcache.page_size=4M';
+--connection node_1
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 4000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 8 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# Still maintains two pages
+#
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000004
+--source suite/galera/include/galera_file_should_not_exist.inc
+
+--file_exists "$MYSQLD_DATADIR/gcache.page.000005";
+--file_exists "$MYSQLD_DATADIR/gcache.page.000006";
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 4000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 9 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# We should see two pages since the keep_pages_count=2
+#
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000005
+--source suite/galera/include/galera_file_should_not_exist.inc
+
+--file_exists "$MYSQLD_DATADIR/gcache.page.000006";
+--file_exists "$MYSQLD_DATADIR/gcache.page.000007";
+
+#
+# (4) keep_pages_size > 0, keep_pages_count > 0, keep_pages_size > keep_pages_count
+# keep_pages_size > (keep_page_count * page_size)
+#
+SET GLOBAL wsrep_provider_options = 'gcache.keep_pages_size=3M;gcache.keep_pages_count=2';
+SET GLOBAL wsrep_provider_options = 'gcache.page_size=1M';
+
+--connection node_2
+SET GLOBAL wsrep_provider_options = 'gcache.keep_pages_size=3M;gcache.keep_pages_count=2';
+SET GLOBAL wsrep_provider_options = 'gcache.page_size=1M';
+--connection node_1
+
+# Here we expect one file (to meet both constraints)
+#
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000006
+--source suite/galera/include/galera_file_should_not_exist.inc
+--file_exists "$MYSQLD_DATADIR/gcache.page.000007";
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 1000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 10 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000007
+--source suite/galera/include/galera_file_should_not_exist.inc
+--file_exists "$MYSQLD_DATADIR/gcache.page.000008";
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 1000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 11 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# These files are under the limits, so we should have
+# two files
+#
+--file_exists "$MYSQLD_DATADIR/gcache.page.000008";
+--file_exists "$MYSQLD_DATADIR/gcache.page.000009";
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 1000000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 12 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+# Similarly, still under the limits, should have
+# two files.
+#
+--file_exists "$MYSQLD_DATADIR/gcache.page.000009";
+--file_exists "$MYSQLD_DATADIR/gcache.page.000010";
+
+#
+# (5) keep_pages_size > 0, keep_pages_count > 0, keep_pages_size < keep_pages_count
+# keep_pages_size < (keep_page_count * page_size)
+#
+# Note: The order of the options is important!  Changing the options forces a
+# cleanup of the gcache pagestore to be run.
+#
+SET GLOBAL wsrep_provider_options = 'gcache.keep_pages_count=3;gcache.keep_pages_size=2M;';
+SET GLOBAL wsrep_provider_options = 'gcache.page_size=1M';
+
+--connection node_2
+SET GLOBAL wsrep_provider_options = 'gcache.keep_pages_count=3;gcache.keep_pages_size=2M;';
+SET GLOBAL wsrep_provider_options = 'gcache.page_size=1M';
+--connection node_1
+
+--file_exists "$MYSQLD_DATADIR/gcache.page.000009";
+--file_exists "$MYSQLD_DATADIR/gcache.page.000010";
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 1500000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 13 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000009
+--source suite/galera/include/galera_file_should_not_exist.inc
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000010
+--source suite/galera/include/galera_file_should_not_exist.inc
+--file_exists "$MYSQLD_DATADIR/gcache.page.000011";
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 1500000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 14 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000011
+--source suite/galera/include/galera_file_should_not_exist.inc
+--file_exists "$MYSQLD_DATADIR/gcache.page.000012";
+
+INSERT INTO t1(f2) VALUES(REPEAT('x', 1500000));
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 15 FROM t1;
+--source include/wait_condition.inc
+--sleep 0.5
+--connection node_1
+
+--let $galera_filename= $MYSQLD_DATADIR/gcache.page.000012
+--source suite/galera/include/galera_file_should_not_exist.inc
+--file_exists "$MYSQLD_DATADIR/gcache.page.000013";
+
+#
+# Test cleanup
+#
+DROP TABLE t1;
+
+--connection node_1
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig_1';
+--enable_query_log
+
+--connection node_2
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig_2';
+--enable_query_log
+
+

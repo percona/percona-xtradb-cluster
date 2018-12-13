@@ -684,12 +684,50 @@ static Sys_var_long Sys_pfs_error_size(
 
 #endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
 
+#ifdef WITH_WSREP
+
+/*
+  We need to keep the original values set by the user, as they will
+  be lost if wsrep_auto_increment_control set to 'ON':
+*/
+static bool update_auto_increment_increment(sys_var *, THD *thd,
+                                            enum_var_type type) {
+  if (type == OPT_GLOBAL)
+    global_system_variables.saved_auto_increment_increment =
+        global_system_variables.auto_increment_increment;
+  else
+    thd->variables.saved_auto_increment_increment =
+        thd->variables.auto_increment_increment;
+  return false;
+}
+
+/*
+  We need to keep the original values set by the user, as they will
+  be lost if wsrep_auto_increment_control set to 'ON':
+*/
+static bool update_auto_increment_offset(sys_var *, THD *thd,
+                                         enum_var_type type) {
+  if (type == OPT_GLOBAL)
+    global_system_variables.saved_auto_increment_offset =
+        global_system_variables.auto_increment_offset;
+  else
+    thd->variables.saved_auto_increment_offset =
+        thd->variables.auto_increment_offset;
+  return false;
+}
+
+#endif /* WITH_WSREP */
+
 static Sys_var_ulong Sys_auto_increment_increment(
     "auto_increment_increment",
     "Auto-increment columns are incremented by this",
     HINT_UPDATEABLE SESSION_VAR(auto_increment_increment), CMD_LINE(OPT_ARG),
     VALID_RANGE(1, 65535), DEFAULT(1), BLOCK_SIZE(1), NO_MUTEX_GUARD,
+#ifdef WITH_WSREP
+    IN_BINLOG, ON_CHECK(0), ON_UPDATE(update_auto_increment_increment));
+#else
     IN_BINLOG);
+#endif /* WITH_WSREP */
 
 static Sys_var_ulong Sys_auto_increment_offset(
     "auto_increment_offset",
@@ -697,7 +735,11 @@ static Sys_var_ulong Sys_auto_increment_offset(
     "auto-increment-increment != 1",
     HINT_UPDATEABLE SESSION_VAR(auto_increment_offset), CMD_LINE(OPT_ARG),
     VALID_RANGE(1, 65535), DEFAULT(1), BLOCK_SIZE(1), NO_MUTEX_GUARD,
+#ifdef WITH_WSREP
+    IN_BINLOG, ON_CHECK(0), ON_UPDATE(update_auto_increment_offset));
+#else
     IN_BINLOG);
+#endif /* WITH_WSREP */
 
 static Sys_var_bool Sys_windowing_use_high_precision(
     "windowing_use_high_precision",
@@ -937,6 +979,69 @@ static bool check_super_outside_trx_outside_sf_outside_sp(sys_var *self,
 
 static bool binlog_format_check(sys_var *self, THD *thd, set_var *var) {
   if (check_has_super(self, thd, var)) return true;
+
+#ifdef WITH_WSREP
+
+  bool block = false;
+
+  bool stmt_or_mixed =
+      (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
+       var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED);
+
+  if (WSREP(thd) && stmt_or_mixed && var->type == OPT_GLOBAL) {
+    /* Toggline binlog-format at GLOBAL level to MIXED/STATEMENT
+    is not allowed. pxc-string-mode check will be evaluated
+    only for SESSION level setting. */
+    WSREP_ERROR(
+        "Percona-XtraDB-Cluster prohibits setting"
+        " binlog_format to STATEMENT or MIXED at global level");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.ulonglong_value == BINLOG_FORMAT_STMT
+                 ? "STATEMENT"
+                 : "MIXED");
+    return true;
+  }
+
+  /* pxc-strict-mode enforcement. */
+  if (WSREP(thd)) {
+    switch (pxc_strict_mode) {
+      case PXC_STRICT_MODE_DISABLED:
+        break;
+      case PXC_STRICT_MODE_PERMISSIVE: {
+        if (stmt_or_mixed) {
+          WSREP_WARN(
+              "Percona-XtraDB-Cluster doesn't recommend setting"
+              " binlog_format to STATEMENT or MIXED"
+              " with pxc_strict_mode = PERMISSIVE");
+          push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                              "Percona-XtraDB-Cluster doesn't recommend setting"
+                              " binlog_format to STATEMENT or MIXED"
+                              " with pxc_strict_mode = PERMISSIVE");
+        }
+        break;
+      }
+      case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_MASTER:
+      default: {
+        if (stmt_or_mixed) {
+          WSREP_ERROR(
+              "Percona-XtraDB-Cluster prohibits setting"
+              " binlog_format to STATEMENT or MIXED"
+              " with pxc_strict_mode = ENFORCING or MASTER");
+          char message[1024];
+          sprintf(message,
+                  "Percona-XtraDB-Cluster prohibits setting"
+                  " binlog_format to STATEMENT or MIXED"
+                  " with pxc_strict_mode = ENFORCING or MASTER");
+          my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+          block = true;
+        }
+      }
+    }
+  }
+
+  if (block) return block;
+#endif /* WITH_WSREP */
 
   if (!var->is_global_persist()) {
     /*
@@ -3041,6 +3146,9 @@ static bool check_require_secure_transport(
 
 static bool fix_read_only(sys_var *self, THD *thd, enum_var_type) {
   bool result = true;
+#ifdef WITH_WSREP
+  bool own_lock = false;
+#endif /* WITH_WSREP */
   bool new_read_only = read_only;  // make a copy before releasing a mutex
   DBUG_ENTER("sys_var_opt_readonly::update");
 
@@ -3086,7 +3194,12 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type) {
   read_only = opt_readonly;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
+#ifdef WITH_WSREP
+  if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
   if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif /* WITH_WSREP */
+
     goto end_with_mutex_unlock;
 
   if ((result = thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -3099,7 +3212,11 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type) {
 
 end_with_read_lock:
   /* Release the lock */
+#ifdef WITH_WSREP
+  if (own_lock) thd->global_read_lock.unlock_global_read_lock(thd);
+#else
   thd->global_read_lock.unlock_global_read_lock(thd);
+#endif /* WITH_WSREP */
 end_with_mutex_unlock:
   mysql_mutex_lock(&LOCK_global_system_variables);
 end:
@@ -3108,6 +3225,11 @@ end:
 }
 
 static bool fix_super_read_only(sys_var *, THD *thd, enum_var_type type) {
+
+#ifdef WITH_WSREP
+  bool own_lock= false;
+#endif /* WITH_WSREP */
+
   DBUG_ENTER("sys_var_opt_super_readonly::update");
 
   /* return if no changes: */
@@ -3142,7 +3264,11 @@ static bool fix_super_read_only(sys_var *, THD *thd, enum_var_type type) {
   super_read_only = opt_super_readonly;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
+#ifdef WITH_WSREP
+  if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
   if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif /* WITH_WSREP */
     goto end_with_mutex_unlock;
 
   if ((result = thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -3151,8 +3277,13 @@ static bool fix_super_read_only(sys_var *, THD *thd, enum_var_type type) {
   result = false;
 
 end_with_read_lock:
+#ifdef WITH_WSREP
+  /* Release the lock */
+  if (own_lock) thd->global_read_lock.unlock_global_read_lock(thd);
+#else
   /* Release the lock */
   thd->global_read_lock.unlock_global_read_lock(thd);
+#endif /* WITH_WSREP */
 end_with_mutex_unlock:
   mysql_mutex_lock(&LOCK_global_system_variables);
 end:
@@ -3456,6 +3587,26 @@ static bool check_not_null_not_empty(sys_var *self, THD *thd, set_var *var) {
   /** empty value ('') is not allowed */
   res = var->value ? var->value->val_str(&str) : NULL;
   if (res && res->is_empty()) return true;
+
+#ifdef WITH_WSREP
+  /* If PXC node is acting as async slave and this slave is trying to enforce
+  order based on master replication then it could interfere with galera
+  commit monitor semantics. Disabling it for now.
+  This can be re-enabled but we just need enough testing for it */
+  if (WSREP(thd) && var->save_result.ulonglong_value == 1) {
+    WSREP_ERROR(
+        "Percona-XtraDB-Cluster prohibits enabling"
+        " slave_preserve_commit_order as it conflicts with galera"
+        " multi-master commit order semantics");
+    char message[1024];
+    sprintf(message,
+            "Percona-XtraDB-Cluster prohibits enabling"
+            " slave_preserve_commit_order as it conflicts with galera"
+            " multi-master commit order semantics");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+    return true;
+  }
+#endif /* WITH_WSREP */
 
   return false;
 }
@@ -4505,6 +4656,44 @@ static Sys_var_uint Sys_threadpool_max_threads(
   @retval   true    Error.
 */
 static bool check_transaction_isolation(sys_var *, THD *thd, set_var *var) {
+#ifdef WITH_WSREP
+  bool block = false;
+
+  enum_tx_isolation new_level =
+      (enum_tx_isolation)var->save_result.ulonglong_value;
+
+  if (new_level == ISO_SERIALIZABLE) {
+    switch (pxc_strict_mode) {
+      case PXC_STRICT_MODE_DISABLED:
+      case PXC_STRICT_MODE_MASTER:
+        break;
+      case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN(
+            "Percona-XtraDB-Cluster doesn't recommend using"
+            " SERIALIZABLE isolation with pxc_strict_mode = PERMISSIVE");
+        push_warning_printf(
+            thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+            "Percona-XtraDB-Cluster doesn't recommend using"
+            " SERIALIZABLE isolation with pxc_strict_mode = PERMISSIVE");
+        break;
+      case PXC_STRICT_MODE_ENFORCING:
+        block = true;
+        WSREP_ERROR(
+            "Percona-XtraDB-Cluster doesn't recommend using"
+            " SERIALIZABLE isolation"
+            " with pxc_strict_mode = ENFORCING");
+        char message[1024];
+        sprintf(message,
+                "Percona-XtraDB-Cluster doesn't recommend using"
+                " SERIALIZABLE isolation"
+                " with pxc_strict_mode = ENFORCING");
+        my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+    }
+  }
+
+  if (block) return block;
+#endif /* WITH_WSREP */
+
   if (var->type == OPT_DEFAULT &&
       (thd->in_active_multi_stmt_transaction() || thd->in_sub_stmt)) {
     DBUG_ASSERT(thd->in_multi_stmt_transaction_mode() || thd->in_sub_stmt);
@@ -4749,6 +4938,14 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type) {
 
     if (trans_commit_stmt(thd) || trans_commit(thd)) {
       thd->variables.option_bits &= ~OPTION_AUTOCOMMIT;
+#ifdef WITH_WSREP
+      // TODO: check if this release is needed ?
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG(
+          "Transaction commit failed while toggling autocommit."
+          " Release MDL trx lock for thread: %u",
+          thd->thread_id());
+#endif /* WITH_WSREP */
       return true;
     }
     /*
@@ -5570,9 +5767,55 @@ static Sys_var_bool Sys_slow_query_log(
     GLOBAL_VAR(opt_slow_log), CMD_LINE(OPT_ARG), DEFAULT(false), NO_MUTEX_GUARD,
     NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(fix_slow_log_state));
 
+#ifdef WITH_WSREP
+static bool check_not_empty_set(sys_var *, THD *thd, set_var *var) {
+  if (var->save_result.ulonglong_value == 0) return true;
+
+  /* Trying to switch off log_output or setting it to FILE is allowed. */
+  if (var->save_result.ulonglong_value == LOG_NONE ||
+      var->save_result.ulonglong_value == LOG_FILE)
+    return false;
+
+  bool block = false;
+
+  switch (pxc_strict_mode) {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN(
+          "Percona-XtraDB-Cluster doesn't recommend setting"
+          " log_output to TABLE"
+          " with pxc_strict_mode = PERMISSIVE");
+      push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                          "Percona-XtraDB-Cluster doesn't recommend setting"
+                          " log_output to TABLE"
+                          " with pxc_strict_mode = PERMISSIVE");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+      block = true;
+      WSREP_WARN(
+          "Percona-XtraDB-Cluster prohibits setting"
+          " log_output to TABLE"
+          " with pxc_strict_mode = ENFORCING or MASTER");
+      char message[1024];
+      sprintf(message,
+              "Percona-XtraDB-Cluster prohibits setting"
+              " log_output to TABLE"
+              " with pxc_strict_mode = ENFORCING or MASTER");
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+      break;
+  }
+
+  return block;
+}
+#else
 static bool check_not_empty_set(sys_var *, THD *, set_var *var) {
   return var->save_result.ulonglong_value == 0;
 }
+#endif /* WITH_WSREP */
+
 static bool fix_log_output(sys_var *, THD *, enum_var_type) {
   query_logger.set_handlers(static_cast<uint>(log_output_options));
   return false;
@@ -5801,13 +6044,18 @@ static Sys_var_uint Sys_checkpoint_mts_group(
     VALID_RANGE(32, MTS_MAX_BITS_IN_GROUP), DEFAULT(512), BLOCK_SIZE(8));
 #endif /* DBUG_OFF */
 
+// TODO: sync binlog set 0 for PXC. Should be set when node is running in standalone only.
 static Sys_var_uint Sys_sync_binlog_period(
     "sync_binlog",
     "Synchronously flush binary log to disk after"
     " every #th write to the file. Use 0 to disable synchronous"
     " flushing",
     GLOBAL_VAR(sync_binlog_period), CMD_LINE(REQUIRED_ARG),
+#ifdef WITH_WSREP
+    VALID_RANGE(0, UINT_MAX), DEFAULT(0), BLOCK_SIZE(1));
+#else
     VALID_RANGE(0, UINT_MAX), DEFAULT(1), BLOCK_SIZE(1));
+#endif /* WITH_WSREP */
 
 static Sys_var_uint Sys_sync_masterinfo_period(
     "sync_master_info",
@@ -6565,3 +6813,356 @@ static Sys_var_bool Sys_show_create_table_verbosity(
     "'SHOW CREATE TABLE'.",
     SESSION_VAR(show_create_table_verbosity), CMD_LINE(OPT_ARG), DEFAULT(false),
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0));
+
+#ifdef WITH_WSREP
+
+#include "wsrep_binlog.h"
+#include "wsrep_sst.h"
+#include "wsrep_var.h"
+
+static PolyLock_mutex PLock_wsrep_slave_threads(&LOCK_wsrep_slave_threads);
+static Sys_var_charptr Sys_wsrep_provider(
+    "wsrep_provider", "Path to replication provider library",
+    PREALLOCATED GLOBAL_VAR(wsrep_provider),
+    CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER), IN_FS_CHARSET,
+    DEFAULT(WSREP_NONE), &PLock_wsrep_slave_threads, NOT_IN_BINLOG,
+    ON_CHECK(wsrep_provider_check), ON_UPDATE(wsrep_provider_update));
+
+static Sys_var_charptr Sys_wsrep_provider_options(
+    "wsrep_provider_options", "provider specific options",
+    PREALLOCATED GLOBAL_VAR(wsrep_provider_options),
+    CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER_OPTIONS), IN_FS_CHARSET,
+    DEFAULT(""), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(wsrep_provider_options_check),
+    ON_UPDATE(wsrep_provider_options_update));
+
+static Sys_var_charptr Sys_wsrep_data_home_dir(
+    "wsrep_data_home_dir", "home directory for wsrep provider",
+    READ_ONLY GLOBAL_VAR(wsrep_data_home_dir), CMD_LINE(REQUIRED_ARG),
+    IN_FS_CHARSET, DEFAULT(mysql_real_data_home), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG);
+
+static Sys_var_charptr Sys_wsrep_cluster_name(
+    "wsrep_cluster_name", "Name for the cluster",
+    READ_ONLY GLOBAL_VAR(wsrep_cluster_name), CMD_LINE(REQUIRED_ARG),
+    IN_FS_CHARSET, DEFAULT(WSREP_CLUSTER_NAME), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(wsrep_cluster_name_check), ON_UPDATE(wsrep_cluster_name_update));
+
+static Sys_var_charptr Sys_wsrep_cluster_address(
+    "wsrep_cluster_address", "Address to initially connect to cluster",
+    PREALLOCATED GLOBAL_VAR(wsrep_cluster_address),
+    CMD_LINE(REQUIRED_ARG, OPT_WSREP_CLUSTER_ADDRESS), IN_FS_CHARSET,
+    DEFAULT(""), &PLock_wsrep_slave_threads, NOT_IN_BINLOG,
+    ON_CHECK(wsrep_cluster_address_check),
+    ON_UPDATE(wsrep_cluster_address_update));
+
+static Sys_var_charptr Sys_wsrep_node_name(
+    "wsrep_node_name", "Node name", PREALLOCATED GLOBAL_VAR(wsrep_node_name),
+    CMD_LINE(REQUIRED_ARG), IN_FS_CHARSET, DEFAULT(0), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG, ON_CHECK(wsrep_node_name_check),
+    ON_UPDATE(wsrep_node_name_update));
+
+static Sys_var_charptr Sys_wsrep_node_address(
+    "wsrep_node_address", "Node address",
+    PREALLOCATED GLOBAL_VAR(wsrep_node_address), CMD_LINE(REQUIRED_ARG),
+    IN_FS_CHARSET, DEFAULT(""), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(wsrep_node_address_check), ON_UPDATE(wsrep_node_address_update));
+
+static Sys_var_charptr Sys_wsrep_node_incoming_address(
+    "wsrep_node_incoming_address", "Client connection address",
+    PREALLOCATED GLOBAL_VAR(wsrep_node_incoming_address),
+    CMD_LINE(REQUIRED_ARG), IN_FS_CHARSET, DEFAULT(WSREP_NODE_INCOMING_AUTO),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
+static Sys_var_ulong Sys_wsrep_slave_threads(
+    "wsrep_slave_threads", "Number of slave appliers to launch",
+    GLOBAL_VAR(wsrep_slave_threads), CMD_LINE(REQUIRED_ARG),
+    VALID_RANGE(1, 512), DEFAULT(1), BLOCK_SIZE(1), &PLock_wsrep_slave_threads,
+    NOT_IN_BINLOG, ON_CHECK(NULL), ON_UPDATE(wsrep_slave_threads_update));
+
+static Sys_var_charptr Sys_wsrep_dbug_option("wsrep_dbug_option",
+                                             "DBUG options to provider library",
+                                             GLOBAL_VAR(wsrep_dbug_option),
+                                             CMD_LINE(REQUIRED_ARG),
+                                             IN_FS_CHARSET, DEFAULT(""),
+                                             NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
+static Sys_var_bool Sys_wsrep_debug("wsrep_debug",
+                                      "To enable debug level logging",
+                                      GLOBAL_VAR(wsrep_debug),
+                                      CMD_LINE(OPT_ARG), DEFAULT(false));
+
+static Sys_var_ulong Sys_wsrep_retry_autocommit(
+    "wsrep_retry_autocommit",
+    "Max number of times to retry "
+    "a failed autocommit statement",
+    SESSION_VAR(wsrep_retry_autocommit), CMD_LINE(REQUIRED_ARG),
+    VALID_RANGE(0, 10000), DEFAULT(1), BLOCK_SIZE(1));
+
+static bool update_wsrep_auto_increment_control(sys_var *, THD *thd,
+                                                enum_var_type) {
+  if (wsrep_auto_increment_control) {
+    /*
+      The variables that control auto increment shall be calculated
+      automaticaly based on the size of the cluster. This usually done
+      within the wsrep_view_handler_cb callback. However, if the user
+      manually sets the value of wsrep_auto_increment_control to 'ON',
+      then we should to re-calculate these variables again (because
+      these values may be required before wsrep_view_handler_cb will
+      be re-invoked, which is rarely invoked if the cluster stays in
+      the stable state):
+    */
+    global_system_variables.auto_increment_increment =
+        wsrep_cluster_size ? wsrep_cluster_size : 1;
+    global_system_variables.auto_increment_offset =
+        wsrep_local_index >= 0 ? wsrep_local_index + 1 : 1;
+    thd->variables.auto_increment_increment =
+        global_system_variables.auto_increment_increment;
+    thd->variables.auto_increment_offset =
+        global_system_variables.auto_increment_offset;
+  } else {
+    /*
+      We must restore the last values of the variables that
+      are explicitly specified by the user:
+    */
+    global_system_variables.auto_increment_increment =
+        global_system_variables.saved_auto_increment_increment;
+    global_system_variables.auto_increment_offset =
+        global_system_variables.saved_auto_increment_offset;
+    thd->variables.auto_increment_increment =
+        thd->variables.saved_auto_increment_increment;
+    thd->variables.auto_increment_offset =
+        thd->variables.saved_auto_increment_offset;
+  }
+  return false;
+}
+
+static Sys_var_bool Sys_wsrep_auto_increment_control(
+    "wsrep_auto_increment_control",
+    "To automatically control the "
+    "assignment of autoincrement variables",
+    GLOBAL_VAR(wsrep_auto_increment_control), CMD_LINE(OPT_ARG), DEFAULT(true),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+    ON_UPDATE(update_wsrep_auto_increment_control));
+
+static Sys_var_bool Sys_wsrep_drupal_282555_workaround(
+    "wsrep_drupal_282555_workaround",
+    "To use a workaround for"
+    "bad autoincrement value",
+    GLOBAL_VAR(wsrep_drupal_282555_workaround), CMD_LINE(OPT_ARG),
+    DEFAULT(false));
+
+static Sys_var_charptr sys_wsrep_sst_method(
+    "wsrep_sst_method", "State snapshot transfer method",
+    GLOBAL_VAR(wsrep_sst_method), CMD_LINE(REQUIRED_ARG), IN_FS_CHARSET,
+    DEFAULT(wsrep_sst_method), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(wsrep_sst_method_check), ON_UPDATE(wsrep_sst_method_update));
+
+static Sys_var_charptr Sys_wsrep_sst_receive_address(
+    "wsrep_sst_receive_address",
+    "Address where node is waiting for "
+    "SST contact",
+    GLOBAL_VAR(wsrep_sst_receive_address), CMD_LINE(REQUIRED_ARG),
+    IN_FS_CHARSET, DEFAULT(wsrep_sst_receive_address), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG, ON_CHECK(wsrep_sst_receive_address_check),
+    ON_UPDATE(wsrep_sst_receive_address_update));
+
+static Sys_var_charptr Sys_wsrep_sst_auth(
+    "wsrep_sst_auth", "Authentication for SST connection",
+    PREALLOCATED GLOBAL_VAR(wsrep_sst_auth),
+    CMD_LINE(REQUIRED_ARG, OPT_WSREP_SST_AUTH), IN_FS_CHARSET,
+    DEFAULT(wsrep_sst_auth), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(wsrep_sst_auth_check), ON_UPDATE(wsrep_sst_auth_update));
+
+static Sys_var_charptr Sys_wsrep_sst_donor(
+    "wsrep_sst_donor", "preferred donor node for the SST",
+    GLOBAL_VAR(wsrep_sst_donor), CMD_LINE(REQUIRED_ARG), IN_FS_CHARSET,
+    DEFAULT(""), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(wsrep_sst_donor_check),
+    ON_UPDATE(wsrep_sst_donor_update));
+
+static Sys_var_bool Sys_wsrep_sst_donor_rejects_queries(
+    "wsrep_sst_donor_rejects_queries",
+    "Reject client queries "
+    "when donating state snapshot transfer",
+    GLOBAL_VAR(wsrep_sst_donor_rejects_queries), CMD_LINE(OPT_ARG),
+    DEFAULT(false));
+
+static Sys_var_bool Sys_wsrep_on("wsrep_on", "To enable wsrep replication ",
+                                   SESSION_ONLY(wsrep_on), CMD_LINE(OPT_ARG),
+                                   DEFAULT(true), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+                                   ON_CHECK(wsrep_on_check),
+                                   ON_UPDATE(wsrep_on_update));
+
+static Sys_var_charptr Sys_wsrep_start_position(
+    "wsrep_start_position", "global transaction position to start from ",
+    PREALLOCATED GLOBAL_VAR(wsrep_start_position),
+    CMD_LINE(REQUIRED_ARG, OPT_WSREP_START_POSITION), IN_FS_CHARSET,
+    DEFAULT(wsrep_start_position), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(wsrep_start_position_check),
+    ON_UPDATE(wsrep_start_position_update));
+
+static Sys_var_ulong Sys_wsrep_max_ws_size(
+    "wsrep_max_ws_size", "Max write set size (bytes)",
+    GLOBAL_VAR(wsrep_max_ws_size), CMD_LINE(REQUIRED_ARG),
+    VALID_RANGE(1024, WSREP_MAX_WS_SIZE), DEFAULT(WSREP_MAX_WS_SIZE),
+    BLOCK_SIZE(1), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+    ON_UPDATE(wsrep_max_ws_size_update));
+
+static Sys_var_ulong Sys_wsrep_max_ws_rows("wsrep_max_ws_rows",
+                                           "Max number of rows in write set",
+                                           GLOBAL_VAR(wsrep_max_ws_rows),
+                                           CMD_LINE(REQUIRED_ARG),
+                                           VALID_RANGE(0, 1048576), DEFAULT(0),
+                                           BLOCK_SIZE(1));
+
+static Sys_var_charptr Sys_wsrep_notify_cmd("wsrep_notify_cmd", "",
+                                            GLOBAL_VAR(wsrep_notify_cmd),
+                                            CMD_LINE(REQUIRED_ARG),
+                                            IN_FS_CHARSET, DEFAULT(""),
+                                            NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
+static Sys_var_bool Sys_wsrep_certify_nonPK(
+    "wsrep_certify_nonPK", "Certify tables with no primary key",
+    GLOBAL_VAR(wsrep_certify_nonPK), CMD_LINE(OPT_ARG), DEFAULT(true));
+
+static const char *wsrep_certification_rules_names[] = {"strict", "optimized",
+                                                        NullS};
+static Sys_var_enum Sys_wsrep_certification_rules(
+    "wsrep_certification_rules",
+    "Certification rules to use in the cluster. Possible values are: "
+    "\"strict\": stricter rules that could result in more certification "
+    "failures. "
+    "\"optimized\": relaxed rules that allow more concurrency and "
+    "cause less certification failures.",
+    GLOBAL_VAR(wsrep_certification_rules), CMD_LINE(REQUIRED_ARG),
+    wsrep_certification_rules_names, DEFAULT(WSREP_CERTIFICATION_RULES_STRICT),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0));
+
+static Sys_var_bool Sys_wsrep_causal_reads(
+    "wsrep_causal_reads",
+    "(DEPRECATED) setting this variable is equivalent to setting "
+    "wsrep_sync_wait READ flag",
+    SESSION_VAR(wsrep_causal_reads), CMD_LINE(OPT_ARG), DEFAULT(false),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+    ON_UPDATE(wsrep_causal_reads_update));
+
+static Sys_var_uint Sys_wsrep_sync_wait(
+    "wsrep_sync_wait",
+    "Ensure \"synchronous\" read view before executing an operation of the "
+    "type specified by bitmask: 1 - READ(includes SELECT, SHOW and BEGIN/START "
+    "TRANSACTION); 2 - UPDATE and DELETE; 4 - INSERT and REPLACE",
+    SESSION_VAR(wsrep_sync_wait), CMD_LINE(OPT_ARG),
+    VALID_RANGE(WSREP_SYNC_WAIT_NONE, WSREP_SYNC_WAIT_MAX),
+    DEFAULT(WSREP_SYNC_WAIT_NONE), BLOCK_SIZE(1), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(0), ON_UPDATE(wsrep_sync_wait_update));
+
+static const char *wsrep_OSU_method_names[] = {"TOI", "RSU", NullS};
+static Sys_var_enum Sys_wsrep_OSU_method(
+    "wsrep_OSU_method", "Method for Online Schema Upgrade",
+    SESSION_VAR(wsrep_OSU_method), CMD_LINE(OPT_ARG), wsrep_OSU_method_names,
+    DEFAULT(WSREP_OSU_TOI), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+    ON_UPDATE(0));
+
+static Sys_var_ulong Sys_wsrep_RSU_commit_timeout(
+    "wsrep_RSU_commit_timeout",
+    "Wait for wsrep_RSU_commit_timeout (in micro-seconds) to allow active "
+    "connection to complete COMMIT action before starting RSU",
+    GLOBAL_VAR(wsrep_RSU_commit_timeout), CMD_LINE(OPT_ARG),
+    VALID_RANGE(5000, (LONG_TIMEOUT * 1000000)), DEFAULT(5000), BLOCK_SIZE(1),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0));
+
+static PolyLock_mutex PLock_wsrep_desync(&LOCK_wsrep_desync);
+static Sys_var_bool Sys_wsrep_desync(
+    "wsrep_desync", "To desynchronize the node from the cluster",
+    GLOBAL_VAR(wsrep_desync), CMD_LINE(OPT_ARG), DEFAULT(false),
+    &PLock_wsrep_desync, NOT_IN_BINLOG, ON_CHECK(wsrep_desync_check),
+    ON_UPDATE(wsrep_desync_update));
+
+static const char *wsrep_reject_queries_names[] = {"NONE", "ALL", "ALL_KILL",
+                                                   NullS};
+static Sys_var_enum Sys_wsrep_reject_queries(
+    "wsrep_reject_queries", "Variable to set to reject queries",
+    GLOBAL_VAR(wsrep_reject_queries), CMD_LINE(OPT_ARG),
+    wsrep_reject_queries_names, DEFAULT(WSREP_REJECT_NONE), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(wsrep_reject_queries_update));
+
+static Sys_var_bool Sys_wsrep_recover_datadir(
+    "wsrep_recover", "Recover database state after crash and exit",
+    READ_ONLY GLOBAL_VAR(wsrep_recovery), CMD_LINE(OPT_ARG, OPT_WSREP_RECOVER),
+    DEFAULT(false));
+
+static Sys_var_bool Sys_wsrep_replicate_myisam(
+    "wsrep_replicate_myisam", "To enable myisam replication",
+    SESSION_VAR(wsrep_replicate_myisam), CMD_LINE(OPT_ARG), DEFAULT(false),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(wsrep_replicate_myisam_check),
+    ON_UPDATE(0));
+
+static Sys_var_bool Sys_wsrep_log_conflicts("wsrep_log_conflicts",
+                                              "To log multi-master conflicts",
+                                              GLOBAL_VAR(wsrep_log_conflicts),
+                                              CMD_LINE(OPT_ARG),
+                                              DEFAULT(false));
+
+static Sys_var_bool Sys_wsrep_preordered(
+    "wsrep_preordered", "To enable preordered write set processing",
+    GLOBAL_VAR(wsrep_preordered_opt), CMD_LINE(OPT_ARG), DEFAULT(false));
+
+static Sys_var_bool Sys_wsrep_load_data_splitting(
+    "wsrep_load_data_splitting",
+    "To commit LOAD DATA "
+    "transaction after every 10K rows inserted",
+    GLOBAL_VAR(wsrep_load_data_splitting), CMD_LINE(OPT_ARG), DEFAULT(true));
+
+static Sys_var_bool Sys_wsrep_slave_FK_checks(
+    "wsrep_slave_FK_checks",
+    "Should slave thread do "
+    "foreign key constraint checks",
+    GLOBAL_VAR(wsrep_slave_FK_checks), CMD_LINE(OPT_ARG), DEFAULT(true));
+
+static Sys_var_bool Sys_wsrep_slave_UK_checks(
+    "wsrep_slave_UK_checks",
+    "Should slave thread do "
+    "secondary index uniqueness chesks",
+    GLOBAL_VAR(wsrep_slave_UK_checks), CMD_LINE(OPT_ARG), DEFAULT(false));
+
+static Sys_var_bool Sys_wsrep_restart_slave(
+    "wsrep_restart_slave",
+    "Should MySQL slave be restarted automatically, when node joins back to "
+    "cluster",
+    GLOBAL_VAR(wsrep_restart_slave), CMD_LINE(OPT_ARG), DEFAULT(false));
+
+static Sys_var_bool Sys_wsrep_dirty_reads(
+    "wsrep_dirty_reads", "Allow reads from a node is not in primary component",
+    SESSION_VAR(wsrep_dirty_reads), CMD_LINE(OPT_ARG), DEFAULT(false),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
+static const char *pxc_strict_modes[] = {"DISABLED", "PERMISSIVE", "ENFORCING",
+                                         "MASTER", NullS};
+static Sys_var_enum Sys_pxc_strict_mode(
+    "pxc_strict_mode",
+    "PXC strict mode help control behavior of experimental features",
+    GLOBAL_VAR(pxc_strict_mode), CMD_LINE(OPT_ARG), pxc_strict_modes,
+    DEFAULT(PXC_STRICT_MODE_ENFORCING), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(pxc_strict_mode_check), ON_UPDATE(0));
+
+static const char *pxc_maint_modes[] = {"DISABLED", "SHUTDOWN", "MAINTENANCE",
+                                        NullS};
+static Sys_var_enum Sys_pxc_maint_mode(
+    "pxc_maint_mode", "ProxySQL assisted PXC maintenance mode",
+    GLOBAL_VAR(pxc_maint_mode), CMD_LINE(OPT_ARG), pxc_maint_modes,
+    DEFAULT(PXC_MAINT_MODE_DISABLED), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(pxc_maint_mode_check), ON_UPDATE(pxc_maint_mode_update));
+
+static Sys_var_ulong Sys_pxc_maint_transition_period(
+    "pxc_maint_transition_period",
+    "Period before the shutdown signal is delivered",
+    GLOBAL_VAR(pxc_maint_transition_period), CMD_LINE(REQUIRED_ARG),
+    VALID_RANGE(0, 3600), DEFAULT(10), BLOCK_SIZE(1));
+
+static Sys_var_bool Sys_pxc_encrypt_cluster_traffic(
+    "pxc_encrypt_cluster_traffic", "PXC cluster traffic SSL auto-configuration",
+    GLOBAL_VAR(pxc_encrypt_cluster_traffic), CMD_LINE(OPT_ARG), DEFAULT(false),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
+#endif /* WITH_WSREP */
+

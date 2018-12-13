@@ -1,0 +1,75 @@
+--source include/galera_cluster.inc
+
+#
+# Ensure that transactions that do not write anything do not cause the wsrep_last_applied counter to advance
+#
+
+# Empty transaction
+
+--connection node_1
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+--let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+--connection node_1
+
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+COMMIT;
+
+--connection node_2
+--sleep 1
+--let $wsrep_last_applied_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--disable_query_log
+if ($wsrep_last_applied_before != $wsrep_last_applied_after)
+{
+	--echo "wsrep_last_applied_before:$wsrep_last_applied_before  wsrep_last_applied_after:$wsrep_last_applied_after"
+}
+--eval SELECT $wsrep_last_applied_after = $wsrep_last_applied_before AS wsrep_last_applied_diff;
+--enable_query_log
+
+# START TRANSACTION READ ONLY
+
+--connection node_2
+--let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+--connection node_1
+START TRANSACTION READ ONLY;
+SELECT COUNT(*) = 0 FROM t1;
+COMMIT;
+
+--connection node_2
+--sleep 1
+--let $wsrep_last_applied_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--disable_query_log
+if ($wsrep_last_applied_before != $wsrep_last_applied_after)
+{
+	--echo "wsrep_last_applied_before:$wsrep_last_applied_before  wsrep_last_applied_after:$wsrep_last_applied_after"
+}
+--eval SELECT $wsrep_last_applied_after = $wsrep_last_applied_before AS wsrep_last_applied_diff;
+--enable_query_log
+
+# Ordinary transaction with only SELECTs
+
+--connection node_1
+START TRANSACTION;
+SELECT COUNT(*) = 0 FROM t1;
+COMMIT;
+
+--connection node_2
+--sleep 1
+--let $wsrep_last_applied_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--disable_query_log
+if ($wsrep_last_applied_before != $wsrep_last_applied_after)
+{
+	--echo "wsrep_last_applied_before:$wsrep_last_applied_before  wsrep_last_applied_after:$wsrep_last_applied_after"
+}
+--eval SELECT $wsrep_last_applied_after = $wsrep_last_applied_before AS wsrep_last_applied_diff;
+--enable_query_log
+
+DROP TABLE t1;
+

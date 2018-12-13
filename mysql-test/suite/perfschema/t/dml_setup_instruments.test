@@ -38,6 +38,7 @@ select * from performance_schema.setup_instruments
     'wait/synch/cond/sql/DEBUG_SYNC::cond',
     'wait/synch/cond/sql/COND_socket_listener_active',
     'wait/synch/cond/sql/COND_start_signal_handler')
+  and name not like 'wait/synch/cond/sql/COND_wsrep_%'
   order by name limit 10;
 
 --disable_result_log

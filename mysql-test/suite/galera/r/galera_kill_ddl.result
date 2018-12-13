@@ -1,0 +1,9 @@
+SET GLOBAL wsrep_provider_options = 'pc.ignore_sb=true';
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+Killing server ...
+ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+# restart
+SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='t1';
+COUNT(*) = 2
+1
+DROP TABLE t1;

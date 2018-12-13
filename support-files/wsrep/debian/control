@@ -1,0 +1,44 @@
+Source: mysql-server-wsrep
+Section: misc
+Priority: extra
+Maintainer: Codership Oy <info@galeracluster.com>
+Build-Depends: debhelper (>= 7)
+Homepage: http://galeracluster.com/
+
+Package: mysql-client-wsrep
+Architecture: any
+ection: misc
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: mysql-client (<< ${source:Version}), mysql-client-core, mysql-client-5.6, mysql-client-core-5.6
+Provides: mysql-client, mysql-client-core, mysql-client-5.6, mysql-client-core-5.6
+Replaces: mysql-client (<< ${source:Version}), mysql-client-core, mysql-client-5.6, mysql-client-core-5.6
+Homepage: http://galeracluster.com/
+Description: MySQL database client binaries for Galera Cluster
+
+
+Package: mysql-client-wsrep-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: mysql-client-wsrep (= ${binary:Version}), ${misc:Depends}
+Description: Debug symbols for mysql-client-wsrep
+
+
+Package: mysql-server-wsrep
+Architecture: any
+Priority: extra
+Depends: rsync, lsof, perl, ${shlibs:Depends}, ${misc:Depends}
+Conflicts: mysql-server (<< ${source:Version}), mysql-server-core, mysql-server-5.6, mysql-server-core-5.6
+Provides: mysql-server, mysql-server-core, mysql-server-5.6, mysql-server-core-5.6
+Replaces: mysql-server (<< ${source:Version}), mysql-server-core, mysql-server-5.6, mysql-server-core-5.6
+Homepage: http://galeracluster.com/
+Description: MySQL database server binaries for Galera Cluster
+
+
+Package: mysql-server-wsrep-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: mysql-server-wsrep (= ${binary:Version}), ${misc:Depends}
+Description: Debug symbols for mysql-server-wsrep

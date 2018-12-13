@@ -64,6 +64,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "trx0undo.h"
 #include "usr0sess.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
+
 /*************************************************************************
 IMPORTANT NOTE: Any operation that generates redo MUST check that there
 is enough space in the redo log before for that operation. This is
@@ -824,6 +828,13 @@ static void row_ins_foreign_report_add_err(
   mutex_exit(&dict_foreign_err_mutex);
 }
 
+#ifdef WITH_WSREP
+dberr_t wsrep_append_foreign_key(trx_t *trx, dict_foreign_t *foreign,
+                                 const rec_t *clust_rec,
+                                 dict_index_t *clust_index, ibool referenced,
+                                 wsrep_key_type key_type);
+#endif /* WITH_WSREP */
+
 /** Fill virtual column information in cascade node for the child table.
 @param[in]	trx		current transaction
 @param[out]	cascade		child update node
@@ -1251,6 +1262,14 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 
   cascade->state = UPD_NODE_UPDATE_CLUSTERED;
 
+#ifdef WITH_WSREP
+  err = wsrep_append_foreign_key(thr_get_trx(thr), foreign, clust_rec,
+                                 clust_index, false, WSREP_KEY_EXCLUSIVE);
+  if (err != DB_SUCCESS) {
+    ib::warn() << "WSREP: foreign key append failed: " << err;
+  } else
+#endif /* WITH_WSREP */
+
   err = row_update_cascade_for_mysql(thr, cascade, foreign->foreign_table);
 
   /* Release the data dictionary latch for a while, so that we do not
@@ -1381,6 +1400,10 @@ dberr_t row_ins_check_foreign_constraint(
   mem_heap_t *heap = NULL;
   ulint offsets_[REC_OFFS_NORMAL_SIZE];
   ulint *offsets = offsets_;
+
+#ifdef WITH_WSREP
+  upd_node = NULL;
+#endif /* WITH_WSREP */
 
   bool skip_gap_lock;
   MDL_ticket *mdl = nullptr;
@@ -1608,6 +1631,24 @@ dberr_t row_ins_check_foreign_constraint(
         if (check_ref) {
           err = DB_SUCCESS;
 
+#ifdef WITH_WSREP
+          wsrep_key_type key_type = WSREP_KEY_EXCLUSIVE;
+          if (upd_node != NULL) {
+            key_type = WSREP_KEY_SHARED;
+          } else {
+            switch (wsrep_certification_rules) {
+              case WSREP_CERTIFICATION_RULES_STRICT:
+                key_type = WSREP_KEY_EXCLUSIVE;
+                break;
+              case WSREP_CERTIFICATION_RULES_OPTIMIZED:
+                key_type = WSREP_KEY_SEMI;
+                break;
+            }
+          }
+          err = wsrep_append_foreign_key(thr_get_trx(thr), foreign, rec,
+                                         check_index, check_ref, key_type);
+#endif /* WITH_WSREP */
+
           goto end_scan;
         } else if (foreign->type != 0) {
           /* There is an ON UPDATE or ON DELETE
@@ -1710,6 +1751,23 @@ do_possible_lock_wait:
     trx_kill_blocking(trx);
 
     lock_wait_suspend_thread(thr);
+
+#ifdef WITH_WSREP
+    ut_ad(!trx_mutex_own(trx));
+    switch (trx->error_state) {
+      case DB_DEADLOCK:
+        if (wsrep_debug) {
+          ib::info() << "WSREP: innodb trx state changed during wait "
+                     << " trx: " << trx->id
+                     << " with error_state: " << trx->error_state
+                     << " err: " << err;
+        }
+        err = trx->error_state;
+        break;
+      default:
+        break;
+    }
+#endif /* WITH_WSREP */
 
     thr->lock_state = QUE_THR_LOCK_NOLOCK;
 

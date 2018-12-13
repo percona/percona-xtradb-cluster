@@ -1,0 +1,19 @@
+#
+# GCF-784 Confirm that START SLAVE can not be issued without log_slave_updates=1
+# 
+
+--source include/have_log_bin.inc
+
+# As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--source include/galera_cluster.inc
+
+--connection node_2
+--disable_query_log
+--eval CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--enable_query_log
+
+--error ER_SLAVE_CONFIGURATION
+START SLAVE USER='root';
+
+RESET SLAVE ALL;

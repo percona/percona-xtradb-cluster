@@ -52,6 +52,14 @@
 #include "sql/table.h"
 #include "template_utils.h"  // delete_container_pointers
 
+#ifdef WITH_WSREP
+#include "sql/dd/types/table.h"                // dd::Table
+#include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
+#include "sql/dd/dd_table.h"                 // dd::table_storage_engine
+#include "sql_parse.h"
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
+
 bool has_external_data_or_index_dir(partition_info &pi);
 
 Alter_info::Alter_info(const Alter_info &rhs, MEM_ROOT *mem_root)
@@ -342,6 +350,203 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
 
   thd->set_slow_log_for_admin_command();
 
+#ifdef WITH_WSREP
+  /* PXC doesn't recommend/allow ALTER operation on table created using
+  non-transactional storage engine (like MyISAM, HEAP/MEMORY, etc....)
+  except ALTER operation to change storage engine to transactional storage
+  engine. (of-course if that is feasible with other constraints)
+  Application only for non-temporary (persistent) tables.
+  Temporarily tables are generally created by some internal workload
+  so we continue to allow them for now as avoid breaking the application.
+  Note: Temporary table are never replicated. */
+
+  if (WSREP_ON && !is_temporary_table(first_table)) {
+    enum legacy_db_type existing_db_type, new_db_type;
+
+    TABLE_LIST* table = first_table;
+
+    // Acquire lock on the table as it is needed to get the instance from DD
+    MDL_request mdl_request;
+    MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db, table->table_name,
+                     MDL_SHARED, MDL_EXPLICIT);
+    thd->mdl_context.acquire_lock(&mdl_request,
+                                  thd->variables.lock_wait_timeout);
+
+    {
+      const char *schema_name = table->db;
+      const char *table_name = table->table_name;
+      dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+      const dd::Table *table_ref = NULL;
+
+      if (thd->dd_client()->acquire(schema_name, table_name, &table_ref)) {
+        thd->mdl_context.release_lock(mdl_request.ticket);
+        DBUG_RETURN(true);
+      }
+
+      if (table_ref == nullptr ||
+          table_ref->hidden() == dd::Abstract_table::HT_HIDDEN_SE) {
+        my_error(ER_NO_SUCH_TABLE, MYF(0), schema_name, table_name);
+        thd->mdl_context.release_lock(mdl_request.ticket);
+        DBUG_RETURN(true);
+      }
+
+      handlerton *hton = nullptr;
+      if (dd::table_storage_engine(thd, table_ref, &hton)) {
+        thd->mdl_context.release_lock(mdl_request.ticket);
+        DBUG_RETURN(true);
+      }
+
+      existing_db_type = hton->db_type;
+    }
+
+    thd->mdl_context.release_lock(mdl_request.ticket);
+
+    bool is_system_db =
+        (first_table && ((strcmp(first_table->db, "mysql") == 0) ||
+                         (strcmp(first_table->db, "information_schema") == 0)));
+
+    if (!is_temporary_table(first_table) && !is_system_db) {
+      bool safe_ops = false;
+
+      /* If create_info.db_type = NULL that means ALTER operation
+      is modifying existing table. */
+      new_db_type =
+          ((create_info.db_type != NULL) ? create_info.db_type->db_type
+                                          : existing_db_type);
+
+      /* Existing table is created with non-transactional storage engine
+      and so switching it to transactional storage engine is allowed.
+      Currently transactional storage engine supported is InnoDB/XtraDB */
+      if ((existing_db_type != DB_TYPE_INNODB) &&
+          (alter_info.flags & Alter_info::ALTER_OPTIONS) &&
+          (create_info.used_fields & HA_CREATE_USED_ENGINE) &&
+          (new_db_type == DB_TYPE_INNODB || existing_db_type == new_db_type))
+        safe_ops = true;
+
+      /* Existing table is created with transactional storage engine
+      and switching it to non-transactional storage engine is blocked
+      other operations are allowed. */
+      if ((existing_db_type == DB_TYPE_INNODB) &&
+          (alter_info.flags & Alter_info::ALTER_OPTIONS) &&
+          (create_info.used_fields & HA_CREATE_USED_ENGINE) &&
+          (new_db_type != DB_TYPE_INNODB))
+        safe_ops = false;
+      else if (existing_db_type == DB_TYPE_INNODB ||
+               existing_db_type == DB_TYPE_PERFORMANCE_SCHEMA)
+        safe_ops = true;
+
+      if (!safe_ops && existing_db_type != DB_TYPE_INNODB &&
+          existing_db_type != DB_TYPE_UNKNOWN) {
+        bool block = false;
+
+        switch (pxc_strict_mode) {
+          case PXC_STRICT_MODE_DISABLED:
+            break;
+          case PXC_STRICT_MODE_PERMISSIVE:
+            WSREP_WARN(
+                "Percona-XtraDB-Cluster doesn't recommend use of"
+                " ALTER command on a table (%s.%s) that resides in"
+                " non-transactional storage engine"
+                " (except switching to transactional engine)"
+                " with pxc_strict_mode = PERMISSIVE",
+                first_table->db, first_table->table_name);
+            push_warning_printf(
+                thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                "Percona-XtraDB-Cluster doesn't recommend use of"
+                " ALTER command on a table (%s.%s) that resides in"
+                " non-transactional storage engine"
+                " (except switching to transactional engine)"
+                " with pxc_strict_mode = PERMISSIVE",
+                first_table->db, first_table->table_name);
+            break;
+          case PXC_STRICT_MODE_ENFORCING:
+          case PXC_STRICT_MODE_MASTER:
+          default:
+            block = true;
+            WSREP_ERROR(
+                "Percona-XtraDB-Cluster prohibits use of"
+                " ALTER command on a table (%s.%s) that resides in"
+                " non-transactional storage engine"
+                " (except switching to transactional engine)"
+                " with pxc_strict_mode = ENFORCING or MASTER",
+                first_table->db, first_table->table_name);
+            char message[1024];
+            sprintf(message,
+                    "Percona-XtraDB-Cluster prohibits use of"
+                    " ALTER command on a table (%s.%s) that resides in"
+                    " non-transactional storage engine"
+                    " (except switching to transactional engine)"
+                    " with pxc_strict_mode = ENFORCING or MASTER",
+                    first_table->db, first_table->table_name);
+            my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+            break;
+        }
+
+        if (block) DBUG_RETURN(true);
+      } else if (!safe_ops && existing_db_type == DB_TYPE_INNODB) {
+        bool block = false;
+
+        switch (pxc_strict_mode) {
+          case PXC_STRICT_MODE_DISABLED:
+            break;
+          case PXC_STRICT_MODE_PERMISSIVE:
+            WSREP_WARN(
+                "Percona-XtraDB-Cluster doesn't recommend changing"
+                " storage engine of a table (%s.%s) from"
+                " transactional to non-transactional"
+                " with pxc_strict_mode = PERMISSIVE",
+                first_table->db, first_table->table_name);
+            push_warning_printf(
+                thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                "Percona-XtraDB-Cluster doesn't recommend changing"
+                " storage engine of a table (%s.%s) from"
+                " transactional to non-transactional"
+                " with pxc_strict_mode = PERMISSIVE",
+                first_table->db, first_table->table_name);
+            break;
+          case PXC_STRICT_MODE_ENFORCING:
+          case PXC_STRICT_MODE_MASTER:
+          default:
+            block = true;
+            WSREP_ERROR(
+                "Percona-XtraDB-Cluster prohibits changing"
+                " storage engine of a table (%s.%s) from"
+                " transactional to non-transactional"
+                " with pxc_strict_mode = ENFORCING or MASTER",
+                first_table->db, first_table->table_name);
+            char message[1024];
+            sprintf(message,
+                    "Percona-XtraDB-Cluster prohibits changing"
+                    " storage engine of a table (%s.%s) from"
+                    " transactional to non-transactional"
+                    " with pxc_strict_mode = ENFORCING or MASTER",
+                    first_table->db, first_table->table_name);
+            my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+            break;
+        }
+
+        if (block) DBUG_RETURN(true);
+      }
+    }
+  }
+
+  {
+    extern TABLE *find_temporary_table(THD * thd, const TABLE_LIST *tl);
+
+    if ((!thd->is_current_stmt_binlog_format_row() ||
+         !find_temporary_table(thd, first_table))) {
+      if (WSREP(thd) &&
+          wsrep_to_isolation_begin(
+              thd, ((thd->lex->name.str) ? thd->lex->select_lex->db : NULL),
+              ((thd->lex->name.str) ? thd->lex->name.str : NULL), first_table,
+              &alter_info)) {
+        WSREP_WARN("ALTER TABLE isolation failure");
+        DBUG_RETURN(true);
+      }
+    }
+  }
+#endif /* WITH_WSREP */
+
   /* Push Strict_error_handler for alter table*/
   Strict_error_handler strict_handler;
   if (!thd->lex->is_ignore() && thd->is_strict_mode())
@@ -374,6 +579,49 @@ bool Sql_cmd_discard_import_tablespace::execute(THD *thd) {
   SELECT_LEX *select_lex = thd->lex->select_lex;
   /* first table of first SELECT_LEX */
   TABLE_LIST *table_list = select_lex->get_table_list();
+
+#ifdef WITH_WSREP
+  /* Disable DISCARD/IMPORT TABLESPACE as this command
+  will execute on single node and can introduce data
+  in-consistency in cluster. */
+  bool block = false;
+  switch (pxc_strict_mode) {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN(
+          "Percona-XtraDB-Cluster doesn't recommend"
+          " DISCARD/IMPORT of tablespace as it can introduce"
+          " data in-consistency (if not done in tandem on all nodes)"
+          " with pxc_strict_mode = PERMISSIVE");
+      push_warning_printf(
+          thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+          "Percona-XtraDB-Cluster doesn't recommend"
+          " DISCARD/IMPORT of tablespace as it can introduce"
+          " data in-consistency (if not done in tandem on all nodes)"
+          " with pxc_strict_mode = PERMISSIVE");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+      block = true;
+      WSREP_ERROR(
+          "Percona-XtraDB-Cluster doesn't recommend"
+          " DISCARD/IMPORT of tablespace as it can introduce"
+          " data in-consistency (if not done in tandem on all nodes)"
+          " with pxc_strict_mode = ENFORCING or MASTER");
+      char message[1024];
+      sprintf(message,
+              "Percona-XtraDB-Cluster prohibits"
+              " DISCARD/IMPORT of tablespace as it can introduce"
+              " data in-consistency (if not done in tandem on all nodes)"
+              " with pxc_strict_mode = ENFORCING or MASTER");
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+      break;
+  }
+
+  if (block) return true;
+#endif /* WITH_WSREP */
 
   if (check_access(thd, ALTER_ACL, table_list->db, &table_list->grant.privilege,
                    &table_list->grant.m_internal, 0, 0))

@@ -144,6 +144,10 @@
 #include "template_utils.h"
 #include "thr_mutex.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
+
 using std::equal_to;
 using std::hash;
 using std::pair;
@@ -384,10 +388,18 @@ size_t get_table_def_key(const TABLE_LIST *table_list, const char **key) {
     strcase is converted to strcasecmp because information_schema tables
     can be accessed with lower case and upper case table names.
   */
-  DBUG_ASSERT(!my_strcasecmp(system_charset_info, table_list->get_db_name(),
-                             table_list->mdl_request.key.db_name()) &&
-              !my_strcasecmp(system_charset_info, table_list->get_table_name(),
-                             table_list->mdl_request.key.name()));
+  DBUG_ASSERT(
+      !my_strcasecmp(system_charset_info, table_list->get_db_name(),
+                     table_list->mdl_request.key.db_name()) &&
+#ifdef WITH_WSREP
+      (!my_strcasecmp(system_charset_info, table_list->get_table_name(),
+                      table_list->mdl_request.key.name()) ||
+       !my_strcasecmp(system_charset_info, table_list->get_table_alias(),
+                      table_list->mdl_request.key.name())));
+#else
+      !my_strcasecmp(system_charset_info, table_list->get_table_name(),
+                     table_list->mdl_request.key.name()));
+#endif /* WITH_WSREP */
 
   *key = (const char *)table_list->mdl_request.key.ptr() + 1;
   return table_list->mdl_request.key.length() - 1;
@@ -4332,6 +4344,7 @@ thr_lock_type read_lock_type_for_table(THD *thd,
     When we do not write to binlog or when we use row based replication,
     it is safe to use a weaker lock.
   */
+
   if (log_on == false || thd->variables.binlog_format == BINLOG_FORMAT_ROW)
     return TL_READ;
 
@@ -5801,6 +5814,141 @@ restart:
         goto err;
       }
     }
+
+#ifdef WITH_WSREP
+    bool is_dml_stmt = (thd->lex->sql_command == SQLCOM_INSERT ||
+                        thd->lex->sql_command == SQLCOM_INSERT_SELECT ||
+                        thd->lex->sql_command == SQLCOM_REPLACE ||
+                        thd->lex->sql_command == SQLCOM_REPLACE_SELECT ||
+                        thd->lex->sql_command == SQLCOM_UPDATE ||
+                        thd->lex->sql_command == SQLCOM_UPDATE_MULTI ||
+                        thd->lex->sql_command == SQLCOM_LOAD ||
+                        thd->lex->sql_command == SQLCOM_DELETE);
+
+    bool is_system_db =
+        (tbl && ((strcmp(tbl->s->db.str, "mysql") == 0) ||
+                 (strcmp(tbl->s->db.str, "information_schema") == 0)));
+
+    legacy_db_type db_type = (tbl ? tbl->file->ht->db_type : DB_TYPE_UNKNOWN);
+
+    if (tables == *start && db_type != DB_TYPE_INNODB &&
+        db_type != DB_TYPE_UNKNOWN && db_type != DB_TYPE_PERFORMANCE_SCHEMA &&
+        is_dml_stmt && !is_system_db && !is_temporary_table(tables)) {
+      /* Table is not an InnoDB table and workload is trying to make changes
+      to the table. Validate workload based on pxc-strict-mode. */
+
+      bool block = false;
+
+      switch (pxc_strict_mode) {
+        case PXC_STRICT_MODE_DISABLED:
+          break;
+        case PXC_STRICT_MODE_PERMISSIVE:
+          WSREP_WARN(
+              "Percona-XtraDB-Cluster doesn't recommend use of"
+              " DML command on a table (%s.%s) that resides in"
+              " non-transactional storage engine"
+              " with pxc_strict_mode = PERMISSIVE",
+              tbl->s->db.str, tbl->s->table_name.str);
+          push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                              "Percona-XtraDB-Cluster doesn't recommend use of"
+                              " DML command on a table (%s.%s) that resides in"
+                              " non-transactional storage engine"
+                              " with pxc_strict_mode = PERMISSIVE",
+                              tbl->s->db.str, tbl->s->table_name.str);
+          break;
+        case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_MASTER:
+        default:
+          block = true;
+          WSREP_ERROR(
+              "Percona-XtraDB-Cluster prohibits use of"
+              " DML command on a table (%s.%s) that resides in"
+              " non-transactional storage engine"
+              " with pxc_strict_mode = ENFORCING or MASTER",
+              tbl->s->db.str, tbl->s->table_name.str);
+          char message[1024];
+          sprintf(message,
+                  "Percona-XtraDB-Cluster prohibits use of"
+                  " DML command on a table (%s.%s) that resides in"
+                  " non-transactional storage engine"
+                  " with pxc_strict_mode = ENFORCING or MASTER",
+                  tbl->s->db.str, tbl->s->table_name.str);
+          my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+          break;
+      }
+
+      if (block) {
+        error = true;
+        goto err;
+      }
+    }
+
+    if (tables == *start && is_dml_stmt &&
+        db_type != DB_TYPE_PERFORMANCE_SCHEMA && tbl &&
+        tbl->s->primary_key == MAX_KEY && !is_system_db &&
+        !is_temporary_table(tables)) {
+      /* Table doesn't have explicit primary-key defined. */
+
+      bool block = false;
+
+      switch (pxc_strict_mode) {
+        case PXC_STRICT_MODE_DISABLED:
+          break;
+        case PXC_STRICT_MODE_PERMISSIVE:
+          WSREP_WARN(
+              "Percona-XtraDB-Cluster doesn't recommend use of"
+              " DML command on a table (%s.%s) without"
+              " an explicit primary key"
+              " with pxc_strict_mode = PERMISSIVE",
+              tbl->s->db.str, tbl->s->table_name.str);
+          push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                              "Percona-XtraDB-Cluster doesn't recommend use of"
+                              " DML command on a table (%s.%s) without"
+                              " an explicit primary key"
+                              " with pxc_strict_mode = PERMISSIVE",
+                              tbl->s->db.str, tbl->s->table_name.str);
+          break;
+        case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_MASTER:
+        default:
+          block = true;
+          WSREP_ERROR(
+              "Percona-XtraDB-Cluster prohibits use of"
+              " DML command on a table (%s.%s) without"
+              " an explicit primary key"
+              " with pxc_strict_mode = ENFORCING or MASTER",
+              tbl->s->db.str, tbl->s->table_name.str);
+          char message[1024];
+          sprintf(message,
+                  "Percona-XtraDB-Cluster prohibits use of"
+                  " DML command on a table (%s.%s) without"
+                  " an explicit primary key"
+                  " with pxc_strict_mode = ENFORCING or MASTER",
+                  tbl->s->db.str, tbl->s->table_name.str);
+          my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+          break;
+      }
+
+      if (block) {
+        error = true;
+        goto err;
+      }
+    }
+
+    /* It is not recommended to replicate MyISAM as it lacks rollback feature
+    but if user demands then actions are replicated using TOI.
+    Following code will kick-start the TOI but this has to be done only once
+    per statement.
+    Note: kick-start will take-care of creating isolation key for all tables
+    involved in the list (provided all of them are MYISAM tables). */
+    if (is_dml_stmt && thd->variables.wsrep_replicate_myisam &&
+        db_type == DB_TYPE_MYISAM && thd->wsrep_exec_mode == LOCAL_STATE) {
+      if (WSREP(thd) && wsrep_to_isolation_begin(thd, NULL, NULL, (*start))) {
+        error = true;
+        goto err;
+      }
+    }
+#endif /* WITH_WSREP */
 
     /* Set appropriate TABLE::lock_type. */
     if (tbl && tables->lock_descriptor().type != TL_UNLOCK &&
@@ -9461,9 +9609,13 @@ void tdc_remove_table(THD *thd, enum_tdc_remove_table_type remove_type,
   else
     table_cache_manager.assert_owner_all_and_tdc();
 
+#ifdef WITH_WSREP
+    /* if thd was BF aborted, exclusive locks are cancelled */
+#else
   DBUG_ASSERT(remove_type == TDC_RT_REMOVE_UNUSED ||
               thd->mdl_context.owns_equal_or_stronger_lock(
                   MDL_key::TABLE, db, table_name, MDL_EXCLUSIVE));
+#endif /* WITH_WSREP */
 
   key_length = create_table_def_key(thd, key, db, table_name, false);
 

@@ -46,6 +46,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "page0page.h"
 #include "trx0sys.h"
 
+#ifdef WITH_WSREP
+#include <ha_prototypes.h>
+#endif /* WITH_WSREP */
+
 /*			PHYSICAL RECORD (OLD STYLE)
                         ===========================
 
@@ -1749,3 +1753,124 @@ void rec_offs_make_nth_extern(ulint *offsets, const ulint n) {
   ut_ad(!rec_offs_nth_sql_null(offsets, n));
   rec_offs_base(offsets)[1 + n] |= REC_OFFS_EXTERNAL;
 }
+
+#ifdef WITH_WSREP
+dberr_t wsrep_rec_get_foreign_key(
+    byte *buf,               /* out: extracted key */
+    ulint *buf_len,          /* in/out: length of buf */
+    const rec_t *rec,        /* in: physical record */
+    dict_index_t *index_for, /* in: index in foreign table */
+    dict_index_t *index_ref, /* in: index in referenced table */
+    ibool new_protocol)      /* in: protocol > 1 */
+{
+  const byte *data;
+  ulint len;
+  ulint key_len = 0;
+  ulint i;
+  uint key_parts;
+  mem_heap_t *heap = NULL;
+  ulint offsets_[REC_OFFS_NORMAL_SIZE];
+  const ulint *offsets;
+
+  ut_ad(index_for);
+  ut_ad(index_ref);
+
+  rec_offs_init(offsets_);
+  offsets = rec_get_offsets(rec, index_for, offsets_, ULINT_UNDEFINED, &heap);
+
+  ut_ad(rec_offs_validate(rec, NULL, offsets));
+
+  ut_ad(rec);
+
+  key_parts = dict_index_get_n_unique_in_tree(index_for);
+  for (i = 0;
+       i < key_parts && (index_for->type & DICT_CLUSTERED || i < key_parts - 1);
+       i++) {
+    dict_field_t *field_f = index_for->get_field(i);
+    const dict_col_t *col_f = field_f->col;
+    dict_field_t *field_r = index_ref->get_field(i);
+    const dict_col_t *col_r = field_r->col;
+
+    data = rec_get_nth_field(rec, offsets, i, &len);
+    if (key_len + ((len != UNIV_SQL_NULL) ? len + 1 : 1) > *buf_len) {
+      fprintf(stderr, "WSREP: FK key len exceeded %lu %lu %lu\n", key_len, len,
+              *buf_len);
+      goto err_out;
+    }
+
+    if (len == UNIV_SQL_NULL) {
+      ut_a(!(col_f->prtype & DATA_NOT_NULL));
+      *buf++ = 1;
+      key_len++;
+    } else if (!new_protocol) {
+      if (!(col_r->prtype & DATA_NOT_NULL)) {
+        *buf++ = 0;
+        key_len++;
+      }
+      memcpy(buf, data, len);
+      *buf_len = wsrep_innobase_mysql_sort(
+          (int)(col_f->prtype & DATA_MYSQL_TYPE_MASK),
+          (uint)dtype_get_charset_coll(col_f->prtype), buf, len, *buf_len);
+    } else { /* new protocol */
+      if (!(col_r->prtype & DATA_NOT_NULL)) {
+        *buf++ = 0;
+        key_len++;
+      }
+      switch (col_f->mtype) {
+        case DATA_INT: {
+          byte *ptr = buf + len;
+          for (;;) {
+            ptr--;
+            *ptr = *data;
+            if (ptr == buf) {
+              break;
+            }
+            data++;
+          }
+
+          if (!(col_f->prtype & DATA_UNSIGNED)) {
+            buf[len - 1] = (byte)(buf[len - 1] ^ 128);
+          }
+
+          break;
+        }
+        case DATA_VARCHAR:
+        case DATA_VARMYSQL:
+        case DATA_CHAR:
+        case DATA_MYSQL:
+          /* Copy the actual data */
+          ut_memcpy(buf, data, len);
+          len = wsrep_innobase_mysql_sort(
+              (int)(col_f->prtype & DATA_MYSQL_TYPE_MASK),
+              (uint)dtype_get_charset_coll(col_f->prtype), buf, len, *buf_len);
+          break;
+        case DATA_BLOB:
+        case DATA_BINARY:
+          memcpy(buf, data, len);
+          break;
+        default:
+          break;
+      }
+
+      key_len += len;
+      buf += len;
+    }
+  }
+
+  rec_validate(rec, offsets);
+
+  if (UNIV_LIKELY_NULL(heap)) {
+    mem_heap_free(heap);
+  }
+
+  *buf_len = key_len;
+  return DB_SUCCESS;
+
+err_out:
+  if (UNIV_LIKELY_NULL(heap)) {
+    mem_heap_free(heap);
+  }
+  return DB_ERROR;
+}
+#endif /* WITH_WSREP */
+

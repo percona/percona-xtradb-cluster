@@ -1,0 +1,14 @@
+# Template my.cnf for PXC
+# Edit to your requirements.
+[mysqld]
+server-id=1
+datadir=/var/lib/mysql
+socket=/var/run/mysqld/mysqld.sock
+log-error=/var/log/mysqld.log
+pid-file=/var/run/mysqld/mysqld.pid
+log-bin
+log_slave_updates
+expire_logs_days=7
+
+# Disabling symbolic-links is recommended to prevent assorted security risks
+symbolic-links=0

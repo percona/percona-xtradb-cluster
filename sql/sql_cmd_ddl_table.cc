@@ -61,6 +61,10 @@
 #include "sql/current_thd.h"
 #endif  // DBUG_OFF
 
+#ifdef WITH_WSREP
+#include "sql/log.h"
+#endif /* WITH_WSREP */
+
 Sql_cmd_ddl_table::Sql_cmd_ddl_table(Alter_info *alter_info)
     : m_alter_info(alter_info) {
 #ifndef DBUG_OFF
@@ -177,6 +181,48 @@ bool Sql_cmd_create_table::execute(THD *thd) {
 
   if (select_lex->item_list.elements)  // With select
   {
+#ifdef WITH_WSREP
+    bool is_temporary_table =
+        (lex->create_info->options & HA_LEX_CREATE_TMP_TABLE);
+
+    if (!is_temporary_table) {
+      bool block = false;
+
+      switch (pxc_strict_mode) {
+        case PXC_STRICT_MODE_DISABLED:
+          break;
+        case PXC_STRICT_MODE_PERMISSIVE:
+          WSREP_WARN(
+              "Percona-XtraDB-Cluster doesn't recommend use of"
+              " CREATE TABLE AS SELECT"
+              " with pxc_strict_mode = PERMISSIVE");
+          push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                              "Percona-XtraDB-Cluster doesn't recommend use of"
+                              " CREATE TABLE AS SELECT"
+                              " with pxc_strict_mode = PERMISSIVE");
+          break;
+        case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_MASTER:
+          block = true;
+          WSREP_ERROR(
+              "Percona-XtraDB-Cluster prohibits use of"
+              " CREATE TABLE AS SELECT"
+              " with pxc_strict_mode = ENFORCING or MASTER");
+          char message[1024];
+          sprintf(message,
+                  "Percona-XtraDB-Cluster prohibits use of"
+                  " CREATE TABLE AS SELECT"
+                  " with pxc_strict_mode = ENFORCING or MASTER");
+          my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+          break;
+      }
+
+      if (block) {
+        return true;
+      }
+    }
+#endif /* WITH_WSREP */
+
     Query_result *result;
 
     /*
@@ -315,6 +361,24 @@ bool Sql_cmd_create_table::execute(THD *thd) {
       res = mysql_create_like_table(thd, create_table, query_expression_tables,
                                     &create_info);
     } else {
+#ifdef WITH_WSREP
+      /* in STATEMENT format, we probably have to replicate also temporary
+         tables, like mysql replication does
+      */
+      if (!thd->is_current_stmt_binlog_format_row() ||
+          !(create_info.options & HA_LEX_CREATE_TMP_TABLE))
+
+        /* Note we are explictly opening the macro as we need to perform
+        cleanup action on TOI failure. */
+        if (WSREP(thd) &&
+            wsrep_to_isolation_begin(thd, create_table->db,
+                                     create_table->table_name, NULL)) {
+          if (!thd->lex->is_ignore() && thd->is_strict_mode())
+            thd->pop_internal_handler();
+          goto error;
+        }
+#endif /* WITH_WSREP */
+
       /* Regular CREATE TABLE */
       res = mysql_create_table(thd, create_table, &create_info, &alter_info);
     }
@@ -333,6 +397,11 @@ bool Sql_cmd_create_table::execute(THD *thd) {
     }
   }
   return res;
+
+#ifdef WITH_WSREP
+error:
+  return true;
+#endif /* WITH_WSREP */
 }
 
 bool Sql_cmd_create_or_drop_index_base::execute(THD *thd) {
@@ -358,6 +427,14 @@ bool Sql_cmd_create_or_drop_index_base::execute(THD *thd) {
     return true;           // OOM
 
   if (check_one_table_access(thd, INDEX_ACL, all_tables)) return true;
+
+#ifdef WITH_WSREP
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, first_table->db,
+                                             first_table->table_name, NULL)) {
+    return true;
+  }
+#endif /* WITH_WSREP */
+
   /*
     Currently CREATE INDEX or DROP INDEX cause a full table rebuild
     and thus classify as slow administrative statements just like

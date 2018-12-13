@@ -2656,6 +2656,10 @@ bool Prepared_statement::set_parameters(String *expanded_query) {
   return false;
 }
 
+#ifdef WITH_WSREP
+void wsrep_replay_transaction(THD *thd);
+#endif /* WITH_WSREP */
+
 /**
   Execute a prepared statement. Re-prepare it a limited number
   of times if necessary.
@@ -2730,7 +2734,50 @@ reexecute:
 
   error = execute(expanded_query, open_cursor) || thd->is_error();
 
+#ifdef WITH_WSREP
+  bool observer_popped = false;
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  switch (thd->wsrep_conflict_state) {
+    case CERT_FAILURE:
+      WSREP_DEBUG(
+          "Prepare Statement execution fail with Certification Failure"
+          " thd: %u err: %d",
+          thd->thread_id(), thd->get_stmt_da()->mysql_errno());
+      thd->wsrep_conflict_state = NO_CONFLICT;
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      break;
+
+    case MUST_REPLAY:
+      thd->pop_reprepare_observer();
+      observer_popped = true;
+      (void)wsrep_replay_transaction(thd);
+      // This extra state was added as a workaround fix to help skip
+      // lex->unit->cleanup. While writing this commit-message, commenting
+      // the said conflict_state doesn't cause galera_transaction_replay
+      // test-case to fail which was suppose to fail and so the fix was
+      // added.
+      // Why it is wrong to set the conflict_state at this point ?
+      // As part of replay transaction flow, conflict_state is already reset
+      // to NO_CONFLICT on completion. Resetting it to REPLAYED will not cause
+      // it to clear-up if prepare statement is executed through
+      // COM_STMT_EXECUTE mysql direct api call. Of-course the block of
+      // COM_STMT_EXECUTE can reset it as it is being done by
+      // mysql_execute_command block but this vary logic of setting REPLAYED
+      // state is questionable. Leaving the original code block as is for now
+      // just commenting the existing conflict_state setting.
+      // thd->wsrep_conflict_state= REPLAYED;
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      break;
+
+    default:
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      break;
+  }
+  if (!observer_popped)
+    thd->pop_reprepare_observer();
+#else
   thd->pop_reprepare_observer();
+#endif /* WITH_WSREP */
 
   if ((sql_command_flags[lex->sql_command] & CF_REEXECUTION_FRAGILE) && error &&
       !thd->is_fatal_error && !thd->killed &&

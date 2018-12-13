@@ -1,0 +1,155 @@
+#node-1
+use test;
+create table t1 (i int, primary key pk(i)) encryption='y';
+create table t2 (i int, primary key pk(i));
+insert into t1 values (1), (2), (3);
+insert into t1 values (10), (20), (30);
+select * from t1;
+i
+1
+2
+3
+10
+20
+30
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Start_encryption	1	163	
+#node-2
+select * from t1;
+i
+1
+2
+3
+10
+20
+30
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
+select * from t2;
+i
+show create table t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+drop table t1, t2;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Start_encryption	2	163	
+#node-2 being killed
+Killing server ...
+#node-1
+use test;
+create table t1 (i int, primary key pk(i)) encryption='y';
+create table t2 (i int, primary key pk(i));
+insert into t1 values (1), (2), (3);
+insert into t1 values (10), (20), (30);
+select * from t1;
+i
+1
+2
+3
+10
+20
+30
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Start_encryption	1	163	
+#node-2 restarted (should get encrypted table through SST)
+# restart
+select * from t1;
+i
+1
+2
+3
+10
+20
+30
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
+select * from t2;
+i
+show create table t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+drop table t1, t2;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Start_encryption	2	163	
+#node-2 being shutdown
+#node-1
+use test;
+create table t1 (i int, primary key pk(i)) encryption='y';
+create table t2 (i int, primary key pk(i));
+insert into t1 values (1), (2), (3);
+insert into t1 values (10), (20), (30);
+select * from t1;
+i
+1
+2
+3
+10
+20
+30
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Start_encryption	1	163	
+#node-2 restarted (should get encrypted table through IST)
+# restart
+select * from t1;
+i
+1
+2
+3
+10
+20
+30
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
+select * from t2;
+i
+show create table t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+drop table t1, t2;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Start_encryption	2	163	

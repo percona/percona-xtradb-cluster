@@ -1,0 +1,38 @@
+#
+# Test mysqldump SST with client SSL key. See galera_sst_mysqldump_with_key.cnf for the configuration on the client side.
+#
+
+--source include/big_test.inc
+--source include/galera_cluster.inc
+--source include/have_openssl.inc
+
+--source suite/galera/include/galera_sst_set_mysqldump.inc
+
+--connection node_1
+CREATE USER 'sslsst';
+GRANT ALL PRIVILEGES ON *.* TO 'sslsst';
+GRANT USAGE ON *.* TO 'sslsst' REQUIRE SSL;
+FLUSH PRIVILEGES;
+
+SET GLOBAL wsrep_sst_auth = 'sslsst:';
+
+--source suite/galera/include/galera_st_disconnect_slave.inc
+
+--source suite/galera/include/galera_sst_restore.inc
+DROP USER sslsst;
+
+--connection node_2
+# We have to manually restore global_log and slow_query_log due to mysql-wsrep#108
+# Otherwise MTR's check_testcases complains
+
+# Why we get this error of table not present ?
+# mysqldump generates dump in sequential fashion failing to understand table
+# inter-dependency. For example: if any innodb table is created and loaded before
+# innodb_table_stats or innodb_index_stats tables are created then there is no table
+# to insert the said stats which then raises the error/warnings mentioned below.
+CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_table_stats` not found");
+CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_index_stats` not found");
+CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table.*");
+
+SET GLOBAL general_log = ON;
+SET GLOBAL slow_query_log = ON;

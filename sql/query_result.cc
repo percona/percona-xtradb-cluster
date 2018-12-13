@@ -57,9 +57,22 @@
 #include "sql/system_variables.h"
 #include "sql_string.h"
 
+#ifdef WITH_WSREP
+#include "sql/log.h"
+#endif /* WITH_WSREP */
+
 using std::min;
 
 bool Query_result_send::send_result_set_metadata(List<Item> &list, uint flags) {
+#ifdef WITH_WSREP
+  if (WSREP(thd) && thd->wsrep_retry_query) {
+    /* Metadata is already send during first try that failed so avoid
+    resending it. Just plan to send the result. */
+    WSREP_DEBUG("Skip resending metadata if query is being re-tried");
+    return false;
+  }
+#endif /* WITH_WSREP */
+
   bool res;
   if (!(res = thd->send_result_metadata(&list, flags)))
     is_result_set_started = true;

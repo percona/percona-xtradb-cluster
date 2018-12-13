@@ -1166,7 +1166,17 @@ bool reset_master(THD *thd, bool unlock_global_read_lock) {
       the point where the gtid_executed table is cleared. This would
       lead to an inconsistent state.
     */
-    ret = mysql_bin_log.reset_logs(thd);
+#ifdef WITH_WSREP
+    if (WSREP(thd) && get_gtid_mode(GTID_MODE_LOCK_NONE) > 0) {
+      /* RESET MASTER will initialize GTID sequence, and that would happen
+         locally in this node only, so better reject it
+      */
+      my_message(ER_NOT_ALLOWED_COMMAND,
+                 "RESET MASTER not allowed when node is in cluster", MYF(0));
+      ret = true;
+    } else
+#endif /* WITH_WSREP */
+      ret = mysql_bin_log.reset_logs(thd);
   } else {
     global_sid_lock->wrlock();
     ret = (gtid_state->clear(thd) != 0);

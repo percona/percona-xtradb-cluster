@@ -1,0 +1,59 @@
+#
+# Test a single node with an arbitrator.  Startup a 2-node cluster, shut down node 2, and use it's ports
+# for the garbd.
+#
+
+--source include/galera_cluster.inc
+
+--echo Killing node #2 to free ports for garbd ...
+--connection node_2
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+
+--echo Starting garbd ...
+#
+# Set the evs.inactive_timeout to ensure that the node will shutdown 6 seconds after it is
+# killed.  This is set to 6 seconds because evs.inactive_timeout > evs.suspect_timeout (PT5S)
+#
+--exec `dirname $WSREP_PROVIDER`/../bin/garbd --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_2' > $MYSQL_TMP_DIR/garbd.log 2>&1 &
+
+--sleep 5
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+
+--echo Killing garbd ...
+# Use "-o -f" instead of "--oldest --full" for older distros
+--exec pkill -o -f garbd.*$NODE_GALERAPORT_2
+
+# Give garbd at least 6+ seconds to die
+--sleep 10
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--echo Restarting node #2 to satisfy MTR's end-of-test checks
+--connection node_2
+--source include/start_mysqld.inc
+
+
+# Workaround for galera#101
+
+--connection node_1
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+
+--connection node_2
+CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+

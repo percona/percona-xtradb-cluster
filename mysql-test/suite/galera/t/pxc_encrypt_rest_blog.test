@@ -1,0 +1,130 @@
+
+#
+#
+--source include/big_test.inc
+--source include/galera_cluster.inc
+
+# Force a restart at the end of the test
+--source include/force_restart.inc
+
+#
+# This test-case will cover data-at-rest encryption scenarios.
+# MySQL-5.7 introduced
+# - file-per-tablespace encryption.
+# PS start with 5.7.21-21 extended this to support encryption of
+# - general tablespace
+# - temporary tablespace
+# - binlog encryption
+
+
+#===============================================================================
+# binlog encryption encryption support
+# galera uses binlog for replication and if binlog is encrypted before galera
+# replicate then replication will break.
+
+#-------------------------------------------------------------------------------
+# direct repliction of encrypted tablespace
+#
+--connection node_1
+--echo #node-1
+use test;
+#
+create table t1 (i int, primary key pk(i)) encryption='y';
+create table t2 (i int, primary key pk(i));
+insert into t1 values (1), (2), (3);
+insert into t1 values (10), (20), (30);
+select * from t1;
+show create table t1;
+
+--connection node_1
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124 LIMIT 1;
+
+--connection node_2
+--echo #node-2
+select * from t1;
+show create table t1;
+select * from t2;
+show create table t2;
+drop table t1, t2;
+
+--connection node_2
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124 LIMIT 1;
+
+#-------------------------------------------------------------------------------
+# sst of the encrypted table
+#
+--connection node_2
+--echo #node-2 being killed
+--source include/kill_galera.inc
+
+--connection node_1
+--echo #node-1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+use test;
+#
+create table t1 (i int, primary key pk(i)) encryption='y';
+create table t2 (i int, primary key pk(i));
+insert into t1 values (1), (2), (3);
+insert into t1 values (10), (20), (30);
+select * from t1;
+show create table t1;
+
+--connection node_1
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124 LIMIT 1;
+
+--connection node_2
+--echo #node-2 restarted (should get encrypted table through SST)
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+select * from t1;
+show create table t1;
+select * from t2;
+show create table t2;
+drop table t1, t2;
+
+--connection node_2
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124 LIMIT 1;
+
+#-------------------------------------------------------------------------------
+# ist of the encrypted table
+#
+--connection node_2
+--echo #node-2 being shutdown
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+--echo #node-1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+use test;
+#
+create table t1 (i int, primary key pk(i)) encryption='y';
+create table t2 (i int, primary key pk(i));
+insert into t1 values (1), (2), (3);
+insert into t1 values (10), (20), (30);
+select * from t1;
+show create table t1;
+
+--connection node_1
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124 LIMIT 1;
+
+--connection node_2
+--echo #node-2 restarted (should get encrypted table through IST)
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+select * from t1;
+show create table t1;
+select * from t2;
+show create table t2;
+drop table t1, t2;
+
+--connection node_2
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124 LIMIT 1;
+

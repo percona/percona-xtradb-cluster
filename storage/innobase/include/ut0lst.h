@@ -243,6 +243,40 @@ void ut_list_insert(List &list, typename List::elem_type *elem1,
   ++list.count;
 }
 
+#ifdef WITH_WSREP
+/* Inserts a ELEM2 after ELEM1 in a list.
+ @param list the base node
+ @param elem1 node after which ELEM2 is inserted
+ @param elem2 node being inserted after ELEM1
+ @param get_node to get the list node for that element */
+template <typename List, typename Functor>
+void ut_list_insert2(List &list, typename List::elem_type *elem1,
+                     typename List::elem_type *elem2, Functor get_node) {
+  ut_ad(elem1 != elem2);
+  UT_LIST_IS_INITIALISED(list);
+
+  typename List::node_type &elem1_node = get_node(*elem1);
+  typename List::node_type &elem2_node = get_node(*elem2);
+
+  elem2_node.prev = elem1;
+  elem2_node.next = elem1_node.next;
+
+  if (elem1_node.next != NULL) {
+    typename List::node_type &next_node = get_node(*elem1_node.next);
+
+    next_node.prev = elem2;
+  }
+
+  elem1_node.next = elem2;
+
+  if (list.end == elem1) {
+    list.end = elem2;
+  }
+
+  ++list.count;
+}
+#endif /* WITH_WSREP */
+
 /** Inserts a ELEM2 after ELEM1 in a list.
  @param LIST list base node (not a pointer to it)
  @param ELEM1 node after which ELEM2 is inserted

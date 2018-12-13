@@ -10,3 +10,10 @@
 #
 ##############################################################################
 #thread_cache_size_func             : Bug#11750172: 2008-11-07 joro main.thread_cache_size_func fails in pushbuild when run with pool of threads
+wsrep_start_position_basic          : This needs server to start in cluster mode with wsrep initialized.
+wsrep_preordered_basic              : TC pending.
+wsrep_reject_queries_basic          : TC pending.
+sql_mode_func                       : Differences in result likely due to configuration. Need more investigation.
+innodb_buffer_pool_populate_basic   : is now mapped to use NUMA interleave policies and some of the modes are not supported on some distros.
+innodb_support_xa_func              : XA is not supported by PXC
+wsrep_max_ws_size_basic             : Setting this now also set repl.max_ws_size which is galera internal setting.

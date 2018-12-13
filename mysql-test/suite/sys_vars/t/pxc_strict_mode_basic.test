@@ -1,0 +1,50 @@
+#
+# Test different setting option for pxc-strict-mode
+
+# let's cache the default value first.
+#--let $pxc_strict_mode_saved = `SELECT @@pxc_strict_mode`
+
+--echo # set default value
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = default;
+select @@pxc_strict_mode;
+
+--echo # being a global variable session setting is prohibited.
+--error ER_GLOBAL_VARIABLE
+set session pxc_strict_mode = default;
+
+--echo # try setting different valid values.
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 'MASTER';
+select @@pxc_strict_mode;
+
+--echo # try setting different invalid values.
+--error ER_WRONG_VALUE_FOR_VAR
+set global pxc_strict_mode = 'PERCONA';
+select @@pxc_strict_mode;
+--error ER_WRONG_VALUE_FOR_VAR
+set global pxc_strict_mode = NULL;
+select @@pxc_strict_mode;
+--error ER_WRONG_VALUE_FOR_VAR
+set global pxc_strict_mode = JUNK;
+select @@pxc_strict_mode;
+
+--echo # try valid values but in different format
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 1;
+select @@pxc_strict_mode;
+--error ER_UNKNOWN_ERROR
+set global pxc_strict_mode = 0;
+select @@pxc_strict_mode;
+
+--echo # End of test
+#--eval set global pxc_strict_mode = $pxc_strict_mode_saved;

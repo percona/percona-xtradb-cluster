@@ -462,6 +462,13 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
   lex->link_first_table_back(view, link_to_local);
   view->open_type = OT_BASE_ONLY;
 
+#ifdef WITH_WSREP
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    res = true;
+    goto err;
+  }
+#endif /* WITH_WSREP */
+
   /*
     No pre-opening of temporary tables is possible since must
     wait until TABLE_LIST::open_type is set. So we have to open

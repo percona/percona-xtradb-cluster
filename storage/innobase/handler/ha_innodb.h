@@ -37,6 +37,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "my_inttypes.h"
 #include "trx0trx.h"
 
+#ifdef WITH_WSREP
+#include <wsrep_mysqld.h>
+#endif /* WITH_WSREP */
+
 /** "GEN_CLUST_INDEX" is the name reserved for InnoDB default
 system clustered index when there is no primary key. */
 extern const char innobase_index_reserve_name[];
@@ -441,6 +445,11 @@ class ha_innobase : public handler {
 
   bool check_if_incompatible_data(HA_CREATE_INFO *info, uint table_changes);
 
+#ifdef WITH_WSREP
+  int wsrep_append_keys(THD *thd, wsrep_key_type key_type, const uchar *record0,
+                        const uchar *record1);
+#endif /* WITH_WSREP */
+
  private:
   /** @name Multi Range Read interface @{ */
 
@@ -657,7 +666,17 @@ class ha_innobase : public handler {
 
   /** If mysql has locked with external_lock() */
   bool m_mysql_has_locked;
+
+#ifdef WITH_WSREP
+  /** number of write_row() calls */
+  uint m_num_write_row;
+#endif /* WITH_WSREP */
 };
+
+#ifdef WITH_WSREP
+#include <wsrep_mysqld.h>
+extern "C" bool wsrep_thd_is_wsrep_on(THD *thd);
+#endif /* WITH_WSREP */
 
 struct trx_t;
 

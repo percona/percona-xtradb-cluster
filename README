@@ -1,13 +1,13 @@
-Percona Server 8.0
-------------------
+Percona XtraDB Cluster 8.0
+--------------------------
 
-Percona Server is a branch of MySQL 8.0 bringing higher performance,
-reliability and more features.
+Percona XtraDB Cluster is based on Percona Server and Codership wsrep API
+using galera replication library that provides Multimaster Cluster based
+on synchronous replication.
 
-http://www.percona.com/software/percona-server/
+https://www.percona.com/software/mysql-database/percona-xtradb-cluster
 
-Documentation: http://www.percona.com/doc/percona-server/8.0
+Documentation: https://www.percona.com/doc/percona-xtradb-cluster/8.0/index.html
 
-Bug Tracker: https://jira.percona.com/projects/PS
+Jira (bugs): https://jira.percona.com/projects/PXC/issues
 
-Sources: https://github.com/percona/percona-server

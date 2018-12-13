@@ -87,6 +87,11 @@
 #include "thr_lock.h"
 #include "violite.h"
 
+#ifdef WITH_WSREP
+#include "sql/dd/types/table.h"                // dd::Table
+#include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
+#endif /* WITH_WSREP */
+
 bool Column_name_comparator::operator()(const String *lhs,
                                         const String *rhs) const {
   DBUG_ASSERT(lhs->charset()->number == rhs->charset()->number);
@@ -1358,6 +1363,108 @@ bool Sql_cmd_analyze_table::handle_histogram_command(THD *thd,
   return res;
 }
 
+#ifdef WITH_WSREP
+static bool pxc_strict_mode_admin_check(THD *thd, TABLE_LIST *tables) {
+  enum legacy_db_type db_type;
+
+  for (TABLE_LIST *table = tables; table; table = table->next_local) {
+
+    /* Skip check for temporary table */
+    if (is_temporary_table(table))
+      continue;
+
+    bool block = false;
+
+    // Acquire lock on the table as it is needed to get the instance from DD
+    MDL_request mdl_request;
+    MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db, table->table_name,
+                     MDL_SHARED, MDL_EXPLICIT);
+    thd->mdl_context.acquire_lock(&mdl_request,
+                                  thd->variables.lock_wait_timeout);
+
+    {
+      const char *schema_name = table->db;
+      const char *table_name = table->table_name;
+      dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+      const dd::Table *table_ref = NULL;
+
+      if (thd->dd_client()->acquire(schema_name, table_name, &table_ref)) {
+        thd->mdl_context.release_lock(mdl_request.ticket);
+        return true;
+      }
+
+      if (table_ref == nullptr ||
+          table_ref->hidden() == dd::Abstract_table::HT_HIDDEN_SE) {
+        my_error(ER_NO_SUCH_TABLE, MYF(0), schema_name, table_name);
+        thd->mdl_context.release_lock(mdl_request.ticket);
+        return true;
+      }
+
+      handlerton *hton = nullptr;
+      if (dd::table_storage_engine(thd, table_ref, &hton)) {
+        thd->mdl_context.release_lock(mdl_request.ticket);
+        return true;
+      }
+
+      db_type = hton->db_type;
+    }
+
+    thd->mdl_context.release_lock(mdl_request.ticket);
+
+    bool is_system_db =
+        (table && ((strcmp(table->db, "mysql") == 0) ||
+                   (strcmp(table->db, "information_schema") == 0)));
+
+    if (db_type != DB_TYPE_INNODB && db_type != DB_TYPE_UNKNOWN &&
+        db_type != DB_TYPE_PERFORMANCE_SCHEMA && !is_system_db &&
+        !is_temporary_table(table)) {
+      switch (pxc_strict_mode) {
+        case PXC_STRICT_MODE_DISABLED:
+          break;
+        case PXC_STRICT_MODE_PERMISSIVE:
+          WSREP_WARN(
+              "Percona-XtraDB-Cluster doesn't recommend use of"
+              " ADMIN command on a table (%s.%s) that resides in"
+              " non-transactional storage engine"
+              " with pxc_strict_mode = PERMISSIVE",
+              table->db, table->table_name);
+          push_warning_printf(
+              thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+              "Percona-XtraDB-Cluster doesn't recommend use of"
+              " ADMIN command on a table (%s.%s) that resides in"
+              " non-transactional storage engine"
+              " with pxc_strict_mode = PERMISSIVE",
+              table->db, table->table_name);
+          break;
+        case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_MASTER:
+        default:
+          block = true;
+          WSREP_ERROR(
+              "Percona-XtraDB-Cluster prohibits use of"
+              " ADMIN command on a table (%s.%s) that resides in"
+              " non-transactional storage engine"
+              " with pxc_strict_mode = ENFORCING or MASTER",
+              table->db, table->table_name);
+          char message[1024];
+          sprintf(message,
+                  "Percona-XtraDB-Cluster prohibits use of"
+                  " ADMIN command on a table (%s.%s) that resides in"
+                  " non-transactional storage engine"
+                  " with pxc_strict_mode = ENFORCING or MASTER",
+                  table->db, table->table_name);
+          my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+          break;
+      }
+    }
+
+    if (block) return true;
+  }
+
+  return false;
+}
+#endif /* WITH_WSREP */
+
 bool Sql_cmd_analyze_table::execute(THD *thd) {
   TABLE_LIST *first_table = thd->lex->select_lex->get_table_list();
   bool res = true;
@@ -1372,6 +1479,19 @@ bool Sql_cmd_analyze_table::execute(THD *thd) {
     my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
     DBUG_RETURN(true);
   });
+
+#ifdef WITH_WSREP
+  if (pxc_strict_mode_admin_check(thd, first_table)) DBUG_RETURN(res);
+
+  DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command", {
+    sql_print_information("In Sql_cmd_analyze_table::execute()");
+  });
+
+  if (WSREP(thd) && !thd->lex->no_write_to_binlog &&
+      wsrep_to_isolation_begin(thd, NULL, NULL, first_table)) {
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
 
   thd->set_slow_log_for_admin_command();
 
@@ -1407,6 +1527,17 @@ bool Sql_cmd_check_table::execute(THD *thd) {
     goto error; /* purecov: inspected */
   thd->enable_slow_log = opt_log_slow_admin_statements;
 
+#ifdef WITH_WSREP
+  if (pxc_strict_mode_admin_check(thd, first_table)) DBUG_RETURN(res);
+
+  DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command", {
+    sql_print_information("In Sql_cmd_check_table::execute()");
+  });
+
+  /* Check table is not replicated in cluster as it check for table
+  state like corruption that could be local to to the said node. */
+#endif /* WITH_WSREP */
+
   res = mysql_admin_table(thd, first_table, &thd->lex->check_opt, "check",
                           lock_type, 0, 0, HA_OPEN_FOR_REPAIR, 0,
                           &handler::ha_check, 1, m_alter_info, true);
@@ -1426,6 +1557,20 @@ bool Sql_cmd_optimize_table::execute(THD *thd) {
   if (check_table_access(thd, SELECT_ACL | INSERT_ACL, first_table, false,
                          UINT_MAX, false))
     goto error; /* purecov: inspected */
+
+#ifdef WITH_WSREP
+  if (pxc_strict_mode_admin_check(thd, first_table)) DBUG_RETURN(res);
+
+  DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command", {
+    sql_print_information("In Sql_cmd_optimize_table::execute()");
+  });
+
+  if (WSREP(thd) && !thd->lex->no_write_to_binlog &&
+      wsrep_to_isolation_begin(thd, NULL, NULL, first_table)) {
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
+
   thd->set_slow_log_for_admin_command();
   res = (specialflag & SPECIAL_NO_NEW_FUNC)
             ? mysql_recreate_table(thd, first_table, true)
@@ -1454,6 +1599,20 @@ bool Sql_cmd_repair_table::execute(THD *thd) {
   if (check_table_access(thd, SELECT_ACL | INSERT_ACL, first_table, false,
                          UINT_MAX, false))
     goto error; /* purecov: inspected */
+
+#ifdef WITH_WSREP
+  if (pxc_strict_mode_admin_check(thd, first_table)) DBUG_RETURN(res);
+
+  DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command", {
+    sql_print_information("In Sql_cmd_repair_table::execute()");
+  });
+
+  if (WSREP(thd) && !thd->lex->no_write_to_binlog &&
+      wsrep_to_isolation_begin(thd, NULL, NULL, first_table)) {
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
+
   thd->set_slow_log_for_admin_command();
   res = mysql_admin_table(
       thd, first_table, &thd->lex->check_opt, "repair", TL_WRITE, 1,

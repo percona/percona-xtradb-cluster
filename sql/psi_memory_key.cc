@@ -169,6 +169,11 @@ PSI_memory_key key_memory_userstat_thread_stats;
 PSI_memory_key key_memory_userstat_client_stats;
 PSI_memory_key key_memory_thread_pool_connection;
 
+// Percona XtraDB Cluster (PXC) PSI memory keys
+#ifdef WITH_WSREP
+PSI_memory_key key_memory_wsrep;
+#endif /* WITH_WSREP */
+
 #ifdef HAVE_PSI_INTERFACE
 
 static PSI_memory_info all_server_memory[] = {
@@ -419,7 +424,12 @@ static PSI_memory_info all_server_memory[] = {
     {&key_memory_userstat_client_stats, "userstat_client_stats",
      PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME},
     {&key_memory_thread_pool_connection, "thread_pool_connection", 0, 0,
-     PSI_DOCUMENT_ME},
+     PSI_DOCUMENT_ME}
+
+#ifdef WITH_WSREP
+    ,
+    {&key_memory_wsrep, "wsrep", PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME}
+#endif /* WITH_WSREP */
 };
 
 void register_server_memory_keys() {

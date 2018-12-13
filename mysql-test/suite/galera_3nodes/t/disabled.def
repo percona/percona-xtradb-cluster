@@ -1,0 +1,16 @@
+##############################################################################
+#
+#  List the test cases that are to be disabled temporarily.
+#
+#  Separate the test case name and the comment with ':'.
+#
+#    <testcasename> : BUG#<xxxx> <date disabled> <disabler> <comment>
+#
+#  Do not use any TAB characters for whitespace.
+#
+##############################################################################
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+galera_parallel_autoinc_manytrx2 : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_pc_bootstrap : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_slave_options_do : GCF-1019 0000-00-00 CODERSHIP 5.7 regression: replication filtering options do not work as they do in 5.6
+galera_slave_options_ignore : GCF-1019 0000-00-00 CODERSHIP 5.7 regression: replication filtering options do not work as they do in 5.6

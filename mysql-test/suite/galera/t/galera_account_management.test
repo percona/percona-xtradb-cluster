@@ -1,0 +1,125 @@
+#
+# Test the account management statements - GRANT, REVOKE, etc.
+#
+
+--source include/galera_cluster.inc
+
+#
+# CREATE USER
+#
+--connection node_1
+CREATE USER user1, user2 IDENTIFIED BY 'password';
+
+--connection node_2
+SELECT COUNT(*) = 2 FROM mysql.user WHERE user IN ('user1', 'user2');
+
+#
+# ALTER USER
+#
+
+--connection node_1
+ALTER USER user1 PASSWORD EXPIRE;
+SELECT password_expired = 'Y' FROM mysql.user WHERE user = 'user1';
+
+--connection node_2
+SELECT password_expired = 'Y' FROM mysql.user WHERE user = 'user1';
+
+#
+# ALTER USER IDENTIFIED BY 
+#
+
+CREATE USER user10 IDENTIFIED BY 'old_password';
+ALTER USER 'user10' IDENTIFIED BY 'new_password';
+
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user10';
+--source include/wait_condition.inc
+
+--connect node_1a, 127.0.0.1, user10, new_password, test, $NODE_MYPORT_1
+--connection node_1a
+SELECT 1 FROM DUAL;
+
+--connection node_1
+DROP USER user10;
+
+#
+# RENAME USER
+#
+
+--connection node_1
+RENAME USER user2 TO user3;
+
+--connection node_2
+SELECT COUNT(*) = 0 FROM mysql.user WHERE user = 'user2';
+SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user3';
+
+#
+# SET PASSWORD
+#
+--connection node_2
+--let $user3_last_changed = query_get_value(SELECT * FROM mysql.user WHERE USER='user3', 'password_last_changed', 1)
+--sleep 3
+
+--connection node_1
+SET PASSWORD FOR user3 = 'foo';
+
+--connection node_2
+let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user3' and '$user3_last_changed' < password_last_changed;
+--source include/wait_condition.inc
+
+--connect node_2b, 127.0.0.1, user3, foo, test, $NODE_MYPORT_2
+--connection node_2b
+SELECT 1 FROM DUAL;
+
+#
+# DROP USER
+#
+--connection node_1
+DROP USER user1, user3;
+
+--connection node_2
+SELECT COUNT(*) = 0 FROM mysql.user WHERE user IN ('user1', 'user2');
+
+#
+# GRANT
+#
+
+--connection node_1
+CREATE USER user4 IDENTIFIED BY 'password';
+GRANT ALL ON *.* TO user4;
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user4';
+SELECT Select_priv = 'Y' FROM mysql.user WHERE user = 'user4';
+
+#
+# GRANT PROXY ON
+#
+--connection node_1
+CREATE USER user5;
+GRANT PROXY ON user4 TO user5;
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM mysql.proxies_priv WHERE user = 'user5';
+
+#
+# REVOKE
+#
+
+--connection node_1
+REVOKE ALL PRIVILEGES ON *.* FROM user4;
+
+--connection node_2
+SELECT Select_priv = 'N' FROM mysql.user WHERE user = 'user4';
+
+#
+# REVOKE PROXY
+#
+
+--connection node_1
+REVOKE PROXY ON user4 FROM user5;
+
+--connection node_2
+SELECT COUNT(*) = 0 FROM mysql.proxies_priv WHERE user = 'user5';
+
+DROP USER user4, user5;

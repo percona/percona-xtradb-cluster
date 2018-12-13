@@ -334,6 +334,24 @@ bool Sql_cmd_dml::prepare(THD *thd) {
   // Perform a coarse statement-specific privilege check.
   if (precheck(thd)) goto err;
 
+#ifdef WITH_WSREP
+  /* This hook is specific to run the DML command (like INSERT ... SELECT)
+  as TOI for pt-table-checksum that checks for cluster consistency and needs
+  to execute the said command at same point on all nodes. */
+  // TODO: do we need to add SQLCOM_REPLACE_SELECT too as part of the check ?
+  if (lex->sql_command == SQLCOM_INSERT_SELECT) {
+    if (thd->wsrep_consistency_check == CONSISTENCY_CHECK_DECLARED) {
+      thd->wsrep_consistency_check = CONSISTENCY_CHECK_RUNNING;
+      TABLE_LIST *const first_table = lex->select_lex->get_table_list();
+      if (WSREP(thd) &&
+          wsrep_to_isolation_begin(thd, first_table->db,
+                                   first_table->table_name, NULL)) {
+        return true;
+      }
+    }
+  }
+#endif /* WITH_WSREP */
+
   // Trigger out_of_memory condition inside open_tables_for_query()
   DBUG_EXECUTE_IF("sql_cmd_dml_prepare__out_of_memory",
                   DBUG_SET("+d,simulate_out_of_memory"););

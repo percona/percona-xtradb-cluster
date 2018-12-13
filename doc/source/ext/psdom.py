@@ -173,6 +173,8 @@ class PSconfigObject(ObjectDescription):
             return _('%s (option)') % name
         elif self.objtype == 'variable':
             return _('%s (variable)') % name
+        elif self.objtype == 'command':
+            return _('%s (command)') % name
         else:
             return ''
 
@@ -324,6 +326,7 @@ class PerconaServerDomain(Domain):
         'column':    ObjType(l_('column'),   'column'),
         'option':    ObjType(l_('option'),   'option'),
         'variable':  ObjType(l_('variable'), 'data'),
+        'command':  ObjType(l_('command'), 'command'),
     }
 
     directives = {
@@ -332,6 +335,7 @@ class PerconaServerDomain(Domain):
         'column':   PSColumn,
         'option':   PSVariable,
         'variable': PSVariable,
+        'command':  PSVariable,
         'rn':       PSReleaseNotes
     }
     roles = {
@@ -340,6 +344,7 @@ class PerconaServerDomain(Domain):
         'column':   PSXRefRole(),
         'option':   PSXRefRole(),
         'variable': PSXRefRole(),
+        'command':  PSXRefRole(),
         'rn': PSXRefRole(),
     }
     initial_data = {

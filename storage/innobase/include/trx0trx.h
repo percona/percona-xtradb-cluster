@@ -278,6 +278,20 @@ void trx_print_latched(
     ulint max_query_len); /*!< in: max query length to print,
                           or 0 to use the default max length */
 
+#ifdef WITH_WSREP
+/** Prints info about a transaction.
+Transaction information may be retrieved without having trx_sys->mutex acquired
+so it may not be completely accurate. The caller must own lock_sys->mutex
+and the trx must have some locks to make sure that it does not escape
+without locking lock_sys->mutex. */
+void wsrep_trx_print_locking(
+    FILE *f,             /*!< in: output stream */
+    const trx_t *trx,    /*!< in: transaction */
+    ulint max_query_len) /*!< in: max query length to print,
+                         or 0 to use the default max length */
+    MY_ATTRIBUTE((nonnull));
+#endif /* WITH_WSREP */
+
 /** Prints info about a transaction.
  Acquires and releases lock_sys->mutex and trx_sys->mutex. */
 void trx_print(FILE *f,              /*!< in: output stream */
@@ -397,7 +411,12 @@ Check if the transaction is being referenced. */
 @return the transaction that will be rolled back, null don't care */
 
 UNIV_INLINE
+#ifdef WITH_WSREP
+const trx_t *trx_arbitrate(const trx_t *requestor,
+                           const trx_t *holder, bool sync = false);
+#else
 const trx_t *trx_arbitrate(const trx_t *requestor, const trx_t *holder);
+#endif /* WITH_WSREP */
 
 /**
 @param[in] trx		Transaction to check
@@ -1018,6 +1037,10 @@ struct trx_t {
                             mark and the actual async kill because
                             the running thread can change. */
 
+#ifdef WITH_WSREP
+  query_id_t wsrep_killed_by_query;
+#endif /* WITH_WSREP */
+
   /* These fields are not protected by any mutex. */
   const char *op_info;   /*!< English text describing the
                          current operation, or an empty
@@ -1275,6 +1298,16 @@ struct trx_t {
 #endif            /* UNIV_DEBUG */
   trx_stats stats;
   ulint magic_n;
+
+#ifdef WITH_WSREP
+  os_event_t wsrep_event; /* event waited for in srv_conc_slot */
+
+  /* During recovery, prepare state transaction may be committed
+  or rollback. If a transaction is committed then xid of such
+  transaction should be persisted to sys_header under wsrep-xid
+  section to record successful commit-recovery of the said transaction. */
+  XID *wsrep_recover_xid;
+#endif /* WITH_WSREP */
 
   bool skip_gap_locks() const {
     switch (isolation_level) {

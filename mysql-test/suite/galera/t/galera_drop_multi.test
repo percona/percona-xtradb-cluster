@@ -1,0 +1,197 @@
+#
+# Test that multi-table DROP TABLE statements are properly replicated
+# See http://dev.mysql.com/doc/relnotes/mysql/5.6/en/news-5-6-20.html
+#
+
+--source include/galera_cluster.inc
+
+set session wsrep_replicate_myisam=ON;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=MyISAM;
+CREATE TEMPORARY TABLE t2 (f1 INTEGER) ENGINE=MyISAM;
+CREATE TABLE t3 (f1 INTEGER) ENGINE=InnoDB;
+CREATE TEMPORARY TABLE t4 (f1 INTEGER) ENGINE=InnoDB;
+
+CREATE TABLE t5 (f1 INTEGER);
+
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+
+DROP TABLE t1, t2, t3, t4;
+
+INSERT INTO t5 VALUES (1);
+
+COMMIT;
+
+--connection node_2
+--error ER_NO_SUCH_TABLE
+SHOW CREATE TABLE t1;
+
+--error ER_NO_SUCH_TABLE
+SHOW CREATE TABLE t2;
+
+--error ER_NO_SUCH_TABLE
+SHOW CREATE TABLE t3;
+
+--error ER_NO_SUCH_TABLE
+SHOW CREATE TABLE t4;
+
+CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t2,test.t4'' on query\. Default database: 'test'\. Query: 'DROP TABLE t1, t2, t3, t4', Error_code: 1051");
+
+--connection node_1
+DROP TABLE t5;
+
+
+#
+# test-case to cover drop of multiple tables (temporary + non-temporary).
+# transaction, non-transactional, etc....
+#
+
+
+#--------------------------------------------------------------------------
+# use-case-1: drop each table independently.
+#
+--connection node_1
+--echo #node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+
+--connection node_1
+--echo #node-2
+show tables;
+
+--connection node_1
+--echo #node-1
+drop table t1;
+drop table t2;
+drop table t3;
+drop table t4;
+
+--connection node_2
+--echo #node-2
+show tables;
+
+#--------------------------------------------------------------------------
+# use-case-2: drop all table through single drop statement
+#
+--connection node_1
+--echo #node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+
+--connection node_1
+--echo #node-2
+show tables;
+
+--connection node_1
+--echo #node-1
+drop table t1, t2, t3, t4;
+
+--connection node_2
+--echo #node-2
+show tables;
+
+#--------------------------------------------------------------------------
+# use-case-3: segregate drop based on transactional and non-transactional tables
+#
+--connection node_1
+--echo #node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+
+--connection node_1
+--echo #node-2
+show tables;
+
+--connection node_1
+--echo #node-1
+drop table t1, t2;
+drop table t3, t4;
+
+--connection node_2
+--echo #node-2
+show tables;
+
+
+#--------------------------------------------------------------------------
+# use-case-4: segregate drop based on temporary or persistent property of table
+#
+--connection node_1
+--echo #node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+
+--connection node_1
+--echo #node-2
+show tables;
+
+--connection node_1
+--echo #node-1
+drop table t1, t3;
+drop table t2, t4;
+
+--connection node_2
+--echo #node-2
+show tables;
+
+
+#--------------------------------------------------------------------------
+# use-case-5: mix-match transactional and non-transactional tables along with
+#             temporary and non-temporary
+#
+--connection node_1
+--echo #node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+
+--connection node_1
+--echo #node-2
+show tables;
+
+--connection node_1
+--echo #node-1
+drop table t1, t4;
+drop table t2, t3;
+
+--connection node_2
+--echo #node-2
+show tables;
+
+#--------------------------------------------------------------------------
+# use-case-5a: mix-match transactional and non-transactional tables along with
+#             temporary and non-temporary
+#
+--connection node_1
+--echo #node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+
+--connection node_1
+--echo #node-2
+show tables;
+
+--connection node_1
+--echo #node-1
+drop table t1, t3, t4;
+drop table t2;
+
+--connection node_2
+--echo #node-2
+show tables;

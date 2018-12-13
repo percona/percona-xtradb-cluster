@@ -857,6 +857,40 @@ class MDL_ticket : public MDL_wait_for_subgraph {
   MDL_ticket **prev_in_lock;
 
  public:
+#ifdef WITH_WSREP
+  void wsrep_report(bool debug);
+
+  const char *get_type_string() {
+    switch (m_type) {
+      case MDL_INTENTION_EXCLUSIVE:
+        return "MDL_INTENTION_EXCLUSIVE";
+      case MDL_SHARED:
+        return "MDL_SHARED";
+      case MDL_SHARED_HIGH_PRIO:
+        return "MDL_SHARED_HIGH_PRIO";
+      case MDL_SHARED_READ:
+        return "MDL_SHARED_READ";
+      case MDL_SHARED_WRITE:
+        return "MDL_SHARED_WRITE";
+      case MDL_SHARED_WRITE_LOW_PRIO:
+        return "MDL_SHARED_WRITE_LOW_PRIO";
+      case MDL_SHARED_UPGRADABLE:
+        return "MDL_SHARED_UPGRADABLE";
+      case MDL_SHARED_READ_ONLY:
+        return "MDL_SHARED_READ_ONLY";
+      case MDL_SHARED_NO_WRITE:
+        return "MDL_SHARED_NO_WRITE";
+      case MDL_SHARED_NO_READ_WRITE:
+        return "MDL_SHARED_NO_READ_WRITE";
+      case MDL_EXCLUSIVE:
+        return "MDL_EXCLUSIVE";
+      case MDL_TYPE_END:
+        return "NULL";
+    }
+    return "NULL";
+  }
+#endif /* WITH_WSREP */
+
   bool has_pending_conflicting_lock() const;
 
   MDL_context *get_ctx() const { return m_ctx; }
@@ -1305,6 +1339,11 @@ class MDL_context {
 
   inline bool has_locks() const { return !m_ticket_store.is_empty(); }
 
+#ifdef WITH_WSREP
+  inline bool has_transactional_locks() const {
+    return !(m_ticket_store.is_empty(MDL_TRANSACTION));
+  }
+#endif /* WITH_WSREP */
   bool has_locks(MDL_key::enum_mdl_namespace mdl_namespace) const;
 
   bool has_locks_waited_for() const;
@@ -1320,6 +1359,9 @@ class MDL_context {
 
   void release_statement_locks();
   void release_transactional_locks();
+#ifdef WITH_WSREP
+  void release_explicit_locks();
+#endif /* WITH_WSREP */
   void rollback_to_savepoint(const MDL_savepoint &mdl_savepoint);
 
   MDL_context_owner *get_owner() const { return m_owner; }
@@ -1507,6 +1549,10 @@ class MDL_context {
   inline bool fix_pins();
 
  public:
+#ifdef WITH_WSREP
+  THD *wsrep_get_thd() const { return get_thd(); }
+  bool wsrep_has_explicit_locks();
+#endif /* WITH_WSREP */
   void find_deadlock();
 
   bool visit_subgraph(MDL_wait_for_graph_visitor *dvisitor);

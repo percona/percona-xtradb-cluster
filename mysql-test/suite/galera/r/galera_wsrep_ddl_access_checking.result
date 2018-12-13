@@ -1,0 +1,547 @@
+CREATE DATABASE testdb;
+USE testdb;
+CREATE TABLE counter(id INT PRIMARY KEY AUTO_INCREMENT, count INT);
+CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT, f2 CHAR(64));
+INSERT INTO t1(f2) VALUES(1);
+CREATE USER 'testme'@'%' IDENTIFIED BY 'secret';
+GRANT SELECT ON testdb.* TO 'testme'@'%';
+GRANT INSERT ON testdb.counter TO 'testme'@'%';
+CREATE USER 'testother'@'%' IDENTIFIED BY 'secret2';
+FLUSH PRIVILEGES;
+# connection node_1
+use testdb;
+SET GLOBAL debug= 'd,sql_cmd.before_toi_begin.log_command';
+# connection node_2
+use testdb;
+SET GLOBAL debug= 'd,sql_cmd.before_toi_begin.log_command';
+# connection node_testme
+use testdb;
+#
+# SQLCOM_CREATE_TABLE access test
+#
+# connection node_testme
+CREATE TABLE t2(id INT PRIMARY KEY AUTO_INCREMENT);
+ERROR 42000: CREATE command denied to user 'testme'@'localhost' for table 't2'
+INSERT INTO counter(count) VALUES(1);;
+# connection node_1
+include/assert.inc [Table t2 should not exist on node 1]
+# connection node_2
+include/assert.inc [Table t2 should not exist on node 2]
+#
+# SQLCOM_CREATE_INDEX access test
+#
+# connection node_testme
+CREATE INDEX index_t1_f2 ON t1(f2);
+ERROR 42000: INDEX command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(2);;
+# connection node_1
+include/assert.inc [Index t1_f2 should not exist on node 1]
+# connection node_2
+include/assert.inc [Index t1_f2 should not exist on node 2]
+#
+# SQLCOM_ALTER_TABLE access test
+#
+# connection node_testme
+ALTER TABLE t1 ADD COLUMN f3 LONGBLOB;
+ERROR 42000: ALTER command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(3);;
+# connection node_1
+include/assert.inc [Column f3 on table t1 should not exist on node 1]
+# connection node_2
+include/assert.inc [Column f3 on table t1 should not exist on node 2]
+#
+# SQLCOM_TRUNCATE access test
+#
+# connection node_testme
+TRUNCATE TABLE t1;
+ERROR 42000: DROP command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(4);;
+# connection node_1
+include/assert.inc [Table t1 was not truncated on node 1]
+# connection node_2
+include/assert.inc [Table t1 was not truncated on node 2]
+#
+# SQLCOM_DROP_TABLE access test
+#
+# connection node_testme
+DROP TABLE t1;
+ERROR 42000: DROP command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(5);;
+# connection node_1
+include/assert.inc [Table t1 was not dropped on node 1]
+# connection node_2
+include/assert.inc [Table t1 was not dropped on node 2]
+#
+# SQLCOM_DROP_INDEX access test
+#
+# connection node_1
+CREATE INDEX t1_f2 ON t1(f2);
+include/assert.inc [Index t1_f2 should exist on node 1]
+# connection node_testme
+DROP INDEX t1_f2 ON t1;
+ERROR 42000: INDEX command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(6);;
+# connection node_1
+include/assert.inc [Index t1_f2 should still exist on node 1]
+# connection node_2
+include/assert.inc [Index t1_f2 should still exist on node 2]
+# connection node_1
+DROP INDEX t1_f2 ON t1;
+#
+# SQLCOM_GRANT access test
+#
+# connection node_testme
+GRANT SELECT ON testdb.* TO 'testother'@'%';
+ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
+INSERT INTO counter(count) VALUES(7);;
+# connection node_1
+SHOW GRANTS FOR 'testother';
+Grants for testother@%
+GRANT USAGE ON *.* TO `testother`@`%`
+# connection node_2
+SHOW GRANTS FOR 'testother';
+Grants for testother@%
+GRANT USAGE ON *.* TO `testother`@`%`
+#
+# SQLCOM_CREATE_DB access test
+#
+# connection node_testme
+include/assert.inc [Database testdbother does not exist on node 1]
+CREATE DATABASE testdbother;
+ERROR 42000: Access denied for user 'testme'@'%' to database 'testdbother'
+INSERT INTO counter(count) VALUES(8);;
+# connection node_1
+include/assert.inc [Database testdbother still does not exist on node 1]
+# connection node_2
+include/assert.inc [Database testdbother still does not exist on node 2]
+#
+# SQLCOM_DROP_DB access test
+#
+# connection node_testme
+include/assert.inc [Database testdb exists on node 1]
+DROP DATABASE testdb;
+ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
+INSERT INTO counter(count) VALUES(9);;
+# connection node_1
+include/assert.inc [Database testdb still exists on node 1]
+# connection node_2
+include/assert.inc [Database testdb still exists on node 2]
+#
+# SQLCOM_ALTER_DB access test
+#
+# connection node_testme
+SHOW CREATE DATABASE testdb;
+Database	Create Database
+testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */
+ALTER DATABASE testdb CHARACTER SET latin7;
+ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
+INSERT INTO counter(count) VALUES(10);;
+# connection node_1
+SHOW CREATE DATABASE testdb;
+Database	Create Database
+testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */
+# connection node_2
+SHOW CREATE DATABASE testdb;
+Database	Create Database
+testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */
+#
+# SQLCOM_REPAIR access test
+#
+# connection node_testme
+REPAIR TABLE t1;
+ERROR 42000: INSERT command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(11);;
+# connection node_1
+include/assert_grep.inc [REPAIR TABLE did not execute on node 1]
+# connection node_2
+include/assert_grep.inc [REPAIR TABLE did not execute on node 2]
+#
+# SQLCOM_DROP_FUNCTION access test
+#
+# connection node_1
+CREATE FUNCTION hello2 (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
+# connection node_1
+include/assert.inc [The hello2 function should exist on node 1]
+# connection node_2
+include/assert.inc [The hello2 function should exist on node 2]
+# connection node_testme
+DROP FUNCTION hello2;
+ERROR 42000: alter routine command denied to user 'testme'@'%' for routine 'testdb.hello2'
+INSERT INTO counter(count) VALUES(12);;
+# connection node_1
+include/assert.inc [The hello2 function should still exist on node 1]
+# connection node_2
+include/assert.inc [The hello2 function should still exist on node 2]
+# connection node_1
+DROP FUNCTION hello2;
+#
+# SQLCOM_REVOKE access test
+#
+# connection node_1
+GRANT SELECT ON testdb.t1 TO 'testother'@'%';
+FLUSH PRIVILEGES;
+# connection node_1
+SHOW GRANTS FOR 'testother';
+Grants for testother@%
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
+# connection node_2
+SHOW GRANTS FOR 'testother';
+Grants for testother@%
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
+# connection node_testme
+REVOKE SELECT ON testdb.t1 FROM 'testother'@'%';
+ERROR 42000: GRANT command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(13);;
+# connection node_1
+SHOW GRANTS FOR 'testother';
+Grants for testother@%
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
+# connection node_2
+SHOW GRANTS FOR 'testother';
+Grants for testother@%
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
+# connection node_1
+REVOKE SELECT ON testdb.t1 FROM 'testother'@'%';
+#
+# SQLCOM_OPTIMIZE access test
+#
+# connection node_testme
+OPTIMIZE TABLE t1;
+ERROR 42000: INSERT command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(14);;
+# connection node_1
+include/assert_grep.inc [OPTIMIZE TABLE did not execute on node 1]
+# connection node_2
+include/assert_grep.inc [OPTIMIZE TABLE did not execute on node 2]
+#
+# SQLCOM_ANALYZE access test
+#
+# connection node_testme
+ANALYZE TABLE t1;
+ERROR 42000: INSERT command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(15);;
+# connection node_1
+include/assert_grep.inc [ANALYZE TABLE did not execute on node 1]
+# connection node_2
+include/assert_grep.inc [ANALYZE TABLE did not execute on node 2]
+#
+# SQLCOM_RENAME_TABLE access test
+#
+# connection node_testme
+RENAME TABLE t1 to t2;
+ERROR 42000: DROP, ALTER command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(16);;
+# connection node_1
+include/assert.inc [Table t1 was not renamed on node 1]
+# connection node_2
+include/assert.inc [Table t1 was not renamed on node 2]
+#
+# SQLCOM_CREATE_USER access test
+#
+# connection node_testme
+CREATE USER 'foo'@'%' IDENTIFIED BY 'secret';
+ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
+INSERT INTO counter(count) VALUES(17);;
+# connection node_1
+include/assert.inc [User foo was not created on node 1]
+# connection node_2
+include/assert.inc [User foo was not created on node 2]
+#
+# SQLCOM_DROP_USER access test
+#
+# connection node_testme
+DROP USER 'testother'@'%';
+ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
+INSERT INTO counter(count) VALUES(18);;
+# connection node_1
+include/assert.inc [User testother still exists on node 1]
+# connection node_2
+include/assert.inc [User testother still exists on node 2]
+#
+# SQLCOM_RENAME_USER access test
+#
+# connection node_testme
+RENAME USER 'testother'@'%' TO 'testwho'@'%';
+ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
+INSERT INTO counter(count) VALUES(19);;
+# connection node_1
+include/assert.inc [User testother still exists on node 1]
+# connection node_2
+include/assert.inc [User testother still exists on node 2]
+#
+# SQLCOM_REVOKE_ALL access test
+#
+# connection node_1
+GRANT SELECT ON testdb.t1 TO 'testother'@'%';
+FLUSH PRIVILEGES;
+# connection node_1
+SHOW GRANTS FOR 'testother';
+Grants for testother@%
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
+# connection node_2
+SHOW GRANTS FOR 'testother';
+Grants for testother@%
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
+# connection node_testme
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'testother'@'%';
+ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
+INSERT INTO counter(count) VALUES(20);;
+# connection node_1
+SHOW GRANTS FOR 'testother';
+Grants for testother@%
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
+# connection node_2
+SHOW GRANTS FOR 'testother';
+Grants for testother@%
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
+#
+# SQLCOM_CREATE_PROCEDURE access test
+#
+# connection node_testme
+CREATE PROCEDURE hellop (OUT ver_param VARCHAR(64), INOUT incr_param INT)
+BEGIN
+END;
+ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
+INSERT INTO counter(count) VALUES(21);;
+# connection node_1
+include/assert.inc [The hellop procedure should not exist on node 1]
+# connection node_2
+include/assert.inc [The hellop function should not exist on node 2]
+#
+# SQLCOM_CREATE_SPFUNCTION access test
+#
+# connection node_testme
+CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello, ',s,'!');
+ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
+INSERT INTO counter(count) VALUES(22);;
+# connection node_1
+include/assert.inc [The hello function should not exist on node 1]
+# connection node_2
+include/assert.inc [The hello function should not exist on node 2]
+#
+# SQLCOM_DROP_PROCEDURE access test
+#
+# connection node_1
+CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
+BEGIN
+END;
+# connection node_1
+include/assert.inc [The hellop procedure should exist on node 1]
+# connection node_2
+include/assert.inc [The hellop procedure should exist on node 2]
+# connection node_testme
+DROP PROCEDURE hellop;
+ERROR 42000: alter routine command denied to user 'testme'@'%' for routine 'testdb.hellop'
+INSERT INTO counter(count) VALUES(23);;
+# connection node_1
+include/assert.inc [The hellop procedure should still exist on node 1]
+# connection node_2
+include/assert.inc [The hellop procedure should still exist on node 2]
+# connection node_1
+DROP PROCEDURE hellop;
+#
+# SQLCOM_ALTER_PROCEDURE access test
+#
+# connection node_1
+CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
+BEGIN
+END;
+# connection node_1
+include/assert.inc [The hellop procedure should exist on node 1]
+# connection node_2
+include/assert.inc [The hellop procedure should exist on node 2]
+SELECT routine_name, security_type FROM information_schema.routines where ROUTINE_NAME = "hellop";
+ROUTINE_NAME	SECURITY_TYPE
+hellop	DEFINER
+# connection node_testme
+ALTER PROCEDURE hellop SQL SECURITY INVOKER;
+ERROR 42000: alter routine command denied to user 'testme'@'%' for routine 'testdb.hellop'
+INSERT INTO counter(count) VALUES(24);;
+# connection node_1
+include/assert.inc [The hellop procedure should still use the DEFINER on node 1]
+# connection node_2
+include/assert.inc [The hellop procedure should still use the DEFINER on node 2]
+# connection node_1
+DROP PROCEDURE hellop;
+#
+# SQLCOM_ALTER_FUNCTION access test
+#
+# connection node_1
+CREATE FUNCTION hellof (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
+# connection node_1
+include/assert.inc [The hellof function should exist on node 1]
+# connection node_2
+include/assert.inc [The hellof function should exist on node 2]
+SELECT routine_name, security_type FROM information_schema.routines where ROUTINE_NAME = "hellof";
+ROUTINE_NAME	SECURITY_TYPE
+hellof	DEFINER
+# connection node_testme
+ALTER FUNCTION hellof SQL SECURITY INVOKER;
+ERROR 42000: alter routine command denied to user 'testme'@'%' for routine 'testdb.hellof'
+INSERT INTO counter(count) VALUES(25);;
+# connection node_1
+include/assert.inc [The hellof function should still use the DEFINER on node 1]
+# connection node_2
+include/assert.inc [The hellof function should still use the DEFINER on node 2]
+# connection node_1
+DROP FUNCTION hellof;
+#
+# SQLCOM_CREATE_VIEW access test
+#
+# connection node_testme
+CREATE VIEW testview AS SELECT * FROM t1;
+ERROR 42000: CREATE VIEW command denied to user 'testme'@'localhost' for table 'testview'
+INSERT INTO counter(count) VALUES(26);;
+# connection node_1
+include/assert.inc [The testview VIEW should not exist on node 1]
+# connection node_2
+include/assert.inc [The testview VIEW should not exist on node 2]
+#
+# SQLCOM_DROP_VIEW access test
+#
+# connection node_1
+CREATE VIEW helloview AS SELECT * FROM t1;
+# connection node_1
+include/assert.inc [The helloview VIEW should exist on node 1]
+# connection node_2
+include/assert.inc [The helloview VIEW should exist on node 2]
+# connection node_testme
+DROP VIEW helloview;
+ERROR 42000: DROP command denied to user 'testme'@'localhost' for table 'helloview'
+INSERT INTO counter(count) VALUES(27);;
+# connection node_1
+include/assert.inc [The helloview VIEW should still exist on node 1]
+# connection node_2
+include/assert.inc [The helloview VIEW should still exist on node 2]
+# connection node_1
+DROP VIEW helloview;
+#
+# SQLCOM_CREATE_TRIGGER access test
+#
+# connection node_testme
+CREATE TRIGGER testtrigger BEFORE INSERT ON t1 FOR EACH ROW SET @sum = @sum + 1;
+ERROR 42000: TRIGGER command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(28);;
+# connection node_1
+include/assert.inc [The testtrigger TRIGGER should not exist on node 1]
+# connection node_2
+include/assert.inc [The testtrigger TRIGGER should not exist on node 2]
+#
+# SQLCOM_DROP_TRIGGER access test
+#
+# connection node_1
+CREATE TRIGGER hellotrigger BEFORE INSERT ON t1 FOR EACH ROW SET @sum = @sum + 1;
+# connection node_1
+include/assert.inc [The hellotrigger TRIGGER should exist on node 1]
+# connection node_2
+include/assert.inc [The hellotrigger TRIGGER should exist on node 2]
+# connection node_testme
+DROP TRIGGER hellotrigger;
+ERROR 42000: TRIGGER command denied to user 'testme'@'localhost' for table 't1'
+INSERT INTO counter(count) VALUES(29);;
+# connection node_1
+include/assert.inc [The hellotrigger TRIGGER should still exist on node 1]
+# connection node_2
+include/assert.inc [The hellotrigger TRIGGER should still exist on node 2]
+# connection node_1
+DROP TRIGGER hellotrigger;
+#
+# SQLCOM_INSTALL_PLUGIN access test
+#
+# connection node_testme
+INSTALL PLUGIN audit_log SONAME "audit_log.so";
+ERROR 42000: INSERT command denied to user 'testme'@'localhost' for table 'plugin'
+INSERT INTO counter(count) VALUES(30);;
+# connection node_1
+include/assert.inc [The audit_log PLUGIN should not be installed on node 1]
+# connection node_2
+include/assert.inc [The audit_log PLUGIN should not be installed on node 2]
+#
+# SQLCOM_UNINSTALL_PLUGIN access test
+#
+# connection node_1
+INSTALL PLUGIN audit_log SONAME "audit_log.so";
+include/assert.inc [The audit_log PLUGIN should be installed on node 1]
+# connection node_2
+# connection node_testme
+UNINSTALL PLUGIN audit_log;
+ERROR 42000: DELETE command denied to user 'testme'@'localhost' for table 'plugin'
+INSERT INTO counter(count) VALUES(31);;
+# connection node_1
+include/assert.inc [The audit_log PLUGIN should still be installed on node 1]
+# connection node_2
+include/assert.inc [The audit_log PLUGIN should still be installed on node 2]
+# connection node_1
+UNINSTALL plugin audit_log;
+Warnings:
+Warning	1620	Plugin is busy and will be uninstalled on shutdown
+#
+# SQLCOM_CREATE_EVENT access test
+#
+# connection node_testme
+CREATE EVENT testevent
+ON SCHEDULE EVERY 1 HOUR
+DO INSERT INTO t1(f2) VALUES(3);
+ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
+INSERT INTO counter(count) VALUES(32);;
+# connection node_1
+include/assert.inc [The testevent EVENT should not exist on node 1]
+# connection node_2
+include/assert.inc [The testevent EVENT should not exist on node 2]
+#
+# SQLCOM_ALTER_EVENT access test
+#
+# connection node_1
+CREATE EVENT helloevent
+ON SCHEDULE EVERY 1 HOUR
+DO INSERT INTO t1(f2) VALUES(3);
+# connection node_1
+include/assert.inc [The helloevent EVENT should exist on node 1]
+# connection node_2
+include/assert.inc [The helloevent EVENT should exist on node 2]
+# connection node_testme
+ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
+ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
+INSERT INTO counter(count) VALUES(33);;
+# connection node_1
+include/assert.inc [The helloevent EVENT should still exist on node 1]
+# connection node_2
+include/assert.inc [The helloevent EVENT should still exist on node 2]
+#
+# SQLCOM_DROP_EVENT access test
+#
+# connection node_testme
+DROP EVENT helloevent;
+ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
+INSERT INTO counter(count) VALUES(34);;
+# connection node_1
+include/assert.inc [The helloevent EVENT should still exist on node 1]
+# connection node_2
+include/assert.inc [The helloevent EVENT should still exist on node 2]
+#
+# SQLCOM_ALTER_USER access test
+#
+# connection node_testme
+ALTER USER 'testother'@'%' PASSWORD EXPIRE;
+ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
+INSERT INTO counter(count) VALUES(35);;
+# connection node_1
+include/assert.inc [User testother should be unexpired on node 1]
+# connection node_2
+include/assert.inc [User testother should be unlocked on node 2]
+#
+# cleanup
+#
+DROP USER 'testother';
+DROP USER 'testme';
+DROP DATABASE testdb;
+SET GLOBAL debug= '';
+SET GLOBAL debug= '';

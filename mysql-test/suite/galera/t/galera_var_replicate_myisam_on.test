@@ -1,0 +1,223 @@
+#
+# Simple test for wsrep-replicate-myisam = ON 
+#
+
+--source include/galera_cluster.inc
+
+
+--connection node_1
+SET SESSION wsrep_replicate_myisam = TRUE;
+--connection node_2
+SET SESSION wsrep_replicate_myisam = TRUE;
+
+#
+# Simple INSERT
+#
+
+--connection node_1
+CREATE TABLE t1 (f1 INT PRIMARY KEY) Engine=MyISAM;
+INSERT INTO t1 VALUES (1);
+INSERT INTO t1 VALUES (2), (3);
+INSERT INTO t1 SELECT 4 FROM DUAL UNION ALL SELECT 5 FROM DUAL;
+
+--connection node_2
+SELECT COUNT(*) = 5 FROM t1;
+
+DROP TABLE t1;
+
+#
+# REPLACE
+#
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 VARCHAR(100)) ENGINE=MyISAM;
+INSERT INTO t1 VALUES (1, 'abc'),(2,'abc'), (3, 'xxx');
+REPLACE INTO t1 VALUES (1, 'klm'), (2,'xyz');
+REPLACE INTO t1 SELECT 3, 'yyy' FROM DUAL;
+
+--connection node_2
+SELECT COUNT(*) = 3 FROM t1;
+SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 1 AND f2 = 'klm';
+SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 2 AND f2 = 'xyz';
+SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 3 AND f2 = 'yyy';
+
+#
+# UPDATE
+#
+
+--connection node_1
+UPDATE t1 SET f2 = 'zzz' WHERE f2 = 'yyy';
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'zzz';
+
+#
+# DELETE
+#
+
+--connection node_1
+DELETE FROM t1 WHERE f2 = 'zzz';
+
+--connection node_2
+SELECT COUNT(*) = 0 FROM t1 WHERE f2 = 'zzz';
+
+#
+# TRUNCATE
+#
+
+--connection node_1
+TRUNCATE TABLE t1;
+
+--connection node_2
+SELECT COUNT(*) = 0 FROM t1;
+DROP TABLE t1;
+
+#
+# Transaction
+#
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER) ENGINE=MyISAM;
+CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+INSERT INTO t1 VALUES (1);
+INSERT INTO t2 VALUES (1);
+COMMIT;
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1;
+SELECT COUNT(*) = 1 FROM t2;
+
+--connection node_1
+SET AUTOCOMMIT=ON;
+
+#
+# Transaction rollback
+#
+
+--connection node_1
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+INSERT INTO t1 VALUES (2);
+INSERT INTO t2 VALUES (2);
+ROLLBACK;
+
+--connection node_2
+SELECT COUNT(*) = 2 FROM t1;
+SELECT COUNT(*) = 1 FROM t2;
+
+DROP TABLE t1;
+DROP TABLE t2;
+
+--connection node_1
+SET AUTOCOMMIT=ON;
+
+#
+# Transaction conflict
+#
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=MyISAM;
+CREATE TABLE t2 (f2 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+INSERT INTO t1 VALUES (1);
+INSERT INTO t2 VALUES (1);
+
+--connection node_2
+# The MyISAM update is replicated immediately, so a duplicate key error happens even before the COMMIT
+--error ER_DUP_ENTRY
+INSERT INTO t1 VALUES (1);
+
+--connection node_1
+COMMIT;
+SET AUTOCOMMIT=ON;
+
+DROP TABLE t1;
+DROP TABLE t2;
+
+#
+# INSERT .... SELECT
+#
+--connection node_1
+use test;
+create table is1 (i int) engine=myisam;
+create table is2 (i int) engine=myisam;
+create table is3 (i int) engine=innodb;
+create table is4 (i int) engine=myisam;
+insert into is1 select 1;
+insert into is1 (i) select i from is1;
+insert into is1 values (2), (3);
+insert into is1 (i) select i from is1;
+select * from is1;
+#
+insert into is2 (i) select i from is1;
+#
+insert into is3 (i) select i from is1;
+insert into is1 (i) select i from is3;
+#
+insert into is4 (i) select 1 from information_schema.tables;
+
+--connection node_2
+select count(*) from is1;
+select count(*) from is2;
+select count(*) from is3;
+drop table is1;
+drop table is2;
+drop table is3;
+drop table is4;
+
+#
+# In INSERT DELAYED statement DELAYED clause is ignored.
+# (Why ? DELAYED clause is execute in async fashion which interfere with
+# sync replication from galera)
+#
+--connection node_1
+--echo #node-1
+#
+--let $wsrep_replicate_myisam_cached = `select @@global.wsrep_replicate_myisam`
+--let $wsrep_OSU_method_cached = `select @@global.wsrep_OSU_method`
+#
+set @@global.wsrep_replicate_myisam = 1;
+set @@global.wsrep_OSU_method="TOI";
+#
+use test;
+create table is1 (i int) engine=myisam;
+insert into is1 values (1), (2);
+#
+--connection node_2
+--echo #node-2
+select * from is1;
+#
+--connection node_1
+--echo #node-1
+insert is1 values (3), (4);
+alter table is1 add column j int;
+#
+--connection node_2
+--echo #node-2
+select * from is1;
+drop table is1;
+
+#
+# with OSU method = RSU
+--connection node_1
+--echo #node-1
+set @@global.wsrep_OSU_method="RSU";
+set @@session.wsrep_OSU_method="RSU";
+select @@global.wsrep_OSU_method;
+select @@session.wsrep_OSU_method;
+use test;
+create table is1 (i int) engine=myisam;
+insert into is1 values (11), (12);
+insert is1 values (13), (14);
+rename table is1 to is2;
+select * from is2;
+drop table is2;
+
+--connection node_1
+--echo #node-1
+--eval set global wsrep_replicate_myisam = $wsrep_replicate_myisam_cached
+--eval set global wsrep_OSU_method = $wsrep_OSU_method_cached

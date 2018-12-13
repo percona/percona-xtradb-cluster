@@ -1,0 +1,14 @@
+#
+# Test ALTER TABLE ... UPGRADE PARTITIONING
+# Testing this fully requires both an old and a new 5.7 version, which MTR can not deliver
+# So we simply confirm that the statement can be executed.
+#
+#
+
+--source include/galera_cluster.inc
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB PARTITION BY KEY(f1) PARTITIONS 2;
+ALTER TABLE t1 UPGRADE PARTITIONING;
+
+DROP TABLE t1;

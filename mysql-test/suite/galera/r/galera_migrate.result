@@ -1,0 +1,89 @@
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+INSERT INTO t1 VALUES (2);
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+INSERT INTO t1 VALUES (3);
+INSERT INTO t1 VALUES (4);
+SET GLOBAL wsrep_cluster_address='gcomm://';
+INSERT INTO t1 VALUES (5);
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+VARIABLE_VALUE
+Synced
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+VARIABLE_VALUE
+Primary
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+VARIABLE_VALUE
+1
+INSERT INTO t1 VALUES (6);
+CREATE USER 'sst';
+GRANT ALL PRIVILEGES ON *.* TO 'sst';
+SET GLOBAL wsrep_sst_auth = 'sst:';
+CREATE USER 'sst';
+GRANT ALL PRIVILEGES ON *.* TO 'sst';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster has deprecated SST through mysqldump. Percona-XtraDB-Cluster recommends using xtrabackup. Please switch to use xtrabackup or rsync.
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+VARIABLE_VALUE
+Synced
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+VARIABLE_VALUE
+Primary
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+VARIABLE_VALUE
+2
+STOP SLAVE;
+RESET SLAVE ALL;
+STOP SLAVE;
+RESET SLAVE ALL;
+INSERT INTO t1 VALUES (7);
+INSERT INTO t1 VALUES (8);
+SELECT COUNT(*) = 8 FROM t1;
+COUNT(*) = 8
+1
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+VARIABLE_VALUE
+Synced
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+VARIABLE_VALUE
+Primary
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+VARIABLE_VALUE
+2
+SELECT COUNT(*) = 8 FROM t1;
+COUNT(*) = 8
+1
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+VARIABLE_VALUE
+Synced
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+VARIABLE_VALUE
+Primary
+SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+VARIABLE_VALUE
+2
+DROP TABLE t1;
+DROP TABLE t1;
+SET GLOBAL wsrep_provider = 'none';
+SET GLOBAL wsrep_sst_auth = '';
+SET GLOBAL wsrep_provider_options = '';
+DROP TABLE t1;
+DROP USER sst;
+SET GLOBAL wsrep_provider = 'none';
+SET GLOBAL wsrep_sst_method = default;
+SET GLOBAL wsrep_sst_auth = '';
+SET GLOBAL wsrep_provider_options = '';
+SET GLOBAL wsrep_sst_receive_address = 'AUTO';
+DROP TABLE t1;
+DROP USER sst;
+CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
+CALL mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
+CALL mtr.add_suppression("`innodb_index_stats` not found");
+CALL mtr.add_suppression("`innodb_table_stats` not found");
+CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table");

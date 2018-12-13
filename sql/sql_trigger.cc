@@ -68,6 +68,10 @@
 #include "sql_string.h"
 #include "thr_lock.h"
 
+#ifdef WITH_WSREP
+#include "sql_parse.h"                  // create_default_definer
+#endif /* WITH_WSREP */
+
 namespace dd {
 class Schema;
 }  // namespace dd
@@ -461,12 +465,35 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
     applies to them too.
   */
   Security_context *sctx = thd->security_context();
+#ifdef WITH_WSREP
+  if (!trust_function_creators &&
+      (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) &&
+      !(sctx->check_access(SUPER_ACL) ||
+        sctx->has_global_grant(STRING_WITH_LEN("SET_USER_ID")).first)) {
+    /*
+      If WSREP is enabled, then we are ALWAYS doing binlog
+      replication of some sort, and we always require the SUPER
+      privilege (or trust_function_creators).
+      So there is no need to mention anything about the binlog.
+    */
+    if (WSREP(thd))
+      my_message(ER_BINLOG_CREATE_ROUTINE_NEED_SUPER,
+                 "You do not have the SUPER privilege"
+                 " (you *might* want to use the less safe "
+                 "log_bin_trust_function_creators variable)",
+                 MYF(0));
+    else
+      my_error(ER_BINLOG_CREATE_ROUTINE_NEED_SUPER, MYF(0));
+    DBUG_RETURN(true);
+  }
+#else
   if (!trust_function_creators && mysql_bin_log.is_open() &&
       !(sctx->check_access(SUPER_ACL) ||
         sctx->has_global_grant(STRING_WITH_LEN("SET_USER_ID")).first)) {
     my_error(ER_BINLOG_CREATE_ROUTINE_NEED_SUPER, MYF(0));
     DBUG_RETURN(true);
   }
+#endif /* WITH_WSREP */
 
   if (check_trg_priv_on_subj_table(thd, m_trigger_table)) DBUG_RETURN(true);
 
@@ -475,6 +502,13 @@ bool Sql_cmd_create_trigger::execute(THD *thd) {
     my_error(ER_TRG_ON_VIEW_OR_TEMP_TABLE, MYF(0), m_trigger_table->alias);
     DBUG_RETURN(true);
   }
+
+#ifdef WITH_WSREP
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL,
+                                             m_trigger_table, NULL)) {
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
 
   MDL_ticket *mdl_ticket = nullptr;
   TABLE *table = open_and_lock_subj_table(thd, m_trigger_table, &mdl_ticket);
@@ -584,6 +618,16 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
 
     /* Still, we need to log the query ... */
     stmt_query.append(thd->query().str, thd->query().length);
+
+#ifdef WITH_WSREP
+    /* Table doesn't exist but query is still being logged
+    so replicate a query with NULL construct. */
+    if (WSREP(thd) &&
+        wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, tables)) {
+      DBUG_RETURN(true);
+    }
+#endif /* WITH_WSREP */
+
     bool result =
         write_bin_log(thd, true, stmt_query.ptr(), stmt_query.length(), false);
 
@@ -592,6 +636,13 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
   }
 
   if (check_trg_priv_on_subj_table(thd, tables)) DBUG_RETURN(true);
+
+#ifdef WITH_WSREP
+  if (WSREP(thd) &&
+      wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, tables)) {
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
 
   MDL_ticket *mdl_ticket = nullptr;
   TABLE *table = open_and_lock_subj_table(thd, tables, &mdl_ticket);
@@ -648,3 +699,50 @@ bool Sql_cmd_drop_trigger::execute(THD *thd) {
 
   DBUG_RETURN(result);
 }
+
+#ifdef WITH_WSREP
+int wsrep_create_trigger_query(THD *thd, uchar **buf, size_t *buf_len) {
+  LEX *lex = thd->lex;
+  String stmt_query;
+
+  LEX_CSTRING definer_user;
+  LEX_CSTRING definer_host;
+
+  if (!lex->definer) {
+    if (!thd->slave_thread) {
+      if (!(lex->definer = create_default_definer(thd))) return 1;
+    }
+  }
+
+  if (lex->definer) {
+    /* SUID trigger. */
+
+    definer_user = lex->definer->user;
+    definer_host = lex->definer->host;
+  } else {
+    /* non-SUID trigger. */
+
+    definer_user.str = 0;
+    definer_user.length = 0;
+
+    definer_host.str = 0;
+    definer_host.length = 0;
+  }
+
+  stmt_query.append(STRING_WITH_LEN("CREATE "));
+
+  append_definer(thd, &stmt_query, definer_user, definer_host);
+
+  LEX_STRING stmt_definition;
+  stmt_definition.str = (char *)thd->lex->stmt_definition_begin;
+  stmt_definition.length =
+      thd->lex->stmt_definition_end - thd->lex->stmt_definition_begin;
+  trim_whitespace(thd->charset(), &stmt_definition);
+
+  stmt_query.append(stmt_definition.str, stmt_definition.length);
+
+  return wsrep_to_buf_helper(thd, stmt_query.c_ptr(), stmt_query.length(), buf,
+                             buf_len);
+}
+#endif /* WITH_WSREP */
+

@@ -615,6 +615,10 @@ sub collect_one_suite($) {
 
       my @new_cases;
       foreach my $comb (@combinations) {
+
+	# ENV is used in My::Config::ENV to store the environment so is not a true combination
+	next if ( $comb->{'name'} eq 'ENV' );
+
         foreach my $test (@cases) {
           next if ($test->{'skip'});
 
@@ -864,7 +868,8 @@ sub collect_one_test_case {
 
   # Test file name should consist of only alpha-numeric characters, dash (-)
   # or underscore (_), but should not start with dash or underscore.
-  if ($tname !~ /^[^_\W][\w-]*$/) {
+  # galera/pxc/wsrep has test-case with # so allowing # as part of the test-case
+  if ($tname !~ /^[^_\W][\w-#]*$/) {
     die("Invalid test file name '$suitename.$tname'. Test file " .
         "name should consist of only alpha-numeric characters, " .
         "dash (-) or underscore (_), but should not start with " .
@@ -936,7 +941,8 @@ sub collect_one_test_case {
   }
 
   if ($marked_as_disabled) {
-    if ($enable_disabled or @::opt_cases) {
+    #if ($enable_disabled or @::opt_cases) {
+    if ($enable_disabled) {
       # User has selected to run all disabled tests
       mtr_report(" - Running test $tinfo->{name} even though it's been",
                  "disabled due to '$tinfo->{comment}'.");

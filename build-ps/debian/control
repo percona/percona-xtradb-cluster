@@ -1,14 +1,22 @@
-Source: percona-server-8.0
+Source: percona-xtradb-cluster-5.7
 Section: database
 Priority: extra
 Maintainer: Percona Server Development Team <mysql-dev@percona.com>
 Uploaders: George Lorch <george.lorch@percona.com>,
            Tomislav Plavcic <tomislav.plavcic@percona.com>
-Build-Depends: bison,
+           Raghavendra Prabhu <raghavendra.prabhu@percona.com>
+           Krunal Bauskar <krunal.bauskar@percona.com>
+Build-Depends: libtool (>= 1.4.2-7),
+               procps,
+               debhelper (>= 7.0.50~),
+               file (>= 3.28),
+               bison,
                cmake,
                debhelper (>= 9.0.0),
                fakeroot,
                libaio-dev[linux-any],
+               libmecab-dev,
+               libwrap0-dev,
                libmecab-dev,
                libncurses5-dev (>= 5.0-6),
                lsb-release,
@@ -22,64 +30,38 @@ Build-Depends: bison,
                libnuma-dev,
                gcc (>= 4.4),
                g++ (>= 4.4),
-               libwrap0-dev,
-               libcurl4-openssl-dev,
+               scons,
+               libboost-dev (>= 1.41),
+               libssl-dev,
+               check,
+               libboost-program-options-dev (>= 1.41),
                libldap2-dev
-Standards-Version: 3.9.4
-Homepage: http://www.percona.com/software/percona-server/
-Vcs-Git: git://github.com/percona/percona-server.git -b 8.0
+Standards-Version: 7.0.0
+Homepage: http://www.percona.com/software/percona-xtradb-cluster/
+Vcs-Git: https://github.com/percona/percona-xtradb-cluster
 
-Package: percona-server-tokudb-8.0
-Section: database
-Architecture: any
-Depends: percona-server-server-8.0 (= ${binary:Version}), libjemalloc1 (>= 3.3.0), ${misc:Depends}
-Breaks: percona-server-tokudb-5.6, percona-server-tokudb-5.7
-Replaces: percona-server-tokudb-5.6, percona-server-tokudb-5.7
-Description: TokuDB engine plugin for Percona Server
- .
- TokuDB is a storage engine for MySQL and MariaDB that is specifically
- designed for high performance on write-intensive workloads. It achieves
- this via Fractal Tree indexing. TokuDB is a scalable, ACID and MVCC compliant
- storage engine that provides indexing-based query improvements, offers online
- schema modifications, and reduces slave lag for both hard disk drives and flash memory.
- .
- This package includes the TokuDB plugin library.
-
-Package: percona-server-rocksdb-8.0
-Section: database
-Architecture: any
-Depends: percona-server-server-8.0 (= ${binary:Version}), ${misc:Depends}
-Breaks: percona-server-rocksdb-5.7
-Replaces: percona-server-rocksdb-5.7
-Description: MyRocks storage engine plugin for Percona Server
- .
- MyRocks is a storage engine for Percona Server which incorporates RocksDB
- library optimized for fast storage and space efficiency.
- .
- This package includes the MyRocks/RocksDB plugin library.
-
-Package: libperconaserverclient21
+Package: libperconaserverclient20
 Architecture: any
 Section: libs
 Pre-Depends: ${misc:Pre-Depends}
 Multi-Arch: same
-Depends: percona-server-common-8.0 (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
-Replaces: libpercona-server-client16, libperconaserverclient18, libperconaserverclient18.1, libperconaserverclient20
-Description: Percona Server database client library
- Percona Server is a fast, stable and true multi-user, 
- multi-threaded SQL database server. SQL (Structured Query Language) 
- is the most popular database query language in the world. The main 
- goals of Percona Server are speed, robustness and ease of use.
+Depends: percona-xtradb-cluster-common-5.7 (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
+Replaces: libpercona-server-client16, libperconaserverclient18, libperconaserverclient18.1
+Description: Percona XtraDB Cluster database client library
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ Percona XtraDB Cluster provides synchronous replication, supports
+ multi-master replication, parallel applying on slaves, automatic
+ node provisioning with primary focus on data consistency.
  .
  This package includes the client library.
 
-Package: libperconaserverclient21-dev
+Package: libperconaserverclient20-dev
 Architecture: any
 Section: libdevel
-Depends: libperconaserverclient21 (= ${binary:Version}),
+Depends: libperconaserverclient20 (= ${binary:Version}),
          zlib1g-dev, ${misc:Depends}
-Breaks: libperconaserverclient20-dev,
-        libperconaserverclient18.1-dev,
+Breaks: libperconaserverclient18.1-dev,
         libperconaserverclient18-dev,
         libperconaserverclient16-dev,
         libperconaserverclient15-dev,
@@ -90,8 +72,7 @@ Breaks: libperconaserverclient20-dev,
         libmysqlclient18-dev,
         libmysqlclient20-dev,
         libmariadbclient-dev
-Replaces: libperconaserverclient20-dev,
-          libperconaserverclient18.1-dev,
+Replaces: libperconaserverclient18.1-dev,
           libperconaserverclient18-dev,
           libperconaserverclient16-dev,
           libperconaserverclient15-dev,
@@ -101,52 +82,56 @@ Replaces: libperconaserverclient20-dev,
           libpercona-xtradb-client-dev,
           libmariadbclient-dev
 Provides: libmysqlclient-dev
-Description: Percona Server database development files
- Percona Server is a fast, stable and true multi-user, multi-threaded SQL 
- database server. SQL (Structured Query Language) is the most popular 
- database query language in the world. The main goals of Percona Server are 
- speed, robustness and ease of use.
+Description: Percona XtraDB Cluster database development files
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ Percona XtraDB Cluster provides synchronous replication, supports
+ multi-master replication, parallel applying on slaves, automatic
+ node provisioning with primary focus on data consistency.
  .
  This package includes development libraries and header files.
 
-Package: percona-server-common-8.0
+Package: percona-xtradb-cluster-common-5.7
 Section: database
 Architecture: any
 Pre-depends: debconf (>= 0.2.17), mysql-common, debsums, ${misc:Pre-Depends}
 Multi-Arch: foreign
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Breaks: percona-server-common-5.7
-Replaces: percona-server-common-5.7
-Description: Percona Server database common files (e.g. /etc/mysql/my.cnf)
- Percona Server is a fast, stable and true multi-user, multi-threaded SQL
- database server. SQL (Structured Query Language) is the most popular database
- query language in the world. The main goals of Percona Server are speed, 
- robustness and ease of use.
+Description: Percona XtraDB Cluster database common files (e.g. /etc/mysql/my.cnf)
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ Percona XtraDB Cluster provides synchronous replication, supports
+ multi-master replication, parallel applying on slaves, automatic
+ node provisioning with primary focus on data consistency.
  .
  This package includes files needed by all versions of the client library
  (e.g. /etc/mysql/my.cnf).
 
-Package: percona-server-client-8.0
+Package: percona-xtradb-cluster-client-5.7
 Architecture: any
-Depends: percona-server-common-8.0 (= ${binary:Version}),
+Depends: percona-xtradb-cluster-common-5.7 (= ${binary:Version}),
          ${shlibs:Depends}, ${misc:Depends}
+         debianutils (>=1.6),
+         libdbi-perl,
 Provides: mysql-client,
           virtual-mysql-client, virtual-mysql-client-core,
-          mysql-client-8.0, mysql-client-core-8.0
+          mysql-client-5.7, mysql-client-core-5.7
 Breaks: mysql-client-5.0,
         mysql-client-core-5.1,
         mysql-client-core-5.5,
         mysql-client-core-5.6,
-        mysql-client-core-8.0,
+        mysql-client-core-5.7,
         mysql-client-5.1,
         mysql-client-5.5,
         mysql-client-5.6,
-        mysql-client-8.0,
+        mysql-client-5.7,
         percona-xtradb-client-5.0,
         percona-server-client-5.1,
         percona-server-client-5.5,
         percona-server-client-5.6,
         percona-server-client-5.7,
+        percona-xtradb-cluster-client-5.5,
+        percona-xtradb-cluster-client-5.6,
         mariadb-client,
         mariadb-client-core-5.5,
         mariadb-client-5.5,
@@ -157,55 +142,71 @@ Replaces: mysql-client-5.0,
            mysql-client-core-5.5,
            mysql-client-core-5.6,
            mysql-client-core-5.7,
-           mysql-client-core-8.0,
            mysql-client-5.1,
            mysql-client-5.5,
            mysql-client-5.6,
            mysql-client-5.7,
-           mysql-client-8.0,
            percona-xtradb-client-5.0,
            percona-server-client-5.1,
            percona-server-client-5.5,
            percona-server-client-5.6,
            percona-server-client-5.7,
+           percona-xtradb-cluster-client-5.5,
+           percona-xtradb-cluster-client-5.6,
            mariadb-client,
            mariadb-client-core-5.5,
            mariadb-client-5.5,
            virtual-mysql-client,
            virtual-mysql-client-core
-Description: Percona Server database client binaries
- Percona Server is a fast, stable and true multi-user, multi-threaded SQL
- database server. SQL (Structured Query Language) is the most popular database
- query language in the world. The main goals of Percona Server are speed,
- robustness and ease of use.
+Description: Percona XtraDB Cluster database client binaries
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ Percona XtraDB Cluster provides synchronous replication, supports
+ multi-master replication, parallel applying on slaves, automatic
+ node provisioning with primary focus on data consistency.
  .
  This package includes the client binaries.
 
-Package: percona-server-server-8.0
+Package: percona-xtradb-cluster-server-5.7
 Architecture: any
-Pre-Depends: percona-server-common-8.0 (= ${binary:Version}),
+Suggests: tinyca, netcat-openbsd, pv 
+Pre-Depends: percona-xtradb-cluster-common-5.7 (= ${binary:Version}),
              adduser,
              debconf (>= 0.2.17)
-Depends: percona-server-client-8.0 (= ${binary:Version}),
-         ${shlibs:Depends}, ${misc:Depends},
-         psmisc
+Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
+         libdbi-perl,
+         libdbd-mysql-perl,
+         perl (>= 5.6),
+         ${shlibs:Depends},
+         ${misc:Depends},
+         psmisc,
+         passwd,
+         lsb-base (>= 3.0-10),
+         percona-xtrabackup-24 (>= 2.4.12),
+         socat,
+        lsof,
+         rsync,
+         qpress,
+         iproute
 Provides: mysql-server,
           virtual-mysql-server, virtual-mysql-server-core,
-          mysql-server-8.0, mysql-server-core-8.0
+          mysql-server-5.7, mysql-server-core-5.7
 Breaks: mysql-server-5.0,
         mysql-server-5.1,
         mysql-server-5.5,
         mysql-server-5.6,
-        mysql-server-8.0,
+        mysql-server-5.7,
         mysql-server-core-5.1,
         mysql-server-core-5.5,
         mysql-server-core-5.6,
-        mysql-server-core-8.0,
+        mysql-server-core-5.7,
         percona-xtradb-server-5.0,
         percona-server-server-5.1,
         percona-server-server-5.5,
         percona-server-server-5.6,
         percona-server-server-5.7,
+        percona-xtradb-cluster-server-5.5,
+        percona-xtradb-cluster-server-5.6,
         mariadb-server,
         mariadb-server-core-5.5,
         mariadb-server-5.5,
@@ -216,62 +217,119 @@ Replaces: mysql-server-5.0,
           mysql-server-5.5,
           mysql-server-5.6,
           mysql-server-5.7,
-          mysql-server-8.0,
           mysql-server-core-5.1,
           mysql-server-core-5.5,
           mysql-server-core-5.6,
           mysql-server-core-5.7,
-          mysql-server-core-8.0,
           percona-xtradb-server-5.0,
           percona-server-server-5.1,
           percona-server-server-5.5,
           percona-server-server-5.6,
           percona-server-server-5.7,
+          percona-xtradb-cluster-server-5.5,
+          percona-xtradb-cluster-server-5.6,
           mariadb-server,
           mariadb-server-core-5.5,
           mariadb-server-5.5,
           virtual-mysql-server,
-          virtual-mysql-server-core
-Description: Percona Server database server binaries
- Percona Server is a fast, stable and true multi-user, multi-threaded SQL
- database server. SQL (Structured Query Language) is the most popular database
- query language in the world. The main goals of Percona Server are speed,
- robustness and ease of use.
+          virtual-mysql-server-core,
+          galera, percona-xtradb-cluster-galera-3, percona-xtradb-cluster-galera, percona-galera-3, galera-57, galera-57-3.x, percona-xtradb-cluster-galera-3.x, galera-garbd-57-3.x, galera-garbd-57
+Description: Percona XtraDB Cluster database server binaries
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ Percona XtraDB Cluster provides synchronous replication, supports
+ multi-master replication, parallel applying on slaves, automatic
+ node provisioning with primary focus on data consistency.
  .
  This package includes the server binaries.
 
-Package: percona-server-test-8.0
+
+Package: percona-xtradb-cluster-server-debug-5.7
 Architecture: any
-Depends: percona-server-client-8.0 (= ${binary:Version}),
-         percona-server-server-8.0 (= ${binary:Version}),
-         libperconaserverclient21-dev (= ${binary:Version}),
-         perl, python, ${misc:Depends}, ${shlibs:Depends}
-Replaces: percona-server-server-8.0, percona-server-client-8.0
-Description: Percona Server database test suite
- Percona Server is a fast, stable and true multi-user, multi-threaded SQL
- database server. SQL (Structured Query Language) is the most popular database
- query language in the world. The main goals of Percona Server are speed,
- robustness and ease of use.
+Suggests: tinyca, netcat-openbsd, pv
+Pre-Depends: percona-xtradb-cluster-common-5.7 (>= ${binary:Version}),
+             adduser (>= 3.4.0),
+             debconf
+Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
+         libdbi-perl,
+         libdbd-mysql-perl,
+         perl (>= 5.6),
+         ${shlibs:Depends},
+         ${misc:Depends},
+         psmisc,
+         passwd,
+         lsb-base (>= 3.0-10),
+         percona-xtrabackup-24 (>= 2.4.12),
+         socat,
+        lsof,
+         rsync,
+         qpress,
+         iproute
+Provides: mysql-server-debug
+Description: Percona XtraDB Cluster database server UNIV_DEBUG binaries
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ Percona XtraDB Cluster provides synchronous replication, supports
+ multi-master replication, parallel applying on slaves, automatic
+ node provisioning with primary focus on data consistency.
  .
- This package includes the Percona Server test framework that provides 
- a means for verifying that Percona Server and its client programs 
- operate according to expectations
+ This package includes the server binaries.
 
-Package: percona-server-source-8.0
+Package: percona-xtradb-cluster-57
+Section: database
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}
-Description: Percona Server 8.0 source
- This package includes the source code to Percona Server as configured before
- building.
+Depends: percona-xtradb-cluster-server-5.7 (>= ${binary:Version}), percona-xtradb-cluster-client-5.7 (>= ${binary:Version}), ${misc:Depends}
+Description: Percona XtraDB Cluster with Galera
+ This is a meta-package providing PXC57 server, client.
 
-Package: percona-server-8.0-dbg
+Package: percona-xtradb-cluster-full-57
+Section: database
+Architecture: any
+Depends: percona-xtradb-cluster-server-5.7 (>= ${binary:Version}), percona-xtradb-cluster-client-5.7 (>= ${binary:Version}), percona-xtradb-cluster-test-5.7 (>= ${binary:Version}), percona-xtradb-cluster-5.7-dbg (>= ${binary:Version}),  percona-xtradb-cluster-server-debug-5.7, percona-xtradb-cluster-garbd-5.7 (>= ${binary:Version}), ${misc:Depends}, percona-xtradb-cluster-garbd-debug-5.7 (>= ${binary:Version})
+Description: Percona XtraDB Cluster with Galera
+ This is a meta-package providing PXC57 server, client, test and debug packages.
+
+Package: percona-xtradb-cluster-test-5.7
+Architecture: any
+Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}), percona-xtradb-cluster-server-5.7 (>= ${binary:Version})
+Description: Percona XtraDB Cluster database test suite
+ This package includes the Percona XtraDB Cluster test framework that provides
+ a means for verifying that Percona XtraDB Cluster and its client programs
+ operate according to expectations.
+
+Package: percona-xtradb-cluster-5.7-dbg
 Architecture: any
 Section: debug
-Depends: percona-server-server-8.0 (= ${binary:Version}), ${misc:Depends}
-Description: Debugging package for Percona Server
- Percona Server is a fast, stable and true multi-user, multi-threaded SQL
- database server. SQL (Structured Query Language) is the most popular database
- query language in the world. The main goals of Percona Server are speed,
- robustness and ease of use.
+Depends: percona-xtradb-cluster-server-5.7 (= ${binary:Version}), ${misc:Depends}
+Description: Debugging package for Percona XtraDB Cluster
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ Percona XtraDB Cluster provides synchronous replication, supports
+ multi-master replication, parallel applying on slaves, automatic
+ node provisioning with primary focus on data consistency.
  .
- This package contains the debugging symbols for the Percona Server binaries.
+ This package contains the debugging symbols for the Percona XtraDB Cluster binaries.
+
+Package: percona-xtradb-cluster-source-5.7
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: Percona XtraDB Cluster 5.7 source
+ This package includes the source code to Percona XtraDB Cluster as configured before building.
+
+Package: percona-xtradb-cluster-garbd-5.7
+Architecture: any
+Provides: garbd-3, garbd3
+Conflicts: garbd-2, percona-xtradb-cluster-garbd-2.x, garbd2, percona-galera-arbitrator-3, percona-xtradb-cluster-garbd-3.x
+Replaces: percona-galera-arbitrator-3, galera-garbd-57-3.x, percona-xtradb-cluster-garbd-3.x
+Depends: ${shlibs:Depends}, ${misc:Depends}, netcat-openbsd
+Description: Garbd components of Percona XtraDB Cluster
+ This package contains the garbd of Percona XtraDB Cluster.
+
+Package: percona-xtradb-cluster-garbd-debug-5.7
+Architecture: any
+Section: debug
+Conflicts: percona-galera-arbitrator-3-dbg
+Replaces: percona-galera-arbitrator-3-dbg
+Depends: percona-xtradb-cluster-garbd-5.7 (= ${binary:Version}), ${misc:Depends}
+Description: Debugging package for Percona XtraDB Cluster Garbd.
+

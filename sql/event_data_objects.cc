@@ -74,6 +74,10 @@
 
 class Item;
 
+#ifdef WITH_WSREP
+#include "wsrep_thd.h"
+#endif /* WITH_WSREP */
+
 /**
   @addtogroup Event_Scheduler
   @{
@@ -1127,6 +1131,24 @@ bool Event_job_data::execute(THD *thd, bool drop) {
       There is no pre-locking and therefore there should be no
       tables open and locked left after execute_procedure.
     */
+
+#ifdef WITH_WSREP
+    /*
+      If the thread has been killed, rollback the operation
+      properly (for WSREP).
+    */
+    if (WSREP(thd)) {
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      if (thd->wsrep_conflict_state == MUST_ABORT) {
+        wsrep_client_rollback(thd);
+        wsrep_cleanup_transaction(thd);
+
+        WSREP_DEBUG("abort the event in exec query state, avoiding autocommit");
+      }
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    }
+#endif /* WITH_WSREP */
+
   }
 
 end:
@@ -1172,7 +1194,34 @@ end:
       bool save_tx_read_only = thd->tx_read_only;
       thd->tx_read_only = false;
 
+#ifdef WITH_WSREP
+      /*
+         This code is processing event execution and does not have client
+         connection. Here, event execution will now execute a prepared
+         DROP EVENT statement, but thd->lex->sql_command is set to
+         SQLCOM_CREATE_PROCEDURE
+         DROP EVENT will be logged in binlog, and we have to
+         replicate it to make all nodes have consistent event definitions
+         Wsrep DDL replication is triggered inside Events::drop_event(),
+         and here we need to prepare the THD so that DDL replication is
+         possible, essentially it requires setting sql_command to
+         SQLCOMM_DROP_EVENT, we will switch sql_command for the duration
+         of DDL replication only.
+      */
+      const enum_sql_command sql_command_save = thd->lex->sql_command;
+      const bool sql_command_set = WSREP(thd);
+      if (sql_command_set) {
+        thd->lex->sql_command = SQLCOM_DROP_EVENT;
+      }
+#endif /* WITH_WSREP */
       ret = Events::drop_event(thd, m_schema_name, m_event_name, false);
+
+#ifdef WITH_WSREP
+      if (sql_command_set) {
+        WSREP_TO_ISOLATION_END;
+        thd->lex->sql_command = sql_command_save;
+      }
+#endif /* WITH_WSREP */
 
       thd->tx_read_only = save_tx_read_only;
       thd->security_context()->set_master_access(saved_master_access);

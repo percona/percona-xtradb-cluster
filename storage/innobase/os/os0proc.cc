@@ -50,6 +50,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <sys/utsname.h> /* uname() */
 #endif
 
+#if defined(WITH_WSREP) && defined(UNIV_LINUX)
+#include <sys/mman.h>		/* madvise() */
+#endif /* WITH_WSREP && UNIV_LINUX */
+
 /* FreeBSD for example has only MAP_ANON, Linux has MAP_ANONYMOUS and
 MAP_ANON but MAP_ANON is marked as deprecated */
 #if defined(MAP_ANONYMOUS)
@@ -57,6 +61,10 @@ MAP_ANON but MAP_ANON is marked as deprecated */
 #elif defined(MAP_ANON)
 #define OS_MAP_ANON MAP_ANON
 #endif
+
+#ifdef WITH_WSREP
+extern bool wsrep_recovery;
+#endif /* WITH_WSREP */
 
 /* Linux's MAP_POPULATE */
 #if defined(MAP_POPULATE)
@@ -186,6 +194,18 @@ skip:
     UNIV_MEM_ALLOC(ptr, size);
   }
 #endif
+
+#if defined(WITH_WSREP) && defined(UNIV_LINUX)
+  /* Do not make the pages from this block available to the child after a
+  fork(). This is required to speed up process spawning for Galera SST. */
+
+  if (madvise(ptr, size, MADV_DONTFORK)) {
+    fprintf(stderr,
+            "InnoDB: Warning: madvise(MADV_DONTFORK) is "
+            "not supported by the kernel. Spawning SST processes "
+            "can be slow.\n");
+  }
+#endif /* WITH_WSREP && UNIV_LINUX */
 
 #if OS_MAP_ANON && OS_MAP_POPULATE
   /* MAP_POPULATE is only supported for private mappings

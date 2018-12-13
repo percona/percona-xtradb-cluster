@@ -1,0 +1,91 @@
+#
+# Test the operation of DDLs that affect multiple database objects
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+
+--echo # Node 1
+--connection node_1
+CREATE DATABASE database1;
+USE database1;
+
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
+
+
+--echo # Node 1a
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+# Make sure autocommit retrying does not kick in as this will mask the error we expect to get
+USE database1;
+SET SESSION wsrep_retry_autocommit = 0;
+
+SET DEBUG_SYNC = "ha_innobase_write_row SIGNAL entered1 WAIT_FOR continue";
+--send INSERT INTO t1 (f1) VALUES(1);
+
+
+--echo # Node 1b
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1b
+USE database1;
+SET SESSION wsrep_retry_autocommit = 0;
+
+SET DEBUG_SYNC = "ha_innobase_write_row SIGNAL entered2 WAIT_FOR continue";
+--send INSERT INTO t2 (f1) VALUES(1);
+
+
+# Ensure that we have reached the sync points
+--echo # Node 1
+--connection node_1
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+SET DEBUG_SYNC = "now WAIT_FOR entered2";
+
+
+--echo # Node 2
+--connection node_2
+# This should cause the operations on node 1 to abort
+DROP DATABASE database1;
+
+# Unblock the sync points
+--echo # Node 1
+--connection node_1
+SET DEBUG_SYNC = "now SIGNAL continue";
+
+--echo # Node 1a
+--connection node_1a
+--error ER_LOCK_DEADLOCK
+--reap
+
+--echo # Node 1b
+--connection node_1b
+--error ER_LOCK_DEADLOCK
+--reap
+
+--echo # Node 1
+--connection node_1
+
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "database1"
+--source include/wait_condition.inc
+
+--let $assert_text = database1 has been deleted on node 1
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "database1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.SCHEMATA
+--source include/assert.inc
+
+--error ER_BAD_DB_ERROR
+USE database1;
+
+SET DEBUG_SYNC = "RESET";
+
+--echo # Node 2
+--connection node_2
+
+--let $assert_text = database1 has been deleted on node 2
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = "database1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.SCHEMATA
+--source include/assert.inc
+
+--error ER_BAD_DB_ERROR
+USE database1;

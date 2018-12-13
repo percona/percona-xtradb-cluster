@@ -1,0 +1,207 @@
+#
+# 1) Check that the values of auto-increment step and offset,
+#    which are set by the user, are saved and restored when user
+#    turning off the automatic control for these options.
+# 2) Check that these options are successfuly passed to new session.
+# 3) Check that the same logic works for the auto-increment parameters
+#    passed via command line.
+#
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+
+--connection node_2
+SET GLOBAL auto_increment_increment=10;
+SET GLOBAL auto_increment_offset=7;
+SET GLOBAL wsrep_auto_increment_control='OFF';
+
+SHOW GLOBAL VARIABLES LIKE '%auto_increment%';
+
+--let $galera_connection_name = node_2a
+--let $galera_server_number = 2
+--source include/galera_connect.inc
+
+--connection node_2a
+
+SHOW VARIABLES LIKE '%auto_increment%';
+
+SET GLOBAL wsrep_auto_increment_control='ON';
+
+--disable_warnings
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+--enable_warnings
+SELECT @@wsrep_auto_increment_control = 1;
+
+--connection node_2
+
+--let $galera_connection_name = node_2b
+--let $galera_server_number = 2
+--source include/galera_connect.inc
+
+--connection node_2b
+
+--disable_warnings
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+--enable_warnings
+SELECT @@wsrep_auto_increment_control = 1;
+
+SET GLOBAL wsrep_auto_increment_control='OFF';
+
+SHOW VARIABLES LIKE '%auto_increment%';
+
+--connection node_2
+
+SET GLOBAL wsrep_auto_increment_control='ON';
+
+--let $restart_parameters = "restart:--auto-increment-increment=7 --auto-increment-offset=5"
+--source include/restart_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--disable_warnings
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+--enable_warnings
+SELECT @@wsrep_auto_increment_control = 1;
+
+SET GLOBAL wsrep_auto_increment_control='OFF';
+
+SHOW VARIABLES LIKE '%auto_increment%';
+
+SET GLOBAL wsrep_auto_increment_control='ON';
+
+--disable_warnings
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+--enable_warnings
+SELECT @@wsrep_auto_increment_control = 1;
+
+
+#--------------------------------------------------------------------------
+#
+# test below try to stimulate a scenario that use to cause duplicate value
+# due to re-calibration of existing re-calibrated auto-increment count.
+#
+
+# understanding tc:
+# tc try to insert sequence with inc/off=3/3 starting with 27 as seed value.
+# expected series 27, 30, 33, 36, 39, 42, .....
+# but post insertion of 33 flow changes inc/off from 3/3 -> 2/2 (flip of node
+# stimulation). this will cause auto-inc sequence to re-calibrate.
+
+# standalone server will re-calibrate sequence as 36, 38, 40, 42, ....
+# where it will use the next biggest number in series.
+
+# pxc auto-increment semantics will avoid using anything <= 36 since those
+# value may have been used by other nodes (that is 34, 35).
+
+--connection node_1
+--echo #node-1
+#
+use test;
+create table t (i int auto_increment, c char(10), primary key pk(i));
+# set auto-inc/offset to 3/3
+set global auto_increment_increment=3;
+set global auto_increment_offset=3;
+insert into t(i, c) values (27, "27");
+select * from t;
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--echo #node-1a
+insert into t(c) values ("30");
+select * from t;
+
+--connection node_1
+--echo #node-1
+insert into t(c) values ("33");
+# changing auto-inc/offset from 3 -> 2 will cause
+# auto-inc range to re-calibrate (this is kind of stimulating
+# flip of nodes in cluster that causes change in auto-inc-inc/offset).
+set global auto_increment_increment=2;
+set global auto_increment_offset=2;
+insert into t(c) values ("36");
+
+--connection node_1a
+--echo #node-1a
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_autoinc_val_generated SIGNAL entered1 WAIT_FOR continue1";
+--send insert into t(c) values ("38");
+
+--connection node_1
+--echo #node-1
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+SET DEBUG_SYNC = "pxc_autoinc_val_generated SIGNAL entered2 WAIT_FOR continue2";
+--send insert into t(c) values ("40");
+
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1b
+--echo #node-1b
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now SIGNAL continue1";
+--let $wait_condition = select count(*) = 1 from t where i = 38;
+--source include/wait_condition.inc
+select * from t;
+SET DEBUG_SYNC = "now SIGNAL continue2";
+
+--connection node_1a
+--echo #node-1a
+--reap
+select * from t;
+
+--connection node_1
+--echo #node-1
+
+# MySQL will re-calibrate auto-inc sequence with change in auto-inc
+# configuration.
+
+# on detecting change in auto-inc configuration (decrease)
+#
+# - standalone server will readjust the seed value and re-calibrate
+#   the sequence from last inserted value.
+
+# - pxc server can't readjust the seed value to last inserted value
+#   since it has risk of generating value in conflicting range.
+
+# let's understand this with an example
+
+# say last-inserted-value=33, next-value=36
+# auto-inc configuration changes from (3/3 to 2/2).
+
+# on next insert
+
+# standalone will construct last inserted values from next-value
+#   using 36 - 3 (old increment) = 33 and this value is then re-calibrated
+#   as per new offset/increment.
+#   33 on re-calibration yeilds 35 which is then aligned using
+#   compute-next-insert-id to 36 and next-value is generated as 38
+
+# pxc skips construction of last inserted values as it may yeild
+#   a value in range of 33 - 35 which is potentially unsafe as parallel
+#   other node may be inserting values 34, 35.
+
+# given that pxc skips readjustment of value re-calibration is not needed
+# unfortunately, re-calibration was still invoked that caused PXC#2128.
+
+# 36 -> recalibrated to 37 that was then aligned to 38 by compute-next-insert-id.
+# 37 generates next-value = 38.
+
+# this generates a flow where-in current-value = next-value.
+
+# this itself is a problem as next-value is for next insert consumption
+# say a thread use this value and complete insert then current thread
+# insert will fail as it is also trying to insert same value.
+
+# mysql-flow does handle this post insert as part of success exit path
+# but thread can take over after auto-inc generation before insert
+# places innodb-row-locks
+#--error ER_DUP_ENTRY
+--reap
+select * from t;
+set DEBUG_SYNC="RESET";
+drop table t;
+
+

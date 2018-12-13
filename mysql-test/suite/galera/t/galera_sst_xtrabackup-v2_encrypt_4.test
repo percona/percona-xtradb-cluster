@@ -1,0 +1,12 @@
+#
+# This test checks encrypt=4 works.
+# Initial SST happens via xtrabackup, so there is not much to do in the body of the test
+#
+
+--source include/big_test.inc
+--source include/galera_cluster.inc
+
+SELECT 1;
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc

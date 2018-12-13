@@ -35,6 +35,10 @@
 #include "sql/sql_plugin_ref.h"  // plugin_ref
 #include "sql/xa_aux.h"          // serialize_xid
 
+#ifdef WITH_WSREP
+#include "sql/wsrep_xid.h"
+#endif /* WITH_WSREP */
+
 class Protocol;
 class THD;
 struct xid_t;
@@ -222,8 +226,17 @@ typedef struct xid_t {
   */
   char data[XIDDATASIZE];
 
+#ifdef WITH_WSREP
+  bool keep_wsrep_xid;
+#endif /* WITH_WSREP */
+
  public:
+#ifdef WITH_WSREP
+  xid_t()
+      : formatID(-1), gtrid_length(0), bqual_length(0), keep_wsrep_xid(false) {
+#else
   xid_t() : formatID(-1), gtrid_length(0), bqual_length(0) {
+#endif /* WITH_WSREP */
     memset(data, 0, XIDDATASIZE);
   }
 
@@ -245,6 +258,12 @@ typedef struct xid_t {
   void set_bqual_length(long v) { bqual_length = v; }
 
   const char *get_data() const { return data; }
+
+#ifdef WITH_WSREP
+  char *get_mutable_data() { return data; }
+
+  void set_keep_wsrep_xid(bool val) { keep_wsrep_xid = val; }
+#endif /* WITH_WSREP */
 
   void set_data(const void *v, long l) {
     DBUG_ASSERT(l <= XIDDATASIZE);
@@ -330,7 +349,17 @@ typedef struct xid_t {
 
   void set(my_xid xid);
 
+#ifdef WITH_WSREP
+  void null() {
+    if (keep_wsrep_xid) {
+      /* Do nothing */
+    } else {
+      formatID = -1;
+    }
+  }
+#else
   void null() { formatID = -1; }
+#endif /* WITH_WSREP */
 
   friend class XID_STATE;
 } XID;

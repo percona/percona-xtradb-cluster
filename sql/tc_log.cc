@@ -58,11 +58,19 @@
 #include "thr_mutex.h"
 
 TC_LOG::enum_result TC_LOG_DUMMY::commit(THD *thd, bool all) {
+#ifdef WITH_WSREP
+  return wsrep_thd_binlog_commit(thd, all);
+#else
   return ha_commit_low(thd, all) ? RESULT_ABORTED : RESULT_SUCCESS;
+#endif /* WITH_WSREP */
 }
 
 int TC_LOG_DUMMY::rollback(THD *thd, bool all) {
+#ifdef WITH_WSREP
+  return wsrep_thd_binlog_rollback(thd, all);
+#else
   return ha_rollback_low(thd, all);
+#endif /* WITH_WSREP */
 }
 
 int TC_LOG_DUMMY::prepare(THD *thd, bool all) {

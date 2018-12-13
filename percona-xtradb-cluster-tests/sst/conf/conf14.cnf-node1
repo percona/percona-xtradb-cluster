@@ -1,0 +1,11 @@
+# compress+encrypt3+threads+samecrt
+# v2only
+[xtrabackup]
+compress
+parallel=4
+compress-threads=4
+
+[sst]
+encrypt=3
+tkey=/tmp/certs/node1.key
+tcert=/tmp/certs/node1.pem

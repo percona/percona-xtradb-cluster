@@ -199,6 +199,17 @@ static bool defaults_already_read = false;
 /* Set to TRUE, if --no-defaults is found. */
 bool no_defaults = false;
 
+#ifdef WITH_WSREP
+/* The only purpose of this global array is to hold full name of my.cnf
+which seems to be otherwise unavailable */
+char wsrep_defaults_file[FN_REFLEN + 10] = {
+    0,
+};
+char wsrep_defaults_group_suffix[FN_EXTLEN] = {
+    0,
+};
+#endif /* WITH_WREP */
+
 /* Which directories are searched for options (and in which order) */
 
 #define MAX_DEFAULT_DIRS 6
@@ -581,6 +592,14 @@ int get_defaults_options(int argc, char **argv, char **defaults,
     }
     if (!*group_suffix && is_prefix(*argv, "--defaults-group-suffix=")) {
       *group_suffix = *argv + sizeof("--defaults-group-suffix=") - 1;
+
+#ifdef WITH_WSREP
+      /* make sure we do this only once - for top-level file */
+      if ('\0' == wsrep_defaults_group_suffix[0])
+        strncpy(wsrep_defaults_group_suffix, *group_suffix,
+                sizeof(wsrep_defaults_group_suffix) - 1);
+#endif /* WITH_WSREP */
+
       argc--;
       default_option_count++;
       continue;
@@ -909,6 +928,11 @@ static int search_default_file_with_ext(Process_option_func opt_handler,
     if (!(fp = mysql_file_fopen(key_file_cnf, name, O_RDONLY, MYF(0))))
       return 1; /* Ignore wrong files */
   }
+#ifdef WITH_WSREP
+  /* make sure we do this only once - for top-level file */
+  if ('\0' == wsrep_defaults_file[0])
+    strncpy(wsrep_defaults_file, name, sizeof(wsrep_defaults_file) - 1);
+#endif /* WITH_WSREP */
 
   while (mysql_file_getline(buff, sizeof(buff) - 1, fp, is_login_file)) {
     line++;

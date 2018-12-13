@@ -87,6 +87,13 @@
 #include "sql/xa.h"
 #include "thr_mutex.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#include "wsrep_thd.h"
+#include "sql/log.h"
+#endif /* WITH_WSREP */
+
+
 using std::max;
 using std::min;
 using std::unique_ptr;
@@ -319,6 +326,152 @@ void THD::enter_stage(const PSI_stage_info *new_stage,
   return;
 }
 
+#ifdef WITH_WSREP
+extern int wsrep_on(void *thd) { return (int)(WSREP(((THD *)thd))); }
+extern "C" bool wsrep_thd_is_wsrep_on(THD *thd) {
+  return thd->variables.wsrep_on;
+}
+
+extern "C" bool wsrep_consistency_check(void *thd) {
+  return ((THD *)thd)->wsrep_consistency_check == CONSISTENCY_CHECK_RUNNING;
+}
+
+void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode) {
+  thd->wsrep_exec_mode = mode;
+}
+
+void wsrep_thd_set_query_state(THD *thd, enum wsrep_query_state state) {
+  thd->wsrep_query_state = state;
+}
+
+void wsrep_thd_set_conflict_state(THD *thd, bool lock,
+                                  enum wsrep_conflict_state state) {
+  if (WSREP(thd)) {
+    if (lock) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    thd->wsrep_conflict_state = state;
+    if (lock) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  }
+}
+
+extern "C" void wsrep_thd_mark_split_trx(THD *thd, bool split_trx) {
+  thd->wsrep_split_trx = split_trx;
+}
+
+enum wsrep_exec_mode wsrep_thd_exec_mode(THD *thd) {
+  return thd->wsrep_exec_mode;
+}
+
+enum wsrep_query_state wsrep_thd_query_state(THD *thd) {
+  return thd->wsrep_query_state;
+}
+
+enum wsrep_conflict_state wsrep_thd_conflict_state(THD *thd) {
+  return thd->wsrep_conflict_state;
+}
+
+extern "C" wsrep_ws_handle_t *wsrep_thd_ws_handle(THD *thd) {
+  return &thd->wsrep_ws_handle;
+}
+
+extern "C" void wsrep_thd_LOCK(THD *thd) {
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+}
+
+extern "C" void wsrep_thd_UNLOCK(THD *thd) {
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+}
+
+extern "C" time_t wsrep_thd_query_start(THD *thd) {
+  return thd->query_start_in_secs();
+}
+
+extern "C" uint32 wsrep_thd_wsrep_rand(THD *thd) { return thd->wsrep_rand; }
+
+extern "C" my_thread_id wsrep_thd_thread_id(THD *thd) {
+  return thd->thread_id();
+}
+
+extern "C" wsrep_seqno_t wsrep_thd_trx_seqno(THD *thd) {
+  return (thd) ? thd->wsrep_trx_meta.gtid.seqno : WSREP_SEQNO_UNDEFINED;
+}
+
+extern "C" query_id_t wsrep_thd_query_id(THD *thd) { return thd->query_id; }
+
+extern "C" wsrep_trx_id_t wsrep_thd_next_trx_id(THD *thd) {
+  return thd->wsrep_next_trx_id();
+}
+
+extern "C" void wsrep_thd_set_next_trx_id(THD *thd) {
+  if (thd->wsrep_trx_id() == WSREP_UNDEFINED_TRX_ID) {
+    thd->set_wsrep_next_trx_id(thd->query_id);
+  }
+}
+
+extern "C" wsrep_trx_id_t wsrep_thd_trx_id(THD *thd) {
+  return thd->wsrep_trx_id();
+}
+
+extern "C" const char *wsrep_thd_query(THD *thd) {
+  return (thd) ? thd->query().str : NULL;
+}
+
+extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd) {
+  return thd->wsrep_last_query_id;
+}
+
+extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id) {
+  thd->wsrep_last_query_id = id;
+}
+
+extern "C" void wsrep_thd_awake(THD *thd, bool signal) {
+  if (signal) {
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    thd->awake(THD::KILL_QUERY);
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
+  } else {
+    mysql_mutex_lock(&LOCK_wsrep_replaying);
+    mysql_cond_broadcast(&COND_wsrep_replaying);
+    mysql_mutex_unlock(&LOCK_wsrep_replaying);
+  }
+}
+
+extern "C" int wsrep_thd_retry_counter(THD *thd) {
+  return (thd->wsrep_retry_counter);
+}
+
+extern int wsrep_trx_order_before(void *thd1, void *thd2) {
+  if (wsrep_thd_trx_seqno((THD *)thd1) < wsrep_thd_trx_seqno((THD *)thd2)) {
+    WSREP_DEBUG("BF conflict, order: %lld %lld\n",
+                (long long)wsrep_thd_trx_seqno((THD *)thd1),
+                (long long)wsrep_thd_trx_seqno((THD *)thd2));
+    return 1;
+  }
+  WSREP_DEBUG("Waiting for BF, trx order: %lld %lld\n",
+              (long long)wsrep_thd_trx_seqno((THD *)thd1),
+              (long long)wsrep_thd_trx_seqno((THD *)thd2));
+  return 0;
+}
+
+extern "C" int wsrep_trx_is_aborting(void *thd_ptr) {
+  if (thd_ptr) {
+    if ((((THD *)thd_ptr)->wsrep_conflict_state == MUST_ABORT) ||
+        (((THD *)thd_ptr)->wsrep_conflict_state == ABORTING)) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+extern "C" void wsrep_set_thd_proc_info(THD *thd, const char *str) {
+  thd->wsrep_info[sizeof(thd->wsrep_info) - 1] = '\0';
+  strncpy(thd->wsrep_info, str, (sizeof(thd->wsrep_info) - 1));
+}
+
+extern "C" const char *wsrep_get_thd_proc_info(THD *thd) {
+  return (thd->wsrep_info);
+}
+#endif /* WITH_WSREP */
+
 void Open_tables_state::set_open_tables_state(Open_tables_state *state) {
   this->open_tables = state->open_tables;
 
@@ -344,7 +497,11 @@ void Open_tables_state::reset_open_tables_state() {
   reset_reprepare_observers();
 }
 
+#ifdef WITH_WSREP
+THD::THD(bool enable_plugins, bool is_applier)
+#else
 THD::THD(bool enable_plugins)
+#endif /* WITH_WSREP */
     : Query_arena(&main_mem_root, STMT_CONVENTIONAL_EXECUTION),
       mark_used_columns(MARK_COLUMNS_READ),
       want_privilege(0),
@@ -402,6 +559,20 @@ THD::THD(bool enable_plugins)
       derived_tables_processing(false),
       parsing_system_view(false),
       sp_runtime_ctx(NULL),
+#ifdef WITH_WSREP
+      wsrep_applier(is_applier),
+      wsrep_applier_closing(false),
+      wsrep_client_thread(0),
+      wsrep_po_handle(WSREP_PO_INITIALIZER),
+      wsrep_po_cnt(0),
+      wsrep_po_in_trans(false),
+      wsrep_apply_format(0),
+      wsrep_apply_toi(false),
+      wsrep_sst_donor(false),
+      wsrep_void_applier_trx(true),
+      wsrep_gtid_event_buf(NULL),
+      wsrep_gtid_event_buf_len(0),
+#endif /* WITH_WSREP */
       m_parser_state(NULL),
       work_part_info(NULL),
       // No need to instrument, highly unlikely to have that many plugins.
@@ -504,6 +675,31 @@ THD::THD(bool enable_plugins)
   set_command(COM_CONNECT);
   *scramble = '\0';
 
+#ifdef WITH_WSREP
+  mysql_mutex_init(key_LOCK_wsrep_thd, &LOCK_wsrep_thd, MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_thd, &COND_wsrep_thd);
+  wsrep_ws_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
+  wsrep_ws_handle.opaque = NULL;
+  wsrep_retry_counter = 0;
+  wsrep_PA_safe = true;
+  wsrep_retry_query = NULL;
+  wsrep_retry_query_len = 0;
+  wsrep_retry_command = COM_CONNECT;
+  wsrep_consistency_check = NO_CONSISTENCY_CHECK;
+  wsrep_status_vars = 0;
+  wsrep_mysql_replicated = 0;
+  wsrep_TOI_pre_query = NULL;
+  wsrep_TOI_pre_query_len = 0;
+  wsrep_sync_wait_gtid = WSREP_GTID_UNDEFINED;
+  wsrep_affected_rows = 0;
+  wsrep_replicate_GTID = false;
+  wsrep_skip_wsrep_GTID = false;
+  wsrep_split_trx = false;
+  m_wsrep_next_trx_id = WSREP_UNDEFINED_TRX_ID;
+  wsrep_skip_SE_checkpoint = false;
+  wsrep_skip_wsrep_hton = false;
+#endif /* WITH_WSREP */
+
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
 
@@ -530,6 +726,12 @@ THD::THD(bool enable_plugins)
     assigned a proper thread_id value but keep using reserved_thread_id.
   */
   thr_lock_info_init(&lock_info, m_thread_id, &COND_thr_lock);
+
+#ifdef WITH_WSREP
+  lock_info.mysql_thd = (void *)this;
+  lock_info.in_lock_tables = false;
+  wsrep_info[sizeof(wsrep_info) - 1] = '\0'; /* make sure it is 0-terminated */
+#endif /* WITH_WSREP */
 
   m_internal_handler = NULL;
   m_binlog_invoker = false;
@@ -792,6 +994,34 @@ void THD::init(void) {
   memset(&status_var, 0, sizeof(status_var));
   binlog_row_event_extra_data = 0;
 
+#ifdef WITH_WSREP
+  wsrep_exec_mode = wsrep_applier ? REPL_RECV : LOCAL_STATE;
+  wsrep_conflict_state = NO_CONFLICT;
+  wsrep_query_state = QUERY_IDLE;
+  wsrep_last_query_id = 0;
+  wsrep_trx_meta.gtid = WSREP_GTID_UNDEFINED;
+  wsrep_trx_meta.depends_on = WSREP_SEQNO_UNDEFINED;
+  wsrep_retry_counter = 0;
+  wsrep_rli = NULL;
+  wsrep_PA_safe = true;
+  wsrep_consistency_check = NO_CONSISTENCY_CHECK;
+  wsrep_mysql_replicated = 0;
+  wsrep_TOI_pre_query     = NULL;
+  wsrep_TOI_pre_query_len = 0;
+  wsrep_sync_wait_gtid = WSREP_GTID_UNDEFINED;
+  wsrep_affected_rows = 0;
+  wsrep_replicate_GTID = false;
+  wsrep_skip_wsrep_GTID = false;
+  wsrep_split_trx = false;
+  wsrep_gtid_event_buf = NULL;
+  wsrep_gtid_event_buf_len = 0;
+  m_wsrep_next_trx_id = WSREP_UNDEFINED_TRX_ID;
+  wsrep_sst_donor = false;
+  wsrep_void_applier_trx = true;
+  wsrep_skip_SE_checkpoint = false;
+  wsrep_skip_wsrep_hton = false;
+#endif /* WITH_WSREP */
+
   if (variables.sql_log_bin)
     variables.option_bits |= OPTION_BIN_LOG;
   else
@@ -1049,6 +1279,24 @@ void THD::release_resources() {
   mysql_mutex_unlock(&LOCK_status);
 
   m_release_resources_done = true;
+
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&LOCK_wsrep_thd);
+  mysql_mutex_unlock(&LOCK_wsrep_thd);
+  mysql_mutex_destroy(&LOCK_wsrep_thd);
+  mysql_cond_destroy(&COND_wsrep_thd);
+
+  if (wsrep_rli) {
+    if (wsrep_rli->current_mts_submode != NULL)
+      delete wsrep_rli->current_mts_submode;
+    wsrep_rli->current_mts_submode = 0;
+    delete wsrep_rli;
+    wsrep_rli = NULL;
+    /* rli_slave MySQL counter part which is initialized to wsrep_rli. */
+    rli_slave = NULL;
+  }
+  wsrep_free_status(this);
+#endif /* WITH_WSREP */
 }
 
 THD::~THD() {
@@ -1247,6 +1495,62 @@ void THD::awake(THD::killed_state state_to_set) {
   DBUG_VOID_RETURN;
 }
 
+#ifdef WITH_WSREP
+/**
+  Awake a thread.
+
+  This is a overloaded version of THD::awake called from wsrep_thd_awake only.
+
+  @note Do always call this while holding LOCK_thd_data.
+*/
+
+void THD::awake() {
+  DBUG_ENTER("THD::awake");
+  DBUG_PRINT("enter", ("this: %p current_thd: %p", this, current_thd));
+  THD_CHECK_SENTRY(this);
+  mysql_mutex_assert_owner(&LOCK_thd_data);
+
+  /* Set the 'killed' flag of 'this', which is the target THD object. */
+  killed = THD::KILL_QUERY;
+
+  /* Broadcast a condition to kick the target if it is waiting on it. */
+  if (is_killable) {
+    mysql_mutex_lock(&LOCK_current_cond);
+    /*
+      This broadcast could be up in the air if the victim thread
+      exits the cond in the time between read and broadcast, but that is
+      ok since all we want to do is to make the victim thread get out
+      of waiting on current_cond.
+      If we see a non-zero current_cond: it cannot be an old value (because
+      then exit_cond() should have run and it can't because we have mutex); so
+      it is the true value but maybe current_mutex is not yet non-zero (we're
+      in the middle of enter_cond() and there is a "memory order
+      inversion"). So we test the mutex too to not lock 0.
+
+      Note that there is a small chance we fail to kill. If victim has locked
+      current_mutex, but hasn't yet entered enter_cond() (which means that
+      current_cond and current_mutex are 0), then the victim will not get
+      a signal and it may wait "forever" on the cond (until
+      we issue a second KILL or the status it's waiting for happens).
+      It's true that we have set its thd->killed but it may not
+      see it immediately and so may have time to reach the cond_wait().
+
+      However, where possible, we test for killed once again after
+      enter_cond(). This should make the signaling as safe as possible.
+      However, there is still a small chance of failure on platforms with
+      instruction or memory write reordering.
+    */
+    if (current_cond && current_mutex) {
+      mysql_mutex_lock(current_mutex);
+      mysql_cond_broadcast(current_cond);
+      mysql_mutex_unlock(current_mutex);
+    }
+    mysql_mutex_unlock(&LOCK_current_cond);
+  }
+  DBUG_VOID_RETURN;
+}
+#endif /* WITH_WSREP */
+
 /* extend for kill session of idle transaction from engine */
 extern "C" int thd_command(const THD *thd) { return (int)thd->get_command(); }
 
@@ -1335,8 +1639,16 @@ void THD::notify_shared_lock(MDL_context_owner *ctx_in_use,
         for some time, during which other thread can see those instances
         (e.g. see partitioning code).
       */
+#ifdef WITH_WSREP
+      if (!thd_table->needs_reopen()) {
+        mysql_lock_abort_for_thread(this, thd_table);
+        if (WSREP_NNULL(this) && wsrep_thd_is_BF((void *)this, false))
+          wsrep_abort_thd((void *)this, (void *)in_use, false);
+      }
+#else
       if (!thd_table->needs_reopen())
         mysql_lock_abort_for_thread(this, thd_table);
+#endif /* WITH_WSREP */
     }
     mysql_mutex_unlock(&in_use->LOCK_thd_data);
   }
@@ -1435,7 +1747,10 @@ void THD::update_stats(bool ran_command) noexcept {
 
   if (ran_command) {
     // The replication thread has the COM_CONNECT command.
+#ifndef WITH_WSREP
+    // TODO: add why this needs to be skipped
     DBUG_ASSERT(get_command() != COM_SLEEP);
+#endif /* !WITH_WSREP */
     if ((get_command() == COM_QUERY || get_command() == COM_CONNECT) &&
         (lex->sql_command >= 0 && lex->sql_command < SQLCOM_END)) {
       // A SQL query.
@@ -1565,6 +1880,11 @@ void THD::cleanup_after_query() {
   approx_distinct_pages.clear();
   // Set the default "cute" mode for the execution environment:
   check_for_truncated_fields = CHECK_FIELD_IGNORE;
+
+#ifdef WITH_WSREP
+  wsrep_sync_wait_gtid = WSREP_GTID_UNDEFINED;
+  if (!in_active_multi_stmt_transaction()) wsrep_affected_rows = 0;
+#endif /* WITH_WSREP */
 }
 
 LEX_CSTRING *make_lex_string_root(MEM_ROOT *mem_root, LEX_CSTRING *lex_str,

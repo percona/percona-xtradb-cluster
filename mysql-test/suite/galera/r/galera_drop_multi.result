@@ -1,0 +1,124 @@
+set session wsrep_replicate_myisam=ON;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=MyISAM;
+CREATE TEMPORARY TABLE t2 (f1 INTEGER) ENGINE=MyISAM;
+CREATE TABLE t3 (f1 INTEGER) ENGINE=InnoDB;
+CREATE TEMPORARY TABLE t4 (f1 INTEGER) ENGINE=InnoDB;
+CREATE TABLE t5 (f1 INTEGER);
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+DROP TABLE t1, t2, t3, t4;
+INSERT INTO t5 VALUES (1);
+COMMIT;
+SHOW CREATE TABLE t1;
+ERROR 42S02: Table 'test.t1' doesn't exist
+SHOW CREATE TABLE t2;
+ERROR 42S02: Table 'test.t2' doesn't exist
+SHOW CREATE TABLE t3;
+ERROR 42S02: Table 'test.t3' doesn't exist
+SHOW CREATE TABLE t4;
+ERROR 42S02: Table 'test.t4' doesn't exist
+CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t2,test.t4'' on query\. Default database: 'test'\. Query: 'DROP TABLE t1, t2, t3, t4', Error_code: 1051");
+DROP TABLE t5;
+#node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+#node-2
+show tables;
+Tables_in_test
+t1
+t3
+#node-1
+drop table t1;
+drop table t2;
+drop table t3;
+drop table t4;
+#node-2
+show tables;
+Tables_in_test
+#node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+#node-2
+show tables;
+Tables_in_test
+t1
+t3
+#node-1
+drop table t1, t2, t3, t4;
+#node-2
+show tables;
+Tables_in_test
+#node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+#node-2
+show tables;
+Tables_in_test
+t1
+t3
+#node-1
+drop table t1, t2;
+drop table t3, t4;
+#node-2
+show tables;
+Tables_in_test
+#node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+#node-2
+show tables;
+Tables_in_test
+t1
+t3
+#node-1
+drop table t1, t3;
+drop table t2, t4;
+#node-2
+show tables;
+Tables_in_test
+#node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+#node-2
+show tables;
+Tables_in_test
+t1
+t3
+#node-1
+drop table t1, t4;
+drop table t2, t3;
+#node-2
+show tables;
+Tables_in_test
+#node-1
+use test;
+create table t1 (i int, primary key pk(i)) engine=innodb;
+create temporary table t2 (i int, primary key pk(i)) engine=innodb;
+create table t3 (i int, primary key pk(i)) engine=myisam;
+create temporary table t4 (i int, primary key pk(i)) engine=myisam;
+#node-2
+show tables;
+Tables_in_test
+t1
+t3
+#node-1
+drop table t1, t3, t4;
+drop table t2;
+#node-2
+show tables;
+Tables_in_test

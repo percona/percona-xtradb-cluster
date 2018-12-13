@@ -1,0 +1,60 @@
+#
+# Checking variables that indicate the memory usage.
+#
+--source include/galera_cluster.inc
+
+#-------------------------------------------------------------------------------
+#
+# create test-bed
+#
+let $wsrep_provider_options_cached = `SELECT @@wsrep_provider_options`;
+
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE 'wsrep_cert_index_size';
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE 'wsrep_cert_bucket_count';
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE 'wsrep_gcache_pool_size';
+
+CREATE TABLE ten (f1 INTEGER);
+INSERT INTO ten VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9);
+
+SET GLOBAL wsrep_provider_options="gcache.keep_pages_count=16;gcache.keep_pages_size=128M;gcache.page_size=4096;gcache.mem_size=4096";
+
+CREATE TABLE t1 (f1 INTEGER, f2 VARCHAR(255) DEFAULT 'too long text... too long text... too long text... too long text... ', PRIMARY KEY (f1)) Engine=InnoDB;
+INSERT INTO t1 (f1) SELECT 0000 + (100 * a1.f1) + (10 * a2.f1) + a3.f1 FROM ten AS a1, ten AS a2, ten AS a3;
+
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE 'wsrep_cert_index_size';
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE 'wsrep_cert_bucket_count';
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE 'wsrep_gcache_pool_size';
+
+SELECT COUNT(*) FROM t1;
+DROP TABLE t1;
+
+SET GLOBAL wsrep_provider_options="gcache.keep_pages_count=0;gcache.keep_pages_size=0;gcache.page_size=0;gcache.mem_size=0";
+
+CREATE TABLE t2 (f1 INTEGER, f2 VARCHAR(255) DEFAULT 'too long text... too long text... too long text... too long text... ', PRIMARY KEY (f1)) Engine=InnoDB;
+INSERT INTO t2 (f1) SELECT 0000 + (100 * a1.f1) + (10 * a2.f1) + a3.f1 FROM ten AS a1, ten AS a2, ten AS a3;
+
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE 'wsrep_cert_index_size';
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE 'wsrep_cert_bucket_count';
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE 'wsrep_gcache_pool_size';
+
+SELECT COUNT(*) FROM t2;
+DROP TABLE t2;
+
+DROP TABLE ten;
+
+#-----------------------------------------------------------------------------
+#
+# restore test-bed
+#
+--disable_query_log
+eval SET GLOBAL wsrep_provider_options = `$wsrep_provider_options_cached`;
+--enable_query_log

@@ -1,0 +1,120 @@
+--source include/galera_cluster.inc
+--source include/big_test.inc
+--source include/force_restart.inc
+
+--let $wsrep_load_data_splitting_orig = `SELECT @@wsrep_load_data_splitting`
+
+# Create a file for LOAD DATA with 95K entries
+--perl
+open(FILE, ">", "$ENV{'MYSQLTEST_VARDIR'}/tmp/galera_var_load_data_splitting.csv") or die;
+foreach  my $i (1..95000) {
+	print FILE "$i\n";
+}
+EOF
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+
+# Record wsrep_last_applied as it was before LOAD DATA
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+--let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+SET GLOBAL wsrep_load_data_splitting = TRUE;
+--disable_query_log
+--eval LOAD DATA INFILE '$MYSQLTEST_VARDIR/tmp/galera_var_load_data_splitting.csv' INTO TABLE t1;
+--enable_query_log
+
+--connection node_2
+--let $wsrep_last_applied_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+
+SELECT COUNT(*) = 95000 FROM t1;
+
+# LOAD-ing 95K rows causes 10 commits to be registered
+--disable_query_log
+
+--let $wsrep_last_applied_total = `SELECT $wsrep_last_applied_before + 10`
+if ($wsrep_last_applied_after != $wsrep_last_applied_total)
+{
+	--echo "before:$wsrep_last_applied_before after:$wsrep_last_applied_after expected:$wsrep_last_applied_total"
+}
+
+--eval SELECT $wsrep_last_applied_after = $wsrep_last_applied_before + 10 AS wsrep_last_applied_diff;
+--enable_query_log
+
+--connection node_1
+--eval SET GLOBAL wsrep_load_data_splitting = $wsrep_load_data_splitting_orig;
+
+DROP TABLE t1;
+
+
+#
+# test scenario where-in data is loaded using LOAD DATA INFILE
+# into a partitioned table.
+#
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB
+PARTITION BY RANGE(f1) (
+    PARTITION p0 VALUES LESS THAN (10000),
+    PARTITION p1 VALUES LESS THAN (20000),
+    PARTITION p2 VALUES LESS THAN (100000)
+);
+
+--connection node_2
+--echo #node-2
+SHOW CREATE TABLE t1;
+SELECT COUNT(*) FROM t1;
+
+--connection node_1
+--echo #node-1
+--disable_query_log
+--eval LOAD DATA INFILE '$MYSQLTEST_VARDIR/tmp/galera_var_load_data_splitting.csv' INTO TABLE t1;
+--enable_query_log
+SELECT COUNT(*) FROM t1;
+
+--connection node_2
+--echo #node-2
+SELECT COUNT(*) FROM t1;
+DROP TABLE t1;
+
+
+#
+# testing load of data with wsrep-on=off
+#
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+--disable_query_log
+--eval LOAD DATA INFILE '$MYSQLTEST_VARDIR/tmp/galera_var_load_data_splitting.csv' INTO TABLE t1;
+--enable_query_log
+SELECT COUNT(*) = 95000 FROM t1;
+
+#
+TRUNCATE TABLE t1;
+--let $wsrep_max_ws_rows_saved = `SELECT @@wsrep_max_ws_rows`
+set global wsrep_max_ws_rows=100;
+--disable_query_log
+--error ER_ERROR_DURING_COMMIT
+--eval LOAD DATA INFILE '$MYSQLTEST_VARDIR/tmp/galera_var_load_data_splitting.csv' INTO TABLE t1;
+--enable_query_log
+
+#
+set session wsrep_on=0;
+--disable_query_log
+--eval LOAD DATA INFILE '$MYSQLTEST_VARDIR/tmp/galera_var_load_data_splitting.csv' INTO TABLE t1;
+--enable_query_log
+SELECT COUNT(*) = 95000 FROM t1;
+set session wsrep_on=1;
+
+#
+--connection node_2
+--echo #node-2
+SELECT COUNT(*) = 0 FROM t1;
+
+#
+--connection node_1
+--echo #node-1
+--eval set global wsrep_max_ws_rows = $wsrep_max_ws_rows_saved;
+DROP TABLE t1;

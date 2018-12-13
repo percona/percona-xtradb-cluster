@@ -1,0 +1,121 @@
+call mtr.add_suppression("Cannot modify @@session.wsrep_on");
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+SET SESSION wsrep_on = FALSE;
+INSERT INTO t1 VALUES (2);
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+SET SESSION wsrep_on = TRUE;
+INSERT INTO t1 VALUES (3);
+SELECT COUNT(*) = 2 FROM t1;
+COUNT(*) = 2
+1
+SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 2;
+COUNT(*) = 0
+1
+SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 3;
+COUNT(*) = 1
+1
+DROP TABLE t1;
+#node-1
+set session wsrep_on = TRUE;
+create table t1 (i int) engine=innodb;
+insert into t1 values (1), (2);
+#node-2
+select * from t1;
+i
+1
+2
+#node-1
+set session wsrep_on = TRUE;
+begin;
+insert into t1 values (3), (4);
+commit;
+#node-2
+select * from t1;
+i
+1
+2
+3
+4
+#node-1
+set session wsrep_on = TRUE;
+begin;
+insert into t1 values (5), (6);
+set session wsrep_on = FALSE;
+ERROR 42000: Variable 'wsrep_on' can't be set to the value of 'OFF'
+select * from t1;
+i
+1
+2
+3
+4
+5
+6
+commit;
+#node-2
+select * from t1;
+i
+1
+2
+3
+4
+5
+6
+#node-1
+set session wsrep_on = TRUE;
+begin;
+insert into t1 values (7), (8);
+set session wsrep_on = FALSE;
+ERROR 42000: Variable 'wsrep_on' can't be set to the value of 'OFF'
+select * from t1;
+i
+1
+2
+3
+4
+5
+6
+7
+8
+rollback;
+#node-2
+select * from t1;
+i
+1
+2
+3
+4
+5
+6
+#node-1
+set session wsrep_on = FALSE;
+begin;
+insert into t1 values (9), (10);
+set session wsrep_on = TRUE;
+ERROR 42000: Variable 'wsrep_on' can't be set to the value of 'ON'
+commit;
+select * from t1;
+i
+1
+2
+3
+4
+5
+6
+9
+10
+insert into t1 values (11), (12);
+#node-2
+select * from t1;
+i
+1
+2
+3
+4
+5
+6
+#node-1
+set session wsrep_on = TRUE;
+drop table t1;

@@ -1,8 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: Percona Server 8.0
-Upstream-Contact: Percona MySQL Development Team <mysqldev@percona.com>
-Source: http://www.percona.com/downloads/Percona-Server-8.0/
-
+Upstream-Name: Percona XtraDB Cluster 5.7
+Upstream-Contact: https://bugs.launchpad.net/percona-xtradb-cluster/
+Source: http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/
 Copyright: 2015, Oracle and/or its affiliates. All rights reserved.
 License:
  This is a release of MySQL, a dual-license SQL database server.

@@ -340,12 +340,37 @@ static void *handle_connection(void *arg) {
     PSI_THREAD_CALL(delete_current_thread)();
 #endif /* HAVE_PSI_THREAD_INTERFACE */
 
+#ifdef WITH_WSREP
+    /* Make sure you capture thd variable before thd is deleted. */
+    bool is_applier = (WSREP(thd) && thd->wsrep_applier);
+    my_thread_id tid = thd->thread_id();
+#endif /* WITH_WSREP */
+
     delete thd;
+    thd= NULL;
 
     // Server is shutting down so end the pthread.
     if (connection_events_loop_aborted()) break;
 
+#ifdef WITH_WSREP
+    if (is_applier) {
+      /*
+        Running in cluster mode and this is applier thread. Avoid reusing thd
+        for applier. Why ? Need to trace reason.
+      */
+      WSREP_DEBUG("avoiding thread re-use for applier, thd: %u", tid);
+      channel_info = NULL;
+    } else {
+      /*
+        Running in cluster mode but this is client thd or running in standalone
+        mode. Re-use of thd is allowed.
+      */
+      channel_info =
+          Per_thread_connection_handler::block_until_new_connection();
+    }
+#else
     channel_info = Per_thread_connection_handler::block_until_new_connection();
+#endif /* WITH_WSREP */
     if (channel_info == NULL) break;
     pthread_reused = true;
   }

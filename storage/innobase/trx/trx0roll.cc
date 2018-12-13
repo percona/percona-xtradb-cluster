@@ -57,6 +57,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "trx0undo.h"
 #include "usr0sess.h"
 
+#ifdef WITH_WSREP
+#include "ha_prototypes.h"
+#endif /* WITH_WSREP */
+
 /** This many pages must be undone before a truncate is tried within
 rollback */
 static const ulint TRX_ROLL_TRUNC_THRESHOLD = 1;
@@ -404,6 +408,12 @@ executed after the savepoint */
 
   trx->op_info = "";
 
+#ifdef WITH_WSREP_OUT
+  // TODO: get rid of this snippet
+  if (wsrep_on(trx->mysql_thd)) {
+    trx->lock.was_chosen_as_deadlock_victim = false;
+  }
+#endif /* WITH_WSREP */
   return (err);
 }
 
@@ -769,6 +779,12 @@ static void trx_roll_try_truncate(
   if (undo_ptr->update_undo) {
     trx_undo_truncate_end(trx, undo_ptr->update_undo, trx->undo_no);
   }
+#ifdef WITH_WSREP_OUT
+  // TODO: get rid of this snippet
+  if (wsrep_on(trx->mysql_thd)) {
+    trx->lock.was_chosen_as_deadlock_victim = false
+  }
+#endif /* WITH_WSREP */
 }
 
 /** Pops the topmost undo log record in a single undo log and updates the info

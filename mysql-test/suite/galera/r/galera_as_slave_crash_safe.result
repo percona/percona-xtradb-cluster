@@ -1,0 +1,25 @@
+#node-3 (async slave)
+call mtr.add_suppression("Recovery from master pos");
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+#node-1 (master)
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(1);
+#node-3 (async slave)
+#Restarting node-3 (async slave) ...
+# restart
+STOP SLAVE;
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+#node-1 (master)
+INSERT INTO t1 VALUES (2);
+#node-3 (async slave)
+#node-2 (galera replicated node non-slave)
+INSERT INTO t1 VALUES (3);
+#node-3 (async slave)
+DROP TABLE t1;
+STOP SLAVE;
+RESET SLAVE ALL;
+RESET MASTER;

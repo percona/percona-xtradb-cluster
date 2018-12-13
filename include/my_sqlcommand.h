@@ -210,6 +210,9 @@ enum enum_sql_command {
   SQLCOM_LOCK_TABLES_FOR_BACKUP,
   SQLCOM_CREATE_COMPRESSION_DICTIONARY,
   SQLCOM_DROP_COMPRESSION_DICTIONARY,
+  /* Placeholder. If you see more command following this
+  lines then check if they need handling in PXC.
+  PXC has special handling (TOI based) for DDL command. */
   /* This should be the last !!! */
   SQLCOM_END
 };

@@ -1,0 +1,32 @@
+#
+# wsrep_on
+#
+# save the initial values
+SET @wsrep_on_session_saved = @@session.wsrep_on;
+# default
+SELECT @@session.wsrep_on;
+@@session.wsrep_on
+0
+
+SET @@session.wsrep_on=OFF;
+SELECT @@session.wsrep_on;
+@@session.wsrep_on
+0
+SET @@session.wsrep_on=ON;
+SELECT @@session.wsrep_on;
+@@session.wsrep_on
+1
+SET @@session.wsrep_on=default;
+SELECT @@session.wsrep_on;
+@@session.wsrep_on
+0
+
+# invalid values
+SET @@session.wsrep_on=NULL;
+ERROR 42000: Variable 'wsrep_on' can't be set to the value of 'NULL'
+SET @@session.wsrep_on='junk';
+ERROR 42000: Variable 'wsrep_on' can't be set to the value of 'junk'
+
+# restore the initial values
+SET @@session.wsrep_on = @wsrep_on_session_saved;
+# End of test

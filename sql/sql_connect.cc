@@ -114,6 +114,10 @@ using std::min;
 #define MIN_HANDSHAKE_SIZE 6
 #endif /* HAVE_OPENSSL */
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
+
 user_stats_t *global_user_stats;
 user_stats_t *global_client_stats;
 thread_stats_t *global_thread_stats;
@@ -963,6 +967,17 @@ static bool login_connection(THD *thd, bool extra_port_connection) {
 void end_connection(THD *thd) {
   NET *net = thd->get_protocol_classic()->get_net();
 
+#ifdef WITH_WSREP
+  if (WSREP(thd)) {
+    wsrep_status_t rcode = wsrep->free_connection(wsrep, thd->thread_id());
+    if (rcode) {
+      WSREP_WARN("wsrep failed to free connection context: %u, code: %d",
+                 thd->thread_id(), rcode);
+    }
+  }
+  thd->wsrep_client_thread = 0;
+#endif /* WITH_WSREP */
+
   mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_CONNECTION_DISCONNECT), 0);
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
@@ -1086,6 +1101,9 @@ bool thd_prepare_connection(THD *thd, bool extra_port_connection) {
   if (rc) return rc;
 
   prepare_new_connection_state(thd);
+#ifdef WITH_WSREP
+  thd->wsrep_client_thread = 1;
+#endif /* WITH_WSREP */
   return false;
 }
 

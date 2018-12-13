@@ -7,6 +7,11 @@
 # $explicit_default_counter - can be set before calling the script,
 #                             reset only at the end of the test, overrides $wait_counter
 
+#
+# We require two consequtive connection successes in order to
+# work around a race condition on Galera startup where the server
+# can temporarily accept queries before starting to reject them again
+#
 
 --disable_result_log
 --disable_query_log
@@ -23,6 +28,8 @@ if ($wait_counter) {
   --let $counter= $wait_counter
 }
 --let $mysql_errno= 9999
+let $successes= 2;
+while ($successes) {
 while ($mysql_errno)
 {
 
@@ -45,6 +52,9 @@ while ($mysql_errno)
   {
     --die Server failed to restart
   }
+  --sleep 0.1
+}
+  --dec $successes
   --sleep 0.1
 }
 # Reset $wait_counter so that its value won't be used on subsequent

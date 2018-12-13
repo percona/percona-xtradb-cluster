@@ -1,0 +1,24 @@
+-- source include/galera_cluster.inc
+
+-- connection node_1
+SET GLOBAL innodb_lock_wait_timeout = 1;
+CREATE TABLE p (i INT PRIMARY KEY, j INT) ENGINE=INNODB;
+INSERT INTO p VALUES (1, 0), (2, 0);
+
+CREATE TABLE c (i INT PRIMARY KEY, j INT, f INT, FOREIGN KEY(f) REFERENCES p(i)) ENGINE=INNODB;
+INSERT INTO c VALUES (1, 0, 1);
+
+BEGIN;
+UPDATE p SET j = 1 WHERE i = 1;
+
+-- connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+# This causes a crash if the bug exists
+-- error ER_LOCK_WAIT_TIMEOUT
+UPDATE c SET f = 2 WHERE i = 1;
+
+-- connection node_1
+COMMIT;
+
+DROP TABLE c, p;
+
+SET GLOBAL innodb_lock_wait_timeout = default;

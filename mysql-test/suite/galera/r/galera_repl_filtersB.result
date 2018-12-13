@@ -1,0 +1,1504 @@
+# connection node_2 : starting async slave
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+#
+# Test preparation
+#
+# connection node_1
+CREATE DATABASE db;
+USE db;
+CREATE TABLE db.counter(id INT PRIMARY KEY AUTO_INCREMENT, count INT);
+# connection node_1
+CREATE DATABASE dbx;
+# connection node_2
+CREATE DATABASE dbx;
+#
+# async.tbl.ddl test preparation
+#
+# connection node_1
+CREATE DATABASE db1;
+CREATE DATABASE dbx1;
+# connection node_3
+include/assert.inc ["db1 is on node_3"]
+CREATE DATABASE dbx1;
+# connection node_2
+include/assert.inc ["db1 is on node_2"]
+include/assert.inc ["dbx1 is on node_2"]
+#
+# Test async.tbl.ddl.1.1 : CREATE TABLE
+#
+# connection node_1
+USE db;
+CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+INSERT INTO db.counter(count) VALUES(1);
+include/assert.inc ['t1 is on node_1']
+# connection node_2
+include/assert.inc ['t1 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is on node_3']
+#
+# Test async.tbl.ddl.1.2 : ALTER TABLE
+#
+# connection node_1
+USE db;
+ALTER TABLE db1.t1 ADD COLUMN x3 LONGBLOB;
+INSERT INTO db.counter(count) VALUES(2);
+include/assert.inc ['t1.x3 is on node_1']
+# connection node_2
+include/assert.inc ['t1.x3 is on node_2']
+# connection node_3
+include/assert.inc ['t1.x3 is on node_3']
+#
+# Test async.tbl.ddl.1.3 : RENAME TABLE
+#
+# connection node_1
+USE db;
+RENAME TABLE db1.t1 TO db1.t2;
+INSERT INTO db.counter(count) VALUES(3);
+include/assert.inc ['db1.t1 is not on node_1']
+include/assert.inc ['db1.t2 is on node_1']
+# connection node_2
+include/assert.inc ['db1.t1 is not on node_2']
+include/assert.inc ['db1.t2 is on node_2']
+# connection node_3
+include/assert.inc ['db1.t1 is not on node_3']
+include/assert.inc ['db1.t2 is on node_3']
+#
+# async.tbl.ddl.1.4 test preparation
+#
+# connection node_1
+USE db;
+INSERT INTO db1.t2(id) VALUES(1);
+include/assert.inc ["db1.t2 has a row on node_1"]
+# connection node_3
+include/assert.inc ["db1.t2 has a row on node_3"]
+# connection node_2
+include/assert.inc ["db1.t2 has a row on node_2"]
+#
+# Test async.tbl.ddl.1.4 : TRUNCATE TABLE
+#
+# connection node_1
+USE db;
+TRUNCATE TABLE db1.t2;
+INSERT INTO db.counter(count) VALUES(4);
+include/assert.inc ['db1.t2 is truncated on node_1']
+# connection node_2
+include/assert.inc ['db1.t2 is truncated on node_2']
+# connection node_3
+include/assert.inc ['db1.t2 is truncated on node_3']
+#
+# Test async.tbl.ddl.1.5 : DROP TABLE
+#
+# connection node_1
+USE db;
+DROP TABLE db1.t2;
+INSERT INTO db.counter(count) VALUES(5);
+include/assert.inc ['t2 is not on node_1']
+# connection node_2
+include/assert.inc ['t2 is not on node_2']
+# connection node_3
+include/assert.inc ['t2 is not on node_3']
+#
+# Test async.tbl.ddl.2.1 : CREATE TABLE
+#
+# connection node_1
+USE db;
+CREATE TABLE dbx1.t1(id INT PRIMARY KEY);
+INSERT INTO db.counter(count) VALUES(6);
+include/assert.inc ['t1 is on node_1']
+# connection node_2
+include/assert.inc ['t1 is not on node_2']
+# connection node_3
+include/assert.inc ['t1 is not on node_3']
+#
+# async.tbl.dll.2.2 test preparation
+#
+# connection node_2
+CREATE TABLE dbx1.t1(id INT PRIMARY KEY);
+# connection node_3
+include/assert.inc ['t1 is on node_3']
+#
+# Test async.tbl.ddl.2.2 : ALTER TABLE
+#
+# connection node_1
+USE db;
+ALTER TABLE dbx1.t1 ADD COLUMN x3 LONGBLOB;
+INSERT INTO db.counter(count) VALUES(7);
+include/assert.inc ['t1.x3 is on node_1']
+# connection node_2
+include/assert.inc ['t1.x3 is not on node_2']
+# connection node_3
+include/assert.inc ['t1.x3 is not on node_3']
+#
+# Test async.tbl.ddl.2.3 : RENAME TABLE
+#
+# connection node_1
+USE db;
+RENAME TABLE dbx1.t1 TO dbx1.t2;
+INSERT INTO db.counter(count) VALUES(8);
+include/assert.inc ['t1 is not on node_1']
+include/assert.inc ['t2 is on node_1']
+# connection node_2
+include/assert.inc ['t1 is on node_2']
+include/assert.inc ['t2 is not on node_2']
+# connection node_3
+include/assert.inc ['t1 is on node_3']
+include/assert.inc ['t2 is not on node_3']
+#
+# Test preparation for async.tbl.ddl.2.4
+#
+# connection node_2
+RENAME TABLE dbx1.t1 TO dbx1.t2;
+# connection node_3
+include/assert.inc ['t2 is on node_3']
+# connection node_2
+INSERT INTO dbx1.t2(id) VALUES(99);
+# connection node_3
+INSERT INTO dbx1.t2(id) VALUES(99);
+#
+# Test async.tbl.ddl.2.4 : TRUNCATE TABLE
+#
+# connection node_1
+USE db;
+TRUNCATE TABLE dbx1.t2;
+INSERT INTO db.counter(count) VALUES(9);
+include/assert.inc ['dbx1.t2 is truncated on node_2']
+# connection node_2
+include/assert.inc ['dbx1.t2 is not truncated on node_2']
+# connection node_3
+include/assert.inc ['dbx1.t2 is not truncated on node_3']
+#
+# Test async.tbl.ddl.2.5 : DROP TABLE
+#
+# connection node_1
+USE db;
+DROP TABLE dbx1.t2;
+INSERT INTO db.counter(count) VALUES(10);
+include/assert.inc ['t2 is not on node_2']
+# connection node_2
+include/assert.inc ['t2 is on node_2 (DROP did not replicate)']
+# connection node_3
+include/assert.inc ['t2 is on node_3 (DROP did not replicate)']
+#
+# async.tbl.ddl.2 test cleanup
+#
+# connection node_2
+DROP TABLE dbx1.t2;
+# connection node_2
+include/assert.inc ['t2 is not on node_3']
+#
+# Test async.tbl.ddl.3.1 : CREATE TABLE
+#
+# connection node_1
+USE dbx;
+CREATE TABLE db1.t1(id INT PRIMARY KEY);
+INSERT INTO db.counter(count) VALUES(11);
+include/assert.inc ['t1 is on node_1']
+# connection node_2
+include/assert.inc ['t1 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is on node_3']
+#
+# Test async.tbl.ddl.3.2 : ALTER TABLE
+#
+# connection node_1
+USE dbx;
+ALTER TABLE db1.t1 ADD COLUMN x3 LONGBLOB;
+INSERT INTO db.counter(count) VALUES(12);
+include/assert.inc ['t1.x3 is on node_1']
+# connection node_2
+include/assert.inc ['t1.x3 is on node_2 (replicated)']
+# connection node_3
+include/assert.inc ['t1.x3 is on node_3 (replicated)']
+#
+# Test async.tbl.ddl.3.3 : RENAME TABLE
+#
+# connection node_1
+USE dbx;
+RENAME TABLE db1.t1 TO db1.t2;
+INSERT INTO db.counter(count) VALUES(13);
+include/assert.inc ['t1 is not on node_1']
+include/assert.inc ['t2 is on node_1']
+# connection node_2
+include/assert.inc ['t1 is not on node_2']
+include/assert.inc ['t2 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is not on node_3']
+include/assert.inc ['t2 is on node_3']
+# restore table to original name
+# connection node_1
+USE db;
+RENAME TABLE db1.t2 TO db1.t1;
+# connection node_3
+include/assert.inc ["t1 is on node_3"]
+# connection node_2
+include/assert.inc ["t1 is on node_2"]
+#
+# Test preparation for async.tbl.ddl.3.4
+#
+# connection node_1
+USE db;
+INSERT INTO db1.t1(id) VALUES(99);
+# connection node_3
+include/assert.inc ["Row added to db1.t1 on node_3"]
+# connection node_2
+include/assert.inc ["Row added to db1.t1 on node_2"]
+#
+# Test async.tbl.ddl.3.4 : TRUNCATE TABLE
+#
+# connection node_1
+USE dbx;
+TRUNCATE TABLE db1.t1;
+INSERT INTO db.counter(count) VALUES(14);
+include/assert.inc ['db1.t1 is truncated on node_1']
+# connection node_2
+include/assert.inc ['db1.t1 is truncated on node_2']
+# connection node_3
+include/assert.inc ['db1.t1 is truncated on node_3']
+#
+# Test async.tbl.ddl.3.5 : DROP TABLE
+#
+# connection node_1
+USE dbx;
+DROP TABLE db1.t1;
+INSERT INTO db.counter(count) VALUES(15);
+include/assert.inc ['t1 is not on node_1']
+# connection node_2
+include/assert.inc ['t1 is not on node_2']
+# connection node_3
+include/assert.inc ['t1 is not on node_3']
+#
+# Test async.tbl.ddl.4.1 : CREATE TABLE
+#
+# connection node_1
+USE dbx;
+CREATE TABLE dbx1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+INSERT INTO db.counter(count) VALUES(16);
+include/assert.inc ['t1 is on node_1']
+# connection node_2
+include/assert.inc ['t1 is not on node_2']
+# connection node_3
+include/assert.inc ['t1 is not on node_3']
+#
+# Test preparation for async.tbl.ddl.4.2
+#
+# connection node_2
+USE db;
+CREATE TABLE dbx1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+# connection node_3
+include/assert.inc ["t1 is on node_3"]
+#
+# Test async.tbl.ddl.4.2 : ALTER TABLE
+#
+# connection node_1
+USE dbx;
+ALTER TABLE dbx1.t1 ADD COLUMN x3 LONGBLOB;
+INSERT INTO db.counter(count) VALUES(17);
+include/assert.inc ['t1.x3 is on node_1']
+# connection node_2
+include/assert.inc ['t1.x3 is not on node_2']
+# connection node_3
+include/assert.inc ['t1.x3 is not on node_3']
+#
+# Test async.tbl.ddl.4.3 : RENAME TABLE
+#
+# connection node_1
+USE dbx;
+RENAME TABLE dbx1.t1 TO dbx1.t2;
+INSERT INTO db.counter(count) VALUES(18);
+include/assert.inc ['t1 is not on node_1']
+include/assert.inc ['t2 is on node_1']
+# connection node_2
+include/assert.inc ['t1 is on node_2']
+include/assert.inc ['t2 is not on node_2']
+# connection node_3
+include/assert.inc ['t1 is on node_3']
+include/assert.inc ['t2 is not on node_3']
+# restore table to original name
+# connection node_1
+USE dbx;
+RENAME TABLE dbx1.t2 TO dbx1.t1;
+#
+# Test preparation for async.tbl.ddl.4.4
+#
+# connection node_1
+INSERT INTO dbx1.t1(id) VALUES(99);
+# connection node_2
+INSERT INTO dbx1.t1(id) VALUES(99);
+# connection node_3
+INSERT INTO dbx1.t1(id) VALUES(99);
+#
+# Test async.tbl.ddl.4.4 : TRUNCATE TABLE
+#
+# connection node_1
+USE dbx;
+TRUNCATE TABLE dbx1.t1;
+INSERT INTO db.counter(count) VALUES(19);
+include/assert.inc ['dbx1.t1 is truncated on node_1']
+# connection node_2
+include/assert.inc ['dbx1.t1 is not truncated on node_2']
+# connection node_3
+include/assert.inc ['dbx1.t1 is not truncated on node_3']
+#
+# Test async.tbl.ddl.4.5 : DROP TABLE
+#
+# connection node_1
+USE dbx;
+DROP TABLE dbx1.t1;
+INSERT INTO db.counter(count) VALUES(20);
+include/assert.inc ['t1 is not on node_1']
+# connection node_2
+include/assert.inc ['t1 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is on node_3']
+#
+# Test cleanup
+#
+# connection node_2
+DROP TABLE dbx1.t1;
+# connection node_3
+include/assert.inc ['t1 is not on node_3']
+#
+# async.tbl.ddl test cleanup
+#
+# connection node_1
+DROP DATABASE db1;
+DROP DATABASE dbx1;
+# connection node_3
+include/assert.inc ["db1 is not on node_3"]
+DROP DATABASE dbx1;
+# connection node_2
+include/assert.inc ["db1 is not on node_2"]
+include/assert.inc ["dbx1 is not on node_2"]
+#
+# async.tbl.dml test preparation
+#
+# connection node_1
+CREATE DATABASE db1;
+CREATE DATABASE dbx1;
+# connection node_3
+include/assert.inc ['db1 is on node_3']
+CREATE DATABASE dbx1;
+# connection node_2
+include/assert.inc ['db1 is on node_2']
+include/assert.inc ['dbx1 is on node_2']
+# connection node_1
+USE db;
+CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+USE db;
+CREATE TABLE dbx1.t2(id INT PRIMARY KEY, f2 LONGBLOB);
+# connection node_3
+include/assert.inc ["db1.t1 is on node_3"]
+USE db;
+CREATE TABLE dbx1.t2(id INT PRIMARY KEY, f2 LONGBLOB);
+# connection node_2
+include/assert.inc ["db1.t1 is on node_2"]
+include/assert.inc ["dbx1.t2 is on node_2"]
+#
+# Test async.tbl.dml.1.1 : INSERT
+#
+# connection node_1
+USE db;
+INSERT INTO db1.t1(id) VALUES(1);
+INSERT INTO db.counter(count) VALUES(21);
+include/assert.inc ["Insert succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Insert succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Insert succeeded on node_3"]
+#
+# Test async.tbl.dml.1.2 : UPDATE
+#
+# connection node_1
+USE db;
+UPDATE db1.t1 SET f2 = "abcde" WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(22);
+include/assert.inc ["Update succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Update succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Update succeeded on node_3"]
+#
+# Test async.tbl.dml.1.3 : DELETE
+#
+# connection node_1
+USE db;
+DELETE FROM db1.t1 WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(23);
+include/assert.inc ["Delete succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Delete succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Delete succeeded on node_3"]
+#
+# Testcase async.tbl.dml.1 cleanup
+#
+# connection node_1
+USE db;
+TRUNCATE TABLE db1.t1;
+#
+# Test async.tbl.dml.2.1 : INSERT
+#
+# connection node_1
+USE db;
+INSERT INTO dbx1.t2(id) VALUES(1);
+INSERT INTO db.counter(count) VALUES(24);
+include/assert.inc ["Insert succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Insert not replicated to node_2"]
+# connection node_3
+include/assert.inc ["Insert not replicated to node_3"]
+#
+# Test async.tbl.dml.2 test preparation
+#
+# connection node_2
+INSERT INTO dbx1.t2(id) VALUES(1);
+# connection node_3
+INSERT INTO dbx1.t2(id) VALUES(1);
+#
+# Test async.tbl.dml.2.2 : UPDATE
+#
+# connection node_1
+USE db;
+UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(25);
+include/assert.inc ["Update succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Update not replicated to node_2"]
+# connection node_3
+include/assert.inc ["Update not replicated to node_3"]
+#
+# Test async.tbl.dml.2.3 : DELETE
+#
+# connection node_1
+USE db;
+DELETE FROM dbx1.t2 WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(26);
+include/assert.inc ["Delete succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Delete not replicated to node_2"]
+# connection node_3
+include/assert.inc ["Delete not replicated to node_3"]
+#
+# Testcase async.tbl.dml.2.3 cleanup
+#
+# connection node_2
+USE db;
+TRUNCATE TABLE dbx1.t2;
+# connection node_3
+USE db;
+TRUNCATE TABLE dbx1.t2;
+#
+# Test async.tbl.dml.3.1 : INSERT
+#
+# connection node_1
+USE dbx;
+INSERT INTO db1.t1(id) VALUES(1);
+INSERT INTO db.counter(count) VALUES(27);
+include/assert.inc ["Insert succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Insert replicated to node_2"]
+# connection node_3
+include/assert.inc ["Insert replicated to node_3"]
+#
+# Test async.tbl.dml.3.2 : UPDATE
+#
+# connection node_1
+USE dbx;
+UPDATE db1.t1 SET f2 = "abcde" WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(28);
+include/assert.inc ["Update succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Update replicated to node_2"]
+# connection node_3
+include/assert.inc ["Update replicated to node_3"]
+#
+# Test async.tbl.dml.3.3 : DELETE
+#
+# connection node_1
+USE dbx;
+DELETE FROM db1.t1 WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(29);
+include/assert.inc ["Delete succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Delete replicated to node_2"]
+# connection node_3
+include/assert.inc ["Delete replicated to node_3"]
+#
+# Test async.tbl.dml.4.1 : INSERT
+#
+# connection node_1
+USE dbx;
+INSERT INTO dbx1.t2(id) VALUES(1);
+INSERT INTO db.counter(count) VALUES(30);
+include/assert.inc ["Insert succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Insert not replicated to node_2"]
+# connection node_3
+include/assert.inc ["Insert not replicated to node_3"]
+#
+# Test async.tbl.dml.4 test preparation
+#
+# connection node_2
+INSERT INTO dbx1.t2(id) VALUES(1);
+# connection node_3
+INSERT INTO dbx1.t2(id) VALUES(1);
+#
+# Test async.tbl.dml.4.2 : UPDATE
+#
+# connection node_1
+USE dbx;
+UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(31);
+include/assert.inc ["Update succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Update not replicated to node_2"]
+# connection node_3
+include/assert.inc ["Update not replicated to node_3"]
+#
+# Test async.tbl.dml.4.3 : DELETE
+#
+# connection node_1
+USE dbx;
+DELETE FROM dbx1.t2 WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(32);
+include/assert.inc ["Delete succeeded on node_1"]
+# connection node_2
+include/assert.inc ["Delete not replicated to node_2"]
+# connection node_3
+include/assert.inc ["Delete not replicated to node_3"]
+#
+# Testcase async.tbl.dml.4.3 cleanup
+#
+# connection node_2
+USE db;
+TRUNCATE TABLE dbx1.t2;
+# connection node_3
+USE db;
+TRUNCATE TABLE dbx1.t2;
+#
+# async.tbl.dml test cleanup
+#
+# connection node_1
+DROP DATABASE db1;
+DROP DATABASE dbx1;
+# connection node_2
+include/assert.inc ['db1 is not on node_2']
+DROP DATABASE dbx1;
+# connection node_3
+include/assert.inc ['db1 is not on node_3']
+include/assert.inc ['dbx1 is not on node_3']
+#
+# async.acct.mgmt test preparation
+#
+# connection node_1
+CREATE DATABASE db1;
+USE db;
+CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+# connection node_3
+include/assert.inc ['db1.t1 is on node_3']
+# connection node_2
+include/assert.inc ['db1.t1 is on node_2']
+#
+# Test async.acct.mgmt.1.1 : CREATE USER
+#
+# connection node_1
+USE db;
+CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+INSERT INTO db.counter(count) VALUES(33);
+include/assert.inc ["User foo is on node_1"]
+# connection node_2
+include/assert.inc ["User foo is not on node_2 (did not replicate)"]
+# connection node_3
+include/assert.inc ["User foo is not on node_3 (did not replicate)"]
+#
+# async.acct.mgmt.1.2 test preparation
+#
+# connection node_2
+USE db;
+CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+include/assert.inc ["User foo is on node_2"]
+# connection node_3
+include/assert.inc ["User foo is on node_3"]
+#
+# Test async.acct.mgmt.1.2 : CHANGE PASSWORD
+#
+# connection node_1
+USE db;
+SET PASSWORD FOR "foo"@"%" = "notapassword";
+INSERT INTO db.counter(count) VALUES(34);
+include/assert.inc ["User foo is altered on node_1"]
+# connection node_2
+include/assert.inc ["User foo is not altered on node_2"]
+# connection node_3
+include/assert.inc ["User foo is not altered on node_3"]
+#
+# Test async.acct.mgmt.1.3 : ALTER USER
+#
+# connection node_1
+include/assert.inc ["User foo is not expired on node_1"]
+USE db;
+ALTER USER "foo"@"%" PASSWORD EXPIRE;
+include/assert.inc ["User foo is altered on node_1"]
+INSERT INTO db.counter(count) VALUES(35);
+# connection node_2
+include/assert.inc ["User foo is not altered on node_2"]
+# connection node_3
+include/assert.inc ["User foo is not altered on node_3"]
+#
+# Test async.acct.mgmt.1.4 : GRANT
+#
+# connection node_1
+USE db;
+GRANT SELECT ON db1.t1 TO "foo"@"%";
+INSERT INTO db.counter(count) VALUES(36);
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_1"]
+# connection node_2
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_3"]
+#
+# async.acct.mgmt.1.5 test preparation
+#
+# connection node_2
+USE db;
+GRANT SELECT ON db1.t1 TO "foo"@"%";
+# connection node_3
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_3"]
+#
+# Test async.acct.mgmt.1.5 : REVOKE
+#
+# connection node_1
+USE db;
+REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+INSERT INTO db.counter(count) VALUES(37);
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_1"]
+# connection node_2
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_3"]
+#
+# Test cleanup for async.acct.mgmt.1.5
+#
+# connection node_2
+USE db;
+REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+# connection node_3
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_3"]
+#
+# Test async.acct.mgmt.1.6 : GRANT ALL
+#
+# connection node_1
+USE db;
+GRANT ALL ON db1.t1 TO "foo"@"%";
+INSERT INTO db.counter(count) VALUES(38);
+include/assert.inc ["User foo has ALL access on db1.t1 on node_1"]
+# connection node_2
+include/assert.inc ["User foo has NO access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has NO access on db1.t1 on node_3"]
+#
+# async.acct.mgmt.1.6 test preparation
+#
+# connection node_2
+USE db;
+GRANT ALL ON db1.t1 TO "foo"@"%";
+# connection node_3
+include/assert.inc ["User foo has ALL access on db1.t1 on node_3"]
+#
+# Test async.acct.mgmt.1.7 : REVOKE ALL
+#
+# connection node_1
+USE db;
+REVOKE ALL ON db1.t1 FROM "foo"@"%";
+INSERT INTO db.counter(count) VALUES(39);
+include/assert.inc ["User foo has no access on db1.t1 on node_1"]
+# connection node_2
+include/assert.inc ["User foo has ALL access on db1.t1 on node_2 (did not replicate)"]
+# connection node_3
+include/assert.inc ["User foo has ALL access on db1.t1 on node_3 (did not replicate)"]
+#
+# Test async.acct.mgmt.1.8 : DROP USER
+#
+# connection node_1
+USE db;
+DROP USER "foo"@"%";
+INSERT INTO db.counter(count) VALUES(40);
+include/assert.inc ["User foo is not on node_1"]
+# connection node_2
+include/assert.inc ["User foo is on node_2"]
+# connection node_3
+include/assert.inc ["User foo is on node_3"]
+#
+# async.acct.mgmt.1.7 test cleanup
+#
+# connection node_2
+USE db;
+DROP USER "foo";
+include/assert.inc ['User foo is not on node_2']
+# connection node_3
+include/assert.inc ["user foo is not on node_3"]
+#
+# Test async.acct.mgmt.2.1 : CREATE USER
+#
+# connection node_1
+USE dbx;
+CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+INSERT INTO db.counter(count) VALUES(41);
+include/assert.inc ["User foo is on node_1"]
+# connection node_2
+include/assert.inc ["User foo is not on node_2"]
+# connection node_3
+include/assert.inc ["User foo is not on node_3"]
+#
+# Test preparation for async.acct.mgmt.2
+#
+# connection node_2
+USE db;
+CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+include/assert.inc ["User foo is on node_2"]
+# connection node_3
+include/assert.inc ["User foo is on node_3"]
+#
+# Test async.acct.mgmt.2.2 : CHANGE PASSWORD
+#
+# connection node_1
+USE db;
+SET PASSWORD FOR "foo"@"%" = "notapassword";
+INSERT INTO db.counter(count) VALUES(42);
+include/assert.inc ["User foo is altered on node_1"]
+# connection node_2
+include/assert.inc ["User foo is not altered on node_2"]
+# connection node_3
+include/assert.inc ["User foo is not altered on node_3"]
+#
+# Test async.acct.mgmt.2.3 : ALTER USER
+#
+# connection node_1
+include/assert.inc ["User foo is not expired on node_1"]
+USE dbx;
+ALTER USER "foo"@"%" PASSWORD EXPIRE;
+include/assert.inc ["User foo is altered on node_1"]
+INSERT INTO db.counter(count) VALUES(43);
+# connection node_2
+include/assert.inc ["User foo is not altered on node_2"]
+# connection node_3
+include/assert.inc ["User foo is not altered on node_3"]
+#
+# Test async.acct.mgmt.2.4 : GRANT
+#
+# connection node_1
+USE dbx;
+GRANT SELECT ON db1.t1 TO "foo"@"%";
+INSERT INTO db.counter(count) VALUES(44);
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_1"]
+# connection node_2
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_3"]
+#
+# Test preparation for async.acct.mgmt.2.5
+#
+# connection node_2
+USE db;
+GRANT SELECT ON db1.t1 TO "foo"@"%";
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_3"]
+#
+# Test async.acct.mgmt.2.5 : REVOKE
+#
+# connection node_1
+USE dbx;
+REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+INSERT INTO db.counter(count) VALUES(45);
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_1"]
+# connection node_2
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_3"]
+#
+# Test cleanup for async.acct.mgmt.2.5
+#
+# connection node_2
+USE db;
+REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_3"]
+#
+# Test async.acct.mgmt.2.6 : GRANT ALL
+#
+# connection node_1
+USE dbx;
+GRANT ALL ON db1.t1 TO "foo"@"%";
+INSERT INTO db.counter(count) VALUES(46);
+include/assert.inc ["User foo has ALL access on db1.t1 on node_1"]
+# connection node_2
+include/assert.inc ["User foo does not have ALL access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo does not have ALL access on db1.t1 on node_3"]
+#
+# Test preparation for async.acct.mgmt.2.7
+#
+# connection node_2
+USE db;
+GRANT ALL ON db1.t1 TO "foo"@"%";
+include/assert.inc ["User foo has ALL access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has ALL access on db1.t1 on node_3"]
+#
+# Test async.acct.mgmt.2.7 : REVOKE ALL
+#
+# connection node_1
+USE dbx;
+REVOKE ALL ON db1.t1 FROM "foo"@"%";
+INSERT INTO db.counter(count) VALUES(47);
+include/assert.inc ["User foo does not have access on db1.t1 on node_1"]
+# connection node_2
+include/assert.inc ["User foo has ALL access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has ALL access on db1.t1 on node_3"]
+#
+# Test async.acct.mgmt.2.8 : DROP USER
+#
+# connection node_1
+USE dbx;
+DROP USER "foo"@"%";
+INSERT INTO db.counter(count) VALUES(48);
+include/assert.inc ["User foo is not on node_1"]
+# connection node_2
+include/assert.inc ["User foo is on node_2"]
+# connection node_3
+include/assert.inc ["User foo is on node_3"]
+#
+# async.acct.mgmt.2.8 test cleanup
+#
+# connection node_2
+USE db;
+DROP USER "foo";
+include/assert.inc ["user foo is not on node_2"]
+# connection node_3
+include/assert.inc ["user foo is not on node_3"]
+#
+# async.acct.mgmt test cleanup
+#
+# connection node_1
+DROP DATABASE db1;
+# connection node_3
+include/assert.inc ['db1 is not on node_3']
+# connection node_2
+include/assert.inc ['db1 is not on node_2']
+#
+# galera.tbl.ddl test preparation
+#
+# connection node_2
+CREATE DATABASE db1;
+CREATE DATABASE dbx1;
+# connection node_3
+include/assert.inc ["db1 is on node_3"]
+include/assert.inc ["dbx1 is on node_3"]
+#
+# Test galera.tbl.ddl.1.1 : CREATE TABLE
+#
+# connection node_2
+USE db;
+CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+INSERT INTO db1.t1(id) VALUES(1);
+INSERT INTO db.counter(count) VALUES(49);
+include/assert.inc ['t1 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is on node_3']
+#
+# Test galera.tbl.ddl.1.2 : ALTER TABLE
+#
+# connection node_2
+USE db;
+ALTER TABLE db1.t1 ADD COLUMN x3 LONGBLOB;
+INSERT INTO db.counter(count) VALUES(50);
+include/assert.inc ['t1.x3 is on node_2']
+# connection node_3
+include/assert.inc ['t1.x3 is on node_3']
+#
+# Test galera.tbl.ddl.1.3 : RENAME TABLE
+#
+# connection node_2
+USE db;
+RENAME TABLE db1.t1 TO db1.t2;
+INSERT INTO db.counter(count) VALUES(51);
+include/assert.inc ['t1 is not on node_2']
+include/assert.inc ['t2 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is not on node_3']
+include/assert.inc ['t2 is on node_3']
+#
+# Test galera.tbl.ddl.1.4 : TRUNCATE TABLE
+#
+# connection node_2
+USE db;
+TRUNCATE TABLE db1.t2;
+INSERT INTO db.counter(count) VALUES(52);
+include/assert.inc ['db1.t2 is truncated on node_2']
+# connection node_3
+include/assert.inc ['db1.t2 is truncated on node_3']
+#
+# Test galera.tbl.ddl.1.5 : DROP TABLE
+#
+# connection node_2
+USE db;
+DROP TABLE db1.t2;
+INSERT INTO db.counter(count) VALUES(53);
+include/assert.inc ['t2 is not on node_2']
+# connection node_3
+include/assert.inc ['t2 is not on node_3']
+#
+# Test galera.tbl.ddl.2.1 : CREATE TABLE
+#
+# connection node_2
+USE db;
+CREATE TABLE dbx1.t1(id INT PRIMARY KEY);
+INSERT INTO db.counter(count) VALUES(54);
+include/assert.inc ['dbx1.t1 is on node_2']
+# connection node_3
+include/assert.inc ['dbx1.t1 is on node_3']
+#
+# Test galera.tbl.ddl.2.2 : ALTER TABLE
+#
+# connection node_2
+USE db;
+ALTER TABLE dbx1.t1 ADD COLUMN x3 LONGBLOB;
+INSERT INTO db.counter(count) VALUES(55);
+include/assert.inc ['t1.x3 is on node_2']
+# connection node_3
+include/assert.inc ['t1.x3 is on node_3']
+#
+# Test galera.tbl.ddl.2.3 : RENAME TABLE
+#
+# connection node_2
+USE db;
+RENAME TABLE dbx1.t1 TO dbx1.t2;
+INSERT INTO db.counter(count) VALUES(56);
+include/assert.inc ['t1 is not on node_2']
+include/assert.inc ['t2 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is not on node_3']
+include/assert.inc ['t2 is on node_3']
+#
+# Test preparation for galera.tbl.ddl.2.4
+#
+# connection node_2
+INSERT INTO dbx1.t2(id) VALUES(99);
+# connection node_3
+INSERT INTO dbx1.t2(id) VALUES(99);
+#
+# Test galera.tbl.ddl.2.4 : TRUNCATE TABLE
+#
+# connection node_2
+USE db;
+TRUNCATE TABLE dbx1.t2;
+INSERT INTO db.counter(count) VALUES(57);
+include/assert.inc ['dbx1.t2 is truncated on node_2']
+# connection node_3
+include/assert.inc ['dbx1.t2 is truncated on node_3']
+#
+# Test galera.tbl.ddl.2.5 : DROP TABLE
+#
+# connection node_2
+USE db;
+DROP TABLE dbx1.t2;
+INSERT INTO db.counter(count) VALUES(58);
+include/assert.inc ['dbx1.t2 is not on node_2']
+# connection node_3
+include/assert.inc ['dbx1.t2 is not on node_3']
+#
+# Test galera.tbl.ddl.3.1 : CREATE TABLE
+#
+# connection node_2
+USE dbx;
+CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+INSERT INTO db.counter(count) VALUES(59);
+include/assert.inc ['t1 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is on node_3']
+#
+# Test galera.tbl.ddl.3.2 : ALTER TABLE
+#
+# connection node_2
+USE dbx;
+ALTER TABLE db1.t1 ADD COLUMN x3 LONGBLOB;
+INSERT INTO db.counter(count) VALUES(60);
+include/assert.inc ['t1.x3 is on node_2']
+# connection node_3
+include/assert.inc ['t1.x3 is on node_3']
+#
+# Test galera.tbl.ddl.3.3 : RENAME TABLE
+#
+# connection node_2
+USE dbx;
+RENAME TABLE db1.t1 TO db1.t2;
+INSERT INTO db.counter(count) VALUES(61);
+include/assert.inc ['t1 is not on node_2']
+include/assert.inc ['t2 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is not on node_3']
+include/assert.inc ['t2 is on node_3']
+#
+# Test preparation for galera.tbl.ddl.3.4
+#
+# connection node_2
+USE db;
+INSERT INTO db1.t2(id) VALUES(99);
+# connection node_3
+include/assert.inc ["Row added to db1.t2 on node_3"]
+#
+# Test galera.tbl.ddl.3.4 : TRUNCATE TABLE
+#
+# connection node_2
+USE dbx;
+TRUNCATE TABLE db1.t2;
+INSERT INTO db.counter(count) VALUES(62);
+include/assert.inc ['db1.t2 is truncated on node_2']
+# connection node_3
+include/assert.inc ['db1.t2 is truncated on node_3']
+#
+# Test galera.tbl.ddl.3.5 : DROP TABLE
+#
+# connection node_2
+USE dbx;
+DROP TABLE db1.t2;
+INSERT INTO db.counter(count) VALUES(63);
+include/assert.inc ['t2 is not on node_2']
+# connection node_3
+include/assert.inc ['t2 is not on node_3']
+#
+# Test galera.tbl.ddl.4.1 : CREATE TABLE
+#
+# connection node_2
+USE dbx;
+CREATE TABLE dbx1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+INSERT INTO db.counter(count) VALUES(64);
+include/assert.inc ['t1 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is on node_3']
+#
+# Test galera.tbl.ddl.4.2 : ALTER TABLE
+#
+# connection node_2
+USE dbx;
+ALTER TABLE dbx1.t1 ADD COLUMN x3 LONGBLOB;
+INSERT INTO db.counter(count) VALUES(65);
+include/assert.inc ['t1.x3 is on node_2']
+# connection node_3
+include/assert.inc ['t1.x3 is on node_3']
+#
+# Test galera.tbl.ddl.4.3 : RENAME TABLE
+#
+# connection node_2
+USE dbx;
+RENAME TABLE dbx1.t1 TO dbx1.t2;
+INSERT INTO db.counter(count) VALUES(66);
+include/assert.inc ['t1 is not on node_2']
+include/assert.inc ['t2 is on node_2']
+# connection node_3
+include/assert.inc ['t1 is not on node_3']
+include/assert.inc ['t2 is on node_3']
+#
+# Test preparation for galera.tbl.ddl.4.4
+#
+# connection node_2
+INSERT INTO dbx1.t2(id) VALUES(99);
+# connection node_3
+INSERT INTO dbx1.t2(id) VALUES(99);
+#
+# Test galera.tbl.ddl.4.4 : TRUNCATE TABLE
+#
+# connection node_2
+USE dbx;
+TRUNCATE TABLE dbx1.t2;
+INSERT INTO db.counter(count) VALUES(67);
+include/assert.inc ['dbx1.t2 is truncated on node_2']
+# connection node_3
+include/assert.inc ['dbx1.t2 is truncated on node_3']
+#
+# Test galera.tbl.ddl.4.5 : DROP TABLE
+#
+# connection node_2
+USE dbx;
+DROP TABLE dbx1.t2;
+INSERT INTO db.counter(count) VALUES(68);
+include/assert.inc ['t2 is not on node_2']
+# connection node_3
+include/assert.inc ['t2 is not on node_3']
+#
+# galera.tbl.ddl test cleanup
+#
+# connection node_2
+DROP DATABASE db1;
+DROP DATABASE dbx1;
+# connection node_3
+include/assert.inc ["db1 is not on node_3"]
+include/assert.inc ["dbx1 is not on node_3"]
+#
+# galera.tbl.dml test preparation
+#
+# connection node_2
+CREATE DATABASE db1;
+CREATE DATABASE dbx1;
+# connection node_3
+include/assert.inc ['db1 is on node_3']
+include/assert.inc ['dbx1 is on node_3']
+# connection node_2
+USE db;
+CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+USE db;
+CREATE TABLE dbx1.t2(id INT PRIMARY KEY, f2 LONGBLOB);
+# connection node_3
+include/assert.inc ["db1.t1 is on node_3"]
+include/assert.inc ["dbx1.t2 is on node_3"]
+#
+# Test galera.tbl.dml.1.1 : INSERT
+#
+# connection node_2
+USE db;
+INSERT INTO db1.t1(id) VALUES(1);
+INSERT INTO db.counter(count) VALUES(69);
+include/assert.inc ["Insert succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Insert succeeded on node_3"]
+#
+# Test galera.tbl.dml.1.2 : UPDATE
+#
+# connection node_2
+USE db;
+UPDATE db1.t1 SET f2 = "abcde" WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(70);
+include/assert.inc ["Update succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Update succeeded on node_3"]
+#
+# Test galera.tbl.dml.1.3 : DELETE
+#
+# connection node_2
+USE db;
+DELETE FROM db1.t1 WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(71);
+include/assert.inc ["Delete succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Delete succeeded on node_3"]
+#
+# Test galera.tbl.dml.2.1 : INSERT
+#
+# connection node_2
+USE db;
+INSERT INTO dbx1.t2(id) VALUES(1);
+INSERT INTO db.counter(count) VALUES(72);
+include/assert.inc ["Insert succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Insert not replicated to node_3"]
+#
+# Test galera.tbl.dml.2 test preparation
+#
+# connection node_3
+INSERT INTO dbx1.t2(id) VALUES(1);
+#
+# Test galera.tbl.dml.2.2 : UPDATE
+#
+# connection node_2
+USE db;
+UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(73);
+include/assert.inc ["Update succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Update not replicated to node_3"]
+#
+# Test galera.tbl.dml.2.3 : DELETE
+#
+# connection node_2
+USE db;
+DELETE FROM dbx1.t2 WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(74);
+include/assert.inc ["Delete succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Delete not replicated to node_3"]
+#
+# Testcase galera.tbl.dml.2.3 cleanup
+#
+# connection node_2
+USE db;
+TRUNCATE TABLE dbx1.t2;
+# connection node_3
+USE db;
+TRUNCATE TABLE dbx1.t2;
+#
+# Test galera.tbl.dml.3.1 : INSERT
+#
+# connection node_2
+USE dbx;
+INSERT INTO db1.t1(id) VALUES(1);
+INSERT INTO db.counter(count) VALUES(75);
+include/assert.inc ["Insert replicated to node_2"]
+# connection node_3
+include/assert.inc ["Insert replicated to node_3"]
+#
+# Test galera.tbl.dml.3.2 : UPDATE
+#
+# connection node_2
+USE dbx;
+UPDATE db1.t1 SET f2 = "abcde" WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(76);
+include/assert.inc ["Update succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Update replicated to node_3"]
+#
+# Test galera.tbl.dml.3.3 : DELETE
+#
+# connection node_2
+USE dbx;
+DELETE FROM db1.t1 WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(77);
+include/assert.inc ["Delete succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Delete replicated to node_3"]
+#
+# Test galera.tbl.dml.4.1 : INSERT
+#
+# connection node_2
+USE dbx;
+INSERT INTO dbx1.t2(id) VALUES(1);
+INSERT INTO db.counter(count) VALUES(78);
+include/assert.inc ["Insert succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Insert not replicated to node_3"]
+#
+# Test galera.tbl.dml.4 test preparation
+#
+# connection node_3
+INSERT INTO dbx1.t2(id) VALUES(1);
+#
+# Test galera.tbl.dml.4.2 : UPDATE
+#
+# connection node_2
+USE dbx;
+UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(79);
+include/assert.inc ["Update succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Update not replicated to node_3"]
+#
+# Test galera.tbl.dml.4.3 : DELETE
+#
+# connection node_2
+USE dbx;
+DELETE FROM dbx1.t2 WHERE id = 1;
+INSERT INTO db.counter(count) VALUES(80);
+include/assert.inc ["Delete succeeded on node_2"]
+# connection node_3
+include/assert.inc ["Delete not replicated to node_3"]
+#
+# Testcase galera.tbl.dml.4.3 cleanup
+#
+# connection node_2
+USE db;
+TRUNCATE TABLE dbx1.t2;
+# connection node_3
+USE db;
+TRUNCATE TABLE dbx1.t2;
+#
+# galera.tbl.dml test cleanup
+#
+# connection node_2
+DROP DATABASE db1;
+DROP DATABASE dbx1;
+# connection node_3
+include/assert.inc ['db1 is not on node_3']
+include/assert.inc ['dbx1 is not on node_3']
+#
+# galera.acct.mgmt test preparation
+#
+# connection node_2
+CREATE DATABASE db1;
+USE db;
+CREATE TABLE db1.t1(id INT PRIMARY KEY, f2 LONGBLOB);
+# connection node_3
+include/assert.inc ['db1.t1 is on node_3']
+#
+# Test galera.acct.mgmt.1.1 : CREATE USER
+#
+# connection node_2
+USE db;
+CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+INSERT INTO db.counter(count) VALUES(81);
+include/assert.inc ["User foo is on node_2"]
+# connection node_3
+include/assert.inc ["User foo is on node_3"]
+#
+# Test galera.acct.mgmt.1.2 : CHANGE PASSWORD
+#
+# connection node_2
+USE db;
+SET PASSWORD FOR "foo"@"%" = "notapassword";
+INSERT INTO db.counter(count) VALUES(82);
+include/assert.inc ["User foo is altered on node_2"]
+# connection node_3
+include/assert.inc ["User foo is altered on node_3"]
+#
+# Test galera.acct.mgmt.1.3 : ALTER USER
+#
+# connection node_2
+include/assert.inc ["User foo is not expired on node_2"]
+USE db;
+ALTER USER "foo"@"%" PASSWORD EXPIRE;
+include/assert.inc ["User foo is expired on node_2"]
+INSERT INTO db.counter(count) VALUES(83);
+# connection node_3
+include/assert.inc ["User foo is expired on node_3"]
+#
+# Test galera.acct.mgmt.1.4 : GRANT
+#
+# connection node_2
+USE db;
+GRANT SELECT ON db1.t1 TO "foo"@"%";
+INSERT INTO db.counter(count) VALUES(84);
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_3"]
+#
+# Test galera.acct.mgmt.1.5 : REVOKE
+#
+# connection node_2
+USE db;
+REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+INSERT INTO db.counter(count) VALUES(85);
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_3"]
+#
+# Test galera.acct.mgmt.1.6 : GRANT ALL
+#
+# connection node_2
+USE db;
+GRANT ALL ON db1.t1 TO "foo"@"%";
+INSERT INTO db.counter(count) VALUES(86);
+include/assert.inc ["User foo has ALL access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has ALL access on db1.t1 on node_3"]
+#
+# Test galera.acct.mgmt.1.7 : REVOKE ALL
+#
+# connection node_2
+USE db;
+REVOKE ALL ON db1.t1 FROM "foo"@"%";
+INSERT INTO db.counter(count) VALUES(87);
+include/assert.inc ["User foo has no access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has no access on db1.t1 on node_3"]
+#
+# Test galera.acct.mgmt.1.8 : DROP USER
+#
+# connection node_2
+USE db;
+DROP USER "foo"@"%";
+INSERT INTO db.counter(count) VALUES(88);
+include/assert.inc ["User foo is not on node_2"]
+# connection node_3
+include/assert.inc ["User foo is not on node_3"]
+#
+# Test galera.acct.mgmt.2.1 : CREATE USER
+#
+# connection node_2
+USE dbx;
+CREATE USER "foo"@"%" IDENTIFIED BY "bar";
+INSERT INTO db.counter(count) VALUES(89);
+include/assert.inc ["User foo is on node_2"]
+# connection node_3
+include/assert.inc ["User foo is on node_3"]
+#
+# Test galera.acct.mgmt.2.2 : CHANGE PASSWORD
+#
+# connection node_2
+USE db;
+SET PASSWORD FOR "foo"@"%" = "notapassword";
+INSERT INTO db.counter(count) VALUES(90);
+include/assert.inc ["User foo is altered on node_2"]
+# connection node_3
+include/assert.inc ["User foo is altered on node_3"]
+#
+# Test galera.acct.mgmt.2.3 : ALTER USER
+#
+# connection node_2
+include/assert.inc ["User foo is not expired on node_2"]
+USE dbx;
+ALTER USER "foo"@"%" PASSWORD EXPIRE;
+include/assert.inc ["User foo is expired on node_2"]
+INSERT INTO db.counter(count) VALUES(91);
+# connection node_3
+include/assert.inc ["User foo is expired on node_3"]
+#
+# Test galera.acct.mgmt.2.4 : GRANT
+#
+# connection node_2
+USE dbx;
+GRANT SELECT ON db1.t1 TO "foo"@"%";
+INSERT INTO db.counter(count) VALUES(92);
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has SELECT access on db1.t1 on node_3"]
+#
+# Test galera.acct.mgmt.2.5 : REVOKE
+#
+# connection node_2
+USE dbx;
+REVOKE SELECT ON db1.t1 FROM "foo"@"%";
+INSERT INTO db.counter(count) VALUES(93);
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo does not have SELECT access on db1.t1 on node_3"]
+#
+# Test galera.acct.mgmt.2.6 : GRANT ALL
+#
+# connection node_2
+USE dbx;
+GRANT ALL ON db1.t1 TO "foo"@"%";
+INSERT INTO db.counter(count) VALUES(94);
+include/assert.inc ["User foo has ALL access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo has ALL access on db1.t1 on node_3"]
+#
+# Test galera.acct.mgmt.2.7 : REVOKE ALL
+#
+# connection node_2
+USE dbx;
+REVOKE ALL ON db1.t1 FROM "foo"@"%";
+INSERT INTO db.counter(count) VALUES(95);
+include/assert.inc ["User foo does not have access on db1.t1 on node_2"]
+# connection node_3
+include/assert.inc ["User foo does not have access on db1.t1 on node_3"]
+#
+# Test galera.acct.mgmt.2.8 : DROP USER
+#
+# connection node_2
+USE dbx;
+DROP USER "foo"@"%";
+INSERT INTO db.counter(count) VALUES(96);
+include/assert.inc ["User foo is not on node_2"]
+# connection node_3
+include/assert.inc ["User foo is not on node_3"]
+#
+# galera.acct.mgmt test cleanup
+#
+# connection node_2
+DROP DATABASE db1;
+# connection node_3
+include/assert.inc ['db1 is not on node_3']
+#
+# Overall cleanup
+#
+# connection node_2
+STOP SLAVE;
+RESET SLAVE ALL;
+# connection node_1
+RESET MASTER;
+call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");

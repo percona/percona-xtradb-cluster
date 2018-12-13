@@ -210,6 +210,16 @@ class Program : public Base::Abstract_connection_program {
       }
     }
 
+#ifdef WITH_WSREP
+    /*
+      Upgrade should be run in standalone mode but as safety check if user
+      run it in cluster mode then setting wsrep_on=OFF will stop upgrade action
+      from replicating.
+    */
+    if (mysql_query(this->m_mysql_connection, "SET wsrep_on=0") != 0) {
+      return this->print_error(1, "Cannot setup server wsrep variables.");
+    }
+#endif /* WITH_WSREP */
     if (mysql_query(this->m_mysql_connection, "USE mysql") != 0) {
       return this->print_error(1, "Cannot select database.");
     }

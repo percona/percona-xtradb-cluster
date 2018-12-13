@@ -1,0 +1,18 @@
+CREATE TABLE t1 (f1 INTEGER);
+INSERT INTO t1 VALUES (1);
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+DROP TABLE t1;
+# Extracting server node name
+# connection node_1
+node_name_check
+1
+# connection node_2
+SELECT @@global.wsrep_node_name = '';
+@@global.wsrep_node_name = ''
+1
+# connection node_3
+SELECT @@global.wsrep_node_name = 'my_host_3';
+@@global.wsrep_node_name = 'my_host_3'
+1

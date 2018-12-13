@@ -1,0 +1,67 @@
+#
+# Test that sensitive statements such as those containing plaintext passwords
+# do not leak into the logs, expecially under wsrep_debug=ON
+#
+
+--source include/galera_cluster.inc
+
+--let $wsrep_debug_orig = `SELECT @@wsrep_debug`
+
+SET GLOBAL wsrep_debug = ON;
+
+CREATE USER u1 IDENTIFIED BY 'plaintext_password';
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE USER = 'u1';
+--source include/wait_condition.inc
+
+--connection node_1
+--error ER_CANNOT_USER
+CREATE USER u1 IDENTIFIED BY 'plaintext_password';
+DROP USER u1;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.user WHERE USER = 'u1';
+--source include/wait_condition.inc
+
+--connection node_1
+# Check that the plaintext password does not appear in the logs
+
+--let $assert_text = plaintext_password
+--let $assert_select = plaintext_password
+--let $assert_count = 0
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+--let $assert_text = plaintext_password
+--let $assert_select = plaintext_password
+--let $assert_count = 0
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+# Check that the obfuscated password appears in the logs
+
+# Five times for the first node, in the various wsrep_debug messages
+--let $assert_text = 'caching_sha2_password' AS '<secret>'
+--let $assert_select = 'caching_sha2_password' AS '<secret>'
+--let $assert_count = 8
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+# Once for the second node, in the 'Slave SQL' error
+--let $assert_text = 'caching_sha2_password' AS '<secret>'
+--let $assert_select = 'caching_sha2_password' AS '<secret>'
+--let $assert_count = 1
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+--disable_query_log
+--eval SET GLOBAL wsrep_debug = $wsrep_debug_orig
+--enable_query_log
+
+--connection node_2
+CALL mtr.add_suppression('Operation CREATE USER failed');

@@ -1,0 +1,65 @@
+
+#
+# Test different options with different variation of pxc-strict-mode.
+#
+
+--source include/galera_cluster.inc
+--source include/force_restart.inc
+
+--connection node_1
+--echo #node-1
+use performance_schema;
+select count(*) from setup_instruments where name like '%galera%' or name like '%wsrep%';
+#
+--connection node_2
+--echo #node-2
+use performance_schema;
+select count(*) from setup_instruments where name like '%galera%' or name like '%wsrep%';
+
+#-------------------------------------------------------------------------------
+#
+# List registers files.
+#
+select count(*) = 5 from performance_schema.threads where name like '%galera%' or name like '%wsrep%';
+select count(*) > 0 from performance_schema.file_instances where event_name like '%galera%' or event_name like '%wsrep%';
+
+#-------------------------------------------------------------------------------
+#
+# Perform some workload and see if things are being instrumented.
+#
+
+#
+# mutexes
+--connection node_1
+--echo #node-1
+use test;
+--let $mutexes = `select count(*) from performance_schema.events_waits_history where event_name like '%LOCK%wsrep%' or event_name like '%LOCK%galera%'`
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1), (2);
+select * from t;
+--replace_regex /[1-9][0-9]+/PREVIOUS_COUNT/
+--eval select count(*) > $mutexes from performance_schema.events_waits_history where event_name like '%LOCK%wsrep%' or event_name like '%LOCK%galera%';
+
+#
+# cond-variables
+--connection node_1
+--echo #node-1
+truncate performance_schema.events_waits_current;
+--let $condvar = `select count(*) from performance_schema.events_waits_current where event_name like '%COND_wsrep_rollback%'`
+use test;
+begin;
+insert into t values (3);
+#
+--connection node_2
+--echo #node-2
+use test;
+insert into t values (3);
+#
+--connection node_1
+--echo #node-1
+--sleep 2
+--error ER_LOCK_DEADLOCK
+commit;
+--replace_regex /[1-9][0-9]+/PREVIOUS_COUNT/
+--eval select count(*) > $condvar from performance_schema.events_waits_current where event_name like '%COND_wsrep_rollback%';
+drop table t;

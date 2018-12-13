@@ -1,0 +1,84 @@
+#!/usr/bin/make -f
+
+DH_VERBOSE = 1
+TMP = $(CURDIR)/debian/tmp
+
+
+override_dh_auto_configure:
+	mkdir -p build_release
+	cd build_release && \
+	cmake \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DINSTALL_LAYOUT=RPM \
+		-DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
+		-DINSTALL_PLUGINDIR=lib/mysql/plugin \
+		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
+		-DMYSQL_USER=mysql \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DWITH_WSREP=1 \
+		-DWITH_EXTRA_CHARSETS=all \
+		-DWITH_INNODB_MEMCACHED=ON \
+		-DWITH_SSL=system \
+		-DWITH_ZLIB=system \
+		-DWITH_LIBEVENT=bundled ..
+
+override_dh_auto_build:
+	cd build_release && make -j3
+
+override_dh_auto_install:
+	mkdir -p $(TMP)
+	cd build_release && DESTDIR=$(TMP) make install
+# Install files not covered with make install
+	install -D -m 644 debian/etc/mysql/debian-start \
+		$(TMP)/etc/mysql/debian-start
+	install -D -m 644 debian/etc/mysql/conf.d/mysqld_safe_syslog.cnf \
+		$(TMP)/etc/mysql/conf.d/mysqld_safe_syslog.cnf
+	install -D -m 640 build_release/support-files/wsrep.cnf \
+		$(TMP)/etc/mysql/conf.d/wsrep.cnf
+	install -D -m 755 debian/etc/logrotate.d/mysql-server \
+		$(TMP)/etc/logrotate.d/mysql-server
+	install -D -m 755 debian/etc/logcheck/ignore.d.paranoid/mysql-server-5_1 \
+		$(TMP)/etc/logcheck/ignore.d.paranoid/mysql-server-5_6
+	install -D -m 755 debian/etc/logcheck/ignore.d.server/mysql-server-5_1 \
+		$(TMP)/etc/logcheck/ignore.d.server/mysql-server-5_6
+	install -D -m 755 debian/etc/logcheck/ignore.d.workstation/mysql-server-5_1 \
+		$(TMP)/etc/logcheck/ignore.d.workstation/mysql-server-5_6
+	install -D -m 755 build_release/support-files/mysql.server \
+		$(TMP)/etc/init.d/mysql
+	install -D -m 755 build_release/scripts/wsrep_sst_rsync \
+		$(TMP)/usr/bin/wsrep_sst_rsync_wan
+	install -D -m 644 scripts/mysql_system_tables_fix.sql \
+		$(TMP)/usr/share/mysql/mysql_system_tables_fix.sql
+	install -D -m 644 Docs/README-wsrep \
+		$(TMP)/usr/share/doc/mysql-server-wsrep/README-wsrep
+	install -D -m 644 build_release/support-files/wsrep.cnf \
+		$(TMP)/usr/share/mysql/wsrep.cnf
+	install -D -m 644 COPYING \
+		$(TMP)/usr/share/doc/mysql-server-wsrep/COPYING
+	install -D -m 644 Docs/ChangeLog \
+		$(TMP)/usr/share/doc/mysql-server-wsrep/ChangeLog
+	install -D -m 644 build_release/Docs/INFO_BIN \
+		$(TMP)/usr/share/doc/mysql-server-wsrep/INFO_BIN
+	install -D -m 644 build_release/Docs/INFO_SRC \
+		$(TMP)/usr/share/doc/mysql-server-wsrep/INFO_SRC
+	install -D -m 644 Docs/INSTALL-BINARY \
+		$(TMP)/usr/share/doc/mysql-server-wsrep/INSTALL-BINARY
+	install -D -m 644 README \
+		$(TMP)/usr/share/doc/mysql-server-wsrep/README
+	install -D -m 644 Docs/sp-imp-spec.txt \
+		$(TMP)/usr/share/doc/mysql-server-wsrep/sp-imp-spec.txt
+# Clean up unnecessary
+	rm $(TMP)/usr/share/mysql/dictionary.txt
+	rm $(TMP)/usr/share/mysql/magic
+
+
+
+
+.PHONY: override_dh_strip
+
+override_dh_strip:
+	dh_strip -pmysql-client-wsrep --dbg-package=mysql-client-wsrep-dbg
+	dh_strip -pmysql-server-wsrep --dbg-package=mysql-server-wsrep-dbg
+
+%:
+	dh $@

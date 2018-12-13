@@ -1,0 +1,11 @@
+usr/bin/myisam_ftdump
+usr/bin/mysql
+usr/bin/mysqladmin
+usr/bin/mysqlcheck
+usr/bin/mysql_client_test
+usr/bin/mysqldump
+usr/bin/mysqldumpslow
+usr/bin/mysqlimport
+usr/bin/mysqlpump
+usr/bin/mysqlshow
+usr/bin/mysqlslap

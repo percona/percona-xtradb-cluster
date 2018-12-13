@@ -272,6 +272,10 @@ extern void notify_thread(LIBEVENT_THREAD *thread);
 extern void notify_dispatcher(void);
 extern bool create_notification_pipe(LIBEVENT_THREAD *me);
 
+#ifdef WITH_WSREP
+extern bool wsrep_is_wsrep_on(void);
+#endif /* WITH_WSREP */
+
 extern LIBEVENT_THREAD* tap_thread;
 
 typedef struct conn conn;

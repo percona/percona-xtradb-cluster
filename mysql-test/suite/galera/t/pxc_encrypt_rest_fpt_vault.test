@@ -1,0 +1,123 @@
+
+#
+#
+--source include/big_test.inc
+--source include/have_keyring_vault_plugin.inc
+--source include/galera_cluster.inc
+
+# Force a restart at the end of the test
+--source include/force_restart.inc
+
+--let $VAULT_CONF_FILE_1=$MYSQLTEST_VARDIR/std_data/keyring_vault_confs/pxc_encrypt_rest_fpt_vault_57_1.conf
+--let $VAULT_CONF_FILE_2=$MYSQLTEST_VARDIR/std_data/keyring_vault_confs/pxc_encrypt_rest_fpt_vault_57_2.conf
+
+--echo # Check to see if the vault server is up-and-running
+--let $KEYRING_CONF_FILE_1=$VAULT_CONF_FILE_1
+--source suite/keyring_vault/is_vault_server_up.inc
+
+#
+# This test-case will cover data-at-rest encryption scenarios.
+# MySQL-5.7 introduced
+# - file-per-tablespace encryption.
+# PS start with 5.7.21-21 extended this to support encryption of
+# - general tablespace
+# - temporary tablespace
+# - binlog encryption
+
+#===============================================================================
+# file-per-tablespace encryption support
+
+#-------------------------------------------------------------------------------
+# direct repliction of encrypted tablespace
+#
+--connection node_1
+--echo #node-1
+use test;
+create table t (i int, primary key pk(i)) encryption='y';
+insert into t values (1), (2), (3);
+select * from t;
+show create table t;
+
+--connection node_2
+--echo #node-2
+select * from t;
+show create table t;
+drop table t;
+
+#-------------------------------------------------------------------------------
+# sst of the encrypted table
+#
+--connection node_2
+--echo #node-2 being killed
+--source include/kill_galera.inc
+
+--connection node_1
+--echo #node-1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+#
+CREATE TABLE e1 (
+  id INT NOT NULL,
+  text VARCHAR(10) DEFAULT NULL,
+  PRIMARY KEY (id)
+) ENCRYPTION='Y';
+INSERT INTO e1 VALUES(1, 'aaaaa');
+INSERT INTO e1 VALUES(2, 'bbbbb');
+
+--connection node_2
+--echo #node-2 restarted (should get encrypted table through SST)
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+select * from e1;
+show create table e1;
+drop table e1;
+
+#-------------------------------------------------------------------------------
+# ist of the encrypted table
+#
+--connection node_2
+--echo #node-2 being shutdown
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+--echo #node-1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+#
+CREATE TABLE e1 (
+  id INT NOT NULL,
+  text VARCHAR(10) DEFAULT NULL,
+  PRIMARY KEY (id)
+) ENCRYPTION='Y';
+INSERT INTO e1 VALUES(1, 'aaaaa');
+INSERT INTO e1 VALUES(2, 'bbbbb');
+
+--connection node_2
+--echo #node-2 restarted (should get encrypted table through IST)
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+select * from e1;
+show create table e1;
+drop table e1;
+
+# Delete mount points
+-- echo # Deleting the mount points
+--connection node_1
+--let $MOUNT_POINT_SERVICE_OP=DELETE
+--let $KEYRING_CONF_FILE=$VAULT_CONF_FILE_1
+--source pxc_mount_point_service.inc
+
+call mtr.add_suppression("Plugin keyring_vault reported: 'There is no vault_ca.*");
+
+--connection node_2
+--let $MOUNT_POINT_SERVICE_OP=DELETE
+--let $KEYRING_CONF_FILE=$VAULT_CONF_FILE_2
+--source pxc_mount_point_service.inc
+
+call mtr.add_suppression("Plugin keyring_vault reported: 'There is no vault_ca.*");

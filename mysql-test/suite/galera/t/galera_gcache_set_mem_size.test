@@ -1,0 +1,38 @@
+#
+# 'gcache.mem_size deprecated' warning fix.
+#
+--source include/galera_cluster.inc
+--let LOGF=$MYSQLTEST_VARDIR/log/mysqld.1.err
+--disable_info
+
+
+# Required to disable earlier warnings, if any.
+--exec cp $MYSQLTEST_VARDIR/log/mysqld.1.err $MYSQLTEST_VARDIR/log/mysqld.1.err.bkp
+--exec echo > $MYSQLTEST_VARDIR/log/mysqld.1.err
+
+SET GLOBAL wsrep_provider_options="gcache.mem_size=262144";
+
+# Search for deprecation warnings in error log.
+perl;
+  use strict;
+  my $logf= $ENV{'LOGF'} or die "LOGF not set";
+  open(FILE, "$logf") or die("Unable to open $logf: $!\n");
+  my $count_warnings=grep(/\[Warning\] WSREP\: gcache\.mem_size parameter is buggy and DEPRECATED\, use it with care\./gi,<FILE>);
+  print "Deprecation warning count: $count_warnings\n";
+  close(FILE);
+EOF
+
+SET GLOBAL wsrep_provider_options="gcache.mem_size=0";
+
+# Search for deprecation warnings in error log.
+perl;
+  use strict;
+  my $logf= $ENV{'LOGF'} or die "LOGF not set";
+  open(FILE, "$logf") or die("Unable to open $logf: $!\n");
+  my $count_warnings=grep(/\[Warning\] WSREP\: gcache\.mem_size parameter is buggy and DEPRECATED\, use it with care\./gi,<FILE>);
+  print "Deprecation warning count: $count_warnings\n";
+  close(FILE);
+EOF
+
+--exec cat $MYSQLTEST_VARDIR/log/mysqld.1.err.bkp > $MYSQLTEST_VARDIR/log/mysqld.1.err
+--remove_file  $MYSQLTEST_VARDIR/log/mysqld.1.err.bkp
