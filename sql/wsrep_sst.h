@@ -25,7 +25,6 @@ typedef struct st_mysql_show_var SHOW_VAR;
 #include "rpl_gtid.h"
 #include "wsrep_api.h"
 
-
 /* system variables */
 extern const char* wsrep_sst_method;
 extern const char* wsrep_sst_receive_address;

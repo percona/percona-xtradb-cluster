@@ -3,52 +3,68 @@
 #
 # save the initial value
 SET @wsrep_forced_binlog_format_global_saved = @@global.wsrep_forced_binlog_format;
+Warnings:
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 # default
 SELECT @@global.wsrep_forced_binlog_format;
 @@global.wsrep_forced_binlog_format
 NONE
+Warnings:
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 
 # scope
 SELECT @@session.wsrep_forced_binlog_format;
 ERROR HY000: Variable 'wsrep_forced_binlog_format' is a GLOBAL variable
 SET @@global.wsrep_forced_binlog_format=STATEMENT;
 Warnings:
-Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_forced_binlog_format;
 @@global.wsrep_forced_binlog_format
 STATEMENT
+Warnings:
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 
 # valid values
 SET @@global.wsrep_forced_binlog_format=STATEMENT;
 Warnings:
-Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_forced_binlog_format;
 @@global.wsrep_forced_binlog_format
 STATEMENT
+Warnings:
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 SET @@global.wsrep_forced_binlog_format=ROW;
 Warnings:
-Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_forced_binlog_format;
 @@global.wsrep_forced_binlog_format
 ROW
+Warnings:
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 SET @@global.wsrep_forced_binlog_format=MIXED;
 Warnings:
-Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_forced_binlog_format;
 @@global.wsrep_forced_binlog_format
 MIXED
+Warnings:
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 SET @@global.wsrep_forced_binlog_format=NONE;
 Warnings:
-Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_forced_binlog_format;
 @@global.wsrep_forced_binlog_format
 NONE
+Warnings:
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 SET @@global.wsrep_forced_binlog_format=default;
 Warnings:
-Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_forced_binlog_format;
 @@global.wsrep_forced_binlog_format
 NONE
+Warnings:
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 
 # invalid values
 SET @@global.wsrep_forced_binlog_format=NULL;
@@ -61,5 +77,5 @@ ERROR 42000: Variable 'wsrep_forced_binlog_format' can't be set to the value of 
 # restore the initial value
 SET @@global.wsrep_forced_binlog_format = @wsrep_forced_binlog_format_global_saved;
 Warnings:
-Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
+Warning	1287	'@@wsrep_forced_binlog_format' is deprecated and will be removed in a future release.
 # End of test

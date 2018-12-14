@@ -3,36 +3,60 @@
 #
 # save the initial value
 SET @wsrep_drupal_282555_workaround_global_saved = @@global.wsrep_drupal_282555_workaround;
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 # default
 SELECT @@global.wsrep_drupal_282555_workaround;
 @@global.wsrep_drupal_282555_workaround
 0
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 
 # scope
 SELECT @@session.wsrep_drupal_282555_workaround;
 ERROR HY000: Variable 'wsrep_drupal_282555_workaround' is a GLOBAL variable
 SET @@global.wsrep_drupal_282555_workaround=OFF;
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_drupal_282555_workaround;
 @@global.wsrep_drupal_282555_workaround
 0
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 SET @@global.wsrep_drupal_282555_workaround=ON;
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_drupal_282555_workaround;
 @@global.wsrep_drupal_282555_workaround
 1
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 
 # valid values
 SET @@global.wsrep_drupal_282555_workaround='OFF';
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_drupal_282555_workaround;
 @@global.wsrep_drupal_282555_workaround
 0
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 SET @@global.wsrep_drupal_282555_workaround=ON;
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_drupal_282555_workaround;
 @@global.wsrep_drupal_282555_workaround
 1
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 SET @@global.wsrep_drupal_282555_workaround=default;
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 SELECT @@global.wsrep_drupal_282555_workaround;
 @@global.wsrep_drupal_282555_workaround
 0
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 
 # invalid values
 SET @@global.wsrep_drupal_282555_workaround=NULL;
@@ -42,4 +66,6 @@ ERROR 42000: Variable 'wsrep_drupal_282555_workaround' can't be set to the value
 
 # restore the initial value
 SET @@global.wsrep_drupal_282555_workaround = @wsrep_drupal_282555_workaround_global_saved;
+Warnings:
+Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 # End of test

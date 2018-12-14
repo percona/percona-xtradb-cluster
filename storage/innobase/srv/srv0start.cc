@@ -208,6 +208,12 @@ mysql_pfs_key_t	srv_worker_thread_key;
 
 #ifdef WITH_WSREP
 extern my_bool wsrep_recovery;
+
+#ifdef WITH_INNODB_DISALLOW_WRITES
+/* Must always init to FALSE. */
+static my_bool	innobase_disallow_writes	= FALSE;
+#endif /* WITH_INNODB_DISALLOW_WRITES */
+
 #endif /* WITH_WSREP */
 
 int unlock_keyrings(THD *thd);
@@ -1866,6 +1872,15 @@ innobase_start_or_create_for_mysql(void)
 			<< " for innodb_flush_method";
 		return(srv_init_abort(DB_ERROR));
 	}
+
+#ifdef WITH_WSREP
+	if (innobase_disallow_writes) {
+		ib::warn() << "innodb_disallow_writes has been deprecated and"
+			      " will be removed in future release."
+			      " Consider using read_only instead.";
+	}
+#endif /* WITH_WSREP */
+
 
 	/* Note that the call srv_boot() also changes the values of
 	some variables to the units used by InnoDB internally */

@@ -579,6 +579,8 @@ select @@pxc_strict_mode;
 DISABLED
 #node-1
 set session binlog_format = 'STATEMENT';
+Warnings:
+Warning	1287	Setting binlog format to STATEMENT OR MIXED at session level is deprecated and will be removed in future release. While operating in cluster mode use binlog_format=ROW.
 select @@binlog_format;
 @@binlog_format
 STATEMENT
@@ -597,6 +599,8 @@ i
 drop table tinnodb;
 #node-1
 set session binlog_format = 'MIXED';
+Warnings:
+Warning	1287	Setting binlog format to STATEMENT OR MIXED at session level is deprecated and will be removed in future release. While operating in cluster mode use binlog_format=ROW.
 select @@binlog_format;
 @@binlog_format
 MIXED
@@ -641,6 +645,7 @@ PERMISSIVE
 #node-1
 set session binlog_format = 'STATEMENT';
 Warnings:
+Warning	1287	Setting binlog format to STATEMENT OR MIXED at session level is deprecated and will be removed in future release. While operating in cluster mode use binlog_format=ROW.
 Warning	1105	Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = PERMISSIVE
 select @@binlog_format;
 @@binlog_format
@@ -661,6 +666,7 @@ drop table tinnodb;
 #node-1
 set session binlog_format = 'MIXED';
 Warnings:
+Warning	1287	Setting binlog format to STATEMENT OR MIXED at session level is deprecated and will be removed in future release. While operating in cluster mode use binlog_format=ROW.
 Warning	1105	Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = PERMISSIVE
 select @@binlog_format;
 @@binlog_format
@@ -696,6 +702,7 @@ drop table tinnodb;
 #node-1
 set session binlog_format = 'STATEMENT';
 Warnings:
+Warning	1287	Setting binlog format to STATEMENT OR MIXED at session level is deprecated and will be removed in future release. While operating in cluster mode use binlog_format=ROW.
 Warning	1105	Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = PERMISSIVE
 set global pxc_strict_mode = 'ENFORCING';
 ERROR HY000: Can't change pxc_strict_mode to ENFORCING as binlog_format != ROW
