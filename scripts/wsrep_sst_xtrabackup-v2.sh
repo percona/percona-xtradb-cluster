@@ -331,7 +331,7 @@ verify_cert_matches_key()
 
     # generate the public key from the cert and the key
     # they should match (otherwise we can't create an SSL connection)
-    if ! diff <(openssl x509 -in "$cert_path" -pubkey -noout) <(openssl rsa -in "$key_path" -pubout 2>/dev/null) >/dev/null 2>&1
+    if ! diff <(openssl x509 -in "$cert_path" -pubkey -noout) <(openssl pkey -in "$key_path" -pubout 2>/dev/null) >/dev/null 2>&1
     then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "* The certifcate and private key do not match. "
@@ -978,11 +978,47 @@ wait_for_listen()
     local port=$3
     local module=$4
 
+    #
+    # Check to see if the OS supports /proc/<pid>/net/tcp
+    #
+    if [[ ! -r /proc/$$/net/tcp && ! -r /proc/$$/net/tcp6 ]]; then
+        wsrep_log_debug "$LINENO: Using ss for socat/nc discovery"
+
+        # Revert to using ss to check if socat/nc is listening
+        wsrep_check_program ss
+        if [[ $? -ne 0 ]]; then
+            wsrep_log_error "******** FATAL ERROR *********************** "
+            wsrep_log_error "* Could not find 'ss'.  Check that it is installed and in the path."
+            wsrep_log_error "******************************************** "
+            return 2
+        fi
+
+        for i in {1..300}
+        do
+            ss -p state listening "( sport = :${port} )" | grep -qE 'socat|nc' && break
+            sleep 0.2
+        done
+
+        echo "ready ${host}:${port}/${module}//$sst_ver"
+        return 0
+    fi
+
+    wsrep_log_debug "$LINENO: Using /proc/pid/net/tcp for socat/nc discovery"
+
     # Get the index for the 'local_address' column in /proc/xxxx/net/tcp
     # We expect this to be the same for IPv4 (net/tcp) and IPv6 (net/tcp6)
     local ip_index=0
     local header
-    read -ra header <<< $(head -n 1 /proc/$$/net/tcp)
+    if [[ -r /proc/$$/net/tcp ]]; then
+        read -ra header <<< $(head -n 1 /proc/$$/net/tcp)
+    elif [[ -r /proc/$$/net/tcp6 ]]; then
+        read -ra header <<< $(head -n 1 /proc/$$/net/tcp6)
+    else
+        wsrep_log_error "******** FATAL ERROR *********************** "
+        wsrep_log_error "* Cannot find /proc/$$/net/tcp (or tcp6)"
+        wsrep_log_error "******************************************** "
+        exit 1
+    fi
     for i in "${!header[@]}"; do
         if [[ ${header[$i]} = "local_address" ]]; then
             # Add one to the index since arrays are 0-based
@@ -998,6 +1034,7 @@ wait_for_listen()
         exit 1
     fi
 
+    wsrep_log_debug "$LINENO: local_address index is $ip_index"
     local port_in_hex
     port_in_hex=$(printf "%04X" $port)
 
@@ -1010,6 +1047,8 @@ wait_for_listen()
         # Then look for processes that have the script pid as a parent prcoess
         # somewhere in the process tree
 
+        wsrep_log_debug "$LINENO: Entering loop body : $i"
+
         # List only socat/nc processes started by this user to avoid triggering SELinux
         for pid in $(ps -u $user_id -o pid,comm | grep -E 'socat|nc' | awk '{ printf $1 " " }')
         do
@@ -1017,9 +1056,12 @@ wait_for_listen()
                 continue
             fi
 
+            wsrep_log_debug "$LINENO: Examining pid: $pid"
+
             # Now get the processtree for this pid
             # If the parentpid is NOT in the process tree, then ignore
             if ! echo $(get_parent_pids $pid) | grep -q " $parentpid "; then
+                wsrep_log_debug "$LINENO: $parentpid is not in the process tree: $(get_parent_pids $pid)"
                 continue
             fi
 
@@ -1031,16 +1073,31 @@ wait_for_listen()
 
             # remove the trailing '|'
             sockets=${sockets%|}
+            wsrep_log_debug "$LINENO: sockets: $sockets"
 
             if [[ -n $sockets ]]; then
                 # For the network addresses, we expect to be listening
                 # on all interfaces, thus the address should be
                 # 00..000:PORT (all zeros for the IP address).
 
+                # Dumping the data in the lines
+                #if [[ -n "$WSREP_LOG_DEBUG" ]]; then
+                #    lines=$(grep -E "\s(${sockets})\s" /proc/$pid/net/tcp)
+                #    if [[ -n $lines ]]; then
+                #        while read -r line; do
+                #            if [[ -z $line ]]; then
+                #                continue
+                #            fi
+                #            wsrep_log_debug "$LINENO: $line"
+                #        done <<< "$lines\n"
+                #    fi
+                #fi
+
                 # Checking IPv4
                 if grep -E "\s(${sockets})\s" /proc/$pid/net/tcp |
                         awk "{print \$${ip_index}}" |
                         grep -q "^00*:${port_in_hex}$"; then
+                    wsrep_log_debug "$LINENO: found a match for pid: $pid"
                     break 2
                 fi
 
@@ -1056,7 +1113,9 @@ wait_for_listen()
         sleep 0.2
     done
 
+    wsrep_log_debug "$LINENO: wait_for_listen() exiting"
     echo "ready ${host}:${port}/${module}//$sst_ver"
+    return 0
 }
 
 #
