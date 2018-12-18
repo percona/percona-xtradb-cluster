@@ -1404,6 +1404,15 @@ echo "See  http://www.percona.com/doc/percona-server/5.7/management/udf_percona_
 #  http://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/RPM_Guide/ch09s04s05.html
 
 if [ $1 = 0 ] ; then
+  timestamp=$(date '+%Y%m%d-%H%M')
+  if [ ! -L /etc/my.cnf ]; then
+    cp -p /etc/my.cnf /etc/my.cnf_backup-${timestamp}
+  else
+    realfile=$(readlink -f /etc/my.cnf)
+    cp "${realfile}" "${realfile}_backup-${timestamp}"
+  fi
+  cp -rp /etc/percona-xtradb-cluster.conf.d /etc/percona-xtradb-cluster.conf.d_backup-${timestamp}
+  cp -rp /etc/my.cnf.d /etc/my.cnf.d_backup-${timestamp}
 %if 0%{?systemd}
     serv=$(/usr/bin/systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
     if [[ -n ${serv:-} ]] && /usr/bin/systemctl is-active $serv;then
