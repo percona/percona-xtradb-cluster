@@ -1,0 +1,108 @@
+#
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+ 
+--connection node_1
+CREATE TABLE t(id int primary key auto_increment, j int) ENGINE=InnoDB;
+INSERT INTO t values (1,0), (2,0), (4,0);
+
+
+SET wsrep_sync_wait=0;
+
+#
+# we will count number of replaying during this test
+#
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+
+#
+# make sure event scheduling is disbaled
+#
+SET GLOBAL event_scheduler = OFF;
+
+#
+# create event to do cleanup for table t, once per minute
+# this event does not fire yet
+#
+--delimiter |
+CREATE EVENT e_minutely
+    ON SCHEDULE
+      EVERY 5 SECOND
+    DO
+      begin
+      DELETE FROM test.t where id > 2;
+      end
+|
+--delimiter ;
+
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_set_sync_point.inc
+
+#
+# send insert which will BF abort the event execution
+#
+--connection node_2
+INSERT INTO t values (3,2);
+select * from t;
+
+--connection node_1
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+#
+# stop next event processing just before commit
+#
+--let $galera_sync_point = after_replicate_sync
+--source include/galera_set_sync_point.inc
+
+#
+# enable event processing, the event will fire immediately and
+# event execution should then stop in sync point
+#
+SET GLOBAL event_scheduler = ON;
+
+#
+# wait until event fires and stops in the sync point
+#
+
+--let $galera_sync_point = after_replicate_sync apply_monitor_slave_enter_sync
+#--let $galera_sync_point = after_replicate_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+#
+# release the applier and event to continue and replay
+#
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_signal_sync_point.inc
+--let $galera_sync_point = after_replicate_sync
+--source include/galera_signal_sync_point.inc
+
+SET SESSION wsrep_sync_wait = default;
+SELECT * FROM t;
+
+#
+# verify that event replaying happened
+#
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--disable_query_log
+--eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 1 AS wsrep_local_replays;
+--enable_query_log
+
+delete from t where id > 2;
+
+#
+# check for consistency
+#
+--connection node_2
+select "node2", id, j from t;
+--connection node_1
+select "node1", id, j from t;
+
+#
+# cleanup
+#
+--connection node_1
+SET GLOBAL event_scheduler = OFF;
+DROP EVENT e_minutely;
+DROP TABLE t;

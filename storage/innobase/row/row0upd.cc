@@ -2489,8 +2489,8 @@ row_upd_sec_index_entry(
 							   << " table " << index->table->name;
 					}
 					break;
-				case DB_LOCK_WAIT:
 				case DB_LOCK_WAIT_TIMEOUT:
+				case DB_LOCK_WAIT:
 					err = DB_LOCK_WAIT_TIMEOUT;
 					break;
 				default:

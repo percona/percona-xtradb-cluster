@@ -143,6 +143,7 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
       thd->variables.option_bits&= ~OPTION_BEGIN;
       thd->server_status&= ~SERVER_STATUS_IN_TRANS;
       assert(event == 1);
+      break;
     }
     default:
       break;
@@ -212,11 +213,24 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
       DBUG_RETURN(WSREP_CB_FAILURE);
     }
 
-    /* row-query-log-event is generated to log extra information when following
-    configuration is set "binlog_rows_query_log_events". The event is cleared
-    after processing of ROWS_LOG_EVENT. Avoid removing it here. */
-    if (ev->get_type_code() != binary_log::ROWS_QUERY_LOG_EVENT)
+    switch (ev->get_type_code()) {
+    case binary_log::ROWS_QUERY_LOG_EVENT:
+      /*
+        Setting binlog_rows_query_log_events to ON will generate
+        ROW_QUERY_LOG_EVENT. This event logs an extra information while logging
+        row information and so event should be kept infact till ROW_LOG_EVENT
+        is processed and should be freed once ROW_LOG_EVENT is done.
+
+        Keeping Rows_log event, it will be needed still, and will be deleted later
+        in rli->cleanup_context()
+        Also FORMAT_DESCRIPTION_EVENT is needed further, but it skipped from this loop
+        by 'continue' above, and thus  avoids the following 'delete ev'
+      */
+      continue;
+    default:
       delete ev;
+      break;
+    }
   }
 
  error:

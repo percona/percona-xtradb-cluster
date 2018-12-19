@@ -295,7 +295,7 @@ my $opt_skip_core;
 
 our $opt_check_testcases= 1;
 my $opt_mark_progress;
-our $opt_test_progress= 1;
+our $opt_test_progress= 0;
 my $opt_max_connections;
 our $opt_report_times= 0;
 

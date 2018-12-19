@@ -97,6 +97,7 @@ do {                                                                    \
 
 int wsrep_show_bf_aborts (THD *thd, SHOW_VAR *var, char *buff);
 void wsrep_client_rollback(THD *thd);
+void wsrep_replay_sp_transaction(THD* thd);
 void wsrep_replay_transaction(THD *thd);
 void wsrep_create_appliers(long threads);
 void wsrep_create_rollbacker();
