@@ -13,9 +13,9 @@ UPDATE t1 SET f1 = 2 WHERE f1 = 1;
 SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 2;
 COUNT(*) = 1
 1
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 312 LIMIT 1;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 321 LIMIT 1;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	312	Rows_query	1	361	# INSERT INTO t1 VALUES (1)
+mysqld-bin.000001	321	Rows_query	2	370	# INSERT INTO t1 VALUES (1)
 DROP TABLE t1;
 SET SESSION wsrep_on=OFF;
 RESET MASTER;

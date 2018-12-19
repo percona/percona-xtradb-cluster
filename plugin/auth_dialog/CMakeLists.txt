@@ -16,8 +16,9 @@
 
 # disabled in favor of libmariadb/plugins/auth/dialog.c
 #
-
+IF(WITH_CODERSHIP_DIALOG)
 MYSQL_ADD_PLUGIN(dialog dialog.c get_password.c MODULE_ONLY)
 
 #MYSQL_ADD_PLUGIN(dialog dialog.c ${CMAKE_SOURCE_DIR}/sql-common/get_password.c
 #    MODULE_ONLY)
+ENDIF(WITH_CODERSHIP_DIALOG)
