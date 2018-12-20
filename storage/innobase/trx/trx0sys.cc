@@ -139,7 +139,7 @@ void trx_sys_update_mysql_binlog_offset(
 
 #ifdef WITH_WSREP
   /* passed as param so ignore declaring. */
-  // TODO: what happens if initiate it here than passing it.
+  // TODO: what happens if we use local copy (instead of passing it as param)
 #else
   trx_sysf_t *sys_header;
 #endif /* WITH_WSREP */
@@ -318,7 +318,6 @@ void trx_sys_update_wsrep_checkpoint(
 }
 
 void trx_sys_read_wsrep_checkpoint(XID *xid)
-/*===================================*/
 {
   trx_sysf_t *sys_header;
   mtr_t mtr;

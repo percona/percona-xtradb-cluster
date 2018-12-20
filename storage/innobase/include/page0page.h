@@ -27,8 +27,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <stddef.h>
 #include <sys/types.h>
 
-#include "my_compiler.h"
-
 /** @file include/page0page.h
  Index page routines
 
@@ -38,6 +36,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #ifndef page0page_h
 #define page0page_h
 
+#include "univ.i"
+
 #include "buf0buf.h"
 #include "data0data.h"
 #include "dict0dict.h"
@@ -46,7 +46,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "mtr0mtr.h"
 #include "page0types.h"
 #include "rem0rec.h"
-#include "univ.i"
 
 #ifdef UNIV_MATERIALIZE
 #undef UNIV_INLINE
@@ -56,6 +55,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 /*			PAGE DIRECTORY
                         ==============
 */
+
+extern bool srv_immediate_scrub_data_uncompressed;
 
 typedef byte page_dir_slot_t;
 typedef page_dir_slot_t page_dir_t;

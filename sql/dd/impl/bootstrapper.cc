@@ -58,6 +58,7 @@
 #include "sql/dd/impl/types/schema_impl.h"      // dd::Schema_impl
 #include "sql/dd/impl/types/table_impl.h"       // dd::Table_impl
 #include "sql/dd/impl/types/tablespace_impl.h"  // dd::Table_impl
+#include "sql/dd/info_schema/metadata.h"
 #include "sql/dd/object_id.h"
 #include "sql/dd/types/abstract_table.h"
 #include "sql/dd/types/object_table.h"             // dd::Object_table
@@ -77,6 +78,7 @@
 #include "sql/sql_class.h"  // THD
 #include "sql/sql_list.h"
 #include "sql/sql_prepare.h"  // Ed_connection
+#include "sql/sql_zip_dict.h"
 #include "sql/stateless_allocator.h"
 #include "sql/system_variables.h"
 #include "sql/table.h"
@@ -286,11 +288,16 @@ bool initialize_dd_properties(THD *thd) {
     initialize the DD_bootstrap_ctx with the relevant version number.
   */
   uint actual_version = dd::DD_VERSION;
+  uint actual_server_version = MYSQL_VERSION_ID;
 
   bootstrap::DD_bootstrap_ctx::instance().set_actual_dd_version(actual_version);
+  bootstrap::DD_bootstrap_ctx::instance().set_actual_server_version(
+      actual_server_version);
 
   if (!opt_initialize) {
     bool exists = false;
+    bool exists_server = false;
+
     // Check 'DD_version' too in order to catch an upgrade from 8.0.3.
     if (dd::tables::DD_properties::instance().get(thd, "DD_VERSION",
                                                   &actual_version, &exists) ||
@@ -331,6 +338,15 @@ bool initialize_dd_properties(THD *thd) {
       }
     }
     /* purecov: end */
+
+    if (dd::tables::DD_properties::instance().get(
+            thd, "MYSQLD_VERSION", &actual_server_version, &exists_server) ||
+        !exists_server)
+      return true;
+
+    if (actual_server_version != MYSQL_VERSION_ID)
+      bootstrap::DD_bootstrap_ctx::instance().set_actual_server_version(
+          actual_server_version);
 
     /*
       Reject restarting with a changed LCTN setting, since the collation
@@ -1377,6 +1393,16 @@ bool migrate_meta_data(THD *thd, const std::set<String_type> &create_set,
 
   /* Version dependent migration of meta data can be added here. */
 
+  /* Upgrade from 80012. */
+  if (bootstrap::DD_bootstrap_ctx::instance().is_upgrade_from_before(
+          bootstrap::DD_VERSION_80013)) {
+    migrated_set.insert("tables");
+    if (execute_query(thd,
+                      "INSERT INTO tables SELECT *, 0 FROM mysql.tables")) {
+      return dd::end_transaction(thd, true);
+    }
+  }
+
   /*
     8.0.11 allowed entries with 0 timestamps to be created. These must
     be updated, otherwise, upgrade will fail since 0 timstamps are not
@@ -2030,6 +2056,61 @@ bool repopulate_charsets_and_collations(THD *thd) {
   return error;
 }
 
+/** On startup from mysql datadir to Percona Server, compression dictionary
+tables and I_S views on them will be missing. We check if they are missing
+and create the tables mysql.compression_dictionary,
+mysql.compression_dictionary_cols
+@param[in,out]  thd  Session context
+@return false on success, true on failure */
+static bool check_and_create_compression_dict_tables(THD *thd) {
+  const dd::Table *new_table_def = nullptr;
+
+  if (thd->dd_client()->acquire("mysql", "compression_dictionary",
+                                &new_table_def)) {
+    return true;
+  }
+
+  if (new_table_def != nullptr) {
+    // Compression dictionary table exists. Do nothing
+    return false;
+  }
+
+  /*
+    If we are in read-only mode, we skip re-populating. Here, 'opt_readonly'
+    is the value of the '--read-only' option.
+  */
+  if (opt_readonly) {
+    LogErr(WARNING_LEVEL, ER_COMPRESSION_DICTIONARY_NO_CREATE, "", "");
+    return false;
+  }
+
+  /*
+    We must also check if the DDSE is started in a way that makes the DD
+    read only. For now, we only support InnoDB as SE for the DD. The call
+    to retrieve the handlerton for the DDSE should be replaced by a more
+    generic mechanism.
+  */
+  handlerton *ddse = ha_resolve_by_legacy_type(thd, DB_TYPE_INNODB);
+
+  if (ddse->is_dict_readonly && ddse->is_dict_readonly()) {
+    LogErr(WARNING_LEVEL, ER_COMPRESSION_DICTIONARY_NO_CREATE, "InnoDB", " ");
+    return false;
+  }
+
+  // Create the compression dictionary tables
+  if (compression_dict::bootstrap(thd)) return true;
+
+  if (dd::info_schema::create_non_dd_views(thd, false)) {
+    return true;
+  }
+
+  /*
+    We must commit the transaction before executing a new query, which
+    expects the transaction to be empty.
+  */
+  return (dd::end_transaction(thd, false));
+}
+
 /*
   Verify that the storage adapter contains the core DD objects and
   nothing else.
@@ -2214,6 +2295,9 @@ bool initialize_dictionary(THD *thd, bool is_dd_upgrade_57,
     return true;
   }
 
+  // Create compression dictionary tables
+  if (compression_dict::bootstrap(thd)) return true;
+
   bootstrap::DD_bootstrap_ctx::instance().set_stage(bootstrap::Stage::FINISHED);
 
   return false;
@@ -2278,8 +2362,10 @@ bool restart(THD *thd) {
       create_tables(thd, nullptr) || sync_meta_data(thd) ||
       DDSE_dict_recover(thd, DICT_RECOVERY_RESTART_SERVER,
                         d->get_actual_dd_version(thd)) ||
-      upgrade_tables(thd) || repopulate_charsets_and_collations(thd) ||
-      verify_contents(thd) || update_versions(thd)) {
+      bootstrap::do_server_upgrade_checks(thd) || upgrade_tables(thd) ||
+      check_and_create_compression_dict_tables(thd) ||
+      repopulate_charsets_and_collations(thd) || verify_contents(thd) ||
+      update_versions(thd)) {
     return true;
   }
 

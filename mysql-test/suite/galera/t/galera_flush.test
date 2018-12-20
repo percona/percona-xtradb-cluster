@@ -3,8 +3,8 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_perfschema.inc
---source include/have_query_cache.inc
+#--source include/have_perfschema.inc
+#--source include/have_query_cache.inc
 
 --disable_warnings
 DROP TABLE IF EXISTS t1, t2; 
@@ -13,24 +13,6 @@ DROP TABLE IF EXISTS t1, t2;
 #
 # The following FLUSH statements should be replicated
 #
-
-#
-# Test: FLUSH DES_KEY_FILE
-#
---connection node_2
---let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN  ('t1', 't2');
---source include/wait_condition.inc
-
---let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
-
---connection node_1
-FLUSH DES_KEY_FILE;
-
---connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
---source include/wait_condition_with_debug.inc
-
 
 #
 # Test: FLUSH HOSTS
@@ -65,22 +47,6 @@ FLUSH PRIVILEGES;
 DELETE FROM mysql.user WHERE user = 'user1';
 SET SESSION wsrep_replicate_myisam = FALSE;
 FLUSH PRIVILEGES;
-
-
-#
-# Test: FLUSH QUERY_CACHE
-#
---connection node_2
---let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
---connection node_1
-FLUSH QUERY CACHE;
-
---connection node_2
---sleep 2
---let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
---disable_query_log
---eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
---enable_query_log
 
 
 #
@@ -288,8 +254,8 @@ CREATE TABLE t1 (f1 INTEGER);
 --source include/wait_condition.inc
 
 # In addition, wait until we have seen the create table
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 2 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 2 as EXPECTED_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 2 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 2 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
@@ -304,12 +270,11 @@ UNLOCK TABLES;
 FLUSH TABLES t1 FOR EXPORT;
 UNLOCK TABLES;
 RESET CHANGED_PAGE_BITMAPS;
-RESET QUERY CACHE;
 
 --connection node_2
 --sleep 5
 --disable_query_log
---let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+--let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 if ($wsrep_last_committed_before != $wsrep_last_committed_after)
 {
 	--echo "before:$wsrep_last_committed_before after:$wsrep_last_committed_after expected:$wsrep_last_committed_before"

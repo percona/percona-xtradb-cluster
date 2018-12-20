@@ -68,8 +68,11 @@ lsn_t recv_calc_lsn_on_data_add(
 @param[in,out]	log		redo log
 @param[in,out]	buf		buffer where to read
 @param[in]	start_lsn	read area start
-@param[in]	end_lsn		read area end */
-void recv_read_log_seg(log_t &log, byte *buf, lsn_t start_lsn, lsn_t end_lsn);
+@param[in]	end_lsn		read area end
+@param[in]	online		whether the read is for the changed page
+                                tracking */
+void recv_read_log_seg(log_t &log, byte *buf, lsn_t start_lsn, lsn_t end_lsn,
+                       bool online);
 
 /** Tries to parse a single log record.
 @param[out]	type		log record type
@@ -423,8 +426,11 @@ class MetadataRecover {
       ut_allocator<std::pair<const table_id_t, PersistentTableMetadata *>>>;
 
  public:
-  /** Default constructor */
-  MetadataRecover() UNIV_NOTHROW {}
+  /** Default constructor
+  @param[in]    read_only_      if set, the instance will only parse the log
+                                without applying any changes */
+  explicit MetadataRecover(bool read_only_) UNIV_NOTHROW
+      : read_only(read_only_) {}
 
   /** Destructor */
   ~MetadataRecover();
@@ -435,9 +441,12 @@ class MetadataRecover {
   @param[in]	version		table dynamic metadata version
   @param[in]	ptr		redo log start
   @param[in]	end		end of redo log
+  @param[in]    apply           if false, this is coming from changed page
+                                tracking and changes should be parsed only
   @retval ptr to next redo log record, NULL if this log record
   was truncated */
-  byte *parseMetadataLog(table_id_t id, uint64_t version, byte *ptr, byte *end);
+  byte *parseMetadataLog(table_id_t id, uint64_t version, byte *ptr, byte *end,
+                         bool apply);
 
   /** Apply the collected persistent dynamic metadata to in-memory
   table objects */
@@ -461,6 +470,9 @@ class MetadataRecover {
  private:
   /** Map used to store and merge persistent dynamic metadata */
   PersistentTables m_tables;
+  /** Flag indicating whether this is a redo log tracking (read-only) or a
+  regular recovery instance */
+  const bool read_only;
 };
 
 /** Recovery system data structure */
@@ -592,6 +604,8 @@ struct recv_sys_t {
   /** Encryption Key information per tablespace ID */
   Encryption_Keys *keys;
 
+  void set_corrupt_log() { found_corrupt_log = true; }
+
   /** Tablespace IDs that were ignored during redo log apply. */
   Missing_Ids missing_ids;
 
@@ -639,6 +653,10 @@ the log and store the scanned log records in the buffer pool: we will
 use these free frames to read in pages when we start applying the
 log records to the database. */
 extern ulint recv_n_pool_free_frames;
+
+/** A list of tablespaces for which (un)encryption process was not
+completed before crash. */
+extern std::list<space_id_t> recv_encr_ts_list;
 
 #include "log0recv.ic"
 

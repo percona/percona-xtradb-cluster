@@ -61,15 +61,19 @@ this program; if not, write to the Free Software Foundation, Inc.,
 /** Pointer to the log checksum calculation function. */
 log_checksum_func_t log_checksum_algorithm_ptr;
 
+/* Next log block number to do dummy record filling if no log records written
+ * for a while */
+static ulint next_lbn_to_pad = 0;
+
 #ifndef UNIV_HOTBACKUP
 
 #include <debug_sync.h>
 #include <sys/types.h>
 #include <time.h>
-#include "ha_prototypes.h"
-
 #include "dict0boot.h"
+#include "ha_prototypes.h"
 #include "os0thread-create.h"
+#include "srv0start.h"
 #include "trx0sys.h"
 
 /**
@@ -468,6 +472,11 @@ that the proper size of the log buffer should be a power of two.
 @param[out]	log		redo log */
 static void log_calc_buf_size(log_t &log);
 
+/** Event to wake up log_scrub_thread */
+os_event_t log_scrub_event;
+/** Whether log_scrub_thread is active */
+bool log_scrub_thread_active;
+
 /**************************************************/ /**
 
  @name	Initialization and finalization of log_sys
@@ -514,6 +523,7 @@ bool log_sys_init(uint32_t n_files, uint64_t file_size, space_id_t space_id) {
   log_files_update_offsets(log, log.current_file_lsn);
 
   log.checkpointer_event = os_event_create("log_checkpointer_event");
+  log.closer_event = os_event_create("log_closer_event");
   log.write_notifier_event = os_event_create("log_write_notifier_event");
   log.flush_notifier_event = os_event_create("log_flush_notifier_event");
   log.writer_event = os_event_create("log_writer_event");
@@ -526,7 +536,13 @@ bool log_sys_init(uint32_t n_files, uint64_t file_size, space_id_t space_id) {
   mutex_create(LATCH_ID_LOG_WRITE_NOTIFIER, &log.write_notifier_mutex);
   mutex_create(LATCH_ID_LOG_FLUSH_NOTIFIER, &log.flush_notifier_mutex);
 
-  log.sn_lock.create(log_sn_lock_key, SYNC_LOG_SN, 64);
+  log.sn_lock.create(
+#ifdef UNIV_PFS_RWLOCK
+      log_sn_lock_key,
+#else
+      PSI_NOT_INSTRUMENTED,
+#endif
+      SYNC_LOG_SN, 64);
 
   /* Allocate buffers. */
   log_allocate_buffer(log);
@@ -644,6 +660,7 @@ void log_sys_close() {
 
   os_event_destroy(log.write_notifier_event);
   os_event_destroy(log.flush_notifier_event);
+  os_event_destroy(log.closer_event);
   os_event_destroy(log.checkpointer_event);
   os_event_destroy(log.writer_event);
   os_event_destroy(log.flusher_event);
@@ -713,14 +730,14 @@ void log_start_background_threads(log_t &log) {
   ut_a(!srv_read_only_mode);
   ut_a(log.sn.load() > 0);
 
-  log.closer_thread_alive = true;
-  log.checkpointer_thread_alive = true;
-  log.writer_thread_alive = true;
-  log.flusher_thread_alive = true;
-  log.write_notifier_thread_alive = true;
-  log.flush_notifier_thread_alive = true;
+  log.closer_thread_alive.store(true);
+  log.checkpointer_thread_alive.store(true);
+  log.writer_thread_alive.store(true);
+  log.flusher_thread_alive.store(true);
+  log.write_notifier_thread_alive.store(true);
+  log.flush_notifier_thread_alive.store(true);
 
-  log.should_stop_threads = false;
+  log.should_stop_threads.store(false);
 
   std::atomic_thread_fence(std::memory_order_seq_cst);
 
@@ -759,7 +776,20 @@ void log_stop_background_threads(log_t &log) {
 
   ut_a(!srv_read_only_mode);
 
-  log.should_stop_threads = true;
+  log.should_stop_threads.store(true);
+
+  /* Log writer may wait on writer_event with 100ms timeout, so we better
+  wake him up, so he could notice that log.should_stop_threads has been
+  set to true, finish his work and exit. */
+  os_event_set(log.writer_event);
+
+  /* The same applies to log_checkpointer thread and log_closer thread.
+  However, it does not apply to others, because:
+    - log_flusher monitors log.writer_thread_alive,
+    - log_write_notifier monitors log.writer_thread_alive,
+    - log_flush_notifier monitors log.flusher_thread_alive. */
+  os_event_set(log.closer_event);
+  os_event_set(log.checkpointer_event);
 
   /* Wait until threads are closed. */
   while (log.closer_thread_alive.load() ||
@@ -833,14 +863,12 @@ void log_print(const log_t &log, FILE *file) {
           last_checkpoint_lsn);
 
   fprintf(file,
-          "Max checkpoint age    " LSN_PF
-          "\n"
           "Checkpoint age target " LSN_PF
           "\n"
           "Modified age no less than " LSN_PF
           "\n"
           "Checkpoint age        " LSN_PF "\n",
-          log_sys->max_checkpoint_age, log_sys->max_checkpoint_age_async,
+          log_sys->max_checkpoint_age_async,
           current_lsn - buf_pool_get_oldest_modification_lwm(),
           current_lsn - log_sys->last_checkpoint_lsn);
 
@@ -862,10 +890,8 @@ void log_print(const log_t &log, FILE *file) {
     checkpoint age */
     fprintf(file,
             "Log tracking enabled\n"
-            "Log tracked up to   " LSN_PF
-            "\n"
-            "Max tracked LSN age " LSN_PF "\n",
-            log_sys->tracked_lsn.load(), log_sys->max_checkpoint_age);
+            "Log tracked up to   " LSN_PF "\n",
+            log_sys->tracked_lsn.load());
   }
 
   log.n_log_ios_old = log.n_log_ios;
@@ -1153,6 +1179,55 @@ void log_position_collect_lsn_info(const log_t &log, lsn_t *current_lsn,
   ut_a(*current_lsn >= *checkpoint_lsn);
 }
 
-  /* @} */
+static void log_pad_current_log_block(void)
+/*===========================*/
+{
+  byte b = MLOG_DUMMY_RECORD;
+  ulint pad_length;
+  ulint i;
+  lsn_t lsn;
+  pad_length = OS_FILE_LOG_BLOCK_SIZE -
+               (log_sys->current_file_real_offset % OS_FILE_LOG_BLOCK_SIZE) -
+               LOG_BLOCK_TRL_SIZE;
+  if (pad_length ==
+      (OS_FILE_LOG_BLOCK_SIZE - LOG_BLOCK_HDR_SIZE - LOG_BLOCK_TRL_SIZE)) {
+    pad_length = 0;
+  }
+  if (pad_length) {
+    srv_stats.n_log_scrubs.inc();
+  }
+  auto handle = log_buffer_reserve(*log_sys, pad_length);
+  for (i = 0; i < pad_length; i++) {
+    log_buffer_write(*log_sys, handle, &b, 1, log_sys->current_file_lsn);
+  }
+  lsn = log_sys->current_file_lsn;
+  ut_a(lsn % OS_FILE_LOG_BLOCK_SIZE == LOG_BLOCK_HDR_SIZE);
+}
+
+static void log_scrub()
+/*=========*/
+{
+  log_writer_mutex_enter(*log_sys);
+  ulint cur_lbn = log_block_convert_lsn_to_no(log_sys->current_file_lsn);
+  if (next_lbn_to_pad == cur_lbn) {
+    log_pad_current_log_block();
+  }
+  next_lbn_to_pad = log_block_convert_lsn_to_no(log_sys->current_file_lsn);
+  log_writer_mutex_exit(*log_sys);
+}
+/* log scrubbing speed, in bytes/sec */
+ulonglong innodb_scrub_log_speed;
+
+void log_scrub_thread() {
+  ut_ad(!srv_read_only_mode);
+  while (srv_shutdown_state < SRV_SHUTDOWN_FLUSH_PHASE) {
+    /* log scrubbing interval in µs. */
+    ulonglong interval = 1000 * 1000 * 512 / innodb_scrub_log_speed;
+    os_event_wait_time(log_scrub_event, static_cast<ulint>(interval));
+    log_scrub();
+    os_event_reset(log_scrub_event);
+  }
+  log_scrub_thread_active = false;
+}
 
 #endif /* !UNIV_HOTBACKUP */

@@ -17,7 +17,7 @@
 #define WSREP_XID_H
 
 #include "handler.h"  // XID typedef
-#include "wsrep_api.h"
+#include "wsrep/src/wsrep_api.h"
 
 #define WSREP_XID_PREFIX "WSREPXid"
 #define WSREP_XID_PREFIX_LEN 8

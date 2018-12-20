@@ -73,9 +73,9 @@
 #include "sql/auth/sql_security_ctx.h"
 #include "sql/binlog.h"  // purge_master_logs
 #include "sql/current_thd.h"
-#include "sql/dd/cache/dictionary_client.h"
-#include "sql/dd/dd.h"          // dd::get_dictionary
-#include "sql/dd/dd_schema.h"   // Schema_MDL_locker
+#include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client::Auto_releaser
+#include "sql/dd/dd.h"                       // dd::get_dictionary
+#include "sql/dd/dd_schema.h"                // Schema_MDL_locker
 #include "sql/dd/dictionary.h"  // dd::Dictionary::is_system_view_name
 #include "sql/dd/info_schema/table_stats.h"
 #include "sql/debug_sync.h"  // DEBUG_SYNC
@@ -173,7 +173,8 @@
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
 static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
-                              Parser_state *parser_state, bool update_userstat);
+                              Parser_state *parser_state, bool update_userstat,
+                              bool force_primary_storage_engine);
 #endif /* WITH_WSREP */
 
 namespace dd {
@@ -246,6 +247,14 @@ const LEX_STRING command_name[] = {
     {C_STRING_WITH_LEN("Reset Connection")},
     {C_STRING_WITH_LEN("Error")}  // Last command number
 };
+
+bool command_satisfy_acl_cache_requirement(unsigned command) {
+  if ((sql_command_flags[command] & CF_REQUIRE_ACL_CACHE) > 0 &&
+      skip_grant_tables() == true)
+    return false;
+  else
+    return true;
+}
 
 /**
   Returns true if all tables should be ignored.
@@ -1053,6 +1062,26 @@ void init_sql_command_flags(void) {
       CF_NEEDS_AUTOCOMMIT_OFF | CF_POTENTIAL_ATOMIC_DDL;
   sql_command_flags[SQLCOM_DROP_SRS] |=
       CF_NEEDS_AUTOCOMMIT_OFF | CF_POTENTIAL_ATOMIC_DDL;
+
+  /**
+    Some statements doesn't if the ACL CACHE is disabled using the
+    --skip-grant-tables server option.
+  */
+  sql_command_flags[SQLCOM_SET_ROLE] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_ALTER_USER_DEFAULT_ROLE] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_CREATE_ROLE] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_DROP_ROLE] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_GRANT_ROLE] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_ALTER_USER] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_GRANT] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_REVOKE] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_REVOKE_ALL] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_REVOKE_ROLE] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_CREATE_USER] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_DROP_USER] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_RENAME_USER] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_SHOW_GRANTS] |= CF_REQUIRE_ACL_CACHE;
+  sql_command_flags[SQLCOM_SET_PASSWORD] |= CF_REQUIRE_ACL_CACHE;
 }
 
 bool sqlcom_can_generate_row_events(enum enum_sql_command command) {
@@ -1553,6 +1582,64 @@ static bool pxc_strict_mode_lock_check(THD *thd) {
 #endif /* WITH_WSREP */
 
 /**
+  Check if a statement was unsuccessfully offloaded to a secondary
+  engine and should be reprepared against the primary storage engine.
+  Restart the statement if this is the case.
+
+  @param thd            the session
+  @param parser_state   the parser state
+  @param query_string   the query to reprepare and execute
+  @param query_length   the length of the query
+*/
+static void check_secondary_engine_statement(THD *thd,
+                                             Parser_state *parser_state,
+                                             const char *query_string,
+                                             size_t query_length) {
+
+#ifdef WITH_WSREP
+  if (WSREP(thd)) {
+    /* While running in cluster mode disable the check for now */
+    return;
+  }
+#endif /* WITH_WSREP */
+
+  // There is no need to do anything if the statement was not
+  // offloaded to a secondary storage engine, or if the offloading was
+  // successful.
+  if (thd->lex->m_sql_cmd == nullptr ||
+      !thd->lex->m_sql_cmd->using_secondary_storage_engine() ||
+      !thd->is_error())
+    return;
+
+  // The query cannot be restarted if it had started executing, since
+  // it may have started sending results to the client.
+  if (thd->lex->unit->is_executed()) return;
+
+  // If the error was fatal, or if the query was killed, don't restart it.
+  if (thd->is_fatal_error || thd->is_killed()) return;
+
+  // Forget about the error raised in the first attempt at preparing the query.
+  thd->clear_error();
+
+  // Tell performance schema that the statement is restarted.
+  MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+  thd->m_statement_psi = MYSQL_START_STATEMENT(
+      &thd->m_statement_state, com_statement_info[thd->get_command()].m_key,
+      thd->db().str, thd->db().length, thd->charset(), nullptr);
+
+  // Reset the statement digest state.
+  thd->m_digest = &thd->m_digest_state;
+  thd->m_digest->reset(thd->m_token_array, max_digest_length);
+
+  // Reset the parser state.
+  thd->set_query(query_string, query_length);
+  parser_state->reset(query_string, query_length);
+
+  // Restart the statement.
+  mysql_parse(thd, parser_state, true, true /* force_primary_storage_engine */);
+}
+
+/**
   Perform one connection-level (COM_XXXX) command.
 
   @param thd             connection handle
@@ -1920,15 +2007,23 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       thd->profiling->set_query_source(thd->query().str, thd->query().length);
 #endif
 
+      const LEX_CSTRING orig_query = thd->query();
+
       Parser_state parser_state;
       if (parser_state.init(thd, thd->query().str, thd->query().length)) break;
 
 #ifdef WITH_WSREP
       wsrep_mysql_parse(thd, thd->query().str, thd->query().length,
-                        &parser_state, false);
+                        &parser_state, false, false);
 #else
-      mysql_parse(thd, &parser_state, false);
+      mysql_parse(thd, &parser_state, false, false);
 #endif /* WITH_WSREP */
+
+      // Check if the statement failed while being prepared for
+      // execution on a secondary storage engine. If so, reprepare the
+      // statement without using secondary storage engines.
+      check_secondary_engine_statement(thd, &parser_state, orig_query.str,
+                                       orig_query.length);
 
       DBUG_EXECUTE_IF("parser_stmt_to_error_log", {
         LogErr(INFORMATION_LEVEL, ER_PARSER_TRACE, thd->query().str);
@@ -2002,13 +2097,16 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
         parser_state.reset(beginning_of_next_stmt, length);
         /* TODO: set thd->lex->sql_command to SQLCOM_END here */
         wsrep_mysql_parse(thd, beginning_of_next_stmt, length, &parser_state,
-                          false);
+                          false, false);
 #else
         thd->set_time(); /* Reset the query start time. */
         parser_state.reset(beginning_of_next_stmt, length);
         /* TODO: set thd->lex->sql_command to SQLCOM_END here */
-        mysql_parse(thd, &parser_state, false);
+        mysql_parse(thd, &parser_state, false, false);
 #endif /* WITH_WSREP */
+
+        check_secondary_engine_statement(thd, &parser_state,
+                                         beginning_of_next_stmt, length);
       }
 
       /* Need to set error to true for graceful shutdown */
@@ -2774,7 +2872,7 @@ static bool wsrep_is_show_query(enum enum_sql_command command) {
 static bool lock_tables_for_backup(THD *thd) {
   DBUG_ENTER("lock_tables_for_backup");
 
-  if (check_global_access(thd, RELOAD_ACL)) DBUG_RETURN(true);
+  if (check_backup_admin_privilege(thd)) DBUG_RETURN(true);
 
   if (delay_key_write_options == DELAY_KEY_WRITE_ALL) {
     my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0), "delay_key_write=ALL");
@@ -2894,6 +2992,8 @@ int mysql_execute_command(THD *thd, bool first_level) {
   TABLE_LIST *const first_table = select_lex->get_table_list();
   /* list of all tables in query */
   TABLE_LIST *all_tables;
+  // keep GTID violation state in order to roll it back on statement failure
+  bool gtid_consistency_violation_state = thd->has_gtid_consistency_violation;
   DBUG_ASSERT(select_lex->master_unit() == lex->unit);
   DBUG_ENTER("mysql_execute_command");
   /* EXPLAIN OTHER isn't explainable command, but can have describe flag. */
@@ -3253,6 +3353,12 @@ int mysql_execute_command(THD *thd, bool first_level) {
   if (lex->opt_hints_global && lex->opt_hints_global->sys_var_hint)
     lex->opt_hints_global->sys_var_hint->update_vars(thd);
 
+  /* Check if the statement fulfill the requirements on ACL CACHE */
+  if (!command_satisfy_acl_cache_requirement(lex->sql_command)) {
+    my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0), "--skip-grant-tables");
+    goto error;
+  }
+
   switch (lex->sql_command) {
     case SQLCOM_SHOW_STATUS: {
       System_status_var old_status_var = thd->status_var;
@@ -3339,18 +3445,22 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
     case SQLCOM_PURGE: {
       Security_context *sctx = thd->security_context();
-      if (!sctx->check_access(SUPER_ACL) &&
-          !sctx->has_global_grant(STRING_WITH_LEN("BINLOG_ADMIN")).first) {
-        my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0),
-                 "SUPER or BINLOG_ADMIN");
-        goto error;
-      }
       if (lex->type == 0) {
         /* PURGE MASTER LOGS TO 'file' */
+        if (!sctx->check_access(SUPER_ACL) &&
+            !sctx->has_global_grant(STRING_WITH_LEN("BINLOG_ADMIN")).first) {
+          my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0),
+                   "SUPER or BINLOG_ADMIN");
+          goto error;
+        }
         res = purge_master_logs(thd, lex->to_log);
         break;
       } else if (lex->type == PURGE_BITMAPS_TO_LSN) {
         /* PURGE CHANGED_PAGE_BITMAPS BEFORE lsn */
+        if (!sctx->check_access(SUPER_ACL)) {
+          my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
+          goto error;
+        }
         ulonglong lsn = 0;
         Item *it = lex->purge_value_list.head();
         if ((!it->fixed && it->fix_fields(lex->thd, &it)) ||
@@ -3803,7 +3913,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       /* DDL and binlog write order are protected by metadata locks. */
       res = mysql_rm_table(thd, first_table, lex->drop_if_exists,
                            lex->drop_temporary);
-      DEBUG_SYNC(thd, "after_mysql_rm_table");
       /* when dropping temporary tables if @@session_track_state_change is ON
          then send the boolean tracker in the OK packet */
       if (!res && lex->drop_temporary) {
@@ -4012,6 +4121,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
       break;
     case SQLCOM_CREATE_COMPRESSION_DICTIONARY: {
+
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
@@ -4026,21 +4136,23 @@ int mysql_execute_command(THD *thd, bool first_level) {
         dict_data_ptr = &dict_data;
       }
 
-      if ((res = mysql_create_zip_dict(
+      if ((res = compression_dict::create_zip_dict(
                thd, lex->ident.str, lex->ident.length, dict_data_ptr->ptr(),
                dict_data_ptr->length(),
-               (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS) !=
-                   0)) == 0)
+               (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS) != 0,
+               false)) == 0)
         my_ok(thd);
       break;
     }
     case SQLCOM_DROP_COMPRESSION_DICTIONARY: {
+
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
 
-      if ((res = mysql_drop_zip_dict(thd, lex->ident.str, lex->ident.length,
-                                     lex->drop_if_exists)) == 0)
+      if ((res = compression_dict::drop_zip_dict(
+               thd, lex->ident.str, lex->ident.length, lex->drop_if_exists)) ==
+          0)
         my_ok(thd);
       break;
     }
@@ -5093,6 +5205,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
             !user->alter_status.update_password_expired_column &&
             !user->alter_status.expire_after_days &&
             user->alter_status.use_default_password_lifetime &&
+            (user->alter_status.update_password_require_current ==
+             Lex_acl_attrib_udyn::UNCHANGED) &&
+            !user->alter_status.update_password_history &&
+            !user->alter_status.update_password_reuse_interval &&
             (thd->lex->ssl_type == SSL_TYPE_NOT_SPECIFIED))
           update_password_only = true;
 
@@ -5350,7 +5466,16 @@ finish:
   }
 #endif
 
-  if (!(res || thd->is_error())) binlog_gtid_end_transaction(thd);
+  if (!res && !thd->is_error()) {      // if statement succeeded
+    binlog_gtid_end_transaction(thd);  // finalize GTID life-cycle
+    DEBUG_SYNC(thd, "persist_new_state_after_statement_succeeded");
+  } else if (!gtid_consistency_violation_state &&    // if the consistency state
+             thd->has_gtid_consistency_violation) {  // was set by the failing
+                                                     // statement
+    gtid_state->end_gtid_violating_transaction(thd);  // just roll it back
+    DEBUG_SYNC(thd, "restore_previous_state_after_statement_failed");
+  }
+
   DBUG_RETURN(res || thd->is_error());
 }
 
@@ -5735,9 +5860,12 @@ bool create_select_for_variable(Parse_context *pc, const char *var_name) {
 
   @param thd          Current session.
   @param parser_state Parser state.
+  @param force_primary_storage_engine True if the statement should be
+  forced to use primary storage engines only.
 */
 
-void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat) {
+void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat,
+                 bool force_primary_storage_engine) {
   DBUG_ENTER("mysql_parse");
   DBUG_PRINT("mysql_parse", ("query: '%s'", thd->query().str));
 
@@ -5769,6 +5897,9 @@ void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat) {
 
     found_semicolon = parser_state->m_lip.found_semicolon;
   }
+
+  if (force_primary_storage_engine && lex->m_sql_cmd != nullptr)
+    lex->m_sql_cmd->disable_secondary_storage_engine();
 
   if (!err) {
     /*
@@ -5976,25 +6107,26 @@ bool mysql_test_parse_for_slave(THD *thd) {
   @param has_explicit_collation Column has an explicit COLLATE attribute.
   @param uint_geom_type         The GIS type of the field.
   @param gcol_info              The generated column data or NULL.
+  @param default_val_expr       The expression for generating default values,
+                                if there is one, or nullptr.
   @param opt_after              The name of the field to add after or
                                 the @see first_keyword pointer to insert first.
   @param srid                   The SRID for this column (only relevant if this
                                 is a geometry column).
+  @param hidden                 Whether or not this field shoud be hidden.
 
   @return
     Return 0 if ok
 */
-
-bool Alter_info::add_field(THD *thd, const LEX_STRING *field_name,
-                           enum_field_types type, const char *length,
-                           const char *decimals, uint type_modifier,
-                           Item *default_value, Item *on_update_value,
-                           LEX_STRING *comment, const char *change,
-                           List<String> *interval_list, const CHARSET_INFO *cs,
-                           bool has_explicit_collation, uint uint_geom_type,
-                           const LEX_CSTRING *zip_dict,
-                           Generated_column *gcol_info, const char *opt_after,
-                           Nullable<gis::srid_t> srid) {
+bool Alter_info::add_field(
+    THD *thd, const LEX_STRING *field_name, enum_field_types type,
+    const char *length, const char *decimals, uint type_modifier,
+    Item *default_value, Item *on_update_value, LEX_STRING *comment,
+    const char *change, List<String> *interval_list, const CHARSET_INFO *cs,
+    bool has_explicit_collation, uint uint_geom_type,
+    const LEX_CSTRING *zip_dict, Value_generator *gcol_info,
+    Value_generator *default_val_expr, const char *opt_after,
+    Nullable<gis::srid_t> srid, dd::Column::enum_hidden_type hidden) {
   Create_field *new_field;
   uint8 datetime_precision = decimals ? atoi(decimals) : 0;
   DBUG_ENTER("add_field_to_list");
@@ -6066,6 +6198,12 @@ bool Alter_info::add_field(THD *thd, const LEX_STRING *field_name,
     }
   }
 
+  // Avoid having sequential definitions for DEFAULT in combination with expr
+  if (default_val_expr && default_value) {
+    my_error(ER_INVALID_DEFAULT, MYF(0), field_name->str);
+    DBUG_RETURN(true);
+  }
+
   if (on_update_value && (!real_type_with_now_on_update(type) ||
                           on_update_value->decimals != datetime_precision)) {
     my_error(ER_INVALID_ON_UPDATE, MYF(0), field_name->str);
@@ -6082,7 +6220,8 @@ bool Alter_info::add_field(THD *thd, const LEX_STRING *field_name,
       new_field->init(thd, field_name->str, type, length, decimals,
                       type_modifier, default_value, on_update_value, comment,
                       change, interval_list, cs, has_explicit_collation,
-                      uint_geom_type, zip_dict, gcol_info, srid))
+                      uint_geom_type, zip_dict, gcol_info, default_val_expr,
+                      srid, hidden))
     DBUG_RETURN(1);
 
   create_list.push_back(new_field);
@@ -7008,18 +7147,24 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query) {
 
 #ifdef WITH_WSREP
 static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
-                              Parser_state *parser_state,
-                              bool update_userstat) {
+                              Parser_state *parser_state, bool update_userstat,
+                              bool force_primary_storage_engine) {
   DBUG_ENTER("wsrep_mysql_parse");
   bool is_autocommit = !thd->in_multi_stmt_transaction_mode() &&
                        thd->wsrep_conflict_state == NO_CONFLICT &&
                        !thd->wsrep_applier;
 
   do {
+
     if (thd->wsrep_conflict_state == RETRY_AUTOCOMMIT) {
       thd->wsrep_conflict_state = NO_CONFLICT;
     }
-    mysql_parse(thd, parser_state, update_userstat);
+
+    mysql_parse(thd, parser_state, update_userstat,
+                force_primary_storage_engine);
+
+    /* TODO: check_secondary_engine_statement functionality is incomplete.
+    Add it once MySQL define semenatics for it. */
 
     if (WSREP(thd)) {
       /* wsrep BF abort in query exec phase */
@@ -7420,14 +7565,18 @@ void get_default_definer(THD *thd, LEX_USER *definer) {
 
   definer->plugin = EMPTY_CSTR;
   definer->auth = NULL_CSTR;
+  definer->current_auth = NULL_CSTR;
   definer->uses_identified_with_clause = false;
   definer->uses_identified_by_clause = false;
   definer->uses_authentication_string_clause = false;
+  definer->uses_replace_clause = false;
   definer->alter_status.update_password_expired_column = false;
   definer->alter_status.use_default_password_lifetime = true;
   definer->alter_status.expire_after_days = 0;
   definer->alter_status.update_account_locked_column = false;
   definer->alter_status.account_locked = false;
+  definer->alter_status.update_password_require_current =
+      Lex_acl_attrib_udyn::DEFAULT;
 }
 
 /**
@@ -7480,6 +7629,9 @@ LEX_USER *get_current_user(THD *thd, LEX_USER *user) {
           user->uses_identified_by_clause;
       default_definer->uses_identified_with_clause =
           user->uses_identified_with_clause;
+      default_definer->uses_replace_clause = user->uses_replace_clause;
+      default_definer->current_auth.str = user->current_auth.str;
+      default_definer->current_auth.length = user->current_auth.length;
       default_definer->plugin.str = user->plugin.str;
       default_definer->plugin.length = user->plugin.length;
       default_definer->auth.str = user->auth.str;

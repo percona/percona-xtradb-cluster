@@ -1718,7 +1718,7 @@ static void complete_update_bin(conn *c) {
 }
 
 static void process_bin_get(conn *c) {
-    item *it;
+    item *it = NULL;
 
     protocol_binary_response_get* rsp = (protocol_binary_response_get*)c->wbuf;
     char* key = binary_get_key(c);
@@ -2978,8 +2978,8 @@ static void dispatch_bin_command(conn *c) {
       if (settings.verbose) {
         settings.extensions.logger->log(
             EXTENSION_LOG_WARNING, c,
-            "The memcached API is disabled because WSREP (Galera replication) "
-            "is enabled.\n");
+            "PXC cluster mode doesn't support memcache (Switch to standalone"
+            " for memcache support)\n");
       }
 
       write_bin_packet(c, PROTOCOL_BINARY_RESPONSE_NOT_SUPPORTED, bodylen);
@@ -3132,7 +3132,7 @@ static void process_bin_update(conn *c) {
     char *key;
     uint16_t nkey;
     uint32_t vlen;
-    item *it;
+    item *it = NULL;
     protocol_binary_request_set* req = binary_get_request(c);
 
     assert(c != NULL);
@@ -3255,7 +3255,7 @@ static void process_bin_append_prepend(conn *c) {
     char *key;
     int nkey;
     int vlen;
-    item *it;
+    item *it = NULL;
 
     assert(c != NULL);
 
@@ -4071,7 +4071,7 @@ static inline char* process_get_command(conn *c, token_t *tokens, size_t ntokens
     char *key;
     size_t nkey;
     int i = c->ileft;
-    item *it;
+    item *it = NULL;
     token_t *key_token = &tokens[KEY_TOKEN];
     int range = false;
     assert(c != NULL);
@@ -4267,9 +4267,9 @@ static void process_update_command(conn *c, token_t *tokens, const size_t ntoken
     unsigned int flags;
     int32_t exptime_int = 0;
     time_t exptime;
-    int vlen;
+    int vlen = 0;
     uint64_t req_cas_id=0;
-    item *it;
+    item *it = NULL;
 
     assert(c != NULL);
 
@@ -4392,7 +4392,7 @@ static char* process_arithmetic_command(conn *c, token_t *tokens, const size_t n
     ENGINE_ERROR_CODE ret = c->aiostat;
     c->aiostat = ENGINE_SUCCESS;
     uint64_t cas;
-    uint64_t result;
+    uint64_t result = 0;
     if (ret == ENGINE_SUCCESS) {
         ret = settings.engine.v1->arithmetic(settings.engine.v0, c, key, nkey,
                                              incr, false, delta, 0, 0, &cas,
@@ -4619,8 +4619,8 @@ static char* process_command(conn *c, char *command) {
         (strcmp(tokens[COMMAND_TOKEN].value, "version") != 0) &&
         (strcmp(tokens[COMMAND_TOKEN].value, "verbosity") != 0)) {
       out_string(c,
-                 "SERVER_ERROR The memcached api is disabled because WSREP "
-                 "(Galera replication) is enabled");
+                 "SERVER_ERROR PXC cluster mode doesn't support memcache"
+                 " (Switch to standalone for memcache support)");
       return NULL;
     }
 #endif /* WITH_WSREP */
@@ -4722,7 +4722,7 @@ static char* process_command(conn *c, char *command) {
     } else if (settings.extensions.ascii != NULL) {
         EXTENSION_ASCII_PROTOCOL_DESCRIPTOR *cmd;
         size_t nbytes = 0;
-        char *ptr;
+        char *ptr = NULL;
 
         if (ntokens > 0) {
             if (ntokens == MAX_TOKENS) {

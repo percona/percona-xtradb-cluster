@@ -27,13 +27,6 @@ IF (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
   RETURN ()
 ENDIF ()
 
-# check compiler version, 4.8.0 is minimal accepted
-IF ((CMAKE_CXX_COMPILER_ID STREQUAL GNU) AND
-    (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.8.0"))
-  MESSAGE (${MYROCKS_STATUS_MODE} "GCC >= 4.8.0 required. ${CMAKE_CXX_COMPILER_VERSION} found. Not building MyRocks")
-  RETURN ()
-ENDIF ()
-
 # Relax unused variable warnings for release modes
 MY_CHECK_CXX_COMPILER_FLAG("-Wunused-variable" HAVE_UNUSED_VARIABLE)
 IF(HAVE_UNUSED_VARIABLE)
@@ -166,6 +159,10 @@ ELSE()
   SET(PIC_EXT "")
 ENDIF()
 
+IF(DEFINED WITH_UBSAN)
+  add_definitions(-DROCKSDB_UBSAN_RUN)
+ENDIF()
+
 SET(ROCKSDB_SOURCES
   ha_rocksdb.cc ha_rocksdb.h ha_rocksdb_proto.h
   logger.h
@@ -183,6 +180,7 @@ SET(ROCKSDB_SOURCES
   rdb_sst_info.cc rdb_sst_info.h
   rdb_utils.cc rdb_utils.h rdb_buff.h
   rdb_threads.cc rdb_threads.h
+  ha_rockspart.cc ha_rockspart.h
   ${ROCKSDB_LIB_SOURCES}
 )
 

@@ -39,8 +39,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ha_prototypes.h"
 #include "log0log.h"
 #include "mach0data.h"
-#include "my_compiler.h"
-#include "my_inttypes.h"
 #include "que0que.h"
 #include "row0log.h"
 #include "row0row.h"
@@ -53,8 +51,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "trx0trx.h"
 #include "trx0undo.h"
 
-#include <debug_sync.h>
 #include "current_thd.h"
+#include "debug_sync.h"
 
 /* Considerations on undoing a modify operation.
 (1) Undoing a delete marking: all index records should be found. Some of
@@ -325,7 +323,15 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
     }
   }
 
-  ut_ad(rec_get_trx_id(btr_pcur_get_rec(pcur), index) == node->new_trx_id);
+  /**
+   * when scrubbing, and records gets cleared,
+   *   the transaction id is not present afterwards.
+   *   this is safe as: since the record is on free-list
+   *   it can be reallocated at any time after this mtr-commits
+   *   which is just below
+   */
+  ut_ad(srv_immediate_scrub_data_uncompressed ||
+        rec_get_trx_id(btr_pcur_get_rec(pcur), index) == node->new_trx_id);
 
   btr_pcur_commit_specify_mtr(pcur, &mtr);
 
@@ -1046,7 +1052,7 @@ static void row_undo_mod_parse_undo_rec(undo_node_t *node, MDL_ticket **mdl) {
     return;
   }
 
-  if (node->table->ibd_file_missing) {
+  if (node->table->file_unreadable) {
     dd_table_close(node->table, current_thd, mdl, false);
 
     /* We skip undo operations to missing .ibd files */

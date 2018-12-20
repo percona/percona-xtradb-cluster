@@ -44,9 +44,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ha_prototypes.h"
 #include "lock0lock.h"
 #include "log0log.h"
-#include "my_compiler.h"
-#include "my_dbug.h"
-#include "my_inttypes.h"
 #include "os0proc.h"
 #include "que0que.h"
 #include "read0read.h"
@@ -65,6 +62,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ut0new.h"
 #include "ut0pool.h"
 #include "ut0vec.h"
+
+#include "my_dbug.h"
 
 #ifdef WITH_WSREP
 #include <wsrep_mysqld.h>
@@ -516,6 +515,8 @@ trx_t *trx_allocate_for_background(void) {
 
   trx->sess = trx_dummy_sess;
 
+  trx->stats.set(false);
+
   return (trx);
 }
 
@@ -742,7 +743,7 @@ void trx_resurrect_locks() {
       if (table) {
         ut_ad(!table->is_temporary());
 
-        if (table->ibd_file_missing || table->is_temporary()) {
+        if (table->file_unreadable || table->is_temporary()) {
           mutex_enter(&dict_sys->mutex);
           dd_table_close(table, NULL, NULL, true);
           dict_table_remove_from_cache(table);
@@ -750,7 +751,7 @@ void trx_resurrect_locks() {
           continue;
         }
 
-        if (trx->state == TRX_STATE_PREPARED) {
+        if (trx->state == TRX_STATE_PREPARED && !dict_table_is_sdi(table->id)) {
           trx->mod_tables.insert(table);
         }
         DICT_TF2_FLAG_SET(table, DICT_TF2_RESURRECT_PREPARED);
@@ -1561,7 +1562,9 @@ static bool trx_write_serialisation_history(
     sleep(3);
     DBUG_SUICIDE();
   });
+
   sys_header = trx_sysf_get(mtr);
+
   /* Update latest MySQL wsrep XID in trx sys header.
   If given transaction is marked for replay then avoid updating
   the xid while the trx is being rolled back. */
@@ -1573,6 +1576,7 @@ static bool trx_write_serialisation_history(
     trx_sys_update_wsrep_checkpoint(trx->wsrep_recover_xid, sys_header, mtr,
                                     true);
   }
+
   trx->wsrep_recover_xid = NULL;
 #endif /* WITH_WSREP */
 
@@ -1696,6 +1700,8 @@ static void trx_flush_log_if_needed(
     trx_t *trx) /*!< in/out: transaction */
 {
   trx->op_info = "flushing log";
+
+  DEBUG_SYNC_C("trx_flush_log_if_needed");
 
   if (trx->ddl_operation || trx->ddl_must_flush) {
     log_write_up_to(*log_sys, lsn, true);
@@ -2285,6 +2291,7 @@ que_thr_t *trx_commit_step(que_thr_t *thr) /*!< in: query thread */
  @return DB_SUCCESS or error number */
 dberr_t trx_commit_for_mysql(trx_t *trx) /*!< in/out: transaction */
 {
+  DEBUG_SYNC_C("trx_commit_for_mysql_checks_for_aborted");
   TrxInInnoDB trx_in_innodb(trx, true);
 
   if (trx_in_innodb.is_aborted() && trx->killed_by != os_thread_get_curr_id()) {
@@ -2330,7 +2337,11 @@ dberr_t trx_commit_for_mysql(trx_t *trx) /*!< in/out: transaction */
 void trx_commit_complete_for_mysql(trx_t *trx) /*!< in/out: transaction */
 {
   if (trx->id != 0 || !trx->must_flush_log_later ||
-      thd_requested_durability(trx->mysql_thd) == HA_IGNORE_DURABILITY) {
+      (thd_requested_durability(trx->mysql_thd) == HA_IGNORE_DURABILITY &&
+       !trx->ddl_must_flush)) {
+    /* If we removed trx->ddl_must_flush from condition above, we would
+    need to take care of fixing innobase_flush_logs for a scenario in
+    which srv_flush_log_at_trx_commit == 0. */
     return;
   }
 
@@ -2556,20 +2567,16 @@ void trx_print_latched(
 }
 
 #ifdef WITH_WSREP
-/**********************************************************************/ /**
- Prints info about a transaction.
+/** Prints info about a transaction.
  Transaction information may be retrieved without having trx_sys->mutex acquired
  so it may not be completely accurate. The caller must own lock_sys->mutex
  and the trx must have some locks to make sure that it does not escape
  without locking lock_sys->mutex. */
 void wsrep_trx_print_locking(
-    FILE *f,
-    /*!< in: output stream */
-    const trx_t *trx,
-    /*!< in: transaction */
-    ulint max_query_len)
-/*!< in: max query length to print,
-or 0 to use the default max length */
+    FILE *f,                /*!< in: output stream */
+    const trx_t *trx,       /*!< in: transaction */
+    ulint max_query_len)    /*!< in: max query length to print,
+                            or 0 to use the default max length */
 {
   ibool newline;
   const char *op_info;
@@ -2827,11 +2834,11 @@ static void trx_prepare(trx_t *trx) /*!< in/out: transaction */
   Recovered transactions cannot. */
   ut_a(!trx->is_recovered);
 
+  DBUG_EXECUTE_IF("ib_trx_crash_during_xa_prepare_step", DBUG_SUICIDE(););
+
   if (trx->rsegs.m_redo.rseg != NULL && trx_is_redo_rseg_updated(trx)) {
     lsn = trx_prepare_low(trx, &trx->rsegs.m_redo, false);
   }
-
-  DBUG_EXECUTE_IF("ib_trx_crash_during_xa_prepare_step", DBUG_SUICIDE(););
 
   if (trx->rsegs.m_noredo.rseg != NULL && trx_is_temp_rseg_updated(trx)) {
     trx_prepare_low(trx, &trx->rsegs.m_noredo, true);
@@ -2916,16 +2923,74 @@ dberr_t trx_prepare_for_mysql(trx_t *trx) {
   return (DB_SUCCESS);
 }
 
+/**
+  Get the table name and database name for the given dd_table object.
+
+  @param[in,out]  table Handler table name object pointer.
+  @param[in]      dd_table  Pointer table name DD object.
+  @param[in]      mem_root  Mem_root for space allocation.
+
+  @retval     true   Error, e.g. Memory allocation failure.
+  @retval     false  Success
+*/
+
+static bool get_table_name_info(st_handler_tablename *table,
+                                const dict_table_t *dd_table,
+                                MEM_ROOT *mem_root) {
+  const char *ptr;
+
+  size_t len = dict_get_db_name_len(dd_table->name.m_name);
+  table->db = strmake_root(mem_root, dd_table->name.m_name, len);
+  if (table->db == nullptr) return true;
+
+  ptr = dict_remove_db_name(dd_table->name.m_name);
+  len = ut_strlen(ptr);
+  table->tablename = strmake_root(mem_root, ptr, len);
+  if (table->tablename == nullptr) return true;
+
+  return false;
+}
+
+/**
+  Get prepared transaction info from InnoDB data structure.
+
+  @param[in,out]  txn_list  Handler layer tansaction list.
+  @param[in]      trx       Innodb transaction info.
+  @param[in]      mem_root  Mem_root for space allocation.
+
+  @retval     true          Error, e.g. Memory allocation failure.
+  @retval     false         Success
+*/
+
+static bool get_info_about_prepared_transaction(XA_recover_txn *txn_list,
+                                                const trx_t *trx,
+                                                MEM_ROOT *mem_root) {
+  txn_list->id = *trx->xid;
+  txn_list->mod_tables = new (mem_root) List<st_handler_tablename>();
+  if (!txn_list->mod_tables) return true;
+
+  for (auto dd_table : trx->mod_tables) {
+    st_handler_tablename *table = new (mem_root) st_handler_tablename();
+
+    if (!table || get_table_name_info(table, dd_table, mem_root) ||
+        txn_list->mod_tables->push_back(table, mem_root))
+      return true;
+  }
+  return false;
+}
+
 /** This function is used to find number of prepared transactions and
  their transaction objects for a recovery.
  @return number of prepared transactions stored in xid_list */
-int trx_recover_for_mysql(XID *xid_list, /*!< in/out: prepared transactions */
-                          ulint len)     /*!< in: number of slots in xid_list */
+int trx_recover_for_mysql(
+    XA_recover_txn *txn_list, /*!< in/out: prepared transactions */
+    ulint len,                /*!< in: number of slots in xid_list */
+    MEM_ROOT *mem_root)       /*!< in: memory for table names */
 {
   const trx_t *trx;
   ulint count = 0;
 
-  ut_ad(xid_list);
+  ut_ad(txn_list);
   ut_ad(len);
 
   /* We should set those transactions which are in the prepared state
@@ -2942,7 +3007,8 @@ int trx_recover_for_mysql(XID *xid_list, /*!< in/out: prepared transactions */
     trx_sys->mutex. It may change to PREPARED, but not if
     trx->is_recovered. It may also change to COMMITTED. */
     if (trx_state_eq(trx, TRX_STATE_PREPARED)) {
-      xid_list[count] = *trx->xid;
+      if (get_info_about_prepared_transaction(&txn_list[count], trx, mem_root))
+        break;
 
       if (count == 0) {
         ib::info(ER_IB_MSG_1207) << "Starting recovery for"

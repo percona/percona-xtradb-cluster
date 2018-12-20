@@ -35,7 +35,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <stddef.h>
 
 #include "my_dbug.h"
-#include "my_inttypes.h"
+
 #include "rem0cmp.h"
 #include "sql/current_thd.h"
 #include "sql/sql_thd_internal_api.h"
@@ -441,6 +441,9 @@ void btr_pcur_move_to_next_page(
   next_block = btr_block_get(page_id_t(block->page.id.space(), next_page_no),
                              block->page.size, mode,
                              btr_pcur_get_btr_cur(cursor)->index, mtr);
+
+  if (!next_block && !btr_pcur_get_btr_cur(cursor)->index->table->is_readable())
+    return; /* decryption failure */
 
   next_page = buf_block_get_frame(next_block);
 

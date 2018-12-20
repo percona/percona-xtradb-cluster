@@ -913,11 +913,6 @@ class ha_tokudb : public handler {
                            int direction, THD *thd, uchar *buf,
                            DBT *key_to_compare);
 
-#if defined(TOKU_INCLUDE_ROW_TYPE_COMPRESSION) && \
-    TOKU_INCLUDE_ROW_TYPE_COMPRESSION
-  enum row_type get_row_type() const;
-#endif  // defined(TOKU_INCLUDE_ROW_TYPE_COMPRESSION) &&
-        // TOKU_INCLUDE_ROW_TYPE_COMPRESSION
  private:
   int read_full_row(uchar *buf);
   int __close();
@@ -982,6 +977,15 @@ class ha_tokudb : public handler {
 
 static inline bool key_is_clustering(const KEY *key) {
   return key->flags & HA_CLUSTERING;
+}
+
+static inline ulong index_flags(const KEY *key) {
+  ulong flags = (HA_READ_NEXT | HA_READ_PREV | HA_READ_ORDER | HA_KEYREAD_ONLY |
+                 HA_READ_RANGE | HA_DO_INDEX_COND_PUSHDOWN);
+  if (key_is_clustering(key)) {
+    flags |= HA_CLUSTERED_INDEX;
+  }
+  return flags;
 }
 
 #endif  // _HA_TOKUDB_H

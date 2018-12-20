@@ -24,7 +24,6 @@ SET SESSION wsrep_on=ON;
 CREATE TEMPORARY TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 DROP TABLE t1;
---let $local_uuid = `SELECT LEFT(@@global.gtid_executed, 36)`
 
 #
 # A mix of normal and temporary tables
@@ -89,15 +88,18 @@ INSERT INTO t1 VALUES (2);
 DROP TABLE t1;
 DROP TABLE t1;
 
---connection node_2
+--connection node_1
+--let $local_uuid = `SELECT LEFT(@@global.gtid_executed, 36)`
 --let $cluster_uuid = `SELECT LEFT(@@global.gtid_executed, 36)`
 
---connection node_1
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
 --replace_result $local_uuid <local_uuid> $cluster_uuid <cluster_uuid>
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 
 --connection node_2
+--let $local_uuid = `SELECT LEFT(@@global.gtid_executed, 36)`
+--let $cluster_uuid = `SELECT LEFT(@@global.gtid_executed, 36)`
+
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
 --replace_result $local_uuid <local_uuid> $cluster_uuid <cluster_uuid>
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;

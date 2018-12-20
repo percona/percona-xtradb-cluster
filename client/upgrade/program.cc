@@ -604,8 +604,9 @@ class Program : public Base::Abstract_connection_program {
         message.get_message_type() == Message_type_error) {
       message.print_error(this->get_name());
     }
-    if (this->m_ignore_errors == false &&
-        message.get_message_type() == Message_type_error) {
+    if ((this->m_ignore_errors == false &&
+         message.get_message_type() == Message_type_error) ||
+        (message.is_fatal())) {
       return message.get_code();
     }
     return 0;
@@ -659,7 +660,7 @@ class Program : public Base::Abstract_connection_program {
            strcmp(*(query_ptr + 1), "SHOW WARNINGS;\n") == 0);
 
       result = runner.run_query(*query_ptr);
-      if (!this->m_ignore_errors && result != 0) {
+      if (result != 0) {
         return result;
       }
     }
@@ -691,7 +692,7 @@ class Program : public Base::Abstract_connection_program {
     for (query_ptr = &mysql_system_tables_data_fix[0]; *query_ptr != NULL;
          query_ptr++) {
       result = runner.run_query(*query_ptr);
-      if (!this->m_ignore_errors && result != 0) {
+      if (result != 0) {
         return result;
       }
     }
@@ -719,7 +720,7 @@ class Program : public Base::Abstract_connection_program {
 
     for (query_ptr = &mysql_sys_schema[0]; *query_ptr != NULL; query_ptr++) {
       result = runner.run_query(*query_ptr);
-      if (!this->m_ignore_errors && result != 0) {
+      if (result != 0) {
         return result;
       }
     }
@@ -919,9 +920,11 @@ class Program : public Base::Abstract_connection_program {
    */
   bool is_expected_error(int64 error_no) {
     static const int64 expected_errors[] = {
-        ER_DUP_FIELDNAME,   /* Duplicate column name */
-        ER_DUP_KEYNAME,     /* Duplicate key name */
-        ER_BAD_FIELD_ERROR, /* Unknown column */
+        ER_DUP_FIELDNAME,                           /* Duplicate column name */
+        ER_DUP_KEYNAME,                             /* Duplicate key name */
+        ER_BAD_FIELD_ERROR,                         /* Unknown column */
+        ER_COL_COUNT_DOESNT_MATCH_PLEASE_UPDATE_V2, /* Please use mysql_upgrade
+                                                       to fix this error */
         0};
 
     const int64 *expected_error = expected_errors;

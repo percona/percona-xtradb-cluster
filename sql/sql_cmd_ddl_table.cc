@@ -375,7 +375,7 @@ bool Sql_cmd_create_table::execute(THD *thd) {
                                      create_table->table_name, NULL)) {
           if (!thd->lex->is_ignore() && thd->is_strict_mode())
             thd->pop_internal_handler();
-          goto error;
+          return true;
         }
 #endif /* WITH_WSREP */
 
@@ -397,11 +397,6 @@ bool Sql_cmd_create_table::execute(THD *thd) {
     }
   }
   return res;
-
-#ifdef WITH_WSREP
-error:
-  return true;
-#endif /* WITH_WSREP */
 }
 
 bool Sql_cmd_create_or_drop_index_base::execute(THD *thd) {

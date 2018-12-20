@@ -33,12 +33,12 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "page0cur.h"
 
-#include <algorithm>
 #include "btr0btr.h"
 #include "ha_prototypes.h"
 #include "log0recv.h"
 #include "mtr0log.h"
-#include "my_inttypes.h"
+
+#include <algorithm>
 #include "page0zip.h"
 
 #ifndef UNIV_HOTBACKUP
@@ -2106,7 +2106,7 @@ void page_copy_rec_list_end_to_created_page(
   mtr_log_t log_mode;
 
   if (index->table->is_temporary() ||
-      index->table->ibd_file_missing /* IMPORT TABLESPACE */) {
+      index->table->file_unreadable /* IMPORT TABLESPACE */) {
     log_mode = mtr_get_log_mode(mtr);
   } else {
     log_mode = mtr_set_log_mode(mtr, MTR_LOG_SHORT_INSERTS);

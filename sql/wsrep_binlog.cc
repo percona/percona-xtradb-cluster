@@ -33,66 +33,71 @@
               in output, function sets the actual length of buffer after
               all appends
  */
-int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len) {
-  my_off_t const saved_pos(my_b_tell(cache));
+int wsrep_write_cache_buf(IO_CACHE_binlog_cache_storage *cache, uchar **buf,
+                          size_t *buf_len) {
 
-  if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0)) {
+  my_off_t const saved_pos(cache->position());
+
+  unsigned char* read_pos = NULL;
+  my_off_t read_len = 0;
+
+  if (cache->begin(&read_pos, &read_len)) {
     WSREP_ERROR("Failed to initialize io-cache");
     return ER_ERROR_ON_WRITE;
   }
 
-  uint length = my_b_bytes_in_cache(cache);
-  if (unlikely(0 == length)) length = my_b_fill(cache);
+  if (read_len == 0 && cache->next(&read_pos, &read_len)) {
+    WSREP_ERROR("Failed to read from io-cache");
+    return ER_ERROR_ON_WRITE;
+  }
 
   size_t total_length = *buf_len;
 
-  if (likely(length > 0)) do {
-      total_length += length;
-      /*
-        Bail out if buffer grows too large.
-        A temporary fix to avoid allocating indefinitely large buffer,
-        not a real limit on a writeset size which includes other things
-        like header and keys.
-      */
-      if (total_length > wsrep_max_ws_size) {
-        WSREP_WARN("Transaction/Write-set size limit (%lu) exceeded: %zu",
-                   wsrep_max_ws_size, total_length);
-        goto error;
-      }
+  while (read_len > 0) {
+    total_length += read_len;
 
-      uchar *tmp =
-          (uchar *)my_realloc(key_memory_wsrep, *buf, total_length, MYF(0));
-      if (!tmp) {
-        WSREP_ERROR(
-            "Fail to allocate/reallocate memory to hold"
-            " write-set for replication."
-            " Existing Size: %zu, Requested Size: %lu",
-            *buf_len, (long unsigned)total_length);
-        goto error;
-      }
-      *buf = tmp;
+    /*
+      Bail out if buffer grows too large.
+      A temporary fix to avoid allocating indefinitely large buffer,
+      not a real limit on a writeset size which includes other things
+      like header and keys.
+    */
+    if (total_length > wsrep_max_ws_size) {
+      WSREP_WARN("Transaction/Write-set size limit (%lu) exceeded: %zu",
+                 wsrep_max_ws_size, total_length);
+      goto error;
+    }
 
-      memcpy(*buf + *buf_len, cache->read_pos, length);
-      *buf_len = total_length;
-      cache->read_pos = cache->read_end;
-    } while ((cache->file >= 0) && (length = my_b_fill(cache)));
+    uchar *tmp =
+        (uchar *)my_realloc(key_memory_wsrep, *buf, total_length, MYF(0));
+    if (!tmp) {
+      WSREP_ERROR(
+          "Fail to allocate/reallocate memory to hold"
+          " write-set for replication."
+          " Existing Size: %zu, Requested Size: %lu",
+          *buf_len, (long unsigned)total_length);
+      goto error;
+    }
+    *buf = tmp;
 
-  if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0)) {
-    WSREP_WARN("Failed to initialize io-cache");
-    goto cleanup;
+    memcpy(*buf + *buf_len, read_pos, read_len);
+    *buf_len = total_length;
+    cache->next(&read_pos, &read_len);
   }
 
-  if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0)) {
-    WSREP_ERROR("Failed to initialize io-cache");
+  if (cache->truncate(saved_pos)) {
+    WSREP_WARN("Failed to reinitialize io-cache");
     goto cleanup;
   }
 
   return 0;
 
 error:
-  if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0)) {
-    WSREP_WARN("Failed to initialize io-cache");
+
+  if (cache->truncate(saved_pos)) {
+    WSREP_WARN("Failed to reinitialize io-cache");
   }
+
 cleanup:
   my_free(*buf);
   *buf = NULL;
@@ -135,10 +140,14 @@ static inline wsrep_status_t wsrep_append_data(wsrep_t *const wsrep,
   writeset at once.
  */
 static int wsrep_write_cache_once(wsrep_t *const wsrep, THD *const thd,
-                                  IO_CACHE *const cache, size_t *const len) {
-  my_off_t const saved_pos(my_b_tell(cache));
+                                  IO_CACHE_binlog_cache_storage *const cache,
+                                  size_t *const len) {
+  my_off_t const saved_pos(cache->position());
 
-  if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0)) {
+  unsigned char *read_pos = NULL;
+  my_off_t read_len = 0;
+
+  if (cache->begin(&read_pos, &read_len)) {
     WSREP_ERROR("Failed to initialize io-cache");
     return ER_ERROR_ON_WRITE;
   }
@@ -151,8 +160,6 @@ static int wsrep_write_cache_once(wsrep_t *const wsrep, THD *const thd,
   uchar *buf(stack_buf);
   size_t allocated(sizeof(stack_buf));
   size_t used(0);
-
-  uint length(my_b_bytes_in_cache(cache));
 
   /* If galera node is acting as independent slave then GTID event that is
   captured during processing of relay log should be cached and appended to
@@ -203,49 +210,54 @@ static int wsrep_write_cache_once(wsrep_t *const wsrep, THD *const thd,
     total_length += gtid_len;
   }
 
-  if (unlikely(0 == length)) length = my_b_fill(cache);
 
-  if (likely(length > 0)) do {
-      total_length += length;
-      /*
-        Bail out if buffer grows too large.
-        A temporary fix to avoid allocating indefinitely large buffer,
-        not a real limit on a writeset size which includes other things
-        like header and keys.
-      */
-      if (unlikely(total_length > wsrep_max_ws_size)) {
-        WSREP_WARN("Transaction/Write-set size limit (%lu) exceeded: %zu",
-                   wsrep_max_ws_size, total_length);
+  if (read_len == 0 && cache->next(&read_pos, &read_len)) {
+    WSREP_ERROR("Failed to read from io-cache");
+    return ER_ERROR_ON_WRITE;
+  }
+
+  while (read_len > 0) {
+    total_length += read_len;
+
+    /*
+      Bail out if buffer grows too large.
+      A temporary fix to avoid allocating indefinitely large buffer,
+      not a real limit on a writeset size which includes other things
+      like header and keys.
+    */
+    if (unlikely(total_length > wsrep_max_ws_size)) {
+      WSREP_WARN("Transaction/Write-set size limit (%lu) exceeded: %zu",
+                 wsrep_max_ws_size, total_length);
+      err = WSREP_TRX_SIZE_EXCEEDED;
+      goto cleanup;
+    }
+
+    if (total_length > allocated) {
+      size_t const new_size(heap_size(total_length));
+      uchar *tmp =
+          (uchar *)my_realloc(key_memory_wsrep, heap_buf, new_size, MYF(0));
+      if (!tmp) {
+        WSREP_ERROR(
+            "Failed to allocate/reallocate memory to hold"
+            " write-set for replication."
+            " Existing Size: %zu, Requested Size: %lu",
+            allocated, (long unsigned)new_size);
         err = WSREP_TRX_SIZE_EXCEEDED;
         goto cleanup;
       }
 
-      if (total_length > allocated) {
-        size_t const new_size(heap_size(total_length));
-        uchar *tmp =
-            (uchar *)my_realloc(key_memory_wsrep, heap_buf, new_size, MYF(0));
-        if (!tmp) {
-          WSREP_ERROR(
-              "Failed to allocate/reallocate memory to hold"
-              " write-set for replication."
-              " Existing Size: %zu, Requested Size: %lu",
-              allocated, (long unsigned)new_size);
-          err = WSREP_TRX_SIZE_EXCEEDED;
-          goto cleanup;
-        }
+      heap_buf = tmp;
+      buf = heap_buf;
+      allocated = new_size;
 
-        heap_buf = tmp;
-        buf = heap_buf;
-        allocated = new_size;
+      if (used <= STACK_SIZE && used > 0)  // there's data in stack_buf
+        memcpy(heap_buf, stack_buf, used);
+    }
 
-        if (used <= STACK_SIZE && used > 0)  // there's data in stack_buf
-          memcpy(heap_buf, stack_buf, used);
-      }
-
-      memcpy(buf + used, cache->read_pos, length);
-      used = total_length;
-      cache->read_pos = cache->read_end;
-    } while ((cache->file >= 0) && (length = my_b_fill(cache)));
+    memcpy(buf + used, read_pos, read_len);
+    used = total_length;
+    cache->next(&read_pos, &read_len);
+  }
 
   if (used > 0)
     err = wsrep_append_data(wsrep, &thd->wsrep_ws_handle, buf, used);
@@ -253,8 +265,9 @@ static int wsrep_write_cache_once(wsrep_t *const wsrep, THD *const thd,
   if (WSREP_OK == err) *len = total_length;
 
 cleanup:
-  if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0)) {
-    WSREP_ERROR("Failed to reinitialize io-cache");
+
+  if (cache->truncate(saved_pos)) {
+    WSREP_WARN("Failed to reinitialize io-cache");
   }
 
   if (unlikely(WSREP_OK != err)) wsrep_dump_rbr_buf(thd, buf, used);
@@ -276,18 +289,21 @@ cleanup:
   This version uses incremental data appending as it reads it from cache.
  */
 static int wsrep_write_cache_inc(wsrep_t *const wsrep, THD *const thd,
-                                 IO_CACHE *const cache, size_t *const len) {
-  my_off_t const saved_pos(my_b_tell(cache));
+                                 IO_CACHE_binlog_cache_storage *const cache,
+                                 size_t *const len) {
+  my_off_t const saved_pos(cache->position());
 
-  if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0)) {
+  unsigned char *read_pos = NULL;
+  my_off_t read_len = 0;
+
+  if (cache->begin(&read_pos, &read_len)) {
     WSREP_ERROR("Failed to initialize io-cache");
-    return WSREP_TRX_ERROR;
+    return ER_ERROR_ON_WRITE;
   }
 
   int err(WSREP_OK);
 
   size_t total_length(*len);
-  uint length(my_b_bytes_in_cache(cache));
 
   if (thd->wsrep_gtid_event_buf) {
     if (WSREP_OK != (err = wsrep_append_data(wsrep, &thd->wsrep_ws_handle,
@@ -312,33 +328,38 @@ static int wsrep_write_cache_inc(wsrep_t *const wsrep, THD *const thd,
     total_length += gtid_len;
   }
 
-  if (unlikely(0 == length)) length = my_b_fill(cache);
+  if (read_len == 0 && cache->next(&read_pos, &read_len)) {
+    WSREP_ERROR("Failed to read from io-cache");
+    return ER_ERROR_ON_WRITE;
+  }
 
-  if (likely(length > 0)) do {
-      total_length += length;
-      /* bail out if buffer grows too large
-         not a real limit on a writeset size which includes other things
-         like header and keys.
-      */
-      if (unlikely(total_length > wsrep_max_ws_size)) {
-        WSREP_WARN("Transaction/Write-set size limit (%lu) exceeded: %zu",
-                   wsrep_max_ws_size, total_length);
-        err = WSREP_TRX_SIZE_EXCEEDED;
-        goto cleanup;
-      }
+  while (read_len > 0) {
+    total_length += read_len;
 
-      if (WSREP_OK != (err = wsrep_append_data(wsrep, &thd->wsrep_ws_handle,
-                                               cache->read_pos, length)))
-        goto cleanup;
+    /* bail out if buffer grows too large
+       not a real limit on a writeset size which includes other things
+       like header and keys.
+    */
+    if (unlikely(total_length > wsrep_max_ws_size)) {
+      WSREP_WARN("Transaction/Write-set size limit (%lu) exceeded: %zu",
+                 wsrep_max_ws_size, total_length);
+      err = WSREP_TRX_SIZE_EXCEEDED;
+      goto cleanup;
+    }
 
-      cache->read_pos = cache->read_end;
-    } while ((cache->file >= 0) && (length = my_b_fill(cache)));
+    if (WSREP_OK != (err = wsrep_append_data(wsrep, &thd->wsrep_ws_handle,
+                                             read_pos, read_len)))
+      goto cleanup;
+
+    cache->next(&read_pos, &read_len);
+  }
 
   if (WSREP_OK == err) *len = total_length;
 
 cleanup:
-  if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0)) {
-    WSREP_ERROR("Failed to reinitialize io-cache");
+
+  if (cache->truncate(saved_pos)) {
+    WSREP_WARN("Failed to re-initialize io-cache");
   }
 
   if (thd->wsrep_gtid_event_buf) my_free(thd->wsrep_gtid_event_buf);
@@ -355,7 +376,8 @@ cleanup:
   with the exception that here we write in buffer instead of log file.
  */
 int wsrep_write_cache(wsrep_t *const wsrep, THD *const thd,
-                      IO_CACHE *const cache, size_t *const len) {
+                      IO_CACHE_binlog_cache_storage *const cache,
+                      size_t *const len) {
   if (wsrep_incremental_data_collection) {
     return wsrep_write_cache_inc(wsrep, thd, cache, len);
   } else {

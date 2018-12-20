@@ -55,7 +55,7 @@ ExecStartPost=@bindir@/mysqld_pre_systemd --post %I
 EnvironmentFile=-/etc/sysconfig/mysql
 
 # Sets open_files_limit
-LimitNOFILE = 5000
+LimitNOFILE = 10000
 
 Restart=on-failure
 
@@ -64,5 +64,8 @@ Restart=on-failure
 RestartSec=1
 
 RestartPreventExitStatus=1
+
+# Set enviroment variable MYSQLD_PARENT_PID. This is required for restart.
+#Environment=MYSQLD_PARENT_PID=1
 
 PrivateTmp=false

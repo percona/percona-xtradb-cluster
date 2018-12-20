@@ -59,6 +59,8 @@ SERVICE_TYPE(log_builtins_string) *log_bs = nullptr;
 
 static handler *tokudb_create_handler(handlerton *hton, TABLE_SHARE *table,
                                       bool partitioned, MEM_ROOT *mem_root);
+/** Return partitioning flags. */
+static uint tokudb_partition_flags();
 
 static void tokudb_print_error(const DB_ENV *db_env, const char *db_errpfx,
                                const char *buffer);
@@ -72,7 +74,9 @@ static void tokudb_kill_connection(handlerton *hton, THD *thd);
 static int tokudb_commit(handlerton *hton, THD *thd, bool all);
 static int tokudb_rollback(handlerton *hton, THD *thd, bool all);
 static int tokudb_xa_prepare(handlerton *hton, THD *thd, bool all);
-static int tokudb_xa_recover(handlerton *hton, XID *xid_list, uint len);
+static int tokudb_xa_recover(handlerton *hton, XA_recover_txn *txn_list,
+                             uint len, MEM_ROOT *mem_root);
+
 static xa_status_code tokudb_commit_by_xid(handlerton *hton, XID *xid);
 static xa_status_code tokudb_rollback_by_xid(handlerton *hton, XID *xid);
 static int tokudb_rollback_to_savepoint(handlerton *hton, THD *thd,
@@ -156,6 +160,9 @@ static char *tokudb_home;
 // static ulong tokudb_region_size = 0;
 // static ulong tokudb_cache_parts = 1;
 const char *tokudb_hton_name = "TokuDB";
+
+// All TokuDB and PerconaFT exts that might appear in a database dir
+static const char *ha_tokudb_exts[]{".tokudb", nullptr};
 
 #if defined(_WIN32)
 extern "C" {
@@ -292,6 +299,7 @@ static int tokudb_init_func(void *p) {
 #endif
 
   tokudb_hton->create = tokudb_create_handler;
+  tokudb_hton->partition_flags = tokudb_partition_flags;
   tokudb_hton->close_connection = tokudb_close_connection;
   tokudb_hton->kill_connection = tokudb_kill_connection;
 
@@ -316,6 +324,7 @@ static int tokudb_init_func(void *p) {
   tokudb_hton->panic = tokudb_end;
   tokudb_hton->flush_logs = tokudb_flush_logs;
   tokudb_hton->show_status = tokudb_show_status;
+  tokudb_hton->file_extensions = ha_tokudb_exts;
 
   if (!tokudb_home) tokudb_home = mysql_real_data_home;
   DBUG_PRINT("info", ("tokudb_home: %s", tokudb_home));
@@ -565,10 +574,21 @@ static int tokudb_done_func(TOKUDB_UNUSED(void *p)) {
 }
 
 static handler *tokudb_create_handler(handlerton *hton, TABLE_SHARE *table,
-                                      TOKUDB_UNUSED(bool partitioned),
-                                      MEM_ROOT *mem_root) {
+                                      bool partitioned, MEM_ROOT *mem_root) {
+  if (partitioned) {
+    DBUG_ASSERT(partitioned);
+    ha_tokupart *file = new (mem_root) ha_tokupart(hton, table);
+    if (file && file->init_partitioning(mem_root)) {
+      destroy(file);
+      return (nullptr);
+    }
+    return (file);
+  }
+
   return new (mem_root) ha_tokudb(hton, table);
 }
+
+static uint tokudb_partition_flags() { return HA_CANNOT_PARTITION_FK; }
 
 int tokudb_end(TOKUDB_UNUSED(handlerton *hton),
                TOKUDB_UNUSED(ha_panic_function type)) {
@@ -869,21 +889,35 @@ static int tokudb_xa_prepare(handlerton *hton, THD *thd, bool all) {
   TOKUDB_DBUG_RETURN(r);
 }
 
-static int tokudb_xa_recover(TOKUDB_UNUSED(handlerton *hton), XID *xid_list,
-                             uint len) {
+static int tokudb_xa_recover(TOKUDB_UNUSED(handlerton *hton),
+                             XA_recover_txn *txn_list, uint len,
+                             TOKUDB_UNUSED(MEM_ROOT *mem_root)) {
   TOKUDB_DBUG_ENTER("");
   TOKUDB_TRACE_FOR_FLAGS(TOKUDB_DEBUG_XA, "enter");
   int r = 0;
-  if (len == 0 || xid_list == NULL) {
+  if (len == 0 || txn_list == NULL) {
     TOKUDB_TRACE_FOR_FLAGS(TOKUDB_DEBUG_XA, "exit %d", 0);
     TOKUDB_DBUG_RETURN(0);
   }
+  std::vector<TOKU_XA_XID> xids;
+  xids.resize(len);
+
   long num_returned = 0;
-  r = db_env->txn_xa_recover(db_env, (TOKU_XA_XID *)xid_list, len,
+  r = db_env->txn_xa_recover(db_env, &xids[0], len,
                              &num_returned, DB_NEXT);
+
+  uint count = 0;
+  for (; count < num_returned; count++) {
+    const auto &trans = xids[count];
+    txn_list[count].id.set(trans.formatID, trans.data, trans.gtrid_length,
+                           trans.data + trans.gtrid_length, trans.bqual_length);
+
+    txn_list[count].mod_tables = new (mem_root) List<st_handler_tablename>();
+    if (!txn_list[count].mod_tables) break;
+  }
   assert_always(r == 0);
-  TOKUDB_TRACE_FOR_FLAGS(TOKUDB_DEBUG_XA, "exit %ld", num_returned);
-  TOKUDB_DBUG_RETURN((int)num_returned);
+  TOKUDB_TRACE_FOR_FLAGS(TOKUDB_DEBUG_XA, "exit %d", count);
+  TOKUDB_DBUG_RETURN((int)count);
 }
 
 static xa_status_code tokudb_commit_by_xid(TOKUDB_UNUSED(handlerton *hton),

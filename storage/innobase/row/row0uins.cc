@@ -40,7 +40,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ibuf0ibuf.h"
 #include "log0log.h"
 #include "mach0data.h"
-#include "my_inttypes.h"
 #include "que0que.h"
 #include "row0log.h"
 #include "row0row.h"
@@ -311,7 +310,7 @@ static void row_undo_ins_parse_undo_rec(undo_node_t *node, MDL_ticket **mdl) {
 
   /* Skip the UNDO if we can't find the table or the .ibd file. */
   if (node->table == NULL) {
-  } else if (node->table->ibd_file_missing) {
+  } else if (node->table->file_unreadable) {
   close_table:
     dd_table_close(node->table, current_thd, mdl, false);
 

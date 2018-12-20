@@ -18,7 +18,6 @@ Usage: $0 [OPTIONS]
         --install_deps      Install build dependencies(root previlages are required)
         --branch            Branch for build
         --repo              Repo for build
-        --yassl             build tarball with yassl
         --perconaft_repo    PerconaFT repo
         --perconaft_branch  Branch for PerconaFT
         --tokubackup_repo   TokuBackup repo
@@ -57,7 +56,6 @@ parse_arguments() {
             --branch=*) BRANCH="$val" ;;
             --repo=*) REPO="$val" ;;
             --install_deps=*) INSTALL="$val" ;;
-            --yassl=*) YASSL="$val" ;;
             --perconaft_branch=*) PERCONAFT_BRANCH="$val" ;;
             --tokubackup_branch=*) 	TOKUBACKUP_BRANCH="$val" ;;
             --perconaft_repo=*) PERCONAFT_REPO="$val" ;;
@@ -120,7 +118,6 @@ deb-src http://jenkins.percona.com/apt-repo/ @@DIST@@ main
 EOL
     sed -i "s:@@DIST@@:$OS_NAME:g" /etc/apt/sources.list.d/percona-dev.list
   fi
-  
   add_key="apt-key adv --keyserver ha.pool.sks-keyservers.net --recv-keys 9334A25F8507EFA5"
   until ${add_key}; do
     sleep 1
@@ -181,9 +178,10 @@ get_sources(){
 
     if [ -z "${DESTINATION:-}" ]; then
         export DESTINATION=experimental
-    fi 
+    fi
+    TIMESTAMP=$(date "+%Y%m%d-%H%M%S") 
     echo "DESTINATION=${DESTINATION}" >> ../percona-server-8.0.properties
-    echo "UPLOAD=UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH_NAME}/${REVISION}" >> ../percona-server-8.0.properties
+    echo "UPLOAD=UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH_NAME}/${REVISION}/${TIMESTAMP}" >> ../percona-server-8.0.properties
 
     rm -rf storage/tokudb/PerconaFT
     rm -rf plugin/tokudb-backup-plugin/Percona-TokuBackup
@@ -514,10 +512,10 @@ build_rpm(){
         echo "It is not possible to build rpm here"
         exit 1
     fi
-    SRC_RPM=$(basename $(find $WORKDIR/srpm -name 'Percona-Server-*.src.rpm' | sort | tail -n1))
+    SRC_RPM=$(basename $(find $WORKDIR/srpm -name 'percona-server-*.src.rpm' | sort | tail -n1))
     if [ -z $SRC_RPM ]
     then
-        SRC_RPM=$(basename $(find $CURDIR/srpm -name 'Percona-Server-*.src.rpm' | sort | tail -n1))
+        SRC_RPM=$(basename $(find $CURDIR/srpm -name 'percona-server-*.src.rpm' | sort | tail -n1))
         if [ -z $SRC_RPM ]
         then
             echo "There is no src rpm for build"
@@ -590,11 +588,12 @@ build_source_deb(){
     TMPREL=$(echo ${TARFILE}| awk -F '-' '{print $4}')
     RELEASE=${TMPREL%.tar.gz}
 
-    NEWTAR=${NAME}-${SHORTVER}_${VERSION}-${RELEASE}.orig.tar.gz
+    NEWTAR=percona-server_${VERSION}-${RELEASE}.orig.tar.gz
     mv ${TARFILE} ${NEWTAR}
 
     tar xzf ${NEWTAR}
-    cd ${NAME}-${VERSION}-${RELEASE}
+    ls -la
+    cd percona-server-${VERSION}-${RELEASE}
     cp -ap build-ps/debian/ .
     dch -D unstable --force-distribution -v "${VERSION}-${RELEASE}-${DEB_RELEASE}" "Update to new upstream release Percona Server ${VERSION}-${RELEASE}-1"
     dpkg-buildpackage -S
@@ -635,8 +634,8 @@ build_deb(){
 
     DSC=$(basename $(find . -name '*.dsc' | sort | tail -n 1))
     DIRNAME=$(echo ${DSC%-${DEB_RELEASE}.dsc} | sed -e 's:_:-:g')
-    VERSION=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $4}')
-    RELEASE=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $5}')
+    VERSION=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $3}')
+    RELEASE=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $4}')
     ARCH=$(uname -m)
     export EXTRAVER=${MYSQL_VERSION_EXTRA#-}
     #
@@ -718,16 +717,14 @@ build_tarball(){
     #
     export CFLAGS=$(rpm --eval %{optflags} | sed -e "s|march=i386|march=i686|g")
     export CXXFLAGS="${CFLAGS}"
-    if [ "${YASSL}" = 0 ]; then
-        if [ -f /etc/redhat-release ]; then
-            SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//')
-            export SSL_VER=".ssl${SSL_VER_TMP}"
-        else
-            SSL_VER_TMP=$(dpkg -l|grep -i libssl|grep -v "libssl\-"|head -n1|awk '{print $2}'|awk -F ":" '{print $1}'|sed 's/libssl/ssl/g'|sed 's/\.//g')
-            export SSL_VER=".${SSL_VER_TMP}"
-        fi
+    if [ -f /etc/redhat-release ]; then
+        SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//')
+        export SSL_VER=".ssl${SSL_VER_TMP}"
+    else
+        SSL_VER_TMP=$(dpkg -l|grep -i libssl|grep -v "libssl\-"|head -n1|awk '{print $2}'|awk -F ":" '{print $1}'|sed 's/libssl/ssl/g'|sed 's/\.//g')
+        export SSL_VER=".${SSL_VER_TMP}"
     fi
-    
+
     build_mecab_lib
     build_mecab_dict
     MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
@@ -743,17 +740,9 @@ build_tarball(){
     rm -fr ${TARFILE%.tar.gz}
     tar xzf ${TARFILE}
     cd ${TARFILE%.tar.gz}
-    if [ "${YASSL}" = 1 ]; then
-        DIRNAME="tarball_yassl"
-        CMAKE_OPTS="-DWITH_ROCKSDB=1" bash -xe ./build-ps/build-binary.sh --with-jemalloc=../jemalloc/ --with-yassl --with-mecab="${MECAB_INSTALL_DIR}/usr" ../TARGET
-    else
-        CMAKE_OPTS="-DWITH_ROCKSDB=1" bash -xe ./build-ps/build-binary.sh --with-mecab="${MECAB_INSTALL_DIR}/usr" --with-jemalloc=../jemalloc/ ../TARGET
+    CMAKE_OPTS="-DWITH_ROCKSDB=1" bash -xe ./build-ps/build-binary.sh --with-mecab="${MECAB_INSTALL_DIR}/usr" --with-jemalloc=../jemalloc/ ../TARGET
+    DIRNAME="tarball"
 
-        DIRNAME="tarball"
-    fi
-
-
-    
     mkdir -p ${WORKDIR}/${DIRNAME}
     mkdir -p ${CURDIR}/${DIRNAME}
     cp ../TARGET/*.tar.gz ${WORKDIR}/${DIRNAME}
@@ -784,7 +773,6 @@ REVISION=0
 BRANCH="8.0"
 RPM_RELEASE=1
 DEB_RELEASE=1
-YASSL=0
 MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
 REPO="git://github.com/percona/percona-server.git"
 PRODUCT=Percona-Server-8.0
@@ -797,9 +785,6 @@ BOOST_PACKAGE_NAME=boost_1_67_0
 PERCONAFT_BRANCH=Percona-Server-5.7.22-22
 TOKUBACKUP_BRANCH=Percona-Server-5.7.22-22
 parse_arguments PICK-ARGS-FROM-ARGV "$@"
-if [ ${YASSL} = 1 ]; then
-  TARBALL=1
-fi
 
 check_workdir
 get_system

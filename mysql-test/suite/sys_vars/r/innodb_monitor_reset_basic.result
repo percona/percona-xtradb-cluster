@@ -37,6 +37,7 @@ buffer_pool_pages_free	disabled
 buffer_pages_created	disabled
 buffer_pages_written	disabled
 buffer_pages_read	disabled
+buffer_pages0_read	disabled
 buffer_data_reads	disabled
 buffer_data_written	disabled
 buffer_flush_batch_scanned	disabled
@@ -185,9 +186,14 @@ log_partial_block_writes	disabled
 log_padded	disabled
 log_next_file	disabled
 log_checkpoints	disabled
+log_free_space	disabled
+log_concurrency_margin	disabled
 log_writer_no_waits	disabled
 log_writer_waits	disabled
 log_writer_wait_loops	disabled
+log_writer_on_file_space_waits	disabled
+log_writer_on_archiver_waits	disabled
+log_writer_on_tracker_waits	disabled
 log_flusher_no_waits	disabled
 log_flusher_waits	disabled
 log_flusher_wait_loops	disabled
@@ -215,6 +221,8 @@ compress_pages_compressed	disabled
 compress_pages_decompressed	disabled
 compression_pad_increments	disabled
 compression_pad_decrements	disabled
+pages_encrypted	disabled
+pages_decrypted	disabled
 index_page_splits	disabled
 index_page_merge_attempts	disabled
 index_page_merge_successful	disabled

@@ -101,8 +101,7 @@ Rdb_key_def::Rdb_key_def(const Rdb_key_def &k)
       m_stats(k.m_stats), m_index_flags_bitmap(k.m_index_flags_bitmap),
       m_ttl_rec_offset(k.m_ttl_rec_offset), m_ttl_duration(k.m_ttl_duration),
       m_ttl_column(k.m_ttl_column), m_pk_part_no(k.m_pk_part_no),
-      m_pack_info(k.m_pack_info), m_keyno(k.m_keyno),
-      m_key_parts(k.m_key_parts),
+      m_pack_info(nullptr), m_keyno(k.m_keyno), m_key_parts(k.m_key_parts),
       m_ttl_pk_key_part_offset(k.m_ttl_pk_key_part_offset),
       m_ttl_field_offset(UINT_MAX), m_prefix_extractor(k.m_prefix_extractor),
       m_maxlength(k.m_maxlength) {
@@ -119,13 +118,11 @@ Rdb_key_def::Rdb_key_def(const Rdb_key_def &k)
   if (k.m_pack_info) {
     const size_t size = sizeof(Rdb_field_packing) * k.m_key_parts;
 #ifdef HAVE_PSI_INTERFACE
-    m_pack_info = static_cast<Rdb_field_packing *>(
-        my_malloc(rdb_datadic_memory_key, size, MYF(0)));
+    void *buf = my_malloc(rdb_datadic_memory_key, size, MYF(0));
 #else
-    m_pack_info = static_cast<Rdb_field_packing *>(
-        my_malloc(PSI_NOT_INSTRUMENTED, size, MYF(0)));
+    void *buf = my_malloc(PSI_NOT_INSTRUMENTED, size, MYF(0));
 #endif
-    memcpy(m_pack_info, k.m_pack_info, size);
+    m_pack_info = new (buf) Rdb_field_packing(*k.m_pack_info);
   }
 
   if (k.m_pk_part_no) {
@@ -147,7 +144,10 @@ Rdb_key_def::~Rdb_key_def() {
   my_free(m_pk_part_no);
   m_pk_part_no = nullptr;
 
-  my_free(m_pack_info);
+  if (m_pack_info) {
+    m_pack_info->~Rdb_field_packing();
+    my_free(m_pack_info);
+  }
   m_pack_info = nullptr;
 }
 
@@ -222,12 +222,11 @@ void Rdb_key_def::setup(const TABLE *const tbl,
 
     const size_t size = sizeof(Rdb_field_packing) * m_key_parts;
 #ifdef HAVE_PSI_INTERFACE
-    m_pack_info = static_cast<Rdb_field_packing *>(
-        my_malloc(rdb_datadic_memory_key, size, MYF(0)));
+    void *buf = my_malloc(rdb_datadic_memory_key, size, MYF(0));
 #else
-    m_pack_info = static_cast<Rdb_field_packing *>(
-        my_malloc(PSI_NOT_INSTRUMENTED, size, MYF(0)));
+    void *buf = my_malloc(PSI_NOT_INSTRUMENTED, size, MYF(0));
 #endif
+    m_pack_info = new (buf) Rdb_field_packing;
 
     /*
       Guaranteed not to error here as checks have been made already during
@@ -1109,7 +1108,7 @@ uint Rdb_key_def::pack_record(
       // Insert TTL timestamp
       if (has_ttl() && ttl_bytes) {
         write_index_flag_field(unpack_info,
-                               reinterpret_cast<const uchar *const>(ttl_bytes),
+                               reinterpret_cast<const uchar *>(ttl_bytes),
                                Rdb_key_def::TTL_FLAG);
       }
     }
@@ -2765,17 +2764,23 @@ void Rdb_key_def::pack_with_varchar_space_pad(
   const CHARSET_INFO *const charset = field->charset();
   const auto field_var = static_cast<Field_varstring *>(field);
 
+  const char *src =
+      reinterpret_cast<const char *>(field_var->ptr + field_var->length_bytes);
+
   const size_t value_length = (field_var->length_bytes == 1)
                                   ? (uint)*field->ptr
                                   : uint2korr(field->ptr);
 
-  const size_t trimmed_len = charset->cset->lengthsp(
-      charset, (const char *)field_var->ptr + field_var->length_bytes,
-      value_length);
+  const size_t trimmed_len =
+      charset->cset->lengthsp(charset, src, value_length);
+
+  const size_t max_xfrm_len = charset->cset->charpos(
+      charset, src, src + trimmed_len, field_var->char_length());
+
   const size_t xfrm_len = charset->coll->strnxfrm(
       charset, buf, fpi->m_max_image_len, field_var->char_length(),
-      field_var->ptr + field_var->length_bytes, trimmed_len,
-      MY_STRXFRM_NOPAD_WITH_SPACE);
+      reinterpret_cast<const uchar *>(src),
+      std::min<size_t>(trimmed_len, max_xfrm_len), MY_STRXFRM_NOPAD_WITH_SPACE);
 
   /* Got a mem-comparable image in 'buf'. Now, produce varlength encoding */
   uchar *const buf_end = buf + xfrm_len;
@@ -3589,6 +3594,31 @@ static int get_segment_size_from_collation(const CHARSET_INFO *const cs) {
   DBUG_ASSERT(ret < RDB_SPACE_XFRM_SIZE);
   return ret;
 }
+
+Rdb_field_packing::Rdb_field_packing(const Rdb_field_packing &o)
+    : m_max_image_len(o.m_max_image_len),
+      m_unpack_data_len(o.m_unpack_data_len),
+      m_unpack_data_offset(o.m_unpack_data_offset),
+      m_maybe_null(o.m_maybe_null), m_varchar_charset(o.m_varchar_charset),
+      m_segment_size(o.m_segment_size),
+      m_unpack_info_uses_two_bytes(o.m_unpack_info_uses_two_bytes),
+      m_covered(o.m_covered), space_xfrm(o.space_xfrm),
+      space_xfrm_len(o.space_xfrm_len), space_mb_len(o.space_mb_len),
+      m_charset_codec(o.m_charset_codec),
+      m_unpack_info_stores_value(o.m_unpack_info_stores_value),
+      m_pack_func(o.m_pack_func),
+      m_make_unpack_info_func(o.m_make_unpack_info_func),
+      m_unpack_func(o.m_unpack_func), m_skip_func(o.m_skip_func),
+      m_keynr(o.m_keynr), m_key_part(o.m_key_part) {}
+
+Rdb_field_packing::Rdb_field_packing()
+    : m_max_image_len(0), m_unpack_data_len(0), m_unpack_data_offset(0),
+      m_maybe_null(false), m_varchar_charset(nullptr), m_segment_size(0),
+      m_unpack_info_uses_two_bytes(false), m_covered(false),
+      space_xfrm(nullptr), space_xfrm_len(0), space_mb_len(0),
+      m_charset_codec(nullptr), m_unpack_info_stores_value(false),
+      m_pack_func(nullptr), m_make_unpack_info_func(nullptr),
+      m_unpack_func(nullptr), m_skip_func(nullptr), m_keynr(0), m_key_part(0) {}
 
 /*
   @brief
@@ -4913,7 +4943,8 @@ bool Rdb_dict_manager::init(rocksdb::TransactionDB *const rdb_dict,
 
   m_db = rdb_dict;
 
-  m_system_cfh = cf_manager->get_or_create_cf(m_db, DEFAULT_SYSTEM_CF_NAME);
+  m_system_cfh =
+      cf_manager->get_or_create_cf(m_db, DEFAULT_SYSTEM_CF_NAME, true);
   rocksdb::ColumnFamilyHandle *default_cfh =
       cf_manager->get_cf(DEFAULT_CF_NAME);
 

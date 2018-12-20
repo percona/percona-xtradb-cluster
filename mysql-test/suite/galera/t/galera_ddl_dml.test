@@ -46,15 +46,15 @@ create table t3 (j int) engine=myisam;
 insert into t3 values (100), (200), (300);
 set wsrep_replicate_myisam = 0;
 
-##create compression_dictionary numbers ('percona');
-##create table tdict (
-##	id int,
-##	a blob column_format compressed,
-##	b blob column_format compressed with compression_dictionary numbers,
-##	primary key pk(id)) engine=innodb;
-##insert into tdict values (
-##	1, repeat('percona is great company', 50),
-##	repeat('percona is great company', 50));
+create compression_dictionary numbers ('percona');
+create table tdict (
+	id int,
+	a blob column_format compressed,
+	b blob column_format compressed with compression_dictionary numbers,
+	primary key pk(id)) engine=innodb;
+insert into tdict values (
+	1, repeat('percona is great company', 50),
+	repeat('percona is great company', 50));
 
 
 --connection node_2
@@ -63,9 +63,9 @@ show tables;
 select * from t1;
 select * from t2;
 select * from t3;
-##show create table tdict;
-##--echo # ensure dictionary is created
-##select * from information_schema.xtradb_zip_dict where name like '%number%';
+show create table tdict;
+--echo # ensure dictionary is created
+select * from information_schema.compression_dictionary_tables where dict_name like '%number%';
 
 --connection node_1
 --echo #node-1
@@ -85,13 +85,13 @@ select * from t3;
 drop table t1;
 drop table t2;
 drop table t3;
-##drop table tdict;
-##drop compression_dictionary numbers;
+drop table tdict;
+drop compression_dictionary numbers;
 
 --connection node_2
 --echo #node-2
-##--echo # ensure dictionary drop is replicated
-##select * from information_schema.xtradb_zip_dict where name like '%number%';
+--echo # ensure dictionary drop is replicated
+select * from information_schema.compression_dictionary_tables where dict_name like '%number%';
 
 #-------------------------------------------------------------------------------
 #

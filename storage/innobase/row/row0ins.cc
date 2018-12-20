@@ -50,9 +50,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "log0log.h"
 #include "m_string.h"
 #include "mach0data.h"
-#include "my_compiler.h"
-#include "my_dbug.h"
-#include "my_inttypes.h"
 #include "que0que.h"
 #include "rem0cmp.h"
 #include "row0ins.h"
@@ -63,6 +60,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "trx0rec.h"
 #include "trx0undo.h"
 #include "usr0sess.h"
+
+#include "my_dbug.h"
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
@@ -935,8 +934,10 @@ func_exit:
 /** Perform referential actions or checks when a parent row is deleted or
  updated and the constraint had an ON DELETE or ON UPDATE condition which was
  not RESTRICT.
- @return DB_SUCCESS, DB_LOCK_WAIT, or error code */
-static MY_ATTRIBUTE((warn_unused_result)) dberr_t
+ @return DB_SUCCESS, DB_LOCK_WAIT, or error code
+ Disable inlining because of a bug in gcc8 which may lead to stack exhaustion.
+*/
+static NO_INLINE MY_ATTRIBUTE((warn_unused_result)) dberr_t
     row_ins_foreign_check_on_constraint(
         que_thr_t *thr,          /*!< in: query thread whose run_node
                                  is an update node */
@@ -1510,7 +1511,7 @@ dberr_t row_ins_check_foreign_constraint(
     check_index = foreign->foreign_index;
   }
 
-  if (check_table == NULL || check_table->ibd_file_missing ||
+  if (check_table == NULL || !check_table->is_readable() ||
       check_index == NULL) {
     if (!srv_read_only_mode && check_ref) {
       FILE *ef = dict_foreign_err_file;
@@ -1768,6 +1769,11 @@ do_possible_lock_wait:
         break;
     }
 #endif /* WITH_WSREP */
+
+    if (trx->error_state != DB_SUCCESS) {
+      err = trx->error_state;
+      goto exit_func;
+    }
 
     thr->lock_state = QUE_THR_LOCK_NOLOCK;
 
@@ -2467,7 +2473,14 @@ and return. don't execute actual insert. */
   /* Note that we use PAGE_CUR_LE as the search mode, because then
   the function will return in both low_match and up_match of the
   cursor sensible values */
-  btr_pcur_open(index, entry, PAGE_CUR_LE, mode, &pcur, &mtr);
+  err = btr_pcur_open(index, entry, PAGE_CUR_LE, mode, &pcur, &mtr);
+
+  if (err != DB_SUCCESS) {
+    index->table->set_file_unreadable();
+    mtr.commit();
+    goto func_exit;
+  }
+
   cursor = btr_pcur_get_btr_cur(&pcur);
   cursor->thr = thr;
 
@@ -2882,7 +2895,13 @@ dberr_t row_ins_sec_index_entry_low(ulint flags, ulint mode,
   This prevents a concurrent change of index->online_status.
   The memory object cannot be freed as long as we have an open
   reference to the table, or index->table->n_ref_count > 0. */
-  const bool check = !index->is_committed();
+  bool check = !index->is_committed();
+
+  DBUG_EXECUTE_IF("idx_mimic_not_committed", {
+    check = true;
+    mode = BTR_MODIFY_TREE;
+  });
+
   if (check) {
     DEBUG_SYNC_C("row_ins_sec_index_enter");
     if (mode == BTR_MODIFY_LEAF) {
@@ -2910,9 +2929,9 @@ dberr_t row_ins_sec_index_entry_low(ulint flags, ulint mode,
     rtr_init_rtr_info(&rtr_info, false, &cursor, index, false);
     rtr_info_update_btr(&cursor, &rtr_info);
 
-    btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_RTREE_INSERT,
-                                search_mode, &cursor, 0, __FILE__, __LINE__,
-                                &mtr);
+    err = btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_RTREE_INSERT,
+                                      search_mode, &cursor, 0, __FILE__,
+                                      __LINE__, &mtr);
 
     if (mode == BTR_MODIFY_LEAF && rtr_info.mbr_adj) {
       mtr_commit(&mtr);
@@ -2926,9 +2945,9 @@ dberr_t row_ins_sec_index_entry_low(ulint flags, ulint mode,
 
       search_mode |= BTR_MODIFY_TREE;
 
-      btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_RTREE_INSERT,
-                                  search_mode, &cursor, 0, __FILE__, __LINE__,
-                                  &mtr);
+      err = btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_RTREE_INSERT,
+                                        search_mode, &cursor, 0, __FILE__,
+                                        __LINE__, &mtr);
       mode = BTR_MODIFY_TREE;
     }
 
@@ -2941,9 +2960,20 @@ dberr_t row_ins_sec_index_entry_low(ulint flags, ulint mode,
       ut_ad(cursor.page_cur.block != NULL);
       ut_ad(cursor.page_cur.block->made_dirty_with_no_latch);
     } else {
-      btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_LE, search_mode,
-                                  &cursor, 0, __FILE__, __LINE__, &mtr);
+      err =
+          btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_LE, search_mode,
+                                      &cursor, 0, __FILE__, __LINE__, &mtr);
     }
+  }
+
+  if (err != DB_SUCCESS) {
+    if (err == DB_DECRYPTION_FAILED) {
+      ib::warn() << "Table is encrypted but encryption service or"
+                    " used key_id is not available. "
+                    " Can't continue reading table.";
+      index->table->set_file_unreadable();
+    }
+    goto func_exit;
   }
 
   if (cursor.flag == BTR_CUR_INSERT_TO_IBUF) {

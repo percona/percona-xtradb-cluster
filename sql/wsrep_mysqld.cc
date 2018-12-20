@@ -59,12 +59,6 @@ bool wsrep_emulate_bin_log = false;
 /* sidno in global_sid_map corresponding to galera uuid */
 rpl_sidno wsrep_sidno = -1;
 
-/* accumulate async replication events to avoid increasing replication
-lag between async-master and cluster-node-slave.
-This was mainly due to lower cluster performance which is now fixed
-so there is no reason to keep this variable. */
-bool wsrep_preordered_opt = false;
-
 /* Begin configuration options and their default values */
 
 const char *wsrep_data_home_dir = NULL;
@@ -74,7 +68,6 @@ int wsrep_slave_count_change = 0;         // # of appliers to stop or start
 bool wsrep_debug = 0;                     // enable debug level logging
 ulong wsrep_retry_autocommit = 5;         // retry aborted autocommit trx
 bool wsrep_auto_increment_control = 1;    // control auto increment variables
-bool wsrep_drupal_282555_workaround = 1;  // retry autoinc insert after dupkey
 bool wsrep_incremental_data_collection = 0;  // incremental data collection
 ulong wsrep_max_ws_size = 1073741824UL;      // max ws (RBR buffer) size
 ulong wsrep_max_ws_rows = 65536;             // max number of rows in ws
@@ -1518,19 +1511,13 @@ bool wsrep_prepare_key_for_innodb(const uchar *cache_key, size_t cache_key_len,
  */
 int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,
                         uchar **buf, size_t *buf_len) {
-  IO_CACHE tmp_io_cache;
-  if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX, 65536,
-                       MYF(MY_WME)))
-    return 1;
-  int ret(0);
 
-#ifdef TODO
-  if (thd->variables.gtid_next.type == GTID_GROUP) {
-    Gtid_log_event gtid_ev(thd, false, &thd->variables.gtid_next);
-    if (!gtid_ev.is_valid()) ret = 0;
-    if (!ret && gtid_ev.write(&tmp_io_cache)) ret = 1;
-  }
-#endif
+  IO_CACHE_binlog_cache_storage tmp_io_cache;
+
+  if (tmp_io_cache.open(mysql_tmpdir, TEMP_PREFIX, 64 * 1024, 64 * 1024))
+    return 1;
+
+  int ret(0);
 
   /* if MySQL GTID event is set, we have to forward it in wsrep channel */
 
@@ -1553,6 +1540,7 @@ int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,
   /* continue to append the actual query */
   Query_log_event ev(thd, query, query_len, false, false, false, 0);
   if (!ret && ev.write(&tmp_io_cache)) ret = 1;
+
   if (!ret && wsrep_write_cache_buf(&tmp_io_cache, buf, buf_len)) ret = 1;
 
   /* Re-assigning so that the buf can be freed using gtid event buffer.
@@ -1561,7 +1549,7 @@ int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,
   thd->wsrep_gtid_event_buf = *buf;
   thd->wsrep_gtid_event_buf_len = *buf_len;
 
-  close_cached_file(&tmp_io_cache);
+  tmp_io_cache.close();
   return ret;
 }
 

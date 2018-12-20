@@ -1224,26 +1224,23 @@ void warn_about_deprecated_national(THD *thd)
 %token<keyword> DESCRIPTION_SYM               /* MYSQL */
 %token<keyword> ORGANIZATION_SYM              /* MYSQL */
 %token<keyword> REFERENCE_SYM                 /* MYSQL */
+%token<keyword> OPTIONAL_SYM                  /* MYSQL */
+%token<keyword> SECONDARY_ENGINE_SYM          /* MYSQL */
+%token<keyword> SECONDARY_LOAD_SYM            /* MYSQL */
+%token<keyword> SECONDARY_UNLOAD_SYM          /* MYSQL */
 
 /*
    Tokens from Percona Server 5.7 and older
 */
-%token CHANGED_PAGE_BITMAPS_SYM
+%token<keyword> CHANGED_PAGE_BITMAPS_SYM
 %token<keyword> CLIENT_STATS_SYM
 %token CLUSTERING_SYM
 %token<keyword> COMPRESSION_DICTIONARY_SYM
 %token<keyword> INDEX_STATS_SYM
 %token<keyword> TABLE_STATS_SYM
 %token<keyword> THREAD_STATS_SYM
-%token<keyword> TOKU_UNCOMPRESSED_SYM
-%token<keyword> TOKU_ZLIB_SYM
-%token<keyword> TOKU_SNAPPY_SYM
-%token<keyword> TOKU_QUICKLZ_SYM
-%token<keyword> TOKU_LZMA_SYM
-%token<keyword> TOKU_FAST_SYM
-%token<keyword> TOKU_SMALL_SYM
-%token<keyword> TOKU_DEFAULT_SYM
 %token<keyword> USER_STATS_SYM
+%token<keyword> ENCRYPTION_KEY_ID_SYM
 
 /*
    Tokens from Percona Server 8.0
@@ -1294,7 +1291,9 @@ void warn_about_deprecated_national(THD *thd)
         opt_describe_column
 
 %type <lex_cstr>
-        opt_table_alias opt_with_compression_dictionary
+        opt_table_alias
+        opt_with_compression_dictionary
+        opt_replace_password
 
 %type <lex_str_list> TEXT_STRING_sys_list
 
@@ -1302,7 +1301,7 @@ void warn_about_deprecated_national(THD *thd)
         table_ident
 
 %type <simple_string>
-        opt_db password
+        opt_db
 
 %type <string>
         text_string opt_gconcat_separator
@@ -1418,7 +1417,7 @@ void warn_about_deprecated_national(THD *thd)
         all_or_alt_part_name_list
 
 %type <key_part>
-        key_part
+        key_part key_part_with_expression
 
 %type <date_time_type> date_time_type;
 %type <interval> interval
@@ -1455,7 +1454,7 @@ void warn_about_deprecated_national(THD *thd)
 %type <keyword> ident_keyword label_keyword role_keyword
         role_or_label_keyword role_or_ident_keyword
 
-%type <lex_user> user create_or_alter_user user_func role
+%type <lex_user> user create_or_alter_user alter_user user_func role
 
 %type <charset>
         opt_collate
@@ -1710,7 +1709,7 @@ void warn_about_deprecated_national(THD *thd)
 
 %type <alter_instance_action> alter_instance_action
 
-%type <index_column_list> key_list
+%type <index_column_list> key_list key_list_with_expression
 
 %type <index_options> opt_index_options index_options  opt_fulltext_index_options
           fulltext_index_options opt_spatial_index_options spatial_index_options
@@ -1887,13 +1886,13 @@ void warn_about_deprecated_national(THD *thd)
         ts_option_engine
         ts_option_extent_size
         ts_option_file_block_size
-        ts_option_encryption
         ts_option_initial_size
         ts_option_max_size
         ts_option_nodegroup
         ts_option_redo_buffer_size
         ts_option_undo_buffer_size
         ts_option_wait
+	ts_option_encryption
 
 %type <explain_format_type> opt_explain_format_type
 
@@ -1954,7 +1953,7 @@ start_entry:
             if (!is_identifier($2, "PARSE_GCOL_EXPR"))
               MYSQL_YYABORT;
 
-            auto gcol_info= NEW_PTN Generated_column;
+            auto gcol_info= NEW_PTN Value_generator;
             if (gcol_info == NULL)
               MYSQL_YYABORT; // OOM
             ITEMIZE($4, &$4);
@@ -2736,7 +2735,7 @@ create:
           }
         | CREATE view_or_trigger_or_sp_or_event
           {}
-        | CREATE USER opt_if_not_exists create_or_alter_user_list default_role_clause
+        | CREATE USER opt_if_not_exists create_user_list default_role_clause
                       require_clause connect_options
                       opt_account_lock_password_expire_options
           {
@@ -2808,7 +2807,7 @@ create:
             Lex->create_info= YYTHD->alloc_typed<HA_CREATE_INFO>();
             if (Lex->create_info == nullptr)
               MYSQL_YYABORT; // OOM
-            Lex->create_info->options= $3;
+            Lex->create_info->options= $3 ? HA_LEX_CREATE_IF_NOT_EXISTS : 0;
             Lex->ident= $4;
             Lex->create_info->zip_dict_name = $6;
           }
@@ -2900,7 +2899,7 @@ default_role_clause:
 
 create_index_stmt:
           CREATE opt_unique_combo_clustering INDEX_SYM ident opt_index_type_clause
-          ON_SYM table_ident '(' key_list ')' opt_index_options
+          ON_SYM table_ident '(' key_list_with_expression ')' opt_index_options
           opt_index_lock_and_algorithm
           {
             $$= NEW_PTN PT_create_index_stmt(YYMEM_ROOT, $2, $4, $5,
@@ -2909,7 +2908,7 @@ create_index_stmt:
                                              $12.lock.get_or_default());
           }
         | CREATE FULLTEXT_SYM INDEX_SYM ident ON_SYM table_ident
-          '(' key_list ')' opt_fulltext_index_options opt_index_lock_and_algorithm
+          '(' key_list_with_expression ')' opt_fulltext_index_options opt_index_lock_and_algorithm
           {
             $$= NEW_PTN PT_create_index_stmt(YYMEM_ROOT, KEYTYPE_FULLTEXT, $4,
                                              NULL, $6, $8, $10,
@@ -2917,7 +2916,7 @@ create_index_stmt:
                                              $11.lock.get_or_default());
           }
         | CREATE SPATIAL_SYM INDEX_SYM ident ON_SYM table_ident
-          '(' key_list ')' opt_spatial_index_options opt_index_lock_and_algorithm
+          '(' key_list_with_expression ')' opt_spatial_index_options opt_index_lock_and_algorithm
           {
             $$= NEW_PTN PT_create_index_stmt(YYMEM_ROOT, KEYTYPE_SPATIAL, $4,
                                              NULL, $6, $8, $10,
@@ -3328,9 +3327,9 @@ sp_fdparam:
                                       NULL, NULL, &NULL_STR, 0,
                                       $2->get_interval_list(),
                                       cs ? cs : thd->variables.collation_database,
-                                      $3 != nullptr,
-                                      $2->get_uint_geom_type(), nullptr, nullptr,
-                                      {}))
+                                      $3 != nullptr, $2->get_uint_geom_type(), nullptr,
+                                      nullptr, nullptr, {},
+                                      dd::Column::enum_hidden_type::HT_VISIBLE))
             {
               MYSQL_YYABORT;
             }
@@ -3389,8 +3388,9 @@ sp_pdparam:
                                       NULL, NULL, &NULL_STR, 0,
                                       $3->get_interval_list(),
                                       cs ? cs : thd->variables.collation_database,
-                                      $4 != nullptr,
-                                      $3->get_uint_geom_type(), nullptr, nullptr, {}))
+                                      $4 != nullptr, $3->get_uint_geom_type(), nullptr,
+                                      nullptr, nullptr, {},
+                                      dd::Column::enum_hidden_type::HT_VISIBLE))
             {
               MYSQL_YYABORT;
             }
@@ -3518,9 +3518,9 @@ sp_decl:
                                         NULL, NULL, &NULL_STR, 0,
                                         $3->get_interval_list(),
                                         cs ? cs : thd->variables.collation_database,
-                                        $4 != nullptr,
-                                        $3->get_uint_geom_type(), nullptr, nullptr,
-                                        {}))
+                                        $4 != nullptr, $3->get_uint_geom_type(), nullptr,
+                                        nullptr, nullptr, {},
+                                        dd::Column::enum_hidden_type::HT_VISIBLE))
               {
                 MYSQL_YYABORT;
               }
@@ -5227,7 +5227,7 @@ tablespace_option:
         | ts_option_wait
         | ts_option_comment
         | ts_option_file_block_size
-        | ts_option_encryption
+	| ts_option_encryption
         ;
 
 opt_alter_tablespace_options:
@@ -5256,6 +5256,7 @@ alter_tablespace_option:
         | ts_option_max_size
         | ts_option_engine
         | ts_option_wait
+	| ts_option_encryption
         ;
 
 opt_logfile_group_options:
@@ -5922,6 +5923,14 @@ create_table_option:
           {
             $$= NEW_PTN PT_create_table_engine_option($3);
           }
+        | SECONDARY_ENGINE_SYM opt_equal NULL_SYM
+          {
+            $$= NEW_PTN PT_create_table_secondary_engine_option();
+          }
+        | SECONDARY_ENGINE_SYM opt_equal ident_or_text
+          {
+            $$= NEW_PTN PT_create_table_secondary_engine_option($3);
+          }
         | MAX_ROWS opt_equal ulonglong_num
           {
             $$= NEW_PTN PT_create_max_rows_option($3);
@@ -5950,6 +5959,10 @@ create_table_option:
 	  {
             $$= NEW_PTN PT_create_encryption_option($3);
 	  }
+        | ENCRYPTION_KEY_ID_SYM opt_equal real_ulong_num
+          {
+            $$= NEW_PTN PT_create_encryption_key_id_option($3);
+          }
         | AUTO_INC opt_equal ulonglong_num
           {
             $$= NEW_PTN PT_create_auto_increment_option($3);
@@ -6082,14 +6095,6 @@ row_types:
         | COMPRESSED_SYM { $$= ROW_TYPE_COMPRESSED; }
         | REDUNDANT_SYM  { $$= ROW_TYPE_REDUNDANT; }
         | COMPACT_SYM    { $$= ROW_TYPE_COMPACT; }
-        | TOKU_UNCOMPRESSED_SYM { $$= ROW_TYPE_TOKU_UNCOMPRESSED; }
-        | TOKU_ZLIB_SYM         { $$= ROW_TYPE_TOKU_ZLIB; }
-        | TOKU_SNAPPY_SYM       { $$= ROW_TYPE_TOKU_SNAPPY; }
-        | TOKU_QUICKLZ_SYM      { $$= ROW_TYPE_TOKU_QUICKLZ; }
-        | TOKU_LZMA_SYM         { $$= ROW_TYPE_TOKU_LZMA; }
-        | TOKU_FAST_SYM         { $$= ROW_TYPE_TOKU_FAST; }
-        | TOKU_SMALL_SYM        { $$= ROW_TYPE_TOKU_SMALL; }
-        | TOKU_DEFAULT_SYM      { $$= ROW_TYPE_TOKU_DEFAULT; }
         ;
 
 merge_insert_types:
@@ -6151,25 +6156,25 @@ opt_check_or_references:
         ;
 
 table_constraint_def:
-          key_or_index opt_index_name_and_type '(' key_list ')'
+          key_or_index opt_index_name_and_type '(' key_list_with_expression ')'
           opt_index_options
           {
             $$= NEW_PTN PT_inline_index_definition(KEYTYPE_MULTIPLE,
                                                    $2.name, $2.type, $4, $6);
           }
-        | FULLTEXT_SYM opt_key_or_index opt_ident '(' key_list ')'
+        | FULLTEXT_SYM opt_key_or_index opt_ident '(' key_list_with_expression ')'
           opt_fulltext_index_options
           {
             $$= NEW_PTN PT_inline_index_definition(KEYTYPE_FULLTEXT, $3, NULL,
                                                    $5, $7);
           }
-        | SPATIAL_SYM opt_key_or_index opt_ident '(' key_list ')'
+        | SPATIAL_SYM opt_key_or_index opt_ident '(' key_list_with_expression ')'
           opt_spatial_index_options
           {
             $$= NEW_PTN PT_inline_index_definition(KEYTYPE_SPATIAL, $3, NULL, $5, $7);
           }
         | opt_constraint constraint_key_type opt_index_name_and_type
-          '(' key_list ')' opt_index_options
+          '(' key_list_with_expression ')' opt_index_options
           {
             if (($1.length != 0)
                  && ($2 == (KEYTYPE_CLUSTERING | KEYTYPE_MULTIPLE)))
@@ -6616,6 +6621,10 @@ column_attribute:
           {
             $$= NEW_PTN PT_default_column_attr($2);
           }
+        | DEFAULT_SYM '(' expr ')'
+          {
+            $$= NEW_PTN PT_generated_default_val_column_attr($3);
+          }
         | ON_SYM UPDATE_SYM now
           {
             $$= NEW_PTN PT_on_update_column_attr(static_cast<uint8>($3));
@@ -6726,8 +6735,7 @@ charset_name:
               my_error(ER_UNKNOWN_CHARACTER_SET, MYF(0), $1.str);
               MYSQL_YYABORT;
             }
-            if (native_strcasecmp($1.str, "utf8") == 0)
-              push_warning(YYTHD, ER_DEPRECATED_UTF8_ALIAS);
+            YYLIP->warn_on_deprecated_charset($$, $1.str);
           }
         | BINARY_SYM { $$= &my_charset_bin; }
         ;
@@ -6760,6 +6768,7 @@ collation_name:
           {
             if (!($$= mysqld_collation_get_by_name($1.str)))
               MYSQL_YYABORT;
+            YYLIP->warn_on_deprecated_collation($$);
           }
         ;
 
@@ -7160,7 +7169,7 @@ key_list:
         | key_part
           {
             // The order is ignored.
-            $$= new (*THR_MALLOC) List<Key_part_spec>;
+            $$= NEW_PTN List<PT_key_part_specification>;
             if ($$ == NULL || $$->push_back($1))
               MYSQL_YYABORT; // OOM
           }
@@ -7169,20 +7178,45 @@ key_list:
 key_part:
           ident opt_ordering_direction
           {
-            $$= new (*THR_MALLOC) Key_part_spec(to_lex_cstring($1), 0, (enum_order) $2);
+            $$= NEW_PTN PT_key_part_specification(to_lex_cstring($1), $2, 0);
             if ($$ == NULL)
               MYSQL_YYABORT;
           }
         | ident '(' NUM ')' opt_ordering_direction
           {
-            int key_part_len= atoi($3.str);
-            if (!key_part_len)
+            int key_part_length= atoi($3.str);
+            if (!key_part_length)
             {
               my_error(ER_KEY_PART_0, MYF(0), $1.str);
             }
-            $$= new (*THR_MALLOC) Key_part_spec(to_lex_cstring($1),
-                                                (uint) key_part_len,
-                                                (enum_order) $5);
+            $$= NEW_PTN PT_key_part_specification(to_lex_cstring($1), $5,
+                                                  key_part_length);
+            if ($$ == NULL)
+              MYSQL_YYABORT; /* purecov: deadcode */
+          }
+        ;
+
+key_list_with_expression:
+          key_list_with_expression ',' key_part_with_expression
+          {
+            if ($1->push_back($3))
+              MYSQL_YYABORT; /* purecov: deadcode */
+            $$= $1;
+          }
+        | key_part_with_expression
+          {
+            // The order is ignored.
+            $$= NEW_PTN List<PT_key_part_specification>;
+            if ($$ == NULL || $$->push_back($1))
+              MYSQL_YYABORT; /* purecov: deadcode */
+          }
+        ;
+
+key_part_with_expression:
+          key_part
+        | '(' expr ')' opt_ordering_direction
+          {
+            $$= NEW_PTN PT_key_part_specification($2, $4);
             if ($$ == NULL)
               MYSQL_YYABORT;
           }
@@ -7446,7 +7480,26 @@ alter_tablespace_stmt:
           {
             Lex->m_sql_cmd= NEW_PTN Sql_cmd_alter_tablespace_rename{$3, $6};
             if (!Lex->m_sql_cmd)
-              MYSQL_YYABORT; /* purecov: inspected */ // OOM
+              MYSQL_YYABORT; // OOM
+
+            Lex->sql_command= SQLCOM_ALTER_TABLESPACE;
+          }
+        | ALTER TABLESPACE_SYM ident alter_tablespace_option_list
+          {
+            auto pc= NEW_PTN Alter_tablespace_parse_context{YYTHD};
+            if (pc == NULL)
+              MYSQL_YYABORT; // OOM
+
+            if ($4 != NULL)
+            {
+              if (YYTHD->is_error() || contextualize_array(pc, $4))
+                MYSQL_YYABORT;
+            }
+
+            Lex->m_sql_cmd=
+              NEW_PTN Sql_cmd_alter_tablespace{$3, pc};
+            if (!Lex->m_sql_cmd)
+              MYSQL_YYABORT; // OOM
 
             Lex->sql_command= SQLCOM_ALTER_TABLESPACE;
           }
@@ -7464,13 +7517,18 @@ alter_server_stmt:
         ;
 
 alter_user_stmt:
-          alter_user_command create_or_alter_user_list require_clause
+          alter_user_command alter_user_list require_clause
           connect_options opt_account_lock_password_expire_options
         | alter_user_command user_func IDENTIFIED_SYM BY TEXT_STRING
+          opt_replace_password
           {
             $2->auth.str= $5.str;
             $2->auth.length= $5.length;
             $2->uses_identified_by_clause= true;
+            if ($6.str != nullptr) {
+              $2->current_auth= $6;
+              $2->uses_replace_clause= true;
+            }
             Lex->contains_plaintext_password= true;
           }
         | alter_user_command user DEFAULT_SYM ROLE_SYM ALL
@@ -7508,6 +7566,11 @@ alter_user_stmt:
                                                  role_enum::ROLE_NAME);
             MAKE_CMD(tmp);
           }
+        ;
+
+opt_replace_password:
+          /* empty */                   { $$ = LEX_CSTRING{nullptr, 0}; }
+        | REPLACE_SYM TEXT_STRING       { $$ = to_lex_cstring($2); }
         ;
 
 alter_resource_group_stmt:
@@ -7618,6 +7681,24 @@ opt_account_lock_password_expire_option:
             lex->alter_password.password_reuse_interval= 0;
             lex->alter_password.update_password_reuse_interval= true;
             lex->alter_password.use_default_password_reuse_interval= true;
+          }
+        | PASSWORD REQUIRE_SYM CURRENT_SYM
+          {
+            LEX *lex= Lex;
+            lex->alter_password.update_password_require_current=
+                Lex_acl_attrib_udyn::YES;
+          }
+        | PASSWORD REQUIRE_SYM CURRENT_SYM DEFAULT_SYM
+          {
+            LEX *lex= Lex;
+            lex->alter_password.update_password_require_current=
+                Lex_acl_attrib_udyn::DEFAULT;
+          }
+        | PASSWORD REQUIRE_SYM CURRENT_SYM OPTIONAL_SYM
+          {
+            LEX *lex= Lex;
+            lex->alter_password.update_password_require_current=
+                Lex_acl_attrib_udyn::NO;
           }
         ;
 
@@ -7971,6 +8052,10 @@ alter_list_item:
           {
             $$= NEW_PTN PT_alter_table_set_default($3.str, $6);
           }
+        |  ALTER opt_column ident SET_SYM DEFAULT_SYM '(' expr ')'
+          {
+            $$= NEW_PTN PT_alter_table_set_default($3.str, $7);
+          }
         | ALTER opt_column ident DROP DEFAULT_SYM
           {
             $$= NEW_PTN PT_alter_table_set_default($3.str, NULL);
@@ -8008,6 +8093,14 @@ alter_list_item:
         | ORDER_SYM BY alter_order_list
           {
             $$= NEW_PTN PT_alter_table_order($3);
+          }
+        | SECONDARY_LOAD_SYM
+          {
+            $$= NEW_PTN PT_alter_table_secondary_load;
+          }
+        | SECONDARY_UNLOAD_SYM
+          {
+            $$= NEW_PTN PT_alter_table_secondary_unload;
           }
         ;
 
@@ -10361,6 +10454,9 @@ variable:
 variable_aux:
           ident_or_text SET_VAR expr
           {
+            push_warning(YYTHD, Sql_condition::SL_WARNING,
+                         ER_WARN_DEPRECATED_SYNTAX,
+                         ER_THD(YYTHD, ER_WARN_DEPRECATED_USER_SET_EXPR));
             $$= NEW_PTN PTI_variable_aux_set_var(@$, $1, $3);
           }
         | ident_or_text
@@ -11293,6 +11389,7 @@ group_list:
           }
         ;
 
+
 olap_opt:
           /* empty */   { $$= UNSPECIFIED_OLAP_TYPE; }
         | WITH_ROLLUP_SYM { $$= ROLLUP_TYPE; }
@@ -11707,7 +11804,7 @@ drop_trigger_stmt:
           }
         ;
 
-drop_tablespace_stmt:  
+drop_tablespace_stmt:
           DROP TABLESPACE_SYM ident opt_drop_ts_options
           {
             auto pc= NEW_PTN Alter_tablespace_parse_context{YYTHD};
@@ -11726,9 +11823,9 @@ drop_tablespace_stmt:
             Lex->m_sql_cmd= cmd;
             Lex->sql_command= SQLCOM_ALTER_TABLESPACE;
           }
-        
+
 drop_logfile_stmt:
-          DROP LOGFILE_SYM GROUP_SYM ident opt_drop_ts_options          
+          DROP LOGFILE_SYM GROUP_SYM ident opt_drop_ts_options
           {
             auto pc= NEW_PTN Alter_tablespace_parse_context{YYTHD};
             if (pc == NULL)
@@ -13578,12 +13675,6 @@ grouping_expr:
           {
             $$= NEW_PTN PT_order_expr($1, ORDER_NOT_RELEVANT);
           }
-        | expr ordering_direction
-          {
-            push_deprecated_warn(YYTHD, "GROUP BY with ASC/DESC",
-                                 "GROUP BY ... ORDER BY ... ASC/DESC");
-            $$= NEW_PTN PT_order_expr($1, $2);
-          }
         ;
 
 simple_ident:
@@ -13906,6 +13997,9 @@ role_or_ident_keyword:
         | ROLE_SYM
         | ROLLBACK_SYM
         | SAVEPOINT_SYM
+        | SECONDARY_ENGINE_SYM
+        | SECONDARY_LOAD_SYM
+        | SECONDARY_UNLOAD_SYM
         | SECURITY_SYM
         | SERVER_SYM
         | SIGNED_SYM
@@ -13968,6 +14062,7 @@ role_or_label_keyword:
         | CATALOG_NAME_SYM
         | CHAIN_SYM
         | CHANGED
+        | CHANGED_PAGE_BITMAPS_SYM
         | CHANNEL_SYM
         | CIPHER_SYM
         | CLASS_ORIGIN_SYM
@@ -13994,6 +14089,7 @@ role_or_label_keyword:
         | CONTEXT_SYM
         | CPU_SYM
         | ENCRYPTION_SYM
+        | ENCRYPTION_KEY_ID_SYM
         /*
           Although a reserved keyword in SQL:2003 (and :2008),
           not reserved in MySQL per WL#2111 specification.
@@ -14145,6 +14241,7 @@ role_or_label_keyword:
         | OFFSET_SYM
         | ONE_SYM
         | ONLY_SYM
+        | OPTIONAL_SYM
         | ORDINALITY_SYM
         | ORGANIZATION_SYM
         | OTHERS_SYM
@@ -14259,14 +14356,6 @@ role_or_label_keyword:
         | TIME_SYM
         | TRANSACTION_SYM
         | TRIGGERS_SYM
-        | TOKU_DEFAULT_SYM
-        | TOKU_FAST_SYM
-        | TOKU_LZMA_SYM
-        | TOKU_QUICKLZ_SYM
-        | TOKU_SMALL_SYM
-        | TOKU_SNAPPY_SYM
-        | TOKU_UNCOMPRESSED_SYM
-        | TOKU_ZLIB_SYM
         | TYPES_SYM
         | TYPE_SYM
         | UDF_RETURNS_SYM
@@ -14349,13 +14438,15 @@ start_option_value_list:
           {
             $$= NEW_PTN PT_start_option_value_list_type($1, $2);
           }
-        | PASSWORD equal password
+        | PASSWORD equal TEXT_STRING opt_replace_password
           {
-            $$= NEW_PTN PT_option_value_no_option_type_password($3, @3);
+            $$= NEW_PTN PT_option_value_no_option_type_password($3.str,
+                                                                $4.str, @4);
           }
-        | PASSWORD FOR_SYM user equal password
+        | PASSWORD FOR_SYM user equal TEXT_STRING opt_replace_password
           {
-            $$= NEW_PTN PT_option_value_no_option_type_password_for($3, $5, @5);
+            $$= NEW_PTN PT_option_value_no_option_type_password_for($3, $5.str,
+                                                                    $6.str, @6);
           }
         ;
 
@@ -14613,15 +14704,6 @@ isolation_types:
         | REPEATABLE_SYM READ_SYM  { $$= ISO_REPEATABLE_READ; }
         | SERIALIZABLE_SYM         { $$= ISO_SERIALIZABLE; }
         ;
-
-password:
-          TEXT_STRING
-          {
-            $$=$1.str;
-            Lex->contains_plaintext_password= true;
-          }
-        ;
-
 
 set_expr_or_default:
           expr
@@ -15044,7 +15126,7 @@ role_or_privilege:
         | SHOW DATABASES
           { $$= NEW_PTN PT_static_privilege(@1, SHOW_DB_ACL); }
         | SUPER_SYM
-          { 
+          {
             /* DEPRECATED */
             $$= NEW_PTN PT_static_privilege(@1, SUPER_ACL);
             if (Lex->grant != GLOBAL_ACLS)
@@ -15215,19 +15297,6 @@ role_list:
           }
         ;
 
-create_or_alter_user_list:
-          create_or_alter_user
-          {
-            if (Lex->users_list.push_back($1))
-              MYSQL_YYABORT;
-          }
-        | create_or_alter_user_list ',' create_or_alter_user
-          {
-            if (Lex->users_list.push_back($3))
-              MYSQL_YYABORT;
-          }
-        ;
-
 create_or_alter_user:
           user IDENTIFIED_SYM BY TEXT_STRING
           {
@@ -15270,6 +15339,61 @@ create_or_alter_user:
           {
             $$= $1;
             $1->auth= NULL_CSTR;
+          }
+        ;
+
+alter_user:
+         user IDENTIFIED_SYM BY TEXT_STRING REPLACE_SYM TEXT_STRING
+          {
+            $$=$1;
+            $1->auth.str= $4.str;
+            $1->auth.length= $4.length;
+            $1->uses_identified_by_clause= true;
+            $1->current_auth.str= $6.str;
+            $1->current_auth.length= $6.length;
+            $1->uses_replace_clause= true;
+            Lex->contains_plaintext_password= true;
+          }
+        | user IDENTIFIED_SYM WITH ident_or_text BY TEXT_STRING REPLACE_SYM TEXT_STRING
+          {
+            $$= $1;
+            $1->plugin.str= $4.str;
+            $1->plugin.length= $4.length;
+            $1->auth.str= $6.str;
+            $1->auth.length= $6.length;
+            $1->current_auth.str= $8.str;
+            $1->current_auth.length= $8.length;
+            $1->uses_replace_clause= true;
+            $1->uses_identified_with_clause= true;
+            $1->uses_identified_by_clause= true;
+            Lex->contains_plaintext_password= true;
+          }
+        | create_or_alter_user
+        ;
+
+create_user_list:
+          create_or_alter_user
+          {
+            if (Lex->users_list.push_back($1))
+              MYSQL_YYABORT;
+          }
+        | create_user_list ',' create_or_alter_user
+          {
+            if (Lex->users_list.push_back($3))
+              MYSQL_YYABORT;
+          }
+        ;
+
+alter_user_list:
+       alter_user
+         {
+            if (Lex->users_list.push_back($1))
+              MYSQL_YYABORT;
+         }
+       | alter_user_list ',' alter_user
+          {
+            if (Lex->users_list.push_back($3))
+              MYSQL_YYABORT;
           }
         ;
 
@@ -15864,9 +15988,9 @@ sf_tail:
                                             $9->get_type_flags(), NULL, NULL, &NULL_STR, 0,
                                             $9->get_interval_list(),
                                             cs ? cs : YYTHD->variables.collation_database,
-                                            $10 != nullptr,
-                                            $9->get_uint_geom_type(), nullptr, nullptr,
-                                            {}))
+                                            $10 != nullptr, $9->get_uint_geom_type(), nullptr,
+                                            nullptr, nullptr, {},
+                                            dd::Column::enum_hidden_type::HT_VISIBLE))
             {
               MYSQL_YYABORT;
             }
@@ -16057,7 +16181,7 @@ xid:
           }
           | text_string ',' text_string ',' ulong_num
           {
-            // check for overwflow of xid format id 
+            // check for overwflow of xid format id
             bool format_id_overflow_detected= ($5 > LONG_MAX);
 
             MYSQL_YYABORT_UNLESS($1->length() <= MAXGTRIDSIZE &&

@@ -1835,9 +1835,12 @@ MDL_wait::enum_wait_status MDL_wait::timed_wait(
     if (wsrep_thd_is_BF(owner->get_thd(), false))
       wait_result = mysql_cond_wait(&m_COND_wait_status, &m_LOCK_wait_status);
     else
-#endif /* WITH_WSREP */
       wait_result = mysql_cond_timedwait(&m_COND_wait_status,
                                          &m_LOCK_wait_status, abs_timeout);
+#else
+    wait_result = mysql_cond_timedwait(&m_COND_wait_status, &m_LOCK_wait_status,
+                                       abs_timeout);
+#endif /* WITH_WSREP */
   }
   thd_wait_end(NULL);
 
@@ -1896,6 +1899,12 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
   */
   DBUG_ASSERT(ticket->get_lock());
 #ifdef WITH_WSREP
+  /* Flow below check if the requesting thread is BF thread (applier or DDL
+  executor thread). Such thread get priority in PXC and so if the thread
+  qualifies then PXC would add this thread at top of the wait queue and
+  kill the thread that is currently holding conflicting lock.
+  This would then resume flow of next selection that would automatically
+  grant ticket to PXC applier thread since it is at the top of the queue */
   if ((this == &(ticket->get_lock()->m_waiting)) &&
       wsrep_thd_is_BF((void *)(ticket->get_ctx()->wsrep_get_thd()), false)) {
     Ticket_iterator itw(ticket->get_lock()->m_waiting);
@@ -3448,7 +3457,8 @@ void MDL_lock::object_lock_notify_conflicting_locks(MDL_context *ctx,
   while ((conflicting_ticket = it++)) {
     if (conflicting_ticket->get_ctx() != ctx &&
         (conflicting_ticket->get_type() == MDL_SHARED ||
-         conflicting_ticket->get_type() == MDL_SHARED_HIGH_PRIO)) {
+         conflicting_ticket->get_type() == MDL_SHARED_HIGH_PRIO) &&
+        conflicting_ticket->get_ctx()->get_owner()->get_thd() != nullptr) {
       MDL_context *conflicting_ctx = conflicting_ticket->get_ctx();
 
       /*
@@ -3774,6 +3784,34 @@ err:
     (*p_req)->ticket = NULL;
   }
   return true;
+}
+
+bool MDL_context::clone_tickets(const MDL_context *ticket_owner,
+                                enum_mdl_duration duration) {
+  MDL_ticket *ticket;
+  MDL_ticket_store::List_iterator it_ticket =
+      ticket_owner->m_ticket_store.list_iterator(duration);
+  bool ret = false;
+  MDL_request request;
+
+  while ((ticket = it_ticket++)) {
+    DBUG_ASSERT(ticket->m_lock);
+
+    MDL_REQUEST_INIT_BY_KEY(&request, ticket->get_key(), ticket->get_type(),
+                            duration);
+    request.ticket = ticket;
+    ret = clone_ticket(&request);
+    if (ret) break;
+  }
+
+  if (ret) {
+    Ticket_iterator it_ticket1 = m_ticket_store.list_iterator(duration);
+    while ((ticket = it_ticket1++)) {
+      release_lock(ticket);
+    }
+  }
+
+  return ret;
 }
 
 /**

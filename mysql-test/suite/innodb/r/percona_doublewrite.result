@@ -3,6 +3,7 @@ SELECT @@innodb_doublewrite;
 1
 CALL mtr.add_suppression("Skip re-populating collations and character sets tables in InnoDB read-only mode.");
 CALL mtr.add_suppression("Skip updating information_schema metadata in InnoDB read-only mode.");
+CALL mtr.add_suppression("Skipped updating resource group metadata in InnoDB read only mode.");
 # Test that the parallel doublewrite is there during the regular server operation
 SELECT @@GLOBAL.innodb_parallel_doublewrite_path;
 @@GLOBAL.innodb_parallel_doublewrite_path
@@ -35,7 +36,7 @@ Pattern "bytes is larger than the maximum size" found
 Pattern "bytes is not a multiple of a page size" found
 # Test that zero-sized doublewrite file is diagnosed and accepted
 # restart:<hidden args>
-Pattern "Parallel doublewrite buffer is zero-sized" not found
+Pattern "Parallel doublewrite buffer is zero-sized" found
 # restart
 #
 # Bug 1629879: Server won't start with innodb_force_recovery=6 because parallel doublewrite file exists

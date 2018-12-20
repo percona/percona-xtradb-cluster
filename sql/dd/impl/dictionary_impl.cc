@@ -67,6 +67,7 @@
 #include "sql/opt_costconstantcache.h"  // init_optimizer_cost_module
 #include "sql/plugin_table.h"
 #include "sql/sql_class.h"  // THD
+#include "sql/sql_zip_dict.h"
 #include "sql/system_variables.h"
 #include "sql/thd_raii.h"                       // Disable_autocommit_guard
 #include "sql/transaction.h"                    // trans_commit()
@@ -336,12 +337,15 @@ bool Dictionary_impl::is_dd_table_access_allowed(bool is_dd_internal_thread,
 
   /*
     Access allowed for external DD tables, for DML on protected DDSE tables,
-    and for any operation on SYSTEM tables.
+    and for any operation on SYSTEM tables. Compression dictionary tables
+    are created as SYSTEM type but we don't allow direct access to them.
+    User should use I_S views on compression dictionary tables
   */
   return (table_type == nullptr ||
           (*table_type == System_tables::Types::DDSE_PROTECTED &&
            !is_ddl_statement) ||
-          *table_type == System_tables::Types::SYSTEM);
+          (*table_type == System_tables::Types::SYSTEM &&
+           !compression_dict::is_hardcoded(schema_str, table_str)));
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -464,18 +468,22 @@ bool has_exclusive_table_mdl(THD *thd, const char *schema_name,
 }
 
 bool acquire_exclusive_tablespace_mdl(THD *thd, const char *tablespace_name,
-                                      bool no_wait, MDL_ticket **ticket) {
+                                      bool no_wait, MDL_ticket **ticket,
+                                      bool for_trx) {
+  enum_mdl_duration duration = (for_trx ? MDL_TRANSACTION : MDL_EXPLICIT);
   return acquire_mdl(thd, MDL_key::TABLESPACE, "", tablespace_name, no_wait,
-                     thd->variables.lock_wait_timeout, MDL_EXCLUSIVE,
-                     MDL_TRANSACTION, ticket);
+                     thd->variables.lock_wait_timeout, MDL_EXCLUSIVE, duration,
+                     ticket);
 }
 
 bool acquire_shared_tablespace_mdl(THD *thd, const char *tablespace_name,
-                                   bool no_wait) {
+                                   bool no_wait, MDL_ticket **ticket,
+                                   bool for_trx) {
   // When requesting a tablespace name lock, we leave the schema name empty.
+  enum_mdl_duration duration = (for_trx ? MDL_TRANSACTION : MDL_EXPLICIT);
   return acquire_mdl(thd, MDL_key::TABLESPACE, "", tablespace_name, no_wait,
-                     thd->variables.lock_wait_timeout, MDL_SHARED,
-                     MDL_TRANSACTION, NULL);
+                     thd->variables.lock_wait_timeout, MDL_SHARED, duration,
+                     ticket);
 }
 
 bool has_shared_tablespace_mdl(THD *thd, const char *tablespace_name) {
@@ -640,7 +648,8 @@ bool reset_tables_and_tablespaces() {
 }
 
 bool commit_or_rollback_tablespace_change(THD *thd, dd::Tablespace *space,
-                                          bool error) {
+                                          bool error,
+                                          bool release_mdl_on_commit_only) {
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
   Disable_autocommit_guard autocommit_guard(thd);
   if (!error && space != nullptr) {
@@ -653,7 +662,10 @@ bool commit_or_rollback_tablespace_change(THD *thd, dd::Tablespace *space,
   } else {
     error = trans_commit_stmt(thd) || trans_commit(thd);
   }
-  thd->mdl_context.release_transactional_locks();
+
+  if (!error || !release_mdl_on_commit_only) {
+    thd->mdl_context.release_transactional_locks();
+  }
   return error;
 }
 

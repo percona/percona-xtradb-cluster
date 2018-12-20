@@ -294,6 +294,8 @@ bool Ha_innopart_share::open_table_parts(THD *thd, const TABLE *table,
   char partition_name[FN_REFLEN];
   bool index_loaded = true;
 
+  if (dd_table == nullptr) return (true);
+
 #ifdef UNIV_DEBUG
   if (m_table_share->tmp_table == NO_TMP_TABLE) {
     mysql_mutex_assert_owner(&m_table_share->LOCK_ha_data);
@@ -820,10 +822,23 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
     set_ha_share_ptr(static_cast<Handler_share *>(m_part_share));
   }
 
-  if (m_part_share->open_table_parts(thd, table, table_def, m_part_info,
-                                     norm_name) ||
-      m_part_share->populate_partition_name_hash(m_part_info)) {
-    goto share_error;
+  {
+    dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+    /* ha_innopart::clone calls handler::clone which calls
+     * handler::ha_open(table_def=nullptr)) */
+    if (table_def == nullptr && table_share->tmp_table == NO_TMP_TABLE) {
+      if (thd->dd_client()->acquire(table_share->db.str,
+                                    table_share->table_name.str, &table_def))
+        return true;
+      DBUG_ASSERT(table_def);
+    }
+
+    if (m_part_share->open_table_parts(thd, table, table_def, m_part_info,
+                                       norm_name) ||
+        m_part_share->populate_partition_name_hash(m_part_info)) {
+      goto share_error;
+    }
   }
 
   if (m_part_share->auto_inc_mutex == NULL &&
@@ -884,7 +899,7 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
 
     no_tablespace = false;
 
-  } else if (ib_table->ibd_file_missing) {
+  } else if (ib_table->file_unreadable) {
     ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_TABLESPACE_MISSING, norm_name);
 
     /* This means we have no idea what happened to the tablespace
@@ -1049,7 +1064,7 @@ int ha_innopart::open(const char *name, int, uint, const dd::Table *table_def) {
   stats.block_size = UNIV_PAGE_SIZE;
 
   /* Only if the table has an AUTOINC column. */
-  if (m_prebuilt->table != NULL && !m_prebuilt->table->ibd_file_missing &&
+  if (m_prebuilt->table != NULL && !m_prebuilt->table->file_unreadable &&
       table->found_next_number_field != NULL) {
     int error;
 
@@ -2323,10 +2338,17 @@ int ha_innopart::create(const char *name, TABLE *form,
 
   trx = check_trx_exists(thd);
 
+  DBUG_ENTER("ha_innopart::create");
+
+  if (is_shared_tablespace(create_info->tablespace)) {
+    my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION, PARTITION_IN_SHARED_TABLESPACE,
+                    MYF(0));
+    DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
+  }
+
   create_table_info_t info(thd, form, create_info, table_name, remote_path,
                            tablespace_name, srv_file_per_table, false, 0, 0);
 
-  DBUG_ENTER("ha_innopart::create");
   ut_ad(create_info != NULL);
   ut_ad(m_part_info == form->part_info);
   ut_ad(table_share != NULL);
@@ -2397,13 +2419,29 @@ int ha_innopart::create(const char *name, TABLE *form,
       while ((sub_elem = sub_it++)) {
         tablespace = partition_get_tablespace(table_level_tablespace_name,
                                               part_elem, sub_elem);
+        if (is_shared_tablespace(tablespace)) {
+          tablespace_names.clear();
+          error = HA_ERR_INTERNAL_ERROR;
+          break;
+        }
         tablespace_names.push_back(tablespace);
       }
     } else {
       tablespace = partition_get_tablespace(table_level_tablespace_name,
                                             part_elem, NULL);
+      if (is_shared_tablespace(tablespace)) {
+        tablespace_names.clear();
+        error = HA_ERR_INTERNAL_ERROR;
+        break;
+      }
       tablespace_names.push_back(tablespace);
     }
+  }
+
+  if (error) {
+    my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION, PARTITION_IN_SHARED_TABLESPACE,
+                    MYF(0));
+    DBUG_RETURN(error);
   }
 
   for (const auto dd_part : *table_def->leaf_partitions()) {
@@ -2668,13 +2706,11 @@ int ha_innopart::set_dd_discard_attribute(dd::Table *table_def, bool discard) {
   dd::Properties &p = table_def->table().se_private_data();
   p.set_bool(dd_table_key_strings[DD_TABLE_DISCARD], discard);
 
-  /* Set new table id of latest partition for dd columns when
-  it's importing tablespace. */
+  /* Set new table id of the first partition to dd::Column::se_private_data */
   if (!discard) {
-    table = m_part_share->get_table_part(m_tot_parts - 1);
-    dd::Partition *dd_part = table_def->leaf_partitions()->back();
+    table = m_part_share->get_table_part(0);
 
-    for (auto dd_column : *dd_part->table().columns()) {
+    for (auto dd_column : *table_def->columns()) {
       dd_column->se_private_data().set_uint64(dd_index_key_strings[DD_TABLE_ID],
                                               table->id);
     }
@@ -2738,9 +2774,9 @@ int ha_innopart::discard_or_import_tablespace(bool discard,
 @param    thd          Thread handler
 @param    part_name    Must be always NULL.
 */
-void ha_innopart::update_field_defs_with_zip_dict_info(THD *thd,
-                                                       const char *part_name) {
-  DBUG_ENTER("ha_innopart::update_field_defs_with_zip_dict_info");
+void ha_innopart::upgrade_update_field_with_zip_dict_info(
+    THD *thd, const char *part_name) {
+  DBUG_ENTER("ha_innopart::upgrade_update_field_with_zip_dict_info");
   char partition_name[FN_REFLEN];
   bool res = get_first_partition_name(
       thd, this, table_share->normalized_path.str,
@@ -2751,7 +2787,7 @@ void ha_innopart::update_field_defs_with_zip_dict_info(THD *thd,
     DBUG_VOID_RETURN;
   }
 
-  ha_innobase::update_field_defs_with_zip_dict_info(thd, partition_name);
+  ha_innobase::upgrade_update_field_with_zip_dict_info(thd, partition_name);
   DBUG_VOID_RETURN;
 }
 
@@ -2837,7 +2873,7 @@ int ha_innopart::truncate_impl(const char *name, TABLE *form,
   THD *thd = ha_thd();
   trx_t *trx = check_trx_exists(thd);
   char partition_name[FN_REFLEN];
-  uint16_t table_name_len;
+  size_t table_name_len;
   bool has_autoinc = false;
   int error = 0;
 
@@ -2871,7 +2907,7 @@ int ha_innopart::truncate_impl(const char *name, TABLE *form,
     if (dict_table_is_discarded(part_table)) {
       ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_TABLESPACE_DISCARDED, norm_name);
       DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
-    } else if (part_table->ibd_file_missing) {
+    } else if (!part_table->is_readable()) {
       DBUG_RETURN(HA_ERR_TABLESPACE_MISSING);
     }
 
@@ -2912,10 +2948,10 @@ int ha_innopart::truncate_partition_low(dd::Table *dd_table) {
   int error = 0;
   const char *table_name = table->s->normalized_path.str;
   char partition_name[FN_REFLEN];
-  uint16_t table_name_len;
+  size_t table_name_len;
   THD *thd = ha_thd();
   trx_t *trx = check_trx_exists(thd);
-  uint16_t i = 0;
+  uint part_num = 0;
   uint64_t autoinc = 0;
   bool truncate_all = (m_part_info->num_partitions_used() == m_tot_parts);
 
@@ -2954,14 +2990,14 @@ int ha_innopart::truncate_partition_low(dd::Table *dd_table) {
       autoinc = part_table->autoinc_persisted;
     }
 
-    if (!m_part_info->is_partition_used(i++)) {
+    if (!m_part_info->is_partition_used(part_num++)) {
       continue;
     }
 
     if (dict_table_is_discarded(part_table)) {
       ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_TABLESPACE_DISCARDED, table_name);
       DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
-    } else if (part_table->ibd_file_missing) {
+    } else if (!part_table->is_readable()) {
       DBUG_RETURN(HA_ERR_TABLESPACE_MISSING);
     }
 
@@ -3557,19 +3593,6 @@ int ha_innopart::info_low(uint flag, bool is_analyze) {
     if ((flag & HA_STATUS_NO_LOCK) == 0) {
       dict_table_stats_unlock(ib_table, RW_S_LATCH);
     }
-
-    char path[FN_REFLEN];
-    os_file_stat_t stat_info;
-    /* Use the first partition for create time until new DD. */
-    ib_table = m_part_share->get_table_part(0);
-    snprintf(path, sizeof(path), "%s/%s%s", mysql_data_home,
-             table->s->normalized_path.str, reg_ext);
-
-    unpack_filename(path, path);
-
-    if (os_file_get_status(path, &stat_info, false, true) == DB_SUCCESS) {
-      stats.create_time = (ulong)stat_info.ctime;
-    }
   }
 
   if (srv_force_recovery >= SRV_FORCE_NO_IBUF_MERGE) {
@@ -3725,21 +3748,6 @@ int ha_innopart::repair(THD *thd, HA_CHECK_OPT *repair_opt) {
   DBUG_RETURN(error);
 }
 
-/** Check if possible to switch engine (no foreign keys).
-Checks if ALTER TABLE may change the storage engine of the table.
-Changing storage engines is not allowed for tables for which there
-are foreign key constraints (parent or child tables).
-@return	true if can switch engines. */
-bool ha_innopart::can_switch_engines() {
-  bool can_switch;
-
-  DBUG_ENTER("ha_innopart::can_switch_engines");
-  can_switch = ha_innobase::can_switch_engines();
-  ut_ad(can_switch);
-
-  DBUG_RETURN(can_switch);
-}
-
 /** Checks if a table is referenced by a foreign key.
 The MySQL manual states that a REPLACE is either equivalent to an INSERT,
 or DELETE(s) + INSERT. Only a delete is then allowed internally to resolve
@@ -3857,6 +3865,13 @@ int ha_innopart::external_lock(THD *thd, int lock_type) {
         if (!srv_read_only_mode && thd_sql_command(thd) == SQLCOM_FLUSH &&
             lock_type == F_RDLCK) {
           ut_ad(table->quiesce == QUIESCE_START);
+
+          if (dict_table_is_discarded(table)) {
+            ib_senderrf(m_prebuilt->trx->mysql_thd, IB_LOG_LEVEL_ERROR,
+                        ER_TABLESPACE_DISCARDED, table->name.m_name);
+
+            return (HA_ERR_NO_SUCH_TABLE);
+          }
 
           row_quiesce_table_start(table, m_prebuilt->trx);
 

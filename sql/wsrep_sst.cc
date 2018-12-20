@@ -794,7 +794,7 @@ static int run_sql_command(THD *thd, const char *query) {
     return -1;
   }
 
-  mysql_parse(thd, &ps, false);
+  mysql_parse(thd, &ps, false, false);
   if (thd->is_error()) {
     int const err = thd->get_stmt_da()->mysql_errno();
     WSREP_WARN("error executing '%s': %d (%s)%s", query, err,

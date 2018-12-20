@@ -15,5 +15,3 @@ global_read_lock : Issue#79 2018-07-26 CODERSHIP https://github.com/codership/my
 memory_aggregate_no_a : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 start_server_low_index : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 # Codership disabled tests end here
-
-innodb_is_data_locks : Bug#27491547 2018-02-08 Marc Alff PERFSCHEMA.INNODB_IS_DATA_LOCKS FAILS SPORADICALLY ON PB2

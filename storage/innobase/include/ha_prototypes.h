@@ -141,6 +141,7 @@ void innobase_convert_from_table_id(
     const char *from,       /*!< in: identifier to convert */
     ulint len);             /*!< in: length of 'to', in bytes; should
                             be at least 5 * strlen(to) + 1 */
+
 /** Converts an identifier to UTF-8. */
 void innobase_convert_from_id(
     const CHARSET_INFO *cs, /*!< in: the 'from' character set */
@@ -148,8 +149,12 @@ void innobase_convert_from_id(
     const char *from,       /*!< in: identifier to convert */
     ulint len);             /*!< in: length of 'to', in bytes;
                             should be at least 3 * strlen(to) + 1 */
+
 /** Makes all characters in a NUL-terminated UTF-8 string lower case. */
 void innobase_casedn_str(char *a); /*!< in/out: string to put in lower case */
+
+/** Makes all characters in a NUL-terminated UTF-8 path string lower case. */
+void innobase_casedn_path(char *a); /*!< in/out: string to put in lower case */
 
 /** Determines the connection character set.
  @return connection character set */
@@ -412,6 +417,19 @@ InnoDB extended statistics should be collected.
 @return transaction object if statistics should be collected, or NULL. */
 MY_NODISCARD
 trx_t *innobase_get_trx_for_slow_log(void) noexcept;
+
+enum srv_encrypt_tables_values {
+  SRV_ENCRYPT_TABLES_OFF = 0,
+  SRV_ENCRYPT_TABLES_ON = 1,
+  SRV_ENCRYPT_TABLES_FORCE = 2,
+  SRV_ENCRYPT_TABLES_KEYRING_ON = 3,
+  SRV_ENCRYPT_TABLES_KEYRING_FORCE = 4,
+  SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING = 5,
+  SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE = 6,
+  SRV_ENCRYPT_TABLES_ONLINE_FROM_KEYRING_TO_UNENCRYPTED = 7
+};
+
+extern bool innodb_inited;
 
 #if defined(WITH_WSREP) && !defined(UNIV_INNOCHECKSUM)
 

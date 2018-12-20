@@ -23,6 +23,7 @@
 #include "log_event.h"  // class THD, EVENT_LEN_OFFSET, etc.
 #include "sql/sql_lex.h"
 #include "mysql/plugin.h"
+#include "sql/binlog_reader.h"
 
 /*
   read the first event from (*buf). The size of the (*buf) is (*buf_len).
@@ -39,20 +40,22 @@ static Log_event *wsrep_read_log_event(
   uint data_len = uint4korr(head + EVENT_LEN_OFFSET);
   char *buf = (*arg_buf);
   const char *error = 0;
-  Log_event *res = 0;
 
-  res = Log_event::read_log_event(buf, data_len, &error, description_event, 0);
+  Log_event *ev = NULL;
+  Binlog_read_error binlog_read_error =
+      binlog_event_deserialize(reinterpret_cast<unsigned char *>(buf), data_len,
+                               description_event, false, &ev);
 
-  if (!res) {
+  if (binlog_read_error.has_error()) {
     DBUG_ASSERT(error != 0);
     sql_print_error(
-        "Error in Log_event::read_log_event(): "
+        "Error in reading event (wsrep_read_log_event): "
         "'%s', data_len: %d, event_type: %d",
-        error, data_len, head[EVENT_TYPE_OFFSET]);
+        binlog_read_error.get_str(), data_len, head[EVENT_TYPE_OFFSET]);
   }
   (*arg_buf) += data_len;
   (*arg_buf_len) -= data_len;
-  DBUG_RETURN(res);
+  DBUG_RETURN(ev);
 }
 
 #include "rpl_rli.h"      // class Relay_log_info;

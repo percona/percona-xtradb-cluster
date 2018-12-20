@@ -92,7 +92,8 @@ class Datafile {
         m_last_os_error(),
         m_file_info(),
         m_encryption_key(),
-        m_encryption_iv() {
+        m_encryption_iv(),
+        m_encryption_op_in_progress(NONE) {
     m_handle.m_file = OS_FILE_CLOSED;
   }
 
@@ -114,7 +115,8 @@ class Datafile {
         m_last_os_error(),
         m_file_info(),
         m_encryption_key(),
-        m_encryption_iv() {
+        m_encryption_iv(),
+        m_encryption_op_in_progress(NONE) {
     ut_ad(m_name != nullptr);
     m_handle.m_file = OS_FILE_CLOSED;
     /* No op */
@@ -136,7 +138,8 @@ class Datafile {
         m_last_os_error(),
         m_file_info(),
         m_encryption_key(),
-        m_encryption_iv() {
+        m_encryption_iv(),
+        m_encryption_op_in_progress(NONE) {
     m_name = mem_strdup(file.m_name);
     ut_ad(m_name != nullptr);
 
@@ -191,6 +194,7 @@ class Datafile {
     m_first_page = nullptr;
     m_encryption_key = nullptr;
     m_encryption_iv = nullptr;
+    m_encryption_op_in_progress = NONE;
 
     m_atomic_write = file.m_atomic_write;
 
@@ -247,6 +251,22 @@ class Datafile {
   @param[in]	name	Tablespace Name if known, nullptr if not */
   void set_name(const char *name);
 
+  struct ValidateOutput {
+    ValidateOutput() : error(DB_ERROR), encryption_type(DO_NOT_KNOW) {}
+
+    Keyring_encryption_info keyring_encryption_info;
+
+    enum EncryptionType {
+      DO_NOT_KNOW, /*error occured before we were able to read encryption type
+                      from first page*/
+      NONE,
+      KEYRING,
+      MASTER_KEY
+    };
+    dberr_t error;
+    EncryptionType encryption_type;
+  };
+
   /** Validates the datafile and checks that it conforms with
   the expected space ID and flags.  The file should exist and be
   successfully opened in order for this function to validate it.
@@ -255,7 +275,8 @@ class Datafile {
   @param[in]	for_import	is it for importing
   @retval DB_SUCCESS if tablespace is valid, DB_ERROR if not.
   m_is_valid is also set true on success, else false. */
-  dberr_t validate_to_dd(space_id_t space_id, ulint flags, bool for_import)
+  ValidateOutput validate_to_dd(space_id_t space_id, ulint flags,
+                                bool for_import)
       MY_ATTRIBUTE((warn_unused_result));
 
   /** Validates this datafile for the purpose of recovery.
@@ -267,7 +288,7 @@ class Datafile {
   @param[in]	space_id	Expected space ID
   @retval DB_SUCCESS on success
   m_is_valid is also set true on success, else false. */
-  dberr_t validate_for_recovery(space_id_t space_id)
+  ValidateOutput validate_for_recovery(space_id_t space_id)
       MY_ATTRIBUTE((warn_unused_result));
 
   /** Checks the consistency of the first page of a datafile when the
@@ -285,8 +306,8 @@ class Datafile {
   @retval DB_INVALID_ENCRYPTION_META if the encrypption meta data
           is not readable
   @retval DB_TABLESPACE_EXISTS if there is a duplicate space_id */
-  dberr_t validate_first_page(space_id_t space_id, lsn_t *flush_lsn,
-                              bool for_import)
+  ValidateOutput validate_first_page(space_id_t space_id, lsn_t *flush_lsn,
+                                     bool for_import)
       MY_ATTRIBUTE((warn_unused_result));
 
   /** Get Datafile::m_name.
@@ -345,6 +366,11 @@ class Datafile {
   @param[in]	other	Datafile to compare with
   @return true if it is the same file, else false */
   bool same_as(const Datafile &other) const;
+
+  /** Get access to the first data page.
+  It is valid after open_read_only() succeeded.
+  @return the first data page */
+  const byte *get_first_page() const { return (m_first_page); }
 
   /** Determine the space id of the given file descriptor by reading
   a few pages from the beginning of the .ibd file.
@@ -494,5 +520,8 @@ class Datafile {
 
   /** Encryption iv read from first page */
   byte *m_encryption_iv;
+
+  /** Encryption operation in progress */
+  encryption_op_type m_encryption_op_in_progress;
 };
 #endif /* fsp0file_h */

@@ -7,7 +7,7 @@ export DH_VERBOSE=1
 export CFLAGS=
 export CXXFLAGS=
 
-PACKAGE=percona-xtradb-cluster-5.7
+PACKAGE=percona-xtradb-cluster-8.0
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
 
 wsrep_version="@@WSREP_VERSION@@"
@@ -15,7 +15,7 @@ percona_server_version="@@PERCONA_VERSION@@"
 revision="@@REVISION@@"
 compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
 compilation_comment_release="Percona XtraDB Cluster (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
-server_suffix="-57"
+server_suffix="-80"
 prefix=/usr
 
 TMP=$(CURDIR)/debian/tmp/
@@ -35,7 +35,7 @@ DEB_UPSTREAM_VERSION ?= $(shell echo $(DEB_NOEPOCH_VERSION) | sed 's/-[^-]*$$//'
 DEB_UPSTREAM_VERSION_MAJOR_MINOR := $(shell echo $(DEB_UPSTREAM_VERSION) | sed -r -n 's/^([0-9]+\.[0-9]+).*/\1/p')
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-5.7.tar.gz
+EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-8.0.tar.gz
 
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -c -s)
@@ -150,7 +150,7 @@ override_dh_auto_build:
 
 	[ -f $(EXPORTED_SOURCE_TARBALL) ] || tar -zcf $(EXPORTED_SOURCE_TARBALL) \
 	--exclude=debian . \
-	--transform="s,^\./,percona-xtradb-cluster-5.7/,"
+	--transform="s,^\./,percona-xtradb-cluster-8.0/,"
 
 ifeq ($(SKIP_DEBUG_BINARY),)
 	cd $(builddebug) && $(MAKE) -j$(NCPU)  VERBOSE=1
@@ -214,7 +214,7 @@ override_dh_auto_install:
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
 
 override_dh_strip:
-	dh_strip --dbg-package=percona-xtradb-cluster-5.7-dbg 
+	dh_strip --dbg-package=percona-xtradb-cluster-8.0-dbg 
 
 override_dh_installinit:
 	@echo "RULES.$@"

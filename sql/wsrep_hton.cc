@@ -425,7 +425,7 @@ extern bool opt_log_slave_updates;
 enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *, bool) {
   int rcode = -1;
   size_t data_len = 0;
-  IO_CACHE *cache;
+  IO_CACHE_binlog_cache_storage *cache;
   int replay_round = 0;
 
   if (thd->get_stmt_da()->is_error()) {
@@ -540,9 +540,11 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *, bool) {
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
   rcode = 0;
+
   if ((thd->lex->sql_command == SQLCOM_CREATE_TABLE) && !thd->wsrep_applier &&
       (cache = wsrep_get_trans_log(thd, false))) {
-    WSREP_DEBUG("Processing CTAS....reading from stmt cache");
+
+    WSREP_DEBUG("Processing CREATE TABLE AS SELECT (reading from stmt cache)");
     thd->binlog_flush_pending_rows_event(false);
     rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
     if (WSREP_OK != rcode) {
@@ -551,6 +553,7 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *, bool) {
           " data_len: %zu, %d",
           data_len, rcode);
       DBUG_RETURN(WSREP_TRX_SIZE_EXCEEDED);
+
     }
     if (data_len > 0) {
       WSREP_DEBUG("Processed %lu bytes from stmt cache",
@@ -636,10 +639,8 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *, bool) {
       mysql_mutex_unlock(&LOCK_wsrep_replaying);
     }
   } else {
-    WSREP_ERROR(
-        "I/O error reading from thd's binlog iocache: "
-        "errno=%d, io cache code=%d",
-        my_errno(), cache->error);
+    WSREP_ERROR("I/O error reading from thd's binlog iocache (errno=%d)",
+                my_errno());
     DBUG_ASSERT(0);  // failure like this can not normally happen
     DBUG_RETURN(WSREP_TRX_ERROR);
   }
@@ -732,7 +733,7 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *, bool) {
 enum wsrep_trx_status wsrep_replicate(THD *thd) {
   int rcode = -1;
   size_t data_len = 0;
-  IO_CACHE *cache;
+  IO_CACHE_binlog_cache_storage *cache;
   int replay_round = 0;
 
   if (thd->get_stmt_da()->is_error()) {
@@ -850,7 +851,8 @@ enum wsrep_trx_status wsrep_replicate(THD *thd) {
   rcode = 0;
   if ((thd->lex->sql_command == SQLCOM_CREATE_TABLE) && !thd->wsrep_applier &&
       (cache = wsrep_get_trans_log(thd, false))) {
-    WSREP_DEBUG("Processing CTAS....reading from stmt cache");
+
+    WSREP_DEBUG("Processing CREATE TABLE AS SELECT (reading from stmt cache)");
     thd->binlog_flush_pending_rows_event(false);
     rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
     if (WSREP_OK != rcode) {
@@ -943,10 +945,8 @@ enum wsrep_trx_status wsrep_replicate(THD *thd) {
       mysql_mutex_unlock(&LOCK_wsrep_replaying);
     }
   } else {
-    WSREP_ERROR(
-        "I/O error reading from thd's binlog iocache: "
-        "errno=%d, io cache code=%d",
-        my_errno(), cache->error);
+    WSREP_ERROR("I/O error reading from thd's binlog iocache (errno=%d)",
+                my_errno());
     DBUG_ASSERT(0);  // failure like this can not normally happen
     DBUG_RETURN(WSREP_TRX_ERROR);
   }

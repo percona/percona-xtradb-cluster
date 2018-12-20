@@ -1,4 +1,4 @@
-# Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -54,8 +54,6 @@ set @@persist_only.innodb_use_native_aio=1;
 set @@persist_only.innodb_write_io_threads=4;
 set @@persist_only.log_slave_updates=0;
 set @@persist_only.max_digest_length=1024;
-set @@persist_only.metadata_locks_cache_size=1024;
-set @@persist_only.metadata_locks_hash_instances=8;
 set @@persist_only.myisam_recover_options='OFF';
 set @@persist_only.ngram_token_size=2;
 set @@persist_only.old=0;
@@ -116,3 +114,12 @@ set @@persist_only.report_host=NULL;
 set @@persist_only.report_port=21000;
 set @@persist_only.report_password=NULL;
 set @@persist_only.report_user=NULL;
+
+# Added by Percona
+call mtr.add_suppression('Default storage engine \\(InnoDB\\) is not the same as enforced storage engine \\(MyISAM\\)');
+set @@persist_only.encrypt_binlog=FALSE;
+set @@persist_only.encrypt_tmp_files=TRUE;
+set @@persist_only.enforce_storage_engine='MyISAM';
+set @@persist_only.binlog_space_limit=134217728;
+set @@persist_only.proxy_protocol_networks='*';
+set @@persist_only.extra_port=1111;

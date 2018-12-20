@@ -1174,9 +1174,12 @@ bool reset_master(THD *thd, bool unlock_global_read_lock) {
       my_message(ER_NOT_ALLOWED_COMMAND,
                  "RESET MASTER not allowed when node is in cluster", MYF(0));
       ret = true;
-    } else
-#endif /* WITH_WSREP */
+    } else {
       ret = mysql_bin_log.reset_logs(thd);
+    }
+#else
+    ret = mysql_bin_log.reset_logs(thd);
+#endif /* WITH_WSREP */
   } else {
     global_sid_lock->wrlock();
     ret = (gtid_state->clear(thd) != 0);

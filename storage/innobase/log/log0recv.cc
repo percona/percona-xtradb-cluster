@@ -51,10 +51,12 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "buf0buf.h"
 #include "buf0flu.h"
 #include "dict0dd.h"
+#include "fil0crypt.h"
 #include "fil0fil.h"
 #include "ha_prototypes.h"
 #include "ibuf0ibuf.h"
 #include "log0log.h"
+#include "log0online.h"
 #include "mem0mem.h"
 #include "mtr0log.h"
 #include "mtr0mtr.h"
@@ -81,6 +83,8 @@ directories which were not included */
 bool meb_replay_file_ops = true;
 #include "../meb/mutex.h"
 #endif /* !UNIV_HOTBACKUP */
+
+std::list<space_id_t> recv_encr_ts_list;
 
 /** Log records are stored in the hash table in chunks at most of this size;
 this must be less than UNIV_PAGE_SIZE as it is stored in the buffer pool */
@@ -267,10 +271,13 @@ the metadata locally
 @param[in]	version	table dynamic metadata version
 @param[in]	ptr	redo log start
 @param[in]	end	end of redo log
+@param[in]      apply   if false, this is coming from changed page
+                        tracking and changes should be parsed only
 @retval ptr to next redo log record, nullptr if this log record
 was truncated */
 byte *MetadataRecover::parseMetadataLog(table_id_t id, uint64_t version,
-                                        byte *ptr, byte *end) {
+                                        byte *ptr, byte *end, bool apply) {
+  ut_ad(!(read_only && apply));
   if (ptr + 2 > end) {
     /* At least we should get type byte and another one byte
     for data, if not, it's an incomplete log */
@@ -303,6 +310,7 @@ byte *MetadataRecover::parseMetadataLog(table_id_t id, uint64_t version,
 /** Apply the collected persistent dynamic metadata to in-memory
 table objects */
 void MetadataRecover::apply() {
+  ut_ad(!read_only);
   PersistentTables::iterator iter;
 
   for (iter = m_tables.begin(); iter != m_tables.end(); ++iter) {
@@ -603,7 +611,7 @@ void recv_sys_init(ulint max_mem) {
 
   new (&recv_sys->missing_ids) recv_sys_t::Missing_Ids();
 
-  recv_sys->metadata_recover = UT_NEW_NOKEY(MetadataRecover());
+  recv_sys->metadata_recover = UT_NEW_NOKEY(MetadataRecover(false));
 
   mutex_exit(&recv_sys->mutex);
 }
@@ -742,7 +750,9 @@ void recv_sys_free() {
   /* wake page cleaner up to progress */
   if (!srv_read_only_mode) {
     ut_ad(!recv_recovery_on);
-    os_event_reset(buf_flush_event);
+    if (buf_flush_event != nullptr) {
+      os_event_reset(buf_flush_event);
+    }
     os_event_set(recv_sys->flush_start);
   }
 
@@ -904,7 +914,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
   constexpr ulint CKP2 = LOG_CHECKPOINT_2;
 
   for (auto i = CKP1; i <= CKP2; i += CKP2 - CKP1) {
-    log_files_header_read(log, i);
+    log_files_header_read(log, static_cast<uint32_t>(i));
 
     if (!recv_check_log_header_checksum(buf)) {
       DBUG_PRINT("ib_log", ("invalid checkpoint, at %lu, checksum %x", i,
@@ -1069,12 +1079,15 @@ pages.
 void recv_apply_hashed_log_recs(log_t &log, bool allow_ibuf) {
   for (;;) {
     mutex_enter(&recv_sys->mutex);
+    bool abort = recv_sys->found_corrupt_log;
 
     if (!recv_sys->apply_batch_on) {
       break;
     }
 
     mutex_exit(&recv_sys->mutex);
+
+    if (abort) return;
 
     os_thread_sleep(500000);
   }
@@ -1147,7 +1160,12 @@ void recv_apply_hashed_log_recs(log_t &log, bool allow_ibuf) {
   /* Wait until all the pages have been processed */
 
   while (recv_sys->n_addrs != 0) {
+    bool abort = recv_sys->found_corrupt_log;
     mutex_exit(&recv_sys->mutex);
+
+    if (abort) {
+      return;
+    }
 
     os_thread_sleep(500000);
 
@@ -1546,10 +1564,31 @@ static byte *recv_parse_or_apply_log_rec_body(mlog_id_t type, byte *ptr,
         recovered. Otherwise, redo will not find the key
         to decrypt the data pages. */
 
-        if (page_no == 0 && !fsp_is_system_or_temp_tablespace(space_id)) {
-          return (
-              fil_tablespace_redo_encryption(ptr, end_ptr, space_id, apply));
+        if (page_no == 0) {
+          byte *ptr_copy = ptr;
+          ptr_copy += 2;  // skip offset
+          ulint len = mach_read_from_2(ptr_copy);
+          ptr_copy += 2;
+          if (end_ptr < ptr_copy + len) return NULL;
+
+          if (memcmp(ptr_copy, ENCRYPTION_KEY_MAGIC_V1,
+                     ENCRYPTION_MAGIC_SIZE) == 0 ||
+              memcmp(ptr_copy, ENCRYPTION_KEY_MAGIC_V2,
+                     ENCRYPTION_MAGIC_SIZE) == 0 ||
+              memcmp(ptr, ENCRYPTION_KEY_MAGIC_V3, ENCRYPTION_MAGIC_SIZE) ==
+                  0) {
+            if (fsp_is_system_or_temp_tablespace(space_id)) {
+              break;
+            }
+            return (
+                fil_tablespace_redo_encryption(ptr, end_ptr, space_id, apply));
+          } else if (memcmp(ptr_copy, ENCRYPTION_KEY_MAGIC_PS_V1,
+                            ENCRYPTION_MAGIC_SIZE) == 0 &&
+                     apply) {
+            return (fil_parse_write_crypt_data(ptr, end_ptr, block, len));
+          }
         }
+        break;
 #ifdef UNIV_HOTBACKUP
       }
 #endif /* UNIV_HOTBACKUP */
@@ -1634,7 +1673,6 @@ static byte *recv_parse_or_apply_log_rec_body(mlog_id_t type, byte *ptr,
 
         fil_space_set_flags(space, mach_read_from_4(FSP_HEADER_OFFSET +
                                                     FSP_SPACE_FLAGS + page));
-
         fil_space_release(space);
 
         break;
@@ -1643,6 +1681,38 @@ static byte *recv_parse_or_apply_log_rec_body(mlog_id_t type, byte *ptr,
       // fall through
 
     case MLOG_1BYTE:
+      /* If 'ALTER TABLESPACE ... ENCRYPTION' was in progress and page 0 has
+      REDO entry for this, set encryption_op_in_progress flag now so that any
+      other page of this tablespace in redo log is written accordingly. */
+      if (page_no == 0 && page != nullptr && end_ptr >= ptr + 2) {
+        ulint offs = mach_read_from_2(ptr);
+
+        fil_space_t *space = fil_space_acquire(space_id);
+        ut_ad(space != nullptr);
+        ulint offset = fsp_header_get_encryption_progress_offset(
+            page_size_t(space->flags));
+
+        if (offs == offset) {
+          ptr = mlog_parse_nbytes(MLOG_1BYTE, ptr, end_ptr, page, page_zip);
+          byte op = mach_read_from_1(page + offset);
+          switch (op) {
+            case ENCRYPTION_IN_PROGRESS:
+              space->encryption_op_in_progress = ENCRYPTION;
+              break;
+            case UNENCRYPTION_IN_PROGRESS:
+              space->encryption_op_in_progress = UNENCRYPTION;
+              break;
+            default:
+              /* Don't reset operation in progress yet. It'll be done in
+              fsp_resume_encryption_unencryption(). */
+              break;
+          }
+        }
+        fil_space_release(space);
+      }
+
+      // fall through
+
     case MLOG_2BYTES:
     case MLOG_8BYTES:
 #ifdef UNIV_DEBUG
@@ -1684,7 +1754,9 @@ static byte *recv_parse_or_apply_log_rec_body(mlog_id_t type, byte *ptr,
             redo log been written with something
             older than InnoDB Plugin 1.0.4. */
             ut_ad(
-                0 ||
+                0
+                /* fil_crypt_rotate_page() writes this */
+                || offs == FIL_PAGE_SPACE_ID ||
                 offs == IBUF_TREE_SEG_HEADER + IBUF_HEADER + FSEG_HDR_SPACE ||
                 offs == IBUF_TREE_SEG_HEADER + IBUF_HEADER + FSEG_HDR_PAGE_NO ||
                 offs == PAGE_BTR_IBUF_FREE_LIST + PAGE_HEADER /* flst_init */
@@ -2501,8 +2573,9 @@ ulint recv_parse_log_rec(mlog_id_t *type, byte *ptr, byte *end_ptr,
           mlog_parse_initial_dict_log_record(ptr, end_ptr, type, &id, &version);
 
       if (new_ptr != nullptr) {
-        new_ptr = recv_sys->metadata_recover->parseMetadataLog(
-            id, version, new_ptr, end_ptr);
+        new_ptr =
+            (apply ? recv_sys->metadata_recover : log_online_metadata_recover)
+                ->parseMetadataLog(id, version, new_ptr, end_ptr, apply);
       }
 
       return (new_ptr == nullptr ? 0 : new_ptr - ptr);
@@ -3170,14 +3243,20 @@ bool meb_scan_log_recs(
 /** Reads a specified log segment to a buffer.
 @param[in,out]	log		redo log
 @param[in,out]	buf		buffer where to read
-@param[in]	start_lsn	read area start */
-void recv_read_log_seg(log_t &log, byte *buf, lsn_t start_lsn, lsn_t end_lsn) {
-  log_background_threads_inactive_validate(log);
+@param[in]	start_lsn	read area start
+@param[in]	end_lsn		read area end
+@param[in]	online		whether the read is for the changed page
+                                tracking */
+void recv_read_log_seg(log_t &log, byte *buf, lsn_t start_lsn, lsn_t end_lsn,
+                       bool online) {
+  if (!online) log_background_threads_inactive_validate(log);
 
   do {
     lsn_t source_offset;
 
+    if (online) log_writer_mutex_enter(log);
     source_offset = log_files_real_offset_for_lsn(log, start_lsn);
+    if (online) log_writer_mutex_exit(log);
 
     ut_a(end_lsn - start_lsn <= ULINT_MAX);
 
@@ -3267,7 +3346,7 @@ static void recv_recovery_begin(log_t &log, lsn_t *contiguous_lsn) {
   while (!finished) {
     lsn_t end_lsn = start_lsn + RECV_SCAN_SIZE;
 
-    recv_read_log_seg(log, log.buf, start_lsn, end_lsn);
+    recv_read_log_seg(log, log.buf, start_lsn, end_lsn, false);
 
     finished = recv_scan_log_recs(log, max_mem, log.buf, RECV_SCAN_SIZE,
                                   checkpoint_lsn, start_lsn, contiguous_lsn,
@@ -3331,7 +3410,7 @@ dberr_t recv_recovery_from_checkpoint_start(log_t &log, lsn_t flush_lsn) {
     return (err);
   }
 
-  log_files_header_read(log, max_cp_field);
+  log_files_header_read(log, static_cast<uint32_t>(max_cp_field));
 
   lsn_t checkpoint_lsn;
   checkpoint_no_t checkpoint_no;
@@ -3499,7 +3578,7 @@ dberr_t recv_recovery_from_checkpoint_start(log_t &log, lsn_t flush_lsn) {
   if (start_lsn < end_lsn) {
     ut_a(start_lsn % log.buf_size + OS_FILE_LOG_BLOCK_SIZE <= log.buf_size);
 
-    recv_read_log_seg(log, recv_sys->last_block, start_lsn, end_lsn);
+    recv_read_log_seg(log, recv_sys->last_block, start_lsn, end_lsn, false);
 
     memcpy(log.buf + start_lsn % log.buf_size, recv_sys->last_block,
            OS_FILE_LOG_BLOCK_SIZE);
@@ -3654,7 +3733,7 @@ void recv_dblwr_t::decrypt_sys_dblwr_pages() {
   IORequest decrypt_request;
 
   decrypt_request.encryption_key(space->encryption_key, space->encryption_klen,
-                                 space->encryption_iv);
+                                 false, space->encryption_iv, 0, 0, NULL, NULL);
   decrypt_request.encryption_algorithm(Encryption::AES);
 
   Encryption encryption(decrypt_request.encryption_algorithm());

@@ -229,12 +229,6 @@ class Global_THD_manager {
 
 #ifdef WITH_WSREP
   /**
-    Waits until total wsrep thd count fails below the set threshold.
-    wsrep thd to considered is filtered using func functor.
-  */
-  // void wait_till_wsrep_thd_eq(Do_THD_Impl *func, int count);
-
-  /**
     Returns total number of THD for which operator() returns true.
     @param func Object of class which overrides operator()
     @return THD

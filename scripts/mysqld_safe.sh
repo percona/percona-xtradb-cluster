@@ -325,6 +325,7 @@ wsrep_recover_position() {
 
   return $ret
 }
+# ---- WITH_WSREP
 
 parse_arguments() {
   # We only need to pass arguments through to the server if we don't

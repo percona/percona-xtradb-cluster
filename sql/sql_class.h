@@ -347,6 +347,9 @@ typedef struct rpl_event_coordinates {
 
 #define THD_CHECK_SENTRY(thd) DBUG_ASSERT(thd->dbug_sentry == THD_SENTRY_MAGIC)
 
+int lock_keyrings(THD *thd);
+int unlock_keyrings(THD *thd);
+
 /* The following macro is to make init of Query_arena simpler */
 #ifndef DBUG_OFF
 #define INIT_ARENA_DBUG_INFO \
@@ -1596,8 +1599,8 @@ class THD : public MDL_context_owner,
 
   void mark_innodb_used(ulonglong trx_id) noexcept {
     DBUG_ASSERT(innodb_trx_id == 0 || innodb_trx_id == trx_id ||
-                is_attachable_ro_transaction_active());
-    if (trx_id) innodb_trx_id = trx_id;
+                is_attachable_transaction_active());
+    if (trx_id && !is_attachable_transaction_active()) innodb_trx_id = trx_id;
     innodb_was_used = true;
   }
 
@@ -1969,6 +1972,16 @@ class THD : public MDL_context_owner,
       stick to UTC for internal storage of timestamps in DD objects.
     */
     bool m_time_zone_used;
+
+    /**
+      Transaction rollback request flag.
+
+      InnoDB can try to access table definition while rolling back regular
+      transaction. So we need to be able to start attachable transaction
+      without being affected by, and affecting, the rollback state of regular
+      transaction.
+    */
+    bool m_transaction_rollback_request;
   };
 
  public:
@@ -2934,9 +2947,9 @@ class THD : public MDL_context_owner,
   bool m_enable_plugins;
 
 #ifdef WITH_WSREP
-  THD(bool enable_plugins = true, bool is_applier = false);
+  explicit THD(bool enable_plugins = true, bool is_applier = false);
 #else
-  THD(bool enable_plugins = true);
+  explicit THD(bool enable_plugins = true);
 #endif /* WITH_WSREP */
 
   /*

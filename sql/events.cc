@@ -1,4 +1,4 @@
-/* Copyright (c) 2005, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -131,7 +131,6 @@
 
 Event_queue *Events::event_queue;
 Event_scheduler *Events::scheduler;
-Event_db_repository *Events::db_repository;
 ulong Events::opt_event_scheduler = Events::EVENTS_OFF;
 
 static bool load_events_from_db(THD *thd, Event_queue *event_queue);
@@ -384,8 +383,8 @@ bool Events::create_event(THD *thd, Event_parse_data *parse_data,
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
 
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
-  if (db_repository->create_event(thd, parse_data, if_not_exists,
-                                  &event_already_exists)) {
+  if (Event_db_repository::create_event(thd, parse_data, if_not_exists,
+                                        &event_already_exists)) {
     /* On error conditions my_error() is called so no need to handle here */
     goto err_with_rollback;
   }
@@ -398,8 +397,8 @@ bool Events::create_event(THD *thd, Event_parse_data *parse_data,
       goto err_with_rollback;
     }
 
-    if (db_repository->load_named_event(thd, parse_data->dbname,
-                                        parse_data->name, new_element.get()))
+    if (Event_db_repository::load_named_event(
+            thd, parse_data->dbname, parse_data->name, new_element.get()))
       goto err_with_rollback;
 
     // Add new event queue element in the events queue.
@@ -545,7 +544,8 @@ bool Events::update_event(THD *thd, Event_parse_data *parse_data,
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
 
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
-  if (db_repository->update_event(thd, parse_data, new_dbname, new_name)) {
+  if (Event_db_repository::update_event(thd, parse_data, new_dbname,
+                                        new_name)) {
     /* On error conditions my_error() is called so no need to handle here */
     goto err_with_rollback;
   }
@@ -560,7 +560,8 @@ bool Events::update_event(THD *thd, Event_parse_data *parse_data,
 
     LEX_STRING dbname = new_dbname ? *new_dbname : parse_data->dbname;
     LEX_STRING name = new_name ? *new_name : parse_data->name;
-    if (db_repository->load_named_event(thd, dbname, name, new_element.get()))
+    if (Event_db_repository::load_named_event(thd, dbname, name,
+                                              new_element.get()))
       goto err_with_rollback;
   }
 
@@ -663,7 +664,8 @@ bool Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name,
 
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
   bool event_exists;
-  if (db_repository->drop_event(thd, dbname, name, if_exists, &event_exists)) {
+  if (Event_db_repository::drop_event(thd, dbname, name, if_exists,
+                                      &event_exists)) {
     /* On error conditions my_error() is called so no need to handle here */
     goto err_with_rollback;
   }
@@ -758,11 +760,9 @@ bool Events::drop_schema_events(THD *thd, const dd::Schema &schema) {
   LEX_STRING db_lex = {const_cast<char *>(schema.name().c_str()),
                        schema.name().length()};
 
-  DBUG_ENTER("Events::drop_schema_events");
-
   if (event_queue) event_queue->drop_schema_events(db_lex);
 
-  DBUG_RETURN(db_repository->drop_schema_events(thd, schema));
+  return Event_db_repository::drop_schema_events(thd, schema);
 }
 
 /**
@@ -886,7 +886,7 @@ bool Events::show_create_event(THD *thd, LEX_STRING dbname, LEX_STRING name) {
     deadlock can occur please refer to the description of 'system table'
     flag.
   */
-  ret = db_repository->load_named_event(thd, dbname, name, &et);
+  ret = Event_db_repository::load_named_event(thd, dbname, name, &et);
   if (!ret) ret = send_show_create_event(thd, &et, thd->get_protocol());
 
   DBUG_RETURN(ret);
@@ -937,14 +937,6 @@ bool Events::init(bool opt_noacl_or_bootstrap) {
   */
   thd->thread_stack = (char *)&thd;
   thd->store_globals();
-  /*
-    We will need Event_db_repository anyway, even if the scheduler is
-    disabled - to perform events DDL.
-  */
-  if (!(db_repository = new Event_db_repository)) {
-    res = true; /* fatal error: request unireg_abort */
-    goto end;
-  }
 
   //  If run with --skip-grant-tables or --initialize, disable the event
   //  scheduler.
@@ -968,12 +960,9 @@ bool Events::init(bool opt_noacl_or_bootstrap) {
     res = true; /* fatal error: request unireg_abort */
     goto end;
   }
-  Event_worker_thread::init(db_repository);
 
 end:
   if (res) {
-    delete db_repository;
-    db_repository = NULL;
     delete event_queue;
     event_queue = NULL;
     delete scheduler;
@@ -1003,9 +992,6 @@ void Events::deinit() {
     delete event_queue;
     event_queue = NULL; /* safety */
   }
-
-  delete db_repository;
-  db_repository = NULL; /* safety */
 
   DBUG_VOID_RETURN;
 }
@@ -1215,8 +1201,7 @@ static bool load_events_from_db(THD *thd, Event_queue *event_queue) {
         thd->security_context()->set_master_access(saved_master_access |
                                                    SUPER_ACL);
 
-        Event_db_repository *db_repository = Events::get_db_repository();
-        (void)db_repository->update_timing_fields_for_event(
+        (void)Event_db_repository::update_timing_fields_for_event(
             thd, et->m_schema_name, et->m_event_name, et->m_last_executed,
             Event_parse_data::SLAVESIDE_DISABLED);
 

@@ -312,13 +312,7 @@ table_pxc_cluster_view.cc
 # -- WITH_WSREP
 )
 
-# self-linking with sql_main is hack and needs to be fixed
-# but for weird reason while compiling with pxc we hit undefined
-# symbol error for static function used by perf-schema that are
-# defined in sql_main (log_resources)
-MYSQL_ADD_PLUGIN(perfschema
-  ${PERFSCHEMA_SOURCES} STORAGE_ENGINE MANDATORY STATIC_ONLY
-  LINK_LIBRARIES sql_main)
+MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES} STORAGE_ENGINE MANDATORY STATIC_ONLY)
 IF(WITH_PERFSCHEMA_STORAGE_ENGINE AND WITH_UNIT_TESTS)
   ENABLE_TESTING()
   ADD_SUBDIRECTORY(unittest)

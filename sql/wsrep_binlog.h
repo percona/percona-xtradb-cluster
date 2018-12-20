@@ -17,6 +17,7 @@
 #define WSREP_BINLOG_H
 
 #include "sql_class.h"  // THD, IO_CACHE
+#include "sql/binlog_ostream.h"
 
 #define HEAP_PAGE_SIZE 65536         /* 64K */
 #define WSREP_MAX_WS_SIZE 2147483647 /* 2GB */
@@ -27,7 +28,8 @@
   This function quite the same as MYSQL_BIN_LOG::write_cache(),
   with the exception that here we write in buffer instead of log file.
  */
-int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len);
+int wsrep_write_cache_buf(IO_CACHE_binlog_cache_storage *cache, uchar **buf,
+                          size_t *buf_len);
 
 /*
   Write the contents of a cache to wsrep provider.
@@ -38,7 +40,8 @@ int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len);
   @param len  total amount of data written
   @return     wsrep error status
  */
-int wsrep_write_cache(wsrep_t *wsrep, THD *thd, IO_CACHE *cache, size_t *len);
+int wsrep_write_cache(wsrep_t *wsrep, THD *thd,
+                      IO_CACHE_binlog_cache_storage *cache, size_t *len);
 
 /* Dump replication buffer to disk */
 void wsrep_dump_rbr_buf(THD *thd, const void *rbr_buf, size_t buf_len);

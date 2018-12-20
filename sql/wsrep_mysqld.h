@@ -105,7 +105,6 @@ extern int wsrep_slave_count_change;
 extern MYSQL_PLUGIN_IMPORT bool wsrep_debug;
 extern ulong wsrep_retry_autocommit;
 extern bool wsrep_auto_increment_control;
-extern bool wsrep_drupal_282555_workaround;
 extern bool wsrep_incremental_data_collection;
 extern const char *wsrep_start_position;
 extern ulong wsrep_max_ws_size;
@@ -371,7 +370,6 @@ extern wsrep_aborting_thd_t wsrep_aborting_thd;
 extern bool wsrep_emulate_bin_log;
 extern int wsrep_to_isolation;
 extern rpl_sidno wsrep_sidno;
-extern bool wsrep_preordered_opt;
 
 #ifdef HAVE_PSI_INTERFACE
 extern PSI_mutex_key key_LOCK_wsrep_ready;

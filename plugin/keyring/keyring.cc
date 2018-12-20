@@ -35,6 +35,10 @@
 #include "plugin/keyring/buffered_file_io.h"
 #include "plugin/keyring/common/keyring.h"
 
+#ifdef WITH_WSREP
+extern bool wsrep_is_wsrep_on(void);
+#endif /* WITH_WSREP */
+
 #ifdef _WIN32
 #define MYSQL_DEFAULT_KEYRINGFILE MYSQL_KEYRINGDIR "\\keyring"
 #else
@@ -130,7 +134,15 @@ static int keyring_init(MYSQL_PLUGIN plugin_info MY_ATTRIBUTE((unused))) {
     if (keys->init(keyring_io, keyring_file_data_value)) {
       is_keys_container_initialized = false;
       logger->log(ERROR_LEVEL, ER_KEYRING_FILE_INIT_FAILED);
+#ifdef WITH_WSREP
+      /* If running in cluster mode, keyring initialization failure is treated
+      as fatal error to avoid inconsistency in cluster enviornment where-in
+      some node of the cluster are running with keyring enabled and other
+      in keyring disabled mode, despite of same user provided configuration. */
+      return (wsrep_is_wsrep_on() ? true : false);
+#else
       return false;
+#endif /* WITH_WSREP */
     }
     is_keys_container_initialized = true;
     return false;

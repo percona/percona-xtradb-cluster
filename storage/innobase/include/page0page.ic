@@ -1016,7 +1016,6 @@ inline ulong page_size_validate(ulong page_size) {
   }
 #endif /* WITH_WSREP */
   return (0);
-
 }
 
 #ifdef UNIV_MATERIALIZE
