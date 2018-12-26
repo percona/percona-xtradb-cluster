@@ -500,6 +500,12 @@ ibool meb_get_checksum_algorithm_enum(const char *algo_name,
 }
 #endif /* !UNIV_HOTBACKUP */
 
+static const char *redo_log_encrypt_names[] = {"off", "on", "master_key",
+                                               "keyring_key", NullS};
+static TYPELIB redo_log_encrypt_typelib = {
+    array_elements(redo_log_encrypt_names) - 1, "redo_log_encrypt_typelib",
+    redo_log_encrypt_names, nullptr};
+
 #ifndef UNIV_HOTBACKUP
 /* The following counter is used to convey information to InnoDB
 about server activity: in case of normal DML ops it is not
@@ -4073,6 +4079,8 @@ bool innobase_fix_tablespaces_empty_uuid() {
     return (false);
   }
 
+  log_enable_encryption_if_set();
+
   /* We only need to handle the case when an encrypted tablespace
   is created at startup. If it is 0, there is no encrypted tablespace,
   If it is > 1, it means we already have fixed the UUID */
@@ -4119,7 +4127,8 @@ bool innobase_fix_tablespaces_empty_uuid() {
   /* Rotate log tablespace */
   bool failure1 = !log_rotate_encryption();
 
-  bool failure2 = !fil_encryption_rotate_global(space_ids);
+  bool failure2 =
+      !fil_encryption_rotate_global(space_ids) || !log_rotate_encryption();
 
   my_free(master_key);
 
@@ -5010,13 +5019,15 @@ static int innodb_init(void *p) {
 /** Create a hard-coded tablespace file at server initialization.
 @param[in]	space_id	fil_space_t::id
 @param[in]	filename	file name
+@param[in]	flags		tabelspace flags
 @retval false	on success
 @retval true	on failure */
-static bool dd_create_hardcoded(space_id_t space_id, const char *filename) {
+static bool dd_create_hardcoded(space_id_t space_id, const char *filename,
+                                ulint flags) {
   page_no_t pages = FIL_IBD_FILE_INITIAL_SIZE;
 
   dberr_t err = fil_ibd_create(space_id, dict_sys_t::s_dd_space_name, filename,
-                               predefined_flags, pages, FIL_ENCRYPTION_DEFAULT,
+                               flags, pages, FIL_ENCRYPTION_DEFAULT,
                                CreateInfoEncryptionKeyId());
 
   if (err == DB_SUCCESS) {
@@ -5039,9 +5050,11 @@ static bool dd_create_hardcoded(space_id_t space_id, const char *filename) {
 /** Open a hard-coded tablespace file at server initialization.
 @param[in]	space_id	fil_space_t::id
 @param[in]	filename	file name
+@param[in]	flags		tabelspace flags
 @retval false	on success
 @retval true	on failure */
-static bool dd_open_hardcoded(space_id_t space_id, const char *filename) {
+static bool dd_open_hardcoded(space_id_t space_id, const char *filename,
+                              ulint flags) {
   bool fail = false;
   fil_space_t *space = fil_space_acquire_silent(space_id);
   Keyring_encryption_info keyring_encryption_info;
@@ -5051,7 +5064,7 @@ static bool dd_open_hardcoded(space_id_t space_id, const char *filename) {
     tablespace. */
 
     /* The tablespace was already opened up by redo log apply. */
-    ut_ad(space->flags == predefined_flags);
+    ut_ad(space->flags == flags);
 
     if (strstr(space->files.front().name, filename) != 0 &&
         space->flags == predefined_flags) {
@@ -5063,7 +5076,7 @@ static bool dd_open_hardcoded(space_id_t space_id, const char *filename) {
 
     fil_space_release(space);
 
-  } else if (fil_ibd_open(true, FIL_TYPE_TABLESPACE, space_id, predefined_flags,
+  } else if (fil_ibd_open(true, FIL_TYPE_TABLESPACE, space_id, flags,
                           dict_sys_t::s_dd_space_name,
                           dict_sys_t::s_dd_space_name, filename, true, false,
                           keyring_encryption_info) == DB_SUCCESS) {
@@ -5076,6 +5089,12 @@ static bool dd_open_hardcoded(space_id_t space_id, const char *filename) {
   }
 
   if (fail) {
+    const char *str =
+        srv_encrypt_tables == SRV_ENCRYPT_TABLES_OFF ? "ON or FORCE" : "OFF";
+
+    ib::error(ER_XB_MSG_2)
+        << "If mysql.ibd opening failed with flags mismatch, try startup with"
+        << " innodb_encrypt_tables = " << str;
     my_error(ER_CANT_OPEN_FILE, MYF(0), filename, 0, "");
   }
 
@@ -5172,14 +5191,27 @@ static int innobase_init_files(dict_init_mode_t dict_init_mode,
     btr_search_enabled = old_btr_search_value;
   }
 
+  bool do_encrypt = dict_detect_encryption(srv_is_upgrade_mode);
+
+  if (do_encrypt && !Encryption::check_keyring()) {
+    my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
+    DBUG_RETURN(innodb_init_abort());
+  }
+
   bool ret;
+
+  const ulint dd_space_flags =
+      do_encrypt ? predefined_flags | FSP_FLAGS_MASK_ENCRYPTION
+                 : predefined_flags;
 
   // For upgrade from 5.7, create mysql.ibd
   create |= (dict_init_mode == DICT_INIT_UPGRADE_57_FILES);
   ret = create ? dd_create_hardcoded(dict_sys_t::s_space_id,
-                                     dict_sys_t::s_dd_space_file_name)
+                                     dict_sys_t::s_dd_space_file_name,
+                                     dd_space_flags)
                : dd_open_hardcoded(dict_sys_t::s_space_id,
-                                   dict_sys_t::s_dd_space_file_name);
+                                   dict_sys_t::s_dd_space_file_name,
+                                   dd_space_flags);
 
   /* Once hardcoded tablespace mysql is created or opened,
   prepare it along with innodb system tablespace for server.
@@ -5192,19 +5224,24 @@ static int innobase_init_files(dict_init_mode_t dict_init_mode,
     snprintf(se_private_data_innodb_system, len, fmt, TRX_SYS_SPACE,
              srv_sys_space.flags(), DD_SPACE_CURRENT_SRV_VERSION,
              DD_SPACE_CURRENT_SPACE_VERSION);
+
     snprintf(se_private_data_dd, len, fmt, dict_sys_t::s_space_id,
-             predefined_flags, DD_SPACE_CURRENT_SRV_VERSION,
+             dd_space_flags, DD_SPACE_CURRENT_SRV_VERSION,
              DD_SPACE_CURRENT_SPACE_VERSION);
 
-    static Plugin_tablespace dd_space(dict_sys_t::s_dd_space_name, "",
-                                      se_private_data_dd, "",
+    const char *dd_space_options = do_encrypt ? "encryption=y" : "";
+
+    static Plugin_tablespace dd_space(dict_sys_t::s_dd_space_name,
+                                      dd_space_options, se_private_data_dd, "",
                                       innobase_hton_name);
     static Plugin_tablespace::Plugin_tablespace_file dd_file(
         dict_sys_t::s_dd_space_file_name, "");
     dd_space.add_file(&dd_file);
     tablespaces->push_back(&dd_space);
 
-    static Plugin_tablespace innodb(dict_sys_t::s_sys_space_name, "",
+    const char *options = srv_sys_space.is_encrypted() ? "encryption=y" : "";
+
+    static Plugin_tablespace innodb(dict_sys_t::s_sys_space_name, options,
                                     se_private_data_innodb_system, "",
                                     innobase_hton_name);
     Tablespace::files_t::const_iterator end = srv_sys_space.m_files.end();
@@ -12573,7 +12610,7 @@ bool create_table_info_t::create_option_tablespace_is_valid() {
   if (!m_use_shared_space) {
     if (!m_use_file_per_table) {
       /* System or temporary tablespace is being used for table */
-      if (m_create_info->encrypt_type.str && !is_temp) {
+      if (m_create_info->encrypt_type.str) {
         /* Encryption option is not allowed for table in general/shared
         tablesapces. */
         my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
@@ -12639,12 +12676,6 @@ bool create_table_info_t::create_option_tablespace_is_valid() {
                       MYF(0));
       return false;
     }
-  }
-
-  /* Tables in shared tablespace should not have encryption options */
-  if (is_shared_tablespace(m_create_info->tablespace)) {
-    m_create_info->encrypt_type.str = nullptr;
-    m_create_info->encrypt_type.length = 0;
   }
 
   /* If TABLESPACE=innodb_file_per_table this function is not called
@@ -12902,14 +12933,6 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
     return (false);
   }
 
-  if (!table_is_encrypted && tablespace_is_encrypted) {
-    my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                    "InnoDB: Tablespace `%s` can contain only an"
-                    " ENCRYPTED tables.",
-                    MYF(0), tablespace_name);
-    return (false);
-  }
-
   return (true);
 }
 
@@ -13105,22 +13128,26 @@ void ha_innobase::adjust_encryption_options(HA_CREATE_INFO *create_info,
 
   bool is_tmp = (create_info->options & HA_LEX_CREATE_TMP_TABLE) != 0;
 
-  /* If table is intrinsic, it will use encryption for table based on
-  temporary tablespace encryption property. For non-intrinsic tables
-  without explicit encryption attribute, table will be forced to be
-  encrypted if innodb_encrypt_tables=ON/FORCE */
+  if (is_intrinsic || is_tmp) {
+    return;
+  }
+
   if (create_info->encrypt_type.length == 0 &&
       create_info->encrypt_type.str == nullptr) {
-    if ((is_intrinsic && srv_tmp_space.is_encrypted()) ||
-        (!is_intrinsic && (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
-                           srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE))) {
-      create_info->encrypt_type = yes_string;
-    } else if (!is_intrinsic && !is_tmp &&
-               (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_ON ||
-                srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE ||
-                srv_encrypt_tables ==
-                    SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE)) {
-      create_info->encrypt_type = keyring_string;
+    switch (srv_encrypt_tables) {
+      case SRV_ENCRYPT_TABLES_ON:
+      case SRV_ENCRYPT_TABLES_FORCE:
+        create_info->encrypt_type = yes_string;
+        break;
+      case SRV_ENCRYPT_TABLES_KEYRING_ON:
+      case SRV_ENCRYPT_TABLES_KEYRING_FORCE:
+      case SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE:
+        create_info->encrypt_type = keyring_string;
+        break;
+      case SRV_ENCRYPT_TABLES_OFF:
+        break;
+      default:
+        ut_ad(0);
     }
   }
 
@@ -13152,7 +13179,10 @@ void ha_innobase::adjust_encryption_options(HA_CREATE_INFO *create_info,
     create_info->was_encryption_key_id_set = false;
   }
 
-  if (table_def) {
+  /* Add encryption attribute only to file_per_table table */
+  if (table_def && (create_info->tablespace == nullptr ||
+                    strcmp(create_info->tablespace,
+                           dict_sys_t::s_file_per_table_name) == 0)) {
     dd::Properties &table_options = table_def->options();
     if (create_info->encrypt_type.str != nullptr) {
       dd::String_type encrypt_type;
@@ -21367,8 +21397,8 @@ static int innodb_track_changed_pages_validate(THD *thd, SYS_VAR *var,
     return 0;
   }
 
-  if (intbuf == srv_track_changed_pages) { // == 0
-    *reinterpret_cast<ulong*>(save) = srv_track_changed_pages;
+  if (intbuf == srv_track_changed_pages) {  // == 0
+    *reinterpret_cast<ulong *>(save) = srv_track_changed_pages;
     return 0;
   }
 
@@ -23684,10 +23714,12 @@ static MYSQL_SYSVAR_ENUM(
     " The ROW_FORMAT value COMPRESSED is not allowed",
     NULL, NULL, DEFAULT_ROW_FORMAT_DYNAMIC, &innodb_default_row_format_typelib);
 
-static MYSQL_SYSVAR_BOOL(redo_log_encrypt, srv_redo_log_encrypt,
+static MYSQL_SYSVAR_ENUM(redo_log_encrypt, srv_redo_log_encrypt,
                          PLUGIN_VAR_OPCMDARG,
-                         "Enable or disable Encryption of REDO tablespace.",
-                         NULL, NULL, FALSE);
+                         "Enable or disable Encryption of REDO tablespace."
+                         "Possible values: OFF, ON, MASTER_KEY, KEYRING_KEY.",
+                         NULL, NULL, REDO_LOG_ENCRYPT_OFF,
+                         &redo_log_encrypt_typelib);
 
 static MYSQL_SYSVAR_BOOL(
     print_ddl_logs, srv_print_ddl_logs, PLUGIN_VAR_OPCMDARG,

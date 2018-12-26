@@ -3721,7 +3721,17 @@ int mysql_execute_command(THD *thd, bool first_level) {
         client thread has locked tables
       */
       if (thd->locked_tables_mode || thd->in_active_multi_stmt_transaction() ||
-          thd->global_read_lock.is_acquired()) {
+          thd->global_read_lock.is_acquired() ||
+          thd->backup_tables_lock.is_acquired()) {
+        my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+        goto error;
+      }
+
+      const auto backup_lock_acquired =
+          thd->mdl_context.owns_equal_or_stronger_lock(MDL_key::BACKUP_LOCK, "",
+                                                       "", MDL_SHARED);
+
+      if (backup_lock_acquired) {
         my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
         goto error;
       }
