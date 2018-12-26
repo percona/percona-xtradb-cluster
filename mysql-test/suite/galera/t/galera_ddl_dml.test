@@ -118,9 +118,19 @@ SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
 --echo #node-1a
 SET SESSION wsrep_sync_wait = 0;
 SET DEBUG_SYNC = "now WAIT_FOR entered1";
---error ER_DB_CREATE_EXISTS
-create database test;
+# starting 8.0, create db is blocking insert. (mdl locks).
+--send create database test;
+
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1b
+--echo #node-1b
+SET SESSION wsrep_sync_wait = 0;
 SET DEBUG_SYNC = "now SIGNAL continue1";
+
+--connection node_1a
+--echo #node-1a
+--error ER_DB_CREATE_EXISTS
+--reap
 
 --connection node_1
 --echo #node-1

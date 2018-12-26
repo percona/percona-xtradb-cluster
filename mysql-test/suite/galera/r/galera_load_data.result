@@ -20,18 +20,18 @@ SHOW BINLOG EVENTS FROM 124;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	124	Previous_gtids	1	155	
 mysqld-bin.000001	155	Anonymous_Gtid	1	230	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000001	230	Query	1	310	BEGIN
-mysqld-bin.000001	310	Table_map	1	358	table_id: ### (test.t1)
-mysqld-bin.000001	358	Write_rows	1	398	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	398	Xid	1	429	COMMIT /* xid=### */
+mysqld-bin.000001	230	Query	1	312	BEGIN
+mysqld-bin.000001	312	Table_map	1	360	table_id: ### (test.t1)
+mysqld-bin.000001	360	Write_rows	1	400	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	400	Xid	1	431	COMMIT /* xid=### */
 SHOW BINLOG EVENTS FROM 124;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	124	Previous_gtids	2	155	
 mysqld-bin.000001	155	Anonymous_Gtid	1	230	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000001	230	Query	1	305	BEGIN
-mysqld-bin.000001	305	Table_map	1	353	table_id: ### (test.t1)
-mysqld-bin.000001	353	Write_rows	1	393	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	393	Xid	1	424	COMMIT /* xid=### */
+mysqld-bin.000001	230	Query	1	307	BEGIN
+mysqld-bin.000001	307	Table_map	1	355	table_id: ### (test.t1)
+mysqld-bin.000001	355	Write_rows	1	395	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	395	Xid	1	426	COMMIT /* xid=### */
 TRUNCATE TABLE t1;
 RESET MASTER;
 ERROR 23000: Duplicate entry '1' for key 'PRIMARY'

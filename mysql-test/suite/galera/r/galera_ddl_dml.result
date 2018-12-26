@@ -44,11 +44,11 @@ tdict	CREATE TABLE `tdict` (
   `a` blob /*!50633 COLUMN_FORMAT COMPRESSED */,
   `b` blob /*!50633 COLUMN_FORMAT COMPRESSED WITH COMPRESSION_DICTIONARY `numbers` */,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 # ensure dictionary is created
-select * from information_schema.xtradb_zip_dict where name like '%number%';
-id	name	zip_dict
-1	numbers	percona
+select * from information_schema.compression_dictionary_tables where dict_name like '%number%';
+TABLE_SCHEMA	TABLE_NAME	COLUMN_NAME	DICT_NAME
+test	tdict	b	numbers
 #node-1
 truncate table t1;
 truncate table t2;
@@ -74,8 +74,8 @@ drop table tdict;
 drop compression_dictionary numbers;
 #node-2
 # ensure dictionary drop is replicated
-select * from information_schema.xtradb_zip_dict where name like '%number%';
-id	name	zip_dict
+select * from information_schema.compression_dictionary_tables where dict_name like '%number%';
+TABLE_SCHEMA	TABLE_NAME	COLUMN_NAME	DICT_NAME
 #node-2
 call mtr.add_suppression("Can't create database");
 #node-1
@@ -87,9 +87,12 @@ insert into t values (1);;
 #node-1a
 SET SESSION wsrep_sync_wait = 0;
 SET DEBUG_SYNC = "now WAIT_FOR entered1";
-create database test;
-ERROR HY000: Can't create database 'test'; database exists
+create database test;;
+#node-1b
+SET SESSION wsrep_sync_wait = 0;
 SET DEBUG_SYNC = "now SIGNAL continue1";
+#node-1a
+ERROR HY000: Can't create database 'test'; database exists
 #node-1
 select * from t;
 i

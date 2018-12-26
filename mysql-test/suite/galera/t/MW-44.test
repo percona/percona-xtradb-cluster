@@ -4,6 +4,14 @@
 
 --source include/galera_cluster.inc
 
+
+--connection node_1
+call mtr.add_suppression("Although a path was specified for the.*");
+
+--connection node_2
+call mtr.add_suppression("Although a path was specified for the.*");
+
+
 --connection node_1
 TRUNCATE TABLE mysql.general_log;
 

@@ -22203,7 +22203,23 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
 
   switch (wsrep_thd_conflict_state(thd)) {
     case NO_CONFLICT:
-      wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
+      if (thd->wsrep_exec_mode == LOCAL_COMMIT) {
+        /* Thread selected for abort is in advance commit state and said
+        transaction is already accepted by cluster so avoid aborting it.
+
+        How come conflicting transaction was allowed to proceed ?
+        If transaction is mysql group commit state then commit monitor is
+        released so conflicting TOI transaction can make progress. */
+        WSREP_DEBUG(
+            "Ignoring brute force abort request from thd (%u) executing"
+            " with write-set (%lld, %s) to forcefully abort thd (%u) executing"
+            " with write-set (%lld, %s) as latter is already replicated",
+            wsrep_thd_thread_id(bf_thd), (long long)wsrep_thd_trx_seqno(bf_thd),
+            wsrep_thd_get_exec_mode(bf_thd), wsrep_thd_thread_id(thd),
+            (long long)wsrep_thd_trx_seqno(thd), wsrep_thd_get_exec_mode(thd));
+      } else {
+        wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
+      }
       break;
     case MUST_ABORT: {
       WSREP_DEBUG(
@@ -22291,51 +22307,67 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
       break;
     }
     case QUERY_EXEC: {
-      /* it is possible that victim trx is itself waiting for some
-       * other lock. We need to cancel this waiting
-       */
-      WSREP_DEBUG("Killing Transaction (%llu) in QUERY_EXEC state",
-                  (long long)victim_trx->id);
+      if (thd->wsrep_exec_mode == LOCAL_COMMIT) {
+        /* Thread selected for abort is in advance commit state and said
+        transaction is already accepted by cluster so avoid aborting it.
 
-      victim_trx->lock.was_chosen_as_deadlock_victim = true;
-      if (victim_trx->lock.wait_lock) {
-        WSREP_DEBUG("victim has wait flag: %u", wsrep_thd_thread_id(thd));
-        lock_t *wait_lock = victim_trx->lock.wait_lock;
-        if (wait_lock) {
-          WSREP_DEBUG("canceling wait lock");
-          victim_trx->lock.was_chosen_as_deadlock_victim = true;
-          lock_cancel_waiting_and_release(wait_lock, true);
-        }
-
-        query_id_t bf_id = wsrep_thd_query_id(bf_thd);
-        if (bf_id == 0) {
-          WSREP_WARN("query ID 0, for query %s", wsrep_thd_query(bf_thd));
-          bf_id = 1;
-        }
-        query_id_t query_id = victim_trx->wsrep_killed_by_query;
-        os_compare_and_swap_thread_id(&victim_trx->wsrep_killed_by_query,
-                                      query_id, bf_id);
-        wsrep_thd_awake(thd, signal);
+        How come conflicting transaction was allowed to proceed ?
+        If transaction is mysql group commit state then commit monitor is
+        released so conflicting TOI transaction can make progress. */
+        WSREP_DEBUG(
+            "Ignoring brute force abort request from thd (%u) executing"
+            " with write-set (%lld, %s) to forcefully abort thd (%u) executing"
+            " with write-set (%lld, %s) as latter is already replicated",
+            wsrep_thd_thread_id(bf_thd), (long long)wsrep_thd_trx_seqno(bf_thd),
+            wsrep_thd_get_exec_mode(bf_thd), wsrep_thd_thread_id(thd),
+            (long long)wsrep_thd_trx_seqno(thd), wsrep_thd_get_exec_mode(thd));
       } else {
-        /* abort currently executing query */
-        DBUG_PRINT("wsrep",
-                   ("sending KILL_QUERY to: %u", wsrep_thd_thread_id(thd)));
-        WSREP_DEBUG("kill query for: %u", wsrep_thd_thread_id(thd));
+        /* it is possible that victim trx is itself waiting for some
+         * other lock. We need to cancel this waiting
+         */
+        WSREP_DEBUG("Killing Transaction (%llu) in QUERY_EXEC state",
+                    (long long)victim_trx->id);
 
-        query_id_t bf_id = wsrep_thd_query_id(bf_thd);
-        if (bf_id == 0) {
-          WSREP_WARN("BF abortee's query ID 0, for: %s",
-                     wsrep_thd_query(bf_thd));
-          bf_id = 1;
-        }
-        query_id_t query_id = victim_trx->wsrep_killed_by_query;
-        os_compare_and_swap_thread_id(&victim_trx->wsrep_killed_by_query,
-                                      query_id, bf_id);
-        wsrep_thd_awake(thd, signal);
+        victim_trx->lock.was_chosen_as_deadlock_victim = true;
+        if (victim_trx->lock.wait_lock) {
+          WSREP_DEBUG("victim has wait flag: %u", wsrep_thd_thread_id(thd));
+          lock_t *wait_lock = victim_trx->lock.wait_lock;
+          if (wait_lock) {
+            WSREP_DEBUG("canceling wait lock");
+            victim_trx->lock.was_chosen_as_deadlock_victim = true;
+            lock_cancel_waiting_and_release(wait_lock, true);
+          }
 
-        /* for BF thd, we need to prevent him from committing */
-        if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
-          wsrep_abort_slave_trx(bf_seqno, wsrep_thd_trx_seqno(thd));
+          query_id_t bf_id = wsrep_thd_query_id(bf_thd);
+          if (bf_id == 0) {
+            WSREP_WARN("query ID 0, for query %s", wsrep_thd_query(bf_thd));
+            bf_id = 1;
+          }
+          query_id_t query_id = victim_trx->wsrep_killed_by_query;
+          os_compare_and_swap_thread_id(&victim_trx->wsrep_killed_by_query,
+                                        query_id, bf_id);
+          wsrep_thd_awake(thd, signal);
+        } else {
+          /* abort currently executing query */
+          DBUG_PRINT("wsrep",
+                     ("sending KILL_QUERY to: %u", wsrep_thd_thread_id(thd)));
+          WSREP_DEBUG("kill query for: %u", wsrep_thd_thread_id(thd));
+
+          query_id_t bf_id = wsrep_thd_query_id(bf_thd);
+          if (bf_id == 0) {
+            WSREP_WARN("BF abortee's query ID 0, for: %s",
+                       wsrep_thd_query(bf_thd));
+            bf_id = 1;
+          }
+          query_id_t query_id = victim_trx->wsrep_killed_by_query;
+          os_compare_and_swap_thread_id(&victim_trx->wsrep_killed_by_query,
+                                        query_id, bf_id);
+          wsrep_thd_awake(thd, signal);
+
+          /* for BF thd, we need to prevent him from committing */
+          if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
+            wsrep_abort_slave_trx(bf_seqno, wsrep_thd_trx_seqno(thd));
+          }
         }
       }
       break;
