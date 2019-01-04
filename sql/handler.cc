@@ -1587,8 +1587,18 @@ int commit_owned_gtid_by_partial_command(THD *thd) {
 int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
   int error = 0;
   PSI_stage_info old_stage;
+#ifdef WITH_WSREP
+  if (!thd->wsrep_applier) {
+    /* While running in applier mode, PXC continue to retains it own
+    stage information as it has better stage tracking. */
+    thd->enter_stage(&stage_waiting_for_handler_commit, &old_stage, __func__,
+                     __FILE__, __LINE__);
+  }
+#else
   thd->enter_stage(&stage_waiting_for_handler_commit, &old_stage, __func__,
                    __FILE__, __LINE__);
+#endif /* WITH_WSREP */
+
   bool need_clear_owned_gtid = false;
   bool run_slave_post_commit = false;
   /*

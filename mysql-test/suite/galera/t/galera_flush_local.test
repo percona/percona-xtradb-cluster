@@ -7,6 +7,7 @@
 #
 # PXC-267
 #
+--error ER_NO_SUCH_TABLE
 OPTIMIZE  /*+ SET_VAR(sort_buffer_size = 0) SET_VAR(myisam_repair_threads=0) */ TABLE t0;
 
 --disable_warnings

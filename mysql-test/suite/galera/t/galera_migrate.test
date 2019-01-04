@@ -117,7 +117,7 @@ CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
 
 --disable_query_log
---eval SET GLOBAL wsrep_sst_method = 'mysqldump';
+--eval SET GLOBAL wsrep_sst_method = 'rsync';
 --eval SET GLOBAL wsrep_sst_auth = 'sst:';
 --eval SET GLOBAL wsrep_provider='$WSREP_PROVIDER'
 --eval SET GLOBAL wsrep_provider_options='base_port=$NODE_GALERAPORT_4'

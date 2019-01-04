@@ -115,7 +115,7 @@ UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
 
 # Wait for both transactions to be blocked
 --connection node_1a
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'System lock';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'Applying batch of row changes (update)';
 --source include/wait_condition.inc
 
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: initiating pre-commit for write set%' AND INFO = 'COMMIT';

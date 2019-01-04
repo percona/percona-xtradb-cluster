@@ -8,6 +8,7 @@
 [mysqld]
 master-info-repository=TABLE 
 relay-log-info-repository=TABLE
+mysqlx=0
 
 [mysqld.1]
 log-bin=mysqld-bin

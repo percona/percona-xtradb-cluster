@@ -597,16 +597,16 @@ select @@pxc_strict_mode;
 # binlog_format=STATEMENT
 --connection node_1
 --echo #node-1
+--error ER_WRONG_VALUE_FOR_VAR 
 set session binlog_format = 'STATEMENT';
 select @@binlog_format;
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
---error ER_LOCK_DEADLOCK
 insert into tinnodb values (1), (2);
 select * from tinnodb;
 #
 --connection node_2
 --echo #node-2
---echo #0 rows expected as as pxc-strict-mode = DISABLED
+--echo #2 rows expected as as pxc-strict-mode = DISABLED
 select * from tinnodb;
 drop table tinnodb;
 
@@ -614,16 +614,16 @@ drop table tinnodb;
 # binlog_format=MIXED
 --connection node_1
 --echo #node-1
+--error ER_WRONG_VALUE_FOR_VAR 
 set session binlog_format = 'MIXED';
 select @@binlog_format;
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
---error ER_LOCK_DEADLOCK
 insert into tinnodb values (1), (2);
 select * from tinnodb;
 #
 --connection node_2
 --echo #node-2
---echo #0 rows expected as as binlog_format = MIXED
+--echo #2 rows expected as as binlog_format = MIXED
 select * from tinnodb;
 drop table tinnodb;
 
@@ -660,16 +660,16 @@ select @@pxc_strict_mode;
 # binlog_format=STATEMENT
 --connection node_1
 --echo #node-1
+--error ER_WRONG_VALUE_FOR_VAR 
 set session binlog_format = 'STATEMENT';
 select @@binlog_format;
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
---error ER_LOCK_DEADLOCK
 insert into tinnodb values (1), (2);
 select * from tinnodb;
 #
 --connection node_2
 --echo #node-2
---echo #0 rows expected as as pxc-strict-mode = DISABLED
+--echo #2 rows expected as as pxc-strict-mode = DISABLED
 select * from tinnodb;
 drop table tinnodb;
 
@@ -677,16 +677,16 @@ drop table tinnodb;
 # binlog_format=MIXED
 --connection node_1
 --echo #node-1
+--error ER_WRONG_VALUE_FOR_VAR 
 set session binlog_format = 'MIXED';
 select @@binlog_format;
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
---error ER_LOCK_DEADLOCK
 insert into tinnodb values (1), (2);
 select * from tinnodb;
 #
 --connection node_2
 --echo #node-2
---echo #0 rows expected as as binlog_format = MIXED
+--echo #2 rows expected as as binlog_format = MIXED
 select * from tinnodb;
 drop table tinnodb;
 
@@ -711,9 +711,6 @@ drop table tinnodb;
 # ENFORCING
 --connection node_1
 --echo #node-1
-set session binlog_format = 'STATEMENT';
---error ER_UNKNOWN_ERROR
-set global pxc_strict_mode = 'ENFORCING';
 set session binlog_format = 'ROW';
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
@@ -727,10 +724,10 @@ select @@pxc_strict_mode;
 # binlog_format=STATEMENT
 --connection node_1
 --echo #node-1
---error ER_UNKNOWN_ERROR
+--error ER_WRONG_VALUE_FOR_VAR
 set session binlog_format = 'STATEMENT';
 select @@binlog_format;
---error ER_UNKNOWN_ERROR
+--error ER_WRONG_VALUE_FOR_VAR
 set session binlog_format = 'MIXED';
 select @@binlog_format;
 

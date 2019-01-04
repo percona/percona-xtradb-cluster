@@ -579,37 +579,41 @@ select @@pxc_strict_mode;
 DISABLED
 #node-1
 set session binlog_format = 'STATEMENT';
-Warnings:
-Warning	1287	Setting binlog format to STATEMENT OR MIXED at session level is deprecated and will be removed in future release. While operating in cluster mode use binlog_format=ROW.
+ERROR 42000: Variable 'binlog_format' can't be set to the value of 'STATEMENT'
 select @@binlog_format;
 @@binlog_format
-STATEMENT
+ROW
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
 select * from tinnodb;
 i
+1
+2
 #node-2
-#0 rows expected as as pxc-strict-mode = DISABLED
+#2 rows expected as as pxc-strict-mode = DISABLED
 select * from tinnodb;
 i
+1
+2
 drop table tinnodb;
 #node-1
 set session binlog_format = 'MIXED';
-Warnings:
-Warning	1287	Setting binlog format to STATEMENT OR MIXED at session level is deprecated and will be removed in future release. While operating in cluster mode use binlog_format=ROW.
+ERROR 42000: Variable 'binlog_format' can't be set to the value of 'MIXED'
 select @@binlog_format;
 @@binlog_format
-MIXED
+ROW
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
 select * from tinnodb;
 i
+1
+2
 #node-2
-#0 rows expected as as binlog_format = MIXED
+#2 rows expected as as binlog_format = MIXED
 select * from tinnodb;
 i
+1
+2
 drop table tinnodb;
 #node-1
 set session binlog_format = 'ROW';
@@ -641,39 +645,41 @@ select @@pxc_strict_mode;
 PERMISSIVE
 #node-1
 set session binlog_format = 'STATEMENT';
-Warnings:
-Warning	1287	Setting binlog format to STATEMENT OR MIXED at session level is deprecated and will be removed in future release. While operating in cluster mode use binlog_format=ROW.
-Warning	1105	Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = PERMISSIVE
+ERROR 42000: Variable 'binlog_format' can't be set to the value of 'STATEMENT'
 select @@binlog_format;
 @@binlog_format
-STATEMENT
+ROW
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
 select * from tinnodb;
 i
+1
+2
 #node-2
-#0 rows expected as as pxc-strict-mode = DISABLED
+#2 rows expected as as pxc-strict-mode = DISABLED
 select * from tinnodb;
 i
+1
+2
 drop table tinnodb;
 #node-1
 set session binlog_format = 'MIXED';
-Warnings:
-Warning	1287	Setting binlog format to STATEMENT OR MIXED at session level is deprecated and will be removed in future release. While operating in cluster mode use binlog_format=ROW.
-Warning	1105	Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = PERMISSIVE
+ERROR 42000: Variable 'binlog_format' can't be set to the value of 'MIXED'
 select @@binlog_format;
 @@binlog_format
-MIXED
+ROW
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
 select * from tinnodb;
 i
+1
+2
 #node-2
-#0 rows expected as as binlog_format = MIXED
+#2 rows expected as as binlog_format = MIXED
 select * from tinnodb;
 i
+1
+2
 drop table tinnodb;
 #node-1
 set session binlog_format = 'ROW';
@@ -694,12 +700,6 @@ i
 2
 drop table tinnodb;
 #node-1
-set session binlog_format = 'STATEMENT';
-Warnings:
-Warning	1287	Setting binlog format to STATEMENT OR MIXED at session level is deprecated and will be removed in future release. While operating in cluster mode use binlog_format=ROW.
-Warning	1105	Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = PERMISSIVE
-set global pxc_strict_mode = 'ENFORCING';
-ERROR HY000: Can't change pxc_strict_mode to ENFORCING as binlog_format != ROW
 set session binlog_format = 'ROW';
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
@@ -712,12 +712,12 @@ select @@pxc_strict_mode;
 ENFORCING
 #node-1
 set session binlog_format = 'STATEMENT';
-ERROR HY000: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = ENFORCING or MASTER
+ERROR 42000: Variable 'binlog_format' can't be set to the value of 'STATEMENT'
 select @@binlog_format;
 @@binlog_format
 ROW
 set session binlog_format = 'MIXED';
-ERROR HY000: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED with pxc_strict_mode = ENFORCING or MASTER
+ERROR 42000: Variable 'binlog_format' can't be set to the value of 'MIXED'
 select @@binlog_format;
 @@binlog_format
 ROW

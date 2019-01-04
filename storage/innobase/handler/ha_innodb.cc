@@ -22462,7 +22462,16 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
 static int wsrep_abort_transaction_func(handlerton *hton, THD *bf_thd,
                                         THD *victim_thd, bool signal) {
   DBUG_ENTER("wsrep_innobase_abort_thd");
+
+  /* TODO: check if this can cause deadlock in PXC world.
+  Secure access to thd ha_data as it could be modified parallel.
+  (One such instance we found was with use of trigger that causes
+   Transaction_ro (attachable transaction use) that would re-vise ha_data) */
+  mysql_mutex_lock(&victim_thd->LOCK_thd_data);
   trx_t *victim_trx = thd_to_trx(victim_thd);
+  mysql_mutex_unlock(&victim_thd->LOCK_thd_data);
+
+  /* mutex lock is not needed here as execution if being done by bf_thd. */
   trx_t *bf_trx = (bf_thd) ? thd_to_trx(bf_thd) : NULL;
   WSREP_DEBUG("Abort Transaction BF query: %s Victim query: %s",
               wsrep_thd_query(bf_thd), wsrep_thd_query(victim_thd));

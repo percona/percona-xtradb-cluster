@@ -29,12 +29,11 @@ INSERT INTO t1 VALUES(5);
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
---let $wait_condition = SELECT COUNT(*) = 4 FROM t1;
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t1;
 --source include/wait_condition.inc
 
-# With wsrep_mysql_replication_bundle = 2, the last insert is not delivered
-# because there are not enough events remaining to complete an entire bundle
-SELECT COUNT(*) = 4 FROM t1;
+# wsrep_replication_bundle has no effect. it is deprecated.
+SELECT COUNT(*) = 5 FROM t1;
 
 # Bundle is now complete, the last INSERT and the DROP are delivered
 --connection node_1

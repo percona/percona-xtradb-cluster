@@ -14,9 +14,6 @@ DROP TABLE t1;
 use test;
 set @@sql_mode = 'NO_AUTO_VALUE_ON_ZERO';
 set @@session.sql_log_bin = 0;
-set @@global.wsrep_drupal_282555_workaround = 1;
-Warnings:
-Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 select get_lock("lock-1", 100000);
 get_lock("lock-1", 100000)
 1
@@ -26,9 +23,6 @@ Warnings:
 Warning	1366	Incorrect integer value: 'a' for column 'c1' at row 1
 insert into t1 values ('a');
 ERROR 23000: Duplicate entry '0' for key 'c1'
-set @@global.wsrep_drupal_282555_workaround = 0;
-Warnings:
-Warning	1287	'@@wsrep_drupal_282555_workaround' is deprecated and will be removed in a future release.
 set @@session.sql_log_bin = 1;
 set @@sql_mode = default;
 CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query");

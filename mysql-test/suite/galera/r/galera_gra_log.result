@@ -17,7 +17,7 @@ AAAAAAAAAAAAAAAAAAC6ecBVEzgNAAgAEgAEBAQEEgAAXAAEGggAAAAICAgCAAAACgoKGRkAAKNu
 Jfk=
 '/*!*/;
 # at 120
-<ISO TIMESTAMP> server id 1  end_log_pos 94 	Query	thread_id=<THREAD_ID>	exec_time=0	error_code=0
+<ISO TIMESTAMP> server id 1  end_log_pos 0 	Query	thread_id=<THREAD_ID>	exec_time=0	error_code=0
 use `test`/*!*/;
 SET TIMESTAMP=<TIMESTAMP>/*!*/;
 SET @@session.pseudo_thread_id=<PSEUDO_THREAD_ID>/*!*/;
@@ -28,7 +28,8 @@ SET @@session.auto_increment_increment=1, @@session.auto_increment_offset=1/*!*/
 SET @@session.character_set_client=255,@@session.collation_connection=255,@@session.collation_server=255/*!*/;
 SET @@session.lc_time_names=0/*!*/;
 SET @@session.collation_database=DEFAULT/*!*/;
-/*!80005 SET @@session.default_collation_for_utf8mb4=255*//*!*/;
+/*!80011 SET @@session.default_collation_for_utf8mb4=255*//*!*/;
+/*!80013 SET @@session.sql_require_primary_key=0*//*!*/;
 CREATE TABLE t1 (f1 INTEGER)
 /*!*/;
 SET @@SESSION.GTID_NEXT= 'AUTOMATIC' /* added by mysqlbinlog */ /*!*/;

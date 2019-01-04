@@ -1,3 +1,5 @@
+OPTIMIZE  /*+ SET_VAR(sort_buffer_size = 0) SET_VAR(myisam_repair_threads=0) */ TABLE t0;
+ERROR 42S02: Table 'test.t0' doesn't exist
 DROP TABLE IF EXISTS t1, t2, x1, x2;
 CREATE TABLE t1 (f1 INTEGER);
 CREATE TABLE t2 (f1 INT PRIMARY KEY AUTO_INCREMENT, f2 INTEGER);

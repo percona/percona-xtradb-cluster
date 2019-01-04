@@ -44,16 +44,16 @@ DROP USER u1;
 # Check that the obfuscated password appears in the logs
 
 # Five times for the first node, in the various wsrep_debug messages
---let $assert_text = 'caching_sha2_password' AS '<secret>'
---let $assert_select = 'caching_sha2_password' AS '<secret>'
---let $assert_count = 8
+--let $assert_text = <secret>
+--let $assert_select = <secret>
+--let $assert_count = 9 
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
 
 # Once for the second node, in the 'Slave SQL' error
---let $assert_text = 'caching_sha2_password' AS '<secret>'
---let $assert_select = 'caching_sha2_password' AS '<secret>'
+--let $assert_text = <secret>
+--let $assert_select = <secret>
 --let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
 --let $assert_only_after = CURRENT_TEST

@@ -36,7 +36,7 @@
 #include "plugin/keyring/common/keyring.h"
 
 #ifdef WITH_WSREP
-extern bool wsrep_is_wsrep_on(void);
+//extern bool wsrep_is_wsrep_on(void);
 #endif /* WITH_WSREP */
 
 #ifdef _WIN32
@@ -139,7 +139,8 @@ static int keyring_init(MYSQL_PLUGIN plugin_info MY_ATTRIBUTE((unused))) {
       as fatal error to avoid inconsistency in cluster enviornment where-in
       some node of the cluster are running with keyring enabled and other
       in keyring disabled mode, despite of same user provided configuration. */
-      return (wsrep_is_wsrep_on() ? true : false);
+      // return (wsrep_is_wsrep_on() ? true : false);
+      return true;
 #else
       return false;
 #endif /* WITH_WSREP */

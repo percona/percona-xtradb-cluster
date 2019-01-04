@@ -5,6 +5,6 @@ ERROR HY000: Operation CREATE USER failed for 'u1'@'%'
 DROP USER u1;
 include/assert_grep.inc [plaintext_password]
 include/assert_grep.inc [plaintext_password]
-include/assert_grep.inc ['caching_sha2_password' AS '<secret>']
-include/assert_grep.inc ['caching_sha2_password' AS '<secret>']
+include/assert_grep.inc [<secret>]
+include/assert_grep.inc [<secret>]
 CALL mtr.add_suppression('Operation CREATE USER failed');

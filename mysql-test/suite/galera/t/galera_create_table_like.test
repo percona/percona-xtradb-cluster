@@ -56,6 +56,7 @@ DROP SCHEMA schema2;
 
 --connection node_1
 --echo #node-1
+set global wsrep_debug=1;
 use test;
 create table t1 (c1 int) engine=innodb;
 create table t2 (c1 int) engine=innodb;
@@ -65,6 +66,7 @@ insert into t2 values (2);
 
 --connection node_2
 --echo #node-2
+set global wsrep_debug=1;
 use test;
 select * from t1;
 select * from t2;
@@ -160,7 +162,8 @@ show tables;
 --connection node_1
 --echo #node-1
 drop table t1, t2, t3, t4, t5;
-drop table t6, t7, t8, t9, t10;
+drop table t6, t9;
+drop table t7, t8, t10;
 drop table t11, t12, t13, t14, t15;
 drop table t16, t17, t18, t19, t20;
 drop table t101, t102;
@@ -213,7 +216,8 @@ show tables;
 --connection node_1
 --echo #node-1
 drop table t1, t2, t3, t4, t5;
-drop table t6, t7, t8, t9, t10;
+drop table t6, t9;
+drop table t7, t8, t10;
 drop table t11, t12, t13, t14, t15;
 drop table t16, t17, t18, t19, t20;
 drop table t101, t102, t201, t202;

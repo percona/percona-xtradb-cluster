@@ -16,11 +16,13 @@ log-bin=mysqld-bin
 binlog-format=row
 gtid-mode=on
 enforce-gtid-consistency=true
+mysqlx=0
 
 [mysqld.1]
 server-id=1
 
 [mysqld.2]
+wsrep_debug=1
 server-id=2
 
 wsrep_provider=@ENV.WSREP_PROVIDER
@@ -41,6 +43,7 @@ innodb_autoinc_lock_mode=2
 innodb_flush_log_at_trx_commit=2
 
 [mysqld.3]
+wsrep_debug=1
 server-id=3
 
 wsrep_provider=@ENV.WSREP_PROVIDER

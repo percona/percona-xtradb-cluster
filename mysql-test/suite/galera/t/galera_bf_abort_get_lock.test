@@ -48,13 +48,11 @@ connect(con_node_1a, localhost, root,,);
 use test;
 --let $existing_sql_mode = `SELECT @@sql_mode`
 --let $existing_sql_log_bin = `SELECT @@session.sql_log_bin`
---let $existing_drupal_workaround = `SELECT @@wsrep_drupal_282555_workaround`
 
 --disable_warnings
 set @@sql_mode = 'NO_AUTO_VALUE_ON_ZERO';
 --enable_warnings
 set @@session.sql_log_bin = 0;
-set @@global.wsrep_drupal_282555_workaround = 1;
 
 select get_lock("lock-1", 100000);
 create table t1 (c1 int auto_increment unique key) engine=innodb;
@@ -62,7 +60,6 @@ insert into t1 values ('a');
 --error ER_DUP_ENTRY
 insert into t1 values ('a');
 
---eval set @@global.wsrep_drupal_282555_workaround = $existing_drupal_workaround
 --eval set @@session.sql_log_bin = $existing_sql_log_bin
 --eval set @@sql_mode = default
 #
