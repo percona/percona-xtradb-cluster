@@ -239,7 +239,7 @@ void Global_THD_manager::add_thd(THD *thd) {
 #ifdef WITH_WSREP
   if (WSREP_ON && thd->wsrep_applier) {
     wsrep_running_threads++;
-    WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads);
+    WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads.load());
   }
 #endif /* WITH_WSREP */
   // Adding the same THD twice is an error.
@@ -266,7 +266,7 @@ void Global_THD_manager::remove_thd(THD *thd) {
 #ifdef WITH_WSREP
   if (WSREP_ON && thd->wsrep_applier) {
     wsrep_running_threads--;
-    WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads);
+    WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads.load());
   }
 #endif /* WITH_WSREP */
   // Removing a THD that was never added is an error.

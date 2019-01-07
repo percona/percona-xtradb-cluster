@@ -123,7 +123,7 @@ extern bool wsrep_restart_slave;
 extern bool wsrep_restart_slave_activated;
 extern bool wsrep_slave_FK_checks;
 extern bool wsrep_slave_UK_checks;
-extern ulong wsrep_running_threads;
+extern std::atomic<ulong> wsrep_running_threads;
 extern ulong wsrep_RSU_commit_timeout;
 
 enum enum_wsrep_reject_types {

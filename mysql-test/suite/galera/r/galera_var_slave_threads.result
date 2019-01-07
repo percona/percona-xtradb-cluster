@@ -1,5 +1,7 @@
+#node-1
 CREATE TABLE t1 (f1 INT PRIMARY KEY) Engine=InnoDB;
 CREATE TABLE t2 (f1 INT AUTO_INCREMENT PRIMARY KEY) Engine=InnoDB;
+#node-2
 SET GLOBAL wsrep_slave_threads = 0;
 Warnings:
 Warning	1292	Truncated incorrect wsrep_slave_threads value: '0'
@@ -17,10 +19,13 @@ SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system use
 COUNT(*) = 1
 1
 SET GLOBAL wsrep_slave_threads = 64;
+#node-1
 INSERT INTO t1 VALUES (1);
+#node-2
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1
+# this should emit presence of 64 applier threads
 SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 COUNT(*) = @@wsrep_slave_threads + 1
 1
@@ -28,6 +33,7 @@ SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system use
 COUNT(*) = 1
 1
 SET GLOBAL wsrep_slave_threads = 1;
+#node-1
 INSERT INTO t2 VALUES (DEFAULT);
 INSERT INTO t2 VALUES (DEFAULT);
 INSERT INTO t2 VALUES (DEFAULT);
@@ -92,10 +98,12 @@ INSERT INTO t2 VALUES (DEFAULT);
 INSERT INTO t2 VALUES (DEFAULT);
 INSERT INTO t2 VALUES (DEFAULT);
 INSERT INTO t2 VALUES (DEFAULT);
+#node-2
 SELECT COUNT(*) = 64 FROM t2;
 COUNT(*) = 64
 1
 SET wsrep_sync_wait=0;
+# this should emit presence of 1 applier thread
 SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 COUNT(*) = @@wsrep_slave_threads + 1
 1
@@ -103,7 +111,13 @@ SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system use
 COUNT(*) = 1
 1
 SET GLOBAL wsrep_slave_threads = 5;
-SET GLOBAL wsrep_slave_threads = 1;
+# this should emit presence of 5 applier threads
+SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+COUNT(*) = @@wsrep_slave_threads + 1
+1
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
+COUNT(*) = 1
+1
 Shutting down server ...
 SET wsrep_sync_wait=0;
 show status like 'wsrep_cluster_size';

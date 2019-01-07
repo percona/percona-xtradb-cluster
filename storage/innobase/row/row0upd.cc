@@ -184,7 +184,7 @@ static bool wsrep_row_upd_index_is_foreign(dict_index_t *index, trx_t *trx) {
 
   dict_foreign_set::iterator it =
       std::find_if(table->foreign_set.begin(), table->foreign_set.end(),
-                   dict_foreign_with_index(index));
+                   dict_foreign_with_foreign_index(index));
 
   is_referenced = (it != table->foreign_set.end());
 
@@ -2309,6 +2309,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
               }
               break;
             case DB_LOCK_WAIT:
+            case DB_LOCK_WAIT_TIMEOUT:
               err = DB_LOCK_WAIT_TIMEOUT;
               break;
             default:

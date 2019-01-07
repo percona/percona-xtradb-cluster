@@ -551,6 +551,9 @@ bool wsrep_slave_threads_update(sys_var *, THD *, enum_var_type) {
                 wsrep_slave_count_change, wsrep_slave_threads);
     wsrep_create_appliers(wsrep_slave_count_change);
     wsrep_slave_count_change = 0;
+  } else {
+    WSREP_DEBUG("%d applier threads scheduled for closure",
+                abs(wsrep_slave_count_change));
   }
   return false;
 }
