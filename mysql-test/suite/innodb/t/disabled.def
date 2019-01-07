@@ -18,3 +18,7 @@ innodb_file_limit_check : BUG#89208 2018-05-31 VasilDimov https://bugs.mysql.com
 mysqldump_max_recordsize : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 xa_prepare_lock_release : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 # Codership disabled tests end here
+log_encrypt_4_mk : PS-4958 2018-10-24 Zsolt Parragi Testcase crashes with eatmydata in LD_PRELOAD
+log_encrypt_4_rk : PS-4958 2018-10-24 Zsolt Parragi Testcase crashes with eatmydata in LD_PRELOAD
+log_encrypt_6_mk : PS-4958 2018-10-24 Zsolt Parragi Testcase crashes with eatmydata in LD_PRELOAD
+log_encrypt_6_rk : PS-4958 2018-10-24 Zsolt Parragi Testcase crashes with eatmydata in LD_PRELOAD

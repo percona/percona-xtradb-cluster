@@ -57,6 +57,7 @@ Created 2/16/1996 Heikki Tuuri
 #include "os0file.h"
 #include "os0thread.h"
 #include "fil0fil.h"
+#include "fil0crypt.h"
 #include "fsp0fsp.h"
 #include "rem0rec.h"
 #include "mtr0mtr.h"
@@ -207,7 +208,15 @@ mysql_pfs_key_t	srv_worker_thread_key;
 
 #ifdef WITH_WSREP
 extern my_bool wsrep_recovery;
+
+#ifdef WITH_INNODB_DISALLOW_WRITES
+/* Must always init to FALSE. */
+static my_bool	innobase_disallow_writes	= FALSE;
+#endif /* WITH_INNODB_DISALLOW_WRITES */
+
 #endif /* WITH_WSREP */
+
+int unlock_keyrings(THD *thd);
 
 #ifdef HAVE_PSI_STAGE_INTERFACE
 /** Array of all InnoDB stage events for monitoring activities via
@@ -460,9 +469,30 @@ create_log_files(
 	fil_space_t*	log_space = fil_space_create(
 		"innodb_redo_log", SRV_LOG_SPACE_FIRST_ID,
 		fsp_flags_set_page_size(0, univ_page_size),
-		FIL_TYPE_LOG);
+		FIL_TYPE_LOG,
+                NULL);
 	ut_a(fil_validate());
 	ut_a(log_space != NULL);
+
+      /* Once the redo log is set to be encrypted,
+        initialize encryption information. */
+       if (srv_redo_log_encrypt != REDO_LOG_ENCRYPT_OFF) {
+               if (!Encryption::check_keyring()) {
+                       ib::error()
+                               << "Redo log encryption is enabled,"
+                               << " but keyring plugin is not loaded.";
+
+                       return(DB_ERROR);
+               }
+
+               log_space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+               err = fil_set_encryption(log_space->id,
+                                        Encryption::AES,
+                                        NULL,
+                                        NULL);
+               ut_ad(err == DB_SUCCESS);
+       }
+
 
 	logfile0 = fil_node_create(
 		logfilename, (ulint) srv_log_file_size,
@@ -498,6 +528,16 @@ create_log_files(
 	ut_d(recv_no_log_write = false);
 	recv_reset_logs(lsn);
 	log_mutex_exit();
+
+	/* Write encryption information into the first log file header
+	if redo log is set with encryption. */
+	if (FSP_FLAGS_GET_ENCRYPTION(log_space->flags)) {
+		if (!log_write_encryption(log_space->encryption_key,
+					  log_space->encryption_iv
+					  )) {
+			return(DB_ERROR);
+		}
+	}
 
 	return(DB_SUCCESS);
 }
@@ -637,6 +677,67 @@ srv_undo_tablespace_create(
 
 	return(err);
 }
+
+/** Try to read encryption metadata from an undo tablespace.
+@param[in]	fh		file handle of undo log file
+@param[in]	space		undo tablespace
+@return DB_SUCCESS if success */
+static
+dberr_t
+srv_undo_tablespace_read_encryption(
+	pfs_os_file_t	fh,
+	fil_space_t*	space)
+{
+	IORequest	request;
+	ulint		n_read = 0;
+	size_t		page_size = UNIV_PAGE_SIZE_MAX;
+	dberr_t		err = DB_ERROR;
+ 	byte* first_page_buf = static_cast<byte*>(
+		ut_malloc_nokey(2 * UNIV_PAGE_SIZE_MAX));
+	/* Align the memory for a possible read from a raw device */
+	byte* first_page = static_cast<byte*>(
+		ut_align(first_page_buf, UNIV_PAGE_SIZE));
+ 	/* Don't want unnecessary complaints about partial reads. */
+	request.disable_partial_io_warnings();
+ 	err = os_file_read_no_error_handling(
+		request, fh, first_page, 0, page_size, &n_read);
+ 	if (err != DB_SUCCESS) {
+		ib::info()
+			<< "Cannot read first page of '"
+			<< space->name << "' "
+			<< ut_strerr(err);
+		ut_free(first_page_buf);
+		return(err);
+	}
+ 	ulint			offset;
+	const page_size_t	space_page_size(space->flags);
+ 	offset = fsp_header_get_encryption_offset(space_page_size);
+	ut_ad(offset);
+ 	/* Return if the encryption metadata is empty. */
+	if (memcmp(first_page + offset,
+		   ENCRYPTION_KEY_MAGIC_V2,
+		   ENCRYPTION_MAGIC_SIZE) != 0) {
+		ut_free(first_page_buf);
+		return(DB_SUCCESS);
+	}
+ 	byte	key[ENCRYPTION_KEY_LEN];
+	byte	iv[ENCRYPTION_KEY_LEN];
+	if (fsp_header_get_encryption_key(space->flags, key,
+					  iv, first_page)) {
+ 		space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+		err = fil_set_encryption(space->id,
+					 Encryption::AES,
+					 key,
+					 iv);
+		ut_ad(err == DB_SUCCESS);
+	} else {
+		ut_free(first_page_buf);
+		return(DB_FAIL);
+	}
+ 	ut_free(first_page_buf);
+ 	return(DB_SUCCESS);
+}
+
 /*********************************************************************//**
 Open an undo tablespace.
 @return DB_SUCCESS or error code */
@@ -694,9 +795,6 @@ srv_undo_tablespace_open(
 		size = os_file_get_size(fh);
 		ut_a(size != (os_offset_t) -1);
 
-		ret = os_file_close(fh);
-		ut_a(ret);
-
 		/* Load the tablespace into InnoDB's internal
 		data structures. */
 
@@ -710,7 +808,7 @@ srv_undo_tablespace_open(
 		flags = fsp_flags_init(
 			univ_page_size, false, false, false, false);
 		space = fil_space_create(
-			undo_name, space_id, flags, FIL_TYPE_TABLESPACE);
+			undo_name, space_id, flags, FIL_TYPE_TABLESPACE, NULL);
 
 		ut_a(fil_validate());
 		ut_a(space);
@@ -721,11 +819,26 @@ srv_undo_tablespace_open(
 		is 64 bits. It is OK to cast the n_pages to ulint because
 		the unit has been scaled to pages and page number is always
 		32 bits. */
-		if (fil_node_create(
+		if (!fil_node_create(
 			name, (ulint) n_pages, space, false, atomic_write)) {
-
-			err = DB_SUCCESS;
+			os_file_close(fh);
+			ib::error() << "Error creating file node for " << undo_name;
+			return(DB_ERROR);
 		}
+
+		err = DB_SUCCESS;
+		/* Read the encryption metadata in this undo tablespace.
+		If the encryption info in the first page cannot be decrypted
+		by the master key, this table cannot be opened. */
+		err = srv_undo_tablespace_read_encryption(fh, space);
+ 		/* The file handle will no longer be needed. */
+		os_file_close(fh);
+
+		if (err != DB_SUCCESS) {
+			ib::error() << "Error reading encryption for " << undo_name;
+			return(err);
+		}
+
 	}
 
 	return(err);
@@ -1343,6 +1456,10 @@ srv_shutdown_all_bg_threads()
 				/* d. Wakeup purge threads. */
 				srv_purge_wakeup();
 			}
+
+			if (srv_n_fil_crypt_threads_started) {
+				os_event_set(fil_crypt_threads_event);
+			}
 		}
 
 		if (srv_start_state_is_set(SRV_START_STATE_IO)) {
@@ -1755,6 +1872,15 @@ innobase_start_or_create_for_mysql(void)
 			<< " for innodb_flush_method";
 		return(srv_init_abort(DB_ERROR));
 	}
+
+#ifdef WITH_WSREP
+	if (innobase_disallow_writes) {
+		ib::warn() << "innodb_disallow_writes has been deprecated and"
+			      " will be removed in future release."
+			      " Consider using read_only instead.";
+	}
+#endif /* WITH_WSREP */
+
 
 	/* Note that the call srv_boot() also changes the values of
 	some variables to the units used by InnoDB internally */
@@ -2230,7 +2356,7 @@ innobase_start_or_create_for_mysql(void)
 			"innodb_redo_log",
 			SRV_LOG_SPACE_FIRST_ID,
 			fsp_flags_set_page_size(0, univ_page_size),
-			FIL_TYPE_LOG);
+			FIL_TYPE_LOG, NULL);
 
 		ut_a(fil_validate());
 		ut_a(log_space);
@@ -2252,6 +2378,14 @@ innobase_start_or_create_for_mysql(void)
 		if (!log_group_init(0, i, srv_log_file_size * UNIV_PAGE_SIZE,
 				    SRV_LOG_SPACE_FIRST_ID)) {
 			return(srv_init_abort(DB_ERROR));
+		}
+
+		/* Read the first log file header to get the encryption
+		information if it exist. */
+		if (srv_force_recovery < SRV_FORCE_NO_LOG_REDO) {
+		    if (!log_read_encryption()) {
+			return(srv_init_abort(DB_ERROR));
+		    }
 		}
 	}
 
@@ -2927,6 +3061,10 @@ files_checked:
 		/* Create the thread that will optimize the FTS sub-system. */
 		fts_optimize_init();
 
+		fil_system_enter();
+		fil_crypt_threads_init();
+		fil_system_exit();
+
 		srv_start_state_set(SRV_START_STATE_STAT);
 	}
 
@@ -3026,6 +3164,8 @@ innobase_shutdown_for_mysql(void)
 
 	if (!srv_read_only_mode) {
 		dict_stats_thread_deinit();
+		/* Shutdown key rotation threads */
+		fil_crypt_threads_cleanup();
 	}
 
 	/* This must be disabled before closing the buffer pool
@@ -3083,6 +3223,8 @@ innobase_shutdown_for_mysql(void)
 
 	srv_was_started = FALSE;
 	srv_start_has_been_called = FALSE;
+
+	unlock_keyrings(NULL);
 
 	return(DB_SUCCESS);
 }

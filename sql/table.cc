@@ -98,8 +98,6 @@ static Item *create_view_field(THD *thd, TABLE_LIST *view, Item **field_ref,
 
 inline bool is_system_table_name(const char *name, size_t length);
 
-static ulong get_form_pos(File file, uchar *head);
-
 /**************************************************************************
   Object_creation_ctx implementation.
 **************************************************************************/
@@ -2209,6 +2207,16 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
       }
       next_chunk+= 2 + share->encrypt_type.length;
     }
+
+    if (next_chunk + strlen("ENCRYPTION_KEY_ID") + 4 // + 4 for encryption_key_id value, ENCRYPTION_KEY_ID is used here as a marker
+        <= buff_end && 
+        strncmp(reinterpret_cast<char*>(next_chunk), "ENCRYPTION_KEY_ID",
+                strlen("ENCRYPTION_KEY_ID")) == 0)
+    {
+          share->encryption_key_id= uint4korr(next_chunk + strlen("ENCRYPTION_KEY_ID"));
+          share->was_encryption_key_id_set= true;
+          next_chunk += 4 + strlen("ENCRYPTION_KEY_ID");
+    }
   }
   share->key_block_size= uint2korr(head+62);
 
@@ -3662,7 +3670,7 @@ void free_blob_buffers_and_reset(TABLE *table, uint32 size)
   @retval The form position.
 */
 
-static ulong get_form_pos(File file, uchar *head)
+ulong get_form_pos(File file, uchar *head)
 {
   uchar *pos, *buf;
   uint names, length;

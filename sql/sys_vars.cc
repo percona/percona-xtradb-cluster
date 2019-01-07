@@ -808,7 +808,7 @@ static Sys_var_int32 Sys_binlog_max_flush_queue_time(
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0),
        DEPRECATED(""));
 
-static Sys_var_ulong Sys_binlog_group_commit_sync_delay(
+static Sys_var_long Sys_binlog_group_commit_sync_delay(
        "binlog_group_commit_sync_delay",
        "The number of microseconds the server waits for the "
        "binary log group commit sync queue to fill before "
@@ -948,6 +948,14 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
   bool stmt_or_mixed=
    (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
     var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED);
+
+  if (WSREP(thd) && stmt_or_mixed && var->type == OPT_SESSION)
+  {
+    push_warning(thd, Sql_condition::SL_WARNING, ER_WARN_DEPRECATED_SYNTAX,
+      "Setting binlog format to STATEMENT OR MIXED at session level is"
+      " deprecated and will be removed in future release."
+      " While operating in cluster mode use binlog_format=ROW.");
+  }
 
   if (WSREP(thd) && stmt_or_mixed && var->type == OPT_GLOBAL)
   {
@@ -6261,7 +6269,8 @@ static Sys_var_mybool Sys_wsrep_convert_LOCK_to_trx(
        "wsrep_convert_LOCK_to_trx", "To convert locking sessions (deprecated)"
        "into transactions",
        GLOBAL_VAR(wsrep_convert_LOCK_to_trx), 
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE), NO_MUTEX_GUARD,
+       NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0), DEPRECATED(""));
 
 static Sys_var_ulong Sys_wsrep_retry_autocommit(
       "wsrep_retry_autocommit", "Max number of times to retry "
@@ -6322,7 +6331,8 @@ static Sys_var_mybool Sys_wsrep_drupal_282555_workaround(
        "wsrep_drupal_282555_workaround", "To use a workaround for"
        "bad autoincrement value", 
        GLOBAL_VAR(wsrep_drupal_282555_workaround), 
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+       ON_CHECK(0), ON_UPDATE(0), DEPRECATED(""));
 
 static Sys_var_charptr sys_wsrep_sst_method(
        "wsrep_sst_method", "State snapshot transfer method",
@@ -6466,13 +6476,12 @@ static Sys_var_enum Sys_wsrep_reject_queries(
 
 static Sys_var_enum Sys_wsrep_forced_binlog_format(
        "wsrep_forced_binlog_format",
-       "binlog format to take effect over user's choice (Deprecated)",
+       "binlog format to take effect over user's choice",
        GLOBAL_VAR(wsrep_forced_binlog_format), 
        CMD_LINE(REQUIRED_ARG, OPT_BINLOG_FORMAT),
        wsrep_binlog_format_names, DEFAULT(BINLOG_FORMAT_UNSPEC),
        NO_MUTEX_GUARD, NOT_IN_BINLOG,
-       ON_CHECK(wsrep_forced_binlog_format_check),
-       ON_UPDATE(0));
+       ON_CHECK(0), ON_UPDATE(0), DEPRECATED(""));
 
 static Sys_var_mybool Sys_wsrep_recover_datadir(
        "wsrep_recover", "Recover database state after crash and exit",
@@ -6491,7 +6500,9 @@ static Sys_var_mybool Sys_wsrep_log_conflicts(
 
 static Sys_var_mybool Sys_wsrep_preordered(
        "wsrep_preordered", "To enable preordered write set processing",
-       GLOBAL_VAR(wsrep_preordered_opt), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+       GLOBAL_VAR(wsrep_preordered_opt), CMD_LINE(OPT_ARG), DEFAULT(FALSE),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0),
+       DEPRECATED(""));
 
 static Sys_var_mybool Sys_wsrep_load_data_splitting(
        "wsrep_load_data_splitting", "To commit LOAD DATA "

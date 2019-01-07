@@ -1015,6 +1015,7 @@ bool Log_event::wrapper_my_b_safe_write(IO_CACHE* file, const uchar* buf, size_t
 {
   DBUG_EXECUTE_IF("simulate_temp_file_write_error",
                   {
+                    memset(file->write_pos, 0, file->write_end - file->write_pos);
                     file->write_pos=file->write_end;
                     DBUG_SET("+d,simulate_file_write_error");
                   });
@@ -4927,7 +4928,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
         if (thd->m_digest != NULL)
           thd->m_digest->reset(thd->m_token_array, max_digest_length);
 
-        mysql_parse(thd, &parser_state);
+        mysql_parse(thd, &parser_state, true);
 
         /*
           Transaction isolation level of pure row based replicated transactions
@@ -5052,6 +5053,13 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
     }
 
 compare_errors:
+    /* Parser errors shall be ignored when (GTID) skipping statements */
+    if (thd->is_error() &&
+        thd->get_stmt_da()->mysql_errno() == ER_PARSE_ERROR &&
+        gtid_pre_statement_checks(thd) == GTID_STATEMENT_SKIP)
+    {
+      thd->get_stmt_da()->reset_diagnostics_area();
+    }
     /*
       In the slave thread, we may sometimes execute some DROP / * 40005
       TEMPORARY * / TABLE that come from parts of binlogs (likely if we
@@ -10201,7 +10209,7 @@ Rows_log_event::row_operations_scan_and_key_setup()
       DBUG_ASSERT (m_key_index < MAX_KEY);
       // Allocate buffer for key searches
       m_key= (uchar*)my_malloc(key_memory_log_event,
-                               MAX_KEY_LENGTH, MYF(MY_WME));
+                               m_key_info->key_length, MYF(MY_WME));
       if (!m_key)
         error= HA_ERR_OUT_OF_MEM;
       goto err;

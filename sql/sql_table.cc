@@ -573,12 +573,16 @@ size_t build_table_filename(char *buff, size_t bufflen, const char *db,
   DBUG_PRINT("enter", ("db: '%s'  table_name: '%s'  ext: '%s'  flags: %x",
                        db, table_name, ext, flags));
 
-  if (flags & FN_IS_TMP) // FN_FROM_IS_TMP | FN_TO_IS_TMP
+  if ((flags & FN_IS_TMP) ||  // FN_FROM_IS_TMP | FN_TO_IS_TMP
+      (flags & FN_IS_ENCODED))
     tab_len= my_stpnmov(tbbuff, table_name, sizeof(tbbuff)) - tbbuff;
   else
     tab_len= tablename_to_filename(table_name, tbbuff, sizeof(tbbuff));
 
-  db_len= tablename_to_filename(db, dbbuff, sizeof(dbbuff));
+  if (flags & FN_IS_ENCODED)
+    db_len= my_stpnmov(dbbuff, db, sizeof(dbbuff)) - dbbuff;
+  else
+    db_len= tablename_to_filename(db, dbbuff, sizeof(dbbuff));
 
   char *end = buff + bufflen;
   /* Don't add FN_ROOTDIR if mysql_data_home already includes it */
@@ -2978,24 +2982,34 @@ bool quick_rm_table(THD *thd, handlerton *base, const char *db,
                     const char *table_name, uint flags)
 {
   char path[FN_REFLEN + 1];
+  char frm_path[FN_REFLEN + 1];
   bool error= 0;
   DBUG_ENTER("quick_rm_table");
-
-  size_t path_length= build_table_filename(path, sizeof(path) - 1,
-                                           db, table_name, reg_ext, flags);
-  if (mysql_file_delete(key_file_frm, path, MYF(0)))
-    error= 1; /* purecov: inspected */
-  path[path_length - reg_ext_length]= '\0'; // Remove reg_ext
+  /*
+    Remove *.frm file at the end of the procedure to let
+    storage engine to read some info from the file
+    (for example, partition info).
+  */
+  size_t path_length= build_table_filename(path, sizeof(path) - 1, db,
+                                           table_name, reg_ext, flags);
+  strncpy(frm_path, path, sizeof(frm_path) - 1);
+  path[path_length - reg_ext_length]= '\0';  // Remove reg_ext
   if (flags & NO_HA_TABLE)
   {
     handler *file= get_new_handler((TABLE_SHARE*) 0, thd->mem_root, base);
     if (!file)
-      DBUG_RETURN(true);
-    (void) file->ha_create_handler_files(path, NULL, CHF_DELETE_FLAG, NULL);
+    {
+      error|= true;
+      goto exit;
+    }
+    (void)file->ha_create_handler_files(path, NULL, CHF_DELETE_FLAG, NULL);
     delete file;
   }
   if (!(flags & (FRM_ONLY|NO_HA_TABLE)))
     error|= ha_delete_table(current_thd, base, path, db, table_name, 0);
+exit:
+  if (mysql_file_delete(key_file_frm, frm_path, MYF(0)))
+    error|= true; /* purecov: inspected */
   DBUG_RETURN(error);
 }
 
@@ -8339,6 +8353,12 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
   if (!(used_fields & HA_CREATE_USED_CONNECTION))
     create_info->connect_string= table->s->connect_string;
 
+  if (!(used_fields & HA_CREATE_USED_ENCRYPTION_KEY_ID))
+  {
+    create_info->encryption_key_id= table->s->encryption_key_id;
+    create_info->was_encryption_key_id_set= table->s->was_encryption_key_id_set;
+  }
+
   restore_record(table, s->default_values);     // Empty record for DEFAULT
   Create_field *def;
 
@@ -8881,6 +8901,16 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
   {
     create_info->encrypt_type.str= table->s->encrypt_type.str;
     create_info->encrypt_type.length= table->s->encrypt_type.length;
+  }
+
+  // Encryption was changed to not KEYRING and ALTER does not contain encryption_key_id
+  // mark encryption_key_id as not set then
+  if (used_fields & HA_CREATE_USED_ENCRYPT &&
+      0 != strncmp(create_info->encrypt_type.str, "KEYRING", create_info->encrypt_type.length) &&
+      !(used_fields & HA_CREATE_USED_ENCRYPTION_KEY_ID))
+  {
+    create_info->used_fields&= ~(HA_CREATE_USED_ENCRYPTION_KEY_ID);
+    create_info->was_encryption_key_id_set = false;
   }
 
   /* Do not pass the update_create_info through to each partition. */

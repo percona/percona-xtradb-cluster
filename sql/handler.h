@@ -546,6 +546,8 @@ namespace AQP {
 /** ENCRYPTION="Y" used during table create. */
 #define HA_CREATE_USED_ENCRYPT          (1L << 27)
 
+#define HA_CREATE_USED_ENCRYPTION_KEY_ID (1L << 28)
+
 /*
   These structures are used to pass information from a set of SQL commands
   on add/drop/change tablespace definitions to the proper hton.
@@ -1070,6 +1072,17 @@ struct handlerton
   */
   bool (*rotate_encryption_master_key)(void);
 
+ /**
+    @brief
+    Fix empty UUID of tablespaces of an engine. This is used when engine encrypts
+    tablespaces as part of initialization. These tablespaces will have empty UUID
+    because UUID is generated after all plugins are initialized. This API will be
+    called by server only after UUID is available.
+    @returns false on success,
+             true on failure
+  */
+  bool (*fix_tablespaces_empty_uuid)(void);
+
   /**
     Creates a new compression dictionary with the specified data for this SE.
 
@@ -1233,6 +1246,8 @@ typedef struct st_ha_create_information
   and ignored by the Server layer. */
 
   LEX_STRING encrypt_type;
+  uint32_t encryption_key_id;
+  bool was_encryption_key_id_set;
 
   const char *data_file_name, *index_file_name;
   const char *alias;

@@ -886,6 +886,8 @@ mysqld_collation_get_by_name(const char *name,
   return cs;
 }
 
+int lock_keyrings(THD *thd);
+int unlock_keyrings(THD *thd);
 
 #ifdef MYSQL_SERVER
 
