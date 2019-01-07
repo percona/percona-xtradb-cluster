@@ -1,7 +1,9 @@
-SET SESSION binlog_rows_query_log_events=TRUE;
-SELECT @@SESSION.binlog_rows_query_log_events;
-@@SESSION.binlog_rows_query_log_events
-1
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
 CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 SELECT COUNT(*) = 1 FROM t1;
@@ -11,5 +13,13 @@ UPDATE t1 SET f1 = 2 WHERE f1 = 1;
 SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 2;
 COUNT(*) = 1
 1
-SET GLOBAL binlog_rows_query_log_events = 0;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 321 LIMIT 1;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	321	Rows_query	2	370	# INSERT INTO t1 VALUES (1)
 DROP TABLE t1;
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;

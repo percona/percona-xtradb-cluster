@@ -1,4 +1,3 @@
-#
 # This test tests the operation of transaction replay. If a potentially conflicting remote transaction arrives at
 # just the right time during the commit of a local transaction, the local transaction will be aborted and replayed.
 #
@@ -10,12 +9,16 @@
 
 --let $wsrep_local_replays_old = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 
+#
+# Replay with AUTOCOMMIT=OFF
+#
+
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
 INSERT INTO t1 VALUES (1, 'a');
 INSERT INTO t1 VALUES (2, 'a');
 
 --connection node_1
-SET AUTOCOMMIT=ON;
+SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
@@ -38,7 +41,74 @@ SET SESSION wsrep_sync_wait = 0;
 --connection node_2
 UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
 
---let $show_rpl_debug_info= 1;
+# Wait for both transactions to be blocked
+--connection node_1a
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'System lock';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep in pre-commit stage' AND INFO = 'COMMIT';
+--source include/wait_condition.inc
+
+# Unblock the commit
+--connection node_1a
+--source include/galera_clear_sync_point.inc
+--source include/galera_signal_sync_point.inc
+
+# Commit succeeds
+--connection node_1
+--reap
+
+# Set AUTOCOMMIT=ON before SELECT in order to avoid a new transaction.
+
+SET AUTOCOMMIT=ON;
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
+
+# wsrep_local_replays has increased by 1
+--let $wsrep_local_replays_new = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--disable_query_log
+--eval SELECT $wsrep_local_replays_new - $wsrep_local_replays_old = 1 AS wsrep_local_replays;
+--enable_query_log
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
+
+DROP TABLE t1;
+
+#
+# Replay with AUTOCOMMIT=ON
+#
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
+INSERT INTO t1 VALUES (1, 'a');
+INSERT INTO t1 VALUES (2, 'a');
+
+--connection node_1
+SET AUTOCOMMIT=ON;
+START TRANSACTION;
+
+UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
+SELECT * FROM t1 WHERE f1 = 2 FOR UPDATE;
+
+# Block the commit
+##--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--let $galera_sync_point = commit_monitor_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_1
+--send COMMIT;
+
+# Wait until commit is blocked
+--connection node_1a
+SET SESSION wsrep_sync_wait = 0;
+--source include/galera_wait_sync_point.inc
+
+# Issue a conflicting update on node #2
+--connection node_2
+UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
+
 # Wait for both transactions to be blocked
 --connection node_1a
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'System lock';
@@ -62,7 +132,7 @@ SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
 # wsrep_local_replays has increased by 1
 --let $wsrep_local_replays_new = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
---eval SELECT $wsrep_local_replays_new - $wsrep_local_replays_old = 1 AS wsrep_local_replays;
+--eval SELECT $wsrep_local_replays_new - $wsrep_local_replays_old = 2 AS wsrep_local_replays;
 --enable_query_log
 
 --connection node_2
@@ -71,7 +141,65 @@ SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
 
 DROP TABLE t1;
 
+#echo "# test for PS replaying"
 
+#
+# test replaying of prepared statements
+#
+--connection node_1
+CREATE TABLE t1 (i int primary key, j int) ENGINE=INNODB;
+INSERT INTO t1 VALUES (1, 0), (3, 0);
+SELECT * FROM t1;
+
+PREPARE stmt1 FROM "UPDATE t1 SET j = 1 where i > 0";
+
+# block the commit of PS
+--connection node_1a
+--let $galera_sync_point = commit_monitor_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_1
+--send EXECUTE stmt1;
+
+# Wait until commit is blocked
+--connection node_1a
+SET SESSION wsrep_sync_wait = 0;
+--source include/galera_wait_sync_point.inc
+
+# Issue a conflicting update on node_2
+--connection node_2
+#UPDATE t1 SET j=2;
+INSERT INTO t1 VALUES(2,2);
+
+# Wait until applying begins in node_1
+--connection node_1a
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'Write_rows_log_event::write_row%';
+--source include/wait_condition.inc
+
+# Unblock the PS commit
+--connection node_1a
+--source include/galera_clear_sync_point.inc
+--source include/galera_signal_sync_point.inc
+
+# Commit succeeds
+--connection node_1
+--reap
+SELECT * FROM t1;
+
+--connection node_2
+SELECT * FROM t1;
+
+--connection node_1
+
+--let $wsrep_local_replays_new = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--disable_query_log
+--eval SELECT $wsrep_local_replays_new - $wsrep_local_replays_old = 3 AS wsrep_local_replays;
+--enable_query_log
+
+DEALLOCATE PREPARE stmt1;
+DROP TABLE t1;
+
+#-------------------------------------------------------------------------------
 #
 # If 2 conflicting trx are executed then local trx is rolled back.
 # If the local trx is through exectuion of prepared statement it use

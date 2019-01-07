@@ -48,8 +48,10 @@ usr/bin/wsrep_sst_xtrabackup
 usr/bin/wsrep_sst_xtrabackup-v2
 # plugins
 usr/lib/mysql/plugin/adt_null.so
+usr/lib/mysql/plugin/auth_pam.so
 usr/lib/mysql/plugin/auth_socket.so
 usr/lib/mysql/plugin/connection_control.so
+usr/lib/mysql/plugin/dialog.so
 usr/lib/mysql/plugin/innodb_engine.so
 usr/lib/mysql/plugin/libmemcached.so
 usr/lib/mysql/plugin/mypluglib.so

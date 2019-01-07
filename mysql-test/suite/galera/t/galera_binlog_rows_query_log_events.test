@@ -5,10 +5,18 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
---let $binlog_rows_query_log_events_orig = `SELECT @@binlog_rows_query_log_events`
+#
+# reset binary logs, there may be some event from earlier tests
+#
+--connection node_1
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
 
-SET SESSION binlog_rows_query_log_events=TRUE;
-SELECT @@SESSION.binlog_rows_query_log_events;
+--connection node_2
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
 
 CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
 
@@ -23,7 +31,21 @@ UPDATE t1 SET f1 = 2 WHERE f1 = 1;
 --connection node_2
 SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 2;
 
---connection node_1
---eval SET GLOBAL binlog_rows_query_log_events = $binlog_rows_query_log_events_orig
+# verify that insert query log event is present in node 2
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 321 LIMIT 1;
 
+--connection node_1
 DROP TABLE t1;
+
+#
+# clean binary logs
+#
+--connection node_1
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+--connection node_2
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;

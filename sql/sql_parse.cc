@@ -114,6 +114,7 @@ using std::max;
 using std::min;
 
 #include "sql_timer.h"        // thd_timer_set, thd_timer_reset
+#include "userstat.h"
 
 #define FLAGSTR(V,F) ((V)&(F)?#F" ":"")
 
@@ -122,7 +123,7 @@ using std::min;
 #include "wsrep_thd.h"
 #include "wsrep_binlog.h"
 static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
-                              Parser_state *parser_state);
+                              Parser_state *parser_state, bool update_userstat);
 #endif /* WITH_WSREP */
 /**
   @defgroup Runtime_Environment Runtime Environment
@@ -511,6 +512,11 @@ void init_update_queries(void)
   sql_command_flags[SQLCOM_SHOW_TABLE_STATUS]= (CF_STATUS_COMMAND |
                                                 CF_SHOW_TABLE_COMMAND |
                                                 CF_REEXECUTION_FRAGILE);
+  sql_command_flags[SQLCOM_SHOW_USER_STATS]=   CF_STATUS_COMMAND;
+  sql_command_flags[SQLCOM_SHOW_TABLE_STATS]=  CF_STATUS_COMMAND;
+  sql_command_flags[SQLCOM_SHOW_INDEX_STATS]=  CF_STATUS_COMMAND;
+  sql_command_flags[SQLCOM_SHOW_CLIENT_STATS]= CF_STATUS_COMMAND;
+  sql_command_flags[SQLCOM_SHOW_THREAD_STATS]= CF_STATUS_COMMAND;
 
   sql_command_flags[SQLCOM_CREATE_USER]=       CF_CHANGES_DATA;
   sql_command_flags[SQLCOM_RENAME_USER]=       CF_CHANGES_DATA;
@@ -856,7 +862,7 @@ static void handle_bootstrap_impl(THD *thd)
       break;
     }
 
-    mysql_parse(thd, thd->query(), length, &parser_state);
+    mysql_parse(thd, thd->query(), length, &parser_state, true);
 
     bootstrap_error= thd->is_error();
     thd->protocol->end_statement();
@@ -1465,6 +1471,14 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   DBUG_EXECUTE_IF("crash_dispatch_command_before",
                   { DBUG_PRINT("crash_dispatch_command_before", ("now"));
                     DBUG_ABORT(); });
+
+#ifdef WITH_WSREP
+  /* To avoid cross initialization in case of pxc/wsrep due to following jump */
+  double start_busy_usecs = 0.0;
+  double start_cpu_nsecs = 0.0;
+#endif /* WITH_WSREP */
+
+  if (unlikely(opt_userstat))
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     if (!thd->in_multi_stmt_transaction_mode())
@@ -1583,6 +1597,14 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
 
   if (!(server_command_flags[command] & CF_SKIP_QUESTIONS))
     statistic_increment(thd->status_var.questions, &LOCK_status);
+
+  /* Declare userstat variables and start timer */
+#ifndef WITH_WSREP
+  double start_busy_usecs = 0.0;
+  double start_cpu_nsecs = 0.0;
+#endif /* !WITH_WSREP */
+  if (unlikely(opt_userstat))
+    userstat_start_timer(&start_busy_usecs, &start_cpu_nsecs);
 
   /**
     Clear the set of flags that are expected to be cleared at the
@@ -1771,9 +1793,10 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       break;
 
 #ifdef WITH_WSREP
-    wsrep_mysql_parse(thd, thd->query(), thd->query_length(), &parser_state);
+    wsrep_mysql_parse(thd, thd->query(), thd->query_length(),
+                      &parser_state, false);
 #else
-    mysql_parse(thd, thd->query(), thd->query_length(), &parser_state);
+    mysql_parse(thd, thd->query(), thd->query_length(), &parser_state, false);
 #endif /* WITH_WSREP */
 
     while (!thd->killed && (parser_state.m_lip.found_semicolon != NULL) &&
@@ -1858,9 +1881,10 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       parser_state.reset(beginning_of_next_stmt, length);
       /* TODO: set thd->lex->sql_command to SQLCOM_END here */
 #ifdef WITH_WSREP
-      wsrep_mysql_parse(thd, beginning_of_next_stmt, length, &parser_state);
+      wsrep_mysql_parse(thd, beginning_of_next_stmt, length,
+                        &parser_state, false);
 #else
-      mysql_parse(thd, beginning_of_next_stmt, length, &parser_state);
+      mysql_parse(thd, beginning_of_next_stmt, length, &parser_state, false);
 #endif /* WITH_WSREP */
     }
 
@@ -2223,6 +2247,18 @@ done:
   DBUG_ASSERT(thd->derived_tables == NULL &&
               (thd->open_tables == NULL ||
                (thd->locked_tables_mode == LTM_LOCK_TABLES)));
+
+  /* Update user statistics only if at least one timer was initialized */
+  if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0))
+  {
+    userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
+                          &thd->cpu_time);
+    /* Updates THD stats and the global user stats. */
+    thd->update_stats(true);
+#ifndef EMBEDDED_LIBRARY
+    update_global_user_stats(thd, true, time(NULL));
+#endif
+  }
 
   /* Finalize server status flags after executing a command. */
   thd->update_server_status();
@@ -3420,6 +3456,11 @@ mysql_execute_command(THD *thd)
   case SQLCOM_SHOW_COLLATIONS:
   case SQLCOM_SHOW_STORAGE_ENGINES:
   case SQLCOM_SHOW_PROFILE:
+  case SQLCOM_SHOW_USER_STATS:
+  case SQLCOM_SHOW_TABLE_STATS:
+  case SQLCOM_SHOW_INDEX_STATS:
+  case SQLCOM_SHOW_CLIENT_STATS:
+  case SQLCOM_SHOW_THREAD_STATS:
   case SQLCOM_SELECT:
   {
 #ifdef WITH_WSREP
@@ -7519,7 +7560,8 @@ void mysql_init_multi_delete(LEX *lex)
 
 #ifdef WITH_WSREP
 static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
-                              Parser_state *parser_state)
+                              Parser_state *parser_state,
+                              bool update_userstat)
 {
   bool is_autocommit=
     !thd->in_multi_stmt_transaction_mode()                  &&
@@ -7570,7 +7612,7 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
     {
       thd->wsrep_conflict_state= NO_CONFLICT;
     }
-    mysql_parse(thd, rawbuf, length, parser_state);
+    mysql_parse(thd, rawbuf, length, parser_state, update_userstat);
 
     if (WSREP(thd)) {
       /* wsrep BF abort in query exec phase */
@@ -7718,7 +7760,7 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
 */
 
 void mysql_parse(THD *thd, char *rawbuf, uint length,
-                 Parser_state *parser_state)
+                 Parser_state *parser_state, bool update_userstat)
 {
   int error MY_ATTRIBUTE((unused));
   DBUG_ENTER("mysql_parse");
@@ -7744,33 +7786,11 @@ void mysql_parse(THD *thd, char *rawbuf, uint length,
   lex_start(thd);
   mysql_reset_thd_for_next_command(thd);
 
-  int start_time_error=   0;
-  int end_time_error=     0;
-  struct timeval start_time, end_time;
-  double start_usecs=     0;
-  double end_usecs=       0;
-  /* cpu time */
-  int cputime_error=      0;
-#ifdef HAVE_CLOCK_GETTIME
-  struct timespec tp;
-#endif
-  double start_cpu_nsecs= 0;
-  double end_cpu_nsecs=   0;
-
-  if (opt_userstat)
-  {
-#ifdef HAVE_CLOCK_GETTIME
-    /* get start cputime */
-    if (!(cputime_error = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &tp)))
-      start_cpu_nsecs = tp.tv_sec*1000000000.0+tp.tv_nsec;
-#endif
-
-    // Gets the start time, in order to measure how long this command takes.
-    if (!(start_time_error = gettimeofday(&start_time, NULL)))
-    {
-      start_usecs = start_time.tv_sec * 1000000.0 + start_time.tv_usec;
-    }
-  }
+  /* Declare userstat variables and start timer */
+  double start_busy_usecs = 0.0;
+  double start_cpu_nsecs = 0.0;
+  if (unlikely(opt_userstat && update_userstat))
+    userstat_start_timer(&start_busy_usecs, &start_cpu_nsecs);
 
   if (query_cache_send_result_to_client(thd, rawbuf, length) <= 0)
   {
@@ -7979,52 +7999,13 @@ void mysql_parse(THD *thd, char *rawbuf, uint length,
 #endif /* WITH_WSREP */
   }
 
-  if (opt_userstat)
+  /* Update user statistics only if at least one timer was initialized */
+  if (unlikely(update_userstat &&
+               (start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0)))
   {
-    // Gets the end time.
-    if (!(end_time_error= gettimeofday(&end_time, NULL)))
-    {
-      end_usecs= end_time.tv_sec * 1000000.0 + end_time.tv_usec;
-    }
-
-    // Calculates the difference between the end and start times.
-    if (start_usecs && end_usecs >= start_usecs && !start_time_error && !end_time_error)
-    {
-      thd->busy_time= (end_usecs - start_usecs) / 1000000;
-      // In case there are bad values, 2629743 is the #seconds in a month.
-      if (thd->busy_time > 2629743)
-      {
-        thd->busy_time= 0;
-      }
-    }
-    else
-    {
-      // end time went back in time, or gettimeofday() failed.
-      thd->busy_time= 0;
-    }
-
-#ifdef HAVE_CLOCK_GETTIME
-    /* get end cputime */
-    if (!cputime_error &&
-        !(cputime_error = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &tp)))
-      end_cpu_nsecs = tp.tv_sec*1000000000.0+tp.tv_nsec;
-#endif
-    if (start_cpu_nsecs && !cputime_error)
-    {
-      thd->cpu_time = (end_cpu_nsecs - start_cpu_nsecs) / 1000000000;
-      // In case there are bad values, 2629743 is the #seconds in a month.
-      if (thd->cpu_time > 2629743)
-      {
-        thd->cpu_time = 0;
-      }
-    }
-    else
-      thd->cpu_time = 0;
-  }
-
-  // Updates THD stats and the global user stats.
-  if (unlikely(opt_userstat))
-  {
+    userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
+                          &thd->cpu_time);
+    /* Updates THD stats and the global user stats. */
     thd->update_stats(true);
 #ifndef EMBEDDED_LIBRARY
     update_global_user_stats(thd, true, time(NULL));
