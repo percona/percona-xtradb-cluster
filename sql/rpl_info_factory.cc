@@ -283,6 +283,24 @@ Relay_log_info *Rpl_info_factory::create_rli(uint rli_option,
     handler_src = NULL;
   }
 
+#ifdef WITH_WSREP
+  /* Till MySQL-5.7, all slave used global replication filter.
+  For now PXC-8.0 will continue to use the same even though MySQL-8.0 now
+  enforces use of per channel filter. PXC replication is not like a traditional
+  async master-slave channel. */
+  if (!strcasecmp(channel, "wsrep")) {
+    rli->set_filter(&rpl_global_filter);
+  } else {
+    rpl_filter = rpl_channel_filters.get_channel_filter(channel);
+    if (rpl_filter == NULL) {
+      LogErr(ERROR_LEVEL, ER_RPL_SLAVE_FILTER_CREATE_FAILED, channel);
+      msg = msg_alloc;
+      goto err;
+    }
+    rli->set_filter(rpl_filter);
+    rpl_filter->set_attached();
+  }
+#else
   /* Set filters here to guarantee that any rli object has a valid filter */
   rpl_filter = rpl_channel_filters.get_channel_filter(channel);
   if (rpl_filter == NULL) {
@@ -292,6 +310,7 @@ Relay_log_info *Rpl_info_factory::create_rli(uint rli_option,
   }
   rli->set_filter(rpl_filter);
   rpl_filter->set_attached();
+#endif /* WITH_WSREP */
 
   DBUG_RETURN(rli);
 

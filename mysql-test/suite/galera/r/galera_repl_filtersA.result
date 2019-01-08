@@ -39,7 +39,7 @@ include/assert.inc ['db1 was altered on node 2']
 include/assert.inc ['db1 was altered on node 3']
 # connection node_1
 USE db1;
-ALTER database db1 CHARACTER SET = 'latin1';
+ALTER database db1 CHARACTER SET = 'utf8mb4';
 #
 # Test async.db.ddl.1.3 : DROP DATABASE
 #
@@ -86,7 +86,7 @@ include/assert.inc ['dbx2 was not altered on node 2']
 include/assert.inc ['dbx2 was not altered on node 3']
 # connection node_1
 USE db;
-ALTER database dbx2 CHARACTER SET = 'latin1';
+ALTER database dbx2 CHARACTER SET = 'utf8mb4';
 #
 # Test async.db.ddl.2.3 : DROP DATABASE
 #
@@ -130,7 +130,7 @@ include/assert.inc ['db1 was altered on node 2']
 include/assert.inc ['db1 was altered on node 3']
 # connection node_1
 USE db1;
-ALTER database db1 CHARACTER SET = 'latin1';
+ALTER database db1 CHARACTER SET = 'utf8mb4';
 #
 # Test async.db.ddl.3.3 : DROP DATABASE
 #
@@ -174,7 +174,7 @@ include/assert.inc ['dbx2 was not altered on node 2']
 include/assert.inc ['dbx2 was not altered on node 3']
 # connection node_1
 USE dbx;
-ALTER database dbx2 CHARACTER SET = 'latin1';
+ALTER database dbx2 CHARACTER SET = 'utf8mb4';
 #
 # Test async.db.ddl.4.3 : DROP DATABASE
 #
@@ -1006,7 +1006,7 @@ include/assert.inc ['db1 was altered on node 2']
 include/assert.inc ['db1 was altered on node 3']
 # connection node_2
 USE db1;
-ALTER database db1 CHARACTER SET = 'latin1';
+ALTER database db1 CHARACTER SET = 'utf8mb4';
 #
 # Test galera.db.ddl.1.3 : DROP DATABASE
 #
@@ -1065,7 +1065,7 @@ include/assert.inc ['dbx2 was altered on node 2']
 include/assert.inc ['dbx2 was altered on node 3']
 # connection node_2
 USE db;
-ALTER database dbx2 CHARACTER SET = 'latin1';
+ALTER database dbx2 CHARACTER SET = 'utf8mb4';
 # Test galera.db.ddl.2 cleanup
 # connection node_2
 DROP DATABASE dbx2;
@@ -1092,7 +1092,7 @@ include/assert.inc ['db1 was altered on node 2']
 include/assert.inc ['db1 was altered on node 2']
 # connection node_2
 USE db1;
-ALTER database db1 CHARACTER SET = 'latin1';
+ALTER database db1 CHARACTER SET = 'utf8mb4';
 #
 # Test galera.db.ddl.3.3 : DROP DATABASE
 #
@@ -1125,7 +1125,7 @@ include/assert.inc ['dbx2 was altered on node 2']
 include/assert.inc ['dbx2 was altered on node 3']
 # connection node_2
 USE dbx;
-ALTER database dbx2 CHARACTER SET = 'latin1';
+ALTER database dbx2 CHARACTER SET = 'utf8mb4';
 #
 # Test galera.db.ddl.4.3 : DROP DATABASE
 #
