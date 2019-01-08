@@ -394,7 +394,7 @@ fi
 
         (make $MAKE_JFLAG $QUIET) || exit 1
         (make install) || exit 1
-        (cp -v sql/mysqld-debug $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/mysqld) || true
+        (cp -v runtime_output_directory/mysqld-debug $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/mysqld) || true
         echo "mysqld in build in debug mode"
     else
         cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
