@@ -16,6 +16,7 @@
 # - temporary tablespace
 # - binlog encryption
 
+call mtr.add_suppression("Slave SQL: Error 'InnoDB : ENCRYPTION is not accepted syntax for CREATE/ALTER table, for tables in general/shared tablespace.'");
 
 #===============================================================================
 # general tablespace encryption support
@@ -28,9 +29,17 @@
 use test;
 CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
 #
+
+#
+# encryption="y/n" options are not allowed in shared tablesapces
+#
+--error ER_ILLEGAL_HA_CREATE_OPTION
 create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
 --error ER_ILLEGAL_HA_CREATE_OPTION
 create table t2 (i int, primary key pk(i)) tablespace foo encryption='n';
+
+create table t1 (i int, primary key pk(i)) tablespace foo;
+
 #
 insert into t1 values (1), (2), (3);
 select * from t1;
@@ -41,7 +50,7 @@ show create table t1;
 select * from t1;
 show create table t1;
 #
-create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
+create table t2 (i int, primary key pk(i)) tablespace foo;
 insert into t2 values (10), (20), (30);
 
 --connection node_1
@@ -65,9 +74,7 @@ drop tablespace foo;
 use test;
 CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
 #
-create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
---error ER_ILLEGAL_HA_CREATE_OPTION
-create table t2 (i int, primary key pk(i)) tablespace foo encryption='n';
+create table t1 (i int, primary key pk(i)) tablespace foo;
 #
 insert into t1 values (1), (2), (3);
 select * from t1;
@@ -84,7 +91,7 @@ call mtr.add_suppression(".*can contain only an ENCRYPTED tables.*");
 select * from t1;
 show create table t1;
 #
-create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
+create table t2 (i int, primary key pk(i)) tablespace foo;
 insert into t2 values (10), (20), (30);
 
 --connection node_1
@@ -110,9 +117,7 @@ drop tablespace foo;
 use test;
 CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
 #
-create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
---error ER_ILLEGAL_HA_CREATE_OPTION
-create table t2 (i int, primary key pk(i)) tablespace foo encryption='n';
+create table t1 (i int, primary key pk(i)) tablespace foo;
 #
 insert into t1 values (1);
 select * from t1;
@@ -129,7 +134,7 @@ call mtr.add_suppression(".*can contain only an ENCRYPTED tables.*");
 select * from t1;
 show create table t1;
 #
-create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
+create table t2 (i int, primary key pk(i)) tablespace foo;
 insert into t2 values (10), (20), (30);
 
 --connection node_1

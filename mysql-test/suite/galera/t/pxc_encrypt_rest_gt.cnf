@@ -4,6 +4,7 @@
 wsrep_sst_method=xtrabackup-v2
 wsrep_sst_auth="root:"
 pxc-encrypt-cluster-traffic=ON
+mysqlx=0
 
 [xtrabackup]
 xtrabackup-plugin-dir=@ENV.XB_PLUGIN_DIR
