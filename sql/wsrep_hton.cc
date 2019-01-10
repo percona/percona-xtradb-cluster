@@ -41,6 +41,12 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *hton,
 */
 void wsrep_cleanup_transaction(THD *thd) {
   if (!WSREP(thd)) return;
+
+  // Enabling it can cause password to appear in log.
+  // WSREP_DEBUG("wsrep_cleanup_transaction %s", thd->query().str);
+  DBUG_ASSERT(thd->wsrep_conflict_state != MUST_REPLAY &&
+              thd->wsrep_conflict_state != REPLAYING);
+
   if (wsrep_emulate_bin_log) wsrep_thd_binlog_trx_reset(thd);
   thd->wsrep_ws_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
   thd->wsrep_trx_meta.gtid = WSREP_GTID_UNDEFINED;
@@ -163,9 +169,23 @@ void wsrep_interim_commit(THD *thd) {
     case LOCAL_STATE:
       break;
     case REPL_RECV: {
-      if (thd->wsrep_ws_handle.opaque && thd->wsrep_conflict_state != REPLAYING)
+      /* There are cases when replicated transaction are empty and there is no
+      need to commit such transaction but given that they have a valid seqno
+      assigned we need to update commit monitor by enter and leaving it.
+      Empty transaction use case: CTAS, pre-executed action on pxc-node
+      acting as slave to an independent master. */
+      if (thd->wsrep_void_applier_trx &&
+          thd->wsrep_conflict_state != REPLAYING &&
+          thd->wsrep_ws_handle.opaque && thd->wsrep_applier)
+        wsrep->applier_pre_commit(wsrep, thd->wsrep_ws_handle.opaque);
+
+      if (thd->wsrep_ws_handle.opaque &&
+          thd->wsrep_conflict_state != REPLAYING) {
         /* Interim-commit hook will stop commit ordering. */
         wsrep->applier_interim_commit(wsrep, thd->wsrep_ws_handle.opaque);
+        thd->wsrep_ws_handle.opaque = 0;
+      }
+
       break;
     }
     default:
@@ -237,7 +257,11 @@ void wsrep_post_commit(THD *thd, bool all) {
         WSREP_WARN("post_rollback fail: %llu %d", (long long)thd->thread_id(),
                    thd->get_stmt_da()->status());
       }
-      wsrep_cleanup_transaction(thd);
+
+      if (thd->wsrep_conflict_state != MUST_REPLAY &&
+          thd->wsrep_conflict_state != REPLAYING) {
+        wsrep_cleanup_transaction(thd);
+      }
       break;
     }
     case REPL_RECV: {
@@ -246,8 +270,9 @@ void wsrep_post_commit(THD *thd, bool all) {
       assigned we need to update commit monitor by enter and leaving it.
       Empty transaction use case: CTAS, pre-executed action on pxc-node
       acting as slave to an independent master. */
-      if (thd->wsrep_void_applier_trx && thd->wsrep_ws_handle.opaque &&
-          thd->wsrep_applier)
+      if (thd->wsrep_void_applier_trx &&
+          thd->wsrep_conflict_state != REPLAYING &&
+          thd->wsrep_ws_handle.opaque && thd->wsrep_applier)
         wsrep->applier_pre_commit(wsrep, thd->wsrep_ws_handle.opaque);
 
       if (thd->wsrep_ws_handle.opaque &&

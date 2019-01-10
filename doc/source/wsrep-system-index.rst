@@ -339,6 +339,7 @@ if you enable ``wsrep_dirty_reads``.
 
 .. variable:: wsrep_drupal_282555_workaround
 
+   :version 5.7.24-31.33: Variable deprecated
    :cli: ``--wsrep-drupal-282555-workaround``
    :conf: Yes
    :scope: Global
@@ -590,6 +591,7 @@ The following methods are available:
 
 .. variable:: wsrep_preordered
 
+   :version 5.7.24-31.33: Variable deprecated
    :cli: ``--wsrep-preordered``
    :conf: Yes
    :scope: Global

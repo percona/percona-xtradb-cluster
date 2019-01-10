@@ -1670,8 +1670,10 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   });
 
 #ifdef WITH_WSREP
+  /* To avoid cross initialization in case of pxc/wsrep due to following jump */
   double start_busy_usecs = 0.0;
   double start_cpu_nsecs = 0.0;
+
   if (WSREP(thd)) {
     if (!thd->in_multi_stmt_transaction_mode()) {
       thd->wsrep_PA_safe = true;
@@ -1780,6 +1782,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   double start_busy_usecs = 0.0;
   double start_cpu_nsecs = 0.0;
 #endif /* WITH_WSREP */
+
   if (unlikely(opt_userstat))
     userstat_start_timer(&start_busy_usecs, &start_cpu_nsecs);
 

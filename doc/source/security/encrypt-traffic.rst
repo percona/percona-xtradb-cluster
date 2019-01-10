@@ -247,7 +247,7 @@ in a running cluster:
 
 1. Create a user for SST on one of the nodes:
 
-   .. code-block:: sql
+   .. code-block:: guess
 
       mysql> CREATE USER 'sst_user'$'%' IDENTIFIED BY PASSWORD 'sst_password';
 
@@ -256,14 +256,14 @@ in a running cluster:
 
 #. Grant usage privileges to this user and require SSL:
 
-   .. code-block:: sql
+   .. code-block:: guess
 
       mysql> GRANT USAGE ON *.* TO 'sst_user' REQUIRE SSL;
 
 #. To make sure that the SST user replicated across the cluster,
    run the following query on another node:
 
-   .. code-block:: sql
+   .. code-block:: guess
 
       mysql> SELECT User, Host, ssl_type FROM mysql.user WHERE User='sst_user';
 

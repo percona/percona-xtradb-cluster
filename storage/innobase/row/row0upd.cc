@@ -2308,8 +2308,8 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
                            << index->table->name;
               }
               break;
-            case DB_LOCK_WAIT:
             case DB_LOCK_WAIT_TIMEOUT:
+            case DB_LOCK_WAIT:
               err = DB_LOCK_WAIT_TIMEOUT;
               break;
             default:

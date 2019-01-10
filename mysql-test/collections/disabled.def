@@ -173,3 +173,65 @@ tokudb.parts.partition_debug_tokudb : the debug code does not exist in 8.0
 tokudb.rpl.rpl_row_sp002_tokudb : tokudb does not support foreign keys
 tokudb.rpl.rpl_deadlock_tokudb : temporarily disabled until properly debugged
 tokudb.rpl.rpl_partition_tokudb : exchange partition is not supported
+
+# Codership disabled tests begin here
+
+# default test-suite
+main.partition_pruning : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+main.range_icp : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+main.range_none : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+main.xa_prepared_binlog_off : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+
+# galera-3nodes
+galera_3nodes.galera_parallel_autoinc_manytrx2 : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_3nodes.galera_pc_bootstrap : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_3nodes.galera_slave_options_do : GCF-1019 0000-00-00 CODERSHIP 5.7 regression: replication filtering options do not work as they do in 5.6
+galera_3nodes.galera_slave_options_ignore : GCF-1019 0000-00-00 CODERSHIP 5.7 regression: replication filtering options do not work as they do in 5.6
+
+# perf-schema
+perfschema.global_read_lock : Issue#79 2018-07-26 CODERSHIP https://github.com/codership/mysql-wsrep/issues/79
+perfschema.memory_aggregate_no_a : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+perfschema.start_server_low_index : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+
+# sys_vars
+sys_vars.wsrep_start_position_basic          : This needs server to start in cluster mode with wsrep initialized.
+sys_vars.wsrep_preordered_basic              : TC pending.
+sys_vars.wsrep_reject_queries_basic          : TC pending.
+sys_vars.sql_mode_func                       : Differences in result likely due to configuration. Need more investigation.
+sys_vars.innodb_buffer_pool_populate_basic   : is now mapped to use NUMA interleave policies and some of the modes are not supported on some distros.
+sys_vars.innodb_support_xa_func              : XA is not supported by PXC
+sys_vars.wsrep_max_ws_size_basic             : Setting this now also set repl.max_ws_size which is galera internal setting.
+
+# innodb_fts
+innodb_fts.fulltext_table_evict : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+
+# rpl
+rpl.rpl_innodb_info_tbl_slave_tmp_tbl_mismatch : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl.rpl_multi_source_channel_map_stress : Issue#330 2018-07-26 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl.rpl_relay_log_recovery_positions : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl.rpl_seconds_behind_master : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl.rpl_semi_sync_ack_thread : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl.rpl_semi_sync_after_sync : Issue#330 2018-06-19 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+
+# galera
+##galera.MW-286 : Fails due to timing issue. Parallel transaction should be running while ALTER is fired.
+##galera.MW-360 : drop temporary table is bin logged (PS issue)
+##galera.galera#500 : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+##galera.galera_kill_nochanges : mysql-wsrep#24 0000-00-00 CODERSHIP Galera server does not restart properly if killed
+##galera.galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
+##galera.galera_create_table_like : Resource leak with CTAS statement (PXC#2232)
+
+galera.galera_fk_multitable : Bug#80821 0000-00-00 CODERSHIP fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
+galera.galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically
+galera.galera_garbd : Failing to find the garbd binary after new minimal image change.
+galera.pxc_encrypt_rest_blog : Currently PXC doesn't support binlog encryption
+galera.pxc_encrypt_rest_gt_vault : Vault server availability is unreliable
+galera.pxc_encrypt_rest_fpt_vault : Vault server availability is unreliable
+
+#binlog
+binlog.binlog_index : codership/mysql-wsrep##71 0000-00-00 CODERSHIP Regression: Duplicate "file was not purged because it is the active log file" warning
+binlog.binlog_xa_prepared_disconnect : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+
+# Codership disabled tests end here
+
+

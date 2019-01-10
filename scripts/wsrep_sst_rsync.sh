@@ -153,9 +153,9 @@ FILTER=(-f '- /lost+found'
         -f '- /.Trashes'
         -f '+ /wsrep_sst_binlog.tar'
         -f '+ /ib_lru_dump'
-        -f '+ /*.ibd'
         -f '+ /ibdata*'
         -f '+ /undo*'
+        -f '+ /*.ibd'
         -f '+ /*/'
         -f '- /*')
 

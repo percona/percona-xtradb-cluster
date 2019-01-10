@@ -115,7 +115,8 @@ class Mts_submode_wsrep : public Mts_submode {
   ~Mts_submode_wsrep(){};
 
   int wait_for_workers_to_finish(Relay_log_info *,
-                                 Slave_worker *ignore = NULL) {
+                                 MY_ATTRIBUTE((__unused__))
+                                     Slave_worker *ignore = NULL) {
     return 0;
   }
 };
