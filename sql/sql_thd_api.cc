@@ -350,6 +350,14 @@ void **thd_ha_data(const MYSQL_THD thd, const struct handlerton *hton) {
   return &(const_cast<THD *>(thd))->get_ha_data(hton->slot)->ha_ptr;
 }
 
+#ifdef WITH_WSREP
+void **wsrep_thd_ha_data(const MYSQL_THD thd, const struct handlerton *hton) {
+  return &(const_cast<THD *>(thd))
+              ->wsrep_get_backup_ha_data(hton->slot)
+              ->ha_ptr;
+}
+#endif /* WITH_WSREP */
+
 void thd_storage_lock_wait(MYSQL_THD thd, long long value) {
   thd->utime_after_lock += value;
 }

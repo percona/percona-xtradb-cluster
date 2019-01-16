@@ -2,6 +2,10 @@
 # Test TRUNCATE
 #
 
+# presence of galera_truncate.cnf will restart the node before the test
+# this will ensure node-1 is first to start and node-2 is second
+# ordering their index for auto-increement
+
 --source include/galera_cluster.inc
 
 #

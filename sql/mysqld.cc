@@ -11539,6 +11539,7 @@ PSI_mutex_key key_LOCK_wsrep_slave_threads;
 PSI_mutex_key key_LOCK_wsrep_desync;
 
 PSI_mutex_key key_LOCK_wsrep_thd;
+PSI_mutex_key key_LOCK_wsrep_thd_attachable_trx;
 PSI_mutex_key key_LOCK_wsrep_sst_thread;
 #endif /* WITH_WSREP */
 
@@ -11644,6 +11645,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 
   { &key_LOCK_wsrep_thd, "LOCK_wsrep_thd", 0, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_wsrep_thd_attachable_trx, "LOCK_wsrep_thd_attachable_trx", 0, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_sst_thread, "LOCK_wsrep_sst_thread", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };

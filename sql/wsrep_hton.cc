@@ -29,8 +29,6 @@
 #include "wsrep_xid.h"
 #include "sql/log.h"
 
-extern ulonglong thd_to_trx_id(THD *thd);
-
 extern "C" int thd_binlog_format(const MYSQL_THD thd);
 
 enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *hton,

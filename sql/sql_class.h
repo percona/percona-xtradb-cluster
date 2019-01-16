@@ -1686,6 +1686,20 @@ class THD : public MDL_context_owner,
   */
   Ha_data *get_ha_data(int slot) { return &ha_data[slot]; }
 
+#ifdef WITH_WSREP
+  Ha_data *wsrep_get_backup_ha_data(int slot) {
+    /* There could be series of attachable transaction as dd action
+    could be cascading. Like dd-action-1 invoking dd-action-2
+    so both of the may get different transaction so there is concept
+    of previous attachable transaction but for now it is not in use. */
+    if (m_attachable_trx != NULL) {
+      DBUG_ASSERT(m_attachable_trx->get_prev_attachable_trx() == NULL);
+      return m_attachable_trx->wsrep_get_main_trx_ha_data(slot);
+    }
+    return &ha_data[slot];
+  }
+#endif /* WITH_WSREP */
+
   /**
     Copy ha_data into the provided argument. Used by Attachble_transaction.
   */
@@ -2007,6 +2021,12 @@ class THD : public MDL_context_owner,
     virtual bool is_read_only() const { return true; }
 
     void init();
+
+#ifdef WITH_WSREP
+    Ha_data* wsrep_get_main_trx_ha_data(int slot) {
+       return &m_trx_state.m_ha_data[slot];
+    }
+#endif /* WITH_WSREP */
 
    protected:
     /// THD instance.
@@ -2815,8 +2835,19 @@ class THD : public MDL_context_owner,
   query_id_t wsrep_last_query_id;
   enum wsrep_query_state wsrep_query_state;
   enum wsrep_conflict_state wsrep_conflict_state;
+
   mysql_mutex_t LOCK_wsrep_thd;
   mysql_cond_t COND_wsrep_thd;
+
+  /**
+    MySQL flow may replace ha_data (from thd) with temporary ha_data
+    for execution of attachable transaction. If brute force abort thread
+    is trying to acesss victim ha_data while this replacement is taking
+    place, brute force abort thread may read stale data.
+    To avoid this use the mutex for co-ordination.
+  */
+  mysql_mutex_t LOCK_wsrep_thd_attachable_trx;
+
   // changed from wsrep_seqno_t to wsrep_trx_meta_t in wsrep API rev 75
   // wsrep_seqno_t             wsrep_trx_seqno;
   wsrep_trx_meta_t wsrep_trx_meta;

@@ -1567,8 +1567,13 @@ static bool trx_write_serialisation_history(
 
   /* Update latest MySQL wsrep XID in trx sys header.
   If given transaction is marked for replay then avoid updating
-  the xid while the trx is being rolled back. */
+  the xid while the trx is being rolled back.
+  - During recovery, if the transaction is not wsrep registered then
+    skip updating wsrep co-ordinates.
+  - Also, if half-cooked transaction is begin rolled back
+    skip updating wsrep co-ordinates. */
   if (wsrep_is_wsrep_xid(trx->xid) &&
+      trx->mysql_thd &&
       wsrep_safe_to_persist_xid(trx->mysql_thd)) {
     trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
   } else if (trx->wsrep_recover_xid &&

@@ -2057,6 +2057,33 @@ trx_t *&thd_to_trx(THD *thd) {
   return (innodb_session->m_trx);
 }
 
+#ifdef WITH_WSREP
+
+/** Obtain the private handler of InnoDB session specific data.
+@param[in,out]	thd	MySQL thread handler.
+@return reference to private handler */
+MY_ATTRIBUTE((warn_unused_result))
+innodb_session_t *&wsrep_thd_to_innodb_session(THD *thd) {
+  DBUG_ASSERT(innodb_hton_ptr->slot != HA_SLOT_UNDEF);
+  innodb_session_t *&innodb_session =
+      *(innodb_session_t **)wsrep_thd_ha_data(thd, innodb_hton_ptr);
+
+  return (innodb_session);
+}
+
+/** Obtain the InnoDB transaction of a MySQL thread.
+@param[in,out]	thd	MySQL thread handler.
+@return reference to transaction pointer */
+MY_ATTRIBUTE((warn_unused_result))
+trx_t *&wsrep_thd_to_trx(THD *thd) {
+  innodb_session_t *&innodb_session = wsrep_thd_to_innodb_session(thd);
+  ut_ad(innodb_session != NULL);
+
+  return (innodb_session->m_trx);
+}
+
+#endif /* WITH_WSREP */
+
 /** Check if statement is of type INSERT .... SELECT that involves
 use of intrinsic tables.
 @param[in]	user_thd	thread handler
@@ -2076,8 +2103,6 @@ static inline bool thd_is_ins_sel_stmt(THD *user_thd) {
 }
 
 #ifdef WITH_WSREP
-ulonglong thd_to_trx_id(THD *thd) { return (thd_to_trx(thd)->id); }
-
 static int wsrep_abort_transaction_func(handlerton *hton, THD *bf_thd,
                                         THD *victim_thd, bool signal);
 static void wsrep_fake_trx_id(handlerton *hton, THD *thd);
@@ -22394,7 +22419,7 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
                                         query_id, bf_id);
           wsrep_thd_awake(thd, signal);
 
-          /* for BF thd, we need to prevent him from committing */
+          /* for BF thd, we need to prevent it from committing */
           if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
             wsrep_abort_slave_trx(bf_seqno, wsrep_thd_trx_seqno(thd));
           }
@@ -22463,13 +22488,30 @@ static int wsrep_abort_transaction_func(handlerton *hton, THD *bf_thd,
                                         THD *victim_thd, bool signal) {
   DBUG_ENTER("wsrep_innobase_abort_thd");
 
-  /* TODO: check if this can cause deadlock in PXC world.
-  Secure access to thd ha_data as it could be modified parallel.
-  (One such instance we found was with use of trigger that causes
-   Transaction_ro (attachable transaction use) that would re-vise ha_data) */
+  /* Starting MySQL-8.0, same thd will be used to perform dictionary
+  (or dd) object changes. These objects changes are done using a separate
+  transaction that is created on the fly. Given the main innodb code
+  is tuned to look at only 1 transaction object, the main transaction
+  object needs to be backed up so that this temporary dd transaction object
+  can be feeded for the said tenure. Once the dd update scope is complete
+  main transaction object is restored.
+  All this happens as part of attachable transaction that is member of thd.
+  In the case below, PXC needs to look at victim transaction but this
+  transaction could be dd transaction as explained above so PXC should
+  carefully look for the needed victim transaction. This is needed
+  as transaction is being accessed outside the main thd context.
+  BF thd is trying to alter transaction state.
+
+  Below call should be mutex protected to avoid allowing victim
+  thd executing routine to restore main transaction while bf_thd
+  is in process to findout victim transaction */
+  mysql_mutex_lock(&victim_thd->LOCK_wsrep_thd_attachable_trx);
+  /* This mutex lock is not needed but keeping it for now as safety check. */
   mysql_mutex_lock(&victim_thd->LOCK_thd_data);
-  trx_t *victim_trx = thd_to_trx(victim_thd);
+  trx_t *victim_trx = wsrep_thd_to_trx(victim_thd);
   mysql_mutex_unlock(&victim_thd->LOCK_thd_data);
+  mysql_mutex_unlock(&victim_thd->LOCK_wsrep_thd_attachable_trx);
+  ut_a(victim_trx);
 
   /* mutex lock is not needed here as execution if being done by bf_thd. */
   trx_t *bf_trx = (bf_thd) ? thd_to_trx(bf_thd) : NULL;
@@ -22486,7 +22528,7 @@ static int wsrep_abort_transaction_func(handlerton *hton, THD *bf_thd,
 
     DBUG_RETURN(rcode);
   } else {
-    WSREP_DEBUG("Victim does not have transaction");
+    WSREP_WARN("Victim does not have transaction");
     wsrep_thd_set_conflict_state(victim_thd, true, MUST_ABORT);
     wsrep_thd_awake(victim_thd, signal);
   }

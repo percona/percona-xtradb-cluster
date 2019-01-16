@@ -2186,6 +2186,18 @@ bool wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
 
   THD *request_thd = requestor_ctx->wsrep_get_thd();
   THD *granted_thd = ticket->get_ctx()->wsrep_get_thd();
+
+#if 0
+  /* TODO: It would be good to enable this since it doesn't make sense to
+  double abort given thd. For now, leaving it as is for 5.7 compatibility */
+  if (granted_thd->wsrep_conflict_state == MUST_ABORT) {
+    /* Granted thd is already scheduled for abort.
+    No point in repeating the action .*/
+    WSREP_DEBUG("state of granted_thd: %d\n", granted_thd->killed.load());
+    return (false);
+  }
+#endif /* 0 */
+
   bool ret = false;
 
   const char *schema = key->db_name();

@@ -435,7 +435,7 @@ extern bool innodb_inited;
 
 int wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx);
 
-int wsrep_innobase_kill_one_trx(void *thd_ptr, const trx_t *bf_trx,
+int wsrep_innobase_kill_one_trx(void *bf_thd_ptr, const trx_t *bf_trx,
                                 trx_t *victim_trx, ibool signal);
 
 bool wsrep_thd_set_PA_safe(void *thd_ptr, bool safe);

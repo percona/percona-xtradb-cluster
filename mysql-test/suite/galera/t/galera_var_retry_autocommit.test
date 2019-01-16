@@ -81,7 +81,7 @@ SET SESSION wsrep_retry_autocommit = 4192;
 
 --sleep 12 
 
-# Once he stream of TRUNCATEs is complete
+# Once the stream of TRUNCATEs is complete
 --connection node_2
 --reap
 

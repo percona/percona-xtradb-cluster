@@ -776,6 +776,9 @@ const char *set_thd_proc_info(MYSQL_THD thd, const char *info,
                               const char *calling_file,
                               const unsigned int calling_line);
 void **thd_ha_data(const MYSQL_THD thd, const struct handlerton *hton);
+#ifdef WITH_WSREP
+void **wsrep_thd_ha_data(const MYSQL_THD thd, const struct handlerton *hton);
+#endif /* WITH_WSREP */
 void thd_storage_lock_wait(MYSQL_THD thd, long long value);
 int thd_tx_isolation(const MYSQL_THD thd);
 int thd_tx_is_read_only(const MYSQL_THD thd);

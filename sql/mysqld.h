@@ -449,6 +449,7 @@ extern PSI_mutex_key key_mutex_slave_worker_hash;
 #ifdef WITH_WSREP
 extern PSI_mutex_key key_LOCK_wsrep_thd;
 extern PSI_cond_key key_COND_wsrep_thd;
+extern PSI_mutex_key key_LOCK_wsrep_thd_attachable_trx;
 extern PSI_thread_key key_thread_handle_wsrep;
 #endif /* WITH_WSREP */
 

@@ -684,6 +684,8 @@ THD::THD(bool enable_plugins)
 #ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_thd, &LOCK_wsrep_thd, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_thd, &COND_wsrep_thd);
+  mysql_mutex_init(key_LOCK_wsrep_thd_attachable_trx,
+                   &LOCK_wsrep_thd_attachable_trx, MY_MUTEX_INIT_FAST);
   wsrep_ws_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
   wsrep_ws_handle.opaque = NULL;
   wsrep_retry_counter = 0;
@@ -1299,6 +1301,8 @@ void THD::release_resources() {
   mysql_mutex_unlock(&LOCK_wsrep_thd);
   mysql_mutex_destroy(&LOCK_wsrep_thd);
   mysql_cond_destroy(&COND_wsrep_thd);
+
+  mysql_mutex_destroy(&LOCK_wsrep_thd_attachable_trx);
 
   if (wsrep_rli) {
     if (wsrep_rli->current_mts_submode != NULL)
@@ -2362,19 +2366,41 @@ void THD::restore_backup_open_tables_state(Open_tables_backup *backup) {
 }
 
 void THD::begin_attachable_ro_transaction() {
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&LOCK_wsrep_thd_attachable_trx);
   m_attachable_trx = new Attachable_trx(this, m_attachable_trx);
+  mysql_mutex_unlock(&LOCK_wsrep_thd_attachable_trx);
+#else
+  m_attachable_trx = new Attachable_trx(this, m_attachable_trx);
+#endif /* WITH_WSREP */
 }
 
 void THD::begin_attachable_transaction(enum_reset_lex reset_lex) {
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&LOCK_wsrep_thd_attachable_trx);
   m_attachable_trx = new Attachable_trx(this, m_attachable_trx, reset_lex);
+  mysql_mutex_unlock(&LOCK_wsrep_thd_attachable_trx);
+#else
+  m_attachable_trx = new Attachable_trx(this, m_attachable_trx, reset_lex);
+#endif /* WITH_WSREP */
 }
 
 void THD::end_attachable_transaction() {
+#ifdef WITH_WSREP
+  /* In PXC flow, bf_thd may be readinf the main transaction data
+  from attachable transaction so this sync is needed. */
+  mysql_mutex_lock(&LOCK_wsrep_thd_attachable_trx);
+#endif /* WITH_WSREP */
+
   Attachable_trx *prev_trx = m_attachable_trx->get_prev_attachable_trx();
   delete m_attachable_trx;
   // Restore attachable transaction which was active before we started
   // the one which just has ended. NULL in most cases.
   m_attachable_trx = prev_trx;
+
+#ifdef WITH_WSREP
+  mysql_mutex_unlock(&LOCK_wsrep_thd_attachable_trx);
+#endif /* WITH_WSREP */
 }
 
 bool THD::is_attachable_rw_transaction_active() const {
@@ -2382,9 +2408,17 @@ bool THD::is_attachable_rw_transaction_active() const {
 }
 
 void THD::begin_attachable_rw_transaction() {
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&LOCK_wsrep_thd_attachable_trx);
   DBUG_ASSERT(!m_attachable_trx);
 
   m_attachable_trx = new Attachable_trx_rw(this);
+  mysql_mutex_unlock(&LOCK_wsrep_thd_attachable_trx);
+#else
+  DBUG_ASSERT(!m_attachable_trx);
+
+  m_attachable_trx = new Attachable_trx_rw(this);
+#endif /* WITH_WSREP */
 }
 
 /****************************************************************************
