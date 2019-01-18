@@ -1724,8 +1724,10 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
 
       DBUG_PRINT("debug", ("Acquire MDL commit lock"));
 #ifdef WITH_WSREP
-      // TODO: add comment why the mdl lock is skipped here when operating
-      // in cluster mode.
+      /* Taking explicit lock will block background/applier thread from aborting
+      a local thread lock so avoid taking this lock here.
+      Lock is meant to protect commit against FLUSH TABLE WITH READ LOCK
+      that may get fired when COMMIT is active. */
       if (!WSREP(thd) && thd->mdl_context.acquire_lock(
                              &mdl_request, thd->variables.lock_wait_timeout)) {
 #else

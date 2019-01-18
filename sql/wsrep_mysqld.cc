@@ -2230,11 +2230,24 @@ bool wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       ret = true;
 
-    } else if (granted_thd->lex->sql_command == SQLCOM_FLUSH ||
-               granted_thd->mdl_context.wsrep_has_explicit_locks()) {
+    } else if (granted_thd->lex->sql_command == SQLCOM_FLUSH) {
       WSREP_DEBUG(
-          "BF thread waiting for FLUSH/explicit lock held by"
-          " thread (%u)",
+          "BF thread waiting for local/victim thread (%u) FLUSH operation",
+          granted_thd->thread_id());
+      ticket->wsrep_report(wsrep_debug);
+      mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
+      ret = false;
+    } else if (granted_thd->mdl_context.wsrep_has_explicit_locks() &&
+               !granted_thd->ull_hash.empty()) {
+      /* Starting MySQL-8.0, mysql flow may take MDL_EXPLICIT lock for DD
+      access or change. Till 8.0, these locks use to normally correspond to
+      user set explicit lock that are generally retained beyond transaction
+      tenure. Given the new meaning or semantics just check for presence of
+      EXPLICIT lock would not work so wsrep flow now check if the lock is
+      user explicit lock too. */
+      WSREP_DEBUG(
+          "BF thread waiting for explicit lock held by victim/local thread "
+          "(%u)",
           granted_thd->thread_id());
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
