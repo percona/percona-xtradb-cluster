@@ -2041,12 +2041,12 @@ static int binlog_start_consistent_snapshot(handlerton *hton, THD *thd)
   LOG_INFO li;
   DBUG_ENTER("binlog_start_consistent_snapshot");
 
-#if 0
 #ifdef WITH_WSREP
+  /* If operating in emulation binlog mode avoid binlog snapshot as
+     binlog is not open. */
   if (wsrep_emulate_bin_log)
     DBUG_RETURN(0);
 #endif /* WITH_WSREP */
-#endif
 
   if ((err= thd->binlog_setup_trx_data()))
     DBUG_RETURN(err);
@@ -2072,12 +2072,12 @@ static int binlog_clone_consistent_snapshot(handlerton *hton, THD *thd,
 
   DBUG_ENTER("binlog_clone_consistent_snapshot");
 
-#if 0
 #ifdef WITH_WSREP
+  /* If operating in emulation binlog mode avoid binlog snapshot as
+     binlog is not open. */
   if (wsrep_emulate_bin_log)
     DBUG_RETURN(0);
 #endif /* WITH_WSREP */
-#endif
 
   from_cache_mngr= opt_bin_log ?
     (binlog_cache_mngr *) thd_get_cache_mngr(from_thd) : NULL;
