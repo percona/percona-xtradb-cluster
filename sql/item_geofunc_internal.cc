@@ -64,8 +64,13 @@ bool Srs_fetcher::lock(gis::srid_t srid, enum_mdl_type lock_type) {
   int10_to_str(srid, id_str, 10);
 
   MDL_request mdl_request;
+#ifdef WITH_WSREP
+  mdl_request.init_with_source(MDL_key::SRID, "", id_str, lock_type,
+                               MDL_TRANSACTION, false, __FILE__, __LINE__);
+#else
   mdl_request.init_with_source(MDL_key::SRID, "", id_str, lock_type,
                                MDL_TRANSACTION, __FILE__, __LINE__);
+#endif /* WITH_WSREP */
   if (m_thd->mdl_context.acquire_lock(&mdl_request,
                                       m_thd->variables.lock_wait_timeout)) {
     /* purecov: begin inspected */

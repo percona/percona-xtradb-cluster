@@ -1,10 +1,20 @@
+#node-1
+use test;
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=InnoDB;
+#node-2 (execute lock table that will establish explicit lock)
 LOCK TABLE t2 WRITE;
+#node-2a (ddl waits for explicit lock as it is non-preemptable)
 OPTIMIZE TABLE t1,t2;;
+#node-2b (ddl waits for explicit lock as it is non-preemptable)
 REPAIR TABLE t1,t2;;
 SET SESSION wsrep_sync_wait = 0;
+#node-2 (check ddl are waiting)
+#node-1 (insert can progress on different table)
 INSERT INTO t2 VALUES (1);
+#node-2 (unlock will release explicit lock unblocking ddl)
+select * from t2;
+id
 UNLOCK TABLES;
 Table	Op	Msg_type	Msg_text
 test.t1	optimize	note	Table does not support optimize, doing recreate + analyze instead
@@ -14,5 +24,70 @@ test.t2	optimize	status	OK
 Table	Op	Msg_type	Msg_text
 test.t1	repair	note	The storage engine for the table doesn't support repair
 test.t2	repair	note	The storage engine for the table doesn't support repair
+select * from t2;
+id
+1
+DROP TABLE t1;
+DROP TABLE t2;
+#node-1
+use test;
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=InnoDB;
+#node-2 (execute lock table that will establish explicit lock)
+FLUSH TABLE WITH READ LOCK;
+#node-2a (ddl waits for explicit lock as it is non-preemptable)
+OPTIMIZE TABLE t1,t2;;
+#node-2b (ddl waits for explicit lock as it is non-preemptable)
+REPAIR TABLE t1,t2;;
+SET SESSION wsrep_sync_wait = 0;
+#node-2 (check ddl are waiting)
+#node-1 (insert can progress on different table)
+INSERT INTO t2 VALUES (1);
+#node-2 (unlock will release explicit lock unblocking ddl)
+select * from t2;
+id
+UNLOCK TABLES;
+Table	Op	Msg_type	Msg_text
+test.t1	optimize	note	Table does not support optimize, doing recreate + analyze instead
+test.t1	optimize	status	OK
+test.t2	optimize	note	Table does not support optimize, doing recreate + analyze instead
+test.t2	optimize	status	OK
+Table	Op	Msg_type	Msg_text
+test.t1	repair	note	The storage engine for the table doesn't support repair
+test.t2	repair	note	The storage engine for the table doesn't support repair
+select * from t2;
+id
+1
+DROP TABLE t1;
+DROP TABLE t2;
+#node-1
+use test;
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=InnoDB;
+#node-2 (execute lock table that will establish explicit lock)
+FLUSH TABLE t2 WITH READ LOCK;
+#node-2a (ddl waits for explicit lock as it is non-preemptable)
+OPTIMIZE TABLE t1,t2;;
+#node-2b (ddl waits for explicit lock as it is non-preemptable)
+REPAIR TABLE t1,t2;;
+SET SESSION wsrep_sync_wait = 0;
+#node-2 (check ddl are waiting)
+#node-1 (insert can progress on different table)
+INSERT INTO t2 VALUES (1);
+#node-2 (unlock will release explicit lock unblocking ddl)
+select * from t2;
+id
+UNLOCK TABLES;
+Table	Op	Msg_type	Msg_text
+test.t1	optimize	note	Table does not support optimize, doing recreate + analyze instead
+test.t1	optimize	status	OK
+test.t2	optimize	note	Table does not support optimize, doing recreate + analyze instead
+test.t2	optimize	status	OK
+Table	Op	Msg_type	Msg_text
+test.t1	repair	note	The storage engine for the table doesn't support repair
+test.t2	repair	note	The storage engine for the table doesn't support repair
+select * from t2;
+id
+1
 DROP TABLE t1;
 DROP TABLE t2;

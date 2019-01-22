@@ -12008,6 +12008,7 @@ PSI_stage_info stage_wsrep_pre_commit = { 0, "wsrep: in pre-commit stage", 0, PS
 PSI_stage_info stage_wsrep_pre_commit_cert_passed = { 0, "wsrep: pre-commit/certification passed", 0, PSI_DOCUMENT_ME};
 
 PSI_stage_info stage_wsrep_preparing_for_TO_isolation = { 0, "wsrep: preparing for TO isolation", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_TO_isolation_initiated = { 0, "wsrep: TO isolation initiated", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_wsrep_completed_TO_isolation = { 0, "wsrep: completed TO isolation", 0, PSI_DOCUMENT_ME};
 
 PSI_stage_info stage_wsrep_replaying_trx = { 0, "wsrep: replaying trx", 0, PSI_DOCUMENT_ME};
@@ -12158,6 +12159,7 @@ PSI_stage_info *wsrep_server_stages[]=
 
   // wsrep_mysqld
   & stage_wsrep_preparing_for_TO_isolation,
+  & stage_wsrep_TO_isolation_initiated,
   & stage_wsrep_completed_TO_isolation,
 
   // wsrep_thd

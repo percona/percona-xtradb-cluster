@@ -1034,8 +1034,14 @@ bool Global_read_lock::lock_global_read_lock(THD *thd) {
       backup lock.
     */
     if (thd->backup_tables_lock.abort_if_acquired()) DBUG_RETURN(true);
+
+#ifdef WITH_WSREP
+    MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, MDL_key::GLOBAL, "", "",
+                                   MDL_SHARED, MDL_EXPLICIT);
+#else
     MDL_REQUEST_INIT(&mdl_request, MDL_key::GLOBAL, "", "", MDL_SHARED,
                      MDL_EXPLICIT);
+#endif /* WITH_WSREP */
 
     /* Increment static variable first to signal innodb memcached server
        to release mdl locks held by it */
@@ -1146,8 +1152,13 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
 
   if (m_state != GRL_ACQUIRED) DBUG_RETURN(0);
 
+#ifdef WITH_WSREP
+  MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, MDL_key::COMMIT, "", "",
+                                 MDL_SHARED, MDL_EXPLICIT);
+#else
   MDL_REQUEST_INIT(&mdl_request, MDL_key::COMMIT, "", "", MDL_SHARED,
                    MDL_EXPLICIT);
+#endif /* WITH_WSREP */
 
   if (thd->mdl_context.acquire_lock(&mdl_request,
                                     thd->variables.lock_wait_timeout))
@@ -1268,10 +1279,18 @@ wsrep_status_t Global_read_lock::wsrep_resume_once(void) {
 */
 
 void Global_read_lock::set_explicit_lock_duration(THD *thd) {
-  if (m_mdl_global_shared_lock)
+  if (m_mdl_global_shared_lock) {
+#ifdef WITH_WSREP
+    m_mdl_global_shared_lock->set_wsrep_non_preemptable_status(true);
+#endif /* WITH_WSREP */
     thd->mdl_context.set_lock_duration(m_mdl_global_shared_lock, MDL_EXPLICIT);
-  if (m_mdl_blocks_commits_lock)
+  }
+  if (m_mdl_blocks_commits_lock) {
+#ifdef WITH_WSREP
+    m_mdl_blocks_commits_lock->set_wsrep_non_preemptable_status(true);
+#endif /* WITH_WSREP */
     thd->mdl_context.set_lock_duration(m_mdl_blocks_commits_lock, MDL_EXPLICIT);
+  }
 }
 
 /**
@@ -1293,7 +1312,12 @@ bool Global_backup_lock::acquire(THD *thd) {
               !thd->mdl_context.owns_equal_or_stronger_lock(m_namespace, "", "",
                                                             MDL_SHARED));
 
+#ifdef WITH_WSREP
+  MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, m_namespace, "", "", MDL_SHARED,
+                                 MDL_EXPLICIT);
+#else
   MDL_REQUEST_INIT(&mdl_request, m_namespace, "", "", MDL_SHARED, MDL_EXPLICIT);
+#endif /* WITH_WSREP */
 
   if (thd->mdl_context.acquire_lock(&mdl_request,
                                     thd->variables.lock_wait_timeout))
@@ -1365,8 +1389,13 @@ void Global_backup_lock::init_protection_request(
     MDL_request *mdl_request, enum_mdl_duration duration) const {
   DBUG_ENTER("Global_backup_lock::init_protection_request");
 
+#ifdef WITH_WSREP
+  MDL_EXPLICIT_LOCK_REQUEST_INIT(mdl_request, m_namespace, "", "",
+                                 MDL_INTENTION_EXCLUSIVE, duration);
+#else
   MDL_REQUEST_INIT(mdl_request, m_namespace, "", "", MDL_INTENTION_EXCLUSIVE,
                    duration);
+#endif /* WITH_WSREP */
 
   DBUG_VOID_RETURN;
 }

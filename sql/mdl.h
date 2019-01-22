@@ -674,6 +674,14 @@ class MDL_request {
   /** Duration for requested lock. */
   enum_mdl_duration duration{MDL_STATEMENT};
 
+#ifdef WITH_WSREP
+  /**
+    Check description of this variable in MDL_ticket. MDL_request
+    just act as aggregator for N variables to set in MDL_ticket.
+  */
+  bool m_wsrep_non_preemptable;
+#endif /* WITH_WSREP */
+
   /**
     Pointers for participating in the list of lock requests for this context.
   */
@@ -705,6 +713,9 @@ class MDL_request {
                         const char *db_arg, const char *name_arg,
                         enum_mdl_type mdl_type_arg,
                         enum_mdl_duration mdl_duration_arg,
+#ifdef WITH_WSREP
+                        bool wsrep_non_preemptable,
+#endif /* WITH_WSREP */
                         const char *src_file, uint src_line);
   void init_by_key_with_source(const MDL_key *key_arg,
                                enum_mdl_type mdl_type_arg,
@@ -760,14 +771,34 @@ class MDL_request {
       Locked_tables_list::rename_locked_table(), a move assignment is actually
       what is intended.
   */
+#ifdef WITH_WSREP
+  MDL_request() : m_wsrep_non_preemptable(false) {}
+
+  MDL_request(const MDL_request &rhs)
+      : type(rhs.type),
+        duration(rhs.duration),
+        m_wsrep_non_preemptable(rhs.m_wsrep_non_preemptable),
+        ticket(NULL),
+        key(rhs.key) {}
+#else
   MDL_request() {}
 
   MDL_request(const MDL_request &rhs)
       : type(rhs.type), duration(rhs.duration), ticket(NULL), key(rhs.key) {}
+#endif /* WITH_WSREP */
+
 };
 
+#ifdef WITH_WSREP
+#define MDL_REQUEST_INIT(R, P1, P2, P3, P4, P5) \
+  (*R).init_with_source(P1, P2, P3, P4, P5, false, __FILE__, __LINE__)
+
+#define MDL_EXPLICIT_LOCK_REQUEST_INIT(R, P1, P2, P3, P4, P5) \
+  (*R).init_with_source(P1, P2, P3, P4, P5, true, __FILE__, __LINE__)
+#else
 #define MDL_REQUEST_INIT(R, P1, P2, P3, P4, P5) \
   (*R).init_with_source(P1, P2, P3, P4, P5, __FILE__, __LINE__)
+#endif /* WITH_WSREP */
 
 #define MDL_REQUEST_INIT_BY_KEY(R, P1, P2, P3) \
   (*R).init_by_key_with_source(P1, P2, P3, __FILE__, __LINE__)
@@ -921,6 +952,13 @@ class MDL_ticket : public MDL_wait_for_subgraph {
   void set_duration(enum_mdl_duration dur) { m_duration = dur; }
 #endif
 
+#ifdef WITH_WSREP
+  bool get_wsrep_non_preemptable_status() { return m_wsrep_non_preemptable; }
+  void set_wsrep_non_preemptable_status(bool wsrep_non_preemptable) {
+    m_wsrep_non_preemptable = wsrep_non_preemptable;
+  }
+#endif /* WITH_WSREP */
+
  public:
   /**
     Status of lock request represented by the ticket as reflected in P_S.
@@ -935,7 +973,12 @@ class MDL_ticket : public MDL_wait_for_subgraph {
  private:
   friend class MDL_context;
 
+#ifdef WITH_WSREP
+  MDL_ticket(MDL_context *ctx_arg, enum_mdl_type type_arg,
+             bool wsrep_non_preemptable
+#else
   MDL_ticket(MDL_context *ctx_arg, enum_mdl_type type_arg
+#endif /* WITH_WSREP */
 #ifndef DBUG_OFF
              ,
              enum_mdl_duration duration_arg
@@ -945,6 +988,9 @@ class MDL_ticket : public MDL_wait_for_subgraph {
 #ifndef DBUG_OFF
         m_duration(duration_arg),
 #endif
+#ifdef WITH_WSREP
+        m_wsrep_non_preemptable(wsrep_non_preemptable),
+#endif /* WITH_WSREP */
         m_ctx(ctx_arg),
         m_lock(NULL),
         m_is_fast_path(false),
@@ -954,11 +1000,20 @@ class MDL_ticket : public MDL_wait_for_subgraph {
 
   virtual ~MDL_ticket() { DBUG_ASSERT(m_psi == NULL); }
 
+#ifdef WITH_WSREP
+  static MDL_ticket *create(MDL_context *ctx_arg, enum_mdl_type type_arg,
+                            bool wsrep_non_preemptable
+#ifndef DBUG_OFF
+                            ,
+                            enum_mdl_duration duration_arg
+#endif
+#else
   static MDL_ticket *create(MDL_context *ctx_arg, enum_mdl_type type_arg
 #ifndef DBUG_OFF
                             ,
                             enum_mdl_duration duration_arg
 #endif
+#endif /* WITH_WSREP */
   );
   static void destroy(MDL_ticket *ticket);
 
@@ -972,6 +1027,22 @@ class MDL_ticket : public MDL_wait_for_subgraph {
   */
   enum_mdl_duration m_duration;
 #endif
+
+#ifdef WITH_WSREP
+  /**
+    If ticket duration = MDL_EXPLICIT and it is marked as non-preemptable
+    then background BF abort thread wait for this ticket to get released.
+    Brute force abort of such local thread is skipped.
+    Isn't MDL_EXPLICIT enough to identify this:
+    - Starting MySQL-8.0, MySQL has started using MDL_EXPLICIT for DD
+      transaction and if local thread is holding MDL_EXPLICIT ticket for
+      DD transaction such thread can be preempted but if local thread
+      is holding MDL_EXPLICIT lock initiating from LOCK TABLE, FLUSH TABLE
+      then such are not scheduled for abort.
+  */
+  bool m_wsrep_non_preemptable;
+#endif /* WITH_WSREP */
+
   /**
     Context of the owner of the metadata lock ticket. Externally accessible.
   */
@@ -1081,19 +1152,28 @@ class MDL_ticket_store {
   MDL_ticket_handle find_in_lists(const MDL_request &req) const;
   MDL_ticket_handle find_in_hash(const MDL_request &req) const;
 
+#ifdef WITH_WSREP
+  mysql_mutex_t m_LOCK_ticket_store_ops;
+#endif /* WITH_WSREP */
+
  public:
   /**
     Public alias.
   */
   using List_iterator = Ticket_p_list::Iterator;
 
+#ifdef WITH_WSREP
+  MDL_ticket_store();
+#else
   /**
     Constructs store. The hash index is initially empty. Filled on demand.
   */
   MDL_ticket_store()
       :  // Comment in to test threshold values in unit test micro benchmark
          // THRESHOLD{read_from_env("TS_THRESHOLD", 500)},
-        m_map{nullptr} {}
+        m_map{nullptr} {
+  }
+#endif /* WITH_WSREP */
 
   /**
     Calls the closure provided as argument for each of the MDL_tickets
@@ -1133,6 +1213,15 @@ class MDL_ticket_store {
     @return true if there are no tickets with the given duration
   */
   bool is_empty(int di) const;
+
+#ifdef WITH_WSREP
+  /**
+    Check if there are non-preemptable tickets from PXC/wsrep prespective.
+    PXC/wsrep doesn't preempt explicit tickets originating from LOCK table,
+    FLUSH TABLE, etc...
+  */
+  bool wsrep_has_non_preemptable_tickets();
+#endif /* WITH_WSREP */
 
   /**
     Return the first MDL_ticket for the given duration.

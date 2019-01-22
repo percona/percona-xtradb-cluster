@@ -1,31 +1,47 @@
+#
 --source include/galera_cluster.inc
 --source include/have_binlog_format_row.inc
 
+#-------------------------------------------------------------------------------
+# lock table will block the other ddl statement even though they could
+# qualify for brute force abort (given these statement are TOI) as lock table
+# holds explicit lock that is non-preemptable.
+
+--connection node_1
+--echo #node-1
+use test;
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=InnoDB;
 
 --connection node_2
+--echo #node-2 (execute lock table that will establish explicit lock)
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
 --source include/wait_condition.inc
 LOCK TABLE t2 WRITE;
 
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
 --connection node_2a
+--echo #node-2a (ddl waits for explicit lock as it is non-preemptable)
 --send OPTIMIZE TABLE t1,t2;
 
 --connect node_2b, 127.0.0.1, root, , test, $NODE_MYPORT_2
 --connection node_2b
+--echo #node-2b (ddl waits for explicit lock as it is non-preemptable)
 --send REPAIR TABLE t1,t2;
 
 --connection node_2
 SET SESSION wsrep_sync_wait = 0;
+--echo #node-2 (check ddl are waiting)
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'Waiting for table metadata lock'
 --source include/wait_condition.inc
 
 --connection node_1
+--echo #node-1 (insert can progress on different table)
 INSERT INTO t2 VALUES (1);
 
 --connection node_2
+--echo #node-2 (unlock will release explicit lock unblocking ddl)
+select * from t2;
 UNLOCK TABLES;
 
 --connection node_2a
@@ -33,6 +49,105 @@ UNLOCK TABLES;
 
 --connection node_2b
 --reap
+select * from t2;
+
+DROP TABLE t1;
+DROP TABLE t2;
+
+#-------------------------------------------------------------------------------
+# FLUSH TABLE WITH READ LOCK will block the other ddl statement as it is global
+# lock and will establish explict lock that are non-preemptable
+
+--connection node_1
+--echo #node-1
+use test;
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=InnoDB;
+
+--connection node_2
+--echo #node-2 (execute lock table that will establish explicit lock)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+--source include/wait_condition.inc
+FLUSH TABLE WITH READ LOCK;
+
+--connection node_2a
+--echo #node-2a (ddl waits for explicit lock as it is non-preemptable)
+--send OPTIMIZE TABLE t1,t2;
+
+--connection node_2b
+--echo #node-2b (ddl waits for explicit lock as it is non-preemptable)
+--send REPAIR TABLE t1,t2;
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 0;
+--echo #node-2 (check ddl are waiting)
+--let $wait_condition = SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep: initiating TOI for write set (-1)';
+--source include/wait_condition.inc
+
+--connection node_1
+--echo #node-1 (insert can progress on different table)
+INSERT INTO t2 VALUES (1);
+
+--connection node_2
+--echo #node-2 (unlock will release explicit lock unblocking ddl)
+select * from t2;
+UNLOCK TABLES;
+
+--connection node_2a
+--reap
+
+--connection node_2b
+--reap
+select * from t2;
+
+DROP TABLE t1;
+DROP TABLE t2;
+
+#-------------------------------------------------------------------------------
+# FLUSH TABLE <table> WITH READ LOCK will block the other ddl statement as it
+# is global lock and will establish explict lock that are non-preemptable
+
+--connection node_1
+--echo #node-1
+use test;
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=InnoDB;
+
+--connection node_2
+--echo #node-2 (execute lock table that will establish explicit lock)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+--source include/wait_condition.inc
+FLUSH TABLE t2 WITH READ LOCK;
+
+--connection node_2a
+--echo #node-2a (ddl waits for explicit lock as it is non-preemptable)
+--send OPTIMIZE TABLE t1,t2;
+
+--connection node_2b
+--echo #node-2b (ddl waits for explicit lock as it is non-preemptable)
+--send REPAIR TABLE t1,t2;
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 0;
+--echo #node-2 (check ddl are waiting)
+--let $wait_condition = SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep: initiating TOI for write set (-1)';
+--source include/wait_condition.inc
+
+--connection node_1
+--echo #node-1 (insert can progress on different table)
+INSERT INTO t2 VALUES (1);
+
+--connection node_2
+--echo #node-2 (unlock will release explicit lock unblocking ddl)
+select * from t2;
+UNLOCK TABLES;
+
+--connection node_2a
+--reap
+
+--connection node_2b
+--reap
+select * from t2;
 
 DROP TABLE t1;
 DROP TABLE t2;

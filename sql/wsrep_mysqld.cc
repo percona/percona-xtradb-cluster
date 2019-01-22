@@ -1818,6 +1818,13 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     return -1;
   }
 
+  THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+           "wsrep: initiating TOI for write set (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
+
   wsrep_key_arr_t key_arr = {0, 0};
   struct wsrep_buf buff = {buf, buf_len};
 
@@ -1848,9 +1855,9 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
         WSREP_QUERY(thd), (long long)wsrep_thd_trx_seqno(thd),
         wsrep_get_exec_mode(thd->wsrep_exec_mode));
 
-    THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
+    THD_STAGE_INFO(thd, stage_wsrep_TO_isolation_initiated);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-             "wsrep: initiating TOI for write set (%lld)",
+             "wsrep: TO isolation initiated for write set (%lld)",
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
@@ -2237,14 +2244,22 @@ bool wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       ret = false;
-    } else if (granted_thd->mdl_context.wsrep_has_explicit_locks() &&
-               !granted_thd->ull_hash.empty()) {
+    } else if (!granted_thd->ull_hash.empty()) {
+      /* If there are user-level-lock skip abort */
+      WSREP_DEBUG(
+          "BF thread waiting for user level lock held by victim/local thread "
+          "(%u)",
+          granted_thd->thread_id());
+      ticket->wsrep_report(wsrep_debug);
+      mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
+      ret = false;
+    } else if (granted_thd->mdl_context.wsrep_has_explicit_locks()) {
       /* Starting MySQL-8.0, mysql flow may take MDL_EXPLICIT lock for DD
       access or change. Till 8.0, these locks use to normally correspond to
-      user set explicit lock that are generally retained beyond transaction
-      tenure. Given the new meaning or semantics just check for presence of
-      EXPLICIT lock would not work so wsrep flow now check if the lock is
-      user explicit lock too. */
+      user set explicit lock (LOCK/FLUSH,GET_LOCK, etc....) that are generally
+      retained beyond transaction tenure. Given the new meaning or semantics
+      just check for presence of EXPLICIT lock would not work so wsrep flow
+      now check if the lock is marked as preemptable. */
       WSREP_DEBUG(
           "BF thread waiting for explicit lock held by victim/local thread "
           "(%u)",

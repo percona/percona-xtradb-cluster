@@ -2068,6 +2068,16 @@ innodb_session_t *&wsrep_thd_to_innodb_session(THD *thd) {
   innodb_session_t *&innodb_session =
       *(innodb_session_t **)wsrep_thd_ha_data(thd, innodb_hton_ptr);
 
+  if (innodb_session != NULL) {
+    return (innodb_session);
+  }
+
+  /* Ideally, each local transaction executing thread should have
+  innodb_session already created but there are cases like background
+  stats update thread that too takes MDL lock creating potential conflict.
+  Given this is background thread it doesn't have an active transaction
+  associated with it. */
+  innodb_session = UT_NEW_NOKEY(innodb_session_t());
   return (innodb_session);
 }
 
@@ -22511,7 +22521,6 @@ static int wsrep_abort_transaction_func(handlerton *hton, THD *bf_thd,
   trx_t *victim_trx = wsrep_thd_to_trx(victim_thd);
   mysql_mutex_unlock(&victim_thd->LOCK_thd_data);
   mysql_mutex_unlock(&victim_thd->LOCK_wsrep_thd_attachable_trx);
-  ut_a(victim_trx);
 
   /* mutex lock is not needed here as execution if being done by bf_thd. */
   trx_t *bf_trx = (bf_thd) ? thd_to_trx(bf_thd) : NULL;
@@ -22528,7 +22537,9 @@ static int wsrep_abort_transaction_func(handlerton *hton, THD *bf_thd,
 
     DBUG_RETURN(rcode);
   } else {
-    WSREP_WARN("Victim does not have transaction");
+    /* Normally a background thread that is selected as victim doesn't have
+    an active transaction associated with it. */
+    WSREP_DEBUG("Victim Thread does not have transaction associated with it");
     wsrep_thd_set_conflict_state(victim_thd, true, MUST_ABORT);
     wsrep_thd_awake(victim_thd, signal);
   }

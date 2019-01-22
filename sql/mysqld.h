@@ -656,6 +656,7 @@ extern PSI_stage_info stage_wsrep_pre_commit;
 extern PSI_stage_info stage_wsrep_pre_commit_cert_passed;
 
 extern PSI_stage_info stage_wsrep_preparing_for_TO_isolation;
+extern PSI_stage_info stage_wsrep_TO_isolation_initiated;
 extern PSI_stage_info stage_wsrep_completed_TO_isolation;
 
 extern PSI_stage_info stage_wsrep_replaying_trx;

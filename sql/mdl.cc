@@ -70,11 +70,21 @@ extern bool wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
 #endif /* WITH_WSREP */
 
 #ifdef HAVE_PSI_INTERFACE
+
 static PSI_mutex_key key_MDL_wait_LOCK_wait_status;
 
+#ifdef WITH_WSREP
+static PSI_mutex_key key_wsrep_LOCK_ticket_store_ops;
+static PSI_mutex_info all_mdl_mutexes[] = {
+    {&key_MDL_wait_LOCK_wait_status, "MDL_wait::LOCK_wait_status", 0, 0,
+     PSI_DOCUMENT_ME},
+    {&key_wsrep_LOCK_ticket_store_ops,
+     "MDL_ticket_store::LOCK_ticket_store_ops", 0, 0, PSI_DOCUMENT_ME}};
+#else
 static PSI_mutex_info all_mdl_mutexes[] = {{&key_MDL_wait_LOCK_wait_status,
                                             "MDL_wait::LOCK_wait_status", 0, 0,
                                             PSI_DOCUMENT_ME}};
+#endif /* WITH_WSREP */
 
 static PSI_rwlock_key key_MDL_lock_rwlock;
 static PSI_rwlock_key key_MDL_context_LOCK_waiting_for;
@@ -1486,6 +1496,9 @@ void MDL_request::init_with_source(MDL_key::enum_mdl_namespace mdl_namespace,
                                    const char *db_arg, const char *name_arg,
                                    enum_mdl_type mdl_type_arg,
                                    enum_mdl_duration mdl_duration_arg,
+#ifdef WITH_WSREP
+                                   bool wsrep_non_preemptable,
+#endif /* WITH_WSREP */
                                    const char *src_file, uint src_line) {
 #if !defined(DBUG_OFF)
   // Make sure all I_S tables (except ndb tables) are in CAPITAL letters.
@@ -1500,6 +1513,9 @@ void MDL_request::init_with_source(MDL_key::enum_mdl_namespace mdl_namespace,
   key.mdl_key_init(mdl_namespace, db_arg, name_arg);
   type = mdl_type_arg;
   duration = mdl_duration_arg;
+#ifdef WITH_WSREP
+  m_wsrep_non_preemptable = wsrep_non_preemptable;
+#endif /* WITH_WSREP */
   ticket = NULL;
   m_src_file = src_file;
   m_src_line = src_line;
@@ -1524,6 +1540,9 @@ void MDL_request::init_by_key_with_source(const MDL_key *key_arg,
   key.mdl_key_init(key_arg);
   type = mdl_type_arg;
   duration = mdl_duration_arg;
+#ifdef WITH_WSREP
+  m_wsrep_non_preemptable = false;
+#endif /* WITH_WSREP */
   ticket = NULL;
   m_src_file = src_file;
   m_src_line = src_line;
@@ -1556,6 +1575,9 @@ void MDL_request::init_by_part_key_with_source(
   type = mdl_type_arg;
   duration = mdl_duration_arg;
   ticket = NULL;
+#ifdef WITH_WSREP
+  m_wsrep_non_preemptable = false;
+#endif /* WITH_WSREP */
   m_src_file = src_file;
   m_src_line = src_line;
 }
@@ -1669,7 +1691,22 @@ bool MDL_lock::needs_hton_notification(
   @todo This naive implementation should be replaced with one that saves
         on memory allocation by reusing released objects.
 */
-
+#ifdef WITH_WSREP
+MDL_ticket *MDL_ticket::create(MDL_context *ctx_arg, enum_mdl_type type_arg,
+                               bool wsrep_non_preemptable
+#ifndef DBUG_OFF
+                               ,
+                               enum_mdl_duration duration_arg
+#endif
+) {
+  return new (std::nothrow) MDL_ticket(ctx_arg, type_arg, wsrep_non_preemptable
+#ifndef DBUG_OFF
+                                       ,
+                                       duration_arg
+#endif
+  );
+}
+#else
 MDL_ticket *MDL_ticket::create(MDL_context *ctx_arg, enum_mdl_type type_arg
 #ifndef DBUG_OFF
                                ,
@@ -1683,6 +1720,7 @@ MDL_ticket *MDL_ticket::create(MDL_context *ctx_arg, enum_mdl_type type_arg
 #endif
   );
 }
+#endif /* WITH_WSREP */
 
 void MDL_ticket::destroy(MDL_ticket *ticket) {
   mysql_mdl_destroy(ticket->m_psi);
@@ -3001,6 +3039,10 @@ bool MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
   if (fix_pins()) return true;
 
   if (!(ticket = MDL_ticket::create(this, mdl_request->type
+#ifdef WITH_WSREP
+                                    ,
+                                    mdl_request->m_wsrep_non_preemptable
+#endif /* WITH_WSREP */
 #ifndef DBUG_OFF
                                     ,
                                     mdl_request->duration
@@ -3334,6 +3376,10 @@ bool MDL_context::clone_ticket(MDL_request *mdl_request) {
     the request.
   */
   if (!(ticket = MDL_ticket::create(this, mdl_request->type
+#ifdef WITH_WSREP
+                                    ,
+                                    mdl_request->m_wsrep_non_preemptable
+#endif /* WITH_WSREP */
 #ifndef DBUG_OFF
                                     ,
                                     mdl_request->duration
@@ -4738,6 +4784,13 @@ void MDL_context::set_transaction_duration_for_all_locks() {
   m_ticket_store.move_explicit_to_transaction_duration();
 }
 
+#ifdef WITH_WSREP
+MDL_ticket_store::MDL_ticket_store() : m_map{nullptr} {
+  mysql_mutex_init(key_wsrep_LOCK_ticket_store_ops, &m_LOCK_ticket_store_ops,
+                   NULL);
+}
+#endif /* WITH_WSREP */
+
 size_t MDL_ticket_store::Hash::operator()(const MDL_key *k) const {
   return static_cast<size_t>(murmur3_32(k->ptr(), k->length(), 0));
 }
@@ -4798,7 +4851,16 @@ MDL_ticket *MDL_ticket_store::front(int di) {
 
 void MDL_ticket_store::push_front(enum_mdl_duration dur, MDL_ticket *ticket) {
   ++m_count;
+#ifdef WITH_WSREP
+  /* While PXC/wsrep bf-abort thread is checking for explicit lock avoid
+  modifying the said ticket_store
+  TODO: Can be optimized only for duration = MDL_EXPLICIT */
+  mysql_mutex_lock(&m_LOCK_ticket_store_ops);
   m_durations[dur].m_ticket_list.push_front(ticket);
+  mysql_mutex_unlock(&m_LOCK_ticket_store_ops);
+#else
+  m_durations[dur].m_ticket_list.push_front(ticket);
+#endif /* WITH_WSREP */
 
   /*
     Note that we do not update m_durations[dur].m_mat_front here. That
@@ -4841,7 +4903,13 @@ void MDL_ticket_store::push_front(enum_mdl_duration dur, MDL_ticket *ticket) {
 
 void MDL_ticket_store::remove(enum_mdl_duration dur, MDL_ticket *ticket) {
   --m_count;
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&m_LOCK_ticket_store_ops);
   m_durations[dur].m_ticket_list.remove(ticket);
+  mysql_mutex_unlock(&m_LOCK_ticket_store_ops);
+#else
+  m_durations[dur].m_ticket_list.remove(ticket);
+#endif /* WITH_WSREP */
 
   if (m_durations[dur].m_mat_front == ticket) {
     m_durations[dur].m_mat_front = ticket->next_in_context;
@@ -4888,6 +4956,22 @@ void MDL_ticket_store::move_all_to_explicit_duration() {
     explicit duration.
   */
 
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&m_LOCK_ticket_store_ops);
+
+  /* All these transaction tickets will be moved to explict list
+  using follow-up swap operation.
+  For now this call is being done only when LOCK_TABLES is called.
+  Explicit LOCK on tables are non-preemptable in PXC/wsrep so mark
+  status accordingly before swapping */
+  {
+    List_iterator it(m_durations[MDL_TRANSACTION].m_ticket_list);
+    while ((ticket = it++)) {
+      ticket->set_wsrep_non_preemptable_status(true);
+    }
+  }
+#endif /* WITH_WSREP */
+
   m_durations[MDL_EXPLICIT].m_ticket_list.swap(
       m_durations[MDL_TRANSACTION].m_ticket_list);
 
@@ -4897,6 +4981,9 @@ void MDL_ticket_store::move_all_to_explicit_duration() {
 
     while ((ticket = it_ticket++)) {
       m_durations[i].m_ticket_list.remove(ticket);
+#ifdef WITH_WSREP
+      ticket->set_wsrep_non_preemptable_status(true);
+#endif /* WITH_WSREP */
       m_durations[MDL_EXPLICIT].m_ticket_list.push_front(ticket);
     }
     /*
@@ -4908,6 +4995,10 @@ void MDL_ticket_store::move_all_to_explicit_duration() {
       MDL_context::materialize_fast_path_locks() runs.
     */
   }
+
+#ifdef WITH_WSREP
+  mysql_mutex_unlock(&m_LOCK_ticket_store_ops);
+#endif /* WITH_WSREP */
 
 #ifndef DBUG_OFF
   List_iterator exp_it(m_durations[MDL_EXPLICIT].m_ticket_list);
@@ -4940,6 +5031,19 @@ void MDL_ticket_store::move_explicit_to_transaction_duration() {
   DBUG_ASSERT(m_durations[MDL_STATEMENT].m_ticket_list.is_empty());
   DBUG_ASSERT(m_durations[MDL_STATEMENT].m_mat_front == nullptr);
 
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&m_LOCK_ticket_store_ops);
+
+  /* Before moving/swapping the tickets with EXPLICIT lock
+  as safety check just set wsrep_non_preemptable to false. */
+  {
+    List_iterator it(m_durations[MDL_EXPLICIT].m_ticket_list);
+    while ((ticket = it++)) {
+      ticket->set_wsrep_non_preemptable_status(false);
+    }
+  }
+#endif /* WITH_WSREP */
+
   m_durations[MDL_TRANSACTION].m_ticket_list.swap(
       m_durations[MDL_EXPLICIT].m_ticket_list);
 
@@ -4950,6 +5054,10 @@ void MDL_ticket_store::move_explicit_to_transaction_duration() {
     m_durations[MDL_EXPLICIT].m_ticket_list.remove(ticket);
     m_durations[MDL_TRANSACTION].m_ticket_list.push_front(ticket);
   }
+
+#ifdef WITH_WSREP
+  mysql_mutex_unlock(&m_LOCK_ticket_store_ops);
+#endif /* WITH_WSREP */
     /*
       Note that we do not update
       m_durations[MDL_TRANSACTION].m_mat_front here. That is ok, since
@@ -5030,8 +5138,26 @@ void MDL_ticket::wsrep_report(bool debug)
 }
 
 bool MDL_context::wsrep_has_explicit_locks() {
-  return (!m_ticket_store.is_empty(MDL_EXPLICIT));
+  return (m_ticket_store.wsrep_has_non_preemptable_tickets());
 }
 
+bool MDL_ticket_store::wsrep_has_non_preemptable_tickets() {
+  mysql_mutex_lock(&m_LOCK_ticket_store_ops);
+
+  bool non_preemptable = false;
+  List_iterator exp_it(m_durations[MDL_EXPLICIT].m_ticket_list);
+  MDL_ticket *ticket;
+  while ((ticket = exp_it++)) {
+    if (ticket->get_wsrep_non_preemptable_status()) {
+      /* This indicate presence of MDL_EXPLICIT ticket that shouldn't be force
+      aborted so return true to skip force abort. */
+      non_preemptable = true;
+      break;
+    }
+  }
+
+  mysql_mutex_unlock(&m_LOCK_ticket_store_ops);
+  return (non_preemptable);
+}
 #endif /* WITH_WSREP */
 
