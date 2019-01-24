@@ -1814,7 +1814,8 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
         "Append/Write to writeset buffer failed (either due to IO "
         "issues (including memory allocation) or hitting a configured "
         "limit viz. write set size, etc.");
-    my_error(ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED);
+    my_error(ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED,
+             "Failed to append TOI write-set");
     return -1;
   }
 

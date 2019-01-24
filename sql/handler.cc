@@ -2292,19 +2292,17 @@ int ha_prepare_low(THD *thd, bool all) {
           switch (err) {
             case WSREP_TRX_SIZE_EXCEEDED: {
               /* give user size exceeded erro from wsrep_api.h */
-              char errbuf[MYSQL_ERRMSG_SIZE];
               my_error(
                   ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED,
-                  my_strerror(errbuf, MYSQL_ERRMSG_SIZE, WSREP_SIZE_EXCEEDED));
+                  "Transaction size exceed set threshold");
               break;
             }
             case WSREP_TRX_CERT_FAIL:
             case WSREP_TRX_ERROR: {
               /* avoid sending error, if we need to replay */
               if (thd->wsrep_conflict_state != MUST_REPLAY) {
-                char errbuf[MYSQL_ERRMSG_SIZE];
                 my_error(ER_LOCK_DEADLOCK, MYF(0), err,
-                         my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+                         "Transaction Error (Check for certification error)");
               }
               break;
             }
@@ -2356,18 +2354,16 @@ int ha_prepare_low(THD *thd, bool all) {
       switch (err) {
         case WSREP_TRX_SIZE_EXCEEDED: {
           /* give user size exeeded erro from wsrep_api.h */
-          char errbuf[MYSQL_ERRMSG_SIZE];
           my_error(ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED,
-                   my_strerror(errbuf, MYSQL_ERRMSG_SIZE, WSREP_SIZE_EXCEEDED));
+                   "Transaction size exceed set threshold");
           break;
         }
         case WSREP_TRX_CERT_FAIL:
         case WSREP_TRX_ERROR: {
           /* avoid sending error, if we need to replay */
           if (thd->wsrep_conflict_state != MUST_REPLAY) {
-            char errbuf[MYSQL_ERRMSG_SIZE];
             my_error(ER_LOCK_DEADLOCK, MYF(0), err,
-                     my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+                     "Transaction Error (Check for certification error)");
           }
           break;
         }

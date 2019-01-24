@@ -5,14 +5,14 @@ call mtr.add_suppression('WSREP: Append/Write to writeset buffer failed.*');
 CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 VARCHAR(1024)) Engine=InnoDB;
 SET GLOBAL wsrep_max_ws_size = 1024;
 INSERT INTO t1 VALUES (DEFAULT, REPEAT('X', 1024));
-ERROR HY000: Got error 5 - 'Input/output error' during COMMIT
+ERROR HY000: Got error 5 - 'Transaction size exceed set threshold' during COMMIT
 SELECT COUNT(*) = 0 FROM t1;
 COUNT(*) = 0
 1
 DROP TABLE t1;
 CREATE TABLE t2 (name char) engine=innodb;
 ALTER TABLE t2 ADD COLUMN address INT COMMENT 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-ERROR HY000: Got error 5 - '(null)' during COMMIT
+ERROR HY000: Got error 5 - 'Failed to append TOI write-set' during COMMIT
 DROP TABLE t2;
 SET GLOBAL wsrep_provider_options = 'repl.max_ws_size=10000';
 SELECT @@wsrep_max_ws_size = 10000;

@@ -113,6 +113,14 @@ SET SESSION wsrep_sync_wait = 0;
 SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
 --send insert into t values (1);
 
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1b
+--echo #node-1b
+SET SESSION wsrep_sync_wait = 0;
+# this loop needs to be done before the next create/ddl loop as
+# create/ddl can conflict with the lock that this connection
+# may take on test db (intention exclusive).
+
 --connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
 --connection node_1a
 --echo #node-1a
@@ -121,10 +129,8 @@ SET DEBUG_SYNC = "now WAIT_FOR entered1";
 # starting 8.0, create db is blocking insert. (mdl locks).
 --send create database test;
 
---connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
 --connection node_1b
 --echo #node-1b
-SET SESSION wsrep_sync_wait = 0;
 SET DEBUG_SYNC = "now SIGNAL continue1";
 
 --connection node_1a
@@ -137,6 +143,7 @@ SET DEBUG_SYNC = "now SIGNAL continue1";
 --reap
 select * from t;
 --eval SET GLOBAL wsrep_debug = $wsrep_debug_orig
+SET DEBUG_SYNC = 'RESET';
 drop table t;
 
 #-------------------------------------------------------------------------------

@@ -1970,9 +1970,7 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
           granted->is_incompatible_when_granted(ticket->get_type())) {
         if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted,
                                        &ticket->get_lock()->key)) {
-          WSREP_DEBUG(
-              "Adding of MDL ticket failed (at add_ticket)"
-              " as initiating thread (victim) got killed");
+          WSREP_DEBUG("Initiated kill of victim thread (through add_ticket)");
         }
       }
     }

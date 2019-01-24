@@ -21,17 +21,9 @@ SELECT @@global.wsrep_sst_method;
 --echo # valid values
 SET @@global.wsrep_sst_method=rsync;
 SELECT @@global.wsrep_sst_method;
-SET @@global.wsrep_sst_method=mysqldump;
-SELECT @@global.wsrep_sst_method;
-SET @@global.wsrep_sst_method=xtrabackup;
-SELECT @@global.wsrep_sst_method;
 SET @@global.wsrep_sst_method="xtrabackup-v2";
 SELECT @@global.wsrep_sst_method;
 SET @@global.wsrep_sst_method=default;
-SELECT @@global.wsrep_sst_method;
-
-# Its a valid name for an SST method
-SET @@global.wsrep_sst_method='junk';
 SELECT @@global.wsrep_sst_method;
 
 --echo

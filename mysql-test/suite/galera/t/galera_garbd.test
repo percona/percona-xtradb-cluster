@@ -57,3 +57,4 @@ CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \
 --connection node_2
 CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
 
+--remove_file $MYSQL_TMP_DIR/garbd.log
