@@ -393,7 +393,12 @@ int ha_recover(const memroot_unordered_set<my_xid> *commit_list) {
 
   if (info.commit_list) LogErr(SYSTEM_LEVEL, ER_XA_STARTING_RECOVERY);
 
+#ifdef WITH_WSREP
+  uint count = WSREP_ON ? 1 : 0;
+  if (total_ha_2pc > (ulong)opt_bin_log + 1 + count) {
+#else
   if (total_ha_2pc > (ulong)opt_bin_log + 1) {
+#endif /* WITH_WSREP */
     if (tc_heuristic_recover == TC_HEURISTIC_RECOVER_ROLLBACK) {
       LogErr(ERROR_LEVEL, ER_XA_NO_MULTI_2PC_HEURISTIC_RECOVER);
       DBUG_RETURN(1);

@@ -125,6 +125,10 @@ DELIMITER ;|
 --connection node_1_insert_10m
 --send CALL insert_10m ();
 
+--connection node_1
+# freeze gcache purge to ensure that node-2 always joins using IST
+set global wsrep_provider_options="gcache.freeze_purge_at_seqno = now";
+
 --connection node_2
 SET SESSION wsrep_sync_wait = 0;
 

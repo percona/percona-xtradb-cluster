@@ -1,3 +1,4 @@
+#node-1
 set global wsrep_sync_wait=0;
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY AUTO_INCREMENT) ENGINE=InnoDB;
 CREATE PROCEDURE p1 ()
@@ -11,11 +12,17 @@ END WHILE;
 END|
 CALL p1();;
 CALL p1();;
+#node-2a
 Killing server ...
 # restart
+#node-1a
+#node-2a
 INSERT INTO t1 VALUES (DEFAULT);
+#node-1a
 INSERT INTO t1 VALUES (DEFAULT);
+#node-1
 Got one of the listed errors
+#node-2
 Got one of the listed errors
 count_equal
 1

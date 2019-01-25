@@ -77,6 +77,7 @@ CALL update_simple ();;
 CALL insert_1k ();;
 CALL insert_1m ();;
 CALL insert_10m ();;
+set global wsrep_provider_options="gcache.freeze_purge_at_seqno = now";
 SET SESSION wsrep_sync_wait = 0;
 Killing server ...
 Killing server ...
