@@ -10,6 +10,9 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY AUTO_INCREMENT, f2 LONGBLOB) ENGINE=Inno
 
 --connection node_2
 SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1'
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1
+select * from t1;
 --source include/kill_galera.inc
 
 --connection node_1

@@ -45,7 +45,7 @@ DELIMITER ;|
 
 --sleep 10
 --source include/start_mysqld.inc
---sleep 25
+#--sleep 25
 --source include/wait_until_connected_again.inc
 
 --connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
@@ -56,6 +56,10 @@ DELIMITER ;|
 
 --connection node_2a
 --echo #node-2a
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_ready';
+--source include/wait_condition.inc
 INSERT INTO t1 VALUES (DEFAULT);
 
 # Terminate the stored procedure

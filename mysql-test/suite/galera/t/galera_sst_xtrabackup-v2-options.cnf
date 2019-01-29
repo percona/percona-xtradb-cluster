@@ -16,7 +16,7 @@ close-files
 #encrypt-key=4FA92C5873672E20FB163A0BCB2BB4A4
 galera-info
 history=backup
-parallel=2
+parallel=1
 
 [SST]
 encrypt=1
