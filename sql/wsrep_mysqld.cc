@@ -1889,6 +1889,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     thd->wsrep_gtid_event_buf = NULL;
     wsrep_keys_free(&key_arr);
     wsrep_cleanup_transaction(thd);
+    DBUG_ASSERT(thd->wsrep_safe_to_abort == true);
     return -1;
   } else {
     /* non replicated DDL, affecting temporary tables only */

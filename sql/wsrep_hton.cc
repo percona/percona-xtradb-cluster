@@ -45,6 +45,18 @@ void wsrep_cleanup_transaction(THD *thd) {
   DBUG_ASSERT(thd->wsrep_conflict_state != MUST_REPLAY &&
               thd->wsrep_conflict_state != REPLAYING);
 
+  if (thd->mdl_context.has_transactional_locks()) {
+    /* If thd has not yet released the locks then this thd
+    can conflict with background running applier thread or parallel
+    local running TOI thread that can cause this thd to get marked
+    with state = MUST_ABORT. Since existing query is already complete
+    this MUST_ABORT state can have 2 side effects:
+    - Can cause next query to get processed with MUST_ABORT
+    - Can cause retry of existing successfully completed query.
+    */
+    thd->wsrep_safe_to_abort = false;
+  }
+
   if (wsrep_emulate_bin_log) wsrep_thd_binlog_trx_reset(thd);
   thd->wsrep_ws_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
   thd->wsrep_trx_meta.gtid = WSREP_GTID_UNDEFINED;

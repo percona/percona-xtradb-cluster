@@ -1686,6 +1686,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
     if (thd->wsrep_conflict_state == MUST_ABORT) {
       wsrep_client_rollback(thd);
+      DBUG_ASSERT(thd->wsrep_safe_to_abort == true);
     }
     if (thd->wsrep_conflict_state == ABORTED) {
       if (command == COM_STMT_PREPARE || command == COM_STMT_FETCH ||
@@ -7191,6 +7192,7 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
 
         wsrep_client_rollback(thd);
         wsrep_cleanup_transaction(thd);
+        DBUG_ASSERT(thd->wsrep_safe_to_abort == true);
         WSREP_DEBUG("abort in exec query state, avoiding autocommit");
       }
 

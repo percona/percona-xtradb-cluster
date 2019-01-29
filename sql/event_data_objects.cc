@@ -1142,6 +1142,7 @@ bool Event_job_data::execute(THD *thd, bool drop) {
       if (thd->wsrep_conflict_state == MUST_ABORT) {
         wsrep_client_rollback(thd);
         wsrep_cleanup_transaction(thd);
+	DBUG_ASSERT(thd->wsrep_safe_to_abort == true);
 
         WSREP_DEBUG("abort the event in exec query state, avoiding autocommit");
       }

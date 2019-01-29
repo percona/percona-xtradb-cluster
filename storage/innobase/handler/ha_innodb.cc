@@ -22282,6 +22282,13 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
             wsrep_thd_thread_id(bf_thd), (long long)wsrep_thd_trx_seqno(bf_thd),
             wsrep_thd_get_exec_mode(bf_thd), wsrep_thd_thread_id(thd),
             (long long)wsrep_thd_trx_seqno(thd), wsrep_thd_get_exec_mode(thd));
+      } else if (!thd->wsrep_safe_to_abort) {
+        WSREP_DEBUG(
+            "Victim transaction (thread-id: %u with write-set: %lld, %s) is not"
+            " safe to abort. This likely indicate transaction is already"
+            " complete but transaction is yet to release transaction/mdl locks",
+            wsrep_thd_thread_id(thd), (long long)wsrep_thd_trx_seqno(thd),
+            wsrep_thd_get_exec_mode(thd));
       } else {
         wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
       }
@@ -22386,6 +22393,13 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
             wsrep_thd_thread_id(bf_thd), (long long)wsrep_thd_trx_seqno(bf_thd),
             wsrep_thd_get_exec_mode(bf_thd), wsrep_thd_thread_id(thd),
             (long long)wsrep_thd_trx_seqno(thd), wsrep_thd_get_exec_mode(thd));
+      } else if (!thd->wsrep_safe_to_abort) {
+        WSREP_DEBUG(
+            "Victim transaction (thread-id: %u with write-set: %lld, %s) is not"
+            " safe to abort. This likely indicate transaction is already"
+            " complete but transaction is yet to release transaction/mdl locks",
+            wsrep_thd_thread_id(thd), (long long)wsrep_thd_trx_seqno(thd),
+            wsrep_thd_get_exec_mode(thd));
       } else {
         /* it is possible that victim trx is itself waiting for some
          * other lock. We need to cancel this waiting

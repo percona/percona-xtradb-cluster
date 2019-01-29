@@ -1968,6 +1968,8 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
     while ((granted = itg++)) {
       if (granted->get_ctx() != ticket->get_ctx() &&
           granted->is_incompatible_when_granted(ticket->get_type())) {
+        DEBUG_SYNC(ticket->get_ctx()->wsrep_get_thd(),
+                   "pxc_add_ticket_trying_to_wait_for_victim");
         if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted,
                                        &ticket->get_lock()->key)) {
           WSREP_DEBUG("Initiated kill of victim thread (through add_ticket)");
@@ -4653,6 +4655,9 @@ void MDL_context::release_transactional_locks() {
   DBUG_ENTER("MDL_context::release_transactional_locks");
   release_locks_stored_before(MDL_STATEMENT, NULL);
   release_locks_stored_before(MDL_TRANSACTION, NULL);
+#ifdef WITH_WSREP
+  wsrep_get_thd()->wsrep_safe_to_abort = true;
+#endif /* WITH_WSREP */
   DBUG_VOID_RETURN;
 }
 

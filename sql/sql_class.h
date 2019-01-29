@@ -2858,6 +2858,13 @@ class THD : public MDL_context_owner,
   char wsrep_info[64];        /* string for dynamic proc info */
   ulong wsrep_retry_counter;  // of autocommit
   bool wsrep_PA_safe;
+
+  /* Normally a thd is safe to abort all the time but there is window
+  when thd is done with cleanup of transaction (through commit) but not yet
+  released the transaction lock(s). During this window it is not safe to abort
+  the said thd despite of the fact that state = NO_CONFLICT */
+  bool wsrep_safe_to_abort;
+
   char *wsrep_retry_query;
   size_t wsrep_retry_query_len;
   enum enum_server_command wsrep_retry_command;
