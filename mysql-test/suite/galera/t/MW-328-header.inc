@@ -27,3 +27,13 @@ DELIMITER ;|
 --connection node_1X
 --let $sp_connection_id = `SELECT CONNECTION_ID()`
 --send CALL proc_update();
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2'
+--source include/wait_condition.inc
+
+--connection node_1
+
+

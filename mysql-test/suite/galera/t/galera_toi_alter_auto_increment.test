@@ -83,7 +83,7 @@ CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) ENGINE=InnoD
 
 --connection node_2a
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1'
---let $wait_condition = SELECT COUNT(*) = 1 FROM t1
+--source include/wait_condition.inc
 ALTER TABLE t1 AUTO_INCREMENT=100;
 
 --connection node_1a

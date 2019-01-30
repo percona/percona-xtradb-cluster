@@ -1,4 +1,5 @@
 SET SESSION wsrep_sync_wait = 0;
+set global wsrep_provider_options="gcache.freeze_purge_at_seqno = now";
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY AUTO_INCREMENT, f2 LONGBLOB) ENGINE=InnoDB;
 CREATE TABLE ten (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
@@ -77,7 +78,6 @@ CALL update_simple ();;
 CALL insert_1k ();;
 CALL insert_1m ();;
 CALL insert_10m ();;
-set global wsrep_provider_options="gcache.freeze_purge_at_seqno = now";
 SET SESSION wsrep_sync_wait = 0;
 Killing server ...
 Killing server ...
