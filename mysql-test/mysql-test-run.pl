@@ -132,7 +132,7 @@ my $opt_retry_failure      = env_or_val(MTR_RETRY_FAILURE => 2);
 my $opt_shutdown_timeout   = $ENV{MTR_SHUTDOWN_TIMEOUT} || 10;         # seconds
 my $opt_skip_ndbcluster    = 0;
 my $opt_skip_sys_schema    = 0;
-my $opt_start_timeout      = $ENV{MTR_START_TIMEOUT} || 180;           # seconds
+my $opt_start_timeout      = $ENV{MTR_START_TIMEOUT} || 240;           # seconds
 my $opt_suite_timeout      = $ENV{MTR_SUITE_TIMEOUT} || 300;           # minutes
 my $opt_testcase_timeout   = $ENV{MTR_TESTCASE_TIMEOUT} || 15;         # minutes
 my $opt_valgrind_clients   = 0;

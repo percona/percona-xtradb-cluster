@@ -23,18 +23,7 @@ uuids_match
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	124	Previous_gtids	2	155	
-mysqld-bin.000001	155	Gtid	1	228	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
-mysqld-bin.000001	228	Query	1	370	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB /* xid=# */
-mysqld-bin.000001	370	Gtid	1	445	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
-mysqld-bin.000001	445	Query	1	522	BEGIN
-mysqld-bin.000001	522	Table_map	1	570	table_id: # (test.t1)
-mysqld-bin.000001	570	Write_rows	1	610	table_id: # flags: STMT_END_F
-mysqld-bin.000001	610	Xid	1	641	COMMIT /* xid=# */
-mysqld-bin.000001	641	Gtid	2	716	SET @@SESSION.GTID_NEXT= '<effective_uuid>:3'
-mysqld-bin.000001	716	Query	2	798	BEGIN
-mysqld-bin.000001	798	Table_map	2	846	table_id: # (test.t1)
-mysqld-bin.000001	846	Write_rows	2	886	table_id: # flags: STMT_END_F
-mysqld-bin.000001	886	Xid	2	917	COMMIT /* xid=# */
+mysqld-bin.000001	155	Stop	2	178	
 uuids_do_not_match
 1
 uuids_match

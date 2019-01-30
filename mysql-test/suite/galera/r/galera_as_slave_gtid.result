@@ -39,13 +39,7 @@ gtid_executed_equal
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	124	Previous_gtids	3	155	
-mysqld-bin.000001	155	Gtid	1	235	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
-mysqld-bin.000001	235	Query	1	377	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB /* xid=1 */
-mysqld-bin.000001	377	Gtid	1	459	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
-mysqld-bin.000001	459	Query	1	531	BEGIN
-mysqld-bin.000001	531	Table_map	1	579	table_id: # (test.t1)
-mysqld-bin.000001	579	Write_rows	1	619	table_id: # flags: STMT_END_F
-mysqld-bin.000001	619	Xid	1	650	COMMIT /* xid=2 */
+mysqld-bin.000001	155	Stop	3	178	
 DROP TABLE t1;
 STOP SLAVE;
 RESET SLAVE ALL;

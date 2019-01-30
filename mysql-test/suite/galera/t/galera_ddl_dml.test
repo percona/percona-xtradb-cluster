@@ -216,3 +216,4 @@ drop table t;
 # remove test-bed
 #
 --eval set @@wsrep_replicate_myisam = $wsrep_replicate_myisam_saved;
+SET DEBUG_SYNC = "reset";

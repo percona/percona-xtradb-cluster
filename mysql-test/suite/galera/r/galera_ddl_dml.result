@@ -133,3 +133,4 @@ SET GLOBAL wsrep_debug = 0;
 SET DEBUG_SYNC = 'RESET';
 drop table t;
 set @@wsrep_replicate_myisam = 0;;
+SET DEBUG_SYNC = "reset";
