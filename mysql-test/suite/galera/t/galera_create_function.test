@@ -51,3 +51,29 @@ DROP FUNCTION f1;
 DROP FUNCTION f2;
 
 DROP USER 'user1';
+
+
+#-------------------------------------------------------------------------------
+#
+# create and drop udf function
+#
+--connection node_1
+--echo #node-1 (create function)
+CREATE FUNCTION service_get_write_locks RETURNS INT SONAME 'locking_service.so';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.func WHERE name = 'service_get_write_locks';
+--source include/wait_condition.inc
+
+--connection node_1
+--echo #node-2 (check if function is created)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.func WHERE name = 'service_get_write_locks';
+--source include/wait_condition.inc
+
+--echo #node-1 (drop function)
+DROP FUNCTION service_get_write_locks;
+--let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.func WHERE name = 'service_get_write_locks';
+--source include/wait_condition.inc
+
+--connection node_1
+--echo #node-2 (check if function is dropped)
+--let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.func WHERE name = 'service_get_write_locks';
+--source include/wait_condition.inc
