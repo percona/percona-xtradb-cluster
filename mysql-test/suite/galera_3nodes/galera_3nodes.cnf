@@ -5,6 +5,7 @@
 default-storage-engine=InnoDB
 binlog-format=row
 wsrep_provider=@ENV.WSREP_PROVIDER
+mysqlx=0
 
 # enforce read-committed characteristics across the cluster
 

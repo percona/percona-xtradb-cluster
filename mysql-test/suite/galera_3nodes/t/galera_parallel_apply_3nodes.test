@@ -4,7 +4,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/have_debug.inc
 
 --let $galera_connection_name = node_3

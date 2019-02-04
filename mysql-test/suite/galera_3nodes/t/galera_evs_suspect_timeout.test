@@ -5,7 +5,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --connection node_1
 --let $wsrep_provider_options_node1 = `SELECT @@wsrep_provider_options`
