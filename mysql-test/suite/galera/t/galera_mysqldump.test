@@ -1,0 +1,19 @@
+#
+# Tests using mysqldump while PXC is running
+#
+# PXC-2345
+# Ensure that mysqldump with --single-transaction can be called
+# on a running server
+#
+
+--source include/big_test.inc
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+#
+# PXC-2345
+# Ensure that mysqldump can be called on a running server
+#
+--connection node_1
+exec $MYSQL_DUMP --single-transaction mysql > $MYSQLTEST_VARDIR/log/galera_mysqldump.test.sql;
+--remove_file $MYSQLTEST_VARDIR/log/galera_mysqldump.test.sql
