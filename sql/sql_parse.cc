@@ -5713,6 +5713,10 @@ end_with_restore_list:
           if (check_access(thd, DELETE_ACL, "mysql", NULL, NULL, 1, 0))
             goto error;
 
+#ifdef WITH_WSREP
+          WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
           if (!(res = mysql_drop_function(thd, &lex->spname->m_name)))
           {
             my_ok(thd);
