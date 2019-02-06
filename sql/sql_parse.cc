@@ -5863,6 +5863,10 @@ create_sp_error:
           if (check_access(thd, DELETE_ACL, "mysql", NULL, NULL, 1, 0))
             goto error;
 
+#ifdef WITH_WSREP
+          WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
           if (!(res = mysql_drop_function(thd, &lex->spname->m_name)))
           {
             my_ok(thd);
@@ -5899,7 +5903,10 @@ create_sp_error:
                                lex->sql_command == SQLCOM_DROP_PROCEDURE,
                                false))
         goto error;
+
+#ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
 
       enum_sp_type sp_type= (lex->sql_command == SQLCOM_DROP_PROCEDURE) ?
                             SP_TYPE_PROCEDURE : SP_TYPE_FUNCTION;
