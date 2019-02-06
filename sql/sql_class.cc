@@ -2372,6 +2372,10 @@ void THD::begin_attachable_ro_transaction() {
   mysql_mutex_lock(&LOCK_wsrep_thd_attachable_trx);
   m_attachable_trx = new Attachable_trx(this, m_attachable_trx);
   mysql_mutex_unlock(&LOCK_wsrep_thd_attachable_trx);
+
+  if (m_attachable_trx->get_prev_attachable_trx() != NULL) {
+    DEBUG_SYNC(this, "pxc_attach_trx_with_prev_attach_trx");
+  }
 #else
   m_attachable_trx = new Attachable_trx(this, m_attachable_trx);
 #endif /* WITH_WSREP */

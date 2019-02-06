@@ -1691,10 +1691,21 @@ class THD : public MDL_context_owner,
     /* There could be series of attachable transaction as dd action
     could be cascading. Like dd-action-1 invoking dd-action-2
     so both of the may get different transaction so there is concept
-    of previous attachable transaction but for now it is not in use. */
+    of previous attachable transaction.
+
+    One such use case is calling store procedure
+    call p1((select i from t limit 1));
+    This would cause opening of table <t> and which in turn also cause
+    opening of procedure table which is system table there-by casusing
+    internal 2 internal actions. */
+
     if (m_attachable_trx != NULL) {
-      DBUG_ASSERT(m_attachable_trx->get_prev_attachable_trx() == NULL);
-      return m_attachable_trx->wsrep_get_main_trx_ha_data(slot);
+      Attachable_trx *main_trx = m_attachable_trx;
+      while (main_trx->get_prev_attachable_trx() != NULL) {
+        main_trx = main_trx->get_prev_attachable_trx();
+      }
+      DBUG_ASSERT(main_trx->get_prev_attachable_trx() == NULL);
+      return main_trx->wsrep_get_main_trx_ha_data(slot);
     }
     return &ha_data[slot];
   }
