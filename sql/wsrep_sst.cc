@@ -34,6 +34,9 @@
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
 #include "wsrep_xid.h"
+#include "my_rnd.h"
+#include "srv_session.h"
+#include "wsrep_service.h"
 
 extern const char wsrep_defaults_file[];
 extern const char wsrep_defaults_group_suffix[];
@@ -66,15 +69,11 @@ extern const char wsrep_defaults_group_suffix[];
 #define WSREP_SST_XTRABACKUP_V2 "xtrabackup-v2"
 #define WSREP_SST_DEFAULT WSREP_SST_XTRABACKUP_V2
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
-#define WSREP_SST_AUTH_MASK "********"
 
 const char *wsrep_sst_method = WSREP_SST_DEFAULT;
 const char *wsrep_sst_receive_address = WSREP_SST_ADDRESS_AUTO;
 const char *wsrep_sst_donor = "";
-char *wsrep_sst_auth = NULL;
 
-// container for real auth string
-static const char *sst_auth_real = NULL;
 bool wsrep_sst_donor_rejects_queries = false;
 
 /* Function checks if the new value for sst_method is valid.
@@ -133,58 +132,6 @@ err:
 
 bool wsrep_sst_receive_address_update(sys_var *, THD *, enum_var_type) {
   return 0;
-}
-
-bool wsrep_sst_auth_check(sys_var *, THD *, set_var *) { return 0; }
-
-void wsrep_sst_auth_free() {
-  if (wsrep_sst_auth) {
-    my_free((void *)wsrep_sst_auth);
-  }
-  if (sst_auth_real) {
-    my_free((void *)sst_auth_real);
-  }
-  wsrep_sst_auth = NULL;
-  sst_auth_real = NULL;
-}
-
-static bool sst_auth_real_set(const char *value) {
-  const char *v = NULL;
-
-  if (value) {
-    v = my_strdup(key_memory_wsrep, value, MYF(0));
-  } else  // its NULL
-  {
-    wsrep_sst_auth_free();
-    return 0;
-  }
-
-  if (v) {
-    // set sst_auth_real
-    if (sst_auth_real) {
-      my_free((void *)sst_auth_real);
-    }
-    sst_auth_real = v;
-
-    // mask wsrep_sst_auth
-    if (strlen(sst_auth_real)) {
-      if (wsrep_sst_auth) {
-        my_free((void *)wsrep_sst_auth);
-      }
-      wsrep_sst_auth = my_strdup(key_memory_wsrep, WSREP_SST_AUTH_MASK, MYF(0));
-    }
-    return 0;
-  }
-  return 1;
-}
-
-bool wsrep_sst_auth_update(sys_var *, THD *, enum_var_type) {
-  return sst_auth_real_set(wsrep_sst_auth);
-}
-
-void wsrep_sst_auth_init(const char *value) {
-  if (wsrep_sst_auth == value) wsrep_sst_auth = NULL;
-  if (value) sst_auth_real_set(value);
 }
 
 bool wsrep_sst_donor_check(sys_var *, THD *, set_var *) { return 0; }
@@ -442,9 +389,13 @@ static void *sst_joiner_thread(void *a) {
     // Launch the SST script and save pointer to its process:
 
     if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
-    wsp::process proc(arg->cmd, "r", arg->env);
+    wsp::process proc(arg->cmd, "rw", arg->env);
     sst_process = &proc;
     mysql_mutex_unlock(&LOCK_wsrep_sst);
+
+    // Make sure that we've closed the write pipe, otherwise
+    // the joiner script will read from the mysqld stdin
+    proc.close_write_pipe();
 
     if (proc.pipe() && !proc.error()) {
       const char *tmp = my_fgets(out, out_len, proc.pipe());
@@ -534,28 +485,8 @@ static void *sst_joiner_thread(void *a) {
   return NULL;
 }
 
-#define WSREP_SST_AUTH_ENV "WSREP_SST_OPT_AUTH"
 
-static int sst_append_auth_env(wsp::env &env, const char *sst_auth) {
-  int const sst_auth_size = strlen(WSREP_SST_AUTH_ENV) + 1 /* = */
-                            + (sst_auth ? strlen(sst_auth) : 0) + 1 /* \0 */;
-
-  wsp::string sst_auth_str(sst_auth_size);  // for automatic cleanup on return
-  if (!sst_auth_str()) return -ENOMEM;
-
-  int ret = snprintf(sst_auth_str(), sst_auth_size, "%s=%s", WSREP_SST_AUTH_ENV,
-                     sst_auth ? sst_auth : "");
-
-  if (ret < 0 || ret >= sst_auth_size) {
-    WSREP_ERROR("sst_append_auth_env(): snprintf() failed: %d", ret);
-    return (ret < 0 ? ret : -EMSGSIZE);
-  }
-
-  env.append(sst_auth_str());
-  return -env.error();
-}
-
-static ssize_t sst_prepare_other(const char *method, const char *sst_auth,
+static ssize_t sst_prepare_other(const char *method,
                                  const char *addr_in, const char **addr_out) {
   int const cmd_len = 4096;
   wsp::string cmd_str(cmd_len);
@@ -600,11 +531,6 @@ static ssize_t sst_prepare_other(const char *method, const char *sst_auth,
   if (env.error()) {
     WSREP_ERROR("sst_prepare_other(): env. var ctor failed: %d", -env.error());
     return -env.error();
-  }
-
-  if ((ret = sst_append_auth_env(env, sst_auth))) {
-    WSREP_ERROR("sst_prepare_other(): appending auth failed: %d", ret);
-    return ret;
   }
 
   pthread_t tmp;
@@ -699,7 +625,7 @@ ssize_t wsrep_sst_prepare(void **msg, THD *thd) {
   }
 
   ssize_t addr_len =
-      sst_prepare_other(wsrep_sst_method, sst_auth_real, addr_in, &addr_out);
+      sst_prepare_other(wsrep_sst_method, addr_in, &addr_out);
   if (addr_len < 0) {
     WSREP_ERROR("Failed to prepare for '%s' SST. Unrecoverable.",
                 wsrep_sst_method);
@@ -785,25 +711,30 @@ static void sst_reject_queries(bool close_conn) {
 
 wsrep_seqno_t wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
 
-static int run_sql_command(THD *thd, const char *query) {
+/*
+  Executes a query.  The second parameter, safe_query, if not NULL, will be used
+  instead of the real query when logging an error (for security-senstive queries).
+**/
+static int run_sql_command(THD *thd, const char *query, const char *safe_query) {
   thd->set_query((char *)query, strlen(query));
 
   Parser_state ps;
   if (ps.init(thd, thd->query().str, thd->query().length)) {
-    WSREP_ERROR("SST query: %s failed", query);
+    WSREP_ERROR("SST query: %s failed", (safe_query ? safe_query : query));
     return -1;
   }
 
   mysql_parse(thd, &ps, false, false);
   if (thd->is_error()) {
     int const err = thd->get_stmt_da()->mysql_errno();
-    WSREP_WARN("error executing '%s': %d (%s)%s", query, err,
-               thd->get_stmt_da()->message_text(),
-               err == ER_UNKNOWN_SYSTEM_VARIABLE
-                   ? ". Was mysqld built with --with-innodb-disallow-writes ?"
-                   : "");
+    if (safe_query) {
+      WSREP_WARN("error executing '%s' : %d", safe_query, err);
+    }
+    else {
+      WSREP_WARN("error executing '%s' : %d (%s)", query, err, thd->get_stmt_da()->message_text());
+    }
     thd->clear_error();
-    return -1;
+    return err;
   }
   return 0;
 }
@@ -813,7 +744,10 @@ static int sst_flush_tables(THD *thd) {
 
   int err;
   int not_used;
-  if (run_sql_command(thd, "FLUSH TABLES WITH READ LOCK")) {
+  err= run_sql_command(thd, "FLUSH TABLES WITH READ LOCK", NULL);
+  if (err) {
+    if (err == ER_UNKNOWN_SYSTEM_VARIABLE)
+      WSREP_WARN("Was mysqld built with --with-innodb-disallow-writes ?");
     WSREP_ERROR("Failed to flush and lock tables");
     err = ECANCELED;
   } else {
@@ -868,10 +802,232 @@ static void sst_disallow_writes(THD *thd, bool yes) {
   snprintf(query_str, query_max, "SET GLOBAL innodb_disallow_writes=%s",
            yes ? "true" : "false");
 
-  if (run_sql_command(thd, query_str)) {
+  if (run_sql_command(thd, query_str, NULL)) {
     WSREP_ERROR("Failed to disallow InnoDB writes");
   }
   return;
+}
+
+// Password characters are limited, because we are using these passwords
+// within a bash script.
+const std::string g_allowed_pwd_chars("qwertyuiopasdfghjklzxcvbnm1234567890"
+                                 "QWERTYUIOPASDFGHJKLZXCVBNM");
+const std::string get_allowed_pwd_chars() { return g_allowed_pwd_chars; }
+
+static void generate_password(std::string *password, int size)
+{
+  std::stringstream ss;
+  rand_struct srnd;
+  while(size > 0)
+  {
+    int ch = ((int)(my_rnd_ssl(&srnd)*100))%get_allowed_pwd_chars().size();
+    ss << get_allowed_pwd_chars()[ch];
+    --size;
+  }
+  password->assign(ss.str());
+}
+
+static void srv_session_error_handler(void *ctx MY_ATTRIBUTE((unused)),
+                                      unsigned int sql_errno,
+                                      const char *err_msg)
+{
+  switch (sql_errno)
+  {
+    case ER_CON_COUNT_ERROR:
+      WSREP_ERROR("Can't establish an internal server connection to "
+                 "execute operations since the server "
+                 "does not have available connections, please "
+                 "increase @@GLOBAL.MAX_CONNECTIONS. Server error: %i.",
+                 sql_errno);
+      break;
+    default:
+      WSREP_ERROR("Can't establish an internal server connection to "
+                 "execute operations. Server error: %i. "
+                 "Server error message: %s",
+                 sql_errno, err_msg);
+  }
+}
+
+static MYSQL_SESSION setup_server_session(bool initialize_thread)
+{
+  MYSQL_SESSION session = NULL;
+
+  if (initialize_thread) {
+    if (srv_session_init_thread(NULL)) {
+      WSREP_ERROR("Failed to initialize the server session thread.");
+      return NULL;
+    }
+  }
+
+  session = srv_session_open(srv_session_error_handler, NULL);
+
+  if (session == NULL)
+  {
+    if (initialize_thread) srv_session_deinit_thread();
+    WSREP_ERROR("Failed to open a session for the SST commands");
+    return NULL;
+  }
+
+  MYSQL_SECURITY_CONTEXT sc;
+  if (thd_get_security_context(srv_session_info_get_thd(session), &sc)) {
+    if (initialize_thread) srv_session_deinit_thread();
+    WSREP_ERROR("Failed to fetch the security context when contacting the server");
+    return NULL;
+  }
+  if (security_context_lookup(sc, "mysql.pxc.sst.root", "localhost", NULL, NULL))
+  {
+    if (initialize_thread) srv_session_deinit_thread();
+    WSREP_ERROR("Error accessing server with user:mysql.pxc.sst.root");
+    return NULL;
+  }
+  // Turn wsrep off here (because the server session has it's own THD object)
+  session->get_thd()->variables.wsrep_on = 0;
+  return session;
+}
+
+static uint server_session_execute(MYSQL_SESSION session, std::string query, const char *safe_query)
+{
+  COM_DATA cmd;
+  wsp::Sql_resultset rset;
+  cmd.com_query.query= (char *) query.c_str();
+  cmd.com_query.length= static_cast<unsigned int>(query.length());
+  wsp::Sql_service_context_base *ctx= new wsp::Sql_service_context(&rset);
+  uint err(0);
+
+  /* execute sql command */
+  command_service_run_command(session, COM_QUERY, &cmd,
+                              &my_charset_utf8_general_ci,
+                              &wsp::Sql_service_context_base::sql_service_callbacks,
+                              CS_TEXT_REPRESENTATION, ctx);
+  delete ctx;
+
+  err = rset.sql_errno();
+  if (err)
+  {
+    // an error occurred, retrieve the status/message
+    if (safe_query)
+    {
+      WSREP_ERROR("Command execution failed (%d) : %s", err, safe_query);
+    }
+    else
+    {
+      WSREP_ERROR("Command execution failed (%d) : %s : %s", err, rset.err_msg().c_str(), query.c_str());
+    }
+
+  }
+  return err;
+}
+
+static void cleanup_server_session(MYSQL_SESSION session, bool initialize_thread)
+{
+  srv_session_close(session);
+  if (initialize_thread)
+    srv_session_deinit_thread();
+}
+
+
+static int wsrep_create_sst_user(bool initialize_thread, const char *password)
+{
+  int err = 0;
+  int const     auth_len = 512;
+  char          auth_buf[auth_len];
+  MYSQL_SESSION session = NULL;
+
+  // This array is filled with pairs of entries
+  // The first entry is the actual query to be run
+  // The second entry is the string to be displayed if the query fails
+  //  (this can be NULL, in which case the actual query will be used)
+  const char *cmds[] = {
+    "SET sql_log_bin = OFF;", nullptr,
+    "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "CREATE USER 'mysql.pxc.sst.user'@localhost IDENTIFIED WITH 'mysql_native_password' BY '%s' ACCOUNT LOCK;", "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
+
+  /*
+    This is the code that uses the mysql.pxc.sst.role
+    However there is a bug in 8.0.13 where the "GRANT CREATE ON DBNAME.*" when
+    used in a role, does not allow the user with the role to create a database.
+    So we have to explicitly grant the privileges.
+  */
+#if 0
+    "GRANT 'mysql.pxc.sst.role'@localhost TO 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "SET DEFAULT ROLE 'mysql.pxc.sst.role'@localhost to 'mysql.pxc.sst.user'@localhost;", nullptr,
+#else
+    /*
+      Explicit privileges needed to run XtraBackup.  This is only used due
+      to the bug in 8.0.13 described above.
+    */
+    "GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "GRANT CREATE, INSERT, SELECT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.user'@localhost;", nullptr,
+#endif
+
+    "ALTER USER 'mysql.pxc.sst.user'@localhost ACCOUNT UNLOCK;", nullptr,
+    "FLUSH PRIVILEGES;", nullptr,
+    nullptr, nullptr
+  };
+
+  wsrep_allow_server_session = true;
+  session = setup_server_session(initialize_thread);
+  if (!session)
+  {
+    wsrep_allow_server_session = false;
+    return ECANCELED;
+  }
+
+  for (int index=0; !err && cmds[index]; index+=2)
+  {
+    int ret;
+    ret = snprintf(auth_buf, auth_len, cmds[index], password);
+    if (ret < 0 || ret >= auth_len)
+    {
+      WSREP_ERROR("wsrep_create_sst_user() : snprintf() failed: %d", ret);
+      err = (ret < 0 ? ret : -EMSGSIZE);
+      break;
+    }
+    err = server_session_execute(session, auth_buf, cmds[index+1]);
+
+    // Overwrite query (clear out any sensitive data)
+    ::memset(auth_buf, 0, auth_len);
+  }
+
+  cleanup_server_session(session, initialize_thread);
+  wsrep_allow_server_session = false;
+  return err;
+}
+
+int wsrep_remove_sst_user(bool initialize_thread)
+{
+  int err = 0;
+  MYSQL_SESSION session = NULL;
+
+  // This array is filled with pairs of entries
+  // The first entry is the actual query to be run
+  // The second entry is the string to be displayed if the query fails
+  //  (this can be NULL, in which case the actual query will be used)
+  const char *cmds[] = {
+    "SET sql_log_bin = OFF;", nullptr,
+    "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "FLUSH PRIVILEGES;", nullptr,
+    nullptr, nullptr
+  };
+
+  wsrep_allow_server_session = true;
+  session = setup_server_session(initialize_thread);
+  if (!session)
+  {
+    wsrep_allow_server_session = false;
+    return ECANCELED;
+  }
+
+  for (int index=0; !err && cmds[index]; index+=2)
+  {
+    err = server_session_execute(session, cmds[index], cmds[index+1]);
+  }
+
+  cleanup_server_session(session, initialize_thread);
+  wsrep_allow_server_session = false;
+  return err;
 }
 
 static void *sst_donor_thread(void *a) {
@@ -887,8 +1043,13 @@ static void *sst_donor_thread(void *a) {
   bool locked = false;
 
   const char *out = NULL;
-  const size_t out_len = 128;
-  char out_buf[out_len];
+  int const   out_len = 128;
+  char        out_buf[out_len];
+
+  // Generate the random password
+  std::string   password;
+  generate_password(&password, 32);
+
 
   wsrep_uuid_t ret_uuid = WSREP_UUID_UNDEFINED;
   wsrep_seqno_t ret_seqno = WSREP_SEQNO_UNDEFINED;  // seqno of complete SST
@@ -897,14 +1058,42 @@ static void *sst_donor_thread(void *a) {
                         // operate with wsrep_ready == OFF
   thd.ptr->wsrep_sst_donor = true;
 
+  // Create the SST auth user
+  err = wsrep_create_sst_user(true, password.c_str());
+
   // Launch the SST script and save pointer to its process:
 
   if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
-  wsp::process proc(arg->cmd, "r", arg->env);
+  wsp::process proc(arg->cmd, "rw", arg->env, !err /* execute_immediately */);
+
+  if (!err)
+  {
+    // Pass the sst username/password as name/value pairs
+    int ret;
+    ret = snprintf(out_buf, out_len,
+                  "sst_user=mysql.pxc.sst.user\n"
+                  "sst_password=%s\n",
+                  password.c_str());
+    if (ret < 0 || ret >= out_len)
+    {
+      WSREP_ERROR("sst_donor_thread(): snprintf() failed: %d", ret);
+      err = (ret < 0 ? ret : -EMSGSIZE);
+    }
+
+    if (!err)
+      fputs(out_buf, proc.write_pipe());
+
+    // Close the pipe, so that the other side gets an EOF
+    proc.close_write_pipe();
+  }
+  ::memset(out_buf, 0, out_len);
+  password.assign(password.length(), 0);  // overwrite password value
+
   sst_process = &proc;
   mysql_mutex_unlock(&LOCK_wsrep_sst);
 
-  err = proc.error();
+  if (!err)
+    err = proc.error();
 
   /* Inform server about SST script startup and release TO isolation */
   mysql_mutex_lock(&arg->LOCK_wsrep_sst_thread);
@@ -974,6 +1163,8 @@ static void *sst_donor_thread(void *a) {
     WSREP_ERROR("Failed to execute: %s : %d (%s)", proc.cmd(), err,
                 strerror(err));
   }
+
+  wsrep_remove_sst_user(true);
 
   if (locked)  // don't forget to unlock server before return
   {
@@ -1090,11 +1281,6 @@ wsrep_cb_status_t wsrep_sst_donate_cb(void *, void *recv_ctx, const void *msg,
   }
 
   int ret;
-  if ((ret = sst_append_auth_env(env, sst_auth_real))) {
-    WSREP_ERROR("wsrep_sst_donate_cb(): appending auth env failed: %d", ret);
-    return WSREP_CB_FAILURE;
-  }
-
   ret = sst_donate_other(method, data, uuid_str, current_gtid->seqno, bypass,
                          env());
 

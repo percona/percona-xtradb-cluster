@@ -26,7 +26,6 @@
 extern const char *wsrep_sst_method;
 extern const char *wsrep_sst_receive_address;
 extern const char *wsrep_sst_donor;
-extern char *wsrep_sst_auth;
 extern bool wsrep_sst_donor_rejects_queries;
 
 /*! Synchronizes applier thread start with init thread */
@@ -43,5 +42,7 @@ extern void wsrep_SE_init_wait(THD *thd); /*! wait for SE init to complete */
 extern void wsrep_SE_init_done();         /*! signal that SE init is complte */
 extern void wsrep_SE_initialized();       /*! mark SE initialization complete */
 extern bool wsrep_is_SE_initialized();
+
+extern int wsrep_remove_sst_user(bool initialize_thread);
 
 #endif /* WSREP_SST_H */

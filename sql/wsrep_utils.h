@@ -69,19 +69,42 @@ class process {
  private:
   const char *const str_;
   FILE *io_;
+  FILE *io_w_;
   int err_;
   pid_t pid_;
 
  public:
-  /*! @arg type is a pointer to a null-terminated string which  must  contain
-           either  the  letter  'r'  for  reading  or the letter 'w' for
-     writing.
+  /*! @arg type is a pointer to a null-terminated string which must contain
+           either the letter 'r' for reading, or the letter 'w' for writing,
+           or the letters 'rw' for both reading and writing.
       @arg env optional null-terminated vector of environment variables
+      @arg execute_immediately  If this is set to true, then the command will
+           be executed while in the constructor.
+           Executing the command from the constructor caused problems
+           due to dealing with errors, so the ability to execute the
+           command separately was added.
    */
-  process(const char *cmd, const char *type, char **env);
+  process(const char *cmd, const char *type, char **env, bool execute_immediately=true);
   ~process();
 
+  /* If type is 'r' or 'rw' this is the read pipe
+     Else if type is 'w', this is the write pipe
+  */
   FILE *pipe() { return io_; }
+
+  /* If type is 'rw' this is the write pipe
+     Else if type is 'r' or 'w' this is NULL
+     This variable is only set if the type is 'rw'
+  */
+  FILE* write_pipe() { return io_w_; }
+
+  /* Closes the write pipe so that the other side will get an EOF
+     (and not hang while waiting for the rest of the data).
+  */
+  void close_write_pipe();
+
+  void execute(const char *type, char **env);
+
   int error() { return err_; }
   int wait();
   const char *cmd() { return str_; }

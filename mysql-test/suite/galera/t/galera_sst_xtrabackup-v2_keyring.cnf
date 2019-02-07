@@ -2,11 +2,7 @@
 
 [mysqld]
 wsrep_sst_method=xtrabackup-v2
-wsrep_sst_auth="root:"
 wsrep_debug=ON
-
-[xtrabackup]
-xtrabackup-plugin-dir=@ENV.XB_PLUGIN_DIR
 
 [sst]
 encrypt=3
