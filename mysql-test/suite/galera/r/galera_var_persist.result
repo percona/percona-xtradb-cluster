@@ -1,0 +1,78 @@
+#node-1 (some workload)
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (10), (20), (30), (40);
+select * from t;
+i
+10
+20
+30
+40
+select @@global.max_connections;
+@@global.max_connections
+151
+SET PERSIST max_connections = 1900;
+select @@global.max_connections;
+@@global.max_connections
+1900
+select @@global.sort_buffer_size;
+@@global.sort_buffer_size
+262144
+SET PERSIST_ONLY sort_buffer_size = 1000000;
+select @@global.sort_buffer_size;
+@@global.sort_buffer_size
+262144
+set global wsrep_provider_options="pc.ignore_sb=true";
+#node-2 (just to validate it is active and working)
+select @@global.sort_buffer_size;
+@@global.sort_buffer_size
+262144
+select @@global.max_connections;
+@@global.max_connections
+151
+#node-2 being killed
+Killing server ...
+#node-1 (some operation on node-1)
+insert into t values (100), (200);
+insert into t values (101), (201);
+insert into t values (102), (202);
+insert into t values (103), (203);
+insert into t values (104), (204);
+select * from t;
+i
+10
+20
+30
+40
+100
+101
+102
+103
+104
+200
+201
+202
+203
+204
+#node-1 (set persist variables)
+SET PERSIST max_connections = 2100;
+select @@global.max_connections;
+@@global.max_connections
+2100
+SET PERSIST_ONLY sort_buffer_size = 20000000;
+select @@global.sort_buffer_size;
+@@global.sort_buffer_size
+262144
+#node-2 (restarted will cause SST as node-2 was killed)
+# restart
+#node-2 (node-2 gets SST from node-1 but the persist settings are not copied over)
+select @@global.sort_buffer_size;
+@@global.sort_buffer_size
+262144
+select @@global.max_connections;
+@@global.max_connections
+151
+drop table t;
+RESET PERSIST max_connections;
+RESET PERSIST sort_buffer_size;
+set global max_connections=DEFAULT;
+set global wsrep_provider_options="pc.ignore_sb=false";
