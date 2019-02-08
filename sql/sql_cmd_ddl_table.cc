@@ -221,6 +221,16 @@ bool Sql_cmd_create_table::execute(THD *thd) {
         return true;
       }
     }
+
+    /* Replicate CTAS as TOI.
+    Till PXC-5.7, it was being replicated through normal binlog replication.
+    After MySQL-8.0, made DDL atomic, it introduces xid in-consistency
+    with CTAS (check bug#93948). */
+    if (WSREP(thd) &&
+        wsrep_to_isolation_begin(thd, create_table->db,
+                                 create_table->table_name, NULL)) {
+        return true;
+    }
 #endif /* WITH_WSREP */
 
     Query_result *result;

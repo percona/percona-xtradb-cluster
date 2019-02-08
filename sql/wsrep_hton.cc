@@ -131,12 +131,8 @@ void wsrep_register_hton(THD *thd, bool all) {
           trans_register_ha(thd, all, wsrep_hton, NULL);
 
           /* follow innodb read/write settting
-           * but, as an exception: CTAS with empty result set will not be
-           * replicated unless we declare wsrep hton as read/write here
            */
-          if (ha_info->is_trx_read_write() ||
-              (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
-               thd->wsrep_exec_mode == LOCAL_STATE)) {
+          if (ha_info->is_trx_read_write()) {
             thd->get_ha_data(wsrep_hton->slot)
                 ->ha_info[all]
                 .set_trx_read_write();
@@ -182,7 +178,7 @@ void wsrep_interim_commit(THD *thd) {
       /* There are cases when replicated transaction are empty and there is no
       need to commit such transaction but given that they have a valid seqno
       assigned we need to update commit monitor by enter and leaving it.
-      Empty transaction use case: CTAS, pre-executed action on pxc-node
+      Empty transaction use case: a. CTAS b. pre-executed action on pxc-node
       acting as slave to an independent master. */
       if (thd->wsrep_void_applier_trx &&
           thd->wsrep_conflict_state != REPLAYING &&
@@ -222,33 +218,6 @@ void wsrep_post_commit(THD *thd, bool all) {
       break;
     }
     case LOCAL_STATE: {
-      /* CTAS: create table as select * from <table> is actually a mix of
-      DDL (CREATE) + DML (INSERT).
-      
-
-      Till MySQL-5.7, CTAS was executed as non-multi-stmt transaction.
-      Starting MySQL-8.0, CTAS is executed as multi-stmt transaction.
-
-      This effectively means trans_commit_stmt will commit CREATE stmt
-      and trans_commit_implicit will commit the DML. This technically is
-      still a single transaction with same GTID.
-
-      To execute this change under single GTID, galera needs to replicate
-      all changes during trans_commit_stmt as post this stmt cache will be
-      cleared and galera will then loose DDL command.
-
-      This also means, when trans_commit_implicit is being executed, galera
-      should ignore replication as it already done in previously.
-      We handle this skip by setting wsrep_skip_wsrep_hton = true post
-      trans_commit_stmt */
-
-      if (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
-          thd->wsrep_skip_wsrep_hton) {
-        thd->wsrep_skip_wsrep_hton = false;
-        wsrep_cleanup_transaction(thd);
-        break;
-      }
-
       /* non-InnoDB statements may have populated events in stmt cache
          => cleanup
       */
@@ -278,7 +247,7 @@ void wsrep_post_commit(THD *thd, bool all) {
       /* There are cases when replicated transaction are empty and there is no
       need to commit such transaction but given that they have a valid seqno
       assigned we need to update commit monitor by enter and leaving it.
-      Empty transaction use case: CTAS, pre-executed action on pxc-node
+      Empty transaction use case: a. CTAS b. pre-executed action on pxc-node
       acting as slave to an independent master. */
       if (thd->wsrep_void_applier_trx &&
           thd->wsrep_conflict_state != REPLAYING &&
@@ -348,9 +317,7 @@ static int wsrep_prepare(handlerton *, THD *thd, bool all) {
   then second OR condition evaluate to true even though all = false as
   commit is being driven by trans_commit_stmt. */
   if (((all || !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
-       (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd))) ||
-      (thd->lex->sql_command == SQLCOM_CREATE_TABLE))  // CTAS with empty table
-  {
+       (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd)))) {
     DBUG_RETURN(wsrep_replicate(thd));
   }
   DBUG_RETURN(0);
@@ -576,26 +543,6 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *, bool) {
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
   rcode = 0;
-
-  if ((thd->lex->sql_command == SQLCOM_CREATE_TABLE) && !thd->wsrep_applier &&
-      (cache = wsrep_get_trans_log(thd, false))) {
-
-    WSREP_DEBUG("Processing CREATE TABLE AS SELECT (reading from stmt cache)");
-    thd->binlog_flush_pending_rows_event(false);
-    rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
-    if (WSREP_OK != rcode) {
-      WSREP_ERROR(
-          "Failed to create write-set from binlog for CTAS"
-          " data_len: %zu, %d",
-          data_len, rcode);
-      DBUG_RETURN(WSREP_TRX_SIZE_EXCEEDED);
-
-    }
-    if (data_len > 0) {
-      WSREP_DEBUG("Processed %lu bytes from stmt cache",
-                  (long unsigned int)data_len);
-    }
-  }
 
   cache = wsrep_get_trans_log(thd, true);
   if (cache) {
@@ -885,25 +832,6 @@ enum wsrep_trx_status wsrep_replicate(THD *thd) {
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
   rcode = 0;
-  if ((thd->lex->sql_command == SQLCOM_CREATE_TABLE) && !thd->wsrep_applier &&
-      (cache = wsrep_get_trans_log(thd, false))) {
-
-    WSREP_DEBUG("Processing CREATE TABLE AS SELECT (reading from stmt cache)");
-    thd->binlog_flush_pending_rows_event(false);
-    rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
-    if (WSREP_OK != rcode) {
-      WSREP_ERROR(
-          "Failed to create write-set from binlog for CTAS"
-          " data_len: %zu, %d",
-          data_len, rcode);
-      DBUG_RETURN(WSREP_TRX_SIZE_EXCEEDED);
-    }
-    if (data_len > 0) {
-      WSREP_DEBUG("Processed %lu bytes from stmt cache",
-                  (long unsigned int)data_len);
-    }
-  }
-
   cache = wsrep_get_trans_log(thd, true);
   if (cache) {
     thd->binlog_flush_pending_rows_event(true);
