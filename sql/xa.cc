@@ -394,8 +394,9 @@ int ha_recover(const memroot_unordered_set<my_xid> *commit_list) {
   if (info.commit_list) LogErr(SYSTEM_LEVEL, ER_XA_STARTING_RECOVERY);
 
 #ifdef WITH_WSREP
-  uint count = WSREP_ON ? 1 : 0;
-  if (total_ha_2pc > (ulong)opt_bin_log + 1 + count) {
+  // WSREP is a built-in plugin and is always counted (even if not ON)
+  // So add an extra 1 to account for wsrep (the other 1 is for innodb)
+  if (total_ha_2pc > (ulong)opt_bin_log + 1 + 1 /* WSREP */) {
 #else
   if (total_ha_2pc > (ulong)opt_bin_log + 1) {
 #endif /* WITH_WSREP */

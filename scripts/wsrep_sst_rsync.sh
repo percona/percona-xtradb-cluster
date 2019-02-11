@@ -55,6 +55,9 @@ if [[ $keyring_plugin -eq 1 ]]; then
                       " (using keyring) with rsync. Please use SST with xtrabackup."
 fi
 
+auto_upgrade=$(parse_cnf sst auto-upgrade "")
+auto_upgrade=$(normalize_boolean "$auto_upgrade" "on")
+
 cleanup_joiner()
 {
     local PID=$(cat "$RSYNC_PID" 2>/dev/null || echo 0)
@@ -65,6 +68,7 @@ cleanup_joiner()
     rm -rf "$MAGIC_FILE"
     rm -rf "$RSYNC_PID"
     rm -rf "$KEYRING_FILE"
+    rm -rf "$MYSQL_UPGRADE_TMPDIR"
     wsrep_log_debug "Joiner cleanup done."
     if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
         wsrep_cleanup_progress_file
@@ -327,16 +331,17 @@ then
         SILENT=""
     fi
 
+# script
 cat << EOF > "$RSYNC_CONF"
-pid file = $RSYNC_PID
-use chroot = no
-read only = no
-timeout = 300
-$SILENT
-[$MODULE]
-    path = $WSREP_SST_OPT_DATA
-[$MODULE-log_dir]
-    path = $WSREP_LOG_DIR
+    pid file = $RSYNC_PID
+    use chroot = no
+    read only = no
+    timeout = 300
+    $SILENT
+    [$MODULE]
+        path = $WSREP_SST_OPT_DATA
+    [$MODULE-log_dir]
+        path = $WSREP_LOG_DIR
 EOF
 
 #    rm -rf "$DATA"/ib_logfile* # we don't want old logs around
@@ -417,14 +422,31 @@ EOF
 
     if [ -r "$MAGIC_FILE" ]
     then
+        rsync_sst_success=1
         cat "$MAGIC_FILE" # output UUID:seqno
     else
+        rsync_sst_success=0
+
         # this message should cause joiner to abort
         echo "rsync process ended without creating '$MAGIC_FILE'"
     fi
     wsrep_cleanup_progress_file
     wsrep_log_info "..............rsync completed"
-#    cleanup_joiner
+
+    #-----------------------------------------------------------------------
+    # start mysql-upgrade execution.
+    #-----------------------------------------------------------------------
+    if [[ $rsync_sst_success -eq 1 ]]; then
+        if [[ "$auto_upgrade" == "on" ]]; then
+            wsrep_log_info "Running mysql-upgrade..........."
+            set +e
+            run_mysql_upgrade "$WSREP_SST_OPT_DATA" "$RSYNC_PORT"
+            set -e
+            wsrep_log_info "...........upgrade done"
+        else
+            wsrep_log_info "auto-upgrade disabled by configuration"
+        fi
+    fi
 else
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "Unrecognized role: '$WSREP_SST_OPT_ROLE'"

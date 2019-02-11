@@ -213,13 +213,11 @@ galera.galera_toi_ddl_online : fails randomly with "deadlock error" as sequence 
 galera.galera_fk_multitable : Bug#80821 0000-00-00 CODERSHIP fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
 galera.galera_kill_nochanges : mysql-wsrep#24 0000-00-00 CODERSHIP Galera server does not restart properly if killed
 galera.galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically
-galera.galera_garbd : Failing to find the garbd binary after new minimal image change.
 galera.pxc_encrypt_rest_blog : Currently PXC  doesn't support binlog encryption
 galera.pxc_encrypt_rest_gt_vault : Vault server availability is unreliable
 galera.pxc_encrypt_rest_fpt_vault : Vault server availability is unreliable
 
 # galera-3nodes
-galera_3nodes.galera_garbd : Failing to find the garbd binary after new minimal image change.
 
 #binlog
 binlog.binlog_index : codership/mysql-wsrep##71 0000-00-00 CODERSHIP Regression: Duplicate "file was not purged because it is the active log file" warning

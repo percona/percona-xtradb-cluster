@@ -2,6 +2,7 @@
 
 [mysqld]
 wsrep_sst_method=rsync
+mysqlx=0
 
 [mysqld.1]
 wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true'

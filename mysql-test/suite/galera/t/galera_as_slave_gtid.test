@@ -64,7 +64,7 @@ SELECT COUNT(*) = 1 FROM t1;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /table_id: [0-9]+/table_id: #/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 124;
 
 --connection node_1
 DROP TABLE t1;

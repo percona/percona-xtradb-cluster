@@ -116,8 +116,8 @@ sub sleep_until_pid_file_created ($$$) {
 
     $total_time = $total_time + 100;
 
-    # 60 seconds wait between each message
-    my $message_timeout = 600;
+    # Wait for 50% of the full timeout for the message
+    my $message_timeout = 10 * $timeout / 2;
     if ($ENV{'VALGRIND_TEST'}) {
       $message_timeout = $message_timeout * 10;
     }

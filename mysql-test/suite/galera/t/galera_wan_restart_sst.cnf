@@ -12,3 +12,8 @@ wsrep_provider_options='base_port=@mysqld.3.#galera_port;gmcast.segment=2'
 [mysqld.4]
 wsrep_provider_options='base_port=@mysqld.4.#galera_port;gmcast.segment=2'
 
+# Increase the SST timeout due to mysql_upgrade
+# This is needed here since we are staring up 4 nodes and there
+# are 3 SSTs running at the same time
+[sst]
+sst-initial-timeout=300
