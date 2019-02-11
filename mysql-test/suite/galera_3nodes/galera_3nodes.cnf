@@ -23,6 +23,7 @@ wsrep_provider_options='base_port=@mysqld.1.#galera_port;evs.suspect_timeout=PT1
 
 wsrep_sst_receive_address=127.0.0.2:@mysqld.1.#sst_port
 wsrep_node_incoming_address=127.0.0.1:@mysqld.1.port
+wsrep_sst_auth='@mysqld.1.#user:@mysqld.1.#password'
 
 [mysqld.2]
 wsrep_cluster_address='gcomm://127.0.0.1:@mysqld.1.#galera_port'
@@ -30,6 +31,7 @@ wsrep_provider_options='base_port=@mysqld.2.#galera_port;evs.suspect_timeout=PT1
 
 wsrep_sst_receive_address=127.0.0.2:@mysqld.2.#sst_port
 wsrep_node_incoming_address=127.0.0.1:@mysqld.2.port
+wsrep_sst_auth='@mysqld.2.#user:@mysqld.2.#password'
 
 [mysqld.3]
 wsrep_cluster_address='gcomm://127.0.0.1:@mysqld.1.#galera_port'
@@ -37,6 +39,7 @@ wsrep_provider_options='base_port=@mysqld.3.#galera_port;evs.suspect_timeout=PT1
 
 wsrep_sst_receive_address=127.0.0.2:@mysqld.3.#sst_port
 wsrep_node_incoming_address=127.0.0.1:@mysqld.3.port
+wsrep_sst_auth='@mysqld.3.#user:@mysqld.3.#password'
 
 [ENV]
 NODE_MYPORT_1= @mysqld.1.port
