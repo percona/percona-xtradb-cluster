@@ -6,6 +6,18 @@
 # check for xid consistency with replication.
 #
 
+# this will rotate binlog
+--connection node_1
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+--connection node_2
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+
 --connection node_1
 --echo #=============================================
 --echo #node-1 (fire some basic ddl and dml workload on node-1)
@@ -31,6 +43,7 @@ begin; insert into t3 values (1000, 1000), (2000, 2000); commit;
 select * from t3;
 #
 #
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 
 --connection node_2
@@ -38,6 +51,8 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 --echo #node-2 (check for replication followed by XID)
 --let $wait_condition = SELECT COUNT(*) = 5 FROM t3
 --source include/wait_condition.inc
+#
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 #
 drop table t3;

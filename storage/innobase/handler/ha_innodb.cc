@@ -202,6 +202,9 @@ extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
                                          wsrep_buf_t *key, size_t *key_len);
 
 extern void wsrep_cleanup_transaction(THD *thd);
+
+/* Must always init to false. */
+static bool innobase_disallow_writes = false;
 #endif /* WITH_WSREP */
 
 #include "log0log.h"
@@ -2553,6 +2556,10 @@ path. If the path is NULL, then it will be created in --tmpdir.
 @param[in]	path	location for creating temporary file
 @return temporary file descriptor, or < 0 on error */
 int innobase_mysql_tmpfile(const char *path) {
+#ifdef WITH_WSREP
+  os_event_wait(srv_allow_writes_event);
+#endif /* WITH_WSREP */
+
   int fd2 = -1;
   File fd;
 
@@ -4639,6 +4646,14 @@ static int innodb_init_params() {
   srv_win_file_flush_method = static_cast<srv_win_flush_t>(innodb_flush_method);
   ut_ad(innodb_flush_method <= SRV_WIN_IO_NORMAL);
 #endif
+
+#ifdef WITH_WSREP
+  if (innobase_disallow_writes) {
+    ib::warn() << "innodb_disallow_writes has been deprecated and"
+                  " will be removed in future release."
+                  " Consider using read_only instead.";
+  }
+#endif /* WITH_WSREP */
 
   /* Set the maximum number of threads which can wait for a semaphore
   inside InnoDB: this is the 'sync wait array' size, as well as the
@@ -23703,6 +23718,44 @@ static MYSQL_SYSVAR_ENUM(
     NULL, NULL, Compression::NONE, &innodb_debug_compress_typelib);
 #endif /* UNIV_DEBUG || UNIV_IBUF_DEBUG */
 
+#ifdef WITH_WSREP
+/* if rsync is being done on live/active node then it is important
+that innodb io write threads are not flushing/writing.
+FLUSH TABLE with READ LOCK will block external action but internal
+action or if the thread is actively writing then all such action
+needs to be avoided. rsync is like taking a snapshot at given
+point in time. If thread-1/2 are altering file-1/2 from innodb
+and both action are needed for complete data-directory to make sense
+then this sequence could break the rsync backed up copy.
+thread-1 write complete -> rsync -> thread-2 write complete */
+
+/* An "update" method for innobase_disallow_writes variable. */
+static void innobase_disallow_writes_update(
+    THD *thd,            // in: thread handle <]
+    SYS_VAR *var,        // in: pointer to
+                         // system variable */
+    void *var_ptr,       // where the
+                         // formal string goes */
+    const void *save) {  // in: immediate result
+                         // from check function
+  ib::warn() << "innodb_disallow_writes has been deprecated and will be"
+                " removed in future release. Consider using read_only"
+                " instead.";
+
+  *(bool *)var_ptr = *(bool *)save;
+  ut_a(srv_allow_writes_event);
+  if (*(bool *)var_ptr)
+    os_event_reset(srv_allow_writes_event);
+  else
+    os_event_set(srv_allow_writes_event);
+}
+
+static MYSQL_SYSVAR_BOOL(disallow_writes, innobase_disallow_writes,
+                         PLUGIN_VAR_NOCMDOPT,
+                         "Tell InnoDB to stop any writes to disk (deprecated)",
+                         NULL, innobase_disallow_writes_update, false);
+#endif /* WITH_WSREP */
+
 static MYSQL_SYSVAR_BOOL(
     random_read_ahead, srv_random_read_ahead, PLUGIN_VAR_NOCMDARG,
     "Whether to use read ahead for random access within an extent.", NULL, NULL,
@@ -24115,6 +24168,9 @@ static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(change_buffering_debug),
     MYSQL_SYSVAR(disable_background_merge),
 #endif /* UNIV_DEBUG || UNIV_IBUF_DEBUG */
+#ifdef WITH_WSREP
+    MYSQL_SYSVAR(disallow_writes),
+#endif /* WITH_WSREP */
     MYSQL_SYSVAR(random_read_ahead),
     MYSQL_SYSVAR(read_ahead_threshold),
     MYSQL_SYSVAR(read_only),

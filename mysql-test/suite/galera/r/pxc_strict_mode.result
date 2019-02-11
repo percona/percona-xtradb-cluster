@@ -43,6 +43,7 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
 set global pxc_strict_mode='ENFORCING';
 #node-1
 set global pxc_strict_mode = 'DISABLED';

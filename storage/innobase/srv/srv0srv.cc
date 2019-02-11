@@ -392,6 +392,10 @@ srv_printf_innodb_monitor() will request mutex acquisition
 with mutex_enter(), which will wait until it gets the mutex. */
 #define MUTEX_NOWAIT(mutex_skipped) ((mutex_skipped) < MAX_MUTEX_NOWAIT)
 
+#ifdef WITH_WSREP
+os_event_t srv_allow_writes_event;
+#endif /* WITH_WSREP */
+
 /** Dedicated server setting */
 bool srv_dedicated_server = true;
 /** Requested size in bytes */
@@ -1211,6 +1215,15 @@ static void srv_init(void) {
 
   dict_ind_init();
 
+#ifdef WITH_WSREP
+  /* Writes have to be enabled on init or else we hang. Thus, we
+  always set the event here regardless of innobase_disallow_writes.
+  That flag will always be 0 at this point because it isn't settable
+  via my.cnf or command line arg. */
+  srv_allow_writes_event = os_event_create("allow_write_events");
+  os_event_set(srv_allow_writes_event);
+#endif /* WITH_WSREP */
+
   /* Initialize some INFORMATION SCHEMA internal structures */
   trx_i_s_cache_init(trx_i_s_cache);
 
@@ -1243,6 +1256,10 @@ void srv_free(void) {
   }
 
   os_event_destroy(srv_buf_resize_event);
+
+#ifdef WITH_WSREP
+  os_event_destroy(srv_allow_writes_event);
+#endif /* WITH_WSREP */
 
 #ifdef UNIV_DEBUG
   os_event_destroy(srv_master_thread_disabled_event);
@@ -1911,7 +1928,21 @@ loop:
 
   if (sync_array_print_long_waits(&waiter, &sema) && sema == old_sema &&
       os_thread_eq(waiter, old_waiter)) {
+#if defined(WITH_WSREP)
+    if (os_event_is_set(srv_allow_writes_event)) {
+#endif /* WITH_WSREP */
     fatal_cnt++;
+#if defined(WITH_WSREP)
+    } else {
+      ib::warn() << "WSREP: avoiding InnoDB self crash due to long "
+                    "semaphore wait of > "
+                 << srv_fatal_semaphore_wait_threshold
+                 << " seconds."
+                    "Server is processing SST donor operation, "
+                    "fatal_cnt now: "
+                 << fatal_cnt;
+    }
+#endif /* WITH_WSREP */
     if (fatal_cnt > 10) {
       ib::fatal(ER_IB_MSG_1047, srv_fatal_semaphore_wait_threshold);
     }
