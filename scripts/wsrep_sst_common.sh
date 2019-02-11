@@ -540,18 +540,18 @@ function run_mysql_upgrade()
 
         $mysqladmin_path ping --socket=$upgrade_socket &> /dev/null
         errcode=$?
-        if [ $errcode -eq 0 ]; then
+        if [[ $errcode -eq 0 ]]; then
             break;
         fi
 
-        if [ $timeout -eq $timeout_threshold ]; then
+        if [[ $timeout -eq $timeout_threshold ]]; then
             wsrep_log_info "Waiting for server instance to start....." \
                            " This may take some time"
         fi
 
         sleep 1
         ((timeout--))
-        if [ $timeout -eq 0 ]; then
+        if [[ $timeout -eq 0 ]]; then
             kill -9 $mysql_pid
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Failed to start the MySQL server that executes mysql-upgrade."
@@ -579,7 +579,7 @@ user=${WSREP_SST_OPT_USER}
 password="${WSREP_SST_OPT_PSWD}"
 EOF
     errcode=$?
-    if [ $errcode -ne 0 ]; then
+    if [[ $errcode -ne 0 ]]; then
         kill -9 $mysql_pid
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Failed to execute mysql-upgrade. Check the parameters and retry"
@@ -587,10 +587,42 @@ EOF
         echo "--------------- mysql_upgrade log (START) --------------------" >&2
         cat ${mysql_upgrade_dir_path}/upgrade.out >&2
         echo "--------------- mysql_upgrade log (END) ----------------------" >&2
+        echo "--------------- mysql error log  (START) --------------------" >&2
+        cat ${mysql_upgrade_dir_path}/err.log >&2
+        echo "--------------- mysql error log (END) ----------------------" >&2
         wsrep_log_error "****************************************************** "
         exit 3
     fi
     wsrep_log_debug "mysql_upgrade completed"
+
+    #-----------------------------------------------------------------------
+    # Stop replication activity
+    wsrep_log_debug "Resetting Async Slave"
+    $mysql_client_path \
+        --defaults-file=/dev/stdin \
+        --socket=$upgrade_socket \
+        --unbuffered --batch --silent \
+        -e "RESET SLAVE ALL;" \
+        &> ${mysql_upgrade_dir_path}/reset_slave.out <<EOF
+[client]
+user=${WSREP_SST_OPT_USER}
+password="${WSREP_SST_OPT_PSWD}"
+EOF
+    errcode=$?
+    if [[ $errcode -ne 0 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Failed to execute mysql 'RESET SLAVE ALL'. Check the parameters and retry"
+        wsrep_log_error "Line $LINENO errcode:${errcode}"
+        echo "--------------- reset slave log (START) --------------------" >&2
+        cat ${mysql_upgrade_dir_path}/reset_slave.out >&2
+        echo "--------------- reset slave log (END) ----------------------" >&2
+        echo "--------------- mysql error log  (START) --------------------" >&2
+        cat ${mysql_upgrade_dir_path}/err.log >&2
+        echo "--------------- mysql error log (END) ----------------------" >&2
+        wsrep_log_error "****************************************************** "
+        exit 3
+    fi
+    wsrep_log_debug "Async Slave Reset completed"
 
     #-----------------------------------------------------------------------
     # shutdown mysql instance started.
@@ -605,7 +637,7 @@ user=${WSREP_SST_OPT_USER}
 password="${WSREP_SST_OPT_PSWD}"
 EOF
     errcode=$?
-    if [ $errcode -ne 0 ]; then
+    if [[ $errcode -ne 0 ]]; then
         kill -9 $mysql_pid
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Failed to shutdown the MySQL instance started for upgrade."
