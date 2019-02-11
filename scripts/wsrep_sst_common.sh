@@ -29,6 +29,16 @@ WSREP_SST_OPT_VERSION=""
 
 WSREP_LOG_DEBUG=""
 
+# These are the 'names' of the commands
+# The paths to these are stored separately (MYSQLD_PATH for MYSQLD_NAME)
+# The NAMEs don't change, however the PATHs may be different (due to packaging)
+readonly MYSQLD_NAME=mysqld
+readonly MYSQLADMIN_NAME=mysqladmin
+readonly MYSQL_UPGRADE_NAME=mysql_upgrade
+readonly MYSQL_CLIENT_NAME=mysql
+
+declare MYSQL_UPGRADE_TMPDIR=""
+
 while [ $# -gt 0 ]; do
 case "$1" in
     '--address')
@@ -329,4 +339,290 @@ wsrep_check_programs()
     done
 
     return $ret
+}
+
+
+# Runs mysql_upgrade on the datadir (argument 1)
+#
+# Globals
+#   MYSQLD_NAME
+#   MYSQLADMIN_NAME
+#   MYSQL_UPGRADE_NAME
+#   MYSQL_CLIENT_NAME
+#   WSREP_SST_OPT_PARENT
+#   WSREP_SST_OPT_USER
+#   WSREP_SST_OPT_PSWD
+#   WSREP_SST_OPT_CONF
+#   WSREP_SST_OPT_CONF_SUFFIX
+#   MYSQL_UPGRADE_TMPDIR    (This path will be deleted on exit)
+#
+# Arguments
+#   Argument 1: Path to the datadir
+#   Argument 2: Port to be used by mysqld
+#
+function run_mysql_upgrade()
+{
+    local datadir=$1
+    local port=$2
+
+    # Path to the binary locations
+    local mysqld_path=""
+    local mysql_upgrade_path
+    local mysql_client_path
+    local mysqladmin_path
+
+    local upgrade_tmpdir
+    local mysql_upgrade_dir_path
+    local use_mysql_upgrade_conf_suffix
+
+    # Locate mysqld
+    # mysqld (depending on the distro) may be in a different
+    # directory from the SST scripts (it may be in /usr/sbin not /usr/bin)
+    # So, first, try to use readlink to read from /proc/<pid>/exe
+    if which readlink >/dev/null; then
+
+        # Check to see if the symlink for the exe exists
+        if [[ -L /proc/${WSREP_SST_OPT_PARENT}/exe ]]; then
+            mysqld_path=$(readlink -f /proc/${WSREP_SST_OPT_PARENT}/exe)
+        fi
+    fi
+    if [[ -z $mysqld_path ]]; then
+        # We don't have readlink, so look for mysqld in the path
+        mysqld_path=$(which ${MYSQLD_NAME})
+    fi
+    if [[ -z $mysqld_path ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Could not locate ${MYSQLD_NAME} (needed to run mysql_upgrade)"
+        wsrep_log_error "Please ensure that ${MYSQLD_NAME} is in the path"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        exit 2
+    fi
+    wsrep_log_debug "Found the ${MYSQLD_NAME} binary in ${mysqld_path}"
+    wsrep_log_debug "--$("$mysqld_path" --version | cut -d' ' -f2-)"
+
+    # Verify any other needed programs
+    wsrep_check_program "${MYSQL_UPGRADE_NAME}"
+    if [[ $? -ne 0 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Could not locate ${MYSQLD_UPGRADE_NAME} (needed for upgrade)"
+        wsrep_log_error "Please ensure that ${MYSQLD_UPGRADE_NAME} is in the path"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        exit 2
+    fi
+    wsrep_check_program "${MYSQLADMIN_NAME}"
+    if [[ $? -ne 0 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Could not locate ${MYSQLADMIN_NAME} (needed for upgrade)"
+        wsrep_log_error "Please ensure that ${MYSQLADMIN_NAME} is in the path"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        exit 2
+    fi
+    wsrep_check_program "${MYSQL_CLIENT_NAME}"
+    if [[ $? -ne 0 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Could not locate ${MYSQL_CLIENT_NAME} (needed for upgrade)"
+        wsrep_log_error "Please ensure that ${MYSQL_CLIENT_NAME} is in the path"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        exit 2
+    fi
+
+    mysql_upgrade_path=$(which ${MYSQL_UPGRADE_NAME})
+    mysqladmin_path=$(which ${MYSQLADMIN_NAME})
+    mysql_client_path=$(which ${MYSQL_CLIENT_NAME})
+
+    wsrep_log_debug "Found the ${MYSQL_UPGRADE_NAME} binary in ${mysql_upgrade_path}"
+    wsrep_log_debug "--$("$mysql_upgrade_path" --version | cut -d' ' -f2-)"
+    wsrep_log_debug "Found the ${MYSQLADMIN_NAME} binary in ${mysqladmin_path}"
+    wsrep_log_debug "--$("$mysqladmin_path" --version | cut -d' ' -f2-)"
+    wsrep_log_debug "Found the ${MYSQL_CLIENT_NAME} binary in ${mysql_client_path}"
+    wsrep_log_debug "--$("$mysql_client_path" --version | cut -d' ' -f2-)"
+
+    # Create a temp directory for upgrade logs/output
+    upgrade_tmpdir=$(parse_cnf sst tmpdir "")
+    if [[ -z "${upgrade_tmpdir}" ]]; then
+        upgrade_tmpdir=$(parse_cnf xtrabackup tmpdir "")
+    fi
+    if [[ -z "${upgrade_tmpdir}" ]]; then
+        upgrade_tmpdir=$(parse_cnf mysqld tmpdir "")
+    fi
+    if [[ -z "${upgrade_tmpdir}" ]]; then
+        mysql_upgrade_dir_path=$(mktemp -dt sst_mysql_upgrade.${port}.XXXX)
+    else
+        mysql_upgrade_dir_path=$(mktemp -p "${upgrade_tmpdir}" -dt sst_mysql_upgrade.${port}.XXXX)
+    fi
+
+    # Set this so that it will be cleaned up on exit
+    MYSQL_UPGRADE_TMPDIR=$mysql_upgrade_dir_path
+
+    # validation check to ensure that the auth param are specified.
+    if [[ -z "$WSREP_SST_OPT_USER" ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Authentication params missing. Check wsrep_sst_auth"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "****************************************************** "
+        exit 3
+    fi
+
+    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
+      use_mysql_upgrade_conf_suffix="--defaults-group-suffix=${WSREP_SST_OPT_CONF_SUFFIX}"
+    fi
+
+    #-----------------------------------------------------------------------
+    # start server in standalone mode with the my.cnf configuration
+    # for upgrade purpose using the data-directory that was just SST from
+    # the DONOR node.
+    #
+    # This is a internal SST process, so isolate this mysqld instance
+    # from the rest of the system.
+    #
+    # Disable wsrep
+    #   --wsrep-provider=none
+    # Disable networking
+    #   --skip-networking
+    # Disable slave start (avoid starting slave threads)
+    #   --skip-slave-start
+    # Turn off logging
+    #   --log-syslog
+    #   --log-output
+    #   --general-log
+    #   --slow-query-log
+    # Turn off logging to syslog
+    #   --log-error-services
+    # Redirect files (to avoid conflict with parent mysqld)
+    #   --pid-file
+    #   --socket
+    #   --log-error
+    #   --datadir
+    local upgrade_socket="${mysql_upgrade_dir_path}/mysqld.sock"
+
+    wsrep_log_debug "Starting the MySQL server used by mysql_upgrade"
+    local mysqld_cmdline="--defaults-file=${WSREP_SST_OPT_CONF} ${use_mysql_upgrade_conf_suffix} \
+        --skip-networking --skip-slave-start \
+        --auto_generate_certs=OFF \
+        --general-log=0 --slow-query-log=0 \
+        --pxc-maint-transition-period=1 \
+        --log-error-services='log_filter_internal;log_sink_internal' \
+        --log-error=${mysql_upgrade_dir_path}/err.log \
+        --log_output=NONE \
+        --pid-file=${mysql_upgrade_dir_path}/mysqld.pid \
+        --socket=$upgrade_socket \
+        --datadir=$datadir --wsrep_provider=none"
+
+    $mysqld_path $mysqld_cmdline &> ${mysql_upgrade_dir_path}/err.log &
+    mysql_pid=$!
+
+    #-----------------------------------------------------------------------
+    # wait for the mysql to come up
+    local -i timeout
+    local -i timeout_threshold
+
+    timeout_threshold=300
+    timeout=$timeout_threshold
+    sleep 5
+
+    while [ true ]; do
+        if ! ps --pid $mysql_pid >/dev/null; then
+            # If the process doesn't exist, then it shut down, so exit
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "Failed to start the mysql server that executes mysql-upgrade."
+            wsrep_log_error "Check the parameters and retry"
+            wsrep_log_error "Line $LINENO  pid:$mysql_pid"
+            echo "--------------- err.log (START) --------------------" >&2
+            cat ${mysql_upgrade_dir_path}/err.log >&2
+            echo "--------------- err.log (END) ----------------------" >&2
+            wsrep_log_error "****************************************************** "
+            exit 3
+        fi
+
+        $mysqladmin_path ping --socket=$upgrade_socket &> /dev/null
+        errcode=$?
+        if [ $errcode -eq 0 ]; then
+            break;
+        fi
+
+        if [ $timeout -eq $timeout_threshold ]; then
+            wsrep_log_info "Waiting for server instance to start....." \
+                           " This may take some time"
+        fi
+
+        sleep 1
+        ((timeout--))
+        if [ $timeout -eq 0 ]; then
+            kill -9 $mysql_pid
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "Failed to start the MySQL server that executes mysql-upgrade."
+            wsrep_log_error "Check the parameters and retry"
+            wsrep_log_error "Line $LINENO"
+            echo "--------------- mysql error log  (START) --------------------" >&2
+            cat ${mysql_upgrade_dir_path}/err.log >&2
+            echo "--------------- mysql error log (END) ----------------------" >&2
+            wsrep_log_error "****************************************************** "
+            exit 3
+        fi
+    done
+    wsrep_log_debug "MySQL server started"
+
+    #-----------------------------------------------------------------------
+    # run mysql-upgrade
+    wsrep_log_debug "Starting mysql_upgrade"
+    $mysql_upgrade_path \
+        --defaults-file=/dev/stdin \
+        --force \
+        --socket=$upgrade_socket \
+        &> ${mysql_upgrade_dir_path}/upgrade.out <<EOF
+[mysql_upgrade]
+user=${WSREP_SST_OPT_USER}
+password="${WSREP_SST_OPT_PSWD}"
+EOF
+    errcode=$?
+    if [ $errcode -ne 0 ]; then
+        kill -9 $mysql_pid
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Failed to execute mysql-upgrade. Check the parameters and retry"
+        wsrep_log_error "Line $LINENO errcode:${errcode}"
+        echo "--------------- mysql_upgrade log (START) --------------------" >&2
+        cat ${mysql_upgrade_dir_path}/upgrade.out >&2
+        echo "--------------- mysql_upgrade log (END) ----------------------" >&2
+        wsrep_log_error "****************************************************** "
+        exit 3
+    fi
+    wsrep_log_debug "mysql_upgrade completed"
+
+    #-----------------------------------------------------------------------
+    # shutdown mysql instance started.
+    wsrep_log_debug "Shutting down the MySQL server"
+    $mysqladmin_path \
+        --defaults-file=/dev/stdin \
+        --socket=$upgrade_socket \
+        shutdown \
+        &> ${mysql_upgrade_dir_path}/upgrade_shutdown.out <<EOF
+[mysqladmin]
+user=${WSREP_SST_OPT_USER}
+password="${WSREP_SST_OPT_PSWD}"
+EOF
+    errcode=$?
+    if [ $errcode -ne 0 ]; then
+        kill -9 $mysql_pid
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Failed to shutdown the MySQL instance started for upgrade."
+        wsrep_log_error "Check the parameters and retry"
+        wsrep_log_error "Line $LINENO errcode:${errcode}"
+        echo "--------------- shutdown log (START) --------------------" >&2
+        cat ${mysql_upgrade_dir_path}/upgrade_shutdown.out >&2
+        echo "--------------- shutdown log (END) ----------------------" >&2
+        wsrep_log_error "****************************************************** "
+        exit 3
+    fi
+
+    sleep 1
+
+    #-----------------------------------------------------------------------
+    # cleanup
+    rm -rf $datadir/*.pem || true
+    rm -rf $datadir/auto.cnf || true
+
 }

@@ -27,6 +27,7 @@ Got one of the listed errors
 count_equal
 1
 CALL mtr.add_suppression("WSREP: Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("WSREP: Failed to remove page file");
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE
 2

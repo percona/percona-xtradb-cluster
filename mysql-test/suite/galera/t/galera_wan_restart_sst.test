@@ -11,6 +11,9 @@
 --source include/big_test.inc
 --source include/galera_cluster.inc
 
+--let wait_condition=SELECT VARIABLE_VALUE = 4 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
 SELECT VARIABLE_VALUE = 4 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
 --connection node_1

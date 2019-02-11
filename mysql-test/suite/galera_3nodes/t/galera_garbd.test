@@ -4,7 +4,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/big_test.inc
 
 --echo Killing node #3 to free ports for garbd ...
@@ -14,7 +13,7 @@
 --source include/shutdown_mysqld.inc
 
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 --echo Starting garbd ...
@@ -26,7 +25,7 @@
 
 --sleep 5
 
---let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 CREATE TABLE t1 (f1 INTEGER);
@@ -43,7 +42,7 @@ SELECT COUNT(*) = 1 FROM t1;
 --sleep 10
 
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 INSERT INTO t1 VALUES (2);
@@ -57,6 +56,8 @@ DROP TABLE t1;
 --connection node_3
 --source include/start_mysqld.inc
 
+# Cleanup
+--remove_file $MYSQL_TMP_DIR/garbd.log
 
 # Workaround for galera#101
 

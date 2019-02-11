@@ -12,3 +12,8 @@ wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.3.#gale
 [mysqld.4]
 wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.4.#galera_port;gmcast.peer_timeout=PT8S;evs.suspect_timeout=PT10S;evs.inactive_timeout=PT30S;evs.install_timeout=PT25S;gmcast.segment=2'
 
+# Increase the SST timeout due to mysql_upgrade
+# This is needed here since we are staring up 4 nodes and there
+# are 3 SSTs running at the same time
+[sst]
+sst-initial-timeout=300

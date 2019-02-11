@@ -328,23 +328,44 @@ fi
         export CC=${GALERA_CC:-gcc}
         export CXX=${GALERA_CXX:-g++}
 
+        # Look for boost_program_options static library
+        # (use if possible to avoid additional installation requirements)
+        BOOST_PROGRAM_OPTIONS_ARGS=""
+        BOOST_PROGRAM_OPTIONS_LIB=""
+        if [[ -r /usr/lib/x86_64-linux-gnu/libboost_program_options.a ]]; then
+            BOOST_PROGRAM_OPTIONS_LIB="/usr/lib/x86_64-linux-gnu/libboost_program_options.a"
+        elif [[ -r /usr/lib64/libboost_program_options.a ]]; then
+            BOOST_PROGRAM_OPTIONS_LIB="/usr/lib64/libboost_program_options.a"
+        else
+            BOOST_PROGRAM_OPTIONS_LIB=$(locate libboost_program_options.a)
+        fi
+        if [[ -n $BOOST_PROGRAM_OPTIONS_LIB ]]; then
+            BOOST_PROGRAM_OPTIONS_ARGS="bpostatic=$BOOST_PROGRAM_OPTIONS_LIB"
+        fi
+
         cd "percona-xtradb-cluster-galera"
         if grep builtin <<< "$STAG";then
             # No builtin SSL in galera yet.
             scons $MAKE_JFLAG psi=1 --config=force ssl=0 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 libgalera_smm.so
             scons $MAKE_JFLAG --config=force ssl=0 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 garb/garbd
         elif grep static <<< "$STAG";then
             # Disable SSL in galera for now
             scons $MAKE_JFLAG psi=1 --config=force static_ssl=1 with_ssl=$GALERA_SSL \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 libgalera_smm.so
             scons $MAKE_JFLAG --config=force static_ssl=1 with_ssl=$GALERA_SSL \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 garb/garbd
         else
             scons $MAKE_JFLAG psi=1 --config=force revno="$GALERA_REVISION" ${SCONS_ARGS} \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 libgalera_smm.so
             scons $MAKE_JFLAG --config=force revno="$GALERA_REVISION" ${SCONS_ARGS} \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 garb/garbd
         fi
         mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
@@ -354,8 +375,8 @@ fi
     else
         mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
              "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
-        mv $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
-        mv $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
+        cp $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
+        cp $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
     fi
     ) || exit 1
 
@@ -442,6 +463,77 @@ fi
 
     ) || exit 1
     fi
+
+    # Extract the Percona Xtrabackup binaries
+    # Look for the pxb 2.4 tarball
+    (
+        cd "$TARGETDIR"
+        pxb_tar=$(ls -1td percona-xtrabackup-2.4.* | grep ".tar" | sort --version-sort | tail -n1)
+        if [[ -z $pxb_tar ]]; then
+            echo "Could not find percona-xtrabackup-2.4 tarball in $TARGETDIR.  Terminating."
+            exit 1
+        fi
+        pxb_dir=$(echo $pxb_tar | grep -oe ".*x86_64" )
+
+        mkdir -p pxc_extra
+        cd pxc_extra
+        if [[ -d ${pxb_dir} ]]; then
+            echo "Using existing pxb 2.4 directory"
+        else
+            echo "Removing existing percona-xtrabackup-2.4 basedir (if found)"
+            find . -maxdepth 1 -type d -name 'percona-xtrabackup-2.*' -exec rm -rf {} \+
+
+            echo "Extracting pxb 2.4 tarball"
+            tar -xzf "../$pxb_tar"
+        fi
+        rm -f "pxb-2.4"
+        echo "Creating symlink pxc_extra/pxb-2.4 --> $pxb_dir"
+        ln -s "$pxb_dir" pxb-2.4
+    ) || exit 1
+
+    pxb_dir=$(ls -1td $TARGETDIR/pxc_extra/percona-xtrabackup-2.* | sort --version-sort | tail -n1)
+    pxb2_version=$(echo $pxb_dir | grep -oe "[1-9]\.[0-9][0-9]*\.[0-9][0-9]*")
+
+    # Look for the pxb 8.0 tarball
+    (
+        cd "$TARGETDIR"
+        pxb_tar=$(ls -1td percona-xtrabackup-8.0.* | grep ".tar" | sort --version-sort | tail -n1)
+        if [[ -z $pxb_tar ]]; then
+            echo "Could not find percona-xtrabackup-8.0.x tarball in $TARGETDIR.  Terminating."
+            exit 1
+        fi
+        pxb_dir=$(echo $pxb_tar | grep -oe ".*x86_64" )
+
+        mkdir -p pxc_extra
+        cd pxc_extra
+        if [[ -d ${pxb_dir} ]]; then
+            echo "Using existing pxb 8.0 directory"
+        else
+            echo "Removing existing percona-xtrabackup-8.0 basedir (if found)"
+            find . -maxdepth 1 -type d -name 'percona-xtrabackup-8.*' -exec rm -rf {} \+
+
+            echo "Extracting pxb 8.0 tarball"
+            tar -xzf "../$pxb_tar"
+        fi
+        rm -f "pxb-8.0"
+        echo "Creating symlink pxc_extra/pxb-8.0 --> $pxb_dir"
+        ln -s "$pxb_dir" pxb-8.0
+    ) || exit 1
+
+    pxb_dir=$(ls -1td $TARGETDIR/pxc_extra/percona-xtrabackup-8.* | sort --version-sort | tail -n1)
+    pxb8_version=$(echo $pxb_dir | grep -oe "[1-9]\.[0-9][0-9]*\.[0-9][0-9]*")
+
+    # Only copy over the bin and lib portions of the xtrabackup packages
+    # Test cases and other files are not copied
+    mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4"
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-2.4/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4) || true
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-2.4/lib/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4) || true
+    echo "percona xtrabackup $pxb2_version in build in release mode"
+
+    mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0"
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-8.0/bin/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0) || true
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-8.0/lib/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0) || true
+    echo "percona xtrabackup $pxb8_version in build in release mode"
 
 ) || exit 1
 
