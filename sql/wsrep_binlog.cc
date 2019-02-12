@@ -401,11 +401,13 @@ int wsrep_write_cache(wsrep_t*  const wsrep,
 
 void wsrep_dump_rbr_buf(THD *thd, const void* rbr_buf, size_t buf_len)
 {
-  char filename[PATH_MAX]= {0};
-  int len= snprintf(filename, PATH_MAX, "%s/GRA_%u_%lld.log",
+  /* filename is derived from wsrep_data_home_dir (which in turn from
+  mysql_real_data_home that has max length limit of FN_REFLEN */
+  char filename[FN_REFLEN + 64]= {0};
+  int len= snprintf(filename, FN_REFLEN + 64, "%s/GRA_%u_%lld.log",
                     wsrep_data_home_dir, thd->thread_id(),
                     (long long)wsrep_thd_trx_seqno(thd));
-  if (len >= PATH_MAX)
+  if (len >= (FN_REFLEN + 64))
   {
     WSREP_ERROR("RBR dump path too long: %d, skipping dump.", len);
     return;
@@ -426,13 +428,15 @@ void wsrep_dump_rbr_buf(THD *thd, const void* rbr_buf, size_t buf_len)
 
 void wsrep_dump_rbr_direct(THD* thd, IO_CACHE* cache)
 {
-  char filename[PATH_MAX]= {0};
-  int len= snprintf(filename, PATH_MAX, "%s/GRA_%u_%lld.log",
+  /* filename is derived from wsrep_data_home_dir (which in turn from
+  mysql_real_data_home that has max length limit of FN_REFLEN */
+  char filename[FN_REFLEN + 64]= {0};
+  int len= snprintf(filename, FN_REFLEN + 64, "%s/GRA_%u_%lld.log",
                     wsrep_data_home_dir, thd->thread_id(),
                     (long long)wsrep_thd_trx_seqno(thd));
   size_t bytes_in_cache = 0;
   // check path
-  if (len >= PATH_MAX)
+  if (len >= (FN_REFLEN + 64))
   {
     WSREP_ERROR("RBR dump path too long: %d, skipping dump.", len);
     return ;
