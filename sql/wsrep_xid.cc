@@ -132,7 +132,7 @@ void wsrep_get_SE_checkpoint(wsrep_uuid_t& uuid, wsrep_seqno_t& seqno)
   seqno= WSREP_SEQNO_UNDEFINED;
 
   XID xid;
-  memset(&xid, 0, sizeof(xid));
+  memset(static_cast<void*>(&xid), 0, sizeof(xid));
   xid.formatID= -1;
 
   wsrep_get_SE_checkpoint(xid);
