@@ -433,7 +433,7 @@ trx_sys_read_wsrep_checkpoint(XID* xid)
 		+ TRX_SYS_WSREP_XID_MAGIC_N_FLD))
 		!= TRX_SYS_WSREP_XID_MAGIC_N) {
 
-		memset(xid, 0, sizeof(*xid));
+		memset(static_cast<void*>(xid), 0, sizeof(*xid));
 		xid->set_format_id(-1);
 		trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
 		mtr_commit(&mtr);
