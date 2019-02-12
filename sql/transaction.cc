@@ -544,19 +544,6 @@ bool trans_commit_stmt(THD *thd, bool ignore_global_read_lock) {
       trans_reset_one_shot_chistics(thd);
       wsrep_post_commit(thd, false);
     }
-
-    /* CTAS is executed as multi-statement command that has statement
-    and transaction cache both populated. Till 5.7 it was marked as
-    multi_stmt_transaction() command but starting 8.0 it is not marked
-    as multi_stmt_transaction(). Post trans_commit_stmt, stmt cache
-    will be cleared so we need to ensure it is captured and replicated
-    as part of trans_commit_stmt and once done transaction is cleared too. */
-    if (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
-        thd->wsrep_exec_mode != TOTAL_ORDER) {
-      /* CREATE table AS SELECT use case */
-      wsrep_post_commit(thd, false);
-      thd->wsrep_skip_wsrep_hton = true;
-    }
 #else
     if (!thd->in_active_multi_stmt_transaction())
       trans_reset_one_shot_chistics(thd);

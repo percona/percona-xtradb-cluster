@@ -1,0 +1,59 @@
+#
+--source include/galera_cluster.inc
+
+#-------------------------------------------------------------------------------
+#
+# check for xid consistency with replication.
+#
+
+# this will rotate binlog
+--connection node_1
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+--connection node_2
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+
+--connection node_1
+--echo #=============================================
+--echo #node-1 (fire some basic ddl and dml workload on node-1)
+create table t1 (i int, primary key pk(i)) engine=innodb;
+insert into t1 values (1), (2), (3), (4);
+select * from t1;
+#
+create table t2 as (select * from t1);
+insert into t2 values (10), (20), (30);
+select * from t2;
+#
+create table t3 like t1;
+begin; insert into t3 values (100), (200), (300); commit;
+#
+alter table t1 add column j int;
+alter table t2 add key uk(i);
+drop table t1, t2;
+#
+optimize table t3;
+analyze table t3;
+alter table t3 add column k int;
+begin; insert into t3 values (1000, 1000), (2000, 2000); commit; 
+select * from t3;
+#
+#
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+
+--connection node_2
+--echo #=============================================
+--echo #node-2 (check for replication followed by XID)
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t3
+--source include/wait_condition.inc
+#
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+#
+drop table t3;
+

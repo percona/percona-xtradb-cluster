@@ -507,6 +507,11 @@ extern ulong srv_log_write_ahead_size;
 extern bool srv_adaptive_flushing;
 extern bool srv_flush_sync;
 
+#ifdef WITH_WSREP
+/* When this event is reset we do not allow any file writes to take place. */
+extern os_event_t srv_allow_writes_event;
+#endif /* WITH_WSREP */
+
 /* If this flag is TRUE, then we will load the indexes' (and tables') metadata
 even if they are marked as "corrupted". Mostly it is for DBA to process
 corrupted index and table */
