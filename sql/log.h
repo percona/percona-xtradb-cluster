@@ -1481,7 +1481,7 @@ void wsrep_thd_binlog_trx_reset(THD *thd);
 // This is a workaround. It also prefixes all messages with "WSREP"
 #define WSREP_LOG(fun, ...)                        \
   {                                                \
-    char msg[1024] = {'\0'};                       \
+    char msg[4096] = {'\0'};                       \
     snprintf(msg, sizeof(msg) - 1, ##__VA_ARGS__); \
     fun("WSREP: %s", msg);                         \
   }
