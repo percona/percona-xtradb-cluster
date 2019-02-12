@@ -1046,7 +1046,7 @@ trx_start_low(
 	}
 
 #ifdef WITH_WSREP
-        memset(&trx->xid, 0, sizeof(trx->xid));
+        memset(static_cast<void*>(&trx->xid), 0, sizeof(trx->xid));
         trx->xid.formatID = -1;
 #endif /* WITH_WSREP */
 
