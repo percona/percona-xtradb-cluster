@@ -8,3 +8,35 @@ ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try r
 wsrep_local_aborts_increment
 1
 DROP TABLE t1;
+#node-2 (create needed object and shutdown)
+create table t (i int, primary key pk(i)) engine=innodb;
+create table t2 (i int, primary key pk(i)) engine=innodb;
+insert into t values (1);
+select * from t;
+i
+1
+create procedure p1(col1 int)
+begin
+insert into t2 values (col1);
+end|
+#shutdown node-2
+#node-1 (check if node-2 has left cluster)
+#node-2 (restart)
+# restart:
+#node-2 (call p1)
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_attach_trx_with_prev_attach_trx SIGNAL entered1 WAIT_FOR continue1";
+call p1((select i from t limit 1));;
+#node-2b (fire parallel DDL action)
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+drop table t;;
+#node-2c (signal proc thread to continue)
+SET DEBUG_SYNC = 'RESET';
+SET DEBUG_SYNC = "now SIGNAL continue1";
+#node-2b (fire parallel DDL action)
+select * from t;
+ERROR 42S02: Table 'test.t' doesn't exist
+#node-2 (cleanup)
+drop procedure p1;
+drop table t2;
