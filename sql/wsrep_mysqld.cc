@@ -1430,7 +1430,7 @@ static bool wsrep_prepare_keys_for_isolation(THD *, const char *db,
   if (db || table) {
     TABLE_LIST tmp_table;
 
-    memset(&tmp_table, 0, sizeof(tmp_table));
+    memset(static_cast<void*>(&tmp_table), 0, sizeof(tmp_table));
     tmp_table.table_name = (char *)table;
     tmp_table.db = (char *)db;
     MDL_REQUEST_INIT(&tmp_table.mdl_request, MDL_key::GLOBAL, (db) ? db : "",
