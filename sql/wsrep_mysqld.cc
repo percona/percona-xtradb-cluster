@@ -2308,7 +2308,8 @@ bool wsrep_node_is_donor() {
 }
 
 bool wsrep_node_is_synced() {
-  return (WSREP_ON) ? (local_status.get() == WSREP_MEMBER_SYNCED) : false;
+  /* If node is not running in cluster mode then node is always in sync state */
+  return (WSREP_ON) ? (local_status.get() == WSREP_MEMBER_SYNCED) : true;
 }
 
 const char *wsrep_get_exec_mode(wsrep_exec_mode state) {

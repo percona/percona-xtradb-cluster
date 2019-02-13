@@ -29,6 +29,10 @@
 #include <stddef.h>
 #include <new>
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
+
 #include "my_dbug.h"
 /*
  service_srv_session.h should not be first to be included as it will include
@@ -183,7 +187,15 @@ int srv_session_close(Srv_session *session) {
     1  available
 */
 int srv_session_server_is_available() {
+#ifdef WITH_WSREP
+  if (WSREP_ON) {
+    return (get_server_state() == SERVER_OPERATING && wsrep_node_is_synced());
+  } else {
+    return get_server_state() == SERVER_OPERATING;
+  }
+#else
   return get_server_state() == SERVER_OPERATING;
+#endif /* WITH_WSREP */
 }
 
 /**
