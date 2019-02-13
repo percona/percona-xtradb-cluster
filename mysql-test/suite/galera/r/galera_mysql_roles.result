@@ -1,0 +1,136 @@
+#node-1 (create roles and grant priviliges)
+CREATE ROLE 'pxc_app_developer', 'pxc_app_read', 'pxc_app_write';
+GRANT ALL ON pxc_app_db.* TO 'pxc_app_developer';
+GRANT SELECT ON pxc_app_db.* TO 'pxc_app_read';
+GRANT INSERT, UPDATE, DELETE ON pxc_app_db.* TO 'pxc_app_write';
+select count(*) = 3 from mysql.user where User like 'pxc_app%';
+count(*) = 3
+1
+#node-2 (check roles are replicated to node-2)
+#node-2 (now create users and assign roles to them)
+CREATE USER 'pxc_dev1'@'localhost' IDENTIFIED BY 'dev1pass';
+CREATE USER 'pxc_read_user1'@'localhost' IDENTIFIED BY 'read_user1pass';
+CREATE USER 'pxc_read_user2'@'localhost' IDENTIFIED BY 'read_user2pass';
+CREATE USER 'pxc_rw_user1'@'localhost' IDENTIFIED BY 'rw_user1pass';
+GRANT 'pxc_app_developer' TO 'pxc_dev1'@'localhost';
+GRANT 'pxc_app_read' TO 'pxc_read_user1'@'localhost', 'pxc_read_user2'@'localhost';
+GRANT 'pxc_app_read', 'pxc_app_write' TO 'pxc_rw_user1'@'localhost';
+SHOW GRANTS FOR 'pxc_dev1'@'localhost';
+Grants for pxc_dev1@localhost
+GRANT USAGE ON *.* TO `pxc_dev1`@`localhost`
+GRANT `pxc_app_developer`@`%` TO `pxc_dev1`@`localhost`
+SHOW GRANTS FOR 'pxc_read_user1'@'localhost';
+Grants for pxc_read_user1@localhost
+GRANT USAGE ON *.* TO `pxc_read_user1`@`localhost`
+GRANT `pxc_app_read`@`%` TO `pxc_read_user1`@`localhost`
+SHOW GRANTS FOR 'pxc_read_user2'@'localhost';
+Grants for pxc_read_user2@localhost
+GRANT USAGE ON *.* TO `pxc_read_user2`@`localhost`
+GRANT `pxc_app_read`@`%` TO `pxc_read_user2`@`localhost`
+SHOW GRANTS FOR 'pxc_rw_user1'@'localhost';
+Grants for pxc_rw_user1@localhost
+GRANT USAGE ON *.* TO `pxc_rw_user1`@`localhost`
+GRANT `pxc_app_read`@`%`,`pxc_app_write`@`%` TO `pxc_rw_user1`@`localhost`
+SELECT SLEEP(5);
+SLEEP(5)
+0
+#node-1 (check if user and roles assignment is replicated on node-1)
+SHOW GRANTS FOR 'pxc_dev1'@'localhost';
+Grants for pxc_dev1@localhost
+GRANT USAGE ON *.* TO `pxc_dev1`@`localhost`
+GRANT `pxc_app_developer`@`%` TO `pxc_dev1`@`localhost`
+SHOW GRANTS FOR 'pxc_read_user1'@'localhost';
+Grants for pxc_read_user1@localhost
+GRANT USAGE ON *.* TO `pxc_read_user1`@`localhost`
+GRANT `pxc_app_read`@`%` TO `pxc_read_user1`@`localhost`
+SHOW GRANTS FOR 'pxc_read_user2'@'localhost';
+Grants for pxc_read_user2@localhost
+GRANT USAGE ON *.* TO `pxc_read_user2`@`localhost`
+GRANT `pxc_app_read`@`%` TO `pxc_read_user2`@`localhost`
+SHOW GRANTS FOR 'pxc_rw_user1'@'localhost';
+Grants for pxc_rw_user1@localhost
+GRANT USAGE ON *.* TO `pxc_rw_user1`@`localhost`
+GRANT `pxc_app_read`@`%`,`pxc_app_write`@`%` TO `pxc_rw_user1`@`localhost`
+#node-1 (now active the roles)
+SET DEFAULT ROLE ALL TO
+'pxc_dev1'@'localhost',
+'pxc_read_user1'@'localhost',
+'pxc_read_user2'@'localhost',
+'pxc_rw_user1'@'localhost';
+#node-2 (create test-db)
+CREATE DATABASE pxc_app_db;
+CREATE TABLE pxc_app_db.t (i int, primary key pk(i)) engine=innodb;
+insert into pxc_app_db.t values (1), (2), (3);
+#node-1 (perform some workload from node-1)
+insert into pxc_app_db.t values (100), (200), (300);
+select * from pxc_app_db.t;
+i
+1
+2
+3
+100
+200
+300
+#node-2a (connected as pxc_read_user2 from node-2)
+#node-2a (trying some INSERT from user with read role)
+insert into pxc_app_db.t values (1000), (2000);
+ERROR 42000: INSERT command denied to user 'pxc_read_user2'@'localhost' for table 't'
+select * from pxc_app_db.t;
+i
+1
+2
+3
+100
+200
+300
+#node-1a (connected as pxc_read_user1 from node-1)
+#node-1a (trying some INSERT from user with read role)
+insert into pxc_app_db.t values (1000), (2000);
+ERROR 42000: INSERT command denied to user 'pxc_read_user1'@'localhost' for table 't'
+select * from pxc_app_db.t;
+i
+1
+2
+3
+100
+200
+300
+#node-2b (connected as pxc_rw_user1 from node-2)
+#node-2b (trying some INSERT from user with read-write role)
+insert into pxc_app_db.t values (1000), (2000);
+select * from pxc_app_db.t;
+i
+1
+2
+3
+100
+200
+300
+1000
+2000
+#node-1a (connected as pxc_dev1 from node-1)
+#node-1b (trying some INSERT from user with developer role)
+insert into pxc_app_db.t values (10000), (20000);
+select * from pxc_app_db.t;
+i
+1
+2
+3
+100
+200
+300
+1000
+2000
+10000
+20000
+#node-1 (drop roles)
+DROP DATABASE pxc_app_db;
+DROP USER 'pxc_dev1'@'localhost';
+DROP USER 'pxc_read_user1'@'localhost';
+DROP USER 'pxc_read_user2'@'localhost';
+DROP USER 'pxc_rw_user1'@'localhost';
+DROP ROLE 'pxc_app_developer', 'pxc_app_read', 'pxc_app_write';
+select count(*) = 0 from mysql.user where User like 'pxc_app%';
+count(*) = 0
+1
+#node-2 (drop roles)
