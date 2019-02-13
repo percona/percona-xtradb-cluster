@@ -425,4 +425,12 @@ bool wsrep_prepare_keys_for_isolation(THD *thd, const char *db,
                                       const TABLE_LIST *table_list,
                                       wsrep_key_arr_t *ka);
 void wsrep_keys_free(wsrep_key_arr_t *key_arr);
+
+
+/* In 8.0, channels now have names
+   Reserve the 'wsrep' name for the WSREP replication channels
+*/
+constexpr char WSREP_CHANNEL_NAME[] = "wsrep";
+bool wsrep_is_wsrep_channel_name(const char *channel_name);
+
 #endif /* WSREP_MYSQLD_H */

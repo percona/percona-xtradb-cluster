@@ -2469,3 +2469,8 @@ const char *wsrep_get_wsrep_status(wsrep_status status) {
 
   return "NULL";
 }
+
+bool wsrep_is_wsrep_channel_name(const char *channel_name)
+{
+  return channel_name && !strcasecmp(channel_name, WSREP_CHANNEL_NAME);
+}

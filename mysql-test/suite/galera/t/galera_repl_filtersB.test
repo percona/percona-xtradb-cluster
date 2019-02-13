@@ -636,7 +636,8 @@ INSERT INTO dbx1.t2(id) VALUES(99);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(99);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t2
+--source include/wait_condition.inc
 
 
 #
@@ -1276,7 +1277,8 @@ INSERT INTO dbx1.t1(id) VALUES(99);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t1(id) VALUES(99);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t1
+--source include/wait_condition.inc
 
 
 #
@@ -1722,7 +1724,8 @@ INSERT INTO dbx1.t2(id) VALUES(1);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t2
+--source include/wait_condition.inc
 
 
 #
@@ -2049,7 +2052,8 @@ INSERT INTO dbx1.t2(id) VALUES(1);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t2
+--source include/wait_condition.inc
 
 
 #
@@ -3689,7 +3693,8 @@ INSERT INTO dbx1.t2(id) VALUES(99);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(99);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t2
+--source include/wait_condition.inc
 
 
 #
@@ -4143,7 +4148,8 @@ INSERT INTO dbx1.t2(id) VALUES(99);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(99);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t2
+--source include/wait_condition.inc
 
 
 #
@@ -4443,10 +4449,10 @@ USE db; DELETE FROM db1.t1 WHERE id = 1;
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 since this
-# will not pass the table filters.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
-# SUMMARY: node_2:yes  node_3:no
+# SUMMARY: node_2:yes  node_3:yes
 #
 USE db; INSERT INTO dbx1.t2(id) VALUES(1);
 
@@ -4461,8 +4467,8 @@ USE db; INSERT INTO dbx1.t2(id) VALUES(1);
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Insert not replicated to node_3"
---let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--let $assert_text = "Insert replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
 --source include/assert.inc
 
 #
@@ -4473,7 +4479,9 @@ USE db; INSERT INTO dbx1.t2(id) VALUES(1);
 --echo #
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
+--let $assert_text = "node_2 and node_3 are the same"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
 
 
 #
@@ -4490,10 +4498,10 @@ INSERT INTO dbx1.t2(id) VALUES(1);
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 since this
-# will not pass the table filters.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
-# SUMMARY: node_2:yes  node_3:no
+# SUMMARY: node_2:yes  node_3:yes
 #
 USE db; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 
@@ -4508,8 +4516,8 @@ USE db; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Update not replicated to node_3"
---let $assert_cond = COUNT(*) = 0 FROM dbx1.t2 WHERE f2 = "abcde"
+--let $assert_text = "Update replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2 WHERE f2 = "abcde"
 --source include/assert.inc
 
 
@@ -4527,8 +4535,8 @@ USE db; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 since this
-# will not pass the table filters.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
 # SUMMARY: node_2:yes  node_3:no
 #
@@ -4545,8 +4553,8 @@ USE db; DELETE FROM dbx1.t2 WHERE id = 1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Delete not replicated to node_3"
---let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--let $assert_text = "Delete replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
 --source include/assert.inc
 
 --echo #
@@ -4703,10 +4711,10 @@ USE dbx; DELETE FROM db1.t1 WHERE id = 1;
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 since this
-# will not pass the table filters.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
-# SUMMARY: node_2:yes  node_3:no
+# SUMMARY: node_2:yes  node_3:yes
 #
 USE dbx; INSERT INTO dbx1.t2(id) VALUES(1);
 
@@ -4721,8 +4729,8 @@ USE dbx; INSERT INTO dbx1.t2(id) VALUES(1);
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Insert not replicated to node_3"
---let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--let $assert_text = "Insert replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
 --source include/assert.inc
 
 #
@@ -4733,7 +4741,9 @@ USE dbx; INSERT INTO dbx1.t2(id) VALUES(1);
 --echo #
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
+--let $assert_text = "node_2 and node_3 are the same"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
 
 
 #
@@ -4750,10 +4760,10 @@ INSERT INTO dbx1.t2(id) VALUES(1);
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 since this
-# will not pass the table filters.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
-# SUMMARY: node_2:yes  node_3:no
+# SUMMARY: node_2:yes  node_3:yes
 #
 USE dbx; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 
@@ -4768,8 +4778,8 @@ USE dbx; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Update not replicated to node_3"
---let $assert_cond = COUNT(*) = 0 FROM dbx1.t2 WHERE f2 = "abcde"
+--let $assert_text = "Update replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2 WHERE f2 = "abcde"
 --source include/assert.inc
 
 
@@ -4787,10 +4797,10 @@ USE dbx; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 since this
-# will not pass the table filters.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
-# SUMMARY: node_2:yes  node_3:no
+# SUMMARY: node_2:yes  node_3:yes
 #
 USE dbx; DELETE FROM dbx1.t2 WHERE id = 1;
 
@@ -4805,8 +4815,8 @@ USE dbx; DELETE FROM dbx1.t2 WHERE id = 1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Delete not replicated to node_3"
---let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--let $assert_text = "Delete replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
 --source include/assert.inc
 
 --echo #
