@@ -450,9 +450,9 @@ function run_mysql_upgrade()
         upgrade_tmpdir=$(parse_cnf mysqld tmpdir "")
     fi
     if [[ -z "${upgrade_tmpdir}" ]]; then
-        mysql_upgrade_dir_path=$(mktemp -dt sst_mysql_upgrade.${port}.XXXX)
+        mysql_upgrade_dir_path=$(mktemp -dt upgrd.XXXX)
     else
-        mysql_upgrade_dir_path=$(mktemp -p "${upgrade_tmpdir}" -dt sst_mysql_upgrade.${port}.XXXX)
+        mysql_upgrade_dir_path=$(mktemp -p "${upgrade_tmpdir}" -dt upgrd.XXXX)
     fi
 
     # Set this so that it will be cleaned up on exit
@@ -497,7 +497,7 @@ function run_mysql_upgrade()
     #   --socket
     #   --log-error
     #   --datadir
-    local upgrade_socket="${mysql_upgrade_dir_path}/mysqld.sock"
+    local upgrade_socket="${mysql_upgrade_dir_path}/my.sock"
 
     wsrep_log_debug "Starting the MySQL server used by mysql_upgrade"
     local mysqld_cmdline="--defaults-file=${WSREP_SST_OPT_CONF} ${use_mysql_upgrade_conf_suffix} \
