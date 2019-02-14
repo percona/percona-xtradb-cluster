@@ -1889,7 +1889,18 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     thd->wsrep_gtid_event_buf = NULL;
     wsrep_keys_free(&key_arr);
     wsrep_cleanup_transaction(thd);
+
+    /* DDL statement especially USER admin related that invokes TOI through
+    mysql_grant can hold a MDL lock while invoking TOI.
+    This MDL lock is released as part of successful MDL execution.
+
+    In this flow-path (say node hits isolation and become non-primary),
+    since DDL failed, this lock is not released. This causes
+    setting of thd->wsrep_safe_to_abort to false
+    example: grant select on t to 'user'@'localhost';
     DBUG_ASSERT(thd->wsrep_safe_to_abort == true);
+    thd->wsrep_safe_to_abort is reset back to true on release of these
+    transactional locks. */
     return -1;
   } else {
     /* non replicated DDL, affecting temporary tables only */
