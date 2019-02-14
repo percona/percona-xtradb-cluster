@@ -343,33 +343,57 @@ the following happens:
 Combining schema and data changes in a single statement
 -------------------------------------------------------
 
-|PXC| does not support ``CREATE TABLE ... AS SELECT`` (CTAS) statements,
-because they combine both schema and data changes.
+With strict mode set to ``ENFORCING``, |PXC| does not support :abbr:`CTAS
+(CREATE TABLE ... AS SELECT)` statements, because they combine both schema and
+data changes.
 
-Depending on the strict mode selected,
-the following happens:
+With strict mode set to ``PERMISSIVE`` or ``DISABLED``, |ctas| statements are
+replicated, like any DDL statement, using the :abbr:`TOI (Total Order
+Isolation)` method to ensure consistency. Note that tables in the SELECT clause
+should be present on all replication nodes.
 
-``DISABLED``
+.. note::
+   
+   MyISAM tables are created and loaded even if
+   :variable:`wsrep_replicate_myisam` equals to 1.  |PXC| does not recommend using
+   the |MyISAM| storage engine. The support for |MyISAM| is experimental and may be
+   removed in a future release.
 
- At startup, no validation is performed.
+.. seealso::
 
- At runtime, all operations are permitted.
+   |MySQL| Bug System: XID inconsistency on master-slave with CTAS
+      https://bugs.mysql.com/bug.php?id=93948   
 
-``PERMISSIVE``
+Depending on the strict mode selected, the following happens:
 
- At startup, no validation is perfromed.
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
 
- At runtime, all operations are permitted,
- but a warning is logged when a CTAS operation is performed.
+   * - Mode
+     - Behavior
+   * - DISABLED
+     - At startup, no validation is performed. At runtime, all operations are
+       permitted.
+   * - PERMISSIVE
+     - At startup, no validation is perfromed. At runtime, all operations are
+       permitted, but a warning is logged when a |ctas| operation is performed.
+   * - ENFORCING
+     - At startup, no validation is performed. At runtime, any CTAS operation is
+       denied and an error is logged.
 
-``ENFORCING``
+.. important::
 
- At startup, no validation is performed.
+   Although |ctas| operations for temporary tables are permitted even in
+   ``STRICT`` mode, temporary tables should not be used as *source* tables in
+   |ctas| operations due to the fact that temporary tables are not present on
+   all nodes.
 
- At runtime, any CTAS operation is denied and an error is logged.
+   If ``node-1`` has a temporary and a non-temporary table with the same name,
+   |ctas| on ``node-1`` will use temporary and |ctas| on ``node-2`` will use the
+   non-temporary table resulting in a data level inconsistency.
 
-.. note:: CTAS operations for temporary tables are permitted
-   even in strict mode.
+.. worklog: 1h 2/21/2019
 
 Discarding and Importing Tablespaces
 ------------------------------------
@@ -404,3 +428,6 @@ the following happens:
 .. rubric:: References
 
 .. target-notes::
+
+
+.. |ctas| replace:: :abbr:`CTAS (CREATE TABLE ... AS SELECT)`
