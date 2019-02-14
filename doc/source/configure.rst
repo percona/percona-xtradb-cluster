@@ -38,7 +38,6 @@ on the first node::
  wsrep_node_address=192.168.70.61
 
  wsrep_sst_method=xtrabackup-v2
- wsrep_sst_auth=sstuser:passw0rd
 
  pxc_strict_mode=ENFORCING
 
@@ -59,7 +58,6 @@ on the first node::
  wsrep_node_address=192.168.70.61
 
  wsrep_sst_method=xtrabackup-v2
- wsrep_sst_auth=sstuser:passw0rd
 
  pxc_strict_mode=ENFORCING
 
@@ -123,27 +121,9 @@ Configuration Reference
 
 :variable:`wsrep_sst_method`
 
-  By default, |PXC| uses |PXB|_ for *State Snapshot Transfer* (:term:`SST`).
+  By default, |PXC| uses |PXB|_ for :term:`State Snapshot Transfer <SST>`.
   Setting ``wsrep_sst_method=xtrabackup-v2`` is highly recommended.
   This method requires a user for SST to be set up on the initial node.
-  Provide SST user credentials with the :variable:`wsrep_sst_auth` variable.
-
-:variable:`wsrep_sst_auth`
-
-  Specify authentication credentials for :term:`SST`
-  as ``<sst_user>:<sst_pass>``.
-  You must create this user when :ref:`bootstrap`
-  and provide necessary privileges for it:
-
-  .. code-block:: sql
-
-     mysql> CREATE USER 'sstuser'@'localhost' IDENTIFIED BY 'passw0rd';
-     mysql> GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO
-       'sstuser'@'localhost';
-     mysql> FLUSH PRIVILEGES;
-
-  For more information, see `Privileges for Percona XtraBackup
-  <https://www.percona.com/doc/percona-xtrabackup/2.4/using_xtrabackup/privileges.html>`_.
 
 :variable:`pxc_strict_mode`
 
@@ -180,7 +160,7 @@ Configuration Reference
 Next Steps
 ==========
 
-After you configure all your nodes,
-initialize |PXC| by bootstrapping the first node
-according to the procedure described in :ref:`bootstrap`.
+After you configure all your nodes, initialize |PXC| by bootstrapping
+the first node according to the procedure described in
+:ref:`bootstrap`.
 

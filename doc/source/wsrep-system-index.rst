@@ -841,24 +841,6 @@ For more configuration tips, see `this document
 Defines whether unique key checking is done for applier threads.
 This is disabled by default.
 
-.. variable:: wsrep_sst_auth
-
-   :cli: Yes
-   :conf: Yes
-   :scope: Global
-   :dyn: Yes
-   :format: <username>:<password>
-
-Specifies authentication information for State Snapshot Transfer (SST).
-Required information depends on the method
-specified in the :variable:`wsrep_sst_method` variable.
-
-For more information about SST authentication,
-see :ref:`state_snapshot_transfer`.
-
-.. note:: Value of this variable is masked in the log
-   and in the ``SHOW VARIABLES`` query output.
-
 .. variable:: wsrep_sst_donor
 
    :cli: Yes

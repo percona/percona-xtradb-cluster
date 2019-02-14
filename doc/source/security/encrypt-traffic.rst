@@ -292,12 +292,6 @@ in a running cluster:
 
    For more information, see :ref:`encrypt-client-server`.
 
-#. Also specify the SST user credentials
-   in the :variable:`wsrep_sst_auth` variable on each node::
-
-    [mysqld]
-    wsrep_sst_auth = sst_user:sst_password
-
 #. Restart the cluster with the new configuration.
 
 If you do everything correctly,
