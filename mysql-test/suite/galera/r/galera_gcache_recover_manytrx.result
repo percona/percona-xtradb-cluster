@@ -91,9 +91,18 @@ ERROR HY000: Lost connection to MySQL server during query
 Performing --wsrep-recover ...
 Using --wsrep-start-position when starting mysqld ...
 # restart: --wsrep-start-position=<WSREP_START_POSITION>
+show status like 'wsrep_local_cached_downto';
+Variable_name	Value
+wsrep_local_cached_downto	1
 Performing --wsrep-recover ...
 Using --wsrep-start-position when starting mysqld ...
 # restart: --wsrep-start-position=<WSREP_START_POSITION>
+show status like 'wsrep_local_cached_downto';
+Variable_name	Value
+wsrep_local_cached_downto	1
+show status like 'wsrep_local_cached_downto';
+Variable_name	Value
+wsrep_local_cached_downto	1
 include/diff_servers.inc [servers=1 2]
 DROP TABLE t1;
 DROP TABLE ten;
