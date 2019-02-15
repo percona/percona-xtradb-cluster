@@ -1,0 +1,54 @@
+#
+--source include/galera_cluster.inc
+--source include/force_restart.inc
+
+#-------------------------------------------------------------------------------
+#
+# non-replicating-atomic-ddl: ALTER TABLE <table> DISCARD TABLESPACE
+#
+--connection node_1
+--echo #node-1 (issue a non-replicating ddl)
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1), (2), (3), (4);
+select * from t;
+#
+# non-replicating ddl
+FLUSH TABLE t FOR EXPORT;
+--let $MYSQL_DATA_DIR= `select @@datadir`
+--copy_file $MYSQL_DATA_DIR/test/t.cfg $MYSQL_TMP_DIR/t.cfg
+--copy_file $MYSQL_DATA_DIR/test/t.ibd $MYSQL_TMP_DIR/t.ibd
+UNLOCK TABLES;
+#
+alter table t discard tablespace;
+--error ER_TABLESPACE_DISCARDED
+select * from t;
+#
+call mtr.add_suppression("Cannot delete tablespace.*");
+alter table t discard tablespace;
+
+--connection node_2
+--echo #node-2 (node-2 is not affected by discard operation on node-1)
+#
+--let $wait_condition = SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't';
+--source include/wait_condition.inc
+#
+# discard is not replicated so operation on node-2 should work as expected.
+show create table t;
+select * from t;
+
+--connection node_1
+--echo #node-1 (re-import tablespace on same node and issue drop)
+#
+--move_file $MYSQL_TMP_DIR/t.cfg $MYSQL_DATA_DIR/test/t.cfg
+--move_file $MYSQL_TMP_DIR/t.ibd $MYSQL_DATA_DIR/test/t.ibd
+#
+alter table t import tablespace;
+select * from t;
+drop table t;
+
+--connection node_2
+--echo #node-2 (ensure table is now gone from node-2 too)
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't';
+--source include/wait_condition.inc
+--error ER_NO_SUCH_TABLE
+select * from t;

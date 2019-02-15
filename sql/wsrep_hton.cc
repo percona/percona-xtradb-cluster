@@ -67,6 +67,7 @@ void wsrep_cleanup_transaction(THD *thd) {
   thd->wsrep_void_applier_trx = true;
   thd->wsrep_skip_wsrep_GTID = false;
   thd->wsrep_skip_SE_checkpoint = false;
+  thd->wsrep_non_replicating_atomic_ddl = false;
   return;
 }
 
@@ -732,6 +733,11 @@ enum wsrep_trx_status wsrep_replicate(THD *thd) {
   /* Avoid replication of write-set through MySQL slave thread if
   log_slave_updates is not configured. */
   if (thd->slave_thread && !opt_log_slave_updates) DBUG_RETURN(WSREP_TRX_OK);
+
+  /* wsrep_replicate is not meant to handle non-replicating DDL. */
+  if (thd->wsrep_non_replicating_atomic_ddl) {
+    DBUG_RETURN(WSREP_TRX_OK);
+  }
 
   if (thd->wsrep_exec_mode == REPL_RECV) {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);

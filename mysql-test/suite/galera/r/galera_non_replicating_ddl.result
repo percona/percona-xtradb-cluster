@@ -1,0 +1,44 @@
+#node-1 (issue a non-replicating ddl)
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1), (2), (3), (4);
+select * from t;
+i
+1
+2
+3
+4
+FLUSH TABLE t FOR EXPORT;
+UNLOCK TABLES;
+alter table t discard tablespace;
+select * from t;
+ERROR HY000: Tablespace has been discarded for table 't'
+call mtr.add_suppression("Cannot delete tablespace.*");
+alter table t discard tablespace;
+Warnings:
+Warning	1812	InnoDB: Tablespace is missing for table test/t.
+#node-2 (node-2 is not affected by discard operation on node-1)
+Timeout in wait_condition.inc for SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't';
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+select * from t;
+i
+1
+2
+3
+4
+#node-1 (re-import tablespace on same node and issue drop)
+alter table t import tablespace;
+select * from t;
+i
+1
+2
+3
+4
+drop table t;
+#node-2 (ensure table is now gone from node-2 too)
+select * from t;
+ERROR 42S02: Table 'test.t' doesn't exist

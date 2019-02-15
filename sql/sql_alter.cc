@@ -575,6 +575,11 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
 }
 
 bool Sql_cmd_discard_import_tablespace::execute(THD *thd) {
+
+#ifdef WITH_WSREP
+   thd->wsrep_non_replicating_atomic_ddl = true;
+#endif /* WITH_WSREP */
+
   /* Verify that exactly one of the DISCARD and IMPORT flags are set. */
   DBUG_ASSERT((m_alter_info->flags & Alter_info::ALTER_DISCARD_TABLESPACE) ^
               (m_alter_info->flags & Alter_info::ALTER_IMPORT_TABLESPACE));
