@@ -630,6 +630,7 @@ mkdir debug
            -DPIDFILE_RPM="/var/run/mysql/mysqld.pid" \
            -DLOGFILE_RPM="/var/log/mysql/mysqld.log" \
            -DCMAKE_BUILD_TYPE=Debug \
+           -DMYSQL_MAINTAINER_MODE=0 \
            -DWITH_BOOST=.. \
            -DCMAKE_C_FLAGS="$optflags" \
            -DCMAKE_CXX_FLAGS="$optflags" \

@@ -4495,7 +4495,7 @@ public:
     query_id= new_query_id;
     mysql_mutex_unlock(&LOCK_thd_data);
 #ifdef WITH_WSREP
-    if (WSREP(this) && wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
+    if (WSREP_NNULL(this) && wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
     {
       set_wsrep_next_trx_id(query_id);
       WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
