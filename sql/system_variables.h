@@ -412,6 +412,15 @@ struct System_variables {
     on the cluster's size):
   */
   ulong saved_auto_increment_increment, saved_auto_increment_offset;
+
+  /*
+    Stored value of sql_log_bin while wsrep_on is turned OFF
+  */
+  enum wsrep_binlog_state_t {
+    WSREP_BINLOG_NOTSET = 0,
+    WSREP_BINLOG_ENABLED,
+    WSREP_BINLOG_DISABLED
+  } wsrep_saved_binlog_state;
 #endif /* WITH_WSREP */
 };
 
