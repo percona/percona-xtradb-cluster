@@ -2851,6 +2851,15 @@ class THD : public MDL_context_owner,
   mysql_cond_t COND_wsrep_thd;
 
   /**
+    set to true when ddl is not marked for replication.
+    example: ALTER TABLE <table> DISCARD TABLESPACE
+    DDL being atomic now may undergo replication (call to wsrep_replicate)
+    and wsrep_replicate is not made to handle DDL related failures.
+    PXC-8.0 continue to replicate DDL using TOI
+  */
+  bool wsrep_non_replicating_atomic_ddl;
+
+  /**
     MySQL flow may replace ha_data (from thd) with temporary ha_data
     for execution of attachable transaction. If brute force abort thread
     is trying to acesss victim ha_data while this replacement is taking
