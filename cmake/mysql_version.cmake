@@ -69,7 +69,6 @@ MACRO(GET_MYSQL_VERSION)
     "${MAJOR_VERSION}.${MINOR_VERSION}" CACHE INTERNAL "MySQL Base version")
   SET(MYSQL_NO_DASH_VERSION
     "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
-  STRING(REGEX REPLACE "^-" "." MYSQL_VERSION_EXTRA_DOT "${EXTRA_VERSION}")
 
   # Use NDBVERSION irregardless of whether this is Cluster or not, if not
   # then the regex will be ignored anyway.
