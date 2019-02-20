@@ -4566,17 +4566,15 @@ int mysql_execute_command(THD *thd, bool first_level) {
       }
 
 #ifdef WITH_WSREP
+
+      /* FLUSH LOGS OR FLUSH BINARY LOGS are not replicated.
+      Check git-hash#8aa97efd935a for more details. */
+
+      /* REFRESH_TABLES is taken care inside reload_acl_and_cache */
       if (lex->type &
-          (REFRESH_GRANT | REFRESH_HOSTS |
-           /*
-           Write all flush log statements except
-           FLUSH LOGS
-           FLUSH BINARY LOGS
-           Check reload_acl_and_cache for why.
-           */
-           REFRESH_RELAY_LOG | REFRESH_SLOW_LOG | REFRESH_GENERAL_LOG |
-           REFRESH_ENGINE_LOG | REFRESH_ERROR_LOG | REFRESH_STATUS |
-           REFRESH_USER_RESOURCES |
+          (REFRESH_GRANT | REFRESH_HOSTS | REFRESH_STATUS |
+           REFRESH_USER_RESOURCES | REFRESH_ERROR_LOG | REFRESH_SLOW_LOG |
+           REFRESH_GENERAL_LOG | REFRESH_ENGINE_LOG | REFRESH_RELAY_LOG |
            /* Percona Server specific */
            REFRESH_FLUSH_PAGE_BITMAPS | REFRESH_TABLE_STATS |
            REFRESH_INDEX_STATS | REFRESH_USER_STATS | REFRESH_CLIENT_STATS |
