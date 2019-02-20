@@ -83,7 +83,51 @@ bool wsrep_on_check(sys_var *, THD *thd, set_var *var) {
   return false;
 }
 
-bool wsrep_on_update(sys_var *, THD *, enum_var_type) { return false; }
+bool wsrep_on_update(sys_var *, THD *thd, enum_var_type) {
+  /* Note: toggle sql_log_bin if wsrep_on = off.
+  wsrep_on = off suggest node-local operation. Avoid logging
+  these operations to binlog as they could write events
+  to binlog with MySQL XID that could duplicate with WSREP XID. */
+
+  if (!thd->variables.wsrep_on &&
+      thd->variables.wsrep_saved_binlog_state ==
+          System_variables::wsrep_binlog_state_t::WSREP_BINLOG_NOTSET) {
+    WSREP_WARN(
+        "Toggling wsrep_on to OFF will affect sql_log_bin."
+        " Check manual for more details");
+
+    /* Cache the state of sql_bin_log before toggling it. */
+    if (thd->variables.option_bits & OPTION_BIN_LOG) {
+      thd->variables.wsrep_saved_binlog_state =
+          System_variables::wsrep_binlog_state_t::WSREP_BINLOG_ENABLED;
+    } else {
+      thd->variables.wsrep_saved_binlog_state =
+          System_variables::wsrep_binlog_state_t::WSREP_BINLOG_DISABLED;
+    }
+
+    thd->variables.option_bits &= ~OPTION_BIN_LOG;
+
+  } else if (thd->variables.wsrep_on &&
+             thd->variables.wsrep_saved_binlog_state !=
+                 System_variables::wsrep_binlog_state_t::WSREP_BINLOG_NOTSET) {
+    WSREP_WARN(
+        "Toggling wsrep_on to ON will affect sql_log_bin."
+        " Check manual for more details");
+
+    /* Restore the state of sql_bin_log. */
+    if (thd->variables.wsrep_saved_binlog_state ==
+        System_variables::wsrep_binlog_state_t::WSREP_BINLOG_ENABLED) {
+      thd->variables.option_bits |= OPTION_BIN_LOG;
+    } else if (thd->variables.wsrep_saved_binlog_state ==
+               System_variables::wsrep_binlog_state_t::WSREP_BINLOG_DISABLED) {
+      thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    }
+    thd->variables.wsrep_saved_binlog_state =
+        System_variables::wsrep_binlog_state_t::WSREP_BINLOG_NOTSET;
+  }
+
+  return false;
+}
 
 bool wsrep_causal_reads_update(sys_var *, THD *thd, enum_var_type) {
   if (thd->variables.wsrep_causal_reads) {

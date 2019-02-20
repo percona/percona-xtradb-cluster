@@ -67,7 +67,22 @@ void wsrep_cleanup_transaction(THD *thd) {
   thd->wsrep_void_applier_trx = true;
   thd->wsrep_skip_wsrep_GTID = false;
   thd->wsrep_skip_SE_checkpoint = false;
+
+  if (thd->wsrep_non_replicating_atomic_ddl) {
+    /* Restore the sql_log_bin mode back to original value
+    on completion of the non-replicating atomic DDL statement. */
+    if (thd->variables.wsrep_saved_binlog_state ==
+        System_variables::wsrep_binlog_state_t::WSREP_BINLOG_ENABLED) {
+      thd->variables.option_bits |= OPTION_BIN_LOG;
+    } else {
+      thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    }
+
+    thd->variables.wsrep_saved_binlog_state =
+        System_variables::wsrep_binlog_state_t::WSREP_BINLOG_NOTSET;
+  }
   thd->wsrep_non_replicating_atomic_ddl = false;
+
   return;
 }
 

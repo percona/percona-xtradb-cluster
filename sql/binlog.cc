@@ -9323,6 +9323,38 @@ static int binlog_recover(Binlog_file_reader *binlog_file_reader,
     WSREP_INFO("Before binlog recovery (wsrep position %s:%lld)", uuid_str,
                (long long)seqno);
   }
+
+  /* Pre-notes:
+  Logic below will scan for xid events and will add them to the xid vector/set.
+  Note: begin a set it can hold only unique event.
+
+  Ideally xid should be unique but in case of PXC if there is node-local
+  transaction then it would get logged to binlog with MySQL XID and not with
+  WSREP XID. MySQL has different logic to generate xid and wsrep has different
+  logic. This would endup in a situation where-in 2 different event with be
+  logged to binlog with different GTID (if enabled) but same XID.
+
+  MySQL logic below doesn't expect this situation but till MySQL-5.7 use of HASH
+  ignored unique insert so duplicate XID were getting inserted.
+  Though this also means, if 2 transaction (one with WSREP XID and other with
+  MySQL XID) with same XID (but different GTID) are logged and MySQL recover
+  both of these transactions as part of recovery, then both of them will
+  under-go a commit_by_xid flow ir-respective of which transaction wrote
+  XID event to binlog as xid is common for both of them.
+
+  This effectively boils down to:
+  - Avoid node local changes in PXC.
+  - If there are node-local changes then these changes should not be binlogged.
+  - If there is non-replicating-atomic-ddl then it should not be binlogged too.
+
+  There-by ensuring that there is no MySQL XID transactions.
+
+  This also means 2 important things, node local transaction or non-replicating
+  ddl transaction will not be replicated even through async replication
+  as they are not being binlogged.
+
+  Note: operation to temporary tables (that are session specific) are never
+  binlogged */
 #endif /* WITH_WSREP */
 
   {

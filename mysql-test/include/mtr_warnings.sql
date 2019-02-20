@@ -354,6 +354,8 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: Table without explict primary key \\(not-recommended\\) and certification of nonPK table is OFF too"),
  ("WSREP: Node is not a cluster node. Disabling pxc_strict_mode"),
  ("WSREP: pxc_strict_mode can be changed only if node is cluster-node"),
+ ("WSREP: Toggling wsrep_on to OFF will affect sql_log_bin"),
+ ("WSREP: Toggling wsrep_on to ON will affect sql_log_bin"),
 
 -- this is not from galera but from PS/MySQL but upstream doesn't need it as the
 -- is warning message and warning messages are not printed during mtr.

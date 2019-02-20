@@ -28,7 +28,6 @@ i
 2
 3
 4
-40
 drop table t1;
 #node-2
 # restart:

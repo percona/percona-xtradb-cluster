@@ -576,10 +576,6 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
 
 bool Sql_cmd_discard_import_tablespace::execute(THD *thd) {
 
-#ifdef WITH_WSREP
-   thd->wsrep_non_replicating_atomic_ddl = true;
-#endif /* WITH_WSREP */
-
   /* Verify that exactly one of the DISCARD and IMPORT flags are set. */
   DBUG_ASSERT((m_alter_info->flags & Alter_info::ALTER_DISCARD_TABLESPACE) ^
               (m_alter_info->flags & Alter_info::ALTER_IMPORT_TABLESPACE));
@@ -639,6 +635,26 @@ bool Sql_cmd_discard_import_tablespace::execute(THD *thd) {
   }
 
   if (block) return true;
+
+  /* Setting this to true will avoid processing this statement through
+  wsrep_replicate that is not meant to handle non-replicated atomic DDL. */
+  thd->wsrep_non_replicating_atomic_ddl = true;
+
+  if (WSREP(thd)) {
+    WSREP_WARN(
+        "While running PXC node in cluster mode it will skip"
+        " binlogging of non-replicating DDL statement");
+
+    /* Cache the state of sql_bin_log before toggling it. */
+    if (thd->variables.option_bits & OPTION_BIN_LOG) {
+      thd->variables.wsrep_saved_binlog_state =
+          System_variables::wsrep_binlog_state_t::WSREP_BINLOG_ENABLED;
+    } else {
+      thd->variables.wsrep_saved_binlog_state =
+          System_variables::wsrep_binlog_state_t::WSREP_BINLOG_DISABLED;
+    }
+    thd->variables.option_bits &= ~OPTION_BIN_LOG;
+  }
 #endif /* WITH_WSREP */
 
   if (check_access(thd, ALTER_ACL, table_list->db, &table_list->grant.privilege,
