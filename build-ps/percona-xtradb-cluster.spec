@@ -17,6 +17,9 @@
 ##############################################################################
 # Some common macro definitions
 ##############################################################################
+
+%undefine _missing_build_ids_terminate_build
+
 %define galera_src_dir percona-xtradb-cluster-galera
 %define galera_docs /usr/share/doc/%{galera_src_dir}
 
@@ -30,13 +33,13 @@ Prefix: %{_sysconfdir}
 %define mysql_old_vendor        MySQL AB
 %define mysql_vendor_2          Sun Microsystems, Inc.
 %define mysql_vendor            Oracle and/or its affiliates
-%define percona_server_vendor	Percona, Inc
+%define percona_server_vendor   Percona, Inc
 
 %define mysql_version @@MYSQL_VERSION@@
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define percona_server_version @@PERCONA_VERSION@@
 %define revision @@REVISION@@
-%define distribution  rhel%{redhatversion}
+%define distribution  rhel%{redhatversion}  
 
 #
 %bcond_with tokudb
@@ -56,13 +59,8 @@ Prefix: %{_sysconfdir}
 %{?with_mecab: %global mecab_option -DWITH_MECAB=%{with_mecab}}
 %{?with_mecab: %global mecab 1}
 
-%if 0%{?rhel} < 6
- %define boost_req boost141-devel
- %define gcc_req gcc44-c++
-%else
  %define boost_req boost-devel
  %define gcc_req gcc-c++
-%endif
 
 %if 0%{?rocksdb}
   %global ROCKSDB_FLAGS -DWITH_ROCKSDB=1
@@ -74,8 +72,9 @@ Prefix: %{_sysconfdir}
  %define scons_args %{nil}
 %endif
 
+#Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 3.31
+ %define galera_version 3.33 
 %endif
 
 %if %{undefined galera_revision}
@@ -99,10 +98,10 @@ Prefix: %{_sysconfdir}
 %{!?wsrep_version:%global wsrep_version @@WSREP_VERSION@@}
 #
 %if %{undefined rpm_version}
-%define rpm_version	1
+%define rpm_version     1
 %endif
 
-%define release_tag	%{nil}
+%define release_tag     %{nil}
 %if %{undefined dist}
     %define release         %{release_tag}%{wsrep_version}.%{rpm_version}.%{distribution}
 %else
@@ -134,55 +133,23 @@ Prefix: %{_sysconfdir}
 %define undefined()     %{expand:%%{?%{1}:0}%%{!?%{1}:1}}
 %endif
 
-# ----------------------------------------------------------------------------
-# RPM build tools now automatically detect Perl module dependencies.  This
-# detection causes problems as it is broken in some versions, and it also
-# provides unwanted dependencies from mandatory scripts in our package.
-# It might not be possible to disable this in all versions of RPM, but here we
-# try anyway.  We keep the "AutoReqProv: no" for the "test" sub package, as
-# disabling here might fail, and that package has the most problems.
-# See:
-#  http://fedoraproject.org/wiki/Packaging/Perl#Filtering_Requires:_and_Provides
-#  http://www.wideopen.com/archives/rpm-list/2002-October/msg00343.html
-# ----------------------------------------------------------------------------
 %undefine __perl_provides
 %undefine __perl_requires
 
-##############################################################################
-# Command line handling
-##############################################################################
-#
-# To set options:
-#
-#   $ rpmbuild --define="option <x>" ...
-#
-
-# ----------------------------------------------------------------------------
-# Commercial builds
-# ----------------------------------------------------------------------------
-%if %{undefined commercial}
 %define commercial 0
-%endif
 
 # ----------------------------------------------------------------------------
 # Source name
 # ----------------------------------------------------------------------------
 %if %{undefined src_base}
-%define src_base Percona-XtraDB-Cluster
+  %define src_base Percona-XtraDB-Cluster
 %endif
-# %define src_dir %{src_base}-%{mysql_version}-%{percona_server_version}
 %define src_dir %{src_base}-%{mysql_version}-%{wsrep_version}
 
-# ----------------------------------------------------------------------------
-# Feature set (storage engines, options).  Default to community (everything)
-# ----------------------------------------------------------------------------
 %if %{undefined feature_set}
-%define feature_set community
+  %define feature_set community
 %endif
 
-# ----------------------------------------------------------------------------
-# Server comment strings
-# ----------------------------------------------------------------------------
 %if %{undefined compilation_comment_debug}
     %define compilation_comment_debug       Percona XtraDB Cluster - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
@@ -190,27 +157,7 @@ Prefix: %{_sysconfdir}
     %define compilation_comment_release     Percona XtraDB Cluster (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
 
-
-# ----------------------------------------------------------------------------
-# Product and server suffixes
-# ----------------------------------------------------------------------------
-%define product_suffix -57
-%if %{undefined product_suffix}
-  %if %{defined short_product_tag}
-    %define product_suffix      -%{short_product_tag}
-  %else
-    %define product_suffix      %{nil}
-  %endif
-%endif
-
-%define server_suffix %{product_suffix}
-%if %{undefined server_suffix}
-%define server_suffix   %{nil}
-%endif
-
-# ----------------------------------------------------------------------------
-# Distribution support
-# ----------------------------------------------------------------------------
+%define server_suffix -80
 
 %if 0%{?rhel} > 6
     %define distro_req           chkconfig nmap
@@ -329,7 +276,7 @@ Prefix: %{_sysconfdir}
 %define license_files_server    LICENSE.mysql
 %define license_type            Commercial
 %else
-%define license_files_server    COPYING README
+%define license_files_server    README
 %define license_type            GPL
 %endif
 
@@ -337,7 +284,7 @@ Prefix: %{_sysconfdir}
 # Main spec file section
 ##############################################################################
 
-Name:           Percona-XtraDB-Cluster%{product_suffix}
+Name:           percona-xtradb-cluster
 Summary:        A High Availability solution based on Percona Server and Galera
 Group:          Applications/Databases
 Version:        %{mysql_version}
@@ -350,8 +297,8 @@ URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
 Requires:       %{distro_requires}
-Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
+Requires:             percona-xtradb-cluster-server = %{version}-%{release}
+Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Provides:       mysql-server galera-57 galera-57-debuginfo
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
 BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
@@ -382,38 +329,29 @@ This is a meta-package which installs server, client and galera-3.
 ##############################################################################
 # Sub package definition
 ##############################################################################
-%package -n Percona-XtraDB-Cluster-full%{product_suffix}
+%package -n percona-xtradb-cluster-full
 Summary:        Percona XtraDB Cluster - full package
 Group:          Applications/Databases
-%if "%rhel" == "5"
 Requires:       %{distro_requires}
-Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster-test%{product_suffix} = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster%{product_suffix}-debuginfo = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster-garbd%{product_suffix} = %{version}-%{release}
-%else
-Requires:       %{distro_requires}
-Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster-devel%{product_suffix} = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster-test%{product_suffix} = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster%{product_suffix}-debuginfo = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster-garbd%{product_suffix} = %{version}-%{release}
-%endif
+Requires:             percona-xtradb-cluster-server = %{version}-%{release}
+Requires:             percona-xtradb-cluster-client = %{version}-%{release}
+Requires:             percona-xtradb-cluster-devel = %{version}-%{release}
+Requires:             percona-xtradb-cluster-test = %{version}-%{release}
+Requires:             percona-xtradb-cluster-debuginfo = %{version}-%{release}
+Requires:             percona-xtradb-cluster-garbd = %{version}-%{release}
 
-%description -n Percona-XtraDB-Cluster-full%{product_suffix}
+%description -n percona-xtradb-cluster-full
 This is a meta-package which provides the full suite of Percona XtraDB
 Cluster 56 packages including the debuginfo. Recommended.
 # ----------------------------------------------------------------------------
 
-%package -n Percona-XtraDB-Cluster-server%{product_suffix}
+%package -n percona-xtradb-cluster-server
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
 Requires:       %{distro_requires}
-Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
-Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = %{version}-%{release}
-Requires:	percona-xtrabackup-24 >= 2.4.12 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:             percona-xtradb-cluster-client = %{version}-%{release}
+Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
+Requires:             percona-xtrabackup-24 >= 2.4.12 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -425,9 +363,9 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
-Conflicts:	Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
+Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
 
-%description -n Percona-XtraDB-Cluster-server%{product_suffix}
+%description -n percona-xtradb-cluster-server
 Percona XtraDB Cluster is based on the Percona Server database server and
 provides a High Availability solution.
 Percona XtraDB Cluster provides synchronous replication, supports
@@ -442,32 +380,17 @@ This package includes the Percona XtraDB Cluster binary
 as well as related utilities to run and administer Percona XtraDB Cluster.
 
 If you want to access and work with the database, you have to install
-package "Percona-XtraDB-Cluster-client%{product_suffix}" as well!
-
-%if %{with tokudb}
-# ----------------------------------------------------------------------------
-%package -n Percona-Server-tokudb%{product_suffix}
-Summary:        Percona Server - TokuDB
-Group:          Applications/Databases
-Requires:       Percona-Server-server%{product_suffix} = %{version}-%{release}
-Requires:       Percona-Server-shared%{product_suffix} = %{version}-%{release}
-Requires:       Percona-Server-client%{product_suffix} = %{version}-%{release}
-Requires:       jemalloc >= 3.3.0
-Provides:       tokudb-plugin = %{version}-%{release}
-
-%description -n Percona-Server-tokudb%{product_suffix}
-This package contains the TokuDB plugin for Percona Server %{version}-%{release}
-%endif
+package "percona-xtradb-cluster-client" as well!
 
 # ----------------------------------------------------------------------------
-%package -n Percona-XtraDB-Cluster-client%{product_suffix}
+%package -n percona-xtradb-cluster-client
 Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
 Provides:       mysql-client MySQL-client MySQL Percona-XtraDB-Cluster-client mysql
 Conflicts:      Percona-SQL-client-50 Percona-Server-client-51 Percona-Server-client-55 Percona-XtraDB-Cluster-client-55
 Requires:       perl-DBI
 
-%description -n Percona-XtraDB-Cluster-client%{product_suffix}
+%description -n percona-xtradb-cluster-client
 Percona XtraDB Cluster is based on the Percona Server database server and
 provides a High Availability solution.
 Percona XtraDB Cluster provides synchronous replication, supports
@@ -484,8 +407,8 @@ For a description of Percona XtraDB Cluster see
 http://www.percona.com/software/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
-%package -n Percona-XtraDB-Cluster-test%{product_suffix}
-Requires:       Percona-XtraDB-Cluster-client%{product_suffix} perl
+%package -n percona-xtradb-cluster-test
+Requires:       percona-xtradb-cluster-client perl
 Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
 Provides:       mysql-test
@@ -493,7 +416,7 @@ Requires:       perl(Socket), perl(Time::HiRes), perl(Data::Dumper), perl(Test::
 Conflicts:      Percona-SQL-test-50 Percona-Server-test-51 Percona-Server-test-55 Percona-XtraDB-Cluster-test-55
 AutoReqProv:    no
 
-%description -n Percona-XtraDB-Cluster-test%{product_suffix}
+%description -n percona-xtradb-cluster-test
 Percona XtraDB Cluster is based on the Percona Server database server and
 provides a High Availability solution.
 Percona XtraDB Cluster provides synchronous replication, supports
@@ -510,7 +433,7 @@ For a description of Percona XtraDB Cluster see
 http://www.percona.com/software/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
-%package -n Percona-XtraDB-Cluster-devel%{product_suffix}
+%package -n percona-xtradb-cluster-devel
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
 Provides:       mysql-devel
@@ -520,7 +443,7 @@ Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-deve
 Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-devel-55 Percona-XtraDB-Cluster-devel-55
 %endif
 
-%description -n Percona-XtraDB-Cluster-devel%{product_suffix}
+%description -n percona-xtradb-cluster-devel
 Percona XtraDB Cluster is based on the Percona Server database server and
 provides a High Availability solution.
 Percona XtraDB Cluster provides synchronous replication, supports
@@ -538,7 +461,7 @@ For a description of Percona XtraDB Cluster see
 http://www.percona.com/software/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
-%package -n Percona-XtraDB-Cluster-shared%{product_suffix}
+%package -n percona-xtradb-cluster-shared
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
@@ -548,7 +471,7 @@ Conflicts:      Percona-Server-shared-56
 Obsoletes:      mariadb-libs >= 5.5.37
 %endif
 
-%description -n Percona-XtraDB-Cluster-shared%{product_suffix}
+%description -n percona-xtradb-cluster-shared
 Percona XtraDB Cluster is based on the Percona Server database server and
 provides a High Availability solution.
 Percona XtraDB Cluster provides synchronous replication, supports
@@ -564,7 +487,7 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 
 # ----------------------------------------------------------------------------
 %if 0%{?compatlib}
-%package -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
+%package -n percona-xtradb-cluster-shared-compat
 Summary:        Shared compat libraries for Percona Server %{compatver}--%{percona_compatver} database client applications
 Group:          Applications/Databases
 Provides:       mysql-libs-compat = %{version}-%{release}
@@ -579,21 +502,19 @@ Conflicts:      Percona-XtraDB-Cluster-shared-55
 Conflicts:      Percona-XtraDB-Cluster-shared-56
 %endif
 
-%description -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
+%description -n percona-xtradb-cluster-shared-compat
 This package contains the shared compat libraries for Percona Server %{compatver}-%{percona_compatver} client
 applications.
 %endif
 
 
-%package -n Percona-XtraDB-Cluster-garbd%{product_suffix}
-Summary:	Garbd component of Percona XtraDB Cluster
-Group:		Applications/Databases
+%package -n percona-xtradb-cluster-garbd
+Summary:        Garbd component of Percona XtraDB Cluster
+Group:          Applications/Databases
 Provides:       garbd3 galera-garbd-57 galera-57-debuginfo
 Requires:       %{distro_requires}
 %if 0%{?systemd}
 BuildRequires:  systemd
-%endif
-%if 0%{?systemd}
 Requires(post):   systemd
 Requires(preun):  systemd
 Requires(postun): systemd
@@ -602,10 +523,33 @@ Requires(post):   /sbin/chkconfig
 Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
-Obsoletes:	galera-57-debuginfo galera-garbd-57
+Obsoletes:      galera-57-debuginfo galera-garbd-57
 
-%description -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+%description -n percona-xtradb-cluster-garbd
 This package contains the garb binary and init scripts.
+
+%package  -n   percona-xtradb-cluster-mysql-router
+Summary:       Percona MySQL Router
+Group:         Applications/Databases
+Provides:      percona-xtradb-cluster-mysql-router = %{version}-%{release}
+Obsoletes:     percona-xtradb-cluster-mysql-router < %{version}-%{release}
+Obsoletes:     percona-mysql-router
+Provides:      mysql-router
+
+%description -n percona-xtradb-cluster-mysql-router
+The Percona MySQL Router software delivers a fast, multi-threaded way of
+routing connections from MySQL Clients to MySQL Servers.
+
+%package   -n   percona-xtradb-cluster-mysql-router-devel
+Summary:        Development header files and libraries for Percona MySQL Router
+Group:          Applications/Databases
+Provides:       percona-xtradb-cluster-mysql-router-devel = %{version}-%{release}
+Obsoletes:      mysql-router-devel percona-mysql-router-devel
+
+%description -n percona-xtradb-cluster-mysql-router-devel
+This package contains the development header files and libraries
+necessary to develop Percona MySQL Router applications.
+
 
 ##############################################################################
 %prep
@@ -617,20 +561,6 @@ This package contains the garb binary and init scripts.
 # Optional package files
 touch optional-files-devel
 
-#
-# Set environment in order of preference, MYSQL_BUILD_* first, then variable
-# name, finally a default.  RPM_OPT_FLAGS is assumed to be a part of the
-# default RPM build environment.
-#
-# We set CXX=gcc by default to support so-called 'generic' binaries, where we
-# do not have a dependancy on libgcc/libstdc++.  This only works while we do
-# not require C++ features such as exceptions, and may need to be removed at
-# a later date.
-#
-
-# This is a hack, $RPM_OPT_FLAGS on ia64 hosts contains flags which break
-# the compile in cmd-line-utils/readline - needs investigation, but for now
-# we simply unset it and use those specified directly in cmake.
 %if "%{_arch}" == "ia64"
 RPM_OPT_FLAGS=
 %endif
@@ -639,11 +569,6 @@ RPM_OPT_FLAGS=
 RPM_OPT_FLAGS=
 %else
 RPM_OPT_FLAGS=$(echo ${RPM_OPT_FLAGS} | sed -e 's|-march=i386|-march=i686|g')
-%endif
-#
-# Needed on centos5 to force debug symbols compatibility with older gdb version
-%if "%rhel" == "5"
-RPM_OPT_FLAGS="${RPM_OPT_FLAGS} -gdwarf-2"
 %endif
 #
 export PATH=${MYSQL_BUILD_PATH:-$PATH}
@@ -655,11 +580,6 @@ export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-cmake}}
 export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:-${MAKE_JFLAG:-}}
 
-# "Fix" cmake directories in case we're crosscompiling.
-# We detect crosscompiles to i686 if uname is x86_64 however _libdir does not
-# contain lib64.
-# In this case, we cannot instruct cmake to change CMAKE_SYSTEM_PROCESSOR, so
-# we need to alter the directories in cmake/install_layout.cmake manually.
 if test "x$(uname -m)" = "xx86_64" && echo "%{_libdir}" | fgrep -vq lib64
 then
     sed -i 's/lib64/lib/' "cmake/install_layout.cmake"
@@ -667,16 +587,16 @@ fi
 
 # Download compat libs
 %if 0%{?compatlib}
-%if 0%{?rhel} > 6
-(
-  rm -rf percona-compatlib
-  mkdir percona-compatlib
-  pushd percona-compatlib
-  wget %{compatsrc}
-  rpm2cpio Percona-XtraDB-Cluster-shared-56-%{compatver}-%{percona_compatver}.1.el6.x86_64.rpm | cpio --extract --make-directories --verbose
-  popd
-)
-%endif # 0%{?rhel} > 6
+  %if 0%{?rhel} > 6
+  (
+    rm -rf percona-compatlib
+    mkdir percona-compatlib
+    pushd percona-compatlib
+    wget %{compatsrc}
+    rpm2cpio Percona-XtraDB-Cluster-shared-56-%{compatver}-%{percona_compatver}.1.el6.x86_64.rpm | cpio --extract --make-directories --verbose
+    popd
+  )
+  %endif # 0%{?rhel} > 6
 %endif # 0%{?compatlib}
 
 # Build debug mysqld and libmysqld.a
@@ -728,7 +648,7 @@ mkdir debug
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            %{?mecab_option} \
-	   -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
+           -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make %{?_smp_mflags}
 )
@@ -796,23 +716,15 @@ then
   if [ -f $libgcc ]
   then
     mkdir -p $RBR%{_libdir}/mysql
-#    install -m 644 $libgcc $RBR%{_libdir}/mysql/libmygcc.a
-#    echo "%{_libdir}/mysql/libmygcc.a" >>optional-files-devel
   fi
 fi
 
-# Move temporarily the saved files to the BUILD directory since the BUILDROOT
-# dir will be cleaned at the start of the install phase
 mkdir -p "$(dirname $RPM_BUILD_DIR/%{_libdir})"
 mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 
 pushd percona-xtradb-cluster-galera
-%if 0%{?rhel} < 6
-  export CC=gcc44
-  export CXX=g++44
-%endif
-scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
-scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
+  scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
+  scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
 popd
 
 
@@ -847,6 +759,8 @@ install -d $RBR%{_mandir}
 install -d $RBR%{_sbindir}
 install -d $RBR%{_libdir}/mysql/plugin
 install -d -m 0755 %{buildroot}/var/run/mysqld
+install -d -m 0755 %{buildroot}/var/run/mysqlrouter
+install -d -m 0755 %{buildroot}/var/log/mysqlrouter
 
 
 (
@@ -860,11 +774,6 @@ install -d -m 0755 %{buildroot}/var/run/mysqld
   make DESTDIR=$RBR install
 )
 
-# FIXME: at some point we should stop doing this and just install everything
-# FIXME: directly into %{_libdir}/mysql - perhaps at the same time as renaming
-# FIXME: the shared libraries to use libmysql*-$major.$minor.so syntax
-#mv -v $RBR/%{_libdir}/*.a $RBR/%{_libdir}/mysql/
-
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
 install -d %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d
@@ -874,19 +783,25 @@ install -D -m 0644 $MBD/build-ps/rpm/mysqld_safe.cnf %{buildroot}%{_sysconfdir}/
 install -D -m 0644 $MBD/build-ps/rpm/wsrep.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/wsrep.cnf
 
 %if 0%{?rhel} > 6
-install -D -m 0644 $MBD/build-ps/rpm/percona-xtradb-cluster.cnf %{buildroot}%{_sysconfdir}/my.cnf
+  install -D -m 0644 $MBD/build-ps/rpm/percona-xtradb-cluster.cnf %{buildroot}%{_sysconfdir}/my.cnf
 %endif
 install -d %{buildroot}%{_sysconfdir}/my.cnf.d
 %if 0%{?systemd}
-install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
-install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
-install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
-install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
+  install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
+  install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
+  install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
+  install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
 %else
-install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
-#install -D -m 0755 $MBD/build-ps/rpm/mysql.init %{buildroot}%{_sysconfdir}/init.d/mysql
+  install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 %endif
 
+%if 0%{?systemd}
+install -D -p -m 0644 packaging/rpm-common/mysqlrouter.service %{buildroot}%{_unitdir}/mysqlrouter.service
+install -D -p -m 0644 packaging/rpm-common/mysqlrouter.tmpfiles.d %{buildroot}%{_tmpfilesdir}/mysqlrouter.conf
+%else
+install -D -p -m 0755 packaging/rpm-common/mysqlrouter.init %{buildroot}%{_sysconfdir}/init.d/mysqlrouter
+%endif
+install -D -p -m 0644 packaging/rpm-common/mysqlrouter.conf.in %{buildroot}%{_sysconfdir}/mysqlrouter/mysqlrouter.conf
 
 #
 %{__rm} -f $RBR/%{_prefix}/README
@@ -900,44 +815,24 @@ install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d
 
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir}/mysql > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
-# Delete the symlinks to the libraries from the libdir. These are created by
-# ldconfig(8) afterwards.
-# rm -f $RBR%{_libdir}/libperconaserverclient.so.20*
-
-# Create a symlink "rcmysql", pointing to the init.script. SuSE users
-# will appreciate that, as all services usually offer this.
 %if 0%{?systemd} == 0
 ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 %endif
 
-# Touch the place where the my.cnf config file might be located
-# Just to make sure it's in the file list and marked as a config file
-# touch $RBR%{_sysconfdir}/my.cnf
-
-# Create a wsrep_sst_rsync_wan symlink.
 install -d $RBR%{_bindir}
 ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
-# Install SELinux files in datadir
-# install -m 600 $MBD/support-files/SELinux/mysql.{fc,te} \
-#  $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
-
 %if %{WITH_TCMALLOC}
-# Even though this is a shared library, put it under /usr/lib*/mysql, so it
-# doesn't conflict with possible shared lib by the same name in /usr/lib*.  See
-# `mysql_config --variable=pkglibdir` and mysqld_safe for how this is used.
 install -m 644 "%{malloc_lib_source}" \
   "$RBR%{_libdir}/mysql/%{malloc_lib_target}"
 %endif
 
-# Remove files we explicitly do not want to package, avoids 'unpackaged
-# files' warning.
 rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
 rm -f $RBR%{_bindir}/ps_tokudb_admin
 rm -f $RBR%{_bindir}/ps-admin
 
 %if 0%{?systemd}
-rm -rf $RBR%{_sysconfdir}/init.d/mysql
+  rm -rf $RBR%{_sysconfdir}/init.d/mysql
 %endif
 
 
@@ -949,12 +844,12 @@ install -d "$RBR/%{_libdir}"
 install -d "$RBR/%{_sharedstatedir}/galera"
 
 %if 0%{?systemd}
-install -D -m 644 $MBD/%{galera_src_dir}/garb/files/garb.service \
+  install -D -m 644 $MBD/%{galera_src_dir}/garb/files/garb.service \
     $RBR/%{_unitdir}/garb.service
-install -m 755 $MBD/%{galera_src_dir}/garb/files/garb-systemd \
+  install -m 755 $MBD/%{galera_src_dir}/garb/files/garb-systemd \
     $RBR/%{_bindir}/garb-systemd
 %else
-install -m 755 $MBD/%{galera_src_dir}/garb/files/garb.sh \
+  install -m 755 $MBD/%{galera_src_dir}/garb/files/garb.sh \
     $RBR%{_sysconfdir}/init.d/garb
 %endif
 
@@ -992,18 +887,16 @@ install -d $RBR%{_libdir}/mysql
 %if 0%{?mecab}
     cp -r $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 %endif
+# remove some unwanted router files
+rm -rf %{buildroot}/%{_libdir}/libmysqlharness.{a,so}
+rm -rf %{buildroot}/%{_libdir}/libmysqlrouter.so
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
 ##############################################################################
 
-%pre -n Percona-XtraDB-Cluster-server%{product_suffix}
+%pre -n percona-xtradb-cluster-server
 
-
-# ATTENTION: Parts of this are duplicated in the "triggerpostun" !
-
-# There are users who deviate from the default file system layout.
-# Check local settings to support them.
 if [ -x %{_bindir}/my_print_defaults ]
 then
   mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1`
@@ -1017,9 +910,6 @@ if [ -z "$PID_FILE_PATT" ]
 then
   PID_FILE_PATT="$mysql_datadir/*.pid"
 fi
-
-# Check if we can safely upgrade.  An upgrade is only safe if it's from one
-# of our RPMs in the same version family.
 
 installed=`rpm -qf $(which mysqld 2>/dev/null) 2> /dev/null`
 version=`rpm -q --queryformat='%{VERSION}' "$installed" 2>&1`
@@ -1103,10 +993,10 @@ fi
 # it contains the valid PID of a running MySQL server.
 NR_PID_FILES=`ls -1 $PID_FILE_PATT 2>/dev/null | wc -l`
 case $NR_PID_FILES in
-	0 ) SERVER_TO_START=''  ;;  # No "*.pid" file == no running server
-	1 ) SERVER_TO_START='true' ;;
-	* ) SERVER_TO_START=''      # Situation not clear
-	    SEVERAL_PID_FILES=true ;;
+        0 ) SERVER_TO_START=''  ;;  # No "*.pid" file == no running server
+        1 ) SERVER_TO_START='true' ;;
+        * ) SERVER_TO_START=''      # Situation not clear
+            SEVERAL_PID_FILES=true ;;
 esac
 # That logic may be debated: We might check whether it is non-empty,
 # contains exactly one number (possibly a PID), and whether "ps" finds it.
@@ -1128,10 +1018,10 @@ if [ -d $mysql_datadir ] ; then
         ps -fp `cat $PID_FILE_PATT`                >> $STATUS_FILE
         echo                                       >> $STATUS_FILE
         echo "SERVER_TO_START=$SERVER_TO_START"    >> $STATUS_FILE
-	echo "UPDATE_REQUIRES=$UPDATE_REQUIRES"    >> $STATUS_FILE
+        echo "UPDATE_REQUIRES=$UPDATE_REQUIRES"    >> $STATUS_FILE
     else
         # Take a note we checked it ...
-	echo "UPDATE_REQUIRES=$UPDATE_REQUIRES"    >> $STATUS_FILE
+        echo "UPDATE_REQUIRES=$UPDATE_REQUIRES"    >> $STATUS_FILE
         echo "PID file:"                           >> $STATUS_FILE
         ls -l   $PID_FILE_PATT                     >> $STATUS_FILE 2>&1
     fi
@@ -1158,7 +1048,7 @@ useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
 usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
 
 
-%post -n Percona-XtraDB-Cluster-server%{product_suffix}
+%post -n percona-xtradb-cluster-server
 
 if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
@@ -1235,23 +1125,7 @@ else
           fi
   fi
 fi
-#%if 0%{?rhel} < 7
-#if [ $1 -eq 1 ]; then
-#  cnflog=$(/usr/bin/my_print_defaults mysqld|grep -c log-error)
-#  if [ $cnflog = 0 -a -f /etc/my.cnf ]; then
-#    sed -i "/^\[mysqld\]$/a log-error=/var/log/mysqld.log" /etc/my.cnf
-#  fi
-#  cnfpid=$(/usr/bin/my_print_defaults mysqld|grep -c pid-file)
-#  if [ $cnfpid = 0 -a -f /etc/my.cnf ]; then
-#    sed -i "/^\[mysqld\]$/a pid-file=/var/run/mysqld/mysqld.pid" /etc/my.cnf
-#  fi
-#fi
-#%endif
 
-# ATTENTION: Parts of this are duplicated in the "triggerpostun" !
-
-# There are users who deviate from the default file system layout.
-# Check local settings to support them.
 if [ -x %{_bindir}/my_print_defaults ]
 then
   mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1`
@@ -1392,16 +1266,7 @@ echo "See  http://www.percona.com/doc/percona-server/5.7/management/udf_percona_
 #scheduled service packs and more.  Visit www.mysql.com/enterprise for more
 #information."
 
-%preun -n Percona-XtraDB-Cluster-server%{product_suffix}
-
-# Which '$1' does this refer to?  Fedora docs have info:
-# " ... a count of the number of versions of the package that are installed.
-#   Action                           Count
-#   Install the first time           1
-#   Upgrade                          2 or higher (depending on the number of versions installed)
-#   Remove last version of package   0 "
-#
-#  http://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/RPM_Guide/ch09s04s05.html
+%preun -n percona-xtradb-cluster-server
 
 if [ $1 = 0 ] ; then
 %if 0%{?systemd}
@@ -1415,11 +1280,8 @@ if [ $1 = 0 ] ; then
         # Stop MySQL before uninstalling it
         if [ -x %{_sysconfdir}/init.d/mysql ] ; then
                 %{_sysconfdir}/init.d/mysql stop > /dev/null
-                # Remove autostart of MySQL
-                # use chkconfig on Enterprise Linux and newer SuSE releases
                 if [ -x /sbin/chkconfig ] ; then
                         /sbin/chkconfig --del mysql
-                # For older SuSE Linux versions
                 elif [ -x /sbin/insserv ] ; then
                         /sbin/insserv -r %{_sysconfdir}/init.d/mysql
                 fi
@@ -1427,10 +1289,7 @@ if [ $1 = 0 ] ; then
 %endif
 fi
 
-# We do not remove the mysql user since it may still own a lot of
-# database files.
-
-%triggerpostun -n Percona-XtraDB-Cluster-server%{product_suffix} --MySQL-server-community
+%triggerpostun -n percona-xtradb-cluster-server --MySQL-server-community
 
 # Setup: We renamed this package, so any existing "server-community"
 #   package will be removed when this "server" is installed.
@@ -1459,7 +1318,7 @@ NEW_VERSION=%{mysql_version}-%{release}
 
 %if 0%{?systemd}
 if [ -x %{_bindir}/systemctl ] ; then
-	%{_bindir}/systemctl enable mysql >/dev/null 2>&1
+        %{_bindir}/systemctl enable mysql >/dev/null 2>&1
 fi
 %else
 if [ -x /sbin/chkconfig ] ; then
@@ -1474,17 +1333,17 @@ fi
 if [ "$SERVER_TO_START" = "true" ] ; then
 # Restart in the same way that mysqld will be started normally.
 %if 0%{?systemd}
-	if [ -x %{_bindir}/systemctl ] ; then
-               	%{_bindir}/systemctl start mysql
+        if [ -x %{_bindir}/systemctl ] ; then
+                %{_bindir}/systemctl start mysql
                 echo "Giving mysqld 5 seconds to start"
                 sleep 5
         fi
 %else
-	if [ -x %{_sysconfdir}/init.d/mysql ] ; then
-		%{_sysconfdir}/init.d/mysql start
-		echo "Giving mysqld 5 seconds to start"
-		sleep 5
-	fi
+        if [ -x %{_sysconfdir}/init.d/mysql ] ; then
+                %{_sysconfdir}/init.d/mysql start
+                echo "Giving mysqld 5 seconds to start"
+                sleep 5
+        fi
 %endif
 fi
 
@@ -1492,31 +1351,39 @@ echo "Trigger 'postun --community' finished at `date`"        >> $STATUS_HISTORY
 echo                                             >> $STATUS_HISTORY
 echo "====="                                     >> $STATUS_HISTORY
 
-%if %{with tokudb}
-# ----------------------------------------------------------------------------
-%post -n Percona-Server-tokudb%{product_suffix}
 
-if [ $1 -eq 1 ] ; then
-	echo ""
-	echo "* This release of Percona Server is distributed with TokuDB storage engine."
-	echo "* Run the following commands to enable the TokuDB storage engine in Percona Server:"
-	echo ""
-	echo "mysql -e \"INSTALL PLUGIN tokudb SONAME 'ha_tokudb.so';\""
-	echo "mysql -e \"INSTALL PLUGIN tokudb_file_map SONAME 'ha_tokudb.so';\""
-	echo "mysql -e \"INSTALL PLUGIN tokudb_fractal_tree_info SONAME 'ha_tokudb.so';\""
-	echo "mysql -e \"INSTALL PLUGIN tokudb_fractal_tree_block_map SONAME 'ha_tokudb.so';\""
-	echo "mysql -e \"INSTALL PLUGIN tokudb_trx SONAME 'ha_tokudb.so';\""
-	echo "mysql -e \"INSTALL PLUGIN tokudb_locks SONAME 'ha_tokudb.so';\""
-	echo "mysql -e \"INSTALL PLUGIN tokudb_lock_waits SONAME 'ha_tokudb.so';\""
-	echo ""
-	echo "* See http://www.percona.com/doc/percona-server/5.7/tokudb/tokudb_intro.html for more details"
-	echo ""
+%pre -n percona-xtradb-cluster-mysql-router
+/usr/sbin/groupadd -r mysqlrouter >/dev/null 2>&1 || :
+/usr/sbin/useradd -M -N -g mysqlrouter -r -d /var/lib/mysqlrouter -s /bin/false \
+    -c "Percona MySQL Router" mysqlrouter >/dev/null 2>&1 || :
+
+%post -n percona-xtradb-cluster-mysql-router
+/sbin/ldconfig
+%if 0%{?systemd}
+%systemd_post mysqlrouter.service
+%else
+/sbin/chkconfig --add mysqlrouter
+%endif # systemd
+
+%preun -n percona-xtradb-cluster-mysql-router
+%if 0%{?systemd}
+%systemd_preun mysqlrouter.service
+%else
+if [ "$1" = 0 ]; then
+    /sbin/service mysqlrouter stop >/dev/null 2>&1 || :
+    /sbin/chkconfig --del mysqlrouter
 fi
-%endif
-# ----------------------------------------------------------------------------
+%endif # systemd
 
-
-
+%postun -n percona-xtradb-cluster-mysql-router
+/sbin/ldconfig
+%if 0%{?systemd}
+%systemd_postun_with_restart mysqlrouter.service
+%else
+if [ $1 -ge 1 ]; then
+    /sbin/service mysqlrouter condrestart >/dev/null 2>&1 || :
+fi
+%endif # systemd
 # ----------------------------------------------------------------------
 # Clean up the BuildRoot after build is done
 # ----------------------------------------------------------------------
@@ -1532,9 +1399,9 @@ fi
 %files
 
 # Empty section for metapackage
-%files -n Percona-XtraDB-Cluster-full%{product_suffix}
+%files -n percona-xtradb-cluster-full
 
-%files -n Percona-XtraDB-Cluster-server%{product_suffix}
+%files -n percona-xtradb-cluster-server
 %defattr(-,root,root,0755)
 
 %if %{defined license_files_server}
@@ -1547,6 +1414,7 @@ fi
 
 #%doc %attr(644, root, root) %{_infodir}/mysql.info*
 %doc %attr(644, root, man) %{_mandir}/man1/innochecksum.1*
+%doc %attr(644, root, root) %{_mandir}/man1/ibd2sdi.1*
 %doc %attr(644, root, man) %{_mandir}/man1/my_print_defaults.1*
 %doc %attr(644, root, man) %{_mandir}/man1/myisam_ftdump.1*
 %doc %attr(644, root, man) %{_mandir}/man1/myisamchk.1*
@@ -1555,17 +1423,14 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysqld_multi.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqld_safe.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqldumpslow.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_install_db.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_secure_installation.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_upgrade.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlman.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.server.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_tzinfo_to_sql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/perror.1*
-%doc %attr(644, root, man) %{_mandir}/man1/replace.1*
 %doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
 %doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_plugin.1*
 %doc %attr(644, root, man) %{_mandir}/man8/mysqld.8*
 %doc %attr(644, root, man) %{_mandir}/man1/lz4_decompress.1*
 %doc %attr(644, root, man) %{_mandir}/man1/zlib_decompress.1*
@@ -1575,33 +1440,29 @@ fi
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
 %attr(755, root, root) %{_bindir}/innochecksum
+%attr(755, root, root) %{_bindir}/ibd2sdi
 %attr(755, root, root) %{_bindir}/my_print_defaults
 %attr(755, root, root) %{_bindir}/myisam_ftdump
 %attr(755, root, root) %{_bindir}/myisamchk
 %attr(755, root, root) %{_bindir}/myisamlog
 %attr(755, root, root) %{_bindir}/myisampack
-%attr(755, root, root) %{_bindir}/mysql_install_db
 %attr(755, root, root) %{_bindir}/mysql_secure_installation
 %attr(755, root, root) %{_bindir}/mysql_tzinfo_to_sql
 %attr(755, root, root) %{_bindir}/mysql_upgrade
-%attr(755, root, root) %{_bindir}/mysql_plugin
 %attr(755, root, root) %{_bindir}/mysqld_safe
 %attr(755, root, root) %{_bindir}/mysqld_multi
 %attr(755, root, root) %{_bindir}/mysqldumpslow
 %attr(755, root, root) %{_bindir}/mysqltest
 %attr(755, root, root) %{_bindir}/perror
-%attr(755, root, root) %{_bindir}/replace
 %attr(755, root, root) %{_bindir}/resolve_stack_dump
 %attr(755, root, root) %{_bindir}/resolveip
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
-%attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
 %attr(755, root, root) %{_bindir}/wsrep_sst_rsync
 %attr(755, root, root) %{_bindir}/ps_mysqld_helper
 # Explicit %attr() mode not applicaple to symlink
 %{_bindir}/wsrep_sst_rsync_wan
 %attr(755, root, root) %{_bindir}/lz4_decompress
-%attr(755, root, root) %{_bindir}/zlib_decompress
 %attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
 
 %attr(755, root, root) %{_sbindir}/mysqld
@@ -1616,8 +1477,6 @@ fi
 %if 0%{?mecab}
 %{_libdir}/mysql/mecab
 %{_libdir}/mecab
-%attr(755, root, root) %{_libdir}/mysql/plugin/libpluginmecab.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/libpluginmecab.so
 %endif
 
 %if "%rhel" == "5"
@@ -1633,7 +1492,6 @@ fi
 %endif
 
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
-%attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
 %dir %attr(751, mysql, mysql) /var/lib/mysql
 %dir %attr(750, mysql, mysql) /var/lib/mysql-files
 %dir %attr(750, mysql, mysql) /var/lib/mysql-keyring
@@ -1648,8 +1506,8 @@ fi
 %endif
 %attr(0755,nobody,nobody) %dir %{_sharedstatedir}/galera
 # This is a symlink
-%attr(0755,root,root) %{_libdir}/libgalera_smm.so
-%attr(0755,root,root) %{_libdir}/galera3/libgalera_smm.so
+%{_libdir}/libgalera_smm.so
+%{_libdir}/galera3/libgalera_smm.so
 %attr(0755,root,root) %dir %{galera_docs}
 %doc %attr(0644,root,root) %{galera_docs}/COPYING
 %doc %attr(0644,root,root) %{galera_docs}/README
@@ -1669,7 +1527,7 @@ fi
 
 
 # ----------------------------------------------------------------------------
-%files -n Percona-XtraDB-Cluster-client%{product_suffix}
+%files -n percona-xtradb-cluster-client
 
 %defattr(-, root, root, 0755)
 %attr(755, root, root) %{_bindir}/mysql
@@ -1696,7 +1554,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlpump.1*
 
 # ----------------------------------------------------------------------------
-%files -n Percona-XtraDB-Cluster-devel%{product_suffix} -f optional-files-devel
+%files -n percona-xtradb-cluster-devel -f optional-files-devel
 %defattr(-, root, root, 0755)
 %doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config.1*
@@ -1712,7 +1570,7 @@ fi
 # %{_libdir}/*.so
 
 # ----------------------------------------------------------------------------
-%files -n Percona-XtraDB-Cluster-shared%{product_suffix}
+%files -n percona-xtradb-cluster-shared
 %defattr(-, root, root, 0755)
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
@@ -1723,7 +1581,7 @@ fi
 #%endif
 
 # ----------------------------------------------------------------------------
-%files -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+%files -n percona-xtradb-cluster-garbd
 %defattr(-,root,root,-)
 %config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
 %attr(0755,nobody,nobody) %dir %{_sharedstatedir}/galera
@@ -1738,23 +1596,23 @@ fi
 %doc %attr(0644,root,root) %{galera_docs2}/README
 %doc %attr(644, root, man) %{_mandir}/man8/garbd.8*
 
-%post -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+%post -n percona-xtradb-cluster-garbd
 %if 0%{?systemd}
   %systemd_post garb
 %endif
 
-%preun -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+%preun -n percona-xtradb-cluster-garbd
 %if 0%{?systemd}
     %systemd_preun garb
 %endif
 
-%postun -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+%postun -n percona-xtradb-cluster-garbd
 %if 0%{?systemd}
     %systemd_postun_with_restart garb
 %endif
 # ----------------------------------------------------------------------------
 %if 0%{?compatlib}
-%files -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
+%files -n percona-xtradb-cluster-shared-compat
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
 %dir %attr(755, root, root) %{_libdir}/mysql
@@ -1763,7 +1621,7 @@ fi
 %{_libdir}/mysql/libmysqlclient_r.so.%{compatlib}.*
 %endif
 
-%post -n Percona-XtraDB-Cluster-shared%{product_suffix}
+%post -n percona-xtradb-cluster-shared
 # Added for compatibility
 #for lib in libperconaserverclient{.so.20,_r.so.20}; do
 #    if [ ! -f %{_libdir}/$lib ]; then
@@ -1772,11 +1630,11 @@ fi
 #done
 /sbin/ldconfig
 
-%postun -n Percona-XtraDB-Cluster-shared%{product_suffix}
+%postun -n percona-xtradb-cluster-shared
 /sbin/ldconfig
 
 %if 0%{?compatlib}
-%post -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
+%post -n percona-xtradb-cluster-shared-compat
 for lib in libmysqlclient{.so.18.0.0,.so.18,_r.so.18.0.0,_r.so.18}; do
 if [ ! -f %{_libdir}/mysql/${lib} ]; then
   ln -s libmysqlclient.so.18.1.0 %{_libdir}/mysql/${lib};
@@ -1784,7 +1642,7 @@ fi
 done
 /sbin/ldconfig
 
-%postun -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
+%postun -n percona-xtradb-cluster-shared-compat
 for lib in libmysqlclient{.so.18.0.0,.so.18,_r.so.18.0.0,_r.so.18}; do
 if [ -h %{_libdir}/mysql/${lib} ]; then
   rm -f %{_libdir}/mysql/${lib};
@@ -1793,7 +1651,7 @@ done
 /sbin/ldconfig
 %endif
 
-%postun -n Percona-XtraDB-Cluster-server%{product_suffix}
+%postun -n percona-xtradb-cluster-server
 
 %if 0%{?systemd}
 if [ $1 -eq 0 ];then
@@ -1839,13 +1697,35 @@ fi
 %endif
 
 # ----------------------------------------------------------------------------
-%files -n Percona-XtraDB-Cluster-test%{product_suffix}
+%files -n percona-xtradb-cluster-test
 %defattr(-, root, root, 0755)
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
 %attr(755, root, root) %{_bindir}/mysqlxtest
 #%attr(755, root, root) %{_bindir}/mysql_client_test_embedded
 #%attr(755, root, root) %{_bindir}/mysqltest_embedded
+
+
+%files -n percona-xtradb-cluster-mysql-router
+%defattr(-, root, root, -)
+%doc $RPM_BUILD_DIR/%{src_dir}/router/README.router  $RPM_BUILD_DIR/%{src_dir}/router/LICENSE.router
+%dir %{_sysconfdir}/mysqlrouter
+%config(noreplace) %{_sysconfdir}/mysqlrouter/mysqlrouter.conf
+%{_bindir}/mysqlrouter
+%{_bindir}/mysqlrouter_plugin_info
+%if 0%{?systemd}
+%{_unitdir}/mysqlrouter.service
+%{_tmpfilesdir}/mysqlrouter.conf
+%else
+%{_sysconfdir}/init.d/mysqlrouter
+%endif
+%{_libdir}/libmysqlharness.so.*
+%{_libdir}/libmysqlrouter.so.*
+%dir %{_libdir}/mysqlrouter
+%{_libdir}/mysqlrouter/*.so
+%dir %attr(755, mysqlrouter, mysqlrouter) /var/log/mysqlrouter
+%dir %attr(755, mysqlrouter, mysqlrouter) /var/run/mysqlrouter
+
 
 ##############################################################################
 # The spec file changelog only includes changes made to the spec file
@@ -2633,4 +2513,3 @@ fi
 - A developers changelog for MySQL is available in the source RPM. And
   there is a history of major user visible changed in the Reference
   Manual.  Only RPM specific changes will be documented here.
-

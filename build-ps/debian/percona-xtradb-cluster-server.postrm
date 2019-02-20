@@ -60,7 +60,6 @@ case "$1" in
 	set -e
 
 	place_upstart_job_back
-	update-alternatives --remove my.cnf "/etc/mysql/mysql.cnf"
 
 	set +e
 
@@ -80,9 +79,9 @@ case "$1" in
 
 	server_stop
 
-	db_input high percona-server-server/remove-data-dir || true
+	db_input high percona-xtradb-cluster-server/remove-data-dir || true
 	db_go
-	db_get percona-server-server/remove-data-dir && RMDATADIR=${RET}
+	db_get percona-xtradb-cluster-server/remove-data-dir && RMDATADIR=${RET}
 	if [ "${RMDATADIR}" = "true" ];
 	then
 		if [ -d ${MYSQLRUN} ] || [ -L ${MYSQLRUN} ];
