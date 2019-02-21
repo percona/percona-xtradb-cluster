@@ -1045,6 +1045,55 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.session', 'localhost', 'SY
 
 FLUSH PRIVILEGES;
 
+#
+# SQL commands to create the PXC SST root and role that is used by the SST process
+#
+# mysql.pxc.sst.root
+#   See the comments in mysql_system_tables.sql
+#
+# These are the values for
+#  GRANT CREATE USER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+#  GRANT SUPER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+#  GRANT RELOAD ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+#
+#INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.root','N','N','N','N','N','N','Y','N','N','N','Y','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','Y','N','N','N','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,  NULL,'Y','N','N',NULL,NULL,NULL);
+
+# These are the values for
+#  GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+#  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+#
+INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.root','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,  NULL,'Y','Y','Y',NULL,NULL,NULL);
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'BACKUP_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'BINLOG_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'CONNECTION_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'ENCRYPTION_KEY_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'GROUP_REPLICATION_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'PERSIST_RO_VARIABLES_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'REPLICATION_SLAVE_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'RESOURCE_GROUP_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'RESOURCE_GROUP_USER', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'ROLE_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'SET_USER_ID', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'SYSTEM_VARIABLES_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'XA_RECOVER_ADMIN', 'Y');
+
+#
+# mysql.pxc.sst.role
+#   See the comments in mysql_system_tables.sql
+
+# These are the values for
+#  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.role'@localhost;
+#  GRANT CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
+#  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
+#  GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
+INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','N','Y','N','N','N','N','N','N','Y','N','Y','N','N','Y','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','N','N',NULL,NULL,NULL);
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'N');
+INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Select,Insert,Create', '');
+INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
+INSERT IGNORE INTO mysql.db VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
+
+FLUSH PRIVILEGES;
+
 # Move all system tables with InnoDB storage engine to mysql tablespace.
 # Move privilege tables to InnoDB only if they were not in NDB.
 SET @cmd="ALTER TABLE mysql.db TABLESPACE = mysql";

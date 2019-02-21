@@ -2,11 +2,7 @@
 
 [mysqld]
 wsrep_sst_method=xtrabackup-v2
-wsrep_sst_auth="root:"
 pxc-encrypt-cluster-traffic=ON
-
-[xtrabackup]
-xtrabackup-plugin-dir=@ENV.XB_PLUGIN_DIR
 
 [sst]
 ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem

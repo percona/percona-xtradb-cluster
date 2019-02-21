@@ -73,10 +73,6 @@ extern void wsrep_sst_method_init INIT_ARGS;
 extern bool wsrep_sst_receive_address_check CHECK_ARGS;
 extern bool wsrep_sst_receive_address_update UPDATE_ARGS;
 
-extern bool wsrep_sst_auth_check CHECK_ARGS;
-extern bool wsrep_sst_auth_update UPDATE_ARGS;
-extern void wsrep_sst_auth_init INIT_ARGS;
-
 extern bool wsrep_sst_donor_check CHECK_ARGS;
 extern bool wsrep_sst_donor_update UPDATE_ARGS;
 

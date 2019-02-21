@@ -23,7 +23,8 @@ BEGIN
 	DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
 
 	WHILE 1 DO
-	        INSERT INTO t1 VALUES (DEFAULT);
+	    INSERT INTO t1 VALUES (DEFAULT);
+	    DO SLEEP(0.1);
 		COMMIT;
 	END WHILE;
 END|
@@ -97,6 +98,7 @@ INSERT INTO t1 VALUES (DEFAULT);
 --enable_query_log
 
 CALL mtr.add_suppression("WSREP: Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("WSREP: Failed to remove page file");
 
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';

@@ -43,3 +43,40 @@ CREATE USER 'mysql.infoschema'@localhost IDENTIFIED WITH caching_sha2_password
  ACCOUNT LOCK;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.infoschema'@localhost;
 GRANT SELECT ON *.* TO 'mysql.infoschema'@localhost;
+
+-- Create the PXC SST root
+-- This user is used by the SST process to create the SST user and
+-- run other commands needed before/after the SST.
+-- If the privileges are changed, the mysql_system_tables_fix.sql script
+-- will also need to be modified to match.
+--
+-- This user is disabled for login
+-- This user has the following privileges:
+--   CREATE USER (to assign roles, add/delete users)
+--   RELOAD (flush privileges)
+--   SUPER (if node is read-only we can still run)
+CREATE USER 'mysql.pxc.sst.root'@localhost IDENTIFIED WITH caching_sha2_password
+ AS '$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED'
+ ACCOUNT LOCK;
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.root'@localhost;
+-- Due to bugs with roles, we need to grant superuser access here
+GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+--GRANT CREATE USER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+--GRANT SUPER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+--GRANT RELOAD ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+
+-- Create the PXC SST role
+-- This role is used during PXC SST (on the donor)
+-- These are the permissions needed to backup the database (using Percona XtraBackup)
+-- See https://www.percona.com/doc/percona-xtrabackup/8.0/using_xtrabackup/privileges.html
+CREATE ROLE 'mysql.pxc.sst.role'@localhost;
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
+GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.*
+ TO 'mysql.pxc.sst.role'@localhost;
+GRANT CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history
+ TO 'mysql.pxc.sst.role'@localhost;
+-- For some reason this is also needed, although the docs say BACKUP_ADMIN is enough
+GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
+-- Need this to create the PERCONA_SCHEMA database if needed
+GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;

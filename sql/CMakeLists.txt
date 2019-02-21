@@ -569,6 +569,7 @@ IF(WITH_WSREP)
    wsrep_binlog.cc
    wsrep_applier.cc
    wsrep_thd.cc
+   wsrep_service.cc
  )
  SET(WSREP_LIB wsrep)
 ENDIF()

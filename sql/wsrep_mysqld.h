@@ -125,6 +125,7 @@ extern bool wsrep_slave_FK_checks;
 extern bool wsrep_slave_UK_checks;
 extern std::atomic<ulong> wsrep_running_threads;
 extern ulong wsrep_RSU_commit_timeout;
+extern bool wsrep_allow_server_session;
 
 enum enum_wsrep_reject_types {
   WSREP_REJECT_NONE,    /* nothing rejected */
@@ -425,4 +426,12 @@ bool wsrep_prepare_keys_for_isolation(THD *thd, const char *db,
                                       const TABLE_LIST *table_list,
                                       wsrep_key_arr_t *ka);
 void wsrep_keys_free(wsrep_key_arr_t *key_arr);
+
+
+/* In 8.0, channels now have names
+   Reserve the 'wsrep' name for the WSREP replication channels
+*/
+constexpr char WSREP_CHANNEL_NAME[] = "wsrep";
+bool wsrep_is_wsrep_channel_name(const char *channel_name);
+
 #endif /* WSREP_MYSQLD_H */

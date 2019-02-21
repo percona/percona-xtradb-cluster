@@ -189,7 +189,7 @@ int srv_session_close(Srv_session *session) {
 int srv_session_server_is_available() {
 #ifdef WITH_WSREP
   if (WSREP_ON) {
-    return (get_server_state() == SERVER_OPERATING && wsrep_node_is_synced());
+    return (wsrep_allow_server_session || (get_server_state() == SERVER_OPERATING && wsrep_node_is_synced()));
   } else {
     return get_server_state() == SERVER_OPERATING;
   }

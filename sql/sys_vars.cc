@@ -7048,13 +7048,6 @@ static Sys_var_charptr Sys_wsrep_sst_receive_address(
     NOT_IN_BINLOG, ON_CHECK(wsrep_sst_receive_address_check),
     ON_UPDATE(wsrep_sst_receive_address_update));
 
-static Sys_var_charptr Sys_wsrep_sst_auth(
-    "wsrep_sst_auth", "Authentication for SST connection",
-    PREALLOCATED GLOBAL_VAR(wsrep_sst_auth),
-    CMD_LINE(REQUIRED_ARG, OPT_WSREP_SST_AUTH), IN_FS_CHARSET,
-    DEFAULT(wsrep_sst_auth), NO_MUTEX_GUARD, NOT_IN_BINLOG,
-    ON_CHECK(wsrep_sst_auth_check), ON_UPDATE(wsrep_sst_auth_update));
-
 static Sys_var_charptr Sys_wsrep_sst_donor(
     "wsrep_sst_donor", "preferred donor node for the SST",
     GLOBAL_VAR(wsrep_sst_donor), CMD_LINE(REQUIRED_ARG), IN_FS_CHARSET,

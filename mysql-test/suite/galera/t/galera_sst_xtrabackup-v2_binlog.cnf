@@ -2,7 +2,6 @@
 
 [mysqld]
 wsrep_sst_method=xtrabackup-v2
-wsrep_sst_auth="root:"
 gtid-mode=ON
 enforce-gtid-consistency=1
 log-slave-updates

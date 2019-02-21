@@ -725,6 +725,20 @@ bool start_slave_cmd(THD *thd) {
     }
 
     res = start_slave(thd);
+#ifdef WITH_WSREP
+  // Similar to GR, do not allow operations on the wsrep channel
+  } else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
+    const char *command = "START SLAVE FOR CHANNEL";
+    if (thd->lex->slave_thd_opt & SLAVE_IO)
+      command = "START SLAVE IO_THREAD FOR CHANNEL";
+    else if (thd->lex->slave_thd_opt & SLAVE_SQL)
+      command = "START SLAVE SQL_THREAD FOR CHANNEL";
+
+    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), command,
+             lex->mi.channel, command);
+
+    goto err;
+#endif /* WITH_WSREP */
   } else {
     mi = channel_map.get_mi(lex->mi.channel);
 
@@ -799,6 +813,22 @@ bool stop_slave_cmd(THD *thd) {
 
   if (!lex->mi.for_channel)
     res = stop_slave(thd);
+#ifdef WITH_WSREP
+  // Similar to GR, do not allow operations on the wsrep channel
+  else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
+    const char *command = "STOP SLAVE FOR CHANNEL";
+    if (thd->lex->slave_thd_opt & SLAVE_IO)
+      command = "STOP SLAVE IO_THREAD FOR CHANNEL";
+    else if (thd->lex->slave_thd_opt & SLAVE_SQL)
+      command = "STOP SLAVE SQL_THREAD FOR CHANNEL";
+
+    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), command,
+             lex->mi.channel, command);
+
+    channel_map.unlock();
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
   else {
     mi = channel_map.get_mi(lex->mi.channel);
 
@@ -959,6 +989,14 @@ static int find_first_relay_log_with_rotate_from_master(Relay_log_info *rli) {
            ER_RPL_RECOVERY_SKIPPED_GROUP_REPLICATION_CHANNEL);
     goto err;
   }
+#ifdef WITH_WSREP
+  // Similar to GR, do not allow operations on the wsrep channel
+  else if (wsrep_is_wsrep_channel_name(rli->get_channel())) {
+    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+             "Relay log recovery skipped for '%s' channel", rli->get_channel());
+    goto err;
+  }
+#endif
 
   for (pos = rli->relay_log.find_log_pos(&linfo, NULL, true); !pos;
        pos = rli->relay_log.find_next_log(&linfo, true)) {
@@ -3777,6 +3815,15 @@ bool show_slave_status_cmd(THD *thd) {
 
   if (!lex->mi.for_channel)
     res = show_slave_status(thd);
+#ifdef WITH_WSREP
+  // Disable the SHOW SLAVE STATUS command with the wsrep channel
+  else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
+    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+             "SHOW SLAVE STATUS", lex->mi.channel);
+    channel_map.unlock();
+    DBUG_RETURN(true);
+  }
+#endif
   else {
     mi = channel_map.get_mi(lex->mi.channel);
 
@@ -8233,6 +8280,25 @@ bool flush_relay_logs_cmd(THD *thd) {
 
       if ((error = flush_relay_logs(mi))) break;
     }
+#ifdef WITH_WSREP
+  // Similar to GR, do not allow operations on the wsrep channel
+  } else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
+    if (thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
+        thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER) {
+      /*
+        Log warning on SQL or worker threads.
+      */
+      LogErr(WARNING_LEVEL, ER_RPL_SLAVE_FLUSH_RELAY_LOGS_NOT_ALLOWED,
+             lex->mi.channel);
+    } else {
+      /*
+        Return error on client sessions.
+      */
+      error = true;
+      my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+               "FLUSH RELAY LOGS", lex->mi.channel);
+    }
+#endif
   } else {
     mi = channel_map.get_mi(lex->mi.channel);
 
@@ -8917,6 +8983,15 @@ bool reset_slave_cmd(THD *thd) {
 
   if (!lex->mi.for_channel)
     res = reset_slave(thd);
+#ifdef WITH_WSREP
+  // Similar to GR, do not allow operations on the wsrep channel
+  else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
+    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+             "RESET SLAVE [ALL] FOR CHANNEL", lex->mi.channel);
+    channel_map.unlock();
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
   else {
     mi = channel_map.get_mi(lex->mi.channel);
     /*
@@ -9815,6 +9890,16 @@ bool change_master_cmd(THD *thd) {
     res = true;
     goto err;
   }
+
+#ifdef WITH_WSREP
+  // Similar to GR, do not allow operations on the wsrep channel
+  if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
+    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+             "CHANGE MASTER with the given parameters", lex->mi.channel);
+    res = true;
+    goto err;
+  }
+#endif /* WITH_WSREP */
 
   // If the channel being used is group_replication_recovery we allow the
   // channel creation based on the check as to which field is being updated.
