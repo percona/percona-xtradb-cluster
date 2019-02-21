@@ -258,11 +258,14 @@ get_keys()
     # Setup the command for all non-SST transfers
     # Encryption is done by xbcrypt for all other (non-SST) transfers
     #
+    # It's ok to use the 8.0 xbcrypt, it's compatible with
+    # the 2.4 xbcrypt.
     ecmd_other="${XTRABACKUP_80_PATH}/bin/xbcrypt --encrypt-algo=$ealgo $encrypt_opts "
     if [[ "$WSREP_SST_OPT_ROLE" == "joiner" ]]; then
         # Decryption is done by xbcrypt for all other (non-SST) transfers
         ecmd_other+=" -d"
     fi
+    ecmd_other+=" 2>/dev/null "
 
     # ensure that ecmd is clear because SST encryption
     # goes through xtrabackup, not a separate program
@@ -782,6 +785,9 @@ get_stream()
 {
     if [[ $sfmt == 'xbstream' ]]; then
         wsrep_log_debug "Streaming with xbstream"
+
+        # It's ok to use the 8.0 xbstream, it's compatible with
+        # the 2.4 xbstream.
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
             strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream \$xbstreameopts -x"
         else
@@ -1479,7 +1485,9 @@ function initialize_pxb_commands()
 # Get our MySQL version
 MYSQL_VERSION=$WSREP_SST_OPT_VERSION
 if [[ -z $MYSQL_VERSION ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "FATAL: Cannot determine the mysqld server version"
+    wsrep_log_error "****************************************************** "
     exit 2
 fi
 
@@ -1535,6 +1543,19 @@ fi
 
 #
 # read configuration and setup ports for streaming data.
+read_variables_from_stdin
+
+#
+# Only the DONOR is sent the credentials
+if [[ $WSREP_SST_OPT_ROLE == "donor" ]]; then
+    if [[ -z $WSREP_SST_OPT_USER || -z $WSREP_SST_OPT_PSWD ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "FATAL: The required auth credentials for an SST have not been received"
+        wsrep_log_error "****************************************************** "
+        exit 2
+    fi
+fi
+
 read_cnf
 setup_ports
 
@@ -1548,6 +1569,7 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
     ssl_ca=$(parse_cnf mysqld ssl-ca "")
     ssl_cert=$(parse_cnf mysqld ssl-cert "")
     ssl_key=$(parse_cnf mysqld ssl-key "")
+
 
     # Check that we have all the files
     # If they have not been explicitly specified, check the datadir

@@ -172,6 +172,8 @@
 #include "wsrep_binlog.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
+#include "wsrep_sst.h"
+
 static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                               Parser_state *parser_state, bool update_userstat,
                               bool force_primary_storage_engine);
@@ -2537,6 +2539,10 @@ bool shutdown(THD *thd, enum mysql_enum_shutdown_level level) {
 
   if (check_global_access(thd, SHUTDOWN_ACL))
     goto error; /* purecov: inspected */
+
+#ifdef WITH_WSREP
+  (void) wsrep_remove_sst_user(false);
+#endif /* WITH_WSREP */
 
   if (level == SHUTDOWN_DEFAULT)
     level = SHUTDOWN_WAIT_ALL_BUFFERS;  // soon default will be configurable

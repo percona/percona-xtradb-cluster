@@ -22,9 +22,8 @@ WSREP_SST_OPT_BYPASS=0
 WSREP_SST_OPT_BINLOG=""
 WSREP_SST_OPT_CONF_SUFFIX=""
 WSREP_SST_OPT_DATA=""
-WSREP_SST_OPT_AUTH=${WSREP_SST_OPT_AUTH:-}
-WSREP_SST_OPT_USER=${WSREP_SST_OPT_USER:-}
-WSREP_SST_OPT_PSWD=${WSREP_SST_OPT_PSWD:-}
+WSREP_SST_OPT_USER=""
+WSREP_SST_OPT_PSWD=""
 WSREP_SST_OPT_VERSION=""
 
 WSREP_LOG_DEBUG=""
@@ -230,27 +229,6 @@ else
     MY_PRINT_DEFAULTS=$(which my_print_defaults)
 fi
 
-wsrep_auth_not_set()
-{
-    [ -z "$WSREP_SST_OPT_AUTH" -o "$WSREP_SST_OPT_AUTH" = "(null)" ]
-}
-
-# For Bug:1200727
-if wsrep_auth_not_set
-then
-    WSREP_SST_OPT_AUTH=$(parse_cnf sst wsrep-sst-auth "")
-fi
-readonly WSREP_SST_OPT_AUTH
-
-# Splitting AUTH into potential user:password pair
-if ! wsrep_auth_not_set
-then
-    readonly AUTH_VEC=(${WSREP_SST_OPT_AUTH//:/ })
-    WSREP_SST_OPT_USER="${AUTH_VEC[0]:-}"
-    WSREP_SST_OPT_PSWD="${AUTH_VEC[1]:-}"
-fi
-readonly WSREP_SST_OPT_USER
-readonly WSREP_SST_OPT_PSWD
 
 if [ -n "${WSREP_SST_OPT_DATA:-}" ]
 then
@@ -339,6 +317,40 @@ wsrep_check_programs()
     done
 
     return $ret
+}
+
+# Returns the length of the string in bytes
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   Parameter 1: the string
+#
+# Outputs:
+#   The length of the string in bytes (not characters!)
+#
+function get_length_in_bytes()
+{
+    local str=$1
+    local byte_len=0
+    local orig_lang=""
+    local orig_locale=""
+
+    if [ -n "${LANG:-}" ]; then
+        orig_lang=$LANG
+    fi
+
+    if [ -n "${LC_ALL:-}" ]; then
+        orig_locale=$LC_ALL
+    fi
+
+    LANG=C LC_ALL=C
+    byte_len=${#str}
+
+    LANG=$orig_lang LC_ALL=$orig_locale
+
+    echo $byte_len
 }
 
 
@@ -458,15 +470,6 @@ function run_mysql_upgrade()
     # Set this so that it will be cleaned up on exit
     MYSQL_UPGRADE_TMPDIR=$mysql_upgrade_dir_path
 
-    # validation check to ensure that the auth param are specified.
-    if [[ -z "$WSREP_SST_OPT_USER" ]]; then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Authentication params missing. Check wsrep_sst_auth"
-        wsrep_log_error "Line $LINENO"
-        wsrep_log_error "****************************************************** "
-        exit 3
-    fi
-
     if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
       use_mysql_upgrade_conf_suffix="--defaults-group-suffix=${WSREP_SST_OPT_CONF_SUFFIX}"
     fi
@@ -499,7 +502,20 @@ function run_mysql_upgrade()
     #   --datadir
     local upgrade_socket="${mysql_upgrade_dir_path}/my.sock"
 
+    # Check socket path length
+    # AF_UNIX socket family restricts sockets path to 108 characters
+    # (107 chars + 1 for terminating null character)
+    if [[ $(get_length_in_bytes "$upgrade_socket") -gt 107 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Socket path is too long (must be less than 107 characters)."
+        wsrep_log_error "  $upgrade_socket"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "****************************************************** "
+        exit 3
+    fi
+
     wsrep_log_debug "Starting the MySQL server used by mysql_upgrade"
+
     local mysqld_cmdline="--defaults-file=${WSREP_SST_OPT_CONF} ${use_mysql_upgrade_conf_suffix} \
         --skip-networking --skip-slave-start \
         --auto_generate_certs=OFF \
@@ -510,13 +526,26 @@ function run_mysql_upgrade()
         --log_output=NONE \
         --pid-file=${mysql_upgrade_dir_path}/mysqld.pid \
         --socket=$upgrade_socket \
-        --datadir=$datadir --wsrep_provider=none"
+        --datadir=$datadir --wsrep_provider=none \
+        --init-file=/dev/stdin"
 
-    $mysqld_path $mysqld_cmdline &> ${mysql_upgrade_dir_path}/err.log &
+    # Generate a new random password to be used by the JOINER
+    WSREP_SST_OPT_USER="mysql.pxc.sst.user"
+    WSREP_SST_OPT_PSWD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+
+    # Reuse the SST User (use it to run mysql_upgrade)
+    # Recreate with root permissions and a new password
+    cat <<EOF | $mysqld_path $mysqld_cmdline &> ${mysql_upgrade_dir_path}/err.log &
+SET sql_log_bin = OFF;
+DROP USER IF EXISTS '${WSREP_SST_OPT_USER}'@localhost;
+CREATE USER '${WSREP_SST_OPT_USER}'@localhost IDENTIFIED BY '${WSREP_SST_OPT_PSWD}';
+GRANT ALL PRIVILEGES ON *.* TO '${WSREP_SST_OPT_USER}'@localhost;
+FLUSH PRIVILEGES;
+EOF
     mysql_pid=$!
 
     #-----------------------------------------------------------------------
-    # wait for the mysql to come up
+    # wait for mysql to come up
     local -i timeout
     local -i timeout_threshold
 
@@ -564,7 +593,7 @@ function run_mysql_upgrade()
             exit 3
         fi
     done
-    wsrep_log_debug "MySQL server started"
+    wsrep_log_debug "MySQL server($mysql_pid) started"
 
     #-----------------------------------------------------------------------
     # run mysql-upgrade
@@ -602,7 +631,7 @@ EOF
         --defaults-file=/dev/stdin \
         --socket=$upgrade_socket \
         --unbuffered --batch --silent \
-        -e "RESET SLAVE ALL;" \
+        -e "SET sql_log_bin=OFF; RESET SLAVE ALL;" \
         &> ${mysql_upgrade_dir_path}/reset_slave.out <<EOF
 [client]
 user=${WSREP_SST_OPT_USER}
@@ -610,6 +639,7 @@ password="${WSREP_SST_OPT_PSWD}"
 EOF
     errcode=$?
     if [[ $errcode -ne 0 ]]; then
+        kill -9 $mysql_pid
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Failed to execute mysql 'RESET SLAVE ALL'. Check the parameters and retry"
         wsrep_log_error "Line $LINENO errcode:${errcode}"
@@ -626,35 +656,96 @@ EOF
 
     #-----------------------------------------------------------------------
     # shutdown mysql instance started.
+    #   (also does some account cleanup)
     wsrep_log_debug "Shutting down the MySQL server"
-    $mysqladmin_path \
+    $mysql_client_path \
         --defaults-file=/dev/stdin \
         --socket=$upgrade_socket \
-        shutdown \
+        --unbuffered --batch --silent \
+        -e "SET sql_log_bin = OFF; ALTER USER '${WSREP_SST_OPT_USER}'@localhost ACCOUNT LOCK; SHUTDOWN;" \
         &> ${mysql_upgrade_dir_path}/upgrade_shutdown.out <<EOF
-[mysqladmin]
+[client]
 user=${WSREP_SST_OPT_USER}
 password="${WSREP_SST_OPT_PSWD}"
 EOF
     errcode=$?
     if [[ $errcode -ne 0 ]]; then
+        sleep 3
         kill -9 $mysql_pid
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Failed to shutdown the MySQL instance started for upgrade."
-        wsrep_log_error "Check the parameters and retry"
+        wsrep_log_error "Check the parameters and retry.  Killing the process."
         wsrep_log_error "Line $LINENO errcode:${errcode}"
         echo "--------------- shutdown log (START) --------------------" >&2
         cat ${mysql_upgrade_dir_path}/upgrade_shutdown.out >&2
         echo "--------------- shutdown log (END) ----------------------" >&2
+        echo "--------------- mysql error log (START) --------------------" >&2
+        cat ${mysql_upgrade_dir_path}/err.log >&2
+        echo "--------------- mysql error log (END) ----------------------" >&2
         wsrep_log_error "****************************************************** "
         exit 3
     fi
 
-    sleep 1
+    # Wait until the mysqld instance has shut down
+    timeout=$timeout_threshold
+    while [ true ]; do
+        if ! ps --pid $mysql_pid >/dev/null; then
+            # If the process doesn't exist, then it shut down, so we're good
+            break
+        fi
+
+        sleep 0.5
+        ((timeout--))
+        if [[ $timeout -eq 0 ]]; then
+            kill -9 $mysql_pid
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "The MySQL server started for the upgrade process"
+            wsrep_log_error "has failed to shutdown.  Killing the process."
+            wsrep_log_error "Line $LINENO"
+            echo "--------------- mysql error log  (START) --------------------" >&2
+            cat ${mysql_upgrade_dir_path}/err.log >&2
+            echo "--------------- mysql error log (END) ----------------------" >&2
+            wsrep_log_error "****************************************************** "
+            break
+        fi
+    done
+
+    wsrep_log_debug "MySQL server shut down"
 
     #-----------------------------------------------------------------------
     # cleanup
     rm -rf $datadir/*.pem || true
     rm -rf $datadir/auto.cnf || true
 
+}
+
+
+# Reads incoming data from STDIN and sets the variables
+#
+# Globals:
+#   WSREP_SST_OPT_USER (sets this variable)
+#   WSREP_SST_OPT_PSWD (sets this variable)
+#
+# Parameters:
+#   Argument 1: the role ("donor" or "joiner")
+#
+# This function will exit if username or password is not received.
+#
+function read_variables_from_stdin()
+{
+    while read line; do
+        name=$(echo "$line" | cut -d"=" -f1)
+        value=$(echo "$line" | cut -d"=" -f2)
+
+        case "$name" in
+            'sst_user')
+                WSREP_SST_OPT_USER="$value"
+                ;;
+            'sst_password')
+                WSREP_SST_OPT_PSWD="$value"
+                ;;
+            *)
+                wsrep_log_warning "Unrecognized input: $line"
+        esac
+    done
 }

@@ -147,6 +147,10 @@ long wsrep_protocol_version = 3;
 // if there was no state gap on receiving first view event.
 static bool wsrep_startup = true;
 
+// Boolean denoting whether to allow server session commands to execute
+// irrespective of the local state.
+bool wsrep_allow_server_session = false;
+
 #ifdef HAVE_PSI_INTERFACE
 
 /* Keys for mutexes and condition variables in galera library space. */
@@ -793,7 +797,10 @@ static void wsrep_synced_cb(void *) {
     // and wait for SE initialization
     /* we don't have recv_ctx (THD*) here */
     wsrep_SE_init_wait(current_thd);
+
+    wsrep_remove_sst_user(false);
   }
+
   if (wsrep_restart_slave_activated) {
     int rcode;
     WSREP_INFO("Restarting MySQL Slave");

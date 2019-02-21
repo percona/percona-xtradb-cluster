@@ -4,7 +4,6 @@
 pxc-encrypt-cluster-traffic=ON
 
 wsrep_sst_method=xtrabackup-v2
-wsrep_sst_auth="root:"
 wsrep_debug=ON
 
 #

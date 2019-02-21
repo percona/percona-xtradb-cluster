@@ -125,6 +125,7 @@ extern bool wsrep_slave_FK_checks;
 extern bool wsrep_slave_UK_checks;
 extern std::atomic<ulong> wsrep_running_threads;
 extern ulong wsrep_RSU_commit_timeout;
+extern bool wsrep_allow_server_session;
 
 enum enum_wsrep_reject_types {
   WSREP_REJECT_NONE,    /* nothing rejected */

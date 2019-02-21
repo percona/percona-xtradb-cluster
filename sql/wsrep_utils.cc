@@ -331,13 +331,20 @@ static int execvpe(const char *file, char *const argv[], char *const envp[]) {
 #define STDIN_FD 0
 #define STDOUT_FD 1
 
-process::process(const char *cmd, const char *type, char **env)
-    : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), err_(0), pid_(0) {
+process::process(const char *cmd, const char *type, char **env, bool execute_immediately)
+    : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), io_w_(NULL), err_(0), pid_(0)
+  {
+    if (execute_immediately)
+      execute(type, env);
+  }
+
+void process::execute(const char *type, char **env)
+{
   int sig;
   struct sigaction sa;
 
   if (0 == str_) {
-    WSREP_ERROR("Can't allocate command line of size: %zu", strlen(cmd));
+    WSREP_ERROR("Can't allocate command line of size: %zu", strlen(str_));
     err_ = ENOMEM;
     return;
   }
@@ -347,8 +354,8 @@ process::process(const char *cmd, const char *type, char **env)
     return;
   }
 
-  if (NULL == type || (strcmp(type, "w") && strcmp(type, "r"))) {
-    WSREP_ERROR("type argument should be either \"r\" or \"w\".");
+  if (NULL == type || (strcmp(type, "w") && strcmp(type, "r") && strcmp(type, "rw"))) {
+    WSREP_ERROR("type argument should be either \"r\" or \"w\" or \"rw\".");
     return;
   }
 
@@ -356,10 +363,21 @@ process::process(const char *cmd, const char *type, char **env)
     env = environ;
   }  // default to global environment
 
-  int pipe_fds[2];
+  int pipe_fds[2] = { -1, -1 };
+  int pipe2_fds[2] = { -1, -1 };
+
   if (::pipe(pipe_fds)) {
     err_ = errno;
     WSREP_ERROR("pipe() failed: %d (%s)", err_, strerror(err_));
+    return;
+  }
+
+  // Create the second pipe (needed only if type = "rw")
+  // One pipe for reading and one pipe for writing
+  if (strcmp(type, "rw") == 0 && ::pipe(pipe2_fds))
+  {
+    err_ = errno;
+    WSREP_ERROR ("pipe() failed to create the second pipe: %d (%s)", err_, strerror(err_));
     return;
   }
 
@@ -387,13 +405,29 @@ process::process(const char *cmd, const char *type, char **env)
   } else if (pid_ > 0) {
     /* Parent */
 
-    io_ = fdopen(pipe_fds[parent_end], type);
+    // Treat 'rw' as an 'r'
+    io_ = fdopen(pipe_fds[parent_end],  (strcmp(type,"rw") == 0 ? "r" : type));
 
     if (io_) {
       pipe_fds[parent_end] = -1;  // skip close on cleanup
     } else {
       err_ = errno;
       WSREP_ERROR("fdopen() failed: %d (%s)", err_, strerror(err_));
+    }
+
+    if (strcmp(type, "rw") == 0)
+    {
+      // Need to open the write end of the pipe
+      io_w_ = fdopen(pipe2_fds[PIPE_WRITE], "w");
+      if (io_w_)
+      {
+        pipe2_fds[PIPE_WRITE] = -1; // skip close on cleanup
+      }
+      else
+      {
+        err_ = errno;
+        WSREP_ERROR ("fdopen() failed: %d (%s)", err_, strerror(err_));
+      }
     }
 
     goto cleanup_pipe;
@@ -464,6 +498,11 @@ process::process(const char *cmd, const char *type, char **env)
     sql_print_error("dup2() failed");
     _exit(EXIT_FAILURE);
   }
+  if ((strcmp(type, "rw") == 0) && dup2(pipe2_fds[PIPE_READ], STDIN_FD) < 0)
+  {
+    sql_print_error("dup2() failed");
+    _exit(EXIT_FAILURE);
+  }
 
   /* Close child and parent pipe descriptors after redirection. */
 
@@ -473,6 +512,18 @@ process::process(const char *cmd, const char *type, char **env)
   }
 
   if (close(pipe_fds[parent_end]) < 0) {
+    sql_perror("close() failed");
+    _exit(EXIT_FAILURE);
+  }
+
+  if (close(pipe2_fds[child_end]) < 0)
+  {
+    sql_perror("close() failed");
+    _exit(EXIT_FAILURE);
+  }
+
+  if (close(pipe2_fds[parent_end]) < 0)
+  {
     sql_perror("close() failed");
     _exit(EXIT_FAILURE);
   }
@@ -598,6 +649,30 @@ process::process(const char *cmd, const char *type, char **env)
     goto cleanup_actions;
   }
 
+  if (strcmp(type, "rw") == 0)
+  {
+    err_ = posix_spawn_file_actions_adddup2(&sfa, pipe2_fds[PIPE_READ], STDIN_FD);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawn_file_actions_adddup2() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_actions;
+    }
+
+    err_ = posix_spawn_file_actions_addclose(&sfa, pipe2_fds[PIPE_READ]);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawn_file_actions_addclose() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_actions;
+    }
+
+    err_ = posix_spawn_file_actions_addclose(&sfa, pipe2_fds[PIPE_WRITE]);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawn_file_actions_addclose() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_actions;
+    }
+  }
+
   /* Launch the child process: */
 
   err_ = posix_spawnp(&pid_, pargv[0], &sfa, &sattr, pargv, env);
@@ -623,7 +698,7 @@ process::process(const char *cmd, const char *type, char **env)
 
   /* We are in the parent process: */
 
-  io_ = fdopen(pipe_fds[parent_end], type);
+  io_ = fdopen(pipe_fds[parent_end], (strcmp(type, "rw") == 0 ? "r" : type));
 
   if (io_) {
     pipe_fds[parent_end] = -1;  // skip close on cleanup
@@ -632,11 +707,28 @@ process::process(const char *cmd, const char *type, char **env)
     WSREP_ERROR("fdopen() failed: %d (%s)", err_, strerror(err_));
   }
 
+  if (strcmp(type, "rw") == 0)
+  {
+    io_w_ = fdopen(pipe2_fds[PIPE_WRITE], "w");
+
+    if (io_w_)
+    {
+      pipe2_fds[PIPE_WRITE] = -1; // skip close on cleanup
+    }
+    else
+    {
+      err_ = errno;
+      WSREP_ERROR ("fdopen() failed: %d (%s)", err_, strerror(err_));
+    }
+  }
+
 #endif
 
 cleanup_pipe:
   if (pipe_fds[0] >= 0) close(pipe_fds[0]);
   if (pipe_fds[1] >= 0) close(pipe_fds[1]);
+  if (pipe2_fds[0] >= 0) close (pipe2_fds[0]);
+  if (pipe2_fds[1] >= 0) close (pipe2_fds[1]);
 
   free(pargv[0]);
   free(pargv[1]);
@@ -671,7 +763,38 @@ process::~process() {
     }
   }
 
+  if (io_w_)
+  {
+      assert (pid_);
+      assert (str_);
+
+      WSREP_WARN("Closing write pipe to child process: %s, PID(%ld) "
+                 "which might still be running.", str_, (long)pid_);
+
+      if (fclose (io_w_) == -1)
+      {
+          err_ = errno;
+          WSREP_ERROR("fclose() failed: %d (%s)", err_, strerror(err_));
+      }
+  }
+
   if (str_) free(const_cast<char *>(str_));
+}
+
+void process::close_write_pipe()
+{
+    if (io_w_)
+    {
+        assert (pid_);
+        assert (str_);
+
+        if (fclose (io_w_) == -1)
+        {
+            err_ = errno;
+            WSREP_ERROR("fclose() failed: %d (%s)", err_, strerror(err_));
+        }
+        io_w_ = NULL;
+    }
 }
 
 int process::wait() {
@@ -710,6 +833,8 @@ int process::wait() {
       pid_ = 0;
       if (io_) fclose(io_);
       io_ = NULL;
+      if (io_w_) fclose(io_w_);
+      io_w_ = NULL;
     }
   } else {
     assert(NULL == io_);

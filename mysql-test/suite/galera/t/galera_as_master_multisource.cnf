@@ -25,7 +25,6 @@ wsrep_sync_wait = 7
 wsrep_node_address=127.0.0.1
 wsrep_sst_receive_address=127.0.0.1:@mysqld.1.#sst_port
 wsrep_node_incoming_address=127.0.0.1:@mysqld.1.port
-wsrep_sst_auth='@mysqld.1.#user:@mysqld.1.#password'
 
 # Required for Galera
 innodb_autoinc_lock_mode=2
@@ -47,7 +46,6 @@ wsrep_sync_wait = 7
 wsrep_node_address=127.0.0.1
 wsrep_sst_receive_address=127.0.0.1:@mysqld.2.#sst_port
 wsrep_node_incoming_address=127.0.0.1:@mysqld.2.port
-wsrep_sst_auth='@mysqld.2.#user:@mysqld.2.#password'
 
 # Required for Galera
 innodb_autoinc_lock_mode=2

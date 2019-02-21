@@ -10716,10 +10716,6 @@ bool mysqld_get_one_option(int optid,
       wsrep_start_position_init(argument);
       break;
     }
-    case OPT_WSREP_SST_AUTH: {
-      wsrep_sst_auth_init(argument);
-      break;
-    }
 #endif /* WITH_WSREP */
   }
   return 0;

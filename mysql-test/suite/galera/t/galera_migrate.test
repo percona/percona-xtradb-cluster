@@ -110,14 +110,13 @@ INSERT INTO t1 VALUES (6);
 # non-empty passwords will not work since there is already an empty 'password=' directive in the [client] section of my.cnf
 CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
-SET GLOBAL wsrep_sst_auth = 'sst:';
 
 --connect node_4, 127.0.0.1, root, , test, $NODE_MYPORT_4
 
 CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
 
---let $restart_parameters = "restart:--wsrep_sst_method='xtrabackup-v2' --wsrep_sst_auth='sst:' --wsrep_provider=$WSREP_PROVIDER --wsrep_provider_options='base_port=$NODE_GALERAPORT_4' --wsrep_sst_receive_address='127.0.0.1:$NODE_SSTPORT_4' --wsrep_cluster_address='gcomm://127.0.0.1:$NODE_GALERAPORT_3'"
+--let $restart_parameters = "restart:--wsrep_sst_method='xtrabackup-v2' --wsrep_provider=$WSREP_PROVIDER --wsrep_provider_options='base_port=$NODE_GALERAPORT_4' --wsrep_sst_receive_address='127.0.0.1:$NODE_SSTPORT_4' --wsrep_cluster_address='gcomm://127.0.0.1:$NODE_GALERAPORT_3'"
 --replace_regex /# restart:.*//
 --source include/restart_mysqld.inc
 
@@ -200,7 +199,6 @@ DROP TABLE t1;
 
 --connection node_3
 SET GLOBAL wsrep_provider = 'none';
-SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;
 DROP USER sst;
@@ -208,7 +206,6 @@ DROP USER sst;
 --connection node_4a
 SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_method = default;
-SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;
