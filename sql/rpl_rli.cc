@@ -1432,6 +1432,15 @@ bool mysql_show_relaylog_events(THD *thd) {
     goto err;
   }
 
+#ifdef WITH_WSREP
+  if (thd->lex->mi.channel && wsrep_is_wsrep_channel_name(thd->lex->mi.channel)) {
+    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), "SHOW RELAYLOG EVENTS",
+             thd->lex->mi.channel, "SHOW RELAYLOG EVENTS");
+    res = true;
+    goto err;
+  }
+#endif /* WITH_WSREP */
+
   Log_event::init_show_field_list(&field_list);
   if (thd->send_result_metadata(&field_list,
                                 Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF)) {

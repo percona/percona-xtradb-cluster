@@ -70,6 +70,10 @@ Rpl_info_factory::struct_file_data Rpl_info_factory::mi_file_data;
 Rpl_info_factory::struct_file_data Rpl_info_factory::worker_file_data;
 Rpl_info_factory::struct_table_data Rpl_info_factory::worker_table_data;
 
+#ifdef WITH_WSREP
+Rpl_filter  wsrep_filter;
+#endif /* WITH_WSREP */
+
 /**
   Creates a Master info repository whose type is defined as a parameter.
 
@@ -284,12 +288,15 @@ Relay_log_info *Rpl_info_factory::create_rli(uint rli_option,
   }
 
 #ifdef WITH_WSREP
-  /* Till MySQL-5.7, all slave used global replication filter.
-  For now PXC-8.0 will continue to use the same even though MySQL-8.0 now
-  enforces use of per channel filter. PXC replication is not like a traditional
-  async master-slave channel. */
-  if (!strcasecmp(channel, "wsrep")) {
-    rli->set_filter(&rpl_global_filter);
+  /* Till MySQL-5.7, all slaves used the global replication filter.
+     For now, PXC-8.0 (like Group Replication) will not use any filters,
+     global or per-channel.
+
+     PXC replication is not like a traditional async master-slave channel.
+  */
+  if (wsrep_is_wsrep_channel_name(channel)) {
+    wsrep_filter.reset();
+    rli->set_filter(&wsrep_filter);
   } else {
     rpl_filter = rpl_channel_filters.get_channel_filter(channel);
     if (rpl_filter == NULL) {
@@ -953,6 +960,14 @@ bool Rpl_info_factory::configure_channel_replication_filters(
   */
   if (channel_map.is_group_replication_channel_name(channel_name))
     DBUG_RETURN(false);
+
+#ifdef WITH_WSREP
+  /* Similar to Group Replication, we do not allow the wsrep
+     channel to be configurable
+  */
+  if (wsrep_is_wsrep_channel_name(channel_name))
+    DBUG_RETURN(false);
+#endif /* WITH_WSREP */
 
   if (Master_info::is_configured(rli->mi)) {
     /*
