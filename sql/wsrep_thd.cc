@@ -745,7 +745,12 @@ extern "C" void wsrep_thd_auto_increment_variables(
 }
 
 bool wsrep_safe_to_persist_xid(THD *thd) {
-  /* transaction rollback too too also invokes persist of XID.
+  /* Avoid persist of XID during intermediate commit. Wait for final commit. */
+  if (thd->wsrep_intermediate_commit) {
+    return (false);
+  }
+
+  /* transaction rollback also invokes persist of XID.
   Avoid persisting XID in this use-case. */
   bool safe_to_persist_xid = false;
   if (thd->wsrep_conflict_state == NO_CONFLICT ||

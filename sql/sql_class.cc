@@ -705,6 +705,7 @@ THD::THD(bool enable_plugins)
   wsrep_replicate_GTID = false;
   wsrep_skip_wsrep_GTID = false;
   wsrep_split_trx = false;
+  wsrep_intermediate_commit = false;
   m_wsrep_next_trx_id = WSREP_UNDEFINED_TRX_ID;
   wsrep_skip_SE_checkpoint = false;
   wsrep_skip_wsrep_hton = false;
@@ -1025,6 +1026,7 @@ void THD::init(void) {
   wsrep_replicate_GTID = false;
   wsrep_skip_wsrep_GTID = false;
   wsrep_split_trx = false;
+  wsrep_intermediate_commit = false;
   wsrep_gtid_event_buf = NULL;
   wsrep_gtid_event_buf_len = 0;
   m_wsrep_next_trx_id = WSREP_UNDEFINED_TRX_ID;
