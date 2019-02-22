@@ -2936,6 +2936,10 @@ class THD : public MDL_context_owner,
      then commit the said transaction as part of external_lock(UNLOCK). */
   bool wsrep_split_trx;
 
+  /* Set to true if intermediate commit is active. Use to skip
+  update of wsrep co-ordinates for intermediate commit. */
+  bool wsrep_intermediate_commit;
+
   /*
     Transaction id:
     * m_next_wsrep_trx_id is assigned on the first query after

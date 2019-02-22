@@ -246,7 +246,21 @@ static bool trans_intermediate_ddl_commit(THD *thd, bool error) {
     trans_rollback(thd);
     return true;
   }
+#ifdef WITH_WSREP
+  /* It is not very clear why intermediate commit is done but it is done
+  for non-atomic storage engines. PXC/Galera capture DDL initiated
+  for objects from these non-atomic storage engines (MyISAM, MEMORY, etc....)
+  and are replicated using TOI. This TOI action also leads to update of
+  wsrep co-ordinates that are stored in InnoDB sys-header.
+  While doing intermediate commit avoid updating this sys-header.
+  sys-header should be updated only when the final commit is being done. */
+  thd->wsrep_intermediate_commit = true;
+  bool ret = trans_commit_stmt(thd) || trans_commit(thd);
+  thd->wsrep_intermediate_commit = false;
+  return (ret);
+#else
   return trans_commit_stmt(thd) || trans_commit(thd);
+#endif /* WITH_WSREP */
 }
 
 /**

@@ -132,5 +132,51 @@ i
 SET GLOBAL wsrep_debug = 0;
 SET DEBUG_SYNC = 'RESET';
 drop table t;
+#node-1
+create table t (i int, primary key pk(i)) engine=innodb;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
+insert into t values (1);;
+#node-1a
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+create table t2 (i int, primary key pk(i)) engine=memory;;
+#node-1c (check if ddl is waiting for final commit that suggest intermediate commit done)
+SET DEBUG_SYNC = "now SIGNAL continue1";
+#node-1
+select * from t;
+i
+1
+#node-1a
+select * from t2;
+i
+#node-1
+SET GLOBAL wsrep_debug = 0;
+SET DEBUG_SYNC = 'RESET';
+drop table t;
+drop table t2;
+#node-1
+create table t (i int, primary key pk(i)) engine=innodb;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
+insert into t values (1);;
+#node-1a
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+create table t2 (i int, primary key pk(i)) engine=innodb;;
+#node-1c (check if ddl is waiting for final commit that suggest intermediate commit done)
+SET DEBUG_SYNC = "now SIGNAL continue1";
+#node-1
+select * from t;
+i
+1
+#node-1a
+select * from t2;
+i
+#node-1
+SET GLOBAL wsrep_debug = 0;
+SET DEBUG_SYNC = 'RESET';
+drop table t;
+drop table t2;
 set @@wsrep_replicate_myisam = 0;;
 SET DEBUG_SYNC = "reset";
