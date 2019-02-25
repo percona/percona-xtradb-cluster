@@ -225,11 +225,11 @@ install_deps() {
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         add_percona_yum_repo
         yum -y install https://repo.percona.com/yum/percona-release-latest.noarch.rpm || true
-        percona-release enable origin release
+        percona-release enable original release
         yum -y install epel-release
-        yum -y install git numactl-devel rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc 
+        yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc 
         yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata jemalloc-devel
-        yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel 
+        yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static
         yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
         until yum -y install centos-release-scl; do
             echo "waiting"
@@ -266,6 +266,7 @@ install_deps() {
         apt-get -y install build-essential devscripts
         apt-get -y install cmake autotools-dev autoconf automake build-essential devscripts debconf debhelper fakeroot
 	apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
+	apt-get -y install doxygen doxygen-gui graphviz rsync
         if [ x"${DIST}" = xcosmic ]; then
             apt-get -y install libssl1.0-dev libeatmydata1
         fi
@@ -348,8 +349,6 @@ build_srpm(){
     mv ${PXCDIR} Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
     tar -zcf Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}.tar.gz Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
     rm -rf ${PXCDIR}
-    #cp ${WORKDIR}/rpmbuild/SOURCES/${TARFILE} ${WORKDIR}/rpmbuild/SOURCES/Percona-XtraDB-Cluster-${MYSQL_VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION}.tar.gz
-    #cp ${WORKDIR}/rpmbuild/SOURCES/${TARFILE} ${WORKDIR}/rpmbuild/SOURCES/Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}.tar.gz
     cd ${WORKDIR}
     #
     sed -i "s:@@MYSQL_VERSION@@:${VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
@@ -653,7 +652,7 @@ build_tarball(){
     fi
     get_tar "source_tarball"
     cd $WORKDIR
-    TARFILE=$(basename $(find . -name 'percona-server-*.tar.gz' | sort | tail -n1))
+    TARFILE=$(basename $(find . -iname 'percona-xtradb-cluster*.tar.gz' | sort | tail -n1))
     if [ -f /etc/debian_version ]; then
       export OS_RELEASE="$(lsb_release -sc)"
     fi
@@ -666,56 +665,53 @@ build_tarball(){
     #
 
     ARCH=$(uname -m 2>/dev/null||true)
-    TARFILE=$(basename $(find . -name 'percona-server-*.tar.gz' | sort | grep -v "tools" | tail -n1))
-    NAME=$(echo ${TARFILE}| awk -F '-' '{print $1"-"$2}')
-    VERSION=$(echo ${TARFILE}| awk -F '-' '{print $3}')
-    #
-    SHORTVER=$(echo ${VERSION} | awk -F '.' '{print $1"."$2}')
-    TMPREL=$(echo ${TARFILE}| awk -F '-' '{print $4}')
-    RELEASE=${TMPREL%.tar.gz}
-    #
-    export CFLAGS=$(rpm --eval %{optflags} | sed -e "s|march=i386|march=i686|g")
-    export CXXFLAGS="${CFLAGS}"
-    if [ "${YASSL}" = 0 ]; then
-        if [ -f /etc/redhat-release ]; then
+    JVERSION=${JEMALLOC_VERSION:-4.0.0}
+
+    if [ -f /etc/redhat-release ]; then
+        RHEL=$(rpm --eval %rhel 2>/dev/null||true)
+        if [ ${RHEL} = 7 ]; then
+            SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//'| awk -F':' '{print $2}')
+            export SSL_VER=".ssl${SSL_VER_TMP}"  
+        else
             SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//')
             export SSL_VER=".ssl${SSL_VER_TMP}"
-        else
-            SSL_VER_TMP=$(dpkg -l|grep -i libssl|grep -v "libssl\-"|head -n1|awk '{print $2}'|awk -F ":" '{print $1}'|sed 's/libssl/ssl/g'|sed 's/\.//g')
-            export SSL_VER=".${SSL_VER_TMP}"
         fi
-    fi
-    
-    build_mecab_lib
-    build_mecab_dict
-    MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
-    rm -fr TARGET && mkdir TARGET
-    rm -rf jemalloc 
-    git clone https://github.com/jemalloc/jemalloc
-    (
-    cd jemalloc
-    git checkout 3.6.0
-    bash autogen.sh
-    )
-    #
-    rm -fr ${TARFILE%.tar.gz}
-    tar xvzf ${TARFILE}
-    cd ${TARFILE%.tar.gz}
-    if [ "${YASSL}" = 1 ]; then
-        DIRNAME="tarball_yassl"
-        bash -xe ./build-ps/build-binary.sh --with-jemalloc=../jemalloc/ --with-yassl --with-mecab="${MECAB_INSTALL_DIR}/usr" ../TARGET
     else
-        CMAKE_OPTS="-DWITH_ROCKSDB=1" bash -xe ./build-ps/build-binary.sh --with-mecab="${MECAB_INSTALL_DIR}/usr" --with-jemalloc=../jemalloc/ ../TARGET
-
-        DIRNAME="tarball"
+        SSL_VER_TMP=$(dpkg -l|grep -i libssl|grep -v "libssl\-"|head -n1|awk '{print $2}'|awk -F ":" '{print $1}'|sed 's/libssl/ssl/g'|sed 's/\.//g')
+        export SSL_VER=".${SSL_VER_TMP}"
     fi
 
+    ROOT_FS=$(pwd)
 
+    TARFILE=$(basename $(find . -iname 'Percona-XtraDB-Cluster*.tar.gz' | grep -v 'galera' | sort | tail -n1))
+    NAME="Percona-XtraDB-Cluster"
+    VERSION=$MYSQL_VERSION
+    RELEASE=$WSREP_VERSION
+
+    export PXC_DIRNAME=${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION}
+
+    tar zxf $TARFILE
+    rm -f $TARFILE
+    #
+    cd ${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION}
+    BUILD_NUMBER=$(date "+%Y%m%d-%H%M%S")
+    mkdir -p $BUILD_NUMBER
+
+    BUILD_ROOT="$ROOT_FS/$PXC_DIRNAME/$BUILD_NUMBER"
+    mkdir -p ${BUILD_ROOT}
+
+    rm -rf jemalloc
+    wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2
+    tar xf jemalloc-$JVERSION.tar.bz2
+    mv jemalloc-$JVERSION jemalloc 
+
+    export SCONS_ARGS=" strict_build_flags=0"
+    bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t 1.1 $BUILD_ROOT
+    mkdir -p ${WORKDIR}/tarball
+    mkdir -p ${CURDIR}/tarball
+    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/tarball
+    cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/tarball
     
-    mkdir -p ${WORKDIR}/${DIRNAME}
-    mkdir -p ${CURDIR}/${DIRNAME}
-    cp ../TARGET/*.tar.gz ${WORKDIR}/${DIRNAME}
-    cp ../TARGET/*.tar.gz ${CURDIR}/${DIRNAME}
 }
 
 #main
