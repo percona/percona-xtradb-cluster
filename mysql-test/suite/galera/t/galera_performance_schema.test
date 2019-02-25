@@ -60,6 +60,9 @@ insert into t values (3);
 --sleep 2
 --error ER_LOCK_DEADLOCK
 commit;
+#
 --replace_regex /[1-9][0-9]+/PREVIOUS_COUNT/
---eval select count(*) > $condvar from performance_schema.events_waits_current where event_name like '%COND_wsrep_rollback%';
+--let $wait_condition = select count(*) > $condvar from performance_schema.events_waits_current where event_name like '%COND_wsrep_rollback%';
+--source include/wait_condition.inc
+#
 drop table t;

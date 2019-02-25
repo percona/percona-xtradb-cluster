@@ -296,6 +296,60 @@ select * from t2;
 SET DEBUG_SYNC = 'RESET';
 drop table t;
 drop table t2;
+
+#-------------------------------------------------------------------------------
+#
+# 5. Explicit lock in form of HANDLER locks.
+#
+--connection node_1
+call mtr.add_suppression("Slave SQL: Error \'Table \'t\' already exists\' on query.*");
+--connection node_2
+call mtr.add_suppression("Slave SQL: Error \'Table \'t\' already exists\' on query.*");
+
+--connection node_1
+--echo #node-1 (this connection will take handler lock)
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1);
+handler t open h1;
+
+--connection node_2
+--echo #node-2 (this connection will issue a conflicting ddl)
+alter table t engine=innodb;
+
+--connection node_1a
+--echo #node-1a
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'Waiting for table metadata lock' and INFO = 'alter table t engine=innodb'
+--source include/wait_condition.inc
+
+--connection node_1
+--echo #node-1 (now close handler)
+handler h1 close;
+--error ER_TABLE_EXISTS_ERROR
+create table t (i int, primary key pk(i)) engine=innodb;
+drop table t;
+
+#-------------------------------------------------------------------------------
+#
+# 6. Explicit lock in form of get_lock locks.
+#
+--connection node_1
+--echo #node-1 (this connection will take user level lock)
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1);
+select get_lock('a', 10);
+
+--connection node_2
+--echo #node-2 (this connection will issue a conflicting ddl)
+alter table t engine=innodb;
+select sleep(5);
+
+--connection node_1
+--echo #node-1 (now release user level lock)
+select release_lock('a');
+--error ER_TABLE_EXISTS_ERROR
+create table t (i int, primary key pk(i)) engine=innodb;
+drop table t;
+
 #-------------------------------------------------------------------------------
 #
 # remove test-bed

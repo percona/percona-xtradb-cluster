@@ -13,9 +13,6 @@ INSERT INTO t1 (f1) VALUES (FLOOR( 1 + RAND( ) * 65535 ));
 END WHILE;
 END|
 CALL proc_insert();;
-SELECT VARIABLE_VALUE > 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
-VARIABLE_VALUE > 0
-1
 DROP PROCEDURE proc_insert;
 DROP TABLE t1;
 CALL mtr.add_suppression("conflict state 3 after post commit");
