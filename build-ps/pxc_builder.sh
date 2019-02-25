@@ -259,7 +259,7 @@ install_deps() {
         apt-get -y install libsasl2-modules:amd64 || apt-get -y install libsasl2-modules
         apt-get -y install dh-systemd || true
         apt-get -y install curl bison cmake perl libssl-dev gcc g++ libaio-dev libldap2-dev libwrap0-dev gdb unzip gawk
-        apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-openssl-dev
+        apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-gnutls-dev
         apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libeatmydata libc6-dbg valgrind libjson-perl python-mysqldb libsasl2-dev
 
         apt-get -y install libmecab2 mecab mecab-ipadic
@@ -627,6 +627,10 @@ build_deb(){
     if [ x"${DEBIAN_VERSION}" = xbionic ]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
+    if [ x"${DEBIAN_VERSION}" = xcosmic ]; then
+        sed -i "s:libssl-dev:libssl1.0-dev:" debian/control
+        sed -i "s:iproute:iproute2:g" debian/control
+    fi
     sudo chmod 777 debian/rules
     dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
@@ -735,7 +739,7 @@ DEB_RELEASE=1
 REVISION=0
 BRANCH="8.0"
 MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
-REPO="https://github.com/EvgeniyPatlan/percona-xtradb-cluster.git"
+REPO="https://github.com/percona/percona-xtradb-cluster.git"
 PRODUCT=Percona-XtraDB-Cluster-8.0
 MYSQL_VERSION=8.0.13
 MYSQL_RELEASE=3
