@@ -62,7 +62,8 @@ while ($count)
 # Confirm that some transaction replays occurred
 #
 
-SELECT VARIABLE_VALUE > 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
+--let $wait_condition = SELECT VARIABLE_VALUE > 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
+--source include/wait_condition.inc
 
 #
 # Terminate the stored procedure

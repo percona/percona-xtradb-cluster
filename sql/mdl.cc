@@ -4764,6 +4764,13 @@ void MDL_context::set_lock_duration(MDL_ticket *mdl_ticket,
   DBUG_ASSERT(mdl_ticket->m_duration == MDL_TRANSACTION &&
               duration != MDL_TRANSACTION);
   m_ticket_store.remove(MDL_TRANSACTION, mdl_ticket);
+#ifdef WITH_WSREP
+  /* This will take care of HANDLER <table> OPEN <handler-name> lock
+  construct and other such construct that exercise use of explicit lock. */
+  if (duration == MDL_EXPLICIT) {
+    mdl_ticket->set_wsrep_non_preemptable_status(true);
+  }
+#endif /* WITH_WSREP */
   m_ticket_store.push_front(duration, mdl_ticket);
 
 #ifndef DBUG_OFF

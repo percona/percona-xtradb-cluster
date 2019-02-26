@@ -178,5 +178,37 @@ SET GLOBAL wsrep_debug = 0;
 SET DEBUG_SYNC = 'RESET';
 drop table t;
 drop table t2;
+call mtr.add_suppression("Slave SQL: Error \'Table \'t\' already exists\' on query.*");
+call mtr.add_suppression("Slave SQL: Error \'Table \'t\' already exists\' on query.*");
+#node-1 (this connection will take handler lock)
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1);
+handler t open h1;
+#node-2 (this connection will issue a conflicting ddl)
+alter table t engine=innodb;
+#node-1a
+#node-1 (now close handler)
+handler h1 close;
+create table t (i int, primary key pk(i)) engine=innodb;
+ERROR 42S01: Table 't' already exists
+drop table t;
+#node-1 (this connection will take user level lock)
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1);
+select get_lock('a', 10);
+get_lock('a', 10)
+1
+#node-2 (this connection will issue a conflicting ddl)
+alter table t engine=innodb;
+select sleep(5);
+sleep(5)
+0
+#node-1 (now release user level lock)
+select release_lock('a');
+release_lock('a')
+1
+create table t (i int, primary key pk(i)) engine=innodb;
+ERROR 42S01: Table 't' already exists
+drop table t;
 set @@wsrep_replicate_myisam = 0;;
 SET DEBUG_SYNC = "reset";
