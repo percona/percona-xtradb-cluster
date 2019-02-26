@@ -437,14 +437,23 @@ EOF
     # start mysql-upgrade execution.
     #-----------------------------------------------------------------------
     if [[ $rsync_sst_success -eq 1 ]]; then
-        if [[ "$auto_upgrade" == "on" ]]; then
-            wsrep_log_info "Running mysql-upgrade..........."
-            set +e
-            run_mysql_upgrade "$WSREP_SST_OPT_DATA" "$RSYNC_PORT"
-            set -e
-            wsrep_log_info "...........upgrade done"
+        if [[ $auto_upgrade == "on" ]]; then
+            run_upgrade=1
         else
+            run_upgrade=0
             wsrep_log_info "auto-upgrade disabled by configuration"
+        fi
+
+        wsrep_log_info "Running post-processing ..........."
+        set +e
+        run_post_processing_steps "$WSREP_SST_OPT_DATA" "$RSYNC_PORT" $run_upgrade
+        errcode=$?
+        set -e
+        if [[ $errcode -ne 0 ]]; then
+            wsrep_log_info "...........post-processing failed.  Exiting"
+            exit $errcode
+        else
+            wsrep_log_info "...........post-processing done"
         fi
     fi
 else

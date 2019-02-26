@@ -334,27 +334,18 @@ function get_length_in_bytes()
 {
     local str=$1
     local byte_len=0
-    local orig_lang=""
-    local orig_locale=""
 
-    if [ -n "${LANG:-}" ]; then
-        orig_lang=$LANG
-    fi
-
-    if [ -n "${LC_ALL:-}" ]; then
-        orig_locale=$LC_ALL
-    fi
-
-    LANG=C LC_ALL=C
-    byte_len=${#str}
-
-    LANG=$orig_lang LC_ALL=$orig_locale
-
-    echo $byte_len
+    # Run this in a sub-shell
+    (
+        LANG=C LC_ALL=C
+        byte_len=${#str}
+        echo $byte_len
+    ) || true
 }
 
 
-# Runs mysql_upgrade on the datadir (argument 1)
+# Runs any post-processing steps needed
+# (after the datadir has been moved)
 #
 # Globals
 #   MYSQLD_NAME
@@ -371,11 +362,17 @@ function get_length_in_bytes()
 # Arguments
 #   Argument 1: Path to the datadir
 #   Argument 2: Port to be used by mysqld
+#   Argument 3: Set to 0 to skip mysql_upgrade, 1 to run mysql_upgrade
 #
-function run_mysql_upgrade()
+# Returns:
+#   0 if successful (no errors encountered)
+#   <non-zero> otherwise
+#
+function run_post_processing_steps()
 {
     local datadir=$1
     local port=$2
+    local run_mysql_upgrade=$3
 
     # Path to the binary locations
     local mysqld_path=""
@@ -385,7 +382,7 @@ function run_mysql_upgrade()
 
     local upgrade_tmpdir
     local mysql_upgrade_dir_path
-    local use_mysql_upgrade_conf_suffix
+    local use_mysql_upgrade_conf_suffix=""
 
     # Locate mysqld
     # mysqld (depending on the distro) may be in a different
@@ -404,50 +401,56 @@ function run_mysql_upgrade()
     fi
     if [[ -z $mysqld_path ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Could not locate ${MYSQLD_NAME} (needed to run mysql_upgrade)"
+        wsrep_log_error "Could not locate ${MYSQLD_NAME} (needed for post-processing)"
         wsrep_log_error "Please ensure that ${MYSQLD_NAME} is in the path"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        exit 2
+        return 2
     fi
     wsrep_log_debug "Found the ${MYSQLD_NAME} binary in ${mysqld_path}"
     wsrep_log_debug "--$("$mysqld_path" --version | cut -d' ' -f2-)"
 
     # Verify any other needed programs
-    wsrep_check_program "${MYSQL_UPGRADE_NAME}"
-    if [[ $? -ne 0 ]]; then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Could not locate ${MYSQLD_UPGRADE_NAME} (needed for upgrade)"
-        wsrep_log_error "Please ensure that ${MYSQLD_UPGRADE_NAME} is in the path"
-        wsrep_log_error "Line $LINENO"
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        exit 2
+    if [[ $run_mysql_upgrade -eq 1 ]]; then
+        wsrep_check_program "${MYSQL_UPGRADE_NAME}"
+        if [[ $? -ne 0 ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "Could not locate ${MYSQLD_UPGRADE_NAME} (needed for upgrade)"
+            wsrep_log_error "Please ensure that ${MYSQLD_UPGRADE_NAME} is in the path"
+            wsrep_log_error "Line $LINENO"
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            return 2
+        fi
     fi
     wsrep_check_program "${MYSQLADMIN_NAME}"
     if [[ $? -ne 0 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Could not locate ${MYSQLADMIN_NAME} (needed for upgrade)"
+        wsrep_log_error "Could not locate ${MYSQLADMIN_NAME} (needed for post-processing)"
         wsrep_log_error "Please ensure that ${MYSQLADMIN_NAME} is in the path"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        exit 2
+        return 2
     fi
     wsrep_check_program "${MYSQL_CLIENT_NAME}"
     if [[ $? -ne 0 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Could not locate ${MYSQL_CLIENT_NAME} (needed for upgrade)"
+        wsrep_log_error "Could not locate ${MYSQL_CLIENT_NAME} (needed for post-processing)"
         wsrep_log_error "Please ensure that ${MYSQL_CLIENT_NAME} is in the path"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        exit 2
+        return 2
     fi
 
-    mysql_upgrade_path=$(which ${MYSQL_UPGRADE_NAME})
+
+    if [[ $run_mysql_upgrade -eq 1 ]]; then
+        mysql_upgrade_path=$(which ${MYSQL_UPGRADE_NAME})
+        wsrep_log_debug "Found the ${MYSQL_UPGRADE_NAME} binary in ${mysql_upgrade_path}"
+        wsrep_log_debug "--$("$mysql_upgrade_path" --version | cut -d' ' -f2-)"
+    fi
+
     mysqladmin_path=$(which ${MYSQLADMIN_NAME})
     mysql_client_path=$(which ${MYSQL_CLIENT_NAME})
 
-    wsrep_log_debug "Found the ${MYSQL_UPGRADE_NAME} binary in ${mysql_upgrade_path}"
-    wsrep_log_debug "--$("$mysql_upgrade_path" --version | cut -d' ' -f2-)"
     wsrep_log_debug "Found the ${MYSQLADMIN_NAME} binary in ${mysqladmin_path}"
     wsrep_log_debug "--$("$mysqladmin_path" --version | cut -d' ' -f2-)"
     wsrep_log_debug "Found the ${MYSQL_CLIENT_NAME} binary in ${mysql_client_path}"
@@ -511,7 +514,7 @@ function run_mysql_upgrade()
         wsrep_log_error "  $upgrade_socket"
         wsrep_log_error "Line $LINENO"
         wsrep_log_error "****************************************************** "
-        exit 3
+        return 3
     fi
 
     wsrep_log_debug "Starting the MySQL server used by mysql_upgrade"
@@ -564,7 +567,7 @@ EOF
             cat ${mysql_upgrade_dir_path}/err.log >&2
             echo "--------------- err.log (END) ----------------------" >&2
             wsrep_log_error "****************************************************** "
-            exit 3
+            return 3
         fi
 
         $mysqladmin_path ping --socket=$upgrade_socket &> /dev/null
@@ -590,39 +593,42 @@ EOF
             cat ${mysql_upgrade_dir_path}/err.log >&2
             echo "--------------- mysql error log (END) ----------------------" >&2
             wsrep_log_error "****************************************************** "
-            exit 3
+            return 3
         fi
     done
     wsrep_log_debug "MySQL server($mysql_pid) started"
 
     #-----------------------------------------------------------------------
     # run mysql-upgrade
-    wsrep_log_debug "Starting mysql_upgrade"
-    $mysql_upgrade_path \
-        --defaults-file=/dev/stdin \
-        --force \
-        --socket=$upgrade_socket \
-        &> ${mysql_upgrade_dir_path}/upgrade.out <<EOF
+    if [[ $run_mysql_upgrade -eq 1 ]]; then
+        wsrep_log_info "Running mysql_upgrade"
+        wsrep_log_debug "Starting mysql_upgrade"
+        $mysql_upgrade_path \
+            --defaults-file=/dev/stdin \
+            --force \
+            --socket=$upgrade_socket \
+            &> ${mysql_upgrade_dir_path}/upgrade.out <<EOF
 [mysql_upgrade]
 user=${WSREP_SST_OPT_USER}
 password="${WSREP_SST_OPT_PSWD}"
 EOF
-    errcode=$?
-    if [[ $errcode -ne 0 ]]; then
-        kill -9 $mysql_pid
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Failed to execute mysql-upgrade. Check the parameters and retry"
-        wsrep_log_error "Line $LINENO errcode:${errcode}"
-        echo "--------------- mysql_upgrade log (START) --------------------" >&2
-        cat ${mysql_upgrade_dir_path}/upgrade.out >&2
-        echo "--------------- mysql_upgrade log (END) ----------------------" >&2
-        echo "--------------- mysql error log  (START) --------------------" >&2
-        cat ${mysql_upgrade_dir_path}/err.log >&2
-        echo "--------------- mysql error log (END) ----------------------" >&2
-        wsrep_log_error "****************************************************** "
-        exit 3
+        errcode=$?
+        if [[ $errcode -ne 0 ]]; then
+            kill -9 $mysql_pid
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "Failed to execute mysql-upgrade. Check the parameters and retry"
+            wsrep_log_error "Line $LINENO errcode:${errcode}"
+            echo "--------------- mysql_upgrade log (START) --------------------" >&2
+            cat ${mysql_upgrade_dir_path}/upgrade.out >&2
+            echo "--------------- mysql_upgrade log (END) ----------------------" >&2
+            echo "--------------- mysql error log  (START) --------------------" >&2
+            cat ${mysql_upgrade_dir_path}/err.log >&2
+            echo "--------------- mysql error log (END) ----------------------" >&2
+            wsrep_log_error "****************************************************** "
+            exit 3
+        fi
+        wsrep_log_debug "mysql_upgrade completed"
     fi
-    wsrep_log_debug "mysql_upgrade completed"
 
     #-----------------------------------------------------------------------
     # Stop replication activity
@@ -650,7 +656,7 @@ EOF
         cat ${mysql_upgrade_dir_path}/err.log >&2
         echo "--------------- mysql error log (END) ----------------------" >&2
         wsrep_log_error "****************************************************** "
-        exit 3
+        return 3
     fi
     wsrep_log_debug "Async Slave Reset completed"
 
@@ -683,7 +689,7 @@ EOF
         cat ${mysql_upgrade_dir_path}/err.log >&2
         echo "--------------- mysql error log (END) ----------------------" >&2
         wsrep_log_error "****************************************************** "
-        exit 3
+        return 3
     fi
 
     # Wait until the mysqld instance has shut down
@@ -717,6 +723,7 @@ EOF
     rm -rf $datadir/*.pem || true
     rm -rf $datadir/auto.cnf || true
 
+    return 0
 }
 
 

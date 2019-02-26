@@ -2210,14 +2210,35 @@ then
         #  Run this AFTER the move to ensure that all of the data files have been
         #  placed correctly (especially for files that live outside of the datadir).
         #-----------------------------------------------------------------------
-        if [[ "$auto_upgrade" == "on" ]]; then
-            wsrep_log_info "Running mysql-upgrade..........."
-            set +e
-            timeit "${stagemsg}-mysql_upgrade" run_mysql_upgrade "$TDATA" "${WSREP_SST_OPT_PORT:-4444}"
-            set -e
-            wsrep_log_info "...........upgrade done"
+        if [[ $auto_upgrade == "on" ]]; then
+            run_upgrade=1
+
+            # Truncate the version numbers (we want the major.minor.revision
+            # version like "5.6.35", not "5.6.35-...")
+            # version upgrades go to the revision number
+            local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+            donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+
+            # Skip the upgrade if doing an SST with nodes of the same version
+            if [[ $local_version_str == $donor_version_str ]]; then
+                wsrep_log_debug "Skipping mysql_upgrade: local/donor versions are the same: $local_version_str"
+                run_upgrade=0
+            fi
         else
-            wsrep_log_info "auto-upgrade disabled by configuration"
+            run_upgrade=0
+            wsrep_log_info "Skipping mysql_upgrade: auto-upgrade disabled by configuration"
+        fi
+
+        wsrep_log_info "Running post-processing..........."
+        set +e
+        timeit "${stagemsg}-post-processing" run_post_processing_steps "$TDATA" "${WSREP_SST_OPT_PORT:-4444}" $run_upgrade
+        errcode=$?
+        set -e
+        if [[ $errcode -ne 0 ]]; then
+            wsrep_log_info "...........post-processing failed.  Exiting"
+            exit $errcode
+        else
+            wsrep_log_info "...........post-processing done"
         fi
 
         wsrep_log_debug "Move successful, removing ${DATA}"
