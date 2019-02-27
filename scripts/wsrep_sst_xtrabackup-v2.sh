@@ -298,6 +298,14 @@ check_for_dhparams()
     if [[ -z "$ssl_dhparams" ]]; then
         if ! [[ -r "$DATA/dhparams.pem" ]]; then
             wsrep_check_programs openssl
+            if [[ $? -ne 0 ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "Could not locate 'openssl'"
+                wsrep_log_error "Please ensure that openssl is installed and is in the path"
+                wsrep_log_error "Line $LINENO"
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                exit 2
+            fi
             wsrep_log_info "Could not find dhparams file, creating $DATA/dhparams.pem"
 
             if ! openssl dhparam -out "$DATA/dhparams.pem" 2048 >/dev/null 2>&1
@@ -327,6 +335,14 @@ verify_cert_matches_key()
     local key_path=$2
 
     wsrep_check_programs openssl diff
+    if [[ $? -ne 0 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Could not locate 'openssl' or 'diff'"
+        wsrep_log_error "Please ensure that openssl and diff are installed and in the path"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        exit 2
+    fi
 
     # generate the public key from the cert and the key
     # they should match (otherwise we can't create an SSL connection)
@@ -354,6 +370,14 @@ verify_ca_matches_cert()
     local cert_path=$2
 
     wsrep_check_programs openssl
+    if [[ $? -ne 0 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Could not locate 'openssl'"
+        wsrep_log_error "Please ensure that openssl is installed and is in the path"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        exit 2
+    fi
 
     if ! openssl verify -verbose -CAfile "$ca_path" "$cert_path" >/dev/null  2>&1
     then
@@ -655,6 +679,8 @@ read_cnf()
 
     auto_upgrade=$(parse_cnf sst auto-upgrade "")
     auto_upgrade=$(normalize_boolean "$auto_upgrade" "on")
+    force_upgrade=$(parse_cnf sst force-upgrade "")
+    force_upgrade=$(normalize_boolean "$force_upgrade" "off")
 
     ssl_dhparams=$(parse_cnf sst ssl-dhparams "")
 
@@ -1223,42 +1249,6 @@ send_data_from_donor_to_joiner()
             exit 32
         fi
     done
-}
-
-# Returns the version string in a standardized format
-# Input "1.2.3" => echoes "010203"
-# Wrongly formatted values => echoes "000000"
-normalize_version()
-{
-    local major=0
-    local minor=0
-    local patch=0
-
-    # Only parses purely numeric version numbers, 1.2.3 
-    # Everything after the first three values are ignored
-    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([^ ])* ]]; then
-        major=${BASH_REMATCH[1]}
-        minor=${BASH_REMATCH[2]}
-        patch=${BASH_REMATCH[3]}
-    fi
-
-    printf %02d%02d%02d $major $minor $patch
-}
-
-# Compares two version strings
-# The first parameter is the version to be checked
-# The second parameter is the minimum version required
-# Returns 0 (success) if $1 >= $2, 1 (failure) otherwise
-check_for_version()
-{
-    local local_version_str="$( normalize_version $1 )"
-    local required_version_str="$( normalize_version $2 )"
-
-    if [[ "$local_version_str" < "$required_version_str" ]]; then
-        return 1
-    else
-        return 0
-    fi
 }
 
 #
@@ -2210,14 +2200,17 @@ then
         #  Run this AFTER the move to ensure that all of the data files have been
         #  placed correctly (especially for files that live outside of the datadir).
         #-----------------------------------------------------------------------
-        if [[ $auto_upgrade == "on" ]]; then
-            run_upgrade=1
 
-            # Truncate the version numbers (we want the major.minor.revision
-            # version like "5.6.35", not "5.6.35-...")
-            # version upgrades go to the revision number
-            local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
-            donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+        # Truncate the version numbers (we want the major.minor.revision
+        # version like "5.6.35", not "5.6.35-...")
+        # version upgrades go to the revision number
+        local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+        donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+
+        if [[ $force_upgrade == "on" ]]; then
+            run_upgrade=1
+        elif [[ $auto_upgrade == "on" ]]; then
+            run_upgrade=1
 
             # Skip the upgrade if doing an SST with nodes of the same version
             if [[ $local_version_str == $donor_version_str ]]; then
@@ -2231,7 +2224,7 @@ then
 
         wsrep_log_info "Running post-processing..........."
         set +e
-        timeit "${stagemsg}-post-processing" run_post_processing_steps "$TDATA" "${WSREP_SST_OPT_PORT:-4444}" $run_upgrade
+        timeit "${stagemsg}-post-processing" run_post_processing_steps "$TDATA" "${WSREP_SST_OPT_PORT:-4444}" $run_upgrade $donor_version_str
         errcode=$?
         set -e
         if [[ $errcode -ne 0 ]]; then
