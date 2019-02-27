@@ -94,7 +94,7 @@ add_percona_apt_repo(){
     mv /etc/apt/sources.list.d/percona-dev.list.template /etc/apt/sources.list.d/percona-dev.list
     sed -i "s:@@DIST@@:$OS_NAME:g" /etc/apt/sources.list.d/percona-dev.list
   fi
- 
+
   wget -q -O - http://jenkins.percona.com/apt-repo/8507EFA5.pub | sudo apt-key add -
   wget -q -O - http://jenkins.percona.com/apt-repo/CD2EFD2A.pub | sudo apt-key add -
   return
@@ -152,7 +152,7 @@ get_sources(){
     #
     if [ -z "${DESTINATION:-}" ]; then
     export DESTINATION=experimental
-    fi 
+    fi
     DESTINATION="UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${BUILD_NUMBER}/${REVISION}"
     echo "DESTINATION=UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${BUILD_NUMBER}/${REVISION}" >> ${WORKDIR}/pxc-80.properties
     echo "GALERA_REVNO=${GALERA_REVNO}" >>${WORKDIR}/pxc-80.properties
@@ -175,13 +175,9 @@ get_sources(){
     # add git submodules because make dist uses git archive which doesn't include them
     rsync -av ${WORKDIR}/percona-xtradb-cluster/percona-xtradb-cluster-galera/ ${PXCDIR}/percona-xtradb-cluster-galera --exclude .git
 
-    #rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep ${PXCDIR}/percona-xtradb-cluster-galera/wsrep --exclude .git
-
     rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep/src/ ${PXCDIR}/percona-xtradb-cluster-galera/wsrep/src --exclude .git
     rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep/src/ ${PXCDIR}/wsrep/src --exclude .git
 
-
-    #rsync -av ${WORKDIR}/percona-xtradb-cluster/proxysql/ ${PXCDIR}/proxysql --exclude .git
     cd ${WORKDIR}
     #
     tar --owner=0 --group=0 --exclude=.bzr --exclude=.git -czf ${PXCDIR}.tar.gz ${PXCDIR}
@@ -193,7 +189,7 @@ get_sources(){
     cp ${PXCDIR}.tar.gz $WORKDIR/source_tarball
     cp ${PXCDIR}.tar.gz $CURDIR/source_tarball
     cd $CURDIR
-    rm -rf percona-server  
+    rm -rf percona-xtradb-cluster
     return
 }
 
@@ -223,28 +219,32 @@ install_deps() {
         exit 1
     fi
     CURPLACE=$(pwd)
-    
+
     if [ "x$OS" = "xrpm" ]; then
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         add_percona_yum_repo
         yum -y install https://repo.percona.com/yum/percona-release-latest.noarch.rpm || true
-        percona-release enable origin release
+        percona-release enable original release
         yum -y install epel-release
-        yum -y install git numactl-devel rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc 
+        yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc 
         yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata jemalloc-devel
-        yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel 
+        yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static
         yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
-        if [ ${RHEL} -lt 7 -a $(uname -m) = x86_64 ]; then
-            yum -y install percona-devtoolset-gcc percona-devtoolset-gcc-c++ percona-devtoolset-binutils 
-        fi
+        until yum -y install centos-release-scl; do
+            echo "waiting"
+            sleep 1
+        done
+        yum -y install  gcc-c++ devtoolset-7-gcc-c++ devtoolset-7-binutils
         if [ "x$RHEL" = "x6" ]; then
-            yum -y install Percona-Server-shared-56  
+            yum -y install Percona-Server-shared-56
         fi
+        source /opt/rh/devtoolset-7/enable
+        yum -y install scons check-devel boost-devel
     else
         apt-get -y install dirmngr || true
         add_percona_apt_repo
-      	apt-get update
+        apt-get update
         apt-get -y install dirmngr || true
         apt-get -y install lsb-release wget
         export DEBIAN_FRONTEND="noninteractive"
@@ -259,13 +259,17 @@ install_deps() {
         apt-get -y install libsasl2-modules:amd64 || apt-get -y install libsasl2-modules
         apt-get -y install dh-systemd || true
         apt-get -y install curl bison cmake perl libssl-dev gcc g++ libaio-dev libldap2-dev libwrap0-dev gdb unzip gawk
-        apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-openssl-dev
+        apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-gnutls-dev
         apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libeatmydata libc6-dbg valgrind libjson-perl python-mysqldb libsasl2-dev
 
         apt-get -y install libmecab2 mecab mecab-ipadic
         apt-get -y install build-essential devscripts
         apt-get -y install cmake autotools-dev autoconf automake build-essential devscripts debconf debhelper fakeroot
-	apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check 
+	apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
+	apt-get -y install doxygen doxygen-gui graphviz rsync
+        if [ x"${DIST}" = xcosmic ]; then
+            apt-get -y install libssl1.0-dev libeatmydata1
+        fi
     fi
     return;
 }
@@ -323,37 +327,62 @@ build_srpm(){
     cd $WORKDIR
     get_tar "source_tarball"
     rm -fr rpmbuild
-    ls | grep -v percona-server*.tar.* | xargs rm -rf
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
 
-    TARFILE=$(basename $(find . -name 'percona-server-*.tar.gz' | sort | tail -n1))
-    NAME=$(echo ${TARFILE}| awk -F '-' '{print $1"-"$2}')
-    VERSION=$(echo ${TARFILE}| awk -F '-' '{print $3}')
-    #
-    SHORTVER=$(echo ${VERSION} | awk -F '.' '{print $1"."$2}')
-    TMPREL=$(echo ${TARFILE}| awk -F '-' '{print $4}')
-    RELEASE=${TMPREL%.tar.gz}
-    #
+    TARFILE=$(basename $(find . -iname 'Percona-XtraDB-Cluster-*.tar.gz' | sort | tail -n1))
+    NAME="Percona-XtraDB-Cluster"
+    VERSION=$MYSQL_VERSION
+    RELEASE=$MYSQL_RELEASE
+
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
     #
     cd ${WORKDIR}/rpmbuild/SPECS
     tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/*.spec' --strip=2
     #
-    cd ${WORKDIR}/rpmbuild/SOURCES
-    #wget http://downloads.sourceforge.net/boost/${BOOST_PACKAGE_NAME}.tar.bz2
-    wget http://jenkins.percona.com/downloads/boost/${BOOST_PACKAGE_NAME}.tar.gz
-    tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/rpm/*.patch' --strip=3
-    tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/rpm/filter-provides.sh' --strip=3
-    tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/rpm/filter-requires.sh' --strip=3
-    tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/rpm/mysql_config.sh' --strip=3
-    tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/rpm/my_config.h' --strip=3
-    #
     cd ${WORKDIR}
     #
     mv -fv ${TARFILE} ${WORKDIR}/rpmbuild/SOURCES
+    cd ${WORKDIR}/rpmbuild/SOURCES
+    tar -xzf ${TARFILE}
+    rm -rf ${TARFILE}
+    PXCDIR=$(ls | grep 'Percona-XtraDB-Cluster*' | sort | tail -n1)
+    mv ${PXCDIR} Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
+    tar -zcf Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}.tar.gz Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
+    rm -rf ${PXCDIR}
+    cd ${WORKDIR}
     #
-    rpmbuild -bs --define "_topdir ${WORKDIR}/rpmbuild" --define "dist .generic" rpmbuild/SPECS/percona-server.spec
+    sed -i "s:@@MYSQL_VERSION@@:${VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+    sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+    sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+    sed -i "s:@@REVISION@@:${REVISION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
+
     #
+
+    SRCRPM=$(find . -name *.src.rpm)
+    RHEL=$(rpm --eval %rhel)
+    #
+    ARCH=$(uname -m)
+    if [ ${ARCH} = i686 ]; then
+        ARCH=i386
+    fi
+
+    if test "x$(uname -m)" == "xx86_64"
+    then
+        SCONS_ARGS="bpostatic=/usr/lib64/libboost_program_options.a"
+    else
+        SCONS_ARGS=""
+    fi
+    source ${WORKDIR}/pxc-80.properties
+    if [ -n ${SRCRPM} ]; then
+        if test "x${SCONS_ARGS}" == "x"
+        then
+            rpmbuild -bs --define "_topdir ${WORKDIR}/rpmbuild" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "dist generic" rpmbuild/SPECS/percona-xtradb-cluster.spec
+        else
+            rpmbuild -bs --define "_topdir ${WORKDIR}/rpmbuild" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "dist generic" --define "scons_args ${SCONS_ARGS}" rpmbuild/SPECS/percona-xtradb-cluster.spec
+        fi
+    fi
+    #
+    echo "RPM_RELEASE=$RPM_RELEASE" >> pxc-80.properties
 
     mkdir -p ${WORKDIR}/srpm
     mkdir -p ${CURDIR}/srpm
@@ -416,10 +445,10 @@ build_rpm(){
         echo "It is not possible to build rpm here"
         exit 1
     fi
-    SRC_RPM=$(basename $(find $WORKDIR/srpm -name 'Percona-Server-*.src.rpm' | sort | tail -n1))
+    SRC_RPM=$(basename $(find $WORKDIR/srpm -iname 'percona-xtradb-cluster*.src.rpm' | sort | tail -n1))
     if [ -z $SRC_RPM ]
     then
-        SRC_RPM=$(basename $(find $CURDIR/srpm -name 'Percona-Server-*.src.rpm' | sort | tail -n1))
+        SRC_RPM=$(basename $(find $CURDIR/srpm -iname 'percona-xtradb-cluster*.src.rpm' | sort | tail -n1))
         if [ -z $SRC_RPM ]
         then
             echo "There is no src rpm for build"
@@ -446,22 +475,16 @@ build_rpm(){
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
     #
     mv *.src.rpm rpmbuild/SRPMS
-    #
-    if [ ${ARCH} = x86_64 ]; then
-        if [ ${RHEL} != 7 ]; then
-            source /opt/percona-devtoolset/enable
-        fi
-    fi
-
+    source /opt/rh/devtoolset-7/enable
     build_mecab_lib
     build_mecab_dict
 
     cd ${WORKDIR}
     #
     if [ ${ARCH} = x86_64 ]; then
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist .el${RHEL}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     else
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist .el${RHEL}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     fi
     return_code=$?
     if [ $return_code != 0 ]; then
@@ -604,6 +627,10 @@ build_deb(){
     if [ x"${DEBIAN_VERSION}" = xbionic ]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
+    if [ x"${DEBIAN_VERSION}" = xcosmic ]; then
+        sed -i "s:libssl-dev:libssl1.0-dev:" debian/control
+        sed -i "s:iproute:iproute2:g" debian/control
+    fi
     sudo chmod 777 debian/rules
     dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
@@ -629,7 +656,7 @@ build_tarball(){
     fi
     get_tar "source_tarball"
     cd $WORKDIR
-    TARFILE=$(basename $(find . -name 'percona-server-*.tar.gz' | sort | tail -n1))
+    TARFILE=$(basename $(find . -iname 'percona-xtradb-cluster*.tar.gz' | sort | tail -n1))
     if [ -f /etc/debian_version ]; then
       export OS_RELEASE="$(lsb_release -sc)"
     fi
@@ -637,60 +664,58 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
       export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
       RHEL=$(rpm --eval %rhel)
+      source /opt/rh/devtoolset-7/enable
     fi
     #
 
     ARCH=$(uname -m 2>/dev/null||true)
-    TARFILE=$(basename $(find . -name 'percona-server-*.tar.gz' | sort | grep -v "tools" | tail -n1))
-    NAME=$(echo ${TARFILE}| awk -F '-' '{print $1"-"$2}')
-    VERSION=$(echo ${TARFILE}| awk -F '-' '{print $3}')
-    #
-    SHORTVER=$(echo ${VERSION} | awk -F '.' '{print $1"."$2}')
-    TMPREL=$(echo ${TARFILE}| awk -F '-' '{print $4}')
-    RELEASE=${TMPREL%.tar.gz}
-    #
-    export CFLAGS=$(rpm --eval %{optflags} | sed -e "s|march=i386|march=i686|g")
-    export CXXFLAGS="${CFLAGS}"
-    if [ "${YASSL}" = 0 ]; then
-        if [ -f /etc/redhat-release ]; then
+    JVERSION=${JEMALLOC_VERSION:-4.0.0}
+
+    if [ -f /etc/redhat-release ]; then
+        RHEL=$(rpm --eval %rhel 2>/dev/null||true)
+        if [ ${RHEL} = 7 ]; then
+            SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//'| awk -F':' '{print $2}')
+            export SSL_VER=".ssl${SSL_VER_TMP}"  
+        else
             SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//')
             export SSL_VER=".ssl${SSL_VER_TMP}"
-        else
-            SSL_VER_TMP=$(dpkg -l|grep -i libssl|grep -v "libssl\-"|head -n1|awk '{print $2}'|awk -F ":" '{print $1}'|sed 's/libssl/ssl/g'|sed 's/\.//g')
-            export SSL_VER=".${SSL_VER_TMP}"
         fi
-    fi
-    
-    build_mecab_lib
-    build_mecab_dict
-    MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
-    rm -fr TARGET && mkdir TARGET
-    rm -rf jemalloc 
-    git clone https://github.com/jemalloc/jemalloc
-    (
-    cd jemalloc
-    git checkout 3.6.0
-    bash autogen.sh
-    )
-    #
-    rm -fr ${TARFILE%.tar.gz}
-    tar xvzf ${TARFILE}
-    cd ${TARFILE%.tar.gz}
-    if [ "${YASSL}" = 1 ]; then
-        DIRNAME="tarball_yassl"
-        bash -xe ./build-ps/build-binary.sh --with-jemalloc=../jemalloc/ --with-yassl --with-mecab="${MECAB_INSTALL_DIR}/usr" ../TARGET
     else
-        CMAKE_OPTS="-DWITH_ROCKSDB=1" bash -xe ./build-ps/build-binary.sh --with-mecab="${MECAB_INSTALL_DIR}/usr" --with-jemalloc=../jemalloc/ ../TARGET
-
-        DIRNAME="tarball"
+        SSL_VER_TMP=$(dpkg -l|grep -i libssl|grep -v "libssl\-"|head -n1|awk '{print $2}'|awk -F ":" '{print $1}'|sed 's/libssl/ssl/g'|sed 's/\.//g')
+        export SSL_VER=".${SSL_VER_TMP}"
     fi
 
+    ROOT_FS=$(pwd)
 
+    TARFILE=$(basename $(find . -iname 'Percona-XtraDB-Cluster*.tar.gz' | grep -v 'galera' | sort | tail -n1))
+    NAME="Percona-XtraDB-Cluster"
+    VERSION=$MYSQL_VERSION
+    RELEASE=$WSREP_VERSION
+
+    export PXC_DIRNAME=${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION}
+
+    tar zxf $TARFILE
+    rm -f $TARFILE
+    #
+    cd ${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION}
+    BUILD_NUMBER=$(date "+%Y%m%d-%H%M%S")
+    mkdir -p $BUILD_NUMBER
+
+    BUILD_ROOT="$ROOT_FS/$PXC_DIRNAME/$BUILD_NUMBER"
+    mkdir -p ${BUILD_ROOT}
+
+    rm -rf jemalloc
+    wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2
+    tar xf jemalloc-$JVERSION.tar.bz2
+    mv jemalloc-$JVERSION jemalloc 
+
+    export SCONS_ARGS=" strict_build_flags=0"
+    bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t 1.1 $BUILD_ROOT
+    mkdir -p ${WORKDIR}/tarball
+    mkdir -p ${CURDIR}/tarball
+    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/tarball
+    cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/tarball
     
-    mkdir -p ${WORKDIR}/${DIRNAME}
-    mkdir -p ${CURDIR}/${DIRNAME}
-    cp ../TARGET/*.tar.gz ${WORKDIR}/${DIRNAME}
-    cp ../TARGET/*.tar.gz ${CURDIR}/${DIRNAME}
 }
 
 #main
@@ -732,4 +757,3 @@ build_srpm
 build_source_deb
 build_rpm
 build_deb
-

@@ -1,4 +1,0 @@
-var/run
-etc/mysql/conf.d
-var/lib/mysql-files
-
