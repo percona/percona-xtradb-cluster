@@ -14,6 +14,7 @@ Percona provides packages for popular DEB-based and RPM-based distributions:
 * Ubuntu 16.04 LTS (Xenial Xerus)
 * Ubuntu 17.10 (Artful Aardvark)
 * Ubuntu 18.04 LTS (Bionic Beaver)
+* Ubuntu 18.10 (Cosmic Cuttlefish)
 * Red Hat Enterprise Linux / CentOS 6
 * Red Hat Enterprise Linux / CentOS 7
 
