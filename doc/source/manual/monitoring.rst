@@ -36,7 +36,7 @@ Metrics collection (i.e., long-term graphing) on the cluster should be done on:
  * Number of transactions in and out in bytes (:variable:`wsrep_replicated_bytes`, :variable:`wsrep_received_bytes`)
  * Replication conflicts (:variable:`wsrep_local_cert_failures` and :variable:`wsrep_local_bf_aborts`)
 
-Using |PMM|
+Using |pmm|
 ===========
 
 `Percona Monitoring and Management <https://www.percona.com/doc/percona-monitoring-and-management/index.html>`_ includes two dashboards to monitor PXC: 
@@ -53,9 +53,11 @@ These dashboards are available from the menu:
 
 .. image:: pmm.menu.ha.png
 
-Please refer to the `official documentation <https://www.percona.com/doc/percona-monitoring-and-management/index.html>`_ for details on |PMM| installation and setup.
+Please refer to the `official documentation <https://www.percona.com/doc/percona-monitoring-and-management/index.html>`_ for details on |pmm| installation and setup.
 
 Other Reading
 =============
 
 * `Realtime stats to pay attention to in PXC and Galera <http://www.mysqlperformanceblog.com/2012/11/26/realtime-stats-to-pay-attention-to-in-percona-xtradb-cluster-and-galera/>`_
+
+.. |pmm| replace:: PMM
