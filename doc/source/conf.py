@@ -149,7 +149,7 @@ extlinks = {
 'mysqlbug': ('http://bugs.mysql.com/bug.php?id=%s', '#'),
 'githubbug': ('https://github.com/codership/galera/issues/%s', '#'),
 'wsrepbug': ('https://github.com/codership/mysql-wsrep/issues/%s', '#'),
-'jirabug': ('https://jira.percona.com/browse/%s', '')}
+'jirabug': ('https://jira.percona.com/browse/PXC-%s', 'PXC-')}
 
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
