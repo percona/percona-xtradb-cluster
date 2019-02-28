@@ -343,6 +343,67 @@ function get_length_in_bytes()
     ) || true
 }
 
+# Returns the version string in a standardized format
+# Input "1.2.3" => echoes "010203"
+# Wrongly formatted values => echoes "000000"
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   Parameter 1: a version string
+#                like "5.1.12"
+#                anything after the major.minor.revision is ignored
+# Outputs:
+#   A string that can be used directly with string comparisons.
+#   So, the string "5.1.12" is transformed into "050112"
+#   Note that individual version numbers can only go up to 99.
+#
+function normalize_version()
+{
+    local major=0
+    local minor=0
+    local patch=0
+
+    # Only parses purely numeric version numbers, 1.2.3
+    # Everything after the first three values are ignored
+    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([^ ])* ]]; then
+        major=${BASH_REMATCH[1]}
+        minor=${BASH_REMATCH[2]}
+        patch=${BASH_REMATCH[3]}
+    fi
+
+    printf %02d%02d%02d $major $minor $patch
+}
+
+# Compares two version strings (succeeds if param1 >= param2)
+#   The version strings passed in will be normalized to a
+#   string-comparable version.
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   Parameter 1: The left-side of the comparison
+#   Parameter 2: The right-side of the comparison
+#
+# Returns:
+#   Returns 0 (success) if param1 >= param2
+#   Returns 1 (failure) otherwise
+#
+function check_for_version()
+{
+    local local_version_str="$( normalize_version $1 )"
+    local required_version_str="$( normalize_version $2 )"
+
+    if [[ "$local_version_str" < "$required_version_str" ]]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+
 
 # Runs any post-processing steps needed
 # (after the datadir has been moved)
@@ -363,6 +424,7 @@ function get_length_in_bytes()
 #   Argument 1: Path to the datadir
 #   Argument 2: Port to be used by mysqld
 #   Argument 3: Set to 0 to skip mysql_upgrade, 1 to run mysql_upgrade
+#   Argument 4: MySQL donor version
 #
 # Returns:
 #   0 if successful (no errors encountered)
@@ -373,6 +435,7 @@ function run_post_processing_steps()
     local datadir=$1
     local port=$2
     local run_mysql_upgrade=$3
+    local donor_version_str=$4
 
     # Path to the binary locations
     local mysqld_path=""
@@ -517,7 +580,7 @@ function run_post_processing_steps()
         return 3
     fi
 
-    wsrep_log_debug "Starting the MySQL server used by mysql_upgrade"
+    wsrep_log_debug "Starting the MySQL server used for post-processing"
 
     local mysqld_cmdline="--defaults-file=${WSREP_SST_OPT_CONF} ${use_mysql_upgrade_conf_suffix} \
         --skip-networking --skip-slave-start \
@@ -539,7 +602,7 @@ function run_post_processing_steps()
     # Reuse the SST User (use it to run mysql_upgrade)
     # Recreate with root permissions and a new password
     cat <<EOF | $mysqld_path $mysqld_cmdline &> ${mysql_upgrade_dir_path}/err.log &
-SET sql_log_bin = OFF;
+SET sql_log_bin=OFF;
 DROP USER IF EXISTS '${WSREP_SST_OPT_USER}'@localhost;
 CREATE USER '${WSREP_SST_OPT_USER}'@localhost IDENTIFIED BY '${WSREP_SST_OPT_PSWD}';
 GRANT ALL PRIVILEGES ON *.* TO '${WSREP_SST_OPT_USER}'@localhost;
