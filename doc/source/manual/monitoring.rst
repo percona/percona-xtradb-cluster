@@ -59,3 +59,5 @@ Other Reading
 =============
 
 * `Realtime stats to pay attention to in PXC and Galera <http://www.mysqlperformanceblog.com/2012/11/26/realtime-stats-to-pay-attention-to-in-percona-xtradb-cluster-and-galera/>`_
+
+.. |PMM| replace:: PMM
