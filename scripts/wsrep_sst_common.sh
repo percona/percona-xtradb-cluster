@@ -183,23 +183,16 @@ normalize_boolean()
 {
     local input_value=$1
     local default_value=$2
-    local return_value=$default_value
 
-    if [[ "$input_value" == "1" ]]; then
-        return_value="on"
-    elif [[ "$input_value" =~ ^[Oo][Nn]$ ]]; then
-        return_value="on"
-    elif [[ "$input_value" =~ ^[Tt][Rr][Uu][Ee]$ ]]; then
-        return_value="on"
-    elif [[ "$input_value" == "0" ]]; then
-        return_value="off"
-    elif [[ "$input_value" =~ ^[Oo][Ff][Ff]$ ]]; then
-        return_value="off"
-    elif [[ "$input_value" =~ ^[Ff][Aa][Ll][Ss][Ee]$ ]]; then
-        return_value="off"
-    fi
+    [[ "$input_value" == "1" ]]                 && echo "on"    && return 0
+    [[ "$input_value" =~ ^[Oo][Nn]$ ]]          && echo "on"    && return 0
+    [[ "$input_value" =~ ^[Tt][Rr][Uu][Ee]$ ]]  && echo "on"    && return 0
+    [[ "$input_value" == "0" ]]                 && echo "off"   && return 0
+    [[ "$input_value" =~ ^[Oo][Ff][Ff]$ ]]      && echo "off"   && return 0
+    [[ "$input_value" =~ ^[Ff][Aa][Ll][Ss][Ee]$ ]] && echo "off"   && return 0
 
-    echo $return_value
+    echo $default_value
+    return 0
 }
 
 
@@ -376,7 +369,7 @@ function normalize_version()
     printf %02d%02d%02d $major $minor $patch
 }
 
-# Compares two version strings (succeeds if param1 >= param2)
+# Compares two version strings
 #   The version strings passed in will be normalized to a
 #   string-comparable version.
 #
@@ -385,22 +378,36 @@ function normalize_version()
 #
 # Arguments:
 #   Parameter 1: The left-side of the comparison
-#   Parameter 2: The right-side of the comparison
+#   Parameter 2: the comparison operation
+#                   '>', '>=', '=', '==', '<', '<='
+#   Parameter 3: The right-side of the comparison
 #
 # Returns:
-#   Returns 0 (success) if param1 >= param2
+#   Returns 0 (success) if param1 op param2
 #   Returns 1 (failure) otherwise
 #
-function check_for_version()
+function compare_versions()
 {
-    local local_version_str="$( normalize_version $1 )"
-    local required_version_str="$( normalize_version $2 )"
+    local version_1="$( normalize_version $1 )"
+    local op=$2
+    local version_2="$( normalize_version $3 )"
 
-    if [[ "$local_version_str" < "$required_version_str" ]]; then
+    if [[ ! " = == > >= < <= " =~ " $op " ]]; then
+        wsrep_log_error "******************* ERROR ********************** "
+        wsrep_log_error "Unknown operation : $op"
+        wsrep_log_error "Must be one of : = == > >= < <="
+        wsrep_log_error "******************* ERROR ********************** "
         return 1
-    else
-        return 0
     fi
+
+    [[ $op == "<"  &&   $version_1 <  $version_2 ]] && return 0
+    [[ $op == "<=" && ! $version_1 >  $version_2 ]] && return 0
+    [[ $op == "="  &&   $version_1 == $version_2 ]] && return 0
+    [[ $op == "==" &&   $version_1 == $version_2 ]] && return 0
+    [[ $op == ">"  &&   $version_1 >  $version_2 ]] && return 0
+    [[ $op == ">=" && ! $version_1 <  $version_2 ]] && return 0
+
+    return 1
 }
 
 
@@ -535,7 +542,7 @@ function wait_for_mysqld_startup()
 #
 #   (1) Receiving from a 5.7 donor
 #       The basic flow is:
-#           1. start up a MySQL server (creates the SST user)
+#           1. start up a MySQL server (#1) (creates the SST user)
 #           2. shut down MySQL server
 #               Because the system tables use MyISAM (5.7 donor), the
 #               account mgmt commands (like CREATE USER, FLUSH PRIVILEGES)
@@ -745,7 +752,7 @@ function run_post_processing_steps()
     # 'FLUSH PRIVILEGES' with 8.0 on a 5.7 datadir will fail because
     # the system tables (mysql.user) are MyISAM and not InnoDB.
 
-    if check_for_version $donor_version_str "8.0.0"; then
+    if compare_versions $donor_version_str ">=" "8.0.0"; then
         #-----------------------------------------------------------------------
         # Reuse the SST User (use it to run mysql_upgrade)
         # Recreate with root permissions and a new password
@@ -827,6 +834,7 @@ EOF
         # The shutdown above does NOT remove the SST user, since it
         # relies on 'DROP USER' and those tables are still MyISAM
 
+        #-----------------------------------------------------------------------
         # Restart the server (now that it has the needed user/password)
         wsrep_log_debug "Starting the MySQL server(#2) used for post-processing"
         echo "" > ${mysqld_err_log}
@@ -873,64 +881,71 @@ EOF
             exit 3
         fi
         wsrep_log_debug "mysql_upgrade completed"
-    fi
 
-    #-----------------------------------------------------------------------
-    # Stop replication activity
-    if ! check_for_version $donor_version_str "8.0.0"; then
         # If this is for 5.7, we will have to restart the mysqld (again, sigh)
-        # The master info tables will not have been loaded
+        # The async info tables will not have been loaded
         # so the SHOW SLAVE STATUS will fail
-        wsrep_log_debug "Shutting down the MySQL server"
-        $mysql_client_path \
-            --defaults-file=/dev/stdin \
-            --socket=$upgrade_socket \
-            --unbuffered --batch --silent \
-            -e "SHUTDOWN;" \
-            &> ${mysql_upgrade_dir_path}/upgrade_shutdown.out <<EOF
+        if compare_versions $donor_version_str "<" "8.0.0"; then
+            #-----------------------------------------------------------------------
+            # Restart the server (to reload the async info tables
+            # that failed to load during the mysql_upgrade from 5.7).
+            wsrep_log_debug "Shutting down the MySQL server"
+            $mysql_client_path \
+                --defaults-file=/dev/stdin \
+                --socket=$upgrade_socket \
+                --unbuffered --batch --silent \
+                -e "SHUTDOWN;" \
+                &> ${mysql_upgrade_dir_path}/upgrade_shutdown.out <<EOF
 [client]
 user=${WSREP_SST_OPT_USER}
 password="${WSREP_SST_OPT_PSWD}"
 EOF
-        errcode=$?
-        if [[ $errcode -ne 0 ]]; then
-            sleep 3
-            kill -9 $mysql_pid
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "Failed to shutdown the MySQL instance started for upgrade."
-            wsrep_log_error "Check the parameters and retry.  Killing the process."
-            wsrep_log_error "Line $LINENO errcode:${errcode}"
-            echo "--------------- shutdown log (START) --------------------" >&2
-            cat ${mysql_upgrade_dir_path}/upgrade_shutdown.out >&2
-            echo "--------------- shutdown log (END) ----------------------" >&2
-            echo "--------------- mysql error log (START) --------------------" >&2
-            cat ${mysqld_err_log} >&2
-            echo "--------------- mysql error log (END) ----------------------" >&2
-            wsrep_log_error "****************************************************** "
-            return 3
-        fi
+            errcode=$?
+            if [[ $errcode -ne 0 ]]; then
+                sleep 3
+                kill -9 $mysql_pid
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "Failed to shutdown the MySQL instance started for upgrade."
+                wsrep_log_error "Check the parameters and retry.  Killing the process."
+                wsrep_log_error "Line $LINENO errcode:${errcode}"
+                echo "--------------- shutdown log (START) --------------------" >&2
+                cat ${mysql_upgrade_dir_path}/upgrade_shutdown.out >&2
+                echo "--------------- shutdown log (END) ----------------------" >&2
+                echo "--------------- mysql error log (START) --------------------" >&2
+                cat ${mysqld_err_log} >&2
+                echo "--------------- mysql error log (END) ----------------------" >&2
+                wsrep_log_error "****************************************************** "
+                return 3
+            fi
 
-        wait_for_mysqld_shutdown $mysql_pid $timeout_threshold "MySQL server started for the upgrade process"
-        [[ $? -ne 0 ]] && return 1
+            wait_for_mysqld_shutdown $mysql_pid $timeout_threshold "MySQL server started for the upgrade process"
+            [[ $? -ne 0 ]] && return 1
 
-        wsrep_log_debug "MySQL server shut down"
+            wsrep_log_debug "MySQL server shut down"
 
-        wsrep_log_debug "Starting the MySQL server(#3) used for post-processing"
-        cat <<EOF | $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &> ${mysqld_err_log} &
+            #-----------------------------------------------------------------------
+            # Starting up the server
+            wsrep_log_debug "Starting the MySQL server(#3) used for post-processing"
+            cat <<EOF | $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &> ${mysqld_err_log} &
 SET sql_log_bin=OFF;
 DROP USER IF EXISTS '${WSREP_SST_OPT_USER}'@localhost;
 CREATE USER '${WSREP_SST_OPT_USER}'@localhost IDENTIFIED BY '${WSREP_SST_OPT_PSWD}';
 GRANT ALL PRIVILEGES ON *.* TO '${WSREP_SST_OPT_USER}'@localhost;
 FLUSH PRIVILEGES;
 EOF
-        mysql_pid=$!
-        wait_for_mysqld_startup $mysql_pid $upgrade_socket $timeout_threshold ${mysqld_err_log} \
-            "mysql server that executes mysql-upgrade"
-        errcode=$?
-        [[ $errcode -ne 0 ]] && return $errcode
-        wsrep_log_debug "MySQL server($mysql_pid) started"
+            mysql_pid=$!
+            wait_for_mysqld_startup $mysql_pid $upgrade_socket $timeout_threshold ${mysqld_err_log} \
+                "mysql server that executes mysql-upgrade"
+            errcode=$?
+            [[ $errcode -ne 0 ]] && return $errcode
+            wsrep_log_debug "MySQL server($mysql_pid) started"
+        fi
     fi
 
+    #-----------------------------------------------------------------------
+    # Stop replication activity
+
+    # First, check to see if we need to reset the slave
     local slave_status=""
     slave_status=$($mysql_client_path \
                     --defaults-file=/dev/stdin \
@@ -977,6 +992,8 @@ EOF
     #-----------------------------------------------------------------------
     # shutdown mysql instance started.
     #   (also does some account cleanup)
+    #   LOCK the account to ensure that the user can't be used pass this
+    #   point if the server fails to shutdown properly (or is killed).
     wsrep_log_debug "Shutting down the MySQL server"
     $mysql_client_path \
         --defaults-file=/dev/stdin \

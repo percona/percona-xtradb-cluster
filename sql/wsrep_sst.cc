@@ -874,10 +874,10 @@ static MYSQL_SESSION setup_server_session(bool initialize_thread)
     WSREP_ERROR("Failed to fetch the security context when contacting the server");
     return NULL;
   }
-  if (security_context_lookup(sc, "mysql.pxc.sst.root", "localhost", NULL, NULL))
+  if (security_context_lookup(sc, "mysql.pxc.internal.session", "localhost", NULL, NULL))
   {
     if (initialize_thread) srv_session_deinit_thread();
-    WSREP_ERROR("Error accessing server with user:mysql.pxc.sst.root");
+    WSREP_ERROR("Error accessing server with user:mysql.pxc.internal.session");
     return NULL;
   }
   // Turn wsrep off here (because the server session has it's own THD object)
