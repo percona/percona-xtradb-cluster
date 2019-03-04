@@ -2912,8 +2912,6 @@ loop:
 			srv_master_do_idle_tasks();
 		}
 
-		log_enable_encryption_if_set();
-
 		srv_enable_undo_encryption_if_set();
 	}
 

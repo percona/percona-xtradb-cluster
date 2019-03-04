@@ -12,12 +12,13 @@ of the following distributions:
 * Ubuntu 12.04 LTS (Precise Pangolin)
 * Ubuntu 14.04 LTS (Trusty Tahr)
 * Ubuntu 16.04 LTS (Xenial Xerus)
-* Ubuntu 17.04 (Zesty Zapus)
-* Ubuntu 17.10 (Artful Aardvark)
 * Ubuntu 18.04 LTS (Bionic Beaver)
+* Ubuntu 18.10 (Cosmic Cuttlefish)
 
-.. note:: |PXC| should work on other DEB-based distributions,
-   but it is tested only on platforms listed above.
+.. note::
+
+   |PXC| should work on other DEB-based distributions, but it is
+   tested only on platforms listed above.
 
 The packages are available in the official Percona software repository
 and on the `download page
@@ -28,31 +29,41 @@ using :command:`apt`.
 Prerequisites
 =============
 
-.. note:: You need to have root access on the node
-   where you will be installing |PXC|
-   (either logged in as a user with root privileges
-   or be able to run commands with :command:`sudo`).
+You need to have root access on the node where you will be installing
+|PXC| (either logged in as a user with root privileges or be able
+to run commands with :command:`sudo`).
 
-.. note:: Make sure that the following ports are not blocked by firewall
-   or used by other software. |PXC| requires them for communication.
+Make sure that the following ports are not blocked by firewall or used
+by other software. |PXC| requires them for communication.
 
-   * 3306
-   * 4444
-   * 4567
-   * 4568
+* 3306
+* 4444
+* 4567
+* 4568
 
-.. note:: If you previously had MySQL installed on the server,
-   there might be an `AppArmor <https://help.ubuntu.com/community/AppArmor>`_
-   profile which will prevent |PXC| nodes from communicating with each other.
-   The best solution is to remove the ``apparmor`` package entirely:
+.. rubric:: If |MySQL| Is Installed
 
-   .. code-block:: bash
+If you previously had MySQL installed on the server, there might be an
+`AppArmor <https://help.ubuntu.com/community/AppArmor>`_ profile
+which will prevent |PXC| nodes from communicating with each other.
+The best solution is to remove the ``apparmor`` package entirely:
 
-      $ sudo apt-get remove apparmor
+.. code-block:: bash
+		
+   $ sudo apt-get remove apparmor
 
-   If you need to have AppArmor enabled due to security policies
-   or for other reasons,
-   it is possible to disable or extend the MySQL profile.
+If you need to have AppArmor enabled due to security policies or for
+other reasons, it is possible to disable or extend the MySQL profile.
+
+.. rubric:: Dependencies on Ubuntu
+
+When installating on a Ubuntu system, make sure that the ``universe``
+repository is enabled to satisfy all essential dependencies.
+
+.. seealso::
+
+   Ubuntu Documentation: Repositories
+      https://help.ubuntu.com/community/Repositories/Ubuntu
 
 Installing from Repository
 ==========================
