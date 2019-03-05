@@ -511,7 +511,7 @@ void wsrep_cluster_address_init(const char *value) {
 
   if (wsrep_cluster_address) my_free((void *)wsrep_cluster_address);
   wsrep_cluster_address =
-      (value) ? my_strdup(PSI_NOT_INSTRUMENTED, value, MYF(0)) : NULL;
+      my_strdup(PSI_NOT_INSTRUMENTED, (value) ? value : "", MYF(0));
 }
 
 /* Function checks if the new value for cluster_name is valid.

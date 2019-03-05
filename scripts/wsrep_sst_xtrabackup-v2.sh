@@ -499,14 +499,14 @@ get_transfer()
             # socat version >= 1.7.3, checks to see if the peername matches the hostname
             #       set commonname="" to disable the peername checks
             #
-            if ! check_for_version "$SOCAT_VERSION" "1.7.3"; then
+            if compare_versions "$SOCAT_VERSION" "<" "1.7.3"; then
                 if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
                     # dhparams check (will create ssl_dhparams if needed)
                     check_for_dhparams
                     joiner_extra=",dhparam=$ssl_dhparams"
                 fi
             fi
-            if check_for_version "$SOCAT_VERSION" "1.7.3"; then
+            if compare_versions "$SOCAT_VERSION" ">=" "1.7.3"; then
                 donor_extra=',commonname=""'
             fi
         fi
@@ -679,7 +679,12 @@ read_cnf()
 
     auto_upgrade=$(parse_cnf sst auto-upgrade "")
     auto_upgrade=$(normalize_boolean "$auto_upgrade" "on")
-    force_upgrade=$(parse_cnf sst force-upgrade "")
+
+    # Check the WSREP_SST_OPT_FORCE_UPGRADE environment variable
+    force_upgrade=${WSREP_SST_OPT_FORCE_UPGRADE:-""}
+    if [[ -z $force_upgrade ]]; then
+        force_upgrade=$(parse_cnf sst force-upgrade "")
+    fi
     force_upgrade=$(normalize_boolean "$force_upgrade" "off")
 
     ssl_dhparams=$(parse_cnf sst ssl-dhparams "")
@@ -1356,7 +1361,7 @@ function initialize_pxb_commands()
 
     # If the DONOR's version is less than 8.0.0, use PXB 2.4
     # Else use PXB 8.0
-    if ! check_for_version "${donor_version_str}" "8.0.0"; then
+    if compare_versions "${donor_version_str}" "<" "8.0.0"; then
         pxb_root="${XTRABACKUP_24_PATH}"
     else
         pxb_root="${XTRABACKUP_80_PATH}"
@@ -1498,7 +1503,7 @@ fi
 XB_2x_VERSION=$($XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
 XB_2x_VERSION=${XB_2x_VERSION# }
 XB_2x_REQUIRED_VERSION="2.4.13"
-if ! check_for_version $XB_2x_VERSION $XB_2x_REQUIRED_VERSION; then
+if compare_versions $XB_2x_VERSION "<" $XB_2x_REQUIRED_VERSION; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "The $XTRABACKUP_BIN version is $XB_2x_VERSION. Needs xtrabackup-$XB_2x_REQUIRED_VERSION or higher to perform SST"
     wsrep_log_error "$XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
@@ -1509,7 +1514,7 @@ fi
 XB_8x_VERSION=$($XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
 XB_8x_VERSION=${XB_8x_VERSION# }
 XB_8x_REQUIRED_VERSION="8.0.4"
-if ! check_for_version $XB_8x_VERSION $XB_8x_REQUIRED_VERSION; then
+if compare_versions $XB_8x_VERSION "<" $XB_8x_REQUIRED_VERSION; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "The $XTRABACKUP_BIN version is $XB_8x_VERSION. Needs xtrabackup-$XB_8x_REQUIRED_VERSION or higher to perform SST"
     wsrep_log_error "$XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
@@ -1894,7 +1899,7 @@ then
             donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
 
             # Is this node's pxc version < donor's pxc version?
-            if ! check_for_version $local_version_str $donor_version_str; then
+            if compare_versions $local_version_str "<" $donor_version_str; then
                 wsrep_log_error "******************* FATAL ERROR ********************** "
                 wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
                 wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
@@ -1923,7 +1928,7 @@ then
 
             # case-a: DONOR is at version < 5.7.22. We should expect keyring file
             #         and not transition_key.
-            if ! check_for_version $DONOR_MYSQL_VERSION "5.7.22"; then
+            if compare_versions $DONOR_MYSQL_VERSION "<" "5.7.22"; then
                 if [[ -n $keyring_file_data ]]; then
                      # joiner needs to wait to receive the file.
                     sleep 3
@@ -2208,6 +2213,7 @@ then
         donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
 
         if [[ $force_upgrade == "on" ]]; then
+            wsrep_log_info "Forcing mysql_upgrade"
             run_upgrade=1
         elif [[ $auto_upgrade == "on" ]]; then
             run_upgrade=1
