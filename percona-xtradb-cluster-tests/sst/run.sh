@@ -35,6 +35,37 @@ SUCCESSFUL_COUNT=0
 TOTAL_COUNT=0
 TOTAL_TIME=0
 
+#Format version string (thanks to wsrep_sst_xtrabackup-v2)
+normalize_version(){
+  local major=0
+  local minor=0
+  local patch=0
+
+  # Only parses purely numeric version numbers, 1.2.3
+  # Everything after the first three values are ignored
+  if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([\.0-9])*$ ]]; then
+    major=${BASH_REMATCH[1]}
+    minor=${BASH_REMATCH[2]}
+    patch=${BASH_REMATCH[3]}
+  fi
+  printf %02d%02d%02d $major $minor $patch
+}
+
+#Version comparison script (thanks to wsrep_sst_xtrabackup-v2)
+check_for_version()
+{
+  local local_version_str="$( normalize_version $1 )"
+  local required_version_str="$( normalize_version $2 )"
+
+  if [[ "$local_version_str" < "$required_version_str" ]]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+MYSQL_VERSION_CHECK=$(${MYSQL_BASEDIR}/bin/mysqld --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1)
+
 function usage()
 {
 cat <<EOF
@@ -300,16 +331,22 @@ function set_vars()
 	TAR=tar
     fi
 
-    find_program MYSQL_INSTALL_DB mysql_install_db $MYSQL_BASEDIR/bin \
-	$MYSQL_BASEDIR/scripts
+    if ! check_for_version $MYSQL_VERSION_CHECK "8.0.0" ; then
+      find_program MYSQL_INSTALL_DB mysql_install_db $MYSQL_BASEDIR/bin \
+        $MYSQL_BASEDIR/scripts
+    fi
     find_program MYSQLD mysqld $MYSQL_BASEDIR/bin/ $MYSQL_BASEDIR/libexec
     # Use the global mysql client binary, if available. This is a workaround for
     # PS packageing bug LP 1153950
     if which mysql >/dev/null 2>&1
     then
-        MYSQL=`which mysql`
+        if ! check_for_version $MYSQL_VERSION_CHECK "8.0.0" ; then
+          MYSQL=`which mysql`
+        else
+          find_program MYSQL mysql $MYSQL_BASEDIR/bin
+        fi
     else
-    find_program MYSQL mysql $MYSQL_BASEDIR/bin
+        find_program MYSQL mysql $MYSQL_BASEDIR/bin
     fi
     find_program MYSQLADMIN mysqladmin $MYSQL_BASEDIR/bin
     find_program MYSQLDUMP mysqldump $MYSQL_BASEDIR/bin
@@ -448,7 +485,7 @@ function get_version_info()
             ;;
         5.5 )
             ;;
-        5.6 | 10.0 | 5.7 )
+        5.6 | 10.0 | 5.7 | 8.0 )
             DEFAULT_IBDATA_SIZE="12M"
             ;;
         *)
