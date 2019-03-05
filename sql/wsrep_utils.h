@@ -225,6 +225,37 @@ class critical {
 };
 #endif
 
+
+class WSREPState
+{
+  public:
+    /* Resets all of the data to default values */
+    void clear() { wsrep_schema_version.clear(); }
+
+    bool load_from(const char *dir, const char *filename);
+    bool save_to(const char *dir, const char *filename);
+
+    /* Compare the server version with the wsrep version
+       Returns true if the wsrep version matches the server version EXACTLY
+       (to the major.minor.revision values).
+    */
+    bool wsrep_schema_version_equals(const char *server_version);
+
+    /* Before saving and after loading, the version string
+       may be modified/truncated to conform to "x.y.z"
+       e.g. "8.0.15-5" would be shortened to "8.0.15"
+       and "8.0" would be lengthened to "8.0.0"
+    */
+    std::string wsrep_schema_version;
+
+  private:
+    /* Parses a "a.b.c" version string into it's three component
+       parts.  If a compoenent is missing, it will be assinged
+       a value of 0.
+    */
+    void parse_version(const char *str, uint &major, uint &minor, uint &revision);
+};
+
 }  // namespace wsp
 
 #endif /* WSREP_UTILS_H */

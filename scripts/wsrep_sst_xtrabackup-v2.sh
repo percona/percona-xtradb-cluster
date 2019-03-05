@@ -260,6 +260,17 @@ get_keys()
     #
     # It's ok to use the 8.0 xbcrypt, it's compatible with
     # the 2.4 xbcrypt.
+
+    if [[ ! -x $XTRABACKUP_80_PATH/bin/xbcrypt ]]; then
+        wsrep_log_error "******** FATAL ERROR *********************** "
+        wsrep_log_error "Could not find the xbcrypt executable (version 8.x)."
+        wsrep_log_error "    Expected location: $XTRABACKUP_80_PATH/bin/xbcrypt"
+        wsrep_log_error "Please verify that PXC was installed correctly."
+        wsrep_log_error "* Line $LINENO"
+        wsrep_log_error "******************************************** "
+        exit 2
+    fi
+
     ecmd_other="${XTRABACKUP_80_PATH}/bin/xbcrypt --encrypt-algo=$ealgo $encrypt_opts "
     if [[ "$WSREP_SST_OPT_ROLE" == "joiner" ]]; then
         # Decryption is done by xbcrypt for all other (non-SST) transfers
@@ -817,6 +828,16 @@ get_stream()
     if [[ $sfmt == 'xbstream' ]]; then
         wsrep_log_debug "Streaming with xbstream"
 
+        if [[ ! -x ${XTRABACKUP_80_PATH}/bin/xbstream ]]; then
+            wsrep_log_error "******** FATAL ERROR *********************** "
+            wsrep_log_error "Could not find the xbstream executable (version 8.x)."
+            wsrep_log_error "    Expected location: $XTRABACKUP_80_PATH/bin/xbstream"
+            wsrep_log_error "Please verify that PXC was installed correctly."
+            wsrep_log_error "* Line $LINENO"
+            wsrep_log_error "******************************************** "
+            exit 2
+        fi
+
         # It's ok to use the 8.0 xbstream, it's compatible with
         # the 2.4 xbstream.
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
@@ -825,6 +846,15 @@ get_stream()
             strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream \$xbstreameopts -c \${FILE_TO_STREAM}"
         fi
     else
+        wsrep_check_program tar
+        if [[ $? -ne 0 ]]; then
+            wsrep_log_error "******** FATAL ERROR *********************** "
+            wsrep_log_error "tar was not found in PATH! Make sure you have it installed."
+            wsrep_log_error "* Line $LINENO"
+            wsrep_log_error "******************************************** "
+            exit 2
+        fi
+
         sfmt="tar"
         wsrep_log_debug "Streaming with tar"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
@@ -1355,6 +1385,8 @@ parse_sst_info()
 function initialize_pxb_commands()
 {
     local donor_version_str=$(expr match "$1" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+    donor_version_str=${donor_version_str:-"0.0.0"}
+
     local local_version_str=$(expr match "$2" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
     local disver=""
     local pxb_root pxb_bin_path pxb_plugin_dir
@@ -1393,7 +1425,8 @@ function initialize_pxb_commands()
         disver="--no-version-check"
     fi
 
-    local xb_version=$(${pxb_bin_path} --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1)
+    local xb_version=$(${pxb_bin_path} --version 2>&1 | grep -oe ' [0-9]\.[0-9][\.0-9]*' | head -n1)
+    xb_version=${xb_version# }
     wsrep_log_debug "pxb-version:$xb_version"
 
     #
@@ -1502,23 +1535,45 @@ fi
 # 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
 #         my.cnf.
 #
+XB_2x_REQUIRED_VERSION="2.4.13"
+
+if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 2.x)."
+    wsrep_log_error "    Expected location: $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "Please verify that PXC was installed correctly."
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
 XB_2x_VERSION=$($XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
 XB_2x_VERSION=${XB_2x_VERSION# }
-XB_2x_REQUIRED_VERSION="2.4.13"
-if compare_versions $XB_2x_VERSION "<" $XB_2x_REQUIRED_VERSION; then
+if compare_versions "$XB_2x_VERSION" "<" "$XB_2x_REQUIRED_VERSION"; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
-    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_2x_VERSION. Needs xtrabackup-$XB_2x_REQUIRED_VERSION or higher to perform SST"
+    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_2x_VERSION."
+    wsrep_log_error "xtrabackup-$XB_2x_REQUIRED_VERSION or higher is needed to perform an SST"
     wsrep_log_error "$XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN"
     wsrep_log_error "****************************************************** "
     exit 2
 fi
 
+# Verify our PXB 8.0 version
+#
+XB_8x_REQUIRED_VERSION="8.0.5"
+
+if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 8.x)."
+    wsrep_log_error "    Expected location: $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
+    wsrep_log_error "Please verify that PXC was installed correctly."
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
 XB_8x_VERSION=$($XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
 XB_8x_VERSION=${XB_8x_VERSION# }
-XB_8x_REQUIRED_VERSION="8.0.5"
-if compare_versions $XB_8x_VERSION "<" $XB_8x_REQUIRED_VERSION; then
+if compare_versions "$XB_8x_VERSION" "<" "$XB_8x_REQUIRED_VERSION"; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
-    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_8x_VERSION. Needs xtrabackup-$XB_8x_REQUIRED_VERSION or higher to perform SST"
+    wsrep_log_error "The $XTRABACKUP_BIN version is $XB_8x_VERSION."
+    wsrep_log_error "xtrabackup-$XB_8x_REQUIRED_VERSION or higher is needed to perform an SST"
     wsrep_log_error "$XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN"
     wsrep_log_error "****************************************************** "
     exit 2
@@ -1541,6 +1596,7 @@ fi
 #
 # read configuration and setup ports for streaming data.
 read_variables_from_stdin
+[[ $? -ne 0 ]] && exit 2
 
 #
 # Only the DONOR is sent the credentials
@@ -1623,6 +1679,9 @@ INNOEXTRA=""
 # Setup stream for transfering and streaming.
 get_stream
 get_transfer
+
+# Will be set to 'ist' or 'sst'
+transfer_type=""
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -1718,9 +1777,13 @@ then
 
         # Before the real SST,send the sst-info
         wsrep_log_debug "Streaming SST meta-info file before SST"
-
         FILE_TO_STREAM=$SST_INFO_FILE
         send_data_from_donor_to_joiner "$donor_tmpdir" "${stagemsg}-sst-info"
+
+        # Send the wsrep_state.dat file also
+        wsrep_log_debug "Streaming WSREP state file before SST"
+        FILE_TO_STREAM="wsrep_state.dat"
+        send_data_from_donor_to_joiner "${DATA}" "${stagemsg}-wsrep-state"
 
         # Restore the transport commmand to its original state
         tcmd="$ttcmd"
@@ -1852,7 +1915,6 @@ then
     STATDIR=$(mktemp --tmpdir="${tmpdirbase}" --directory joiner_XXXX)
 
     sst_file_info_path="${STATDIR}/${SST_INFO_FILE}"
-
     recv_data_from_donor_to_joiner $STATDIR "${stagemsg}-sst-info" $stimeout -2
 
     #
@@ -1873,6 +1935,7 @@ then
             encrypt_prepare_options="--transition-key=\$transition_key"
             encrypt_move_options="--transition-key=\$transition_key --generate-new-master-key"
         fi
+
     elif [[ -r "${STATDIR}/${XB_GTID_INFO_FILE}" ]]; then
         #
         # For compatibility, we have received the gtid file
@@ -1892,24 +1955,41 @@ then
 
     if [ ! -r "${STATDIR}/${IST_FILE}" ]
     then
-        if [[ -n "$DONOR_MYSQL_VERSION" ]]; then
-            local_version_str=""
-            donor_version_str=""
+        # -----------------------------------------------------
+        # Reject the DONOR if it's version is too old
+        # We also reject the donor if it does not send a version string.
+        # (which is true for any version of PXC < 5.7.19)
+        #
+        # Truncate the version numbers (we want the major.minor version like "5.6", not "5.6.35-...")
+        local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+        donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+        donor_version_str=${donor_version_str:-"0.0.0"}
 
-            # Truncate the version numbers (we want the major.minor version like "5.6", not "5.6.35-...")
-            local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
-            donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
+        # Required DONOR PXC version
+        #
+        #   5.7.19  : This is the first version that sent the donor version
+        #
+        REQUIRED_DONOR_MYSQL_VERSION="5.7.19"
 
-            # Is this node's pxc version < donor's pxc version?
-            if compare_versions $local_version_str "<" $donor_version_str; then
-                wsrep_log_error "******************* FATAL ERROR ********************** "
-                wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
-                wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
-                wsrep_log_error "Upgrade this node before joining the cluster."
-                wsrep_log_error "Line $LINENO"
-                wsrep_log_error "****************************************************** "
-                exit 2
-            fi
+        if [[ -z $DONOR_MYSQL_VERSION ]] || compare_versions "$donor_version_str" "<" "$REQUIRED_DONOR_MYSQL_VERSION"; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "FATAL: The donor version is too old."
+            wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
+            wsrep_log_error "The donor node must be at least version $REQUIRED_DONOR_MYSQL_VERSION."
+            wsrep_log_error "Line $LINENO"
+            wsrep_log_error "****************************************************** "
+            exit 2
+        fi
+
+        # Is this node's pxc version < donor's pxc version?
+        if compare_versions "$local_version_str" "<" "$donor_version_str"; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
+            wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
+            wsrep_log_error "Upgrade this node before joining the cluster."
+            wsrep_log_error "Line $LINENO"
+            wsrep_log_error "****************************************************** "
+            exit 2
         fi
 
         # Initializes the command-line args for XB
@@ -1917,6 +1997,34 @@ then
         #   INNOMOVE
         #   INNOBACKUP
         initialize_pxb_commands "$DONOR_MYSQL_VERSION" "$MYSQL_VERSION"
+
+        # For compatibility, if the tmpdir is not specified, then use
+        # the datadir to hold the .sst directory
+        if [[ -z "$(parse_cnf sst tmpdir "")" ]]; then
+            if [[ -d ${DATA}/.sst ]]; then
+                wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer. Removing"
+                rm -rf ${DATA}/.sst
+            fi
+            mkdir -p ${DATA}/.sst
+            JOINER_SST_DIR=$DATA/.sst
+        else
+            JOINER_SST_DIR=$(mktemp -p "${tmpdirbase}" -dt sst_XXXX)
+        fi
+
+        # Wait to receive the wsrep_state.dat file (this will not be sent with 5.7)
+        # So, only wait for this if the donor version >= 8.0
+        if compare_versions "$donor_version_str" ">=" "8.0.0"; then
+
+            recv_data_from_donor_to_joiner $JOINER_SST_DIR "${stagemsg}-wsrep-state" $stimeout -2
+
+            if [[ ! -r "${JOINER_SST_DIR}/wsrep_state.dat" ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "Did not receive expected file from donor: 'wsrep_state.dat'"
+                wsrep_log_error "Line $LINENO"
+                wsrep_log_error "****************************************************** "
+                exit 32
+            fi
+        fi
 
         # server-id is already part of backup-my.cnf so avoid appending it.
         # server-id is the id of the node that is acting as donor and not joiner node.
@@ -1930,7 +2038,7 @@ then
 
             # case-a: DONOR is at version < 5.7.22. We should expect keyring file
             #         and not transition_key.
-            if compare_versions $DONOR_MYSQL_VERSION "<" "5.7.22"; then
+            if compare_versions "$DONOR_MYSQL_VERSION" "<" "5.7.22"; then
                 if [[ -n $keyring_file_data ]]; then
                      # joiner needs to wait to receive the file.
                     sleep 3
@@ -2004,19 +2112,6 @@ then
         fi
         if [[ $encrypt -eq 1 ]]; then
             xbstreameopts=$xbstreameopts_sst
-        fi
-
-        # For compatibility, if the tmpdir is not specified, then use
-        # the datadir to hold the .sst directory
-        if [[ -z "$(parse_cnf sst tmpdir "")" ]]; then
-            if [[ -d ${DATA}/.sst ]]; then
-                wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer. Removing"
-                rm -rf ${DATA}/.sst
-            fi
-            mkdir -p ${DATA}/.sst
-            JOINER_SST_DIR=$DATA/.sst
-        else
-            JOINER_SST_DIR=$(mktemp -p "${tmpdirbase}" -dt sst_XXXX)
         fi
 
         (recv_data_from_donor_to_joiner "$JOINER_SST_DIR" "${stagemsg}-SST" 0 0) &
@@ -2183,6 +2278,7 @@ then
         fi
 
         wsrep_log_info "Moving the backup to ${TDATA}"
+
         set +e
         timeit "Xtrabackup move stage" "$INNOMOVE"
         errcode=$?
@@ -2207,51 +2303,17 @@ then
             wsrep_log_debug "Keyring move successful"
         fi
 
-        #-----------------------------------------------------------------------
-        #  execute mysql-upgrade
-        #  Run this AFTER the move to ensure that all of the data files have been
-        #  placed correctly (especially for files that live outside of the datadir).
-        #-----------------------------------------------------------------------
-
-        # Truncate the version numbers (we want the major.minor.revision
-        # version like "5.6.35", not "5.6.35-...")
-        # version upgrades go to the revision number
-        local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
-        donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
-
-        if [[ $force_upgrade == "on" ]]; then
-            wsrep_log_info "Forcing mysql_upgrade"
-            run_upgrade=1
-        elif [[ $auto_upgrade == "on" ]]; then
-            run_upgrade=1
-
-            # Skip the upgrade if doing an SST with nodes of the same version
-            if [[ $local_version_str == $donor_version_str ]]; then
-                wsrep_log_debug "Skipping mysql_upgrade: local/donor versions are the same: $local_version_str"
-                run_upgrade=0
-            fi
-        else
-            run_upgrade=0
-            wsrep_log_info "Skipping mysql_upgrade: auto-upgrade disabled by configuration"
-        fi
-
-        wsrep_log_info "Running post-processing..........."
-        set +e
-        timeit "${stagemsg}-post-processing" run_post_processing_steps "$TDATA" "${WSREP_SST_OPT_PORT:-4444}" $run_upgrade $donor_version_str
-        errcode=$?
-        set -e
-        if [[ $errcode -ne 0 ]]; then
-            wsrep_log_info "...........post-processing failed.  Exiting"
-            exit $errcode
-        else
-            wsrep_log_info "...........post-processing done"
+        if [[ -r ${STATDIR}/wsrep_state.dat ]]; then
+            mv "${STATDIR}/wsrep_state.dat" "${TDATA}"
         fi
 
         wsrep_log_debug "Move successful, removing ${DATA}"
         rm -rf "$DATA"
         DATA=${TDATA}
+        transfer_type="sst"
     else
         wsrep_log_info "${IST_FILE} received from donor: Running IST"
+        transfer_type="ist"
     fi
 
     if [[ ! -r ${XB_GTID_INFO_FILE_PATH} ]]; then
@@ -2261,6 +2323,32 @@ then
         wsrep_log_error "****************************************************** "
         exit 2
     fi
+
+    #-----------------------------------------------------------------------
+    #  execute mysql-upgrade
+    #  Run this AFTER the move to ensure that all of the data files have been
+    #  placed correctly (especially for files that live outside of the datadir).
+    #-----------------------------------------------------------------------
+
+    if [[ -r "${DATA}/wsrep_state.dat" ]]; then
+        read_variables_from_wsrep_state "${DATA}/wsrep_state.dat"
+        [[ $? -ne 0 ]] && exit 2
+    fi
+
+    wsrep_log_info "Running post-processing..........."
+    set +e
+    timeit "${stagemsg}-post-processing" run_post_processing_steps "$DATA" "${WSREP_SST_OPT_PORT:-4444}" \
+            "$DONOR_MYSQL_VERSION" "$MYSQL_VERSION" "xtrabackup" "$transfer_type" "$force_upgrade" "$auto_upgrade"
+
+    errcode=$?
+    set -e
+    if [[ $errcode -ne 0 ]]; then
+        wsrep_log_info "...........post-processing failed.  Exiting"
+        exit $errcode
+    else
+        wsrep_log_info "...........post-processing done"
+    fi
+
     wsrep_log_info "Galera co-ords from recovery: $(cat "${XB_GTID_INFO_FILE_PATH}")"
     cat "${XB_GTID_INFO_FILE_PATH}" # output UUID:seqno
     if [[ $ttime -eq 1 ]]; then

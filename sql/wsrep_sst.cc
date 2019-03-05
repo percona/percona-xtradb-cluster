@@ -45,17 +45,15 @@ extern const char wsrep_defaults_group_suffix[];
 #define WSREP_SST_OPT_ADDR "--address"
 #define WSREP_SST_OPT_AUTH "--auth"
 #define WSREP_SST_OPT_DATA "--datadir"
+#define WSREP_SST_OPT_BASEDIR "--basedir"
+#define WSREP_SST_OPT_PLUGINDIR "--plugindir"
 #define WSREP_SST_OPT_CONF "--defaults-file"
 #define WSREP_SST_OPT_CONF_SUFFIX "--defaults-group-suffix"
 #define WSREP_SST_OPT_PARENT "--parent"
 #define WSREP_SST_OPT_BINLOG "--binlog"
 #define WSREP_SST_OPT_VERSION "--mysqld-version"
-#define WSREP_SST_OPT_BASEDIR "--basedir"
-#define WSREP_SST_OPT_PLUGINDIR "--plugin-dir"
 
 // mysqldump-specific options
-#define WSREP_SST_OPT_USER "--user"
-#define WSREP_SST_OPT_PSWD "--password"
 #define WSREP_SST_OPT_HOST "--host"
 #define WSREP_SST_OPT_PORT "--port"
 #define WSREP_SST_OPT_LPORT "--local-port"
@@ -383,7 +381,7 @@ static void *sst_joiner_thread(void *a) {
   {
     const char magic[] = "ready";
     const size_t magic_len = sizeof(magic) - 1;
-    const size_t out_len = 512;
+    const int  out_len = 512;
     char out[out_len];
 
     WSREP_INFO("Initiating SST/IST transfer on JOINER side (%s)", arg->cmd);
@@ -395,9 +393,23 @@ static void *sst_joiner_thread(void *a) {
     sst_process = &proc;
     mysql_mutex_unlock(&LOCK_wsrep_sst);
 
-    // Make sure that we've closed the write pipe, otherwise
-    // the joiner script will read from the mysqld stdin
-    proc.close_write_pipe();
+    if (!proc.error())
+    {
+      int ret;
+      err = 0;
+      ret = fprintf(proc.write_pipe(),
+                    "wsrep_schema_version=%s\n",
+                    WSREP_SCHEMA_VERSION
+                    );
+      if (ret <= 0)
+      {
+        WSREP_ERROR("sst_joiner_thread(): fprintf() failed: %d", ret);
+        err = (ret < 0 ? ret : -EMSGSIZE);
+      }
+
+      // Close the pipe, so that the other side gets an EOF
+      proc.close_write_pipe();
+    }
 
     if (proc.pipe() && !proc.error()) {
       const char *tmp = my_fgets(out, out_len, proc.pipe());
@@ -515,8 +527,8 @@ static ssize_t sst_prepare_other(const char *method,
                  "wsrep_sst_%s "
                  WSREP_SST_OPT_ROLE " 'joiner' "
                  WSREP_SST_OPT_ADDR " '%s' "
-                 WSREP_SST_OPT_BASEDIR " '%s' "
                  WSREP_SST_OPT_DATA " '%s' "
+                 WSREP_SST_OPT_BASEDIR " '%s' "
                  WSREP_SST_OPT_PLUGINDIR " '%s' "
                  WSREP_SST_OPT_CONF " '%s' "
                  WSREP_SST_OPT_CONF_SUFFIX " '%s' "
@@ -524,7 +536,9 @@ static ssize_t sst_prepare_other(const char *method,
                  WSREP_SST_OPT_VERSION " '%s' "
                  " %s '%s' ",
                  method, addr_in,
-                 mysql_home_ptr, mysql_real_data_home, opt_plugin_dir,
+                 mysql_real_data_home,
+                 mysql_home_ptr ? mysql_home_ptr : "",
+                 opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "",
                  wsrep_defaults_file,
                  wsrep_defaults_group_suffix, (int)getpid(),
                  MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF, binlog_opt,
@@ -857,6 +871,14 @@ static void srv_session_error_handler(void *ctx MY_ATTRIBUTE((unused)),
   }
 }
 
+static void cleanup_server_session(MYSQL_SESSION session, bool initialize_thread)
+{
+  srv_session_close(session);
+  if (initialize_thread)
+    srv_session_deinit_thread();
+}
+
+
 static MYSQL_SESSION setup_server_session(bool initialize_thread)
 {
   MYSQL_SESSION session = NULL;
@@ -879,13 +901,13 @@ static MYSQL_SESSION setup_server_session(bool initialize_thread)
 
   MYSQL_SECURITY_CONTEXT sc;
   if (thd_get_security_context(srv_session_info_get_thd(session), &sc)) {
-    if (initialize_thread) srv_session_deinit_thread();
+    cleanup_server_session(session, initialize_thread);
     WSREP_ERROR("Failed to fetch the security context when contacting the server");
     return NULL;
   }
   if (security_context_lookup(sc, "mysql.pxc.internal.session", "localhost", NULL, NULL))
   {
-    if (initialize_thread) srv_session_deinit_thread();
+    cleanup_server_session(session, initialize_thread);
     WSREP_ERROR("Error accessing server with user:mysql.pxc.internal.session");
     return NULL;
   }
@@ -927,14 +949,6 @@ static uint server_session_execute(MYSQL_SESSION session, std::string query, con
   return err;
 }
 
-static void cleanup_server_session(MYSQL_SESSION session, bool initialize_thread)
-{
-  srv_session_close(session);
-  if (initialize_thread)
-    srv_session_deinit_thread();
-}
-
-
 static int wsrep_create_sst_user(bool initialize_thread, const char *password)
 {
   int err = 0;
@@ -947,13 +961,13 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password)
   // The second entry is the string to be displayed if the query fails
   //  (this can be NULL, in which case the actual query will be used)
   const char *cmds[] = {
-    "SET sql_log_bin = OFF;", nullptr,
+    "SET SESSION sql_log_bin = OFF;", nullptr,
     "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;", nullptr,
-    "CREATE USER 'mysql.pxc.sst.user'@localhost IDENTIFIED WITH 'mysql_native_password' BY '%s' ACCOUNT LOCK;", "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
-
+    "CREATE USER 'mysql.pxc.sst.user'@localhost IDENTIFIED WITH 'mysql_native_password' BY '%s' ACCOUNT LOCK;",
+                "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
   /*
     This is the code that uses the mysql.pxc.sst.role
-    However there is a bug in 8.0.13 where the "GRANT CREATE ON DBNAME.*" when
+    However there is a bug in 8.0.15 where the "GRANT CREATE ON DBNAME.*" when
     used in a role, does not allow the user with the role to create a database.
     So we have to explicitly grant the privileges.
   */
@@ -963,7 +977,7 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password)
 #else
     /*
       Explicit privileges needed to run XtraBackup.  This is only used due
-      to the bug in 8.0.13 described above.
+      to the bug in 8.0.15 described above.
     */
     "GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.user'@localhost;", nullptr,
     "GRANT CREATE, INSERT, SELECT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.user'@localhost;", nullptr,
@@ -972,7 +986,6 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password)
 #endif
 
     "ALTER USER 'mysql.pxc.sst.user'@localhost ACCOUNT UNLOCK;", nullptr,
-    "FLUSH PRIVILEGES;", nullptr,
     nullptr, nullptr
   };
 
@@ -995,10 +1008,10 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password)
       break;
     }
     err = server_session_execute(session, auth_buf, cmds[index+1]);
-
-    // Overwrite query (clear out any sensitive data)
-    ::memset(auth_buf, 0, auth_len);
   }
+
+  // Overwrite query (clear out any sensitive data)
+  ::memset(auth_buf, 0, auth_len);
 
   cleanup_server_session(session, initialize_thread);
   wsrep_allow_server_session = false;
@@ -1015,9 +1028,8 @@ int wsrep_remove_sst_user(bool initialize_thread)
   // The second entry is the string to be displayed if the query fails
   //  (this can be NULL, in which case the actual query will be used)
   const char *cmds[] = {
-    "SET sql_log_bin = OFF;", nullptr,
+    "SET SESSION sql_log_bin = OFF;", nullptr,
     "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;", nullptr,
-    "FLUSH PRIVILEGES;", nullptr,
     nullptr, nullptr
   };
 
@@ -1052,7 +1064,7 @@ static void *sst_donor_thread(void *a) {
   bool locked = false;
 
   const char *out = NULL;
-  int const   out_len = 128;
+  int const   out_len = 1024;
   char        out_buf[out_len];
 
   // Generate the random password
@@ -1077,25 +1089,23 @@ static void *sst_donor_thread(void *a) {
 
   if (!err)
   {
-    // Pass the sst username/password as name/value pairs
-    int ret;
-    ret = snprintf(out_buf, out_len,
+    int         ret;
+    ret = fprintf(proc.write_pipe(),
                   "sst_user=mysql.pxc.sst.user\n"
-                  "sst_password=%s\n",
-                  password.c_str());
-    if (ret < 0 || ret >= out_len)
+                  "sst_password=%s\n"
+                  "wsrep_schema_version=%s\n",
+                  password.c_str(),
+                  WSREP_SCHEMA_VERSION
+                  );
+    if (ret < 0)
     {
-      WSREP_ERROR("sst_donor_thread(): snprintf() failed: %d", ret);
+      WSREP_ERROR("sst_donor_thread(): fprintf() failed: %d", ret);
       err = (ret < 0 ? ret : -EMSGSIZE);
     }
-
-    if (!err)
-      fputs(out_buf, proc.write_pipe());
 
     // Close the pipe, so that the other side gets an EOF
     proc.close_write_pipe();
   }
-  ::memset(out_buf, 0, out_len);
   password.assign(password.length(), 0);  // overwrite password value
 
   sst_process = &proc;
@@ -1222,17 +1232,29 @@ static int sst_donate_other(const char *method, const char *addr,
 
   ret = snprintf(
       cmd_str(), cmd_len,
-      "wsrep_sst_%s " WSREP_SST_OPT_ROLE " 'donor' " WSREP_SST_OPT_ADDR
-      " '%s' " WSREP_SST_OPT_SOCKET " '%s' " WSREP_SST_OPT_DATA
-      " '%s' " WSREP_SST_OPT_CONF " '%s' " WSREP_SST_OPT_CONF_SUFFIX
-      " '%s' " WSREP_SST_OPT_VERSION
-      " '%s' "
-      " %s '%s' " WSREP_SST_OPT_GTID
-      " '%s:%lld' "
+      "wsrep_sst_%s "
+      WSREP_SST_OPT_ROLE " 'donor' "
+      WSREP_SST_OPT_ADDR " '%s' "
+      WSREP_SST_OPT_SOCKET " '%s' "
+      WSREP_SST_OPT_DATA " '%s' "
+      WSREP_SST_OPT_BASEDIR " '%s' "
+      WSREP_SST_OPT_PLUGINDIR " '%s' "
+      WSREP_SST_OPT_CONF " '%s' "
+      WSREP_SST_OPT_CONF_SUFFIX " '%s' "
+      WSREP_SST_OPT_VERSION " '%s' "
+      " %s '%s' "
+      WSREP_SST_OPT_GTID " '%s:%lld' "
       "%s",
-      method, addr, mysqld_unix_port, mysql_real_data_home, wsrep_defaults_file,
-      wsrep_defaults_group_suffix, MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
-      binlog_opt, binlog_opt_val, uuid, (long long)seqno,
+      method, addr,
+      mysqld_unix_port,
+      mysql_real_data_home,
+      mysql_home_ptr ? mysql_home_ptr : "",
+      opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "",
+      wsrep_defaults_file,
+      wsrep_defaults_group_suffix,
+      MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+      binlog_opt, binlog_opt_val,
+      uuid, (long long)seqno,
       bypass ? " " WSREP_SST_OPT_BYPASS : "");
   my_free(binlog_opt_val);
 

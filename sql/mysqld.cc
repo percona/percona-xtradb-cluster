@@ -745,6 +745,7 @@ The documentation is based on the source files such as:
 #include "wsrep_mysqld.h"
 #include "wsrep_sst.h"
 #include "wsrep_thd.h"
+#include "wsrep_utils.h"
 #include "wsrep_var.h"
 #endif /* WITH_WSREP */
 
@@ -7539,7 +7540,15 @@ int mysqld_main(int argc, char **argv)
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
   if (opt_initialize) {
-    /*! bootstrap wsrep init was taken care of above */
+    /* Create the wsrep state file */
+    wsp::WSREPState  wsrep_state;
+    wsrep_state.wsrep_schema_version = WSREP_SCHEMA_VERSION;
+    if (!wsrep_state.save_to(mysql_real_data_home_ptr, WSREP_STATE_FILENAME))
+    {
+      WSREP_ERROR("Could not create the wsrep state file : %s", WSREP_STATE_FILENAME);
+      WSREP_ERROR("Exiting");
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
   } else {
     wsrep_SE_initialized();
 

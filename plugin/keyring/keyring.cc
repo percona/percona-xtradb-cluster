@@ -124,7 +124,15 @@ static int keyring_init(MYSQL_PLUGIN plugin_info MY_ATTRIBUTE((unused))) {
     logger.reset(new Logger());
     if (create_keyring_dir_if_does_not_exist(keyring_file_data_value)) {
       logger->log(ERROR_LEVEL, ER_KEYRING_FAILED_TO_CREATE_KEYRING_DIR);
+#ifdef WITH_WSREP
+      /* If running in cluster mode, keyring initialization failure is treated
+      as fatal error to avoid inconsistency in cluster enviornment where-in
+      some node of the cluster are running with keyring enabled and other
+      in keyring disabled mode, despite of same user provided configuration. */
+      return true;
+#else
       return false;
+#endif
     }
     keys.reset(new Keys_container(logger.get()));
     std::vector<std::string> allowedFileVersionsToInit;

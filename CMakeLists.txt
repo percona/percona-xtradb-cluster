@@ -949,7 +949,7 @@ SET(SYSTEM_LIBRARIES
   LZ4
 # LZMA     use bundled by default here
   PROTOBUF
-  READLINE
+#  READLINE use EDITLINE=bundled
   RAPIDJSON
   RE2
   SSL

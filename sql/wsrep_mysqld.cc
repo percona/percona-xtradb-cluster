@@ -1260,6 +1260,23 @@ bool wsrep_start_replication() {
   bool const bootstrap(true == wsrep_new_cluster);
   wsrep_new_cluster = false;
 
+  // This is the same check that galera uses
+  if (bootstrap || !strcmp(wsrep_cluster_address, "gcomm://")) {
+    // Check the wsrep schema version in the wsrep_state.dat file
+    // If the version does not match, do not allow wsrep to startup
+
+    wsp::WSREPState  wsrep_state;
+    if (!wsrep_state.load_from(mysql_real_data_home_ptr, WSREP_STATE_FILENAME))
+      return false;
+
+    if (!wsrep_state.wsrep_schema_version_equals(MYSQL_SERVER_VERSION))
+    {
+      WSREP_ERROR("Cluster is not allowed to startup on a datadir that has not been upgraded.");
+      WSREP_ERROR("Current version:%s datadir:%s", MYSQL_SERVER_VERSION, wsrep_state.wsrep_schema_version.c_str());
+      return false;
+    }
+  }
+
   WSREP_INFO("Starting replication");
 
   if ((rcode = wsrep->connect(wsrep, wsrep_cluster_name, wsrep_cluster_address,
