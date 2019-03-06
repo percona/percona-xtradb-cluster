@@ -1,0 +1,11 @@
+
+.. |cfname| replace:: `cf_name`
+.. |cf-name| replace:: `cf_name`
+
+.. |cf| replace:: column family
+.. |column-family| replace:: column family
+
+.. |sql.comment| replace:: :mysql:`COMMENT`
+.. |sql.create-table| replace:: :mysql:`CREATE TABLE`
+.. |sql.alter-table| replace:: :mysql:`ALTER TABLE`
+.. |sql.upgrade-partitioning| replace:: :mysql:`UPGRADE PARTITIONING`

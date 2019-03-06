@@ -16,23 +16,27 @@ of incompatible changes that could cause automatic upgrade to fail:
 - :ref:`changed_in_8.0`
 - `Upgrading MySQL <http://dev.mysql.com/doc/refman/8.0/en/upgrading.html>`_
 - `Upgrading from MySQL 5.7 to 8.0 <http://dev.mysql.com/doc/refman/8.0/en/upgrading-from-previous-series.html>`_
+- `Upgrade Paths <https://dev.mysql.com/doc/refman/8.0/en/upgrade-paths.html>`_
 - `Preparing your Installation for Upgrade <https://dev.mysql.com/doc/refman/8.0/en/upgrade-prerequisites.html>`_
-- `Partitioning Limitations Relating to Storage Engines
-  <https://dev.mysql.com/doc/refman/8.0/en/partitioning-limitations-storage-engines.html>`_
 
 .. warning:: 
 
    Do not upgrade from 5.7 to 8.0 on a crashed instance. If the server instance
    has crashed, crash recovery should be run before proceeding with the upgrade.
 
-   With partitioned tables that use the |TokuDB| or |MyRocks| storage engine, the
-   upgrade only works with native partitioning.
-
    Note that in |Percona Server| 8.0, the ``ROW FORMAT`` clause is not supported
    in ``CREATE TABLE`` and ``ALTER TABLE`` statements. Instead, use the
    :variable:`tokudb_row_format` variable to set the default compression
    algorithm.
 
+   With partitioned tables that use the TokuDB or MyRocks storage
+   engine, the upgrade only works with native partitioning.
+
+--------------------------------------------------------------------------------
+
+.. contents::
+   :local:
+   :depth: 1
 
 Upgrading using the Percona repositories
 ================================================================================
@@ -45,7 +49,7 @@ Instructions for enabling the repositories in a system can be found in:
 * :doc:`Percona APT Repository <installation/apt_repo>`
 * :doc:`Percona YUM Repository <installation/yum_repo>`
 
-``DEB``-based distributions
+DEB-based distributions
 --------------------------------------------------------------------------------
 
 |tip.run-all.root|
@@ -67,20 +71,32 @@ Enable the repository:
 
 .. code-block:: bash
 
-   $ percona-release enable ps-80 testing
+   $ percona-release enable ps-80 release
    $ apt-get update
 
 .. code-block:: bash
 
-   $ apt-get install percona-server
+   $ apt-get install percona-server-server
 
-If you're using |Percona Server| 8.0 with |TokuDB| you'll need to specify the |TokuDB| package as well:
+If you used or |TokuDB| or |MyRocks| storage engines
+
+The |TokuDB| and |MyRocks| storage engines are installed separately. The ``percona-server-tokudb`` package installs both of them.
 
 .. code-block:: bash
 
-   $ apt-get install percona-server percona-server-tokudb-8.0
+   $ apt-get install percona-server-tokudb
 
-The installation script will *NOT* run automatically :command:`mysql_upgrade` as it was the case in previous versions. You'll need to run the command manually and restart the service after it's finished.
+If you only used the |MyRocks| storage engine in |Percona Server| |version.prev|, install the
+``percona-server-rocksdb`` package.
+
+.. code-block:: bash
+
+   $ apt-get install percona-server-rocksdb
+
+
+The installation script will *NOT* run automatically :command:`mysql_upgrade` as
+it was the case in previous versions. You'll need to run the command manually
+and restart the service after it's finished.
 
 .. code-block:: bash
 
@@ -99,7 +115,7 @@ The installation script will *NOT* run automatically :command:`mysql_upgrade` as
  
    $ service mysql restart
 
-``RPM``-based distributions
+RPM-based distributions
 ---------------------------
 
 |tip.run-all.root|
@@ -114,17 +130,18 @@ Having done the full backup (and dump if possible), stop the server:
    service manager you can invoke the above command with :program:`systemctl`
    instead of :program:`service`. Currently both are supported.
 
-
 .. admonition:: Output of :bash:`rpm -qa | grep Percona-Server`
 
    .. code-block:: guess
 
-      Percona-Server-shared-80-8.0.12-rel76.1.el7.x86_64
-      Percona-Server-server-80-8.0.12-rel76.1.el7.x86_64
-      Percona-Server-devel-80-8.0.12-rel76.1.el7.x86_64
-      Percona-Server-client-80-8.0.12-rel76.1.el7.x86_64
-      Percona-Server-test-80-8.0.12-rel76.1.el7.x86_64
-      Percona-Server-80-debuginfo-8.0.12-rel76.1.el7.x86_64
+      Percona-Server-57-debuginfo-5.7.10-3.1.el7.x86_64
+      Percona-Server-client-57-5.7.10-3.1.el7.x86_64
+      Percona-Server-devel-57-5.7.10-3.1.el7.x86_64
+      Percona-Server-server-57-5.7.10-3.1.el7.x86_64
+      Percona-Server-shared-57-5.7.10-3.1.el7.x86_64
+      Percona-Server-shared-compat-57-5.7.10-3.1.el7.x86_64
+      Percona-Server-test-57-5.7.10-3.1.el7.x86_64
+      Percona-Server-tokudb-57-5.7.10-3.1.el7.x86_64
 
 After checking, proceed to remove them without dependencies: 
 
@@ -132,20 +149,42 @@ After checking, proceed to remove them without dependencies:
 
    $ rpm -qa | grep Percona-Server | xargs rpm -e --nodeps
 
-It is important that you remove it without dependencies as many packages may
+It is important that you remove them without dependencies as many packages may
 depend on these (as they replace ``mysql``) and will be removed if omitted.
+
+.. important:: |etc.my-cnf| Backed Up in |centos| 7
+
+   In |centos| 7, the |etc.my-cnf| configuration file is backed up when you
+   uninstall the |Percona Server| packages with the |rpm.e.nodeps| command.
+
+   The backup file is stored in the same directory with the `_backup` suffix
+   followed by a timestamp: |etc.my-cnf-backup|.
 
 Substitute :bash:`grep '^mysql-'` for :bash:`grep 'Percona-Server'` in the previous command and
 remove the listed packages.
 
-You will have to install the ``percona-server`` package: :bash:`yum install percona-server`
-
-If you're using |Percona Server| 8.0 with |TokuDB| you'll need to specify the
-|TokuDB| package as well when doing the upgrade:
+You will have to install the ``percona-server-server`` package:
 
 .. code-block:: bash
 
-   $ yum install percona-server Percona-Server-tokudb-80
+   $ yum install percona-server-server
+
+The |TokuDB| and |MyRocks| storage engines are installed separately.
+
+If you used |TokuDB| in |Percona Server| |version.prev|, install the
+``percona-server-tokudb`` package when doing the upgrade. This command installs
+both
+
+.. code-block:: bash
+
+   $ yum install percona-server-tokudb
+
+If you used the |MyRocks| storage engine in |Percona Server| |version.prev|, install the
+``percona-server-rocksdb`` package:
+
+.. code-block:: bash
+
+   $ yum install percona-server-rocksdb
 
 Once installed, proceed to modify your configuration file - :file:`my.cnf` - and
 reinstall the plugins if necessary.
@@ -167,21 +206,26 @@ indexes needed and do the modifications needed:
 .. note::
 
    If you're using |TokuDB| storage engine you'll need re-enable the storage
-   engine plugin by running the: ``ps_tokudb_admin --enable`` before running
+   engine plugin by running the: |ps-admin.enable-tokudb| before running
    ``mysql_upgrade`` otherwise you'll get errors.
 
 .. code-block:: bash
 
    $ mysql_upgrade
-   Checking if update is needed.
-   Checking server version.
-   Running queries to upgrade MySQL server.
-   Checking system database.
-   mysql.columns_priv                                 OK
-   mysql.db                                           OK
-   ...
-   pgrade process completed successfully.
-   Checking if update is needed.
+
+.. admonition:: Output
+
+   .. code-block:: guess
+
+      Checking if update is needed.
+      Checking server version.
+      Running queries to upgrade MySQL server.
+      Checking system database.
+      mysql.columns_priv                                 OK
+      mysql.db                                           OK
+      ...
+      pgrade process completed successfully.
+      Checking if update is needed.
 
 Once this is done, just restart the server as usual: |service.mysql.restart| 
 
@@ -203,34 +247,35 @@ as explained at the beginning of this guide.
 
 Then, download the following packages for your architecture:
 
-- ``percona-server-server-8.0``
-- ``percona-server-client-8.0``
-- ``percona-server-common-8.0``
-- ``libperconaserverclient20``
+- ``percona-server-server``
+- ``percona-server-client``
+- ``percona-server-common``
+- ``libperconaserverclient21``
 
 The following example will download |Percona Server| :rn:`8.0.13-3` release
-packages for *Debian* 8.0:
+packages for *Debian* 9.0:
 
 .. code-block:: bash
 
-   $ wget https://www.percona.com/downloads/Percona-Server-8.9/Percona-Server-8.0.13-3/binary/debian/jessie/x86_64/Percona-Server-8.0.13-3-r63dafaf-jessie-x86_64-bundle.tar
+   $ wget https://www.percona.com/downloads/Percona-Server-8.9/Percona-Server-8.0.13-3/binary/debian/stretch/x86_64/percona-server-8.0.13-3-r63dafaf-stretch-x86_64-bundle.tar
 
-You should then unpack the bundle to get the packages: :bash:`tar xvf Percona-Server-8.0.13-3-r63dafaf-jessie-x86_64-bundle.tar`
+You should then unpack the bundle to get the packages: :bash:`tar xvf Percona-Server-8.0.13-3-r63dafaf-stretch-x86_64-bundle.tar`
 
 After you unpack the bundle you should see the following packages:
 
 .. code-block:: bash
 
    $ ls *.deb
-   libperconaserverclient20-dev_8.0.10-3-1.jessie_amd64.deb
-   libperconaserverclient20_8.0.10-3-1.jessie_amd64.deb
-   percona-server-8.0-dbg_8.0.10-3-1.jessie_amd64.deb
-   percona-server-client-8.0_8.0.13-3.jessie_amd64.deb
-   percona-server-common-8.0_8.0.13-3.jessie_amd64.deb
-   percona-server-server-8.0_8.0.13-3.jessie_amd64.deb
-   percona-server-source-8.0_8.0.13-3.jessie_amd64.deb
-   percona-server-test-8.0_8.0.13-3.jessie_amd64.deb
-   percona-server-tokudb-8.0_8.0.13-3.jessie_amd64.deb
+
+   libperconaserverclient21-dev_8.0.13-3-1.stretch_amd64.deb
+   libperconaserverclient21_8.0.13-3-1.stretch_amd64.deb
+   percona-server-dbg_8.0.13-3-1.stretch_amd64.deb
+   percona-server-client_8.0.13-3-1.stretch_amd64.deb
+   percona-server-common_8.0.13-3-1.stretch_amd64.deb
+   percona-server-server_8.0.13-3-1.stretch_amd64.deb
+   percona-server-source_8.0.13-3-1.stretch_amd64.deb
+   percona-server-test_8.0.13-3-1.stretch_amd64.deb
+   percona-server-tokudb_8.0.13-3-1.stretch_amd64.deb
 
 Now you can install |Percona Server| by running:
 
@@ -240,11 +285,11 @@ Now you can install |Percona Server| by running:
 
 This will install all the packages from the bundle. Another option is to
 download/specify only the packages you need for running |Percona Server|
-installation (``libperconaserverclient20_8.0.13-3.jessie_amd64.deb``,
-``percona-server-client-8.0_8.0.13-3.jessie_amd64.deb``,
-``percona-server-common-8.0_8.0.13-3.jessie_amd64.deb``, and
-``percona-server-server-8.0_8.0.13-3.jessie_amd64.deb``. Optionally you can
-install ``percona-server-tokudb-8.0_8.0.13-3.jessie_amd64.deb`` if you want
+installation (``libperconaserverclient21_8.0.13-3.stretch_amd64.deb``,
+``percona-server-client-8.0.13-3.stretch_amd64.deb``,
+``percona-server-common-8.0.13-3.stretch_amd64.deb``, and
+``percona-server-server-8.0.13-3.stretch_amd64.deb``. Optionally you can
+install ``percona-server-tokudb-8.0.13-3.stretch_amd64.deb`` if you want
 |TokuDB| storage engine).
 
 .. note::
@@ -273,16 +318,18 @@ Having done the full backup (and dump if possible), stop the server (command:
 
    $ rpm -qa | grep Percona-Server
    
-   Percona-Server-shared-80-8.0.13-3.el6.x86_64
-   Percona-Server-server-80-8.0.13-3.el6.x86_64
-   Percona-Server-client-80-8.0.13-3.el6.x86_64
-   Percona-Server-tokudb-80-8.0.13-3.el6.x86_64
+   Percona-Server-57-debuginfo-5.7.10-3.1.el7.x86_64
+   Percona-Server-client-57-5.7.10-3.1.el7.x86_64
+   Percona-Server-devel-57-5.7.10-3.1.el7.x86_64
+   Percona-Server-server-57-5.7.10-3.1.el7.x86_64
+   Percona-Server-shared-57-5.7.10-3.1.el7.x86_64
+   Percona-Server-shared-compat-57-5.7.10-3.1.el7.x86_64
+   Percona-Server-test-57-5.7.10-3.1.el7.x86_64
+   Percona-Server-tokudb-57-5.7.10-3.1.el7.x86_64
 
-You may have a fourth, ``shared-compat``, which is for compatibility purposes.
+You may have the ``shared-compat`` package, which is for compatibility purposes.
 
-After checked that, proceed to remove them without dependencies: ::
-
-  $ rpm -qa | grep Percona-Server | xargs rpm -e --nodeps
+After checked that, proceed to remove them without dependencies: :bash:`rpm -qa | grep percona-server | xargs rpm -e --nodeps`
 
 It is important that you remove it without dependencies as many packages may
 depend on these (as they replace ``mysql``) and will be removed if ommited.
@@ -308,26 +355,27 @@ After you unpack the bundle you should see the following packages: :bash:`ls *.r
 
    .. code-block:: guess
 
-      percona-server-80-debuginfo-8.0.13-3.el7.x86_64.rpm
-      percona-server-client-80-8.0.13-3.el7.x86_64.rpm
-      percona-server-devel-80-8.0.13-3.el7.x86_64.rpm
-      percona-server-server-80-8.0.13-3.el7.x86_64.rpm
-      percona-server-shared-80-8.0.13-3.el7.x86_64.rpm
-      percona-server-shared-compat-80-8.0.13-3.el7.x86_64.rpm
-      percona-server-test-80-8.0.13-3.el7.x86_64.rpm
-      percona-server-tokudb-80-8.0.13-3.el7.x86_64.rpm
+      percona-server-debuginfo-8.0.13-3.1.el7.x86_64.rpm
+      percona-server-client-8.0.13-3.1.el7.x86_64.rpm
+      percona-server-devel-8.0.13-3.1.el7.x86_64.rpm
+      percona-server-server-8.0.13-3.1.el7.x86_64.rpm
+      percona-server-shared-8.0.13-3.1.el7.x86_64.rpm
+      percona-server-shared-compat-8.0.13-3.1.el7.x86_64.rpm
+      percona-server-test-8.0.13-3.1.el7.x86_64.rpm
+      percona-server-tokudb-8.0.13-3.1.el7.x86_64.rpm
 
-Now you can install |Percona Server| 8.0 by running:
+
+Now, you can install |Percona Server| 8.0 by running:
 
 .. code-block:: bash
 
-   rpm -ivh percona-Server-server-8.0.13-3.el7.x86_64.rpm \
-   percona-perver-client-8.0.13-3.el7.x86_64.rpm \
-   percona-server-shared-8.0.13-3.el7.x86_64.rpm
+   rpm -ivh percona-server-server_8.0.13-3.el7.x86_64.rpm \
+   percona-server-client_8.0.13-3.el7.x86_64.rpm \
+   percona-server-shared_8.0.13-3.el7.x86_64.rpm
 
 This will install only packages required to run the |Percona Server|
 8.0. Optionally you can install :ref:`TokuDB <tokudb_intro>` storage engine by
-adding the ``Percona-Server-tokudb-80-8.0.13-3.el7.x86_64.rpm`` to the command
+adding the ``percona-server-tokudb-8.0.13-3.el7.x86_64.rpm`` to the command
 above. You can find more information on how to install and enable the |TokuDB|
 storage in the :ref:`tokudb_installation` guide.
 
@@ -358,10 +406,66 @@ rebuild the indexes needed and do the modifications needed:
 .. note::
 
    If you're using |TokuDB| storage engine you'll need re-enable the storage
-   engine plugin by running the: ``ps-admin --enable`` before running
+   engine plugin by running the: |ps-admin.enable-tokudb| before running
    ``mysql_upgrade`` otherwise you'll get errors.
 
-After this is done, just restart the server as usual: :bash:`service mysql restart`
+After this is done, just restart the server as usual: |service.mysql.restart|
+
+Upgrading from Systems that Use the |TokuDB| or |MyRocks| Storage Engine and Partitioned Tables
+====================================================================================================
+
+Due to the limitation imposed by |MySQL|, it is the storage engine that must
+provide support for partitioning.  |MySQL| 8.0 only provides support for
+partitioned table for the |InnoDB| storage engine.
+
+If you use partitioned tables with the |TokuDB| or |MyRocks| storage engine, the
+upgrade may fail if the native partitioning (i.e. provided by the storage engine
+itself) is not enabled.
+
+Before you attempt the upgrade, check whether or not you have any tables that do not use the native partitioning.
+
+.. code-block:: bash
+
+   $ mysqlcheck -u root --all-databases --check-upgrade
+
+If such tables are found |mysqlcheck| issues a warning:
+
+.. admonition:: Output of |mysqlcheck| detecting a table that do not use the native partitioning
+
+   .. code-block:: guess
+
+      | comp_test.t1_RocksDB_lz4     OK
+      | warning  : The partition engine, used by table 'comp_test.t1_RocksDB_lz4',
+      | is deprecated and will be removed in a future release. Please use native partitioning instead.
+
+In this case ``comp_test.t1_RocksDB_lz4`` is not using native partitions. To
+switch, enable either :variable:`rocksdb_enable_native_partition` or
+:variable:`tokudb_enable_native_partition` variable depending on the storage
+engine that you are using. Then restart the server. Your next step is to alter
+the tables that are not using the native partitioning with the
+|sql.upgrade-partitioning| clause:
+
+.. code-block:: mysql
+
+   ALTER TABLE comp_test.t1_RocksDB_lz4 UPGRADE PARTITIONING
+
+In this example, the table ``comp_test.t1_RocksDB_lz4`` to native
+partitioning. Unless you complete these steps for each table that |mysqlcheck|
+complained about, the upgrade to |MySQL| |version| will fail and your error log
+will contain messages like:
+
+.. code-block:: guess
+
+   2018-12-17T18:34:14.152660Z 2 [ERROR] [MY-013140] [Server] The 'partitioning' feature is not available; you need to remove '--skip-partition' or use MySQL built with '-DWITH_PARTITION_STORAGE_ENGINE=1'
+   2018-12-17T18:34:14.152679Z 2 [ERROR] [MY-013140] [Server] Can't find file: './comp_test/t1_RocksDB_lz4.frm' (errno: 0 - Success)
+   2018-12-17T18:34:14.152691Z 2 [ERROR] [MY-013137] [Server] Can't find file: './comp_test/t1_RocksDB_lz4.frm' (OS errno: 0 - Success)
+
+.. seealso::
+
+   |MySQL| Documentation: Partitioning Limitations Relating to Storage Engines
+      https://dev.mysql.com/doc/refman/8.0/en/partitioning-limitations-storage-engines.html
 
 .. include:: .res/replace.txt
 .. include:: .res/replace.program.txt
+.. include:: .res/replace.concept.txt
+.. include:: .res/replace.file.txt

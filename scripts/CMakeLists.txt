@@ -421,7 +421,7 @@ ENDIF()
 MESSAGE(STATUS "CONFIG_CLIENT_LIBS ${CONFIG_CLIENT_LIBS}")
 MESSAGE(STATUS "CONFIG_LIBS_PRIVATE ${CONFIG_LIBS_PRIVATE}")
 
-SET(mysql_config_COMPONENT COMPONENT Development)
+SET(mysql_config_COMPONENT Development)
 
 IF(WIN32)
   # On Windows, some .sh and some .pl.in files are configured
@@ -447,23 +447,25 @@ IF(WIN32)
        ${CMAKE_CURRENT_BINARY_DIR}/${file}.pl ESCAPE_QUOTES @ONLY)
     INSTALL_SCRIPT(${CMAKE_CURRENT_BINARY_DIR}/${file}.pl COMPONENT Server_Scripts)
   ENDFOREACH()
+
 ELSE()
   IF(WITH_WSREP)
     SET(WSREP_BINARIES wsrep_sst_common wsrep_sst_rsync wsrep_sst_xtrabackup-v2 clustercheck pyclustercheck)
   ENDIF()
+
   # Configure this one, for testing, but do not install it.
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/mysql_config.pl.in
     ${CMAKE_CURRENT_BINARY_DIR}/mysql_config.pl ESCAPE_QUOTES @ONLY)
   # On Unix, most of the files end up in the bin directory
-  SET(mysql_config_COMPONENT COMPONENT Development)
+  SET(mysql_config_COMPONENT Development)
 
   IF(WITH_SYSTEMD)
     SET(BIN_SCRIPTS
       mysql_config
       mysqldumpslow
-      ${WSREP_BINARIES}
       ps_mysqld_helper
       ps-admin
+      ${WSREP_BINARIES}
       )
   ELSE()
     SET(BIN_SCRIPTS
@@ -471,9 +473,9 @@ ELSE()
       mysqldumpslow
       mysqld_multi
       mysqld_safe
-      ${WSREP_BINARIES}
       ps_mysqld_helper
       ps-admin
+      ${WSREP_BINARIES}
       )
   ENDIF()
   IF(WITH_WSREP)
@@ -530,13 +532,6 @@ ELSE()
       COMPONENT ${${file}_COMPONENT}
      )
   ENDFOREACH()
-
-  #CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/mysqlchk.sh
-  #  ${CMAKE_CURRENT_BINARY_DIR}/mysqlchk ESCAPE_QUOTES @ONLY)
-  #INSTALL(FILES
-  #  ${CMAKE_CURRENT_BINARY_DIR}/mysqlchk
-  #  DESTINATION ${INSTALL_XINETDDIR}
-  #  COMPONENT Server)
 
   # Systemd files
   IF(WITH_SYSTEMD)
