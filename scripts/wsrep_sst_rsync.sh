@@ -63,7 +63,12 @@ fi
 
 auto_upgrade=$(parse_cnf sst auto-upgrade "")
 auto_upgrade=$(normalize_boolean "$auto_upgrade" "on")
-force_upgrade=$(parse_cnf sst force-upgrade "")
+
+# Check the WSREP_SST_OPT_FORCE_UPGRADE environment variable
+force_upgrade=${WSREP_SST_OPT_FORCE_UPGRADE:-""}
+if [[ -z $force_upgrade ]]; then
+    force_upgrade=$(parse_cnf sst force-upgrade "")
+fi
 force_upgrade=$(normalize_boolean "$force_upgrade" "off")
 
 cleanup_joiner()
@@ -129,6 +134,27 @@ function send_rsync_error()
     echo "error=$err" > "$MAGIC_FILE"
     rsync --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR || true
 }
+
+# Removes the redo logs (ib_logfile*) from the given directory
+#
+# Globals:
+#   None
+#
+# Parameters:
+#   Argument 1: the redo log directory
+#
+function remove_redo_logs()
+{
+    local redo_log_dir=$1
+    (
+        if [[ -d $redo_log_dir ]]; then
+            cd "${redo_log_dir}"
+            rm -f ib_logfile*
+        fi
+    )
+    return 0
+}
+
 
 MYSQL_VERSION=$WSREP_SST_OPT_VERSION
 if [[ -z $MYSQL_VERSION ]]; then
@@ -424,7 +450,7 @@ EOF
                 # If donor < local, then this is unsupported, we cannot
                 # have a higher version node donating to a lower version node
                 # (there is no way to downgrade the DB)
-                if ! check_for_version $MYSQL_VERSION $DONOR_MYSQL_VERSION; then
+                if compare_versions $MYSQL_VERSION "<" $DONOR_MYSQL_VERSION; then
                     wsrep_log_error "******************* FATAL ERROR ********************** "
                     wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
                     wsrep_log_error "This node's PXC version is $MYSQL_VERSION.  The donor's PXC version is $DONOR_MYSQL_VERSION."
@@ -530,6 +556,7 @@ EOF
     donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
 
     if [[ $force_upgrade == "on" ]]; then
+        wsrep_log_info "Forcing mysql_upgrade"
         run_upgrade=1
     elif [[ $auto_upgrade == "on" ]]; then
         run_upgrade=1
@@ -542,6 +569,22 @@ EOF
     else
         run_upgrade=0
         wsrep_log_info "auto-upgrade disabled by configuration"
+    fi
+
+    # If the donor version is less than 8.0, remove the redo logs
+    # Otherwise mysqld will not start up on the 5.7 datadir
+    if compare_versions "${donor_version_str}" "<" "8.0.0"; then
+        wsrep_log_info "Removing the redo logs (older version:$donor_version_str)"
+        remove_redo_logs "${WSREP_LOG_DIR}"
+        errcode=$?
+        if [[ $errcode -ne 0 ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "FATAL: Failed to remove the redo logs that were received"
+            wsrep_log_error "       from an older version."
+            wsrep_log_error "       donor:${donor_version_str}"
+            wsrep_log_error "****************************************************** "
+            exit $errcode
+        fi
     fi
 
     wsrep_log_info "Running post-processing ..........."

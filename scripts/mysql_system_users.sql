@@ -56,16 +56,16 @@ GRANT SELECT ON *.* TO 'mysql.infoschema'@localhost;
 --   CREATE USER (to assign roles, add/delete users)
 --   RELOAD (flush privileges)
 --   SUPER (if node is read-only we can still run)
-CREATE USER 'mysql.pxc.sst.root'@localhost IDENTIFIED WITH caching_sha2_password
+CREATE USER 'mysql.pxc.internal.session'@localhost IDENTIFIED WITH caching_sha2_password
  AS '$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED'
  ACCOUNT LOCK;
-REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.root'@localhost;
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.internal.session'@localhost;
 -- Due to bugs with roles, we need to grant superuser access here
-GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
-GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
---GRANT CREATE USER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
---GRANT SUPER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
---GRANT RELOAD ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+--GRANT CREATE USER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+--GRANT SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+--GRANT RELOAD ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 
 -- Create the PXC SST role
 -- This role is used during PXC SST (on the donor)

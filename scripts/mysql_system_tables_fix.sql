@@ -1068,34 +1068,34 @@ FLUSH PRIVILEGES;
 #
 # SQL commands to create the PXC SST root and role that is used by the SST process
 #
-# mysql.pxc.sst.root
+# mysql.pxc.internal.session
 #   See the comments in mysql_system_tables.sql
 #
 # These are the values for
-#  GRANT CREATE USER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
-#  GRANT SUPER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
-#  GRANT RELOAD ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+#  GRANT CREATE USER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+#  GRANT SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+#  GRANT RELOAD ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 #
-#INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.root','N','N','N','N','N','N','Y','N','N','N','Y','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','Y','N','N','N','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,  NULL,'Y','N','N',NULL,NULL,NULL);
+#INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.internal.session','N','N','N','N','N','N','Y','N','N','N','Y','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','Y','N','N','N','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,  NULL,'Y','N','N',NULL,NULL,NULL);
 
 # These are the values for
-#  GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
-#  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.root'@localhost WITH GRANT OPTION;
+#  GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+#  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 #
-INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.root','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,  NULL,'Y','Y','Y',NULL,NULL,NULL);
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'BACKUP_ADMIN', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'BINLOG_ADMIN', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'CONNECTION_ADMIN', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'ENCRYPTION_KEY_ADMIN', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'GROUP_REPLICATION_ADMIN', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'PERSIST_RO_VARIABLES_ADMIN', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'REPLICATION_SLAVE_ADMIN', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'RESOURCE_GROUP_ADMIN', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'RESOURCE_GROUP_USER', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'ROLE_ADMIN', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'SET_USER_ID', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'SYSTEM_VARIABLES_ADMIN', 'Y');
-INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.root', 'localhost', 'XA_RECOVER_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.internal.session','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,  NULL,'Y','Y','Y',NULL,NULL,NULL);
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'BACKUP_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'BINLOG_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'CONNECTION_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'ENCRYPTION_KEY_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'GROUP_REPLICATION_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'PERSIST_RO_VARIABLES_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'REPLICATION_SLAVE_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'RESOURCE_GROUP_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'RESOURCE_GROUP_USER', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'ROLE_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SET_USER_ID', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SYSTEM_VARIABLES_ADMIN', 'Y');
+INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'XA_RECOVER_ADMIN', 'Y');
 
 #
 # mysql.pxc.sst.role
