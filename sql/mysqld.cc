@@ -1383,7 +1383,7 @@ mysql_mutex_t LOCK_wsrep_desync;
 int wsrep_replaying = 0;
 std::atomic<ulong> wsrep_running_threads{0};  // # of currently running wsrep threads
 static void wsrep_close_threads(THD *thd);
-bool mysqld_server_initialized = 0;
+bool wsrep_unireg_abort = false;
 #endif /* WITH_WSREP */
 
 /*
@@ -2262,6 +2262,8 @@ static void unireg_abort(int exit_code) {
 #ifdef WITH_WSREP
   if (wsrep) {
     WSREP_DEBUG("Initiating abort (unireg_abort)");
+
+    wsrep_unireg_abort = true;
 
     /* Cancel the SST script if it is running: */
     wsrep_sst_cancel(true);
@@ -5811,9 +5813,6 @@ static int init_server_components() {
     - SST may modify binlog index file, so it must be opened
       after SST has happened
    */
-  /* It's now safe to use thread specific memory */
-  mysqld_server_initialized = true;
-
   if (gtid_server_init()) {
     LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_GTID);
     unireg_abort(MYSQLD_ABORT_EXIT);

@@ -23,6 +23,8 @@
 #include "wsrep_mysqld.h"  // for logging macros
 #include "sql/log.h"
 
+extern bool srv_sys_tablespaces_open;
+
 void wsrep_xid_init(XID *xid, const wsrep_uuid_t &uuid, wsrep_seqno_t seqno) {
   xid->reset();
   xid->set_format_id(1);
@@ -88,6 +90,21 @@ void wsrep_set_SE_checkpoint(XID &xid) {
 }
 
 void wsrep_set_SE_checkpoint(const wsrep_uuid_t &uuid, wsrep_seqno_t seqno) {
+
+  if (!WSREP_ON || wsrep_unireg_abort) return;
+
+  if (!srv_sys_tablespaces_open) {
+    /* If system/default innodb tablespace (ibdata1) is encrypted and
+    user starts node with wrong/insufficient configuration then server will
+    initiate srv_init_abort sequence shutting down galera.
+    On shutdown galera will try to update wsrep co-ordinates to sys_header
+    that is located in innodb tablespace (ibdata1) and will fail. */
+
+    WSREP_DEBUG("Failed to execute wsrep_set_SE_checkpoint."
+                " System tablespace not open");
+    return;
+  }
+
   XID xid;
   wsrep_xid_init(&xid, uuid, seqno);
   wsrep_set_SE_checkpoint(xid);
@@ -116,7 +133,19 @@ void wsrep_get_SE_checkpoint(XID &xid) {
 }
 
 void wsrep_get_SE_checkpoint(wsrep_uuid_t &uuid, wsrep_seqno_t &seqno) {
-  if (!WSREP_ON) return;
+
+  if (!WSREP_ON || wsrep_unireg_abort) return;
+
+  if (!srv_sys_tablespaces_open) {
+    /* If system/default innodb tablespace (ibdata1) is encrypted and
+    user starts node with wrong/insufficient configuration then server will
+    initiate srv_init_abort sequence shutting down galera.
+    On shutdown galera will try to update wsrep co-ordinates to sys_header
+    that is located in innodb tablespace (ibdata1) and will fail. */
+
+    WSREP_DEBUG("Failed to execute wsrep_get_SE_checkpoint."
+                " System tablespace not open");
+  }
 
   uuid = WSREP_UUID_UNDEFINED;
   seqno = WSREP_SEQNO_UNDEFINED;

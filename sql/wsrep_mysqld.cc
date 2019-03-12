@@ -888,7 +888,7 @@ int wsrep_init() {
   if (strlen(wsrep_provider) == 0 || !strcmp(wsrep_provider, WSREP_NONE)) {
     // enable normal operation in case no provider is specified
     wsrep_ready_set(true);
-    global_system_variables.wsrep_on = 0;
+    global_system_variables.wsrep_on = false;
     wsrep_init_args args;
     args.logger_cb = wsrep_log_cb;
     args.options = (wsrep_provider_options) ? wsrep_provider_options : "";
@@ -905,7 +905,7 @@ int wsrep_init() {
     }
     return rcode;
   } else {
-    global_system_variables.wsrep_on = 1;
+    global_system_variables.wsrep_on = true;
     strncpy(provider_name, wsrep->provider_name, sizeof(provider_name) - 1);
     strncpy(provider_version, wsrep->provider_version,
             sizeof(provider_version) - 1);

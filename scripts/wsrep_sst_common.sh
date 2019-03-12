@@ -21,7 +21,9 @@ set -u
 WSREP_SST_OPT_BYPASS=0
 WSREP_SST_OPT_BINLOG=""
 WSREP_SST_OPT_CONF_SUFFIX=""
+WSREP_SST_OPT_BASEDIR=""
 WSREP_SST_OPT_DATA=""
+WSREP_SST_OPT_PLUGINDIR=""
 WSREP_SST_OPT_USER=""
 WSREP_SST_OPT_PSWD=""
 WSREP_SST_OPT_VERSION=""
@@ -63,8 +65,16 @@ case "$1" in
     '--bypass')
         WSREP_SST_OPT_BYPASS=1
         ;;
+    '--basedir')
+        readonly WSREP_SST_OPT_BASEDIR="$2"
+        shift
+        ;;
     '--datadir')
         readonly WSREP_SST_OPT_DATA="$2"
+        shift
+        ;;
+    '--plugin-dir')
+        readonly WSREP_SST_OPT_PLUGINDIR="$2"
         shift
         ;;
     '--defaults-file')
@@ -734,6 +744,8 @@ function run_post_processing_steps()
         --server-id=1 \
         --pid-file=${mysql_upgrade_dir_path}/mysqld.pid \
         --socket=$upgrade_socket \
+        --basedir=$WSREP_SST_OPT_BASEDIR \
+        --plugin-dir=$WSREP_SST_OPT_PLUGINDIR \
         --datadir=$datadir --wsrep_provider=none"
 
     # Generate a new random password to be used by the JOINER
@@ -1030,8 +1042,9 @@ EOF
 
     #-----------------------------------------------------------------------
     # cleanup
-    rm -rf $datadir/*.pem || true
-    rm -rf $datadir/auto.cnf || true
+    cp $mysqld_err_log $datadir/mysqld.intermediate.boot.log
+    #rm -rf $datadir/*.pem || true
+    #rm -rf $datadir/auto.cnf || true
 
     return 0
 }

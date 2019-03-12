@@ -6237,7 +6237,6 @@ static void lock_rec_convert_impl_to_expl(const buf_block_t *block,
     ut_ad(!dict_index_is_online_ddl(index));
 
     trx = lock_sec_rec_some_has_impl(rec, index, offsets);
-
     if (trx) {
 #ifdef WITH_WSREP
 #else
