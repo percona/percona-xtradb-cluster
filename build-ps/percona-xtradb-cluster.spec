@@ -619,9 +619,6 @@ sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python2:g' scripts/pyclustercheck
 sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python2:g' mysql-test/suite/tokudb/t/*
 %endif
 
-# Optional package files
-touch optional-files-devel
-
 #
 # Set environment in order of preference, MYSQL_BUILD_* first, then variable
 # name, finally a default.  RPM_OPT_FLAGS is assumed to be a part of the
@@ -801,8 +798,6 @@ then
   if [ -f $libgcc ]
   then
     mkdir -p $RBR%{_libdir}/mysql
-#    install -m 644 $libgcc $RBR%{_libdir}/mysql/libmygcc.a
-#    echo "%{_libdir}/mysql/libmygcc.a" >>optional-files-devel
   fi
 fi
 
@@ -1701,7 +1696,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlpump.1*
 
 # ----------------------------------------------------------------------------
-%files -n Percona-XtraDB-Cluster-devel%{product_suffix} -f optional-files-devel
+%files -n Percona-XtraDB-Cluster-devel%{product_suffix}
 %defattr(-, root, root, 0755)
 %doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config.1*
