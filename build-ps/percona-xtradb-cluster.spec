@@ -269,7 +269,7 @@ Prefix: %{_sysconfdir}
             else
               %{error:Red Hat Enterprise Linux %{rhelver} is unsupported}
             %endif
-          %endif    
+          %endif
         %endif
       %endif
     %else
@@ -354,7 +354,8 @@ Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
 Provides:       mysql-server galera-57 galera-57-debuginfo
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
-BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
+BuildRequires:  check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
+
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
