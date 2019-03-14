@@ -1431,7 +1431,7 @@ fi
 # We do not remove the mysql user since it may still own a lot of
 # database files.
 
-%triggerpostun -n Percona-XtraDB-Cluster-server%{product_suffix} --MySQL-server-community
+%triggerpostun -n Percona-XtraDB-Cluster-server%{product_suffix} -- MySQL-server-community
 
 # Setup: We renamed this package, so any existing "server-community"
 #   package will be removed when this "server" is installed.
