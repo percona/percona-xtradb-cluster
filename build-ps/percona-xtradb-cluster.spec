@@ -614,6 +614,10 @@ This package contains the garb binary and init scripts.
 ##############################################################################
 %build
 
+%if 0%{?rhel} == 8
+sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python2:g' scripts/pyclustercheck
+sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python2:g' mysql-test/suite/tokudb/t/*
+%endif
 
 # Optional package files
 touch optional-files-devel
