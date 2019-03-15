@@ -214,7 +214,10 @@ Prefix: %{_sysconfdir}
               %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
               %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
             else
-              %{error:Red Hat Enterprise Linux %{rhelver} is unsupported}
+              %define distro_description    Red Hat Enterprise Linux 8
+              %define distro_releasetag     rhel8
+              %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
+              %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
             %endif
           %endif    
         %endif
@@ -260,7 +263,7 @@ Prefix: %{_sysconfdir}
 %endif
 
 # Version for compat libs
-%if 0%{?rhel} == 7
+%if 0%{?rhel} > 6
 %global compatver             5.6.28
 %global percona_compatver     25.14
 %global compatlib             18
@@ -1289,7 +1292,7 @@ if [ $1 = 0 ] ; then
 %endif
 fi
 
-%triggerpostun -n percona-xtradb-cluster-server --MySQL-server-community
+%triggerpostun -n percona-xtradb-cluster-server -- MySQL-server-community
 
 # Setup: We renamed this package, so any existing "server-community"
 #   package will be removed when this "server" is installed.
@@ -1395,12 +1398,6 @@ fi
 #  Files section
 ##############################################################################
 
-# Empty section for metapackage
-%files
-
-# Empty section for metapackage
-%files -n percona-xtradb-cluster-full
-
 %files -n percona-xtradb-cluster-server
 %defattr(-,root,root,0755)
 
@@ -1412,7 +1409,6 @@ fi
 %doc Docs/README-wsrep
 %doc release/support-files/wsrep.cnf
 
-#%doc %attr(644, root, root) %{_infodir}/mysql.info*
 %doc %attr(644, root, man) %{_mandir}/man1/innochecksum.1*
 %doc %attr(644, root, root) %{_mandir}/man1/ibd2sdi.1*
 %doc %attr(644, root, man) %{_mandir}/man1/my_print_defaults.1*
@@ -1436,7 +1432,6 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/zlib_decompress.1*
 %doc %attr(644, root, root) %{_mandir}/man1/mysql_ssl_rsa_setup.1*
 
-#%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
 %attr(755, root, root) %{_bindir}/innochecksum
@@ -1531,7 +1526,6 @@ fi
 
 %defattr(-, root, root, 0755)
 %attr(755, root, root) %{_bindir}/mysql
-# XXX: This should be moved to %{_sysconfdir}
 %attr(755, root, root) %{_bindir}/mysqladmin
 %attr(755, root, root) %{_bindir}/mysqlbinlog
 %attr(755, root, root) %{_bindir}/mysqlcheck
@@ -1566,8 +1560,6 @@ fi
 %{_libdir}/pkgconfig/*
 %{_libdir}/libperconaserverclient*.a
 %{_libdir}/libmysqlservices.a
-# mistake?
-# %{_libdir}/*.so
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-shared
@@ -1575,10 +1567,6 @@ fi
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libperconaserver*.so*
-#%if 0%{?systemd}
-#%{_sysconfdir}/my.cnf.d
-#%attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
-#%endif
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-garbd
@@ -1622,12 +1610,6 @@ fi
 %endif
 
 %post -n percona-xtradb-cluster-shared
-# Added for compatibility
-#for lib in libperconaserverclient{.so.20,_r.so.20}; do
-#    if [ ! -f %{_libdir}/$lib ]; then
-#            ln -s libmysqlclient.so.20.1.0 %{_libdir}/$lib
-#    fi
-#done
 /sbin/ldconfig
 
 %postun -n percona-xtradb-cluster-shared
@@ -1702,8 +1684,6 @@ fi
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
 %attr(755, root, root) %{_bindir}/mysqlxtest
-#%attr(755, root, root) %{_bindir}/mysql_client_test_embedded
-#%attr(755, root, root) %{_bindir}/mysqltest_embedded
 
 
 %files -n percona-xtradb-cluster-mysql-router

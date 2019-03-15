@@ -83,7 +83,24 @@ check_workdir(){
 add_percona_yum_repo(){
     if [ ! -f /etc/yum.repos.d/percona-dev.repo ]
     then
-        curl -o /etc/yum.repos.d/ https://jenkins.percona.com/yum-repo/percona-dev.repo
+        if [ "x$RHEL" = "x8" ]; then
+            cat >/etc/yum.repos.d/percona-dev.repo <<EOL
+[percona-rhel8-AppStream]
+name=Percona internal YUM repository for RHEL8 AppStream
+baseurl=http://jenkins.percona.com/yum-repo/rhel8/AppStream
+gpgkey=https://jenkins.percona.com/yum-repo/rhel8/AppStream/RPM-GPG-KEY-redhat-beta
+gpgcheck=0
+enabled=1
+[percona-rhel8-BaseOS]
+name=Percona internal YUM repository for RHEL8 BaseOS
+baseurl=https://jenkins.percona.com/yum-repo/rhel8/BaseOS/
+gpgkey=https://jenkins.percona.com/yum-repo/rhel8/BaseOS/RPM-GPG-KEY-redhat-beta
+gpgcheck=0
+enabled=1
+EOL
+        else
+            curl -o /etc/yum.repos.d/ https://jenkins.percona.com/yum-repo/percona-dev.repo
+	fi
     fi
     return
 }
@@ -224,18 +241,29 @@ install_deps() {
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         add_percona_yum_repo
-        yum -y install https://repo.percona.com/yum/percona-release-latest.noarch.rpm || true
-        percona-release enable original release
-        yum -y install epel-release
-        yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc 
-        yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata jemalloc-devel
-        yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static
-        yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
-        until yum -y install centos-release-scl; do
-            echo "waiting"
-            sleep 1
-        done
-        yum -y install  gcc-c++ devtoolset-7-gcc-c++ devtoolset-7-binutils
+	if [ "x${RHEL}" = "x8" ]; then
+            yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++
+            yum -y install git gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
+            yum -y install libstdc++-devel libtirpc-devel make ncurses-devel numactl-devel
+            yum -y install openldap-devel openssl-devel pam-devel perl perl-Data-Dumper
+            yum -y install perl-Dig perl-Digest perl-Digest-MD5 perl-Env perl-JSON perl-Time-HiRes
+            yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel
+            wget https://rpmfind.net/linux/fedora/linux/releases/29/Everything/x86_64/os/Packages/r/rpcgen-1.4-1.fc29.x86_64.rpm
+            yum -y install rpcgen-1.4-1.fc29.x86_64.rpm
+        else
+            yum -y install https://repo.percona.com/yum/percona-release-latest.noarch.rpm || true
+            percona-release enable original release
+            yum -y install epel-release
+            yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc 
+            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata jemalloc-devel
+            yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static
+            yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
+            until yum -y install centos-release-scl; do
+                echo "waiting"
+                sleep 1
+            done
+            yum -y install  gcc-c++ devtoolset-7-gcc-c++ devtoolset-7-binutils
+	fi
         if [ "x$RHEL" = "x6" ]; then
             yum -y install Percona-Server-shared-56
         fi
