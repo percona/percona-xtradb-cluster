@@ -69,17 +69,67 @@ MACRO(GET_MYSQL_VERSION)
     "${MAJOR_VERSION}.${MINOR_VERSION}" CACHE INTERNAL "MySQL Base version")
   SET(MYSQL_NO_DASH_VERSION
     "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
+  STRING(REGEX REPLACE "^-" "." MYSQL_VERSION_EXTRA_DOT "${EXTRA_VERSION}")
+  SET(VERSION_SRC "${VERSION}")
 
-  # Use NDBVERSION irregardless of whether this is Cluster or not, if not
-  # then the regex will be ignored anyway.
-  STRING(REGEX REPLACE "^.*-ndb-" "" NDBVERSION "${VERSION}")
-  STRING(REPLACE "-" "_" MYSQL_RPM_VERSION "${NDBVERSION}")
   MATH(EXPR MYSQL_VERSION_ID
     "10000*${MAJOR_VERSION} + 100*${MINOR_VERSION} + ${PATCH_VERSION}")
   MARK_AS_ADVANCED(VERSION MYSQL_VERSION_ID MYSQL_BASE_VERSION)
   SET(CPACK_PACKAGE_VERSION_MAJOR ${MAJOR_VERSION})
   SET(CPACK_PACKAGE_VERSION_MINOR ${MINOR_VERSION})
   SET(CPACK_PACKAGE_VERSION_PATCH ${PATCH_VERSION})
+
+  IF(WITH_NDBCLUSTER)
+    # Read MySQL Cluster version values from VERSION, these are optional
+    # as by default MySQL Cluster is using the MySQL Server version
+    MYSQL_GET_CONFIG_VALUE("MYSQL_CLUSTER_VERSION_MAJOR" CLUSTER_MAJOR_VERSION)
+    MYSQL_GET_CONFIG_VALUE("MYSQL_CLUSTER_VERSION_MINOR" CLUSTER_MINOR_VERSION)
+    MYSQL_GET_CONFIG_VALUE("MYSQL_CLUSTER_VERSION_PATCH" CLUSTER_PATCH_VERSION)
+    MYSQL_GET_CONFIG_VALUE("MYSQL_CLUSTER_VERSION_EXTRA" CLUSTER_EXTRA_VERSION)
+
+    # Set MySQL Cluster version same as the MySQL Server version
+    # unless a specific MySQL Cluster version has been specified
+    # in the VERSION file. This is the version used when creating
+    # the cluster package names as well as by all the NDB binaries.
+    IF(DEFINED CLUSTER_MAJOR_VERSION AND
+       DEFINED CLUSTER_MINOR_VERSION AND
+       DEFINED CLUSTER_PATCH_VERSION)
+      # Set MySQL Cluster version to the specific version defined in VERSION
+      SET(MYSQL_CLUSTER_VERSION "${CLUSTER_MAJOR_VERSION}")
+      SET(MYSQL_CLUSTER_VERSION
+        "${MYSQL_CLUSTER_VERSION}.${CLUSTER_MINOR_VERSION}")
+      SET(MYSQL_CLUSTER_VERSION
+        "${MYSQL_CLUSTER_VERSION}.${CLUSTER_PATCH_VERSION}")
+      IF(DEFINED CLUSTER_EXTRA_VERSION)
+        SET(MYSQL_CLUSTER_VERSION
+          "${MYSQL_CLUSTER_VERSION}${CLUSTER_EXTRA_VERSION}")
+      ENDIF()
+    ELSE()
+      # Set MySQL Cluster version to the same as MySQL Server, possibly
+      # overriding the extra version with value specified in VERSION
+      # This might be used when MySQL Cluster is still released as DMR
+      # while MySQL Server is already GA.
+      SET(MYSQL_CLUSTER_VERSION
+        "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
+      IF(DEFINED CLUSTER_EXTRA_VERSION)
+        # Using specific MySQL Cluster extra version
+        SET(MYSQL_CLUSTER_VERSION
+          "${MYSQL_CLUSTER_VERSION}${CLUSTER_EXTRA_VERSION}")
+        # Override the extra version for rpm packages
+        STRING(REGEX REPLACE "^-" "." MYSQL_VERSION_EXTRA_DOT
+          "${CLUSTER_EXTRA_VERSION}")
+      ELSE()
+        SET(MYSQL_CLUSTER_VERSION
+          "${MYSQL_CLUSTER_VERSION}${EXTRA_VERSION}")
+      ENDIF()
+    ENDIF()
+    MESSAGE(STATUS "MySQL Cluster version: ${MYSQL_CLUSTER_VERSION}")
+
+    SET(VERSION_SRC "${MYSQL_CLUSTER_VERSION}")
+
+    # Set suffix to indicate that this is MySQL Server built for MySQL Cluster
+    SET(MYSQL_SERVER_SUFFIX "-cluster")
+  ENDIF()
 ENDMACRO()
 
 # Get mysql version and other interesting variables
@@ -96,12 +146,18 @@ ELSEIF(MYSQL_TCP_PORT EQUAL MYSQL_TCP_PORT_DEFAULT)
   SET(MYSQL_TCP_PORT_DEFAULT "0")
 ENDIF()
 
+IF(NOT MYSQL_ADMIN_TCP_PORT)
+  SET(MYSQL_ADMIN_TCP_PORT 33062)
+ENDIF(NOT MYSQL_ADMIN_TCP_PORT)
 
 IF(NOT MYSQL_UNIX_ADDR)
   SET(MYSQL_UNIX_ADDR "/tmp/mysql.sock")
 ENDIF()
 IF(NOT COMPILATION_COMMENT)
   SET(COMPILATION_COMMENT "Source distribution")
+ENDIF()
+IF(NOT COMPILATION_COMMENT_SERVER)
+  SET(COMPILATION_COMMENT_SERVER ${COMPILATION_COMMENT})
 ENDIF()
 
 # Get the sys schema version from the mysql_sys_schema.sql file

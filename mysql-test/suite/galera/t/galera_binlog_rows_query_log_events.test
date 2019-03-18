@@ -31,7 +31,7 @@ UPDATE t1 SET f1 = 2 WHERE f1 = 1;
 SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 2;
 
 # verify that insert query log event is present in node 2
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 523 LIMIT 1;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 529 LIMIT 1;
 
 --connection node_1
 DROP TABLE t1;

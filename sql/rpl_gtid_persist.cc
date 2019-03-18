@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -91,7 +91,7 @@ static void init_thd(THD **p_thd) {
   /* Set wsrep-on=0 for compressed GTID table thread as it would write
   rows that we don't want to replicate. */
   WSREP_DEBUG("Compress GTID table thread will run with wsrep_on=0/false");
-  thd->variables.wsrep_on = 0;
+  thd->variables.wsrep_on = false;
 #endif /* WITH_WSREP */
   DBUG_VOID_RETURN;
 }
@@ -116,7 +116,7 @@ THD *Gtid_table_access_context::create_thd() {
   thd->system_thread = SYSTEM_THREAD_COMPRESS_GTID_TABLE;
 #ifdef WITH_WSREP
   WSREP_DEBUG("SYSTEM_THREAD_COMPRESS_GTID_TABLE declared as non wsrep_on");
-  thd->variables.wsrep_on = 0;
+  thd->variables.wsrep_on = false;
 #endif /* WITH_WSREP */
   /*
     This is equivalent to a new "statement". For that reason, we call
@@ -124,8 +124,13 @@ THD *Gtid_table_access_context::create_thd() {
   */
   lex_start(thd);
   mysql_reset_thd_for_next_command(thd);
-
+  thd->set_skip_readonly_check();
   return (thd);
+}
+
+void Gtid_table_access_context::drop_thd(THD *thd) {
+  thd->reset_skip_readonly_check();
+  System_table_access::drop_thd(thd);
 }
 
 void Gtid_table_access_context::before_open(THD *) {

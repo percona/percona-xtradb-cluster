@@ -396,21 +396,29 @@ fi
             -DCMAKE_BUILD_TYPE=Debug \
             $DEBUG_EXTRA \
             -DFEATURE_SET=community \
-            $SSL_OPT \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
+            -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
+            -DWITH_PAM=ON \
+            -DWITHOUT_ROCKSDB=ON \
+            -DWITHOUT_TOKUDB=ON \
+            -DWITH_INNODB_MEMCACHED=ON \
+            -DDOWNLOAD_BOOST=1 \
+            -DFORCE_INSOURCE_BUILD=1 \
+            -DWITH_SYSTEM_LIBS=ON \
+            -DWITH_PROTOBUF=bundled \
+            -DWITH_RAPIDJSON=bundled \
+            -DWITH_ICU=bundled \
+            -DWITH_LZ4=bundled \
+            -DWITH_RE2=bundled \
+            -DWITH_LIBEVENT=bundled \
+            -DWITH_EDITLINE=bundled \
+            -DWITH_NUMA=ON \
+            -DWITH_BOOST="$TARGETDIR/libboost" \
             -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
-            -DWITH_READLINE=system \
-            -DWITHOUT_TOKUDB=ON \
-            -DWITHOUT_ROCKSDB=ON \
             -DWITH_DEBUG=ON \
-            -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
-            -DWITH_PAM=ON \
-            -DWITH_INNODB_MEMCACHED=ON \
-            -DDOWNLOAD_BOOST=1 \
-            -DWITH_BOOST="$TARGETDIR/libboost" \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
@@ -421,20 +429,28 @@ fi
         cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
             -DFEATURE_SET=community \
-            $SSL_OPT \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
+            -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
+            -DWITH_PAM=ON \
+            -DWITHOUT_ROCKSDB=ON \
+            -DWITHOUT_TOKUDB=ON \
+            -DWITH_INNODB_MEMCACHED=ON \
+            -DDOWNLOAD_BOOST=1 \
+            -DFORCE_INSOURCE_BUILD=1 \
+            -DWITH_SYSTEM_LIBS=ON \
+            -DWITH_PROTOBUF=bundled \
+            -DWITH_RAPIDJSON=bundled \
+            -DWITH_ICU=bundled \
+            -DWITH_LZ4=bundled \
+            -DWITH_RE2=bundled \
+            -DWITH_EDITLINE=bundled \
+            -DWITH_LIBEVENT=bundled \
+            -DWITH_NUMA=ON \
+            -DWITH_BOOST="$TARGETDIR/libboost" \
             -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
-            -DWITH_READLINE=system \
-            -DWITHOUT_TOKUDB=ON \
-            -DWITHOUT_ROCKSDB=ON \
-            -DCOMPILATION_COMMENT="$COMMENT" \
-            -DWITH_PAM=ON \
-            -DWITH_INNODB_MEMCACHED=ON \
-            -DDOWNLOAD_BOOST=1 \
-            -DWITH_BOOST="$TARGETDIR/libboost" \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1

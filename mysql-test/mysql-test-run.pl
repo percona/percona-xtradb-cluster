@@ -129,7 +129,7 @@ my $opt_port_base          = $ENV{'MTR_PORT_BASE'} || "auto";
 my $opt_reorder            = 1;
 my $opt_retry              = 3;
 my $opt_retry_failure      = env_or_val(MTR_RETRY_FAILURE => 2);
-my $opt_shutdown_timeout   = $ENV{MTR_SHUTDOWN_TIMEOUT} || 10;         # seconds
+my $opt_shutdown_timeout   = $ENV{MTR_SHUTDOWN_TIMEOUT} || 20;         # seconds
 my $opt_skip_ndbcluster    = 0;
 my $opt_skip_sys_schema    = 0;
 my $opt_start_timeout      = $ENV{MTR_START_TIMEOUT} || 240;           # seconds
@@ -159,7 +159,7 @@ my $path_config_file;       # The generated config file, var/my.cnf
 my $path_vardir_trace;      # Unix formatted opt_vardir for trace files
 
 my $DEFAULT_SUITES =
-"main,sys_vars,binlog,binlog_gtid,binlog_nogtid,binlog_encryption,rpl_encryption,federated,gis,rpl,rpl_gtid,rpl_nogtid,innodb,innodb_gis,innodb_fts,innodb_zip,innodb_undo,perfschema,funcs_1,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,test_service_sql_api,json,connection_control,test_services,collations,service_udf_registration,service_sys_var_registration,service_status_var_registration,x,secondary_engine,"
+"main,sys_vars,binlog,binlog_gtid,binlog_nogtid,binlog_57_decryption,rpl_encryption,federated,gis,rpl,rpl_gtid,rpl_nogtid,innodb,innodb_gis,innodb_fts,innodb_zip,innodb_undo,perfschema,funcs_1,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,test_service_sql_api,json,connection_control,test_services,collations,service_udf_registration,service_sys_var_registration,service_status_var_registration,x,secondary_engine,"
   ."funcs_2,jp,stress,engines/iuds,engines/funcs,group_replication,audit_null,"
   ."interactive_utilities,innodb_stress,"
   ."audit_log,keyring_vault,"
@@ -219,25 +219,26 @@ our $opt_vardir;
 our $opt_xml_report;
 our $opt_gterm;
 
-our $opt_big_test        = 0;
-our $opt_check_testcases = 1;
-our $opt_clean_vardir    = $ENV{'MTR_CLEAN_VARDIR'};
-our $opt_ctest           = env_or_val(MTR_UNIT_TESTS => -1);
-our $opt_fast            = 0;
-our $opt_gcov_err        = "mysql-test-gcov.err";
-our $opt_gcov_exe        = "gcov";
-our $opt_gcov_msg        = "mysql-test-gcov.msg";
-our $opt_mem             = $ENV{'MTR_MEM'} ? 1 : 0;
-our $opt_only_big_test   = 0;
-our $opt_parallel        = $ENV{MTR_PARALLEL};
-our $opt_repeat          = 1;
-our $opt_report_times    = 0;
-our $opt_resfile         = $ENV{'MTR_RESULT_FILE'} || 0;
-our $opt_test_progress   = 0;
-our $opt_sanitize        = 0;
-our $opt_user            = "root";
-our $opt_valgrind        = 0;
-our $opt_verbose         = 0;
+our $opt_big_test         = 0;
+our $opt_check_testcases  = 1;
+our $opt_clean_vardir     = $ENV{'MTR_CLEAN_VARDIR'};
+our $opt_ctest            = env_or_val(MTR_UNIT_TESTS => -1);
+our $opt_fast             = 0;
+our $opt_gcov_err         = "mysql-test-gcov.err";
+our $opt_gcov_exe         = "gcov";
+our $opt_gcov_msg         = "mysql-test-gcov.msg";
+our $opt_mem              = $ENV{'MTR_MEM'} ? 1 : 0;
+our $opt_only_big_test    = 0;
+our $opt_parallel         = $ENV{MTR_PARALLEL};
+our $opt_quiet            = $ENV{'MTR_QUIET'} || 0;
+our $opt_repeat           = 1;
+our $opt_report_times     = 0;
+our $opt_resfile          = $ENV{'MTR_RESULT_FILE'} || 0;
+our $opt_test_progress    = 0;
+our $opt_sanitize         = 0;
+our $opt_user             = "root";
+our $opt_valgrind         = 0;
+our $opt_verbose          = 0;
 # Visual Studio produces executables in different sub-directories
 # based on the configuration used to build them. To make life easier,
 # an environment variable or command-line option may be specified to
@@ -531,7 +532,7 @@ sub main {
 
   init_timers();
 
-  mtr_report("Collecting tests...");
+  mtr_report("Collecting tests");
   my $tests = collect_test_cases($opt_reorder, $opt_suites,
                                  \@opt_cases,  $opt_skip_test_list);
   mark_time_used('collect');
@@ -574,6 +575,12 @@ sub main {
     $num_tests_for_report = $num_tests * $opt_repeat;
   } else {
     $num_tests_for_report = $num_tests;
+  }
+
+  # When either --valgrind or --sanitize option is enabled, a dummy
+  # test is created.
+  if ($opt_valgrind_mysqld or $opt_sanitize) {
+    $num_tests_for_report = $num_tests_for_report + 1;
   }
 
   # Please note, that disk_usage() will print a space to separate its
@@ -651,8 +658,6 @@ sub main {
     $children{$child_pid} = 1;
   }
 
-  mtr_report();
-  mtr_print_thick_line();
   mtr_print_header($opt_parallel > 1);
 
   mark_time_used('init');
@@ -713,7 +718,13 @@ sub main {
       $tinfo->{result} = 'MTR_RES_PASSED';
     }
     mtr_report_test($tinfo);
+    report_option('prev_report_length', 0);
     push @$completed, $tinfo;
+  }
+
+  if ($opt_quiet) {
+    my $last_test = $completed->[-1];
+    mtr_report() if !$last_test->is_failed();
   }
 
   mtr_print_line();
@@ -817,6 +828,7 @@ sub run_test_server ($$$) {
           mtr_verbose("Child closed socket");
           $s->remove($sock);
           if (--$childs == 0) {
+            report_option('prev_report_length', 0);
             return $completed;
           }
           next;
@@ -845,18 +857,20 @@ sub run_test_server ($$$) {
               # Look for the test log file and put that in savedir location
               my $logfile     = "$result->{shortname}" . ".log";
               my $logfilepath = dirname($worker_savedir) . "/" . $logfile;
+
               move($logfilepath, $savedir);
+              $logfilepath = $savedir . "/" . $logfile;
 
               if ($opt_check_testcases &&
                   !defined $result->{'result_file'} &&
                   !$result->{timeout}) {
                 mtr_report("Mysqltest client output from logfile");
                 mtr_report("----------- MYSQLTEST OUTPUT START -----------\n");
-                mtr_printfile($savedir . "/" . $logfile);
+                mtr_printfile($logfilepath);
                 mtr_report("\n------------ MYSQLTEST OUTPUT END -----------\n");
               }
 
-              mtr_report(" - the logfile can be found in '$savedir/$logfile'");
+              mtr_report(" - the logfile can be found in '$logfilepath'\n");
 
               # Move any core files from e.g. mysqltest
               foreach my $coref (glob("core*"), glob("*.dmp")) {
@@ -930,11 +944,11 @@ sub run_test_server ($$$) {
             my $failures = $result->{failures};
 
             if ($opt_retry > 1 and $failures >= $opt_retry_failure) {
-              mtr_report("\nTest $tname has failed $failures times,",
-                         "no more retries!\n");
+              mtr_report("Test $tname has failed $failures times,",
+                         "no more retries.\n");
             } else {
-              mtr_report("\nRetrying test $tname, " .
-                         "attempt($retries/$opt_retry)...\n");
+              mtr_report(
+                  "Retrying test $tname, " . "attempt($retries/$opt_retry).\n");
               delete($result->{result});
               $result->{retries} = $retries + 1;
               $result->write_test($sock, 'TESTCASE');
@@ -1499,6 +1513,7 @@ sub command_line_setup {
     'help|h'                => \$opt_usage,
     'max-connections=i'     => \$opt_max_connections,
     'print-testcases'       => \&collect_option,
+    'quiet'                 => \$opt_quiet,
     'reorder!'              => \$opt_reorder,
     'repeat=i'              => \$opt_repeat,
     'report-features'       => \$opt_report_features,
@@ -1650,6 +1665,12 @@ sub command_line_setup {
     }
   }
 
+  # Disable --quiet option when verbose output is enabled.
+  if ($opt_verbose and $opt_quiet) {
+    $opt_quiet = 0;
+    mtr_report("Turning off '--quiet' since verbose output is enabled.");
+  }
+
   if ($opt_test_progress != 0 and $opt_test_progress != 1) {
     mtr_error("Invalid value '$opt_test_progress' for option 'test-progress'.");
   }
@@ -1792,7 +1813,7 @@ sub command_line_setup {
 
     if ($res) {
       mtr_report("Too long tmpdir path '$opt_tmpdir'",
-                 " creating a shorter one...");
+                 " creating a shorter one");
 
       # Create temporary directory in standard location for temporary files
       $opt_tmpdir = tempdir(TMPDIR => 1, CLEANUP => 0);
@@ -2000,6 +2021,13 @@ sub command_line_setup {
     $opt_check_testcases = 0;
   }
 
+  if (defined $mysql_version_extra &&
+      $mysql_version_extra =~ /-tsan/) {
+    # Turn off check testcases to save time
+    mtr_report("Turning off --check-testcases to save time when using thread sanitizer");
+    $opt_check_testcases = 0;
+  }
+
   if ($opt_debug_common) {
     $opt_debug = 1;
     $debug_d   = "d,query,info,error,enter,exit";
@@ -2015,7 +2043,7 @@ sub command_line_setup {
     mtr_warning("Strace only supported in Linux ");
   }
 
-  mtr_report("Checking supported features...");
+  mtr_report("Checking supported features");
 
   check_debug_support(\%mysqld_variables);
   check_ndbcluster_support(\%mysqld_variables);
@@ -2113,7 +2141,7 @@ sub set_build_thread_ports($) {
               "($baseport - $baseport + $ports_per_thread - 1)");
   }
 
-  mtr_report("Using MTR_BUILD_THREAD $build_thread,",
+  mtr_verbose("Using MTR_BUILD_THREAD $build_thread,",
        "with reserved ports $baseport.." . ($baseport + $ports_per_thread - 1));
 }
 
@@ -2876,7 +2904,14 @@ sub environment_setup {
   $ENV{'UBSAN_OPTIONS'} = "print_stacktrace=1,halt_on_error=1" if $opt_sanitize;
 
   # Make sure LeakSanitizer exits if leaks are found
-  $ENV{'LSAN_OPTIONS'} = "exitcode=42" if $opt_sanitize;
+  $ENV{'LSAN_OPTIONS'} = "exitcode=42,suppressions=${glob_mysql_test_dir}/lsan.supp"
+    if $opt_sanitize;
+
+  $ENV{'ASAN_OPTIONS'} = "suppressions=${glob_mysql_test_dir}/asan.supp"
+    if $opt_sanitize;
+
+  # The Thread Sanitizer allocator should return NULL instead of crashing on out-of-memory.
+  $ENV{'TSAN_OPTIONS'} = $ENV{'TSAN_OPTIONS'} . ",allocator_may_return_null=1" if $opt_sanitize;
 
   # Add dir of this perl to aid mysqltest in finding perl
   my $perldir = dirname($^X);
@@ -2894,7 +2929,7 @@ sub remove_vardir_subs() {
 
 # Remove var and any directories in var/ created by previous tests
 sub remove_stale_vardir () {
-  mtr_report("Removing old var directory...");
+  mtr_report("Removing old var directory");
 
   mtr_error("No, don't remove the vardir when running with --extern")
     if using_extern();
@@ -2955,7 +2990,7 @@ sub remove_stale_vardir () {
 
 # Create var and the directories needed in var
 sub setup_vardir() {
-  mtr_report("Creating var directory '$opt_vardir'...");
+  mtr_report("Creating var directory '$opt_vardir'");
 
   if ($opt_vardir eq $default_vardir) {
     # Running with "var" in mysql-test dir
@@ -3162,6 +3197,8 @@ sub check_ndbcluster_support ($) {
   # Add MySQL Cluster test suites
   $DEFAULT_SUITES .=
     ",ndb,ndb_binlog,rpl_ndb,ndb_rpl,ndb_memcache,ndbcluster,ndb_ddl,gcol_ndb";
+  # Increase the suite timeout when running with default ndb suites
+  $opt_suite_timeout *= 2;
   return;
 }
 
@@ -3391,7 +3428,8 @@ sub memcached_start {
   my $found_so = my_find_file(
     $bindir,
     [ "storage/ndb/memcache",    # source or build
-      "lib", "lib64"
+      "lib", "lib64",
+      "lib/mysql", "lib64/mysql"
     ],                           # install
     "ndb_engine.so",
     NOT_REQUIRED);
@@ -3498,6 +3536,7 @@ sub memcached_load_metadata($) {
   my $sql_script = my_find_file(
     $bindir,
     [ "share/mysql/memcache-api",    # RPM install
+      "share/mysql-8.0/memcache-api",# RPM (8.0)
       "share/memcache-api",          # Other installs
       "scripts"                      # Build tree
     ],
@@ -3634,7 +3673,7 @@ sub kill_leftovers ($) {
   my $rundir = shift;
   return unless (-d $rundir);
 
-  mtr_report("Checking leftover processes...");
+  mtr_report("Checking leftover processes");
 
   # Scan the "run" directory for process id's to kill
   opendir(RUNDIR, $rundir) or
@@ -3790,7 +3829,7 @@ sub mysql_install_db {
   my $install_chsdir  = $mysqld->value('character-sets-dir');
   my $install_datadir = $datadir || $mysqld->value('datadir');
 
-  mtr_report("Installing system database...");
+  mtr_report("Installing system database");
 
   my $args;
   mtr_init_args(\$args);
@@ -3956,7 +3995,7 @@ sub mysql_install_db {
   }
 
   # Set blacklist option early so it works during bootstrap
-  $ENV{'TSAN_OPTIONS'} = "suppressions=$basedir/mysql-test/tsan.supp"
+  $ENV{'TSAN_OPTIONS'} = "suppressions=${glob_mysql_test_dir}/tsan.supp"
     if $opt_sanitize;
 
   if ($opt_manual_boot_gdb) {
@@ -4666,7 +4705,10 @@ sub run_testcase ($) {
     if ($proc eq $test) {
       my $res = $test->exit_status();
 
-      if ($res == 0 and $opt_warnings and check_warnings($tinfo)) {
+        if ($res == 0 and
+            $opt_warnings and
+            not defined $tinfo->{'skip_check_warnings'} and
+            check_warnings($tinfo)) {
         # Test case succeeded, but it has produced unexpected warnings,
         # continue in $res == 1
         $res = 1;
@@ -5245,7 +5287,7 @@ sub check_warnings ($) {
   # Return immediately if no check proceess was started
   return 0 unless (keys %started);
 
-  my $timeout = start_timer(check_timeout($tinfo));
+  my $timeout = start_timer(testcase_timeout($tinfo));
 
   while (1) {
     my $result = 0;
@@ -5311,7 +5353,7 @@ sub check_warnings ($) {
       }
     } elsif ($proc->{timeout}) {
       $tinfo->{comment} .= "Timeout for 'check warnings' expired after " .
-        check_timeout($tinfo) . " seconds";
+        testcase_timeout($tinfo) . " seconds\n";
       $result = 4;
     } else {
       # Unknown process returned, most likley a crash, abort everything
@@ -6923,6 +6965,10 @@ sub run_ctest() {
   # Special override: also ignore in Pushbuild, some platforms may
   # not have it. Now, run ctest and collect output.
   $ENV{CTEST_OUTPUT_ON_FAILURE} = 1;
+  # Run unit tests in parallel with the same number of threads as
+  # the MTR tests.
+  mtr_report("Running ctest parallel=$opt_parallel");
+  $ENV{CTEST_PARALLEL_LEVEL} = $opt_parallel;
   my $ctest_out = `ctest --test-timeout $opt_ctest_timeout $ctest_vs 2>&1`;
   if ($? == $no_ctest && ($opt_ctest == -1 || defined $ENV{PB2WORKDIR})) {
     chdir($olddir);
@@ -7225,6 +7271,10 @@ Misc options
                         and if not running named tests/suites.
   parallel=N            Run tests in N parallel threads. The default value is 1.
                         Use parallel=auto for auto-setting of N.
+  quiet                 Reuse the output buffer and maintain a single line for
+                        reporting successful tests, skipped tests and disabled
+                        tests. Failed tests and the necessary information about
+                        the failure will be printed on a separate line.
   reorder               Reorder tests to get fewer server restarts.
   repeat=N              Run each test N number of times, in parallel if
                         --parallel option value is > 1.

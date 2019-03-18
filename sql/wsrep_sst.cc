@@ -50,6 +50,8 @@ extern const char wsrep_defaults_group_suffix[];
 #define WSREP_SST_OPT_PARENT "--parent"
 #define WSREP_SST_OPT_BINLOG "--binlog"
 #define WSREP_SST_OPT_VERSION "--mysqld-version"
+#define WSREP_SST_OPT_BASEDIR "--basedir"
+#define WSREP_SST_OPT_PLUGINDIR "--plugin-dir"
 
 // mysqldump-specific options
 #define WSREP_SST_OPT_USER "--user"
@@ -510,13 +512,20 @@ static ssize_t sst_prepare_other(const char *method,
   if (strlen(binlog_opt_val)) binlog_opt = WSREP_SST_OPT_BINLOG;
 
   ret = snprintf(cmd_str(), cmd_len,
-                 "wsrep_sst_%s " WSREP_SST_OPT_ROLE
-                 " 'joiner' " WSREP_SST_OPT_ADDR " '%s' " WSREP_SST_OPT_DATA
-                 " '%s' " WSREP_SST_OPT_CONF " '%s' " WSREP_SST_OPT_CONF_SUFFIX
-                 " '%s' " WSREP_SST_OPT_PARENT " '%d' " WSREP_SST_OPT_VERSION
-                 " '%s' "
+                 "wsrep_sst_%s "
+                 WSREP_SST_OPT_ROLE " 'joiner' "
+                 WSREP_SST_OPT_ADDR " '%s' "
+                 WSREP_SST_OPT_BASEDIR " '%s' "
+                 WSREP_SST_OPT_DATA " '%s' "
+                 WSREP_SST_OPT_PLUGINDIR " '%s' "
+                 WSREP_SST_OPT_CONF " '%s' "
+                 WSREP_SST_OPT_CONF_SUFFIX " '%s' "
+                 WSREP_SST_OPT_PARENT " '%d' "
+                 WSREP_SST_OPT_VERSION " '%s' "
                  " %s '%s' ",
-                 method, addr_in, mysql_real_data_home, wsrep_defaults_file,
+                 method, addr_in,
+                 mysql_home_ptr, mysql_real_data_home, opt_plugin_dir,
+                 wsrep_defaults_file,
                  wsrep_defaults_group_suffix, (int)getpid(),
                  MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF, binlog_opt,
                  binlog_opt_val);
@@ -881,7 +890,7 @@ static MYSQL_SESSION setup_server_session(bool initialize_thread)
     return NULL;
   }
   // Turn wsrep off here (because the server session has it's own THD object)
-  session->get_thd()->variables.wsrep_on = 0;
+  session->get_thd()->variables.wsrep_on = false;
   return session;
 }
 

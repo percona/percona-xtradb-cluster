@@ -145,7 +145,7 @@ static char *make_timestamp(char *buf, size_t buf_len, time_t t) noexcept {
   tm tm;
 
   memset(&tm, 0, sizeof(tm));
-  strftime(buf, buf_len, "%FT%T UTC", gmtime_r(&t, &tm));
+  strftime(buf, buf_len, "%FT%TZ", gmtime_r(&t, &tm));
 
   return buf;
 }
@@ -509,7 +509,8 @@ static char *audit_log_general_record(char *buf, size_t buflen,
     endptr = endbuf;
     query = escape_string(event.general_query.str, event.general_query.length,
                           endptr, endbuf - endptr, &endptr, &full_outlen);
-    full_outlen += full_outlen * my_charset_utf8mb4_general_ci.mbmaxlen;
+    full_outlen *= my_charset_utf8mb4_general_ci.mbmaxlen;
+    full_outlen += query_length * my_charset_utf8mb4_general_ci.mbmaxlen;
   }
 
   user = escape_string(event.general_user.str, event.general_user.length,
@@ -1134,12 +1135,13 @@ static int audit_log_notify(MYSQL_THD thd, mysql_event_class_t event_class,
             event_general->general_time, event_general->general_error_code,
             *event_general, local->db, &len);
         if (len > buflen) {
-          buflen = len * 4;
+          buflen = len + 1024;
           log_rec = audit_log_general_record(
               get_record_buffer(thd, buflen), buflen,
               event_general->general_command.str, event_general->general_time,
               event_general->general_error_code, *event_general, local->db,
               &len);
+          DBUG_ASSERT(log_rec);
         }
         if (log_rec) audit_log_write(log_rec, len);
         break;

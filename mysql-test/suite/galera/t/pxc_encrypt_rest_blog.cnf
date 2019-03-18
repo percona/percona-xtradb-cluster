@@ -3,9 +3,7 @@
 [mysqld]
 wsrep_sst_method=xtrabackup-v2
 pxc-encrypt-cluster-traffic=ON
-encrypt_binlog=ON
-master_verify_checksum=ON
-binlog_checksum=CRC32
+binlog_encryption=1
 
 [sst]
 ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem

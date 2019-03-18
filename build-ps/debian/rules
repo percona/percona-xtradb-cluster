@@ -69,21 +69,12 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DSYSCONFDIR=/etc/mysql \
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 		-DCMAKE_BUILD_TYPE=Debug \
-		-DWITH_ZLIB=system \
-		-DWITH_SSL=system \
-		-DWITH_SCALABILITY_METRICS=ON \
-		-DSYSTEM_TYPE="debian-linux-gnu" \
-		-DWITH_READLINE=system \
-		-DWITHOUT_TOKUDB=ON \
 		-DCOMPILATION_COMMENT=$(compilation_comment_debug) \
+		-DSYSTEM_TYPE="debian-linux-gnu" \
+		-DWITHOUT_TOKUDB=ON \
 		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
-		-DINSTALL_LAYOUT=RPM \
-		-DWITH_INNODB_DISALLOW_WRITES=ON \
 		-DWITH_WSREP=ON \
-		-DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
-		-DINSTALL_PLUGINDIR=lib/mysql/plugin/debug \
 		-DINSTALL_LAYOUT=DEB \
-		-DWITH_EMBEDDED_SERVER=OFF \
 		-DWITH_INNODB_MEMCACHED=ON \
 		-DWITH_MECAB=system \
 		-DWITH_ARCHIVE_STORAGE_ENGINE=ON \
@@ -91,8 +82,16 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_FEDERATED_STORAGE_ENGINE=ON \
 		-DWITH_PAM=ON \
 		-DWITH_ROCKSDB=0 \
+		-DFORCE_INSOURCE_BUILD=1 \
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
+		-DWITH_SYSTEM_LIBS=ON \
+                -DWITH_PROTOBUF=bundled \
+                -DWITH_RAPIDJSON=bundled \
+                -DWITH_ICU=bundled \
+                -DWITH_LZ4=bundled \
+                -DWITH_EDITLINE=bundled \
+                -DWITH_NUMA=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 endif
 
@@ -115,22 +114,14 @@ endif
 		-DSYSCONFDIR=/etc/mysql \
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		-DWITH_ZLIB=system \
-		-DWITH_SSL=system \
-		-DWITH_SCALABILITY_METRICS=ON \
-		-DSYSTEM_TYPE="debian-linux-gnu" \
-		-DWITH_READLINE=system \
-		-DWITHOUT_TOKUDB=ON \
 		-DCOMPILATION_COMMENT=$(compilation_comment_release) \
+		-DSYSTEM_TYPE="debian-linux-gnu" \
+		-DWITHOUT_TOKUDB=ON \
 		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
-		-DINSTALL_LAYOUT=RPM \
-		-DWITH_INNODB_DISALLOW_WRITES=ON \
 		-DWITH_WSREP=ON \
-		-DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
-		-DINSTALL_PLUGINDIR=lib/mysql/plugin \
 		-DINSTALL_LAYOUT=DEB \
-		-DWITH_EMBEDDED_SERVER=OFF \
 		-DWITH_INNODB_MEMCACHED=ON \
+		-DFORCE_INSOURCE_BUILD=1 \
 		-DWITH_MECAB=system \
 		-DWITH_ARCHIVE_STORAGE_ENGINE=ON \
 		-DWITH_BLACKHOLE_STORAGE_ENGINE=ON \
@@ -139,6 +130,13 @@ endif
 		-DWITH_ROCKSDB=0 \
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
+		-DWITH_SYSTEM_LIBS=ON \
+                -DWITH_PROTOBUF=bundled \
+                -DWITH_RAPIDJSON=bundled \
+                -DWITH_ICU=bundled \
+                -DWITH_LZ4=bundled \
+                -DWITH_EDITLINE=bundled \
+                -DWITH_NUMA=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 
 	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)
@@ -209,6 +207,7 @@ override_dh_auto_install:
 	install -m 0644 debian/extra/default-mysql $(TMP)/etc/default/mysql
         # Add helper functions for maintainer scripts
 	install -m 0644 debian/extra/mysql-helpers debian/tmp/usr/share/mysql/
+
 
 	# install source tarball for source package
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`

@@ -1507,11 +1507,12 @@ bool Sql_cmd_change_repl_filter::change_rpl_filter(THD *thd) {
         mysql_mutex_unlock(&mi->rli->run_lock);
     }
   } else {
-    if (channel_map.is_group_replication_channel_name(lex->mi.channel)
 #ifdef WITH_WSREP
-      || wsrep_is_wsrep_channel_name(lex->mi.channel)
+    if (channel_map.is_group_replication_channel_name(lex->mi.channel) ||
+        wsrep_is_wsrep_channel_name(lex->mi.channel)) {
+#else
+    if (channel_map.is_group_replication_channel_name(lex->mi.channel)) {
 #endif /* WITH_WSREP */
-      ) {
       /*
         If an explicit FOR CHANNEL clause is provided, the statement
         is disallowed on group replication channels.

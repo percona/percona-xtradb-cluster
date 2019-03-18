@@ -328,13 +328,13 @@ static void *handle_bootstrap(void *arg) {
 
   /* The following must be called before DBUG_ENTER */
   thd->thread_stack = (char *)&thd;
-  if (my_thread_init() || thd->store_globals()) {
+  if (my_thread_init()) {
     close_connection(thd, ER_OUT_OF_RESOURCES);
-    thd->fatal_error();
     bootstrap_error = true;
     thd->get_protocol_classic()->end_net();
     thd->release_resources();
   } else {
+    thd->store_globals();
     Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
     thd_manager->add_thd(thd);
 
@@ -364,7 +364,7 @@ bool run_bootstrap_thread(MYSQL_FILE *file, bootstrap_functor boot_handler,
   THD *thd = new THD;
   thd->system_thread = thread_type;
 #ifdef WITH_WSREP
-  thd->variables.wsrep_on = 0;
+  thd->variables.wsrep_on = false;
 #endif /* WITH_WSREP */
   thd->get_protocol_classic()->init_net(NULL);
   thd->security_context()->set_master_access(~(ulong)0);

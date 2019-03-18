@@ -307,7 +307,15 @@ bool trans_commit(THD *thd, bool ignore_global_read_lock) {
 
   trans_track_end_trx(thd);
 
-  thd->dd_client()->commit_modified_objects();
+  /*
+    Avoid updating modified uncommitted objects when committing attachable
+    read-write transaction. This is required to allow I_S queries to update
+    table statistics during CREATE TABLE ... SELECT, otherwise the
+    uncommitted object added by DDL would be removed by I_S query.
+  */
+  if (!thd->is_attachable_rw_transaction_active())
+    thd->dd_client()->commit_modified_objects();
+
   thd->locked_tables_list.adjust_renamed_tablespace_mdls(&thd->mdl_context);
 
   DBUG_RETURN(res);
@@ -363,7 +371,7 @@ bool trans_commit_implicit(THD *thd, bool ignore_global_read_lock) {
 #endif /* WITH_WSREP */
 
   } else if (tc_log)
-    tc_log->commit(thd, true);
+    res = tc_log->commit(thd, true);
 
   if (res == false)
     if (thd->rpl_thd_ctx.session_gtids_ctx().notify_after_transaction_commit(
@@ -385,7 +393,15 @@ bool trans_commit_implicit(THD *thd, bool ignore_global_read_lock) {
 
   trans_track_end_trx(thd);
 
-  thd->dd_client()->commit_modified_objects();
+  /*
+    Avoid updating modified uncommitted objects when committing attachable
+    read-write transaction. This is required to allow I_S queries to update
+    table statistics during CREATE TABLE ... SELECT, otherwise the
+    uncommitted object added by DDL would be removed by I_S query.
+  */
+  if (!thd->is_attachable_rw_transaction_active())
+    thd->dd_client()->commit_modified_objects();
+
   thd->locked_tables_list.adjust_renamed_tablespace_mdls(&thd->mdl_context);
   DBUG_RETURN(res);
 }
@@ -430,7 +446,16 @@ bool trans_rollback(THD *thd) {
 
   trans_track_end_trx(thd);
 
-  thd->dd_client()->rollback_modified_objects();
+  /*
+    Avoid updating modified uncommitted objects when rolling back
+    attachable read-write transaction. This is required to allow I_S
+    queries to update table statistics during CREATE TABLE ... SELECT,
+    otherwise the uncommitted object added by DDL would be removed by I_S
+    query.
+  */
+  if (!thd->is_attachable_rw_transaction_active())
+    thd->dd_client()->rollback_modified_objects();
+
   thd->locked_tables_list.discard_renamed_tablespace_mdls();
 
   DBUG_RETURN(res);
@@ -482,7 +507,16 @@ bool trans_rollback_implicit(THD *thd) {
 
   trans_track_end_trx(thd);
 
-  thd->dd_client()->rollback_modified_objects();
+  /*
+    Avoid updating modified uncommitted objects when rolling back
+    attachable read-write transaction. This is required to allow I_S
+    queries to update table statistics during CREATE TABLE ... SELECT,
+    otherwise the uncommitted object added by DDL would be removed by I_S
+    query.
+  */
+  if (!thd->is_attachable_rw_transaction_active())
+    thd->dd_client()->rollback_modified_objects();
+
   thd->locked_tables_list.discard_renamed_tablespace_mdls();
 
   DBUG_RETURN(res);
@@ -549,7 +583,7 @@ bool trans_commit_stmt(THD *thd, bool ignore_global_read_lock) {
       trans_reset_one_shot_chistics(thd);
 #endif /* WITH_WSREP */
   } else if (tc_log)
-    tc_log->commit(thd, false);
+    res = tc_log->commit(thd, false);
   if (res == false && !thd->in_active_multi_stmt_transaction())
     if (thd->rpl_thd_ctx.session_gtids_ctx().notify_after_transaction_commit(
             thd))
