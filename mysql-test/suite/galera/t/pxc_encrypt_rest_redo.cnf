@@ -3,7 +3,8 @@
 [mysqld]
 wsrep_sst_method=xtrabackup-v2
 pxc-encrypt-cluster-traffic=ON
-binlog_encryption=1
+innodb_redo_log_encrypt=1
+innodb_log_file_size=100M
 
 [sst]
 ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem

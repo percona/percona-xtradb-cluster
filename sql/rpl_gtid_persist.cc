@@ -91,7 +91,7 @@ static void init_thd(THD **p_thd) {
   /* Set wsrep-on=0 for compressed GTID table thread as it would write
   rows that we don't want to replicate. */
   WSREP_DEBUG("Compress GTID table thread will run with wsrep_on=0/false");
-  thd->variables.wsrep_on = 0;
+  thd->variables.wsrep_on = false;
 #endif /* WITH_WSREP */
   DBUG_VOID_RETURN;
 }
@@ -116,7 +116,7 @@ THD *Gtid_table_access_context::create_thd() {
   thd->system_thread = SYSTEM_THREAD_COMPRESS_GTID_TABLE;
 #ifdef WITH_WSREP
   WSREP_DEBUG("SYSTEM_THREAD_COMPRESS_GTID_TABLE declared as non wsrep_on");
-  thd->variables.wsrep_on = 0;
+  thd->variables.wsrep_on = false;
 #endif /* WITH_WSREP */
   /*
     This is equivalent to a new "statement". For that reason, we call

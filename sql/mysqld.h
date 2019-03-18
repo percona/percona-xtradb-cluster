@@ -361,7 +361,7 @@ extern const char *load_default_groups[];
 extern struct my_option my_long_early_options[];
 extern bool mysqld_server_started;
 #ifdef WITH_WSREP
-extern bool mysqld_server_initialized;
+extern bool wsrep_unireg_abort;
 #endif /* WITH_WSREP */
 extern "C" MYSQL_PLUGIN_IMPORT int orig_argc;
 extern "C" MYSQL_PLUGIN_IMPORT char **orig_argv;

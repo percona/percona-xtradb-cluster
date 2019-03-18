@@ -12,35 +12,18 @@ DROP TABLE t1;
 Killing server ...
 #node-1
 CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
+begin;
 INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten as a5;
-#node-1a (open read only transaction)
-begin;
-select count(*) from t1 where f1 > 1000;
-count(*)
-99000
-#node-1b (open read only transaction)
-begin;
-select count(*) from t1 where f1 < 1000;
-count(*)
-999
-#node-1 (open trx that would involve use of undo)
-update t1 set f2 = 9999999 where f1 > 1000;
-begin;
-update t1 set f2 = 8888888 where f1 < 1000;
 #node-2 restarted
 # restart
-SELECT COUNT(*) = 0 from t1 where f2 = 8888888;
+SELECT COUNT(*) = 0 from t1;
 COUNT(*) = 0
 1
-SELECT COUNT(*) from t1 where f2 = 9999999;
-COUNT(*)
-99000
 #node-1
 commit;
-#node-1a
-commit;
-#node-1b
-commit;
+SELECT COUNT(*) = 100000 from t1;
+COUNT(*) = 100000
+1
 #node-2
 DROP TABLE t1;
 #node-2 being shutdown 

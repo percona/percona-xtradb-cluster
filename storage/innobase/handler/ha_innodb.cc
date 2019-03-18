@@ -1923,7 +1923,9 @@ allowed, else the thread is put into sleep.
 @param[in,out]	prebuilt	row prebuilt handler */
 static inline void innobase_srv_conc_enter_innodb(row_prebuilt_t *prebuilt) {
 #ifdef WITH_WSREP
-  // TODO: add reasoning
+  // innodb_thread_concurreny limit how many thread can work in innodb
+  // at any given time. This limit is not applicable to wsrep-applier
+  // threads given they are high priority threads.
   if (wsrep_on(prebuilt->trx->mysql_thd) &&
       wsrep_thd_is_BF(prebuilt->trx->mysql_thd, false))
     return;
@@ -1964,7 +1966,9 @@ any spare tickets.
 @param[in,out]	prebuilt	row prebuilt handler */
 static inline void innobase_srv_conc_exit_innodb(row_prebuilt_t *prebuilt) {
 #ifdef WITH_WSREP
-  // TODO: add reasoning
+  // innodb_thread_concurreny limit how many thread can work in innodb
+  // at any given time. This limit is not applicable to wsrep-applier
+  // threads given they are high priority threads.
   if (wsrep_on(prebuilt->trx->mysql_thd) &&
       wsrep_thd_is_BF(prebuilt->trx->mysql_thd, false))
     return;
@@ -5194,6 +5198,13 @@ static int innodb_init(void *p) {
         DBUG_RETURN(innodb_init_abort());
         break;
     }
+  }
+
+  if (srv_encrypt_tables != SRV_ENCRYPT_TABLES_OFF) {
+    WSREP_ERROR(
+        "Percona-XtraDB-Cluster doesn't support"
+        " innodb_encrypt_tables");
+    DBUG_RETURN(innodb_init_abort());
   }
 #endif /* WITH_WSREP */
 

@@ -8,8 +8,8 @@
 --source include/force_restart.inc
 
 #
-# this test-case cover binary-log encrpytion.
-# binary-log are node specific and has role to play only during
+# this test-case cover undo log encrpytion.
+# undo log are node specific and has role to play only during
 # SST when backup is taken and restored.
 #
 

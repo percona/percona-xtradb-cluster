@@ -5,36 +5,36 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES(1);
 uuids_do_not_match
 1
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 124;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	124	Previous_gtids	1	155	
-mysqld-bin.000001	155	Gtid	1	232	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
-mysqld-bin.000001	232	Query	1	374	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB /* xid=# */
-mysqld-bin.000001	374	Gtid	1	453	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
-mysqld-bin.000001	453	Query	1	533	BEGIN
-mysqld-bin.000001	533	Table_map	1	581	table_id: # (test.t1)
-mysqld-bin.000001	581	Write_rows	1	621	table_id: # flags: STMT_END_F
-mysqld-bin.000001	621	Xid	1	652	COMMIT /* xid=# */
+mysqld-bin.000002	124	Previous_gtids	1	155	
+mysqld-bin.000002	155	Gtid	1	232	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000002	232	Query	1	374	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB /* xid=# */
+mysqld-bin.000002	374	Gtid	1	453	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000002	453	Query	1	533	BEGIN
+mysqld-bin.000002	533	Table_map	1	581	table_id: # (test.t1)
+mysqld-bin.000002	581	Write_rows	1	621	table_id: # flags: STMT_END_F
+mysqld-bin.000002	621	Xid	1	652	COMMIT /* xid=# */
 INSERT INTO t1 VALUES(2);
 uuids_do_not_match
 1
 uuids_match
 1
-SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000004' FROM 124;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000002	124	Previous_gtids	2	155	
-mysqld-bin.000002	155	Gtid	1	232	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
-mysqld-bin.000002	232	Query	1	374	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB /* xid=# */
-mysqld-bin.000002	374	Gtid	1	453	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
-mysqld-bin.000002	453	Query	1	528	BEGIN
-mysqld-bin.000002	528	Table_map	1	576	table_id: # (test.t1)
-mysqld-bin.000002	576	Write_rows	1	616	table_id: # flags: STMT_END_F
-mysqld-bin.000002	616	Xid	1	647	COMMIT /* xid=# */
-mysqld-bin.000002	647	Gtid	2	726	SET @@SESSION.GTID_NEXT= '<effective_uuid>:3'
-mysqld-bin.000002	726	Query	2	806	BEGIN
-mysqld-bin.000002	806	Table_map	2	854	table_id: # (test.t1)
-mysqld-bin.000002	854	Write_rows	2	894	table_id: # flags: STMT_END_F
-mysqld-bin.000002	894	Xid	2	925	COMMIT /* xid=# */
+mysqld-bin.000004	124	Previous_gtids	2	155	
+mysqld-bin.000004	155	Gtid	1	232	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000004	232	Query	1	374	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB /* xid=# */
+mysqld-bin.000004	374	Gtid	1	453	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000004	453	Query	1	528	BEGIN
+mysqld-bin.000004	528	Table_map	1	576	table_id: # (test.t1)
+mysqld-bin.000004	576	Write_rows	1	616	table_id: # flags: STMT_END_F
+mysqld-bin.000004	616	Xid	1	647	COMMIT /* xid=# */
+mysqld-bin.000004	647	Gtid	2	726	SET @@SESSION.GTID_NEXT= '<effective_uuid>:3'
+mysqld-bin.000004	726	Query	2	806	BEGIN
+mysqld-bin.000004	806	Table_map	2	854	table_id: # (test.t1)
+mysqld-bin.000004	854	Write_rows	2	894	table_id: # flags: STMT_END_F
+mysqld-bin.000004	894	Xid	2	925	COMMIT /* xid=# */
 uuids_do_not_match
 1
 uuids_match

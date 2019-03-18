@@ -1434,6 +1434,7 @@ function initialize_pxb_commands()
             # prepare doesn't look at my.cnf instead it has its own generated backup-my.cnf
             INNOPREPARE="${pxb_bin_path} $disver $iapts --prepare --binlog-info=ON \
                 \$rebuildcmd \$keyringapplyopt \$encrypt_prepare_options \
+                --rollback-prepared-trx \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
                 --target-dir=\${DATA} 2>&1  | logger -p daemon.err -t ${ssystag}innobackupex-apply "
             INNOMOVE="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
@@ -1453,6 +1454,7 @@ function initialize_pxb_commands()
         # prepare doesn't look at my.cnf instead it has its own generated backup-my.cnf
         INNOPREPARE="${pxb_bin_path} $disver $iapts --prepare --binlog-info=ON \
             \$rebuildcmd \$keyringapplyopt \$encrypt_prepare_options \
+            --rollback-prepared-trx \
             --xtrabackup-plugin-dir="$pxb_plugin_dir" \
             --target-dir=\${DATA} &>\${DATA}/innobackup.prepare.log"
         INNOMOVE="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
@@ -1513,7 +1515,7 @@ fi
 
 XB_8x_VERSION=$($XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN --version 2>&1 | grep -oe ' [0-9]\.[0-9]\.[0-9]*' | head -n1)
 XB_8x_VERSION=${XB_8x_VERSION# }
-XB_8x_REQUIRED_VERSION="8.0.4"
+XB_8x_REQUIRED_VERSION="8.0.5"
 if compare_versions $XB_8x_VERSION "<" $XB_8x_REQUIRED_VERSION; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "The $XTRABACKUP_BIN version is $XB_8x_VERSION. Needs xtrabackup-$XB_8x_REQUIRED_VERSION or higher to perform SST"
@@ -2121,35 +2123,6 @@ then
             fi
         fi
 
-        if  [[ -n "$WSREP_SST_OPT_BINLOG" && -n "$DONOR_BINLOGNAME" ]]; then
-
-            binlog_dir=$(dirname "$WSREP_SST_OPT_BINLOG")
-            binlog_file=$(basename "$WSREP_SST_OPT_BINLOG")
-            donor_binlog_file=$DONOR_BINLOGNAME
-
-            # rename the donor binlog to the name of the binlogs on the joiner
-            if [[ "$binlog_file" != "$donor_binlog_file" ]]; then
-                pushd "$DATA" &>/dev/null
-                for f in $donor_binlog_file.*; do
-                    if [[ ! -e "$f" ]]; then continue; fi
-                    f_new=$(echo $f | sed "s/$donor_binlog_file/$binlog_file/")
-                    mv "$f" "$f_new" 2>/dev/null || true
-                done
-                popd &> /dev/null
-            fi
-
-            # To avoid comparing data directory and BINLOG_DIRNAME 
-            mv $DATA/${binlog_file}.* "$binlog_dir"/ 2>/dev/null || true
-
-            pushd "$binlog_dir" &>/dev/null
-            for bfiles in $binlog_file.*; do
-                if [[ ! -e "$bfiles" ]]; then continue; fi
-                echo "${binlog_dir}/${bfiles}" >> "${binlog_file}.index"
-            done
-            popd &> /dev/null
-
-        fi
-
         wsrep_log_info "Preparing the backup at ${DATA}"
         timeit "Xtrabackup prepare stage" "$INNOPREPARE"
 
@@ -2168,6 +2141,40 @@ then
 
         XB_GTID_INFO_FILE_PATH="${TDATA}/${XB_GTID_INFO_FILE}"
         rm -f $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
+
+        # Just rename the file till PXB-8.0.6 fix this issue of rename.
+        # moving file to property directory will be take care by PXB-8.0.5.
+        if  [[ -n "$WSREP_SST_OPT_BINLOG" && -n "$DONOR_BINLOGNAME" ]]; then
+
+            binlog_dir=$(dirname "$WSREP_SST_OPT_BINLOG")
+            binlog_file=$(basename "$WSREP_SST_OPT_BINLOG")
+            donor_binlog_file=$DONOR_BINLOGNAME
+
+            # rename the donor binlog to the name of the binlogs on the joiner
+            if [[ "$binlog_file" != "$donor_binlog_file" ]]; then
+                pushd "$DATA" &>/dev/null
+                for f in $donor_binlog_file.*; do
+                    if [[ ! -e "$f" ]]; then continue; fi
+                    f_new=$(echo $f | sed "s/$donor_binlog_file/$binlog_file/")
+                    mv "$f" "$f_new" 2>/dev/null || true
+                done
+                popd &> /dev/null
+            fi
+
+            # To avoid comparing data directory and BINLOG_DIRNAME 
+            #mv $DATA/${binlog_file}.* "$binlog_dir"/ 2>/dev/null || true
+
+            pushd "$DATA" &>/dev/null
+            # starting PXB-8.0.5 it started shipping index file but since PXC
+            # may rename the file it is important that PXC re-generate the file.
+            rm -rf "${binlog_file}.index" || true
+            for bfiles in $binlog_file.*; do
+                if [[ ! -e "$bfiles" ]]; then continue; fi
+                echo "${binlog_dir}/${bfiles}" >> "${binlog_file}.index"
+            done
+            popd &> /dev/null
+
+        fi
 
         # If we have a transition key, remove the existing keyring file data
         # it will be recreated in the move-back operation
