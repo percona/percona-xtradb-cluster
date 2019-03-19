@@ -375,7 +375,7 @@ function set_vars()
     else
 	TAR=tar
     fi
-    # Check mysql_install_db script if the version is below 8.0.0
+    # Check mysql_install_db script if the version is below 8.0.0. mysql_install_db script is not present in 8.0.0 version.
     if compare_versions $MYSQL_VERSION_CHECK "<" "8.0.0" ; then
       find_program MYSQL_INSTALL_DB mysql_install_db $MYSQL_BASEDIR/bin \
         $MYSQL_BASEDIR/scripts
