@@ -51,6 +51,8 @@
 #include <net/if.h>
 #endif  // HAVE_GETIFADDRS
 
+#include "mysql/psi/mysql_file.h"
+
 extern char **environ;  // environment variables
 
 static wsp::string wsrep_PATH;
@@ -877,6 +879,188 @@ thd::~thd() {
   if (ptr) {
     delete ptr;
   }
+}
+
+
+void WSREPState::parse_version(const char *str, uint& major, uint& minor, uint& revision)
+{
+  char * end;
+  major = minor = revision = 0;
+
+  if (!str || !*str)
+    return;
+
+  major = strtoul(str, &end, 10);
+  if (*end)
+    minor = strtoul(end+1, &end, 10);
+  if (*end)
+    revision = strtoul(end+1, &end, 10);
+
+  /* Ensure that we aren't overflowing any values */
+  if (major > 99) major = 99;
+  if (minor > 99) minor = 99;
+  if (revision > 99) revision = 99;
+  return;
+}
+
+bool WSREPState::wsrep_schema_version_equals(const char *server_version)
+{
+  uint  wsrep_major, wsrep_minor, wsrep_revision;
+  uint  server_major, server_minor, server_revision;
+
+  parse_version(this->wsrep_schema_version.c_str(), wsrep_major, wsrep_minor, wsrep_revision);
+  parse_version(server_version, server_major, server_minor, server_revision);
+
+  return wsrep_major == server_major &&
+         wsrep_minor == server_minor &&
+         wsrep_revision == server_revision;
+}
+
+
+bool WSREPState::load_from(const char *dir, const char *filename)
+{
+  MYSQL_FILE *file;
+  int         errcode = 0;
+  const int   full_path_len = 1024;
+  char        full_path[full_path_len];
+  const int   buf_len = 256;
+  char        buf[buf_len];
+
+  if (snprintf(full_path, full_path_len,
+               "%s/%s", dir ? dir : "", filename ? filename : "") <= 0)
+  {
+    WSREP_ERROR("WSREPState::load_from() snprintf failed");
+    return false;
+  }
+
+  file = mysql_file_fopen(key_file_misc, full_path, O_RDONLY, MYF(0));
+  if (!file)
+  {
+    WSREP_ERROR("Could not open the wsrep state file : %s", full_path);
+    return false;
+  }
+
+  /* Clear out all data */
+  clear();
+
+  /* Loop over the file and read it in */
+  while (mysql_file_fgets(buf, buf_len, file) != NULL)
+  {
+    /* Examine the line */
+    char *line = buf;
+    while (*line && isspace(*line))
+      line++;
+
+    /* Are we at the end of the line? */
+    if (*line == 0)
+      continue;
+
+    /* If the line starts with a '#', then it's a comment */
+    if (line[0] == '#')
+      continue;
+
+    char *sep = strchr(line, '=');
+    if (sep == NULL)
+    {
+      WSREP_ERROR("Unexpected line formatting (expected '=') : %s", buf);
+      errcode = EINVAL;
+      break;
+    }
+
+    /* Separate the name/value */
+    *sep = 0;
+    char * name = line;
+    char * value = sep+1;
+
+    if (strcmp(name, WSREP_SCHEMA_VERSION_NAME) == 0)
+    {
+      uint  major, minor, revision;
+      const int buf_len=32;
+      char buf[buf_len];
+      this->parse_version(value, major, minor, revision);
+      if (snprintf(buf, buf_len, "%d.%d.%d", major, minor, revision) <= 0)
+      {
+        WSREP_ERROR("WSREPState::load_from() snprintf failed to format the version");
+        errcode = EINVAL;
+        break;
+      }
+      this->wsrep_schema_version = buf;
+    }
+    else if (strcmp(name, WSREP_STATE_FILE_VERSION_NAME) == 0)
+    {
+      /* Only allow version 1.x */
+      uint  major, minor, revision;
+      this->parse_version(value, major, minor, revision);
+      if (major != 1)
+      {
+        WSREP_ERROR("WSREPState::load_from() unsupported/unknown version: %s", value);
+        errcode = EINVAL;
+        break;
+      }
+    }
+    else
+    {
+      /*
+       Unknown name
+       Issue a warning, but continue to process the entire file
+      */
+      WSREP_WARN("Unknown state file entry: %s=%s", name, value);
+    }
+  }
+
+  if (this->wsrep_schema_version.empty())
+  {
+    WSREP_ERROR("Could not locate the wsrep schema version in the wsrep_state.dat file");
+    errcode = EINVAL;
+  }
+  mysql_file_fclose(file, MYF(0));
+  return errcode == 0;
+}
+
+bool WSREPState::save_to(const char *dir, const char *filename)
+{
+  MYSQL_FILE *file;
+  const int   buf_len=1024;
+  char        buf[buf_len];
+
+  /* Normalize the wsrep_schema_version */
+  uint        major, minor, revision;
+  parse_version(this->wsrep_schema_version.c_str(), major, minor, revision);
+  if (snprintf(buf, buf_len, "%d.%d.%d", major, minor, revision) <= 0)
+  {
+    /* Failure to format */
+    WSREP_ERROR("WSREPState::save_to() snprintf failed to format the version");
+    return false;
+  }
+  this->wsrep_schema_version = buf;
+
+  if (snprintf(buf, buf_len, "%s/%s", dir ? dir : "", filename ? filename : "") <= 0)
+  {
+    WSREP_ERROR("WSREPState::save_to() snprintf failed");
+    return false;
+  }
+
+  file = mysql_file_fopen(key_file_misc, buf, O_TRUNC | O_CREAT | O_WRONLY, MYF(0));
+  if (!file)
+  {
+    WSREP_ERROR("Could not open the wsrep state file : %s", buf);
+    return false;
+  }
+  int errcode;
+  errcode = mysql_file_fprintf(file,
+        "# WSREP state file (created on initialization)\n"
+        "%s=%s\n"
+        "%s=%s\n",
+        WSREP_STATE_FILE_VERSION_NAME, WSREP_STATE_FILE_VERSION,
+        WSREP_SCHEMA_VERSION_NAME, this->wsrep_schema_version.c_str()
+      );
+  mysql_file_fclose(file, MYF(0));
+
+  if (errcode <= 0) {
+    WSREP_ERROR("Error while writing to the wsrep state file");
+    return false;
+  }
+  return true;
 }
 
 }  // namespace wsp

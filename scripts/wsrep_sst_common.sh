@@ -21,8 +21,8 @@ set -u
 WSREP_SST_OPT_BYPASS=0
 WSREP_SST_OPT_BINLOG=""
 WSREP_SST_OPT_CONF_SUFFIX=""
-WSREP_SST_OPT_BASEDIR=""
 WSREP_SST_OPT_DATA=""
+WSREP_SST_OPT_BASEDIR=""
 WSREP_SST_OPT_PLUGINDIR=""
 WSREP_SST_OPT_USER=""
 WSREP_SST_OPT_PSWD=""
@@ -39,6 +39,16 @@ readonly MYSQL_UPGRADE_NAME=mysql_upgrade
 readonly MYSQL_CLIENT_NAME=mysql
 
 declare MYSQL_UPGRADE_TMPDIR=""
+declare WSREP_LOG_DIR=""
+
+# This is the WSREP schema version expected by the server
+# This is the WSREP version of sys_version (as the WSREP version may change
+# independently of the system schema version)
+declare WSREP_WSREP_SCHEMA_VERSION=""
+
+# The WSREP schema version found in the local wsrep_state.dat file
+declare DATADIR_WSREP_SCHEMA_VERSION=""
+
 
 while [ $# -gt 0 ]; do
 case "$1" in
@@ -62,19 +72,15 @@ case "$1" in
         readonly WSREP_SST_OPT_PATH=${WSREP_SST_OPT_ADDR#*/}
         shift
         ;;
-    '--bypass')
-        WSREP_SST_OPT_BYPASS=1
-        ;;
     '--basedir')
         readonly WSREP_SST_OPT_BASEDIR="$2"
         shift
         ;;
+    '--bypass')
+        WSREP_SST_OPT_BYPASS=1
+        ;;
     '--datadir')
         readonly WSREP_SST_OPT_DATA="$2"
-        shift
-        ;;
-    '--plugin-dir')
-        readonly WSREP_SST_OPT_PLUGINDIR="$2"
         shift
         ;;
     '--defaults-file')
@@ -98,7 +104,11 @@ case "$1" in
         shift
         ;;
     '--password')
-        WSREP_SST_OPT_PSWD="$2"
+        # Ignore (read value from stdin)
+        shift
+        ;;
+    '--plugindir')
+        readonly WSREP_SST_OPT_PLUGINDIR="$2"
         shift
         ;;
     '--port')
@@ -114,7 +124,7 @@ case "$1" in
         shift
         ;;
     '--user')
-        WSREP_SST_OPT_USER="$2"
+        # Ignore (read value from stdin)
         shift
         ;;
     '--mysqld-version')
@@ -387,10 +397,10 @@ function normalize_version()
 #   None
 #
 # Arguments:
-#   Parameter 1: The left-side of the comparison
+#   Parameter 1: The left-side of the comparison (for example: "5.7.25")
 #   Parameter 2: the comparison operation
-#                   '>', '>=', '=', '==', '<', '<='
-#   Parameter 3: The right-side of the comparison
+#                   '>', '>=', '=', '==', '<', '<=', "!="
+#   Parameter 3: The right-side of the comparison (for example: "5.7.24")
 #
 # Returns:
 #   Returns 0 (success) if param1 op param2
@@ -402,7 +412,7 @@ function compare_versions()
     local op=$2
     local version_2="$( normalize_version $3 )"
 
-    if [[ ! " = == > >= < <= " =~ " $op " ]]; then
+    if [[ ! " = == > >= < <= != " =~ " $op " ]]; then
         wsrep_log_error "******************* ERROR ********************** "
         wsrep_log_error "Unknown operation : $op"
         wsrep_log_error "Must be one of : = == > >= < <="
@@ -416,6 +426,7 @@ function compare_versions()
     [[ $op == "==" &&   $version_1 == $version_2 ]] && return 0
     [[ $op == ">"  &&   $version_1 >  $version_2 ]] && return 0
     [[ $op == ">=" && ! $version_1 <  $version_2 ]] && return 0
+    [[ $op == "!=" &&   $version_1 != $version_2 ]] && return 0
 
     return 1
 }
@@ -520,6 +531,85 @@ function wait_for_mysqld_startup()
     return 0
 }
 
+# Reads data from wsrep_state.dat and sets the variables
+#
+# Globals:
+#   DATADIR_WSREP_SCHEMA_VERSION (sets this variable)
+#
+# Parameters:
+#   Argument 1: Path to the wsrep_state.dat file
+#
+function read_variables_from_wsrep_state()
+{
+    local state_filename=$1
+    local file_version=""
+
+    while read line; do
+        [[ -z $line ]] && continue
+
+        # Ignore comment lines
+        [[ $line =~ ^[[:space:]]*# ]] && continue
+
+        name=$(echo "$line" | cut -d"=" -f1)
+        value=$(echo "$line" | cut -d"=" -f2)
+
+        case "$name" in
+            'wsrep_schema_version')
+                DATADIR_WSREP_SCHEMA_VERSION=$(expr match "$value" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+                ;;
+            'version')
+                file_version="$value"
+                ;;
+            *)
+                wsrep_log_warning "Unrecognized input: $line"
+        esac
+    done < "${state_filename}"
+
+    #
+    # Version 1.0 : initial version
+    REQUIRED_WSREP_STATE_FILE_VERSION="1.0"
+    if compare_versions "$file_version" ">" "$REQUIRED_WSREP_STATE_FILE_VERSION"; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error " Could not read the wsrep_state.dat file"
+        wsrep_log_error " Unsupported file version:$file_version"
+        wsrep_log_error " file:$state_filename"
+        wsrep_log_error "****************************************************** "
+        return 1
+    fi
+
+    if [[ -z $DATADIR_WSREP_SCHEMA_VERSION ]]; then
+        DATADIR_WSREP_SCHEMA_VERSION="0.0.0"
+    fi
+    return 0
+}
+
+# Writes out a new wsrep_state.dat file
+#
+# Globals:
+#   None
+#
+# Parameters
+#   Argument 1: path to the file
+#   Argument 2: wsrep schema version
+#
+# This must be kept in sync with the code in mysqld.cc that
+# writes out the file on db initialization.
+#
+function write_wsrep_state_file()
+{
+    local path=$1
+    local wsrep_schema_version=$2
+
+    wsrep_log_debug "Creating wsrep state file:$path (version:1.0 wsrep:$wsrep_schema_version)"
+
+    # This is implicit.  If the format changes, this needs to be updated.
+    # This should always write out the current version
+    local file_version="1.0"
+
+    printf "# WSREP state file (created via mysql_upgrade)\n" >  $path
+    printf "version=$file_version\n" >> $path
+    printf "wsrep_schema_version=$wsrep_schema_version\n" >> $path
+}
 
 # Runs any post-processing steps needed
 # (after the datadir has been moved)
@@ -530,17 +620,22 @@ function wait_for_mysqld_startup()
 #   MYSQL_UPGRADE_NAME
 #   MYSQL_CLIENT_NAME
 #   WSREP_SST_OPT_PARENT
-#   WSREP_SST_OPT_USER
-#   WSREP_SST_OPT_PSWD
 #   WSREP_SST_OPT_CONF
 #   WSREP_SST_OPT_CONF_SUFFIX
+#   WSREP_SST_OPT_BASEDIR
+#   WSREP_SST_OPT_PLUGINDIR
+#   WSREP_SYS_SCHEMA_VERSION
 #   MYSQL_UPGRADE_TMPDIR    (This path will be deleted on exit)
 #
 # Arguments
 #   Argument 1: Path to the datadir
 #   Argument 2: Port to be used by mysqld
-#   Argument 3: Set to 0 to skip mysql_upgrade, 1 to run mysql_upgrade
-#   Argument 4: MySQL donor version
+#   Argument 3: The DONOR's version string
+#   Argument 4: The local (JOINER) version string
+#   Argument 5: The transfer method ('rsync' or 'xtrabackup')
+#   Argument 6: The transfer type ('sst' or 'ist')
+#   Argument 7: The value of 'force_upgrade'
+#   Argument 8: The value of 'auto_upgrade'
 #
 # Returns:
 #   0 if successful (no errors encountered)
@@ -550,7 +645,7 @@ function wait_for_mysqld_startup()
 #   (1) Receiving from a < 8.0 donor (5.7 donor)
 #   (2) Receiving from a >= 8.0 donor
 #
-#   (1) Receiving from a 5.7 donor
+#   (1) Receiving an SST from a 5.7 donor
 #       The basic flow is:
 #           1. start up a MySQL server (#1) (creates the SST user)
 #           2. shut down MySQL server
@@ -585,8 +680,24 @@ function run_post_processing_steps()
 {
     local datadir=$1
     local port=$2
-    local run_mysql_upgrade=$3
-    local donor_version_str=$4
+    local donor_version=$3
+    local local_version=$4
+    local transfer_method=$5
+    local transfer_type=$6
+    local force_upgrade=$7
+    local auto_upgrade=$8
+
+    local local_version_str
+    local donor_version_str
+
+    # A value of 'no'   : do not run mysql_upgrade
+    #            'yes'  : run mysql_upgrade
+    local run_mysql_upgrade
+
+    # A value of 'no'   : do not run 'reset slave all'
+    #            'yes'  : run 'reset slave all'
+    #            'check': check the slave status before running 'reset slave all'
+    local run_reset_slave
 
     # Path to the binary locations
     local mysqld_path=""
@@ -597,6 +708,93 @@ function run_post_processing_steps()
     local upgrade_tmpdir
     local mysql_upgrade_dir_path
     local use_mysql_upgrade_conf_suffix=""
+
+
+    local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+    donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+    donor_version_str=${donor_version_str:-"0.0.0"}
+
+    if [[ $force_upgrade == "on" ]]; then
+        wsrep_log_info "Forcing mysql_upgrade"
+        run_mysql_upgrade='yes'
+    elif [[ $auto_upgrade == "on" ]]; then
+        if [[ $transfer_type == "sst" ]]; then
+            # For an SST, we know the version of the datadir from the donor
+            # thus, we can skip mysql_upgrade if it's the same version
+            if compare_versions "$local_version_str" "!=" "$donor_version_str"; then
+                # Check the sys and wsrep schema versions to determine
+                # if mysql_upgrade is needed
+                run_mysql_upgrade='yes'
+            else
+                wsrep_log_debug "Skipping mysql_upgrade: local/donor versions are the same: $local_version_str"
+                run_mysql_upgrade='no'
+            fi
+        else
+            # For an IST, we can't determine if mysql_upgrade is needed or not here
+            # (we don't know what version of MySQL created the datadir).
+            # Force a check of the sys and wsrep schema version to determine
+            # if mysql_upgrade is needed or not
+
+            # Check for termination conditions
+            if compare_versions "$DATADIR_WSREP_SCHEMA_VERSION" ">" "$WSREP_WSREP_SCHEMA_VERSION"; then
+                # If the datadir has a higher version, then exit
+                # (The datadir wsrep schema version is higher than expected)
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "The local datadir has an unsupported wsrep schema version."
+                wsrep_log_error "The version is higher than the current one (downgrade is unsupported)"
+                wsrep_log_error "  expected:$WSREP_WSREP_SCHEMA_VERSION  found:$DATADIR_WSREP_SCHEMA_VERSION"
+                wsrep_log_error "****************************************************** "
+                return 3
+            fi
+
+            if [[ $WSREP_WSREP_SCHEMA_VERSION == $DATADIR_WSREP_SCHEMA_VERSION ]]; then
+                wsrep_log_debug "Skipping mysql_upgrade, schema versions are the same wsrep:$DATADIR_WSREP_SCHEMA_VERSION"
+                run_mysql_upgrade='no'
+            else
+                wsrep_log_debug "Running mysql_upgrade, schema versions do not match"
+                wsrep_log_debug "wsrep schema version expected:$WSREP_WSREP_SCHEMA_VERSION datadir:$DATADIR_WSREP_SCHEMA_VERSION"
+                run_mysql_upgrade='yes'
+            fi
+        fi
+    else
+        wsrep_log_info "Skipping mysql_upgrade: auto-upgrade disabled by configuration"
+        run_mysql_upgrade='no'
+    fi
+
+    # If the donor version is less than 8.0, remove the redo logs
+    # Otherwise mysqld will not start up on the 5.7 datadir
+    if [[ -n $WSREP_LOG_DIR && $run_mysql_upgrade == "yes" ]] && compare_versions "${donor_version_str}" "<" "8.0.0"; then
+        wsrep_log_info "Removing the redo logs (older version:$donor_version_str)"
+        remove_redo_logs "${WSREP_LOG_DIR}"
+        errcode=$?
+        if [[ $errcode -ne 0 ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "FATAL: Failed to remove the redo logs that were received"
+            wsrep_log_error "       from an older version."
+            wsrep_log_error "       donor:${donor_version_str}"
+            wsrep_log_error "****************************************************** "
+            return $errcode
+        fi
+    fi
+
+    # If we have received an IST, do NOT reset the async slave info
+    # If we have received an SST, we always try to reset the slave info
+    #
+    # Side-effect! For an SST, this ensures that the SST user gets removed
+    # during the shutdown of the mysqld started to run the commands.
+    # We do not need to remove the SST user for an IST, since the datadir
+    # is not sent for an IST.
+    if [[ $transfer_type == "ist" ]]; then
+        run_reset_slave='no'
+    else
+        run_reset_slave='check'
+    fi
+
+    # Check if we have anything to do
+    if [[ $run_reset_slave == 'no' && $run_mysql_upgrade == 'no' ]]; then
+        # nothing to do here, just return
+        return 0
+    fi
 
     # Locate mysqld
     # mysqld (depending on the distro) may be in a different
@@ -625,7 +823,7 @@ function run_post_processing_steps()
     wsrep_log_debug "--$("$mysqld_path" --version | cut -d' ' -f2-)"
 
     # Verify any other needed programs
-    if [[ $run_mysql_upgrade -eq 1 ]]; then
+    if [[ $run_mysql_upgrade != 'no' ]]; then
         wsrep_check_program "${MYSQL_UPGRADE_NAME}"
         if [[ $? -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -656,7 +854,7 @@ function run_post_processing_steps()
     fi
 
 
-    if [[ $run_mysql_upgrade -eq 1 ]]; then
+    if [[ $run_mysql_upgrade != 'no' ]]; then
         mysql_upgrade_path=$(which ${MYSQL_UPGRADE_NAME})
         wsrep_log_debug "Found the ${MYSQL_UPGRADE_NAME} binary in ${mysql_upgrade_path}"
         wsrep_log_debug "--$("$mysql_upgrade_path" --version | cut -d' ' -f2-)"
@@ -744,13 +942,19 @@ function run_post_processing_steps()
         --server-id=1 \
         --pid-file=${mysql_upgrade_dir_path}/mysqld.pid \
         --socket=$upgrade_socket \
-        --basedir=$WSREP_SST_OPT_BASEDIR \
-        --plugin-dir=$WSREP_SST_OPT_PLUGINDIR \
         --datadir=$datadir --wsrep_provider=none"
 
+    if [[ -n $WSREP_SST_OPT_BASEDIR ]]; then
+        mysqld_cmdline+=" --basedir=${WSREP_SST_OPT_BASEDIR}"
+    fi
+
+    if [[ -n $WSREP_SST_OPT_PLUGINDIR ]]; then
+        mysqld_cmdline+=" --plugin-dir=${WSREP_SST_OPT_PLUGINDIR}"
+    fi
+
     # Generate a new random password to be used by the JOINER
-    WSREP_SST_OPT_USER="mysql.pxc.sst.user"
-    WSREP_SST_OPT_PSWD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    local sst_user="mysql.pxc.sst.user"
+    local sst_password=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 
     local -i timeout_threshold
     timeout_threshold=300
@@ -764,16 +968,16 @@ function run_post_processing_steps()
     # 'FLUSH PRIVILEGES' with 8.0 on a 5.7 datadir will fail because
     # the system tables (mysql.user) are MyISAM and not InnoDB.
 
-    if compare_versions $donor_version_str ">=" "8.0.0"; then
+    if compare_versions "$donor_version_str" ">=" "8.0.0"; then
         #-----------------------------------------------------------------------
         # Reuse the SST User (use it to run mysql_upgrade)
         # Recreate with root permissions and a new password
         wsrep_log_debug "Starting the MySQL server used for post-processing"
         cat <<EOF | $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &> ${mysqld_err_log} &
 SET sql_log_bin=OFF;
-DROP USER IF EXISTS '${WSREP_SST_OPT_USER}'@localhost;
-CREATE USER '${WSREP_SST_OPT_USER}'@localhost IDENTIFIED BY '${WSREP_SST_OPT_PSWD}';
-GRANT ALL PRIVILEGES ON *.* TO '${WSREP_SST_OPT_USER}'@localhost;
+DROP USER IF EXISTS '${sst_user}'@localhost;
+CREATE USER '${sst_user}'@localhost IDENTIFIED BY '${sst_password}';
+GRANT ALL PRIVILEGES ON *.* TO '${sst_user}'@localhost;
 FLUSH PRIVILEGES;
 EOF
         mysql_pid=$!
@@ -784,18 +988,19 @@ EOF
 
         # Generate the authentication string for our new password
         # Use the same algorithm as mysql_native_password
-        AUTH_STRING=$(echo -n "${WSREP_SST_OPT_PSWD}" | openssl sha1 -binary | openssl sha1 -hex)
+        local auth_string
+        auth_string=$(echo -n "${sst_password}" | openssl sha1 -binary | openssl sha1 -hex)
         # Remove everything before the '='
-        AUTH_STRING=${AUTH_STRING#*=}
+        auth_string=${auth_string#*=}
         # Remove any leading spaces
-        AUTH_STRING=${AUTH_STRING# }
+        auth_string=${auth_string# }
         # add '*' at the beginning and convert to all uppercase
-        AUTH_STRING=$(echo "${AUTH_STRING}" | awk '{print "*"toupper($0)}')
+        auth_string=$(echo "${auth_string}" | awk '{print "*"toupper($0)}')
 
         wsrep_log_debug "Starting the MySQL server(#1) used for post-processing"
         cat <<EOF | timeout -k ${timeout_threshold}s ${timeout_threshold}s $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &> ${mysqld_err_log} &
 SET sql_log_bin=OFF;
-DELETE FROM mysql.user WHERE User='${WSREP_SST_OPT_USER}' AND Host='localhost';
+DELETE FROM mysql.user WHERE User='${sst_user}' AND Host='localhost';
 INSERT INTO mysql.user
     ( User, Host, Select_priv, Insert_priv, Update_priv,
       Delete_priv, Create_priv, Drop_priv, Reload_priv, Shutdown_priv,
@@ -810,7 +1015,7 @@ INSERT INTO mysql.user
       password_expired, password_last_changed, password_lifetime, account_locked
     )
     VALUES
-    ('${WSREP_SST_OPT_USER}', 'localhost', 'Y', 'Y', 'Y',
+    ('${sst_user}', 'localhost', 'Y', 'Y', 'Y',
      'Y', 'Y', 'Y', 'Y', 'Y',
      'Y', 'Y', 'Y', 'Y', 'Y',
      'Y', 'Y', 'Y', 'Y', 'Y',
@@ -819,7 +1024,7 @@ INSERT INTO mysql.user
      'Y',
      '', '', '', '',
      0, 0, 0, 0,
-     'mysql_native_password', '${AUTH_STRING}',
+     'mysql_native_password', '${auth_string}',
      'N', CURRENT_TIMESTAMP, NULL, 'N'
     );
 SHUTDOWN;
@@ -865,8 +1070,10 @@ EOF
 
     #-----------------------------------------------------------------------
     # run mysql-upgrade
-    if [[ $run_mysql_upgrade -eq 1 ]]; then
-        wsrep_log_info "Running mysql_upgrade"
+    # If we get here, then mysql_upgrade should be 'yes' or 'no'
+    if [[ $run_mysql_upgrade == 'yes' ]]; then
+
+        wsrep_log_info "Running mysql_upgrade  donor:$donor_version_str  local:$local_version_str"
         wsrep_log_debug "Starting mysql_upgrade"
         $mysql_upgrade_path \
             --defaults-file=/dev/stdin \
@@ -874,8 +1081,8 @@ EOF
             --socket=$upgrade_socket \
             &> ${mysql_upgrade_dir_path}/upgrade.out <<EOF
 [mysql_upgrade]
-user=${WSREP_SST_OPT_USER}
-password="${WSREP_SST_OPT_PSWD}"
+user=${sst_user}
+password="${sst_password}"
 EOF
         errcode=$?
         if [[ $errcode -ne 0 ]]; then
@@ -894,10 +1101,13 @@ EOF
         fi
         wsrep_log_debug "mysql_upgrade completed"
 
+        # If the upgrade succeded, update the wsrep_schema_version
+        write_wsrep_state_file "$datadir/wsrep_state.dat" "$WSREP_WSREP_SCHEMA_VERSION"
+
         # If this is for 5.7, we will have to restart the mysqld (again, sigh)
         # The async info tables will not have been loaded
         # so the SHOW SLAVE STATUS will fail
-        if compare_versions $donor_version_str "<" "8.0.0"; then
+        if [[ $run_reset_slave != 'no' ]] && compare_versions "$donor_version_str" "<" "8.0.0"; then
             #-----------------------------------------------------------------------
             # Restart the server (to reload the async info tables
             # that failed to load during the mysql_upgrade from 5.7).
@@ -909,8 +1119,8 @@ EOF
                 -e "SHUTDOWN;" \
                 &> ${mysql_upgrade_dir_path}/upgrade_shutdown.out <<EOF
 [client]
-user=${WSREP_SST_OPT_USER}
-password="${WSREP_SST_OPT_PSWD}"
+user=${sst_user}
+password="${sst_password}"
 EOF
             errcode=$?
             if [[ $errcode -ne 0 ]]; then
@@ -940,9 +1150,9 @@ EOF
             wsrep_log_debug "Starting the MySQL server(#3) used for post-processing"
             cat <<EOF | $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &> ${mysqld_err_log} &
 SET sql_log_bin=OFF;
-DROP USER IF EXISTS '${WSREP_SST_OPT_USER}'@localhost;
-CREATE USER '${WSREP_SST_OPT_USER}'@localhost IDENTIFIED BY '${WSREP_SST_OPT_PSWD}';
-GRANT ALL PRIVILEGES ON *.* TO '${WSREP_SST_OPT_USER}'@localhost;
+DROP USER IF EXISTS '${sst_user}'@localhost;
+CREATE USER '${sst_user}'@localhost IDENTIFIED BY '${sst_password}';
+GRANT ALL PRIVILEGES ON *.* TO '${sst_user}'@localhost;
 FLUSH PRIVILEGES;
 EOF
             mysql_pid=$!
@@ -957,20 +1167,44 @@ EOF
     #-----------------------------------------------------------------------
     # Stop replication activity
 
-    # First, check to see if we need to reset the slave
-    local slave_status=""
-    slave_status=$($mysql_client_path \
-                    --defaults-file=/dev/stdin \
-                    --socket=$upgrade_socket \
-                    --unbuffered --batch --silent --skip-column-names \
-                    -e "SHOW SLAVE STATUS;" \
-                    2> ${mysql_upgrade_dir_path}/reset_slave.out <<EOF
+    if [[ $run_reset_slave == 'check' ]]; then
+        wsrep_log_debug "Checking slave status"
+
+        local slave_status=""
+        slave_status=$($mysql_client_path \
+                        --defaults-file=/dev/stdin \
+                        --socket=$upgrade_socket \
+                        --unbuffered --batch --silent --skip-column-names \
+                        -e "SHOW SLAVE STATUS;" \
+                        2> ${mysql_upgrade_dir_path}/show_slave_status.out <<EOF
 [client]
-user=${WSREP_SST_OPT_USER}
-password="${WSREP_SST_OPT_PSWD}"
+user=${sst_user}
+password="${sst_password}"
 EOF
 )
-    if [[ -n $slave_status ]]; then
+        errcode=$?
+        if [[ $errcode -ne 0 ]]; then
+            kill -9 $mysql_pid
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "Failed to execute mysql 'SHOW SLAVE STATUS'. Check the parameters and retry"
+            wsrep_log_error "Line $LINENO errcode:${errcode}"
+            echo "--------------- show slave status log (START) --------------------" >&2
+            cat ${mysql_upgrade_dir_path}/show_slave_status.out >&2
+            echo "--------------- show slave status log (END) ----------------------" >&2
+            echo "--------------- mysql error log  (START) --------------------" >&2
+            cat ${mysqld_err_log} >&2
+            echo "--------------- mysql error log (END) ----------------------" >&2
+            wsrep_log_error "****************************************   ************** "
+            return 3
+        fi
+        if [[ -n $slave_status ]]; then
+            run_reset_slave='yes'
+        else
+            run_reset_slave='no'
+        fi
+    fi
+
+    if [[ $run_reset_slave == 'yes' ]]; then
         wsrep_log_debug "Resetting Async Slave"
 
         $mysql_client_path \
@@ -980,8 +1214,8 @@ EOF
             -e "SET sql_log_bin=OFF; RESET SLAVE ALL;" \
             &> ${mysql_upgrade_dir_path}/reset_slave.out <<EOF
 [client]
-user=${WSREP_SST_OPT_USER}
-password="${WSREP_SST_OPT_PSWD}"
+user=${sst_user}
+password="${sst_password}"
 EOF
         errcode=$?
         if [[ $errcode -ne 0 ]]; then
@@ -1011,11 +1245,11 @@ EOF
         --defaults-file=/dev/stdin \
         --socket=$upgrade_socket \
         --unbuffered --batch --silent \
-        -e "SET sql_log_bin=OFF; ALTER USER '${WSREP_SST_OPT_USER}'@localhost ACCOUNT LOCK; SHUTDOWN;" \
+        -e "SET sql_log_bin=OFF; ALTER USER '${sst_user}'@localhost ACCOUNT LOCK; SHUTDOWN;" \
         &> ${mysql_upgrade_dir_path}/upgrade_shutdown.out <<EOF
 [client]
-user=${WSREP_SST_OPT_USER}
-password="${WSREP_SST_OPT_PSWD}"
+user=${sst_user}
+password="${sst_password}"
 EOF
     errcode=$?
     if [[ $errcode -ne 0 ]]; then
@@ -1043,8 +1277,6 @@ EOF
     #-----------------------------------------------------------------------
     # cleanup
     cp $mysqld_err_log $datadir/mysqld.intermediate.boot.log
-    #rm -rf $datadir/*.pem || true
-    #rm -rf $datadir/auto.cnf || true
 
     return 0
 }
@@ -1055,11 +1287,11 @@ EOF
 # Globals:
 #   WSREP_SST_OPT_USER (sets this variable)
 #   WSREP_SST_OPT_PSWD (sets this variable)
+#   WSREP_SYS_SCHEMA_VERSION (sets this variable)
+#   WSREP_WSREP_SCHEMA_VERSION (sets this variable)
 #
 # Parameters:
-#   Argument 1: the role ("donor" or "joiner")
-#
-# This function will exit if username or password is not received.
+#   None
 #
 function read_variables_from_stdin()
 {
@@ -1074,8 +1306,12 @@ function read_variables_from_stdin()
             'sst_password')
                 WSREP_SST_OPT_PSWD="$value"
                 ;;
+            'wsrep_schema_version')
+                WSREP_WSREP_SCHEMA_VERSION=$(expr match "$value" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+                ;;
             *)
                 wsrep_log_warning "Unrecognized input: $line"
         esac
     done
+    return 0
 }

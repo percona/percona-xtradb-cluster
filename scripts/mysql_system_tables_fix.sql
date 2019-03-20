@@ -1066,7 +1066,7 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.session', 'localhost', 'SE
 FLUSH PRIVILEGES;
 
 #
-# SQL commands to create the PXC SST root and role that is used by the SST process
+# SQL commands to create the PXC internal session user and role that is used by the SST process
 #
 # mysql.pxc.internal.session
 #   See the comments in mysql_system_tables.sql
@@ -1076,13 +1076,15 @@ FLUSH PRIVILEGES;
 #  GRANT SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 #  GRANT RELOAD ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 #
-#INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.internal.session','N','N','N','N','N','N','Y','N','N','N','Y','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','Y','N','N','N','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,  NULL,'Y','N','N',NULL,NULL,NULL);
+#INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.internal.session','N','N','N','N','N','N','Y','N','N','N','Y','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','Y','N','N','N','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP, NULL,'Y','N','N',NULL,NULL,NULL,NULL);
 
+# (Use this since the CREATE DATABASE doesn't work when the grant is in a role)
+# So we assign the mysql.pxc.internal.session root privileges with grant option
 # These are the values for
 #  GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 #  GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 #
-INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.internal.session','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,  NULL,'Y','Y','Y',NULL,NULL,NULL);
+INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.internal.session','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'caching_sha2_password','$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED','N',CURRENT_TIMESTAMP,NULL,'Y','Y','Y',NULL,NULL,NULL,NULL);
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'BACKUP_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'BINLOG_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'CONNECTION_ADMIN', 'Y');
@@ -1097,6 +1099,7 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'lo
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'SYSTEM_VARIABLES_ADMIN', 'Y');
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'localhost', 'XA_RECOVER_ADMIN', 'Y');
 
+
 #
 # mysql.pxc.sst.role
 #   See the comments in mysql_system_tables.sql
@@ -1106,7 +1109,7 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'lo
 #  GRANT CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
-INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','N','Y','N','N','N','N','N','N','Y','N','Y','N','N','Y','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','N','N',NULL,NULL,NULL);
+INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','N','Y','N','N','N','N','N','N','Y','N','Y','N','N','Y','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','N','N',NULL,NULL,NULL,NULL);
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'N');
 INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Select,Insert,Create', '');
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N');

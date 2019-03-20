@@ -45,8 +45,9 @@ CREATE USER 'mysql.infoschema'@localhost IDENTIFIED WITH caching_sha2_password
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.infoschema'@localhost;
 GRANT SELECT ON *.* TO 'mysql.infoschema'@localhost;
 
--- Create the PXC SST root
--- This user is used by the SST process to create the SST user and
+-- Create the PXC internal session user
+-- This user is used by PXC to run commands needed by PXC.
+-- Specifically, this user is used by the SST process to create the SST user and
 -- run other commands needed before/after the SST.
 -- If the privileges are changed, the mysql_system_tables_fix.sql script
 -- will also need to be modified to match.
@@ -60,6 +61,7 @@ CREATE USER 'mysql.pxc.internal.session'@localhost IDENTIFIED WITH caching_sha2_
  AS '$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED'
  ACCOUNT LOCK;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.internal.session'@localhost;
+
 -- Due to bugs with roles, we need to grant superuser access here
 GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
@@ -67,8 +69,9 @@ GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *
 --GRANT SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 --GRANT RELOAD ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 
+
 -- Create the PXC SST role
--- This role is used during PXC SST (on the donor)
+-- This role is used by the SST user during an SST (on the donor)
 -- These are the permissions needed to backup the database (using Percona XtraBackup)
 -- See https://www.percona.com/doc/percona-xtrabackup/8.0/using_xtrabackup/privileges.html
 CREATE ROLE 'mysql.pxc.sst.role'@localhost;

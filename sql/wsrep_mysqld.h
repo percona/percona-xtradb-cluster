@@ -20,6 +20,7 @@
 #include "query_options.h"
 #include "rpl_gtid.h"
 #include "wsrep/src/wsrep_api.h"
+#include "mysql_version.h"
 // #include "sql/log.h"
 
 #define WSREP_UNDEFINED_TRX_ID ULLONG_MAX
@@ -433,5 +434,26 @@ void wsrep_keys_free(wsrep_key_arr_t *key_arr);
 */
 constexpr char WSREP_CHANNEL_NAME[] = "wsrep";
 bool wsrep_is_wsrep_channel_name(const char *channel_name);
+
+
+/* In 8.0, a WSREP state file was added to keep track of information
+   about WSREP that could be accessed by other processes (e.g. SST)
+
+   This file is named 'wsrep_state.dat'
+ */
+
+/* Name of the file that holds metadata about the WSREP state.
+ */
+constexpr char WSREP_STATE_FILENAME[] = "wsrep_state.dat";
+
+/* Version number for the state file format
+ */
+constexpr char WSREP_STATE_FILE_VERSION_NAME[] = "version";
+constexpr char WSREP_STATE_FILE_VERSION[] = "1.0";
+
+/* This identifies the PXC version of the datadir/schema.
+ */
+constexpr char WSREP_SCHEMA_VERSION_NAME[] = "wsrep_schema_version";
+constexpr char WSREP_SCHEMA_VERSION[] = MYSQL_SERVER_VERSION;
 
 #endif /* WSREP_MYSQLD_H */
