@@ -5330,6 +5330,15 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   }
 
 #ifdef HAVE_REPLICATION
+
+#ifdef WITH_WSREP
+  /* In wsrep_recovery mode, PXC avoid creation of new binlog file for
+  the reason mentioned above. In light of the said flow avoid purge
+  action on binlog. */
+  if (!wsrep_recovery)
+  {
+#endif /* WITH_WSREP */
+
   if (opt_bin_log && expire_logs_days)
   {
     time_t purge_time= server_start_time - expire_logs_days*24*60*60;
@@ -5344,6 +5353,11 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   {
     mysql_bin_log.purge_logs_by_size(true);
   }
+
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
+
 #endif
 
   if (opt_myisam_log)
