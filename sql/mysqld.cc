@@ -11953,6 +11953,7 @@ PSI_thread_key key_thread_handle_con_admin_sockets;
 #ifdef WITH_WSREP
 PSI_thread_key key_THREAD_wsrep_sst_joiner;
 PSI_thread_key key_THREAD_wsrep_sst_donor;
+PSI_thread_key key_THREAD_wsrep_sst_upgrade;
 PSI_thread_key key_THREAD_wsrep_applier;
 PSI_thread_key key_THREAD_wsrep_rollbacker;
 #endif /* WITH_WSREP */
@@ -11977,6 +11978,7 @@ static PSI_thread_info all_server_threads[]=
 #ifdef WITH_WSREP
   { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_sst_upgrade, "THREAD_wsrep_sst_upgrade", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */

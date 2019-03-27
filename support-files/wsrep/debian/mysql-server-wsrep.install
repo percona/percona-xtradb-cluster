@@ -23,6 +23,7 @@ usr/bin/mysqltest
 usr/bin/replace
 usr/bin/resolve_stack_dump
 usr/bin/resolveip
+usr/bin/wsrep_sst_upgrade
 usr/bin/wsrep_sst_xtrabackup-v2
 usr/bin/wsrep_sst_rsync
 usr/bin/wsrep_sst_rsync_wan

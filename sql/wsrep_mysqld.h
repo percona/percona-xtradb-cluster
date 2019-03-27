@@ -394,6 +394,7 @@ extern PSI_cond_key key_COND_wsrep_sst_thread;
 
 extern PSI_thread_key key_THREAD_wsrep_sst_joiner;
 extern PSI_thread_key key_THREAD_wsrep_sst_donor;
+extern PSI_thread_key key_THREAD_wsrep_sst_upgrade;
 extern PSI_thread_key key_THREAD_wsrep_applier;
 extern PSI_thread_key key_THREAD_wsrep_rollbacker;
 #endif /* HAVE_PSI_INTERFACE */

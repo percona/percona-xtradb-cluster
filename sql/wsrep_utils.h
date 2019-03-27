@@ -229,6 +229,8 @@ class critical {
 class WSREPState
 {
   public:
+    static bool node_needs_upgrading();
+
     /* Resets all of the data to default values */
     void clear() { wsrep_schema_version.clear(); }
 
@@ -255,6 +257,7 @@ class WSREPState
     */
     void parse_version(const char *str, uint &major, uint &minor, uint &revision);
 };
+
 
 }  // namespace wsp
 

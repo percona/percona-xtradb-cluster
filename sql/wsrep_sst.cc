@@ -188,8 +188,10 @@ void wsrep_sst_complete(const wsrep_uuid_t *sst_uuid, wsrep_seqno_t sst_seqno,
   if (!sst_complete) {
     sst_complete = true;
     sst_needed = needed;
-    local_uuid = *sst_uuid;
-    local_seqno = sst_seqno;
+    if (sst_uuid) {
+      local_uuid = *sst_uuid;
+      local_seqno = sst_seqno;
+    }
     mysql_cond_signal(&COND_wsrep_sst);
   } else {
     /* This can happen when called from wsrep_synced_cb().
@@ -680,6 +682,201 @@ ssize_t wsrep_sst_prepare(void **msg, THD *thd) {
     free((char *)addr_out);
 
   return msg_len;
+}
+
+static void *sst_upgrade_thread(void *a) {
+  sst_thread_arg *arg = (sst_thread_arg *)a;
+  int err = 1;
+
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_register_thread(key_THREAD_wsrep_sst_upgrade);
+#endif /* HAVE_PSI_INTERFACE */
+
+  {
+    const char magic[] = "ready";
+    const size_t magic_len = sizeof(magic) - 1;
+    const int  out_len = 512;
+    char out[out_len];
+
+    WSREP_INFO("Initiating mysql upgrade on JOINER side (%s)", arg->cmd);
+
+    // Launch the SST script and save pointer to its process:
+    if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+    wsp::process proc(arg->cmd, "rw", arg->env);
+    sst_process = &proc;
+    mysql_mutex_unlock(&LOCK_wsrep_sst);
+
+    if (!proc.error())
+    {
+      int ret;
+      err = 0;
+      ret = fprintf(proc.write_pipe(),
+                    "wsrep_schema_version=%s\n",
+                    WSREP_SCHEMA_VERSION
+                    );
+      if (ret <= 0)
+      {
+        WSREP_ERROR("sst_upgrade_thread(): fprintf() failed: %d", ret);
+        err = (ret < 0 ? ret : -EMSGSIZE);
+      }
+
+      // Close the pipe, so that the other side gets an EOF
+      proc.close_write_pipe();
+    }
+
+    if (proc.pipe() && !proc.error()) {
+      // We wait for "ready" to be written out. This means that the script
+      // has completed the upgrade and we can return and let the rest of
+      // the system continue.
+      const char *tmp = my_fgets(out, out_len, proc.pipe());
+
+      if (!tmp || strlen(tmp) < magic_len || strncasecmp(tmp, magic, magic_len)) {
+        err = EINVAL;
+        if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+        // Print error message if SST is not cancelled:
+        if (!sst_cancelled) {
+          // Null-pointer is not valid argument for %s formatting (even
+          // though it is supported by many compilers):
+          WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '%s'",
+                      magic, arg->cmd, tmp ? tmp : "(null)");
+        }
+        // Clear the pointer to SST process:
+        sst_process = NULL;
+        mysql_mutex_unlock(&LOCK_wsrep_sst);
+        proc.wait();
+        if (proc.error()) err = proc.error();
+      } else {
+        // Clear the pointer to SST process:
+        if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+        sst_process = NULL;
+        mysql_mutex_unlock(&LOCK_wsrep_sst);
+        err = 0;
+      }
+    } else {
+      // Clear the pointer to SST process:
+      if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+      sst_process = NULL;
+      mysql_mutex_unlock(&LOCK_wsrep_sst);
+      err = proc.error();
+      WSREP_ERROR("Failed to execute: %s : %d (%s)", arg->cmd, err,
+                  strerror(err));
+    }
+
+    // signal sst_prepare thread with ret code,
+    // it will go on sending SST request
+    mysql_mutex_lock(&arg->LOCK_wsrep_sst_thread);
+    arg->err = -err;
+    mysql_cond_signal(&arg->COND_wsrep_sst_thread);
+    mysql_mutex_unlock(&arg->LOCK_wsrep_sst_thread);
+
+    if (err)
+      return NULL; /* lp:808417 - return immediately, don't signal
+                    * initializer thread to ensure single thread of
+                    * shutdown. */
+
+    proc.wait();
+
+    if (proc.error()) {
+      err = proc.error();
+      char errbuf[MYSYS_STRERROR_SIZE];
+      WSREP_ERROR("Upgrade script aborted with error %d (%s)", err,
+                  my_strerror(errbuf, sizeof(errbuf), err));
+    }
+
+    // Tell initializer thread that SST is complete
+    wsrep_sst_complete(NULL, 0, true);
+  }
+
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_delete_thread();
+#endif /* HAVE_PSI_INTERFACE */
+
+  return NULL;
+}
+
+static ssize_t sst_prepare_upgrade() {
+  int const cmd_len = 4096;
+  wsp::string cmd_str(cmd_len);
+
+  if (!cmd_str()) {
+    WSREP_ERROR(
+        "sst_prepare_upgrade(): could not allocate cmd buffer of %d bytes",
+        cmd_len);
+    return -ENOMEM;
+  }
+
+  const char *binlog_opt = "";
+  char *binlog_opt_val = NULL;
+
+  int ret;
+  if ((ret = generate_binlog_opt_val(&binlog_opt_val))) {
+    WSREP_ERROR("sst_prepare_upgrade(): generate_binlog_opt_val() failed: %d",
+                ret);
+    return ret;
+  }
+  if (strlen(binlog_opt_val)) binlog_opt = WSREP_SST_OPT_BINLOG;
+
+  ret = snprintf(cmd_str(), cmd_len,
+                 "wsrep_sst_upgrade "
+                 WSREP_SST_OPT_DATA " '%s' "
+                 WSREP_SST_OPT_BASEDIR " '%s' "
+                 WSREP_SST_OPT_PLUGINDIR " '%s' "
+                 WSREP_SST_OPT_CONF " '%s' "
+                 WSREP_SST_OPT_CONF_SUFFIX " '%s' "
+                 WSREP_SST_OPT_PARENT " '%d' "
+                 WSREP_SST_OPT_VERSION " '%s' "
+                 " %s '%s' ",
+                 mysql_real_data_home,
+                 mysql_home_ptr ? mysql_home_ptr : "",
+                 opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "",
+                 wsrep_defaults_file,
+                 wsrep_defaults_group_suffix,
+                 (int)getpid(),
+                 MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+                 binlog_opt, binlog_opt_val);
+  my_free(binlog_opt_val);
+
+  if (ret < 0 || ret >= cmd_len) {
+    WSREP_ERROR("sst_prepare_upgrade(): snprintf() failed: %d", ret);
+    return (ret < 0 ? ret : -EMSGSIZE);
+  }
+
+  wsp::env env(NULL);
+  if (env.error()) {
+    WSREP_ERROR("sst_prepare_upgrade(): env. var ctor failed: %d", -env.error());
+    return -env.error();
+  }
+
+  pthread_t tmp;
+  sst_thread_arg arg(cmd_str(), env());
+  mysql_mutex_lock(&arg.LOCK_wsrep_sst_thread);
+  ret = pthread_create(&tmp, NULL, sst_upgrade_thread, &arg);
+  if (ret) {
+    WSREP_ERROR("sst_prepare_upgrade(): pthread_create() failed: %d (%s)", ret,
+                strerror(ret));
+    return -ret;
+  }
+  mysql_cond_wait(&arg.COND_wsrep_sst_thread, &arg.LOCK_wsrep_sst_thread);
+
+  if (arg.err) {
+    assert(arg.err < 0);
+    ret = arg.err;
+  }
+
+  pthread_detach(tmp);
+
+  return ret;
+}
+
+
+ssize_t wsrep_sst_upgrade() {
+  ssize_t addr_len = sst_prepare_upgrade();
+  if (addr_len < 0) {
+    WSREP_ERROR("Failed to run upgrade. Unrecoverable.");
+    unireg_abort(1);
+  }
+
+  return addr_len;
 }
 
 #if 0
