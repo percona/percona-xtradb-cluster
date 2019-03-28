@@ -67,6 +67,10 @@ Automatic Configuration
 The ``proxysql`` package from Percona includes the ``proxysql-admin`` tool
 for configuring |PXC| nodes with ProxySQL.
 
+.. note:: The *ProxySQL Admin* is specially developed by Percona to
+   automatize this configuration. Bug reports and feature proposals are welcome
+   in the ProxySQL Admin `issue tracking system <https://jira.percona.com/projects/PSQLADM>`_.
+
 .. note:: The ``proxysql-admin`` tool can only be used
    for *initial* ProxySQL configuration.
 
