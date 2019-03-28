@@ -106,7 +106,7 @@ Prefix: %{_sysconfdir}
 %if %{undefined dist}
     %define release         %{release_tag}%{wsrep_version}.%{rpm_version}.%{distribution}
 %else
-    %define release         %{release_tag}%{wsrep_version}.%{rpm_version}%{dist}
+    %define release         %{release_tag}%{wsrep_version}.%{rpm_version}.%{dist}
 %endif
 
 #
