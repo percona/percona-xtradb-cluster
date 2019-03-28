@@ -19,3 +19,10 @@ sql_mode_func                       : Differences in result likely due to config
 innodb_buffer_pool_populate_basic   : is now mapped to use NUMA interleave policies and some of the modes are not supported on some distros.
 innodb_support_xa_func              : XA is not supported by PXC
 wsrep_max_ws_size_basic             : Setting this now also set repl.max_ws_size which is galera internal setting.
+
+innodb_temp_tablespace_encrypt_basic: not supported by PXC-5.7
+innodb_encrypt_tables_basic         : not supported by PXC-5.7
+innodb_sys_tablespace_encrypt_basic : not supported by PXC-5.7
+innodb_parallel_dblwr_encrypt_basic : not supported by PXC-5.7
+innodb_undo_log_encrypt_basic       : not supported by PXC-5.7
+innodb_redo_log_encrypt_basic       : not supported by PXC-5.7
