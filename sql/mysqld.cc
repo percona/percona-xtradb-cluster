@@ -6474,6 +6474,13 @@ static int init_server_components() {
     mysql_mutex_unlock(log_lock);
   }
 
+#ifdef WITH_WSREP
+  /* In wsrep_recovery mode, PXC avoid creation of new binlog file for
+  the reason mentioned above. In light of the said flow avoid purge
+  action on binlog. */
+  if (!wsrep_recovery)
+  {
+#endif /* WITH_WSREP */
   /*
     When we pass non-zero values for both expire_logs_days and
     binlog_expire_logs_seconds at the server start-up, the value of
@@ -6504,6 +6511,9 @@ static int init_server_components() {
     if (binlog_space_limit)
       LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-space-limit");
   }
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
 
   if (opt_myisam_log) (void)mi_log(1);
 
