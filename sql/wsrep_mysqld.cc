@@ -1725,10 +1725,12 @@ void wsrep_to_isolation_end(THD *thd)
       msg, schema_len, schema,                                                 \
       req->thread_id, (long long)wsrep_thd_trx_seqno(req),                     \
       req->wsrep_exec_mode, req->wsrep_query_state, req->wsrep_conflict_state, \
-      req->get_command(), req->lex->sql_command, req->query(),                 \
+      req->get_command(), req->lex->sql_command,                               \
+      (req->rewritten_query.length() ? req->rewritten_query.c_ptr_safe() : req->query()), \
       gra->thread_id, (long long)wsrep_thd_trx_seqno(gra),                     \
       gra->wsrep_exec_mode, gra->wsrep_query_state, gra->wsrep_conflict_state, \
-      gra->get_command(), gra->lex->sql_command, gra->query());
+      gra->get_command(), gra->lex->sql_command,                               \
+      (gra->rewritten_query.length() ? gra->rewritten_query.c_ptr_safe() : gra->query()));
 
 bool
 wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
