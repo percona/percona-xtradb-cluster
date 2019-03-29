@@ -2378,12 +2378,14 @@ void wsrep_to_isolation_end(THD *thd)
       wsrep_get_exec_mode(req->wsrep_exec_mode),                               \
       wsrep_get_query_state(req->wsrep_query_state),                           \
       wsrep_get_conflict_state(req->wsrep_conflict_state),                     \
-      req->get_command(), req->lex->sql_command, req->query().str,             \
+      req->get_command(), req->lex->sql_command,                               \
+      (req->rewritten_query.length() ? req->rewritten_query.c_ptr_safe() : req->query().str), \
       gra->thread_id(), (long long)wsrep_thd_trx_seqno(gra),                   \
       wsrep_get_exec_mode(gra->wsrep_exec_mode),                               \
       wsrep_get_query_state(gra->wsrep_query_state),                           \
       wsrep_get_conflict_state(gra->wsrep_conflict_state),                     \
-      gra->get_command(), gra->lex->sql_command, gra->query().str);
+      gra->get_command(), gra->lex->sql_command,                               \
+      (gra->rewritten_query.length() ? gra->rewritten_query.c_ptr_safe() : gra->query().str));
 
 bool
 wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
