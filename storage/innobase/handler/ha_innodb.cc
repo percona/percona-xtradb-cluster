@@ -4351,6 +4351,48 @@ innobase_init(
 			break;
 		}
 	}
+
+        if (wsrep_provider_loaded && srv_tmp_tablespace_encrypt)
+        {
+            WSREP_ERROR("Percona-XtraDB-Cluster doesn't support"
+                        " innodb_temp_tablespace_encrypt");
+            DBUG_RETURN(innobase_init_abort());
+        }
+
+        if (wsrep_provider_loaded && srv_sys_tablespace_encrypt)
+        {
+            WSREP_ERROR("Percona-XtraDB-Cluster doesn't support"
+                        " innodb_sys_tablespace_encrypt");
+            DBUG_RETURN(innobase_init_abort());
+        }
+
+        if (wsrep_provider_loaded && srv_encrypt_tables)
+        {
+            WSREP_ERROR("Percona-XtraDB-Cluster doesn't support"
+                        " innodb_encrypt_tables");
+            DBUG_RETURN(innobase_init_abort());
+        }
+
+        if (wsrep_provider_loaded && srv_parallel_dblwr_encrypt)
+        {
+            WSREP_ERROR("Percona-XtraDB-Cluster doesn't support"
+                        " innodb_parallel_dblwr_encrypt");
+            DBUG_RETURN(innobase_init_abort());
+        }
+
+        if (wsrep_provider_loaded && srv_undo_log_encrypt)
+        {
+            WSREP_ERROR("Percona-XtraDB-Cluster doesn't support"
+                        " innodb_undo_log_encrypt");
+            DBUG_RETURN(innobase_init_abort());
+        }
+
+        if (wsrep_provider_loaded && srv_redo_log_encrypt)
+        {
+            WSREP_ERROR("Percona-XtraDB-Cluster doesn't support"
+                        " innodb_redo_log_encrypt");
+            DBUG_RETURN(innobase_init_abort());
+        }
 #endif /* WITH_WSREP */
 
 	/* Check that values don't overflow on 32-bit systems. */
@@ -23811,7 +23853,11 @@ static TYPELIB srv_encrypt_tables_typelib = {
 	NULL
 };
 static MYSQL_SYSVAR_ENUM(encrypt_tables, srv_encrypt_tables,
+#ifdef WITH_WSREP
+			 PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+#else
 			 PLUGIN_VAR_OPCMDARG,
+#endif /* WITH_WSREP */
 			 "Enable encryption for tables. "
 			 "When turned ON, all tables are created encrypted unless otherwise "
 			 "specified. When it's set to FORCE, only encrypted tables can be created."
@@ -24201,7 +24247,11 @@ static MYSQL_SYSVAR_STR(temp_data_file_path, innobase_temp_data_file_path,
   NULL, NULL, NULL);
 
 static MYSQL_SYSVAR_BOOL(temp_tablespace_encrypt, srv_tmp_tablespace_encrypt,
+#ifdef WITH_WSREP
+  PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+#else
   PLUGIN_VAR_OPCMDARG,
+#endif /* WITH_WSREP */
   "Enable or disable encryption of temporary tablespace.",
   NULL, innodb_temp_tablespace_encryption_update, FALSE);
 
@@ -24211,7 +24261,11 @@ static MYSQL_SYSVAR_BOOL(sys_tablespace_encrypt, srv_sys_tablespace_encrypt,
   NULL, NULL, FALSE);
 
 static MYSQL_SYSVAR_BOOL(parallel_dblwr_encrypt, srv_parallel_dblwr_encrypt,
+#ifdef WITH_WSREP
+  PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+#else
   PLUGIN_VAR_OPCMDARG,
+#endif /* WITH_WSREP */
   "Enable or disable encryption of parallel doublewrite buffer file.",
   NULL, NULL, FALSE);
 
@@ -24282,7 +24336,11 @@ static MYSQL_SYSVAR_LONG(autoinc_lock_mode, innobase_autoinc_lock_mode,
   AUTOINC_NO_LOCKING, 0);	/* Maximum value */
 
 static MYSQL_SYSVAR_BOOL(undo_log_encrypt, srv_undo_log_encrypt,
+#ifdef WITH_WSREP
+  PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+#else
   PLUGIN_VAR_OPCMDARG,
+#endif /* WITH_WSREP */
   "Enable or disable Encryption of UNDO tablespaces.",
   NULL, NULL, FALSE);
 
@@ -24529,7 +24587,11 @@ static MYSQL_SYSVAR_ENUM(default_row_format, innodb_default_row_format,
   &innodb_default_row_format_typelib);
 
 static MYSQL_SYSVAR_ENUM(redo_log_encrypt, srv_redo_log_encrypt,
+#ifdef WITH_WSREP
+  PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+#else
   PLUGIN_VAR_OPCMDARG,
+#endif /* WITH_WSREP */
   "Enable or disable Encryption of REDO tablespace. Possible values: OFF, MASTER_KEY, KEYRING_KEY.",
   NULL, innodb_redo_encryption_update, REDO_LOG_ENCRYPT_OFF, &redo_log_encrypt_typelib);
 
