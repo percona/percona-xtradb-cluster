@@ -2091,6 +2091,13 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
    */
   if (thd->wsrep_exec_mode == REPL_RECV) return 0;
 
+  /*
+    If plugin native tables are being created/dropped then skip TOI for such
+    action as the main/parent ddl is already replicated and should cause
+    same action on all nodes.
+  */
+  if (thd->is_plugin_fake_ddl()) return 0;
+
   /* Generally if node enters non-primary state then execution of DDL+DML
   is blocked on such node but there are some asynchronous pre-register
   action that can cause invocation of TOI. For example: DROP of event
@@ -2185,6 +2192,13 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
 }
 
 void wsrep_to_isolation_end(THD *thd) {
+  /*
+    If plugin native tables are being created/dropped then skip TOI for such
+    action as the main/parent ddl is already replicated and should cause
+    same action on all nodes.
+  */
+  if (thd->is_plugin_fake_ddl()) return;
+
   if (thd->wsrep_exec_mode == TOTAL_ORDER) {
     switch (thd->variables.wsrep_OSU_method) {
       case WSREP_OSU_TOI:
