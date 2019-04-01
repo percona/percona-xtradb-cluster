@@ -467,7 +467,7 @@ EOF
                 # If donor < local, then this is unsupported, we cannot
                 # have a higher version node donating to a lower version node
                 # (there is no way to downgrade the DB)
-                if compare_versions $MYSQL_VERSION "<" $DONOR_MYSQL_VERSION; then
+                if compare_versions "$MYSQL_VERSION" "<" "$DONOR_MYSQL_VERSION"; then
                     wsrep_log_error "******************* FATAL ERROR ********************** "
                     wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
                     wsrep_log_error "This node's PXC version is $MYSQL_VERSION.  The donor's PXC version is $DONOR_MYSQL_VERSION."

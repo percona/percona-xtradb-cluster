@@ -936,7 +936,7 @@ bool WSREPState::load_from(const char *dir, const char *filename)
   file = mysql_file_fopen(key_file_misc, full_path, O_RDONLY, MYF(0));
   if (!file)
   {
-    WSREP_ERROR("Could not open the wsrep state file : %s", full_path);
+    WSREP_WARN("Could not open the wsrep state file : %s", full_path);
     return false;
   }
 
@@ -1061,6 +1061,23 @@ bool WSREPState::save_to(const char *dir, const char *filename)
     return false;
   }
   return true;
+}
+
+bool WSREPState::node_needs_upgrading()
+{
+    wsp::WSREPState  wsrep_state;
+
+    /* If we can't load the data file, assume the node is out-of-date (i.e. from 5.7) */
+    if (!wsrep_state.load_from(mysql_real_data_home_ptr, WSREP_STATE_FILENAME))
+      return true;
+
+    if (!wsrep_state.wsrep_schema_version_equals(WSREP_SCHEMA_VERSION))
+    {
+      WSREP_WARN("WSREP schema versions  server:%s  datadir:%s", MYSQL_SERVER_VERSION, wsrep_state.wsrep_schema_version.c_str());
+      return true;
+    }
+
+    return false;
 }
 
 }  // namespace wsp

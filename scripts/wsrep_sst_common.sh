@@ -626,6 +626,8 @@ function write_wsrep_state_file()
 #   WSREP_SST_OPT_PLUGINDIR
 #   WSREP_SYS_SCHEMA_VERSION
 #   MYSQL_UPGRADE_TMPDIR    (This path will be deleted on exit)
+#   DATADIR_WSREP_SCHEMA_VERSION
+#   WSREP_WSREP_SCHEMA_VERSION
 #
 # Arguments
 #   Argument 1: Path to the datadir
@@ -634,8 +636,8 @@ function write_wsrep_state_file()
 #   Argument 4: The local (JOINER) version string
 #   Argument 5: The transfer method ('rsync' or 'xtrabackup')
 #   Argument 6: The transfer type ('sst' or 'ist')
-#   Argument 7: The value of 'force_upgrade'
-#   Argument 8: The value of 'auto_upgrade'
+#   Argument 7: The value of 'force_upgrade' ('on'' or 'off')
+#   Argument 8: The value of 'auto_upgrade' ('on' or 'off')
 #
 # Returns:
 #   0 if successful (no errors encountered)
@@ -709,9 +711,8 @@ function run_post_processing_steps()
     local mysql_upgrade_dir_path
     local use_mysql_upgrade_conf_suffix=""
 
-
-    local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
-    donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+    local_version_str=$(expr match "$local_version" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
+    donor_version_str=$(expr match "$donor_version" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
     donor_version_str=${donor_version_str:-"0.0.0"}
 
     if [[ $force_upgrade == "on" ]]; then
@@ -754,6 +755,12 @@ function run_post_processing_steps()
                 wsrep_log_debug "Running mysql_upgrade, schema versions do not match"
                 wsrep_log_debug "wsrep schema version expected:$WSREP_WSREP_SCHEMA_VERSION datadir:$DATADIR_WSREP_SCHEMA_VERSION"
                 run_mysql_upgrade='yes'
+
+                # Change the donor version to be the schema version
+                # This is as if we have received an SST from an older node
+                # Otherwise we won't get the proper behavior below (when creating the users)
+                donor_version=$DATADIR_WSREP_SCHEMA_VERSION
+                donor_version_str=$(expr match "$donor_version" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
             fi
         fi
     else

@@ -18,6 +18,7 @@ usr/bin/resolveip
 usr/bin/wsrep_sst_common
 usr/bin/wsrep_sst_xtrabackup-v2
 usr/bin/wsrep_sst_rsync
+usr/bin/wsrep_sst_upgrade
 usr/sbin/mysqld
 usr/share/man/man1/myisamchk.1
 usr/share/man/man1/myisamlog.1
