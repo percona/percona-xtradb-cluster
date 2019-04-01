@@ -1,0 +1,15 @@
+#node-1
+INSTALL COMPONENT "file://component_pfs_example_component_population";
+SELECT * FROM performance_schema.pfs_example_continent;
+NAME
+bar1
+bar2
+#node-2
+SELECT * FROM performance_schema.pfs_example_continent;
+NAME
+bar1
+bar2
+UNINSTALL COMPONENT "file://component_pfs_example_component_population";
+#node-1
+SELECT * FROM performance_schema.pfs_example_continent;
+ERROR 42S02: Table 'performance_schema.pfs_example_continent' doesn't exist
