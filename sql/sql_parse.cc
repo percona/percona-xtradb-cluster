@@ -9696,6 +9696,29 @@ LEX_USER *get_current_user(THD *thd, LEX_USER *user)
 {
   if (!user->user.str)  // current_user
   {
+
+#ifdef WITH_WSREP
+    if (WSREP(thd) && (thd->lex->sql_command == SQLCOM_ALTER_USER
+                       || thd->lex->sql_command == SQLCOM_CREATE_USER
+                       || thd->lex->sql_command == SQLCOM_DROP_USER
+                       || thd->lex->sql_command == SQLCOM_RENAME_USER
+                       || thd->lex->sql_command == SQLCOM_REVOKE
+                       || thd->lex->sql_command == SQLCOM_REVOKE_ALL
+                       || thd->lex->sql_command == SQLCOM_GRANT))
+    {
+      WSREP_ERROR("Percona XtraDB Cluster doesn't allow use of"
+                  " CURRENT_USER/USER function for USER operation"
+                  " while operating in cluster mode");
+      char message[1024];
+      sprintf(message,
+        "Percona XtraDB Cluster doesn't allow use of"
+        " CURRENT_USER/USER function for USER operation"
+        " while operating in cluster mode");
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+      return 0;
+    }
+#endif /* WITH_WSREP */
+
     LEX_USER *default_definer= create_default_definer(thd);
     if (default_definer)
     {
