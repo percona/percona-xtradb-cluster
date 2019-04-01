@@ -84,4 +84,4 @@ drop table t1;
 --source include/wait_condition.inc
 --source include/galera_wait_ready.inc
 
-call mtr.add_suppression("WSREP: Failed to prepare for incremental state transfer.*");
+call mtr.add_suppression("Failed to prepare for incremental state transfer.*");

@@ -17,6 +17,7 @@
 #include "log_event.h"
 #include "mysql/plugin.h"
 #include "wsrep_priv.h"
+#include "mysql/components/services/log_builtins.h"
 
 /*
   Write the contents of a cache to a memory buffer.

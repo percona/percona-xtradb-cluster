@@ -53,6 +53,7 @@
 #include "template_utils.h"  // delete_container_pointers
 
 #ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
 #include "sql/dd/types/table.h"                // dd::Table
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
 #include "sql/dd/dd_table.h"                 // dd::table_storage_engine

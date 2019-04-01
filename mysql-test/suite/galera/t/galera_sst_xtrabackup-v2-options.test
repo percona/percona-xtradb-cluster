@@ -10,3 +10,13 @@ SELECT 1;
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
+
+--connection node_1
+call mtr.add_suppression("Using the 'encrypt-key' option causes the encryption key");
+call mtr.add_suppression("to be set via the command-line and is considered insecure.");
+call mtr.add_suppression("It is recommended to use the 'encrypt-key-file' option instead.");
+
+--connection node_2
+call mtr.add_suppression("Using the 'encrypt-key' option causes the encryption key");
+call mtr.add_suppression("to be set via the command-line and is considered insecure.");
+call mtr.add_suppression("It is recommended to use the 'encrypt-key-file' option instead.");

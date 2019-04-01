@@ -8,4 +8,4 @@ SET SESSION wsrep_sync_wait = default;
 SET GLOBAL wsrep_provider_options="pc.bootstrap=1";
 SET SESSION wsrep_on=0;
 # restart
-CALL mtr.add_suppression("WSREP: exception from gcomm, backend must be restarted: Gcomm backend termination was requested by setting gmcast.isolate=2.");
+CALL mtr.add_suppression("exception from gcomm, backend must be restarted: Gcomm backend termination was requested by setting gmcast.isolate=2.");

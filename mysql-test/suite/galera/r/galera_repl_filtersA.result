@@ -1755,6 +1755,6 @@ RESET SLAVE FOR CHANNEL 'wsrep';
 ERROR HY000: RESET SLAVE [ALL] FOR CHANNEL cannot be performed on channel 'wsrep'.
 CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';
 ERROR HY000: CHANGE REPLICATION FILTER cannot be performed on channel 'wsrep'.
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");

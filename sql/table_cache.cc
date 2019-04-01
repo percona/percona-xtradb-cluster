@@ -34,6 +34,7 @@
 #include "thr_mutex.h"
 
 #ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
 #include "wsrep_thd.h" // wsrep_thd_is_BF
 #include "sql/log.h"
 #endif /* WITH_WSREP */

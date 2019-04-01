@@ -27,8 +27,8 @@ Got one of the listed errors
 Got one of the listed errors
 count_equal
 1
-CALL mtr.add_suppression("WSREP: Action message in non-primary configuration from member 0");
-CALL mtr.add_suppression("WSREP: Failed to remove page file");
+CALL mtr.add_suppression("Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("Failed to remove page file");
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE
 2
@@ -44,4 +44,4 @@ VARIABLE_VALUE = 2
 DROP PROCEDURE p1;
 DROP TABLE t1;
 CALL mtr.add_suppression("gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)");
-CALL mtr.add_suppression("WSREP: Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("Action message in non-primary configuration from member 0");

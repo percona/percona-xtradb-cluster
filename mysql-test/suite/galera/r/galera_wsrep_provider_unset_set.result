@@ -11,7 +11,7 @@ f1
 101
 commit;
 #node-2
-call mtr.add_suppression('WSREP: Cannot modify wsrep_provider inside a transaction');
+call mtr.add_suppression('Cannot modify wsrep_provider inside a transaction');
 BEGIN;
 INSERT INTO t1 VALUES (100);
 SET GLOBAL wsrep_provider='none';
@@ -35,7 +35,7 @@ COUNT(*) = 5
 1
 DROP TABLE t1;
 #node-2
-call mtr.add_suppression("WSREP: gcs_caused\\(\\) returned -103 \\(Software caused connection abort\\)");
+call mtr.add_suppression("gcs_caused\\(\\) returned -103 \\(Software caused connection abort\\)");
 show status like 'wsrep_cluster_size';
 Variable_name	Value
 wsrep_cluster_size	2

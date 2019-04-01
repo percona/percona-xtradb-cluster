@@ -58,6 +58,7 @@
 #include "sql_string.h"
 
 #ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
 #include "sql/log.h"
 #endif /* WITH_WSREP */
 

@@ -132,10 +132,10 @@ SET DEBUG_SYNC='RESET';
    my $test_log=$ENV{'TEST_LOG'} or die "TEST_LOG not set";
    my $test_log_copy=$test_log . '.copy';
    open(FILE, $test_log_copy) or die("Unable to open $test_log_copy: $!\n");
-   my $initial=grep(/\[Warning\] WSREP\: Failed to prepare for incremental state transfer/gi,<FILE>);
+   my $initial=grep(/\[Warning\].*Failed to prepare for incremental state transfer/gi,<FILE>);
    close(FILE);
    open(FILE, $test_log) or die("Unable to open $test_log: $!\n");
-   my $count_warnings=grep(/\[Warning\] WSREP\: Failed to prepare for incremental state transfer/gi,<FILE>);
+   my $count_warnings=grep(/\[Warning\].*Failed to prepare for incremental state transfer/gi,<FILE>);
    close(FILE);
    if ($count_warnings != $initial) {
       my $diff=$count_warnings-$initial;

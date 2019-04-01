@@ -36,7 +36,7 @@ DROP TABLE t1;
 #
 --echo # Node 1
 --connection node_1
-call mtr.add_suppression("WSREP: RSU failed due to pending transactions");
+call mtr.add_suppression("RSU failed due to pending transactions");
 call mtr.add_suppression("ALTER TABLE isolation");
 
 #

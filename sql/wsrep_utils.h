@@ -70,6 +70,10 @@ class process {
   const char *const str_;
   FILE *io_;
   FILE *io_w_;
+
+  /* Read end of STDERR */
+  FILE *io_err_;
+
   int err_;
   pid_t pid_;
 
@@ -98,10 +102,22 @@ class process {
   */
   FILE* write_pipe() { return io_w_; }
 
+  /* This is the read end of a stderr pipe.
+     The process being started will write to stderr.
+     This is where we will read from stderr.
+     All processses will have their stderr redirected to this pipe.
+  */
+  FILE * err_pipe() { return io_err_; }
+
   /* Closes the write pipe so that the other side will get an EOF
      (and not hang while waiting for the rest of the data).
   */
   void close_write_pipe();
+
+  /* Clears the err_pipe.  This does NOT close the err pipe. This means
+     that this class is no longer responsible for closing the pipe.
+  */
+  void clear_err_pipe() { io_err_ = NULL; }
 
   void execute(const char *type, char **env);
 

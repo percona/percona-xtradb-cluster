@@ -63,6 +63,7 @@
 #include "thr_lock.h"
 
 #ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
 #include "sql_parse.h" // WSREP_TO_ISOLATION_BEGIN_WRTCHK
 #endif /* WITH_WSREP */
 

@@ -16,6 +16,7 @@
 #include "mysqld.h"
 #include "wsrep_priv.h"
 #include "wsrep_utils.h"
+#include "mysql/components/services/log_builtins.h"
 
 const char *wsrep_notify_cmd = "";
 

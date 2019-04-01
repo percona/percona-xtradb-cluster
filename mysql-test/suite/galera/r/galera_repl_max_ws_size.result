@@ -6,5 +6,5 @@ SELECT COUNT(*) = 0 FROM t1;
 COUNT(*) = 0
 1
 DROP TABLE t1;
-CALL mtr.add_suppression("WSREP: Transaction/Write-set size limit.*");
-CALL mtr.add_suppression("WSREP: Failed to create write-set from binlog.*");
+CALL mtr.add_suppression("Transaction/Write-set size limit.*");
+CALL mtr.add_suppression("Failed to create write-set from binlog.*");

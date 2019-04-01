@@ -5,7 +5,7 @@
 --source include/galera_cluster.inc
 --source include/have_debug_sync.inc
 
-call mtr.add_suppression("WSREP: Trying to desync a node that is already paused");
+call mtr.add_suppression("Trying to desync a node that is already paused");
 
 #-------------------------------------------------------------------------------
 #

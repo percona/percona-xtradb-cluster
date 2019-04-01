@@ -17,7 +17,7 @@ perl;
   use strict;
   my $logf= $ENV{'LOGF'} or die "LOGF not set";
   open(FILE, "$logf") or die("Unable to open $logf: $!\n");
-  my $count_warnings=grep(/WSREP\: gcache\.mem_size parameter is buggy and DEPRECATED\, use it with care\./gi,<FILE>);
+  my $count_warnings=grep(/gcache\.mem_size parameter is buggy and DEPRECATED\, use it with care\./gi,<FILE>);
   print "Deprecation warning count: $count_warnings\n";
   close(FILE);
 EOF
@@ -29,7 +29,7 @@ perl;
   use strict;
   my $logf= $ENV{'LOGF'} or die "LOGF not set";
   open(FILE, "$logf") or die("Unable to open $logf: $!\n");
-  my $count_warnings=grep(/WSREP\: gcache\.mem_size parameter is buggy and DEPRECATED\, use it with care\./gi,<FILE>);
+  my $count_warnings=grep(/gcache\.mem_size parameter is buggy and DEPRECATED\, use it with care\./gi,<FILE>);
   print "Deprecation warning count: $count_warnings\n";
   close(FILE);
 EOF

@@ -18,6 +18,7 @@
 #include "wsrep_binlog.h"  // wsrep_dump_rbr_buf()
 #include "wsrep_priv.h"
 #include "wsrep_xid.h"
+#include "mysql/components/services/log_builtins.h"
 
 #include "debug_sync.h"
 #include "log_event.h"  // class THD, EVENT_LEN_OFFSET, etc.
@@ -48,7 +49,7 @@ static Log_event *wsrep_read_log_event(
 
   if (binlog_read_error.has_error()) {
     DBUG_ASSERT(error != 0);
-    sql_print_error(
+    WSREP_ERROR(
         "Error in reading event (wsrep_read_log_event): "
         "'%s', data_len: %d, event_type: %d",
         binlog_read_error.get_str(), data_len, head[EVENT_TYPE_OFFSET]);

@@ -33,4 +33,4 @@ DROP TABLE t1;
 --connection node_1
 SET GLOBAL binlog_format = 'ROW';
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED");

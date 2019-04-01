@@ -119,6 +119,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ut0crc32.h"
 #include "ut0new.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
+
 /** fil_space_t::flags for hard-coded tablespaces */
 extern ulint predefined_flags;
 

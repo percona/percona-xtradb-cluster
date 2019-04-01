@@ -25,6 +25,7 @@
 #include "my_config.h"
 #ifdef WITH_WSREP
 #include "wsrep_sst.h"
+#include "mysql/components/services/log_builtins.h"
 #endif /* WITH_WSREP */
 
 #include "mysql/components/services/psi_cond_bits.h"

@@ -139,17 +139,17 @@ SELECT COUNT(*) = 19 FROM t1;
 
 --connection node_1
 DROP TABLE t1;
-CALL mtr.add_suppression("WSREP: There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
+CALL mtr.add_suppression("There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
 CALL mtr.add_suppression("Action message in non-primary configuration from member");
 
 --connection node_2
-CALL mtr.add_suppression("WSREP: There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
+CALL mtr.add_suppression("There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
 CALL mtr.add_suppression("Action message in non-primary configuration from member");
 
 --connection node_3
-CALL mtr.add_suppression("WSREP: There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
+CALL mtr.add_suppression("There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
 CALL mtr.add_suppression("Action message in non-primary configuration from member");
 
 --connection node_4
-CALL mtr.add_suppression("WSREP: There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
+CALL mtr.add_suppression("There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
 CALL mtr.add_suppression("Action message in non-primary configuration from member");

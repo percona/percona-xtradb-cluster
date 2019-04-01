@@ -90,6 +90,7 @@
 #include "thr_lock.h"
 
 #ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
 #include "sql/log.h"
 #include "wsrep_thd.h"
 #endif /* WITH_WSREP */
