@@ -398,12 +398,6 @@ then
 
     RSYNC_CONF="$WSREP_SST_OPT_DATA/$MODULE.conf"
 
-    if [ -n "${MYSQL_TMP_DIR:-}" ] ; then
-        SILENT="log file = $MYSQL_TMP_DIR/rsyncd.log"
-    else
-        SILENT=""
-    fi
-
 # script
 cat << EOF > "$RSYNC_CONF"
     pid file = $RSYNC_PID
@@ -413,7 +407,6 @@ cat << EOF > "$RSYNC_CONF"
     transfer logging = true
     log file = $RSYNC_LOG_FILE
     log format = %o %a file:%f %l
-    $SILENT
     [$MODULE]
         path = $WSREP_SST_OPT_DATA
     [$MODULE-log_dir]
