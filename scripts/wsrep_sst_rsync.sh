@@ -61,10 +61,11 @@ cleanup_joiner()
     wsrep_log_debug "Joiner cleanup. rsync PID: $PID"
     [ "0" != "$PID" ] && kill $PID && sleep 0.5 && kill -9 $PID >/dev/null 2>&1 \
     || :
-    rm -rf "$RSYNC_CONF"
-    rm -rf "$MAGIC_FILE"
-    rm -rf "$RSYNC_PID"
-    rm -rf "$KEYRING_FILE"
+    rm -f "$RSYNC_CONF"
+    rm -f "$MAGIC_FILE"
+    rm -f "$RSYNC_LOG_FILE"
+    rm -f "$RSYNC_PID"
+    rm -f "$KEYRING_FILE"
     wsrep_log_debug "Joiner cleanup done."
     if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
         wsrep_cleanup_progress_file
@@ -106,6 +107,9 @@ check_pid_and_port()
 
 MAGIC_FILE="$WSREP_SST_OPT_DATA/rsync_sst_complete"
 rm -rf "$MAGIC_FILE"
+
+RSYNC_LOG_FILE="$WSREP_SST_OPT_DATA/rsync_sst_log"
+rm -f "$RSYNC_LOG_FILE"
 
 BINLOG_TAR_FILE="$WSREP_SST_OPT_DATA/wsrep_sst_binlog.tar"
 BINLOG_N_FILES=1
@@ -282,17 +286,18 @@ then
             exit 255 # unknown error
         fi
         wsrep_log_info "...............rsync completed"
-
     else # BYPASS
         wsrep_log_info "Bypassing state dump (SST)."
         STATE="$WSREP_SST_OPT_GTID"
     fi
 
-    echo "continue" # now server can resume updating data
-
-    echo "$STATE" > "$MAGIC_FILE"
+    # This is the very last piece of data to send
+    # After receiving the MAGIC_FILE, the joiner knows that it has
+    # received all the data.
+    printf "$STATE\n" > "$MAGIC_FILE"
     rsync --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
 
+    echo "continue" # now server can resume updating data
     echo "done $STATE"
 
 elif [ "$WSREP_SST_OPT_ROLE" = "joiner" ]
@@ -321,18 +326,14 @@ then
 
     RSYNC_CONF="$WSREP_SST_OPT_DATA/$MODULE.conf"
 
-    if [ -n "${MYSQL_TMP_DIR:-}" ] ; then
-        SILENT="log file = $MYSQL_TMP_DIR/rsyncd.log"
-    else
-        SILENT=""
-    fi
-
 cat << EOF > "$RSYNC_CONF"
 pid file = $RSYNC_PID
 use chroot = no
 read only = no
 timeout = 300
-$SILENT
+transfer logging = true
+log file = $RSYNC_LOG_FILE
+log format = %o %a file:%f %l
 [$MODULE]
     path = $WSREP_SST_OPT_DATA
 [$MODULE-log_dir]
@@ -387,44 +388,63 @@ EOF
         popd &> /dev/null
     fi
 
-    if [[ -n $keyring_file_data ]]; then
-        if [[ -r $KEYRING_FILE ]]; then
-            wsrep_log_info "Moving sst keyring into place: moving $KEYRING_FILE to $keyring_file_data"
-            mv $KEYRING_FILE $keyring_file_data
-        else
-            # error, missing file
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "FATAL: rsync could not find '${KEYRING_FILE}'"
-            wsrep_log_error "The joiner is using a keyring file but the donor has not sent"
-            wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
-            wsrep_log_error "both sides are using a keyring file"
-            wsrep_log_error "****************************************************** "
-            exit 32
-        fi
+    # We need to determine the transfer_type
+    # Do this by looking at the rsync transfer logs
+    transfer_type=""
+    if [[ ! -r $RSYNC_LOG_FILE ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "FATAL: Could not find the rsync log file : $RSYNC_LOG_FILE"
+        wsrep_log_error "****************************************************** "
+        exit 32
+    fi
+    # If we're received a file from the mysql/ directory
+    # Then this is an SST, for an IST we will only receive the $MAGIC_FILE
+    if grep -q file:mysql/ "$RSYNC_LOG_FILE"; then
+        transfer_type="sst"
     else
-        if [[ -r $KEYRING_FILE ]]; then
-            # error, file should not be here
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "FATAL: rsync found '${KEYRING_FILE}'"
-            wsrep_log_error "The joiner is not using a keyring file but the donor has sent"
-            wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
-            wsrep_log_error "both sides are using a keyring file"
-            wsrep_log_error "****************************************************** "
-            rm -rf $KEYRING_FILE
-            exit 32
+        transfer_type="ist"
+    fi
+    wsrep_log_debug "Transfer-type determined to be: $transfer_type"
+
+    if [[ $transfer_type == "sst" ]]; then
+        if [[ -n $keyring_file_data ]]; then
+            if [[ -r $KEYRING_FILE ]]; then
+                wsrep_log_info "Moving sst keyring into place: moving $KEYRING_FILE to $keyring_file_data"
+                mv $KEYRING_FILE $keyring_file_data
+            else
+                # error, missing file
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "FATAL: rsync could not find '${KEYRING_FILE}'"
+                wsrep_log_error "The joiner is using a keyring file but the donor has not sent"
+                wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
+                wsrep_log_error "both sides are using a keyring file"
+                wsrep_log_error "****************************************************** "
+                exit 32
+            fi
+        else
+            if [[ -r $KEYRING_FILE ]]; then
+                # error, file should not be here
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "FATAL: rsync found '${KEYRING_FILE}'"
+                wsrep_log_error "The joiner is not using a keyring file but the donor has sent"
+                wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
+                wsrep_log_error "both sides are using a keyring file"
+                wsrep_log_error "****************************************************** "
+                rm -rf $KEYRING_FILE
+                exit 32
+            fi
         fi
     fi
 
-    if [ -r "$MAGIC_FILE" ]
-    then
+    if [[ -r $MAGIC_FILE ]]; then
         cat "$MAGIC_FILE" # output UUID:seqno
     else
         # this message should cause joiner to abort
         echo "rsync process ended without creating '$MAGIC_FILE'"
     fi
+
     wsrep_cleanup_progress_file
     wsrep_log_info "..............rsync completed"
-#    cleanup_joiner
 else
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "Unrecognized role: '$WSREP_SST_OPT_ROLE'"
