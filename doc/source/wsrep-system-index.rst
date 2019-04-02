@@ -494,9 +494,15 @@ which shows all active cluster nodes.
 
 Defines a unique name for the node. Defaults to the host name.
 
-The name is used for convenience,
-to help you identify nodes in the cluster
-by means other than the node address.
+In many situations, you may use the value of this variable as a means to
+identify the given node in the cluster as the alternative to using the node address
+(the value of the :variable:`wsrep_node_address`).
+
+.. note::
+
+   The variable :variable:`wsrep_sst_donor` is an example where you may only use
+   the value of :variable:`wsrep_node_name` and the node address is not
+   permitted.
 
 .. variable:: wsrep_notify_cmd
 
@@ -867,11 +873,24 @@ see :ref:`state_snapshot_transfer`.
    :dyn: Yes
 
 Specifies a list of nodes (using their :variable:`wsrep_node_name` values)
-that the current node should prefer as donors for SST and IST.
-If the value is empty, the first node in SYNCED state in the index
-becomes the donor and will not be able to serve requests during state transfer.
+that the current node should prefer as donors for :term:`SST` and :term:`IST`.
 
-If you want to consider other nodes when listed ones are not available,
+.. warning::
+
+   Using IP addresses of nodes instead of node names (the value of
+   :variable:`wsrep_node_name`) as values of
+   :variable:`wsrep_sst_donor` results in an error.
+
+   .. admonition:: Error message
+
+      [ERROR] WSREP: State transfer request failed unrecoverably: 113 (No route
+      to host). Most likely it is due to inability to communicate with the
+      cluster primary component. Restart required.
+
+If the value is empty, the first node in SYNCED state in the index
+becomes the donor and will not be able to serve requests during the state transfer.
+
+To consider other nodes if the listed nodes are not available,
 add a comma at the end of the list, for example::
 
  wsrep_sst_donor=node1,node2,
@@ -882,12 +901,12 @@ then the joining node will consider *only* ``node1`` and ``node2``.
 .. note:: By default, the joiner node does not wait for more than 100 seconds
    to receive the first packet from a donor.
    This is implemented via the :option:`sst-initial-timeout` option.
-   If you set the list of preferred donors without a terminating comma
+   If you set the list of preferred donors without the trailing comma
    or believe that all nodes in the cluster can often be unavailable for SST
    (this is common for small clusters),
    then you may want to increase the initial timeout
    (or disable it completely
-   if you don't mind joiner node waiting for state transfer indefinitely).
+   if you don't mind the joiner node waiting for the state transfer indefinitely).
 
 .. variable:: wsrep_sst_donor_rejects_queries
 
