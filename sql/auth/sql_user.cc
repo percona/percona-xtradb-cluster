@@ -1776,12 +1776,28 @@ bool mysql_rename_user(THD *thd, List <LEX_USER> &list)
     if (!(user_from= get_current_user(thd, tmp_user_from)))
     {
       result= TRUE;
+#ifdef WITH_WSREP
+      /* if operation to get current_user fails there is no point
+      in continuing further to scan for rename-to user.
+      Also, the while logic will cause rename-to user to appear NULL.*/
+      mysql_mutex_unlock(&acl_cache->lock);
+      lock.unlock();
+      DBUG_RETURN(result);
+#endif /* WITH_WSREP */
       continue;
     }  
     tmp_user_to= user_list++;
     if (!(user_to= get_current_user(thd, tmp_user_to)))
     {
       result= TRUE;
+#ifdef WITH_WSREP
+      /* if operation to get current_user fails there is no point
+      in continuing further to scan for rename-to user.
+      Also, the while logic will cause rename-to user to appear NULL.*/
+      mysql_mutex_unlock(&acl_cache->lock);
+      lock.unlock();
+      DBUG_RETURN(result);
+#endif /* WITH_WSREP */
       continue;
     }  
     DBUG_ASSERT(user_to != 0); /* Syntax enforces pairs of users. */
