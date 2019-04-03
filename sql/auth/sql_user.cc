@@ -104,6 +104,12 @@
   @param comma   If true, append a ',' before the the user.
  */
 void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
+
+#ifdef WITH_WSREP
+  /* PXC doesn't allow user function (CURRENT_USER) with user operation */
+  if (WSREP(thd) && !user) return;
+#endif /* WITH_WSREP */
+
   String from_user(user->user.str, user->user.length, system_charset_info);
   String from_plugin(user->plugin.str, user->plugin.length,
                      system_charset_info);
@@ -2279,11 +2285,25 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
   while ((tmp_user_from = user_list++)) {
     if (!(user_from = get_current_user(thd, tmp_user_from))) {
       result = 1;
+#ifdef WITH_WSREP
+      /* if operation to get current_user fails there is no point
+      in continuing further to scan for rename-to user.
+      Also, the while logic will cause rename-to user to appear NULL.*/
+      commit_and_close_mysql_tables(thd);
+      DBUG_RETURN(result);
+#endif /* WITH_WSREP */
       continue;
     }
     tmp_user_to = user_list++;
     if (!(user_to = get_current_user(thd, tmp_user_to))) {
       result = 1;
+#ifdef WITH_WSREP
+      /* if operation to get current_user fails there is no point
+      in continuing further to scan for rename-to user.
+      Also, the while logic will cause rename-to user to appear NULL.*/
+      commit_and_close_mysql_tables(thd);
+      DBUG_RETURN(result);
+#endif /* WITH_WSREP */
       continue;
     }
     DBUG_ASSERT(user_to != 0); /* Syntax enforces pairs of users. */
