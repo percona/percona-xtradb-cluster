@@ -1,3 +1,4 @@
+#
 --source include/galera_cluster.inc
 
 CREATE USER 'userMW416'@'localhost';
@@ -132,3 +133,44 @@ SHOW DATABASES;
 --disable_query_log
 --eval SELECT $wsrep_replicated_after - $wsrep_replicated_before AS wsrep_replicated_after_diff
 --enable_query_log
+
+#-------------------------------------------------------------------------------
+# cover scenario involving user of CURRENT_USER()
+#
+--connection node_1
+--echo #node-1 (create tmp user)
+call mtr.add_suppression("WSREP: Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
+#
+--error ER_UNKNOWN_ERROR
+CREATE USER CURRENT_USER();
+#
+--error ER_UNKNOWN_ERROR
+DROP USER CURRENT_USER();
+#
+--error ER_UNKNOWN_ERROR
+ALTER USER CURRENT_USER() PASSWORD EXPIRE;
+--error ER_UNKNOWN_ERROR
+ALTER USER CURRENT_USER() IDENTIFIED BY 'abc';
+--error ER_UNKNOWN_ERROR
+ALTER USER USER() IDENTIFIED BY 'abc';
+#
+--error ER_UNKNOWN_ERROR
+RENAME USER CURRENT_USER() to 'root2'@'localhost';
+--error ER_UNKNOWN_ERROR
+RENAME USER 'root2'@'localhost' to CURRENT_USER();
+#
+--error ER_UNKNOWN_ERROR
+GRANT ALL PRIVILEGES ON *.* TO CURRENT_USER();
+#
+--error ER_UNKNOWN_ERROR
+GRANT DROP ON *.* TO CURRENT_USER();
+#
+--error ER_UNKNOWN_ERROR
+REVOKE CREATE ON *.* FROM CURRENT_USER();
+#
+--error ER_UNKNOWN_ERROR
+REVOKE ALL ON *.* FROM CURRENT_USER();
+
+--connection node_2
+--echo #node-2
+call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
