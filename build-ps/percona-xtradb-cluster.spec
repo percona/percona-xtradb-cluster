@@ -629,14 +629,6 @@ sed -i 's:#!/usr/bin/env python:#!/usr/bin/env python2:g' mysql-test/suite/tokud
 # not require C++ features such as exceptions, and may need to be removed at
 # a later date.
 #
-
-# This is a hack, $RPM_OPT_FLAGS on ia64 hosts contains flags which break
-# the compile in cmd-line-utils/readline - needs investigation, but for now
-# we simply unset it and use those specified directly in cmake.
-%if "%{_arch}" == "ia64"
-RPM_OPT_FLAGS=
-%endif
-#
 %if %{with tokudb}
 RPM_OPT_FLAGS=
 %else
@@ -811,6 +803,13 @@ pushd percona-xtradb-cluster-galera
   export CC=gcc44
   export CXX=g++44
 %endif
+
+%if 0%{?rhel}" == 8
+  export CFLAGS=" -O2 -g"
+  export CXXFLAGS="${CFLAGS}"
+#  RPM_OPT_FLAGS=
+%endif
+
 scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
 scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
 popd
