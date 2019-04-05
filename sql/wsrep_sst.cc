@@ -16,8 +16,11 @@
 #include "wsrep_sst.h"
 #include <cstdio>
 #include <cstdlib>
+#include <sstream>
 #include "debug_sync.h"
 #include "log_event.h"
+#include "my_rnd.h"
+#include "mysql/components/services/log_builtins.h"
 #include "mysql_version.h"
 #include "mysqld.h"
 #include "rpl_msr.h"  // channel_map
@@ -27,16 +30,15 @@
 #include "sql_class.h"
 #include "sql_parse.h"
 #include "sql_reload.h"
+#include "srv_session.h"
 #include "wsrep_applier.h"
 #include "wsrep_binlog.h"
 #include "wsrep_priv.h"
+#include "wsrep_service.h"
 #include "wsrep_thd.h"
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
 #include "wsrep_xid.h"
-#include "my_rnd.h"
-#include "srv_session.h"
-#include "wsrep_service.h"
 
 extern const char wsrep_defaults_file[];
 extern const char wsrep_defaults_group_suffix[];
@@ -79,10 +81,8 @@ bool wsrep_sst_donor_rejects_queries = false;
 /* Function checks if the new value for sst_method is valid.
 @return false if no error encountered with check else return true. */
 bool wsrep_sst_method_check(sys_var *, THD *, set_var *var) {
-
   if ((!var->save_result.string_value.str) ||
       (var->save_result.string_value.length == 0)) {
-
     my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
              var->save_result.string_value.str
                  ? var->save_result.string_value.str
@@ -93,7 +93,6 @@ bool wsrep_sst_method_check(sys_var *, THD *, set_var *var) {
   if (!(strcmp(var->save_result.string_value.str, WSREP_SST_XTRABACKUP_V2) ==
             0 ||
         strcmp(var->save_result.string_value.str, WSREP_SST_RSYNC) == 0)) {
-
     my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
              var->save_result.string_value.str
                  ? var->save_result.string_value.str
@@ -251,11 +250,24 @@ void wsrep_sst_continue() {
   }
 }
 
+// get rid of trailing \n
+static char *my_fgets(char *buf, size_t buf_len, FILE *stream) {
+  char *ret = fgets(buf, buf_len, stream);
+
+  if (ret) {
+    size_t len = strlen(ret);
+    if (len > 0 && ret[len - 1] == '\n') ret[len - 1] = '\0';
+  }
+
+  return ret;
+}
+
 struct sst_thread_arg {
   const char *cmd;
   char **env;
   char *ret_str;
   int err;
+
   mysql_mutex_t LOCK_wsrep_sst_thread;
   mysql_cond_t COND_wsrep_sst_thread;
 
@@ -273,6 +285,120 @@ struct sst_thread_arg {
   }
 };
 
+struct sst_logger_thread_arg {
+  /* This is the READ end of the stderr pipe */
+  FILE *err_pipe;
+
+  sst_logger_thread_arg(FILE *ferr) : err_pipe(ferr) {}
+
+  ~sst_logger_thread_arg() {
+    if (err_pipe) fclose(err_pipe);
+    err_pipe = NULL;
+  }
+};
+
+static enum loglevel string_to_loglevel(const char *s) {
+  if (strncmp(s, "ERR:", 4) == 0)
+    return ERROR_LEVEL;
+  else if (strncmp(s, "WRN:", 4) == 0)
+    return WARNING_LEVEL;
+  else if (strncmp(s, "INF:", 4) == 0)
+    return INFORMATION_LEVEL;
+  else if (strncmp(s, "DBG:", 4) == 0)
+    return INFORMATION_LEVEL;
+  else
+    return SYSTEM_LEVEL;
+}
+
+static void *sst_logger_thread(void *a) {
+  sst_logger_thread_arg *arg = (sst_logger_thread_arg *)a;
+
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_register_thread(key_THREAD_wsrep_sst_logger);
+#endif /* HAVE_PSI_INTERFACE */
+
+  int const out_len = 1024;
+  char out_buf[out_len];
+
+  /* Loops over the READ end of stderr.  Only stops
+     when the pipe is in an error or EOF state.
+   */
+  while (!feof(arg->err_pipe) && !ferror(arg->err_pipe)) {
+    char *p = my_fgets(out_buf, out_len, arg->err_pipe);
+    if (!p) continue;
+
+    enum loglevel level = string_to_loglevel(p);
+    if (level != SYSTEM_LEVEL) {
+      WSREP_SST_LOG(level, p + 4);
+    } else if (strncmp(p, "FIL:", 4) == 0) {
+      /* Expect a string with 3 components (separated by semi-colons)
+          "FIL" marker
+          Level marker : "ERR", "WRN", "INF", "DBG"
+          Descriptive string
+      */
+      std::string s;
+      std::string description;
+      s.reserve(8002);
+
+      level = string_to_loglevel(p + 4);
+      if (level == SYSTEM_LEVEL) {
+        // Unknown priority level
+        WSREP_ERROR("Unexpected line formatting: %s", p);
+        level = INFORMATION_LEVEL;
+        description = "(Unknown)";
+      } else
+        description = p + 8;
+
+      // Header line
+      s = "------------ " + description + " (START) ------------\n";
+
+      // Loop around until we get an "EOF:"
+      while ((p = fgets(out_buf, out_len, arg->err_pipe)) != NULL) {
+        if (strncmp(p, "EOF:", 4) == 0) break;
+
+        // Output the data  if we have to (data max is 8K)
+        if (s.length() + strlen(p) + 1 >= 8000) {
+          // Ensure the string ends with a newline
+          if (s.back() != '\n') s += "\n";
+          WSREP_SST_LOG(level, s.c_str());
+          s = "------------ " + description + " (cont) ------------\n";
+        }
+        s += "\t";  // Indent the file contents
+        s += p;
+      }
+
+      // Either we've had an error, or we've gotten to the end
+      // Either way, dump all of our contents
+      WSREP_SST_LOG(level, s.c_str());
+
+      s = "------------ " + description + " (END) ------------";
+      WSREP_SST_LOG(level, s.c_str());
+    } else {
+      // Unexpected output
+      WSREP_SST_LOG(INFORMATION_LEVEL, p);
+    }
+  }
+
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_delete_thread();
+#endif /* HAVE_PSI_INTERFACE */
+
+  return NULL;
+}
+
+static int start_sst_logger_thread(sst_logger_thread_arg *arg, pthread_t *thd) {
+  int ret;
+
+  ret = pthread_create(thd, NULL, sst_logger_thread, arg);
+  if (ret) {
+    *thd = 0;
+    WSREP_ERROR("start_sst_logger_thread(): pthread_create() failed: %d (%s)",
+                ret, strerror(ret));
+    return -ret;
+  }
+  return 0;
+}
+
 static int sst_scan_uuid_seqno(const char *str, wsrep_uuid_t *uuid,
                                wsrep_seqno_t *seqno) {
   int offt = wsrep_uuid_scan(str, strlen(str), uuid);
@@ -285,18 +411,6 @@ static int sst_scan_uuid_seqno(const char *str, wsrep_uuid_t *uuid,
 
   WSREP_ERROR("Failed to parse uuid:seqno pair: '%s'", str);
   return EINVAL;
-}
-
-// get rid of trailing \n
-static char *my_fgets(char *buf, size_t buf_len, FILE *stream) {
-  char *ret = fgets(buf, buf_len, stream);
-
-  if (ret) {
-    size_t len = strlen(ret);
-    if (len > 0 && ret[len - 1] == '\n') ret[len - 1] = '\0';
-  }
-
-  return ret;
 }
 
 /*
@@ -383,8 +497,9 @@ static void *sst_joiner_thread(void *a) {
   {
     const char magic[] = "ready";
     const size_t magic_len = sizeof(magic) - 1;
-    const int  out_len = 512;
+    const int out_len = 512;
     char out[out_len];
+    int ret;
 
     WSREP_INFO("Initiating SST/IST transfer on JOINER side (%s)", arg->cmd);
 
@@ -395,16 +510,17 @@ static void *sst_joiner_thread(void *a) {
     sst_process = &proc;
     mysql_mutex_unlock(&LOCK_wsrep_sst);
 
-    if (!proc.error())
-    {
-      int ret;
+    pthread_t logger_thd = 0;
+    sst_logger_thread_arg logger_arg(proc.err_pipe());
+    proc.clear_err_pipe();
+
+    err = start_sst_logger_thread(&logger_arg, &logger_thd);
+
+    if (!err && !proc.error()) {
       err = 0;
-      ret = fprintf(proc.write_pipe(),
-                    "wsrep_schema_version=%s\n",
-                    WSREP_SCHEMA_VERSION
-                    );
-      if (ret <= 0)
-      {
+      ret = fprintf(proc.write_pipe(), "wsrep_schema_version=%s\n",
+                    WSREP_SCHEMA_VERSION);
+      if (ret <= 0) {
         WSREP_ERROR("sst_joiner_thread(): fprintf() failed: %d", ret);
         err = (ret < 0 ? ret : -EMSGSIZE);
       }
@@ -413,7 +529,7 @@ static void *sst_joiner_thread(void *a) {
       proc.close_write_pipe();
     }
 
-    if (proc.pipe() && !proc.error()) {
+    if (!err && proc.pipe() && !proc.error()) {
       const char *tmp = my_fgets(out, out_len, proc.pipe());
 
       if (!tmp || strlen(tmp) < (magic_len + 2) ||
@@ -473,6 +589,10 @@ static void *sst_joiner_thread(void *a) {
     proc.wait();
     err = EINVAL;
 
+    // The process has exited, so the logger thread should
+    // also have exited
+    if (logger_thd) pthread_join(logger_thd, NULL);
+
     if (!tmp || proc.error()) {
       WSREP_ERROR("Failed to read uuid:seqno from joiner script.");
       if (proc.error()) {
@@ -501,9 +621,8 @@ static void *sst_joiner_thread(void *a) {
   return NULL;
 }
 
-
-static ssize_t sst_prepare_other(const char *method,
-                                 const char *addr_in, const char **addr_out) {
+static ssize_t sst_prepare_other(const char *method, const char *addr_in,
+                                 const char **addr_out) {
   int const cmd_len = 4096;
   wsp::string cmd_str(cmd_len);
 
@@ -542,9 +661,10 @@ static ssize_t sst_prepare_other(const char *method,
                  mysql_home_ptr ? mysql_home_ptr : "",
                  opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "",
                  wsrep_defaults_file,
-                 wsrep_defaults_group_suffix, (int)getpid(),
-                 MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF, binlog_opt,
-                 binlog_opt_val);
+                 wsrep_defaults_group_suffix,
+                 (int)getpid(),
+                 MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+                 binlog_opt, binlog_opt_val);
   my_free(binlog_opt_val);
 
   if (ret < 0 || ret >= cmd_len) {
@@ -635,9 +755,7 @@ ssize_t wsrep_sst_prepare(void **msg, THD *thd) {
 
   if (SE_initialized) {
     // we already did SST at initializaiton, now engines are running
-    // sql_print_information() is here because the message is too long
-    // for WSREP_INFO.
-    sql_print_information(
+    WSREP_INFO(
         "WSREP: "
         "You have configured '%s' state snapshot transfer method "
         "which cannot be performed on a running server. "
@@ -649,8 +767,7 @@ ssize_t wsrep_sst_prepare(void **msg, THD *thd) {
     return 0;
   }
 
-  ssize_t addr_len =
-      sst_prepare_other(wsrep_sst_method, addr_in, &addr_out);
+  ssize_t addr_len = sst_prepare_other(wsrep_sst_method, addr_in, &addr_out);
   if (addr_len < 0) {
     WSREP_ERROR("Failed to prepare for '%s' SST. Unrecoverable.",
                 wsrep_sst_method);
@@ -695,7 +812,7 @@ static void *sst_upgrade_thread(void *a) {
   {
     const char magic[] = "ready";
     const size_t magic_len = sizeof(magic) - 1;
-    const int  out_len = 512;
+    const int out_len = 512;
     char out[out_len];
 
     WSREP_INFO("Initiating mysql upgrade on JOINER side (%s)", arg->cmd);
@@ -706,16 +823,18 @@ static void *sst_upgrade_thread(void *a) {
     sst_process = &proc;
     mysql_mutex_unlock(&LOCK_wsrep_sst);
 
-    if (!proc.error())
-    {
+    pthread_t logger_thd = 0;
+    sst_logger_thread_arg logger_arg(proc.err_pipe());
+    proc.clear_err_pipe();
+
+    err = start_sst_logger_thread(&logger_arg, &logger_thd);
+
+    if (!err && !proc.error()) {
       int ret;
       err = 0;
-      ret = fprintf(proc.write_pipe(),
-                    "wsrep_schema_version=%s\n",
-                    WSREP_SCHEMA_VERSION
-                    );
-      if (ret <= 0)
-      {
+      ret = fprintf(proc.write_pipe(), "wsrep_schema_version=%s\n",
+                    WSREP_SCHEMA_VERSION);
+      if (ret <= 0) {
         WSREP_ERROR("sst_upgrade_thread(): fprintf() failed: %d", ret);
         err = (ret < 0 ? ret : -EMSGSIZE);
       }
@@ -724,13 +843,14 @@ static void *sst_upgrade_thread(void *a) {
       proc.close_write_pipe();
     }
 
-    if (proc.pipe() && !proc.error()) {
+    if (!err && proc.pipe() && !proc.error()) {
       // We wait for "ready" to be written out. This means that the script
       // has completed the upgrade and we can return and let the rest of
       // the system continue.
       const char *tmp = my_fgets(out, out_len, proc.pipe());
 
-      if (!tmp || strlen(tmp) < magic_len || strncasecmp(tmp, magic, magic_len)) {
+      if (!tmp || strlen(tmp) < magic_len ||
+          strncasecmp(tmp, magic, magic_len)) {
         err = EINVAL;
         if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
         // Print error message if SST is not cancelled:
@@ -775,6 +895,10 @@ static void *sst_upgrade_thread(void *a) {
                     * shutdown. */
 
     proc.wait();
+
+    // The process has exited, so the logger thread should
+    // also have exited
+    if (logger_thd) pthread_join(logger_thd, NULL);
 
     if (proc.error()) {
       err = proc.error();
@@ -843,7 +967,8 @@ static ssize_t sst_prepare_upgrade() {
 
   wsp::env env(NULL);
   if (env.error()) {
-    WSREP_ERROR("sst_prepare_upgrade(): env. var ctor failed: %d", -env.error());
+    WSREP_ERROR("sst_prepare_upgrade(): env. var ctor failed: %d",
+                -env.error());
     return -env.error();
   }
 
@@ -867,7 +992,6 @@ static ssize_t sst_prepare_upgrade() {
 
   return ret;
 }
-
 
 ssize_t wsrep_sst_upgrade() {
   ssize_t addr_len = sst_prepare_upgrade();
@@ -933,9 +1057,11 @@ wsrep_seqno_t wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
 
 /*
   Executes a query.  The second parameter, safe_query, if not NULL, will be used
-  instead of the real query when logging an error (for security-senstive queries).
+  instead of the real query when logging an error (for security-senstive
+queries).
 **/
-static int run_sql_command(THD *thd, const char *query, const char *safe_query) {
+static int run_sql_command(THD *thd, const char *query,
+                           const char *safe_query) {
   thd->set_query((char *)query, strlen(query));
 
   Parser_state ps;
@@ -949,9 +1075,9 @@ static int run_sql_command(THD *thd, const char *query, const char *safe_query) 
     int const err = thd->get_stmt_da()->mysql_errno();
     if (safe_query) {
       WSREP_WARN("error executing '%s' : %d", safe_query, err);
-    }
-    else {
-      WSREP_WARN("error executing '%s' : %d (%s)", query, err, thd->get_stmt_da()->message_text());
+    } else {
+      WSREP_WARN("error executing '%s' : %d (%s)", query, err,
+                 thd->get_stmt_da()->message_text());
     }
     thd->clear_error();
     return err;
@@ -964,7 +1090,7 @@ static int sst_flush_tables(THD *thd) {
 
   int err;
   int not_used;
-  err= run_sql_command(thd, "FLUSH TABLES WITH READ LOCK", NULL);
+  err = run_sql_command(thd, "FLUSH TABLES WITH READ LOCK", NULL);
   if (err) {
     if (err == ER_UNKNOWN_SYSTEM_VARIABLE)
       WSREP_WARN("Was mysqld built with --with-innodb-disallow-writes ?");
@@ -1030,17 +1156,16 @@ static void sst_disallow_writes(THD *thd, bool yes) {
 
 // Password characters are limited, because we are using these passwords
 // within a bash script.
-const std::string g_allowed_pwd_chars("qwertyuiopasdfghjklzxcvbnm1234567890"
-                                 "QWERTYUIOPASDFGHJKLZXCVBNM");
+const std::string g_allowed_pwd_chars(
+    "qwertyuiopasdfghjklzxcvbnm1234567890"
+    "QWERTYUIOPASDFGHJKLZXCVBNM");
 const std::string get_allowed_pwd_chars() { return g_allowed_pwd_chars; }
 
-static void generate_password(std::string *password, int size)
-{
+static void generate_password(std::string *password, int size) {
   std::stringstream ss;
   rand_struct srnd;
-  while(size > 0)
-  {
-    int ch = ((int)(my_rnd_ssl(&srnd)*100))%get_allowed_pwd_chars().size();
+  while (size > 0) {
+    int ch = ((int)(my_rnd_ssl(&srnd) * 100)) % get_allowed_pwd_chars().size();
     ss << get_allowed_pwd_chars()[ch];
     --size;
   }
@@ -1049,35 +1174,32 @@ static void generate_password(std::string *password, int size)
 
 static void srv_session_error_handler(void *ctx MY_ATTRIBUTE((unused)),
                                       unsigned int sql_errno,
-                                      const char *err_msg)
-{
-  switch (sql_errno)
-  {
+                                      const char *err_msg) {
+  switch (sql_errno) {
     case ER_CON_COUNT_ERROR:
-      WSREP_ERROR("Can't establish an internal server connection to "
-                 "execute operations since the server "
-                 "does not have available connections, please "
-                 "increase @@GLOBAL.MAX_CONNECTIONS. Server error: %i.",
-                 sql_errno);
+      WSREP_ERROR(
+          "Can't establish an internal server connection to "
+          "execute operations since the server "
+          "does not have available connections, please "
+          "increase @@GLOBAL.MAX_CONNECTIONS. Server error: %i.",
+          sql_errno);
       break;
     default:
-      WSREP_ERROR("Can't establish an internal server connection to "
-                 "execute operations. Server error: %i. "
-                 "Server error message: %s",
-                 sql_errno, err_msg);
+      WSREP_ERROR(
+          "Can't establish an internal server connection to "
+          "execute operations. Server error: %i. "
+          "Server error message: %s",
+          sql_errno, err_msg);
   }
 }
 
-static void cleanup_server_session(MYSQL_SESSION session, bool initialize_thread)
-{
+static void cleanup_server_session(MYSQL_SESSION session,
+                                   bool initialize_thread) {
   srv_session_close(session);
-  if (initialize_thread)
-    srv_session_deinit_thread();
+  if (initialize_thread) srv_session_deinit_thread();
 }
 
-
-static MYSQL_SESSION setup_server_session(bool initialize_thread)
-{
+static MYSQL_SESSION setup_server_session(bool initialize_thread) {
   MYSQL_SESSION session = NULL;
 
   if (initialize_thread) {
@@ -1089,8 +1211,7 @@ static MYSQL_SESSION setup_server_session(bool initialize_thread)
 
   session = srv_session_open(srv_session_error_handler, NULL);
 
-  if (session == NULL)
-  {
+  if (session == NULL) {
     if (initialize_thread) srv_session_deinit_thread();
     WSREP_ERROR("Failed to open a session for the SST commands");
     return NULL;
@@ -1099,11 +1220,12 @@ static MYSQL_SESSION setup_server_session(bool initialize_thread)
   MYSQL_SECURITY_CONTEXT sc;
   if (thd_get_security_context(srv_session_info_get_thd(session), &sc)) {
     cleanup_server_session(session, initialize_thread);
-    WSREP_ERROR("Failed to fetch the security context when contacting the server");
+    WSREP_ERROR(
+        "Failed to fetch the security context when contacting the server");
     return NULL;
   }
-  if (security_context_lookup(sc, "mysql.pxc.internal.session", "localhost", NULL, NULL))
-  {
+  if (security_context_lookup(sc, "mysql.pxc.internal.session", "localhost",
+                              NULL, NULL)) {
     cleanup_server_session(session, initialize_thread);
     WSREP_ERROR("Error accessing server with user:mysql.pxc.internal.session");
     return NULL;
@@ -1113,44 +1235,39 @@ static MYSQL_SESSION setup_server_session(bool initialize_thread)
   return session;
 }
 
-static uint server_session_execute(MYSQL_SESSION session, std::string query, const char *safe_query)
-{
+static uint server_session_execute(MYSQL_SESSION session, std::string query,
+                                   const char *safe_query) {
   COM_DATA cmd;
   wsp::Sql_resultset rset;
-  cmd.com_query.query= (char *) query.c_str();
-  cmd.com_query.length= static_cast<unsigned int>(query.length());
-  wsp::Sql_service_context_base *ctx= new wsp::Sql_service_context(&rset);
+  cmd.com_query.query = (char *)query.c_str();
+  cmd.com_query.length = static_cast<unsigned int>(query.length());
+  wsp::Sql_service_context_base *ctx = new wsp::Sql_service_context(&rset);
   uint err(0);
 
   /* execute sql command */
-  command_service_run_command(session, COM_QUERY, &cmd,
-                              &my_charset_utf8_general_ci,
-                              &wsp::Sql_service_context_base::sql_service_callbacks,
-                              CS_TEXT_REPRESENTATION, ctx);
+  command_service_run_command(
+      session, COM_QUERY, &cmd, &my_charset_utf8_general_ci,
+      &wsp::Sql_service_context_base::sql_service_callbacks,
+      CS_TEXT_REPRESENTATION, ctx);
   delete ctx;
 
   err = rset.sql_errno();
-  if (err)
-  {
+  if (err) {
     // an error occurred, retrieve the status/message
-    if (safe_query)
-    {
+    if (safe_query) {
       WSREP_ERROR("Command execution failed (%d) : %s", err, safe_query);
+    } else {
+      WSREP_ERROR("Command execution failed (%d) : %s : %s", err,
+                  rset.err_msg().c_str(), query.c_str());
     }
-    else
-    {
-      WSREP_ERROR("Command execution failed (%d) : %s : %s", err, rset.err_msg().c_str(), query.c_str());
-    }
-
   }
   return err;
 }
 
-static int wsrep_create_sst_user(bool initialize_thread, const char *password)
-{
+static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
   int err = 0;
-  int const     auth_len = 512;
-  char          auth_buf[auth_len];
+  int const auth_len = 512;
+  char auth_buf[auth_len];
   MYSQL_SESSION session = NULL;
 
   // This array is filled with pairs of entries
@@ -1160,8 +1277,8 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password)
   const char *cmds[] = {
     "SET SESSION sql_log_bin = OFF;", nullptr,
     "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;", nullptr,
-    "CREATE USER 'mysql.pxc.sst.user'@localhost IDENTIFIED WITH 'mysql_native_password' BY '%s' ACCOUNT LOCK;",
-                "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
+    "CREATE USER 'mysql.pxc.sst.user'@localhost IDENTIFIED WITH "
+    "'mysql_native_password' BY '%s' ACCOUNT LOCK;", "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
   /*
     This is the code that uses the mysql.pxc.sst.role
     However there is a bug in 8.0.15 where the "GRANT CREATE ON DBNAME.*" when
@@ -1176,8 +1293,10 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password)
       Explicit privileges needed to run XtraBackup.  This is only used due
       to the bug in 8.0.15 described above.
     */
-    "GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.sst.user'@localhost;", nullptr,
-    "GRANT CREATE, INSERT, SELECT ON PERCONA_SCHEMA.xtrabackup_history TO 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, "
+    "SUPER ON *.* TO 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "GRANT CREATE, INSERT, SELECT ON PERCONA_SCHEMA.xtrabackup_history TO "
+    "'mysql.pxc.sst.user'@localhost;", nullptr,
     "GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.user'@localhost;", nullptr,
     "GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.user'@localhost;", nullptr,
 #endif
@@ -1188,23 +1307,20 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password)
 
   wsrep_allow_server_session = true;
   session = setup_server_session(initialize_thread);
-  if (!session)
-  {
+  if (!session) {
     wsrep_allow_server_session = false;
     return ECANCELED;
   }
 
-  for (int index=0; !err && cmds[index]; index+=2)
-  {
+  for (int index = 0; !err && cmds[index]; index += 2) {
     int ret;
     ret = snprintf(auth_buf, auth_len, cmds[index], password);
-    if (ret < 0 || ret >= auth_len)
-    {
+    if (ret < 0 || ret >= auth_len) {
       WSREP_ERROR("wsrep_create_sst_user() : snprintf() failed: %d", ret);
       err = (ret < 0 ? ret : -EMSGSIZE);
       break;
     }
-    err = server_session_execute(session, auth_buf, cmds[index+1]);
+    err = server_session_execute(session, auth_buf, cmds[index + 1]);
   }
 
   // Overwrite query (clear out any sensitive data)
@@ -1215,8 +1331,7 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password)
   return err;
 }
 
-int wsrep_remove_sst_user(bool initialize_thread)
-{
+int wsrep_remove_sst_user(bool initialize_thread) {
   int err = 0;
   MYSQL_SESSION session = NULL;
 
@@ -1224,23 +1339,19 @@ int wsrep_remove_sst_user(bool initialize_thread)
   // The first entry is the actual query to be run
   // The second entry is the string to be displayed if the query fails
   //  (this can be NULL, in which case the actual query will be used)
-  const char *cmds[] = {
-    "SET SESSION sql_log_bin = OFF;", nullptr,
-    "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;", nullptr,
-    nullptr, nullptr
-  };
+  const char *cmds[] = {"SET SESSION sql_log_bin = OFF;", nullptr,
+                        "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;", nullptr,
+                        nullptr, nullptr};
 
   wsrep_allow_server_session = true;
   session = setup_server_session(initialize_thread);
-  if (!session)
-  {
+  if (!session) {
     wsrep_allow_server_session = false;
     return ECANCELED;
   }
 
-  for (int index=0; !err && cmds[index]; index+=2)
-  {
-    err = server_session_execute(session, cmds[index], cmds[index+1]);
+  for (int index = 0; !err && cmds[index]; index += 2) {
+    err = server_session_execute(session, cmds[index], cmds[index + 1]);
   }
 
   cleanup_server_session(session, initialize_thread);
@@ -1261,13 +1372,12 @@ static void *sst_donor_thread(void *a) {
   bool locked = false;
 
   const char *out = NULL;
-  int const   out_len = 1024;
-  char        out_buf[out_len];
+  int const out_len = 1024;
+  char out_buf[out_len];
 
   // Generate the random password
-  std::string   password;
+  std::string password;
   generate_password(&password, 32);
-
 
   wsrep_uuid_t ret_uuid = WSREP_UUID_UNDEFINED;
   wsrep_seqno_t ret_seqno = WSREP_SEQNO_UNDEFINED;  // seqno of complete SST
@@ -1284,18 +1394,19 @@ static void *sst_donor_thread(void *a) {
   if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
   wsp::process proc(arg->cmd, "rw", arg->env, !err /* execute_immediately */);
 
-  if (!err)
-  {
-    int         ret;
+  pthread_t logger_thd = 0;
+  sst_logger_thread_arg logger_arg(proc.err_pipe());
+  proc.clear_err_pipe();
+  err = start_sst_logger_thread(&logger_arg, &logger_thd);
+
+  if (!err) {
+    int ret;
     ret = fprintf(proc.write_pipe(),
                   "sst_user=mysql.pxc.sst.user\n"
                   "sst_password=%s\n"
                   "wsrep_schema_version=%s\n",
-                  password.c_str(),
-                  WSREP_SCHEMA_VERSION
-                  );
-    if (ret < 0)
-    {
+                  password.c_str(), WSREP_SCHEMA_VERSION);
+    if (ret < 0) {
       WSREP_ERROR("sst_donor_thread(): fprintf() failed: %d", ret);
       err = (ret < 0 ? ret : -EMSGSIZE);
     }
@@ -1308,8 +1419,7 @@ static void *sst_donor_thread(void *a) {
   sst_process = &proc;
   mysql_mutex_unlock(&LOCK_wsrep_sst);
 
-  if (!err)
-    err = proc.error();
+  if (!err) err = proc.error();
 
   /* Inform server about SST script startup and release TO isolation */
   mysql_mutex_lock(&arg->LOCK_wsrep_sst_thread);
@@ -1393,6 +1503,10 @@ static void *sst_donor_thread(void *a) {
                                       err ? WSREP_SEQNO_UNDEFINED : ret_seqno};
   wsrep->sst_sent(wsrep, &state_id, -err);
   proc.wait();
+
+  // The process has exited, so the logger thread should
+  // also have exited
+  if (logger_thd) pthread_join(logger_thd, NULL);
 
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_delete_thread();

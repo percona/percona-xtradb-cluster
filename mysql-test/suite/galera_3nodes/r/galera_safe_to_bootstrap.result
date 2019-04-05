@@ -20,9 +20,9 @@ safe_to_bootstrap: 0
 # restart
 # restart
 # restart
-CALL mtr.add_suppression("WSREP: moving position backwards: [0-9]+ -> 0");
+CALL mtr.add_suppression("moving position backwards: [0-9]+ -> 0");
 CALL mtr.add_suppression("Failed to prepare for incremental state transfer");
-CALL mtr.add_suppression("WSREP: moving position backwards: [0-9]+ -> 0");
+CALL mtr.add_suppression("moving position backwards: [0-9]+ -> 0");
 CALL mtr.add_suppression("Failed to prepare for incremental state transfer");
 SHOW CREATE TABLE t1;
 Table	Create Table

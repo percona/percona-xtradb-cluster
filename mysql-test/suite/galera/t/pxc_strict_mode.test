@@ -26,46 +26,46 @@
 # to allow insertion in add_suppression table.
 set global pxc_strict_mode='DISABLED';
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of GET_LOCK");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of RELEASE_LOCK");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of GET_LOCK");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of GET_LOCK");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of RELEASE_LOCK");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of GET_LOCK");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK");
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT");
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED");
-call mtr.add_suppression("WSREP: Can't change pxc_strict_mode while binlog format != ROW");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED");
+call mtr.add_suppression("Can't change pxc_strict_mode while binlog format != ROW");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED");
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend using SERIALIZABLE isolation");
-call mtr.add_suppression("WSREP: Can't change pxc_strict_mode while isolation level is SERIALIZABLE");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits using SERIALIZABLE isolation mode");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend using SERIALIZABLE isolation");
+call mtr.add_suppression("Can't change pxc_strict_mode while isolation level is SERIALIZABLE");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits using SERIALIZABLE isolation mode");
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend setting log_output to TABLE");
-call mtr.add_suppression("WSREP: Can't change pxc_strict_mode while log_output != NONE/FILE");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits setting log_output to TABLE");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend setting log_output to TABLE");
+call mtr.add_suppression("Can't change pxc_strict_mode while log_output != NONE/FILE");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits setting log_output to TABLE");
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication feature");
-call mtr.add_suppression("WSREP: Can't change pxc_strict_mode with wsrep_replicate_myisam turned ON");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of MyISAM table replication feature");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication feature");
+call mtr.add_suppression("Can't change pxc_strict_mode with wsrep_replicate_myisam turned ON");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of MyISAM table replication feature");
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of DML command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of INSERT");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of DML command");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of INSERT");
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of DML command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of TRUNCATE command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ADMIN command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ALTER command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits changing storage engine of a table");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of INSERT");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of DML command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of TRUNCATE command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of ADMIN command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of ALTER command");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits changing storage engine of a table");
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of INSERT");
 
 
 call mtr.add_suppression("WSREP doesn't support XA transaction");
@@ -81,14 +81,14 @@ set global pxc_strict_mode='ENFORCING';
 # to allow insertion in add_suppression table.
 set global pxc_strict_mode='DISABLED';
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of DML command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of DML command");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE command");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
+call mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
 
 set global pxc_strict_mode='ENFORCING';
 
@@ -572,8 +572,8 @@ drop table tmyisam;
 --echo # restart with wsrep_replicate_myisam=1
 --error 1
 --exec $MYSQLD --no-defaults --wsrep_provider="libgalera_smm.so" --wsrep_replicate_myisam=1 > $restartdir/restart.log 2>&1
---echo "grep --count \"WSREP: Percona-XtraDB-Cluster prohibits use of MyISAM table replication"
---exec grep --count "WSREP: Percona-XtraDB-Cluster prohibits use of MyISAM table replication" $restartdir/restart.log
+--echo "grep --count \"Percona-XtraDB-Cluster prohibits use of MyISAM table replication"
+--exec grep --count "Percona-XtraDB-Cluster prohibits use of MyISAM table replication" $restartdir/restart.log
 --remove_file $restartdir/restart.log
 
 #-------------------------------------------------------------------------------
@@ -753,8 +753,8 @@ drop table tinnodb;
 --echo # restart with binlog_format=STATEMENT
 --error 1
 --exec $MYSQLD --no-defaults --wsrep_provider="libgalera_smm.so" --binlog_format=STATEMENT > $restartdir/restart.log 2>&1
---echo "grep --count \"WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level\""
---exec grep --count "WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level" $restartdir/restart.log
+--echo "grep --count \"Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level\""
+--exec grep --count "Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level" $restartdir/restart.log
 --remove_file $restartdir/restart.log
 
 #-------------------------------------------------------------------------------
@@ -992,8 +992,8 @@ select count(*) from mysql.general_log;
 --echo # restart with log_output=TABLE
 --error 1
 --exec $MYSQLD --no-defaults --wsrep_provider="libgalera_smm.so" --log_output=TABLE > $restartdir/restart.log 2>&1
---echo "grep --count \"WSREP: Percona-XtraDB-Cluster prohibits setting log_output to TABLE\""
---exec grep --count "WSREP: Percona-XtraDB-Cluster prohibits setting log_output to TABLE" $restartdir/restart.log
+--echo "grep --count \"Percona-XtraDB-Cluster prohibits setting log_output to TABLE\""
+--exec grep --count "Percona-XtraDB-Cluster prohibits setting log_output to TABLE" $restartdir/restart.log
 --remove_file $restartdir/restart.log
 
 --disable_query_log
@@ -1319,8 +1319,8 @@ drop table t;
 --exec echo "try:$start_mysqld_params" > $_expect_file_name
 --sleep 30
 #
---echo "grep --count \"WSREP: Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to"
---exec grep --count "WSREP: Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to" $restartdir/restart.log
+--echo "grep --count \"Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to"
+--exec grep --count "Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to" $restartdir/restart.log
 --remove_file $restartdir/restart.log
 #
 --echo "Try restarting node-2 with default options"

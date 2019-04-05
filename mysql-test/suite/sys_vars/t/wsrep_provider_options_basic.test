@@ -4,7 +4,7 @@
 --echo # wsrep_provider_options
 --echo #
 
-call mtr.add_suppression("WSREP: Failed to get provider options");
+call mtr.add_suppression("Failed to get provider options");
 
 --echo # save the initial value
 SET @wsrep_provider_options_global_saved = @@global.wsrep_provider_options;

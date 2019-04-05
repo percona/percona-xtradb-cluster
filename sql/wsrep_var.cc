@@ -25,6 +25,7 @@
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
 #include "wsrep_xid.h"
+#include "mysql/components/services/log_builtins.h"
 
 #define WSREP_START_POSITION_ZERO "00000000-0000-0000-0000-000000000000:-1"
 #define WSREP_CLUSTER_NAME "my_wsrep_cluster"

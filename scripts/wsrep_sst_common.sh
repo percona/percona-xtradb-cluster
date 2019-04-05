@@ -260,46 +260,30 @@ if [[ "$WSREP_LOG_DEBUG" == "off" ]]; then
     WSREP_LOG_DEBUG=""
 fi
 
-
-# Determine the timezone to use for error logging
-LOGGING_TZ=$(parse_cnf mysqld log-timestamps "")
-if [ -z "$LOGGING_TZ" ]; then
-    LOGGING_TZ="UTC"
-fi
-# Set the options to the 'date' command based on the timezone
-if [[ "$LOGGING_TZ" == "SYSTEM" ]]; then
-    LOG_DATE_COMMAND="+%Y-%m-%dT%H:%M:%S.%6N%:z"
-else
-    LOG_DATE_COMMAND="-u +%Y-%m-%dT%H:%M:%S.%6NZ"
-fi
-
 wsrep_log()
 {
-    # echo everything to stderr so that it gets into common error log
-    # deliberately made to look different from the rest of the log
-    local readonly tst="$(date $LOG_DATE_COMMAND)"
-    echo -e "\t$tst WSREP_SST: $*" >&2
+    echo -e "$*" >&2
 }
 
 wsrep_log_error()
 {
-    wsrep_log "[ERROR] $*"
+    wsrep_log "ERR:$*"
 }
 
 wsrep_log_warning()
 {
-    wsrep_log "[WARNING] $*"
+    wsrep_log "WRN:$*"
 }
 
 wsrep_log_info()
 {
-    wsrep_log "[INFO] $*"
+    wsrep_log "INF:$*"
 }
 
 wsrep_log_debug()
 {
     if [[ -n "$WSREP_LOG_DEBUG" ]]; then
-        wsrep_log "[DEBUG] $*"
+        wsrep_log "DBG:(debug) $*"
     fi
 }
 
@@ -468,9 +452,7 @@ function wait_for_mysqld_shutdown()
             wsrep_log_error "The $description"
             wsrep_log_error "has failed to shutdown.  Killing the process."
             wsrep_log_error "Line $LINENO"
-            echo "--------------- mysql error log  (START) --------------------" >&2
-            cat ${mysqld_err_log} >&2
-            echo "--------------- mysql error log (END) ----------------------" >&2
+            cat_file_to_stderr "${mysqld_err_log}" "ERR" "mysql error log"
             wsrep_log_error "****************************************************** "
             return 1
         fi
@@ -496,9 +478,7 @@ function wait_for_mysqld_startup()
             wsrep_log_error "Failed to start the $description."
             wsrep_log_error "Check the parameters and retry"
             wsrep_log_error "Line $LINENO  pid:$mysqld_pid"
-            echo "--------------- err.log (START) --------------------" >&2
-            cat ${err_log} >&2
-            echo "--------------- err.log (END) ----------------------" >&2
+            cat_file_to_stderr "${err_log}" "ERR" "mysql error log"
             wsrep_log_error "****************************************************** "
             return 3
         fi
@@ -520,9 +500,7 @@ function wait_for_mysqld_startup()
             wsrep_log_error "Failed to start the $description. (timeout)"
             wsrep_log_error "Check the parameters and retry"
             wsrep_log_error "Line $LINENO  pid:$mysqld_pid"
-            echo "--------------- mysql error log  (START) --------------------" >&2
-            cat ${err_log} >&2
-            echo "--------------- mysql error log (END) ----------------------" >&2
+            cat_file_to_stderr "${err_log}" "ERR" "mysql error log"
             wsrep_log_error "****************************************************** "
             return 3
         fi
@@ -1047,9 +1025,7 @@ EOF
             wsrep_log_error "The MySQL server failed and was terminated."
             wsrep_log_error "Check the parameters and retry"
             wsrep_log_error "Line $LINENO  errcode:$errcode  pid:$mysql_pid"
-            echo "--------------- err.log (START) --------------------" >&2
-            cat ${mysqld_err_log} >&2
-            echo "--------------- err.log (END) ----------------------" >&2
+            cat_file_to_stderr "${mysqld_err_log}" "ERR" "mysql error log"
             wsrep_log_error "****************************************************** "
             return 3
         fi
@@ -1097,12 +1073,8 @@ EOF
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Failed to execute mysql-upgrade. Check the parameters and retry"
             wsrep_log_error "Line $LINENO errcode:${errcode}"
-            echo "--------------- mysql_upgrade log (START) --------------------" >&2
-            cat ${mysql_upgrade_dir_path}/upgrade.out >&2
-            echo "--------------- mysql_upgrade log (END) ----------------------" >&2
-            echo "--------------- mysql error log  (START) --------------------" >&2
-            cat ${mysqld_err_log} >&2
-            echo "--------------- mysql error log (END) ----------------------" >&2
+            cat_file_to_stderr "${mysql_upgrade_dir_path}/upgrade.out" "ERR" "mysql upgrade log"
+            cat_file_to_stderr "${mysqld_err_log}" "ERR" "mysql error log"
             wsrep_log_error "****************************************************** "
             exit 3
         fi
@@ -1137,12 +1109,8 @@ EOF
                 wsrep_log_error "Failed to shutdown the MySQL instance started for upgrade."
                 wsrep_log_error "Check the parameters and retry.  Killing the process."
                 wsrep_log_error "Line $LINENO errcode:${errcode}"
-                echo "--------------- shutdown log (START) --------------------" >&2
-                cat ${mysql_upgrade_dir_path}/upgrade_shutdown.out >&2
-                echo "--------------- shutdown log (END) ----------------------" >&2
-                echo "--------------- mysql error log (START) --------------------" >&2
-                cat ${mysqld_err_log} >&2
-                echo "--------------- mysql error log (END) ----------------------" >&2
+                cat_file_to_stderr "${mysql_upgrade_dir_path}/upgrade_shutdown.out" "ERR" "shutdown log"
+                cat_file_to_stderr "${mysqld_err_log}" "ERR" "mysql error log"
                 wsrep_log_error "****************************************************** "
                 return 3
             fi
@@ -1195,12 +1163,8 @@ EOF
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Failed to execute mysql 'SHOW SLAVE STATUS'. Check the parameters and retry"
             wsrep_log_error "Line $LINENO errcode:${errcode}"
-            echo "--------------- show slave status log (START) --------------------" >&2
-            cat ${mysql_upgrade_dir_path}/show_slave_status.out >&2
-            echo "--------------- show slave status log (END) ----------------------" >&2
-            echo "--------------- mysql error log  (START) --------------------" >&2
-            cat ${mysqld_err_log} >&2
-            echo "--------------- mysql error log (END) ----------------------" >&2
+            cat_file_to_stderr "${mysql_upgrade_dir_path}/show_slave_status.out" "ERR" "show slave status log"
+            cat_file_to_stderr "${mysqld_err_log}" "ERR" "mysql error log"
             wsrep_log_error "****************************************   ************** "
             return 3
         fi
@@ -1230,12 +1194,8 @@ EOF
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Failed to execute mysql 'RESET SLAVE ALL'. Check the parameters and retry"
             wsrep_log_error "Line $LINENO errcode:${errcode}"
-            echo "--------------- reset slave log (START) --------------------" >&2
-            cat ${mysql_upgrade_dir_path}/reset_slave.out >&2
-            echo "--------------- reset slave log (END) ----------------------" >&2
-            echo "--------------- mysql error log  (START) --------------------" >&2
-            cat ${mysqld_err_log} >&2
-            echo "--------------- mysql error log (END) ----------------------" >&2
+            cat_file_to_stderr "${mysql_upgrade_dir_path}/reset_slave.out" "ERR" "reset slave log"
+            cat_file_to_stderr "${mysqld_err_log}" "ERR" "mysql error log"
             wsrep_log_error "****************************************   ************** "
             return 3
         fi
@@ -1266,12 +1226,8 @@ EOF
         wsrep_log_error "Failed to shutdown the MySQL instance started for upgrade."
         wsrep_log_error "Check the parameters and retry.  Killing the process."
         wsrep_log_error "Line $LINENO errcode:${errcode}"
-        echo "--------------- shutdown log (START) --------------------" >&2
-        cat ${mysql_upgrade_dir_path}/upgrade_shutdown.out >&2
-        echo "--------------- shutdown log (END) ----------------------" >&2
-        echo "--------------- mysql error log (START) --------------------" >&2
-        cat ${mysqld_err_log} >&2
-        echo "--------------- mysql error log (END) ----------------------" >&2
+        cat_file_to_stderr "${mysql_upgrade_dir_path}/upgrade_shutdown.out" "ERR" "shutdown log"
+        cat_file_to_stderr "${mysqld_err_log}" "ERR" "mysql error log"
         wsrep_log_error "****************************************************** "
         return 3
     fi
@@ -1321,4 +1277,27 @@ function read_variables_from_stdin()
         esac
     done
     return 0
+}
+
+
+# Takes a file and writes it to stderr in a way that allows
+# for better formatting by the server
+#
+# Globals:
+#   None
+#
+# Parameters:
+#   Argument 1: Path to the file
+#   Argument 2: Priority level (DBG, INF, WRN, ERR)
+#   Argument 3: File description
+#
+function cat_file_to_stderr()
+{
+    local file_path=$1
+    local level=$2
+    local description=$3
+
+    echo "FIL:${level}:${description}" >&2
+    cat $file_path >&2
+    echo "EOF:" >&2
 }

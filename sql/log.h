@@ -1495,40 +1495,6 @@ bool wsrep_trans_cache_is_empty(THD *thd);
 void wsrep_thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
 void wsrep_thd_binlog_trx_reset(THD *thd);
 
-// MySQL logging functions don't seem to understand long long length modifer.
-// This is a workaround. It also prefixes all messages with "WSREP"
-#define WSREP_LOG(fun, ...)                        \
-  {                                                \
-    char msg[4096] = {'\0'};                       \
-    snprintf(msg, sizeof(msg) - 1, ##__VA_ARGS__); \
-    fun("WSREP: %s", msg);                         \
-  }
-
-#define WSREP_DEBUG(...) \
-  if (wsrep_debug) WSREP_LOG(sql_print_information, ##__VA_ARGS__)
-#define WSREP_INFO(...) WSREP_LOG(sql_print_information, ##__VA_ARGS__)
-#define WSREP_WARN(...) WSREP_LOG(sql_print_warning, ##__VA_ARGS__)
-#define WSREP_ERROR(...) WSREP_LOG(sql_print_error, ##__VA_ARGS__)
-
-#define WSREP_LOG_CONFLICT_THD(thd, role)                                      \
-  WSREP_LOG(sql_print_information,                                             \
-            "%s: \n "                                                          \
-            "  THD: %u, mode: %s, state: %s, conflict: %s, seqno: %lld\n "     \
-            "  SQL: %s\n",                                                     \
-            role, wsrep_thd_thread_id(thd), wsrep_thd_get_exec_mode(thd),      \
-            wsrep_thd_get_query_state(thd), wsrep_thd_get_conflict_state(thd), \
-            (long long)wsrep_thd_trx_seqno(thd), wsrep_thd_query(thd));
-
-#define WSREP_LOG_CONFLICT(bf_thd, victim_thd, bf_abort)                      \
-  if (wsrep_debug || wsrep_log_conflicts) {                                   \
-    WSREP_LOG(sql_print_information, "--------- CONFLICT DETECTED --------"); \
-    WSREP_LOG(sql_print_information,                                          \
-              "cluster conflict due to %s for threads:\n",                    \
-              (bf_abort) ? "high priority abort" : "certification failure");  \
-    if (bf_thd) WSREP_LOG_CONFLICT_THD(bf_thd, "Winning thread");             \
-    if (victim_thd) WSREP_LOG_CONFLICT_THD(victim_thd, "Victim thread");      \
-  }
-
 #endif /* WITH_WSREP */
 
 #endif /* LOG_H */

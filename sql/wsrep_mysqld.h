@@ -281,24 +281,27 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 
 #define WSREP_EMULATE_BINLOG(thd) (WSREP(thd) && wsrep_emulate_bin_log)
 
-#if 0
-// MySQL logging functions don't seem to understand long long length modifer.
-// This is a workaround. It also prefixes all messages with "WSREP"
-#define WSREP_LOG(fun, ...)                        \
-  {                                                \
-    char msg[1024] = {'\0'};                       \
-    snprintf(msg, sizeof(msg) - 1, ##__VA_ARGS__); \
-    fun("WSREP: %s", msg);                         \
-  }
 
-#define WSREP_DEBUG(...) \
-  if (wsrep_debug) WSREP_LOG(sql_print_information, ##__VA_ARGS__)
-#define WSREP_INFO(...) WSREP_LOG(sql_print_information, ##__VA_ARGS__)
-#define WSREP_WARN(...) WSREP_LOG(sql_print_warning, ##__VA_ARGS__)
-#define WSREP_ERROR(...) WSREP_LOG(sql_print_error, ##__VA_ARGS__)
+#define WSREP_LOG(severity, fmt, ...)              \
+    LogEvent()                                     \
+      .prio(severity)                              \
+      .subsys("WSREP")                             \
+      .component("WSREP")                          \
+      .source_line(__LINE__)                       \
+      .source_file(MY_BASENAME)                    \
+      .function(__FUNCTION__)                      \
+      .message(fmt, ##__VA_ARGS__);
+
+
+#define WSREP_DEBUG(fmt, ...) \
+  if (wsrep_debug) WSREP_LOG(INFORMATION_LEVEL, fmt, ##__VA_ARGS__)
+#define WSREP_INFO(fmt, ...) WSREP_LOG(INFORMATION_LEVEL, fmt, ##__VA_ARGS__)
+#define WSREP_WARN(fmt, ...) WSREP_LOG(WARNING_LEVEL, fmt, ##__VA_ARGS__)
+#define WSREP_ERROR(fmt, ...) WSREP_LOG(ERROR_LEVEL, fmt, ##__VA_ARGS__)
+
 
 #define WSREP_LOG_CONFLICT_THD(thd, role)                                      \
-  WSREP_LOG(sql_print_information,                                             \
+  WSREP_LOG(INFORMATION_LEVEL,                                                 \
             "%s: \n "                                                          \
             "  THD: %u, mode: %s, state: %s, conflict: %s, seqno: %lld\n "     \
             "  SQL: %s\n",                                                     \
@@ -308,19 +311,44 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 
 #define WSREP_LOG_CONFLICT(bf_thd, victim_thd, bf_abort)                      \
   if (wsrep_debug || wsrep_log_conflicts) {                                   \
-    WSREP_LOG(sql_print_information, "--------- CONFLICT DETECTED --------"); \
-    WSREP_LOG(sql_print_information,                                          \
+    WSREP_LOG(INFORMATION_LEVEL, "--------- CONFLICT DETECTED --------");     \
+    WSREP_LOG(INFORMATION_LEVEL,                                              \
               "cluster conflict due to %s for threads:\n",                    \
               (bf_abort) ? "high priority abort" : "certification failure");  \
     if (bf_thd) WSREP_LOG_CONFLICT_THD(bf_thd, "Winning thread");             \
     if (victim_thd) WSREP_LOG_CONFLICT_THD(victim_thd, "Victim thread");      \
   }
-#endif
 
 #define WSREP_QUERY(thd)                                   \
   ((!opt_general_log_raw) && thd->rewritten_query.length() \
        ? thd->rewritten_query.c_ptr_safe()                 \
        : thd->query().str)
+
+
+// Use this for logging output received from the SST scripts
+#define WSREP_SST_LOG(severity, s)  \
+    LogEvent()                      \
+      .prio(severity)               \
+      .subsys("WSREP-SST")          \
+      .component("WSREP-SST")       \
+      .source_line(__LINE__)        \
+      .source_file(MY_BASENAME)     \
+      .function(__FUNCTION__)       \
+      .verbatim(s);
+
+
+// Use this for output received from Galera (via the logging callback)
+#define WSREP_GALERA_LOG(severity, s)  \
+    LogEvent()                      \
+      .prio(severity)               \
+      .subsys("Galera")             \
+      .component("Galera")          \
+      .source_line(__LINE__)        \
+      .source_file(MY_BASENAME)     \
+      .function(__FUNCTION__)       \
+      .verbatim(s);
+
+
 
 extern bool wsrep_ready_get();
 extern void wsrep_ready_wait();
@@ -395,6 +423,7 @@ extern PSI_cond_key key_COND_wsrep_sst_thread;
 extern PSI_thread_key key_THREAD_wsrep_sst_joiner;
 extern PSI_thread_key key_THREAD_wsrep_sst_donor;
 extern PSI_thread_key key_THREAD_wsrep_sst_upgrade;
+extern PSI_thread_key key_THREAD_wsrep_sst_logger;
 extern PSI_thread_key key_THREAD_wsrep_applier;
 extern PSI_thread_key key_THREAD_wsrep_rollbacker;
 #endif /* HAVE_PSI_INTERFACE */

@@ -1,4 +1,4 @@
-call mtr.add_suppression("WSREP: Trying to desync a node that is already paused");
+call mtr.add_suppression("Trying to desync a node that is already paused");
 ** Test #1 **
 CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
 SET GLOBAL wsrep_desync=1;

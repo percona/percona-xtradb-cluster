@@ -38,6 +38,7 @@
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
 #include "wsrep_xid.h"
+#include "mysql/components/services/log_builtins.h"
 
 #ifdef HAVE_PSI_INTERFACE
 #include <map>
@@ -536,17 +537,17 @@ static void wsrep_pfs_instr_cb(wsrep_pfs_instr_type_t type,
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   switch (level) {
     case WSREP_LOG_INFO:
-      sql_print_information("WSREP: %s", msg);
+      WSREP_GALERA_LOG(INFORMATION_LEVEL, msg);
       break;
     case WSREP_LOG_WARN:
-      sql_print_warning("WSREP: %s", msg);
+      WSREP_GALERA_LOG(WARNING_LEVEL, msg);
       break;
     case WSREP_LOG_ERROR:
     case WSREP_LOG_FATAL:
-      sql_print_error("WSREP: %s", msg);
+      WSREP_GALERA_LOG(ERROR_LEVEL, msg);
       break;
     case WSREP_LOG_DEBUG:
-      if (wsrep_debug) sql_print_information("[Debug] WSREP: %s", msg);
+      if (wsrep_debug) WSREP_GALERA_LOG(INFORMATION_LEVEL, msg);
     default:
       break;
   }

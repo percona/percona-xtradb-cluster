@@ -21,6 +21,7 @@
 #include "sql_class.h"
 #include "sql_plugin.h"
 #include "wsrep_mysqld.h"  // for logging macros
+#include "mysql/components/services/log_builtins.h"
 #include "sql/log.h"
 
 extern bool srv_sys_tablespaces_open;

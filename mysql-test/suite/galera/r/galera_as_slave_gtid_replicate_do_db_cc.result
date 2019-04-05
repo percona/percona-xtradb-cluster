@@ -295,7 +295,7 @@ CALL mtr.add_suppression("Slave SQL for channel '': Error in Xid_log_event: Comm
 CALL mtr.add_suppression("Slave SQL for channel '': Error in Xid_log_event: Commit could not be completed, 'WSREP GTID replication was interrupted', Error_code: MY-001180");
 CALL mtr.add_suppression("Slave SQL for channel '': Node has dropped from cluster");
 CALL mtr.add_suppression("MySQL GTID event pending");
-CALL mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+CALL mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 CALL mtr.add_suppression("TO isolation failed for");
 CALL mtr.add_suppression("Slave SQL: Error 'Deadlock found when trying to get lock; try restarting transaction' on query");
 CALL mtr.add_suppression("Slave SQL: Error 'WSREP has not yet prepared node for application use' on query");

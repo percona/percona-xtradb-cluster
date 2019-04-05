@@ -26,5 +26,5 @@ DROP TABLE t1;
 #CALL mtr.add_suppression("transaction size limit");
 #CALL mtr.add_suppression("transaction size exceeded");
 #CALL mtr.add_suppression("rbr write fail");
-CALL mtr.add_suppression("WSREP: Transaction/Write-set size limit.*");
-CALL mtr.add_suppression("WSREP: Failed to create write-set from binlog.*");
+CALL mtr.add_suppression("Transaction/Write-set size limit.*");
+CALL mtr.add_suppression("Failed to create write-set from binlog.*");

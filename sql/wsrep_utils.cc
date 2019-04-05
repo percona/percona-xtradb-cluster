@@ -22,6 +22,7 @@
 
 #include "wsrep_utils.h"
 #include "wsrep_mysqld.h"
+#include "mysql/components/services/log_builtins.h"
 
 #include "sql_class.h"
 
@@ -332,9 +333,10 @@ static int execvpe(const char *file, char *const argv[], char *const envp[]) {
 #define PIPE_WRITE 1
 #define STDIN_FD 0
 #define STDOUT_FD 1
+#define STDERR_FD 2
 
 process::process(const char *cmd, const char *type, char **env, bool execute_immediately)
-    : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), io_w_(NULL), err_(0), pid_(0)
+    : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), io_w_(NULL), io_err_(NULL), err_(0), pid_(0)
   {
     if (execute_immediately)
       execute(type, env);
@@ -367,19 +369,11 @@ void process::execute(const char *type, char **env)
 
   int pipe_fds[2] = { -1, -1 };
   int pipe2_fds[2] = { -1, -1 };
+  int pipeerr_fds[2] = { -1, -1 };
 
   if (::pipe(pipe_fds)) {
     err_ = errno;
     WSREP_ERROR("pipe() failed: %d (%s)", err_, strerror(err_));
-    return;
-  }
-
-  // Create the second pipe (needed only if type = "rw")
-  // One pipe for reading and one pipe for writing
-  if (strcmp(type, "rw") == 0 && ::pipe(pipe2_fds))
-  {
-    err_ = errno;
-    WSREP_ERROR ("pipe() failed to create the second pipe: %d (%s)", err_, strerror(err_));
     return;
   }
 
@@ -389,6 +383,22 @@ void process::execute(const char *type, char **env)
   int const close_fd(parent_end == PIPE_READ ? STDOUT_FD : STDIN_FD);
 
   char *const pargv[4] = {strdup("sh"), strdup("-c"), strdup(str_), NULL};
+
+  // Create the second pipe (needed only if type = "rw")
+  // One pipe for reading and one pipe for writing
+  if (strcmp(type, "rw") == 0 && ::pipe(pipe2_fds))
+  {
+    err_ = errno;
+    WSREP_ERROR ("pipe() failed to create the second pipe: %d (%s)", err_, strerror(err_));
+    goto cleanup_pipe;
+  }
+
+  if (::pipe(pipeerr_fds)) {
+    err_ = errno;
+    WSREP_ERROR("pipe() failed to create the error pipe: %d (%s)", err_, strerror(err_));
+    goto cleanup_pipe;
+  }
+
   if (!(pargv[0] && pargv[1] && pargv[2])) {
     err_ = ENOMEM;
     WSREP_ERROR("Failed to allocate pargv[] array.");
@@ -432,6 +442,17 @@ void process::execute(const char *type, char **env)
       }
     }
 
+    io_err_ = fdopen(pipeerr_fds[PIPE_READ], "r");
+    if (io_err_)
+    {
+      pipeerr_fds[PIPE_READ] = -1;  // skip close on cleanup
+    }
+    else
+    {
+      err = errno;
+      WSREP_ERROR ("fdopen() failed: %d (%s)", err_, strerror(err_));
+    }
+
     goto cleanup_pipe;
   }
 
@@ -444,7 +465,7 @@ void process::execute(const char *type, char **env)
   */
 
   if (prctl(PR_SET_PDEATHSIG, SIGTERM)) {
-    sql_print_error("prctl() failed");
+    WSREP_ERROR("prctl() failed");
     _exit(EXIT_FAILURE);
   }
 #endif
@@ -455,7 +476,7 @@ void process::execute(const char *type, char **env)
   (void)sigemptyset(&set);
 
   if (sigprocmask(SIG_SETMASK, &set, NULL)) {
-    sql_print_error("sigprocmask() failed");
+    WSREP_ERROR("sigprocmask() failed");
     _exit(EXIT_FAILURE);
   }
 
@@ -479,7 +500,7 @@ void process::execute(const char *type, char **env)
   */
 
   if (setsid() < 0) {
-    sql_print_error("setsid() failed");
+    WSREP_ERROR("setsid() failed");
     _exit(EXIT_FAILURE);
   }
 
@@ -497,42 +518,58 @@ void process::execute(const char *type, char **env)
   /* substitute our pipe descriptor in place of the closed one */
 
   if (dup2(pipe_fds[child_end], close_fd) < 0) {
-    sql_print_error("dup2() failed");
+    WSREP_ERROR("dup2() failed");
     _exit(EXIT_FAILURE);
   }
   if ((strcmp(type, "rw") == 0) && dup2(pipe2_fds[PIPE_READ], STDIN_FD) < 0)
   {
-    sql_print_error("dup2() failed");
+    WSREP_ERROR("dup2() failed");
+    _exit(EXIT_FAILURE);
+  }
+  if (dup2(pipeerr_fds[PIPE_WRITE], STDERR_FD) < 0) {
+    WSREP_ERROR("dup2() failed");
     _exit(EXIT_FAILURE);
   }
 
   /* Close child and parent pipe descriptors after redirection. */
 
   if (close(pipe_fds[child_end]) < 0) {
-    sql_perror("close() failed");
+    WSREP_ERROR("close() failed");
     _exit(EXIT_FAILURE);
   }
 
   if (close(pipe_fds[parent_end]) < 0) {
-    sql_perror("close() failed");
+    WSREP_ERROR("close() failed");
     _exit(EXIT_FAILURE);
   }
 
   if (close(pipe2_fds[child_end]) < 0)
   {
-    sql_perror("close() failed");
+    WSREP_ERROR("close() failed");
     _exit(EXIT_FAILURE);
   }
 
   if (close(pipe2_fds[parent_end]) < 0)
   {
-    sql_perror("close() failed");
+    WSREP_ERROR("close() failed");
+    _exit(EXIT_FAILURE);
+  }
+
+  if (close(pipeerr_fds[PIPE_WRITE]) < 0)
+  {
+    WSREP_ERROR("close() failed");
+    _exit(EXIT_FAILURE);
+  }
+
+  if (close(pipeerr_fds[PIPE_READ]) < 0)
+  {
+    WSREP_ERROR("close() failed");
     _exit(EXIT_FAILURE);
   }
 
   execvpe(pargv[0], pargv, env);
 
-  sql_print_error("execlp() failed");
+  WSREP_ERROR("execlp() failed");
   _exit(EXIT_FAILURE);
 
 #else  // _POSIX_SPAWN is defined:
@@ -675,6 +712,28 @@ void process::execute(const char *type, char **env)
     }
   }
 
+  err_ = posix_spawn_file_actions_adddup2(&sfa, pipeerr_fds[PIPE_WRITE], STDERR_FD);
+  if (err_) {
+    WSREP_ERROR("posix_spawn_file_actions_adddup2() failed: %d (%s)", err_,
+                strerror(err_));
+    goto cleanup_actions;
+  }
+
+  err_ = posix_spawn_file_actions_addclose(&sfa, pipeerr_fds[PIPE_WRITE]);
+  if (err_) {
+    WSREP_ERROR("posix_spawn_file_actions_addclose() failed: %d (%s)", err_,
+                strerror(err_));
+    goto cleanup_actions;
+  }
+
+  err_ = posix_spawn_file_actions_addclose(&sfa, pipeerr_fds[PIPE_READ]);
+  if (err_) {
+    WSREP_ERROR("posix_spawn_file_actions_addclose() failed: %d (%s)", err_,
+                strerror(err_));
+    goto cleanup_actions;
+  }
+
+
   /* Launch the child process: */
 
   err_ = posix_spawnp(&pid_, pargv[0], &sfa, &sattr, pargv, env);
@@ -724,6 +783,16 @@ void process::execute(const char *type, char **env)
     }
   }
 
+  io_err_ = fdopen(pipeerr_fds[PIPE_READ], "r");
+
+  if (io_err_) {
+    pipeerr_fds[PIPE_READ] = -1;  // skip close on cleanup
+  } else {
+    err_ = errno;
+    WSREP_ERROR("fdopen() failed: %d (%s)", err_, strerror(err_));
+  }
+
+
 #endif
 
 cleanup_pipe:
@@ -731,6 +800,8 @@ cleanup_pipe:
   if (pipe_fds[1] >= 0) close(pipe_fds[1]);
   if (pipe2_fds[0] >= 0) close (pipe2_fds[0]);
   if (pipe2_fds[1] >= 0) close (pipe2_fds[1]);
+  if (pipeerr_fds[0] >= 0) close (pipeerr_fds[0]);
+  if (pipeerr_fds[1] >= 0) close (pipeerr_fds[1]);
 
   free(pargv[0]);
   free(pargv[1]);
@@ -778,6 +849,19 @@ process::~process() {
           err_ = errno;
           WSREP_ERROR("fclose() failed: %d (%s)", err_, strerror(err_));
       }
+  }
+
+  if (io_err_)
+  {
+    WSREP_WARN(
+        "Closing pipe to child process: %s, PID(%ld) "
+        "which might still be running.",
+        str_, (long)pid_);
+
+    if (fclose(io_err_) == -1) {
+      err_ = errno;
+      WSREP_ERROR("fclose() failed: %d (%s)", err_, strerror(err_));
+    }
   }
 
   if (str_) free(const_cast<char *>(str_));
@@ -837,6 +921,8 @@ int process::wait() {
       io_ = NULL;
       if (io_w_) fclose(io_w_);
       io_w_ = NULL;
+      if (io_err_) fclose(io_err_);
+      io_err_ = NULL;
     }
   } else {
     assert(NULL == io_);

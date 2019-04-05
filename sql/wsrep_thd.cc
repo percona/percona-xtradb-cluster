@@ -24,6 +24,7 @@
 #include "transaction.h"
 #include "mysql/plugin.h"
 #include "sql/log.h"
+#include "mysql/components/services/log_builtins.h"
 
 static std::atomic<long long> atomic_wsrep_bf_aborts_counter(0);
 
@@ -618,7 +619,7 @@ static void wsrep_rollback_process(THD *thd) {
   thd->current_cond = 0;
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 
-  sql_print_information("WSREP: rollbacker thread exiting");
+  WSREP_INFO("rollbacker thread exiting");
   thd->store_globals();
   DBUG_PRINT("wsrep", ("wsrep rollbacker thread exiting"));
   DBUG_VOID_RETURN;

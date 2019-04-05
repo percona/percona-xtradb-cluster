@@ -41,7 +41,7 @@ SET SESSION wsrep_sync_wait = 0;
 
 --perl
         use strict;
-        my $wsrep_start_position = `grep 'WSREP: Recovered position:' $ENV{MYSQL_TMP_DIR}/galera_var_wsrep_recover.log | sed 's/.*WSREP\:\ Recovered\ position://' | sed 's/^[ \t]*//'`;
+        my $wsrep_start_position = `grep 'Recovered position:' $ENV{MYSQL_TMP_DIR}/galera_var_wsrep_recover.log | sed 's/.*Recovered\ position://' | sed 's/^[ \t]*//'`;
         chomp($wsrep_start_position);
 
         $wsrep_start_position ne '' or die 'wsrep_start_position not found';

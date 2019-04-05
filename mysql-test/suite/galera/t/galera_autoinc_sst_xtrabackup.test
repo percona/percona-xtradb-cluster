@@ -97,8 +97,8 @@ INSERT INTO t1 VALUES (DEFAULT);
 --eval SELECT COUNT(*) = $count AS count_equal FROM t1
 --enable_query_log
 
-CALL mtr.add_suppression("WSREP: Action message in non-primary configuration from member 0");
-CALL mtr.add_suppression("WSREP: Failed to remove page file");
+CALL mtr.add_suppression("Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("Failed to remove page file");
 
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
@@ -111,7 +111,7 @@ DROP PROCEDURE p1;
 DROP TABLE t1;
 
 CALL mtr.add_suppression("gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)");
-CALL mtr.add_suppression("WSREP: Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("Action message in non-primary configuration from member 0");
 
 --connection node_1a
 --disable_query_log

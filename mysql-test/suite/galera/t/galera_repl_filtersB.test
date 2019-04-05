@@ -5597,10 +5597,10 @@ RESET SLAVE ALL;
 RESET MASTER;
 
 --connection node_1
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 
 --connection node_2
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 
 --connection node_3
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");

@@ -24,7 +24,7 @@ alter table t discard tablespace;
 select * from t;
 #
 call mtr.add_suppression("Cannot delete tablespace.*");
-call mtr.add_suppression("WSREP: While running PXC node in cluster mode it will skip.*");
+call mtr.add_suppression("While running PXC node in cluster mode it will skip.*");
 alter table t discard tablespace;
 
 --connection node_2

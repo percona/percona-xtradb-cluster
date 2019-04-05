@@ -60,6 +60,7 @@ extern MYSQL_PLUGIN_IMPORT CHARSET_INFO *system_charset_info;
 static PSI_memory_key key_memory_MDL_context_acquire_locks;
 
 #ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
 #include "debug_sync.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"

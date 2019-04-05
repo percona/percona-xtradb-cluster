@@ -1873,9 +1873,7 @@ then
             wsrep_log_error "${XTRABACKUP_BIN} finished with error: ${RC[0]}. " \
                             "Check ${DATA}/innobackup.backup.log"
             wsrep_log_error "Line $LINENO"
-            echo "--------------- innobackup.backup.log (START) --------------------" >&2
-            cat ${DATA}/innobackup.backup.log >&2
-            echo "--------------- innobackup.backup.log (END) ----------------------" >&2
+            cat_file_to_stderr "${DATA}/innobackup.backup.log" "ERR" "innobackup.backup.log"
             wsrep_log_error "****************************************************** "
             exit 22
         elif [[ ${RC[$(( ${#RC[@]}-1 ))]} -eq 1 ]]; then
@@ -2278,9 +2276,7 @@ then
             wsrep_log_error "${XTRABACKUP_BIN} apply finished with errors." \
                             "Check ${DATA}/innobackup.prepare.log"
             wsrep_log_error "Line $LINENO"
-            echo "--------------- innobackup.prepare.log (START) --------------------" >&2
-            cat "${DATA}/innobackup.prepare.log" >&2
-            echo "--------------- innobackup.prepare.log (END) --------------------" >&2
+            cat_file_to_stderr "${DATA}/innobackup.prepare.log" "ERR" "innobackup.prepare.log"
             wsrep_log_error "****************************************************** "
             exit 22
         fi
@@ -2340,9 +2336,7 @@ then
             wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis" \
                             "Check ${DATA}/innobackup.move.log for details"
             wsrep_log_error "Line $LINENO"
-            echo "--------------- innobackup.move.log (START) --------------------" >&2
-            cat "${DATA}/innobackup.move.log" >&2
-            echo "--------------- innobackup.move.log (END) --------------------" >&2
+            cat_file_to_stderr "${DATA}/innobackup.move.log" "ERR" "innobackup.move.log"
             wsrep_log_error "****************************************************** "
             exit 22
         fi

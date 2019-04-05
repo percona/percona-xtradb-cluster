@@ -26,6 +26,7 @@
 #include "sql_base.h"
 #include "wsrep_binlog.h"
 #include "wsrep_mysqld.h"
+#include "mysql/components/services/log_builtins.h"
 #include "wsrep_xid.h"
 #include "sql/log.h"
 

@@ -29,7 +29,7 @@ commit;
 # Test the sceanrio where-in we try to set wsrep_provider in middle of
 # an active transaction.
 #
-call mtr.add_suppression('WSREP: Cannot modify wsrep_provider inside a transaction');
+call mtr.add_suppression('Cannot modify wsrep_provider inside a transaction');
 BEGIN;
 INSERT INTO t1 VALUES (100);
 --error ER_WRONG_VALUE_FOR_VAR
@@ -80,7 +80,7 @@ DROP TABLE t1;
 --echo #node-2
 --let $wsrep_provider_orig = `SELECT @@wsrep_provider`
 --let $wsrep_cluster_address_orig = `SELECT @@wsrep_cluster_address`
-call mtr.add_suppression("WSREP: gcs_caused\\(\\) returned -103 \\(Software caused connection abort\\)");
+call mtr.add_suppression("gcs_caused\\(\\) returned -103 \\(Software caused connection abort\\)");
 
 #
 show status like 'wsrep_cluster_size';

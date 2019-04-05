@@ -21,6 +21,7 @@
 #include <mysql/plugin.h>
 #include <string>
 #include <vector>
+#include "mysql/components/services/log_builtins.h"
 
 namespace wsp {
 

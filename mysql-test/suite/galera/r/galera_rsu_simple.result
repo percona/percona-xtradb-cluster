@@ -20,8 +20,8 @@ COUNT(*) = 2
 1
 DROP TABLE t1;
 #node-1
-call mtr.add_suppression("WSREP: RSU failed due to pending transactions");
-call mtr.add_suppression("WSREP: ALTER TABLE isolation failure");
+call mtr.add_suppression("RSU failed due to pending transactions");
+call mtr.add_suppression("ALTER TABLE isolation failure");
 #node-1
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) Engine=InnoDB;
 #node-1a
