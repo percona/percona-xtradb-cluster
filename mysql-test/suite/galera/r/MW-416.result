@@ -112,7 +112,7 @@ test
 wsrep_replicated_after_diff
 1
 #node-1 (create tmp user)
-call mtr.add_suppression("WSREP: Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
+call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
 CREATE USER CURRENT_USER();
 ERROR HY000: Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function for USER operation while operating in cluster mode
 DROP USER CURRENT_USER();
