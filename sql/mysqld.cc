@@ -2066,6 +2066,14 @@ class Find_wsrep_thd : public Find_THD_Impl {
         case COMMITTING:
           return thd->wsrep_query_state == QUERY_COMMITTING;
       }
+    } else if (!WSREP_ON) {
+      /* case when user try to set wsrep_provider = none w/o server shutdown */
+      switch (m_type) {
+        case APPLIER:
+          return thd->wsrep_applier;
+        default:
+          return false;
+      }
     }
     return false;
   }

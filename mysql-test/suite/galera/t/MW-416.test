@@ -139,7 +139,7 @@ SHOW DATABASES;
 #
 --connection node_1
 --echo #node-1 (create tmp user)
-call mtr.add_suppression("WSREP: Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
+call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
 #
 --error ER_UNKNOWN_ERROR
 CREATE USER CURRENT_USER();
