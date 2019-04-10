@@ -76,3 +76,70 @@ drop tablespace ts1;
 --echo #node-2
 --let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'ts1';
 --source include/wait_condition.inc
+
+
+#------------------------------------------------------------------------------
+#
+# trying alter and rename of tablespace
+#
+--connection node_1
+--echo #node-1
+create tablespace ts1 add datafile 'ts1.ibd' engine=innodb;
+create tablespace ts2 add datafile 'ts2.ibd' engine=innodb;
+create table t1 (i int) TABLESPACE ts1 engine=innodb;
+show create table t1;
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+select name, path from information_schema.innodb_tablespaces_brief where name LIKE 'ts%';
+
+--connection node_2
+--echo #node-2
+#
+# rename tablespace
+alter tablespace ts1 rename to ts10;
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+select name, path from information_schema.innodb_tablespaces_brief where name LIKE 'ts%';
+show create table t1;
+#
+drop tablespace ts2;
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+
+--connection node_1
+--echo #node-1
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+select name, path from information_schema.innodb_tablespaces_brief where name LIKE 'ts%';
+drop table t1;
+drop tablespace ts10;
+
+#------------------------------------------------------------------------------
+#
+# MySQL-8.0 introduces create/alter/drop of undo tables
+#
+--connection node_1
+--echo #node-1
+CREATE UNDO TABLESPACE one_undo ADD DATAFILE 'one_undo.ibu';
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+
+--connection node_2
+--echo #node-2
+#
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+
+#
+ALTER UNDO TABLESPACE one_undo SET INACTIVE;
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+# -- truncate of undo tablespace after marking inactive may take some time
+SELECT SLEEP(5);
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+
+#
+DROP UNDO TABLESPACE one_undo;
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+
+
+--connection node_1
+--echo #node-1
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
