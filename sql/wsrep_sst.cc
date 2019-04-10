@@ -332,6 +332,7 @@ static void *sst_logger_thread(void *a) {
       WSREP_SST_LOG(level, p + 4);
       if (level == ERROR_LEVEL) {
         flush_error_log_messages();
+        pxc_force_flush_error_message = true;
       }
     } else if (strncmp(p, "FIL:", 4) == 0) {
       /* Expect a string with 3 components (separated by semi-colons)

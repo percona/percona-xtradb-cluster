@@ -167,6 +167,8 @@ extern ulong pxc_maint_mode;
 extern ulong pxc_maint_transition_period;
 extern bool pxc_encrypt_cluster_traffic;
 
+extern bool pxc_force_flush_error_message;
+
 // MySQL status variables
 extern bool wsrep_new_cluster;
 extern bool wsrep_connected;
@@ -281,24 +283,31 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 
 #define WSREP_EMULATE_BINLOG(thd) (WSREP(thd) && wsrep_emulate_bin_log)
 
-
-#define WSREP_LOG(severity, fmt, ...)              \
-    LogEvent()                                     \
-      .prio(severity)                              \
-      .subsys("WSREP")                             \
-      .component("WSREP")                          \
-      .source_line(__LINE__)                       \
-      .source_file(MY_BASENAME)                    \
-      .function(__FUNCTION__)                      \
-      .message(fmt, ##__VA_ARGS__);
-
+#define WSREP_LOG(severity, fmt, ...)                              \
+  do {                                                             \
+    LogEvent()                                                     \
+        .prio(severity)                                            \
+        .subsys("WSREP")                                           \
+        .component("WSREP")                                        \
+        .source_line(__LINE__)                                     \
+        .source_file(MY_BASENAME)                                  \
+        .function(__FUNCTION__)                                    \
+        .message(fmt, ##__VA_ARGS__);                              \
+    if (pxc_force_flush_error_message) flush_error_log_messages(); \
+  } while (0);
 
 #define WSREP_DEBUG(fmt, ...) \
   if (wsrep_debug) WSREP_LOG(INFORMATION_LEVEL, fmt, ##__VA_ARGS__)
 #define WSREP_INFO(fmt, ...) WSREP_LOG(INFORMATION_LEVEL, fmt, ##__VA_ARGS__)
 #define WSREP_WARN(fmt, ...) WSREP_LOG(WARNING_LEVEL, fmt, ##__VA_ARGS__)
-#define WSREP_ERROR(fmt, ...) WSREP_LOG(ERROR_LEVEL, fmt, ##__VA_ARGS__)
 
+extern bool wsrep_is_SE_initialized();
+
+#define WSREP_ERROR(fmt, ...)                                             \
+  do {                                                                    \
+    if (!wsrep_is_SE_initialized()) pxc_force_flush_error_message = true; \
+    WSREP_LOG(ERROR_LEVEL, fmt, ##__VA_ARGS__)                            \
+  } while (0);
 
 #define WSREP_LOG_CONFLICT_THD(thd, role)                                      \
   WSREP_LOG(INFORMATION_LEVEL,                                                 \
@@ -324,31 +333,33 @@ extern wsrep_seqno_t wsrep_locked_seqno;
        ? thd->rewritten_query.c_ptr_safe()                 \
        : thd->query().str)
 
-
 // Use this for logging output received from the SST scripts
-#define WSREP_SST_LOG(severity, s)  \
-    LogEvent()                      \
-      .prio(severity)               \
-      .subsys("WSREP-SST")          \
-      .component("WSREP-SST")       \
-      .source_line(__LINE__)        \
-      .source_file(MY_BASENAME)     \
-      .function(__FUNCTION__)       \
-      .verbatim(s);
-
+#define WSREP_SST_LOG(severity, s)                                 \
+  do {                                                             \
+    LogEvent()                                                     \
+        .prio(severity)                                            \
+        .subsys("WSREP-SST")                                       \
+        .component("WSREP-SST")                                    \
+        .source_line(__LINE__)                                     \
+        .source_file(MY_BASENAME)                                  \
+        .function(__FUNCTION__)                                    \
+        .verbatim(s);                                              \
+    if (pxc_force_flush_error_message) flush_error_log_messages(); \
+  } while (0);
 
 // Use this for output received from Galera (via the logging callback)
-#define WSREP_GALERA_LOG(severity, s)  \
-    LogEvent()                      \
-      .prio(severity)               \
-      .subsys("Galera")             \
-      .component("Galera")          \
-      .source_line(__LINE__)        \
-      .source_file(MY_BASENAME)     \
-      .function(__FUNCTION__)       \
-      .verbatim(s);
-
-
+#define WSREP_GALERA_LOG(severity, s)                              \
+  do {                                                             \
+    LogEvent()                                                     \
+        .prio(severity)                                            \
+        .subsys("Galera")                                          \
+        .component("Galera")                                       \
+        .source_line(__LINE__)                                     \
+        .source_file(MY_BASENAME)                                  \
+        .function(__FUNCTION__)                                    \
+        .verbatim(s);                                              \
+    if (pxc_force_flush_error_message) flush_error_log_messages(); \
+  } while (0);
 
 extern bool wsrep_ready_get();
 extern void wsrep_ready_wait();
