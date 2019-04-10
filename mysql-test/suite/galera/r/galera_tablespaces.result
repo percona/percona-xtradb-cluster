@@ -73,3 +73,95 @@ drop table t1;
 drop table t2;
 drop tablespace ts1;
 #node-2
+#node-1
+create tablespace ts1 add datafile 'ts1.ibd' engine=innodb;
+create tablespace ts2 add datafile 'ts2.ibd' engine=innodb;
+create table t1 (i int) TABLESPACE ts1 engine=innodb;
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `i` int(11) DEFAULT NULL
+) /*!50100 TABLESPACE `ts1` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+name	space_type	state
+ts1	General	normal
+ts2	General	normal
+select name, path from information_schema.innodb_tablespaces_brief where name LIKE 'ts%';
+NAME	PATH
+ts1	ts1.ibd
+ts2	ts2.ibd
+#node-2
+alter tablespace ts1 rename to ts10;
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+name	space_type	state
+ts10	General	normal
+ts2	General	normal
+select name, path from information_schema.innodb_tablespaces_brief where name LIKE 'ts%';
+NAME	PATH
+ts10	ts1.ibd
+ts2	ts2.ibd
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `i` int(11) DEFAULT NULL
+) /*!50100 TABLESPACE `ts10` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+drop tablespace ts2;
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+name	space_type	state
+ts10	General	normal
+#node-1
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+name	space_type	state
+ts10	General	normal
+select name, path from information_schema.innodb_tablespaces_brief where name LIKE 'ts%';
+NAME	PATH
+ts10	ts1.ibd
+drop table t1;
+drop tablespace ts10;
+#node-1
+CREATE UNDO TABLESPACE one_undo ADD DATAFILE 'one_undo.ibu';
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+NAME	SPACE_TYPE	STATE
+innodb_undo_001	Undo	active
+innodb_undo_002	Undo	active
+one_undo	Undo	active
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+count(*) = 1
+0
+#node-2
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+NAME	SPACE_TYPE	STATE
+innodb_undo_001	Undo	active
+innodb_undo_002	Undo	active
+one_undo	Undo	active
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+count(*) = 1
+0
+ALTER UNDO TABLESPACE one_undo SET INACTIVE;
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+NAME	SPACE_TYPE	STATE
+innodb_undo_001	Undo	active
+innodb_undo_002	Undo	active
+one_undo	Undo	inactive
+SELECT SLEEP(5);
+SLEEP(5)
+0
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+count(*) = 1
+1
+DROP UNDO TABLESPACE one_undo;
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+NAME	SPACE_TYPE	STATE
+innodb_undo_001	Undo	active
+innodb_undo_002	Undo	active
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+count(*) = 1
+0
+#node-1
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+NAME	SPACE_TYPE	STATE
+innodb_undo_001	Undo	active
+innodb_undo_002	Undo	active
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+count(*) = 1
+0

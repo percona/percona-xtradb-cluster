@@ -123,3 +123,25 @@ t2	CREATE TABLE `t2` (
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 drop table t1, t2;
 drop tablespace foo;
+#node-1
+CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION = 'Y' Engine=InnoDB;
+CREATE TABLE t1 (c1 INT) ENCRYPTION = 'Y';
+#node-2
+select name, flag, encryption from information_schema.innodb_tablespaces where name = "ts1" OR name = "test/t1";
+name	flag	encryption
+ts1	26624	Y
+test/t1	24609	Y
+alter table t1 tablespace ts1;
+ALTER TABLESPACE ts1 ENCRYPTION = 'N';
+select name, flag, encryption from information_schema.innodb_tablespaces where name = "ts1" OR name = "test/t1";
+name	flag	encryption
+ts1	18432	N
+#node-1
+select name, flag, encryption from information_schema.innodb_tablespaces where name = "ts1" OR name = "test/t1";
+name	flag	encryption
+ts1	18432	N
+DROP TABLE t1;
+DROP TABLESPACE `ts1`;
+#node-2
+select name, flag, encryption from information_schema.innodb_tablespaces where name = "ts1" OR name = "test/t1";
+name	flag	encryption

@@ -142,3 +142,30 @@ insert into t2 values (10), (20), (30);
 show create table t2;
 drop table t1, t2;
 drop tablespace foo;
+
+
+#-------------------------------------------------------------------------------
+# alter encrypted general tablespace
+#
+
+--connection node_1
+--echo #node-1
+CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION = 'Y' Engine=InnoDB;
+CREATE TABLE t1 (c1 INT) ENCRYPTION = 'Y';
+
+--connection node_2
+--echo #node-2
+select name, flag, encryption from information_schema.innodb_tablespaces where name = "ts1" OR name = "test/t1";
+alter table t1 tablespace ts1;
+ALTER TABLESPACE ts1 ENCRYPTION = 'N';
+select name, flag, encryption from information_schema.innodb_tablespaces where name = "ts1" OR name = "test/t1";
+
+--connection node_1
+--echo #node-1
+select name, flag, encryption from information_schema.innodb_tablespaces where name = "ts1" OR name = "test/t1";
+DROP TABLE t1;
+DROP TABLESPACE `ts1`;
+
+--connection node_2
+--echo #node-2
+select name, flag, encryption from information_schema.innodb_tablespaces where name = "ts1" OR name = "test/t1";
