@@ -105,6 +105,10 @@ ulong pxc_maint_transition_period = 30;
 /* enables PXC SSL auto-config */
 bool pxc_encrypt_cluster_traffic = 0;
 
+/* force flush of error message if error is detected at early stage
+   during SST or other initialization. */
+bool pxc_force_flush_error_message = false;
+
 /* End configuration options */
 
 static wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
@@ -544,6 +548,10 @@ static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
       break;
     case WSREP_LOG_ERROR:
     case WSREP_LOG_FATAL:
+      if (!wsrep_is_SE_initialized()) {
+        pxc_force_flush_error_message = true;
+        flush_error_log_messages();
+      }
       WSREP_GALERA_LOG(ERROR_LEVEL, msg);
       break;
     case WSREP_LOG_DEBUG:
