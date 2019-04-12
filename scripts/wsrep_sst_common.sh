@@ -47,7 +47,7 @@ declare WSREP_LOG_DIR=""
 declare WSREP_WSREP_SCHEMA_VERSION=""
 
 # The WSREP schema version found in the local wsrep_state.dat file
-declare DATADIR_WSREP_SCHEMA_VERSION=""
+declare DATADIR_WSREP_SCHEMA_VERSION="0.0.0"
 
 
 while [ $# -gt 0 ]; do
@@ -703,9 +703,10 @@ function run_post_processing_steps()
             if compare_versions "$local_version_str" "!=" "$donor_version_str"; then
                 # Check the sys and wsrep schema versions to determine
                 # if mysql_upgrade is needed
+                wsrep_log_info "Opting mysql_upgrade (sst): local version ($local_version_str) != donor version ($donor_version_str)"
                 run_mysql_upgrade='yes'
             else
-                wsrep_log_debug "Skipping mysql_upgrade: local/donor versions are the same: $local_version_str"
+                wsrep_log_info "Skipping mysql_upgrade (sst): local version ($local_version_str) == donor version ($donor_version_str)"
                 run_mysql_upgrade='no'
             fi
         else
@@ -727,11 +728,11 @@ function run_post_processing_steps()
             fi
 
             if [[ $WSREP_WSREP_SCHEMA_VERSION == $DATADIR_WSREP_SCHEMA_VERSION ]]; then
-                wsrep_log_debug "Skipping mysql_upgrade, schema versions are the same wsrep:$DATADIR_WSREP_SCHEMA_VERSION"
+                wsrep_log_info "Skipping mysql_upgrade (ist): schema versions are the same wsrep: $DATADIR_WSREP_SCHEMA_VERSION"
                 run_mysql_upgrade='no'
             else
-                wsrep_log_debug "Running mysql_upgrade, schema versions do not match"
-                wsrep_log_debug "wsrep schema version expected:$WSREP_WSREP_SCHEMA_VERSION datadir:$DATADIR_WSREP_SCHEMA_VERSION"
+                wsrep_log_info "Opting mysql_upgrade (ist): schema versions do not match"
+                wsrep_log_info "wsrep schema version expected: $WSREP_WSREP_SCHEMA_VERSION datadir: $DATADIR_WSREP_SCHEMA_VERSION"
                 run_mysql_upgrade='yes'
 
                 # Change the donor version to be the schema version
@@ -874,8 +875,13 @@ function run_post_processing_steps()
       use_mysql_upgrade_conf_suffix="--defaults-group-suffix=${WSREP_SST_OPT_CONF_SUFFIX}"
     fi
 
-    local mysqld_err_log="${mysql_upgrade_dir_path}/err.log"
+    #local mysqld_err_log="${mysql_upgrade_dir_path}/err.log"
+    local mysqld_err_log="${datadir}/mysqld.post.processing.log"
+    local mysqld_upgrade_log="${datadir}/mysqld.upgrade.log"
     local upgrade_socket="${mysql_upgrade_dir_path}/my.sock"
+
+    rm -f ${mysqld_err_log} 2> /dev/null || true
+    rm -f ${mysqld_upgrade_log} 2> /dev/null || true
 
     # ---------------------------------------------------------
     # Check socket path length
@@ -958,7 +964,8 @@ function run_post_processing_steps()
         # Reuse the SST User (use it to run mysql_upgrade)
         # Recreate with root permissions and a new password
         wsrep_log_debug "Starting the MySQL server used for post-processing"
-        cat <<EOF | $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &> ${mysqld_err_log} &
+        echo "---- Starting the MySQL server used for post-processing ----" >> ${mysqld_err_log}
+        cat <<EOF | $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &>> ${mysqld_err_log} &
 SET sql_log_bin=OFF;
 DROP USER IF EXISTS '${sst_user}'@localhost;
 CREATE USER '${sst_user}'@localhost IDENTIFIED BY '${sst_password}';
@@ -983,7 +990,8 @@ EOF
         auth_string=$(echo "${auth_string}" | awk '{print "*"toupper($0)}')
 
         wsrep_log_debug "Starting the MySQL server(#1) used for post-processing"
-        cat <<EOF | timeout -k ${timeout_threshold}s ${timeout_threshold}s $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &> ${mysqld_err_log} &
+        echo "----  Starting the MySQL server(#1) used for post-processing ----" >> ${mysqld_err_log}
+        cat <<EOF | timeout -k ${timeout_threshold}s ${timeout_threshold}s $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &>> ${mysqld_err_log} &
 SET sql_log_bin=OFF;
 DELETE FROM mysql.user WHERE User='${sst_user}' AND Host='localhost';
 INSERT INTO mysql.user
@@ -1037,8 +1045,9 @@ EOF
         #-----------------------------------------------------------------------
         # Restart the server (now that it has the needed user/password)
         wsrep_log_debug "Starting the MySQL server(#2) used for post-processing"
-        echo "" > ${mysqld_err_log}
-        $mysqld_path $mysqld_cmdline &> ${mysqld_err_log} &
+        echo "---- Starting the MySQL server(#2) used for post-processing ----" >> ${mysqld_err_log}
+        #echo "" > ${mysqld_err_log}
+        $mysqld_path $mysqld_cmdline &>> ${mysqld_err_log} &
         mysql_pid=$!
     fi
 
@@ -1056,13 +1065,13 @@ EOF
     # If we get here, then mysql_upgrade should be 'yes' or 'no'
     if [[ $run_mysql_upgrade == 'yes' ]]; then
 
-        wsrep_log_info "Running mysql_upgrade  donor:$donor_version_str  local:$local_version_str"
+        wsrep_log_info "Running mysql_upgrade donor: $donor_version_str local: $local_version_str"
         wsrep_log_debug "Starting mysql_upgrade"
         $mysql_upgrade_path \
             --defaults-file=/dev/stdin \
             --force \
             --socket=$upgrade_socket \
-            &> ${mysql_upgrade_dir_path}/upgrade.out <<EOF
+            &> ${mysqld_upgrade_log} <<EOF
 [mysql_upgrade]
 user=${sst_user}
 password="${sst_password}"
@@ -1123,7 +1132,8 @@ EOF
             #-----------------------------------------------------------------------
             # Starting up the server
             wsrep_log_debug "Starting the MySQL server(#3) used for post-processing"
-            cat <<EOF | $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &> ${mysqld_err_log} &
+            echo "---- Starting the MySQL server(#3) used for post-processing ----" >> ${mysqld_err_log}
+            cat <<EOF | $mysqld_path $mysqld_cmdline --init-file=/dev/stdin &>> ${mysqld_err_log} &
 SET sql_log_bin=OFF;
 DROP USER IF EXISTS '${sst_user}'@localhost;
 CREATE USER '${sst_user}'@localhost IDENTIFIED BY '${sst_password}';
@@ -1239,7 +1249,7 @@ EOF
 
     #-----------------------------------------------------------------------
     # cleanup
-    cp $mysqld_err_log $datadir/mysqld.intermediate.boot.log
+    #cp $mysqld_err_log $datadir/mysqld.intermediate.boot.log
 
     return 0
 }
