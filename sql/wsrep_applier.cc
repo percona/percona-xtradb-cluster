@@ -40,7 +40,6 @@ static Log_event *wsrep_read_log_event(
 
   uint data_len = uint4korr(head + EVENT_LEN_OFFSET);
   char *buf = (*arg_buf);
-  const char *error = 0;
 
   Log_event *ev = NULL;
   Binlog_read_error binlog_read_error =
@@ -48,7 +47,6 @@ static Log_event *wsrep_read_log_event(
                                description_event, false, &ev);
 
   if (binlog_read_error.has_error()) {
-    DBUG_ASSERT(error != 0);
     WSREP_ERROR(
         "Error in reading event (wsrep_read_log_event): "
         "'%s', data_len: %d, event_type: %d",
