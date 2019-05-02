@@ -804,7 +804,7 @@ pushd percona-xtradb-cluster-galera
   export CXX=g++44
 %endif
 
-%if 0%{?rhel}" == 8
+%if 0%{?rhel} == 8
   export CFLAGS=" -O2 -g"
   export CXXFLAGS="${CFLAGS}"
 #  RPM_OPT_FLAGS=
