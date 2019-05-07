@@ -1,441 +1,38 @@
 .. _load_balancing_with_proxysql:
 
-============================
+================================================================================
 Load balancing with ProxySQL
-============================
+================================================================================
 
-ProxySQL_ is a high-performance SQL proxy.
-ProxySQL runs as a daemon watched by a monitoring process.
-The process monitors the daemon and restarts it in case of a crash
-to minimize downtime.
+ProxySQL_ is a high-performance SQL proxy.  ProxySQL runs as a daemon watched by
+a monitoring process.  The process monitors the daemon and restarts it in case
+of a crash to minimize downtime.
 
-The daemon accepts incoming traffic from |MySQL| clients
-and forwards it to backend |MySQL| servers.
+The daemon accepts incoming traffic from |MySQL| clients and forwards it to
+backend |MySQL| servers.
 
-The proxy is designed to run continuously without needing to be restarted.
-Most configuration can be done at runtime
-using queries similar to SQL statements.
-These include runtime parameters, server grouping,
-and traffic-related settings.
+The proxy is designed to run continuously without needing to be restarted.  Most
+configuration can be done at runtime using queries similar to SQL statements.
+These include runtime parameters, server grouping, and traffic-related settings.
 
-ProxySQL supports |PXC| node status check using scheduler.
+.. note::
 
-.. note:: For more information about ProxySQL, see `ProxySQL documentation
+   For more information about ProxySQL, see `ProxySQL documentation
    <https://github.com/sysown/proxysql/tree/master/doc>`_.
 
-Installing ProxySQL
-===================
-
-ProxySQL is available from the Percona software repositories.
-If that is what you used to :ref:`install PXC <install>`
-or any other Percona software, run the corresponding command:
-
-* On Debian or Ubuntu:
-
-.. code-block:: bash
-
-   $ sudo apt-get install proxysql
-
-* On Red Hat Enterprise Linux or CentOS:
-
-.. code-block:: bash
-
-   $ sudo yum install proxysql
-
-Alternatively, you can download packages from
-https://www.percona.com/downloads/proxysql/.
-
-To start ProxySQL, run the following command:
-
-.. code-block:: bash
-
-   $ sudo service proxysql start
-
-.. _default-credentials:
-
-.. warning:: Do not run ProxySQL with default credentials in production.
-
-   Before starting the ``proxysql`` service,
-   you can change the defaults in the :file:`/etc/proxysql.cnf` file
-   by changing the ``admin_credentials`` variable.
-   For more information, see `Global Variables
-   <https://github.com/sysown/proxysql/blob/master/doc/global_variables.md>`_.
-
-Automatic Configuration
-=======================
-
-The ``proxysql`` package from Percona includes the ``proxysql-admin`` tool
-for configuring |PXC| nodes with ProxySQL.
-
-.. note:: The *ProxySQL Admin* is specially developed by Percona to
-   automatize this configuration. Bug reports and feature proposals are welcome
-   in the ProxySQL Admin `issue tracking system <https://jira.percona.com/projects/PSQLADM>`_.
-
-.. note:: The ``proxysql-admin`` tool can only be used
-   for *initial* ProxySQL configuration.
-
-To view usage information, run ``proxysql-admin`` without any options:
-
-.. code-block:: text
-
-   Usage: [ options ]
-   Options:
-     --config-file=<config-file>        Read login credentials from a configuration file (overrides any login credentials specified on the command line)
-     --quick-demo                       Setup a quick demo with no authentication
-     --proxysql-datadir=<datadir>       Specify proxysql data directory location
-     --proxysql-username=user_name      Username for connecting to the ProxySQL service
-     --proxysql-password[=password]     Password for connecting to the ProxySQL service
-     --proxysql-port=port_num           Port Nr. for connecting to the ProxySQL service
-     --proxysql-hostname=host_name      Hostname for connecting to the ProxySQL service
-     --cluster-username=user_name       Username for connecting to the Percona XtraDB Cluster node
-     --cluster-password[=password]      Password for connecting to the Percona XtraDB Cluster node
-     --cluster-port=port_num            Port Nr. for connecting to the Percona XtraDB Cluster node
-     --cluster-hostname=host_name       Hostname for connecting to the Percona XtraDB Cluster node
-     --cluster-app-username=user_name   Application username for connecting to the Percona XtraDB Cluster node
-     --cluster-app-password[=password]  Application password for connecting to the Percona XtraDB Cluster node
-     --without-cluster-app-user         Configure Percona XtraDB Cluster without application user
-     --monitor-username=user_name       Username for monitoring Percona XtraDB Cluster nodes through ProxySQL
-     --monitor-password[=password]      Password for monitoring Percona XtraDB Cluster nodes through ProxySQL
-     --without-check-monitor-user       Configure ProxySQL without checking/attempting to create monitor user
-     --enable, -e                       Auto-configure Percona XtraDB Cluster nodes into ProxySQL
-     --disable, -d                      Remove any Percona XtraDB Cluster configurations from ProxySQL
-     --node-check-interval=3000         Interval for monitoring node checker script (in milliseconds)
-     --mode=[loadbal|singlewrite]       ProxySQL read/write configuration mode, currently supporting: 'loadbal' and 'singlewrite' (the default) modes
-     --write-node=host_name:port        Writer node to accept write statments. This option is supported only when using --mode=singlewrite
-                                        Can accept comma delimited list with the first listed being the highest priority.
-     --include-slaves=host_name:port    Add specified slave node(s) to ProxySQL, these nodes will go into the reader hostgroup and will only be put into
-                                        the writer hostgroup if all cluster nodes are down.  Slaves must be read only.  Can accept comma delimited list.
-                                        If this is used make sure 'read_only=1' is in the slave's my.cnf
-     --adduser                          Adds the Percona XtraDB Cluster application user to the ProxySQL database
-     --syncusers                        Sync user accounts currently configured in MySQL to ProxySQL (deletes ProxySQL users not in MySQL)
-     --sync-multi-cluster-users         Sync user accounts currently configured in MySQL to ProxySQL (Don't delete ProxySQL users not in MySQL)
-     --version, -v                      Print version info
-   
-.. note:: Before using the ``proxysql-admin`` tool,
-   ensure that ProxySQL and |PXC| nodes you want to add are running. For
-   security purposes, please ensure to change the default user settings in
-   the ProxySQL configuration file.
-
-Preparing Configuration File
-----------------------------
-
-It is recommended to provide connection and authentication information
-in the ProxySQL configuration file (:file:`/etc/proxysql-admin.cnf`),
-instead of specifying it on the command line.
-
-By default, the configuration file contains the following::
-
-.. code-block:: text
-
-   # proxysql admin interface credentials.
-   export PROXYSQL_USERNAME="admin"
-   export PROXYSQL_PASSWORD="admin"
-   export PROXYSQL_HOSTNAME="localhost"
-   export PROXYSQL_PORT="6032"
-   
-   # PXC admin credentials for connecting to pxc-cluster-node.
-   export CLUSTER_USERNAME="admin"
-   export CLUSTER_PASSWORD="admin"
-   export CLUSTER_HOSTNAME="localhost"
-   export CLUSTER_PORT="3306"
-   
-   # proxysql monitoring user. proxysql admin script will create this user in pxc to monitor pxc-nodes.
-   export MONITOR_USERNAME="monitor"
-   export MONITOR_PASSWORD="monit0r"
-   
-   # Application user to connect to pxc-node through proxysql
-   export CLUSTER_APP_USERNAME="proxysql_user"
-   export CLUSTER_APP_PASSWORD="passw0rd"
-   
-   # ProxySQL read/write hostgroup 
-   export WRITE_HOSTGROUP_ID="10"
-   export READ_HOSTGROUP_ID="11"
-   
-   # ProxySQL read/write configuration mode.
-   export MODE="singlewrite"
-   
-.. note:: It is recommended to
-   :ref:`change default ProxySQL credentials <default-credentials>`
-   before running ProxySQL in production.
-   Make sure that you provide ProxySQL location and credentials
-   in the configuration file.
-
-Provide superuser credentials for one of the |PXC| nodes.
-The ``proxysql-admin`` script will detect
-other nodes in the cluster automatically.
-
-Enabling ProxySQL
------------------
-
-Use the ``--enable`` option to automatically configure a |PXC| node
-into ProxySQL.
-The ``proxysql-admin`` tool will do the following:
-
-* Add |PXC| node into the ProxySQL database
-
-* Add the ``proxysql_galera_checker`` monitoring script
-  into the ProxySQL ``scheduler`` table if it is not available.
-  This script checks for desynced nodes and temporarily deactivates them.
-  It also calls the ``proxysql_node_monitor`` script,
-  which checks cluster node membership
-  and re-configures ProxySQL if the membership changes.
-
-* Create two new |PXC| users with the ``USAGE`` privilege on the node
-  and add them to ProxySQL configuration, if they are not already configured.
-  One user is for monitoring cluster nodes,
-  and the other one is for communicating with the cluster.
-
-.. note:: Please make sure to use super user credentials from Cluster
-  to setup the default users.
-
-The following example shows how to add a |PXC| node
-using the ProxySQL configuration file
-with all necessary connection and authentication information:
-
-.. code-block:: bash
-
-   $ proxysql-admin --config-file=/etc/proxysql-admin.cnf --enable
-   
-   This script will assist with configuring ProxySQL (currently only Percona XtraDB cluster in combination with ProxySQL is supported)
-   
-   ProxySQL read/write configuration mode is singlewrite
-   
-   Configuring ProxySQL monitoring user..
-   ProxySQL monitor username as per command line/config-file is monitor
-   
-   User 'monitor'@'127.%' has been added with USAGE privilege
-   
-   Configuring the Percona XtraDB Cluster application user to connect through ProxySQL
-   Percona XtraDB Cluster application username as per command line/config-file is proxysql_user
-   
-   Percona XtraDB Cluster application user 'proxysql_user'@'127.%' has been added with the USAGE privilege, please make sure to the grant appropriate privileges
-   
-   Adding the Percona XtraDB Cluster server nodes to ProxySQL
-   
-   Configuring singlewrite mode with the following nodes designated as priority order:
-   
-   Write node info
-   +-----------+--------------+-------+---------+---------+
-   | hostname  | hostgroup_id | port  | weight  | comment |
-   +-----------+--------------+-------+---------+---------+
-   | 127.0.0.1 | 10           | 25000 | 1000000 | WRITE   |
-   +-----------+--------------+-------+---------+---------+
-   
-   ProxySQL configuration completed!
-   
-   ProxySQL has been successfully configured to use with Percona XtraDB Cluster
-   
-   You can use the following login credentials to connect your application through ProxySQL
-   
-   mysql --user=proxysql_user -p --host=localhost --port=6033 --protocol=tcp
-
-Disabling ProxySQL
-------------------
-
-Use the ``--disable`` option to remove a |PXC| node's configuration
-from ProxySQL.
-The ``proxysql-admin`` tool will do the following:
-
-* Remove |PXC| node from the ProxySQL database
-
-* Stop the ProxySQL monitoring daemon for this node
-
-The following example shows how to disable ProxySQL
-and remove the |PXC| node:
-
-.. code-block:: bash
-
-   $ proxysql-admin --config-file=/etc/proxysql-admin.cnf --disable
-   ProxySQL configuration removed!
-
-Additional Options
-------------------
-
-The following extra options can be used:
-
-* ``--adduser``
-
-  Add |PXC| application user to ProxySQL database.
-
-  .. code-block:: bash
-
-     $ proxysql-admin --config-file=/etc/proxysql-admin.cnf --adduser
-
-     Adding Percona XtraDB Cluster application user to ProxySQL database
-     Enter Percona XtraDB Cluster application user name: root
-     Enter Percona XtraDB Cluster application user password:
-     Added Percona XtraDB Cluster application user to ProxySQL database!
-
-* ``--syncusers``
-
-  Sync user accounts currently configured in |PXC| to ProxySQL database
-  except users with no password and the ``admin`` user.
-
-  .. note:: This option also deletes users
-     that are not in |PXC| from ProxySQL database.
-
-* ``--node-check-interval``
-
-  This option configures the interval for monitoring via the 
-  ``proxysql_galera_checker`` script (in milliseconds).
-
-  .. code-block:: bash
-
-     $ proxysql-admin --config-file=/etc/proxysql-admin.cnf \
-        --node-check-interval=5000 --enable
-
-* ``--mode``
-
-  Set the read/write mode for |PXC| nodes in ProxySQL database,
-  based on the hostgroup.
-  Supported modes are ``loadbal`` and ``singlewrite``.
-
-  * ``singlewrite`` is the default mode,
-    it will accept writes only on one single node
-    (based on the info you provide in ``--write-node``).
-    Remaining nodes will accept only read statements.
-
-    With ``--write-node`` option we can control a priority order of what host
-    is most desired to be the writer at any given time.
-    When used the feature will create a configuration file,
-    which is by default stored as ``${CLUSTER_NAME}_host_priority``
-    under your ``$PROXYSQL_DATADIR`` folder.
-    Servers can be separated by commas, for example::
-
-     10.0.0.51:3306, 10.0.0.52:3306
-
-    In the previous example, ``10.0.0.51:3306`` will be in the writer hostgroup
-    if it is ONLINE.
-    If it is OFFLINE, then ``10.0.0.52:3306`` will go into the writer hostgroup.
-    And if that node also goes down, then one of the remaining nodes
-    will be randomly chosen for the writer hostgroup.
-    The configuration file is deleted when ``--disable`` is used.
-
-    ``singlewrite`` mode setup:
-
-    .. code-block:: bash
- 
-       $ sudo grep "MODE" /etc/proxysql-admin.cnf
-       export MODE="singlewrite"
-       $ sudo proxysql-admin --config-file=/etc/proxysql-admin.cnf --write-node=127.0.0.1:25000 --enable
-       ProxySQL read/write configuration mode is singlewrite
-       [..]
-       ProxySQL configuration completed!
-  
-    To check the configuration you can run:
-
-    .. code-block:: text
-
-       mysql> SELECT hostgroup_id,hostname,port,status,comment FROM mysql_servers;
-       +--------------+-----------+-------+--------+---------+
-       | hostgroup_id | hostname  | port  | status | comment |
-       +--------------+-----------+-------+--------+---------+
-       | 11           | 127.0.0.1 | 25400 | ONLINE | READ    |
-       | 10           | 127.0.0.1 | 25000 | ONLINE | WRITE   |
-       | 11           | 127.0.0.1 | 25100 | ONLINE | READ    |
-       | 11           | 127.0.0.1 | 25200 | ONLINE | READ    |
-       | 11           | 127.0.0.1 | 25300 | ONLINE | READ    |
-       +--------------+-----------+-------+--------+---------+
-       5 rows in set (0.00 sec)
-
-  * The ``loadbal`` mode uses a set of evenly weighted read/write nodes.
-
-    ``loadbal`` mode setup:
-
-    .. code-block:: bash
-
-       $ sudo proxysql-admin --config-file=/etc/proxysql-admin.cnf --mode=loadbal --enable
-
-       This script will assist with configuring ProxySQL (currently only Percona XtraDB cluster in combination with ProxySQL is supported)
-
-       ProxySQL read/write configuration mode is loadbal
-       [..]
-       ProxySQL has been successfully configured to use with Percona XtraDB Cluster
-
-       You can use the following login credentials to connect your application through ProxySQL
-
-       mysql --user=proxysql_user --password=*****  --host=127.0.0.1 --port=6033 --protocol=tcp 
-
-    .. code-block:: text
-
-       mysql> SELECT hostgroup_id,hostname,port,status,comment FROM mysql_servers;
-       +--------------+-----------+-------+--------+-----------+
-       | hostgroup_id | hostname  | port  | status | comment   |
-       +--------------+-----------+-------+--------+-----------+
-       | 10           | 127.0.0.1 | 25400 | ONLINE | READWRITE |
-       | 10           | 127.0.0.1 | 25000 | ONLINE | READWRITE |
-       | 10           | 127.0.0.1 | 25100 | ONLINE | READWRITE |
-       | 10           | 127.0.0.1 | 25200 | ONLINE | READWRITE |
-       | 10           | 127.0.0.1 | 25300 | ONLINE | READWRITE |
-       +--------------+-----------+-------+--------+-----------+
-       5 rows in set (0.01 sec)
-
-* ``--quick-demo``
-
-  This option is used to setup dummy ProxySQL configuration.
-
-  .. code-block:: bash
-
-    $ sudo  proxysql-admin  --enable --quick-demo
-
-    You have selected the dry test run mode. WARNING: This will create a test user (with all privileges) in the Percona XtraDB Cluster & ProxySQL installations.
-
-    You may want to delete this user after you complete your testing!
-
-    Would you like to proceed with '--quick-demo' [y/n] ? y
-
-    Setting up proxysql test configuration!
-
-    Do you want to use the default ProxySQL credentials (admin:admin:6032:127.0.0.1) [y/n] ? y
-    Do you want to use the default Percona XtraDB Cluster credentials (root::3306:127.0.0.1) [y/n] ? n
-
-    Enter the Percona XtraDB Cluster username (super user): root
-    Enter the Percona XtraDB Cluster user password: 
-    Enter the Percona XtraDB Cluster port: 25100
-    Enter the Percona XtraDB Cluster hostname: localhost
-
-
-    ProxySQL read/write configuration mode is singlewrite
-
-    Configuring ProxySQL monitoring user..
-
-    User 'monitor'@'127.%' has been added with USAGE privilege
-
-    Configuring the Percona XtraDB Cluster application user to connect through ProxySQL
-
-    Percona XtraDB Cluster application user 'pxc_test_user'@'127.%' has been added with ALL privileges, this user is created for testing purposes
-
-    Adding the Percona XtraDB Cluster server nodes to ProxySQL
-
-    ProxySQL configuration completed!
-
-    ProxySQL has been successfully configured to use with Percona XtraDB Cluster
-
-    You can use the following login credentials to connect your application through ProxySQL
-
-    mysql --user=pxc_test_user  --host=127.0.0.1 --port=6033 --protocol=tcp 
-
-* ``--include-slaves=host_name:port``
-
-  This option helps to include specified slave node(s) to ProxySQL database.
-  These nodes will go into the reader hostgroup and will only be put into the
-  writer hostgroup if all cluster nodes are down. Slaves must be read only. Can
-  accept comma delimited list. If this is used, make sure ``read_only=1`` is
-  included into the slave's ``my.cnf`` configuration file.
-
-  .. note:: With ``loadbal`` mode slave hosts only accept read/write requests
-     when all cluster nodes are down.
-
-ProxySQL Status script
-----------------------
-
-There is a simple script to dump ProxySQL configuration and statistics:
-
-.. code-block:: text
-
-   Usage:
-
-   proxysql-status admin admin 127.0.0.1 6032
+ProxySQL is available from the Percona software repositories in two
+versions. ProxySQL v1 does not natively support |PXC| and requires
+custom bash scripts to keep track of the status of |PXC| nodes using the
+|proxysql| scheduler.
+
+ProxySQL v2 natively supports |PXC|. With this version,
+|proxysql-admin| tool does not require custom scripts to keep track of
+|PXC| status.
+
+.. toctree::
+
+   proxysql-v1
+   proxysql-v2
 
 Manual Configuration
 ====================
@@ -729,29 +326,29 @@ add this user on one of the |PXC| nodes:
   mysql@pxc3> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.64';
   Query OK, 0 rows affected (0.00 sec)
 
-Adding Galera Support
----------------------
+Adding Galera Support in ProxySQL v1
+--------------------------------------------------------------------------------
 
-Default ProxySQL cannot detect a node which is not in ``Synced`` state.
-To monitor status of |PXC| nodes,
-use the :file:`proxysql_galera_checker` script.
-The script is located here: :file:`/usr/bin/proxysql_galera_checker`.
+ProxySQL v2 supports monitoring the status |PXC| nodes. ProxySQL v1 cannot
+detect a node which is not in ``Synced`` state.  To monitor the status of |PXC|
+nodes in ProxySQL v1, use the :file:`proxysql_galera_checker` script.  The
+script is located here: :file:`/usr/bin/proxysql_galera_checker`.
 
-To use this script, load it into ProxySQL
+To use this script, load it into ProxySQL v1
 `Scheduler <https://github.com/sysown/proxysql/blob/master/doc/scheduler.md>`_.
 
 The following example shows how you can load the script
-for default ProxySQL configuration:
+for default ProxySQL v1 configuration:
 
 .. code-block:: text
 
-  INSERT INTO scheduler (active,interval_ms,filename,arg1,comment)
-    VALUES (1,10000,'/usr/bin/proxysql_galera_checker','--config-file=/etc/proxysql-admin.cnf
-    --write-hg=10 --read-hg=11 --writer-count=1 --mode=singlewrite 
-    --priority=192.168.100.20:3306,192.168.100.40:3306,192.168.100.10:3306,192.168.100.30:3306 
-    --log=/var/lib/proxysql/cluster_one_proxysql_galera_check.log','cluster_one');
+   INSERT INTO scheduler (active,interval_ms,filename,arg1,comment)
+   VALUES (1,10000,'/usr/bin/proxysql_galera_checker','--config-file=/etc/proxysql-admin.cnf
+   --write-hg=10 --read-hg=11 --writer-count=1 --mode=singlewrite 
+   --priority=192.168.100.20:3306,192.168.100.40:3306,192.168.100.10:3306,192.168.100.30:3306 
+   --log=/var/lib/proxysql/cluster_one_proxysql_galera_check.log','cluster_one');
 
-This Scheduler script accepts the following options in the ``arg1`` argument:
+This scheduler script accepts the following options in the ``arg1`` argument:
 
 .. list-table::
    :widths: 15 20 25 40
@@ -797,64 +394,64 @@ To load the scheduler changes into the runtime space:
 
 .. code-block:: text
 
-  mysql@proxysql> LOAD SCHEDULER TO RUNTIME;
+   mysql@proxysql> LOAD SCHEDULER TO RUNTIME;
 
 To make sure that the script has been loaded,
 check the :table:`runtime_scheduler` table:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT * FROM scheduler\G
-  *************************** 1. row ***************************
-           id: 1
-       active: 1
-  interval_ms: 10000
-     filename: /bin/proxysql_galera_checker
-         arg1: --config-file=/etc/proxysql-admin.cnf --write-hg=10 --read-hg=11 
-               --writer-count=1 --mode=singlewrite 
-               --priority=192.168.100.20:3306,192.168.100.40:3306,192.168.100.10:3306,192.168.100.30:3306 
-               --log=/var/lib/proxysql/cluster_one_proxysql_galera_check.log
-         arg2: NULL
-         arg3: NULL
-         arg4: NULL
-         arg5: NULL
-      comment: cluster_one
-  1 row in set (0.00 sec)
+   mysql@proxysql> SELECT * FROM scheduler\G
+   *************************** 1. row ***************************
+            id: 1
+        active: 1
+   interval_ms: 10000
+      filename: /bin/proxysql_galera_checker
+          arg1: --config-file=/etc/proxysql-admin.cnf --write-hg=10 --read-hg=11 
+                --writer-count=1 --mode=singlewrite 
+                --priority=192.168.100.20:3306,192.168.100.40:3306,192.168.100.10:3306,192.168.100.30:3306 
+                --log=/var/lib/proxysql/cluster_one_proxysql_galera_check.log
+          arg2: NULL
+          arg3: NULL
+          arg4: NULL
+          arg5: NULL
+       comment: cluster_one
+   1 row in set (0.00 sec)
 
 To check the status of available nodes, run the following command:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
-  +--------------+---------------+------+--------+
-  | hostgroup_id | hostname      | port | status |
-  +--------------+---------------+------+--------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE |
-  | 0            | 192.168.70.62 | 3306 | ONLINE |
-  | 0            | 192.168.70.63 | 3306 | ONLINE |
-  +--------------+---------------+------+--------+
-  3 rows in set (0.00 sec)
+   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
+   +--------------+---------------+------+--------+
+   | hostgroup_id | hostname      | port | status |
+   +--------------+---------------+------+--------+
+   | 0            | 192.168.70.61 | 3306 | ONLINE |
+   | 0            | 192.168.70.62 | 3306 | ONLINE |
+   | 0            | 192.168.70.63 | 3306 | ONLINE |
+   +--------------+---------------+------+--------+
+   3 rows in set (0.00 sec)
 
 .. note::
 
-  Each node can have the following status:
+   Each node can have the following status:
 
-  * ``ONLINE``: backend node is fully operational.
+   * ``ONLINE``: backend node is fully operational.
 
-  * ``SHUNNED``: backend node is temporarily taken out of use,
-    because either too many connection errors hapenned in a short time,
-    or replication lag exceeded the allowed threshold.
+   * ``SHUNNED``: backend node is temporarily taken out of use,
+     because either too many connection errors hapenned in a short time,
+     or replication lag exceeded the allowed threshold.
 
-  * ``OFFLINE_SOFT``: new incoming connections aren't accepted,
-    while existing connections are kept until they become inactive.
-    In other words, connections are kept in use
-    until the current transaction is completed.
-    This allows to gracefully detach a backend node.
+   * ``OFFLINE_SOFT``: new incoming connections aren't accepted,
+     while existing connections are kept until they become inactive.
+     In other words, connections are kept in use
+     until the current transaction is completed.
+     This allows to gracefully detach a backend node.
 
-  * ``OFFLINE_HARD``: existing connections are dropped,
-    and new incoming connections aren't accepted.
-    This is equivalent to deleting the node from a hostgroup,
-    or temporarily taking it out of the hostgroup for maintenance.
+   * ``OFFLINE_HARD``: existing connections are dropped,
+     and new incoming connections aren't accepted.
+     This is equivalent to deleting the node from a hostgroup,
+     or temporarily taking it out of the hostgroup for maintenance.
 
 Testing Cluster with sysbench
 -----------------------------
@@ -863,15 +460,15 @@ You can install ``sysbench`` from Percona software repositories:
 
 * For Debian or Ubuntu:
 
-.. code-block:: bash
+  .. code-block:: bash
 
-  root@proxysql:~# apt-get install sysbench
+     root@proxysql:~# apt-get install sysbench
 
 * For Red Hat Enterprise Linux or CentOS
 
-.. code-block:: bash
+  .. code-block:: bash
 
-  [root@proxysql ~]# yum install sysbench
+     [root@proxysql ~]# yum install sysbench
 
 .. note:: ``sysbench`` requires ProxySQL client user credentials
    that you creted in :ref:`proxysql-client-user`.
@@ -880,18 +477,18 @@ You can install ``sysbench`` from Percona software repositories:
 
    .. code-block:: text
 
-     mysql@pxc1> CREATE DATABASE sbtest;
+      mysql@pxc1> CREATE DATABASE sbtest;
 
 #. Populate the table with data for the benchmark on the ProxySQL node:
 
    .. code-block:: bash
 
       root@proxysql:~# sysbench --report-interval=5 --num-threads=4 \
-        --num-requests=0 --max-time=20 \
-        --test=/usr/share/doc/sysbench/tests/db/oltp.lua \
-        --mysql-user='sbuser' --mysql-password='sbpass' \
-        --oltp-table-size=10000 --mysql-host=127.0.0.1 --mysql-port=6033 \
-        prepare
+      --num-requests=0 --max-time=20 \
+      --test=/usr/share/doc/sysbench/tests/db/oltp.lua \
+      --mysql-user='sbuser' --mysql-password='sbpass' \
+      --oltp-table-size=10000 --mysql-host=127.0.0.1 --mysql-port=6033 \
+      prepare
 
 #. Run the benchmark on the ProxySQL node:
 
@@ -908,49 +505,49 @@ ProxySQL stores collected data in the ``stats`` schema:
 
 .. code-block:: text
 
-  mysql@proxysql> SHOW TABLES FROM stats;
-  +--------------------------------+
-  | tables                         |
-  +--------------------------------+
-  | stats_mysql_query_rules        |
-  | stats_mysql_commands_counters  |
-  | stats_mysql_processlist        |
-  | stats_mysql_connection_pool    |
-  | stats_mysql_query_digest       |
-  | stats_mysql_query_digest_reset |
-  | stats_mysql_global             |
-  +--------------------------------+
+   mysql@proxysql> SHOW TABLES FROM stats;
+   +--------------------------------+
+   | tables                         |
+   +--------------------------------+
+   | stats_mysql_query_rules        |
+   | stats_mysql_commands_counters  |
+   | stats_mysql_processlist        |
+   | stats_mysql_connection_pool    |
+   | stats_mysql_query_digest       |
+   | stats_mysql_query_digest_reset |
+   | stats_mysql_global             |
+   +--------------------------------+
 
 For example, to see the number of commands that run on the cluster:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT * FROM stats_mysql_commands_counters;
-  +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
-  | Command           | Total_Time_us | Total_cnt | cnt_100us | cnt_500us | cnt_1ms | cnt_5ms | cnt_10ms | cnt_50ms | cnt_100ms | cnt_500ms | cnt_1s | cnt_5s | cnt_10s | cnt_INFs |
-  +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
-  | ALTER_TABLE       | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | ANALYZE_TABLE     | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | BEGIN             | 2212625       | 3686      | 55        | 2162      | 899     | 569     | 1        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | CHANGE_MASTER     | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | COMMIT            | 21522591      | 3628      | 0         | 0         | 0       | 1765    | 1590     | 272      | 1         | 0         | 0      | 0      | 0       | 0        |
-  | CREATE_DATABASE   | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | CREATE_INDEX      | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  ...
-  | DELETE            | 2904130       | 3670      | 35        | 1546      | 1346    | 723     | 19       | 1        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | DESCRIBE          | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  ...
-  | INSERT            | 19531649      | 3660      | 39        | 1588      | 1292    | 723     | 12       | 2        | 0         | 1         | 0      | 1      | 2       | 0        |
-  ...
-  | SELECT            | 35049794      | 51605     | 501       | 26180     | 16606   | 8241    | 70       | 3        | 4         | 0         | 0      | 0      | 0       | 0        |
-  | SELECT_FOR_UPDATE | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  ...
-  | UPDATE            | 6402302       | 7367      | 75        | 2503      | 3020    | 1743    | 23       | 3        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | USE               | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | SHOW              | 19691         | 2         | 0         | 0         | 0       | 0       | 1        | 1        | 0         | 0         | 0      | 0      | 0       | 0        |
-  | UNKNOWN           | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
-  +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
-  45 rows in set (0.00 sec)
+   mysql@proxysql> SELECT * FROM stats_mysql_commands_counters;
+   +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
+   | Command           | Total_Time_us | Total_cnt | cnt_100us | cnt_500us | cnt_1ms | cnt_5ms | cnt_10ms | cnt_50ms | cnt_100ms | cnt_500ms | cnt_1s | cnt_5s | cnt_10s | cnt_INFs |
+   +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
+   | ALTER_TABLE       | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | ANALYZE_TABLE     | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | BEGIN             | 2212625       | 3686      | 55        | 2162      | 899     | 569     | 1        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | CHANGE_MASTER     | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | COMMIT            | 21522591      | 3628      | 0         | 0         | 0       | 1765    | 1590     | 272      | 1         | 0         | 0      | 0      | 0       | 0        |
+   | CREATE_DATABASE   | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | CREATE_INDEX      | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   ...
+   | DELETE            | 2904130       | 3670      | 35        | 1546      | 1346    | 723     | 19       | 1        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | DESCRIBE          | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   ...
+   | INSERT            | 19531649      | 3660      | 39        | 1588      | 1292    | 723     | 12       | 2        | 0         | 1         | 0      | 1      | 2       | 0        |
+   ...
+   | SELECT            | 35049794      | 51605     | 501       | 26180     | 16606   | 8241    | 70       | 3        | 4         | 0         | 0      | 0      | 0       | 0        |
+   | SELECT_FOR_UPDATE | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   ...
+   | UPDATE            | 6402302       | 7367      | 75        | 2503      | 3020    | 1743    | 23       | 3        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | USE               | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | SHOW              | 19691         | 2         | 0         | 0         | 0       | 0       | 1        | 1        | 0         | 0         | 0      | 0      | 0       | 0        |
+   | UNKNOWN           | 0             | 0         | 0         | 0         | 0       | 0       | 0        | 0        | 0         | 0         | 0      | 0      | 0       | 0        |
+   +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
+   45 rows in set (0.00 sec)
 
 Automatic Fail-over
 -------------------
@@ -962,57 +559,57 @@ You can check the status of all available nodes by running:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
-  +--------------+---------------+------+--------+
-  | hostgroup_id | hostname      | port | status |
-  +--------------+---------------+------+--------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE |
-  | 0            | 192.168.70.62 | 3306 | ONLINE |
-  | 0            | 192.168.70.63 | 3306 | ONLINE |
-  +--------------+---------------+------+--------+
-  3 rows in set (0.00 sec)
+   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
+   +--------------+---------------+------+--------+
+   | hostgroup_id | hostname      | port | status |
+   +--------------+---------------+------+--------+
+   | 0            | 192.168.70.61 | 3306 | ONLINE |
+   | 0            | 192.168.70.62 | 3306 | ONLINE |
+   | 0            | 192.168.70.63 | 3306 | ONLINE |
+   +--------------+---------------+------+--------+
+   3 rows in set (0.00 sec)
 
 To test problem detection and fail-over mechanism, shut down Node 3:
 
 .. code-block:: bash
 
-  root@pxc3:~# service mysql stop
+   root@pxc3:~# service mysql stop
 
 ProxySQL will detect that the node is down and update its status to
 ``OFFLINE_SOFT``:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
-  +--------------+---------------+------+--------------+
-  | hostgroup_id | hostname      | port | status       |
-  +--------------+---------------+------+--------------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE       |
-  | 0            | 192.168.70.62 | 3306 | ONLINE       |
-  | 0            | 192.168.70.63 | 3306 | OFFLINE_SOFT |
-  +--------------+---------------+------+--------------+
-  3 rows in set (0.00 sec)
+   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
+   +--------------+---------------+------+--------------+
+   | hostgroup_id | hostname      | port | status       |
+   +--------------+---------------+------+--------------+
+   | 0            | 192.168.70.61 | 3306 | ONLINE       |
+   | 0            | 192.168.70.62 | 3306 | ONLINE       |
+   | 0            | 192.168.70.63 | 3306 | OFFLINE_SOFT |
+   +--------------+---------------+------+--------------+
+   3 rows in set (0.00 sec)
 
 Now start Node 3 again:
 
 .. code-block:: bash
 
-  root@pxc3:~# service mysql start
+   root@pxc3:~# service mysql start
 
 The script will detect the change and mark the node as
 ``ONLINE``:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
-  +--------------+---------------+------+--------+
-  | hostgroup_id | hostname      | port | status |
-  +--------------+---------------+------+--------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE |
-  | 0            | 192.168.70.62 | 3306 | ONLINE |
-  | 0            | 192.168.70.63 | 3306 | ONLINE |
-  +--------------+---------------+------+--------+
-  3 rows in set (0.00 sec)
+   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
+   +--------------+---------------+------+--------+
+   | hostgroup_id | hostname      | port | status |
+   +--------------+---------------+------+--------+
+   | 0            | 192.168.70.61 | 3306 | ONLINE |
+   | 0            | 192.168.70.62 | 3306 | ONLINE |
+   | 0            | 192.168.70.63 | 3306 | ONLINE |
+   +--------------+---------------+------+--------+
+   3 rows in set (0.00 sec)
 
 .. _pxc-maint-mode:
 
@@ -1079,3 +676,9 @@ but the user can still open conenctions to monitor status.
 
 .. note:: If you increase the transition period,
    the packaging script may determine it as a server stall.
+
+
+.. |proxysql| replace:: ProxySQL
+.. |proxysql-admin| replace:: ``proxysql-admin``
+
+
