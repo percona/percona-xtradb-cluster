@@ -78,7 +78,7 @@ software, run the corresponding command:
    $ sudo yum install proxysql2
 
 Alternatively, you can download the packages from
-https://www.percona.com/downloads/proxysql/.
+https://www.percona.com/downloads/proxysql2/.
 
 To start ProxySQL, run the following command:
 
