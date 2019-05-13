@@ -175,3 +175,29 @@ REVOKE ALL ON *.* FROM CURRENT_USER();
 --connection node_2
 --echo #node-2
 call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
+
+#-------------------------------------------------------------------------------
+# test the use of mysqladmin password change feature
+# (which uses ALTER USER USER()
+#
+--connection node_1
+--echo # node-1
+CREATE USER 'mysqladmin_test' IDENTIFIED BY '1234';
+
+# This call should fail
+--echo # mysqladmin password change (should fail)
+--error 1
+--exec $MYSQLADMIN --user=mysqladmin_test --password=1234 -S $NODE_MYSOCK_1 -P $NODE_MYPORT_1 password 5678
+
+# This call should succeed (with the --use-set-password option)
+--echo # mysqladmin password change with --use-set-password (should succeed)
+--exec $MYSQLADMIN --user=mysqladmin_test --password=1234 -S $NODE_MYSOCK_1 -P $NODE_MYPORT_1 --use-set-password password 5678
+
+# Test our login with the new password
+--connect node_1a, 127.0.0.1, mysqladmin_test, 5678,, $NODE_MYPORT_1
+--connection node_1a
+--echo # Login with new password successful
+SELECT 1;
+
+--connection node_1
+DROP USER 'mysqladmin_test';
