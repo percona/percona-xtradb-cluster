@@ -329,24 +329,21 @@ extern "C" void *handle_connection(void *arg)
     PSI_THREAD_CALL(delete_current_thread)();
 #endif /* HAVE_PSI_THREAD_INTERFACE */
 
+#ifdef WITH_WSREP
+    const bool wsrep_applier_thread= (WSREP(thd) && thd->wsrep_applier);
+#endif /* WITH_WSREP */
+
     delete thd;
 
     if (abort_loop) // Server is shutting down so end the pthread.
       break;
 
 #ifdef WITH_WSREP
-    if (WSREP(thd) && thd->wsrep_applier)
-    {
-      WSREP_DEBUG("avoiding thread re-use for applier, thd: %u", thd->thread_id());
-      channel_info = NULL;
-    }
-    else
-    {
+    if (wsrep_applier_thread)
+      break;
 #endif /* WITH_WSREP */
+
     channel_info= Per_thread_connection_handler::block_until_new_connection();
-#ifdef WITH_WSREP
-    }
-#endif /* WITH_WSREP */
     if (channel_info == NULL)
       break;
     pthread_reused= true;
