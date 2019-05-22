@@ -137,3 +137,12 @@ REVOKE ALL ON *.* FROM CURRENT_USER();
 ERROR HY000: Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function for USER operation while operating in cluster mode
 #node-2
 call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
+# node-1
+CREATE USER 'mysqladmin_test' IDENTIFIED BY '1234';
+# mysqladmin password change (should fail)
+# mysqladmin password change with --use-set-password (should succeed)
+# Login with new password successful
+SELECT 1;
+1
+1
+DROP USER 'mysqladmin_test';
