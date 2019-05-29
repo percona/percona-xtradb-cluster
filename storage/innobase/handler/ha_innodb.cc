@@ -3558,6 +3558,7 @@ innobase_init(
 
 	innobase_hton->create_zip_dict = innobase_create_zip_dict;
 	innobase_hton->drop_zip_dict = innobase_drop_zip_dict;
+	innobase_hton->is_reserved_db_name= innobase_check_reserved_file_name;
 
 	ut_a(DATA_MYSQL_TRUE_VARCHAR == (ulint)MYSQL_TYPE_VARCHAR);
 
