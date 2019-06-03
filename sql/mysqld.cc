@@ -2191,6 +2191,7 @@ static bool network_init(void)
   set_ports();
 
   set_proxy();
+
 #ifdef HAVE_SYS_UN_H
   std::string const unix_sock_name(mysqld_unix_port ? mysqld_unix_port : "");
 #else
