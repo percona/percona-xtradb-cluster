@@ -197,6 +197,7 @@ trx_init(
 	trx->lock.rec_cached = 0;
 
 	trx->lock.table_cached = 0;
+	trx->error_index = NULL;
 
 	trx->stats.set(false);
 
