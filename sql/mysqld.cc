@@ -1216,25 +1216,41 @@ public:
 
 enum wsrep_thd_type   {APPLIER, COMMITTING};
 
-class Find_wsrep_thd: public Find_THD_Impl
+class Count_wsrep_thd: public Do_THD_Impl
 {
 public:
-  Find_wsrep_thd(enum wsrep_thd_type type): m_type(type) {}
-  virtual bool operator()(THD *thd)
+  Count_wsrep_thd(enum wsrep_thd_type type)
+    : m_type(type)
+    , m_count(0) 
+  {}
+  virtual void operator()(THD *thd)
   {
     if (WSREP(thd))
     { 
       switch (m_type) 
+      {
+        case APPLIER:
         {
-        case APPLIER:    return thd->wsrep_applier;
-        case COMMITTING: return thd->wsrep_query_state == QUERY_COMMITTING;
+          if (thd->wsrep_applier)
+            m_count++;
         }
+        break;
+        case COMMITTING:
+        {
+          if (thd->wsrep_query_state == QUERY_COMMITTING)
+            m_count++;
+        }
+        break;
+      }
     }
-    return false;
+  }
+  int get_thd_count() const
+  {
+    return m_count;
   }
 private:
   enum wsrep_thd_type m_type;
-  bool is_server_shutdown;
+  int m_count;
 };
 #endif /* WITH_WSREP */
 
@@ -6769,12 +6785,11 @@ extern "C" void *start_wsrep_THD(void *arg)
  */
 static int have_wsrep_appliers(THD *thd)
 {
-  Find_wsrep_thd find_wsrep_thd(APPLIER);
-  //Find_thd_with_bid find_thd_applier(10);
+  Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
+  Count_wsrep_thd count_wsrep_applier_thd(APPLIER);
 
-  THD* tmp= Global_THD_manager::get_instance()->find_thd(&find_wsrep_thd);
-  if (tmp) return true;
-  return false;
+  thd_manager->do_for_all_thd(&count_wsrep_applier_thd);
+  return count_wsrep_applier_thd.get_thd_count();
 }
 
 static void wsrep_close_thread(THD *thd)
@@ -6793,12 +6808,11 @@ static void wsrep_close_thread(THD *thd)
 
 static my_bool have_committing_connections()
 {
-  //Find_thd_committing find_thd_committing();
-  Find_wsrep_thd find_thd_committing(COMMITTING);
-
-  THD* tmp= Global_THD_manager::get_instance()->find_thd(&find_thd_committing);
-  if (tmp) return true;
-  return false;
+  Count_wsrep_thd count_thd_committing(COMMITTING);
+  Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
+  
+  thd_manager->do_for_all_thd(&count_thd_committing);
+  return (count_thd_committing.get_thd_count() != 0);
 }
 
 int wsrep_wait_committing_connections_close(int wait_time)
@@ -6870,17 +6884,14 @@ void wsrep_wait_appliers_close(THD *thd)
   // This gotta be fixed in a more elegant manner if we gonna have arbitrary
   // number of non-applier wsrep threads.
   {
+    my_sleep(100000);
   }
   /* Now kill remaining wsrep threads: rollbacker */
   wsrep_close_threads (thd);
   /* and wait for them to die */
-  int round=0;
-  while (have_wsrep_appliers(thd) > 0 && round < 5)
+  while (have_wsrep_appliers(thd) > 0)
   {
-    WSREP_INFO("active appliers remaining");
-    wsrep_close_threads (thd);
-    sleep(1);
-    round++;
+    my_sleep(100000);
   }
 
   /* All wsrep applier threads have now been aborted. However, if this thread
