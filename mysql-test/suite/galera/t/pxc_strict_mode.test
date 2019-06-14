@@ -196,6 +196,11 @@ alter table tinnodb engine=memory;
 alter table tinnodb engine=innodb;
 drop table tinnodb;
 
+--connection node_2
+--echo #node-2 (ensure cleanup is done before starting next scenario)
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'tinnodb';
+--source include/wait_condition.inc
+
 
 #----------------------------
 #
@@ -294,6 +299,10 @@ alter table tinnodb engine=memory;
 alter table tinnodb engine=innodb;
 drop table tinnodb;
 
+--connection node_2
+--echo #node-2 (ensure cleanup is done before starting next scenario)
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'tinnodb';
+--source include/wait_condition.inc
 
 #----------------------------
 #
@@ -417,6 +426,12 @@ alter table tinnodb engine=myisam;
 alter table tinnodb engine=memory;
 alter table tinnodb engine=innodb;
 drop table tinnodb;
+
+--connection node_2
+--echo #node-2 (ensure cleanup is done before starting next scenario)
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'tinnodb';
+--source include/wait_condition.inc
+
 
 #-------------------------------------------------------------------------------
 #
