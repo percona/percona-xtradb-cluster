@@ -15,7 +15,7 @@ Percona is glad to announce the release of Percona XtraDB Cluster |release| on
 
 * `Percona Server for MySQL 5.7.26-29 <https://www.percona.com/doc/percona-server/5.7/release-notes/Percona-Server-5.7.26-29.html>`_
 * Galera Replication library 3.26
-* Galera/Codership WSREP API Release 5.7.24
+* Galera/Codership WSREP API Release 5.7.25
 
 
 Bugs Fixed
