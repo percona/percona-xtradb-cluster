@@ -1825,6 +1825,7 @@ void THD::init(void)
   wsrep_gtid_event_buf_len = 0;
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
 #endif
+  status_var_aggregated= false;
   binlog_row_event_extra_data= 0;
 
   if (variables.sql_log_bin)
