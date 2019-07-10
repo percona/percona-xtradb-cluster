@@ -13,6 +13,7 @@ CREATE USER user1, user2 IDENTIFIED BY 'password';
 
 --connection node_2
 SELECT COUNT(*) = 2 FROM mysql.user WHERE user IN ('user1', 'user2');
+SELECT STRCMP(authentication_string, "password") <> 0 FROM mysql.user where user = 'user2';
 
 #
 # ALTER USER
@@ -45,6 +46,9 @@ SET PASSWORD FOR user3 = PASSWORD('foo');
 
 --connection node_1
 SELECT password != '' FROM mysql.user WHERE user = 'user3';
+
+--connection node_2
+SELECT STRCMP(authentication_string, "foo") <> 0 FROM mysql.user where user = 'user3';
 
 #
 # DROP USER
