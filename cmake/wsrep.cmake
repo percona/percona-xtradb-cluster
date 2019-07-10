@@ -17,7 +17,7 @@
 # so WSREP_VERSION is produced regardless
 
 # Set the patch version
-SET(WSREP_PATCH_VERSION "32")
+SET(WSREP_PATCH_VERSION "34")
 # PXC needs this because it still support execvpe approach for forking
 # while initiating SST.
 INCLUDE(CheckFunctionExists)
