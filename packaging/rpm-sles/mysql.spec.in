@@ -87,9 +87,13 @@
 %global sles12                1
 %endif
 
+%if 0%{?suse_version} >= 1315
+%global systemd               1
+%endif
+
 
 # https://en.opensuse.org/openSUSE:Systemd_packaging_guidelines
-%{?sles12:                %global systemd 1}
+#%{?sles12:                %global systemd 1}
 %{!?_tmpfilesdir:         %global _tmpfilesdir /usr/lib/tmpfiles.d}
 
 %global min                   5.7.9
@@ -630,6 +634,7 @@ mkdir debug
            -DPIDFILE_RPM="/var/run/mysql/mysqld.pid" \
            -DLOGFILE_RPM="/var/log/mysql/mysqld.log" \
            -DCMAKE_BUILD_TYPE=Debug \
+           -DMYSQL_MAINTAINER_MODE=0 \
            -DWITH_BOOST=.. \
            -DCMAKE_C_FLAGS="$optflags" \
            -DCMAKE_CXX_FLAGS="$optflags" \

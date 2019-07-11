@@ -679,7 +679,7 @@ drop database mysqldump_test_db;
 # --default-character-set=xxx. However, we should dump in UTF8
 # if it is explicitely set.
 CREATE TABLE t1 (a  CHAR(10));
-INSERT INTO t1  VALUES (_latin1 'ƒ÷‹ﬂ');
+INSERT INTO t1  VALUES (_latin1 '??');
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -756,7 +756,7 @@ CREATE TABLE `t1` (
 
 LOCK TABLES `t1` WRITE;
 /*!40000 ALTER TABLE `t1` DISABLE KEYS */;
-INSERT INTO `t1` VALUES ('éôö·');
+INSERT INTO `t1` VALUES ('????);
 /*!40000 ALTER TABLE `t1` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!50112 SET @disable_bulk_load = IF (@is_rocksdb_supported, 'SET SESSION rocksdb_bulk_load = @old_rocksdb_bulk_load', 'SET @dummy_rocksdb_bulk_load = 0') */;
@@ -792,7 +792,7 @@ CREATE TABLE `t1` (
 
 LOCK TABLES `t1` WRITE;
 /*!40000 ALTER TABLE `t1` DISABLE KEYS */;
-INSERT INTO `t1` VALUES ('éôö·');
+INSERT INTO `t1` VALUES ('????);
 /*!40000 ALTER TABLE `t1` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!50112 SET @disable_bulk_load = IF (@is_rocksdb_supported, 'SET SESSION rocksdb_bulk_load = @old_rocksdb_bulk_load', 'SET @dummy_rocksdb_bulk_load = 0') */;
@@ -2004,11 +2004,11 @@ create table t1 (a text character set utf8, b text character set latin1);
 insert t1 values (0x4F736E616272C3BC636B, 0x4BF66C6E);
 select * from t1;
 a	b
-Osnabr¸ck	Kˆln
+Osnabr?ck	K?ln
 test.t1: Records: 1  Deleted: 0  Skipped: 0  Warnings: 0
 select * from t1;
 a	b
-Osnabr¸ck	Kˆln
+Osnabr?ck	K?ln
 drop table t1;
 #
 # Bug#15328 Segmentation fault occured if my.cnf is invalid for escape sequence
@@ -4510,14 +4510,14 @@ UNLOCK TABLES;
 /*!50717 PREPARE s FROM @rocksdb_enable_bulk_load */;
 /*!50717 EXECUTE s */;
 /*!50717 DEALLOCATE PREPARE s */;
-DROP TABLE IF EXISTS `straﬂe`;
-CREATE TABLE `straﬂe` (
+DROP TABLE IF EXISTS `stra?`;
+CREATE TABLE `stra?` (
   `f1` int(11) DEFAULT NULL
 ) TYPE=InnoDB;
 
-LOCK TABLES `straﬂe` WRITE;
-/*!40000 ALTER TABLE `straﬂe` DISABLE KEYS */;
-/*!40000 ALTER TABLE `straﬂe` ENABLE KEYS */;
+LOCK TABLES `stra?` WRITE;
+/*!40000 ALTER TABLE `stra?` DISABLE KEYS */;
+/*!40000 ALTER TABLE `stra?` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!50112 SET @disable_bulk_load = IF (@is_rocksdb_supported, 'SET SESSION rocksdb_bulk_load = @old_rocksdb_bulk_load', 'SET @dummy_rocksdb_bulk_load = 0') */;
 /*!50112 PREPARE s FROM @disable_bulk_load */;
@@ -4838,12 +4838,12 @@ second	ee1	root@localhost	UTC	ONE TIME	2035-12-31 20:01:23	NULL	NULL	NULL	NULL	E
 show create event ee1;
 Event	sql_mode	time_zone	Create Event	character_set_client	collation_connection	Database Collation
 ee1		UTC	CREATE DEFINER=`root`@`localhost` EVENT `ee1` ON SCHEDULE AT '2035-12-31 20:01:23' ON COMPLETION NOT PRESERVE ENABLE DO set @a=5	latin1	latin1_swedish_ci	latin1_swedish_ci
-create event ee2 on schedule at '2036-12-31 21:01:23' do set @a=5;
+create event ee2 on schedule at '2029-12-31 21:01:23' do set @a=5;
 create event ee3 on schedule at '2030-12-31 22:01:23' do set @a=5;
 show events;
 Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
 second	ee1	root@localhost	UTC	ONE TIME	2035-12-31 20:01:23	NULL	NULL	NULL	NULL	ENABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
-second	ee2	root@localhost	UTC	ONE TIME	2036-12-31 21:01:23	NULL	NULL	NULL	NULL	ENABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
+second	ee2	root@localhost	UTC	ONE TIME	2029-12-31 21:01:23	NULL	NULL	NULL	NULL	ENABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
 second	ee3	root@localhost	UTC	ONE TIME	2030-12-31 22:01:23	NULL	NULL	NULL	NULL	ENABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
 drop database second;
 create database third;
@@ -4851,7 +4851,7 @@ use third;
 show events;
 Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
 third	ee1	root@localhost	UTC	ONE TIME	2035-12-31 20:01:23	NULL	NULL	NULL	NULL	ENABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
-third	ee2	root@localhost	UTC	ONE TIME	2036-12-31 21:01:23	NULL	NULL	NULL	NULL	ENABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
+third	ee2	root@localhost	UTC	ONE TIME	2029-12-31 21:01:23	NULL	NULL	NULL	NULL	ENABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
 third	ee3	root@localhost	UTC	ONE TIME	2030-12-31 22:01:23	NULL	NULL	NULL	NULL	ENABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
 drop database third;
 set time_zone = 'SYSTEM';
@@ -4957,8 +4957,8 @@ DROP DATABASE IF EXISTS mysqldump_test_db;
 # Create objects.
 CREATE DATABASE mysqldump_test_db;
 set names koi8r;
-CREATE VIEW mysqldump_test_db.v2 AS SELECT 1 AS ÀœÃœŒÀ¡1;
-CREATE VIEW mysqldump_test_db.v1 AS SELECT ÀœÃœŒÀ¡1 FROM mysqldump_test_db.v2;
+CREATE VIEW mysqldump_test_db.v2 AS SELECT 1 AS ????1;
+CREATE VIEW mysqldump_test_db.v1 AS SELECT ????1 FROM mysqldump_test_db.v2;
 set names latin1;
 
 # Dump mysqldump_test_db to bug30027.sql.
@@ -5132,8 +5132,7 @@ INSERT INTO t1 VALUES (1, 'ABC-–ê–ë–í', 'DEF-√Ç√É√Ñ'), (2, NULL, NULL);
 # error on multi-character ENCLOSED/ESCAPED BY
 # default '--default-charset' (binary):
 ##################################################
-1	ABC-·‚˜	DEF-¬√ƒ
-2	\N	\N
+1	ABC-??	DEF-??2	\N	\N
 ##################################################
 TRUNCATE t2;
 LOAD DATA INFILE 'MYSQLTEST_VARDIR/tmp/t1.txt' INTO TABLE t2 CHARACTER SET binary;
@@ -5154,8 +5153,7 @@ a	b	c
 2	NULL	NULL
 # latin1 (data corruption is expected):
 ##################################################
-1	ABC-???	DEF-¬√ƒ
-2	\N	\N
+1	ABC-???	DEF-??2	\N	\N
 ##################################################
 TRUNCATE t2;
 LOAD DATA INFILE 'MYSQLTEST_VARDIR/tmp/t1.txt' INTO TABLE t2 CHARACTER SET latin1 ;
@@ -5166,7 +5164,7 @@ a	b	c
 2	NULL	NULL
 # koi8r (data corruption is expected):
 ##################################################
-1	ABC-·‚˜	DEF-???
+1	ABC-??	DEF-???
 2	\N	\N
 ##################################################
 TRUNCATE t2;

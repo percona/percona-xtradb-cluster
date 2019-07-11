@@ -159,6 +159,7 @@ alter table tinnodb engine=myisam;
 alter table tinnodb engine=memory;
 alter table tinnodb engine=innodb;
 drop table tinnodb;
+#node-2 (ensure cleanup is done before starting next scenario)
 #node-1
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
@@ -302,6 +303,7 @@ Warnings:
 Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of ALTER command on a table (test.tinnodb) that resides in non-transactional storage engine (except switching to transactional engine) with pxc_strict_mode = PERMISSIVE
 alter table tinnodb engine=innodb;
 drop table tinnodb;
+#node-2 (ensure cleanup is done before starting next scenario)
 #node-1
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
@@ -420,6 +422,7 @@ alter table tinnodb engine=memory;
 ERROR HY000: Percona-XtraDB-Cluster prohibits changing storage engine of a table (test.tinnodb) from transactional to non-transactional with pxc_strict_mode = ENFORCING or MASTER
 alter table tinnodb engine=innodb;
 drop table tinnodb;
+#node-2 (ensure cleanup is done before starting next scenario)
 #node-1
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2000, 2019, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, 2009 Google Inc.
 Copyright (c) 2009, 2016, Percona Inc.
 Copyright (c) 2012, Facebook Inc.
@@ -9511,7 +9511,7 @@ no_commit:
 
 				{
 				const dict_index_t*     err_index=
-					trx_get_error_info(m_prebuilt->trx);
+					trx_get_error_index(m_prebuilt->trx);
 				WSREP_DEBUG("Found duplicate value for"
 				      " table (%s) - key (%s)"
 				      " THD %u, Auto-Inc-Value: %llu"
@@ -12550,8 +12550,7 @@ innodb_base_col_setup_for_stored(
 	for (uint i= 0; i < field->table->s->fields; ++i) {
 		const Field* base_field = field->table->field[i];
 
-		if (!innobase_is_s_fld(base_field)
-		    && !innobase_is_v_fld(base_field)
+		if (!innobase_is_v_fld(base_field)
 		    && bitmap_is_set(&field->gcol_info->base_columns_map,
 				     i)) {
 			ulint	z;
@@ -17333,7 +17332,7 @@ ha_innobase::info_low(
 		ut_a(m_prebuilt->trx);
 		ut_a(m_prebuilt->trx->magic_n == TRX_MAGIC_N);
 
-		err_index = trx_get_error_info(m_prebuilt->trx);
+		err_index = trx_get_error_index(m_prebuilt->trx);
 
 		if (err_index) {
 			errkey = innobase_get_mysql_key_number_for_index(
@@ -20015,7 +20014,7 @@ ha_innobase::get_foreign_dup_key(
 	ut_a(m_prebuilt->trx != NULL);
 	ut_a(m_prebuilt->trx->magic_n == TRX_MAGIC_N);
 
-	err_index = trx_get_error_info(m_prebuilt->trx);
+	err_index = trx_get_error_index(m_prebuilt->trx);
 
 	if (err_index == NULL) {
 		return(false);
@@ -23583,6 +23582,13 @@ static MYSQL_SYSVAR_UINT(merge_threshold_set_all_debug,
   " cache by the specified value dynamically, at the time.",
   NULL, innodb_merge_threshold_set_all_debug_update,
   DICT_INDEX_MERGE_THRESHOLD_DEFAULT, 1, 50, 0);
+
+static MYSQL_SYSVAR_ULONG(semaphore_wait_timeout_debug,
+  srv_fatal_semaphore_wait_threshold,
+  PLUGIN_VAR_RQCMDARG,
+  "Number of seconds that a semaphore can be held. If semaphore wait crosses"
+  "this value, server will crash", NULL, NULL, 600, 100, 600, 0);
+
 #endif /* UNIV_DEBUG */
 
 static MYSQL_SYSVAR_ULONG(purge_batch_size, srv_purge_batch_size,
@@ -24931,6 +24937,7 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(buf_flush_list_now),
   MYSQL_SYSVAR(track_redo_log_now),
   MYSQL_SYSVAR(merge_threshold_set_all_debug),
+  MYSQL_SYSVAR(semaphore_wait_timeout_debug),
 #endif /* UNIV_DEBUG */
 #if defined UNIV_DEBUG || defined UNIV_PERF_DEBUG
   MYSQL_SYSVAR(page_hash_locks),
