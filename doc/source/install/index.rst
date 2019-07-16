@@ -24,7 +24,7 @@ for manual installation:
 
 If you want to build |PXC| from source, see :ref:`compile`.
 
-If you want to run |PXC| using Docker, see :ref:`docker`.
+If you want to run |PXC| using Docker, see :ref:`pxc.docker-container.running`.
 
 .. toctree::
    :hidden:
