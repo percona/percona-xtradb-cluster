@@ -17,7 +17,7 @@
 # so WSREP_VERSION is produced regardless
 
 # Set the patch version
-SET(WSREP_PATCH_VERSION "25")
+SET(WSREP_PATCH_VERSION "26")
 
 # Obtain patch revision number
 SET(WSREP_REVISION $ENV{WSREP_REV})
