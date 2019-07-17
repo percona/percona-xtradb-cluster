@@ -6783,6 +6783,7 @@ extern "C" void *start_wsrep_THD(void *arg)
    returns the number of wsrep appliers running.
    However, the caller (thd parameter) is not taken in account
  */
+MY_ATTRIBUTE((noinline))
 static int have_wsrep_appliers(THD *thd)
 {
   Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
@@ -6806,6 +6807,7 @@ static void wsrep_close_thread(THD *thd)
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 }
 
+MY_ATTRIBUTE((noinline))
 static my_bool have_committing_connections()
 {
   Count_wsrep_thd count_thd_committing(COMMITTING);
