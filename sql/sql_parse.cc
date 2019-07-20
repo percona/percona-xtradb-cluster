@@ -2232,6 +2232,18 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
         (thd->wsrep_conflict_state != RETRY_AUTOCOMMIT)) {
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
+      /* Update user statistics only if at least one timer was initialized */
+      if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0))
+      {
+        userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
+                              &thd->cpu_time);
+        /* Updates THD stats and the global user stats. */
+        thd->update_stats(true);
+#ifndef EMBEDDED_LIBRARY
+        update_global_user_stats(thd, true, time(NULL));
+#endif
+      }
+
       thd->update_server_status();
       thd->protocol->end_statement();
       query_cache_end_of_result(thd);
