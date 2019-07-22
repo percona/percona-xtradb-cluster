@@ -112,6 +112,38 @@ XML_TAG::XML_TAG(int l, String f, String v) {
 #define GET (stack_pos != stack ? *--stack_pos : my_b_get(&cache))
 #define PUSH(A) *(stack_pos++) = (A)
 
+#ifdef WITH_WSREP
+/** If requested by wsrep_load_data_splitting and streaming replication is
+    not enabled, replicate a streaming fragment every 10,000 rows.*/
+class Wsrep_load_data_split {
+ public:
+  Wsrep_load_data_split(THD *thd)
+      : m_thd(thd),
+        m_load_data_splitting(wsrep_load_data_splitting),
+        m_fragment_unit(thd->wsrep_trx().streaming_context().fragment_unit()),
+        m_fragment_size(thd->wsrep_trx().streaming_context().fragment_size()) {
+    if (WSREP(m_thd) && m_load_data_splitting) {
+      /* Override streaming settings with backward compatible values for
+         load data splitting */
+      m_thd->wsrep_cs().streaming_params(wsrep::streaming_context::row, 10000);
+    }
+  }
+
+  ~Wsrep_load_data_split() {
+    if (WSREP(m_thd) && m_load_data_splitting) {
+      /* Restore original settings */
+      m_thd->wsrep_cs().streaming_params(m_fragment_unit, m_fragment_size);
+    }
+  }
+
+ private:
+  THD *m_thd;
+  bool m_load_data_splitting;
+  enum wsrep::streaming_context::fragment_unit m_fragment_unit;
+  size_t m_fragment_size;
+};
+#endif /* WITH_WSREP */
+
 class READ_INFO {
   File file;
   uchar *buffer,    /* Buffer for read text */
@@ -208,6 +240,10 @@ bool Sql_cmd_load_table::execute_inner(THD *thd,
   const char *tdb = thd->db().str ? thd->db().str : db;  // Result is never null
   ulong skip_lines = m_exchange.skip_lines;
   DBUG_ENTER("Sql_cmd_load_table::execute_inner");
+
+#ifdef WITH_WSREP
+  Wsrep_load_data_split wsrep_load_data_split(thd);
+#endif /* WITH_WSREP */
 
   /*
     Bug #34283

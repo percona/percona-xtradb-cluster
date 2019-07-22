@@ -568,20 +568,27 @@ ENDIF()
 
 IF(WITH_WSREP)
  SET(WSREP_SOURCES
-   wsrep_utils.cc
-   wsrep_xid.cc
+   wsrep_applier.cc
+   wsrep_binlog.cc
    wsrep_check_opts.cc
-   wsrep_hton.cc
+   wsrep_client_service.cc
+   wsrep_high_priority_service.cc
    wsrep_mysqld.cc
    wsrep_notify.cc
-   wsrep_sst.cc
-   wsrep_var.cc
-   wsrep_binlog.cc
-   wsrep_applier.cc
-   wsrep_thd.cc
+   wsrep_plugin.cc
+   wsrep_schema.cc
+   wsrep_server_service.cc
+   wsrep_server_state.cc
    wsrep_service.cc
+   wsrep_sst.cc
+   wsrep_storage_service.cc
+   wsrep_thd.cc
+   wsrep_utils.cc
+   wsrep_var.cc
+   wsrep_xid.cc
+   service_wsrep.cc
  )
- SET(WSREP_LIB wsrep)
+ SET(WSREP_LIB wsrep-lib wsrep_api_v26)
 ENDIF()
 
 SET(SQL_SOURCE

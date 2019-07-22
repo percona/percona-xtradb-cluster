@@ -103,12 +103,7 @@ void trx_sys_flush_max_trx_id(void) {
   mtr_t mtr;
   trx_sysf_t *sys_header;
 
-#ifdef WITH_WSREP
-  /* wsrep_fake_trx_id  violates this assert
-  Copied from trx_sys_get_new_trx_id */
-#else
   ut_ad(trx_sys_mutex_own());
-#endif /* !WITH_WSREP */
 
   if (!srv_read_only_mode) {
     mtr_start(&mtr);
@@ -261,7 +256,7 @@ void trx_sys_update_wsrep_checkpoint(
     unsigned char xid_uuid[16];
     long long xid_seqno = read_wsrep_xid_seqno(xid);
     read_wsrep_xid_uuid(xid, xid_uuid);
-    if (!memcmp(xid_uuid, trx_sys_cur_xid_uuid, 8)) {
+    if (xid_seqno != -1 && !memcmp(xid_uuid, trx_sys_cur_xid_uuid, 8)) {
       if (recovery) {
         /* When recovery happens prepare transactions
         are revived based on undo-log entries in InnoDB.

@@ -1634,7 +1634,7 @@ bool check_readonly(THD *thd, bool err_if_readonly) {
   if (thd->slave_thread || thd->is_cmd_skip_readonly()) DBUG_RETURN(false);
 
 #ifdef WITH_WSREP
-  /* Ignore readonly for background wsrep applier */
+  /* Ignore readonly for background wsrep applier too (like slave thread) */
   if (WSREP(thd) && thd->wsrep_applier) DBUG_RETURN(false);
 #endif /* WITH_WSREP */
 

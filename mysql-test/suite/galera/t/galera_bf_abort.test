@@ -106,7 +106,7 @@ SET DEBUG_SYNC = 'RESET';
 SET DEBUG_SYNC = "now SIGNAL continue1";
 
 --connection node_2b
---echo #node-2b (fire parallel DDL action)
+--echo #node-2b (ensuring table got dropped)
 --reap
 --error ER_NO_SUCH_TABLE
 select * from t;

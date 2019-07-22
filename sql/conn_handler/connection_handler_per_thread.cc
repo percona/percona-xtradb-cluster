@@ -63,6 +63,10 @@
 #include "sql/sql_thd_internal_api.h"  // thd_set_thread_stack
 #include "thr_mutex.h"
 
+#ifdef WITH_WSREP
+#include "sql/wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
+
 // Initialize static members
 ulong Per_thread_connection_handler::blocked_pthread_count = 0;
 ulong Per_thread_connection_handler::slow_launch_threads = 0;
@@ -307,10 +311,18 @@ static void *handle_connection(void *arg) {
     if (thd_prepare_connection(thd))
       handler_manager->inc_aborted_connects();
     else {
+#ifdef WITH_WSREP
+      wsrep_open(thd);
+#endif /* WITH_WSREP */
+
       while (thd_connection_alive(thd)) {
         if (do_command(thd)) break;
       }
       end_connection(thd);
+
+#ifdef WITH_WSREP
+      wsrep_close(thd);
+#endif /* WITH_WSREP */
     }
     close_connection(thd, 0, false, false);
 

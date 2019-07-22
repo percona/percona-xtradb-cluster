@@ -65,7 +65,7 @@ INSERT INTO t1 VALUES (5);
 --let $galera_server_number = 1
 --source include/galera_connect.inc
 --connection node_1a
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: initiating replication for write set%' AND INFO = 'INSERT INTO t1 VALUES (5)';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: replicating and certifying write set%' AND INFO = 'INSERT INTO t1 VALUES (5)';
 --source include/wait_condition.inc
 
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
@@ -97,3 +97,11 @@ SHOW STATUS LIKE 'wsrep_flow_control_status';
 --enable_query_log
 
 DROP TABLE t1;
+
+--echo #restart node-2 to restore original default (fc_factor to 1.0 (vs 1).
+--source include/restart_mysqld.inc
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+

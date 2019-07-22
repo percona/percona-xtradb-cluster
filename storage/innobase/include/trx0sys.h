@@ -233,10 +233,9 @@ trx_sys_update_wsrep_checkpoint(
 
 void
 /** Read WSREP checkpoint XID from sys header. */
-trx_sys_read_wsrep_checkpoint(
-        XID* xid); /*!< out: WSREP XID */
-#endif /* WITH_WSREP */
+trx_sys_read_wsrep_checkpoint(XID *xid); /*!< out: WSREP XID */
 
+#endif /* WITH_WSREP */
 
 /** Determine if there are incomplete transactions in the system.
 @return whether incomplete transactions need rollback */

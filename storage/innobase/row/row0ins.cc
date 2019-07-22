@@ -834,7 +834,7 @@ static void row_ins_foreign_report_add_err(
 dberr_t wsrep_append_foreign_key(trx_t *trx, dict_foreign_t *foreign,
                                  const rec_t *clust_rec,
                                  dict_index_t *clust_index, ibool referenced,
-                                 wsrep_key_type key_type);
+                                 Wsrep_service_key_type key_type);
 #endif /* WITH_WSREP */
 
 /** Fill virtual column information in cascade node for the child table.
@@ -1271,8 +1271,9 @@ static NO_INLINE MY_ATTRIBUTE((warn_unused_result)) dberr_t
   cascade->state = UPD_NODE_UPDATE_CLUSTERED;
 
 #ifdef WITH_WSREP
-  err = wsrep_append_foreign_key(thr_get_trx(thr), foreign, clust_rec,
-                                 clust_index, false, WSREP_KEY_EXCLUSIVE);
+  err =
+      wsrep_append_foreign_key(thr_get_trx(thr), foreign, clust_rec,
+                               clust_index, false, WSREP_SERVICE_KEY_EXCLUSIVE);
   if (err != DB_SUCCESS) {
     ib::warn() << "WSREP: foreign key append failed: " << err;
   } else
@@ -1640,21 +1641,11 @@ dberr_t row_ins_check_foreign_constraint(
           err = DB_SUCCESS;
 
 #ifdef WITH_WSREP
-          wsrep_key_type key_type = WSREP_KEY_EXCLUSIVE;
-          if (upd_node != NULL) {
-            key_type = WSREP_KEY_SHARED;
-          } else {
-            switch (wsrep_certification_rules) {
-              case WSREP_CERTIFICATION_RULES_STRICT:
-                key_type = WSREP_KEY_EXCLUSIVE;
-                break;
-              case WSREP_CERTIFICATION_RULES_OPTIMIZED:
-                key_type = WSREP_KEY_SEMI;
-                break;
-            }
-          }
-          err = wsrep_append_foreign_key(thr_get_trx(thr), foreign, rec,
-                                         check_index, check_ref, key_type);
+          err = wsrep_append_foreign_key(
+              thr_get_trx(thr), foreign, rec, check_index, check_ref,
+              (upd_node != NULL && wsrep_protocol_version < 4)
+                  ? WSREP_SERVICE_KEY_SHARED
+                  : WSREP_SERVICE_KEY_REFERENCE);
 #endif /* WITH_WSREP */
 
           goto end_scan;
@@ -3210,9 +3201,30 @@ and return. don't execute actual insert. */
   /* Try first optimistic descent to the B-tree */
   ulint flags;
 
+#ifdef WITH_WSREP
+  const bool skip_locking = wsrep_thd_skip_locking(thr_get_trx(thr)->mysql_thd);
+#endif /* WITH_WSREP */
+
   if (!index->table->is_intrinsic()) {
     log_free_check();
+#ifdef WITH_WSREP
+    flags = (index->table->is_temporary() || skip_locking) ? BTR_NO_LOCKING_FLAG
+                                                           : 0;
+#else
     flags = index->table->is_temporary() ? BTR_NO_LOCKING_FLAG : 0;
+#endif /* WITH_WSREP */
+
+#ifdef UNIV_DEBUG
+    if (skip_locking &&
+        strcmp(wsrep_get_sr_table_name(), index->table->name.m_name)) {
+      WSREP_ERROR(
+          "Record locking is disabled in this thread, "
+          "but the table being modified is not "
+          "`%s`: `%s`.",
+          wsrep_get_sr_table_name(), index->table->name.m_name);
+      ut_error;
+    }
+#endif /* UNIV_DEBUG */
 
     /* For intermediate table of copy alter operation,
     skip undo logging and record lock checking for

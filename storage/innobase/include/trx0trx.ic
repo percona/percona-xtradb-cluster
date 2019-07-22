@@ -301,7 +301,7 @@ const trx_t *trx_arbitrate(const trx_t *requestor, const trx_t *holder) {
 
 #ifdef WITH_WSREP
 
-  // TODO: KRUNAL Execute this only when WSREP_ON = true
+  // TODO: Execute this only when WSREP_ON = true
 
   /* For wsrep we always try to priotize applier thread. */
 

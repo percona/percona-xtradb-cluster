@@ -2788,6 +2788,7 @@ reexecute:
 
 #ifdef WITH_WSREP
   bool observer_popped = false;
+#if 0
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   switch (thd->wsrep_conflict_state) {
     case CERT_FAILURE:
@@ -2825,6 +2826,7 @@ reexecute:
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       break;
   }
+#endif
   if (!observer_popped)
     thd->pop_reprepare_observer();
 #else

@@ -19,27 +19,3 @@ SELECT COUNT(3) = 4 FROM t1;
 COUNT(3) = 4
 1
 DROP TABLE t1;
-# Node 1
-call mtr.add_suppression("RSU failed due to pending transactions");
-call mtr.add_suppression("ALTER TABLE isolation");
-USE test;
-CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
-CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
-# Node 1a
-use test;
-SET SESSION wsrep_retry_autocommit = 0;
-SET DEBUG_SYNC = "wsrep_after_replication SIGNAL entered1 WAIT_FOR continue";
-INSERT INTO t1 (f1) VALUES(1);;
-# Node 1
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "now WAIT_FOR entered1";
-SET wsrep_OSU_method = "RSU";
-ALTER TABLE t2 ADD COLUMN k INT;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
-SET SESSION wsrep_OSU_method = "TOI";
-SET DEBUG_SYNC = "now SIGNAL continue";
-# Node 1
-SELECT * FROM t2;
-f1
-DROP TABLE t1;
-DROP TABLE t2;

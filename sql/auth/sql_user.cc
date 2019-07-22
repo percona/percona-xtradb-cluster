@@ -94,6 +94,10 @@
 #include "sql/mysqld.h"
 #include "sql/sql_rewrite.h"
 
+#ifdef WITH_WSREP
+#include "sql/wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
+
 /**
   Auxiliary function for constructing a  user list string.
   This function is used for error reporting and logging.
@@ -106,7 +110,11 @@
 void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
 
 #ifdef WITH_WSREP
-  /* PXC doesn't allow user function (CURRENT_USER) with user operation */
+  /*
+    PXC doesn't allow user functions viz. USER/CURRENT_USER
+    as TOI replication of this statement is unable to establish user context
+    on applier thread. (mysql-wsrep#304)
+  */
   if (WSREP(thd) && !user) return;
 #endif /* WITH_WSREP */
 
@@ -143,7 +151,8 @@ bool check_change_password(THD *thd, const char *host, const char *user,
   sctx = thd->security_context();
   if (!thd->slave_thread &&
 #ifdef WITH_WSREP
-      (!WSREP(thd) || !thd->wsrep_applier) &&
+      /* Suppress check for applier/slave thread. */
+      !(WSREP(thd) && thd->wsrep_applier) &&
 #endif /* WITH_WSREP */
       (strcmp(sctx->user().str, user) ||
        my_strcasecmp(system_charset_info, host, sctx->priv_host().str))) {
@@ -167,7 +176,7 @@ bool check_change_password(THD *thd, const char *host, const char *user,
 
   if (!thd->slave_thread && likely((get_server_state() == SERVER_OPERATING)) &&
 #ifdef WITH_WSREP
-      (!WSREP(thd) || !thd->wsrep_applier) &&
+      !(WSREP(thd) && thd->wsrep_applier) &&
 #endif /* WITH_WSREP */
       !strcmp(thd->security_context()->priv_user().str, "")) {
     my_error(ER_PASSWORD_ANONYMOUS_USER, MYF(0));
@@ -1337,6 +1346,12 @@ bool change_password(THD *thd, LEX_USER *lex_user, char *new_password,
   Save_and_Restore_binlog_format_state binlog_format_state(thd);
 
 #ifdef WITH_WSREP
+  /*
+    Rewrite query to ensure it is safe to replay on slave thread with proper
+    user context established (this is important if original query fails to
+    explictly specify the user context and if such query is replicated
+    w/o re-writting then applier will not be able to establish user context).
+  */
   if (WSREP(thd) && !thd->wsrep_applier) {
     char buff[2048];
     ulong query_length =
@@ -1348,7 +1363,6 @@ bool change_password(THD *thd, LEX_USER *lex_user, char *new_password,
     if ((ret = open_grant_tables(thd, tables, &transactional_tables,
                                  WSREP_MYSQL_DB, "user"))) {
       thd->set_query(query_save);
-      thd->wsrep_exec_mode = LOCAL_STATE;
       DBUG_RETURN(ret != 1);
     }
   } else {
@@ -1454,7 +1468,6 @@ end:
   if (WSREP(thd) && !thd->wsrep_applier) {
     WSREP_TO_ISOLATION_END
     thd->set_query(query_save);
-    thd->wsrep_exec_mode = LOCAL_STATE;
   }
 #endif /* WITH_WSREP */
 

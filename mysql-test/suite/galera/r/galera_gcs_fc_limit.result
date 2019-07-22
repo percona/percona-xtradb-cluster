@@ -41,3 +41,5 @@ SHOW STATUS LIKE 'wsrep_flow_control_status';
 Variable_name	Value
 wsrep_flow_control_status	OFF
 DROP TABLE t1;
+#restart node-2 to restore original default (fc_factor to 1.0 (vs 1).
+# restart

@@ -49,6 +49,8 @@ DROP TABLE t4;
 #
 --connection node_2
 call mtr.add_suppression("Slave SQL: Error 'Table 'v1' already exists' on .*");
+call mtr.add_suppression("Query apply failed.*");
+
 --connection node_1
 call mtr.add_suppression("Slave SQL: Error 'Table 'v1' already exists' on .*");
 #

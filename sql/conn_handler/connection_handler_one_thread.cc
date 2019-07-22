@@ -24,6 +24,11 @@
 
 #include <stddef.h>
 
+#ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
+#include "sql/wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
+
 #include "my_systime.h"  //my_getsystime
 #include "mysql/psi/mysql_socket.h"
 #include "mysql/psi/mysql_thread.h"
@@ -83,17 +88,15 @@ bool One_thread_connection_handler::add_connection(Channel_info *channel_info) {
     create_user = false;
   } else {
     delete channel_info;
+#ifdef WITH_WSREP
+    wsrep_open(thd);
+#endif /* WITH_WSREP */
     while (thd_connection_alive(thd)) {
       if (do_command(thd)) break;
     }
     end_connection(thd);
 #ifdef WITH_WSREP
-    if (WSREP(thd)) {
-      /* Update the query state to reflect EXIT of the thd. */
-      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-      thd->wsrep_query_state = QUERY_EXITING;
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-    }
+    wsrep_close(thd);
 #endif /* WITH_WSREP */
   }
   close_connection(thd, 0, false, false);

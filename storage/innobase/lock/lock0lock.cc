@@ -59,7 +59,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ut0vec.h"
 
 #ifdef WITH_WSREP
-extern bool wsrep_debug;
+extern ulong wsrep_debug;
 extern bool wsrep_log_conflicts;
 #include <wsrep_mysqld.h>
 static void lock_table_print(FILE *file, const lock_t *lock);
@@ -684,8 +684,7 @@ request is really for a 'gap' type lock */
         lock_rec_print(stderr, lock2);
       }
 
-      if ((wsrep_trx_order_before(trx->mysql_thd, lock2->trx->mysql_thd)) &&
-          ((type_mode & LOCK_MODE_MASK) == LOCK_X) &&
+      if (((type_mode & LOCK_MODE_MASK) == LOCK_X) &&
           ((lock2->type_mode & LOCK_MODE_MASK) == LOCK_X)) {
         if (for_locking || wsrep_debug) {
           /* exclusive lock conflicts are not accepted */
@@ -693,9 +692,9 @@ request is really for a 'gap' type lock */
                      << "mode: " << type_mode
                      << " supremum: " << lock_is_on_supremum;
           ib::info() << "conflicts states: my: "
-                     << wsrep_thd_conflict_state(trx->mysql_thd, false)
+                     << wsrep_thd_transaction_state_str(trx->mysql_thd)
                      << " locked: "
-                     << wsrep_thd_conflict_state(lock2->trx->mysql_thd, false);
+                     << wsrep_thd_transaction_state_str(lock2->trx->mysql_thd);
           lock_rec_print(stderr, lock2);
           if (for_locking) return false;
         }
@@ -1003,14 +1002,19 @@ static void wsrep_kill_victim(const trx_t *const trx, const lock_t *lock) {
   /* quit for native mysql */
   if (!wsrep_on(trx->mysql_thd)) return;
 
+  if (!wsrep_thd_is_BF(trx->mysql_thd, false)) {
+    return;
+  }
+
   bool bf_this = wsrep_thd_is_BF(trx->mysql_thd, false);
   bool bf_other = wsrep_thd_is_BF(lock->trx->mysql_thd, true);
 
   if ((bf_this && !bf_other) ||
       (bf_this && bf_other &&
-       wsrep_trx_order_before(trx->mysql_thd, lock->trx->mysql_thd))) {
+       wsrep_thd_order_before(trx->mysql_thd, lock->trx->mysql_thd))) {
+
     if (lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
-      if (wsrep_debug) fprintf(stderr, "WSREP: BF victim waiting\n");
+      WSREP_DEBUG("WSREP: BF victim waiting\n");
       /* cannot release lock, until our lock
       is in the queue*/
     } else if (lock->trx != trx) {
@@ -1019,6 +1023,9 @@ static void wsrep_kill_victim(const trx_t *const trx, const lock_t *lock) {
           fputs("\n*** Priority TRANSACTION:\n", stderr);
         else
           fputs("\n*** Victim TRANSACTION:\n", stderr);
+        wsrep_trx_print_locking(stderr, trx, 3000);
+
+        ib::info() << "*** Priority TRANSACTION:";
         wsrep_trx_print_locking(stderr, trx, 3000);
 
         if (bf_other)
@@ -1563,7 +1570,7 @@ void RecLock::lock_add(lock_t *lock, bool add_to_hash) {
       lock_t *prev = NULL;
 
       while (hash && wsrep_thd_is_BF(((lock_t *)hash)->trx->mysql_thd, true) &&
-             wsrep_trx_order_before(((lock_t *)hash)->trx->mysql_thd,
+             wsrep_thd_order_before(((lock_t *)hash)->trx->mysql_thd,
                                     trx->mysql_thd)) {
         prev = hash;
         hash = (lock_t *)hash->hash;
@@ -5725,18 +5732,19 @@ static bool lock_rec_queue_validate(
                      << ((wsrep_thd_is_BF(impl_trx->mysql_thd, false))
                              ? "BF"
                              : "normal")
-                     << " exec: " << wsrep_thd_exec_mode(impl_trx->mysql_thd)
+                     << " exec: "
+                     << wsrep_thd_client_mode_str(impl_trx->mysql_thd)
                      << " conflict: "
-                     << wsrep_thd_conflict_state(impl_trx->mysql_thd)
+                     << wsrep_thd_client_state_str(impl_trx->mysql_thd)
                      << " seqno: " << wsrep_thd_trx_seqno(impl_trx->mysql_thd)
                      << " SQL: " << wsrep_thd_query(impl_trx->mysql_thd);
           trx_t *otrx = other_lock->trx;
           ib::info() << "WSREP other lock:\n BF:"
                      << ((wsrep_thd_is_BF(otrx->mysql_thd, false)) ? "BF"
                                                                    : "normal")
-                     << " exec: " << wsrep_thd_exec_mode(otrx->mysql_thd)
+                     << " exec: " << wsrep_thd_client_mode_str(otrx->mysql_thd)
                      << " conflict: "
-                     << wsrep_thd_conflict_state(otrx->mysql_thd)
+                     << wsrep_thd_client_state_str(otrx->mysql_thd)
                      << " seqno: " << wsrep_thd_trx_seqno(otrx->mysql_thd)
                      << " SQL: " << wsrep_thd_query(otrx->mysql_thd);
         }
@@ -6976,7 +6984,8 @@ dberr_t lock_trx_handle_wait(trx_t *trx) /*!< in/out: trx lock state */
   dberr_t err;
 
 #ifdef WITH_WSREP
-  if (trx->wsrep_killed_by_query == 0) {
+  /* We already own mutexes. */
+  if (!trx->lock.was_chosen_as_wsrep_victim) {
     lock_mutex_enter();
     trx_mutex_enter(trx);
   }
@@ -7000,7 +7009,7 @@ dberr_t lock_trx_handle_wait(trx_t *trx) /*!< in/out: trx lock state */
 
   trx->owns_mutex = false;
 #ifdef WITH_WSREP
-  if (trx->wsrep_killed_by_query == 0) {
+  if (!trx->lock.was_chosen_as_wsrep_victim) {
     lock_mutex_exit();
     trx_mutex_exit(trx);
   }
@@ -7559,6 +7568,12 @@ void DeadlockChecker::trx_rollback() {
 
   print("*** WE ROLL BACK TRANSACTION (1)\n");
 
+#ifdef WITH_WSREP
+  if (wsrep_on(trx->mysql_thd)) {
+    wsrep_handle_SR_rollback(m_start->mysql_thd, trx->mysql_thd);
+  }
+#endif /* WITH_WSREP */
+
   trx_mutex_enter(trx);
 
   trx->owns_mutex = true;
@@ -7659,6 +7674,12 @@ const trx_t *DeadlockChecker::check_and_resolve(const lock_t *lock,
   /* If the joining transaction was selected as the victim. */
   if (victim_trx != NULL) {
     print("*** WE ROLL BACK TRANSACTION (2)\n");
+
+#ifdef WITH_WSREP
+    if (wsrep_on(trx->mysql_thd)) {
+      wsrep_handle_SR_rollback(trx->mysql_thd, victim_trx->mysql_thd);
+    }
+#endif
 
     lock_deadlock_found = true;
 

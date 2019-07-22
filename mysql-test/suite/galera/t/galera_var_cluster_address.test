@@ -24,7 +24,7 @@ SELECT COUNT(*) > 0 FROM performance_schema.global_status;
 # Must return 'OFF'
 SHOW STATUS LIKE 'wsrep_ready';
 
-# Must return 'Non-primary'
+# Must return 'Disconnected'
 SHOW STATUS LIKE 'wsrep_cluster_status';
 
 # Must return 0 = 'Initialized'

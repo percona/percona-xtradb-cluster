@@ -79,7 +79,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #endif /* !UNIV_HOTBACKUP */
 
 #ifdef WITH_WSREP
-extern bool wsrep_debug;
+extern ulong wsrep_debug;
 #endif /* WITH_WSREP */
 
 #ifndef UNIV_HOTBACKUP
@@ -2290,7 +2290,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
               err = DB_SUCCESS;
               break;
             case DB_DEADLOCK:
-              if (wsrep_debug) {
+              if (wsrep_get_debug()) {
                 ib::warn() << "WSREP: sec index FK check fail for deadlock"
                            << " index " << index->name << " table "
                            << index->table->name;

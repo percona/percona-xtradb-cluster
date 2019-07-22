@@ -3588,6 +3588,27 @@ sub have_wsrep() {
   return defined $wsrep_on
 }
 
+#
+# wsrep_on
+#
+# Check if wsrep has been enabled for a server.
+#
+# RETURN
+# 1 Wsrep has been enabled
+# 0 Wsrep is not enabled
+#
+sub wsrep_on($) {
+  my $mysqld= shift;
+  #check if wsrep_on=  is set in configuration
+  if ($mysqld->if_exist('wsrep-on')) {
+    my $on= "".$mysqld->value('wsrep-on');
+    if ($on eq "1" || $on eq "ON") {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 sub wsrep_is_bootstrap_server($) {
   my $mysqld= shift;
   return $mysqld->if_exist('wsrep_cluster_address') &&
@@ -6286,9 +6307,12 @@ sub start_servers($) {
     # If wsrep is on, we need to wait until the first
     # server starts and bootstraps the cluster before
     # starting other servers.
-    if (have_wsrep() && wsrep_is_bootstrap_server($mysqld)) {
-      mtr_verbose("WSREP waiting for first server to bootstrap cluster");
-      if (!wait_wsrep_ready($tinfo, $mysqld)) {
+    # starting other servers.The bootsrap server in the
+    # configuration should always be the first which has
+    # wsrep_on = ON
+    if (wsrep_on($mysqld) && wsrep_is_bootstrap_server($mysqld)) {
+      mtr_verbose("Waiting for wsrep bootstrap server to start");
+      if ($mysqld->{ WAIT }->($mysqld)) {
         return 1;
       }
     }
@@ -6328,9 +6352,13 @@ sub start_servers($) {
       return 1;
     }
 
-    if (have_wsrep() && !wait_wsrep_ready($tinfo, $mysqld))
+    if (wsrep_on($mysqld))
     {
-      return 1;
+      mtr_verbose("Waiting for wsrep server " . $mysqld->name() . " to be ready");
+      if (!wait_wsrep_ready($tinfo, $mysqld))
+      {
+        return 1;
+      }
     }
   }
 

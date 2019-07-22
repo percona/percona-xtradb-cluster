@@ -71,7 +71,7 @@ Rpl_info_factory::struct_file_data Rpl_info_factory::worker_file_data;
 Rpl_info_factory::struct_table_data Rpl_info_factory::worker_table_data;
 
 #ifdef WITH_WSREP
-Rpl_filter  wsrep_filter;
+Rpl_filter wsrep_filter;
 #endif /* WITH_WSREP */
 
 /**

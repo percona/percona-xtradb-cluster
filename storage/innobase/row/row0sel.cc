@@ -4653,6 +4653,12 @@ dberr_t row_search_mvcc(byte *buf, page_cur_mode_t mode,
     metadata locks */
     set_also_gap_locks = false;
   }
+#ifdef WITH_WSREP
+  else if (wsrep_thd_skip_locking(trx->mysql_thd)) {
+    ut_ad(!strcmp(wsrep_get_sr_table_name(), prebuilt->table->name.m_name));
+    set_also_gap_locks = false;
+  }
+#endif /* WITH_WSREP */
 
   /* Note that if the search mode was GE or G, then the cursor
   naturally moves upward (in fetch next) in alphabetical order,

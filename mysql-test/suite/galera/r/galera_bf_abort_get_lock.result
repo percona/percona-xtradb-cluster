@@ -6,7 +6,7 @@ SET AUTOCOMMIT=OFF;
 INSERT INTO t1 VALUES (1);
 SELECT GET_LOCK("foo", 1000);;
 INSERT INTO t1 VALUES (1);
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 wsrep_local_aborts_increment
 1
 DROP TABLE t1;
@@ -26,4 +26,5 @@ ERROR 23000: Duplicate entry '0' for key 'c1'
 set @@session.sql_log_bin = 1;
 set @@sql_mode = default;
 call mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query.*");
+call mtr.add_suppression("Query apply failed.*");
 drop table t1;

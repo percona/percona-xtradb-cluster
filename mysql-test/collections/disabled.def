@@ -218,7 +218,6 @@ rpl.rpl_semi_sync_ack_thread : Issue#330 2018-05-16 CODERSHIP https://github.com
 rpl.rpl_semi_sync_after_sync : Issue#330 2018-06-19 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 
 # galera
-galera.MW-286 : Fails due to timing issue. Parallel transaction should be running while ALTER is fired.
 galera.galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
 galera.galera_fk_multitable : Bug#80821 0000-00-00 CODERSHIP fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
 galera.galera_kill_nochanges : mysql-wsrep#24 0000-00-00 CODERSHIP Galera server does not restart properly if killed

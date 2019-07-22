@@ -10,8 +10,13 @@
 --connection node_2
 # Make sure no signals have been leftover from previous tests to surprise us.
 SELECT @@debug_sync;
+set debug_sync='RESET';
 
 SET SESSION wsrep_sync_wait = 1;
+# said statement will also set the signal and wait-for point.
+# this is done internally to allow setting the said debug sync point
+# on background applier thread which is not possible with debug_sync
+# given session only scope.
 SET GLOBAL debug = "+d,sync.wsrep_apply_cb";
 
 --connection node_1
@@ -99,17 +104,18 @@ SET SESSION wsrep_sync_wait = default;
 # from the test.
 DROP TABLE t_wait1;
 
-#----
+
+#------------------------------------------------------------------------------
+#
 # Additional PXC test - See Jira PXC-2061
 # This tests to see if a SELECT (with wsrep_sync_wait=1) waits until
 # the transaction has been applied.
-#----
+
 --let $show_rpl_debug_info = 0
 
 --connection node_2
 --let $wsrep_provider_options_saved = `SELECT @@wsrep_provider_options`
 SET GLOBAL wsrep_provider_options = 'repl.causal_read_timeout=PT0.5S';
-
 
 --connection node_1
 --echo # Node 1
@@ -117,8 +123,12 @@ CREATE TABLE t1(id INT PRIMARY KEY);
 
 --connection node_2
 --echo # Node 2 : block at the point right after we have left the commit monitor
---let $galera_sync_point = sync.applier_interim_commit.after_commit_leave
---source include/galera_set_sync_point.inc
+SET SESSION wsrep_sync_wait = 0;
+# said statement will also set the signal and wait-for point.
+# this is done internally to allow setting the said debug sync point
+# on background applier thread which is not possible with debug_sync
+# given session only scope.
+set GLOBAL debug = "+d,sync.wsrep_ordered_commit";
 
 --connection node_1
 --echo # Node 1 : Perform the insert. This will succeed on node1 but will block on node2
@@ -126,8 +136,7 @@ INSERT INTO t1 VALUES(1);
 
 --connection node_2
 --echo # Node 2 : Wait for the commit point
-SET SESSION wsrep_sync_wait = 0;
---source include/galera_wait_sync_point.inc
+SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_ordered_commit_reached";
 SET SESSION wsrep_sync_wait = 1;
 
 # This should timeout since we are waiting for the apply monitor to clear
@@ -136,8 +145,9 @@ SET SESSION wsrep_sync_wait = 1;
 SELECT COUNT(*) FROM t1;
 
 --echo # Node 2 : Unblock the commit point
---source include/galera_clear_sync_point.inc
---source include/galera_signal_sync_point.inc
+SET GLOBAL debug = "-d,sync.wsrep_ordered_commit";
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_ordered_commit_continue";
+SET DEBUG_SYNC = "RESET";
 
 #--echo # Node 2 : run the query
 # This should return after the INSERT has been applied
@@ -149,8 +159,6 @@ SELECT COUNT(*) FROM t1;
 --enable_query_log
 SET SESSION wsrep_sync_wait = default;
 DROP TABLE t1;
-
-
 
 # Make sure no pending signals are leftover to surprise subsequent tests.
 SELECT @@debug_sync;

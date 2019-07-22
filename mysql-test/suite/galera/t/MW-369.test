@@ -272,6 +272,9 @@ DROP TABLE p;
 #    parent table should have row (1)
 #    child table should have row (20, 1)
 
+# ---- said conflict is no more valid with introduction of update/reference key.
+# ---- chid will have both the rows. (10, 1), (20, 1)
+
 --connection node_1
 SET GLOBAL wsrep_certification_rules='strict';
 
@@ -295,7 +298,6 @@ INSERT INTO p VALUES (1);
 
 # Commit fails
 --connection node_1
---error ER_LOCK_DEADLOCK
 --reap
 
 --connection node_2

@@ -2235,8 +2235,7 @@ bool Query_result_insert::send_eof(THD *thd) {
               table->file->has_transactions(), table->file->table_type()));
 
 #ifdef WITH_WSREP
-  if (thd->wsrep_conflict_state == MUST_ABORT ||
-      thd->wsrep_conflict_state == CERT_FAILURE)
+  if (thd->wsrep_cs().current_error())
     error = -1;
   else
     error = (bulk_insert_started ? table->file->ha_end_bulk_insert() : 0);
@@ -2814,7 +2813,13 @@ int Query_result_create::binlog_show_create_table(THD *thd) {
     DEBUG_SYNC(thd, "create_select_after_write_create_event");
   }
 #ifdef WITH_WSREP
-  ha_wsrep_fake_trx_id(thd);
+#if 0
+  if (thd->wsrep_trx().active()) {
+    WSREP_DEBUG("transaction already started for CTAS");
+  } else {
+    wsrep_start_transaction(thd, thd->wsrep_next_trx_id());
+  }
+#endif /* 0 */
 #endif /* WITH_WSREP */
   DBUG_RETURN(result);
 }
@@ -2958,9 +2963,11 @@ bool Query_result_create::send_eof(THD *thd) {
       thd->get_stmt_da()->set_overwrite_status(false);
 
 #ifdef WITH_WSREP
+#if 0
+      // TODO: G-4 remove
       if (WSREP(thd)) {
         mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-        if (thd->wsrep_conflict_state != NO_CONFLICT) {
+        if (wsrep_current_error(thd)) {
           WSREP_DEBUG("select_create commit failed, thd: %u err: %s %s",
                       thd->thread_id(),
                       wsrep_get_conflict_state(thd->wsrep_conflict_state),
@@ -2971,6 +2978,7 @@ bool Query_result_create::send_eof(THD *thd) {
         }
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       }
+#endif
 #endif /* WITH_WSREP */
     }
 

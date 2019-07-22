@@ -350,6 +350,11 @@ void **thd_ha_data(const MYSQL_THD thd, const struct handlerton *hton) {
 }
 
 #ifdef WITH_WSREP
+/*
+  Handler private data is cached in thd. If thd is use to execute dd
+  action through attachable-trx concept in MySQL-8.0 then to access private
+  data of native transaction needs traversal through attachable-trx list.
+*/
 void **wsrep_thd_ha_data(const MYSQL_THD thd, const struct handlerton *hton) {
   return &(const_cast<THD *>(thd))
               ->wsrep_get_backup_ha_data(hton->slot)

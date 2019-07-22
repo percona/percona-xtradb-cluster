@@ -35,7 +35,10 @@
 #include "my_config.h"
 
 #ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
 #include "wsrep_mysqld.h"
+#include "wsrep_trans_observer.h"
+#include "service_wsrep.h"
 #endif /* WITH_WSREP */
 
 #include <errno.h>
@@ -4409,14 +4412,16 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
     exec_res = ev->apply_event(rli);
 
 #ifdef WITH_WSREP
-    if (exec_res && thd->wsrep_conflict_state != NO_CONFLICT) {
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    if (exec_res &&
+        thd->wsrep_trx().state() != wsrep::transaction::s_executing) {
       WSREP_DEBUG("Apply Event failed (Reason: %d, Conflict-State: %s)",
-                  exec_res,
-                  wsrep_get_conflict_state(thd->wsrep_conflict_state));
+                  exec_res, wsrep_thd_client_state_str(thd));
       rli->abort_slave = 1;
       rli->report(ERROR_LEVEL, ER_UNKNOWN_COM_ERROR,
                   "Node has dropped from cluster");
     }
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
 
     DBUG_EXECUTE_IF("simulate_stop_when_mts_in_group",
@@ -4825,6 +4830,13 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
   }
 
   if (ev) {
+#ifdef WITH_WSREP
+    if (wsrep_before_statement(thd)) {
+      WSREP_INFO("Wsrep before statement error");
+      DBUG_RETURN(1);
+    }
+#endif /* WITH_WSREP */
+
     enum enum_slave_apply_event_and_update_pos_retval exec_res;
 
     ptr_ev = &ev;
@@ -4859,6 +4871,9 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
       */
       rli->abort_slave = 1;
       mysql_mutex_unlock(&rli->data_lock);
+#ifdef WITH_WSREP
+      wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
       delete ev;
       DBUG_RETURN(1);
     }
@@ -4878,6 +4893,9 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
                 Transaction_ctx::SESSION));
             rli->abort_slave = 1;
             mysql_mutex_unlock(&rli->data_lock);
+#ifdef WITH_WSREP
+            wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
             delete ev;
             rli->inc_event_relay_log_pos();
             DBUG_RETURN(0);
@@ -4898,11 +4916,14 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
         ev->server_id != ::server_id && ev->common_header->log_pos != 0 &&
         rli->is_parallel_exec() && rli->curr_group_seen_gtid) {
       if (coord_handle_partial_binlogged_transaction(rli, ev))
-        /*
-          In the case of an error, coord_handle_partial_binlogged_transaction
-          will not try to get the rli->data_lock again.
-        */
-        DBUG_RETURN(1);
+      /*
+        In the case of an error, coord_handle_partial_binlogged_transaction
+        will not try to get the rli->data_lock again.
+      */
+#ifdef WITH_WSREP
+        wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
+      DBUG_RETURN(1);
     }
 
     /* ptr_ev can change to NULL indicating MTS coorinator passed to a Worker */
@@ -4967,124 +4988,128 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
     */
     if (exec_res >= SLAVE_APPLY_EVENT_AND_UPDATE_POS_UPDATE_POS_ERROR) {
       delete ev;
+#ifdef WITH_WSREP
+      wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
       DBUG_RETURN(1);
     }
 
 #ifdef WITH_WSREP
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    if (thd->wsrep_conflict_state == NO_CONFLICT) {
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    enum wsrep::client_error wsrep_error = thd->wsrep_cs().current_error();
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+    if (wsrep_error == wsrep::e_success) {
 #endif /* WITH_WSREP */
 
-    if (slave_trans_retries) {
-      int temp_err = 0;
-      bool silent = false;
-      if (exec_res && !is_mts_worker(thd) /* no reexecution in MTS mode */ &&
-          (temp_err = rli->has_temporary_error(thd, 0, &silent)) &&
-          !thd->get_transaction()->cannot_safely_rollback(
-              Transaction_ctx::SESSION)) {
-        const char *errmsg;
-        /*
-          We were in a transaction which has been rolled back because of a
-          temporary error;
-          let's seek back to BEGIN log event and retry it all again.
-          Note, if lock wait timeout (innodb_lock_wait_timeout exceeded)
-          there is no rollback since 5.0.13 (ref: manual).
-          We have to not only seek but also
-          a) init_info(), to seek back to hot relay log's start for later
-          (for when we will come back to this hot log after re-processing the
-          possibly existing old logs where BEGIN is: applier_reader will
-          then need the cache to be at position 0 (see comments at beginning of
-          init_info()).
-          b) init_relay_log_pos(), because the BEGIN may be an older relay log.
-        */
-        if (rli->trans_retries < slave_trans_retries) {
+      if (slave_trans_retries) {
+        int temp_err = 0;
+        bool silent = false;
+        if (exec_res && !is_mts_worker(thd) /* no reexecution in MTS mode */ &&
+            (temp_err = rli->has_temporary_error(thd, 0, &silent)) &&
+            !thd->get_transaction()->cannot_safely_rollback(
+                Transaction_ctx::SESSION)) {
+          const char *errmsg;
           /*
-            The transactions has to be rolled back before
-            load_mi_and_rli_from_repositories is called. Because
-            load_mi_and_rli_from_repositories will starts a new
-            transaction if master_info_repository is TABLE.
+            We were in a transaction which has been rolled back because of a
+            temporary error;
+            let's seek back to BEGIN log event and retry it all again.
+            Note, if lock wait timeout (innodb_lock_wait_timeout exceeded)
+            there is no rollback since 5.0.13 (ref: manual).
+            We have to not only seek but also
+            a) init_info(), to seek back to hot relay log's start for later
+            (for when we will come back to this hot log after re-processing the
+            possibly existing old logs where BEGIN is: applier_reader will
+            then need the cache to be at position 0 (see comments at beginning
+            of init_info()). b) init_relay_log_pos(), because the BEGIN may be
+            an older relay log.
           */
-          rli->cleanup_context(thd, 1);
-          /*
-            Temporary error status is both unneeded and harmful for following
-            open-and-lock slave system tables but store its number first for
-            monitoring purposes.
-          */
-          uint temp_trans_errno = thd->get_stmt_da()->mysql_errno();
-          thd->clear_error();
-          applier_reader->close();
-          /*
-             We need to figure out if there is a test case that covers
-             this part. \Alfranio.
-          */
-          if (load_mi_and_rli_from_repositories(rli->mi, false, SLAVE_SQL))
-            LogErr(ERROR_LEVEL,
-                   ER_RPL_SLAVE_FAILED_TO_INIT_MASTER_INFO_STRUCTURE,
-                   rli->get_for_channel_str());
-          else if (applier_reader->open(&errmsg))
-            LogErr(ERROR_LEVEL, ER_RPL_SLAVE_CANT_INIT_RELAY_LOG_POSITION,
-                   rli->get_for_channel_str(), errmsg);
-          else {
-            exec_res = SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK;
-            /* chance for concurrent connection to get more locks */
-            slave_sleep(thd,
-                        min<ulong>(rli->trans_retries, MAX_SLAVE_RETRY_PAUSE),
-                        sql_slave_killed, rli);
-            mysql_mutex_lock(&rli->data_lock);  // because of SHOW STATUS
-            if (!silent) {
-              rli->trans_retries++;
-              if (rli->is_processing_trx()) {
-                rli->retried_processing(temp_trans_errno,
-                                        ER_THD(thd, temp_trans_errno),
-                                        rli->trans_retries);
+          if (rli->trans_retries < slave_trans_retries) {
+            /*
+              The transactions has to be rolled back before
+              load_mi_and_rli_from_repositories is called. Because
+              load_mi_and_rli_from_repositories will starts a new
+              transaction if master_info_repository is TABLE.
+            */
+            rli->cleanup_context(thd, 1);
+            /*
+              Temporary error status is both unneeded and harmful for following
+              open-and-lock slave system tables but store its number first for
+              monitoring purposes.
+            */
+            uint temp_trans_errno = thd->get_stmt_da()->mysql_errno();
+            thd->clear_error();
+            applier_reader->close();
+            /*
+               We need to figure out if there is a test case that covers
+               this part. \Alfranio.
+            */
+            if (load_mi_and_rli_from_repositories(rli->mi, false, SLAVE_SQL))
+              LogErr(ERROR_LEVEL,
+                     ER_RPL_SLAVE_FAILED_TO_INIT_MASTER_INFO_STRUCTURE,
+                     rli->get_for_channel_str());
+            else if (applier_reader->open(&errmsg))
+              LogErr(ERROR_LEVEL, ER_RPL_SLAVE_CANT_INIT_RELAY_LOG_POSITION,
+                     rli->get_for_channel_str(), errmsg);
+            else {
+              exec_res = SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK;
+              /* chance for concurrent connection to get more locks */
+              slave_sleep(thd,
+                          min<ulong>(rli->trans_retries, MAX_SLAVE_RETRY_PAUSE),
+                          sql_slave_killed, rli);
+              mysql_mutex_lock(&rli->data_lock);  // because of SHOW STATUS
+              if (!silent) {
+                rli->trans_retries++;
+                if (rli->is_processing_trx()) {
+                  rli->retried_processing(temp_trans_errno,
+                                          ER_THD(thd, temp_trans_errno),
+                                          rli->trans_retries);
+                }
               }
-            }
 
-            rli->retried_trans++;
-            mysql_mutex_unlock(&rli->data_lock);
+              rli->retried_trans++;
+              mysql_mutex_unlock(&rli->data_lock);
 #ifndef DBUG_OFF
-            if (rli->trans_retries == 2 || rli->trans_retries == 6) {
-              DBUG_EXECUTE_IF("rpl_ps_tables_worker_retry", {
-                char const act[] =
-                    "now SIGNAL signal.rpl_ps_tables_worker_retry_pause "
-                    "WAIT_FOR signal.rpl_ps_tables_worker_retry_continue";
-                DBUG_ASSERT(opt_debug_sync_timeout > 0);
-                DBUG_ASSERT(
-                    !debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
-              };);
-            }
+              if (rli->trans_retries == 2 || rli->trans_retries == 6) {
+                DBUG_EXECUTE_IF("rpl_ps_tables_worker_retry", {
+                  char const act[] =
+                      "now SIGNAL signal.rpl_ps_tables_worker_retry_pause "
+                      "WAIT_FOR signal.rpl_ps_tables_worker_retry_continue";
+                  DBUG_ASSERT(opt_debug_sync_timeout > 0);
+                  DBUG_ASSERT(!debug_sync_set_action(current_thd,
+                                                     STRING_WITH_LEN(act)));
+                };);
+              }
 #endif
-            DBUG_PRINT("info", ("Slave retries transaction "
-                                "rli->trans_retries: %lu",
-                                rli->trans_retries));
+              DBUG_PRINT("info", ("Slave retries transaction "
+                                  "rli->trans_retries: %lu",
+                                  rli->trans_retries));
+            }
+          } else {
+            thd->fatal_error();
+            rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
+                        "Slave SQL thread retried transaction %lu time(s) "
+                        "in vain, giving up. Consider raising the value of "
+                        "the slave_transaction_retries variable.",
+                        rli->trans_retries);
           }
-        } else {
-          thd->fatal_error();
-          rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                      "Slave SQL thread retried transaction %lu time(s) "
-                      "in vain, giving up. Consider raising the value of "
-                      "the slave_transaction_retries variable.",
-                      rli->trans_retries);
+        } else if ((exec_res && !temp_err) ||
+                   (opt_using_transactions &&
+                    rli->get_group_relay_log_pos() ==
+                        rli->get_event_relay_log_pos())) {
+          /*
+            Only reset the retry counter if the entire group succeeded
+            or failed with a non-transient error.  On a successful
+            event, the execution will proceed as usual; in the case of a
+            non-transient error, the slave will stop with an error.
+           */
+          rli->trans_retries = 0;  // restart from fresh
+          DBUG_PRINT("info",
+                     ("Resetting retry counter, rli->trans_retries: %lu",
+                      rli->trans_retries));
         }
-      } else if ((exec_res && !temp_err) ||
-                 (opt_using_transactions &&
-                  rli->get_group_relay_log_pos() ==
-                      rli->get_event_relay_log_pos())) {
-        /*
-          Only reset the retry counter if the entire group succeeded
-          or failed with a non-transient error.  On a successful
-          event, the execution will proceed as usual; in the case of a
-          non-transient error, the slave will stop with an error.
-         */
-        rli->trans_retries = 0;  // restart from fresh
-        DBUG_PRINT("info", ("Resetting retry counter, rli->trans_retries: %lu",
-                            rli->trans_retries));
       }
-    }
 #ifdef WITH_WSREP
-    } else {
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     }
 #endif /* WITH_WSREP */
 
@@ -5096,8 +5121,14 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
       mysql_mutex_lock(&rli->data_lock);
       rli->abort_slave = 1;
       mysql_mutex_unlock(&rli->data_lock);
+#ifdef WITH_WSREP
+      wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
       DBUG_RETURN(1);
     }
+#ifdef WITH_WSREP
+    wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
     DBUG_RETURN(exec_res);
   }
 
@@ -5860,6 +5891,14 @@ static void *handle_slave_worker(void *arg) {
   thd_manager->add_thd(thd);
   thd_added = true;
 
+#ifdef WITH_WSREP
+  wsrep_open(thd);
+  if (wsrep_before_command(thd)) {
+    WSREP_WARN("Slave SQL worker wsrep_before_command() failed");
+    goto err;
+  }
+#endif /* WITH_WSREP */
+
   if (w->update_is_transactional()) {
     rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
                 ER_THD(thd, ER_SLAVE_FATAL_ERROR),
@@ -5941,6 +5980,12 @@ static void *handle_slave_worker(void *arg) {
   mysql_mutex_unlock(&w->jobs_lock);
 
 err:
+
+#ifdef WITH_WSREP
+  wsrep_after_command_before_result(thd);
+  wsrep_after_command_after_result(thd);
+  wsrep_close(thd);
+#endif /* WITH_WSREP */
 
   if (thd) {
     /*
@@ -6913,18 +6958,6 @@ wsrep_restart_point:
   THD_CHECK_SENTRY(thd);
   DBUG_ASSERT(rli->info_thd == thd);
 
-#ifdef WITH_WSREP
-  thd->wsrep_exec_mode = LOCAL_STATE;
-  /* synchronize with wsrep replication */
-  if (WSREP_ON) {
-    thd->wsrep_po_handle = WSREP_PO_INITIALIZER;
-    thd->wsrep_po_cnt = 0;
-    thd->wsrep_po_in_trans = false;
-    memset(&thd->wsrep_po_sid, 0, sizeof(thd->wsrep_po_sid));
-    wsrep_ready_wait();
-  }
-#endif /* WITH_WSREP */
-
   DBUG_PRINT("master_info", ("log_file_name: %s  position: %s",
                              rli->get_group_master_log_name(),
                              llstr(rli->get_group_master_log_pos(), llbuff)));
@@ -6972,6 +7005,14 @@ wsrep_restart_point:
   }
   mysql_mutex_unlock(&rli->data_lock);
 
+#ifdef WITH_WSREP
+  wsrep_open(thd);
+  if (wsrep_before_command(thd)) {
+    WSREP_WARN("Slave SQL wsrep_before_command() failed");
+    goto err;
+  }
+#endif /* WITH_WSREP */
+
   /* Read queries from the IO/THREAD until this thread is killed */
 
   while (!sql_slave_killed(thd, rli)) {
@@ -6991,11 +7032,15 @@ wsrep_restart_point:
     }
 
     if (exec_relay_log_event(thd, rli, &applier_reader)) {
-
 #ifdef WITH_WSREP
-      if (thd->wsrep_conflict_state != NO_CONFLICT) {
-        wsrep_node_dropped = 1;
-        rli->abort_slave = 1;
+      if (WSREP_ON) {
+        mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+
+        if (thd->wsrep_cs().current_error()) {
+          wsrep_node_dropped = true;
+          rli->abort_slave = true;
+        }
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       }
 #endif /* WITH_WSREP */
 
@@ -7054,10 +7099,12 @@ wsrep_restart_point:
         else
           slave_errno = ER_RPL_SLAVE_ERROR_RUNNING_QUERY;
 
+#if 0
 #ifdef WITH_WSREP
         if (WSREP_ON && last_errno == ER_UNKNOWN_COM_ERROR)
           wsrep_node_dropped = true;
 #endif /* WITH_WSREP */
+#endif /* 0 */
       }
       goto err;
     }
@@ -7085,12 +7132,9 @@ err:
   rli->clear_mts_recovery_groups();
 
 #ifdef WITH_WSREP
-  if (WSREP_ON) {
-    if (wsrep->preordered_commit(wsrep, &thd->wsrep_po_handle, NULL, 0, 0,
-                                 false)) {
-      WSREP_WARN("preordered cleanup failed");
-    }
-  }
+  wsrep_after_command_before_result(thd);
+  wsrep_after_command_after_result(thd);
+  wsrep_close(thd);
 #endif /* WITH_WSREP */
   /*
     Some events set some playgrounds, which won't be cleared because thread
@@ -7185,7 +7229,7 @@ err:
   /* if slave stopped due to node going non primary, we set global flag to
      trigger automatic restart of slave when node joins back to cluster
   */
-  if (wsrep_node_dropped && wsrep_restart_slave) {
+  if (WSREP_ON && wsrep_node_dropped && wsrep_restart_slave) {
     if (wsrep_ready_get()) {
       WSREP_INFO(
           "Slave error due to node temporarily went non-primary"
@@ -7193,8 +7237,7 @@ err:
       wsrep_node_dropped = false;
       mysql_mutex_unlock(&rli->run_lock);
       WSREP_INFO("Restarting Slave (conflict-state: %s)",
-                 wsrep_get_conflict_state(thd->wsrep_conflict_state));
-      thd->wsrep_conflict_state = NO_CONFLICT;
+                 wsrep_thd_client_state_str(thd));
       goto wsrep_restart_point;
     } else {
       WSREP_INFO("Slave error due to node going non-primary");
@@ -7204,6 +7247,7 @@ err:
       wsrep_restart_slave_activated = true;
     }
   }
+  // wsrep_close(thd);
 #endif /* WITH_WSREP */
 
   /*

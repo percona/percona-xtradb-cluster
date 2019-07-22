@@ -1475,7 +1475,6 @@ using wsrep_abort_transaction_t = int (*)(handlerton *hton, THD *bf_thd,
                                           THD *victim_thd, bool signal);
 using wsrep_set_checkpoint_t = int (*)(handlerton *hton, const XID *xid);
 using wsrep_get_checkpoint_t = int (*)(handlerton *hton, XID *xid);
-using wsrep_fake_trx_id_t = void (*)(handlerton *hton, THD *thd);
 #endif /* WITH_WSREP */
 
 /**
@@ -2179,7 +2178,6 @@ struct handlerton {
   wsrep_abort_transaction_t wsrep_abort_transaction;
   wsrep_set_checkpoint_t wsrep_set_checkpoint;
   wsrep_get_checkpoint_t wsrep_get_checkpoint;
-  wsrep_fake_trx_id_t wsrep_fake_trx_id;
 #endif /* WITH_WSREP */
 
   /*
@@ -2332,6 +2330,13 @@ struct handlerton {
   Engine supports compressed columns.
 */
 #define HTON_SUPPORTS_COMPRESSED_COLUMNS (1 << 17)
+
+#ifdef WITH_WSREP
+/**
+  Engine support replication through wsrep-replication provider plugin
+*/
+#define HTON_WSREP_REPLICATION (1 << 18)
+#endif /* WITH_WSREP */
 
 struct TABLE_STATS {
   ulonglong rows_read, rows_changed;
@@ -6636,7 +6641,6 @@ int ha_release_savepoint(THD *thd, SAVEPOINT *sv);
 
 #ifdef WITH_WSREP
 int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, bool signal);
-void ha_wsrep_fake_trx_id(THD *thd);
 #endif /* WITH_WSREP */
 
 /* Build pushed joins in handlers implementing this feature */

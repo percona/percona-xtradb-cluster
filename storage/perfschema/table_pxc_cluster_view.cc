@@ -27,6 +27,7 @@
 #include "sql/plugin_table.h"
 
 #include "sql/wsrep_mysqld.h"
+#include "sql/wsrep_server_state.h"
 
 THR_LOCK table_pxc_cluster_view::m_table_lock;
 
@@ -86,7 +87,7 @@ ha_rows table_pxc_cluster_view::get_row_count(void) {
 }
 
 int table_pxc_cluster_view::rnd_init(bool) {
-  wsrep->fetch_pfs_info(wsrep, m_entries, 64);
+  Wsrep_server_state::instance().get_provider().fetch_pfs_info(m_entries, 64);
   return (0);
 }
 

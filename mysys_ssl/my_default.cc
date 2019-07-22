@@ -202,8 +202,10 @@ static bool defaults_already_read = false;
 bool no_defaults = false;
 
 #ifdef WITH_WSREP
-/* The only purpose of this global array is to hold full name of my.cnf
-which seems to be otherwise unavailable */
+/*
+  Cache full path of my.cnf along with group suffix.
+  This needs to be passed to sst process.
+*/
 char wsrep_defaults_file[FN_REFLEN + 10] = {
     0,
 };

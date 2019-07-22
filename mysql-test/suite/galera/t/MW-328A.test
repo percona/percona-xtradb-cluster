@@ -72,8 +72,9 @@ UPDATE t1 SET j=2 WHERE i=1;
 COMMIT;
 
 SELECT * FROM t1;
+
 --connection node_2
 SELECT * FROM t1;
---connection node_1
 
+--connection node_1
 DROP TABLE t1;

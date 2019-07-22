@@ -39,4 +39,5 @@ DELIMITER ;
 /*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=0*/;
 SET SESSION wsrep_on=ON;
 CALL mtr.add_suppression("Slave SQL: Error 'Table 't1' already exists' on query");
+call mtr.add_suppression("Query apply failed.*");
 DROP TABLE t1;

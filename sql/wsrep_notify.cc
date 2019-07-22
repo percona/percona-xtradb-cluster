@@ -20,25 +20,9 @@
 
 const char *wsrep_notify_cmd = "";
 
-static const char *_status_str(wsrep_member_status_t status) {
-  switch (status) {
-    case WSREP_MEMBER_UNDEFINED:
-      return "Undefined";
-    case WSREP_MEMBER_JOINER:
-      return "Joiner";
-    case WSREP_MEMBER_DONOR:
-      return "Donor";
-    case WSREP_MEMBER_JOINED:
-      return "Joined";
-    case WSREP_MEMBER_SYNCED:
-      return "Synced";
-    default:
-      return "Error(?)";
-  }
-}
-
-void wsrep_notify_status(wsrep_member_status_t status,
-                         const wsrep_view_info_t *view) {
+void wsrep_notify_status(enum wsrep::server_state::state status,
+                         const wsrep::view* view)
+{
   if (!wsrep_notify_cmd || 0 == strlen(wsrep_notify_cmd)) {
     WSREP_INFO("wsrep_notify_cmd is not defined, skipping notification.");
     return;
@@ -52,36 +36,32 @@ void wsrep_notify_status(wsrep_member_status_t status,
   cmd_off +=
       snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, "%s", wsrep_notify_cmd);
 
-  if (status >= WSREP_MEMBER_UNDEFINED && status < WSREP_MEMBER_ERROR) {
-    cmd_off += snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, " --status %s",
-                        _status_str(status));
-  } else {
-    /* here we preserve provider error codes */
-    cmd_off += snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off,
-                        " --status 'Error(%d)'", status);
-  }
+  cmd_off += snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, " --status %s",
+                      to_c_string(status));
 
-  if (0 != view) {
-    char uuid_str[40];
-
-    wsrep_uuid_print(&view->state_id.uuid, uuid_str, sizeof(uuid_str));
-    cmd_off +=
-        snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, " --uuid %s", uuid_str);
+  if (view != NULL) {
+    std::ostringstream uuid;
+    uuid << view->state_id().id();
+    cmd_off += snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, " --uuid %s",
+                        uuid.str().c_str());
 
     cmd_off += snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, " --primary %s",
-                        view->view >= 0 ? "yes" : "no");
+                        view->view_seqno().get() >= 0 ? "yes" : "no");
 
-    cmd_off += snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, " --index %d",
-                        view->my_idx);
+    cmd_off += snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, " --index %zd",
+                        view->own_index());
 
-    if (view->memb_num) {
+    const std::vector<wsrep::view::member> &members(view->members());
+    if (members.size()) {
       cmd_off += snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, " --members");
 
-      for (int i = 0; i < view->memb_num; i++) {
-        wsrep_uuid_print(&view->members[i].id, uuid_str, sizeof(uuid_str));
-        cmd_off += snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, "%c%s/%s/%s",
-                            i > 0 ? ',' : ' ', uuid_str, view->members[i].name,
-                            view->members[i].incoming);
+      for (unsigned int i = 0; i < members.size(); i++) {
+        std::ostringstream id;
+        id << members[i].id();
+        cmd_off +=
+            snprintf(cmd_ptr + cmd_off, cmd_len - cmd_off, "%c%s/%s/%s",
+                     i > 0 ? ',' : ' ', id.str().c_str(),
+                     members[i].name().c_str(), members[i].incoming().c_str());
       }
     }
   }

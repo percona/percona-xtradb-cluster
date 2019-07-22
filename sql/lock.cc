@@ -115,6 +115,7 @@
 #include "mysql/components/services/log_builtins.h"
 #include "wsrep_mysqld.h"
 #include "sql/log.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 /**
@@ -1044,6 +1045,7 @@ bool Global_read_lock::lock_global_read_lock(THD *thd) {
     if (thd->backup_tables_lock.abort_if_acquired()) DBUG_RETURN(true);
 
 #ifdef WITH_WSREP
+    /* Take an explict lock that is not wsrep-preemptable. */
     MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, MDL_key::GLOBAL, "", "",
                                    MDL_SHARED, MDL_EXPLICIT);
 #else
@@ -1097,24 +1099,18 @@ void Global_read_lock::unlock_global_read_lock(THD *thd) {
     m_mdl_blocks_commits_lock = NULL;
 
 #ifdef WITH_WSREP
-    if (thd->wsrep_sst_donor) {
-      /* If this is sst_donor then it is resync internally.
-      So only resume the cluster. */
-      wsrep_resume();
-    } else if (WSREP(thd) && provider_desynced_paused) {
-      /* Function will take care of decrementing reference count
-      if it is not the last one to get called. Last one will
-      perform the resume action. */
-      wsrep_resume();
-
-      int ret = wsrep->resync(wsrep);
-      if (ret != WSREP_OK) {
-        WSREP_WARN("resync failed %d for FTWRL: db: %s, query: %s", ret,
-                   (thd->db().length ? thd->db().str : "(null)"),
-                   WSREP_QUERY(thd));
-        DBUG_VOID_RETURN;
-      }
-      provider_desynced_paused = false;
+    Wsrep_server_state &server_state = Wsrep_server_state::instance();
+    if (server_state.state() == Wsrep_server_state::s_donor ||
+        (wsrep_on(thd) &&
+         server_state.state() != Wsrep_server_state::s_synced)) {
+      /* TODO: maybe redundant here?: */
+      wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
+      server_state.resume();
+      pause_provider(false);
+    } else if (wsrep_on(thd) &&
+               server_state.state() == Wsrep_server_state::s_synced) {
+      server_state.resume_and_resync();
+      pause_provider(false);
     }
 #endif /* WITH_WSREP */
   }
@@ -1161,6 +1157,7 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
   if (m_state != GRL_ACQUIRED) DBUG_RETURN(0);
 
 #ifdef WITH_WSREP
+  /* Take an explict lock that is not wsrep-preemptable. */
   MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, MDL_key::COMMIT, "", "",
                                  MDL_SHARED, MDL_EXPLICIT);
 #else
@@ -1176,38 +1173,26 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
   m_state = GRL_ACQUIRED_AND_BLOCKS_COMMIT;
 
 #ifdef WITH_WSREP
-  if (thd->wsrep_sst_donor) {
-    /* If this is sst_donor then it is already desync internally.
-    So only pause the cluster */
-    if (!wsrep_pause()) {
-      WSREP_DEBUG("Trying to pause SST DONOR (GRL) failed");
-      DBUG_RETURN(true);
-    }
-  } else if (WSREP(thd) && !provider_desynced_paused) {
-    int rcode;
-    WSREP_DEBUG("Running implicit desync for node from FTWRL");
-
-    rcode = wsrep->desync(wsrep);
-
-    if (rcode == WSREP_TRX_FAIL &&
-        strcmp(wsrep_cluster_status, "Primary") != 0) {
-      WSREP_DEBUG("desync failed while non-Primary, ignoring failure");
-    } else if (rcode != WSREP_OK) {
-      WSREP_WARN("FTWRL desync failed %d for schema: %s, query: %s", rcode,
-                 (thd->db().length ? thd->db().str : "(null)"),
-                 WSREP_QUERY(thd));
-      my_message(ER_LOCK_DEADLOCK, "wsrep desync failed for FTWRL", MYF(0));
-      DBUG_RETURN(true);
-    }
-
-    if (!wsrep_pause()) {
-      /* pause failed so rollback desync action too. */
-      WSREP_DEBUG("Trying to pause a node (GRL) failed");
-      wsrep->resync(wsrep);
-      DBUG_RETURN(true);
-    }
-
-    provider_desynced_paused = true;
+  /* Native threads should bail out before wsrep operations to follow.
+     Donor servicing thread is an exception, it should pause provider
+     but not desync, as it is already desynced in donor state.
+     Desync should be called only when we are in synced state.
+  */
+  Wsrep_server_state &server_state = Wsrep_server_state::instance();
+  wsrep::seqno paused_seqno;
+  if (server_state.state() == Wsrep_server_state::s_donor ||
+      (wsrep_on(thd) && server_state.state() != Wsrep_server_state::s_synced)) {
+    paused_seqno = server_state.pause();
+  } else if (wsrep_on(thd) &&
+             server_state.state() == Wsrep_server_state::s_synced) {
+    paused_seqno = server_state.desync_and_pause();
+  } else {
+    DBUG_RETURN(false);
+  }
+  WSREP_INFO("Server paused at: %lld", paused_seqno.get());
+  if (paused_seqno.get() >= 0) {
+    wsrep_locked_seqno = paused_seqno.get();
+    pause_provider(true);
   }
 #endif /* WITH_WSREP */
 
@@ -1223,17 +1208,16 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
   @retval True   Provider has been paused.
 */
 bool Global_read_lock::wsrep_pause() {
-  wsrep_seqno_t ret = wsrep->pause(wsrep);
+  Wsrep_server_state &server_state = Wsrep_server_state::instance();
+  wsrep::seqno paused_seqno = server_state.pause();
 
-  if (ret >= 0) {
-    wsrep_locked_seqno = ret;
+  if (paused_seqno.get() >= 0) {
+    wsrep_locked_seqno = paused_seqno.get();
     pause_provider(true);
-  } else if (ret != -ENOSYS) { /* -ENOSYS - no provider */
-
-    WSREP_ERROR("Failed to pause provider: %lld (%s)", (long long)-ret,
-                strerror(-ret));
-
-    /* m_mdl_blocks_commits_lock is always NULL here */
+    WSREP_INFO("Server paused at: %lld", paused_seqno.get());
+  } else {
+    WSREP_ERROR("Failed to pause provider (ret-code: %lld)",
+                paused_seqno.get());
     wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return false;
@@ -1249,19 +1233,12 @@ bool Global_read_lock::wsrep_pause() {
   @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
   @retval True   Provider has been paused.
 */
-wsrep_status_t Global_read_lock::wsrep_resume() {
-  wsrep_status_t ret;
-
+int Global_read_lock::wsrep_resume() {
+  Wsrep_server_state &server_state = Wsrep_server_state::instance();
   wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
-  ret = wsrep->resume(wsrep);
-
-  if (ret != WSREP_OK) {
-    WSREP_WARN("failed to resume provider: %d", ret);
-  } else {
-    pause_provider(false);
-  }
-
-  return ret;
+  server_state.resume();
+  pause_provider(false);
+  return 0;
 }
 
 bool Global_read_lock::wsrep_pause_once(bool *already_paused) {
@@ -1273,9 +1250,9 @@ bool Global_read_lock::wsrep_pause_once(bool *already_paused) {
   return true;
 }
 
-wsrep_status_t Global_read_lock::wsrep_resume_once(void) {
+int Global_read_lock::wsrep_resume_once(void) {
   if (provider_paused) return wsrep_resume();
-  return WSREP_OK;
+  return 0;
 }
 
 #endif /* WITH_WSREP */
@@ -1321,6 +1298,7 @@ bool Global_backup_lock::acquire(THD *thd) {
                                                             MDL_SHARED));
 
 #ifdef WITH_WSREP
+  /* Take an explict lock that is not wsrep-preemptable. */
   MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, m_namespace, "", "", MDL_SHARED,
                                  MDL_EXPLICIT);
 #else
@@ -1398,6 +1376,7 @@ void Global_backup_lock::init_protection_request(
   DBUG_ENTER("Global_backup_lock::init_protection_request");
 
 #ifdef WITH_WSREP
+  /* Take an explict lock that is not wsrep-preemptable. */
   MDL_EXPLICIT_LOCK_REQUEST_INIT(mdl_request, m_namespace, "", "",
                                  MDL_INTENTION_EXCLUSIVE, duration);
 #else

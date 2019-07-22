@@ -174,3 +174,4 @@ REVOKE ALL ON *.* FROM CURRENT_USER();
 --connection node_2
 --echo #node-2
 call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
+call mtr.add_suppression("Query apply failed.*");

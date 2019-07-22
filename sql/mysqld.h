@@ -456,7 +456,6 @@ extern PSI_mutex_key key_mutex_slave_worker_hash;
 extern PSI_mutex_key key_LOCK_wsrep_thd;
 extern PSI_cond_key key_COND_wsrep_thd;
 extern PSI_mutex_key key_LOCK_wsrep_thd_attachable_trx;
-extern PSI_thread_key key_thread_handle_wsrep;
 #endif /* WITH_WSREP */
 
 extern PSI_rwlock_key key_rwlock_LOCK_logger;
@@ -650,24 +649,28 @@ extern PSI_stage_info stage_wsrep_updating_rows;
 extern PSI_stage_info stage_wsrep_applying_writeset;
 extern PSI_stage_info stage_wsrep_applied_writeset;
 
+extern PSI_stage_info stage_wsrep_applying_toi_writeset;
+extern PSI_stage_info stage_wsrep_applied_toi_writeset;
+
 extern PSI_stage_info stage_wsrep_committing;
 extern PSI_stage_info stage_wsrep_committed;
+
+extern PSI_stage_info stage_wsrep_toi_committing;
+extern PSI_stage_info stage_wsrep_toi_committed;
 
 extern PSI_stage_info stage_wsrep_rolling_back;
 extern PSI_stage_info stage_wsrep_rolled_back;
 
 extern PSI_stage_info stage_wsrep_replicating_commit;
 extern PSI_stage_info stage_wsrep_write_set_replicated;
-extern PSI_stage_info stage_wsrep_waiting_on_replaying;
-extern PSI_stage_info stage_wsrep_replicate;
-extern PSI_stage_info stage_wsrep_pre_commit;
-extern PSI_stage_info stage_wsrep_pre_commit_cert_passed;
+
+extern PSI_stage_info stage_wsrep_replaying_trx;
+extern PSI_stage_info stage_wsrep_replayed_write_set;
 
 extern PSI_stage_info stage_wsrep_preparing_for_TO_isolation;
 extern PSI_stage_info stage_wsrep_TO_isolation_initiated;
 extern PSI_stage_info stage_wsrep_completed_TO_isolation;
 
-extern PSI_stage_info stage_wsrep_replaying_trx;
 extern PSI_stage_info stage_wsrep_applier_idle;
 extern PSI_stage_info stage_wsrep_in_rollback_thread;
 extern PSI_stage_info stage_wsrep_aborter_idle;
@@ -836,7 +839,6 @@ extern bool opt_always_activate_granted_roles;
 
 #ifdef WITH_WSREP
 extern "C" void *start_wsrep_THD(void *);
-typedef void (*wsrep_thd_processor_fun)(THD *);
 void unireg_abort(int exit_code);
 #endif /* WITH_WSREP */
 

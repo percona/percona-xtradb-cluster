@@ -6,7 +6,7 @@ f1	f2
 1	10
 UPDATE t1 SET f1 = 2;
 COMMIT;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 wsrep_local_bf_aborts_diff
 1
 BEGIN;
@@ -15,7 +15,7 @@ f1	f2
 2	10
 UPDATE t1 SET f2 = 20;
 COMMIT;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 wsrep_local_bf_aborts_diff
 1
 DROP TABLE t1;

@@ -28,7 +28,7 @@
 
 #-------------------------------------------------------------------------------
 #
-# 1. DDL/DML statement and their replication
+# 0. DDL/DML statement and their replication
 #
 --connection node_1
 --echo #node-1
@@ -100,6 +100,7 @@ select * from information_schema.compression_dictionary_tables where dict_name l
 --connection node_2
 --echo #node-2
 call mtr.add_suppression("Can't create database");
+call mtr.add_suppression("Query apply failed.*");
 
 
 --connection node_1
@@ -126,7 +127,7 @@ SET SESSION wsrep_sync_wait = 0;
 --echo #node-1a
 SET SESSION wsrep_sync_wait = 0;
 SET DEBUG_SYNC = "now WAIT_FOR entered1";
-# starting 8.0, create db is blocking insert. (mdl locks).
+# starting 8.0, create db is blocking insert. (mdl locks (with g-4 apply-monitor lock)).
 --send create database test;
 
 --connection node_1b
@@ -146,156 +147,156 @@ select * from t;
 SET DEBUG_SYNC = 'RESET';
 drop table t;
 
-#-------------------------------------------------------------------------------
-#
-# 2. Variation of test-case above where DML complete while DDL is process of
-#    forcefully aborting it.
-#
---connection node_2
---echo #node-2
-call mtr.add_suppression("Can't create database");
-
-
---connection node_1
---echo #node-1
-#
---let $wsrep_debug_orig = `SELECT @@wsrep_debug`
-set global wsrep_debug=1;
-#
-create table t (i int, primary key pk(i)) engine=innodb;
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
---send insert into t values (1);
-
---connection node_1b
---echo #node-1b
-SET SESSION wsrep_sync_wait = 0;
-# this loop needs to be done before the next create/ddl loop as
-# create/ddl can conflict with the lock that this connection
-# may take on test db (intention exclusive).
-
---connect node_1c, 127.0.0.1, root, , test, $NODE_MYPORT_1
---connection node_1c
---echo #node-1c
-SET SESSION wsrep_sync_wait = 0;
-
---connection node_1a
---echo #node-1a
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "now WAIT_FOR entered1";
-# starting 8.0, create db is blocking insert. (mdl locks).
-set DEBUG_SYNC = "pxc_add_ticket_trying_to_wait_for_victim SIGNAL entered2 WAIT_FOR continue2";
---send create database test;
-
---connection node_1b
---echo #node-1b
-SET DEBUG_SYNC = "now WAIT_FOR entered2";
-SET DEBUG_SYNC = "now SIGNAL continue1";
-
---connection node_1c
---echo #node-1c (while ddl is trying to abort dml, let dml complete)
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'closing tables' and INFO = 'insert into t values (1)';
---source include/wait_condition.inc
-SET DEBUG_SYNC = "now SIGNAL continue2";
-
---connection node_1a
---echo #node-1a
---error ER_DB_CREATE_EXISTS
---reap
-
---connection node_1
---echo #node-1
---reap
-select * from t;
---eval SET GLOBAL wsrep_debug = $wsrep_debug_orig
-SET DEBUG_SYNC = 'RESET';
-drop table t;
-
-#-------------------------------------------------------------------------------
-#
-# 3. Test-case exercise a use-case where-in atomic engine DML is waiting to get
-#    get committed and at same time DDL from non-atomic engine initiate.
-#    This non-atomic engine DDL can cause intermediate commit that can cause
-#    update of wsrep co-ordinates before DML that has smaller seqno is done with
-#    commit.
-#
---connection node_1
---echo #node-1
-create table t (i int, primary key pk(i)) engine=innodb;
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
---send insert into t values (1);
-
---connection node_1a
---echo #node-1a
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "now WAIT_FOR entered1";
-# fire non-atomic storage engine ddl that will cause intemediate commit
---send create table t2 (i int, primary key pk(i)) engine=memory;
-
---connection node_1c
---echo #node-1c (check if ddl is waiting for final commit that suggest intermediate commit done)
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'innobase_commit_low%' and INFO = 'create table t2 (i int, primary key pk(i)) engine=memory';
---source include/wait_condition.inc
-SET DEBUG_SYNC = "now SIGNAL continue1";
-
---connection node_1
---echo #node-1
---reap
-select * from t;
-
---connection node_1a
---echo #node-1a
---reap
-select * from t2;
-
---connection node_1
---echo #node-1
---eval SET GLOBAL wsrep_debug = $wsrep_debug_orig
-SET DEBUG_SYNC = 'RESET';
-drop table t;
-drop table t2;
-
-#-------------------------------------------------------------------------------
-#
-# 4. Same as Case-3 but this time DDL is also from atomic storage engine
-#
---connection node_1
---echo #node-1
-create table t (i int, primary key pk(i)) engine=innodb;
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
---send insert into t values (1);
-
---connection node_1a
---echo #node-1a
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "now WAIT_FOR entered1";
-# fire non-atomic storage engine ddl that will cause intemediate commit
---send create table t2 (i int, primary key pk(i)) engine=innodb;
-
---connection node_1c
---echo #node-1c (check if ddl is waiting for final commit that suggest intermediate commit done)
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'waiting for handler commit' and INFO = 'create table t2 (i int, primary key pk(i)) engine=innodb';
---source include/wait_condition.inc
-SET DEBUG_SYNC = "now SIGNAL continue1";
-
---connection node_1
---echo #node-1
---reap
-select * from t;
-
---connection node_1a
---echo #node-1a
---reap
-select * from t2;
-
---connection node_1
---echo #node-1
---eval SET GLOBAL wsrep_debug = $wsrep_debug_orig
-SET DEBUG_SYNC = 'RESET';
-drop table t;
-drop table t2;
+####-------------------------------------------------------------------------------
+####
+#### 2. Variation of test-case above where DML complete while DDL is process of
+####    forcefully aborting it.
+####
+###--connection node_2
+###--echo #node-2
+###call mtr.add_suppression("Can't create database");
+###
+###
+###--connection node_1
+###--echo #node-1
+####
+###--let $wsrep_debug_orig = `SELECT @@wsrep_debug`
+###set global wsrep_debug=1;
+####
+###create table t (i int, primary key pk(i)) engine=innodb;
+###SET SESSION wsrep_sync_wait = 0;
+###SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
+###--send insert into t values (1);
+###
+###--connection node_1b
+###--echo #node-1b
+###SET SESSION wsrep_sync_wait = 0;
+#### this loop needs to be done before the next create/ddl loop as
+#### create/ddl can conflict with the lock that this connection
+#### may take on test db (intention exclusive).
+###
+###--connect node_1c, 127.0.0.1, root, , test, $NODE_MYPORT_1
+###--connection node_1c
+###--echo #node-1c
+###SET SESSION wsrep_sync_wait = 0;
+###
+###--connection node_1a
+###--echo #node-1a
+###SET SESSION wsrep_sync_wait = 0;
+###SET DEBUG_SYNC = "now WAIT_FOR entered1";
+#### starting 8.0, create db is blocking insert. (mdl locks).
+###set DEBUG_SYNC = "pxc_add_ticket_trying_to_wait_for_victim SIGNAL entered2 WAIT_FOR continue2";
+###--send create database test;
+###
+###--connection node_1b
+###--echo #node-1b
+###SET DEBUG_SYNC = "now WAIT_FOR entered2";
+###SET DEBUG_SYNC = "now SIGNAL continue1";
+###
+###--connection node_1c
+###--echo #node-1c (while ddl is trying to abort dml, let dml complete)
+###--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'closing tables' and INFO = 'insert into t values (1)';
+###--source include/wait_condition.inc
+###SET DEBUG_SYNC = "now SIGNAL continue2";
+###
+###--connection node_1a
+###--echo #node-1a
+###--error ER_DB_CREATE_EXISTS
+###--reap
+###
+###--connection node_1
+###--echo #node-1
+###--reap
+###select * from t;
+###--eval SET GLOBAL wsrep_debug = $wsrep_debug_orig
+###SET DEBUG_SYNC = 'RESET';
+###drop table t;
+###
+####-------------------------------------------------------------------------------
+####
+#### 3. Test-case exercise a use-case where-in atomic engine DML is waiting to get
+####    get committed and at same time DDL from non-atomic engine initiate.
+####    This non-atomic engine DDL can cause intermediate commit that can cause
+####    update of wsrep co-ordinates before DML that has smaller seqno is done with
+####    commit.
+####
+###--connection node_1
+###--echo #node-1
+###create table t (i int, primary key pk(i)) engine=innodb;
+###SET SESSION wsrep_sync_wait = 0;
+###SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
+###--send insert into t values (1);
+###
+###--connection node_1a
+###--echo #node-1a
+###SET SESSION wsrep_sync_wait = 0;
+###SET DEBUG_SYNC = "now WAIT_FOR entered1";
+#### fire non-atomic storage engine ddl that will cause intemediate commit
+###--send create table t2 (i int, primary key pk(i)) engine=memory;
+###
+###--connection node_1c
+###--echo #node-1c (check if ddl is waiting for final commit that suggest intermediate commit done)
+###--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'innobase_commit_low%' and INFO = 'create table t2 (i int, primary key pk(i)) engine=memory';
+###--source include/wait_condition.inc
+###SET DEBUG_SYNC = "now SIGNAL continue1";
+###
+###--connection node_1
+###--echo #node-1
+###--reap
+###select * from t;
+###
+###--connection node_1a
+###--echo #node-1a
+###--reap
+###select * from t2;
+###
+###--connection node_1
+###--echo #node-1
+###--eval SET GLOBAL wsrep_debug = $wsrep_debug_orig
+###SET DEBUG_SYNC = 'RESET';
+###drop table t;
+###drop table t2;
+###
+####-------------------------------------------------------------------------------
+####
+#### 4. Same as Case-3 but this time DDL is also from atomic storage engine
+####
+###--connection node_1
+###--echo #node-1
+###create table t (i int, primary key pk(i)) engine=innodb;
+###SET SESSION wsrep_sync_wait = 0;
+###SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
+###--send insert into t values (1);
+###
+###--connection node_1a
+###--echo #node-1a
+###SET SESSION wsrep_sync_wait = 0;
+###SET DEBUG_SYNC = "now WAIT_FOR entered1";
+#### fire non-atomic storage engine ddl that will cause intemediate commit
+###--send create table t2 (i int, primary key pk(i)) engine=innodb;
+###
+###--connection node_1c
+###--echo #node-1c (check if ddl is waiting for final commit that suggest intermediate commit done)
+###--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'waiting for handler commit' and INFO = 'create table t2 (i int, primary key pk(i)) engine=innodb';
+###--source include/wait_condition.inc
+###SET DEBUG_SYNC = "now SIGNAL continue1";
+###
+###--connection node_1
+###--echo #node-1
+###--reap
+###select * from t;
+###
+###--connection node_1a
+###--echo #node-1a
+###--reap
+###select * from t2;
+###
+###--connection node_1
+###--echo #node-1
+###--eval SET GLOBAL wsrep_debug = $wsrep_debug_orig
+###SET DEBUG_SYNC = 'RESET';
+###drop table t;
+###drop table t2;
 
 #-------------------------------------------------------------------------------
 #

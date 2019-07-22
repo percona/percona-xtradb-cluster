@@ -471,8 +471,8 @@ class ha_innobase : public handler {
                                   uint table_changes) override;
 
 #ifdef WITH_WSREP
-  int wsrep_append_keys(THD *thd, wsrep_key_type key_type, const uchar *record0,
-                        const uchar *record1);
+  int wsrep_append_keys(THD *thd, Wsrep_service_key_type key_type,
+                        const uchar *record0, const uchar *record1);
 #endif /* WITH_WSREP */
 
  private:

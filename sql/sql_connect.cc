@@ -975,17 +975,6 @@ static bool login_connection(THD *thd) {
 void end_connection(THD *thd) {
   NET *net = thd->get_protocol_classic()->get_net();
 
-#ifdef WITH_WSREP
-  if (WSREP(thd)) {
-    wsrep_status_t rcode = wsrep->free_connection(wsrep, thd->thread_id());
-    if (rcode) {
-      WSREP_WARN("wsrep failed to free connection context: %u, code: %d",
-                 thd->thread_id(), rcode);
-    }
-  }
-  thd->wsrep_client_thread = 0;
-#endif /* WITH_WSREP */
-
   mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_CONNECTION_DISCONNECT), 0);
 
 #ifdef HAVE_PSI_THREAD_INTERFACE

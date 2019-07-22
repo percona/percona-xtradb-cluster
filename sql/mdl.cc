@@ -66,8 +66,8 @@ static PSI_memory_key key_memory_MDL_context_acquire_locks;
 #include "wsrep_thd.h"
 #include "sql/log.h"
 
-extern bool wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
-                                      MDL_ticket *ticket, const MDL_key *key);
+extern bool wsrep_handle_mdl_conflict(
+    const MDL_context *requestor_ctx, MDL_ticket *ticket, const MDL_key *key);
 #endif /* WITH_WSREP */
 
 #ifdef HAVE_PSI_INTERFACE
@@ -1945,7 +1945,7 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
   This would then resume flow of next selection that would automatically
   grant ticket to PXC applier thread since it is at the top of the queue */
   if ((this == &(ticket->get_lock()->m_waiting)) &&
-      wsrep_thd_is_BF((void *)(ticket->get_ctx()->wsrep_get_thd()), false)) {
+      wsrep_thd_is_BF((ticket->get_ctx()->wsrep_get_thd()), false)) {
     Ticket_iterator itw(ticket->get_lock()->m_waiting);
     Ticket_iterator itg(ticket->get_lock()->m_granted);
 
@@ -1954,8 +1954,7 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
     bool added = false;
 
     while ((waiting = itw++) && !added) {
-      if (!wsrep_thd_is_BF((void *)(waiting->get_ctx()->wsrep_get_thd()),
-                           true)) {
+      if (!wsrep_thd_is_BF((waiting->get_ctx()->wsrep_get_thd()), true)) {
         WSREP_DEBUG("MDL add_ticket inserted before: %u %s",
                     wsrep_thd_thread_id(waiting->get_ctx()->wsrep_get_thd()),
                     wsrep_thd_query(waiting->get_ctx()->wsrep_get_thd()));
@@ -1971,7 +1970,7 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
           granted->is_incompatible_when_granted(ticket->get_type())) {
         DEBUG_SYNC(ticket->get_ctx()->wsrep_get_thd(),
                    "pxc_add_ticket_trying_to_wait_for_victim");
-        if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted,
+        if (!wsrep_handle_mdl_conflict(ticket->get_ctx(), granted,
                                        &ticket->get_lock()->key)) {
           WSREP_DEBUG("Initiated kill of victim thread (through add_ticket)");
         }
@@ -2545,8 +2544,7 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
         while ((ticket = it++)) {
           if (ticket->get_ctx() != requestor_ctx &&
               ticket->is_incompatible_when_granted(type_arg)) {
-            if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()),
-                                false) &&
+            if (wsrep_thd_is_BF(requestor_ctx->get_thd(), false) &&
                 key.mdl_namespace() == MDL_key::GLOBAL) {
               WSREP_DEBUG(
                   "Global lock granted to applier/TOI action processor:"
@@ -2554,14 +2552,14 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
                   wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()),
                   wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
               can_grant = true;
-            } else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket,
+            } else if (!wsrep_handle_mdl_conflict(requestor_ctx, ticket,
                                                   &key)) {
               wsrep_can_grant = false;
               if (wsrep_log_conflicts) {
-                MDL_lock *lock = ticket->get_lock();
-                WSREP_INFO("MDL conflict db=%s table=%s ticket=%s solved by %s",
-                           lock->key.db_name(), lock->key.name(),
-                           ticket->get_type_string(), "abort");
+                auto key = ticket->get_key();
+                WSREP_INFO(
+                    "MDL conflict db=%s table=%s ticket=%d solved by abort",
+                    key->db_name(), key->name(), ticket->get_type());
               }
             } else {
               can_grant = true;
@@ -2569,7 +2567,7 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
           }
         } /* while */
 
-        if ((ticket == NULL) && wsrep_can_grant) can_grant = true;
+        if (ticket == NULL && wsrep_can_grant) can_grant = true;
 #else
         while ((ticket = it++)) {
           if (ticket->get_ctx() != requestor_ctx &&
@@ -2596,7 +2594,7 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
         belong to us and our request cannot be satisfied.
       */
 #ifdef WITH_WSREP
-      if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()), false) &&
+      if (wsrep_thd_is_BF(requestor_ctx->wsrep_get_thd(), false) &&
           key.mdl_namespace() == MDL_key::GLOBAL) {
         WSREP_DEBUG(
             "Global lock granted to applier/TOI action processor"
@@ -2615,7 +2613,7 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
   }
 #ifdef WITH_WSREP
   else {
-    if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()), false) &&
+    if (wsrep_thd_is_BF(requestor_ctx->wsrep_get_thd(), false) &&
         key.mdl_namespace() == MDL_key::GLOBAL) {
       WSREP_DEBUG(
           "Global lock granted to applier/TOI action processor"
@@ -2626,6 +2624,7 @@ bool MDL_lock::can_grant_lock(enum_mdl_type type_arg,
     }
   }
 #endif /* WITH_WSREP */
+
   return can_grant;
 }
 
@@ -3338,8 +3337,9 @@ slow_path:
     mdl_request->ticket = ticket;
 
     mysql_mdl_set_status(ticket->m_psi, MDL_ticket::GRANTED);
-  } else
+  } else {
     *out_ticket = ticket;
+  }
 
   return false;
 }
@@ -5117,20 +5117,21 @@ MDL_ticket *MDL_ticket_store::materialized_front(int di) {
 }
 
 #ifdef WITH_WSREP
-void MDL_ticket::wsrep_report(bool debug)
-{
-  if (debug) 
-    {
-      WSREP_DEBUG("MDL ticket: type: %s space: %s db: %s name: %s",
+void MDL_ticket::wsrep_report(bool debug) {
+  if (debug) {
+      WSREP_DEBUG("MDL ticket: type: %s, space: %s, db: %s, name: %s",
        	 (get_type()  == MDL_INTENTION_EXCLUSIVE)  ? "intention exclusive"  :
        	 ((get_type() == MDL_SHARED)               ? "shared"               :
        	 ((get_type() == MDL_SHARED_HIGH_PRIO      ? "shared high prio"     :
        	 ((get_type() == MDL_SHARED_READ)          ? "shared read"          :
        	 ((get_type() == MDL_SHARED_WRITE)         ? "shared write"         :
+       	 ((get_type() == MDL_SHARED_WRITE_LOW_PRIO)? "shared write low prio":
+       	 ((get_type() == MDL_SHARED_UPGRADABLE)    ? "shared upgradable"    :
+       	 ((get_type() == MDL_SHARED_READ_ONLY)     ? "shared read only"     :
        	 ((get_type() == MDL_SHARED_NO_WRITE)      ? "shared no write"      :
          ((get_type() == MDL_SHARED_NO_READ_WRITE) ? "shared no read write" :
        	 ((get_type() == MDL_EXCLUSIVE)            ? "exclusive"            :
-          "UNKNOWN")))))))),
+          "UNKNOWN"))))))))))),
          (m_lock->key.mdl_namespace()  == MDL_key::GLOBAL)    ? "GLOBAL"       :
          ((m_lock->key.mdl_namespace() == MDL_key::SCHEMA)    ? "SCHEMA"       :
          ((m_lock->key.mdl_namespace() == MDL_key::TABLE)     ? "TABLE"        :
@@ -5142,7 +5143,7 @@ void MDL_ticket::wsrep_report(bool debug)
          (char *)"UNKNOWN"))))))),
          m_lock->key.db_name(),
          m_lock->key.name());
-    }
+  }
 }
 
 bool MDL_context::wsrep_has_explicit_locks() {

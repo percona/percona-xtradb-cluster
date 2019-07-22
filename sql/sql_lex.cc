@@ -70,6 +70,7 @@
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
 #include "sql/log.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 extern int HINT_PARSER_parse(THD *thd, Hint_scanner *scanner,
@@ -1764,7 +1765,7 @@ static int lex_one_token(YYSTYPE *yylval, THD *thd) {
               /* Special consistency check that would replicate DML command
               as TOI needed for pt-table-checksum to check for cluster node
               consistency. */
-              if (version == 99997 && thd->wsrep_exec_mode == LOCAL_STATE) {
+              if (version == 99997 && wsrep_thd_is_local(thd)) {
                 WSREP_DEBUG("consistency check: %s", thd->query().str);
                 thd->wsrep_consistency_check = CONSISTENCY_CHECK_DECLARED;
                 lip->yySkipn(5);
