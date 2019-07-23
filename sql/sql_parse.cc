@@ -940,6 +940,10 @@ static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables)
   {
     TABLE_CATEGORY c;
     LEX_STRING     db, tn;
+
+    /* PXC-2557 : skip if NULL, otherwise lex_string_set will crash */
+    if (!table->db || !table->table_name) continue;
+
     lex_string_set(&db, table->db);
     lex_string_set(&tn, table->table_name);
     c= get_table_category(db, tn);
