@@ -2299,6 +2299,18 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
                   (thd->open_tables == NULL ||
                    (thd->locked_tables_mode == LTM_LOCK_TABLES)));
 
+      /* Update user statistics only if at least one timer was initialized */
+      if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0))
+      {
+        userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
+                              &thd->cpu_time);
+        /* Updates THD stats and the global user stats. */
+        thd->update_stats(true);
+#ifndef EMBEDDED_LIBRARY
+        update_global_user_stats(thd, true, time(NULL));
+#endif
+      }
+
       /* Finalize server status flags after executing a command. */
       thd->update_server_status();
       if (thd->killed)
