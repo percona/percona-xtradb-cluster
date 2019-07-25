@@ -1177,7 +1177,7 @@ public:
 
   virtual void operator()(THD *thd)
   {
-    if (WSREP(thd) && thd->wsrep_applier)
+    if (thd->wsrep_applier)
     {
       WSREP_DEBUG("Closing applier thread %u", thd->thread_id());
       mysql_mutex_lock(&thd->LOCK_thd_data);
@@ -1225,23 +1225,20 @@ public:
   {}
   virtual void operator()(THD *thd)
   {
-    if (WSREP(thd))
-    { 
-      switch (m_type) 
+    switch (m_type)
+    {
+      case APPLIER:
       {
-        case APPLIER:
-        {
-          if (thd->wsrep_applier)
-            m_count++;
-        }
-        break;
-        case COMMITTING:
-        {
-          if (thd->wsrep_query_state == QUERY_COMMITTING)
-            m_count++;
-        }
-        break;
+        if (thd->wsrep_applier)
+          m_count++;
       }
+      break;
+      case COMMITTING:
+      {
+        if (thd->wsrep_query_state == QUERY_COMMITTING)
+          m_count++;
+      }
+      break;
     }
   }
   int get_thd_count() const
@@ -6866,7 +6863,7 @@ static void wsrep_close_threads(THD *thd)
   thd_manager->do_for_all_thd(&call_wsrep_close_wsrep_threads);
 }
 
-void wsrep_close_applier_threads(int count)
+void wsrep_close_applier_threads()
 {
   Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
 
@@ -6885,8 +6882,15 @@ void wsrep_wait_appliers_close(THD *thd)
   {
     my_sleep(100000);
   }
-  /* Now kill remaining wsrep threads: rollbacker */
-  wsrep_close_threads (thd);
+
+  /* Notify rollbacker threads to exit */
+  wsrep_close_applier_threads();
+
+  /* Rollbacker thread can wait on condition so signal it */
+  mysql_mutex_lock(&LOCK_wsrep_rollback);
+  mysql_cond_signal(&COND_wsrep_rollback);
+  mysql_mutex_unlock(&LOCK_wsrep_rollback);
+
   /* and wait for them to die */
   while (have_wsrep_appliers(thd) > 0)
   {

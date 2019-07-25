@@ -18,6 +18,5 @@ galera_kill_nochanges : mysql-wsrep#24 0000-00-00 CODERSHIP Galera server does n
 galera_sst_xtrabackup-v2-options : N/A 0000-00-00 CODERSHIP fails in multiple ways, including xtrabackup crash
 galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically
 galera_var_wsrep_recover : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
-galera_wsrep_provider_unset_set : lp1379204 0000-00-00 CODERSHIP 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
 mysql-wsrep#216 : GCF-1021 0000-00-00 CODERSHIP 5.7 Regression: obfuscated passwords not consistent in error logs
 
