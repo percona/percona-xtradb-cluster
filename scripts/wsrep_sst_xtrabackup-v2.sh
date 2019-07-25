@@ -1060,7 +1060,7 @@ wait_for_listen()
 
             # Now get the processtree for this pid
             # If the parentpid is NOT in the process tree, then ignore
-            if ! echo $(get_parent_pids $pid) | grep -q " $parentpid "; then
+            if ! echo "$(get_parent_pids $pid)" | grep -qw "$parentpid"; then
                 wsrep_log_debug "$LINENO: $parentpid is not in the process tree: $(get_parent_pids $pid)"
                 continue
             fi
