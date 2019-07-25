@@ -2802,7 +2802,6 @@ class THD : public MDL_context_owner,
   enum enum_server_command wsrep_retry_command;
   enum wsrep_consistency_check_mode wsrep_consistency_check;
   std::vector<wsrep::provider::status_variable> wsrep_status_vars;
-  int wsrep_mysql_replicated;
   const char *wsrep_TOI_pre_query; /* a query to apply before
                                       the actual TOI query */
   size_t wsrep_TOI_pre_query_len;
@@ -2813,7 +2812,6 @@ class THD : public MDL_context_owner,
   void *wsrep_apply_format;
   bool wsrep_apply_toi; /* applier processing in TOI */
   uchar *wsrep_rbr_buf;
-  wsrep_gtid_t wsrep_sync_wait_gtid;
   ulong wsrep_affected_rows;
   bool wsrep_has_ignored_error;
   bool wsrep_replicate_GTID;
@@ -2821,8 +2819,6 @@ class THD : public MDL_context_owner,
   void *wsrep_gtid_event_buf;
   ulong wsrep_gtid_event_buf_len;
 
-  bool wsrep_sst_donor;
-  bool wsrep_void_applier_trx;
   bool wsrep_skip_wsrep_GTID;
 
   // DDL statement can fail in which case SE checkpoint shouldn't get updated.
@@ -2835,23 +2831,6 @@ class THD : public MDL_context_owner,
     DDL statement for normal replication.
   */
   bool wsrep_skip_wsrep_hton;
-
-  /**
-    This field is set when wsrep try to do an intermediate special
-    commit while processing LOAD DATA INFILE statement by breaking it
-    into 10K rows mini transactions.
-
-    If this variable is set then binlog rotation is not performed
-    while mini transaction try to commit. Why ?
-    a. From logical perspective LDI is still a single transaction
-    b. rotation will cause unregistration of binlog/innodb handler.
-       On resuming the flow binlog handler is re-register but innodb
-       isn't this eventually causes replication of last chunk (< 10K)
-       rows to skip. Infact, this is logical issue that exist in
-       MySQL/InnoDB world but it just work for them as InnoDB
-       then commit the said transaction as part of external_lock(UNLOCK).
-  */
-  bool wsrep_split_trx;
 
   /* Set to true if intermediate commit is active. Use to skip
   update of wsrep co-ordinates for intermediate commit. */
@@ -4240,7 +4219,7 @@ class THD : public MDL_context_owner,
     if (WSREP(this) && wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID &&
         update_wsrep_id) {
       set_wsrep_next_trx_id(query_id);
-      // TODO: re-add this debug statement
+      // TODO: readd this once the dependency with logevent is resolved.
       // WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
       //            (long unsigned int)wsrep_next_trx_id());
     }

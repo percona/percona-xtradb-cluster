@@ -120,8 +120,6 @@ extern "C" void wsrep_commit_ordered(THD *thd);
 
 extern "C" bool wsrep_consistency_check(const THD *thd);
 
-extern "C" void wsrep_thd_mark_split_trx(THD *thd, bool split_trx);
-
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
 
 extern "C" bool get_wsrep_recovery();

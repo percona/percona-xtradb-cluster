@@ -132,25 +132,6 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
 
   DBUG_ENTER("wsrep_apply_events");
 
-#if 0
-  /* Even is replayed using apply event flow (like background events are
-  are applied) so the special handling for REPLAYing event. */
-  if (thd->killed == THD::KILL_CONNECTION &&
-      thd->wsrep_conflict_state != REPLAYING) {
-    WSREP_INFO(
-        "Applier aborted. Skipping apply event while processing"
-        " write-set: %lld",
-        (long long)wsrep_thd_trx_seqno(thd));
-    DBUG_RETURN(WSREP_CB_FAILURE);
-  }
-
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  thd->wsrep_query_state = QUERY_EXEC;
-  if (thd->wsrep_conflict_state != REPLAYING)
-    thd->wsrep_conflict_state = NO_CONFLICT;
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-#endif /* 0 */
-
   if (!buf_len)
     WSREP_DEBUG("Empty apply event found while processing write-set: %lld",
                 (long long)wsrep_thd_trx_seqno(thd));

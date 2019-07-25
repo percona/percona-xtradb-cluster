@@ -132,7 +132,6 @@ void Wsrep_client_service::cleanup_transaction() {
     */
     m_thd->wsrep_safe_to_abort = false;
   }
-  m_thd->wsrep_void_applier_trx = true;
   m_thd->wsrep_skip_wsrep_GTID = false;
   m_thd->wsrep_skip_SE_checkpoint = false;
   m_thd->run_wsrep_commit_hooks = false;

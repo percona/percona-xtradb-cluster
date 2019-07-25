@@ -696,11 +696,6 @@ class ha_innobase : public handler {
 
   /** Do a parallel scan of an index. */
   Parallel_reader_adapter *m_parallel_reader{nullptr};
-
-#ifdef WITH_WSREP
-  /** number of write_row() calls */
-  uint m_num_write_row;
-#endif /* WITH_WSREP */
 };
 
 #ifdef WITH_WSREP

@@ -189,7 +189,6 @@ void wsrep_init_startup(bool before);
 void wsrep_recover_sr_from_storage(THD *);
 
 extern "C" wsrep_ws_handle_t *wsrep_thd_ws_handle(THD *thd);
-extern "C" void wsrep_thd_mark_split_trx(THD *thd, bool mini_trx);
 extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id);
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
 extern "C" wsrep_trx_id_t wsrep_thd_next_trx_id(THD *thd);

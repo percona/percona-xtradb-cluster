@@ -2708,10 +2708,6 @@ bool Prepared_statement::set_parameters(String *expanded_query) {
   return false;
 }
 
-#ifdef WITH_WSREP
-void wsrep_replay_transaction(THD *thd);
-#endif /* WITH_WSREP */
-
 /**
   Execute a prepared statement. Re-prepare it a limited number
   of times if necessary.

@@ -1768,17 +1768,11 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
     }
 
 #ifdef WITH_WSREP
-#if 0
-    if ((!trn_ctx->no_2pc(trx_scope) &&
-         (trn_ctx->rw_ha_count(trx_scope) > 1)) ||
-        (WSREP(thd) && thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
-         !trans_has_updated_trans_table(thd)))
-      error = tc_log->prepare(thd, all);
-#endif
     if (!trn_ctx->no_2pc(trx_scope) && (trn_ctx->rw_ha_count(trx_scope) > 1))
       error = tc_log->prepare(thd, all);
     else if (trn_ctx->no_2pc(trx_scope) ||
              trn_ctx->rw_ha_count(trx_scope) == 1) {
+      /* cache decision to run wsrep-commit-hook with log_bin=off. */
       thd->run_wsrep_commit_hooks = wsrep_run_commit_hook(thd, all);
     }
 #else

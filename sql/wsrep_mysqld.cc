@@ -2014,7 +2014,12 @@ static void wsrep_TOI_end(THD *thd) {
   thd_proc_info(thd, thd->wsrep_info);
 
   if (wsrep_thd_is_local_toi(thd)) {
-    wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
+
+    /* Skip update of SE checkpoint if the TOI/DDL failed. */
+    if (!thd->wsrep_skip_SE_checkpoint) {
+      wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
+    }
+
     int ret = client_state.leave_toi();
     if (!ret) {
       WSREP_DEBUG("TO END: %lld", client_state.toi_meta().seqno().get());

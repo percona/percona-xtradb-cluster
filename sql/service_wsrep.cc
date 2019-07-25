@@ -236,10 +236,6 @@ extern "C" bool wsrep_consistency_check(const MYSQL_THD thd) {
   return ((THD *)thd)->wsrep_consistency_check == CONSISTENCY_CHECK_RUNNING;
 }
 
-extern "C" void wsrep_thd_mark_split_trx(THD *thd, bool split_trx) {
-  thd->wsrep_split_trx = split_trx;
-}
-
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd) {
   return thd->thread_id();
 }

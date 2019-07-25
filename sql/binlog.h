@@ -972,4 +972,11 @@ extern ulong rpl_read_size;
 
 bool normalize_binlog_name(char *to, const char *from, bool is_relay_log);
 
+#ifdef WITH_WSREP
+IO_CACHE_binlog_cache_storage *wsrep_get_trans_cache(THD *thd, bool transaction);
+bool wsrep_trans_cache_is_empty(THD *thd);
+void wsrep_thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
+void wsrep_thd_binlog_trx_reset(THD *thd);
+#endif /* WITH_WSREP */
+
 #endif /* BINLOG_H_INCLUDED */

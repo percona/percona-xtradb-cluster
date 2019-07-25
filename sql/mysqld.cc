@@ -5884,10 +5884,6 @@ static int init_server_components() {
       }
     }
 
-#if 0
-    if (wsrep_init_server()) unireg_abort(MYSQLD_ABORT_EXIT);
-#endif
-
     /* Disable wsrep functionality with bootstrap */
     if (opt_initialize) {
       wsrep_provider_init(WSREP_NONE);
@@ -12232,10 +12228,6 @@ PSI_stage_info stage_wsrep_rolled_back = { 0, "wsrep: rolled back", 0, PSI_DOCUM
 
 PSI_stage_info stage_wsrep_replicating_commit = { 0, "wsrep: replicating and certifying write set", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_wsrep_write_set_replicated= { 0, "wsrep: write-set replicated and certified", 0, PSI_DOCUMENT_ME};
-
-//PSI_stage_info stage_wsrep_replicate = { 0, "wsrep: in replicate stage", 0, PSI_DOCUMENT_ME};
-//PSI_stage_info stage_wsrep_pre_commit = { 0, "wsrep: in pre-commit stage", 0, PSI_DOCUMENT_ME};
-//PSI_stage_info stage_wsrep_pre_commit_cert_passed = { 0, "wsrep: pre-commit/certification passed", 0, PSI_DOCUMENT_ME};
 
 PSI_stage_info stage_wsrep_replaying_trx = { 0, "wsrep: replaying transaction", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_wsrep_replayed_write_set = { 0, "wsrep: replayed write set", 0, PSI_DOCUMENT_ME};

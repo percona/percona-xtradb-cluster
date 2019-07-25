@@ -1404,7 +1404,6 @@ static void *sst_donor_thread(void *a) {
 
   wsp::thd thd(false);  // we turn off wsrep_on for this THD so that it can
                         // operate with wsrep_ready == OFF
-  thd.ptr->wsrep_sst_donor = true;
 
   // Create the SST auth user
   err = wsrep_create_sst_user(true, password.c_str());

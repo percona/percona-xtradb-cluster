@@ -58,6 +58,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #ifdef WITH_WSREP
 extern ulong wsrep_debug;
 #include "service_wsrep.h"
+#include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
 
 /** Number of times a thread is allowed to enter InnoDB within the same

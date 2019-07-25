@@ -22,6 +22,7 @@
 #include "wsrep_binlog.h"  /* register/deregister group commit */
 #include "wsrep_thd.h"
 #include "wsrep_xid.h"
+#include "sql/binlog.h"
 
 class THD;
 

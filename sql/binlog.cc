@@ -1749,6 +1749,9 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
 
 #ifdef WITH_WSREP
       if (WSREP_ON && thd->slave_thread && !thd->wsrep_applier) {
+        /* If the galera node is acting as async slave then capture
+        GTID event from the async slave applied thread and mark it for
+        replication in galera channel. */
         thd->wsrep_replicate_GTID = true;
 
         /* Replicating DDL (from async-master) with replication filter will
@@ -9420,16 +9423,7 @@ commit_stage:
    */
   if (DBUG_EVALUATE_IF("force_rotate", 1, 0) ||
       (do_rotate && thd->commit_error == THD::CE_NONE &&
-#ifdef WITH_WSREP
-       /* Split trx represent intermediate commit trx like
-       intermediate commit during LDI every 10K rows.
-       Avoid binlog rotation if this commit is caused by intermediate
-       commit. Rotation should happen when the complete logical
-       unit is committed. */
-       !is_rotating_caused_by_incident && !thd->wsrep_split_trx)) {
-#else
        !is_rotating_caused_by_incident)) {
-#endif /* WITH_WSREP */
     /*
       Do not force the rotate as several consecutive groups may
       request unnecessary rotations.
@@ -9891,23 +9885,6 @@ static int binlog_start_trans_and_stmt(THD *thd, Log_event *start_event) {
   binlog_cache_mngr *cache_mngr = thd_get_cache_mngr(thd);
   binlog_cache_data *cache_data =
       cache_mngr->get_binlog_cache_data(is_transactional);
-
-#ifdef WITH_WSREP
-#if 0
-  // early return under emulation binlog mode will not register
-  // binlog handler that would further skip prepare stage.
-  /*
-    With wsrep binlog emulation we can skip the rest because the
-    binlog cache will not be written into binlog. Note however that
-    because of this the hton callbacks will not get called to clean
-    up the cache, so this must be done explicitly when the transaction
-    terminates.
-  */
-  if (WSREP_EMULATE_BINLOG_NNULL(thd)) {
-    DBUG_RETURN(0);
-  }
-#endif /* 0 */
-#endif /* WITH_WSREP */
 
   /*
     If the event is requesting immediatly logging, there is no need to go
@@ -10375,6 +10352,17 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
     binlog by filtering rules.
   */
 #ifdef WITH_WSREP
+  if (WSREP(this) && wsrep_thd_is_local(this) &&
+      variables.wsrep_trx_fragment_size > 0) {
+    if (!is_current_stmt_binlog_format_row()) {
+      my_message(ER_NOT_SUPPORTED_YET,
+                 "Streaming replication not supported with "
+                 "binlog_format=STATEMENT",
+                 MYF(0));
+      DBUG_RETURN(-1);
+    }
+  }
+
   if ((WSREP_EMULATE_BINLOG_NNULL(this) ||
        (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG))) &&
       !(variables.binlog_format == BINLOG_FORMAT_STMT &&

@@ -3189,11 +3189,7 @@ ha_innobase::ha_innobase(handlerton *hton, TABLE_SHARE *table_arg)
           HA_ONLINE_ANALYZE | HA_SUPPORTS_DEFAULT_EXPRESSION),
       m_start_of_scan(),
       m_stored_select_lock_type(LOCK_NONE_UNSET),
-#ifdef WITH_WSREP
-      m_mysql_has_locked(), m_num_write_row(0) {}
-#else
       m_mysql_has_locked() {}
-#endif /* WITH_WSREP */
 
 /** Destruct ha_innobase handler. */
 
@@ -9477,105 +9473,6 @@ int ha_innobase::write_row(uchar *record) /*!< in: a row in MySQL format */
   } else if (!trx_is_started(trx)) {
     ++trx->will_lock;
   }
-
-#if 0
-#ifdef WITH_WSREP
-  /* Intermediate commit hack for LDI as PXC doesn't support load of large
-   * table. */
-  if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
-      thd_sql_command(m_user_thd) == SQLCOM_LOAD &&
-      !thd_test_options(m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN) &&
-      m_num_write_row >= 10000) {
-    m_num_write_row = 0;
-
-    enum lock_mode mode;
-
-    dict_table_t *src_table =
-        lock_get_src_table(m_prebuilt->trx, m_prebuilt->table, &mode);
-
-    if (src_table == m_prebuilt->table) {
-      /* common case as src and prebuilt table are same */
-
-      WSREP_DEBUG(
-          "Forcing split of large transaction"
-          " for LOAD DATA INFILE: %s",
-          wsrep_thd_query(m_user_thd));
-
-      switch (wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, true)) {
-        case WSREP_TRX_OK:
-          break;
-        case WSREP_TRX_SIZE_EXCEEDED:
-        case WSREP_TRX_CERT_FAIL:
-        case WSREP_TRX_ERROR:
-          DBUG_RETURN(1);
-      }
-
-      /* mark split trx = true to avoid binlog rotation as LDI is executing
-      intermediate commit */
-      wsrep_thd_mark_split_trx(m_user_thd, true);
-
-      if (tc_log->commit(m_user_thd, true)) DBUG_RETURN(1);
-      wsrep_post_commit(m_user_thd, true);
-      innobase_commit(ht, m_user_thd, true);
-
-      /* Start new transaction after existing mini-transaction
-      is committed in all respect. Starting it early will
-      cause last bucket of left over rows (< 10K) to get
-      processed without active transaction (with log-bin=0).*/
-      wsrep_thd_mark_split_trx(m_user_thd, false);
-      wsrep_thd_set_next_trx_id(m_user_thd);
-
-      trx_register_for_2pc(m_prebuilt->trx);
-      m_prebuilt->sql_stat_start = true;
-    } else if (lock_is_table_exclusive(m_prebuilt->table, m_prebuilt->trx)) {
-      /* Ensure that there are no other table locks than
-      LOCK_IX and LOCK_AUTO_INC on the destination table. */
-
-      /* use-case with partitioning table:
-      say 9999th insert was to nth partition table and
-      say 10000th insert now goes to different partition table then
-      ensuring we lock repsective table post intermediate commit is important */
-
-      WSREP_DEBUG(
-          "Forcing split of large transaction"
-          " for LOAD DATA INFILE: %s",
-          wsrep_thd_query(m_user_thd));
-
-      switch (wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, true)) {
-        case WSREP_TRX_OK:
-          break;
-        case WSREP_TRX_SIZE_EXCEEDED:
-        case WSREP_TRX_CERT_FAIL:
-        case WSREP_TRX_ERROR:
-          DBUG_RETURN(1);
-      }
-
-      /* mark split trx = true to avoid binlog rotation as LDI is executing
-      intermediate commit */
-      wsrep_thd_mark_split_trx(m_user_thd, true);
-      if (tc_log->commit(m_user_thd, true)) DBUG_RETURN(1);
-      wsrep_post_commit(m_user_thd, true);
-
-      innobase_commit(ht, m_user_thd, true);
-
-      /* Start new transaction after existing mini-transaction
-      is committed in all respect. Starting it early will
-      cause last bucket of left over rows (< 10K) to get
-      processed without active transaction (with log-bin=0).*/
-      wsrep_thd_mark_split_trx(m_user_thd, false);
-      wsrep_thd_set_next_trx_id(m_user_thd);
-
-      trx_register_for_2pc(m_prebuilt->trx);
-
-      /* Restore lock on soruce table post intermediate commit */
-      row_lock_table(m_prebuilt, src_table, mode);
-
-      m_prebuilt->sql_stat_start = true;
-    }
-  }
-  m_num_write_row++;
-#endif /* WITH_WSREP */
-#endif /* 0 */
 
   /* Handling of Auto-Increment Columns. */
   if (table->next_number_field && record == table->record[0]) {
