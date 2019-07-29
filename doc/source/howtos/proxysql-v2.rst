@@ -122,7 +122,7 @@ To view the usage information, run ``proxysql-admin`` without any options:
 
 .. code-block:: text
 
-   Usage: [ options ]
+   Usage: proxysql-admin [ options ]
    Options:
 
    --config-file=<config-file>        Read login credentials from a configuration file
@@ -202,6 +202,8 @@ To view the usage information, run ``proxysql-admin`` without any options:
    --enable, -e                       Auto-configure Percona XtraDB Cluster nodes into ProxySQL
    --update-cluster                   Updates the cluster membership, adds new cluster nodes
                                       to the configuration.
+   --update-mysql-version             Updates the `mysql-server_version` variable in ProxySQL with the version
+                                      from a node in the cluster.
    --quick-demo                       Setup a quick demo with no authentication
    --syncusers                        Sync user accounts currently configured in MySQL to ProxySQL
                                       May be used with --enable.
@@ -209,12 +211,18 @@ To view the usage information, run ``proxysql-admin`` without any options:
    --sync-multi-cluster-users         Sync user accounts currently configured in MySQL to ProxySQL
                                       May be used with --enable.
                                       (doesn't delete ProxySQL users not in MySQL)
+   --add-query-rule                   Create query rules for synced mysql user. This is applicable only
+                                      for singlewrite mode and works only with --syncusers
+                                      and --sync-multi-cluster-users options
    --is-enabled                       Checks if the current configuration is enabled in ProxySQL.
    --status                           Returns a status report on the current configuration.
                                       If "--writer-hg=<NUM>" is specified, than the
                                       data corresponding to the galera cluster with that
                                       writer hostgroup is displayed. Otherwise, information
                                       for all clusters will be displayed.
+   --force                            This option will skip existing configuration checks in mysql_servers, 
+                                      mysql_users and mysql_galera_hostgroups tables. This option will only 
+				      work with ``proxysql-admin --enable``.
    --version, -v                      Prints the version info
  
 Preparing Configuration File
@@ -502,6 +510,26 @@ This option works in the same way as --syncusers but it does not delete ProxySQL
 users that are not present in the Percona XtraDB Cluster. It is to be used when
 syncing proxysql instances that manage multiple clusters.
 
+.. _pxc.proxysql.v2.admin-tool.add-query-rule:
+
+--add-query-rule
+--------------------------------------------------------------------------------
+
+Create query rules for synced mysql user. This is applicable only for
+singlewrite mode and works only with :ref:`pxc.proxysql.v2.admin-tool.syncusers`
+and :ref:`pxc.proxysql.v2.admin-tool.sync-multi-cluster-users` options.
+
+.. code-block:: text
+
+   Syncing user accounts from PXC to ProxySQL
+
+   Note : 'admin' is in proxysql admin user list, this user cannot be added to ProxySQL
+   -- (For more info, see https://github.com/sysown/proxysql/issues/709)
+   Adding user to ProxySQL: test_query_rule
+   Added query rule for user: test_query_rule
+
+   Synced PXC users to the ProxySQL database!
+
 .. _pxc.proxysql.v2.admin-tool.quick-demo:
 
 --quick-demo
@@ -674,6 +702,29 @@ supported by this ProxySQL instance.
       | backup-writer | 12    | 127.0.0.1 | 25100 | ONLINE | 1000      | 1000     | 0       | 0         |
       | backup-writer | 12    | 127.0.0.1 | 25200 | ONLINE | 1000      | 1000     | 0       | 0         |
       +---------------+-------+-----------+-------+--------+-----------+----------+---------+-----------+
+
+.. _pxc.proxysql.v2.admin-tool.force:
+
+--force
+--------------------------------------------------------------------------------
+
+This will skip existing configuration checks with the ``--enable`` option in
+`mysql_servers`, `mysql_users`, and `mysql_galera_hostgroups` tables.
+
+.. _pxc.proxysql.v2.admin-tool.update-mysql-version:
+
+--update-mysql-version
+--------------------------------------------------------------------------------
+
+This option will updates mysql server version (specified by the writer
+hostgroup, either from ``--writer-hg`` or from the config file) in proxysql db based
+on online writer node.
+
+.. code-block:: bash
+
+   $  sudo proxysql-admin --update-mysql-version --writer-hg=10
+   ProxySQL MySQL version changed to 5.7.26
+
 
 Extra options
 ================================================================================
