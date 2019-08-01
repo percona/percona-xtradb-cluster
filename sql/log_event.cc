@@ -4925,19 +4925,14 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
       }
       thd->is_slave_error = 1;
 
-#if 0
-      // wsrep_apply_toi is no more being used. So the said block is dead.
 #ifdef WITH_WSREP
-      // TODO: G-4: Need to findout why to ignore this error if TOI ?
-      // There are certain TOI errors that can be ignored say like
-      // DROP TABLE IF EXISTS, etc....
+      /* If DDL evaluate if user has configured to ignore certain errors. */
       if (thd->wsrep_apply_toi && wsrep_must_ignore_error(thd)) {
         thd->clear_error();
         thd->killed = THD::NOT_KILLED;
         thd->wsrep_has_ignored_error = true;
       }
 #endif /* WITH_WSREP */
-#endif /* 0 */
     }
 
     /*
@@ -8518,7 +8513,7 @@ int Rows_log_event::handle_idempotent_and_ignored_errors(
         (idempotent_error == 0 ? ignored_error_code(actual_error) : 0);
 
 #ifdef WITH_WSREP
-    /* Check if error qualifies for WSREP ignore error condition. */
+    /* Check if error qualifies for WSREP ignore error condition (DML). */
     if (WSREP(thd) && !thd->slave_thread &&
         wsrep_ignored_error_code(this, actual_error)) {
       idempotent_error = true;

@@ -408,6 +408,14 @@ void wsrep_provider_init(const char *value) {
 bool wsrep_provider_options_check(sys_var *, THD *, set_var *) { return 0; }
 
 bool wsrep_provider_options_update(sys_var *, THD *, enum_var_type) {
+
+  if (!wsrep_provider_options) {
+    WSREP_ERROR("Invalid value for wsrep_provider_options");
+    my_message(ER_WRONG_ARGUMENTS, "Invalid value for wsrep_provider_options",
+               MYF(0));
+    return true;
+  }
+
   enum wsrep::provider::status ret =
       Wsrep_server_state::instance().provider().options(wsrep_provider_options);
 
@@ -502,11 +510,13 @@ bool wsrep_cluster_address_update(sys_var *, THD *thd, enum_var_type) {
   if (wsrep_start_replication()) {
     wsrep_create_rollbacker();
     wsrep_create_appliers(1);
-    if (WSREP_ON) {
+#if 0
+    if (WSREP_ON && wsrep_connected) {
       Wsrep_server_state::instance().wait_until_state(
           Wsrep_server_state::s_initializing);
       Wsrep_server_state::instance().initialized();
     }
+#endif
     wsrep_create_appliers(wsrep_slave_threads - 1);
   }
 
@@ -690,6 +700,14 @@ bool wsrep_max_ws_size_update(sys_var *, THD *, enum_var_type) {
 }
 
 bool wsrep_trx_fragment_size_check(sys_var *, THD *thd, set_var *var) {
+
+  if (!WSREP(thd)) {
+    push_warning(thd, Sql_condition::SL_WARNING, ER_WRONG_VALUE_FOR_VAR,
+                 "Cannot set 'wsrep_trx_fragment_size' to a value other than "
+                 "0 because wsrep is switched off.");
+    return true;
+  }
+
   if (var->value == NULL) {
     return false;
   }

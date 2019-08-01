@@ -128,7 +128,7 @@ bool pxc_encrypt_cluster_traffic = 0;
 
 /* force flush of error message if error is detected at early stage
    during SST or other initialization. */
-bool pxc_force_flush_error_message = true;
+bool pxc_force_flush_error_message = false;
 
 /* End configuration options */
 
@@ -565,7 +565,7 @@ static void wsrep_log_cb(wsrep::log::level level, const char *msg) {
       WSREP_GALERA_LOG(WARNING_LEVEL, msg);
       break;
     case wsrep::log::error:
-      if (!Wsrep_server_state::instance().is_initialized()) {
+      if (!Wsrep_server_state::instance().is_initialized_unprotected()) {
         pxc_force_flush_error_message = true;
         flush_error_log_messages();
       }

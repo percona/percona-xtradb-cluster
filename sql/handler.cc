@@ -2378,10 +2378,15 @@ int ha_prepare_low(THD *thd, bool all) {
         bool must_replay = wsrep_must_replay(thd);
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         if (!must_replay) {
-          /* set error only if transaction is not marked for replay. */
-          char errbuf[MYSQL_ERRMSG_SIZE];
-          my_error(ER_LOCK_DEADLOCK, MYF(0), err,
-                   my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+          if (thd->wsrep_cs().current_error() ==
+              wsrep::e_size_exceeded_error) {
+            // retain existing error code and message
+          } else {
+            /* set error only if transaction is not marked for replay. */
+            char errbuf[MYSQL_ERRMSG_SIZE];
+            my_error(ER_LOCK_DEADLOCK, MYF(0), err,
+                     my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
+          }
         }
 
         error = 1;

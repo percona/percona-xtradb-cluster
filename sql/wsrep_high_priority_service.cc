@@ -181,8 +181,15 @@ Wsrep_high_priority_service::~Wsrep_high_priority_service() {
 int Wsrep_high_priority_service::start_transaction(
     const wsrep::ws_handle &ws_handle, const wsrep::ws_meta &ws_meta) {
   DBUG_ENTER(" Wsrep_high_priority_service::start_transaction");
+  /* trans_begin doesn't make sense here as transaction is started
+  through a BEGIN event that is part of the write-set replication.
+  This trans_begin exist was added by upstream for MDB compatibility
+  that doesn't carry BEGIN event like MySQL. */
+#if 0
   DBUG_RETURN(m_thd->wsrep_cs().start_transaction(ws_handle, ws_meta) ||
               trans_begin(m_thd));
+#endif
+  DBUG_RETURN(m_thd->wsrep_cs().start_transaction(ws_handle, ws_meta));
 }
 
 const wsrep::transaction &Wsrep_high_priority_service::transaction() const {

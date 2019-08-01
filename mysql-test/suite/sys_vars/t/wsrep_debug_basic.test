@@ -1,3 +1,4 @@
+#
 --source include/have_wsrep.inc
 
 --echo #
@@ -14,16 +15,16 @@ SELECT @@global.wsrep_debug;
 --echo # scope
 --error ER_INCORRECT_GLOBAL_LOCAL_VAR
 SELECT @@session.wsrep_debug;
-SET @@global.wsrep_debug=OFF;
+SET @@global.wsrep_debug=0;
 SELECT @@global.wsrep_debug;
-SET @@global.wsrep_debug=ON;
+SET @@global.wsrep_debug=1;
 SELECT @@global.wsrep_debug;
 
 --echo
 --echo # valid values
-SET @@global.wsrep_debug='OFF';
+SET @@global.wsrep_debug=0;
 SELECT @@global.wsrep_debug;
-SET @@global.wsrep_debug=ON;
+SET @@global.wsrep_debug=1;
 SELECT @@global.wsrep_debug;
 SET @@global.wsrep_debug=default;
 SELECT @@global.wsrep_debug;

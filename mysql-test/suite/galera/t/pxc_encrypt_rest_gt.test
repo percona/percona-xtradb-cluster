@@ -17,6 +17,7 @@
 # - binlog encryption
 
 call mtr.add_suppression("Slave SQL: Error 'InnoDB : ENCRYPTION is not accepted syntax for CREATE/ALTER table, for tables in general/shared tablespace.'");
+call mtr.add_suppression("Query apply failed.");
 
 #===============================================================================
 # general tablespace encryption support

@@ -273,7 +273,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 
 #define WSREP_ERROR(fmt, ...)                             \
   do {                                                    \
-    if (!Wsrep_server_state::instance().is_initialized()) \
+    if (!Wsrep_server_state::instance().is_initialized_unprotected()) \
       pxc_force_flush_error_message = true;               \
     WSREP_LOG(ERROR_LEVEL, fmt, ##__VA_ARGS__)            \
   } while (0);
