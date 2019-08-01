@@ -66,14 +66,14 @@ static Log_event *wsrep_read_log_event(
 #include "sql_base.h"     // close_temporary_table()
 #include "transaction.h"  // trans_commit(), trans_rollback()
 
-inline void wsrep_set_apply_format(THD *thd, Format_description_log_event *ev) {
+void wsrep_set_apply_format(THD *thd, Format_description_log_event *ev) {
   if (thd->wsrep_apply_format) {
     delete (Format_description_log_event *)thd->wsrep_apply_format;
   }
   thd->wsrep_apply_format = ev;
 }
 
-inline Format_description_log_event *wsrep_get_apply_format(THD *thd) {
+Format_description_log_event *wsrep_get_apply_format(THD *thd) {
   if (thd->wsrep_apply_format)
     return (Format_description_log_event *)thd->wsrep_apply_format;
   return thd->wsrep_rli->get_rli_description_event();

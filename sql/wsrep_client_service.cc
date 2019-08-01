@@ -297,16 +297,19 @@ void Wsrep_client_service::wait_for_replayers(
   lock.lock();
 }
 
-void Wsrep_client_service::debug_sync(const char *sync_point) {
+void Wsrep_client_service::debug_sync(const char *sync_point
+                                      __attribute__((unused))) {
   DBUG_ASSERT(m_thd == current_thd);
 
+#if defined(ENABLED_DEBUG_SYNC)
   if (unlikely(opt_debug_sync_timeout))
     ::debug_sync(m_thd, sync_point, strlen(sync_point));
-  // debug_sync_caller(m_thd, sync_point);
+    // debug_sync_caller(m_thd, sync_point);
+#endif /* defined(ENABLED_DEBUG_SYNC) */
 }
 
-void Wsrep_client_service::debug_crash(const char *crash_point) {
-  // DBUG_ASSERT(m_thd == current_thd);
+void Wsrep_client_service::debug_crash(const char *crash_point
+                                       __attribute__((unused))) {
   DBUG_EXECUTE_IF(crash_point, DBUG_SUICIDE(););
 }
 

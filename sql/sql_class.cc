@@ -897,8 +897,7 @@ void THD::init(void) {
 
 #ifdef WITH_WSREP
   wsrep_last_query_id = 0;
-  memset(&wsrep_xid, 0, sizeof(wsrep_xid));
-  wsrep_xid.set_format_id(-1);
+  wsrep_xid.reset();
   wsrep_skip_locking = false;
   wsrep_retry_counter = 0;
   wsrep_rli = NULL;
