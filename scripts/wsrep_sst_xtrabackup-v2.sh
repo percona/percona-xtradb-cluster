@@ -573,6 +573,7 @@ read_cnf()
     ttime=$(parse_cnf sst time 0)
     scomp=$(parse_cnf sst compressor "")
     sdecomp=$(parse_cnf sst decompressor "")
+    xbstreameopts=$(parse_cnf sst xbstreameopts "")
 
     # if wsrep_node_address is not set raise a warning
     wsrep_node_address=$(parse_cnf mysqld wsrep-node-address "")
