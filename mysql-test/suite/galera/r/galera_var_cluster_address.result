@@ -49,3 +49,5 @@ Warning	1620	Plugin is busy and will be uninstalled on shutdown
 show status like 'wsrep_cluster_size';
 Variable_name	Value
 wsrep_cluster_size	2
+#restart node-2 to get rid of audit plugin that is marked deleted but not removed
+# restart

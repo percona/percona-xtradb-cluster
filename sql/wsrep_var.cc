@@ -510,13 +510,16 @@ bool wsrep_cluster_address_update(sys_var *, THD *thd, enum_var_type) {
   if (wsrep_start_replication()) {
     wsrep_create_rollbacker();
     wsrep_create_appliers(1);
-#if 0
-    if (WSREP_ON && wsrep_connected) {
+
+    if (WSREP_ON && wsrep_connected &&
+        !Wsrep_server_state::instance().is_initialized()) {
+      /* If server was not initialized during startup then
+      first initialization takes place here. */
       Wsrep_server_state::instance().wait_until_state(
           Wsrep_server_state::s_initializing);
       Wsrep_server_state::instance().initialized();
     }
-#endif
+
     wsrep_create_appliers(wsrep_slave_threads - 1);
   }
 

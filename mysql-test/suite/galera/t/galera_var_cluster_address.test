@@ -83,3 +83,11 @@ show status like 'wsrep_local_state_comment';
 #
 UNINSTALL PLUGIN audit_log;
 show status like 'wsrep_cluster_size';
+
+--echo #restart node-2 to get rid of audit plugin that is marked deleted but not removed
+--source include/restart_mysqld.inc
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+

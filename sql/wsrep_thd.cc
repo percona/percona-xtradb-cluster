@@ -53,6 +53,8 @@ static void wsrep_replication_process(THD *thd,
       new rpl_sql_thread_info(thd->wsrep_rgi->rli->mi->rpl_filter);
 #endif
 
+  THD_STAGE_INFO(thd, stage_wsrep_applier_idle);
+
   WSREP_INFO("Starting applier thread %u", thd->thread_id());
   enum wsrep::provider::status ret =
       Wsrep_server_state::get_provider().run_applier(&applier_service);

@@ -225,6 +225,7 @@ galera.galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_i
 galera.pxc_encrypt_rest_blog : Currently PXC  doesn't support binlog encryption
 galera.pxc_encrypt_rest_gt_vault : Vault server availability is unreliable
 galera.pxc_encrypt_rest_fpt_vault : Vault server availability is unreliable
+galera.galera_var_notify_cmd : Failing to invoke the external script
 
 # galera-3nodes
 

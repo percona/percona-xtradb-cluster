@@ -183,7 +183,7 @@ int Wsrep_high_priority_service::start_transaction(
   DBUG_ENTER(" Wsrep_high_priority_service::start_transaction");
   /* trans_begin doesn't make sense here as transaction is started
   through a BEGIN event that is part of the write-set replication.
-  This trans_begin exist was added by upstream for MDB compatibility
+  This explicit trans_begin is added by upstream for MDB compatibility
   that doesn't carry BEGIN event like MySQL. */
 #if 0
   DBUG_RETURN(m_thd->wsrep_cs().start_transaction(ws_handle, ws_meta) ||
@@ -657,10 +657,19 @@ Wsrep_replayer_service::~Wsrep_replayer_service() {
 
   /* Store replay result/state to original thread wsrep client
      state and switch execution context back to original. */
-  orig_thd->wsrep_cs().after_replay(replayer_thd->wsrep_trx());
-  wsrep_after_apply(replayer_thd);
-  wsrep_after_command_ignore_result(replayer_thd);
-  wsrep_close(replayer_thd);
+  if (m_replay_status == wsrep::provider::error_certification_failed) {
+    /* Replay of transaction failed at certification level.
+       This will leave transaction in s_replaying mode.
+       De-attach the transaction from original transaction and proceed. */
+    replayer_thd->wsrep_cs().deattach_after_replay();
+    wsrep_after_command_ignore_result(replayer_thd);
+    wsrep_close(replayer_thd);
+  } else {
+    orig_thd->wsrep_cs().after_replay(replayer_thd->wsrep_trx());
+    wsrep_after_apply(replayer_thd);
+    wsrep_after_command_ignore_result(replayer_thd);
+    wsrep_close(replayer_thd);
+  }
   replayer_thd->wsrep_replayer = false;
   replayer_thd->restore_globals();
   orig_thd->store_globals();
