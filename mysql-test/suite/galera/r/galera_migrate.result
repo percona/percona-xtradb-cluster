@@ -78,3 +78,4 @@ DROP TABLE t1;
 DROP USER sst;
 CALL mtr.add_suppression("InnoDB: Error: Table \"mysql\"\\.\"innodb_index_stats\" not found");
 CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
+CALL mtr.add_suppression("Host name '[0-9a-zA-Z\.\-]+' could not be resolved.*");

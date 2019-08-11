@@ -870,7 +870,6 @@ extern const char *MY_BIND_ALL_ADDRESSES;
 typedef void (*wsrep_thd_processor_fun)(THD *);
 pthread_handler_t start_wsrep_THD(void*);
 #endif /* WITH_WSREP */
-
 #ifdef _WIN32
 bool update_named_pipe_full_access_group(const char *new_group_name);
 #endif
