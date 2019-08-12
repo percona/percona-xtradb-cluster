@@ -223,6 +223,11 @@ To view the usage information, run ``proxysql-admin`` without any options:
    --force                            This option will skip existing configuration checks in mysql_servers, 
                                       mysql_users and mysql_galera_hostgroups tables. This option will only 
 				      work with ``proxysql-admin --enable``.
+   --disable-updates                  Disable admin updates for ProxySQL cluster for the
+                                      current operation. The default is to not change the
+                                      admin variable settings.  If this option is specifed,
+                                      these options will be set to false.
+                                      (default: updates are not disabled)
    --version, -v                      Prints the version info
  
 Preparing Configuration File
