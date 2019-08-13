@@ -26,7 +26,7 @@ Configuration examples assume there are three |PXC| nodes:
 +--------+-----------+---------------+
 
 If you are running Debian or Ubuntu,
-add the following configuration variables to :file:`/etc/mysql/my.cnf`
+add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
 on the first node::
 
  wsrep_provider=/usr/lib/libgalera_smm.so
@@ -47,7 +47,7 @@ on the first node::
  innodb_autoinc_lock_mode=2
 
 If you are running Red Hat or CentOS,
-add the following configuration variables to :file:`/etc/my.cnf`
+add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
 on the first node::
 
  wsrep_provider=/usr/lib64/galera3/libgalera_smm.so
