@@ -318,6 +318,43 @@ history.
 This variable can be used to define the location of the :file:`galera.cache`
 file.
 
+.. variable:: gcache.freeze_purge_at_seqno
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Local, Global
+   :dyn: Yes
+   :default: 0
+
+This variable controls the purging of the gcache and enables retaining
+more data in it. This variable makes it possible to use :term:`IST
+(Incremental State Transfer) <IST>` when the node rejoins instead of
+:term:`SST (State Snapshot Transfer) <SST>`.
+
+Set this variable on an existing node of the cluster (that will
+continue to be part of the cluster and can act as a potential
+:term:`donor node`). This node continues to retain the write-sets and
+allows restarting the node to rejoin by using :term:`IST`.
+
+.. seealso::
+
+   Percona Database Performance Blog:
+      - `All You Need to Know About GCache (Galera-Cache) <https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/>`_
+      - `Want IST Not SST for Node Rejoins? We Have a Solution! <https://www.percona.com/blog/2018/02/13/no-sst-node-rejoins/>`_
+   
+The :variable:`gcache.freeze_purge_at_seqno` variable takes three values:
+
+-1 (default)
+   No freezing of gcache, the purge operates as normal.
+A valid seqno in gcache
+   The freeze purge of write-sets may not be smaller than the selected seqno.
+   The best way to select an optimal value is to use the value of the
+   variable :variable:`wsrep_last_applied` from the node that you plan to shut down.
+*now*
+   The freeze purge of write-sets is no less than the smallest seqno currently
+   in gcache. Using this value results in freezing the gcache-purge instantly.
+   Use this value if selecting a valid seqno in gcache is difficult.
+   
 .. variable:: gcache.keep_pages_count
 
    :cli: Yes
