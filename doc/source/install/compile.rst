@@ -75,6 +75,9 @@ dependencies:
    $ sudo apt-get install -y git scons gcc g++ openssl check cmake bison \
    libboost-all-dev libasio-dev libaio-dev libncurses5-dev libreadline-dev \
    libpam-dev socat libcurl-dev
+   
+   .. libcurl-dev (not found on debian; used libcurl4-gnutls-dev
+   .. zlib-dev is missing here. on debian worked with zlib1g-dev
 
 * For Red Hat Enterprise Linux or CentOS:
 
@@ -92,27 +95,45 @@ To compile |PXC| from source code:
 
       $ git clone https://github.com/percona/percona-xtradb-cluster.git
 
-   .. note:: You have to clone the latest repository
-      or update it to the latest state.
+   .. important::
+
+      Clone the latest repository or update it to the latest state.
       Old codebase may not be compatible with the build script.
 
-#. Check out the ``5.7`` branch.
+#. Check out the ``5.7`` branch:
+
+   .. code-block:: bash
+
+      $ cd percona-xtradb-cluster-galera
+      $ git checkout 5.7
 
 #. Initialize the submodule:
 
    .. code-block:: bash
 
-      $ cd percona-xtradb-cluster-galera
       $ git submodule init wsrep/src && git submodule update wsrep/src
+      $ git submodule init percona-xtradb-cluster-galera && git submodule update percona-xtradb-cluster-galera
+      $ cd  percona-xtradb-cluster-galera
+      $ git submodule init wsrep/src && git submodule update wsrep/src
+      & git submodule init && git submodule update
+      $ cd ..
 
 #. Run the build script :file:`./build-ps/build-binary.sh`.
-   By default, it will build into the current directory,
-   but you can specify another target output directory.
-   For example, if you want to build into :file:`./pxc-build`,
-   run the following:
+   By default, it attempts building into the current directory. Specify
+   the target output directory, such as :file:`./pxc-build`:
 
    .. code-block:: bash
 
       $ mkdir ./pxc-build
       $ ./build-ps/build-binary.sh ./pxc-build
 
+When the compilation completes, |pxc-build| contains a tarball, such as |tarball|, that you can deploy on your system.
+
+.. note::
+
+   The exact version and release numbers may differ.
+
+
+.. |pxc-build| replace:: :file:`pxc-build`
+.. |tarball| replace:: :file:`Percona-XtraDB-Cluster-5.7.25-rel28-31.35.1.Linux.x86_64.tar.gz`
+   
