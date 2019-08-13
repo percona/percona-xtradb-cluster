@@ -233,7 +233,7 @@ up (total rounds will be :variable:`evs.max_install_timeouts` + 2).
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: 4
+   :default: 10
 
 This variable defines the maximum number of data packets in replication at a
 time. For WAN setups, the variable can be set to a considerably higher value
@@ -278,7 +278,7 @@ When this variable is enabled, smaller packets will be aggregated into one.
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: 2
+   :default: 4
 
 This variable defines the maximum number of data packets in replication at a
 time. For WAN setups, the variable can be set to a considerably higher value
