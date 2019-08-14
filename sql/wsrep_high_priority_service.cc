@@ -340,7 +340,17 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(m_thd, m_thd->wsrep_info);
 
+#if 0
   int ret = (trans_rollback_stmt(m_thd) || trans_rollback(m_thd));
+  // Following call to trans_rollback_stmt has been made conditional
+  // based on presence of statement level transaction to comply
+  // with PXC-5.7 behavior. trans_rollback_stmt functionality as defined
+  // by upstream is to call rollback (MYSQL_BIN_LOG::rollback) even if
+  // there is no statement level transaction to commit.
+#endif
+  int ret = (!m_thd->get_transaction()->is_empty(Transaction_ctx::STMT))
+                ? (trans_rollback_stmt(m_thd) || trans_rollback(m_thd))
+                : (trans_rollback(m_thd));
 
   if (ret == 0) {
     m_rli->cleanup_context(m_thd, 0);

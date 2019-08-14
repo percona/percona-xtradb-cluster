@@ -55,6 +55,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifdef WITH_WSREP
 #include "ha_prototypes.h" /* wsrep_is_wsrep_xid() */
+#include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
 
 /** The transaction system */
@@ -256,6 +257,14 @@ void trx_sys_update_wsrep_checkpoint(
     unsigned char xid_uuid[16];
     long long xid_seqno = read_wsrep_xid_seqno(xid);
     read_wsrep_xid_uuid(xid, xid_uuid);
+
+    char uuid_str[40] = {
+        0,
+    };
+    wsrep_uuid_print((const wsrep_uuid_t*)xid_uuid, uuid_str,
+                     sizeof(uuid_str));
+    WSREP_DEBUG("Update WSREPXid: %s:%lld", uuid_str, xid_seqno);
+
     if (xid_seqno != -1 && !memcmp(xid_uuid, trx_sys_cur_xid_uuid, 8)) {
       if (recovery) {
         /* When recovery happens prepare transactions

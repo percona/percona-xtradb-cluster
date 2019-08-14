@@ -1,0 +1,35 @@
+#
+--source include/galera_cluster.inc
+
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+
+--connection node_1
+--echo #node-1
+SET SESSION wsrep_trx_fragment_size = 128;
+START TRANSACTION;
+INSERT INTO t1 VALUES (1, 0);
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--echo #node-1a
+SET SESSION wsrep_trx_fragment_size = 1;
+START TRANSACTION;
+INSERT INTO t1 VALUES (2, 0);
+
+--connection node_2
+--echo #node-2
+ALTER TABLE t1 DROP COLUMN f2;
+
+--connection node_1
+--echo #node-1
+--error ER_LOCK_DEADLOCK
+COMMIT;
+
+--connection node_1a
+--echo #node-1a
+--error ER_LOCK_DEADLOCK
+INSERT INTO t1 VALUES (3, 0);
+
+DROP TABLE t1;

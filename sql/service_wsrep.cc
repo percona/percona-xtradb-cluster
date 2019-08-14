@@ -225,6 +225,9 @@ extern "C" int wsrep_thd_append_key(THD *thd, const struct wsrep_key *key,
 }
 
 extern "C" void wsrep_commit_ordered(THD *thd) {
+
+  WSREP_DEBUG("wsrep_commit_ordered");
+
   if (wsrep_is_active(thd) &&
       thd->wsrep_trx().state() == wsrep::transaction::s_committing &&
       !wsrep_commit_will_write_binlog(thd)) {

@@ -1,0 +1,31 @@
+#node-1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INTEGER PRIMARY KEY, f2 CHAR) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'a'), (2, 'a'), (3, 'a');
+INSERT INTO t2 VALUES (3, 'b');
+SET SESSION wsrep_trx_fragment_size = 1;
+INSERT INTO t2 SELECT * FROM t1;
+ERROR 23000: Duplicate entry '3' for key 'PRIMARY'
+last_committed_diff
+3
+#node-2
+#node-1
+INSERT INTO t2 VALUES (1, 'c');
+#node-2
+INSERT INTO t2 VALUES (2, 'c');
+#node-1
+SELECT * FROM t2;
+f1	f2
+1	c
+2	c
+3	b
+#node-2
+SELECT * FROM t2;
+f1	f2
+1	c
+2	c
+3	b
+#node-1
+SET SESSION wsrep_trx_fragment_size = DEFAULT;
+DROP TABLE t1;
+DROP TABLE t2;

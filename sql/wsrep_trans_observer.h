@@ -218,12 +218,16 @@ static inline int wsrep_before_prepare(THD *thd, bool all) {
   int ret = 0;
   DBUG_ASSERT(wsrep_run_commit_hook(thd, all));
 
-  THD_STAGE_INFO(thd, stage_wsrep_replicating_commit);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: replicating and certifying write set(%lld)",
-           (long long)wsrep_thd_trx_seqno(thd));
-  WSREP_DEBUG("%s", thd->wsrep_info);
-  thd_proc_info(thd, thd->wsrep_info);
+  /* applier too use this routine but before prepare doesn't invoke
+  galera replication action. */
+  if (!wsrep_thd_is_applying(thd)) {
+    THD_STAGE_INFO(thd, stage_wsrep_replicating_commit);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: replicating and certifying write set(%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+  }
 
   if ((ret = thd->wsrep_cs().before_prepare()) == 0) {
     DBUG_ASSERT(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
@@ -234,12 +238,14 @@ static inline int wsrep_before_prepare(THD *thd, bool all) {
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                    thd->wsrep_trx().ws_meta().gtid());
 
-    THD_STAGE_INFO(thd, stage_wsrep_write_set_replicated);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "wsrep: write set replicated and certified (%lld)",
-             (long long)wsrep_thd_trx_seqno(thd));
-    WSREP_DEBUG("%s", thd->wsrep_info);
-    thd_proc_info(thd, thd->wsrep_info);
+    if (!wsrep_thd_is_applying(thd)) {
+      THD_STAGE_INFO(thd, stage_wsrep_write_set_replicated);
+      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+               "wsrep: write set replicated and certified (%lld)",
+               (long long)wsrep_thd_trx_seqno(thd));
+      WSREP_DEBUG("%s", thd->wsrep_info);
+      thd_proc_info(thd, thd->wsrep_info);
+    }
   }
   DBUG_RETURN(ret);
 }

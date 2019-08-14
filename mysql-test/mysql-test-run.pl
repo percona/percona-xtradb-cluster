@@ -165,7 +165,7 @@ my $DEFAULT_SUITES =
   ."audit_log,keyring_vault,"
   ."tokudb.add_index,tokudb.alter_table,tokudb,tokudb.bugs,tokudb.parts,"
   ."tokudb.rpl,tokudb.perfschema,"
-  ."galera,galera_3nodes"
+  ."galera,galera_3nodes,galera_sr,galera_3nodes,sr,"
   ."rocksdb,rocksdb.rpl,rocksdb.sys_vars,"
   ."percona-pam-for-mysql";
 

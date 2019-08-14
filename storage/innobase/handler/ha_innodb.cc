@@ -6016,6 +6016,14 @@ static int innobase_commit(handlerton *hton, /*!< in: InnoDB handlerton */
       trx->flush_log_later = true;
     }
 
+#ifdef WITH_WSREP
+    /* If the transaction is not run in 2pc, we must assign wsrep
+    XID here in order to get it written in rollback segment. */
+    if (wsrep_on(thd)) {
+      thd_get_xid(thd, (MYSQL_XID *)trx->xid);
+    }
+#endif /* WITH_WSREP */
+
     innobase_commit_low(trx);
 
     if (!read_only) {
