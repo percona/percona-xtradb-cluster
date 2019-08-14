@@ -86,6 +86,18 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
 
   DBUG_ENTER("wsrep_apply_events");
 
+  DBUG_EXECUTE_IF("wsrep_applier_sleep_15",
+  {
+    static bool slept_once= false;
+    if (!slept_once)
+    {
+      slept_once= true;
+      WSREP_INFO("Applier sleeping 15 sec");
+      my_sleep(15000000);
+      WSREP_INFO("Applier slept 15 sec");
+    }
+  });
+
   if (thd->killed == THD::KILL_CONNECTION &&
       thd->wsrep_conflict_state != REPLAYING)
   {

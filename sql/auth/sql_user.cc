@@ -808,7 +808,11 @@ bool change_password(THD *thd, const char *host, const char *user,
     In case its a slave thread or a binlog applier thread, the password
     is already hashed. Do not generate another hash!
    */
+#ifdef WITH_WSREP
+  if ((thd->slave_thread && !thd->wsrep_applier) || thd->is_binlog_applier())
+#else
   if (thd->slave_thread || thd->is_binlog_applier())
+#endif
   {
     /* Password is in hash form */
     combo->uses_authentication_string_clause= true;

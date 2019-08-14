@@ -6063,6 +6063,13 @@ sub mysqld_arguments ($$$) {
 #    }
     elsif ($arg eq "--loose-skip-log-bin")
     {
+      if (grep { /--wsrep-provider=/ } @$extra_opts) {
+        # As an exception, allow --binlog-format if MTR is run with
+        # wsrep provider loaded.
+        mtr_add_arg($args, "%s", $arg);
+      } else {
+        ; # Dont add --binlog-format when running without binlog
+      }
     }
     elsif ($arg eq "--loose-skip-log-bin" and
            $mysqld->option("log-slave-updates"))

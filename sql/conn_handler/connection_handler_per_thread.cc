@@ -342,8 +342,7 @@ extern "C" void *handle_connection(void *arg)
 #endif /* HAVE_PSI_THREAD_INTERFACE */
 
 #ifdef WITH_WSREP
-    bool is_applier= (WSREP(thd) && thd->wsrep_applier);
-    my_thread_id tid= thd->thread_id();
+    const bool wsrep_applier_thread= (WSREP(thd) && thd->wsrep_applier);
 #endif /* WITH_WSREP */
 
     delete thd;
@@ -354,18 +353,11 @@ extern "C" void *handle_connection(void *arg)
 
     channel_info= NULL;
 #ifdef WITH_WSREP
-    if (is_applier)
-    {
-      WSREP_DEBUG("avoiding thread re-use for applier, thd: %u", tid);
-      channel_info = NULL;
-    }
-    else
-    {
+    if (wsrep_applier_thread)
+      break;
 #endif /* WITH_WSREP */
+
     channel_info= Per_thread_connection_handler::block_until_new_connection();
-#ifdef WITH_WSREP
-    }
-#endif /* WITH_WSREP */
     if (channel_info == NULL)
       break;
     pthread_reused= true;

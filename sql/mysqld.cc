@@ -1271,25 +1271,41 @@ public:
 
 enum wsrep_thd_type   {APPLIER, COMMITTING};
 
-class Find_wsrep_thd: public Find_THD_Impl
+class Count_wsrep_thd: public Do_THD_Impl
 {
 public:
-  Find_wsrep_thd(enum wsrep_thd_type type): m_type(type) {}
-  virtual bool operator()(THD *thd)
+  Count_wsrep_thd(enum wsrep_thd_type type)
+    : m_type(type)
+    , m_count(0) 
+  {}
+  virtual void operator()(THD *thd)
   {
     if (WSREP(thd))
     { 
       switch (m_type) 
+      {
+        case APPLIER:
         {
-        case APPLIER:    return thd->wsrep_applier;
-        case COMMITTING: return thd->wsrep_query_state == QUERY_COMMITTING;
+          if (thd->wsrep_applier)
+            m_count++;
         }
+        break;
+        case COMMITTING:
+        {
+          if (thd->wsrep_query_state == QUERY_COMMITTING)
+            m_count++;
+        }
+        break;
+      }
     }
-    return false;
+  }
+  int get_thd_count() const
+  {
+    return m_count;
   }
 private:
   enum wsrep_thd_type m_type;
-  bool is_server_shutdown;
+  int m_count;
 };
 
 class Count_wsrep_applier_threads : public Do_THD_Impl
@@ -7564,14 +7580,14 @@ static inline bool is_committing_connection(THD *thd)
    returns the number of wsrep appliers running.
    However, the caller (thd parameter) is not taken in account
  */
+MY_ATTRIBUTE((noinline))
 static int have_wsrep_appliers(THD *thd)
 {
-  Find_wsrep_thd find_wsrep_thd(APPLIER);
-  //Find_thd_with_bid find_thd_applier(10);
+  Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
+  Count_wsrep_thd count_wsrep_applier_thd(APPLIER);
 
-  THD* tmp= Global_THD_manager::get_instance()->find_thd(&find_wsrep_thd);
-  if (tmp) return true;
-  return false;
+  thd_manager->do_for_all_thd(&count_wsrep_applier_thd);
+  return count_wsrep_applier_thd.get_thd_count();
 }
 #endif /* 0 */
 
@@ -7589,14 +7605,14 @@ static void wsrep_close_thread(THD *thd)
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 }
 
+MY_ATTRIBUTE((noinline))
 static my_bool have_committing_connections()
 {
-  //Find_thd_committing find_thd_committing();
-  Find_wsrep_thd find_thd_committing(COMMITTING);
-
-  THD* tmp= Global_THD_manager::get_instance()->find_thd(&find_thd_committing);
-  if (tmp) return true;
-  return false;
+  Count_wsrep_thd count_thd_committing(COMMITTING);
+  Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
+  
+  thd_manager->do_for_all_thd(&count_thd_committing);
+  return (count_thd_committing.get_thd_count() != 0);
 }
 
 int wsrep_wait_committing_connections_close(int wait_time)
