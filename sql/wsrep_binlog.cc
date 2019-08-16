@@ -380,12 +380,9 @@ bool wsrep_commit_will_write_binlog(THD *thd) {
             opt_log_slave_updates)));
 }
 
-#if 0
-// TODO: G-4
-/*
-  The last THD/commit_for_wait registered for group commit.
-*/
-static wait_for_commit *commit_order_tail = NULL;
+#include <queue>
+
+static std::queue<THD *> wsrep_group_commit_queue;
 
 void wsrep_register_for_group_commit(THD *thd) {
   DBUG_ENTER("wsrep_register_for_group_commit");
@@ -395,40 +392,77 @@ void wsrep_register_for_group_commit(THD *thd) {
   }
 
   DBUG_ASSERT(thd->wsrep_trx().state() == wsrep::transaction::s_committing);
+  mysql_mutex_lock(&LOCK_wsrep_group_commit);
+  wsrep_group_commit_queue.push(thd);
+  thd->wsrep_enforce_group_commit = true;
+  WSREP_DEBUG("Registering thread with id (%d) in wsrep group commit queue",
+              thd->thread_id());
+  mysql_mutex_unlock(&LOCK_wsrep_group_commit);
+  DBUG_VOID_RETURN;
+}
 
-  wait_for_commit *wfc = thd->wait_for_commit_ptr = &thd->wsrep_wfc;
+void wsrep_wait_for_turn_in_group_commit(THD *thd) {
+  DBUG_ENTER("wsrep_wait_for_turn_in_group_commit");
+  if (wsrep_emulate_bin_log || thd == NULL) {
+    /* Binlog is off, no need to maintain group commit queue */
+    DBUG_VOID_RETURN;
+  }
+
+  /* thd can be NULL if the transaction is being committed
+  during recovery using XID. */
+  if (!thd) {
+    DBUG_VOID_RETURN;
+  }
 
   mysql_mutex_lock(&LOCK_wsrep_group_commit);
-  if (commit_order_tail) {
-    wfc->register_wait_for_prior_commit(commit_order_tail);
-  }
-  commit_order_tail = thd->wait_for_commit_ptr;
-  mysql_mutex_unlock(&LOCK_wsrep_group_commit);
 
-  /*
-    Now we have queued for group commit. If the commit will go
-    through TC log_and_order(), the commit ordering is done
-    by TC group commit. Otherwise the wait for prior
-    commits to complete is done in ha_commit_one_phase().
-  */
+  if (!thd->wsrep_enforce_group_commit) {
+    /* Said handler was not register for wsrep group commit */
+    mysql_mutex_unlock(&LOCK_wsrep_group_commit);
+    DBUG_VOID_RETURN;
+  }
+
+  while (true) {
+    if (thd == wsrep_group_commit_queue.front()) {
+      WSREP_DEBUG("Thread with id (%d) granted turn to proceed", thd->thread_id());
+      break;
+    } else {
+      WSREP_DEBUG("Thread with id (%d) waiting for its turns in wsrep group"
+                  " commit queue", thd->thread_id());
+      mysql_cond_wait(&COND_wsrep_group_commit, &LOCK_wsrep_group_commit);
+    }
+  }
+
+  mysql_mutex_unlock(&LOCK_wsrep_group_commit);
   DBUG_VOID_RETURN;
 }
 
 void wsrep_unregister_from_group_commit(THD *thd) {
-  DBUG_ASSERT(thd->wsrep_trx().state() == wsrep::transaction::s_ordered_commit);
-  wait_for_commit *wfc = thd->wait_for_commit_ptr;
-
-  if (wfc) {
-    mysql_mutex_lock(&LOCK_wsrep_group_commit);
-    wfc->unregister_wait_for_prior_commit();
-    thd->wakeup_subsequent_commits(0);
-
-    /* The last one queued for group commit has completed commit, it is
-       safe to set tail to NULL. */
-    if (wfc == commit_order_tail) commit_order_tail = NULL;
-    mysql_mutex_unlock(&LOCK_wsrep_group_commit);
-    thd->wait_for_commit_ptr = NULL;
+  DBUG_ENTER("wsrep_unregister_from_group_commit");
+  if (wsrep_emulate_bin_log || thd == NULL) {
+    /* Binlog is off, no need to maintain group commit queue */
+    DBUG_VOID_RETURN;
   }
-}
-#endif
 
+  /* thd can be NULL if the transaction is being committed
+  during recovery using XID. */
+  if (!thd) {
+    DBUG_VOID_RETURN;
+  }
+
+  mysql_mutex_lock(&LOCK_wsrep_group_commit);
+
+  if (!thd->wsrep_enforce_group_commit) {
+    /* Said handler was not register for wsrep group commit */
+    mysql_mutex_unlock(&LOCK_wsrep_group_commit);
+    DBUG_VOID_RETURN;
+  }
+
+  thd->wsrep_enforce_group_commit = false;
+  wsrep_group_commit_queue.pop();
+  WSREP_DEBUG("Un-Registering thread with id (%d) from wsrep group commit"
+              " queue", thd->thread_id());
+  mysql_mutex_unlock(&LOCK_wsrep_group_commit);
+  mysql_cond_broadcast(&COND_wsrep_group_commit);
+  DBUG_VOID_RETURN;
+}

@@ -85,14 +85,12 @@ COMMIT;
 --connection node_1
 --echo #node-1
 SELECT COUNT(*) = 2 FROM t4;
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 
 #
 --connection node_2
 --echo #node-2
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 

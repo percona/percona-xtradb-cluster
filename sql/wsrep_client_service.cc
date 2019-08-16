@@ -136,6 +136,7 @@ void Wsrep_client_service::cleanup_transaction() {
   m_thd->wsrep_skip_SE_checkpoint = false;
   m_thd->run_wsrep_commit_hooks = false;
   m_thd->run_wsrep_ordered_commit = false;
+  m_thd->wsrep_enforce_group_commit = false;
 
   if (m_thd->wsrep_non_replicating_atomic_ddl) {
     /* Restore the sql_log_bin mode back to original value

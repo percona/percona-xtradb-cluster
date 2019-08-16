@@ -2023,14 +2023,11 @@ static void wsrep_TOI_end(THD *thd) {
     int ret = client_state.leave_toi();
     if (!ret) {
       WSREP_DEBUG("TO END: %lld", client_state.toi_meta().seqno().get());
-#if 0
-      /* DDL transaction are now atomic so append wsrep xid.
-      This will ensure transactions are logged with the given xid. */
+      /* Reset XID on completion of DDL transactions */
       bool atomic_ddl = is_atomic_ddl(thd, true);
       if (atomic_ddl) {
         thd->get_transaction()->xid_state()->get_xid()->reset();
       }
-#endif
     } else {
       WSREP_WARN("TO isolation end failed for: %d, schema: %s, sql: %s", ret,
                  (thd->db().str ? thd->db().str : "(null)"), WSREP_QUERY(thd));

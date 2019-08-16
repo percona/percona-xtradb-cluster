@@ -5,6 +5,20 @@
 --source include/have_log_bin.inc
 --source include/galera_cluster.inc
 
+--connection node_1
+--echo #node-1
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+--connection node_2
+--echo #node-2
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+--connection node_1
+--echo #node-1
 CREATE TABLE t1 (f1 INT PRIMARY KEY);
 
 SET SESSION wsrep_trx_fragment_size=1;
@@ -36,13 +50,13 @@ SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 2;
 --enable_query_log
 
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 
 --connection node_2
 --echo #node-2
 # Perform causal wait
 SELECT 1 FROM DUAL;
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000004' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 
 DROP TABLE t1;

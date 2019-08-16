@@ -227,14 +227,21 @@ static inline int wsrep_before_prepare(THD *thd, bool all) {
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
+  } else {
+    THD_STAGE_INFO(thd, stage_wsrep_replicating_commit);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: preparing to commit write set(%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
   }
 
   if ((ret = thd->wsrep_cs().before_prepare()) == 0) {
     DBUG_ASSERT(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
+    thd->wsrep_xid.reset();
 #if 0
     wsrep_xid_init(&thd->wsrep_xid, thd->wsrep_trx().ws_meta().gtid());
 #endif
-    thd->wsrep_xid.reset();
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                    thd->wsrep_trx().ws_meta().gtid());
 
@@ -287,10 +294,19 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                    thd->wsrep_cs().toi_meta().gtid());
 #endif
+
+    if (thd->run_wsrep_commit_hooks) {
+      /* If the transaction is running as one-phase then register
+      THD in wsrep group commit queue at this stage.
+      If the transaction is running as 2-phase then THD is registered
+      in ordered_commit to ensure thd registration order is same as
+      mysql group commit queue order. */
+      wsrep_register_for_group_commit(thd);
+    }
+
     /* If the transaction doesn't go through prepare phase */
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                    thd->wsrep_trx().ws_meta().gtid());
-    // wsrep_register_for_group_commit(thd);
   }
   DBUG_RETURN(ret);
 }
@@ -324,6 +340,13 @@ static inline int wsrep_ordered_commit(THD *thd, bool all,
   DBUG_ENTER("wsrep_ordered_commit");
   WSREP_DEBUG("wsrep_ordered_commit: %d", wsrep_is_real(thd, all));
   DBUG_ASSERT(wsrep_run_commit_hook(thd, all));
+
+  /* Register thread handler in wsrep group commit queue.
+  Note: thread handler executing 2 phase commit transaction is registered
+  as part of ordered_commit (and not part of before_commit) as wsrep group
+  commit sequence should be same as mysql group commit queue sequence. */
+  wsrep_register_for_group_commit(thd);
+
   DBUG_RETURN(thd->wsrep_cs().ordered_commit());
 }
 
@@ -338,12 +361,29 @@ static inline int wsrep_after_commit(THD *thd, bool all) {
               wsrep_is_active(thd), (long long)wsrep_thd_trx_seqno(thd),
               wsrep_has_changes(thd));
   DBUG_ASSERT(wsrep_run_commit_hook(thd, all));
+
+  if (thd->wsrep_enforce_group_commit) {
+    /* Ideally, for one-phase (with binlog=off) or two-phase (with binlog=on)
+    this step would be executed when transaction commits in InnoDB.
+    If galera node is acting as async slave and replicated action from async
+    master result in empty changes on slave (slave directly applied the said
+    changes and has skipped error through skip-slave-error configuration) it
+    can result in said situation. In this case slave protocol directly commits
+    gtid through gtid_end_transaction that invokes ordered_commit causing
+    thread handler to register in wsrep group commit queue but since storage
+    engine commit is not done it would fail to unregister the said thread
+    handler as part of storage engine commit. Handle unregistration here. */
+    wsrep_unregister_from_group_commit(thd);
+  }
+
+  DBUG_ASSERT(!thd->wsrep_enforce_group_commit);
+
   int ret = 0;
   if (thd->wsrep_trx().state() == wsrep::transaction::s_committing) {
     ret = thd->wsrep_cs().ordered_commit();
   }
-  // wsrep_unregister_from_group_commit(thd);
   thd->wsrep_xid.reset();
+  thd->get_transaction()->xid_state()->get_xid()->reset();
   DBUG_RETURN(ret || thd->wsrep_cs().after_commit());
 }
 
@@ -372,6 +412,7 @@ static inline int wsrep_before_rollback(THD *thd, bool all) {
          history in InnoDB. This needs to be avoided because rollback
          may happen out of order and replay may follow. */
       thd->wsrep_xid.reset();
+      thd->get_transaction()->xid_state()->get_xid()->reset();
       ret = thd->wsrep_cs().before_rollback();
     }
   }

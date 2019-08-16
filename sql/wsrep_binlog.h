@@ -85,25 +85,8 @@ void wsrep_register_binlog_handler(THD *thd, bool trx);
 */
 bool wsrep_commit_will_write_binlog(THD *thd);
 
-#if 0
-/**
-   Register THD for group commit. The wsrep_trx must be in committing state,
-   i.e. the call must be done after wsrep_before_commit() but before
-   commit order is released.
-
-   This call will release commit order critical section if it is
-   determined that the commit will go through binlog group commit.
- */
 void wsrep_register_for_group_commit(THD *thd);
-
-/**
-   Deregister THD from group commit. The wsrep_trx must be in committing state,
-   as for wsrep_register_for_group_commit() above.
-
-   This call must be used only for THDs which will not go through
-   binlog group commit.
-*/
+void wsrep_wait_for_turn_in_group_commit(THD* thd);
 void wsrep_unregister_from_group_commit(THD *thd);
-#endif
 
 #endif /* WSREP_BINLOG_H */

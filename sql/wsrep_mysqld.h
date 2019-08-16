@@ -357,6 +357,7 @@ extern mysql_cond_t  COND_wsrep_slave_threads;
 extern mysql_mutex_t LOCK_wsrep_cluster_config;
 extern mysql_mutex_t LOCK_wsrep_desync;
 extern mysql_mutex_t LOCK_wsrep_group_commit;
+extern mysql_cond_t COND_wsrep_group_commit;
 extern mysql_mutex_t LOCK_wsrep_SR_pool;
 extern mysql_mutex_t LOCK_wsrep_SR_store;
 
@@ -382,6 +383,7 @@ extern PSI_cond_key  key_COND_wsrep_slave_threads;
 extern PSI_mutex_key key_LOCK_wsrep_cluster_config;
 extern PSI_mutex_key key_LOCK_wsrep_desync;
 extern PSI_mutex_key key_LOCK_wsrep_group_commit;
+extern PSI_cond_key key_COND_wsrep_group_commit;
 extern PSI_mutex_key key_LOCK_wsrep_SR_pool;
 extern PSI_mutex_key key_LOCK_wsrep_SR_store;
 

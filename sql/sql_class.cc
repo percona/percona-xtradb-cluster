@@ -463,6 +463,7 @@ THD::THD(bool enable_plugins)
       wsrep_replayer(false),
       run_wsrep_commit_hooks(false),
       run_wsrep_ordered_commit(false),
+      wsrep_enforce_group_commit(false),
 
       /* wsrep-lib */
       m_wsrep_next_trx_id(WSREP_UNDEFINED_TRX_ID),
@@ -923,6 +924,7 @@ void THD::init(void) {
   wsrep_replayer = false;
   run_wsrep_commit_hooks = false;
   run_wsrep_ordered_commit = false;
+  wsrep_enforce_group_commit = false;
 #endif /* WITH_WSREP */
 
   if (variables.sql_log_bin)

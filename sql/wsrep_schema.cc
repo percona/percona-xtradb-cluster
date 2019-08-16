@@ -1228,7 +1228,7 @@ int Wsrep_schema::replay_transaction(THD* orig_thd,
 int Wsrep_schema::recover_sr_transactions(THD *orig_thd)
 {
   DBUG_ENTER("Wsrep_schema::recover_sr_transactions");
-  THD storage_thd;
+  THD storage_thd(false, true);
   storage_thd.set_new_thread_id();
   storage_thd.thread_stack= (orig_thd ? orig_thd->thread_stack :
                              (char*) &storage_thd);
@@ -1337,7 +1337,7 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd)
                                                          transaction_id)))
       {
         DBUG_ASSERT(wsrep::starts_transaction(flags));
-        THD* thd= new THD;
+        THD* thd= new THD(false, true);
         thd->set_new_thread_id();
         thd->thread_stack= (char*)&storage_thd;
 

@@ -66,6 +66,7 @@ extern const char wsrep_defaults_group_suffix[];
 #define WSREP_SST_OPT_BYPASS "--bypass"
 
 #define WSREP_SST_RSYNC "rsync"
+#define WSREP_SST_MYSQLDUMP "mysqldump"
 #define WSREP_SST_SKIP "skip"
 #define WSREP_SST_XTRABACKUP "xtrabackup"
 #define WSREP_SST_XTRABACKUP_V2 "xtrabackup-v2"
@@ -90,9 +91,7 @@ bool wsrep_sst_method_check(sys_var *, THD *, set_var *var) {
     return true;
   }
 
-  if (!(strcmp(var->save_result.string_value.str, WSREP_SST_XTRABACKUP_V2) ==
-            0 ||
-        strcmp(var->save_result.string_value.str, WSREP_SST_RSYNC) == 0)) {
+  if (strcmp(var->save_result.string_value.str, WSREP_SST_XTRABACKUP_V2) != 0) {
     my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
              var->save_result.string_value.str
                  ? var->save_result.string_value.str

@@ -24,6 +24,8 @@
 #include "mysqld.h" /* next_query_id() */
 #include "transaction.h" /* trans_commit(), trans_rollback() */
 
+extern handlerton *binlog_hton;
+
 /*
   Temporarily enable wsrep on thd
  */

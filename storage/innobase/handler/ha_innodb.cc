@@ -21126,6 +21126,11 @@ static xa_status_code innobase_commit_by_xid(
     /* use cases are: disconnected xa, slave xa, recovery */
     trx_deregister_from_2pc(trx);
     ut_ad(!trx->will_lock); /* trx cache requirement */
+
+#ifdef WITH_WSREP
+    trx->wsrep_recover_xid = NULL;
+#endif /* WITH_WSREP */
+
     trx_free_for_background(trx);
 
     return (XA_OK);

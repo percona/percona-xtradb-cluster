@@ -1,3 +1,12 @@
+#node-1
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+#node-2
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+#node-1
 CREATE TABLE t1 (f1 INT PRIMARY KEY);
 SET SESSION wsrep_trx_fragment_size=1;
 INSERT INTO t1 VALUES (1);
@@ -17,38 +26,38 @@ COUNT(*) = 1
 1
 gtid_executed_equal
 1
-SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000002	124	Previous_gtids	1	155	
-mysqld-bin.000002	155	Anonymous_Gtid	1	232	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000002	232	Query	1	356	use `test`; CREATE TABLE t1 (f1 INT PRIMARY KEY) /* xid=### */
-mysqld-bin.000002	356	Anonymous_Gtid	1	435	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000002	435	Query	1	515	BEGIN
-mysqld-bin.000002	515	Table_map	1	563	table_id: ### (test.t1)
-mysqld-bin.000002	563	Write_rows	1	603	table_id: ### flags: STMT_END_F
-mysqld-bin.000002	603	Xid	1	634	COMMIT /* xid=### */
-mysqld-bin.000002	634	Anonymous_Gtid	2	713	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000002	713	Query	2	788	BEGIN
-mysqld-bin.000002	788	Table_map	2	836	table_id: ### (test.t1)
-mysqld-bin.000002	836	Update_rows	2	882	table_id: ### flags: STMT_END_F
-mysqld-bin.000002	882	Xid	2	913	COMMIT /* xid=### */
+mysqld-bin.000001	124	Previous_gtids	1	155	
+mysqld-bin.000001	155	Anonymous_Gtid	1	232	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	232	Query	1	356	use `test`; CREATE TABLE t1 (f1 INT PRIMARY KEY) /* xid=### */
+mysqld-bin.000001	356	Anonymous_Gtid	1	435	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	435	Query	1	515	BEGIN
+mysqld-bin.000001	515	Table_map	1	563	table_id: ### (test.t1)
+mysqld-bin.000001	563	Write_rows	1	603	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	603	Xid	1	634	COMMIT /* xid=### */
+mysqld-bin.000001	634	Anonymous_Gtid	2	713	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	713	Query	2	788	BEGIN
+mysqld-bin.000001	788	Table_map	2	836	table_id: ### (test.t1)
+mysqld-bin.000001	836	Update_rows	2	882	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	882	Xid	2	913	COMMIT /* xid=### */
 #node-2
 SELECT 1 FROM DUAL;
 1
 1
-SHOW BINLOG EVENTS IN 'mysqld-bin.000004' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000004	124	Previous_gtids	2	155	
-mysqld-bin.000004	155	Anonymous_Gtid	1	232	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000004	232	Query	1	356	use `test`; CREATE TABLE t1 (f1 INT PRIMARY KEY) /* xid=### */
-mysqld-bin.000004	356	Anonymous_Gtid	1	435	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000004	435	Query	1	510	BEGIN
-mysqld-bin.000004	510	Table_map	1	558	table_id: ### (test.t1)
-mysqld-bin.000004	558	Write_rows	1	598	table_id: ### flags: STMT_END_F
-mysqld-bin.000004	598	Xid	1	629	COMMIT /* xid=### */
-mysqld-bin.000004	629	Anonymous_Gtid	2	708	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000004	708	Query	2	797	BEGIN
-mysqld-bin.000004	797	Table_map	2	845	table_id: ### (test.t1)
-mysqld-bin.000004	845	Update_rows	2	891	table_id: ### flags: STMT_END_F
-mysqld-bin.000004	891	Xid	2	922	COMMIT /* xid=### */
+mysqld-bin.000001	124	Previous_gtids	2	155	
+mysqld-bin.000001	155	Anonymous_Gtid	1	232	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	232	Query	1	356	use `test`; CREATE TABLE t1 (f1 INT PRIMARY KEY) /* xid=### */
+mysqld-bin.000001	356	Anonymous_Gtid	1	435	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	435	Query	1	510	BEGIN
+mysqld-bin.000001	510	Table_map	1	558	table_id: ### (test.t1)
+mysqld-bin.000001	558	Write_rows	1	598	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	598	Xid	1	629	COMMIT /* xid=### */
+mysqld-bin.000001	629	Anonymous_Gtid	2	708	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	708	Query	2	797	BEGIN
+mysqld-bin.000001	797	Table_map	2	845	table_id: ### (test.t1)
+mysqld-bin.000001	845	Update_rows	2	891	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	891	Xid	2	922	COMMIT /* xid=### */
 DROP TABLE t1;

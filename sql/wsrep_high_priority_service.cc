@@ -29,6 +29,7 @@
 
 #include "sql_base.h"     // close_temporary_table()
 
+extern handlerton *binlog_hton;
 
 /* RLI */
 #include "rpl_rli.h"
@@ -445,6 +446,12 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
 
   thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(false);
+  /* Reset the xid once the transaction has been committed.
+  This being TOI transaction it will not pass through wsrep_xxx hooks.
+  Resetting is important to ensure that the applier xid state is restored
+  so if node rejoins and applier thread is re-use for logging view or local
+  activity like rolling back of SR transaction then stale state is not used. */
+  thd->get_transaction()->xid_state()->get_xid()->reset();
 
   must_exit_ = check_exit_status();
 

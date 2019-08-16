@@ -2872,10 +2872,11 @@ class THD : public MDL_context_owner,
   bool wsrep_replayer;
 
   /**
-    Capture if transaction needs to run the wsrep commit hooks
-    MyISAM/Local state transaction are not replicated so no need to run
-    wsrep commit hook. Same way TOI replicated transaction may still use
-    group commit protocol (DDL) but should avoid wsrep commit hooks. */
+    Capture if transaction (running with binlog=off) needs to run the
+    wsrep commit hooks. MyISAM/Local state transaction are not replicated so no
+    need to run wsrep commit hook. Same way TOI replicated transaction may
+    still use group commit protocol (DDL) but should avoid wsrep commit hooks.
+  */
   bool run_wsrep_commit_hooks;
 
   /**
@@ -2885,6 +2886,15 @@ class THD : public MDL_context_owner,
     to execute commit hooks and re-use it to fire ordered commit.
   */
   bool run_wsrep_ordered_commit;
+
+  /**
+    Force group commit protocol for transaction that logs fragments
+    to wsrep_streaming_log. As binlog is disabled group commit protocol
+    is not skipped but this creates issue with wsrep co-ordinate update
+    as part of the transaction runs normal transaction runs through group commit
+    and wsrep_streaming_log update transaction runs outside group commit.
+  */
+  bool wsrep_enforce_group_commit;
 
   /*
     Transaction id:

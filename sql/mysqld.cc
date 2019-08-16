@@ -1376,6 +1376,7 @@ mysql_cond_t  COND_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_cluster_config;
 mysql_mutex_t LOCK_wsrep_desync;
 mysql_mutex_t LOCK_wsrep_group_commit;
+mysql_cond_t COND_wsrep_group_commit;
 mysql_mutex_t LOCK_wsrep_SR_pool;
 mysql_mutex_t LOCK_wsrep_SR_store;
 
@@ -2626,6 +2627,7 @@ static void clean_up_mutexes() {
   mysql_mutex_destroy(&LOCK_wsrep_cluster_config);
   mysql_mutex_destroy(&LOCK_wsrep_desync);
   mysql_mutex_destroy(&LOCK_wsrep_group_commit);
+  mysql_cond_destroy(&COND_wsrep_group_commit);
   mysql_mutex_destroy(&LOCK_wsrep_SR_pool);
   mysql_mutex_destroy(&LOCK_wsrep_SR_store);
 #endif /* WITH_WSREP */
@@ -4732,7 +4734,15 @@ int init_common_variables() {
   if (wsrep_provider_loaded && !strcmp(WSREP_SST_MYSQLDUMP, wsrep_sst_method)) {
     WSREP_FATAL(
         "Percona-XtraDB-Cluster doesn't support SST through mysqldump."
-        " Please switch to use xtrabackup or rsync.");
+        " Please switch to use xtrabackup-v2.");
+    return 1;
+  }
+
+  const char *WSREP_SST_RSYNC = "rsync";
+  if (wsrep_provider_loaded && !strcmp(WSREP_SST_RSYNC, wsrep_sst_method)) {
+    WSREP_FATAL(
+        "Percona-XtraDB-Cluster doesn't support SST through rsync."
+        " Please switch to use xtrabackup-v2.");
     return 1;
   }
 
@@ -5177,6 +5187,7 @@ static int init_thread_environment() {
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_group_commit, &LOCK_wsrep_group_commit,
                    MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_group_commit, &COND_wsrep_group_commit);
   mysql_mutex_init(key_LOCK_wsrep_SR_pool, &LOCK_wsrep_SR_pool,
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_SR_store, &LOCK_wsrep_SR_store,
@@ -11917,6 +11928,7 @@ PSI_cond_key key_COND_wsrep_thd;
 PSI_cond_key key_COND_wsrep_sst_thread;
 
 PSI_cond_key key_COND_wsrep_thd_queue;
+PSI_cond_key key_COND_wsrep_group_commit;
 #endif /* WITH_WSREP */
 
 PSI_cond_key key_RELAYLOG_update_cond;
@@ -11977,7 +11989,8 @@ static PSI_cond_info all_server_conds[]=
   { &key_COND_wsrep_thd, "THD::COND_wsrep_thd", 0, 0, PSI_DOCUMENT_ME},
   { &key_COND_wsrep_sst_thread, "COND_wsrep_sst_thread", 0, 0, PSI_DOCUMENT_ME},
 
-  { &key_COND_wsrep_thd_queue, "COND_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME}
+  { &key_COND_wsrep_thd_queue, "COND_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
+  { &key_COND_wsrep_group_commit, "COND_wsrep_group_commit", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };
 /* clang-format on */
