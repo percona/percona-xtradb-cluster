@@ -129,11 +129,13 @@ readonly WSREP_SST_OPT_CONF_SUFFIX
 # 1st param: group : name of the config file section, e.g. mysqld
 # 2nd param: var : name of the variable in the section, e.g. server-id
 # 3rd param: - : default value for the param
+# 4th param: joiner : character to use if multiple entries exist for the key; otherwise, return last entry
 parse_cnf()
 {
     local group=$1
     local var=$2
     local reval=""
+    local joiner=${4:-'\n'}
 
     # normalize the variable name by replacing all '_' with '-'
     var=${var//_/-}
@@ -145,12 +147,12 @@ parse_cnf()
 
     # look in group+suffix
     if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
-        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | paste -sd "${joiner}" -| tail -1)
     fi
 
     # look in group
     if [[ -z $reval ]]; then
-        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | paste -sd "${joiner}" -| tail -1)
     fi
 
     # use default if we haven't found a value

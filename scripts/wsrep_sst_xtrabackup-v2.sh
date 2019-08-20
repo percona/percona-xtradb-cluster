@@ -730,6 +730,10 @@ read_cnf()
         done
     fi
 
+    if [[ ! -z "$(parse_cnf mysqld ignore-db-dir '')" ]]; then
+        cpat+="\|.*/$(echo "$(parse_cnf mysqld ignore-db-dir '' '|')"| sed -e 's/|/$\\|.*\//g')$"
+    fi
+
     # Retry the connection 30 times (at 1-second intervals)
     if [[ ! "$sockopt" =~ retry= ]]; then
         sockopt+=",retry=30"
