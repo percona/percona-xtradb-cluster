@@ -435,6 +435,43 @@ If the verification is successful, you should see the following output::
  server-cert.pem: OK
  client-cert.pem: OK
 
+.. rubric:: Failed validation caused by matching CN
+
+Sometimes, an SSL configuration may fail if the certificate and the CA files contain the same :abbr:`CN (SSL Certificate Common Name)`.
+
+To check if this is the case run ``openssl`` command as follows and verify that the **CN** field differs for the *Subject* and *Issuer* lines.
+
+.. code-block:: bash
+
+   $ openssl x509 -in server-cert.pem -text -noout
+
+.. admonition:: Incorrect values
+
+.. code-block:: text
+
+   Certificate:
+   Data:
+   Version: 1 (0x0)
+   Serial Number: 1 (0x1)
+   Signature Algorithm: sha256WithRSAEncryption
+   Issuer: CN=www.percona.com, O=Database Performance., C=US
+   ...
+   Subject: CN=www.percona.com, O=Database Performance., C=AU
+   ...
+
+To obtain a more compact output run ``openssl`` specifying `-subject` and `-issuer` parameters:
+
+.. code-block:: bash
+
+   $ openssl x509 -in server-cert.pem -subject -issuer -noout
+
+.. admonition:: Output
+
+.. code-block:: text
+
+   subject= /CN=www.percona.com/O=Database Performance./C=AU
+   issuer= /CN=www.percona.com/O=Database Performance./C=US
+
 Deploying Keys and Certificates
 -------------------------------
 
