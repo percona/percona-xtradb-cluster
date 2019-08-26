@@ -183,6 +183,16 @@ static int wsrep_start_position_verify(const char *start_str) {
 /* Function checks if the new value for start_position is valid.
 @return false if no error encountered with check else return true. */
 bool wsrep_start_position_check(sys_var *, THD *, set_var *var) {
+  if (Wsrep_server_state::instance().state() !=
+      wsrep::server_state::s_disconnected) {
+    char message[1024];
+    sprintf(message,
+            "wsrep_start_position can be set during server boot"
+            " or before loading wsrep_provider");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+    return false;
+  }
+
   char start_pos_buf[FN_REFLEN];
 
   if ((!var->save_result.string_value.str) ||
