@@ -234,8 +234,6 @@ galera.galera_ist_rsync : rsync feature removed
 # galera_sr
 galera_sr.galera_sr_table_contents : missing header file
 galera_sr.GCF-1043A : Hitting PXC-2513
-galera_sr.GCF-1043B : Hitting PXC-2513
-galera_sr.GCF-1060 : Hitting PXC-2513
 
 # galera_3nodes_sr
 galera_3nodes_sr.GCF-810A : Test sub-file missing

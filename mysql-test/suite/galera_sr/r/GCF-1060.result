@@ -1,6 +1,3 @@
-#node-2
-#node-1
-connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1;
 Running a concurrent test with the following queries:
 TRUNCATE TABLE t1
 INSERT INTO t1 VALUE (1,'x'),(2,'x'),(3,'x')
