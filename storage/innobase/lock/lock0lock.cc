@@ -1076,7 +1076,9 @@ static const lock_t *lock_rec_other_has_conflicting(
     if (lock_rec_has_to_wait(true, trx, mode, lock, is_supremum)) {
       if (wsrep_on(trx->mysql_thd)) {
         trx_mutex_enter(lock->trx);
+        lock->trx->owns_mutex = true;
         wsrep_kill_victim(trx, lock);
+        lock->trx->owns_mutex = false;
         trx_mutex_exit(lock->trx);
       }
 #else
@@ -1606,9 +1608,11 @@ void RecLock::lock_add(lock_t *lock, bool add_to_hash) {
         /* have to release trx mutex for the duration of
         victim lock release. This will eventually call
         lock_grant, which wants to grant trx mutex again */
+        trx->owns_mutex = false;
         trx_mutex_exit(trx);
         lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock, true);
         trx_mutex_enter(trx);
+        trx->owns_mutex = true;
 
         /* trx might not wait for c_lock, but some other lock
         does not matter if wait_lock was released above */
@@ -4006,9 +4010,11 @@ lock_t *lock_table_create(dict_table_t *table, /*!< in/out: database table
       victim lock release. This will eventually call
       lock_grant, which wants to grant trx mutex again */
       /* caller has trx_mutex, have to release for lock cancel */
+      trx->owns_mutex = false;
       trx_mutex_exit(trx);
       lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock, true);
       trx_mutex_enter(trx);
+      trx->owns_mutex = true;
 
       /* trx might not wait for c_lock, but some other lock
       does not matter if wait_lock was released above */
@@ -4284,7 +4290,9 @@ const lock_t *lock_table_other_has_incompatible(
       if (wsrep_on(trx->mysql_thd)) {
         if (wsrep_debug) ib::info() << "WSREP: table lock abort";
         trx_mutex_enter(lock->trx);
+        lock->trx->owns_mutex = true;
         wsrep_kill_victim((trx_t *)trx, (lock_t *)lock);
+        lock->trx->owns_mutex = false;
         trx_mutex_exit(lock->trx);
       }
 #endif /* WITH_WSREP */
@@ -6988,14 +6996,16 @@ dberr_t lock_trx_handle_wait(trx_t *trx) /*!< in/out: trx lock state */
   if (!trx->lock.was_chosen_as_wsrep_victim) {
     lock_mutex_enter();
     trx_mutex_enter(trx);
+    trx->owns_mutex = true;
   }
 #else
   lock_mutex_enter();
 
   trx_mutex_enter(trx);
-#endif /* WITH_WSREP */
 
   trx->owns_mutex = true;
+#endif /* WITH_WSREP */
+
 
   if (trx->lock.was_chosen_as_deadlock_victim) {
     err = DB_DEADLOCK;
@@ -7007,13 +7017,14 @@ dberr_t lock_trx_handle_wait(trx_t *trx) /*!< in/out: trx lock state */
     err = DB_SUCCESS;
   }
 
-  trx->owns_mutex = false;
 #ifdef WITH_WSREP
   if (!trx->lock.was_chosen_as_wsrep_victim) {
     lock_mutex_exit();
+    trx->owns_mutex = false;
     trx_mutex_exit(trx);
   }
 #else
+  trx->owns_mutex = false;
 
   lock_mutex_exit();
   DEBUG_SYNC_C("lock_trx_handle_wait_released_lock_mutex");
