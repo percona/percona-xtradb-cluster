@@ -14,9 +14,6 @@ Killing server ...
 #node-1
 INSERT INTO t1 VALUES (6);
 ROLLBACK;
-SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
-COUNT(*) = 0
-1
 #node-2
 # restart
 #node-2

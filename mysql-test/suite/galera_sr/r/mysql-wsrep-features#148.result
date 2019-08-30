@@ -25,9 +25,6 @@ Got one of the listed errors
 SET GLOBAL wsrep_slave_threads = 1;
 SET GLOBAL DEBUG = '';
 SET DEBUG_SYNC='now SIGNAL signal.wsrep_apply_cb';
-SELECT COUNT(*) = 10 FROM t1;
-COUNT(*) = 10
-1
 DROP TABLE t1;
 DROP TABLE t2;
 SET DEBUG_SYNC = RESET;

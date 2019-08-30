@@ -58,7 +58,8 @@ SET GLOBAL wsrep_slave_threads = 1;
 SET GLOBAL DEBUG = '';
 SET DEBUG_SYNC='now SIGNAL signal.wsrep_apply_cb';
 
-SELECT COUNT(*) = 10 FROM t1;
+--let $wait_condition = SELECT COUNT(*) = 10 FROM t1;
+--source include/wait_condition.inc
 
 DROP TABLE t1;
 DROP TABLE t2;

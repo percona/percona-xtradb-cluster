@@ -5778,8 +5778,6 @@ static bool lock_rec_queue_validate(
 
     if (!lock->is_gap() && !lock->is_waiting()) {
 
-#ifdef WITH_WSREP
-#else
       lock_mode mode;
 
       if (lock_get_mode(lock) == LOCK_S) {
@@ -5791,6 +5789,10 @@ static bool lock_rec_queue_validate(
       const lock_t *other_lock =
           lock_rec_other_has_expl_req(mode, block, false, heap_no, lock->trx);
 
+#ifdef WITH_WSREP
+      ut_a(!other_lock || wsrep_thd_is_BF(lock->trx->mysql_thd, false) ||
+           wsrep_thd_is_BF(other_lock->trx->mysql_thd, false));
+#else
       ut_a(!other_lock);
 #endif /* WITH_WSREP */
 
