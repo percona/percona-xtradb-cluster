@@ -6311,11 +6311,12 @@ sub start_servers($) {
     # configuration should always be the first which has
     # wsrep_on = ON
     if (wsrep_on($mysqld) && wsrep_is_bootstrap_server($mysqld)) {
-      mtr_verbose("Waiting for wsrep bootstrap server to start");
-      if ($mysqld->{ WAIT }->($mysqld)) {
+      mtr_verbose("WSREP waiting for first server to bootstrap cluster");
+      if (!wait_wsrep_ready($tinfo, $mysqld)) {
         return 1;
       }
     }
+    mtr_milli_sleep(3000);
   }
 
   # Wait for clusters to start

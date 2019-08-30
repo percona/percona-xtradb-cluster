@@ -45,6 +45,8 @@ SET SESSION wsrep_sync_wait = 0;
 --connection node_2
 --echo #node-2
 SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLES WHERE NAME LIKE 'test/t1';
+--source include/wait_condition.inc
 --eval SET SESSION wsrep_trx_fragment_size = $wsrep_trx_fragment_size;
 
 --disable_query_log

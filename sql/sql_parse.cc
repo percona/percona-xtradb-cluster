@@ -7274,11 +7274,6 @@ static void wsrep_prepare_for_autocommit_retry(THD *thd, const char *rawbuf,
   DBUG_ASSERT(thd->wsrep_trx().active() == false);
   thd->wsrep_cs().reset_error();
   thd->set_query_id(next_query_id());
-
-  /* If SR transaction failed certification then context is cached in
-  streaming_applier to process rollback fragment whenever cluster as whole
-  initiate the action. Ensure the action is complete before scheduling retry. */
-  thd->wsrep_cs().wait_for_SR_cleanup();
 }
 
 static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
@@ -7341,10 +7336,6 @@ static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
         my_error(ER_LOCK_DEADLOCK, MYF(0));
         thd->killed = THD::NOT_KILLED;
         thd->wsrep_retry_counter = 0;  //  reset
-        /* Clear the cached streaming transaction id before marking end of
-        the said transaction so the followup transaction doesn't carry
-        left over state context. */
-        thd->wsrep_cs().set_streaming_transaction_id_for_retry();
       }
     } else {
       set_if_smaller(thd->wsrep_retry_counter, 0);  // reset; eventually ok

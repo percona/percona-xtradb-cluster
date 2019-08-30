@@ -136,7 +136,7 @@ SET SESSION wsrep_sync_wait = 0;
 
 --source include/kill_galera.inc
 
---sleep 10
+--sleep 18
 --connection node_1
 --source include/kill_galera.inc
 

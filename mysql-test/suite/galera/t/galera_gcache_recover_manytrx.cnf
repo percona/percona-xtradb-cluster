@@ -2,8 +2,9 @@
 
 [mysqld.1]
 innodb_log_file_size=110M
-wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.recover=yes;pc.ignore_sb=true;gcache.size=1024M'
+wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.1.#galera_port;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S;gcache.recover=yes;pc.ignore_sb=true;gcache.size=1024M'
+
 
 [mysqld.2]
 innodb_log_file_size=110M
-wsrep_provider_options='base_port=@mysqld.2.#galera_port;gcache.recover=yes;pc.ignore_sb=true;'
+wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.2.#galera_port;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S;gcache.recover=yes;pc.ignore_sb=true;'

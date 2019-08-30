@@ -4226,12 +4226,15 @@ class THD : public MDL_context_owner,
     query_id = new_query_id;
     mysql_mutex_unlock(&LOCK_thd_data);
 #ifdef WITH_WSREP
-    if (WSREP(this) && wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID &&
-        update_wsrep_id) {
+    /* With update protocol starting g-4 trx_is is always updated
+       with update of query_id. */
+    if (WSREP(this) && update_wsrep_id) {
       set_wsrep_next_trx_id(query_id);
-      // TODO: readd this once the dependency with logevent is resolved.
-      // WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
-      //            (long unsigned int)wsrep_next_trx_id());
+#if 0
+      TODO: readd this once the dependency with logevent is resolved.
+      WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
+                  (long unsigned int)wsrep_next_trx_id());
+#endif /* 0 */
     }
 #endif /* WITH_WSREP */
     MYSQL_SET_STATEMENT_QUERY_ID(m_statement_psi, new_query_id);
