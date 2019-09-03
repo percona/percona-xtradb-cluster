@@ -15,19 +15,6 @@
 
 # Common warning flags for GCC, G++, Clang and Clang++
 SET(MY_WARNING_FLAGS "-Wall -Wextra -Wformat-security -Wvla")
-#SET(MY_WARNING_FLAGS "-Wall -Wextra -Wformat-security -Wvla -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value -Wno-error=misleading-indentation -Wno-error=literal-suffix -Wno-error=virtual-move-assign ")
-
-#
-# (kenn.takara@percona.com): Not sure why this was done, seems to work ok
-#
-## The default =3 given by -Wextra is a bit too strict for our code.
-#IF(CMAKE_COMPILER_IS_GNUCXX)
-#  MY_CHECK_CXX_COMPILER_FLAG("-Wimplicit-fallthrough=2"
-#    HAVE_IMPLICIT_FALLTHROUGH)
-#  IF(HAVE_IMPLICIT_FALLTHROUGH)
-#    SET(MY_WARNING_FLAGS "${MY_WARNING_FLAGS} -Wimplicit-fallthrough=2")
-#  ENDIF()
-#ENDIF()
 
 # Common warning flags for GCC and Clang
 SET(MY_C_WARNING_FLAGS

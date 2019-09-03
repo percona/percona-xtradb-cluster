@@ -5,3 +5,4 @@ SET GLOBAL DEBUG = "d,wsrep_applier_sleep_15";
 INSERT INTO t1 VALUES (1);
 # restart
 DROP TABLE t1;
+SET GLOBAL DEBUG = "";

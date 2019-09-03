@@ -35,8 +35,12 @@
 /*
   MySQL can survive with 32K, but some glibc libraries require > 128K stack
   To resolve hostnames. Also recursive stored procedures needs stack.
+
+  ASAN requires more stack space.
 */
-#if defined(__sparc) && (defined(__SUNPRO_CC) || defined(__SUNPRO_C))
+#if defined(HAVE_ASAN)
+#define STACK_MULTIPLIER 8UL
+#elif defined(__sparc) && (defined(__SUNPRO_CC) || defined(__SUNPRO_C))
 #define STACK_MULTIPLIER 2UL
 #else
 #define STACK_MULTIPLIER 1UL
