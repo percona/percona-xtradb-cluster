@@ -425,7 +425,7 @@ static lock_t *lock_prdt_add_to_queue(
   RecLock rec_lock(index, block, PRDT_HEAPNO, type_mode);
 
 #ifdef WITH_WSREP
-  return (rec_lock.create(trx, true, prdt, NULL, NULL));
+  return (rec_lock.create(NULL, trx, true, prdt));
 #else
   return (rec_lock.create(trx, true, prdt));
 #endif /* WITH_WSREP */
@@ -492,8 +492,13 @@ dberr_t lock_prdt_insert_check_and_lock(
 
   const ulint mode = LOCK_X | LOCK_PREDICATE | LOCK_INSERT_INTENTION;
 
+#ifdef WITH_WSREP
+  lock_t *const wait_for =
+      (lock_t *)lock_prdt_other_has_conflicting(mode, block, prdt, trx);
+#else
   const lock_t *wait_for =
       lock_prdt_other_has_conflicting(mode, block, prdt, trx);
+#endif /* WITH_WSREP */
 
   if (wait_for != NULL) {
     rtr_mbr_t *mbr = prdt_get_mbr_from_prdt(prdt);
@@ -755,7 +760,7 @@ dberr_t lock_prdt_lock(buf_block_t *block,  /*!< in/out: buffer block of rec */
     RecLock rec_lock(index, block, PRDT_HEAPNO, prdt_mode);
 
 #ifdef WITH_WSREP
-    lock = rec_lock.create(trx, true, NULL, NULL, NULL);
+    lock = rec_lock.create(NULL, trx, true);
 #else
     lock = rec_lock.create(trx, true);
 #endif /* WITH_WSREP */
@@ -776,9 +781,16 @@ dberr_t lock_prdt_lock(buf_block_t *block,  /*!< in/out: buffer block of rec */
       lock = lock_prdt_has_lock(mode, type_mode, block, prdt, trx);
 
       if (lock == NULL) {
+#ifdef WITH_WSREP
+        lock_t *wait_for;
+
+        wait_for = (lock_t *)lock_prdt_other_has_conflicting(prdt_mode, block,
+                                                             prdt, trx);
+#else
         const lock_t *wait_for;
 
         wait_for = lock_prdt_other_has_conflicting(prdt_mode, block, prdt, trx);
+#endif /* WITH_WSREP */
 
         if (wait_for != NULL) {
           RecLock rec_lock(thr, index, block, PRDT_HEAPNO, prdt_mode, prdt);
@@ -867,7 +879,7 @@ dberr_t lock_place_prdt_page_lock(
     RecLock rec_lock(index, rec_id, mode);
 
 #ifdef WITH_WSREP
-    rec_lock.create(trx, true, NULL, NULL, NULL);
+    rec_lock.create(NULL, trx, true);
 #else
     rec_lock.create(trx, true);
 #endif /* WITH_WSREP */

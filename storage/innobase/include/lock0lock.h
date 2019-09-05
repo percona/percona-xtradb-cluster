@@ -817,21 +817,6 @@ waiting behind it.
 @param[in,out]  lock            Waiting lock request
 @param[in]      use_fcfs        true -> use first come first served strategy */
 void lock_cancel_waiting_and_release(lock_t *lock, bool use_fcfs);
-
-/* Determine if the given table is exclusively "owned" by the given
-transaction, i.e., transaction holds LOCK_IX and possibly LOCK_AUTO_INC
-on the table.
-@return true if table is only locked by trx, with LOCK_IX, and
-possibly LOCK_AUTO_INC */
-bool lock_is_table_exclusive(const dict_table_t *table, const trx_t *trx);
-
-/* Get the alternative table that is locked by the said transaction.
-@param trx              transaction
-@param dest             destination table (reference to one we already have)
-@param mode             lock mode of source table
-*/
-dict_table_t *lock_get_src_table(trx_t *trx, dict_table_t *dest,
-                                 lock_mode *mode);
 #endif /* WITH_WSREP */
 
 #include "lock0lock.ic"
