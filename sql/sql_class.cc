@@ -1213,6 +1213,11 @@ void THD::release_resources() {
     if (wsrep_rli->current_mts_submode != NULL)
       delete wsrep_rli->current_mts_submode;
     wsrep_rli->current_mts_submode = 0;
+
+    if (wsrep_rli->deferred_events != NULL)
+      delete wsrep_rli->deferred_events;
+    wsrep_rli->deferred_events = 0;
+
     delete wsrep_rli;
     wsrep_rli = NULL;
     /* rli_slave MySQL counter part which is initialized to wsrep_rli. */

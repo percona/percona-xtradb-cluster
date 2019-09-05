@@ -171,6 +171,12 @@ Wsrep_high_priority_service::~Wsrep_high_priority_service() {
   if (thd->wsrep_rli) {
     delete thd->wsrep_rli->current_mts_submode;
     thd->wsrep_rli->current_mts_submode = 0;
+
+    if (thd->wsrep_rli->deferred_events != NULL) {
+      delete thd->wsrep_rli->deferred_events;
+    }
+    thd->wsrep_rli->deferred_events = 0;
+
     delete thd->wsrep_rli;
     thd->wsrep_rli = 0;
   }
