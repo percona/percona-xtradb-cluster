@@ -735,7 +735,11 @@ class RecLock {
           there was a deadlock, but another transaction was chosen
           as a victim, and we got the lock immediately: no need to
           wait then */
+#ifdef WITH_WSREP
+  dberr_t add_to_waitq(lock_t *const wait_for, const lock_prdt_t *prdt = NULL);
+#else
   dberr_t add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt = NULL);
+#endif /* WITH_WSREP */
 
   /**
   Create a lock for a transaction and initialise it.
@@ -744,8 +748,8 @@ class RecLock {
   @param[in] prdt			Predicate lock (optional)
   @return new lock instance */
 #ifdef WITH_WSREP
-  lock_t *create(trx_t *trx, bool add_to_hash, const lock_prdt_t *prdt,
-                 lock_t *const c_lock, que_thr_t *thr);
+  lock_t *create(lock_t* const c_lock, trx_t *trx, bool add_to_hash,
+                 const lock_prdt_t *prdt = nullptr);
 #else
   lock_t *create(trx_t *trx, bool add_to_hash,
                  const lock_prdt_t *prdt = nullptr);
@@ -836,12 +840,7 @@ class RecLock {
   @param[in,out] lock	Newly created record lock to add to the
                           rec hash and the transaction lock list
   @param[in] add_to_hash	If the lock should be added to the hash table */
-#ifdef WITH_WSREP
-  void lock_add(lock_t *lock, bool add_to_hash, lock_t *const c_lock,
-                que_thr_t *thr);
-#else
   void lock_add(lock_t *lock, bool add_to_hash);
-#endif /* WITH_WSREP */
 
   /**
   Check and resolve any deadlocks
