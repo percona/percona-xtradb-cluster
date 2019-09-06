@@ -5705,7 +5705,14 @@ static bool lock_rec_queue_validate(
       ut_ad(!trx_is_ac_nl_ro(lock->trx));
 
       if (lock->is_waiting()) {
+#ifdef WITH_WSREP
+        /* lock is not a gap lock and lock_rec_has_to_wait_in_queue is being
+        invoked for validation post adding lock to wait queue.
+        Check lock_rec_has_to_wait_in_queue for detailed comments. */
+        ut_a(lock_rec_has_to_wait_in_queue(lock, true));
+#else
         ut_a(lock_rec_has_to_wait_in_queue(lock));
+#endif /* WITH_WSREP */
       }
 
       if (index != nullptr) {

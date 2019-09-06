@@ -179,6 +179,9 @@ Wsrep_high_priority_service::~Wsrep_high_priority_service() {
 
     delete thd->wsrep_rli;
     thd->wsrep_rli = 0;
+
+    /* rli_slave MySQL counter part which is initialized to wsrep_rli. */
+    thd->rli_slave = NULL;
   }
 
   thd->set_row_count_func(m_shadow.row_count_func);

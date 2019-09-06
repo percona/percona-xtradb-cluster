@@ -43,7 +43,7 @@ INSERT INTO t1 VALUES (6);
 ROLLBACK;
 
 SET SESSION wsrep_sync_wait = 0;
---let wait_condition = SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
+--let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log
 --source include/wait_condition.inc
 
 --connection node_2

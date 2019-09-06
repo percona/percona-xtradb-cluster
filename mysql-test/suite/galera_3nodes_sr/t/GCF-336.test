@@ -1,5 +1,6 @@
 #
 --source include/galera_cluster.inc
+--source include/force_restart.inc
 
 --connection node_2
 --echo #node-2

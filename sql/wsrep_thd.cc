@@ -71,14 +71,23 @@ static void wsrep_replication_process(THD *thd,
 
   // thd->wsrep_rgi->cleanup_after_session();
 
-  delete thd->wsrep_rli->current_mts_submode;
-  thd->wsrep_rli->current_mts_submode = 0;
-  if (thd->wsrep_rli->deferred_events != NULL) {
-    delete thd->wsrep_rli->deferred_events;
+  if (thd->wsrep_rli) {
+    if (thd->wsrep_rli->current_mts_submode) {
+      delete thd->wsrep_rli->current_mts_submode;
+    }
+    thd->wsrep_rli->current_mts_submode = 0;
+
+    if (thd->wsrep_rli->deferred_events != NULL) {
+      delete thd->wsrep_rli->deferred_events;
+    }
+    thd->wsrep_rli->deferred_events = 0;
+
+    delete thd->wsrep_rli;
+    thd->wsrep_rli = 0;
+
+    /* rli_slave MySQL counter part which is initialized to wsrep_rli. */
+    thd->rli_slave = NULL;
   }
-  thd->wsrep_rli->deferred_events = 0;
-  delete thd->wsrep_rli;
-  thd->wsrep_rli = 0;
 
   TABLE *tmp;
   while ((tmp = thd->temporary_tables)) {

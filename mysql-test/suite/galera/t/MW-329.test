@@ -59,6 +59,9 @@ while ($count)
 		}
 	}
 
+        # if by the time next update get scheduled insert thread doesn't get chance to run.
+        --sleep 0.5
+
         #
         # Ensure at least one replay happens
         #
