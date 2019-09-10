@@ -9,6 +9,7 @@ ERROR 42S02: Table 'test.t2' doesn't exist
 CREATE TABLE t1 AS SELECT 1 FROM DUAL;
 call mtr.add_suppression("Slave SQL: Error \'Table \'t1\' already exists\' on query");
 call mtr.add_suppression("Slave SQL: Error \'Table \'test.t2\' doesn\'t exist\' on query");
+call mtr.add_suppression("Query apply failed.*");
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1

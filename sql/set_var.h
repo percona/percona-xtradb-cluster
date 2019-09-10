@@ -394,10 +394,6 @@ class set_var : public set_var_base {
   void update_source_user_host_timestamp(THD *thd);
   int light_check(THD *thd);
 
-#ifdef WITH_WSREP
-  int wsrep_store_variable(THD *thd);
-#endif /* WITH_WSREP */
-
   /**
     Print variable in short form.
 
@@ -524,9 +520,6 @@ extern ulonglong system_variable_hash_version;
 
 const CHARSET_INFO *get_old_charset_by_name(const char *old_name);
 
-#ifdef WITH_WSREP
-int sql_set_wsrep_variables(THD *thd, List<set_var_base> *var_list);
-#endif /* WITH_WSREP */
 int sys_var_init();
 int sys_var_add_options(std::vector<my_option> *long_options, int parse_flags);
 void sys_var_end(void);

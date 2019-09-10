@@ -468,6 +468,14 @@ EOF
                     wsrep_log_error "Line $LINENO"
                     wsrep_log_error "****************************************************** "
                     exit 2
+                elif compare_versions "$DONOR_MYSQL_VERSION" "<" "8.0.0"; then
+                    wsrep_log_error "******************* FATAL ERROR ********************** "
+                    wsrep_log_error "FATAL: PXC JOINER is from 8.x ($MYSQL_VERSION) series and DONOR from 5.x ($DONOR_MYSQL_VERSION) series."
+                    wsrep_log_error "This node's PXC version is $MYSQL_VERSION.  The donor's PXC version is $DONOR_MYSQL_VERSION."
+                    wsrep_log_error "Upgrade this node before joining the cluster."
+                    wsrep_log_error "Line $LINENO"
+                    wsrep_log_error "****************************************************** "
+                    exit 2
                 fi
             elif [[ $line =~ ^error= ]]; then
                 wsrep_log_error "******************* FATAL ERROR ********************** "

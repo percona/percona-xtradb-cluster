@@ -78,6 +78,7 @@ select * from information_schema.compression_dictionary_tables where dict_name l
 TABLE_SCHEMA	TABLE_NAME	COLUMN_NAME	DICT_NAME
 #node-2
 call mtr.add_suppression("Can't create database");
+call mtr.add_suppression("Query apply failed.*");
 #node-1
 set global wsrep_debug=1;
 create table t (i int, primary key pk(i)) engine=innodb;
@@ -98,86 +99,9 @@ ERROR HY000: Can't create database 'test'; database exists
 select * from t;
 i
 1
-SET GLOBAL wsrep_debug = 0;
+SET GLOBAL wsrep_debug = NONE;
 SET DEBUG_SYNC = 'RESET';
 drop table t;
-#node-2
-call mtr.add_suppression("Can't create database");
-#node-1
-set global wsrep_debug=1;
-create table t (i int, primary key pk(i)) engine=innodb;
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
-insert into t values (1);;
-#node-1b
-SET SESSION wsrep_sync_wait = 0;
-#node-1c
-SET SESSION wsrep_sync_wait = 0;
-#node-1a
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "now WAIT_FOR entered1";
-set DEBUG_SYNC = "pxc_add_ticket_trying_to_wait_for_victim SIGNAL entered2 WAIT_FOR continue2";
-create database test;;
-#node-1b
-SET DEBUG_SYNC = "now WAIT_FOR entered2";
-SET DEBUG_SYNC = "now SIGNAL continue1";
-#node-1c (while ddl is trying to abort dml, let dml complete)
-SET DEBUG_SYNC = "now SIGNAL continue2";
-#node-1a
-ERROR HY000: Can't create database 'test'; database exists
-#node-1
-select * from t;
-i
-1
-SET GLOBAL wsrep_debug = 0;
-SET DEBUG_SYNC = 'RESET';
-drop table t;
-#node-1
-create table t (i int, primary key pk(i)) engine=innodb;
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
-insert into t values (1);;
-#node-1a
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "now WAIT_FOR entered1";
-create table t2 (i int, primary key pk(i)) engine=memory;;
-#node-1c (check if ddl is waiting for final commit that suggest intermediate commit done)
-SET DEBUG_SYNC = "now SIGNAL continue1";
-#node-1
-select * from t;
-i
-1
-#node-1a
-select * from t2;
-i
-#node-1
-SET GLOBAL wsrep_debug = 0;
-SET DEBUG_SYNC = 'RESET';
-drop table t;
-drop table t2;
-#node-1
-create table t (i int, primary key pk(i)) engine=innodb;
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
-insert into t values (1);;
-#node-1a
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "now WAIT_FOR entered1";
-create table t2 (i int, primary key pk(i)) engine=innodb;;
-#node-1c (check if ddl is waiting for final commit that suggest intermediate commit done)
-SET DEBUG_SYNC = "now SIGNAL continue1";
-#node-1
-select * from t;
-i
-1
-#node-1a
-select * from t2;
-i
-#node-1
-SET GLOBAL wsrep_debug = 0;
-SET DEBUG_SYNC = 'RESET';
-drop table t;
-drop table t2;
 call mtr.add_suppression("Slave SQL: Error \'Table \'t\' already exists\' on query.*");
 call mtr.add_suppression("Slave SQL: Error \'Table \'t\' already exists\' on query.*");
 #node-1 (this connection will take handler lock)

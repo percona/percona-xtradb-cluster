@@ -16,7 +16,7 @@ FLUSH STATUS;
 SELECT VARIABLE_VALUE = 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
 
 #
-# Run concurrent INSERTs 
+# Run concurrent INSERTs
 #
 
 DELIMITER |;
@@ -41,7 +41,10 @@ DELIMITER ;|
 #
 
 --connection node_2
---let $count = 20
+select sleep(0.5);
+--let $count = 5
+--let $wsrep_local_replays_old = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+
 while ($count)
 {
 	--let $signature = `SELECT LEFT(MD5(RAND()), 10)`
@@ -55,15 +58,29 @@ while ($count)
 			--die ROW_COUNT() = 0
 		}
 	}
-	--dec $count
+
+        # if by the time next update get scheduled insert thread doesn't get chance to run.
+        --sleep 0.5
+
+        #
+        # Ensure at least one replay happens
+        #
+        --let $wsrep_replays = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+        --disable_query_log
+        if (`SELECT $wsrep_replays - $wsrep_local_replays_old > 0`) {
+                --dec $count
+        }
+        --enable_query_log
 }
 
 #
 # Confirm that some transaction replays occurred
 #
 
---let $wait_condition = SELECT VARIABLE_VALUE > 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
---source include/wait_condition.inc
+--let $wsrep_local_replays_new = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--disable_query_log
+--eval SELECT $wsrep_local_replays_new - $wsrep_local_replays_old > 0 AS wsrep_local_replays;
+--enable_query_log
 
 #
 # Terminate the stored procedure

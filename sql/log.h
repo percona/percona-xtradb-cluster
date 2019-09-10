@@ -1486,15 +1486,4 @@ int log_builtins_exit();
 */
 void log_write_errstream(const char *buffer, size_t length);
 
-#ifdef WITH_WSREP
-
-#include "sql/binlog_ostream.h"
-
-IO_CACHE_binlog_cache_storage *wsrep_get_trans_log(THD *thd, bool transaction);
-bool wsrep_trans_cache_is_empty(THD *thd);
-void wsrep_thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
-void wsrep_thd_binlog_trx_reset(THD *thd);
-
-#endif /* WITH_WSREP */
-
 #endif /* LOG_H */

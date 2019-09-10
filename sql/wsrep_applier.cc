@@ -26,6 +26,11 @@
 #include "mysql/plugin.h"
 #include "sql/binlog_reader.h"
 
+#include "wsrep_thd.h"
+#include "wsrep_trans_observer.h"
+#include "service_wsrep.h"
+#include "wsrep_priv.h"
+
 /*
   read the first event from (*buf). The size of the (*buf) is (*buf_len).
   At the end (*buf) is shitfed to point to the following event or NULL and
@@ -61,47 +66,71 @@ static Log_event *wsrep_read_log_event(
 #include "sql_base.h"     // close_temporary_table()
 #include "transaction.h"  // trans_commit(), trans_rollback()
 
-static inline void wsrep_set_apply_format(THD *thd,
-                                          Format_description_log_event *ev) {
+void wsrep_set_apply_format(THD *thd, Format_description_log_event *ev) {
   if (thd->wsrep_apply_format) {
     delete (Format_description_log_event *)thd->wsrep_apply_format;
   }
   thd->wsrep_apply_format = ev;
 }
 
-static inline Format_description_log_event *wsrep_get_apply_format(THD *thd) {
+Format_description_log_event *wsrep_get_apply_format(THD *thd) {
   if (thd->wsrep_apply_format)
     return (Format_description_log_event *)thd->wsrep_apply_format;
   return thd->wsrep_rli->get_rli_description_event();
 }
 
+void wsrep_apply_error::store(const THD *const thd) {
+  Diagnostics_area::Sql_condition_iterator it =
+      thd->get_stmt_da()->sql_conditions();
+  const Sql_condition *cond;
+
+  static size_t const max_len =
+      2 * MAX_SLAVE_ERRMSG;  // 2x so that we have enough
+
+  if (NULL == str_) {
+    // this must be freeable by standard free()
+    str_ = static_cast<char *>(malloc(max_len));
+    if (NULL == str_) {
+      WSREP_ERROR("Failed to allocate %zu bytes for error buffer.", max_len);
+      len_ = 0;
+      return;
+    }
+  } else {
+    /* This is possible when we invoke rollback after failed applying.
+     * In this situation DA should not be reset yet and should contain
+     * all previous errors from applying and new ones from rollbacking,
+     * so we just overwrite is from scratch */
+  }
+
+  char *slider = str_;
+  const char *const buf_end = str_ + max_len - 1;  // -1: leave space for \0
+
+  for (cond = it++; cond && slider < buf_end; cond = it++) {
+    uint const err_code = cond->mysql_errno();
+    const char *const err_str = cond->message_text();
+
+    slider += snprintf(slider, buf_end - slider, " %s, Error_code: %d;",
+                       err_str, err_code);
+  }
+
+  *slider = '\0';
+  len_ = slider - str_ + 1;  // +1: add \0
+
+  WSREP_DEBUG("Error buffer for thd %u seqno %lld, %zu bytes: %s",
+              thd->thread_id(), (long long)wsrep_thd_trx_seqno(thd), len_,
+              str_ ? str_ : "(null)");
+}
+
 /**
   Helper function to apply replicated event.
 */
-static wsrep_cb_status_t wsrep_apply_events(THD *thd, const void *events_buf,
-                                            size_t buf_len) {
+int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
+                       const void *events_buf, size_t buf_len) {
   char *buf = (char *)events_buf;
-  int rcode = 0;
+  int rcode = WSREP_RET_SUCCESS;
   int event = 1;
 
   DBUG_ENTER("wsrep_apply_events");
-
-  /* Even is replayed using apply event flow (like background events are
-  are applied) so the special handling for REPLAYing event. */
-  if (thd->killed == THD::KILL_CONNECTION &&
-      thd->wsrep_conflict_state != REPLAYING) {
-    WSREP_INFO(
-        "Applier aborted. Skipping apply event while processing"
-        " write-set: %lld",
-        (long long)wsrep_thd_trx_seqno(thd));
-    DBUG_RETURN(WSREP_CB_FAILURE);
-  }
-
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  thd->wsrep_query_state = QUERY_EXEC;
-  if (thd->wsrep_conflict_state != REPLAYING)
-    thd->wsrep_conflict_state = NO_CONFLICT;
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
   if (!buf_len)
     WSREP_DEBUG("Empty apply event found while processing write-set: %lld",
@@ -115,7 +144,7 @@ static wsrep_cb_status_t wsrep_apply_events(THD *thd, const void *events_buf,
     if (!ev) {
       WSREP_ERROR("Applier could not read binlog event, seqno: %lld, len: %zu",
                   (long long)wsrep_thd_trx_seqno(thd), buf_len);
-      rcode = 1;
+      rcode = WSREP_ERR_BAD_EVENT;
       goto error;
     }
 
@@ -151,9 +180,15 @@ static wsrep_cb_status_t wsrep_apply_events(THD *thd, const void *events_buf,
     thd->server_id = ev->server_id;  // use the original server id for logging
     thd->unmasked_server_id = ev->common_header->unmasked_server_id;
     thd->set_time();  // time the query
-    wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
-                   thd->wsrep_trx_meta.gtid.uuid,
-                   thd->wsrep_trx_meta.gtid.seqno);
+
+    if (wsrep_thd_is_toi(thd)) {
+      wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
+                     thd->wsrep_cs().toi_meta().gtid());
+    } else {
+      wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
+                     thd->wsrep_trx().ws_meta().gtid());
+    }
+
     thd->lex->set_current_select(NULL);
     if (!ev->common_header->when.tv_sec)
       my_micro_time_to_timeval(my_micro_time(), &ev->common_header->when);
@@ -163,20 +198,11 @@ static wsrep_cb_status_t wsrep_apply_events(THD *thd, const void *events_buf,
     thd->wsrep_rli->stats_read_time +=
         diff_timespec(&thd->wsrep_rli->ts_exec[0], &thd->wsrep_rli->ts_exec[1]);
 
-    /* MySQL slave "Sleeps if needed, and unlocks rli->data_lock."
-     * at this point. But this does not apply for wsrep, we just do the unlock
-     * part of sql_delay_event()
-     *
-     * if (sql_delay_event(ev, thd, rli))
-     */
-    // mysql_mutex_assert_owner(&rli->data_lock);
-    // mysql_mutex_unlock(&rli->data_lock);
-
     exec_res = ev->apply_event(thd->wsrep_rli);
     DBUG_PRINT("info", ("exec_event result: %d", exec_res));
 
     if (exec_res) {
-      WSREP_WARN("RBR event %d %s apply warning: %d, %lld", event,
+      WSREP_WARN("Event %d %s apply failed: %d, seqno %lld", event,
                  ev->get_type_str(), exec_res,
                  (long long)wsrep_thd_trx_seqno(thd));
       rcode = exec_res;
@@ -191,25 +217,6 @@ static wsrep_cb_status_t wsrep_apply_events(THD *thd, const void *events_buf,
 
     DBUG_PRINT("info", ("wsrep apply_event error = %d", exec_res));
     event++;
-
-    if (thd->wsrep_conflict_state != NO_CONFLICT &&
-        thd->wsrep_conflict_state != REPLAYING)
-      WSREP_WARN("conflict state after RBR event applying: %s, %lld",
-                 wsrep_get_query_state(thd->wsrep_query_state),
-                 (long long)wsrep_thd_trx_seqno(thd));
-
-    if (thd->wsrep_conflict_state == MUST_ABORT) {
-      WSREP_WARN("RBR event apply failed, rolling back: %lld",
-                 (long long)wsrep_thd_trx_seqno(thd));
-      /* Check for comments in Relay_log_info::cleanup_context */
-      trans_rollback_stmt(thd);
-      trans_rollback(thd);
-      thd->locked_tables_list.unlock_locked_tables(thd);
-      /* Release transactional metadata locks. */
-      thd->mdl_context.release_transactional_locks();
-      thd->wsrep_conflict_state = NO_CONFLICT;
-      DBUG_RETURN(WSREP_CB_FAILURE);
-    }
 
     switch (ev->get_type_code()) {
     case binary_log::ROWS_QUERY_LOG_EVENT:
@@ -232,241 +239,10 @@ static wsrep_cb_status_t wsrep_apply_events(THD *thd, const void *events_buf,
   }
 
 error:
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  thd->wsrep_query_state = QUERY_IDLE;
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
-  assert(thd->wsrep_exec_mode == REPL_RECV);
-
   if (thd->killed == THD::KILL_CONNECTION)
     WSREP_INFO("applier aborted while processing write-set: %lld",
                (long long)wsrep_thd_trx_seqno(thd));
 
-  if (rcode) DBUG_RETURN(WSREP_CB_FAILURE);
-  DBUG_RETURN(WSREP_CB_SUCCESS);
-}
-
-/**
-  Apply cluster replicated event.
-
-  @retval
-    WSREP_CB_SUCCESS	success
-  @retval
-    WSREP_CB_FAILURE	failure
-*/
-wsrep_cb_status_t wsrep_apply_cb(void *const ctx, const void *const buf,
-                                 size_t const buf_len, uint32_t const flags,
-                                 const wsrep_trx_meta_t *meta) {
-  THD *const thd((THD *)ctx);
-
-  assert(thd->wsrep_apply_toi == false);
-
-  // Allow tests to block the applier thread using the DBUG facilities
-  DBUG_EXECUTE_IF("sync.wsrep_apply_cb", {
-    const char act[] =
-        "now "
-        "SIGNAL sync.wsrep_apply_cb_reached "
-        "WAIT_FOR signal.wsrep_apply_cb";
-    DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
-  };);
-
-  thd->wsrep_trx_meta = *meta;
-
-  THD_STAGE_INFO(thd, stage_wsrep_applying_writeset);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: applying write-set (%lld)",
-           (long long)wsrep_thd_trx_seqno(thd));
-  WSREP_DEBUG("%s", thd->wsrep_info);
-  thd_proc_info(thd, thd->wsrep_info);
-
-  /* tune FK and UK checking policy */
-  if (wsrep_slave_UK_checks == false)
-    thd->variables.option_bits |= OPTION_RELAXED_UNIQUE_CHECKS;
-  else
-    thd->variables.option_bits &= ~OPTION_RELAXED_UNIQUE_CHECKS;
-
-  if (wsrep_slave_FK_checks == false)
-    thd->variables.option_bits |= OPTION_NO_FOREIGN_KEY_CHECKS;
-  else
-    thd->variables.option_bits &= ~OPTION_NO_FOREIGN_KEY_CHECKS;
-
-  if (flags & WSREP_FLAG_ISOLATION) {
-    thd->wsrep_apply_toi = true;
-    /* Don't run in transaction mode with TOI actions. */
-    thd->variables.option_bits &= ~OPTION_BEGIN;
-    thd->server_status &= ~SERVER_STATUS_IN_TRANS;
-
-    thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(true);
-  }
-  wsrep_cb_status_t rcode(wsrep_apply_events(thd, buf, buf_len));
-
-  THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: %s write set (%lld)",
-           rcode == WSREP_CB_SUCCESS ? "applied" : "failed to apply",
-           (long long)wsrep_thd_trx_seqno(thd));
-  WSREP_DEBUG("%s", thd->wsrep_info);
-  thd_proc_info(thd, thd->wsrep_info);
-
-  if (WSREP_CB_SUCCESS != rcode) {
-    wsrep_dump_rbr_buf(thd, buf, buf_len);
-  }
-
-  TABLE *tmp;
-  while ((tmp = thd->temporary_tables)) {
-    WSREP_DEBUG("Applier %u, has temporary tables: %s.%s", thd->thread_id(),
-                (tmp->s) ? tmp->s->db.str : "void",
-                (tmp->s) ? tmp->s->table_name.str : "void");
-    close_temporary_table(thd, tmp, 1, 1);
-  }
-
-  return rcode;
-}
-
-static wsrep_cb_status_t wsrep_commit(THD *const thd) {
-  THD_STAGE_INFO(thd, stage_wsrep_committing);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: committing write set (%lld)",
-           (long long)wsrep_thd_trx_seqno(thd));
-  WSREP_DEBUG("%s", thd->wsrep_info);
-  thd_proc_info(thd, thd->wsrep_info);
-
-  if (!thd->get_transaction()->is_empty(Transaction_ctx::STMT)) {
-    WSREP_INFO("Applier statement commit needed");
-    if (trans_commit_stmt(thd)) {
-      WSREP_WARN("Applier statement commit failed");
-    }
-  }
-  wsrep_cb_status_t const rcode(trans_commit(thd) ? WSREP_CB_FAILURE
-                                                  : WSREP_CB_SUCCESS);
-
-  THD_STAGE_INFO(thd, stage_wsrep_committed);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: %s write set (%lld)",
-           (rcode == WSREP_CB_SUCCESS ? "committed" : "failed to commit"),
-           (long long)wsrep_thd_trx_seqno(thd));
-  WSREP_DEBUG("%s", thd->wsrep_info);
-  thd_proc_info(thd, thd->wsrep_info);
-
-  if (WSREP_CB_SUCCESS == rcode) {
-    thd->wsrep_rli->cleanup_context(thd, 0);
-    thd->variables.gtid_next.set_automatic();
-    if (thd->wsrep_apply_toi) {
-      wsrep_set_SE_checkpoint(thd->wsrep_trx_meta.gtid.uuid,
-                              thd->wsrep_trx_meta.gtid.seqno);
-      thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(false);
-    }
-  }
-
-  return rcode;
-}
-
-static wsrep_cb_status_t wsrep_rollback(THD *const thd) {
-  THD_STAGE_INFO(thd, stage_wsrep_rolling_back);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: rolling back write set (%lld)",
-           (long long)wsrep_thd_trx_seqno(thd));
-  WSREP_DEBUG("%s", thd->wsrep_info);
-  thd_proc_info(thd, thd->wsrep_info);
-
-  if (!thd->get_transaction()->is_empty(Transaction_ctx::STMT)) {
-    WSREP_INFO("Applier statement rollback needed");
-    if (trans_rollback_stmt(thd)) {
-      WSREP_WARN("Applier statement rollback failed");
-    }
-  }
-  wsrep_cb_status_t const rcode(trans_rollback(thd) ? WSREP_CB_FAILURE
-                                                    : WSREP_CB_SUCCESS);
-
-  THD_STAGE_INFO(thd, stage_wsrep_rolled_back);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: %s write set (%lld)",
-           rcode == WSREP_CB_SUCCESS ? "rolled back" : "failed to rollback",
-           (long long)wsrep_thd_trx_seqno(thd));
-  WSREP_DEBUG("%s", thd->wsrep_info);
-  thd_proc_info(thd, thd->wsrep_info);
-
-  thd->wsrep_rli->cleanup_context(thd, 0);
-  thd->variables.gtid_next.set_automatic();
-
-  return rcode;
-}
-
-/**
-  Commit cluster replicated event.
-
-  @retval
-    WSREP_CB_SUCCESS	success
-  @retval
-    WSREP_CB_FAILURE	failure
-*/
-wsrep_cb_status_t wsrep_commit_cb(void *const ctx, const void *trx_handle,
-                                  uint32_t const,
-                                  const wsrep_trx_meta_t *meta,
-                                  wsrep_bool_t *const exit, bool const commit) {
-  THD *const thd((THD *)ctx);
-
-  /* Applier transaction delays entering CommitMonitor so
-  cache the needed params that can aid entering CommitMonitor
-  post prepare stage.
-  Replay of local transaction uses the same path as applying of
-  transaction but CommitMonitor protocol is different for it. */
-  if (trx_handle && thd->wsrep_conflict_state != REPLAYING)
-    thd->wsrep_ws_handle.opaque = const_cast<void *>(trx_handle);
-
-  assert(meta->gtid.seqno == wsrep_thd_trx_seqno(thd));
-
-  wsrep_cb_status_t rcode;
-
-  if (commit)
-    rcode = wsrep_commit(thd);
-  else
-    rcode = wsrep_rollback(thd);
-
   wsrep_set_apply_format(thd, NULL);
-  thd->mdl_context.release_transactional_locks();
-
-  if (thd->wsrep_applier) {
-    /* This function is meant to initiate a commit after write-set has been
-    applied. This generally will be done by applier thread to replicate
-    action that some other node has executed.
-    There is an exception here: A local action may also follow this route
-    of applying write-set followed by commit if local transaction is forced
-    to rollback. Galera replay_transaction flow will try to use write-set
-    in that case instead of re-running the complete transaction.
-    In latter case it is not adviable to free the mem_root as follow-up
-    action associated with user thread will need it and so this action
-    is executed only when wsrep_applier = true which suggest true applier
-    (Note: this flags is set to flase for user thread even though it is using
-     write-set to complete the action) */
-    free_root(thd->mem_root, MYF(MY_KEEP_PREALLOC));
-  }
-
-  thd->tx_isolation = (enum_tx_isolation)thd->variables.transaction_isolation;
-
-  if (wsrep_slave_count_change < 0 && commit && WSREP_CB_SUCCESS == rcode) {
-    mysql_mutex_lock(&LOCK_wsrep_slave_threads);
-    if (wsrep_slave_count_change < 0) {
-      wsrep_slave_count_change++;
-      WSREP_DEBUG("Closing applier thread(s). Yet to close %d",
-                  abs(wsrep_slave_count_change));
-      *exit = true;
-    }
-    mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
-  }
-
-  if (thd->wsrep_applier) {
-    /* From trans_begin(). Also check the comment at line:134 when/why these
-     * bits are unset. */
-    thd->variables.option_bits |= OPTION_BEGIN;
-    thd->server_status |= SERVER_STATUS_IN_TRANS;
-    thd->wsrep_apply_toi = false;
-  }
-
-  return rcode;
-}
-
-wsrep_cb_status_t wsrep_unordered_cb(void *const, const void *const,
-                                     size_t const) {
-  return WSREP_CB_SUCCESS;
+  DBUG_RETURN(rcode);
 }

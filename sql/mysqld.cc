@@ -914,9 +914,6 @@ static PSI_cond_key key_COND_start_signal_handler;
 static PSI_mutex_key key_LOCK_server_started;
 static PSI_cond_key key_COND_server_started;
 static PSI_mutex_key key_LOCK_keyring_operations;
-#ifdef WITH_WSREP
-PSI_thread_key key_thread_handle_wsrep;
-#endif /* WITH_WSREP */
 #endif /* HAVE_PSI_INTERFACE */
 
 /**
@@ -1372,19 +1369,32 @@ mysql_mutex_t LOCK_wsrep_sst;
 mysql_cond_t COND_wsrep_sst;
 mysql_mutex_t LOCK_wsrep_sst_init;
 mysql_cond_t COND_wsrep_sst_init;
-mysql_mutex_t LOCK_wsrep_rollback;
-mysql_cond_t COND_wsrep_rollback;
-wsrep_aborting_thd_t wsrep_aborting_thd = NULL;
 mysql_mutex_t LOCK_wsrep_replaying;
 mysql_cond_t COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
+mysql_cond_t  COND_wsrep_slave_threads;
+mysql_mutex_t LOCK_wsrep_cluster_config;
 mysql_mutex_t LOCK_wsrep_desync;
+mysql_mutex_t LOCK_wsrep_group_commit;
+mysql_cond_t COND_wsrep_group_commit;
+mysql_mutex_t LOCK_wsrep_SR_pool;
+mysql_mutex_t LOCK_wsrep_SR_store;
 
-
+// Track replaying thread handler(s).
 int wsrep_replaying = 0;
-std::atomic<ulong> wsrep_running_threads{0};  // # of currently running wsrep threads
-static void wsrep_close_threads(THD *thd);
+
+// currently running wsrep threads
+std::atomic<ulong> wsrep_running_threads{0};
+
+/*
+  If server is being aborted avoid persisting SE checkpoint.
+  abort suggest error situation with introduction of encrypted tablespace
+  if abort originate from tablespace error then persist of SE checkpoint
+  to tablespace will not work.
+*/
 bool wsrep_unireg_abort = false;
+
+static void wsrep_close_threads(THD *thd);
 #endif /* WITH_WSREP */
 
 /*
@@ -1832,8 +1842,8 @@ class Set_kill_conn : public Do_THD_Impl {
 
 #ifdef WITH_WSREP
       /* skip wsrep system threads as well */
-      if (WSREP(killing_thd) && (killing_thd->wsrep_exec_mode == REPL_RECV ||
-                                 killing_thd->wsrep_applier))
+      if (WSREP(killing_thd) &&
+          (wsrep_thd_is_applying(killing_thd) || killing_thd->wsrep_applier))
         return;
 #endif /* WITH_WSREP */
 
@@ -1908,7 +1918,7 @@ class Call_close_conn : public Do_THD_Impl {
      *       The code here makes sure mysqld will not hang during shutdown
      *       even if wsrep provider has problems in shutting down.
      */
-    if (WSREP(closing_thd) && closing_thd->wsrep_exec_mode == REPL_RECV) {
+    if (WSREP(closing_thd) && wsrep_thd_is_applying(closing_thd)) {
       sql_print_information("closing wsrep system thread");
 
       mysql_mutex_lock(&closing_thd->LOCK_thd_data);
@@ -1954,8 +1964,8 @@ class Set_wsrep_kill_conn : public Do_THD_Impl {
       // We skip slave threads & scheduler on this first loop through.
       if (killing_thd->slave_thread) return;
       /* skip wsrep system threads as well */
-      if (WSREP(killing_thd) && (killing_thd->wsrep_exec_mode == REPL_RECV ||
-                                 killing_thd->wsrep_applier))
+      if (WSREP(killing_thd) &&
+          (wsrep_thd_is_applying(killing_thd) || killing_thd->wsrep_applier))
         return;
 
       if (killing_thd->get_command() == COM_BINLOG_DUMP ||
@@ -1994,7 +2004,7 @@ class Call_wsrep_close_client_conn : public Do_THD_Impl {
 
   virtual void operator()(THD *closing_thd) {
     if (closing_thd->get_protocol()->connection_alive() &&
-        (WSREP(closing_thd) || closing_thd->wsrep_exec_mode == LOCAL_STATE) &&
+        (WSREP(closing_thd) || wsrep_thd_is_local(closing_thd)) &&
         closing_thd != current_thd) {
       LEX_CSTRING main_sctx_user = closing_thd->m_main_security_ctx.user();
       sql_print_warning(ER_DEFAULT(ER_FORCING_CLOSE), my_progname,
@@ -2045,8 +2055,8 @@ class Find_thd_committing : public Find_THD_Impl {
   Find_thd_committing() {}
 
   virtual bool operator()(THD *thd) {
-    if (WSREP(thd) && thd->wsrep_exec_mode == LOCAL_STATE &&
-        thd->wsrep_query_state == QUERY_COMMITTING) {
+    if (WSREP(thd) && wsrep_thd_is_local(thd) &&
+        thd->wsrep_trx().state() == wsrep::transaction::s_committing) {
       return true;
     }
     return false;
@@ -2062,9 +2072,9 @@ class Find_wsrep_thd : public Find_THD_Impl {
     if (WSREP(thd)) {
       switch (m_type) {
         case APPLIER:
-          return thd->wsrep_applier;
+          return (thd->wsrep_applier);
         case COMMITTING:
-          return thd->wsrep_query_state == QUERY_COMMITTING;
+          return (thd->wsrep_trx().state() == wsrep::transaction::s_committing);
       }
     } else if (!WSREP_ON) {
       /* case when user try to set wsrep_provider = none w/o server shutdown */
@@ -2269,7 +2279,8 @@ static void unireg_abort(int exit_code) {
   if (!daemon_launcher_quiet && exit_code) LogErr(ERROR_LEVEL, ER_ABORTING);
 
 #ifdef WITH_WSREP
-  if (wsrep) {
+  if (WSREP_ON && Wsrep_server_state::instance().state() !=
+                      wsrep::server_state::s_disconnected) {
     WSREP_DEBUG("Initiating abort (unireg_abort)");
 
     wsrep_unireg_abort = true;
@@ -2281,7 +2292,7 @@ static void unireg_abort(int exit_code) {
      * wsrep threads here, we can only diconnect from service */
     wsrep_close_client_connections(false, true);
     wsrep_close_threads(NULL);
-    wsrep->disconnect(wsrep);
+    Wsrep_server_state::instance().disconnect();
 
     THD *thd = current_thd;
     if (thd) {
@@ -2329,6 +2340,9 @@ static void mysqld_exit(int exit_code) {
   DBUG_ASSERT(
       (exit_code >= MYSQLD_SUCCESS_EXIT && exit_code <= MYSQLD_ABORT_EXIT) ||
       exit_code == MYSQLD_RESTART_EXIT);
+#ifdef WITH_WSREP
+  wsrep_deinit_server();
+#endif /* WITH_WSREP */
   mysql_audit_finalize();
   Srv_session::module_deinit();
   delete_optimizer_cost_module();
@@ -2606,12 +2620,16 @@ static void clean_up_mutexes() {
   mysql_cond_destroy(&COND_wsrep_sst);
   mysql_mutex_destroy(&LOCK_wsrep_sst_init);
   mysql_cond_destroy(&COND_wsrep_sst_init);
-  mysql_mutex_destroy(&LOCK_wsrep_rollback);
-  mysql_cond_destroy(&COND_wsrep_rollback);
   mysql_mutex_destroy(&LOCK_wsrep_replaying);
   mysql_cond_destroy(&COND_wsrep_replaying);
   mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
+  mysql_cond_destroy(&COND_wsrep_slave_threads);
+  mysql_mutex_destroy(&LOCK_wsrep_cluster_config);
   mysql_mutex_destroy(&LOCK_wsrep_desync);
+  mysql_mutex_destroy(&LOCK_wsrep_group_commit);
+  mysql_cond_destroy(&COND_wsrep_group_commit);
+  mysql_mutex_destroy(&LOCK_wsrep_SR_pool);
+  mysql_mutex_destroy(&LOCK_wsrep_SR_store);
 #endif /* WITH_WSREP */
 }
 
@@ -3541,7 +3559,7 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused))) {
 
 #ifdef WITH_WSREP
           /* Stop wsrep threads in case they are running. */
-          if (wsrep_running_threads > 0) wsrep_stop_replication(NULL, true);
+          if (wsrep_running_threads > 0) wsrep_shutdown_replication();
 #endif /* WITH_WSREP */
 
           close_connections();
@@ -4624,6 +4642,10 @@ int init_common_variables() {
   pxc-strict-mode, validation for valid value would be difficult. */
   bool wsrep_provider_loaded =
       !(strlen(wsrep_provider) == 0 || !strcmp(wsrep_provider, WSREP_NONE));
+ 
+  /* Turn-off WSREP_ON since the loader is not yet loaded and if the checks
+  below hit some error then error flow should operate with wsrep_on=off. */
+  global_system_variables.wsrep_on = false;
 
   if (opt_initialize) {
     /* Node is running bootstrap mode pxc-strict-mode = DISABLED. */
@@ -4654,7 +4676,7 @@ int init_common_variables() {
       case PXC_STRICT_MODE_ENFORCING:
       case PXC_STRICT_MODE_MASTER:
       default:
-        WSREP_ERROR(
+        WSREP_FATAL(
             "Percona-XtraDB-Cluster prohibits use of MyISAM"
             " table replication feature"
             " with pxc_strict_mode = ENFORCING or MASTER");
@@ -4672,7 +4694,7 @@ int init_common_variables() {
       case PXC_STRICT_MODE_ENFORCING:
       case PXC_STRICT_MODE_MASTER:
       default:
-        WSREP_ERROR(
+        WSREP_FATAL(
             "Percona-XtraDB-Cluster prohibits setting"
             " binlog_format to STATEMENT or MIXED at global level");
         return 1;
@@ -4693,7 +4715,7 @@ int init_common_variables() {
       case PXC_STRICT_MODE_ENFORCING:
       case PXC_STRICT_MODE_MASTER:
       default:
-        WSREP_ERROR(
+        WSREP_FATAL(
             "Percona-XtraDB-Cluster prohibits setting log_output"
             " to TABLE with pxc_strict_mode = ENFORCING or MASTER");
         return 1;
@@ -4702,7 +4724,7 @@ int init_common_variables() {
   }
 
   if (wsrep_provider_loaded && wsrep_desync) {
-    WSREP_ERROR(
+    WSREP_FATAL(
         "Can't desync a non-synced node."
         " (Node is yet not SYNCED with cluster)");
     return 1;
@@ -4710,11 +4732,24 @@ int init_common_variables() {
 
   const char *WSREP_SST_MYSQLDUMP = "mysqldump";
   if (wsrep_provider_loaded && !strcmp(WSREP_SST_MYSQLDUMP, wsrep_sst_method)) {
-    WSREP_ERROR(
+    WSREP_FATAL(
         "Percona-XtraDB-Cluster doesn't support SST through mysqldump."
-        " Please switch to use xtrabackup or rsync.");
+        " Please switch to use xtrabackup-v2.");
     return 1;
   }
+
+  const char *WSREP_SST_RSYNC = "rsync";
+  if (wsrep_provider_loaded && !strcmp(WSREP_SST_RSYNC, wsrep_sst_method)) {
+    WSREP_FATAL(
+        "Percona-XtraDB-Cluster doesn't support SST through rsync."
+        " Please switch to use xtrabackup-v2.");
+    return 1;
+  }
+
+  /* Restore wsrep_on after passing all the check.
+  Since the loader is not yet loaded flow relies on the wsrep_on to filter
+  WSREP statements. */
+  global_system_variables.wsrep_on = true;
 
   /*
     We need to initialize auxiliary variables, that will be
@@ -5140,15 +5175,22 @@ static int init_thread_environment() {
   mysql_mutex_init(key_LOCK_wsrep_sst_init, &LOCK_wsrep_sst_init,
                    MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_sst_init, &COND_wsrep_sst_init);
-  mysql_mutex_init(key_LOCK_wsrep_rollback, &LOCK_wsrep_rollback,
-                   MY_MUTEX_INIT_FAST);
-  mysql_cond_init(key_COND_wsrep_rollback, &COND_wsrep_rollback);
   mysql_mutex_init(key_LOCK_wsrep_replaying, &LOCK_wsrep_replaying,
                    MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_replaying, &COND_wsrep_replaying);
   mysql_mutex_init(key_LOCK_wsrep_slave_threads, &LOCK_wsrep_slave_threads,
                    MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_slave_threads, &COND_wsrep_slave_threads);
+  mysql_mutex_init(key_LOCK_wsrep_cluster_config, &LOCK_wsrep_cluster_config,
+                   MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_desync, &LOCK_wsrep_desync,
+                   MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_group_commit, &LOCK_wsrep_group_commit,
+                   MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_group_commit, &COND_wsrep_group_commit);
+  mysql_mutex_init(key_LOCK_wsrep_SR_pool, &LOCK_wsrep_SR_pool,
+                   MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_SR_store, &LOCK_wsrep_SR_store,
                    MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
   return 0;
@@ -5826,6 +5868,10 @@ static int init_server_components() {
     LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_GTID);
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
+
+  /* Init server even for recover as it is needed for initialization
+  of THD structure. */
+  if (wsrep_init_server()) unireg_abort(MYSQLD_ABORT_EXIT);
 
   if (!wsrep_recovery) {
     if (pxc_encrypt_cluster_traffic) {
@@ -7559,24 +7605,17 @@ int mysqld_main(int argc, char **argv)
 #ifdef WITH_WSREP /* WSREP AFTER SE */
   if (opt_initialize) {
     /* Create the wsrep state file */
-    wsp::WSREPState  wsrep_state;
+    wsp::WSREPState wsrep_state;
     wsrep_state.wsrep_schema_version = WSREP_SCHEMA_VERSION;
-    if (!wsrep_state.save_to(mysql_real_data_home_ptr, WSREP_STATE_FILENAME))
-    {
-      WSREP_ERROR("Could not create the wsrep state file : %s", WSREP_STATE_FILENAME);
+    if (!wsrep_state.save_to(mysql_real_data_home_ptr, WSREP_STATE_FILENAME)) {
+      WSREP_ERROR("Could not create the wsrep state file : %s",
+                  WSREP_STATE_FILENAME);
       WSREP_ERROR("Exiting");
       unireg_abort(MYSQLD_ABORT_EXIT);
     }
   } else {
-    wsrep_SE_initialized();
-
-    if (wsrep_before_SE()) {
-      /*! in case of no SST wsrep waits in view handler callback */
-      wsrep_SE_init_grab();
-      wsrep_SE_init_done();
-      /*! in case of SST wsrep waits for wsrep->sst_received */
-      wsrep_sst_continue();
-    } else {
+    wsrep_init_globals();
+    if (!wsrep_before_SE()) {
       wsrep_init_startup(false);
     }
 
@@ -8751,13 +8790,11 @@ static int init_wsrep_thread(THD *thd) {
   DBUG_RETURN(0);
 }
 
-typedef void (*wsrep_thd_processor_fun)(THD *);
-
 extern "C" void *start_wsrep_THD(void *arg) {
   THD *thd;
   bool thd_added = false;
 
-  wsrep_thd_processor_fun processor = (wsrep_thd_processor_fun)arg;
+  Wsrep_thd_args *thd_args = (Wsrep_thd_args *)arg;
 
   Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
   if (my_thread_init()) {
@@ -8800,7 +8837,11 @@ extern "C" void *start_wsrep_THD(void *arg) {
 #endif
   THD_CHECK_SENTRY(thd);
 
-  processor(thd);
+  thd_args->fun()(thd, thd_args->args());
+
+  /* Wsrep may reset globals during thread context switches, store globals
+     before cleanup. */
+  thd->store_globals();
 
 err:
   thd->clear_error();
@@ -8852,31 +8893,6 @@ err:
   my_thread_exit(0);
 
   return (NULL);
-}
-
-/**/
-static inline bool is_client_connection(THD *thd) {
-  return (thd->wsrep_client_thread && thd->variables.wsrep_on);
-}
-
-static inline bool is_replaying_connection(THD *thd) {
-  bool ret;
-
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  ret = (thd->wsrep_conflict_state == REPLAYING) ? true : false;
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
-  return ret;
-}
-
-static inline bool is_committing_connection(THD *thd) {
-  bool ret;
-
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  ret = (thd->wsrep_query_state == QUERY_COMMITTING) ? true : false;
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
-  return ret;
 }
 
 static void wsrep_close_thread(THD *thd) {
@@ -8961,7 +8977,8 @@ void wsrep_wait_appliers_close(THD *thd) {
     int count =
         Global_THD_manager::get_instance()->count_if_thd(&find_wsrep_thd);
 
-    if (count > 1) {
+    /* rollback + post-rollback thread are terminated later */
+    if (count > 2) {
       WSREP_INFO("Waiting for (%d) applier thread(s) to terminate", count - 1);
       sleep(1);
     } else {
@@ -8971,7 +8988,7 @@ void wsrep_wait_appliers_close(THD *thd) {
     }
   }
 
-  /* Now kill remaining wsrep threads: rollbacker */
+  /* Now kill remaining wsrep threads: rollbacker + post-rollback */
   wsrep_close_threads(thd);
 
   uint retry_counter = 5;
@@ -9935,6 +9952,12 @@ SHOW_VAR status_vars[] = {
      SHOW_SCOPE_GLOBAL},
     {"wsrep_provider_vendor", (char *)&wsrep_provider_vendor, SHOW_CHAR_PTR,
      SHOW_SCOPE_GLOBAL},
+    {"wsrep_provider_capabilities", (char *)&wsrep_provider_capabilities,
+     SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
+    {"wsrep_thread_count", (char *)&wsrep_running_threads, SHOW_LONG_NOFLUSH,
+     SHOW_SCOPE_GLOBAL},
+    {"wsrep_cluster_capabilities", (char *)&wsrep_cluster_capabilities,
+     SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
     {"wsrep", (char *)&wsrep_show_status, SHOW_FUNC, SHOW_SCOPE_ALL},
 #endif /* WITH_WSREP */
     {NullS, NullS, SHOW_LONG, SHOW_SCOPE_ALL}};
@@ -11625,7 +11648,9 @@ void refresh_status() {
   /* Reset some global variables. */
   reset_status_vars();
 #ifdef WITH_WSREP
-  wsrep->stats_reset(wsrep);
+  if (WSREP_ON) {
+    Wsrep_server_state::instance().provider().reset_status();
+  }
 #endif /* WITH_WSREP */
 
   /* Reset the counters of all key caches (default and named). */
@@ -11700,15 +11725,21 @@ PSI_mutex_key key_mutex_slave_worker_hash;
 PSI_mutex_key key_LOCK_wsrep_ready;
 PSI_mutex_key key_LOCK_wsrep_sst;
 PSI_mutex_key key_LOCK_wsrep_sst_init;
-PSI_mutex_key key_LOCK_wsrep_rollback;
 PSI_mutex_key key_LOCK_wsrep_replaying;
 
 PSI_mutex_key key_LOCK_wsrep_slave_threads;
+PSI_mutex_key key_LOCK_wsrep_cluster_config;
 PSI_mutex_key key_LOCK_wsrep_desync;
+
+PSI_mutex_key key_LOCK_wsrep_group_commit;
+PSI_mutex_key key_LOCK_wsrep_SR_pool;
+PSI_mutex_key key_LOCK_wsrep_SR_store;
 
 PSI_mutex_key key_LOCK_wsrep_thd;
 PSI_mutex_key key_LOCK_wsrep_thd_attachable_trx;
 PSI_mutex_key key_LOCK_wsrep_sst_thread;
+
+PSI_mutex_key key_LOCK_wsrep_thd_queue;
 #endif /* WITH_WSREP */
 
 /* clang-format off */
@@ -11806,15 +11837,21 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_ready, "LOCK_wsrep_ready", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_sst, "LOCK_wsrep_sst", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_sst_init, "LOCK_wsrep_sst_init", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_LOCK_wsrep_rollback, "LOCK_wsrep_rollback", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_replaying, "LOCK_wsrep_replaying", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_wsrep_cluster_config, "LOCK_wsrep_cluster_config", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+
+  { &key_LOCK_wsrep_group_commit, "LOCK_wsrep_group_commit", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_wsrep_SR_pool, "LOCK_wsrep_SR_pool", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_wsrep_SR_store, "LOCK_wsrep_SR_store", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 
   { &key_LOCK_wsrep_thd, "LOCK_wsrep_thd", 0, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_thd_attachable_trx, "LOCK_wsrep_thd_attachable_trx", 0, 0, PSI_DOCUMENT_ME},
-  { &key_LOCK_wsrep_sst_thread, "LOCK_wsrep_sst_thread", 0, 0, PSI_DOCUMENT_ME}
+  { &key_LOCK_wsrep_sst_thread, "LOCK_wsrep_sst_thread", 0, 0, PSI_DOCUMENT_ME},
+
+  { &key_LOCK_wsrep_thd_queue, "LOCK_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };
 /* clang-format on */
@@ -11884,11 +11921,14 @@ PSI_cond_key key_cond_mts_gaq;
 PSI_cond_key key_COND_wsrep_ready;
 PSI_cond_key key_COND_wsrep_sst;
 PSI_cond_key key_COND_wsrep_sst_init;
-PSI_cond_key key_COND_wsrep_rollback;
 PSI_cond_key key_COND_wsrep_replaying;
+PSI_cond_key key_COND_wsrep_slave_threads;
 
 PSI_cond_key key_COND_wsrep_thd;
 PSI_cond_key key_COND_wsrep_sst_thread;
+
+PSI_cond_key key_COND_wsrep_thd_queue;
+PSI_cond_key key_COND_wsrep_group_commit;
 #endif /* WITH_WSREP */
 
 PSI_cond_key key_RELAYLOG_update_cond;
@@ -11943,11 +11983,14 @@ static PSI_cond_info all_server_conds[]=
   { &key_COND_wsrep_ready, "COND_wsrep_ready", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_COND_wsrep_sst, "COND_wsrep_sst", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_COND_wsrep_sst_init, "COND_wsrep_sst_init", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_COND_wsrep_rollback, "COND_wsrep_rollback", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_COND_wsrep_replaying, "COND_wsrep_replaying", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_COND_wsrep_slave_threads, "COND_wsrep_slave_threads", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 
   { &key_COND_wsrep_thd, "THD::COND_wsrep_thd", 0, 0, PSI_DOCUMENT_ME},
-  { &key_COND_wsrep_sst_thread, "wsrep_sst_thread", 0, 0, PSI_DOCUMENT_ME}
+  { &key_COND_wsrep_sst_thread, "COND_wsrep_sst_thread", 0, 0, PSI_DOCUMENT_ME},
+
+  { &key_COND_wsrep_thd_queue, "COND_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
+  { &key_COND_wsrep_group_commit, "COND_wsrep_group_commit", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };
 /* clang-format on */
@@ -11966,6 +12009,7 @@ PSI_thread_key key_THREAD_wsrep_sst_logger;
 
 PSI_thread_key key_THREAD_wsrep_applier;
 PSI_thread_key key_THREAD_wsrep_rollbacker;
+PSI_thread_key key_THREAD_wsrep_post_rollbacker;
 #endif /* WITH_WSREP */
 
 /* clang-format off */
@@ -11991,7 +12035,8 @@ static PSI_thread_info all_server_threads[]=
   { &key_THREAD_wsrep_sst_upgrade, "THREAD_wsrep_sst_upgrade", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_sst_logger, "THREAD_wsrep_sst_logger", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
+  { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_post_rollbacker, "THREAD_wsrep_post_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };
 /* clang-format on */
@@ -12019,6 +12064,10 @@ PSI_file_key key_file_relaylog_cache;
 PSI_file_key key_file_relaylog_index;
 PSI_file_key key_file_relaylog_index_cache;
 PSI_file_key key_file_sdi;
+
+#ifdef WITH_WSREP
+PSI_file_key key_file_wsrep_gra_log;
+#endif /* WITH_WSREP */
 
 /* clang-format off */
 static PSI_file_info all_server_files[]=
@@ -12051,6 +12100,9 @@ static PSI_file_info all_server_files[]=
   { &key_file_trn, "trigger", 0, 0, PSI_DOCUMENT_ME},
   { &key_file_init, "init", 0, 0, PSI_DOCUMENT_ME},
   { &key_file_sdi, "SDI", 0, 0, PSI_DOCUMENT_ME}
+#ifdef WITH_WSREP
+  ,{ &key_file_wsrep_gra_log, "wsrep_gra_log", 0, 0, PSI_DOCUMENT_ME}
+#endif /* WITH_WSREP */
 };
 /* clang-format on */
 #endif /* HAVE_PSI_INTERFACE */
@@ -12175,24 +12227,27 @@ PSI_stage_info stage_wsrep_updating_rows = { 0, "wsrep: updating rows", 0, PSI_D
 PSI_stage_info stage_wsrep_applying_writeset = { 0, "wsrep: applying write set", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_wsrep_applied_writeset = { 0, "wsrep: applied write set", 0, PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_committing = { 0, "wsrep: committing", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_committed = { 0, "wsrep: committed", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_applying_toi_writeset = { 0, "wsrep: applying TOI write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_applied_toi_writeset = { 0, "wsrep: applied TOI write set", 0, PSI_DOCUMENT_ME};
+
+PSI_stage_info stage_wsrep_committing = { 0, "wsrep: committing write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_committed = { 0, "wsrep: committed write set", 0, PSI_DOCUMENT_ME};
+
+PSI_stage_info stage_wsrep_toi_committing = { 0, "wsrep: committing TOI write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_toi_committed = { 0, "wsrep: TOI committed write set", 0, PSI_DOCUMENT_ME};
 
 PSI_stage_info stage_wsrep_rolling_back = { 0, "wsrep: rolling back", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_wsrep_rolled_back = { 0, "wsrep: rolled back", 0, PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_replicating_commit = { 0, "wsrep: replicating commit", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_write_set_replicated= { 0, "wsrep: write-set replicated", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_waiting_on_replaying = { 0, "wsrep: waiting on replaying", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_replicate = { 0, "wsrep: in replicate stage", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_pre_commit = { 0, "wsrep: in pre-commit stage", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_pre_commit_cert_passed = { 0, "wsrep: pre-commit/certification passed", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_replicating_commit = { 0, "wsrep: replicating and certifying write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_write_set_replicated= { 0, "wsrep: write-set replicated and certified", 0, PSI_DOCUMENT_ME};
+
+PSI_stage_info stage_wsrep_replaying_trx = { 0, "wsrep: replaying transaction", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_replayed_write_set = { 0, "wsrep: replayed write set", 0, PSI_DOCUMENT_ME};
 
 PSI_stage_info stage_wsrep_preparing_for_TO_isolation = { 0, "wsrep: preparing for TO isolation", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_wsrep_TO_isolation_initiated = { 0, "wsrep: TO isolation initiated", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_wsrep_completed_TO_isolation = { 0, "wsrep: completed TO isolation", 0, PSI_DOCUMENT_ME};
-
-PSI_stage_info stage_wsrep_replaying_trx = { 0, "wsrep: replaying trx", 0, PSI_DOCUMENT_ME};
 
 PSI_stage_info stage_wsrep_applier_idle = { 0, "wsrep: applier idle", 0, PSI_DOCUMENT_ME};
 PSI_stage_info stage_wsrep_in_rollback_thread = { 0, "wsrep: in rollback thread", 0, PSI_DOCUMENT_ME};
@@ -12325,19 +12380,23 @@ PSI_stage_info *wsrep_server_stages[]=
   & stage_wsrep_applying_writeset,
   & stage_wsrep_applied_writeset,
 
+  & stage_wsrep_applying_toi_writeset,
+  & stage_wsrep_applied_toi_writeset,
+
   & stage_wsrep_committing,
   & stage_wsrep_committed,
+
+  & stage_wsrep_toi_committing,
+  & stage_wsrep_toi_committed,
 
   & stage_wsrep_rolling_back,
   & stage_wsrep_rolled_back,
 
-  // wsrep_hton
   & stage_wsrep_replicating_commit,
   & stage_wsrep_write_set_replicated,
-  & stage_wsrep_waiting_on_replaying,
-  & stage_wsrep_replicate,
-  & stage_wsrep_pre_commit,
-  & stage_wsrep_pre_commit_cert_passed,
+
+  & stage_wsrep_replaying_trx,
+  & stage_wsrep_replayed_write_set,
 
   // wsrep_mysqld
   & stage_wsrep_preparing_for_TO_isolation,
@@ -12345,7 +12404,6 @@ PSI_stage_info *wsrep_server_stages[]=
   & stage_wsrep_completed_TO_isolation,
 
   // wsrep_thd
-  & stage_wsrep_replaying_trx,
   & stage_wsrep_applier_idle,
   & stage_wsrep_in_rollback_thread,
   & stage_wsrep_aborter_idle,

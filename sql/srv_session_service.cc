@@ -188,8 +188,14 @@ int srv_session_close(Srv_session *session) {
 */
 int srv_session_server_is_available() {
 #ifdef WITH_WSREP
+  /* mysqlx plugin bootup fires queries against server. PXC server will not
+  accept queries till it reaches sync state. So the additional wsrep level
+  check.
+  wsrep_allow_server_session is set while creating session for SST user
+  creation. At this stage wsrep node state = s_donor. */
   if (WSREP_ON) {
-    return (wsrep_allow_server_session || (get_server_state() == SERVER_OPERATING && wsrep_node_is_synced()));
+    return (wsrep_allow_server_session ||
+            (get_server_state() == SERVER_OPERATING && wsrep_node_is_synced()));
   } else {
     return get_server_state() == SERVER_OPERATING;
   }

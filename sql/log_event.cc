@@ -156,6 +156,7 @@
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #include "wsrep_xid.h"
+#include "service_wsrep.h"
 #endif /* WITH_WSREP */
 
 #define window_size Log_throttle::LOG_THROTTLE_WINDOW_SIZE
@@ -3982,9 +3983,13 @@ Query_log_event::Query_log_event(THD *thd_arg, const char *query_arg,
     /* Step below generates DDL xid. Now that DDL are atomic (mysql-8.0)
     DDL is also assigned a valid xid. When running in cluster mode assign
     wsrep-xid to ensure that sequence is maintained for DDL and DML statement.*/
-    my_xid xid = (wsrep_is_wsrep_xid(trn_ctx->xid_state()->get_xid())
-                      ? wsrep_xid_seqno(*trn_ctx->xid_state()->get_xid())
-                      : trn_ctx->xid_state()->get_xid()->get_my_xid());
+    my_xid xid;
+    const XID *curr_xid = trn_ctx->xid_state()->get_xid();
+    if (wsrep_is_wsrep_xid(curr_xid)) {
+      xid = wsrep_xid_seqno(*curr_xid).get();
+    } else {
+      xid = curr_xid->get_my_xid();
+    }
 #else
     my_xid xid = trn_ctx->xid_state()->get_xid()->get_my_xid();
 #endif /* WITH_WSREP */
@@ -4919,6 +4924,15 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
 #endif /* WITH_WSREP */
       }
       thd->is_slave_error = 1;
+
+#ifdef WITH_WSREP
+      /* If DDL evaluate if user has configured to ignore certain errors. */
+      if (thd->wsrep_apply_toi && wsrep_must_ignore_error(thd)) {
+        thd->clear_error();
+        thd->killed = THD::NOT_KILLED;
+        thd->wsrep_has_ignored_error = true;
+      }
+#endif /* WITH_WSREP */
     }
 
     /*
@@ -8498,6 +8512,15 @@ int Rows_log_event::handle_idempotent_and_ignored_errors(
     bool ignored_error =
         (idempotent_error == 0 ? ignored_error_code(actual_error) : 0);
 
+#ifdef WITH_WSREP
+    /* Check if error qualifies for WSREP ignore error condition (DML). */
+    if (WSREP(thd) && !thd->slave_thread &&
+        wsrep_ignored_error_code(this, actual_error)) {
+      idempotent_error = true;
+      thd->wsrep_has_ignored_error = true;
+    }
+#endif /* WITH_WSREP */
+
     if (idempotent_error || ignored_error) {
       loglevel ll;
       if (idempotent_error)
@@ -9355,10 +9378,12 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli) {
       if (WSREP(thd)) {
         WSREP_WARN(
             "BF applier failed to open_and_lock_tables: %u, fatal: %s "
-            "wsrep = (exec_mode: %d conflict_state: %d seqno: %lld) ",
+            "wsrep = (exec_mode: %s conflict_state: %s seqno: %lld) ",
             thd->get_stmt_da()->mysql_errno(),
-            thd->is_fatal_error() ? "true" : "false", thd->wsrep_exec_mode,
-            thd->wsrep_conflict_state, (long long)wsrep_thd_trx_seqno(thd));
+            thd->is_fatal_error() ? "true" : "false",
+            wsrep_thd_client_mode_str(thd),
+            wsrep_thd_transaction_state_str(thd),
+            (long long)wsrep_thd_trx_seqno(thd));
       }
 #endif /* WITH_WSREP */
 

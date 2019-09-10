@@ -100,12 +100,22 @@ const char *IO_CACHE_binlog_cache_storage::tmp_file_name() const {
   return my_filename(m_io_cache.file);
 }
 
+#ifdef WITH_WSREP
+bool IO_CACHE_binlog_cache_storage::begin(unsigned char **buffer,
+                                          my_off_t *length,
+                                          my_off_t seek_offset) {
+#else
 bool IO_CACHE_binlog_cache_storage::begin(unsigned char **buffer,
                                           my_off_t *length) {
+#endif /* WITH_WSREP */
   DBUG_EXECUTE_IF("simulate_tmpdir_partition_full",
                   { DBUG_SET("+d,simulate_file_write_error"); });
 
+#ifdef WITH_WSREP
+  if (reinit_io_cache(&m_io_cache, READ_CACHE, seek_offset, false, false)) {
+#else
   if (reinit_io_cache(&m_io_cache, READ_CACHE, 0, false, false)) {
+#endif /* WITH_WSREP */
     DBUG_EXECUTE_IF("simulate_tmpdir_partition_full",
                     { DBUG_SET("-d,simulate_file_write_error"); });
 

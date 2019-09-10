@@ -416,8 +416,9 @@ struct System_variables {
   bool wsrep_replicate_myisam;  // enable myisam replication
   uint wsrep_sync_wait;
   ulong wsrep_retry_autocommit;
+  ulonglong wsrep_trx_fragment_size;
+  ulong wsrep_trx_fragment_unit;
   ulong wsrep_OSU_method;
-  ulong wsrep_RSU_commit_timeout;
   ulong wsrep_auto_increment_control;
   bool wsrep_dirty_reads;
 
@@ -429,6 +430,13 @@ struct System_variables {
     on the cluster's size):
   */
   ulong saved_auto_increment_increment, saved_auto_increment_offset;
+
+  /*
+    Control RSU timeout. When commit is in progress and RSU is fired
+    it wait for existing commit to end. This timeout define how long
+    RSU should wait before flagging timeout
+  */
+  ulong wsrep_RSU_commit_timeout;
 
   /*
     Stored value of sql_log_bin while wsrep_on is turned OFF

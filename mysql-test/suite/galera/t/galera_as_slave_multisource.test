@@ -6,7 +6,7 @@
 
 # As nodes #1, #2 is not a Galera node, we connect to node #3 in order to run include/galera_cluster.inc
 --connect node_3a, 127.0.0.1, root, , test, $NODE_MYPORT_3
---source include/galera_cluster.inc
+--source include/galera_cluster_master_slave.inc
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
 --connection node_3

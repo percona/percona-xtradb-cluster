@@ -125,11 +125,11 @@ Check usage of these function to understand there importance. */
 
 static wsrep_thd_is_brute_force_func wsrep_thd_is_brute_force = NULL;
 static wsrep_abort_thd_func wsrep_abort_thd = NULL;
-static bool wsrep_debug;
+static ulong wsrep_debug;
 static wsrep_on_func wsrep_on = NULL;
 
 void wsrep_thr_lock_init(wsrep_thd_is_brute_force_func bf_func,
-                         wsrep_abort_thd_func abort_func, bool debug,
+                         wsrep_abort_thd_func abort_func, ulong debug,
                          wsrep_on_func on_func) {
   wsrep_thd_is_brute_force = bf_func;
   wsrep_abort_thd = abort_func;
@@ -537,10 +537,6 @@ static inline bool wsrep_break_lock(THR_LOCK_DATA *data,
       wsrep_thd_is_brute_force(data->owner->mysql_thd, true)) {
     THR_LOCK_DATA *holder;
 
-    /* if locking session conversion to transaction has been enabled,
-       we know that this conflicting lock must be read lock and furthermore,
-       lock holder is read-only. It is safe to wait for him.
-    */
     if (wsrep_debug) fprintf(stderr, "WSREP wsrep_break_lock aborting locks\n");
 
     /* aborting lock holder(s) here */

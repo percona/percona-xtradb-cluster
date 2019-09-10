@@ -5,6 +5,9 @@
 CALL mtr.add_suppression("Aborting");
 CALL mtr.add_suppression("unknown option '--galera-unknown-option'");
 call mtr.add_suppression("The privilege system failed to initialize correctly");
+call mtr.add_suppression("SST failed/interrupted");
+call mtr.add_suppression("IST was interrupted");
+call mtr.add_suppression("IST didn't contain all write sets");
 
 #
 # We should count the number of "Assertion failed" warnings

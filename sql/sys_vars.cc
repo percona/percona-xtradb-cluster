@@ -1061,50 +1061,6 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var) {
                  : "MIXED");
     return true;
   }
-
-#if 0
-  bool block = false;
-
-  /* pxc-strict-mode enforcement. */
-  if (WSREP(thd)) {
-    switch (pxc_strict_mode) {
-      case PXC_STRICT_MODE_DISABLED:
-        break;
-      case PXC_STRICT_MODE_PERMISSIVE: {
-        if (stmt_or_mixed) {
-          WSREP_WARN(
-              "Percona-XtraDB-Cluster doesn't recommend setting"
-              " binlog_format to STATEMENT or MIXED"
-              " with pxc_strict_mode = PERMISSIVE");
-          push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
-                              "Percona-XtraDB-Cluster doesn't recommend setting"
-                              " binlog_format to STATEMENT or MIXED"
-                              " with pxc_strict_mode = PERMISSIVE");
-        }
-        break;
-      }
-      case PXC_STRICT_MODE_ENFORCING:
-      case PXC_STRICT_MODE_MASTER:
-      default: {
-        if (stmt_or_mixed) {
-          WSREP_ERROR(
-              "Percona-XtraDB-Cluster prohibits setting"
-              " binlog_format to STATEMENT or MIXED"
-              " with pxc_strict_mode = ENFORCING or MASTER");
-          char message[1024];
-          sprintf(message,
-                  "Percona-XtraDB-Cluster prohibits setting"
-                  " binlog_format to STATEMENT or MIXED"
-                  " with pxc_strict_mode = ENFORCING or MASTER");
-          my_message(ER_UNKNOWN_ERROR, message, MYF(0));
-          block = true;
-        }
-      }
-    }
-  }
-
-  if (block) return block;
-#endif /* 0 */
 #endif /* WITH_WSREP */
 
   if (var->type == OPT_GLOBAL || var->type == OPT_PERSIST) {
@@ -7153,12 +7109,12 @@ static Sys_var_uint Sys_immediate_server_version(
 #include "wsrep_sst.h"
 #include "wsrep_var.h"
 
-static PolyLock_mutex PLock_wsrep_slave_threads(&LOCK_wsrep_slave_threads);
+static PolyLock_mutex PLock_wsrep_cluster_config(&LOCK_wsrep_cluster_config);
 static Sys_var_charptr Sys_wsrep_provider(
     "wsrep_provider", "Path to replication provider library",
     PREALLOCATED GLOBAL_VAR(wsrep_provider),
     CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER), IN_FS_CHARSET,
-    DEFAULT(WSREP_NONE), &PLock_wsrep_slave_threads, NOT_IN_BINLOG,
+    DEFAULT(WSREP_NONE), &PLock_wsrep_cluster_config, NOT_IN_BINLOG,
     ON_CHECK(wsrep_provider_check), ON_UPDATE(wsrep_provider_update));
 
 static Sys_var_charptr Sys_wsrep_provider_options(
@@ -7178,14 +7134,15 @@ static Sys_var_charptr Sys_wsrep_data_home_dir(
 static Sys_var_charptr Sys_wsrep_cluster_name(
     "wsrep_cluster_name", "Name for the cluster",
     READ_ONLY GLOBAL_VAR(wsrep_cluster_name), CMD_LINE(REQUIRED_ARG),
-    IN_FS_CHARSET, DEFAULT(WSREP_CLUSTER_NAME), NO_MUTEX_GUARD, NOT_IN_BINLOG,
-    ON_CHECK(wsrep_cluster_name_check), ON_UPDATE(wsrep_cluster_name_update));
+    IN_FS_CHARSET, DEFAULT(WSREP_CLUSTER_NAME), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG, ON_CHECK(wsrep_cluster_name_check),
+    ON_UPDATE(wsrep_cluster_name_update));
 
 static Sys_var_charptr Sys_wsrep_cluster_address(
     "wsrep_cluster_address", "Address to initially connect to cluster",
     PREALLOCATED GLOBAL_VAR(wsrep_cluster_address),
     CMD_LINE(REQUIRED_ARG, OPT_WSREP_CLUSTER_ADDRESS), IN_FS_CHARSET,
-    DEFAULT(""), &PLock_wsrep_slave_threads, NOT_IN_BINLOG,
+    DEFAULT(""), &PLock_wsrep_cluster_config, NOT_IN_BINLOG,
     ON_CHECK(wsrep_cluster_address_check),
     ON_UPDATE(wsrep_cluster_address_update));
 
@@ -7210,7 +7167,7 @@ static Sys_var_charptr Sys_wsrep_node_incoming_address(
 static Sys_var_ulong Sys_wsrep_slave_threads(
     "wsrep_slave_threads", "Number of slave appliers to launch",
     GLOBAL_VAR(wsrep_slave_threads), CMD_LINE(REQUIRED_ARG),
-    VALID_RANGE(1, 512), DEFAULT(1), BLOCK_SIZE(1), &PLock_wsrep_slave_threads,
+    VALID_RANGE(1, 512), DEFAULT(1), BLOCK_SIZE(1), &PLock_wsrep_cluster_config,
     NOT_IN_BINLOG, ON_CHECK(NULL), ON_UPDATE(wsrep_slave_threads_update));
 
 static Sys_var_charptr Sys_wsrep_dbug_option("wsrep_dbug_option",
@@ -7220,10 +7177,13 @@ static Sys_var_charptr Sys_wsrep_dbug_option("wsrep_dbug_option",
                                              IN_FS_CHARSET, DEFAULT(""),
                                              NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
-static Sys_var_bool Sys_wsrep_debug("wsrep_debug",
-                                      "To enable debug level logging",
-                                      GLOBAL_VAR(wsrep_debug),
-                                      CMD_LINE(OPT_ARG), DEFAULT(false));
+static const char *wsrep_debug_names[] = {"NONE",      "SERVER", "TRANSACTION",
+                                          "STREAMING", "CLIENT", NullS};
+static Sys_var_enum Sys_wsrep_debug("wsrep_debug", "WSREP debug level logging",
+                                    GLOBAL_VAR(wsrep_debug),
+                                    CMD_LINE(REQUIRED_ARG), wsrep_debug_names,
+                                    DEFAULT(0), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+                                    ON_CHECK(0), ON_UPDATE(wsrep_debug_update));
 
 static Sys_var_ulong Sys_wsrep_retry_autocommit(
     "wsrep_retry_autocommit",
@@ -7307,10 +7267,10 @@ static Sys_var_bool Sys_wsrep_sst_donor_rejects_queries(
     DEFAULT(false));
 
 static Sys_var_bool Sys_wsrep_on("wsrep_on", "To enable wsrep replication ",
-                                   SESSION_ONLY(wsrep_on), CMD_LINE(OPT_ARG),
-                                   DEFAULT(true), NO_MUTEX_GUARD, NOT_IN_BINLOG,
-                                   ON_CHECK(wsrep_on_check),
-                                   ON_UPDATE(wsrep_on_update));
+                                 SESSION_ONLY(wsrep_on), CMD_LINE(OPT_ARG),
+                                 DEFAULT(true), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+                                 ON_CHECK(wsrep_on_check),
+                                 ON_UPDATE(wsrep_on_update));
 
 static Sys_var_charptr Sys_wsrep_start_position(
     "wsrep_start_position", "global transaction position to start from ",
@@ -7425,8 +7385,10 @@ static Sys_var_bool Sys_wsrep_log_conflicts("wsrep_log_conflicts",
 static Sys_var_bool Sys_wsrep_load_data_splitting(
     "wsrep_load_data_splitting",
     "To commit LOAD DATA "
-    "transaction after every 10K rows inserted",
-    GLOBAL_VAR(wsrep_load_data_splitting), CMD_LINE(OPT_ARG), DEFAULT(true));
+    "transaction after every 10K rows inserted (deprecated)",
+    GLOBAL_VAR(wsrep_load_data_splitting), CMD_LINE(OPT_ARG), DEFAULT(0),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0),
+    DEPRECATED_VAR(""));
 
 static Sys_var_bool Sys_wsrep_slave_FK_checks(
     "wsrep_slave_FK_checks",
@@ -7446,10 +7408,41 @@ static Sys_var_bool Sys_wsrep_restart_slave(
     "cluster",
     GLOBAL_VAR(wsrep_restart_slave), CMD_LINE(OPT_ARG), DEFAULT(false));
 
+static Sys_var_ulonglong Sys_wsrep_trx_fragment_size(
+    "wsrep_trx_fragment_size",
+    "Size of transaction fragments for streaming replication (measured in "
+    "units of 'wsrep_trx_fragment_unit')",
+    SESSION_VAR(wsrep_trx_fragment_size), CMD_LINE(REQUIRED_ARG),
+    VALID_RANGE(0, WSREP_MAX_WS_SIZE), DEFAULT(0), BLOCK_SIZE(1),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(wsrep_trx_fragment_size_check),
+    ON_UPDATE(wsrep_trx_fragment_size_update));
+
+extern const char *wsrep_fragment_units[];
+
+static Sys_var_enum Sys_wsrep_trx_fragment_unit(
+    "wsrep_trx_fragment_unit",
+    "Unit for streaming replication transaction fragments' size: bytes, "
+    "rows, statements",
+    SESSION_VAR(wsrep_trx_fragment_unit), CMD_LINE(REQUIRED_ARG),
+    wsrep_fragment_units, DEFAULT(WSREP_FRAG_BYTES), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(wsrep_trx_fragment_unit_update));
+
+extern const char *wsrep_SR_store_types[];
+static Sys_var_enum Sys_wsrep_SR_store(
+    "wsrep_SR_store", "Storage for streaming replication fragments",
+    READ_ONLY GLOBAL_VAR(wsrep_SR_store_type), CMD_LINE(REQUIRED_ARG),
+    wsrep_SR_store_types, DEFAULT(WSREP_SR_STORE_TABLE));
+
 static Sys_var_bool Sys_wsrep_dirty_reads(
     "wsrep_dirty_reads", "Allow reads from a node is not in primary component",
     SESSION_VAR(wsrep_dirty_reads), CMD_LINE(OPT_ARG), DEFAULT(false),
     NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
+static Sys_var_uint Sys_wsrep_ignore_apply_errors (
+       "wsrep_ignore_apply_errors", "Ignore replication errors",
+       GLOBAL_VAR(wsrep_ignore_apply_errors), CMD_LINE(REQUIRED_ARG),
+       VALID_RANGE(WSREP_IGNORE_ERRORS_NONE, WSREP_IGNORE_ERRORS_MAX),
+       DEFAULT(7), BLOCK_SIZE(1));
 
 static const char *pxc_strict_modes[] = {"DISABLED", "PERMISSIVE", "ENFORCING",
                                          "MASTER", NullS};

@@ -56,6 +56,10 @@
 #include "sql/transaction_info.h"
 #include "sql/xa.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
+
 /**
   Helper: Tell tracker (if any) that transaction ended.
 */
@@ -147,17 +151,15 @@ bool trans_begin(THD *thd, uint flags) {
       (thd->variables.option_bits & OPTION_TABLE_LOCK)) {
     thd->variables.option_bits &= ~OPTION_TABLE_LOCK;
 
-#ifdef WITH_WSREP
-    wsrep_register_hton(thd, true);
-#endif /* WITH_WSREP */
-
     thd->server_status &=
         ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
     DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
     res = ha_commit_trans(thd, true);
 
 #ifdef WITH_WSREP
-    wsrep_post_commit(thd, true);
+    if (wsrep_thd_is_local(thd)) {
+      res = res || wsrep_after_statement(thd);
+    }
 #endif /* WITH_WSREP */
   }
 
@@ -205,9 +207,12 @@ bool trans_begin(THD *thd, uint flags) {
   });
 
 #ifdef WITH_WSREP
-  thd->wsrep_PA_safe= true;
-  if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd))
-    DBUG_RETURN(true);
+  if (wsrep_thd_is_local(thd)) {
+    if (wsrep_sync_wait(thd)) DBUG_RETURN(true);
+    if (!thd->tx_read_only &&
+        wsrep_start_transaction(thd, thd->wsrep_next_trx_id()))
+      DBUG_RETURN(true);
+  }
 #endif /* WITH_WSREP */
 
 
@@ -266,10 +271,6 @@ bool trans_commit(THD *thd, bool ignore_global_read_lock) {
 
   if (trans_check_state(thd)) DBUG_RETURN(true);
 
-#ifdef WITH_WSREP
-  wsrep_register_hton(thd, true);
-#endif /* WITH_WSREP */
-
   thd->server_status &=
       ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
   DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
@@ -300,10 +301,6 @@ bool trans_commit(THD *thd, bool ignore_global_read_lock) {
   DBUG_ASSERT(thd->m_transaction_psi == NULL);
 
   thd->tx_priority = 0;
-
-#ifdef WITH_WSREP
-  wsrep_post_commit(thd, true);
-#endif /* WITH_WSREP */
 
   trans_track_end_trx(thd);
 
@@ -357,19 +354,10 @@ bool trans_commit_implicit(THD *thd, bool ignore_global_read_lock) {
     if (!thd->locked_tables_mode)
       thd->variables.option_bits &= ~OPTION_TABLE_LOCK;
 
-#ifdef WITH_WSREP
-    wsrep_register_hton(thd, true);
-#endif /* WITH_WSREP */
-
     thd->server_status &=
         ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
     DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
     res = ha_commit_trans(thd, true, ignore_global_read_lock);
-
-#ifdef WITH_WSREP
-    wsrep_post_commit(thd, true);
-#endif /* WITH_WSREP */
-
   } else if (tc_log)
     res = tc_log->commit(thd, true);
 
@@ -419,17 +407,7 @@ bool trans_rollback(THD *thd) {
   int res;
   DBUG_ENTER("trans_rollback");
 
-#ifdef WITH_WSREP
-  thd->wsrep_PA_safe= true;
-#endif /* WITH_WSREP */
-
-
   if (trans_check_state(thd)) DBUG_RETURN(true);
-
-#ifdef WITH_WSREP
-  wsrep_register_hton(thd, true);
-#endif /* WITH_WSREP */
-
 
   thd->server_status &=
       ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
@@ -488,10 +466,6 @@ bool trans_rollback_implicit(THD *thd) {
   */
   DBUG_ASSERT(thd->get_transaction()->is_empty(Transaction_ctx::STMT) &&
               !thd->in_sub_stmt);
-
-#ifdef WITH_WSREP
-  wsrep_register_hton(thd, true);
-#endif /* WITH_WSREP */
 
   thd->server_status &=
       ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
@@ -564,33 +538,31 @@ bool trans_commit_stmt(THD *thd, bool ignore_global_read_lock) {
 
   if (thd->get_transaction()->is_active(Transaction_ctx::STMT)) {
 
-#ifdef WITH_WSREP
-    /* If this is a multi-statement transaction then there would
-    be implict_commit or commit followed by this stmt_commit. */
-    wsrep_register_hton(thd, false);
-#endif /* WITH_WSREP */
-
     res = ha_commit_trans(thd, false, ignore_global_read_lock);
-
-#ifdef WITH_WSREP
-    if (!thd->in_active_multi_stmt_transaction())
-    {
-      trans_reset_one_shot_chistics(thd);
-      wsrep_post_commit(thd, false);
-    }
-#else
     if (!thd->in_active_multi_stmt_transaction())
       trans_reset_one_shot_chistics(thd);
-#endif /* WITH_WSREP */
   } else if (tc_log)
     res = tc_log->commit(thd, false);
   if (res == false && !thd->in_active_multi_stmt_transaction())
     if (thd->rpl_thd_ctx.session_gtids_ctx().notify_after_transaction_commit(
             thd))
       LogErr(WARNING_LEVEL, ER_TRX_GTID_COLLECT_REJECT);
+
+#if 0
+  /* TODO: (G-4) Krunal
+  streaming replication transaction flow will regularly append
+  transactions fragments and persist them in streaming table
+  (wsrep_streaming_log). Once the main transaction is committed then
+  the relevant entries from the streaming table needs to be removed.
+  this removal action is done as part of main transaction commit action.
+  main transaction commit ha_commit_trans involves 2 commits:
+  - main commit: to register commit of main transaction.
+  - sub-commit: to register commit of streaming table entries removal.
+  This could be avoided by using a new THD for sub-commit purpose. */
   /* In autocommit=1 mode the transaction should be marked as complete in P_S */
   DBUG_ASSERT(thd->in_active_multi_stmt_transaction() ||
               thd->m_transaction_psi == NULL);
+#endif
 
   thd->get_transaction()->reset(Transaction_ctx::STMT);
 
@@ -625,11 +597,6 @@ bool trans_rollback_stmt(THD *thd) {
   thd->get_transaction()->merge_unsafe_rollback_flags();
 
   if (thd->get_transaction()->is_active(Transaction_ctx::STMT)) {
-
-#ifdef WITH_WSREP
-    wsrep_register_hton(thd, false);
-#endif /* WITH_WSREP */
-
     ha_rollback_trans(thd, false);
     if (!thd->in_active_multi_stmt_transaction())
       trans_reset_one_shot_chistics(thd);

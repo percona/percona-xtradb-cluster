@@ -129,6 +129,7 @@ using std::list;
 #ifdef WITH_WSREP
 #include "wsrep_xid.h"
 #include "wsrep_binlog.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 using std::max;
@@ -158,7 +159,7 @@ static bool unsafe_warning_suppression_is_activated = false;
 static int limit_unsafe_warning_count = 0;
 
 #ifdef WITH_WSREP
-handlerton *binlog_hton;  // we need it in wsrep_binlog.cc
+handlerton *binlog_hton;  // we need it in wsrep_binlog.cc so skip static
 #else
 static handlerton *binlog_hton;
 #endif /* WITH_WSREP */
@@ -190,6 +191,7 @@ static int binlog_recover(Binlog_file_reader *binlog_file_reader,
 
 static inline bool has_commit_order_manager(THD *thd) {
 #ifdef WITH_WSREP
+  /* Avoid using commit order manager while operating in cluster mode. */
   if (WSREP(thd)) return false;
 #endif /* WITH_WSREP */
   return is_mts_worker(thd) &&
@@ -1377,9 +1379,11 @@ static int binlog_init(void *p) {
   binlog_hton = (handlerton *)p;
 
 #ifdef WITH_WSREP
-  /* During bootstrap (seed-db creation) wsrep options may not be configured
-  which will then disable binlog_hton but other WSREP compiled checks needs
-  binlog_hton so enable it while operating in bootstrap mode too. */
+  /*
+    During bootstrap (seed-db creation), wsrep options may not be configured
+    which will then disable binlog_hton but other WSREP compiled checks needs
+    binlog_hton, so enable it while operating in bootstrap mode too.
+  */
   if (WSREP_ON || opt_initialize)
     binlog_hton->state = SHOW_OPTION_YES;
   else
@@ -1426,14 +1430,14 @@ static int binlog_close_connection(handlerton *, THD *thd) {
     uchar *buf;
     size_t len = 0;
 
-    IO_CACHE_binlog_cache_storage *trx_cache = wsrep_get_trans_log(thd, true);
+    IO_CACHE_binlog_cache_storage *trx_cache = wsrep_get_trans_cache(thd, true);
     wsrep_write_cache_buf(trx_cache, &buf, &len);
     WSREP_WARN(
         "binlog trx cache not empty (%llu bytes) @ connection close %llu",
         (unsigned long long)len, (unsigned long long)thd->thread_id());
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
 
-    IO_CACHE_binlog_cache_storage *stmt_cache = wsrep_get_trans_log(thd, false);
+    IO_CACHE_binlog_cache_storage *stmt_cache = wsrep_get_trans_cache(thd, false);
     wsrep_write_cache_buf(stmt_cache, &buf, &len);
     WSREP_WARN(
         "binlog stmt cache not empty (%llu bytes) @ connection close %llu",
@@ -1745,7 +1749,21 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
 
 #ifdef WITH_WSREP
       if (WSREP_ON && thd->slave_thread && !thd->wsrep_applier) {
+        /* If the galera node is acting as async slave then capture
+        GTID event from the async slave applied thread and mark it for
+        replication in galera channel. */
         thd->wsrep_replicate_GTID = true;
+
+        /* Replicating DDL (from async-master) with replication filter will
+        cause DDL to get skipped way-early before the MySQL flow starts
+        transaction. Even though there is nothing to commit Galera/PXC flow
+        needs to capture empty event with GTID and replicate it. For this
+        it needs an active transaction. Start a transaction in Galera/PXC
+        context that will be committed as part of binlog_commit action
+        called below. */
+        if (!wsrep_is_active(thd)) {
+          wsrep_start_transaction(thd, thd->wsrep_next_trx_id());
+        }
       }
 #endif /* WITH_WSREP */
       /*
@@ -1755,6 +1773,10 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
       DBUG_PRINT("debug", ("Writing to trx_cache"));
       if (cache_data->write_event(&qinfo) || mysql_bin_log.commit(thd, true))
         DBUG_RETURN(1);
+
+#ifdef WITH_WSREP
+      thd->wsrep_replicate_GTID = false;
+#endif /* WITH_WSREP */
     }
   } else if (thd->owned_gtid.sidno == THD::OWNED_SIDNO_ANONYMOUS ||
              /*
@@ -1768,6 +1790,18 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
 
   {
     gtid_state->update_on_commit(thd);
+#ifdef WITH_WSREP
+    /* if setup is operating with gtid_mode=OFF + replication filter
+    then replication of DML event can cause start of transaction (as part of
+    BEGIN event) but the followup action of apply is blocked or skipped
+    by presence of replication filter.
+    binlog-commit will commit the transaction in InnoDB world but
+    PXC needs to be ensure the said transaction is closed as empty
+    transaction (just like SELECT empty transaction). */
+    if (wsrep_is_active(thd)) {
+      wsrep_commit_empty(thd, true);
+    }
+#endif /* WITH_WSREP */
   } else if (thd->variables.gtid_next.type == ASSIGNED_GTID &&
              thd->owned_gtid.is_empty()) {
     DBUG_ASSERT(thd->has_gtid_consistency_violation == false);
@@ -2281,7 +2315,7 @@ static int binlog_rollback(handlerton *, THD *thd, bool all) {
   int error = 0;
 #ifdef WITH_WSREP
   if (thd->lex->sql_command == SQLCOM_ROLLBACK_TO_SAVEPOINT &&
-      thd->wsrep_conflict_state != ABORTING)
+      thd->wsrep_trx().state() != wsrep::transaction::s_aborting)
 #else
   if (thd->lex->sql_command == SQLCOM_ROLLBACK_TO_SAVEPOINT)
 #endif /* WITH_WSREP */
@@ -2363,7 +2397,18 @@ bool Stage_manager::Mutex_queue::append(THD *first) {
 
   In order to rule out this race we ensure that FLUSH QUEUE addition and interim
   commit are executed as atomic action. */
-  if (interim_commit) wsrep_interim_commit(thd_to_append);
+  if (WSREP(thd_to_append) && interim_commit &&
+      thd_to_append->run_wsrep_ordered_commit) {
+    wsrep_ordered_commit(thd_to_append, true, wsrep_apply_error());
+
+    DBUG_EXECUTE_IF("sync.wsrep_ordered_commit", {
+      const char act[] =
+          "now "
+          "SIGNAL sync.wsrep_ordered_commit_reached "
+          "WAIT_FOR signal.wsrep_ordered_commit_continue";
+      DBUG_ASSERT(!debug_sync_set_action(thd_to_append, STRING_WITH_LEN(act)));
+    };);
+  }
 #endif /* WITH_WSREP */
   unlock();
   DBUG_RETURN(empty);
@@ -2614,7 +2659,7 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all) {
       this one
      */
   } else if (thd->lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT ||
-             thd->wsrep_conflict_state == ABORTING) {
+             thd->wsrep_trx().state() == wsrep::transaction::s_aborting) {
 #else
   } else if (thd->lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT) {
 #endif /* WITH_WSREP */
@@ -2923,7 +2968,15 @@ static int binlog_savepoint_rollback(handlerton *, THD *thd, void *sv) {
     non-transactional table. Otherwise, truncate the binlog cache starting
     from the SAVEPOINT command.
   */
+#ifdef WITH_WSREP
+  /*
+    For streaming replication, we  must replicate savepoint rollback so that
+    slaves can maintain SR transactions
+  */
+  if (thd->wsrep_trx().is_streaming() || trans_cannot_safely_rollback(thd)) {
+#else
   if (trans_cannot_safely_rollback(thd)) {
+#endif /* WITH_WSREP */
     String log_query;
     if (log_query.append(STRING_WITH_LEN("ROLLBACK TO ")))
       DBUG_RETURN(1);
@@ -5433,6 +5486,18 @@ void MYSQL_BIN_LOG::report_cache_write_error(THD *thd, bool is_transactional) {
              my_strerror(errbuf, sizeof(errbuf), errno));
   }
 
+#ifdef WITH_WSREP
+  /* If wsrep transaction is active and binlog emulation is on,
+     binlog write error may leave transaction without any registered
+     htons. This makes wsrep rollback hooks to be skipped and the
+     transaction will remain alive in wsrep world after rollback.
+     Register binlog hton here to ensure that rollback happens in full. */
+  if (WSREP_EMULATE_BINLOG(thd)) {
+    if (is_transactional) trans_register_ha(thd, true, binlog_hton, NULL);
+    trans_register_ha(thd, false, binlog_hton, NULL);
+  }
+#endif /* WITH_WSREP */
+
   DBUG_VOID_RETURN;
 }
 
@@ -7152,8 +7217,7 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info) {
   applier action to get binlogged.
   But this should be avoided if applier thread is operating in emulation
   binlog mode. */
-  if ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) ||
-      is_open()) {
+  if ((WSREP_EMULATE_BINLOG(thd) && !wsrep_thd_is_applying(thd)) || is_open()) {
 #else
   if (likely(is_open())) {
 #endif /* WITH_WSREP */
@@ -8181,9 +8245,13 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
   binlog_cache_mngr *cache_mngr = thd_get_cache_mngr(thd);
   Transaction_ctx *trn_ctx = thd->get_transaction();
 #ifdef WITH_WSREP
-  my_xid xid = (wsrep_is_wsrep_xid(trn_ctx->xid_state()->get_xid())
-                    ? wsrep_xid_seqno(*trn_ctx->xid_state()->get_xid())
-                    : trn_ctx->xid_state()->get_xid()->get_my_xid());
+  my_xid xid;
+  const XID *curr_xid = trn_ctx->xid_state()->get_xid();
+  if (wsrep_is_wsrep_xid(curr_xid)) {
+    xid = wsrep_xid_seqno(*curr_xid).get();
+  } else {
+    xid = curr_xid->get_my_xid();
+  }
 #else
   my_xid xid = trn_ctx->xid_state()->get_xid()->get_my_xid();
 #endif /* WITH_WSREP */
@@ -8389,26 +8457,6 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
   */
   if (stmt_stuff_logged || trx_stuff_logged) {
 
-#ifdef WITH_WSREP
-    /* Action below will log an empty group of GTID.
-    This is done when the real action fails to generate any meaningful result on
-    executing slave.
-    Let's understand with an example:
-    * Topology master <-> slave
-    * Some action is performed on slave which put it out-of-sync from master.
-    * Master then execute same action. Slave may choose to ignore error arising
-      from execution of these actions using slave_skip_errors configuration but
-      the GTID sequence increment still need to register on slave to keep it in
-      sync with master. So a dummy trx of this form is created. Galera
-      eco-system too will capture this dummy trx and will execute it for
-      internal replication to keep GTID sequence consistent across
-      the cluster. */
-    if (WSREP_ON && thd->wsrep_replicate_GTID && wsrep_replicate_GTID(thd)) {
-      /* GTID replication failed */
-      DBUG_RETURN(RESULT_ABORTED);
-    }
-#endif /* WITH_WSREP */
-
     if (RUN_HOOK(
             transaction, before_commit,
             (thd, all, thd_get_cache_mngr(thd)->get_trx_cache(),
@@ -8444,7 +8492,42 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
       DBUG_RETURN(RESULT_ABORTED);
     }
 
+#ifdef WITH_WSREP
+    int error;
+    const bool run_wsrep_hooks = wsrep_run_commit_hook(thd, all);
+    /* Set this flag to trigger execution of ordered commit as part of
+    thread handler flush stage append flow. */
+    thd->run_wsrep_ordered_commit = run_wsrep_hooks;
+
+    if (run_wsrep_hooks && (error = wsrep_before_commit(thd, all))) {
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      if (run_wsrep_hooks && wsrep_must_abort(thd)) {
+        WSREP_DEBUG("BF abort has happened after prepare & certify");
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      } else {
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      }
+
+      ha_rollback_low(thd, all);
+      gtid_state->update_on_rollback(thd);
+      thd_get_cache_mngr(thd)->reset();
+      // Reset the thread OK status before changing the outcome.
+      if (thd->get_stmt_da()->is_ok())
+        thd->get_stmt_da()->reset_diagnostics_area();
+      my_error(ER_TRANSACTION_ROLLBACK_DURING_COMMIT, MYF(0));
+      DBUG_RETURN(RESULT_ABORTED);
+    }
+
     int rc = ordered_commit(thd, all, skip_commit);
+
+    if (run_wsrep_hooks) {
+      wsrep_after_commit(thd, all);
+    }
+
+    thd->run_wsrep_ordered_commit = false;
+#else
+    int rc = ordered_commit(thd, all, skip_commit);
+#endif /* WITH_WSREP */
 
     if (rc) DBUG_RETURN(RESULT_INCONSISTENT);
 
@@ -9340,16 +9423,7 @@ commit_stage:
    */
   if (DBUG_EVALUATE_IF("force_rotate", 1, 0) ||
       (do_rotate && thd->commit_error == THD::CE_NONE &&
-#ifdef WITH_WSREP
-       /* Split trx represent intermediate commit trx like
-       intermediate commit during LDI every 10K rows.
-       Avoid binlog rotation if this commit is caused by intermediate
-       commit. Rotation should happen when the complete logical
-       unit is committed. */
-       !is_rotating_caused_by_incident && !thd->wsrep_split_trx)) {
-#else
        !is_rotating_caused_by_incident)) {
-#endif /* WITH_WSREP */
     /*
       Do not force the rotate as several consecutive groups may
       request unnecessary rotations.
@@ -9455,13 +9529,11 @@ static int binlog_recover(Binlog_file_reader *binlog_file_reader,
     the recovery committed transaction.
   */
   if (WSREP_ON) {
-    wsrep_uuid_t uuid;
-    wsrep_seqno_t seqno;
-    wsrep_get_SE_checkpoint(uuid, seqno);
-    char uuid_str[40];
-    wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
-    WSREP_INFO("Before binlog recovery (wsrep position %s:%lld)", uuid_str,
-               (long long)seqno);
+    wsrep::gtid gtid = wsrep_get_SE_checkpoint();
+    std::ostringstream oss;
+    oss << gtid;
+    WSREP_INFO("Before binlog recovery (wsrep position: %s)",
+               oss.str().c_str());
   }
 
   /* Pre-notes:
@@ -9579,13 +9651,10 @@ static int binlog_recover(Binlog_file_reader *binlog_file_reader,
 
 #ifdef WITH_WSREP
   if (WSREP_ON) {
-    wsrep_uuid_t uuid;
-    wsrep_seqno_t seqno;
-    wsrep_get_SE_checkpoint(uuid, seqno);
-    char uuid_str[40];
-    wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
-    WSREP_INFO("After binlog recovery (wsrep position %s:%lld)", uuid_str,
-               (long long)seqno);
+    wsrep::gtid gtid = wsrep_get_SE_checkpoint();
+    std::ostringstream oss;
+    oss << gtid;
+    WSREP_INFO("After binlog recovery (wsrep position: %s)", oss.str().c_str());
   }
 #endif /* WITH_WSREP */
   return 0;
@@ -10283,6 +10352,17 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
     binlog by filtering rules.
   */
 #ifdef WITH_WSREP
+  if (WSREP(this) && wsrep_thd_is_local(this) &&
+      variables.wsrep_trx_fragment_size > 0) {
+    if (!is_current_stmt_binlog_format_row()) {
+      my_message(ER_NOT_SUPPORTED_YET,
+                 "Streaming replication not supported with "
+                 "binlog_format=STATEMENT",
+                 MYF(0));
+      DBUG_RETURN(-1);
+    }
+  }
+
   if ((WSREP_EMULATE_BINLOG_NNULL(this) ||
        (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG))) &&
       !(variables.binlog_format == BINLOG_FORMAT_STMT &&
@@ -10662,7 +10742,7 @@ int THD::decide_logging_format(TABLE_LIST *tables) {
                limited to row-logging when binlog_format = STATEMENT
           */
 #ifdef WITH_WSREP
-          if (!WSREP_NNULL(this) || wsrep_exec_mode == LOCAL_STATE) {
+          if (!WSREP_NNULL(this) || wsrep_thd_is_local(this)) {
             my_error((error = ER_BINLOG_STMT_MODE_AND_ROW_ENGINE), MYF(0), "");
           }
 #else
@@ -11374,8 +11454,8 @@ class Row_data_memory {
 int THD::binlog_write_row(TABLE *table, bool is_trans, uchar const *record,
                           const uchar *extra_row_info) {
 #ifdef WITH_WSREP
-  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
-	      ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() &&
+              ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
 #endif /* WITH_WSREP */
@@ -11406,7 +11486,7 @@ int THD::binlog_update_row(TABLE *table, bool is_trans,
                            const uchar *after_record,
                            const uchar *extra_row_info) {
 #ifdef WITH_WSREP
-  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() &&
               ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
@@ -11957,7 +12037,8 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, const char *query_arg,
 
 #ifdef WITH_WSREP
 
-IO_CACHE_binlog_cache_storage *wsrep_get_trans_log(THD *thd, bool transaction) {
+IO_CACHE_binlog_cache_storage *wsrep_get_trans_cache(THD *thd,
+                                                     bool transaction) {
   binlog_cache_mngr *const cache_mngr = thd_get_cache_mngr(thd);
   if (cache_mngr) {
     if (transaction)
@@ -12002,7 +12083,7 @@ TC_LOG::enum_result wsrep_thd_binlog_commit(THD *thd, bool all) {
      - applier and replayer can skip binlog commit
      - also if node is not joined, replication must be skipped
    */
-  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) &&
+  if (WSREP_EMULATE_BINLOG(thd) && !wsrep_thd_is_applying(thd) &&
       wsrep_ready_get())
     return mysql_bin_log.commit(thd, all);
   else
@@ -12015,12 +12096,81 @@ int wsrep_thd_binlog_rollback(THD *thd, bool all) {
      - applier and replayer can skip binlog commit
      - also if node is not joined, replication must be skipped
    */
-  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) &&
+  if (WSREP_EMULATE_BINLOG(thd) && !wsrep_thd_is_applying(thd) &&
       wsrep_ready_get())
     return mysql_bin_log.rollback(thd, all);
   else
     return ha_rollback_low(thd, all);
 }
+
+bool wsrep_stmt_rollback_is_safe(THD *thd) {
+  bool ret(true);
+
+  DBUG_ENTER("wsrep_binlog_stmt_rollback_is_safe");
+
+  binlog_cache_mngr *cache_mngr =
+      (binlog_cache_mngr *)thd_get_ha_data(thd, binlog_hton);
+
+  if (binlog_hton && cache_mngr) {
+    if (thd->wsrep_sr().fragments_certified() > 0 &&
+        (cache_mngr->trx_cache.get_prev_position() == MY_OFF_T_UNDEF ||
+         cache_mngr->trx_cache.get_prev_position() <
+             thd->wsrep_sr().bytes_certified())) {
+      WSREP_DEBUG(
+          "statement rollback is not safe for streaming replication"
+          " pre-stmt_pos: %llu, frag repl pos: %zu\n"
+          "Thread: %u, SQL: %s",
+          cache_mngr->trx_cache.get_prev_position(),
+          thd->wsrep_sr().bytes_certified(), thd->thread_id(),
+          thd->query().str);
+      ret = false;
+    }
+  }
+  DBUG_RETURN(ret);
+}
+
+void wsrep_register_binlog_handler(THD *thd, bool trx) {
+  DBUG_ENTER("wsrep_register_binlog_handler");
+  /*
+    If this is the first call to this function while processing a statement,
+    the transactional cache does not have a savepoint defined. So, in what
+    follows:
+      . an implicit savepoint is defined;
+      . callbacks are registered;
+      . binary log is set as read/write.
+
+    The savepoint allows for truncating the trx-cache transactional changes
+    fail. Callbacks are necessary to flush caches upon committing or rolling
+    back a statement or a transaction. However, notifications do not happen
+    if the binary log is set as read/write.
+  */
+  // binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(thd);
+  binlog_cache_mngr *cache_mngr =
+      (binlog_cache_mngr *)thd_get_ha_data(thd, binlog_hton);
+  /* cache_mngr may be missing e.g. in mtr test ev51914.test */
+  if (cache_mngr &&
+      cache_mngr->trx_cache.get_prev_position() == MY_OFF_T_UNDEF) {
+    /*
+      Set an implicit savepoint in order to be able to truncate a trx-cache.
+    */
+    my_off_t pos = 0;
+    binlog_trans_log_savepos(thd, &pos);
+    cache_mngr->trx_cache.set_prev_position(pos);
+
+    /*
+      Set callbacks in order to be able to call commmit or rollback.
+    */
+    if (trx) trans_register_ha(thd, true, binlog_hton, NULL);
+    trans_register_ha(thd, false, binlog_hton, NULL);
+
+    /*
+      Set the binary log as read/write otherwise callbacks are not called.
+    */
+    thd->get_ha_data(binlog_hton->slot)->ha_info[0].set_trx_read_write();
+  }
+  DBUG_VOID_RETURN;
+}
+
 #endif /* WITH_WSREP */
 
 static int show_binlog_vars(THD *thd, SHOW_VAR *var,

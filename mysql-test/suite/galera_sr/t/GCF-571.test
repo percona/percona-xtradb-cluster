@@ -1,0 +1,65 @@
+#
+# GCF-571 ROLLBACK TO SAVEPOINT causes all SR records to be deleted
+#
+
+--source include/galera_cluster.inc
+
+
+--connection node_1
+--echo #node-1
+SET AUTOCOMMIT=OFF;
+CREATE TABLE t1 (f1 VARCHAR(10)) ENGINE=InnoDB;
+
+SET SESSION wsrep_trx_fragment_size = 1;
+START TRANSACTION;
+INSERT INTO t1 VALUES ('%abcdef%');
+INSERT INTO t1 VALUES ('%abcdef%');
+INSERT INTO t1 VALUES ('%abcdef%');
+INSERT INTO t1 VALUES ('%abcdef%');
+SAVEPOINT A;
+INSERT INTO t1 VALUES ('xyzxyz');
+INSERT INTO t1 VALUES ('xyzxyz');
+INSERT INTO t1 VALUES ('xyzxyz');
+INSERT INTO t1 VALUES ('xyzxyz');
+INSERT INTO t1 VALUES ('xyzxyz');
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--echo #node-1a
+SELECT COUNT(*) > 0 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%abcdef%';
+SELECT COUNT(*) > 0 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%xyz%';
+SELECT COUNT(*) = 1 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%SAVEPOINT `A`%';
+
+--connection node_1
+--echo #node-1
+ROLLBACK TO SAVEPOINT A;
+
+--connection node_1a
+--echo #node-1a
+SELECT COUNT(*) > 0 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%abcdef%';
+SELECT COUNT(*) > 0 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%xyz%';
+SELECT COUNT(*) = 1 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%SAVEPOINT `A`%';
+SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%ROLLBACK TO `A`%';
+
+--connection node_2
+--echo #node-2
+SELECT COUNT(*) > 0 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%abcdef%';
+SELECT COUNT(*) > 0 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%xyz%';
+SELECT COUNT(*) = 1 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%SAVEPOINT `A`%';
+SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log WHERE frag LIKE '%ROLLBACK TO `A`%';
+
+--connection node_1
+--echo #node-1
+ROLLBACK;
+
+--connection node_1a
+--echo #node-1a
+SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
+
+--connection node_2
+--echo #node-2
+SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
+
+--connection node_1
+--echo #node-1
+DROP TABLE t1;

@@ -1321,7 +1321,7 @@ drop table t;
 #
 --echo "grep --count \"Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to"
 --exec grep --count "Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to" $restartdir/restart.log
---remove_file $restartdir/restart.log
+#--remove_file $restartdir/restart.log
 #
 --echo "Try restarting node-2 with default options"
 --let $start_mysqld_params=""

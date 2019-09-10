@@ -1,0 +1,52 @@
+#
+# Test different setting option for wsrep_ignore_apply_errors 
+
+# Save initial value
+--let $saved_wsrep_ignored_apply_errors = `SELECT @@global.wsrep_ignore_apply_errors`
+select @@wsrep_ignore_apply_errors;
+
+#
+# try to set default value
+set global wsrep_ignore_apply_errors=default;
+select @@wsrep_ignore_apply_errors;
+
+#
+# try to different valid values
+set global wsrep_ignore_apply_errors=0;
+select @@wsrep_ignore_apply_errors;
+set global wsrep_ignore_apply_errors=1;
+select @@wsrep_ignore_apply_errors;
+set global wsrep_ignore_apply_errors=2;
+select @@wsrep_ignore_apply_errors;
+set global wsrep_ignore_apply_errors=3;
+select @@wsrep_ignore_apply_errors;
+set global wsrep_ignore_apply_errors=4;
+select @@wsrep_ignore_apply_errors;
+set global wsrep_ignore_apply_errors=5;
+select @@wsrep_ignore_apply_errors;
+set global wsrep_ignore_apply_errors=6;
+select @@wsrep_ignore_apply_errors;
+set global wsrep_ignore_apply_errors=7;
+select @@wsrep_ignore_apply_errors;
+
+#
+# try to different invalid values
+set global wsrep_ignore_apply_errors=100;
+show warnings;
+select @@wsrep_ignore_apply_errors;
+#
+set global wsrep_ignore_apply_errors=-1;
+show warnings;
+select @@wsrep_ignore_apply_errors;
+
+#
+# try to valid value at session level 
+--error ER_GLOBAL_VARIABLE
+set session wsrep_ignore_apply_errors=1;
+select @@wsrep_ignore_apply_errors;
+
+# Clean up
+--disable_query_log
+--eval SET GLOBAL wsrep_ignore_apply_errors = $saved_wsrep_ignored_apply_errors
+--enable_query_log
+

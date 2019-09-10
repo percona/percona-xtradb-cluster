@@ -1,8 +1,9 @@
-SET GLOBAL wsrep_debug = ON;
+SET GLOBAL wsrep_debug = 1;
 CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 ERROR HY000: Operation CREATE USER failed for 'u1'@'%'
 DROP USER u1;
+call mtr.add_suppression("Query apply failed.*");
 include/assert_grep.inc [plaintext_password]
 include/assert_grep.inc [plaintext_password]
 include/assert_grep.inc [<secret>]

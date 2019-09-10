@@ -682,8 +682,12 @@ bool log_and_commit_acl_ddl(THD *thd, bool transactional_tables,
     User_params user_params(extra_users);
     mysql_rewrite_acl_query(thd, Consumer_type::BINLOG, &user_params);
 #ifdef WITH_WSREP
-    /* If operating in cluster mode + binlog is enabled + sql_log_bin = 0
-    dis-allow write_to_binlog routine to execute. */
+    /*
+      If operating in cluster mode and binlog is enabled but sql_log_bin = 0
+      then disallow write_to_binlog routine to execute.
+      Even if it executes and generate binlog data it will not be written to
+      binary logs.
+    */
     write_to_binlog =
         (WSREP(thd) && (mysql_bin_log.is_open() &&
                         !(thd->variables.option_bits & OPTION_BIN_LOG)))

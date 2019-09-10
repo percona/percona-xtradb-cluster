@@ -2,7 +2,7 @@
 
 [mysqld]
 wsrep_sst_method=xtrabackup-v2
-wsrep_debug=ON
+wsrep_debug=1
 
 [SST]
 tkey=@ENV.MYSQL_TEST_DIR/std_data/galera-key.pem

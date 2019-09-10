@@ -37,7 +37,7 @@
 # As node #1 is not a Galera node, we connect to node #2 in order to run
 # include/galera_cluster.inc
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
---source include/galera_cluster.inc
+--source include/galera_cluster_master_slave.inc
 
 --connection node_2
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'

@@ -444,9 +444,7 @@ ENDIF()
 INCLUDE(CMakePushCheckState)
 
 # Add macros
-#---- WSREP
-INCLUDE(wsrep)
-#---- WSREP
+INCLUDE(wsrep-lib)
 INCLUDE(character_sets)
 INCLUDE(cpu_info)
 INCLUDE(zlib)
@@ -866,6 +864,10 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_BINARY_DIR}/libbinlogevents/include
   ${CMAKE_SOURCE_DIR}/libbinlogevents/export)
 
+IF(WITH_WSREP)
+  INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/include)
+  INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/wsrep-API/v26/)
+ENDIF()
 
 SET(WITH_SYSTEM_LIBS_DEFAULT OFF)
 
@@ -1070,11 +1072,9 @@ ADD_SUBDIRECTORY(extra/regex)
 ADD_SUBDIRECTORY(libmysql)
 ADD_SUBDIRECTORY(libbinlogevents)
 ADD_SUBDIRECTORY(libbinlogstandalone)
-#---- WITH_WSREP
 IF(WITH_WSREP)
-ADD_SUBDIRECTORY(wsrep)
+   ADD_SUBDIRECTORY(wsrep-lib)
 ENDIF()
-#---- WITH_WSREP
 
 IF(NOT WITHOUT_SERVER)
   SET (MYSQLD_STATIC_PLUGIN_LIBS "" CACHE INTERNAL "")

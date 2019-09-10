@@ -218,16 +218,29 @@ rpl.rpl_semi_sync_ack_thread : Issue#330 2018-05-16 CODERSHIP https://github.com
 rpl.rpl_semi_sync_after_sync : Issue#330 2018-06-19 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 
 # galera
-galera.MW-286 : Fails due to timing issue. Parallel transaction should be running while ALTER is fired.
 galera.galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
 galera.galera_fk_multitable : Bug#80821 0000-00-00 CODERSHIP fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
 galera.galera_kill_nochanges : mysql-wsrep#24 0000-00-00 CODERSHIP Galera server does not restart properly if killed
 galera.galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically
-galera.pxc_encrypt_rest_blog : Currently PXC  doesn't support binlog encryption
+galera.pxc_encrypt_rest_blog : Currently PXC do not support binlog encryption
 galera.pxc_encrypt_rest_gt_vault : Vault server availability is unreliable
 galera.pxc_encrypt_rest_fpt_vault : Vault server availability is unreliable
+galera.galera_var_notify_cmd : Failing to invoke the external script
+galera.galera_sst_rsync : rsync feature removed
+galera.galera_ist_rsync : rsync feature removed
+galera.galera_truncate : result depends on which node indexing
 
 # galera-3nodes
+galera_3nodes.galera_ipv6_rsync : Needs rsync so disabled
+
+# galera_sr
+galera_sr.galera_sr_table_contents : missing header file
+#galera_sr.GCF-1043A : Hitting PXC-2513
+
+# galera_3nodes_sr
+galera_3nodes_sr.GCF-810A : Test sub-file missing
+galera_3nodes_sr.GCF-810B : Test sub-file missing
+galera_3nodes_sr.GCF-810C : Test sub-file missing
 
 #binlog
 binlog.binlog_index : codership/mysql-wsrep##71 0000-00-00 CODERSHIP Regression: Duplicate "file was not purged because it is the active log file" warning

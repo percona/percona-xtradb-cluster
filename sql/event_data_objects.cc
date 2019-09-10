@@ -75,7 +75,7 @@
 class Item;
 
 #ifdef WITH_WSREP
-#include "wsrep_thd.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 /**
@@ -1034,6 +1034,13 @@ bool Event_job_data::execute(THD *thd, bool drop) {
 
   mysql_reset_thd_for_next_command(thd);
 
+#ifdef WITH_WSREP
+  // Event are executed as part of background thread as if it is new
+  // connection with new command. Run wsrep_open to initialize the open-state
+  wsrep_open(thd);
+  wsrep_before_command(thd);
+#endif /* WITH_WSREP */
+
   /*
     MySQL parser currently assumes that current database is either
     present in THD or all names in all statements are fully specified.
@@ -1131,25 +1138,6 @@ bool Event_job_data::execute(THD *thd, bool drop) {
       There is no pre-locking and therefore there should be no
       tables open and locked left after execute_procedure.
     */
-
-#ifdef WITH_WSREP
-    /*
-      If the thread has been killed, rollback the operation
-      properly (for WSREP).
-    */
-    if (WSREP(thd)) {
-      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-      if (thd->wsrep_conflict_state == MUST_ABORT) {
-        wsrep_client_rollback(thd);
-        wsrep_cleanup_transaction(thd);
-	DBUG_ASSERT(thd->wsrep_safe_to_abort == true);
-
-        WSREP_DEBUG("abort the event in exec query state, avoiding autocommit");
-      }
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-    }
-#endif /* WITH_WSREP */
-
   }
 
 end:
@@ -1229,6 +1217,12 @@ end:
     }
   }
   if (save_sctx) event_sctx.restore_security_context(thd, save_sctx);
+
+#ifdef WITH_WSREP
+  wsrep_after_command_ignore_result(thd);
+  wsrep_close(thd);
+#endif /* WITH_WSREP */
+
   thd->lex->unit->cleanup(true);
   thd->end_statement();
   thd->cleanup_after_query();

@@ -2708,10 +2708,6 @@ bool Prepared_statement::set_parameters(String *expanded_query) {
   return false;
 }
 
-#ifdef WITH_WSREP
-void wsrep_replay_transaction(THD *thd);
-#endif /* WITH_WSREP */
-
 /**
   Execute a prepared statement. Re-prepare it a limited number
   of times if necessary.
@@ -2788,6 +2784,7 @@ reexecute:
 
 #ifdef WITH_WSREP
   bool observer_popped = false;
+#if 0
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   switch (thd->wsrep_conflict_state) {
     case CERT_FAILURE:
@@ -2825,6 +2822,7 @@ reexecute:
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       break;
   }
+#endif
   if (!observer_popped)
     thd->pop_reprepare_observer();
 #else

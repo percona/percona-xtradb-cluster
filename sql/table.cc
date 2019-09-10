@@ -306,6 +306,14 @@ TABLE_CATEGORY get_table_category(const LEX_STRING &db,
   DBUG_ASSERT(db.str != NULL);
   DBUG_ASSERT(name.str != NULL);
 
+#ifdef WITH_WSREP
+  if (my_strcasecmp(system_charset_info, db.str, "mysql") == 0 &&
+      my_strcasecmp(system_charset_info, name.str, "wsrep_streaming_log") ==
+          0) {
+    return TABLE_CATEGORY_INFORMATION;
+  }
+#endif /* WITH_WSREP */
+
   if (is_infoschema_db(db.str, db.length)) return TABLE_CATEGORY_INFORMATION;
 
   if (is_perfschema_db(db.str, db.length)) return TABLE_CATEGORY_PERFORMANCE;

@@ -1708,7 +1708,13 @@ static const std::pair<const char *, Create_func *> func_array[] = {
     {"INTERNAL_TABLESPACE_DATA_FREE",
      SQL_FN_INTERNAL(Item_func_internal_tablespace_data_free, 4)},
     {"INTERNAL_TABLESPACE_STATUS",
-     SQL_FN_INTERNAL(Item_func_internal_tablespace_status, 4)}};
+     SQL_FN_INTERNAL(Item_func_internal_tablespace_status, 4)}
+#ifdef WITH_WSREP
+    , {"WSREP_LAST_WRITTEN_GTID", SQL_FN(Item_func_wsrep_last_written_gtid, 0)}
+    , {"WSREP_LAST_SEEN_GTID", SQL_FN(Item_func_wsrep_last_seen_gtid, 0)}
+    , {"WSREP_SYNC_WAIT_UPTO", SQL_FN_V(Item_func_wsrep_sync_wait_upto, 1, 2)}
+#endif /* WITH_WSREP */
+};
 
 using Native_functions_hash = std::unordered_map<std::string, Create_func *>;
 static const Native_functions_hash *native_functions_hash;

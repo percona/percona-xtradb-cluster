@@ -1,0 +1,62 @@
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+7
+set global wsrep_ignore_apply_errors=default;
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+7
+set global wsrep_ignore_apply_errors=0;
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+0
+set global wsrep_ignore_apply_errors=1;
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+1
+set global wsrep_ignore_apply_errors=2;
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+2
+set global wsrep_ignore_apply_errors=3;
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+3
+set global wsrep_ignore_apply_errors=4;
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+4
+set global wsrep_ignore_apply_errors=5;
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+5
+set global wsrep_ignore_apply_errors=6;
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+6
+set global wsrep_ignore_apply_errors=7;
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+7
+set global wsrep_ignore_apply_errors=100;
+Warnings:
+Warning	1292	Truncated incorrect wsrep_ignore_apply_errors value: '100'
+show warnings;
+Level	Code	Message
+Warning	1292	Truncated incorrect wsrep_ignore_apply_errors value: '100'
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+7
+set global wsrep_ignore_apply_errors=-1;
+Warnings:
+Warning	1292	Truncated incorrect wsrep_ignore_apply_errors value: '-1'
+show warnings;
+Level	Code	Message
+Warning	1292	Truncated incorrect wsrep_ignore_apply_errors value: '-1'
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+0
+set session wsrep_ignore_apply_errors=1;
+ERROR HY000: Variable 'wsrep_ignore_apply_errors' is a GLOBAL variable and should be set with SET GLOBAL
+select @@wsrep_ignore_apply_errors;
+@@wsrep_ignore_apply_errors
+0

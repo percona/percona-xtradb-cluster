@@ -693,7 +693,7 @@ void buf_dump_thread() {
 
   if (srv_buffer_pool_load_at_startup) {
 #ifdef WITH_WSREP
-    if (!wsrep_recovery) buf_load();
+    if (!get_wsrep_recovery()) buf_load();
 #else
     buf_load();
 #endif /* WITH_WSREP */
@@ -717,7 +717,7 @@ void buf_dump_thread() {
 
   if (srv_buffer_pool_dump_at_shutdown && srv_fast_shutdown != 2) {
 #ifdef WITH_WSREP
-    if (!wsrep_recovery) {
+    if (!get_wsrep_recovery()) {
       buf_dump(FALSE /* ignore shutdown down flag,
                      keep going even if we are in a shutdown state */);
     }

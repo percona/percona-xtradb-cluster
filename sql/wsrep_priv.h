@@ -21,6 +21,7 @@
 
 #include "wsrep_api.h"
 #include "wsrep_mysqld.h"
+#include "wsrep_schema.h"
 
 #include <pthread.h>
 #include <cstdio>
@@ -29,26 +30,25 @@
 extern wsrep_uuid_t local_uuid;
 extern wsrep_seqno_t local_seqno;
 
-bool wsrep_ready_set(bool x);
-
-ssize_t wsrep_sst_prepare(void **msg, THD *thd);
+std::string wsrep_sst_prepare();
 ssize_t wsrep_sst_upgrade();
+wsrep_cb_status wsrep_sst_donate_cb (void* app_ctx,
+                                     void* recv_ctx,
+                                     const wsrep_buf_t* msg,
+                                     const wsrep_gtid_t* state_id,
+                                     const wsrep_buf_t* state,
+                                     bool bypass);
 
-wsrep_cb_status wsrep_sst_donate_cb(void *app_ctx, void *recv_ctx,
-                                    const void *msg, size_t msg_len,
-                                    const wsrep_gtid_t *state_id,
-                                    const char *state, size_t state_len,
-                                    bool bypass);
+extern wsrep_uuid_t  local_uuid;
+extern wsrep_seqno_t local_seqno;
+extern Wsrep_schema* wsrep_schema;
 
 void wsrep_abort_cb(void);
 
-void wsrep_sst_received(wsrep_t *, const wsrep_uuid_t &, wsrep_seqno_t,
-                        const void *, size_t);
+void wsrep_sst_received(THD*, const wsrep_uuid_t&, wsrep_seqno_t,
+                        const void*, size_t);
 
-/*! SST thread signals init thread about sst completion */
-void wsrep_sst_complete(const wsrep_uuid_t *, wsrep_seqno_t, bool);
-
-void wsrep_notify_status(wsrep_member_status_t new_status,
-                         const wsrep_view_info_t *view = 0);
+void wsrep_notify_status(enum wsrep::server_state::state status,
+                         const wsrep::view* view= 0);
 
 #endif /* WSREP_PRIV_H */

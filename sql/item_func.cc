@@ -123,6 +123,10 @@
 #include "template_utils.h"
 #include "thr_mutex.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
+
 class Protocol;
 class sp_rcontext;
 
@@ -2943,12 +2947,13 @@ void Item_func_rand::seed_random(Item *arg) {
   */
 #ifdef WITH_WSREP
   uint32 tmp;
-  if (WSREP(current_thd)) {
-    /* This ensures same random value is assigned to replication transaction. */
-    if (current_thd->wsrep_exec_mode == REPL_RECV)
-      tmp = current_thd->wsrep_rand;
+  THD* thd = current_thd;
+  if (WSREP(thd)) {
+    /* This ensures same random value is assigned to replicated transaction. */
+    if (wsrep_thd_is_applying(thd))
+      tmp = thd->wsrep_rand;
     else
-      tmp = current_thd->wsrep_rand = (uint32)arg->val_int();
+      tmp = thd->wsrep_rand = (uint32)arg->val_int();
   } else {
     tmp = (uint32)arg->val_int();
   }

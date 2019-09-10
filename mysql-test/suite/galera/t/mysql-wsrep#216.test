@@ -7,7 +7,7 @@
 
 --let $wsrep_debug_orig = `SELECT @@wsrep_debug`
 
-SET GLOBAL wsrep_debug = ON;
+SET GLOBAL wsrep_debug = 1;
 
 CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 
@@ -21,6 +21,7 @@ CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 DROP USER u1;
 
 --connection node_2
+call mtr.add_suppression("Query apply failed.*");
 --let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.user WHERE USER = 'u1';
 --source include/wait_condition.inc
 
@@ -46,7 +47,7 @@ DROP USER u1;
 # Five times for the first node, in the various wsrep_debug messages
 --let $assert_text = <secret>
 --let $assert_select = <secret>
---let $assert_count = 7 
+--let $assert_count = 9 
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc

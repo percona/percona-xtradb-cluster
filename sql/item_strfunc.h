@@ -1536,4 +1536,61 @@ class Item_func_convert_cpu_id_mask final : public Item_str_func {
   String *val_str(String *) override;
 };
 
+#ifdef WITH_WSREP
+
+#include "wsrep_api.h"
+
+class Item_func_wsrep_last_written_gtid : public Item_str_func {
+  typedef Item_str_func super;
+  String gtid_str;
+
+ public:
+  Item_func_wsrep_last_written_gtid(const POS &pos) : Item_str_func(pos) {}
+  String *val_str(String *) override;
+  bool itemize(Parse_context *pc, Item **res) override;
+  bool resolve_type(THD *) override {
+    set_data_type_string(WSREP_GTID_STR_LEN, &my_charset_bin);
+    maybe_null = true;
+    return false;
+  }
+  const char *func_name() const { return "wsrep_last_written_gtid"; }
+};
+
+class Item_func_wsrep_last_seen_gtid : public Item_str_func {
+  typedef Item_str_func super;
+  String gtid_str;
+
+ public:
+  Item_func_wsrep_last_seen_gtid(const POS &pos) : Item_str_func(pos) {}
+  String *val_str(String *) override;
+  bool itemize(Parse_context *pc, Item **res) override;
+  bool resolve_type(THD *) override {
+    set_data_type_string((uint32) WSREP_GTID_STR_LEN);
+    maybe_null = true;
+    return false;
+  }
+  const char *func_name() const { return "wsrep_last_seen_gtid"; }
+};
+
+class Item_func_wsrep_sync_wait_upto : public Item_bool_func {
+  typedef Item_bool_func super;
+  String value;
+
+ public:
+  Item_func_wsrep_sync_wait_upto(const POS &pos, Item *a)
+      : Item_bool_func(pos, a) {}
+  Item_func_wsrep_sync_wait_upto(const POS &pos, Item *a, Item *b)
+      : Item_bool_func(pos, a, b) {}
+
+  longlong val_int() override;
+  bool itemize(Parse_context *pc, Item **res) override;
+  const char *func_name() const override { return "wsrep_sync_wait_upto_gtid"; }
+  bool resolve_type(THD *thd) override {
+    bool res = super::resolve_type(thd);
+    maybe_null = true;
+    return res;
+  }
+};
+#endif /* WITH_WSREP */
+
 #endif /* ITEM_STRFUNC_INCLUDED */

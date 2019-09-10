@@ -140,12 +140,12 @@ inline bool is_supported_parser_charset(const CHARSET_INFO *cs) {
     goto error;
 
 #define WSREP_TO_ISOLATION_BEGIN_ALTER(db_, table_, table_list_, alter_info_) \
-  if (WSREP(thd) &&                                                           \
+  if (WSREP(thd) && wsrep_thd_is_local(thd) &&                                \
       wsrep_to_isolation_begin(thd, db_, table_, table_list_, alter_info_))   \
     goto error;
 
-#define WSREP_TO_ISOLATION_END                                    \
-  if (WSREP(thd) || (thd && thd->wsrep_exec_mode == TOTAL_ORDER)) \
+#define WSREP_TO_ISOLATION_END                                                 \
+  if ((WSREP(thd) && wsrep_thd_is_local_toi(thd)) || wsrep_thd_is_in_rsu(thd)) \
     wsrep_to_isolation_end(thd);
 
 /* Checks if lex->no_write_to_binlog is set for statements that use
@@ -321,6 +321,13 @@ bool set_default_collation(HA_CREATE_INFO *create_info,
   --skip-grant-tables server option.
 */
 #define CF_REQUIRE_ACL_CACHE (1U << 20)
+
+#ifdef WITH_WSREP
+/**
+  DDL statement that may be subject to error filtering.
+*/
+#define CF_WSREP_MAY_IGNORE_ERRORS (1U << 21)
+#endif /* WITH_WSREP */
 
 /* Bits in server_command_flags */
 

@@ -149,6 +149,8 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+#include "wsrep_thd.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 using std::equal_to;
@@ -6001,7 +6003,10 @@ restart:
     Note: kick-start will take-care of creating isolation key for all tables
     involved in the list (provided all of them are MYISAM tables). */
     if (is_dml_stmt && thd->variables.wsrep_replicate_myisam &&
-        db_type == DB_TYPE_MYISAM && thd->wsrep_exec_mode == LOCAL_STATE) {
+        db_type == DB_TYPE_MYISAM && wsrep_thd_is_local(thd)) {
+      wsrep_before_rollback(thd, true);
+      wsrep_after_rollback(thd, true);
+      wsrep_after_statement(thd);
       if (WSREP(thd) && wsrep_to_isolation_begin(thd, NULL, NULL, (*start))) {
         error = true;
         goto err;

@@ -9,4 +9,5 @@ wsrep_node_address=localhost
 wsrep_node_name=my_host_3
 
 [mysqld.4]
-wsrep_node_address=lo
+# ist can't operate with wsrep_node_address=lo
+wsrep_node_address=localhost

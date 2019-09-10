@@ -77,6 +77,7 @@ INSERT INTO t1 VALUES (1);
 ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
 COMMIT;
 SET AUTOCOMMIT=ON;
+call mtr.add_suppression("Query apply failed.*");
 DROP TABLE t1;
 DROP TABLE t2;
 use test;

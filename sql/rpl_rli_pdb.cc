@@ -72,6 +72,10 @@
 #include "sql/transaction_info.h"
 #include "thr_mutex.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
+
 #ifndef DBUG_OFF
 ulong w_rr = 0;
 uint mts_debug_concurrent_access = 0;
@@ -2448,6 +2452,13 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
       goto err;
     }
 
+#ifdef WITH_WSREP
+    if (wsrep_before_statement(thd)) {
+      WSREP_INFO("Wsrep before statement error (with slave worker)");
+      DBUG_RETURN(1);
+    }
+#endif /* WITH_WSREP */
+
     ev = job_item->data;
     DBUG_ASSERT(ev != NULL);
     DBUG_PRINT("info", ("W_%lu <- job item: %p data: %p thd: %p", worker->id,
@@ -2473,7 +2484,14 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
     ptr_g = rli->gaq->get_job_group(ev->mts_group_idx);
     if (ptr_g->new_fd_event) {
       error = worker->set_rli_description_event(ptr_g->new_fd_event);
+#ifdef WITH_WSREP
+      if (unlikely(error)) {
+        wsrep_after_statement(thd);
+        goto err;
+      }
+#else
       if (unlikely(error)) goto err;
+#endif /* WITH_WSREP */
       ptr_g->new_fd_event = NULL;
     }
 
@@ -2486,7 +2504,14 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
       error = worker->retry_transaction(start_relay_number, start_relay_pos,
                                         job_item->relay_number,
                                         job_item->relay_pos);
+#ifdef WITH_WSREP
+      if (error) {
+        wsrep_after_statement(thd);
+        goto err;
+      }
+#else
       if (error) goto err;
+#endif /* WITH_WSREP */
     }
     /*
       p-event or any other event of B-free (malformed) group can
@@ -2504,11 +2529,22 @@ int slave_worker_exec_job_group(Slave_worker *worker, Relay_log_info *rli) {
                              (ev->get_type_code() == binary_log::QUERY_EVENT ||
                               /* break through by LC only in GTID off */
                               (!seen_gtid && !is_mts_db_partitioned(rli)))))
+#ifdef WITH_WSREP
+    {
+      wsrep_after_statement(thd);
       break;
+    }
+#else
+      break;
+#endif /* WITH_WSREP */
 
     remove_item_from_jobs(job_item, worker, rli);
     /* The event will be used later if worker is NULL, so it is not freed */
     if (ev->worker != NULL) delete ev;
+
+#ifdef WITH_WSREP
+    wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
 
     job_item = pop_jobs_item(worker, job_item);
   }

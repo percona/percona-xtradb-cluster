@@ -561,7 +561,7 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *, bool) {
 
   rcode = 0;
 
-  cache = wsrep_get_trans_log(thd, true);
+  cache = wsrep_get_trans_cache(thd, true);
   if (cache) {
     thd->binlog_flush_pending_rows_event(true);
     rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
@@ -854,7 +854,7 @@ enum wsrep_trx_status wsrep_replicate(THD *thd) {
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
   rcode = 0;
-  cache = wsrep_get_trans_log(thd, true);
+  cache = wsrep_get_trans_cache(thd, true);
   if (cache) {
     thd->binlog_flush_pending_rows_event(true);
     rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);

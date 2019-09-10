@@ -22,10 +22,11 @@
 #include "set_var.h"
 #include "sql_class.h"
 #include "sql_plugin.h"
+#include "mysql/components/services/log_builtins.h"
+
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
 #include "wsrep_xid.h"
-#include "mysql/components/services/log_builtins.h"
 
 #define WSREP_START_POSITION_ZERO "00000000-0000-0000-0000-000000000000:-1"
 #define WSREP_CLUSTER_NAME "my_wsrep_cluster"
@@ -182,6 +183,16 @@ static int wsrep_start_position_verify(const char *start_str) {
 /* Function checks if the new value for start_position is valid.
 @return false if no error encountered with check else return true. */
 bool wsrep_start_position_check(sys_var *, THD *, set_var *var) {
+  if (Wsrep_server_state::instance().state() !=
+      wsrep::server_state::s_disconnected) {
+    char message[1024];
+    sprintf(message,
+            "wsrep_start_position can be set during server boot"
+            " or before loading wsrep_provider");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+    return false;
+  }
+
   char start_pos_buf[FN_REFLEN];
 
   if ((!var->save_result.string_value.str) ||
@@ -201,26 +212,26 @@ err:
   return true;
 }
 
-static void wsrep_set_local_position(const char *const value, bool const sst) {
-  size_t const value_len = strlen(value);
+static void wsrep_set_local_position(THD *thd, const char *const value,
+                                     size_t length, bool const sst) {
   wsrep_uuid_t uuid;
-  size_t const uuid_len = wsrep_uuid_scan(value, value_len, &uuid);
+  size_t const uuid_len = wsrep_uuid_scan(value, length, &uuid);
   wsrep_seqno_t const seqno = strtoll(value + uuid_len + 1, NULL, 10);
 
   if (sst) {
-    wsrep_sst_received(wsrep, uuid, seqno, NULL, 0);
+    wsrep_sst_received(thd, uuid, seqno, NULL, 0);
   } else {
-    // initialization
     local_uuid = uuid;
     local_seqno = seqno;
   }
 }
 
-bool wsrep_start_position_update(sys_var *, THD *, enum_var_type) {
+bool wsrep_start_position_update(sys_var *, THD *thd, enum_var_type) {
   WSREP_INFO("Updating wsrep_start_position to: '%s'", wsrep_start_position);
   // since this value passed wsrep_start_position_check, don't check anything
   // here
-  wsrep_set_local_position(wsrep_start_position, true);
+  wsrep_set_local_position(thd, wsrep_start_position,
+                           strlen(wsrep_start_position), true);
   return 0;
 }
 
@@ -231,7 +242,7 @@ void wsrep_start_position_init(const char *val) {
     return;
   }
 
-  wsrep_set_local_position(val, false);
+  wsrep_set_local_position(NULL, val, strlen(val), false);
 }
 
 static int get_provider_option_value(const char *opts, const char *opt_name,
@@ -261,17 +272,17 @@ end:
 static bool refresh_provider_options() {
   WSREP_DEBUG("refresh_provider_options: %s",
               (wsrep_provider_options) ? wsrep_provider_options : "null");
-  char *opts = wsrep->options_get(wsrep);
-  if (opts) {
-    wsrep_provider_options_init(opts);
+
+  try {
+    std::string opts = Wsrep_server_state::instance().provider().options();
+    wsrep_provider_options_init(opts.c_str());
     get_provider_option_value(wsrep_provider_options,
                               (char *)"repl.max_ws_size", &wsrep_max_ws_size);
-    free(opts);
-  } else {
+    return false;
+  } catch (...) {
     WSREP_ERROR("Failed to get provider options");
     return true;
   }
-  return false;
 }
 
 static int wsrep_provider_verify(const char *provider_str) {
@@ -335,9 +346,6 @@ err:
 bool wsrep_provider_update(sys_var *, THD *thd, enum_var_type) {
   bool rcode = false;
 
-  bool wsrep_on_saved = thd->variables.wsrep_on;
-  thd->variables.wsrep_on = false;
-
   /* Ensure we free the stats that are allocated by galera-library.
   wsrep part doesn't know how to free them shouldn't be attempting it
   as it not allocated by wsrep part.
@@ -358,13 +366,11 @@ bool wsrep_provider_update(sys_var *, THD *thd, enum_var_type) {
   mysql_mutex_unlock(&LOCK_global_system_variables);
   wsrep_stop_replication(thd, false);
 
-  /*
-    Unlock and lock LOCK_wsrep_slave_threads to maintain lock order & avoid
-    any potential deadlock.
+  /* provider status variables are allocated in provider library
+     and need to freed here, otherwise a dangling reference to
+     wsrep_status_vars would remain in THD
   */
-  mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
-  mysql_mutex_lock(&LOCK_global_system_variables);
-  mysql_mutex_lock(&LOCK_wsrep_slave_threads);
+  wsrep_free_status(thd);
 
   wsrep_deinit();
 
@@ -379,10 +385,18 @@ bool wsrep_provider_update(sys_var *, THD *thd, enum_var_type) {
   // we sure don't want to use old address with new provider
   wsrep_cluster_address_init(NULL);
   wsrep_provider_options_init(NULL);
+  if (!rcode) refresh_provider_options();
 
-  thd->variables.wsrep_on = wsrep_on_saved;
+  /* locking order to be enforced is:
+     1. LOCK_global_system_variables
+     2. LOCK_wsrep_cluster_config
+     => have to juggle mutexes to comply with this
+  */
 
-  refresh_provider_options();
+  mysql_mutex_unlock(&LOCK_wsrep_cluster_config);
+  mysql_mutex_lock(&LOCK_global_system_variables);
+  mysql_mutex_lock(&LOCK_wsrep_cluster_config);
+
 
   return rcode;
 }
@@ -404,13 +418,19 @@ void wsrep_provider_init(const char *value) {
 bool wsrep_provider_options_check(sys_var *, THD *, set_var *) { return 0; }
 
 bool wsrep_provider_options_update(sys_var *, THD *, enum_var_type) {
-  if (wsrep == NULL) {
-    my_message(ER_WRONG_ARGUMENTS, "WSREP (galera) not started", MYF(0));
+
+  if (!wsrep_provider_options) {
+    WSREP_ERROR("Invalid value for wsrep_provider_options");
+    my_message(ER_WRONG_ARGUMENTS, "Invalid value for wsrep_provider_options",
+               MYF(0));
     return true;
   }
 
-  wsrep_status_t ret = wsrep->options_set(wsrep, wsrep_provider_options);
-  if (ret != WSREP_OK) {
+  enum wsrep::provider::status ret =
+      Wsrep_server_state::instance().provider().options(wsrep_provider_options);
+
+  if (ret)
+  {
     WSREP_ERROR("Set options returned %d", ret);
     refresh_provider_options();
     return true;
@@ -447,6 +467,11 @@ bool wsrep_reject_queries_update(sys_var *, THD *, enum_var_type) {
   return false;
 }
 
+bool wsrep_debug_update(sys_var *, THD *, enum_var_type) {
+  Wsrep_server_state::instance().debug_log_level(wsrep_debug);
+  return false;
+}
+
 static int wsrep_cluster_address_verify(const char *) {
   /* There is no predefined address format, it depends on provider. */
   return 0;
@@ -475,8 +500,11 @@ err:
 }
 
 bool wsrep_cluster_address_update(sys_var *, THD *thd, enum_var_type) {
-  bool wsrep_on_saved = thd->variables.wsrep_on;
-  thd->variables.wsrep_on = false;
+  if (!Wsrep_server_state::instance().is_provider_loaded()) {
+    WSREP_INFO(
+        "WSREP (galera) provider is not loaded, can't re(start) replication.");
+    return false;
+  }
 
   /* stop replication is heavy operation, and includes closing all client
      connections. Closing clients may need to get LOCK_global_system_variables
@@ -485,22 +513,35 @@ bool wsrep_cluster_address_update(sys_var *, THD *thd, enum_var_type) {
      Note: releasing LOCK_global_system_variables may cause race condition, if
      there can be several concurrent clients changing wsrep_provider
   */
+  WSREP_DEBUG("wsrep_cluster_address_update: %s", wsrep_cluster_address);
   mysql_mutex_unlock(&LOCK_global_system_variables);
   wsrep_stop_replication(thd, false);
-  /*
-    Unlock and lock LOCK_wsrep_slave_threads to maintain lock order & avoid
-    any potential deadlock.
-  */
-  mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
-  mysql_mutex_lock(&LOCK_global_system_variables);
-  mysql_mutex_lock(&LOCK_wsrep_slave_threads);
 
   if (wsrep_start_replication()) {
     wsrep_create_rollbacker();
-    wsrep_create_appliers(wsrep_slave_threads);
+    wsrep_create_appliers(1);
+
+    if (WSREP_ON && wsrep_connected &&
+        !Wsrep_server_state::instance().is_initialized()) {
+      /* If server was not initialized during startup then
+      first initialization takes place here. */
+      Wsrep_server_state::instance().wait_until_state(
+          Wsrep_server_state::s_initializing);
+      Wsrep_server_state::instance().initialized();
+    }
+
+    wsrep_create_appliers(wsrep_slave_threads - 1);
   }
 
-  thd->variables.wsrep_on = wsrep_on_saved;
+  /* locking order to be enforced is:
+     1. LOCK_global_system_variables
+     2. LOCK_wsrep_cluster_config
+     => have to juggle mutexes to comply with this
+  */
+
+  mysql_mutex_unlock(&LOCK_wsrep_cluster_config);
+  mysql_mutex_lock(&LOCK_global_system_variables);
+  mysql_mutex_lock(&LOCK_wsrep_cluster_config);
 
   return false;
 }
@@ -585,8 +626,9 @@ void wsrep_node_address_init(const char *value) {
 }
 
 static void wsrep_slave_count_change_update() {
-  // wsrep_running_threads = appliers threads + 1 rollbacker thread
-  wsrep_slave_count_change = (wsrep_slave_threads - wsrep_running_threads + 1);
+  // wsrep_running_threads = appliers threads + rollbacker thread +
+  //                         post rollback thread
+  wsrep_slave_count_change = (wsrep_slave_threads - wsrep_running_threads + 2);
 }
 
 bool wsrep_slave_threads_update(sys_var *, THD *, enum_var_type) {
@@ -604,6 +646,11 @@ bool wsrep_slave_threads_update(sys_var *, THD *, enum_var_type) {
 }
 
 bool wsrep_desync_check(sys_var *, THD *thd, set_var *var) {
+  if (!WSREP_ON) {
+    my_message(ER_WRONG_ARGUMENTS, "WSREP (galera) not started", MYF(0));
+    return true;
+  }
+
   bool new_wsrep_desync = var->save_result.ulonglong_value;
   if (wsrep_desync == new_wsrep_desync) {
     if (new_wsrep_desync) {
@@ -629,22 +676,21 @@ bool wsrep_desync_check(sys_var *, THD *thd, set_var *var) {
     my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     return true;
   }
-
-  wsrep_status_t ret(WSREP_WARNING);
+  int ret= 1;
   if (new_wsrep_desync) {
-    ret = wsrep->desync(wsrep);
-    if (ret != WSREP_OK) {
-      WSREP_WARN("SET desync failed %d for schema: %s, query: %s", ret,
-                 (thd->db().str ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-      my_error(ER_CANNOT_USER, MYF(0), "'desync'", thd->query().str);
+    ret= Wsrep_server_state::instance().provider().desync();
+    if (ret) {
+      WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
+                  thd->db().str, WSREP_QUERY(thd));
+      my_error (ER_CANNOT_USER, MYF(0), "'desync'", thd->query());
       return true;
     }
   } else {
-    ret = wsrep->resync(wsrep);
+    ret= Wsrep_server_state::instance().provider().resync();
     if (ret != WSREP_OK) {
-      WSREP_WARN("SET resync failed %d for schema: %s, query: %s", ret,
-                 (thd->db().str ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-      my_error(ER_CANNOT_USER, MYF(0), "'resync'", thd->query().str);
+      WSREP_WARN ("SET resync failed %d for schema: %s, query: %s", ret,
+                  thd->db().str, WSREP_QUERY(thd));
+      my_error (ER_CANNOT_USER, MYF(0), "'resync'", thd->query());
       return true;
     }
   }
@@ -657,13 +703,78 @@ bool wsrep_max_ws_size_update(sys_var *, THD *, enum_var_type) {
   char max_ws_size_opt[128];
   snprintf(max_ws_size_opt, sizeof(max_ws_size_opt), "repl.max_ws_size=%lu",
            wsrep_max_ws_size);
-  wsrep_status_t ret = wsrep->options_set(wsrep, max_ws_size_opt);
-  if (ret != WSREP_OK) {
+  enum wsrep::provider::status ret =
+      Wsrep_server_state::instance().provider().options(max_ws_size_opt);
+  if (ret) {
     WSREP_ERROR("Set options returned %d", ret);
-    refresh_provider_options();
     return true;
   }
   return refresh_provider_options();
+}
+
+bool wsrep_trx_fragment_size_check(sys_var *, THD *thd, set_var *var) {
+
+  if (!WSREP(thd)) {
+    push_warning(thd, Sql_condition::SL_WARNING, ER_WRONG_VALUE_FOR_VAR,
+                 "Cannot set 'wsrep_trx_fragment_size' to a value other than "
+                 "0 because wsrep is switched off.");
+    return true;
+  }
+
+  if (var->value == NULL) {
+    return false;
+  }
+
+  const ulong new_trx_fragment_size = var->value->val_uint();
+
+  if (!WSREP(thd) && new_trx_fragment_size > 0) {
+    push_warning(thd, Sql_condition::SL_WARNING, ER_WRONG_VALUE_FOR_VAR,
+                 "Cannot set 'wsrep_trx_fragment_size' to a value other than "
+                 "0 because wsrep is switched off.");
+    return true;
+  }
+
+  if (new_trx_fragment_size > 0 && !wsrep_provider_is_SR_capable()) {
+    push_warning(thd, Sql_condition::SL_WARNING, ER_WRONG_VALUE_FOR_VAR,
+                 "Cannot set 'wsrep_trx_fragment_size' to a value other than "
+                 "0 because the wsrep_provider does not support streaming "
+                 "replication.");
+    return true;
+  }
+
+  if (wsrep_protocol_version < 4  && new_trx_fragment_size > 0) {
+    push_warning (thd, Sql_condition::SL_WARNING,
+                  ER_WRONG_VALUE_FOR_VAR,
+                  "Cannot set 'wsrep_trx_fragment_size' to a value other than "
+                  "0 because cluster is not yet operating in Galera 4 mode.");
+    return true;
+  }
+
+  return false;
+}
+
+bool wsrep_trx_fragment_size_update(sys_var *, THD *thd, enum_var_type) {
+  WSREP_DEBUG("wsrep_trx_fragment_size_update: %llu",
+              thd->variables.wsrep_trx_fragment_size);
+  if (thd->variables.wsrep_trx_fragment_size) {
+    return thd->wsrep_cs().enable_streaming(
+        wsrep_fragment_unit(thd->variables.wsrep_trx_fragment_unit),
+        size_t(thd->variables.wsrep_trx_fragment_size));
+  } else {
+    thd->wsrep_cs().disable_streaming();
+    return false;
+  }
+}
+
+bool wsrep_trx_fragment_unit_update(sys_var *, THD *thd, enum_var_type) {
+  WSREP_DEBUG("wsrep_trx_fragment_unit_update: %lu",
+              thd->variables.wsrep_trx_fragment_unit);
+  if (thd->variables.wsrep_trx_fragment_size) {
+    return thd->wsrep_cs().enable_streaming(
+        wsrep_fragment_unit(thd->variables.wsrep_trx_fragment_unit),
+        size_t(thd->variables.wsrep_trx_fragment_size));
+  }
+  return false;
 }
 
 /*
@@ -701,22 +812,20 @@ static void export_wsrep_status_to_mysql(THD *thd) {
   will make these references invalid. */
   wsrep_free_status(thd);
 
-  thd->wsrep_status_vars = wsrep->stats_get(wsrep);
+  thd->wsrep_status_vars = Wsrep_server_state::instance().status();
 
-  if (!thd->wsrep_status_vars) {
-    return;
-  }
-
-  for (wsrep_status_len = 0;
-       thd->wsrep_status_vars[wsrep_status_len].name != NULL;
-       wsrep_status_len++) {
-    /* */
-  }
+  wsrep_status_len= thd->wsrep_status_vars.size();
 
   if (mysql_status_len < wsrep_status_len) wsrep_status_len = mysql_status_len;
 
-  for (i = 0; i < wsrep_status_len; i++)
-    wsrep_assign_to_mysql(mysql_status_vars + i, thd->wsrep_status_vars + i);
+  for (i = 0; i < wsrep_status_len; i++) {
+    mysql_status_vars[i].name =
+        (char *)thd->wsrep_status_vars[i].name().c_str();
+    mysql_status_vars[i].value =
+        (char *)thd->wsrep_status_vars[i].value().c_str();
+    mysql_status_vars[i].type = SHOW_CHAR;
+    mysql_status_vars[i].scope = SHOW_SCOPE_ALL;
+  }
 
   mysql_status_vars[wsrep_status_len].name = NullS;
   mysql_status_vars[wsrep_status_len].value = NullS;
@@ -731,10 +840,7 @@ int wsrep_show_status(THD *thd, SHOW_VAR *var, char *) {
 }
 
 void wsrep_free_status(THD *thd) {
-  if (thd->wsrep_status_vars) {
-    wsrep->stats_free(wsrep, thd->wsrep_status_vars);
-    thd->wsrep_status_vars = 0;
-  }
+  thd->wsrep_status_vars.clear();
 }
 
 bool wsrep_replicate_myisam_check(sys_var *, THD *thd, set_var *var) {

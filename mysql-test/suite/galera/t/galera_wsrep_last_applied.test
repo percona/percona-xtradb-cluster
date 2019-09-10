@@ -9,8 +9,8 @@
 --source include/have_debug_sync.inc
 --source suite/galera/include/galera_have_debug_sync.inc
 
---let $galera_dml_local_sync_point = sync.post_commit.after_commit_leave
---let $galera_dml_remote_sync_point = sync.applier_post_commit.after_commit_leave
+--let $galera_dml_local_sync_point = sync.interim_commit.after_commit_leave
+--let $galera_dml_remote_sync_point = sync.applier_interim_commit.after_commit_leave
 --let $galera_ddl_local_sync_point = sync.to_isolation_end.after_commit_leave
 --let $galera_ddl_remote_sync_point = sync.apply_trx.after_commit_leave
 

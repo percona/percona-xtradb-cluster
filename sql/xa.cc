@@ -324,7 +324,7 @@ static bool xarecover_handlerton(THD *, plugin_ref plugin, void *arg) {
       for (int i = 0; i < got; i++) {
 #ifdef WITH_WSREP
         my_xid x = (wsrep_is_wsrep_xid(&info->list[i].id)
-                        ? wsrep_xid_seqno(info->list[i].id)
+                        ? wsrep_xid_seqno(info->list[i].id).get()
                         : info->list[i].id.get_my_xid());
 #else
         my_xid x = info->list[i].id.get_my_xid();
@@ -450,10 +450,6 @@ bool xa_trans_force_rollback(THD *thd) {
     by ha_rollback()/THD::transaction::cleanup().
   */
   thd->get_transaction()->xid_state()->reset_error();
-
-#ifdef WITH_WSREP
-  wsrep_register_hton(thd, true);
-#endif /* WITH_WSREP */
 
   if (ha_rollback_trans(thd, true)) {
     my_error(ER_XAER_RMERR, MYF(0));
@@ -679,17 +675,8 @@ bool Sql_cmd_xa_commit::process_internal_xa_commit(THD *thd,
     res = thd->is_error();
   } else if (xid_state->has_state(XID_STATE::XA_IDLE) &&
              m_xa_opt == XA_ONE_PHASE) {
-#ifdef WITH_WSREP
-    wsrep_register_hton(thd, true);
-#endif /* WITH_WSREP */
-
     int r = ha_commit_trans(thd, true);
     if ((res = r)) my_error(r == 1 ? ER_XA_RBROLLBACK : ER_XAER_RMERR, MYF(0));
-
-#ifdef WITH_WSREP
-    wsrep_post_commit(thd, true);
-#endif /* WITH_WSREP */
-
   } else if (xid_state->has_state(XID_STATE::XA_PREPARED) &&
              m_xa_opt == XA_NONE) {
     MDL_request mdl_request;
@@ -716,10 +703,6 @@ bool Sql_cmd_xa_commit::process_internal_xa_commit(THD *thd,
 
     gtid_error = commit_owned_gtids(thd, true, &need_clear_owned_gtid);
     if (gtid_error) {
-#ifdef WITH_WSREP
-      wsrep_register_hton(thd, true);
-#endif /* WITH_WSREP */
-
       res = true;
       /*
         Failure to store gtid is regarded as a unilateral one of the

@@ -120,7 +120,12 @@ class IO_CACHE_binlog_cache_storage : public Truncatable_ostream {
      @retval false  Success
      @retval true  Error
   */
+#ifdef WITH_WSREP
+  bool begin(unsigned char **buffer, my_off_t *length,
+             my_off_t seek_offset = 0);
+#else
   bool begin(unsigned char **buffer, my_off_t *length);
+#endif /* WITH_WSREP */
   /**
      Returns next piece of data. buffer is controlled by binlog cache
      implementation, so caller should not release it. If the function sets

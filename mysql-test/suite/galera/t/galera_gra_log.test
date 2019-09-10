@@ -33,6 +33,7 @@ SELECT COUNT(*) = 0 FROM t1;
 SET SESSION wsrep_on=ON;
 
 CALL mtr.add_suppression("Slave SQL: Error 'Table 't1' already exists' on query");
+call mtr.add_suppression("Query apply failed.*");
 
 DROP TABLE t1;
 --exec rm -rf $gra_binlog_file 

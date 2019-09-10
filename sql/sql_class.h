@@ -154,17 +154,14 @@ struct Binlog_user_var_event;
 struct LOG_INFO;
 
 #ifdef WITH_WSREP
+/* wsrep-lib */
 #include "wsrep_mysqld.h"
-struct wsrep_thd_shadow {
-  ulonglong options;
-  uint server_status;
-  enum wsrep_exec_mode wsrep_exec_mode;
-  Vio *vio;
-  ulong tx_isolation;
-  LEX_CSTRING db;
-  struct timeval user_time;
-  longlong row_count_func;
-};
+#include "wsrep_client_service.h"
+#include "wsrep_client_state.h"
+#include "wsrep_mutex.h"
+#include "wsrep_condition_variable.h"
+
+class Wsrep_applier_service;
 #endif /* WITH_WSREP */
 
 extern bool opt_log_slow_admin_statements;
@@ -770,7 +767,6 @@ class Global_read_lock {
       : m_state(GRL_NONE),
 #ifdef WITH_WSREP
         provider_paused(false),
-        provider_desynced_paused(false),
 #endif /* WITH_WSREP */
         m_mdl_global_shared_lock(NULL),
         m_mdl_blocks_commits_lock(NULL) {}
@@ -804,9 +800,9 @@ class Global_read_lock {
 
 #ifdef WITH_WSREP
   bool wsrep_pause(void);
-  wsrep_status_t wsrep_resume(void);
+  int wsrep_resume(void);
   bool wsrep_pause_once(bool *already_paused);
-  wsrep_status_t wsrep_resume_once(void);
+  int wsrep_resume_once(void);
   bool provider_resumed() const { return !provider_paused; }
   void pause_provider(bool val) { provider_paused = val; }
 #endif /* WITH_WSREP */
@@ -823,9 +819,6 @@ class Global_read_lock {
   FLUSH TABLES <table> FOR EXPORT
   and so while unlocking such context provider needs to resumed. */
   bool provider_paused;
-
-  /* Mark this true only when both action are successful. */
-  bool provider_desynced_paused;
 #endif /* WITH_WSREP */
 
   /**
@@ -1632,10 +1625,14 @@ class THD : public MDL_context_owner,
 #ifdef WITH_WSREP
   Ha_data *wsrep_get_backup_ha_data(int slot) {
     /* There could be series of attachable transaction as dd action
-    could be cascading. Like dd-action-1 invoking dd-action-2
-    so both of the may get different transaction so there is concept
-    of previous attachable transaction.
+    can be cascading. Like dd-action-1 invokes dd-action-2 and dd-action-2
+    invokes dd-action-3 and so on.
 
+    wsrep-interface is interested in the native transaction.
+    Reach native transaction by traversing the said attachable-transaction
+    list (attahable transaction are dd-action-transaction).
+
+    example of multiple list:
     One such use case is calling store procedure
     call p1((select i from t limit 1));
     This would cause opening of table <t> and which in turn also cause
@@ -2778,16 +2775,66 @@ class THD : public MDL_context_owner,
   } binlog_evt_union;
 
 #ifdef WITH_WSREP
-  const bool wsrep_applier;   /* dedicated slave applier thread */
+  bool wsrep_applier;         /* dedicated slave applier thread */
   bool wsrep_applier_closing; /* applier marked to close */
-  bool wsrep_client_thread;   /* to identify client threads*/
-  enum wsrep_exec_mode wsrep_exec_mode;
+  bool wsrep_client_thread;   /* to identify client threads */
   query_id_t wsrep_last_query_id;
-  enum wsrep_query_state wsrep_query_state;
-  enum wsrep_conflict_state wsrep_conflict_state;
+  XID wsrep_xid;
+
+  /**
+    This flag denotes that record locking should be skipped during INSERT
+    and gap locking during SELECT. Only used by the streaming replication thread
+    that only modifies the wsrep_schema.SR table.
+  */
+  bool wsrep_skip_locking;
 
   mysql_mutex_t LOCK_wsrep_thd;
   mysql_cond_t COND_wsrep_thd;
+
+  // changed from wsrep_seqno_t to wsrep_trx_meta_t in wsrep API rev 75
+  uint32 wsrep_rand;
+  Relay_log_info *wsrep_rli;
+  char wsrep_info[64];        /* string for dynamic proc info */
+  ulong wsrep_retry_counter;  // of autocommit
+  bool wsrep_PA_safe;
+  char *wsrep_retry_query;
+  size_t wsrep_retry_query_len;
+  enum enum_server_command wsrep_retry_command;
+  enum wsrep_consistency_check_mode wsrep_consistency_check;
+  std::vector<wsrep::provider::status_variable> wsrep_status_vars;
+  const char *wsrep_TOI_pre_query; /* a query to apply before
+                                      the actual TOI query */
+  size_t wsrep_TOI_pre_query_len;
+  wsrep_po_handle_t wsrep_po_handle;
+  size_t wsrep_po_cnt;
+  bool wsrep_po_in_trans;
+  rpl_sid wsrep_po_sid;
+  void *wsrep_apply_format;
+  bool wsrep_apply_toi; /* applier processing in TOI */
+  uchar *wsrep_rbr_buf;
+  ulong wsrep_affected_rows;
+  bool wsrep_has_ignored_error;
+  bool wsrep_replicate_GTID;
+
+  void *wsrep_gtid_event_buf;
+  ulong wsrep_gtid_event_buf_len;
+
+  bool wsrep_skip_wsrep_GTID;
+
+  // DDL statement can fail in which case SE checkpoint shouldn't get updated.
+  bool wsrep_skip_SE_checkpoint;
+
+  /**
+    Skip registering wsrep_hton handler for a DDL statement that got skipped
+    from TOI replication due probably due to sql_log_bin=0.
+    Given the mode for the statement is not set to TOI, flow will try to
+    DDL statement for normal replication.
+  */
+  bool wsrep_skip_wsrep_hton;
+
+  /* Set to true if intermediate commit is active. Use to skip
+  update of wsrep co-ordinates for intermediate commit. */
+  bool wsrep_intermediate_commit;
 
   /**
     set to true when ddl is not marked for replication.
@@ -2807,77 +2854,47 @@ class THD : public MDL_context_owner,
   */
   mysql_mutex_t LOCK_wsrep_thd_attachable_trx;
 
-  // changed from wsrep_seqno_t to wsrep_trx_meta_t in wsrep API rev 75
-  // wsrep_seqno_t             wsrep_trx_seqno;
-  wsrep_trx_meta_t wsrep_trx_meta;
-  uint32 wsrep_rand;
-  Relay_log_info *wsrep_rli;
-  wsrep_ws_handle_t wsrep_ws_handle;
-  /* PROCESSLIST_STATE is declared as VARCHAR(64) so limit the buffer */
-  char wsrep_info[64];        /* string for dynamic proc info */
-  ulong wsrep_retry_counter;  // of autocommit
-  bool wsrep_PA_safe;
-
-  /* Normally a thd is safe to abort all the time but there is window
-  when thd is done with cleanup of transaction (through commit) but not yet
-  released the transaction lock(s). During this window it is not safe to abort
-  the said thd despite of the fact that state = NO_CONFLICT */
+  /**
+    Normally a thd is safe to abort all the time but there is window
+    when thd is done with cleanup of transaction (through commit) but not yet
+    released the transaction lock(s). During this window it is not safe to abort
+    the said thd despite of the fact that state = NO_CONFLICT
+  */
   bool wsrep_safe_to_abort;
 
-  char *wsrep_retry_query;
-  size_t wsrep_retry_query_len;
-  enum enum_server_command wsrep_retry_command;
-  enum wsrep_consistency_check_mode wsrep_consistency_check;
-  wsrep_stats_var *wsrep_status_vars;
-  int wsrep_mysql_replicated;
+  /**
+    Set to true if this thread handler (thd) is being use to replay
+    a transaction. Galera flow will use a temporary intermediate thread handler
+    to replay the aborted transaction caching the original thread handler.
+    This temporary thread handler runs with thread_id = 0 that can cause
+    cross-checks for gtid ownership by given thread to fail. This flag
+    help catch such situtation and suppress them. */
+  bool wsrep_replayer;
 
-  const char *wsrep_TOI_pre_query; /* a query to apply before
-                                      the actual TOI query */
-  size_t wsrep_TOI_pre_query_len;
+  /**
+    Capture if transaction (running with binlog=off) needs to run the
+    wsrep commit hooks. MyISAM/Local state transaction are not replicated so no
+    need to run wsrep commit hook. Same way TOI replicated transaction may
+    still use group commit protocol (DDL) but should avoid wsrep commit hooks.
+  */
+  bool run_wsrep_commit_hooks;
 
-  wsrep_po_handle_t wsrep_po_handle;
-  size_t wsrep_po_cnt;
-  bool wsrep_po_in_trans;
-  rpl_sid wsrep_po_sid;
-  void *wsrep_apply_format;
-  bool wsrep_apply_toi; /* applier processing in TOI */
-  wsrep_gtid_t wsrep_sync_wait_gtid;
-  ulong wsrep_affected_rows;
-  bool wsrep_sst_donor;
-  bool wsrep_void_applier_trx;
-  void *wsrep_gtid_event_buf;
-  ulong wsrep_gtid_event_buf_len;
-  bool wsrep_replicate_GTID;
-  bool wsrep_skip_wsrep_GTID;
+  /**
+    While using ordered-commit if flow decide to execute commit hooks
+    then also execute ordered commit. Since ordered commit is executed
+    as part of transaction append stage (to flush queue) cache the decision
+    to execute commit hooks and re-use it to fire ordered commit.
+  */
+  bool run_wsrep_ordered_commit;
 
-  /* DDL statement can fail in which case SE checkpoint shouldn't get updated.
-   */
-  bool wsrep_skip_SE_checkpoint;
-
-  /* DDL statement. skip registering wsrep_hton handler.
-  This is normally blocked by checking wsrep_exec_state != TOTAL_ORDER
-  but if sql_log_bin = 0 then the state is not set and DDL should is expected
-  not be replicated. This variable helps identify situation like these. */
-  bool wsrep_skip_wsrep_hton;
-
-  /* This field is set when wsrep try to do an intermediate special
-  commit while processing LOAD DATA INFILE statement by breaking it
-  into 10K rows mini transactions.
-
-  If this variable is set then binlog rotation is not performed
-  while mini transaction try to commit. Why ?
-  a. From logical perspective LDI is still a single transaction
-  b. rotation will cause unregistration of binlog/innodb handler.
-     On resuming the flow binlog handler is re-register but innodb
-     isn't this eventually causes replication of last chunk (< 10K)
-     rows to skip. Infact, this is logical issue that exist in
-     MySQL/InnoDB world but it just work for them as InnoDB
-     then commit the said transaction as part of external_lock(UNLOCK). */
-  bool wsrep_split_trx;
-
-  /* Set to true if intermediate commit is active. Use to skip
-  update of wsrep co-ordinates for intermediate commit. */
-  bool wsrep_intermediate_commit;
+  /**
+    Force group commit protocol for transaction that logs fragments
+    to wsrep_streaming_log. As binlog is disabled group commit protocol
+    is not skipped but this creates issue with wsrep co-ordinate update
+    as part of the transaction runs normal transaction runs through group commit
+    and wsrep_streaming_log update transaction runs outside group commit.
+  */
+  bool wsrep_enforce_group_commit;
 
   /*
     Transaction id:
@@ -2891,29 +2908,52 @@ class THD : public MDL_context_owner,
   /*
     Return effective transaction id
    */
-  wsrep_trx_id_t wsrep_trx_id() const { return wsrep_ws_handle.trx_id; }
+  wsrep_trx_id_t wsrep_trx_id() const {
+    return m_wsrep_client_state.transaction().id().get();
+  }
 
   /*
     Set next trx id
    */
   void set_wsrep_next_trx_id(query_id_t query_id) {
-    DBUG_ASSERT(wsrep_ws_handle.trx_id == WSREP_UNDEFINED_TRX_ID);
     m_wsrep_next_trx_id = (wsrep_trx_id_t)query_id;
   }
-
   /*
     Return next trx id
    */
   wsrep_trx_id_t wsrep_next_trx_id() const { return m_wsrep_next_trx_id; }
 
  private:
-  /* Imagine this be a query-id that is assigned to all statements
-  including non-replicating statement like SELECT/SET.
+  /**
+    Imagine this be a query-id that is assigned to all statements
+    including non-replicating statement like SELECT/SET.
 
-  For data-changing DML statement wsrep_ws_handle trx_id is set
-  to real-transaction-id. */
+    For data-changing DML statement wsrep_ws_handle trx_id is set
+    to real-transaction-id.
+  */
   wsrep_trx_id_t m_wsrep_next_trx_id; /* cast from query_id_t */
+
+  /* wsrep-lib */
+  Wsrep_mutex m_wsrep_mutex;
+  Wsrep_condition_variable m_wsrep_cond;
+  Wsrep_client_service m_wsrep_client_service;
+  Wsrep_client_state m_wsrep_client_state;
+
  public:
+  Wsrep_client_state &wsrep_cs() { return m_wsrep_client_state; }
+  const Wsrep_client_state &wsrep_cs() const { return m_wsrep_client_state; }
+  const wsrep::transaction &wsrep_trx() const {
+    return m_wsrep_client_state.transaction();
+  }
+  const wsrep::streaming_context &wsrep_sr() const {
+    return m_wsrep_client_state.transaction().streaming_context();
+  }
+  /* Pointer to applier service for streaming THDs. This is needed to
+     be able to delete applier service object in case of background
+     rollback. */
+  Wsrep_applier_service *wsrep_applier_service;
+  /* wait_for_commit struct for binlog group commit */
+  // wait_for_commit wsrep_wfc;
 #endif /* WITH_WSREP */
 
   /**
@@ -4186,12 +4226,15 @@ class THD : public MDL_context_owner,
     query_id = new_query_id;
     mysql_mutex_unlock(&LOCK_thd_data);
 #ifdef WITH_WSREP
-    if (WSREP(this) && wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID &&
-        update_wsrep_id) {
+    /* With update protocol starting g-4 trx_is is always updated
+       with update of query_id. */
+    if (WSREP(this) && update_wsrep_id) {
       set_wsrep_next_trx_id(query_id);
-      // TODO: re-add this debug statement
-      // WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
-      //            (long unsigned int)wsrep_next_trx_id());
+#if 0
+      TODO: readd this once the dependency with logevent is resolved.
+      WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
+                  (long unsigned int)wsrep_next_trx_id());
+#endif /* 0 */
     }
 #endif /* WITH_WSREP */
     MYSQL_SET_STATEMENT_QUERY_ID(m_statement_psi, new_query_id);

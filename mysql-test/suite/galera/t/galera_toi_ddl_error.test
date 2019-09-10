@@ -16,6 +16,10 @@ INSERT INTO t1 (f1) SELECT (10000 * a1.f1) + (1000 * a2.f1) + (100 * a3.f1) + (1
 # Insert one duplicate value
 INSERT INTO t1 (f1) SELECT MAX(f1) FROM t1;
 
+--connection node_1
+# to take care of duplicate entry that will cause alter to fail.
+call mtr.add_suppression("Query apply failed.*");
+
 --connection node_2
 --error ER_DUP_ENTRY
 ALTER TABLE t1 ADD PRIMARY KEY (f1);

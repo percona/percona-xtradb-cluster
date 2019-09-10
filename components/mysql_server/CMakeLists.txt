@@ -24,10 +24,6 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/libbinlogevents/include
 )
 
-IF(WITH_WSREP)
-  INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep/src)
-ENDIF()
-
 SET(MYSQL_SERVER_COMPONENT_SOURCES
   registry.cc
   dynamic_loader.cc

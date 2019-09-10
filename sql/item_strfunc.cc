@@ -4750,3 +4750,114 @@ void Item_func_roles_graphml::cleanup() {
     value_cache_set = false;
   }
 }
+
+
+#ifdef WITH_WSREP
+
+String *Item_func_wsrep_last_written_gtid::val_str(String *) {
+  wsrep::gtid gtid = current_thd->wsrep_cs().last_written_gtid();
+  if (gtid_str.alloc(wsrep::gtid_c_str_len())) {
+    my_error(ER_OUTOFMEMORY, wsrep::gtid_c_str_len());
+    null_value = true;
+    return NULL;
+  }
+
+  ssize_t gtid_len = gtid_print_to_c_str(gtid, (char *)gtid_str.ptr(),
+                                         wsrep::gtid_c_str_len());
+  if (gtid_len < 0) {
+    my_error(ER_ERROR_WHEN_EXECUTING_COMMAND, MYF(0), func_name(),
+             "wsrep_gtid_print failed");
+    null_value = true;
+    return NULL;
+  }
+  gtid_str.length(gtid_len);
+  return &gtid_str;
+}
+
+bool Item_func_wsrep_last_written_gtid::itemize(Parse_context *pc, Item **res) {
+  if (skip_itemize(res)) return false;
+  if (super::itemize(pc, res)) return true;
+  pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
+  pc->thd->lex->safe_to_cache_query = 0;
+  return false;
+}
+
+String *Item_func_wsrep_last_seen_gtid::val_str(String *) {
+  wsrep::gtid gtid =
+      Wsrep_server_state::instance().provider().last_committed_gtid();
+  if (gtid_str.alloc(wsrep::gtid_c_str_len())) {
+    my_error(ER_OUTOFMEMORY, wsrep::gtid_c_str_len());
+    null_value = true;
+    return NULL;
+  }
+  ssize_t gtid_len = wsrep::gtid_print_to_c_str(gtid, (char *)gtid_str.ptr(),
+                                                wsrep::gtid_c_str_len());
+  if (gtid_len < 0) {
+    my_error(ER_ERROR_WHEN_EXECUTING_COMMAND, MYF(0), func_name(),
+             "wsrep_gtid_print failed");
+    null_value = true;
+    return NULL;
+  }
+  gtid_str.length(gtid_len);
+  return &gtid_str;
+}
+
+bool Item_func_wsrep_last_seen_gtid::itemize(Parse_context *pc, Item **res) {
+  if (skip_itemize(res)) return false;
+  if (super::itemize(pc, res)) return true;
+  pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
+  pc->thd->lex->safe_to_cache_query = 0;
+  return false;
+}
+
+longlong Item_func_wsrep_sync_wait_upto::val_int() {
+  int timeout = -1;
+  String *gtid_str = args[0]->val_str(&value);
+  if (gtid_str == NULL) {
+    my_error(ER_WRONG_ARGUMENTS, MYF(0), func_name());
+    return 0LL;
+  }
+
+  if (arg_count == 2) {
+    timeout = args[1]->val_int();
+  }
+
+  wsrep_gtid_t gtid;
+  int gtid_len = wsrep_gtid_scan(gtid_str->ptr(), gtid_str->length(), &gtid);
+  if (gtid_len < 0) {
+    my_error(ER_WRONG_ARGUMENTS, MYF(0), func_name());
+    return 0LL;
+  }
+
+  if (gtid.seqno == WSREP_SEQNO_UNDEFINED &&
+      wsrep_uuid_compare(&gtid.uuid, &WSREP_UUID_UNDEFINED) == 0) {
+    return 1LL;
+  }
+
+  enum wsrep::provider::status status =
+      wsrep_sync_wait_upto(current_thd, &gtid, timeout);
+
+  if (status) {
+    int err;
+    switch (status) {
+      case wsrep::provider::error_transaction_missing:
+        err = ER_WRONG_ARGUMENTS;
+        break;
+      default:
+        err = ER_LOCK_WAIT_TIMEOUT;
+    }
+    my_error(err, MYF(0), func_name());
+    return 0LL;
+  }
+  return 1LL;
+}
+
+bool Item_func_wsrep_sync_wait_upto::itemize(Parse_context *pc, Item **res) {
+  if (skip_itemize(res)) return false;
+  if (super::itemize(pc, res)) return true;
+  pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
+  pc->thd->lex->safe_to_cache_query = 0;
+  return false;
+}
+
+#endif /* WITH_WSREP */

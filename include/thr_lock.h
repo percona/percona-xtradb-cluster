@@ -44,13 +44,12 @@ struct THR_LOCK;
 extern ulong locks_immediate, locks_waited;
 
 #ifdef WITH_WSREP
-
-typedef bool (*wsrep_thd_is_brute_force_func)(void *, bool);
-typedef int (*wsrep_abort_thd_func)(void *, void *, bool);
-typedef int (*wsrep_on_func)(void *);
-
+class THD;
+typedef bool (*wsrep_thd_is_brute_force_func)(const THD *, bool);
+typedef int (*wsrep_abort_thd_func)(const THD *, THD *, bool);
+typedef bool (*wsrep_on_func)(const THD *);
 void wsrep_thr_lock_init(wsrep_thd_is_brute_force_func bf_func,
-                         wsrep_abort_thd_func abort_func, bool debug,
+                         wsrep_abort_thd_func abort_func, ulong debug,
                          wsrep_on_func on_func);
 #endif /* WITH_WSREP */
 
@@ -141,7 +140,7 @@ extern enum thr_lock_type thr_upgraded_concurrent_insert_lock;
 struct THR_LOCK_INFO {
   my_thread_id thread_id;
 #ifdef WITH_WSREP
-  void *mysql_thd;      // THD pointer
+  THD *mysql_thd;       // THD pointer
   bool in_lock_tables;  // true, if inside locking session
 #endif /* WITH_WSREP */
   mysql_cond_t *suspend;

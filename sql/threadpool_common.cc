@@ -14,6 +14,11 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
    USA */
 
+#ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
+#include "wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
+
 #include "my_thread_local.h"
 #include "mysql/psi/mysql_idle.h"
 #include "mysql/psi/mysql_socket.h"
@@ -228,12 +233,23 @@ int threadpool_process_request(THD *thd) {
     Vio *vio;
     thd_set_net_read_write(thd, 0);
 
+#ifdef WITH_WSREP
+    wsrep_open(thd);
+#endif /* WITH_WSREP */
+
     if ((retval = do_command(thd)) != 0) goto end;
 
     if (!thd_connection_alive(thd)) {
+#ifdef WITH_WSREP
+      wsrep_close(thd);
+#endif /* WITH_WSREP */
       retval = 1;
       goto end;
     }
+
+#ifdef WITH_WSREP
+    wsrep_close(thd);
+#endif /* WITH_WSREP */
 
     vio = thd->get_protocol_classic()->get_vio();
     if (!vio->has_data(vio)) {

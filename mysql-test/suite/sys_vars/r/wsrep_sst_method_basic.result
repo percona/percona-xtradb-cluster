@@ -11,16 +11,8 @@ xtrabackup-v2
 # scope
 SELECT @@session.wsrep_sst_method;
 ERROR HY000: Variable 'wsrep_sst_method' is a GLOBAL variable
-SET @@global.wsrep_sst_method=rsync;
-SELECT @@global.wsrep_sst_method;
-@@global.wsrep_sst_method
-rsync
 
 # valid values
-SET @@global.wsrep_sst_method=rsync;
-SELECT @@global.wsrep_sst_method;
-@@global.wsrep_sst_method
-rsync
 SET @@global.wsrep_sst_method="xtrabackup-v2";
 SELECT @@global.wsrep_sst_method;
 @@global.wsrep_sst_method
@@ -33,6 +25,21 @@ xtrabackup-v2
 # invalid values
 SET @@global.wsrep_sst_method=NULL;
 ERROR 42000: Variable 'wsrep_sst_method' can't be set to the value of 'NULL'
+SELECT @@global.wsrep_sst_method;
+@@global.wsrep_sst_method
+xtrabackup-v2
+SET @@global.wsrep_sst_method="rsync";
+ERROR 42000: Variable 'wsrep_sst_method' can't be set to the value of 'rsync'
+SELECT @@global.wsrep_sst_method;
+@@global.wsrep_sst_method
+xtrabackup-v2
+SET @@global.wsrep_sst_method="mysqldump";
+ERROR 42000: Variable 'wsrep_sst_method' can't be set to the value of 'mysqldump'
+SELECT @@global.wsrep_sst_method;
+@@global.wsrep_sst_method
+xtrabackup-v2
+SET @@global.wsrep_sst_method="xyz";
+ERROR 42000: Variable 'wsrep_sst_method' can't be set to the value of 'xyz'
 SELECT @@global.wsrep_sst_method;
 @@global.wsrep_sst_method
 xtrabackup-v2

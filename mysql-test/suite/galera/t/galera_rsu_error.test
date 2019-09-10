@@ -31,46 +31,48 @@ SELECT COUNT(3) = 4 FROM t1;
 DROP TABLE t1;
 
 
-#
-# RSU is not allowed if there is active commit transaction.
-#
---echo # Node 1
---connection node_1
-call mtr.add_suppression("RSU failed due to pending transactions");
-call mtr.add_suppression("ALTER TABLE isolation");
-
-#
-USE test;
-CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
-CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
-
---echo # Node 1a
---connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
---connection node_1a
-# Make sure autocommit retrying does not kick in as this will mask the error we expect to get
-use test;
-SET SESSION wsrep_retry_autocommit = 0;
-SET DEBUG_SYNC = "wsrep_after_replication SIGNAL entered1 WAIT_FOR continue";
---send INSERT INTO t1 (f1) VALUES(1);
-
-# Ensure that we have reached the sync points
---echo # Node 1
---connection node_1
-SET SESSION wsrep_sync_wait = 0;
-SET DEBUG_SYNC = "now WAIT_FOR entered1";
-
-SET wsrep_OSU_method = "RSU";
---error ER_LOCK_DEADLOCK
-ALTER TABLE t2 ADD COLUMN k INT;
-SET SESSION wsrep_OSU_method = "TOI";
-
-SET DEBUG_SYNC = "now SIGNAL continue";
-
-# Unblock the sync points
---echo # Node 1
---connection node_1
---let $wait_condition = SELECT COUNT(*) = 1 FROM t1;
---source include/wait_condition.inc
-SELECT * FROM t2;
-DROP TABLE t1;
-DROP TABLE t2;
+##
+##
+###
+### RSU is not allowed if there is active commit transaction.
+###
+##--echo # Node 1
+##--connection node_1
+##call mtr.add_suppression("RSU failed due to pending transactions");
+##call mtr.add_suppression("ALTER TABLE isolation");
+##
+###
+##USE test;
+##CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+##CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
+##
+##--echo # Node 1a
+##--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+##--connection node_1a
+### Make sure autocommit retrying does not kick in as this will mask the error we expect to get
+##use test;
+##SET SESSION wsrep_retry_autocommit = 0;
+##SET SESSION DEBUG_SYNC = 'wsrep_after_certification SIGNAL wsrep_after_certification_reached WAIT_FOR wsrep_after_certification_continue';
+##--send INSERT INTO t1 (f1) VALUES(1);
+##
+### Ensure that we have reached the sync points
+##--echo # Node 1
+##--connection node_1
+##SET SESSION wsrep_sync_wait = 0;
+##SET DEBUG_SYNC = "now WAIT_FOR wsrep_after_certification_reached";
+##
+##SET wsrep_OSU_method = "RSU";
+##--error ER_LOCK_DEADLOCK
+##ALTER TABLE t2 ADD COLUMN k INT;
+##SET SESSION wsrep_OSU_method = "TOI";
+##
+##SET DEBUG_SYNC = "now SIGNAL wsrep_after_certification_continue";
+##
+### Unblock the sync points
+##--echo # Node 1
+##--connection node_1
+##--let $wait_condition = SELECT COUNT(*) = 1 FROM t1;
+##--source include/wait_condition.inc
+##SELECT * FROM t2;
+##DROP TABLE t1;
+##DROP TABLE t2;

@@ -14,13 +14,9 @@ SELECT @@global.wsrep_sst_method;
 --echo # scope
 --error ER_INCORRECT_GLOBAL_LOCAL_VAR
 SELECT @@session.wsrep_sst_method;
-SET @@global.wsrep_sst_method=rsync;
-SELECT @@global.wsrep_sst_method;
 
 --echo
 --echo # valid values
-SET @@global.wsrep_sst_method=rsync;
-SELECT @@global.wsrep_sst_method;
 SET @@global.wsrep_sst_method="xtrabackup-v2";
 SELECT @@global.wsrep_sst_method;
 SET @@global.wsrep_sst_method=default;
@@ -30,6 +26,18 @@ SELECT @@global.wsrep_sst_method;
 --echo # invalid values
 --error ER_WRONG_VALUE_FOR_VAR
 SET @@global.wsrep_sst_method=NULL;
+SELECT @@global.wsrep_sst_method;
+#
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@global.wsrep_sst_method="rsync";
+SELECT @@global.wsrep_sst_method;
+#
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@global.wsrep_sst_method="mysqldump";
+SELECT @@global.wsrep_sst_method;
+#
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@global.wsrep_sst_method="xyz";
 SELECT @@global.wsrep_sst_method;
 
 --echo

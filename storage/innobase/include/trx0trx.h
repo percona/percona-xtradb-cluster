@@ -640,6 +640,11 @@ struct trx_lock_t {
   /** The transaction called ha_innobase::start_stmt() to
   lock a table. Most likely a temporary table. */
   bool start_stmt;
+
+#ifdef WITH_WSREP
+  bool was_chosen_as_wsrep_victim; /*!< high priority wsrep thread has
+                                   marked this trx to abort */
+#endif /* WITH_WSREP */
 };
 
 /** Type used to store the list of tables that are modified by a given

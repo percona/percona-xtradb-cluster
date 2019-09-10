@@ -7,7 +7,7 @@ SET AUTOCOMMIT=ON;
 applied = committed
 1
 # Node 1 : block the commit, perform the insert
-SET GLOBAL wsrep_provider_options = 'dbug=d,sync.post_commit.after_commit_leave';
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.interim_commit.after_commit_leave';
 INSERT INTO t1 VALUES (1, 'a');;
 # Node 1a : wait until the commit is blocked
 SET SESSION wsrep_sync_wait = 0;
@@ -18,7 +18,7 @@ applied+1 = committed
 1
 # Node 1a : unblock the commit
 SET GLOBAL wsrep_provider_options = 'dbug=';
-SET GLOBAL wsrep_provider_options = 'signal=sync.post_commit.after_commit_leave';
+SET GLOBAL wsrep_provider_options = 'signal=sync.interim_commit.after_commit_leave';
 SELECT * FROM t1;
 f1	f2
 1	a
@@ -32,7 +32,7 @@ applied = committed
 applied = committed
 1
 # Node 2 : block the commit
-SET GLOBAL wsrep_provider_options = 'dbug=d,sync.applier_post_commit.after_commit_leave';
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.applier_interim_commit.after_commit_leave';
 # Node 1 : perform the insert
 INSERT INTO t1 VALUES (2, 'b');
 # Node 2a : wait until the commit is blocked
@@ -44,7 +44,7 @@ applied+1 = committed
 1
 # Node 2a : unblock the commit
 SET GLOBAL wsrep_provider_options = 'dbug=';
-SET GLOBAL wsrep_provider_options = 'signal=sync.applier_post_commit.after_commit_leave';
+SET GLOBAL wsrep_provider_options = 'signal=sync.applier_interim_commit.after_commit_leave';
 SELECT * FROM t1;
 f1	f2
 1	a

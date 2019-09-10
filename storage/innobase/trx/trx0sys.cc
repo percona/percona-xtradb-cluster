@@ -55,6 +55,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifdef WITH_WSREP
 #include "ha_prototypes.h" /* wsrep_is_wsrep_xid() */
+#include "wsrep_mysqld.h"
+#include "wsrep_binlog.h"
 #endif /* WITH_WSREP */
 
 /** The transaction system */
@@ -103,12 +105,7 @@ void trx_sys_flush_max_trx_id(void) {
   mtr_t mtr;
   trx_sysf_t *sys_header;
 
-#ifdef WITH_WSREP
-  /* wsrep_fake_trx_id  violates this assert
-  Copied from trx_sys_get_new_trx_id */
-#else
   ut_ad(trx_sys_mutex_own());
-#endif /* !WITH_WSREP */
 
   if (!srv_read_only_mode) {
     mtr_start(&mtr);
@@ -253,15 +250,31 @@ void trx_sys_update_wsrep_checkpoint(
     mtr_t *mtr,             /*!< in: mtr */
     bool recovery)          /*!< in: running recovery */
 {
+#if 0
+  /* Said check for increasing seqno is now enforced even in optimized
+  build as the said logic ensures wait of thread handler. */
 #ifndef UNIV_DEBUG
+  /* Said check for xid seqno is ignored while running with optimized
+  build. It is presumed that xid are being persisted in proper order.
+  PXC too disables the said flow during optimized build but enforces
+  it during recovery so the conditional if statement below. */
   if (recovery)
 #endif /* !UNIV_DEBUG */
+#endif
   {
     /* Check that seqno is monotonically increasing */
     unsigned char xid_uuid[16];
     long long xid_seqno = read_wsrep_xid_seqno(xid);
     read_wsrep_xid_uuid(xid, xid_uuid);
-    if (!memcmp(xid_uuid, trx_sys_cur_xid_uuid, 8)) {
+
+    char uuid_str[40] = {
+        0,
+    };
+    wsrep_uuid_print((const wsrep_uuid_t*)xid_uuid, uuid_str,
+                     sizeof(uuid_str));
+    WSREP_DEBUG("Updating WSREPXid: %s:%lld", uuid_str, xid_seqno);
+
+    if (xid_seqno != -1 && !memcmp(xid_uuid, trx_sys_cur_xid_uuid, 8)) {
       if (recovery) {
         /* When recovery happens prepare transactions
         are revived based on undo-log entries in InnoDB.
@@ -280,6 +293,10 @@ void trx_sys_update_wsrep_checkpoint(
         else
           return;
       } else {
+
+        /* Wait and unregister from wsrep group commit */
+        wsrep_wait_for_turn_in_group_commit(current_thd);
+
         /* DDL transaction are executed as TOI.
         With 8.0, DDL are atomic and will cause commit of transaction
         in InnoDB world that will cause xid to persist.
@@ -288,11 +305,25 @@ void trx_sys_update_wsrep_checkpoint(
         So condition check is now >= and not just > */
         ut_ad(xid_seqno >= trx_sys_cur_xid_seqno);
         trx_sys_cur_xid_seqno = xid_seqno;
+
+        /* Mark as done */
+        wsrep_unregister_from_group_commit(current_thd);
       }
     } else {
+
+      /* Wait and unregister from wsrep group commit */
+      wsrep_wait_for_turn_in_group_commit(current_thd);
+
       memcpy(trx_sys_cur_xid_uuid, xid_uuid, 16);
       trx_sys_cur_xid_seqno = xid_seqno;
+
+      /* Mark as done and unregister */
+      wsrep_unregister_from_group_commit(current_thd);
     }
+  }
+
+  if (sys_header == NULL) {
+    sys_header = trx_sysf_get(mtr);
   }
 
   ut_ad(xid && mtr && sys_header);

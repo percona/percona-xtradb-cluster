@@ -26,6 +26,7 @@
 #ifdef WITH_WSREP
 #include "wsrep_sst.h"
 #include "mysql/components/services/log_builtins.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 #include "mysql/components/services/psi_cond_bits.h"
@@ -177,7 +178,7 @@ class Print_conn : public Do_THD_Impl {
   virtual void operator()(THD *thd) {
     WSREP_INFO("THD %u applier %s exec_mode %s killed %s", thd->thread_id(),
                thd->wsrep_applier ? "true" : "false",
-               wsrep_get_exec_mode(thd->wsrep_exec_mode),
+               wsrep_thd_client_mode_str(thd),
                thd->killed ? "true" : "false");
   }
 };

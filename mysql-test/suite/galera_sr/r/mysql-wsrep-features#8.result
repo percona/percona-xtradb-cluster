@@ -1,0 +1,38 @@
+#node-1
+SET SESSION wsrep_trx_fragment_size = 1;
+CREATE TABLE ten (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
+#node-1
+CREATE TABLE t1 (f1 INT PRIMARY KEY AUTO_INCREMENT, f2 VARCHAR(100), FULLTEXT (f2)) ENGINE=InnoDB;
+#node-2
+SELECT COUNT(*) = 13 FROM INFORMATION_SCHEMA.INNODB_TABLES WHERE name LIKE 'test/%';
+COUNT(*) = 13
+1
+#node-1
+INSERT INTO t1 (f2) SELECT 'foobarbaz' FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;
+#node-2
+SELECT COUNT(f2) = 10000 FROM t1 WHERE MATCH(f2) AGAINST ('foobarbaz');
+COUNT(f2) = 10000
+1
+UPDATE t1 SET f2 = 'abcdefjhk';
+#node-1
+SELECT COUNT(f2) = 10000 FROM t1 WHERE MATCH(f2) AGAINST ('abcdefjhk');
+COUNT(f2) = 10000
+1
+#node-2
+DROP TABLE t1;
+#node-1
+CREATE TABLE t1 (f1 VARCHAR(100), FULLTEXT (f1)) ENGINE=InnoDB;
+#node-2
+INSERT INTO t1 (f1) SELECT 'foobarbaz' FROM ten AS a1, ten AS a2, ten AS a3;
+#node-1
+SELECT COUNT(f1) = 1000 FROM t1 WHERE MATCH(f1) AGAINST ('foobarbaz');
+COUNT(f1) = 1000
+1
+UPDATE t1 SET f1 = 'abcdefjhk';
+#node-2
+SELECT COUNT(f1) = 1000 FROM t1 WHERE MATCH(f1) AGAINST ('abcdefjhk');
+COUNT(f1) = 1000
+1
+DROP TABLE t1;
+DROP TABLE ten;

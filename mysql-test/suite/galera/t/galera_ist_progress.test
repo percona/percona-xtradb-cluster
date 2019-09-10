@@ -54,19 +54,19 @@ SET GLOBAL wsrep_provider_options = 'gmcast.isolate = 0';
 
 --let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
---let $assert_only_after = Need state transfer
+--let $assert_only_after = Requesting state transfer
 
---let $assert_text = Receiving IST: 11 writesets, seqnos
---let $assert_select = Receiving IST: 11 writesets, seqnos
+--let $assert_text = Receiving IST: 13 writesets, seqnos
+--let $assert_select = Receiving IST: 13 writesets, seqnos
 --source include/assert_grep.inc
 
---let $assert_text = Receiving IST\.\.\.  0\.0% \( 0/11 events\) complete
---let $assert_select = Receiving IST\.\.\.  0\.0% \( 0/11 events\) complete
---source include/assert_grep.inc
+#--let $assert_text = Receiving IST\.\.\.  0\.0% \( 0/13 events\) complete
+#--let $assert_select = Receiving IST\.\.\.  0\.0% \( 0/13 events\) complete
+#--source include/assert_grep.inc
 
---let $assert_text = Receiving IST\.\.\.100\.0% \(11/11 events\) complete
---let $assert_select = Receiving IST\.\.\.100\.0% \(11/11 events\) complete
---source include/assert_grep.inc
+#--let $assert_text = Receiving IST\.\.\.100\.0% \(13/13 events\) complete
+#--let $assert_select = Receiving IST\.\.\.100\.0% \(13/13 events\) complete
+#--source include/assert_grep.inc
 
 # Cleanup
 

@@ -1,0 +1,41 @@
+select @@wsrep_trx_fragment_unit;
+@@wsrep_trx_fragment_unit
+bytes
+set global wsrep_trx_fragment_unit = default;
+select @@wsrep_trx_fragment_unit;
+@@wsrep_trx_fragment_unit
+bytes
+set global wsrep_trx_fragment_unit=0;
+select @@wsrep_trx_fragment_unit;
+@@wsrep_trx_fragment_unit
+bytes
+set global wsrep_trx_fragment_unit=1;
+select @@wsrep_trx_fragment_unit;
+@@wsrep_trx_fragment_unit
+bytes
+set global wsrep_trx_fragment_unit=2;
+select @@wsrep_trx_fragment_unit;
+@@wsrep_trx_fragment_unit
+bytes
+set global wsrep_trx_fragment_unit=1000;
+ERROR 42000: Variable 'wsrep_trx_fragment_unit' can't be set to the value of '1000'
+select @@wsrep_trx_fragment_unit;
+@@wsrep_trx_fragment_unit
+bytes
+set global wsrep_trx_fragment_unit=-1;
+ERROR 42000: Variable 'wsrep_trx_fragment_unit' can't be set to the value of '-1'
+select @@wsrep_trx_fragment_unit;
+@@wsrep_trx_fragment_unit
+bytes
+set session wsrep_trx_fragment_unit=0;
+select @@wsrep_trx_fragment_unit;
+@@wsrep_trx_fragment_unit
+bytes
+set session wsrep_trx_fragment_unit=1;
+select @@wsrep_trx_fragment_unit;
+@@wsrep_trx_fragment_unit
+rows
+set session wsrep_trx_fragment_unit=2;
+select @@wsrep_trx_fragment_unit;
+@@wsrep_trx_fragment_unit
+statements

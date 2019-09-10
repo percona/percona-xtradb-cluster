@@ -69,6 +69,7 @@
 
 #ifdef WITH_WSREP
 #include "debug_sync.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 /**
@@ -306,6 +307,12 @@ static void *event_worker_thread(void *arg) {
 
   mysql_thread_set_psi_id(thd->thread_id());
 
+#ifdef WITH_WSREP
+  if (WSREP(thd)) {
+    wsrep_ready_wait();
+  }
+#endif /* WITH_WSREP */
+
   Event_worker_thread worker_thread;
   worker_thread.run(thd, event);
 
@@ -384,34 +391,6 @@ void Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event) {
 
   thd->enable_slow_log = true;
 
-#ifdef WITH_WSREP
-  /**
-    We need to set up the proper thread state for the event worker thread
-    (so that WSREP will run/cleanup the thread correctly).
-
-    - wsrep_exec_state = LOCAL_STATE
-      This is a local (background) thread (we ar not handling replication
-      events).
-
-    - wsrep_query_state = QUERY_EXEC
-      This ensures proper cleanup in the case a transaction is aborted
-      by wsrep_innobase_kill_one_trx().
-  */
-  if (WSREP(thd)) {
-    /* synchronize with wsrep replication */
-    wsrep_ready_wait();
-
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-
-    thd->wsrep_exec_mode = LOCAL_STATE;
-    thd->wsrep_query_state = QUERY_EXEC;
-
-    thd->variables.wsrep_on = true;
-
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  }
-#endif /* WITH_WSREP */
-
   res = job_data.execute(thd, event->dropped);
 
   print_warnings(thd, &job_data);
@@ -422,15 +401,6 @@ void Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event) {
 
 #ifdef WITH_WSREP
   DEBUG_SYNC(thd, "pxc_event_worker_thread_end");
-
-  if (WSREP(thd)) {
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-
-    wsrep_thd_set_query_state(thd, QUERY_EXITING);
-    thd->variables.wsrep_on = false;
-
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  }
 #endif /* WITH_WSREP */
 
 end:

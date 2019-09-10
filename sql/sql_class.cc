@@ -96,6 +96,7 @@
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
 #include "sql/log.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 
@@ -336,160 +337,6 @@ void THD::enter_stage(const PSI_stage_info *new_stage,
   return;
 }
 
-#ifdef WITH_WSREP
-
-extern int wsrep_on(void *thd) {
-  return (int)(WSREP(((THD *)thd)));
-}
-
-extern "C" bool wsrep_thd_is_wsrep_on(THD *thd) {
-  return thd->variables.wsrep_on;
-}
-
-extern "C" bool wsrep_consistency_check(void *thd) {
-  return ((THD *)thd)->wsrep_consistency_check == CONSISTENCY_CHECK_RUNNING;
-}
-
-extern "C" void wsrep_thd_mark_split_trx(THD *thd, bool split_trx) {
-  thd->wsrep_split_trx = split_trx;
-}
-
-void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode) {
-  thd->wsrep_exec_mode = mode;
-}
-
-void wsrep_thd_set_query_state(THD *thd, enum wsrep_query_state state) {
-  thd->wsrep_query_state = state;
-}
-
-void wsrep_thd_set_conflict_state(THD *thd, bool lock,
-                                  enum wsrep_conflict_state state) {
-  if (WSREP(thd)) {
-    if (lock) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_conflict_state = state;
-    if (lock) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  }
-}
-
-enum wsrep_exec_mode wsrep_thd_exec_mode(THD *thd) {
-  return thd->wsrep_exec_mode;
-}
-
-enum wsrep_query_state wsrep_thd_query_state(THD *thd) {
-  return thd->wsrep_query_state;
-}
-
-enum wsrep_conflict_state wsrep_thd_conflict_state(THD *thd) {
-  return thd->wsrep_conflict_state;
-}
-
-extern "C" wsrep_ws_handle_t *wsrep_thd_ws_handle(THD *thd) {
-  return &thd->wsrep_ws_handle;
-}
-
-extern "C" void wsrep_thd_LOCK(THD *thd) {
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-}
-
-extern "C" void wsrep_thd_UNLOCK(THD *thd) {
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-}
-
-extern "C" time_t wsrep_thd_query_start(THD *thd) {
-  return thd->query_start_in_secs();
-}
-
-extern "C" uint32 wsrep_thd_wsrep_rand(THD *thd) {
-   return thd->wsrep_rand;
-}
-
-extern "C" my_thread_id wsrep_thd_thread_id(THD *thd) {
-  return thd->thread_id();
-}
-
-extern "C" wsrep_seqno_t wsrep_thd_trx_seqno(THD *thd) {
-  return (thd) ? thd->wsrep_trx_meta.gtid.seqno : WSREP_SEQNO_UNDEFINED;
-}
-
-extern "C" query_id_t wsrep_thd_query_id(THD *thd) {
-  return thd->query_id;
-}
-
-extern "C" wsrep_trx_id_t wsrep_thd_next_trx_id(THD *thd) {
-  return thd->wsrep_next_trx_id();
-}
-
-extern "C" void wsrep_thd_set_next_trx_id(THD *thd) {
-  if (thd->wsrep_trx_id() == WSREP_UNDEFINED_TRX_ID) {
-    thd->set_wsrep_next_trx_id(thd->query_id);
-  }
-}
-
-extern "C" wsrep_trx_id_t wsrep_thd_trx_id(THD *thd) {
-  return thd->wsrep_trx_id();
-}
-
-extern "C" const char *wsrep_thd_query(THD *thd) {
-  return (thd) ? thd->query().str : NULL;
-}
-
-extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd) {
-  return thd->wsrep_last_query_id;
-}
-
-extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id) {
-  thd->wsrep_last_query_id = id;
-}
-
-extern "C" void wsrep_thd_awake(THD *thd, bool signal) {
-  if (signal) {
-    mysql_mutex_lock(&thd->LOCK_thd_data);
-    thd->awake(THD::KILL_QUERY);
-    mysql_mutex_unlock(&thd->LOCK_thd_data);
-  } else {
-    mysql_mutex_lock(&LOCK_wsrep_replaying);
-    mysql_cond_broadcast(&COND_wsrep_replaying);
-    mysql_mutex_unlock(&LOCK_wsrep_replaying);
-  }
-}
-
-extern "C" int wsrep_thd_retry_counter(THD *thd) {
-  return (thd->wsrep_retry_counter);
-}
-
-extern int wsrep_trx_order_before(void *thd1, void *thd2) {
-  if (wsrep_thd_trx_seqno((THD *)thd1) < wsrep_thd_trx_seqno((THD *)thd2)) {
-    WSREP_DEBUG("BF conflict, order: %lld %lld\n",
-                (long long)wsrep_thd_trx_seqno((THD *)thd1),
-                (long long)wsrep_thd_trx_seqno((THD *)thd2));
-    return 1;
-  }
-  WSREP_DEBUG("Waiting for BF, trx order: %lld %lld\n",
-              (long long)wsrep_thd_trx_seqno((THD *)thd1),
-              (long long)wsrep_thd_trx_seqno((THD *)thd2));
-  return 0;
-}
-
-extern "C" int wsrep_trx_is_aborting(void *thd_ptr) {
-  if (thd_ptr) {
-    if ((((THD *)thd_ptr)->wsrep_conflict_state == MUST_ABORT) ||
-        (((THD *)thd_ptr)->wsrep_conflict_state == ABORTING)) {
-      return 1;
-    }
-  }
-  return 0;
-}
-
-extern "C" void wsrep_set_thd_proc_info(THD *thd, const char *str) {
-  thd->wsrep_info[sizeof(thd->wsrep_info) - 1] = '\0';
-  strncpy(thd->wsrep_info, str, (sizeof(thd->wsrep_info) - 1));
-}
-
-extern "C" const char *wsrep_get_thd_proc_info(THD *thd) {
-  return (thd->wsrep_info);
-}
-#endif /* WITH_WSREP */
-
 void Open_tables_state::set_open_tables_state(Open_tables_state *state) {
   this->open_tables = state->open_tables;
 
@@ -564,6 +411,7 @@ THD::THD(bool enable_plugins)
       m_transaction_psi(NULL),
       m_idle_psi(NULL),
       m_server_idle(false),
+      m_thread_id(Global_THD_manager::reserved_thread_id),
       user_var_events(key_memory_user_var_entry),
       next_to_commit(NULL),
       binlog_need_explicit_defaults_ts(false),
@@ -580,17 +428,53 @@ THD::THD(bool enable_plugins)
 #ifdef WITH_WSREP
       wsrep_applier(is_applier),
       wsrep_applier_closing(false),
-      wsrep_client_thread(0),
-      wsrep_non_replicating_atomic_ddl(false),
+      wsrep_client_thread(false),
+      wsrep_last_query_id(0),
+      wsrep_xid(),
+      wsrep_skip_locking(false),
+      wsrep_rand(0),
+      wsrep_rli(NULL),
+      wsrep_retry_counter(0),
+      wsrep_PA_safe(true),
+      wsrep_retry_query(NULL),
+      wsrep_retry_query_len(0),
+      wsrep_retry_command(COM_CONNECT),
+      wsrep_consistency_check(NO_CONSISTENCY_CHECK),
+      wsrep_TOI_pre_query(NULL),
+      wsrep_TOI_pre_query_len(0),
       wsrep_po_handle(WSREP_PO_INITIALIZER),
       wsrep_po_cnt(0),
-      wsrep_po_in_trans(false),
       wsrep_apply_format(0),
       wsrep_apply_toi(false),
-      wsrep_sst_donor(false),
-      wsrep_void_applier_trx(true),
+      wsrep_rbr_buf(NULL),
+      wsrep_affected_rows(0),
+      wsrep_has_ignored_error(false),
+      wsrep_replicate_GTID(false),
+
+      /* pxc specific (private varaibles) */
       wsrep_gtid_event_buf(NULL),
       wsrep_gtid_event_buf_len(0),
+      wsrep_skip_wsrep_GTID(false),
+      wsrep_skip_SE_checkpoint(false),
+      wsrep_skip_wsrep_hton(false),
+      wsrep_intermediate_commit(false),
+      wsrep_non_replicating_atomic_ddl(false),
+      wsrep_safe_to_abort(true),
+      wsrep_replayer(false),
+      run_wsrep_commit_hooks(false),
+      run_wsrep_ordered_commit(false),
+      wsrep_enforce_group_commit(false),
+
+      /* wsrep-lib */
+      m_wsrep_next_trx_id(WSREP_UNDEFINED_TRX_ID),
+      m_wsrep_mutex(LOCK_wsrep_thd),
+      m_wsrep_cond(COND_wsrep_thd),
+      m_wsrep_client_service(this, m_wsrep_client_state),
+      m_wsrep_client_state(
+          this, m_wsrep_mutex, m_wsrep_cond, Wsrep_server_state::instance(),
+          m_wsrep_client_service, wsrep::client_id(m_thread_id)),
+      wsrep_applier_service(NULL),
+      // wsrep_wfc()
 #endif /* WITH_WSREP */
       m_parser_state(NULL),
       work_part_info(NULL),
@@ -649,7 +533,7 @@ THD::THD(bool enable_plugins)
   current_linfo = 0;
   slave_thread = 0;
   memset(&variables, 0, sizeof(variables));
-  m_thread_id = Global_THD_manager::reserved_thread_id;
+  // m_thread_id = Global_THD_manager::reserved_thread_id;
   file_id = 0;
   query_id = 0;
   query_name_consts = 0;
@@ -699,28 +583,9 @@ THD::THD(bool enable_plugins)
   mysql_cond_init(key_COND_wsrep_thd, &COND_wsrep_thd);
   mysql_mutex_init(key_LOCK_wsrep_thd_attachable_trx,
                    &LOCK_wsrep_thd_attachable_trx, MY_MUTEX_INIT_FAST);
-  wsrep_ws_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
-  wsrep_ws_handle.opaque = NULL;
-  wsrep_retry_counter = 0;
-  wsrep_PA_safe = true;
-  wsrep_safe_to_abort = true;
-  wsrep_retry_query = NULL;
-  wsrep_retry_query_len = 0;
-  wsrep_retry_command = COM_CONNECT;
-  wsrep_consistency_check = NO_CONSISTENCY_CHECK;
-  wsrep_status_vars = 0;
-  wsrep_mysql_replicated = 0;
-  wsrep_TOI_pre_query = NULL;
-  wsrep_TOI_pre_query_len = 0;
-  wsrep_sync_wait_gtid = WSREP_GTID_UNDEFINED;
-  wsrep_affected_rows = 0;
-  wsrep_replicate_GTID = false;
-  wsrep_skip_wsrep_GTID = false;
-  wsrep_split_trx = false;
-  wsrep_intermediate_commit = false;
-  m_wsrep_next_trx_id = WSREP_UNDEFINED_TRX_ID;
-  wsrep_skip_SE_checkpoint = false;
-  wsrep_skip_wsrep_hton = false;
+  lock_info.mysql_thd = this;
+  lock_info.in_lock_tables = false;
+  wsrep_info[sizeof(wsrep_info) - 1] = '\0'; /* make sure it is 0-terminated */
 #endif /* WITH_WSREP */
 
   /* Call to init() below requires fully initialized Open_tables_state. */
@@ -749,12 +614,6 @@ THD::THD(bool enable_plugins)
     assigned a proper thread_id value but keep using reserved_thread_id.
   */
   thr_lock_info_init(&lock_info, m_thread_id, &COND_thr_lock);
-
-#ifdef WITH_WSREP
-  lock_info.mysql_thd = (void *)this;
-  lock_info.in_lock_tables = false;
-  wsrep_info[sizeof(wsrep_info) - 1] = '\0'; /* make sure it is 0-terminated */
-#endif /* WITH_WSREP */
 
   m_internal_handler = NULL;
   m_binlog_invoker = false;
@@ -922,6 +781,15 @@ Sql_condition *THD::raise_condition(uint sql_errno, const char *sqlstate,
       (level == Sql_condition::SL_NOTE))
     DBUG_RETURN(NULL);
 
+#ifdef WITH_WSREP
+  /*
+    Suppress warnings/errors if the wsrep THD is going to replay. The
+    deadlock/interrupted errors may be transitient and should not be
+    reported to the client.
+  */
+  if (wsrep_must_replay(this)) DBUG_RETURN(NULL);
+#endif /* WITH_WSREP */
+
   DBUG_ASSERT(sql_errno != 0);
   if (sql_errno == 0) /* Safety in release build */
     sql_errno = ER_UNKNOWN_ERROR;
@@ -1029,34 +897,34 @@ void THD::init(void) {
   binlog_row_event_extra_data = 0;
 
 #ifdef WITH_WSREP
-  wsrep_exec_mode = wsrep_applier ? REPL_RECV : LOCAL_STATE;
-  wsrep_conflict_state = NO_CONFLICT;
-  wsrep_query_state = QUERY_IDLE;
   wsrep_last_query_id = 0;
-  wsrep_non_replicating_atomic_ddl = false;
-  wsrep_trx_meta.gtid = WSREP_GTID_UNDEFINED;
-  wsrep_trx_meta.depends_on = WSREP_SEQNO_UNDEFINED;
+  wsrep_xid.reset();
+  wsrep_skip_locking = false;
   wsrep_retry_counter = 0;
   wsrep_rli = NULL;
   wsrep_PA_safe = true;
-  wsrep_safe_to_abort = true;
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
-  wsrep_mysql_replicated = 0;
-  wsrep_TOI_pre_query     = NULL;
+  wsrep_TOI_pre_query = NULL;
   wsrep_TOI_pre_query_len = 0;
-  wsrep_sync_wait_gtid = WSREP_GTID_UNDEFINED;
+  wsrep_rbr_buf = NULL;
   wsrep_affected_rows = 0;
   wsrep_replicate_GTID = false;
-  wsrep_skip_wsrep_GTID = false;
-  wsrep_split_trx = false;
-  wsrep_intermediate_commit = false;
+
   wsrep_gtid_event_buf = NULL;
   wsrep_gtid_event_buf_len = 0;
+
   m_wsrep_next_trx_id = WSREP_UNDEFINED_TRX_ID;
-  wsrep_sst_donor = false;
-  wsrep_void_applier_trx = true;
+
+  wsrep_skip_wsrep_GTID = false;
   wsrep_skip_SE_checkpoint = false;
   wsrep_skip_wsrep_hton = false;
+  wsrep_intermediate_commit = false;
+  wsrep_non_replicating_atomic_ddl = false;
+  wsrep_safe_to_abort = true;
+  wsrep_replayer = false;
+  run_wsrep_commit_hooks = false;
+  run_wsrep_ordered_commit = false;
+  wsrep_enforce_group_commit = false;
 #endif /* WITH_WSREP */
 
   if (variables.sql_log_bin)
@@ -1168,6 +1036,14 @@ void THD::cleanup(void) {
   DEBUG_SYNC(this, "thd_cleanup_start");
 
   killed = KILL_CONNECTION;
+
+#ifdef WITH_WSREP
+  if (wsrep_cs().state() != wsrep::client_state::s_none) {
+    wsrep_cs().cleanup();
+  }
+  wsrep_client_thread = false;
+#endif /* WITH_WSREP */
+
   if (trn_ctx->xid_state()->has_state(XID_STATE::XA_PREPARED)) {
     /*
       Return error is not an option as XA is in prepared state and
@@ -1337,6 +1213,11 @@ void THD::release_resources() {
     if (wsrep_rli->current_mts_submode != NULL)
       delete wsrep_rli->current_mts_submode;
     wsrep_rli->current_mts_submode = 0;
+
+    if (wsrep_rli->deferred_events != NULL)
+      delete wsrep_rli->deferred_events;
+    wsrep_rli->deferred_events = 0;
+
     delete wsrep_rli;
     wsrep_rli = NULL;
     /* rli_slave MySQL counter part which is initialized to wsrep_rli. */
@@ -1696,8 +1577,8 @@ void THD::notify_shared_lock(MDL_context_owner *ctx_in_use,
 #ifdef WITH_WSREP
       if (!thd_table->needs_reopen()) {
         mysql_lock_abort_for_thread(this, thd_table);
-        if (WSREP_NNULL(this) && wsrep_thd_is_BF((void *)this, false))
-          wsrep_abort_thd((void *)this, (void *)in_use, false);
+        if (WSREP_NNULL(this) && wsrep_thd_is_BF(this, false))
+          wsrep_abort_thd(this, in_use, false);
       }
 #else
       if (!thd_table->needs_reopen())
@@ -1934,7 +1815,6 @@ void THD::cleanup_after_query() {
   check_for_truncated_fields = CHECK_FIELD_IGNORE;
 
 #ifdef WITH_WSREP
-  wsrep_sync_wait_gtid = WSREP_GTID_UNDEFINED;
   if (!in_active_multi_stmt_transaction()) wsrep_affected_rows = 0;
 #endif /* WITH_WSREP */
 }
@@ -2364,7 +2244,7 @@ void THD::begin_attachable_ro_transaction() {
 
 void THD::end_attachable_transaction() {
 #ifdef WITH_WSREP
-  /* In PXC flow, bf_thd may be readinf the main transaction data
+  /* In PXC flow, bf_thd may be reading the main transaction data
   from attachable transaction so this sync is needed. */
   mysql_mutex_lock(&LOCK_wsrep_thd_attachable_trx);
 #endif /* WITH_WSREP */
@@ -3173,6 +3053,18 @@ void THD::send_statement_status() {
   DBUG_ASSERT(!get_stmt_da()->is_sent());
   bool error = false;
   Diagnostics_area *da = get_stmt_da();
+
+#ifdef WITH_WSREP
+  /*
+    sanity check, don't send end statement while replaying
+  */
+  DBUG_ASSERT(wsrep_trx().state() != wsrep::transaction::s_replaying);
+  if (WSREP(this) &&
+      wsrep_trx().state() == wsrep::transaction::s_replaying) {
+    WSREP_ERROR("attempting net_end_statement while replaying");
+    return;
+  }
+#endif /* WITH_WSREP */
 
   /* Can not be true, but do not take chances in production. */
   if (da->is_sent()) DBUG_VOID_RETURN;

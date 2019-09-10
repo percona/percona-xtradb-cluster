@@ -229,12 +229,6 @@ static void trx_init(trx_t *trx) {
     trx->in_innodb &= TRX_FORCE_ROLLBACK_MASK;
   }
 
-#ifdef WITH_WSREP
-  // TODO: needs comment Why and how it is used ?
-  query_id_t query_id = trx->wsrep_killed_by_query;
-  os_compare_and_swap_thread_id(&trx->wsrep_killed_by_query, query_id, 0);
-#endif /* WITH_WSREP */
-
   /* Note: It's possible that this list is not empty if a transaction
   was interrupted after it collected the victim transactions and before
   it got a chance to roll them back asynchronously. */
@@ -383,10 +377,6 @@ struct TrxFactory {
     ut_ad(trx->hit_list.empty());
 
     ut_ad(trx->killed_by == 0);
-
-#ifdef WITH_WSREP
-    ut_ad(trx->wsrep_killed_by_query == 0);
-#endif /* WITH_WSREP */
 
     return (true);
   }
@@ -683,10 +673,6 @@ void trx_disconnect_prepared(trx_t *trx) {
 /** Free a transaction object for MySQL.
 @param[in,out]	trx	transaction */
 void trx_free_for_mysql(trx_t *trx) {
-#ifdef WITH_WSREP
-  /* for sanity, this may not have been cleared yet */
-  trx->wsrep_killed_by_query = 0;
-#endif /* WITH_WSREP */
   trx_disconnect_plain(trx);
   trx_free_for_background(trx);
 }
@@ -1459,7 +1445,7 @@ static bool trx_write_serialisation_history(
     mtr_t *mtr) /*!< in/out: mini-transaction */
 {
 #ifdef WITH_WSREP
-  trx_sysf_t *sys_header;
+  trx_sysf_t *sys_header = NULL;
 #endif /* WITH_WSREP */
 
   /* Change the undo log segment states from TRX_UNDO_ACTIVE to some
@@ -1573,7 +1559,6 @@ static bool trx_write_serialisation_history(
     DBUG_SUICIDE();
   });
 
-  sys_header = trx_sysf_get(mtr);
 
   /* Update latest MySQL wsrep XID in trx sys header.
   If given transaction is marked for replay then avoid updating
@@ -1593,6 +1578,8 @@ static bool trx_write_serialisation_history(
   }
 
   trx->wsrep_recover_xid = NULL;
+
+  sys_header = trx_sysf_get(mtr);
 #endif /* WITH_WSREP */
 
   /* Update the latest MySQL binlog name and offset info
@@ -2019,9 +2006,7 @@ written */
   }
 
 #ifdef WITH_WSREP
-  if (wsrep_on(trx->mysql_thd)) {
-    trx->lock.was_chosen_as_deadlock_victim = false;
-  }
+  trx->lock.was_chosen_as_wsrep_victim = false;
 #endif /* WITH_WSREP */
 
   /* trx->in_mysql_trx_list would hold between
@@ -2143,6 +2128,20 @@ void trx_commit(trx_t *trx) /*!< in/out: transaction */
   }
 
   trx_commit_low(trx, mtr);
+
+#if 0
+  -- G4_CHANGE
+  /* PXC original flow does this as part of trx_commit_complete_for_mysql */
+#ifdef WITH_WSREP
+  /* Serialization history has been written and the
+     transaction is committed in memory, which makes
+     this commit ordered. Release commit order critical
+     section. */
+  if (wsrep_on(trx->mysql_thd)) {
+    wsrep_commit_ordered(trx->mysql_thd);
+  }
+#endif /* WITH_WSREP */
+#endif
 }
 
 /** Cleans up a transaction at database startup. The cleanup is needed if
@@ -2445,7 +2444,7 @@ void trx_commit_complete_for_mysql(trx_t *trx) /*!< in/out: transaction */
 
   trx-1 then try to flush redo log but return without any work todo.*/
 
-  wsrep_post_commit(trx->mysql_thd, true /* don't care */);
+  wsrep_commit_ordered(trx->mysql_thd);
 #endif /* WITH_WSREP */
 
   trx_flush_log_if_needed(trx->commit_lsn, trx);
@@ -3455,7 +3454,9 @@ void trx_kill_blocking(trx_t *trx) {
     */
     trx_id_t save_id = victim_trx->id;
     victim_trx->id = victim_id;
-    wsrep_signal_replicator(victim_trx, trx);
+    // TODO: G-4
+    assert(0);
+    // wsrep_signal_replicator(victim_trx, trx);
     victim_trx->id = save_id;
 #endif /* WITH_WSREP */
 

@@ -32,6 +32,7 @@ DROP TABLE t2;
 DROP TABLE t3;
 DROP TABLE t4;
 call mtr.add_suppression("Slave SQL: Error 'Table 'v1' already exists' on .*");
+call mtr.add_suppression("Query apply failed.*");
 call mtr.add_suppression("Slave SQL: Error 'Table 'v1' already exists' on .*");
 use test;
 create table t1 (i int key, j blob) engine=innodb;

@@ -12,10 +12,10 @@ SELECT @@wsrep_slave_threads = 1;
 @@wsrep_slave_threads = 1
 1
 SET GLOBAL wsrep_slave_threads = 1;
-SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
-COUNT(*) = 2
+SELECT COUNT(*) = 3 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+COUNT(*) = 3
 1
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep aborter idle';
 COUNT(*) = 1
 1
 SET GLOBAL wsrep_slave_threads = 64;
@@ -26,10 +26,10 @@ SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1
 # this should emit presence of 64 applier threads
-SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
-COUNT(*) = @@wsrep_slave_threads + 1
+SELECT COUNT(*) = @@wsrep_slave_threads + 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+COUNT(*) = @@wsrep_slave_threads + 2
 1
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep aborter idle';
 COUNT(*) = 1
 1
 SET GLOBAL wsrep_slave_threads = 1;
@@ -104,18 +104,18 @@ COUNT(*) = 64
 1
 SET wsrep_sync_wait=0;
 # this should emit presence of 1 applier thread
-SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
-COUNT(*) = @@wsrep_slave_threads + 1
+SELECT COUNT(*) = @@wsrep_slave_threads + 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+COUNT(*) = @@wsrep_slave_threads + 2
 1
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep aborter idle';
 COUNT(*) = 1
 1
 SET GLOBAL wsrep_slave_threads = 5;
 # this should emit presence of 5 applier threads
-SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
-COUNT(*) = @@wsrep_slave_threads + 1
+SELECT COUNT(*) = @@wsrep_slave_threads + 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+COUNT(*) = @@wsrep_slave_threads + 2
 1
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep aborter idle';
 COUNT(*) = 1
 1
 Shutting down server ...
@@ -129,8 +129,8 @@ SET GLOBAL wsrep_cluster_address='';
 SET GLOBAL wsrep_cluster_address='gcomm://';
 SET GLOBAL wsrep_slave_threads = 10;
 # restart
-SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
-COUNT(*) = @@wsrep_slave_threads + 1
+SELECT COUNT(*) = @@wsrep_slave_threads + 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+COUNT(*) = @@wsrep_slave_threads + 2
 1
 SET GLOBAL wsrep_slave_threads = 1;
 SET GLOBAL wsrep_slave_threads = 1;

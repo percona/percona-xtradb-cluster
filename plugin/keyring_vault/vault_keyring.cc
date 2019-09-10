@@ -8,10 +8,6 @@
 #include "vault_keys_container.h"
 #include "vault_parser.h"
 
-#ifdef WITH_WSREP
-//extern bool wsrep_is_wsrep_on(void);
-#endif /* WITH_WSREP */
-
 using keyring::IVault_curl;
 using keyring::IVault_parser;
 using keyring::Keys_iterator;
@@ -164,8 +160,6 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info MY_ATTRIBUTE((unused))) {
       as fatal error to avoid inconsistency in cluster enviornment where-in
       some node of the cluster are running with keyring enabled and other
       in keyring disabled mode, despite of same user provided configuration. */
-      // return (wsrep_is_wsrep_on() ? 1 : 0);
-      /* problem exporting wsrep_is_wsrep_on function in udf. */
       return 1;
 #else
       return 0;
