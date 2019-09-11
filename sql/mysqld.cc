@@ -1280,23 +1280,20 @@ public:
   {}
   virtual void operator()(THD *thd)
   {
-    if (WSREP(thd))
-    { 
-      switch (m_type) 
+    switch (m_type)
+    {
+      case APPLIER:
       {
-        case APPLIER:
-        {
-          if (thd->wsrep_applier)
-            m_count++;
-        }
-        break;
-        case COMMITTING:
-        {
-          if (thd->wsrep_query_state == QUERY_COMMITTING)
-            m_count++;
-        }
-        break;
+        if (thd->wsrep_applier)
+          m_count++;
       }
+      break;
+      case COMMITTING:
+      {
+        if (thd->wsrep_query_state == QUERY_COMMITTING)
+          m_count++;
+      }
+      break;
     }
   }
   int get_thd_count() const
@@ -7664,7 +7661,7 @@ static void wsrep_close_threads(THD *thd)
   thd_manager->do_for_all_thd(&call_wsrep_close_wsrep_threads);
 }
 
-void wsrep_close_applier_threads(int count)
+void wsrep_close_applier_threads()
 {
   Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
 

@@ -23,3 +23,5 @@ galera_create_table_like : Resource leak with CTAS statement (PXC#2232)
 pxc_encrypt_rest_blog : Currently PXC doesn't support binlog encryption
 pxc_encrypt_rest_gt_vault : Vault server availability is unreliable
 pxc_encrypt_rest_fpt_vault : Vault server availability is unreliable
+#galera_var_wsrep_recover : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+#mysql-wsrep#216 : GCF-1021 0000-00-00 CODERSHIP 5.7 Regression: obfuscated passwords not consistent in error logs

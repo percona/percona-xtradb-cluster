@@ -1,0 +1,5 @@
+SET GLOBAL wsrep_provider_options = 'dbug=d,before_async_recv_process_sync';
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+SET GLOBAL wsrep_provider='none';
+SET GLOBAL wsrep_provider_options = 'dbug=';
+DROP TABLE t1;
