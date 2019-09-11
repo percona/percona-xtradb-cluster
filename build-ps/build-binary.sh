@@ -67,6 +67,9 @@ KEEP_BUILD=0
 # enable asan
 ENABLE_ASAN=0
 
+# build comment
+BUILD_COMMENT=""
+
 #-------------------------------------------------------------------------------
 #
 # Step-1: Set default configuration.
@@ -95,7 +98,7 @@ do
     -d | --debug )
         shift
         CMAKE_BUILD_TYPE='Debug'
-        BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
+        BUILD_COMMENT="debug."
         DEBUG_EXTRA="-DDEBUG_EXTNAME=ON"
         SCONS_ARGS+=' debug=0'
         ;;
@@ -110,7 +113,7 @@ do
     -v | --valgrind )
         shift
         CMAKE_OPTS="${CMAKE_OPTS:-} -DWITH_VALGRIND=ON"
-        BUILD_COMMENT="${BUILD_COMMENT:-}-valgrind"
+        BUILD_COMMENT="valgrind."
         ;;
     -q | --verbose )
         shift
@@ -244,7 +247,7 @@ fi
 
 source "$SOURCEDIR/VERSION"
 MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
-PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
+PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/./')"
 PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 
 # Note: WSREP_INTERFACE_VERSION act as compatibility check between wsrep-plugin
@@ -257,9 +260,8 @@ if [[ $COPYGALERA -eq 0 ]];then
 fi
 TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
-RELEASE_TAG=''
-PRODUCT_NAME="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
-PRODUCT_FULL_NAME="$PRODUCT_NAME-$RELEASE_TAG$WSREP_VERSION${BUILD_COMMENT:-}.$TAG.$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
+PRODUCT_NAME="Percona-XtraDB-Cluster_$MYSQL_VERSION$PERCONA_SERVER_EXTENSION"
+PRODUCT_FULL_NAME="${PRODUCT_NAME}-${WSREP_VERSION}_${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
 
 #
 # This corresponds to GIT revision when the build/package is created.
