@@ -688,6 +688,11 @@ static bool mysql_admin_table(THD* thd, TABLE_LIST* tables,
         table->mdl_request.ticket= NULL;
 
         tmp_disable_binlog(thd); // binlogging is done by caller if wanted
+#ifdef WITH_WSREP
+        /* Re-create table should run with wsrep_on = ON that got disabled
+        by tmp_disable_binlog as it takes MDL lock that can force abort. */
+        reenable_wsrep(thd);
+#endif /* WITH_WSREP */
         result_code= mysql_recreate_table(thd, table, false);
         reenable_binlog(thd);
         /*
@@ -858,6 +863,11 @@ send_result_message:
                  *save_next_global= table->next_global;
       table->next_local= table->next_global= 0;
       tmp_disable_binlog(thd); // binlogging is done by caller if wanted
+#ifdef WITH_WSREP
+        /* Re-create table should run with wsrep_on = ON that got disabled
+        by tmp_disable_binlog as it takes MDL lock that can force abort. */
+        reenable_wsrep(thd);
+#endif /* WITH_WSREP */
       /* Don't forget to pre-open temporary tables. */
       result_code= (open_temporary_tables(thd, table) ||
                     mysql_recreate_table(thd, table, false));

@@ -10221,6 +10221,11 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
   bool varchar= create_info->varchar;
 
   tmp_disable_binlog(thd);
+#ifdef WITH_WSREP
+  /* Create table should run with wsrep_on = ON that got disabled
+  by tmp_disable_binlog as it takes MDL lock that can force abort. */
+  reenable_wsrep(thd);
+#endif /* WITH_WSREP */
   error= create_table_impl(thd, alter_ctx.new_db, alter_ctx.tmp_name,
                            alter_ctx.table_name,
                            alter_ctx.get_tmp_path(),
