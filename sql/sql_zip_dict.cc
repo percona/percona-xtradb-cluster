@@ -21,8 +21,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "sql/sql_zip_dict.h"
 
 #include <iostream>
-#include "sql/dd/impl/bootstrapper.h"
+#include "sql/dd/impl/bootstrap/bootstrap_ctx.h"  // DD_bootstrap_ctx
+#include "sql/dd/impl/bootstrap/bootstrapper.h"
 #include "sql/dd/impl/transaction_impl.h"
+#include "sql/dd/impl/utils.h"                 // execute_query
 #include "sql/dd/types/column.h"               // dd::enum_column_types
 #include "sql/dd/types/column_type_element.h"  // dd::Column_type_element
 #include "sql/dd/types/table.h"                // dd::enum_column_types
@@ -102,13 +104,25 @@ bool bootstrap(THD *thd) {
   DBUG_EXECUTE_IF("skip_compression_dict_create", skip_bootstrap = true;
                   return false;);
 
+  dd::String_type dict_table_str_enc{dict_table_str};
+
+  if (dd::bootstrap::DD_bootstrap_ctx::instance().is_dd_encrypted()) {
+    dict_table_str_enc += " ENCRYPTION='Y'";
+  }
+
   // Create mysql.compression_dictionary table
-  if (execute_query(thd, dict_table_str)) {
+  if (execute_query(thd, dict_table_str_enc)) {
     return true;
   }
 
+  dd::String_type dict_cols_table_str_enc{dict_cols_table_str};
+
+  if (dd::bootstrap::DD_bootstrap_ctx::instance().is_dd_encrypted()) {
+    dict_cols_table_str_enc += " ENCRYPTION='Y'";
+  }
+
   // Create mysql.compression_dictionary_cols table
-  if (execute_query(thd, dict_cols_table_str)) {
+  if (execute_query(thd, dict_cols_table_str_enc)) {
     return true;
   }
 
@@ -313,11 +327,12 @@ int create_zip_dict(THD *thd, const char *name, ulong name_len,
 #ifndef DBUG_OFF
   const std::string name_str(name, name_len);
   const std::string data_str(data, data_len);
-  DBUG_LOG("zip_dict",
-           "thd->query: " << thd->query().str << " dict_name: " << name_str
-                          << " dict_name_len: " << name_len
-                          << " data: " << data_str << " data_len: " << data_len
-                          << " if_not_exists: " << if_not_exists);
+  const std::string query_str(to_string(thd->query()));
+  DBUG_LOG("zip_dict", "thd->query: " << query_str << " dict_name: " << name_str
+                                      << " dict_name_len: " << name_len
+                                      << " data: " << data_str
+                                      << " data_len: " << data_len
+                                      << " if_not_exists: " << if_not_exists);
 #endif
   int error;
 
@@ -426,10 +441,18 @@ int create_zip_dict(THD *thd, const char *name, ulong name_len,
         break;
       case HA_ERR_RECORD_FILE_FULL:
         error = ER_RECORD_FILE_FULL;
-        my_error(error, MYF(0), "compression_dictionary");
+        my_error(error, MYF(0), COMPRESSION_DICTIONARY_TABLE);
         break;
       case HA_ERR_TOO_MANY_CONCURRENT_TRXS:
         error = ER_TOO_MANY_CONCURRENT_TRXS;
+        my_error(error, MYF(0));
+        break;
+      case HA_ERR_TABLE_READONLY:
+        error = ER_OPEN_AS_READONLY;
+        my_error(error, MYF(0), COMPRESSION_DICTIONARY_TABLE);
+        break;
+      case HA_ERR_INNODB_FORCED_RECOVERY:
+        error = ER_INNODB_FORCED_RECOVERY;
         my_error(error, MYF(0));
         break;
       default:
@@ -578,6 +601,14 @@ int drop_zip_dict(THD *thd, const char *name, ulong name_len, bool if_exists) {
       break;
     case HA_ERR_TOO_MANY_CONCURRENT_TRXS:
       error = ER_TOO_MANY_CONCURRENT_TRXS;
+      my_error(error, MYF(0));
+      break;
+    case HA_ERR_TABLE_READONLY:
+      error = ER_OPEN_AS_READONLY;
+      my_error(error, MYF(0), COMPRESSION_DICTIONARY_TABLE);
+      break;
+    case HA_ERR_INNODB_FORCED_RECOVERY:
+      error = ER_INNODB_FORCED_RECOVERY;
       my_error(error, MYF(0));
       break;
     default:
@@ -767,13 +798,16 @@ static bool cols_table_delete_low(TABLE *table, uint64 table_id,
     ret = table->file->ha_delete_row(table->record[0]);
   }
 
-  if (ret == 0) {
-    return (false);
-  } else {
-    DBUG_ASSERT(0);
-    int error = ER_UNKNOWN_ERROR;
-    my_error(error, MYF(0));
-    return (true);
+  switch (ret) {
+    case 0:
+      return (false);
+    case HA_ERR_INNODB_FORCED_RECOVERY:
+      my_error(ER_INNODB_FORCED_RECOVERY, MYF(0));
+      return (true);
+    default:
+      DBUG_ASSERT(0);
+      my_error(ER_UNKNOWN_ERROR, MYF(0));
+      return (true);
   }
 }
 

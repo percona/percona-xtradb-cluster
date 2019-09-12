@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -54,6 +54,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "fil0rkinfo.h"
 
 #define REDO_LOG_ENCRYPT_NO_VERSION 0
+
+struct redo_log_key;
 
 /** Structure containing encryption specification */
 struct fil_space_crypt_t;
@@ -312,6 +314,9 @@ struct fil_space_t {
   byte encryption_iv[ENCRYPTION_KEY_LEN];
 
   ulint encryption_key_version;
+
+  /** Only used for redo log encryption: the currently active key handle */
+  redo_log_key *encryption_redo_key;
 
   /** Encryption is in progress */
   encryption_op_type encryption_op_in_progress;
@@ -1051,7 +1056,7 @@ Error messages are issued to the server log.
 @return pointer to created tablespace, to be filled in with fil_node_create()
 @retval nullptr on failure (such as when the same tablespace exists) */
 fil_space_t *fil_space_create(const char *name, space_id_t space_id,
-                              ulint flags, fil_type_t purpose,
+                              uint32_t flags, fil_type_t purpose,
                               fil_space_crypt_t *crypt_data,
                               fil_encryption_t mode = FIL_ENCRYPTION_DEFAULT)
     MY_ATTRIBUTE((warn_unused_result));
@@ -1084,14 +1089,14 @@ page_no_t fil_space_get_size(space_id_t space_id)
 in the memory cache.
 @param[in]	space_id	Tablespace ID for which to get the flags
 @return flags, ULINT_UNDEFINED if space not found */
-ulint fil_space_get_flags(space_id_t space_id)
+uint32_t fil_space_get_flags(space_id_t space_id)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Sets the flags of the tablespace. The tablespace must be locked
 in MDL_EXCLUSIVE MODE.
 @param[in]	space		tablespace in-memory struct
 @param[in]	flags		tablespace flags */
-void fil_space_set_flags(fil_space_t *space, ulint flags);
+void fil_space_set_flags(fil_space_t *space, uint32_t flags);
 
 /** Open each file of a tablespace if not already open.
 @param[in]	space_id	Tablespace ID
@@ -1205,7 +1210,14 @@ when it could be dropped concurrently.
 @param[in]	id	tablespace ID
 @return	the tablespace
 @retval	NULL if missing */
-fil_space_t *fil_space_acquire_for_io(ulint id);
+fil_space_t *fil_space_acquire_for_io(space_id_t id);
+
+/** Load and acquire a tablespace for reading or writing a block,
+when it could be dropped concurrently.
+@param[in]	id	tablespace ID
+@return	the tablespace
+@retval	NULL if missing */
+fil_space_t *fil_space_acquire_for_io_with_load(space_id_t space_id);
 
 /** Release a tablespace acquired with fil_space_acquire_for_io().
 @param[in,out]	space	tablespace to release  */
@@ -1242,7 +1254,7 @@ class FilSpace {
   /** Constructor: Look up the tablespace and increment the
   referece count if found.
   @param[in]	space_id	tablespace ID */
-  explicit FilSpace(ulint space_id, bool silent = false)
+  explicit FilSpace(space_id_t space_id, bool silent = false)
       : m_space(silent ? fil_space_acquire_silent(space_id)
                        : fil_space_acquire(space_id)) {}
 
@@ -1344,9 +1356,9 @@ The tablespace must exist in the memory cache.
 @param[in]	new_name	New tablespace name in the schema/name format
 @param[in]	new_path_in	New file name, or nullptr if it is located in
                                 The normal data directory
-@return true if success */
-bool fil_rename_tablespace(space_id_t space_id, const char *old_path,
-                           const char *new_name, const char *new_path_in)
+@return InnoDB error code */
+dberr_t fil_rename_tablespace(space_id_t space_id, const char *old_path,
+                              const char *new_name, const char *new_path_in)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Create a tablespace file.
@@ -1360,7 +1372,7 @@ bool fil_rename_tablespace(space_id_t space_id, const char *old_path,
                                 must be >= FIL_IBD_FILE_INITIAL_SIZE
 @return DB_SUCCESS or error code */
 dberr_t fil_ibd_create(
-    space_id_t space_id, const char *name, const char *path, ulint flags,
+    space_id_t space_id, const char *name, const char *path, uint32_t flags,
     page_no_t size, fil_encryption_t mode,
     const CreateInfoEncryptionKeyId &create_info_encryption_key_id)
     MY_ATTRIBUTE((warn_unused_result));
@@ -1374,7 +1386,7 @@ dberr_t fil_ibd_create(
                                 must be >= FIL_IBT_FILE_INITIAL_SIZE
 @return DB_SUCCESS or error code */
 dberr_t fil_ibt_create(space_id_t space_id, const char *name, const char *path,
-                       ulint flags, page_no_t size)
+                       uint32_t flags, page_no_t size)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Deletes an IBD tablespace, either general or single-table.
@@ -1414,7 +1426,7 @@ from it
                                 by upgrade
 @return DB_SUCCESS or error code */
 dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
-                     ulint flags, const char *space_name,
+                     uint32_t flags, const char *space_name,
                      const char *table_name, const char *path_in, bool strict,
                      bool old_space,
                      Keyring_encryption_info &keyring_encryption_info)
@@ -1971,7 +1983,7 @@ void fil_space_update_name(fil_space_t *space, const char *name);
 @param space_id	space id */
 void fil_space_set_corrupt(space_id_t space_id);
 
-void fil_space_set_encrypted(ulint space_id);
+void fil_space_set_encrypted(space_id_t space_id);
 
 using space_id_vec = std::vector<space_id_t>;
 
@@ -1985,7 +1997,12 @@ bool fil_encryption_rotate_global(const space_id_vec &space_ids);
 void fil_system_acquire();
 void fil_system_release();
 
-void fil_lock_shard_by_id(ulint space_id);
-void fil_unlock_shard_by_id(ulint space_id);
+void fil_lock_shard_by_id(space_id_t space_id);
+void fil_unlock_shard_by_id(space_id_t space_id);
+
+/** Rotate the tablespace key by new master key.
+@param[in]	space	tablespace object
+@return true if the re-encrypt suceeds */
+bool encryption_rotate_low(fil_space_t *space);
 
 #endif /* fil0fil_h */

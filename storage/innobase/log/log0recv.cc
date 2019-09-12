@@ -44,6 +44,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <string>
 #include <vector>
 
+#include "arch0arch.h"
 #include "log0recv.h"
 
 #include "btr0btr.h"
@@ -710,6 +711,10 @@ static recv_addr_t *recv_get_rec(space_id_t space_id, page_no_t page_no) {
   return (nullptr);
 }
 
+bool is_mysql_ibd_page_0_in_redo() {
+  return recv_get_rec(dict_sys_t::s_space_id, 0) != nullptr;
+}
+
 #ifndef UNIV_HOTBACKUP
 /** Store the collected persistent dynamic metadata to
 mysql.innodb_dynamic_metadata */
@@ -1016,13 +1021,19 @@ static void recv_apply_log_rec(recv_addr_t *recv_addr) {
     return;
   }
 
-  bool found;
   const page_id_t page_id(recv_addr->space, recv_addr->page_no);
 
-  const page_size_t page_size =
-      fil_space_get_page_size(recv_addr->space, &found);
+  fil_space_t *space = fil_space_acquire_for_io_with_load(recv_addr->space);
+  const page_size_t page_size(space->flags);
 
-  if (!found || recv_sys->missing_ids.find(recv_addr->space) !=
+  if (space && space->is_encrypted) {
+    /* found space that cannot be decrypted, abort processing REDO */
+    recv_sys->found_corrupt_log = true;
+    fil_space_release_for_io(space);
+    return;
+  }
+
+  if (!space || recv_sys->missing_ids.find(recv_addr->space) !=
                     recv_sys->missing_ids.end()) {
     /* Tablespace was discarded or dropped after changes were
     made to it. Or, we have ignored redo log for this tablespace
@@ -1064,6 +1075,10 @@ static void recv_apply_log_rec(recv_addr_t *recv_addr) {
     }
 
     mutex_enter(&recv_sys->mutex);
+  }
+
+  if (space) {
+    fil_space_release_for_io(space);
   }
 }
 
@@ -2278,6 +2293,12 @@ void recv_recover_page_func(
     buf_block_t *block) {
   mutex_enter(&recv_sys->mutex);
 
+  if (block->page.encrypted) {
+    recv_sys->found_corrupt_log = true;
+    mutex_exit(&recv_sys->mutex);
+    return;
+  }
+
   if (recv_sys->apply_log_recs == false) {
     /* Log records should not be applied now */
 
@@ -2301,6 +2322,25 @@ void recv_recover_page_func(
 
     return;
   }
+
+#ifndef UNIV_HOTBACKUP
+  buf_page_t bpage = block->page;
+
+  if (!fsp_is_system_temporary(bpage.id.space()) &&
+      (arch_page_sys != nullptr && arch_page_sys->is_active())) {
+    page_t *frame;
+    lsn_t frame_lsn;
+
+    frame = bpage.zip.data;
+
+    if (!frame) {
+      frame = block->frame;
+    }
+    frame_lsn = mach_read_from_8(frame + FIL_PAGE_LSN);
+
+    arch_page_sys->track_page(&bpage, LSN_MAX, frame_lsn, true);
+  }
+#endif /* !UNIV_HOTBACKUP */
 
 #ifndef UNIV_HOTBACKUP
   /* this is explicitly false in case of meb, skip the assert */
@@ -2423,7 +2463,7 @@ void recv_recover_page_func(
 
     if (recv->start_lsn >= page_lsn
 #ifndef UNIV_HOTBACKUP
-        && undo::is_active(recv_addr->space)
+        && undo::is_active(recv_addr->space, false)
 #endif /* !UNIV_HOTBACKUP */
     ) {
 

@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2018, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2019, Oracle and/or its affiliates. All rights reserved.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -150,23 +150,12 @@ BEGIN
   -- INSTALL/UNINSTALL command
   SELECT * FROM INFORMATION_SCHEMA.PLUGINS;
 
-  -- Percona disabled until zip dictionary reimplementation in the new DD
-  -- -- Dump all created compression dictionaries
-  -- SELECT * FROM information_schema.xtradb_zip_dict ORDER BY name;
+  -- Dump all created compression dictionaries
+  SELECT * FROM INFORMATION_SCHEMA.COMPRESSION_DICTIONARY ORDER BY DICT_NAME;
 
   SHOW GLOBAL STATUS LIKE 'slave_open_temp_tables';
 
   -- Check for number of active connections before & after the test run.
-  -- It is observed that several rpl tests fails due to mismatch in Threads
-  -- count when we use SHOW GLOBAL STATUS LIKE 'Threads_Connected':
-  --  Variable_name Value
-  -- -Threads_connected    1
-  -- +Threads_connected    2
-  -- This is due to the default value of MASTER_HEARTBEAT_PERIOD which is equal
-  -- to slave_net_timeout/2 = 60secs.
-  -- Due to this, even after the slave is stopped, the master will not close
-  -- the client session until MASTER_HEARTBEAT_PERIOD is reached.
-  -- Hence, excluding the 'Binlog Dump' thread.
 
   -- mysql.session is used internally by plugins to access the server. We may
   -- not find consistent result in information_schema.processlist, hence
@@ -175,13 +164,8 @@ BEGIN
   -- excluding it from check-testcase. Similar reasoning applies to the event
   -- scheduler.
   -- SELECT USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-  --  WHERE COMMAND NOT IN ('Binlog Dump','Binlog Dump GTID','Sleep')
+  --  WHERE COMMAND NOT IN ('Sleep')
   --    AND USER NOT IN ('mysql.session', 'event_scheduler')
-  --      ORDER BY COMMAND;
-  -- excluding it from check-testcase.
-  -- SELECT USER, HOST, DB, COMMAND, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
-  --  WHERE COMMAND NOT IN ('Binlog Dump','Binlog Dump GTID','Sleep')
-  --    AND USER <> 'mysql.session'
   --      ORDER BY COMMAND;
 
   -- Show open connections/transactions in wsrep provider

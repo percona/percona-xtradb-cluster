@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -22,7 +22,7 @@
 
 #include <mysqld_error.h>
 
-#include "sql/dd/impl/bootstrap_ctx.h"            // DD_bootstrap_ctx
+#include "sql/dd/impl/bootstrap/bootstrap_ctx.h"  // DD_bootstrap_ctx
 #include "sql/dd/impl/types/object_table_impl.h"  // Object_table_impl
 #include "sql/table.h"
 
@@ -46,9 +46,20 @@ Object_table_impl::Object_table_impl()
                           "ROW_FORMAT", "ROW_FORMAT=DYNAMIC");
   m_target_def.add_option(static_cast<int>(Common_option::STATS_PERSISTENT),
                           "STATS_PERSISTENT", "STATS_PERSISTENT=0");
+
+  if (bootstrap::DD_bootstrap_ctx::instance().is_dd_encrypted()) {
+    m_target_def.add_option(static_cast<int>(Common_option::ENCRYPTION),
+                            "ENCRYPTION", "ENCRYPTION='Y'");
+  }
+
   m_target_def.add_option(
       static_cast<int>(Common_option::TABLESPACE), "TABLESPACE",
       String_type("TABLESPACE=") + String_type(MYSQL_TABLESPACE_NAME.str));
+}
+
+void Object_table_impl::set_encrypted() {
+  m_target_def.add_option(static_cast<int>(Common_option::ENCRYPTION),
+                          "ENCRYPTION", "ENCRYPTION='Y'");
 }
 
 bool Object_table_impl::set_actual_table_definition(

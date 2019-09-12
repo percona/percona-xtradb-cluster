@@ -36,6 +36,8 @@ Build-Depends: libtool (>= 1.4.2-7),
                libssl-dev,
                check,
                libboost-program-options-dev (>= 1.41),
+               libwrap0-dev,
+               libcurl4-openssl-dev,
                libldap2-dev
 Standards-Version: 7.0.0
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/

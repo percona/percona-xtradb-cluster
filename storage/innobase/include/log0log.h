@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2018, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 1995, 2019, Oracle and/or its affiliates. All rights reserved.
 Copyright (c) 2009, Google Inc.
 
 Portions of this file contain modifications contributed and copyrighted by
@@ -52,6 +52,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "log0test.h"
 #include "log0types.h"
+
+extern uint srv_redo_log_key_version;
 
 /** Prefix for name of log file, e.g. "ib_logfile" */
 constexpr const char *const ib_logfile_basename = "ib_logfile";
@@ -781,13 +783,28 @@ information if it exist.
 @return true if success */
 bool log_read_encryption();
 
+enum redo_log_encrypt_enum {
+  REDO_LOG_ENCRYPT_OFF = 0,
+  REDO_LOG_ENCRYPT_ON = 1,
+  REDO_LOG_ENCRYPT_MK = 2,
+  REDO_LOG_ENCRYPT_RK = 3,
+};
+
+extern redo_log_encrypt_enum existing_redo_encryption_mode;
+
+const char *log_encrypt_name(redo_log_encrypt_enum val);
+
+void log_rotate_default_key();
+
 /** Write the encryption info into the log file header(the 3rd block).
 It just need to flush the file header block with current master key.
 @param[in]	key	encryption key
 @param[in]	iv	encryption iv
 @param[in]	is_boot	if it is for bootstrap
+@param[in]	redo_log_encrypt	encryption type
 @return true if success. */
-bool log_write_encryption(byte *key, byte *iv, bool is_boot);
+bool log_write_encryption(byte *key, byte *iv, bool is_boot,
+                          redo_log_encrypt_enum redo_log_encrypt);
 
 /** Rotate the redo log encryption
 It will re-encrypt the redo log encryption metadata and write it to
@@ -795,10 +812,8 @@ redo log file header.
 @return true if success. */
 bool log_rotate_encryption();
 
-/** Try to enable the redo log encryption if it's set.
-It will try to enable the redo log encryption and write the metadata to
-redo log file header if the innodb_undo_log_encrypt is ON. */
-void log_enable_encryption_if_set();
+/* Checks if there is a new redo key when using keyring encryption. */
+void log_check_new_key_version();
 
 /** Requests a sharp checkpoint write for provided or greater lsn.
 @param[in,out]	log	redo log

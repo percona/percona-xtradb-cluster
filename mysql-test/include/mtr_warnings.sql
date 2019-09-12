@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2018, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2019, Oracle and/or its affiliates. All rights reserved.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -234,13 +234,14 @@ INSERT INTO global_suppressions VALUES
  ("\\[GCS\\] Error on opening a connection to localhost:.* on local port: .*."),
  ("\\[GCS\\] Error pushing message into group communication engine."),
  ("\\[GCS\\] Message cannot be sent because the member does not belong to a group."),
- ("\\[GCS\\] Automatically adding IPv4 localhost address to the whitelist. It is mandatory that it is added."),
+ ("\\[GCS\\] Automatically adding IPv. localhost address to the whitelist. It is mandatory that it is added."),
  ("Member with address .* has become unreachable."),
  ("This server is not able to reach a majority of members in the group.*"),
  ("Member with address .* is reachable again."),
  ("The member has resumed contact with a majority of the members in the group.*"),
  ("Members removed from the group.*"),
  ("Error while sending message for group replication recovery"),
+ ("Slave SQL for channel 'group_replication_recovery': ... The slave coordinator and worker threads are .*"),
 
  /*
    Warnings/errors related to SSL connection by mysqlx

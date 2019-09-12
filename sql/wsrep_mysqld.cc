@@ -24,6 +24,7 @@
 #include "sql_class.h"
 #include "sql_parse.h"
 #include "sql_plugin.h"  // SHOW_MY_BOOL
+#include "sql/ssl_acceptor_context.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -209,31 +210,31 @@ PSI_mutex_key key_LOCK_galera_mempool;
 
 /* Sequence here should match with tag name sequence specified in wsrep_api.h */
 PSI_mutex_info all_galera_mutexes[] = {
-    {&key_LOCK_galera_cert, "LOCK_galera_cert", 0},
-    {&key_LOCK_galera_stats, "LOCK_galera_stats", 0},
-    {&key_LOCK_galera_dummy_gcs, "LOCK_galera_dummy_gcs", 0},
-    {&key_LOCK_galera_service_thd, "LOCK_galera_service_thd", 0},
-    {&key_LOCK_galera_ist_receiver, "LOCK_galera_ist_receiver", 0},
-    {&key_LOCK_galera_local_monitor, "LOCK_galera_local_monitor", 0},
-    {&key_LOCK_galera_apply_monitor, "LOCK_galera_apply_monitor", 0},
-    {&key_LOCK_galera_commit_monitor, "LOCK_galera_commit_monitor", 0},
+    {&key_LOCK_galera_cert, "LOCK_galera_cert", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_stats, "LOCK_galera_stats", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_dummy_gcs, "LOCK_galera_dummy_gcs", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_service_thd, "LOCK_galera_service_thd", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_ist_receiver, "LOCK_galera_ist_receiver", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_local_monitor, "LOCK_galera_local_monitor", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_apply_monitor, "LOCK_galera_apply_monitor", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_commit_monitor, "LOCK_galera_commit_monitor", 0, 0, PSI_DOCUMENT_ME},
     {&key_LOCK_galera_async_sender_monitor, "LOCK_galera_async_sender_monitor",
-     0},
+     0, 0, PSI_DOCUMENT_ME},
     {&key_LOCK_galera_ist_receiver_monitor, "LOCK_galera_ist_receiver_monitor",
-     0},
-    {&key_LOCK_galera_sst, "LOCK_galera_sst", 0},
-    {&key_LOCK_galera_incoming, "LOCK_galera_incoming", 0},
-    {&key_LOCK_galera_saved_state, "LOCK_galera_saved_state", 0},
-    {&key_LOCK_galera_trx_handle, "LOCK_galera_trx_handle", 0},
-    {&key_LOCK_galera_wsdb_trx, "LOCK_galera_wsdb", 0},
-    {&key_LOCK_galera_wsdb_conn, "LOCK_galera_wsdb_conn", 0},
-    {&key_LOCK_galera_profile, "LOCK_galera_profile", 0},
-    {&key_LOCK_galera_gcache, "LOCK_galera_gcache", 0},
-    {&key_LOCK_galera_protstack, "LOCK_galera_protstack", 0},
-    {&key_LOCK_galera_prodcons, "LOCK_galera_prodcons", 0},
-    {&key_LOCK_galera_gcommconn, "LOCK_galera_gcommconn", 0},
-    {&key_LOCK_galera_recvbuf, "LOCK_galera_recvbuf", 0},
-    {&key_LOCK_galera_mempool, "LOCK_galera_mempool", 0}};
+     0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_sst, "LOCK_galera_sst", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_incoming, "LOCK_galera_incoming", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_saved_state, "LOCK_galera_saved_state", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_trx_handle, "LOCK_galera_trx_handle", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_wsdb_trx, "LOCK_galera_wsdb", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_wsdb_conn, "LOCK_galera_wsdb_conn", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_profile, "LOCK_galera_profile", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_gcache, "LOCK_galera_gcache", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_protstack, "LOCK_galera_protstack", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_prodcons, "LOCK_galera_prodcons", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_gcommconn, "LOCK_galera_gcommconn", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_recvbuf, "LOCK_galera_recvbuf", 0, 0, PSI_DOCUMENT_ME},
+    {&key_LOCK_galera_mempool, "LOCK_galera_mempool", 0, 0, PSI_DOCUMENT_ME}};
 
 PSI_cond_key key_COND_galera_dummy_gcs;
 PSI_cond_key key_COND_galera_service_thd;
@@ -256,22 +257,22 @@ PSI_cond_key key_COND_galera_gcache;
 PSI_cond_key key_COND_galera_recvbuf;
 
 PSI_cond_info all_galera_condvars[] = {
-    {&key_COND_galera_dummy_gcs, "COND_galera_dummy_gcs", 0},
-    {&key_COND_galera_service_thd, "COND_galera_service_thd", 0},
-    {&key_COND_galera_service_thd_flush, "COND_galera_service_thd_flush", 0},
-    {&key_COND_galera_ist_receiver, "COND_galera_ist_receiver", 0},
-    {&key_COND_galera_ist_consumer, "COND_galera_ist_consumer", 0},
-    {&key_COND_galera_local_monitor, "COND_galera_local_monitor", 0},
-    {&key_COND_galera_apply_monitor, "COND_galera_apply_monitor", 0},
-    {&key_COND_galera_commit_monitor, "COND_galera_commit_monitor", 0},
+    {&key_COND_galera_dummy_gcs, "COND_galera_dummy_gcs", 0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_service_thd, "COND_galera_service_thd", 0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_service_thd_flush, "COND_galera_service_thd_flush", 0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_ist_receiver, "COND_galera_ist_receiver", 0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_ist_consumer, "COND_galera_ist_consumer", 0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_local_monitor, "COND_galera_local_monitor", 0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_apply_monitor, "COND_galera_apply_monitor", 0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_commit_monitor, "COND_galera_commit_monitor", 0, 0, PSI_DOCUMENT_ME},
     {&key_COND_galera_async_sender_monitor, "COND_galera_async_sender_monitor",
-     0},
+     0, 0, PSI_DOCUMENT_ME},
     {&key_COND_galera_ist_receiver_monitor, "COND_galera_ist_receiver_monitor",
-     0},
-    {&key_COND_galera_sst, "COND_galera_sst", 0},
-    {&key_COND_galera_prodcons, "COND_galera_prodcons", 0},
-    {&key_COND_galera_gcache, "COND_galera_gcache", 0},
-    {&key_COND_galera_recvbuf, "COND_galera_recvbuf", 0}};
+     0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_sst, "COND_galera_sst", 0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_prodcons, "COND_galera_prodcons", 0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_gcache, "COND_galera_gcache", 0, 0, PSI_DOCUMENT_ME},
+    {&key_COND_galera_recvbuf, "COND_galera_recvbuf", 0, 0, PSI_DOCUMENT_ME}};
 
 PSI_thread_key key_THREAD_galera_service_thd;
 PSI_thread_key key_THREAD_galera_ist_receiver;
@@ -282,15 +283,15 @@ PSI_thread_key key_THREAD_galera_receiver;
 PSI_thread_key key_THREAD_galera_gcommconn;
 
 PSI_thread_info all_galera_threads[] = {
-    {&key_THREAD_galera_service_thd, "THREAD_galera_service_thd", 0},
-    {&key_THREAD_galera_ist_receiver, "THREAD_galera_ist_receiver", 0},
-    {&key_THREAD_galera_ist_async_sender, "THREAD_galera_ist_async_sender", 0},
+    {&key_THREAD_galera_service_thd, "THREAD_galera_service_thd", 0, 0, PSI_DOCUMENT_ME},
+    {&key_THREAD_galera_ist_receiver, "THREAD_galera_ist_receiver", 0, 0, PSI_DOCUMENT_ME},
+    {&key_THREAD_galera_ist_async_sender, "THREAD_galera_ist_async_sender", 0, 0, PSI_DOCUMENT_ME},
     {&key_THREAD_galera_writeset_checksum, "THREAD_galera_writeset_checksum",
-     0},
+     0, 0, PSI_DOCUMENT_ME},
     {&key_THREAD_galera_gcache_removefile, "THREAD_galera_gcache_removefile",
-     0},
-    {&key_THREAD_galera_receiver, "THREAD_galera_receiver", 0},
-    {&key_THREAD_galera_gcommconn, "THREAD_galera_gcommconn", 0}};
+     0, 0, PSI_DOCUMENT_ME},
+    {&key_THREAD_galera_receiver, "THREAD_galera_receiver", 0, 0, PSI_DOCUMENT_ME},
+    {&key_THREAD_galera_gcommconn, "THREAD_galera_gcommconn", 0, 0, PSI_DOCUMENT_ME}};
 
 PSI_file_key key_FILE_galera_recordset;
 PSI_file_key key_FILE_galera_ringbuffer;
@@ -299,11 +300,11 @@ PSI_file_key key_FILE_galera_grastate;
 PSI_file_key key_FILE_galera_gvwstate;
 
 PSI_file_info all_galera_files[] = {
-    {&key_FILE_galera_recordset, "FILE_galera_recordset", 0},
-    {&key_FILE_galera_ringbuffer, "FILE_galera_ringbuffer", 0},
-    {&key_FILE_galera_gcache_page, "FILE_galera_gcache_page", 0},
-    {&key_FILE_galera_grastate, "FILE_galera_grastate", 0},
-    {&key_FILE_galera_gvwstate, "FILE_galera_gvwstate", 0}};
+    {&key_FILE_galera_recordset, "FILE_galera_recordset", 0, 0, PSI_DOCUMENT_ME},
+    {&key_FILE_galera_ringbuffer, "FILE_galera_ringbuffer", 0, 0, PSI_DOCUMENT_ME},
+    {&key_FILE_galera_gcache_page, "FILE_galera_gcache_page", 0, 0, PSI_DOCUMENT_ME},
+    {&key_FILE_galera_grastate, "FILE_galera_grastate", 0, 0, PSI_DOCUMENT_ME},
+    {&key_FILE_galera_gvwstate, "FILE_galera_gvwstate", 0, 0, PSI_DOCUMENT_ME}};
 
 /* Vector to cache PSI key and mutex for corresponding galera mutex. */
 typedef std::vector<void *> wsrep_psi_key_vec_t;
@@ -979,20 +980,26 @@ int wsrep_init() {
 
   global_system_variables.wsrep_on = 1;
 
-#if 0
-  if (wsrep_gtid_mode && opt_bin_log && !opt_log_slave_updates) {
-    WSREP_ERROR(
-        "Option --log-slave-updates is required if "
-        "binlog is enabled, GTID mode is on and wsrep provider "
-        "is specified");
-    return 1;
-  }
-#endif
-
   const char *provider_options = wsrep_provider_options;
   char buffer[4096];
 
   if (pxc_encrypt_cluster_traffic) {
+    if (!SslAcceptorContext::is_wsrep_context_initialized()) {
+      WSREP_ERROR(
+          "ssl-ca, ssl-cert, and ssl-key must all be defined"
+          " to use encrypted mode traffic. Unable to configure SSL."
+          " Must shutdown.");
+      return 1;
+    }
+
+    char ssl_opts[4096];
+    SslAcceptorContext::populate_wsrep_ssl_options(ssl_opts, sizeof(ssl_opts));
+    snprintf(buffer, sizeof(buffer), "%s%s%s",
+             provider_options ? provider_options : "",
+             ((provider_options && *provider_options) ? ";" : ""), ssl_opts);
+    provider_options = buffer;
+
+#if 0
     if (opt_ssl_ca == 0 || *opt_ssl_ca == 0 || opt_ssl_cert == 0 ||
         *opt_ssl_cert == 0 || opt_ssl_key == 0 || *opt_ssl_key == 0) {
       WSREP_ERROR(
@@ -1011,6 +1018,7 @@ int wsrep_init() {
              opt_ssl_ca, opt_ssl_cert);
     buffer[sizeof(buffer) - 1] = 0;
     provider_options = buffer;
+#endif /* 0 */
   }
 
   if (!wsrep_data_home_dir || strlen(wsrep_data_home_dir) == 0)

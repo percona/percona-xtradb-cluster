@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -140,8 +140,11 @@ dberr_t dict_build_tablespace(
     return DB_IO_ERROR;
   }
 
-  log_ddl->write_delete_space_log(trx, NULL, space, datafile->filepath(), false,
-                                  true);
+  err = log_ddl->write_delete_space_log(trx, NULL, space, datafile->filepath(),
+                                        false, true);
+  if (err != DB_SUCCESS) {
+    return err;
+  }
 
   /* We create a new generic empty tablespace.
   We initially let it be 4 pages:
@@ -195,17 +198,14 @@ static ibt::Tablespace *determine_session_temp_tblsp(
     innodb_session_t *innodb_session, bool is_intrinsic, bool is_slave_thd) {
   ibt::Tablespace *tblsp = nullptr;
   bool encrypted = false;
-  switch (srv_encrypt_tables) {
-    case SRV_ENCRYPT_TABLES_ON:
-    case SRV_ENCRYPT_TABLES_FORCE:
-    case SRV_ENCRYPT_TABLES_KEYRING_ON:
-    case SRV_ENCRYPT_TABLES_KEYRING_FORCE:
-    case SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING:
-    case SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE:
+  switch (srv_default_table_encryption) {
+    case DEFAULT_TABLE_ENC_ON:
+    case DEFAULT_TABLE_ENC_KEYRING_ON:
+    case DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING:
       encrypted = true;
       break;
-    case SRV_ENCRYPT_TABLES_OFF:
-    case SRV_ENCRYPT_TABLES_ONLINE_FROM_KEYRING_TO_UNENCRYPTED:
+    case DEFAULT_TABLE_ENC_OFF:
+    case DEFAULT_TABLE_ENC_ONLINE_FROM_KEYRING_TO_UNENCRYPTED:
       if (srv_tmp_tablespace_encrypt) {
         encrypted = true;
       }
@@ -256,8 +256,7 @@ dberr_t dict_build_tablespace_for_table(
 
   if (mode == FIL_ENCRYPTION_ON ||
       (mode == FIL_ENCRYPTION_DEFAULT &&
-       (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
-        srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE))) {
+       srv_default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING)) {
     DICT_TF2_FLAG_SET(table, DICT_TF2_ENCRYPTION_FILE_PER_TABLE);
   }
 
@@ -282,11 +281,11 @@ dberr_t dict_build_tablespace_for_table(
     table->space = space;
 
     /* Determine the tablespace flags. */
-    ulint fsp_flags = dict_tf_to_fsp_flags(table->flags);
+    uint32_t fsp_flags = dict_tf_to_fsp_flags(table->flags);
 
     /* For file-per-table tablespace, set encryption flag */
     if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_ENCRYPTION_FILE_PER_TABLE)) {
-      FSP_FLAGS_SET_ENCRYPTION(fsp_flags);
+      fsp_flags_set_encryption(fsp_flags);
     }
 
     if (DICT_TF_HAS_DATA_DIR(table->flags)) {
@@ -312,7 +311,12 @@ dberr_t dict_build_tablespace_for_table(
       return DB_IO_ERROR;
     }
 
-    log_ddl->write_delete_space_log(trx, table, space, filepath, false, false);
+    err = log_ddl->write_delete_space_log(trx, table, space, filepath, false,
+                                          false);
+    if (err != DB_SUCCESS) {
+      ut_free(filepath);
+      return err;
+    }
 
     /* We create a new single-table tablespace for the table.
     We initially let it be 4 pages:
@@ -708,11 +712,11 @@ void dict_table_assign_new_id(dict_table_t *table, trx_t *trx) {
 @param[in]	is_create	true when creating SDI index
 @return in-memory index structure for tablespace dictionary or NULL */
 dict_index_t *dict_sdi_create_idx_in_mem(space_id_t space, bool space_discarded,
-                                         ulint in_flags, bool is_create) {
-  ulint flags = space_discarded ? in_flags : fil_space_get_flags(space);
+                                         uint32_t in_flags, bool is_create) {
+  uint32_t flags = space_discarded ? in_flags : fil_space_get_flags(space);
 
   /* This means the tablespace is evicted from cache */
-  if (flags == ULINT_UNDEFINED) {
+  if (flags == UINT32_UNDEFINED) {
     return (NULL);
   }
 
@@ -735,7 +739,7 @@ dict_index_t *dict_sdi_create_idx_in_mem(space_id_t space, bool space_discarded,
     rec_format = REC_FORMAT_COMPACT;
   }
 
-  ulint table_flags = 0;
+  uint32_t table_flags = 0;
   dict_tf_set(&table_flags, rec_format, zip_ssize, has_data_dir,
               has_shared_space);
 
@@ -843,10 +847,10 @@ static ibool dict_create_extract_int_aux(void *row,      /*!< in: sel_node_t* */
 (table id, column pos) pair.
 @return	error code or DB_SUCCESS */
 dberr_t dict_create_get_zip_dict_id_by_reference(
-    ulint table_id,   /*!< in: table id */
-    ulint column_pos, /*!< in: column position */
-    ulint *dict_id,   /*!< out: dict id */
-    trx_t *trx)       /*!< in/out: transaction */
+    table_id_t table_id, /*!< in: table id */
+    ulint column_pos,    /*!< in: column position */
+    ulint *dict_id,      /*!< out: dict id */
+    trx_t *trx)          /*!< in/out: transaction */
 {
   ut_ad(dict_id);
   ut_ad(srv_is_upgrade_mode);

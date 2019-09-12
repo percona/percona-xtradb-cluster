@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2011, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2011, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -3078,7 +3078,7 @@ bool row_log_allocate(
   index->online_log = log;
 
   if (log_tmp_is_encrypted()) {
-    ulint size = srv_sort_buf_size;
+    auto size = srv_sort_buf_size;
     log->crypt_head = static_cast<byte *>(os_mem_alloc_large(&size, false));
     log->crypt_tail = static_cast<byte *>(os_mem_alloc_large(&size, false));
 
@@ -3154,7 +3154,7 @@ static void row_log_apply_op_low(
 
   ut_ad(!index->is_clustered());
 
-  ut_ad(rw_lock_own(dict_index_get_lock(index), RW_LOCK_X) == has_index_lock);
+  ut_ad(!!rw_lock_own(dict_index_get_lock(index), RW_LOCK_X) == has_index_lock);
 
   ut_ad(!index->is_corrupted());
   ut_ad(trx_id != 0 || op == ROW_OP_DELETE);
@@ -3374,7 +3374,7 @@ static MY_ATTRIBUTE((warn_unused_result)) const mrec_t *row_log_apply_op(
   /* Online index creation is only used for secondary indexes. */
   ut_ad(!index->is_clustered());
 
-  ut_ad(rw_lock_own(dict_index_get_lock(index), RW_LOCK_X) == has_index_lock);
+  ut_ad(!!rw_lock_own(dict_index_get_lock(index), RW_LOCK_X) == has_index_lock);
 
   if (index->is_corrupted()) {
     *error = DB_INDEX_CORRUPT;

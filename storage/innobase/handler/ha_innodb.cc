@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2000, 2019, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, 2009 Google Inc.
 Copyright (c) 2009, 2016, Percona Inc.
 Copyright (c) 2012, Facebook Inc.
@@ -77,6 +77,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <sql_thd_internal_api.h>
 #include "api0api.h"
 #include "api0misc.h"
+#include "arch0arch.h"
+#include "arch0page.h"
 #include "auth_acls.h"
 #include "btr0btr.h"
 #include "btr0bulk.h"
@@ -217,7 +219,7 @@ static const uint64_t MB = KB * 1024;
 static const uint64_t GB = MB * 1024;
 
 /** fil_space_t::flags for hard-coded tablespaces */
-ulint predefined_flags;
+uint32_t predefined_flags;
 
 /** to protect innobase_open_files */
 static mysql_mutex_t innobase_share_mutex;
@@ -288,11 +290,6 @@ extern bool srv_background_scrub_data_uncompressed;
 extern bool srv_background_scrub_data_compressed;
 extern uint srv_background_scrub_data_interval;
 extern uint srv_background_scrub_data_check_interval;
-#ifdef UNIV_DEBUG
-extern bool srv_scrub_force_testing;
-#endif
-
-extern mysql_pfs_key_t scrub_stat_mutex_key;
 
 static Innodb_data_lock_inspector innodb_data_lock_inspector;
 
@@ -493,8 +490,8 @@ ibool meb_get_checksum_algorithm_enum(const char *algo_name,
 }
 #endif /* !UNIV_HOTBACKUP */
 
-static const char *redo_log_encrypt_names[] = {"off", "on", "master_key",
-                                               "keyring_key", NullS};
+static const char *redo_log_encrypt_names[] = {"OFF", "ON", "MASTER_KEY",
+                                               "KEYRING_KEY", NullS};
 static TYPELIB redo_log_encrypt_typelib = {
     array_elements(redo_log_encrypt_names) - 1, "redo_log_encrypt_typelib",
     redo_log_encrypt_names, nullptr};
@@ -679,6 +676,7 @@ static PSI_mutex_info all_innodb_mutexes[] = {
     PSI_MUTEX_KEY(mutex_list_mutex, 0, 0, PSI_DOCUMENT_ME),
     PSI_MUTEX_KEY(page_sys_arch_mutex, 0, 0, PSI_DOCUMENT_ME),
     PSI_MUTEX_KEY(page_sys_arch_oper_mutex, 0, 0, PSI_DOCUMENT_ME),
+    PSI_MUTEX_KEY(page_sys_arch_client_mutex, 0, 0, PSI_DOCUMENT_ME),
     PSI_MUTEX_KEY(page_zip_stat_per_index_mutex, 0, 0, PSI_DOCUMENT_ME),
     PSI_MUTEX_KEY(page_cleaner_mutex, 0, 0, PSI_DOCUMENT_ME),
     PSI_MUTEX_KEY(purge_sys_pq_mutex, 0, 0, PSI_DOCUMENT_ME),
@@ -757,7 +755,8 @@ static PSI_rwlock_info all_innodb_rwlocks[] = {
 performance schema instrumented if "UNIV_PFS_THREAD"
 is defined */
 static PSI_thread_info all_innodb_threads[] = {
-    PSI_KEY(archiver_thread, 0, 0, PSI_DOCUMENT_ME),
+    PSI_KEY(log_archiver_thread, 0, 0, PSI_DOCUMENT_ME),
+    PSI_KEY(page_archiver_thread, 0, 0, PSI_DOCUMENT_ME),
     PSI_KEY(buf_dump_thread, 0, 0, PSI_DOCUMENT_ME),
     PSI_KEY(dict_stats_thread, 0, 0, PSI_DOCUMENT_ME),
     PSI_KEY(io_handler_thread, 0, 0, PSI_DOCUMENT_ME),
@@ -1062,14 +1061,16 @@ static inline ulint innobase_map_isolation_level(
 @return offset */
 static inline uint get_field_offset(const TABLE *table, const Field *field);
 
-static int innodb_encrypt_tables_validate(
-    /*==================================*/
-    THD *thd,                      /*!< in: thread handle */
-    SYS_VAR *var,                  /*!< in: pointer to system
-                                                   variable */
-    void *save,                    /*!< out: immediate result
-                                   for update function */
-    struct st_mysql_value *value); /*!< in: incoming string */
+/** Validates the possible innodb_redo_log_encrypt_values.
+memory needed for buffer pool resize.
+@param[in]	thd	thread handle
+@param[in]	var	pointer to system variable
+@param[out]	save	immediate result for update function
+@param[in]	value	incoming string
+@return 0 on success, 1 on failure.
+*/
+static int innodb_redo_log_encrypt_validate(THD *thd, SYS_VAR *var, void *save,
+                                            struct st_mysql_value *value);
 
 static MYSQL_THDVAR_BOOL(table_locks, PLUGIN_VAR_OPCMDARG,
                          "Enable InnoDB locking in LOCK TABLES",
@@ -1359,6 +1360,9 @@ static SHOW_VAR innodb_status_variables[] = {
     {"encryption_n_rowlog_blocks_decrypted",
      (char *)&export_vars.innodb_n_rowlog_blocks_decrypted, SHOW_LONGLONG,
      SHOW_SCOPE_GLOBAL},
+    {"encryption_redo_key_version",
+     (char *)&export_vars.innodb_redo_key_version, SHOW_LONGLONG,
+     SHOW_SCOPE_GLOBAL},
     {NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL},
     /* Encryption */
     {"encryption_rotation_pages_read_from_cache",
@@ -1481,14 +1485,14 @@ static handler *innobase_create_handler(handlerton *hton, TABLE_SHARE *table,
 @param[in]	se_private_id		The internal id of the table
 @param[in]	ts_se_private_data	Tablespace SE Private data
 @param[in]	tbl_se_private_data	Table SE private data
-@param[in]	flags			flags used to retrieve specific stats
+@param[in]	stat_flags		flags used to retrieve specific stats
 @param[in,out]	stats			structure to save the
 retrieved statistics
 @return false on success, true on failure */
 static bool innobase_get_table_statistics(
     const char *db_name, const char *table_name, dd::Object_id se_private_id,
     const dd::Properties &ts_se_private_data,
-    const dd::Properties &tbl_se_private_data, uint flags,
+    const dd::Properties &tbl_se_private_data, uint stat_flags,
     ha_statistics *stats);
 
 /** Retrieve index column cardinality.
@@ -1525,6 +1529,14 @@ static bool innobase_get_tablespace_statistics(
 @return false on success, true on failure */
 static bool innobase_get_tablespace_type(const dd::Tablespace &space,
                                          Tablespace_type *space_type);
+
+/** Retrieve the tablespace type by name.
+
+@param[in]  tablespace_name	Tablespace name.
+@param[out] space_type	        Tablespace category.
+@return false on success, true on failure */
+static bool innobase_get_tablespace_type_by_name(const char *tablespace_name,
+                                                 Tablespace_type *space_type);
 
 /** Perform post-commit/rollback cleanup after DDL statement.
 @param[in,out]	thd	connection thread */
@@ -2220,14 +2232,13 @@ inline void innobase_active_small(void) {
 }
 
 /** Converts an InnoDB error code to a MySQL error code and also tells to MySQL
- about a possible transaction rollback inside InnoDB caused by a lock wait
- timeout or a deadlock.
- @return MySQL error code */
-int convert_error_code_to_mysql(
-    dberr_t error, /*!< in: InnoDB error code */
-    ulint flags,   /*!< in: InnoDB table flags, or 0 */
-    THD *thd)      /*!< in: user thread handle or NULL */
-{
+about a possible transaction rollback inside InnoDB caused by a lock wait
+timeout or a deadlock.
+@param[in]  error   InnoDB error code
+@param[in]  flags   InnoDB table flags, or 0
+@param[in]  thd     user thread handle or NULL
+@return MySQL error code */
+int convert_error_code_to_mysql(dberr_t error, uint32_t flags, THD *thd) {
   switch (error) {
     case DB_SUCCESS:
       return (0);
@@ -2338,7 +2349,7 @@ int convert_error_code_to_mysql(
     case DB_TABLESPACE_NOT_FOUND:
       return (HA_ERR_TABLESPACE_MISSING);
 
-    case DB_DECRYPTION_FAILED:
+    case DB_IO_DECRYPT_FAIL:
       return (HA_ERR_DECRYPTION_FAILED);
 
     case DB_TOO_BIG_RECORD: {
@@ -2788,7 +2799,7 @@ bool Encryption::is_empty(const char *algorithm) {
 @return true if no algorithm requested */
 bool Encryption::is_none(const char *algorithm) {
   return Encryption::is_empty(algorithm) ||
-         Encryption::none_explicitly_specified(algorithm);
+         innobase_strcasecmp(algorithm, "n") == 0;
 }
 
 bool Encryption::is_master_key_encryption(const char *algorithm) {
@@ -2798,12 +2809,30 @@ bool Encryption::is_master_key_encryption(const char *algorithm) {
 /** Check if the NO algorithm was explicitly specified.
 @param[in]      algorithm       Encryption algorithm to check
 @return true if no algorithm explicitly requested */
-bool Encryption::none_explicitly_specified(const char *algorithm) noexcept {
-  return (algorithm != nullptr && innobase_strcasecmp(algorithm, "n") == 0);
+bool Encryption::none_explicitly_specified(ulong create_info_used_fields,
+                                           const char *algorithm) noexcept {
+  if (create_info_used_fields & HA_CREATE_USED_ENCRYPT) {
+    ut_ad(algorithm != nullptr);
+    return innobase_strcasecmp(algorithm, "n") == 0;
+  }
+  return false;
 }
 
 bool Encryption::is_keyring(const char *algoritm) {
   return (algoritm != NULL && innobase_strcasecmp(algoritm, "keyring") == 0);
+}
+
+bool Encryption::is_online_encryption_on() {
+  return srv_default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING;
+}
+
+// This for now excludes MK encryption ...
+bool Encryption::should_be_keyring_encrypted(ulong create_info_used_fields,
+                                             const char *algorithm) {
+  return !none_explicitly_specified(create_info_used_fields, algorithm) &&
+         (is_keyring(algorithm) ||
+          (!Encryption::is_master_key_encryption(algorithm) &&
+           is_online_encryption_on()));
 }
 
 /** Check the encryption option and set it
@@ -3193,7 +3222,7 @@ ha_innobase::ha_innobase(handlerton *hton, TABLE_SHARE *table_arg)
 
 /** Destruct ha_innobase handler. */
 
-ha_innobase::~ha_innobase() { UT_DELETE(m_parallel_reader); }
+ha_innobase::~ha_innobase() {}
 
 /** Updates the user_thd field in a handle and also allocates a new InnoDB
  transaction handle if needed, and updates the transaction fields in the
@@ -3472,7 +3501,8 @@ static int innodb_init_abort() {
 @param[in,out]	tablespaces	predefined tablespaces created by the DDSE
 @return 0 on success, 1 on failure */
 static int innobase_init_files(dict_init_mode_t dict_init_mode,
-                               List<const Plugin_tablespace> *tablespaces);
+                               List<const Plugin_tablespace> *tablespaces,
+                               bool &is_dd_encrypted);
 
 /** Initialize InnoDB for being used to store the DD tables.
 Create the required files according to the dict_init_mode.
@@ -3931,7 +3961,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool boot_tablespaces(
 @retval false	on success
 @retval true	on failure */
 static bool predefine_tablespace(dd::cache::Dictionary_client *dd_client,
-                                 THD *thd, space_id_t space_id, ulint flags,
+                                 THD *thd, space_id_t space_id, uint32_t flags,
                                  const char *name, const char *filename) {
   dd::Object_id dd_space_id;
 
@@ -3948,7 +3978,7 @@ static bool predefine_undo_tablespaces(dd::cache::Dictionary_client *dd_client,
                                        THD *thd) {
   /** Undo tablespaces use a reserved range of tablespace ID. */
   for (auto undo_space : undo::spaces->m_spaces) {
-    ulint flags = fsp_flags_init(univ_page_size, false, false, false, false);
+    uint32_t flags = fsp_flags_init(univ_page_size, false, false, false, false);
 
     if (predefine_tablespace(dd_client, thd, undo_space->id(), flags,
                              undo_space->space_name(),
@@ -4098,10 +4128,53 @@ static bool innobase_dict_recover(dict_recovery_mode_t dict_recovery_mode,
 /** DDL crash recovery: process the records recovered from "log_ddl" table */
 static void innobase_post_recover() {
   if (srv_force_recovery < SRV_FORCE_NO_TRX_UNDO) {
-    log_ddl->recover();
+    DBUG_EXECUTE_IF("DDL_Log_remove_inject_startup_error_2",
+                    srv_inject_too_many_concurrent_trxs = true;);
+
+    dberr_t err = log_ddl->recover();
+
+    /* Abort post recovery startup if this is not successful. */
+    if (err != DB_SUCCESS) {
+      ib::fatal(ER_IB_MSG_POST_RECOVER_DDL_LOG_RECOVER);
+    }
   }
 
   fil_free_scanned_files();
+
+  /* If undo tablespaces are to be encrypted, encrypt them now */
+  if (srv_undo_log_encrypt) {
+    ut_ad(Encryption::check_keyring());
+
+    /* There would be at least 2 UNDO tablespaces */
+    ut_ad(undo::spaces->size() >= FSP_IMPLICIT_UNDO_TABLESPACES);
+
+    if (srv_read_only_mode) {
+      ib::error(ER_IB_MSG_1051);
+      srv_undo_log_encrypt = false;
+    } else {
+      /* Enable encryption for UNDO tablespaces */
+      if (srv_enable_undo_encryption(nullptr, true)) {
+        ut_ad(false);
+        srv_undo_log_encrypt = false;
+      }
+    }
+  }
+
+  /* If redo log is to be encrypted, encrypt it now */
+  if (srv_redo_log_encrypt) {
+    ut_ad(Encryption::check_keyring());
+
+    if (srv_read_only_mode) {
+      ib::error(ER_IB_MSG_1242);
+      srv_redo_log_encrypt = false;
+    } else {
+      /* Enable encryption for REDO log */
+      if (srv_enable_redo_encryption(nullptr)) {
+        ut_ad(false);
+        srv_redo_log_encrypt = false;
+      }
+    }
+  }
 
   if (srv_read_only_mode || srv_force_recovery >= SRV_FORCE_NO_BACKGROUND) {
     purge_sys->state = PURGE_STATE_DISABLED;
@@ -4153,6 +4226,120 @@ static bool innobase_dict_get_server_version(uint *version) {
 static bool innobase_dict_set_server_version() {
   /* Update the server version number, but leave the space version unchanged */
   return (upgrade_space_version(dict_sys_t::s_space_id, true));
+}
+
+/** Start page tracking.
+@param[out]    start_id      LSN indicating when the tracking was started
+@return Operation status.
+  @retval 0 Success
+  @retval other ER_* mysql error. Get error details from THD. */
+static int innobase_page_track_start(uint64_t *start_id) {
+  ut_ad(arch_page_sys);
+
+  Page_Arch_Client_Ctx *ctx = arch_page_sys->get_sys_client();
+
+  int err = ctx->start(false, start_id);
+
+  return (err);
+}
+
+/** Stop page tracking.
+@param[out]    stop_id      Stop LSN indicating when the tracking was stopped
+@return Operation status.
+@retval 0 Success
+@retval other ER_* mysql error. Get error details from THD. */
+static int innobase_page_track_stop(uint64_t *stop_id) {
+  ut_ad(arch_page_sys);
+
+  Page_Arch_Client_Ctx *ctx = arch_page_sys->get_sys_client();
+
+  int err = ctx->stop(stop_id);
+
+  return (err);
+}
+
+/** Purge page tracking data.
+@param[in,out] purge_id     Purge LSN initially indicating till where the data
+needs to be purged and finally updated to until where it was actually purged
+@return Operation status.
+@retval 0 Success
+@retval other ER_* mysql error. Get error details from THD. */
+static int innobase_page_track_purge(uint64_t *purge_id) {
+  ut_ad(arch_page_sys);
+
+  auto err = arch_page_sys->purge(purge_id);
+
+  return (err);
+}
+
+/** Fetch tracked pages.
+@param[in]     cbk_func     callback function return page IDs
+@param[in]     cbk_ctx      caller's context for callback
+@param[in,out] start_id     SE specific sequence number [LSN for Innodb] from
+where the pages tracked would be returned.
+@note The range might get expanded and the actual start_id used for the
+querying will be updated.
+@param[in,out] stop_id      SE specific sequence number [LSN for Innodb]
+until where the pages tracked would be returned.
+@note The range might get expanded and the actual stop_id used for the
+querying will be updated.
+@param[out]    buffer       allocated buffer to copy page IDs
+@param[in]     buffer_len   length of buffer in bytes
+@return Operation status.
+  @retval 0 Success
+  @retval other ER_* mysql error. Get error details from THD. */
+static int innobase_page_track_get_page_ids(Page_Track_Callback cbk_func,
+                                            void *cbk_ctx, uint64_t *start_id,
+                                            uint64_t *stop_id,
+                                            unsigned char *buffer,
+                                            size_t buffer_len) {
+  auto err = arch_page_sys->get_pages(nullptr, cbk_func, cbk_ctx, *start_id,
+                                      *stop_id, buffer, buffer_len);
+
+  if (err != 0) {
+    DBUG_PRINT("page_archiver", ("Fetch Pages"));
+    DBUG_PRINT("page_archiver", ("Can't fetch pages"));
+  }
+
+  return (err);
+}
+
+/** Fetch approximate number of tracked pages in the given range.
+@param[in,out] start_id     SE specific sequence number [LSN for Innodb] from
+where the pages tracked would be returned.
+@note the range might get expanded and the actual start_id used for the
+querying will be updated.
+@param[in,out] stop_id      SE specific sequence number [LSN for Innodb]
+until where the pages tracked would be returned.
+@note the range might get expanded and the actual stop_id used for the
+querying will be updated.
+@param[out]    num_pages    number of pages tracked
+@return Operation status.
+  @retval 0 Success
+  @retval other ER_* mysql error. Get error details from THD. */
+static int innobase_page_track_get_num_page_ids(uint64_t *start_id,
+                                                uint64_t *stop_id,
+                                                uint64_t *num_pages) {
+  auto err = arch_page_sys->get_num_pages(*start_id, *stop_id, num_pages);
+
+  if (err != 0) {
+    DBUG_PRINT("page_archiver", ("Fetch Pages"));
+    DBUG_PRINT("page_archiver", ("Can't fetch pages"));
+  }
+
+  return (err);
+}
+
+/** Fetch the page tracking status.
+@param[out]	status	vector of a pair of (ID, bool) where ID is the
+start/stop point and bool is true if the ID is a start point else false */
+static void innobase_page_track_get_status(
+    std::vector<std::pair<lsn_t, bool>> &status) {
+  if (arch_page_sys == nullptr) {
+    return;
+  }
+
+  arch_page_sys->get_status(status);
 }
 
 /** Check if InnoDB is in a mode where the data dictionary is read-only.
@@ -4276,6 +4463,9 @@ bool innobase_encryption_key_rotation() {
     return (ret);
   }
 
+  /* Rotate encrypted session temporary tablespaces */
+  ibt::tbsp_pool->rotate_encryption_keys();
+
   my_free(master_key);
 
   /* Release the mutex. */
@@ -4284,26 +4474,42 @@ bool innobase_encryption_key_rotation() {
   return (ret);
 }
 
+void innobase_fix_default_table_encryption(ulong encryption_option) {
+  if (!srv_read_only_mode) {
+    fil_crypt_set_encrypt_tables(
+        static_cast<enum_default_table_encryption>(encryption_option));
+  }
+}
+
 /** Fix the empty UUID of tablespaces like system, temp etc by generating
 a new master key and do key rotation. These tablespaces if encrypted
 during startup, will be encrypted with tablespace key which has empty UUID
 @return false on success, true on failure */
 bool innobase_fix_tablespaces_empty_uuid() {
+#ifdef UNIV_DEBUG
+  /* This API is called only after uuid is ready */
+  srv_is_uuid_ready = true;
+#endif /* UNIV_DEBUG */
+
+  if (Encryption::s_master_key_id == 0) {
+    /* We have to call srv_enable_redo_encryption during every startup, to
+       report errors generated in this function correctly. Without this call
+       here, some illegal configurations, such as enabling encryption without a
+       keyring are silently accepted, and result in errors later during the
+       server run. These functions are also called later, when the master key is
+       correctly set up, later in this function.
+     */
+    if (srv_enable_redo_encryption(nullptr)) {
+      srv_redo_log_encrypt = REDO_LOG_ENCRYPT_OFF;
+    } else {
+      log_rotate_default_key();
+    }
+  }
+
   /* If we are in read only mode, we cannot do rotation but it
   is OK */
   if (srv_read_only_mode) {
     return (false);
-  }
-
-  if (Encryption::s_master_key_id == 0 &&
-      srv_redo_log_encrypt == REDO_LOG_ENCRYPT_RK) {
-    /* redo log can be encrypted with keyring_key, which has to be
-       initialized even when nothing's encrypted with master_key - in
-       which case, master_key_id == 0, so this condition succeeds.
-       We call this function here, because otherwise, if the redo log
-       is encrypted with master_key, log encryption has to be initialized
-       after Encryption::create_master_key. */
-    log_enable_encryption_if_set();
   }
 
   /* We only need to handle the case when an encrypted tablespace
@@ -4333,13 +4539,30 @@ bool innobase_fix_tablespaces_empty_uuid() {
     return (true);
   }
 
-  log_enable_encryption_if_set();
+  if (srv_enable_redo_encryption(nullptr)) {
+    srv_redo_log_encrypt = REDO_LOG_ENCRYPT_OFF;
+  } else {
+    log_rotate_default_key();
+  }
 
   /** Check if sys, temp need rotation to fix the empty uuid */
   space_id_vec space_ids;
 
   space_ids.push_back(srv_sys_space.space_id());
   space_ids.push_back(srv_tmp_space.space_id());
+
+#ifdef UNIV_DEBUG
+  /* Currently all session temp tablespaces that use empty uuid
+  are destroyed. So if there is encrypted sesion temp tablespace
+  we assert here */
+  const auto find_encrypted = [&](const ibt::Tablespace *ts) {
+    if (ts->is_encrypted()) {
+      ut_ad(0);
+    }
+  };
+
+  ibt::tbsp_pool->iterate_active_tbsp(find_encrypted);
+#endif /* UNIV_DEBUG */
 
   undo::spaces->s_lock();
   for (auto undo_space : undo::spaces->m_spaces) {
@@ -4964,7 +5187,7 @@ static int innodb_init_params() {
 
   /* Create the filespace flags. */
   predefined_flags = fsp_flags_init(univ_page_size, false, false, true, false);
-  FSP_FLAGS_SET_SDI(predefined_flags);
+  fsp_flags_set_sdi(predefined_flags);
 
   srv_sys_space.set_flags(predefined_flags);
 
@@ -4985,13 +5208,15 @@ static int innodb_init_params() {
   srv_tmp_space.set_path(srv_data_home);
 
   /* Create the filespace flags with the temp flag set. */
-  ulint fsp_flags = fsp_flags_init(univ_page_size, false, false, false, true);
+  uint32_t fsp_flags =
+      fsp_flags_init(univ_page_size, false, false, false, true);
   srv_tmp_space.set_flags(fsp_flags);
 
   /* Set buffer pool size to default for fast startup when mysqld is
   run with --help --verbose options. */
   ulint srv_buf_pool_size_org = 0;
-  if (opt_help && opt_verbose && srv_buf_pool_size > srv_buf_pool_def_size) {
+  if (opt_help && opt_verbose && opt_validate_config &&
+      srv_buf_pool_size > srv_buf_pool_def_size) {
     ib::warn(ER_IB_MSG_543) << "Setting innodb_buf_pool_size to "
                             << srv_buf_pool_def_size << " for fast startup, "
                             << "when running with --help --verbose options.";
@@ -5031,7 +5256,15 @@ static void innobase_post_ddl(THD *thd) {
   /* During upgrade, etc., the log_ddl may haven't been
   initialized and there is nothing to do now. */
   if (log_ddl != nullptr) {
-    log_ddl->post_ddl(thd);
+    DBUG_EXECUTE_IF("DDL_Log_remove_inject_startup_error_3",
+                    srv_inject_too_many_concurrent_trxs = true;);
+
+    dberr_t err = log_ddl->post_ddl(thd);
+
+    /* If this fails, do not continue startup. */
+    if (err != DB_SUCCESS) {
+      ib::fatal(ER_IB_MSG_DDL_LOG_FAIL_POST_DDL);
+    }
   }
 }
 
@@ -5089,11 +5322,11 @@ static int innodb_init(void *p) {
   innobase_hton->unlock_hton_log = innobase_unlock_hton_log;
   innobase_hton->collect_hton_log_info = innobase_collect_hton_log_info;
   innobase_hton->fill_is_table = innobase_fill_i_s_table;
-  innobase_hton->flags = HTON_SUPPORTS_EXTENDED_KEYS |
-                         HTON_SUPPORTS_FOREIGN_KEYS | HTON_SUPPORTS_ATOMIC_DDL |
-                         HTON_CAN_RECREATE | HTON_SUPPORTS_SECONDARY_ENGINE |
-                         HTON_SUPPORTS_ONLINE_BACKUPS |
-                         HTON_SUPPORTS_COMPRESSED_COLUMNS;
+  innobase_hton->flags =
+      HTON_SUPPORTS_EXTENDED_KEYS | HTON_SUPPORTS_FOREIGN_KEYS |
+      HTON_SUPPORTS_ATOMIC_DDL | HTON_CAN_RECREATE |
+      HTON_SUPPORTS_SECONDARY_ENGINE | HTON_SUPPORTS_TABLE_ENCRYPTION |
+      HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_COMPRESSED_COLUMNS;
 #ifdef WITH_WSREP
   innobase_hton->flags |= HTON_WSREP_REPLICATION;
 #endif /* WITH_WSREP */
@@ -5128,6 +5361,8 @@ static int innodb_init(void *p) {
 
   innobase_hton->get_tablespace_statistics = innobase_get_tablespace_statistics;
   innobase_hton->get_tablespace_type = innobase_get_tablespace_type;
+  innobase_hton->get_tablespace_type_by_name =
+      innobase_get_tablespace_type_by_name;
 
   innobase_hton->is_dict_readonly = innobase_is_dict_readonly;
 
@@ -5143,6 +5378,9 @@ static int innodb_init(void *p) {
 
   innobase_hton->fix_tablespaces_empty_uuid =
       innobase_fix_tablespaces_empty_uuid;
+
+  innobase_hton->fix_default_table_encryption =
+      innobase_fix_default_table_encryption;
 
   innobase_hton->post_ddl = innobase_post_ddl;
 
@@ -5180,13 +5418,6 @@ static int innodb_init(void *p) {
         break;
     }
   }
-
-  if (srv_encrypt_tables != SRV_ENCRYPT_TABLES_OFF) {
-    WSREP_ERROR(
-        "Percona-XtraDB-Cluster doesn't support"
-        " innodb_encrypt_tables");
-    DBUG_RETURN(innodb_init_abort());
-  }
 #endif /* WITH_WSREP */
 
   /* Initialize handler clone interfaces for. */
@@ -5208,11 +5439,18 @@ static int innodb_init(void *p) {
   innobase_hton->check_fk_column_compat = innodb_check_fk_column_compat;
   innobase_hton->is_reserved_db_name = innobase_check_reserved_file_name;
 
+  innobase_hton->page_track.start = innobase_page_track_start;
+  innobase_hton->page_track.stop = innobase_page_track_stop;
+  innobase_hton->page_track.purge = innobase_page_track_purge;
+  innobase_hton->page_track.get_page_ids = innobase_page_track_get_page_ids;
+  innobase_hton->page_track.get_num_page_ids =
+      innobase_page_track_get_num_page_ids;
+  innobase_hton->page_track.get_status = innobase_page_track_get_status;
+
   innobase_hton->upgrade_get_compression_dict_data =
       dd_upgrade_get_compression_dict_data;
 
-  if ((srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING ||
-       srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE) &&
+  if (srv_default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING &&
       !Encryption::tablespace_key_exists_or_create_new_one_if_does_not_exist(
           FIL_DEFAULT_ENCRYPTION_KEY)) {
     sql_print_error(
@@ -5360,9 +5598,9 @@ static int innodb_init(void *p) {
   if (ut_win_init_time()) DBUG_RETURN(innodb_init_abort());
 #endif /* _WIN32 */
 
-  /* Make sure keyring plugin is loaded if UNDO logs are intended to be
-  encrypted*/
-  if (srv_undo_log_encrypt && Encryption::check_keyring() == false) {
+  /* Check for keyring plugin if UNDO/REDO logs are intended to be encrypted */
+  if ((srv_undo_log_encrypt || srv_redo_log_encrypt) &&
+      Encryption::check_keyring() == false) {
     DBUG_RETURN(innodb_init_abort());
   }
 
@@ -5416,11 +5654,9 @@ static bool dd_open_hardcoded(space_id_t space_id, const char *filename,
     /* ADD SDI flag presence in predefined flags of mysql
     tablespace. */
 
-    /* The tablespace was already opened up by redo log apply. */
-    ut_ad(space->flags == flags);
-
     if (strstr(space->files.front().name, filename) != 0 &&
-        space->flags == predefined_flags) {
+        /* Ignore encryption flag as it might have changed */
+        !((space->flags ^ flags) & ~(FSP_FLAGS_MASK_ENCRYPTION))) {
       fil_space_open_if_needed(space);
 
     } else {
@@ -5442,12 +5678,6 @@ static bool dd_open_hardcoded(space_id_t space_id, const char *filename,
   }
 
   if (fail) {
-    const char *str =
-        srv_encrypt_tables == SRV_ENCRYPT_TABLES_OFF ? "ON or FORCE" : "OFF";
-
-    ib::error(ER_XB_MSG_2)
-        << "If mysql.ibd opening failed with flags mismatch, try startup with"
-        << " innodb_encrypt_tables = " << str;
     my_error(ER_CANT_OPEN_FILE, MYF(0), filename, 0, "");
   }
 
@@ -5459,7 +5689,8 @@ static bool dd_open_hardcoded(space_id_t space_id, const char *filename,
 @param[in,out]	tablespaces	predefined tablespaces created by the DDSE
 @return 0 on success, 1 on failure */
 static int innobase_init_files(dict_init_mode_t dict_init_mode,
-                               List<const Plugin_tablespace> *tablespaces) {
+                               List<const Plugin_tablespace> *tablespaces,
+                               bool &is_dd_encrypted) {
   DBUG_ENTER("innobase_init_files");
 
   ut_ad(dict_init_mode == DICT_INIT_CREATE_FILES ||
@@ -5555,15 +5786,21 @@ static int innobase_init_files(dict_init_mode_t dict_init_mode,
     btr_search_enabled = old_btr_search_value;
   }
 
-  bool do_encrypt =
-      dict_detect_encryption(srv_is_upgrade_mode, upgrade_mysql_plugin_space);
+  bool do_encrypt = false;
+  bool ret = dict_detect_encryption_of_mysql_ibd(
+      dict_init_mode, upgrade_mysql_plugin_space, do_encrypt);
+  if (!ret) {
+    ib::error(ER_XB_MSG_4) << "Failed to determine if mysql.ibd is encrypted. "
+                              "Have you deleted it?";
+    DBUG_RETURN(innodb_init_abort());
+  }
 
   if (do_encrypt && !Encryption::check_keyring()) {
     my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
     DBUG_RETURN(innodb_init_abort());
   }
 
-  bool ret;
+  is_dd_encrypted = do_encrypt;
 
   const ulint dd_space_flags =
       do_encrypt ? predefined_flags | FSP_FLAGS_MASK_ENCRYPTION
@@ -6612,11 +6849,11 @@ table name always to lower case if "set_lower_case" is set to TRUE.
 void create_table_info_t::normalize_table_name_low(char *norm_name,
                                                    const char *name,
                                                    ibool set_lower_case) {
-  char *name_ptr;
+  const char *name_ptr;
   ulint name_len;
-  char *db_ptr;
+  const char *db_ptr;
   ulint db_len;
-  char *ptr;
+  const char *ptr;
   ulint norm_len;
 
   /* Scan name from the end */
@@ -7313,7 +7550,7 @@ void ha_innobase::innobase_initialize_autoinc() {
         updates should fail. */
         err = DB_SUCCESS;
         break;
-      case DB_DECRYPTION_FAILED:
+      case DB_IO_DECRYPT_FAIL:
         ut_ad(index->table->is_readable() == false);
         return;
 
@@ -7509,22 +7746,27 @@ int ha_innobase::open(const char *name, int, uint open_flags,
     /* Mark this table as corrupted, so the drop table
     or force recovery can still use it, but not others. */
     FilSpace space;
+    int error = 0;
     if (ib_table) space = fil_space_acquire_silent(ib_table->space);
     if (space() == NULL &&
         (ib_table->keyring_encryption_info.keyring_encryption_key_is_missing ||
          ib_table->keyring_encryption_info.page0_has_crypt_data)) {
       /* Proper error message has been already printed by
        * Datafile::validate_first_page, thus we do not print anything here */
-      DBUG_RETURN(HA_ERR_DECRYPTION_FAILED);
+      error = HA_ERR_ENCRYPTION_KEY_MISSING;
+    } else if (space() && space()->crypt_data) {
+      ib_table->keyring_encryption_info.page0_has_crypt_data = true;
+      ib::warn(ER_XB_MSG_4, table_share->table_name.str);
+      error = HA_ERR_DECRYPTION_FAILED;
     } else {
       my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
-      dict_table_close(ib_table, FALSE, FALSE);
-      ib_table = NULL;
-      is_part = NULL;
-      free_share(m_share);
-
-      DBUG_RETURN(HA_ERR_TABLE_CORRUPT);
+      error = HA_ERR_TABLE_CORRUPT;
     }
+    dict_table_close(ib_table, FALSE, FALSE);
+    ib_table = NULL;
+    is_part = NULL;
+    free_share(m_share);
+    DBUG_RETURN(error);
   }
 
   // if (space() == NULL) {
@@ -7590,7 +7832,7 @@ int ha_innobase::open(const char *name, int, uint open_flags,
 
   } else if (!ib_table->is_readable()) {
     if (space()) {
-      if (space()->crypt_data && space()->crypt_data->is_encrypted()) {
+      if (space()->crypt_data && space()->is_encrypted) {
         /* This means that tablespace was found but we could not
         decrypt encrypted page. */
         no_tablespace = true;
@@ -7619,20 +7861,8 @@ int ha_innobase::open(const char *name, int, uint open_flags,
     is tablespace made unaccessible because encryption service
     or used key_id is not available. */
     if (encrypted) {
-      bool warning_pushed = false;
-
-      /* If table is marked as encrypted then we push
-      warning if it has not been already done as used
-      key_id might be found but it is incorrect. */
-      if (!warning_pushed) {
-        push_warning_printf(
-            thd, Sql_condition::SL_WARNING, HA_ERR_DECRYPTION_FAILED,
-            "Table %s in file %s is encrypted but encryption service or"
-            " used key_id is not available. "
-            " Can't continue reading table.",
-            table_share->table_name.str, space()->files.begin()->name);
-        ret_err = HA_ERR_DECRYPTION_FAILED;
-      }
+      ib::warn(ER_XB_MSG_4, table_share->table_name.str);
+      ret_err = HA_ERR_DECRYPTION_FAILED;
     }
 
     dict_table_close(ib_table, FALSE, FALSE);
@@ -8864,7 +9094,7 @@ inline bool build_template_needs_field_in_icp(
     bool is_virtual)
 /*!< in: a virtual column or not */
 {
-  ut_ad(contains == dict_index_contains_col_or_prefix(index, i, is_virtual));
+  ut_ad(contains == !!dict_index_contains_col_or_prefix(index, i, is_virtual));
 
   return (index == prebuilt->index ? contains
                                    : dict_index_contains_col_or_prefix(
@@ -9576,7 +9806,8 @@ int ha_innobase::write_row(uchar *record) /*!< in: a row in MySQL format */
 #ifdef WITH_WSREP
           /* workaround for LP bug #355000, retrying the insert */
           case SQLCOM_INSERT: {
-            const dict_index_t *err_index = trx_get_error_info(m_prebuilt->trx);
+            const dict_index_t *err_index =
+                trx_get_error_index(m_prebuilt->trx);
             WSREP_DEBUG(
                 "Found duplicate value for"
                 " table (%s) - key (%s)"
@@ -12134,7 +12365,7 @@ void innodb_base_col_setup_for_stored(const dict_table_t *table,
   for (uint i = 0; i < field->table->s->fields; ++i) {
     const Field *base_field = field->table->field[i];
 
-    if (!innobase_is_s_fld(base_field) && !innobase_is_v_fld(base_field) &&
+    if (!innobase_is_v_fld(base_field) &&
         bitmap_is_set(&field->gcol_info->base_columns_map, i)) {
       ulint z;
       for (z = 0; z < table->n_cols; z++) {
@@ -12163,7 +12394,11 @@ and set the encryption flag in table flags
 dberr_t create_table_info_t::enable_master_key_encryption(dict_table_t *table) {
   const char *encrypt = m_create_info->encrypt_type.str;
 
-  if (Encryption::is_none(encrypt)) return (DB_SUCCESS);
+  /* if table is part of tablespace - no need for retrieving
+  master key as tablespace key was already decrypted
+  either by validate_first_page or during tablespace creation */
+  if (Encryption::is_none(encrypt) || !(m_flags2 & DICT_TF2_USE_FILE_PER_TABLE))
+    return (DB_SUCCESS);
 
   /* Set the encryption flag. */
   byte *master_key = nullptr;
@@ -12186,10 +12421,12 @@ dberr_t create_table_info_t::enable_master_key_encryption(dict_table_t *table) {
 
 dberr_t create_table_info_t::enable_keyring_encryption(
     dict_table_t *table, fil_encryption_t &keyring_encryption_option) {
-  if (Encryption::none_explicitly_specified(m_create_info->encrypt_type.str)) {
+  if (Encryption::none_explicitly_specified(m_create_info->used_fields,
+                                            m_create_info->encrypt_type.str)) {
     keyring_encryption_option = FIL_ENCRYPTION_OFF;
   } else if (Encryption::is_keyring(m_create_info->encrypt_type.str) ||
-             (srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING)) {
+             (srv_default_table_encryption ==
+              DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING)) {
     // Check if keyring is up and the key exists in keyring was already done in
     // encryption option validation
     keyring_encryption_option =
@@ -12678,7 +12915,7 @@ inline int create_index(
     trx_t *trx,                /*!< in: InnoDB transaction handle */
     const TABLE *form,         /*!< in: information on table
                                columns and indexes */
-    ulint flags,               /*!< in: InnoDB table flags */
+    uint32_t flags,            /*!< in: InnoDB table flags */
     const char *table_name,    /*!< in: table name */
     uint key_num,              /*!< in: index number */
     const dd::Table *dd_table) /*!< in: dd::Table for the table*/
@@ -12880,7 +13117,7 @@ inline int create_index(
  primary index. */
 inline int create_clustered_index_when_no_primary(
     trx_t *trx,             /*!< in: InnoDB transaction handle */
-    ulint flags,            /*!< in: InnoDB table flags */
+    uint32_t flags,         /*!< in: InnoDB table flags */
     const char *table_name) /*!< in: table name */
 {
   dict_index_t *index;
@@ -13025,11 +13262,9 @@ static int validate_tablespace_name(ts_command_type ts_command,
         err = HA_WRONG_CREATE_OPTION;
       }
     }
-  }
-  /* TODO: Replace the string literal below by a proper string constant
-  representing the DD tablespace name. */
-  else if (0 == strcmp(name, "mysql")) {
-    if (ts_command != TS_CMD_NOT_DEFINED) {
+  } else if (0 == strcmp(name, dict_sys_t::s_dd_space_name)) {
+    /* mysql tablespace can't be created or dropped */
+    if (ts_command == CREATE_TABLESPACE || ts_command == DROP_TABLESPACE) {
       my_printf_error(ER_WRONG_TABLESPACE_NAME,
                       "InnoDB: `mysql` is a reserved"
                       " tablespace name.",
@@ -13086,16 +13321,23 @@ bool create_table_info_t::create_option_tablespace_is_valid() {
         " is deprecated and will be removed in a future release.",
         m_create_info->tablespace);
   }
+
+  /* Check the encryption option validity. */
+  if (m_create_info->encrypt_type.str != nullptr &&
+      Encryption::validate(m_create_info->encrypt_type.str) == DB_UNSUPPORTED) {
+    my_error(ER_INVALID_ENCRYPTION_OPTION, MYF(0));
+    return false;
+  }
+
   if (!m_use_shared_space) {
     if (!m_use_file_per_table) {
-      /* System or temporary tablespace is being used for table */
-      if (m_create_info->encrypt_type.str) {
-        /* Encryption option is not allowed for table in general/shared
-        tablesapces. */
+      if (m_create_info->encrypt_type.str != nullptr && is_temp) {
+        /* Temporary tablespace is being used for table */
         my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                        "InnoDB : ENCRYPTION is not accepted"
-                        " syntax for CREATE/ALTER table, for"
-                        " tables in general/shared tablespace.",
+                        "InnoDB: ENCRYPTION is not accepted"
+                        " for temporary tablespace. For temporary tablespace"
+                        " encryption please use innodb_temp_tablespace_encrypt"
+                        " variable.",
                         MYF(0));
         return false;
       }
@@ -13127,7 +13369,7 @@ bool create_table_info_t::create_option_tablespace_is_valid() {
   }
 
   /* Cannot add a second table to a file-per-table tablespace. */
-  ulint fsp_flags = fil_space_get_flags(space_id);
+  uint32_t fsp_flags = fil_space_get_flags(space_id);
   if (fsp_is_file_per_table(space_id, fsp_flags)) {
     my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
                     "InnoDB: Tablespace `%s` is file-per-table so no"
@@ -13137,34 +13379,6 @@ bool create_table_info_t::create_option_tablespace_is_valid() {
   }
 
   bool is_create_table = (thd_sql_command(m_thd) == SQLCOM_CREATE_TABLE);
-  /* If ENCRYPTION option is used */
-  if (m_create_info->used_fields & HA_CREATE_USED_ENCRYPT) {
-    bool report_error = false;
-    if (is_create_table) { /* CREATE TABLE ... */
-      /* Its a create table command (obviously for shared tablespace).*/
-      report_error = true;
-    } else { /* ALTER TABLE ... */
-      /* TABLESPACE option is also used */
-      if (m_create_info->used_fields & HA_CREATE_USED_TABLESPACE) {
-        if (is_shared_tablespace(m_create_info->tablespace)) {
-          /* Table is being moved to a shared tablespace */
-          report_error = true;
-        }
-      } else if (is_shared_tablespace(m_create_info->tablespace)) {
-        /* Table belongs to a shared tablespace */
-        report_error = true;
-      }
-    }
-
-    if (report_error) {
-      my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                      "InnoDB : ENCRYPTION is not accepted syntax"
-                      " for CREATE/ALTER table, for tables in"
-                      " general/shared tablespace.",
-                      MYF(0));
-      return false;
-    }
-  }
 
   /* If TABLESPACE=innodb_file_per_table this function is not called
   since tablespace_is_shared_space() will return false.  Any other
@@ -13313,17 +13527,6 @@ bool create_table_info_t::create_option_compression_is_valid() {
   return (true);
 }
 
-static const char *srv_encrypt_tables_names[] = {
-    "OFF",
-    "ON",
-    "FORCE",
-    "KEYRING_ON",
-    "KEYRING_FORCE",
-    "ONLINE_TO_KEYRING",
-    "ONLINE_TO_KEYRING_FORCE",
-    "ONLINE_FROM_KEYRING_TO_UNENCRYPTED",
-    nullptr};
-
 /** Validate ENCRYPTION option.
 @return true if valid, false if not. */
 bool create_table_info_t::create_option_encryption_is_valid() const {
@@ -13338,18 +13541,18 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
   bool table_is_keyring =
       Encryption::is_keyring(m_create_info->encrypt_type.str);
 
-  if (table_is_keyring) {
-    if (!m_allow_file_per_table) {
-      my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
-                      "InnoDB: KEYRING requires innodb_file_per_table.",
-                      MYF(0));
-      return (false);
-    }
+  if (table_is_keyring && !m_allow_file_per_table) {
+    my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+                    "InnoDB: KEYRING requires innodb_file_per_table.", MYF(0));
+    return (false);
+  }
 
-    /* Currently we do not support keyring encryption for
-    spatial indexes thus do not allow creating table with forced
-    encryption */
+  /* Currently we do not support keyring encryption for
+  spatial indexes thus do not allow creating table with forced
+  encryption */
 
+  if (Encryption::should_be_keyring_encrypted(
+          m_create_info->used_fields, m_create_info->encrypt_type.str)) {
     for (ulint i = 0; i < m_form->s->keys; i++) {
       const KEY *key = m_form->key_info + i;
       if (key->flags & HA_SPATIAL) {
@@ -13366,38 +13569,9 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
   const bool table_is_encrypted =
       !Encryption::is_none(m_create_info->encrypt_type.str);
 
-  if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE &&
-      (Encryption::none_explicitly_specified(m_create_info->encrypt_type.str) ||
-       Encryption::is_keyring(m_create_info->encrypt_type.str))) {
-    my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
-                    "InnoDB: Only Master Key encrypted tables "
-                    "(ENCRYPTION=\'Y\') can be created with "
-                    "innodb_encrypt_tables=FORCE.",
-                    MYF(0));
-    return (false);
-  }
-
-  if (srv_encrypt_tables == SRV_ENCRYPT_TABLES_KEYRING_FORCE &&
-      (!Encryption::is_keyring(m_create_info->encrypt_type.str) &&
-       !(Encryption::is_master_key_encryption(
-             m_create_info->encrypt_type.str) &&
-         m_create_info->options & HA_LEX_CREATE_TMP_TABLE)) &&
-      !(m_create_info->options & HA_LEX_CREATE_INTERNAL_TMP_TABLE)) {
-    my_printf_error(ER_INVALID_ENCRYPTION_OPTION,
-                    "InnoDB: Only KEYRING encrypted tables "
-                    "(ENCRYPTION=\'KEYRING\') can be created with "
-                    "innodb_encrypt_tables=KEYRING_FORCE.",
-                    MYF(0));
-    return (false);
-  }
-
   ulint space_id;
   if (m_use_shared_space) {
     space_id = fil_space_get_id_by_name(m_create_info->tablespace);
-
-    /* Space id already validated by
-    create_option_tablespace_is_valid */
-    ut_a(space_id != ULINT_UNDEFINED);
   } else if (m_create_info->options & HA_LEX_CREATE_TMP_TABLE) {
     space_id = srv_tmp_space.space_id();
   } else if (!m_use_file_per_table) {
@@ -13407,7 +13581,7 @@ bool create_table_info_t::create_option_encryption_is_valid() const {
   }
 
   fil_space_t *space = fil_space_get(space_id);
-  const ulint fsp_flags = space->flags;
+  const auto fsp_flags = space->flags;
 
   const bool tablespace_is_encrypted = FSP_FLAGS_GET_ENCRYPTION(fsp_flags);
   const char *const tablespace_name =
@@ -13603,8 +13777,44 @@ const char *create_table_info_t::create_options_are_invalid() {
   return (ret);
 }
 
-static const LEX_STRING yes_string = {C_STRING_WITH_LEN("Y")};
-static const LEX_STRING keyring_string = {C_STRING_WITH_LEN("KEYRING")};
+void ha_innobase::adjust_encryption_key_id(HA_CREATE_INFO *create_info,
+                                           dd::Properties *options) noexcept {
+  if (false == create_info->was_encryption_key_id_set) {
+    if (Encryption::should_be_keyring_encrypted(
+            create_info->used_fields, create_info->encrypt_type.str)) {
+      create_info->encryption_key_id =
+          THDVAR(current_thd, default_encryption_key_id);
+      create_info->was_encryption_key_id_set = true;
+    }
+  } else if (Encryption::is_master_key_encryption(
+                 create_info->encrypt_type.str) ||
+             Encryption::none_explicitly_specified(
+                 create_info->used_fields, create_info->encrypt_type.str)) {
+    // if it is encrypted table with Master key encryption or marked as not to
+    // be encrypted and alter table does not have ENCRYPTION_KEY_ID - mark
+    // encryption key id as not set.
+
+    push_warning_printf(
+        current_thd, Sql_condition::SL_WARNING, HA_WRONG_CREATE_OPTION,
+        Encryption::none_explicitly_specified(create_info->used_fields,
+                                              create_info->encrypt_type.str)
+            ? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when "
+              "encryption is disabled."
+            : "InnoDB: Ignored ENCRYPTION_KEY_ID %u when "
+              "Master Key encryption is enabled.",
+        create_info->encryption_key_id);
+    create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
+    create_info->was_encryption_key_id_set = false;
+    options->remove("encryption_key_id");
+  }
+
+  if (options && create_info->was_encryption_key_id_set &&
+      (create_info->tablespace == nullptr ||
+       strcmp(create_info->tablespace, dict_sys_t::s_file_per_table_name) ==
+           0)) {
+    options->set("encryption_key_id", create_info->encryption_key_id);
+  }
+}
 
 /** Adjust encryption options.
 @param[in,out]  create_info Additional create information.
@@ -13620,68 +13830,8 @@ void ha_innobase::adjust_encryption_options(HA_CREATE_INFO *create_info,
     return;
   }
 
-  if (create_info->encrypt_type.length == 0 &&
-      create_info->encrypt_type.str == nullptr) {
-    switch (srv_encrypt_tables) {
-      case SRV_ENCRYPT_TABLES_ON:
-      case SRV_ENCRYPT_TABLES_FORCE:
-        create_info->encrypt_type = yes_string;
-        break;
-      case SRV_ENCRYPT_TABLES_KEYRING_ON:
-      case SRV_ENCRYPT_TABLES_KEYRING_FORCE:
-      case SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE:
-        create_info->encrypt_type = keyring_string;
-        break;
-      case SRV_ENCRYPT_TABLES_OFF:
-        break;
-      default:
-        ut_ad(0);
-    }
-  }
-
-  LEX_STRING *encrypt_type = &create_info->encrypt_type;
-
-  if (false == create_info->was_encryption_key_id_set) {
-    if (Encryption::is_keyring(encrypt_type->str) ||
-        (encrypt_type->length == 0 &&
-         srv_encrypt_tables == SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING)) {
-      create_info->encryption_key_id =
-          THDVAR(current_thd, default_encryption_key_id);
-      create_info->was_encryption_key_id_set = true;
-    }
-  } else if (Encryption::is_master_key_encryption(encrypt_type->str) ||
-             Encryption::none_explicitly_specified(encrypt_type->str)) {
-    // if it is encrypted table with Master key encryption or marked as not to
-    // be encrypted and alter table does not have ENCRYPTION_KEY_ID - mark
-    // encryption key id as not set.
-
-    push_warning_printf(current_thd, Sql_condition::SL_WARNING,
-                        HA_WRONG_CREATE_OPTION,
-                        Encryption::none_explicitly_specified(encrypt_type->str)
-                            ? "InnoDB: Ignored ENCRYPTION_KEY_ID %u when "
-                              "encryption is disabled."
-                            : "InnoDB: Ignored ENCRYPTION_KEY_ID %u when "
-                              "Master Key encryption is enabled.",
-                        create_info->encryption_key_id);
-    create_info->encryption_key_id = FIL_DEFAULT_ENCRYPTION_KEY;
-    create_info->was_encryption_key_id_set = false;
-  }
-
-  /* Add encryption attribute only to file_per_table table */
-  if (table_def && (create_info->tablespace == nullptr ||
-                    strcmp(create_info->tablespace,
-                           dict_sys_t::s_file_per_table_name) == 0)) {
-    dd::Properties &table_options = table_def->options();
-    if (create_info->encrypt_type.str != nullptr) {
-      dd::String_type encrypt_type;
-      encrypt_type.assign(create_info->encrypt_type.str,
-                          create_info->encrypt_type.length);
-      table_options.set("encrypt_type", encrypt_type);
-    }
-    if (create_info->was_encryption_key_id_set) {
-      table_options.set("encryption_key_id", create_info->encryption_key_id);
-    }
-  }
+  adjust_encryption_key_id(create_info,
+                           table_def ? &(table_def->options()) : nullptr);
 }
 
 /** Update create_info.  Used in SHOW CREATE TABLE et al. */
@@ -13766,7 +13916,9 @@ static bool innobase_ddse_dict_init(
   DBUG_ASSERT(tables && tables->is_empty());
   DBUG_ASSERT(tablespaces && tablespaces->is_empty());
 
-  if (innobase_init_files(dict_init_mode, tablespaces)) {
+  bool is_dd_encrypted{false};
+
+  if (innobase_init_files(dict_init_mode, tablespaces, is_dd_encrypted)) {
     DBUG_RETURN(true);
   }
 
@@ -13851,6 +14003,13 @@ static bool innobase_ddse_dict_init(
   def->add_index(0, "index_pk", "PRIMARY KEY(id)");
   def->add_index(1, "index_k_thread_id", "KEY(thread_id)");
   /* Options and tablespace are set at the SQL layer. */
+
+  if (is_dd_encrypted) {
+    innodb_dynamic_metadata->set_encrypted();
+    innodb_table_stats->set_encrypted();
+    innodb_index_stats->set_encrypted();
+    innodb_ddl_log->set_encrypted();
+  }
 
   tables->push_back(innodb_dynamic_metadata);
   tables->push_back(innodb_table_stats);
@@ -13964,13 +14123,6 @@ bool create_table_info_t::innobase_table_flags() {
       /* Incorrect encryption option */
       my_error(ER_INVALID_ENCRYPTION_OPTION, MYF(0));
       DBUG_RETURN(false);
-    }
-    if (m_use_shared_space && !m_use_file_per_table) {
-      /* Can't encrypt shared tablespace with keyring encryption */
-      if (Encryption::is_keyring(encryption)) {
-        my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
-        DBUG_RETURN(false);
-      }
     }
   }
 
@@ -14687,31 +14839,21 @@ int create_table_info_t::create_table(const dd::Table *dd_table) {
   ut_ad(handler == NULL || handler->is_intrinsic());
   ut_ad(handler == NULL || is_intrinsic_temp_table());
 
-#ifndef UNIV_DEBUG
-#define dbug_v_stack_overrun false
-#else  /* UNIV_DEBUG */
-  bool dbug_v_stack_overrun = false;
-#endif /* UNIV_DEBUG */
-
-  DBUG_EXECUTE_IF("enable_stack_overrun_alter_table",
-                  { dbug_v_stack_overrun = true; });
-
   /* There is no concept of foreign key for intrinsic tables. */
-  if (handler == NULL && stmt != NULL && dd_table != nullptr &&
-      (!(dd_table->foreign_keys().empty() &&
-         dd_table->foreign_key_parents().empty()) ||
-       dbug_v_stack_overrun)) {
+  if (handler == NULL && stmt != NULL && dd_table != nullptr
+      /* FIXME: NewDD: WL#6049 should add a new call to check if a table
+      is a parent table of any FK. If the table is not child table, nor
+      parent table, then it can skip the check:
+      dd_table->foreign_keys().empty() &&
+      dd_table->referenced_keys().empty() */
+  ) {
     dberr_t err = DB_SUCCESS;
 
-    DBUG_EXECUTE_IF("enable_stack_overrun_alter_table",
-                    { DBUG_SET("+d,simulate_stack_overrun"); });
     mutex_enter(&dict_sys->mutex);
     err = row_table_add_foreign_constraints(
         m_trx, stmt, stmt_len, m_table_name,
         m_create_info->options & HA_LEX_CREATE_TMP_TABLE, dd_table);
     mutex_exit(&dict_sys->mutex);
-    DBUG_EXECUTE_IF("enable_stack_overrun_alter_table",
-                    { DBUG_SET("-d,simulate_stack_overrun"); });
 
     switch (err) {
       case DB_PARENT_NO_INDEX:
@@ -15122,7 +15264,7 @@ int innobase_basic_ddl::delete_impl(THD *thd, const char *name,
     dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
     dd::cache::Dictionary_client::Auto_releaser releaser(client);
 
-    if (dd_drop_tablespace(client, thd, dd_space_id) != 0) {
+    if (dd_drop_tablespace(client, thd, dd_space_id)) {
       error = DB_ERROR;
     }
   }
@@ -15475,14 +15617,12 @@ int innobase_truncate<Table>::rename_tablespace() {
   if (err == DB_SUCCESS) {
     mutex_enter(&dict_sys->mutex);
     clone_mark_abort(true);
-    bool success = fil_rename_tablespace(m_table->space, old_path, temp_name,
-                                         new_path.c_str());
+    err = fil_rename_tablespace(m_table->space, old_path, temp_name,
+                                new_path.c_str());
     clone_mark_active();
     mutex_exit(&dict_sys->mutex);
 
-    if (!success) {
-      err = DB_ERROR;
-    } else {
+    if (err == DB_SUCCESS) {
       m_table->trunc_name.m_name = temp_name;
     }
   }
@@ -16078,7 +16218,10 @@ int ha_innobase::truncate_impl(const char *name, TABLE *form,
     ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_TABLESPACE_DISCARDED, norm_name);
     DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
   } else if (!innodb_table->is_readable()) {
-    DBUG_RETURN(HA_ERR_TABLESPACE_MISSING);
+    DBUG_RETURN(innodb_table->keyring_encryption_info.page0_has_crypt_data ==
+                        true
+                    ? HA_ERR_DECRYPTION_FAILED
+                    : HA_ERR_TABLESPACE_MISSING);
   }
 
   if (UNIV_UNLIKELY(innodb_table->is_corrupt)) DBUG_RETURN(HA_ERR_CRASHED);
@@ -16302,7 +16445,7 @@ static int innodb_create_tablespace(handlerton *hton, THD *thd,
                                     dd::Tablespace *dd_space) {
   int error;
   Tablespace tablespace;
-  ulint fsp_flags = 0;
+  uint32_t fsp_flags = 0;
 
   DBUG_ENTER("innodb_create_tablespace");
   DBUG_ASSERT(hton == innodb_hton_ptr);
@@ -16392,7 +16535,7 @@ static int innodb_create_tablespace(handlerton *hton, THD *thd,
   if (err == DB_SUCCESS) {
     err = btr_sdi_create_index(tablespace.space_id(), true);
     if (err == DB_SUCCESS) {
-      FSP_FLAGS_SET_SDI(fsp_flags);
+      fsp_flags_set_sdi(fsp_flags);
       tablespace.set_flags(fsp_flags);
 
       /* Make sure the DD has the space_id and the flags. */
@@ -16596,6 +16739,16 @@ static int innodb_alter_tablespace(handlerton *hton, THD *thd,
   /* ALTER_TABLESPACE_RENAME */
   const char *from = old_dd_space->name().c_str();
   const char *to = new_dd_space->name().c_str();
+
+  /* mysql tablespace can't be renamed */
+  if (innobase_strcasecmp(from, dict_sys_t::s_dd_space_name) == 0) {
+    my_printf_error(ER_WRONG_TABLESPACE_NAME,
+                    "InnoDB: `mysql` is a reserved"
+                    " tablespace name.",
+                    MYF(0));
+    DBUG_RETURN(HA_WRONG_CREATE_OPTION);
+  }
+
   ut_ad(ut_strcmp(from, to) != 0);
 
   dberr_t err = fil_rename_tablespace_by_id(space_id, from, to);
@@ -16674,7 +16827,7 @@ static int innodb_drop_tablespace(handlerton *hton, THD *thd,
     DBUG_RETURN(HA_ERR_NOT_ALLOWED_COMMAND);
   }
 
-  if (fil_space_get_flags(space_id) == ULINT_UNDEFINED) {
+  if (fil_space_get_flags(space_id) == UINT32_UNDEFINED) {
     /* The DD knows about it but the actual tablespace is missing.
     Allow it to be dropped from the DD. */
     DBUG_RETURN(0);
@@ -16695,8 +16848,11 @@ static int innodb_drop_tablespace(handlerton *hton, THD *thd,
     DBUG_RETURN(error);
   }
 
-  log_ddl->write_delete_space_log(
+  err = log_ddl->write_delete_space_log(
       trx, NULL, space_id, dd_tablespace_get_filename(dd_space), true, false);
+  if (err != DB_SUCCESS) {
+    error = convert_error_code_to_mysql(err, 0, NULL);
+  }
 
   DBUG_RETURN(error);
 }
@@ -16712,7 +16868,7 @@ static int innodb_create_undo_tablespace(handlerton *hton, THD *thd,
                                          dd::Tablespace *dd_space) {
   int error = 0;
   dberr_t err;
-  ulint flags;
+  uint32_t flags;
 
   DBUG_ENTER("innodb_create_undo_tablespace");
   DBUG_ASSERT(hton == innodb_hton_ptr);
@@ -16984,17 +17140,17 @@ static int innodb_drop_undo_tablespace(handlerton *hton, THD *thd,
   has been altered inactive and is now empty. */
   if (undo_space->num() <= FSP_IMPLICIT_UNDO_TABLESPACES ||
       !undo_space->is_empty()) {
-    ib::error err;
-    err << "Cannot drop undo tablespace '" << undo_space->space_name();
+    ib::error err_msg;
+    err_msg << "Cannot drop undo tablespace '" << undo_space->space_name();
     if (undo_space->num() <= FSP_IMPLICIT_UNDO_TABLESPACES) {
-      err << "' because it was not created explicitly.";
+      err_msg << "' because it was not created explicitly.";
     } else if (undo_space->is_active() || undo_space->is_inactive_implicit()) {
-      err << "' because it is active. "
-          << "Please do: ALTER UNDO TABLESPACE " << undo_space->space_name()
-          << " SET INACTIVE;";
+      err_msg << "' because it is active. "
+              << "Please do: ALTER UNDO TABLESPACE " << undo_space->space_name()
+              << " SET INACTIVE;";
     } else {
-      err << "' because it is still being truncated."
-             " Please try again later.";
+      err_msg << "' because it is still being truncated."
+                 " Please try again later.";
     }
 
     undo::spaces->x_unlock();
@@ -17018,8 +17174,11 @@ static int innodb_drop_undo_tablespace(handlerton *hton, THD *thd,
   TrxInInnoDB trx_in_innodb(trx);
   trx_start_if_not_started(trx, true);
   ++trx->will_lock;
-  log_ddl->write_delete_space_log(trx, NULL, space_id, file_name.c_str(), true,
-                                  false);
+  dberr_t err = log_ddl->write_delete_space_log(trx, NULL, space_id,
+                                                file_name.c_str(), true, false);
+  if (err != DB_SUCCESS) {
+    error = convert_error_code_to_mysql(err, 0, NULL);
+  }
 
   mutex_exit(&(undo::ddl_mutex));
   DBUG_RETURN(error);
@@ -17222,6 +17381,12 @@ int ha_innobase::records(ha_rows *num_rows) /*!< out: number of rows */
     DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
 
   } else if (m_prebuilt->table->file_unreadable) {
+    if (m_prebuilt->table->keyring_encryption_info.page0_has_crypt_data)
+      DBUG_RETURN(m_prebuilt->table->keyring_encryption_info
+                          .keyring_encryption_key_is_missing
+                      ? HA_ERR_ENCRYPTION_KEY_MISSING
+                      : HA_ERR_DECRYPTION_FAILED);
+
     ib_senderrf(m_user_thd, IB_LOG_LEVEL_ERROR, ER_TABLESPACE_MISSING,
                 table->s->table_name.str);
 
@@ -18090,7 +18255,7 @@ int ha_innobase::info_low(uint flag, bool is_analyze) {
     ut_a(m_prebuilt->trx);
     ut_a(m_prebuilt->trx->magic_n == TRX_MAGIC_N);
 
-    err_index = trx_get_error_info(m_prebuilt->trx);
+    err_index = trx_get_error_index(m_prebuilt->trx);
 
     if (err_index) {
       errkey = innobase_get_mysql_key_number_for_index(m_share, table, ib_table,
@@ -18182,7 +18347,7 @@ static ib_uint64_t innodb_get_auto_increment_for_uncached(
 @param[in]	se_private_id		InnoDB table id
 @param[in]	ts_se_private_data	tablespace se private data
 @param[in]	tbl_se_private_data	table se private data
-@param[in]	flags		flags used to retrieve specific stats
+@param[in]	stat_flags		flags used to retrieve specific stats
 @param[in,out]	stats		structure to save the retrieved statistics
 @return true if the stats information filled successfully
 @return false if tablespace is missing or table doesn't have persistent
@@ -18190,7 +18355,7 @@ stats. */
 static bool innodb_get_table_statistics_for_uncached(
     const char *db_name, const char *tbl_name, const char *norm_name,
     dd::Object_id se_private_id, const dd::Properties &ts_se_private_data,
-    const dd::Properties &tbl_se_private_data, ulint flags,
+    const dd::Properties &tbl_se_private_data, ulint stat_flags,
     ha_statistics *stats) {
   TableStatsRecord stat_info;
   space_id_t space_id;
@@ -18215,7 +18380,7 @@ static bool innodb_get_table_statistics_for_uncached(
   }
 
   fil_space_t *space;
-  ulint fsp_flags;
+  uint32_t fsp_flags;
 
   space = fil_space_acquire(space_id);
 
@@ -18227,23 +18392,23 @@ static bool innodb_get_table_statistics_for_uncached(
   fsp_flags = space->flags;
   page_size_t page_size(fsp_flags);
 
-  if (flags & HA_STATUS_VARIABLE_EXTRA) {
+  if (stat_flags & HA_STATUS_VARIABLE_EXTRA) {
     ulint avail_space = fsp_get_available_space_in_free_extents(space);
     stats->delete_length = avail_space * 1024;
   }
 
   fil_space_release(space);
 
-  if (flags & HA_STATUS_AUTO) {
+  if (stat_flags & HA_STATUS_AUTO) {
     stats->auto_increment_value = innodb_get_auto_increment_for_uncached(
         se_private_id, tbl_se_private_data);
   }
 
-  if (flags & HA_STATUS_TIME) {
+  if (stat_flags & HA_STATUS_TIME) {
     stats->update_time = (time_t)NULL;
   }
 
-  if (flags & HA_STATUS_VARIABLE) {
+  if (stat_flags & HA_STATUS_VARIABLE) {
     stats->records = static_cast<ha_rows>(stat_info.get_n_rows());
     stats->data_file_length =
         static_cast<ulonglong>(stat_info.get_clustered_index_size()) *
@@ -18263,20 +18428,10 @@ static bool innodb_get_table_statistics_for_uncached(
   return (true);
 }
 
-/** Retrieve table satistics.
-@param[in]	db_name			database name
-@param[in]	table_name		table name
-@param[in]	se_private_id		The internal id of the table
-@param[in]	ts_se_private_data	Tablespace SE Private data
-@param[in]	tbl_se_private_data	Table SE private data
-@param[in]	flags			flags used to retrieve specific stats
-@param[in,out]	stats			structure to save the
-retrieved statistics
-@return false on success, true on failure */
 static bool innobase_get_table_statistics(
     const char *db_name, const char *table_name, dd::Object_id se_private_id,
     const dd::Properties &ts_se_private_data,
-    const dd::Properties &tbl_se_private_data, uint flags,
+    const dd::Properties &tbl_se_private_data, uint stat_flags,
     ha_statistics *stats) {
   char norm_name[FN_REFLEN];
   dict_table_t *ib_table;
@@ -18296,7 +18451,7 @@ static bool innobase_get_table_statistics(
   if (ib_table == nullptr) {
     if (innodb_get_table_statistics_for_uncached(
             db_name, table_name, norm_name, se_private_id, ts_se_private_data,
-            tbl_se_private_data, flags, stats)) {
+            tbl_se_private_data, stat_flags, stats)) {
       return (false);
     }
 
@@ -18310,19 +18465,19 @@ static bool innobase_get_table_statistics(
     }
   }
 
-  if (flags & HA_STATUS_AUTO) {
+  if (stat_flags & HA_STATUS_AUTO) {
     stats->auto_increment_value = innobase_peek_autoinc(ib_table, false);
   }
 
-  if (flags & HA_STATUS_TIME) {
+  if (stat_flags & HA_STATUS_TIME) {
     stats->update_time = static_cast<ulong>(ib_table->update_time);
   }
 
-  if (flags & HA_STATUS_VARIABLE_EXTRA) {
+  if (stat_flags & HA_STATUS_VARIABLE_EXTRA) {
     calculate_delete_length_stat(ib_table, stats, current_thd);
   }
 
-  if (flags & HA_STATUS_VARIABLE) {
+  if (stat_flags & HA_STATUS_VARIABLE) {
     dict_stats_init(ib_table);
 
     ut_a(ib_table->stat_initialized);
@@ -18451,6 +18606,47 @@ static bool innobase_get_tablespace_type(const dd::Tablespace &space,
   } else {
     ut_ad(0);
     return true;
+  }
+
+  return false;
+}
+
+/**
+  Get the tablespace type given the name.
+
+  @param[in]  tablespace_name tablespace name
+  @param[out] space_type      type of space
+
+  @return Operation status.
+  @retval false on success and true for failure.
+*/
+static bool innobase_get_tablespace_type_by_name(const char *tablespace_name,
+                                                 Tablespace_type *space_type) {
+  if ((tablespace_name == nullptr && srv_file_per_table) ||
+      (tablespace_name &&
+       0 == strcmp(tablespace_name, dict_sys_t::s_file_per_table_name))) {
+    *space_type = Tablespace_type::SPACE_TYPE_IMPLICIT;
+  } else if ((tablespace_name == nullptr && !srv_file_per_table) ||
+             (tablespace_name &&
+              0 == strcmp(tablespace_name, dict_sys_t::s_sys_space_name))) {
+    *space_type = Tablespace_type::SPACE_TYPE_SYSTEM;
+  } else if (0 == strcmp(tablespace_name, dict_sys_t::s_dd_space_name)) {
+    *space_type = Tablespace_type::SPACE_TYPE_DICTIONARY;
+  } else if (0 == strcmp(tablespace_name, dict_sys_t::s_temp_space_name)) {
+    *space_type = Tablespace_type::SPACE_TYPE_TEMPORARY;
+  } else if (0 == strcmp(tablespace_name,
+                         dict_sys_t::s_default_undo_space_name_1) ||
+             0 == strcmp(tablespace_name,
+                         dict_sys_t::s_default_undo_space_name_2)) {
+    /*
+      TODO: This function doesn't consider user created UNDO
+      tablespaces because, as of now this function is not being
+      called for UNDO tablesapces. But should consider this in
+      future for completeness.
+     */
+    *space_type = Tablespace_type::SPACE_TYPE_UNDO;
+  } else {
+    *space_type = Tablespace_type::SPACE_TYPE_SHARED;
   }
 
   return false;
@@ -18789,12 +18985,9 @@ int ha_innobase::check(THD *thd,                /*!< in: user thread handle */
       if (err != DB_SUCCESS) {
         is_ok = false;
 
-        if (err == DB_DECRYPTION_FAILED) {
-          push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NO_SUCH_TABLE,
-                              "Table %s is encrypted but encryption service or"
-                              " used key_id is not available. "
-                              " Can't continue checking table.",
-                              index->table->name.m_name);
+        if (err == DB_IO_DECRYPT_FAIL) {
+          ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_XB_MSG_4,
+                      index->table->name.m_name);
         } else {
           push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NOT_KEYFILE,
                               "InnoDB: The B-tree of"
@@ -18861,12 +19054,9 @@ int ha_innobase::check(THD *thd,                /*!< in: user thread handle */
       break;
     }
     if (ret != DB_SUCCESS) {
-      if (ret == DB_DECRYPTION_FAILED) {
-        push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NO_SUCH_TABLE,
-                            "Table %s is encrypted but encryption service or"
-                            " used key_id is not available. "
-                            " Can't continue checking table.",
-                            index->table->name.m_name);
+      if (ret == DB_IO_DECRYPT_FAIL) {
+        ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_XB_MSG_4,
+                    index->table->name.m_name);
       } else {
         /* Assume some kind of corruption. */
         push_warning_printf(thd, Sql_condition::SL_WARNING, ER_NOT_KEYFILE,
@@ -20810,9 +21000,14 @@ bool ha_innobase::get_error_message(int error, String *buf) {
 
   if (error == HA_ERR_DECRYPTION_FAILED) {
     const char *msg =
-        "Table encrypted but decryption failed. This could be because correct "
-        "encryption management plugin is not loaded, used encryption key is "
-        "not available or encryption method does not match.";
+        "Table encrypted but decryption failed. Seems that the encryption key "
+        "fetched from keyring is "
+        "not the correct one. Are you using the correct keyring?";
+    buf->copy(msg, (uint)strlen(msg), system_charset_info);
+  } else if (error == HA_ERR_ENCRYPTION_KEY_MISSING) {
+    const char *msg =
+        "Table encrypted but decryption key was not found. "
+        "Is correct keyring loaded?";
     buf->copy(msg, (uint)strlen(msg), system_charset_info);
   } else {
     buf->copy(trx->detailed_error, (uint)strlen(trx->detailed_error),
@@ -20846,7 +21041,7 @@ bool ha_innobase::get_foreign_dup_key(char *child_table_name,
   ut_a(m_prebuilt->trx != NULL);
   ut_a(m_prebuilt->trx->magic_n == TRX_MAGIC_N);
 
-  err_index = trx_get_error_info(m_prebuilt->trx);
+  err_index = trx_get_error_index(m_prebuilt->trx);
 
   if (err_index == NULL) {
     return (false);
@@ -22189,6 +22384,55 @@ static void innodb_undo_tablespaces_update(
   innodb_undo_tablespaces_deprecate();
 }
 
+/** Update the value of innodb_undo_log_encrypt global variable. This function
+is registered as a callback with MySQL.
+@param[in]	thd       thread handle
+@param[in]	var       pointer to system variable
+@param[in]	var_ptr   where the formal string goes
+@param[in]	save      immediate result from check function */
+static void update_innodb_undo_log_encrypt(THD *thd MY_ATTRIBUTE((unused)),
+                                           SYS_VAR *var MY_ATTRIBUTE((unused)),
+                                           void *var_ptr MY_ATTRIBUTE((unused)),
+                                           const void *save) {
+  bool target = *static_cast<const bool *>(save);
+
+  if (srv_undo_log_encrypt == target) {
+    /* No change */
+    return;
+  }
+
+  /* If encryption is to be disabled. This will just make sure I/O doesn't
+  write UNDO pages encrypted from now on. */
+  if (srv_undo_log_encrypt == true) {
+    srv_undo_log_encrypt = false;
+    return;
+  }
+
+  /* There would be at least 2 UNDO tablespaces */
+  ut_ad(undo::spaces->size() >= FSP_IMPLICIT_UNDO_TABLESPACES);
+
+  if (!Encryption::check_keyring()) {
+    ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_UNDO_NO_KEYRING);
+    ib::error(ER_UNDO_NO_KEYRING);
+    return;
+  }
+
+  if (srv_read_only_mode) {
+    ib::error(ER_IB_MSG_1051);
+    ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_IB_MSG_1051);
+    return;
+  }
+
+  /* Enable encryption for UNDO tablespaces */
+  bool ret = srv_enable_undo_encryption(thd, false);
+
+  if (ret == false) {
+    /* At this point, all UNDO tablespaces have been encrypted. */
+    srv_undo_log_encrypt = true;
+  }
+  return;
+}
+
 /** Update the number of rollback segments per tablespace when the
 system variable innodb_rollback_segments is changed.
 This function is registered as a callback with MySQL.
@@ -22930,7 +23174,9 @@ static void innodb_encryption_threads_update(
     const void *save) /*!< in: immediate result
                       from check function */
 {
+  mysql_mutex_unlock(&LOCK_global_system_variables);
   fil_crypt_set_thread_cnt(*static_cast<const uint *>(save));
+  mysql_mutex_lock(&LOCK_global_system_variables);
 }
 
 /******************************************************************
@@ -22961,21 +23207,6 @@ static void innodb_encryption_rotation_iops_update(
                       from check function */
 {
   fil_crypt_set_rotation_iops(*static_cast<const uint *>(save));
-}
-
-/******************************************************************
-Update the system variable innodb_encrypt_tables*/
-static void innodb_encrypt_tables_update(
-    /*=========================*/
-    THD *thd,         /*!< in: thread handle */
-    SYS_VAR *var,     /*!< in: pointer to
-                                      system variable */
-    void *var_ptr,    /*!< out: where the
-                      formal string goes */
-    const void *save) /*!< in: immediate result
-                      from check function */
-{
-  fil_crypt_set_encrypt_tables(*static_cast<const ulong *>(save));
 }
 
 /** Update the innodb_log_checksums parameter.
@@ -23024,18 +23255,66 @@ static void innodb_temp_tablespace_encryption_update(THD *thd, SYS_VAR *var,
 @param[in]	var	system variable
 @param[out]	var_ptr	current value
 @param[in]	save	immediate result from check function */
-static void innodb_redo_encryption_update(THD *thd, SYS_VAR *var, void *var_ptr,
-                                          const void *save) {
-  if (srv_read_only_mode) {
-    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
-                        " Redo log cannot be"
-                        " encrypted in innodb_read_only mode");
+static void update_innodb_redo_log_encrypt(THD *thd, SYS_VAR *var,
+                                           void *var_ptr, const void *save) {
+  const ulong target = *static_cast<const ulong *>(save);
+
+  if (srv_redo_log_encrypt == target) {
+    /* No change */
     return;
   }
 
-  *static_cast<ulong *>(var_ptr) = *static_cast<const ulong *>(save);
+  if (target == REDO_LOG_ENCRYPT_OFF) {
+    srv_redo_log_encrypt = REDO_LOG_ENCRYPT_OFF;
+    return;
+  }
 
-  log_enable_encryption_if_set();
+  if (existing_redo_encryption_mode != REDO_LOG_ENCRYPT_OFF &&
+      existing_redo_encryption_mode != target &&
+      !(existing_redo_encryption_mode == REDO_LOG_ENCRYPT_MK &&
+        target == REDO_LOG_ENCRYPT_ON)) {
+    ib::error(ER_REDO_ENCRYPTION_CANT_BE_CHANGED,
+              log_encrypt_name(existing_redo_encryption_mode),
+              log_encrypt_name(static_cast<redo_log_encrypt_enum>(target)));
+    ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_REDO_ENCRYPTION_CANT_BE_CHANGED,
+                log_encrypt_name(existing_redo_encryption_mode),
+                log_encrypt_name(static_cast<redo_log_encrypt_enum>(target)));
+    return;
+  }
+
+  if (srv_read_only_mode) {
+    ib::error(ER_IB_MSG_1242);
+    ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_IB_MSG_1242);
+    return;
+  }
+
+  ut_ad(strlen(server_uuid) > 0);
+
+  if (!Encryption::check_keyring()) {
+    ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_REDO_ENCRYPTION_KEYRING);
+    ib::error(ER_REDO_ENCRYPTION_KEYRING);
+    return;
+  }
+
+  if (target == REDO_LOG_ENCRYPT_MK || target == REDO_LOG_ENCRYPT_ON) {
+    if (srv_enable_redo_encryption_mk(thd)) {
+      return;
+    }
+    srv_redo_log_encrypt = target;
+    return;
+  }
+
+  if (target == REDO_LOG_ENCRYPT_RK) {
+    ut_ad(strlen(server_uuid) > 0);
+    if (srv_enable_redo_encryption_rk(thd)) {
+      return;
+    }
+
+    srv_redo_log_encrypt = target;
+    return;
+  }
+
+  ut_ad(0);
 }
 
 static SHOW_VAR innodb_status_variables_export[] = {
@@ -23417,6 +23696,13 @@ static MYSQL_SYSVAR_UINT(
     " cache by the specified value dynamically, at the time.",
     NULL, innodb_merge_threshold_set_all_debug_update,
     DICT_INDEX_MERGE_THRESHOLD_DEFAULT, 1, 50, 0);
+
+static MYSQL_SYSVAR_ULONG(
+    semaphore_wait_timeout_debug, srv_fatal_semaphore_wait_threshold,
+    PLUGIN_VAR_RQCMDARG,
+    "Number of seconds that a semaphore can be held. If semaphore wait crosses"
+    "this value, server will crash",
+    NULL, NULL, 600, 100, 600, 0);
 #endif /* UNIV_DEBUG */
 
 static MYSQL_SYSVAR_ULONG(
@@ -23628,19 +23914,6 @@ static MYSQL_SYSVAR_ULONG(autoextend_increment,
                           PLUGIN_VAR_RQCMDARG,
                           "Data file autoextend increment in megabytes", NULL,
                           NULL, 64L, 1L, 1000L, 0);
-
-static TYPELIB srv_encrypt_tables_typelib = {
-    array_elements(srv_encrypt_tables_names) - 1, 0, srv_encrypt_tables_names,
-    nullptr};
-static MYSQL_SYSVAR_ENUM(
-    encrypt_tables, srv_encrypt_tables, PLUGIN_VAR_OPCMDARG,
-    "Enable encryption for tables. "
-    "When turned ON, all tables are created encrypted unless otherwise "
-    "specified. When it's set to FORCE, only encrypted tables can be created."
-    "The FORCE setting also disables non inplace alteration of unencrypted,"
-    " tables without encrypting them in the process.",
-    innodb_encrypt_tables_validate, innodb_encrypt_tables_update, 0,
-    &srv_encrypt_tables_typelib);
 
 /** Validate the requested buffer pool size.  Also, reserve the necessary
 memory needed for buffer pool resize.
@@ -24187,6 +24460,13 @@ static MYSQL_SYSVAR_ULONG(
     "Maximum delay between polling for a spin lock (6 by default)", NULL, NULL,
     6L, 0L, 1000, 0);
 
+static MYSQL_SYSVAR_ULONG(spin_wait_pause_multiplier,
+                          ut::spin_wait_pause_multiplier, PLUGIN_VAR_RQCMDARG,
+                          "Controls how many times in a row to use a PAUSE "
+                          "instruction to achieve one unit of delay in a spin "
+                          "lock (see @@innodb_spin_wait_delay), defaults to 50",
+                          NULL, NULL, 50, 0, 100, 0);
+
 static MYSQL_SYSVAR_ULONGLONG(
     fsync_threshold, os_fsync_threshold, PLUGIN_VAR_RQCMDARG,
     "The value of this variable determines how often InnoDB calls fsync when "
@@ -24235,7 +24515,7 @@ static MYSQL_SYSVAR_BOOL(
 
 static MYSQL_SYSVAR_BOOL(
     sys_tablespace_encrypt, srv_sys_tablespace_encrypt,
-    PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+    PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY | PLUGIN_VAR_NOPERSIST,
     "Enable this option at bootstrap to encrypt system tablespace.", nullptr,
     nullptr, false);
 
@@ -24313,7 +24593,7 @@ static MYSQL_SYSVAR_ULONG(
 static MYSQL_SYSVAR_BOOL(undo_log_encrypt, srv_undo_log_encrypt,
                          PLUGIN_VAR_OPCMDARG,
                          "Enable or disable Encrypt of UNDO tablespace.", NULL,
-                         NULL, FALSE);
+                         update_innodb_undo_log_encrypt, FALSE);
 
 static MYSQL_SYSVAR_LONG(
     autoinc_lock_mode, innobase_autoinc_lock_mode,
@@ -24570,11 +24850,12 @@ static MYSQL_SYSVAR_ENUM(
     NULL, NULL, DEFAULT_ROW_FORMAT_DYNAMIC, &innodb_default_row_format_typelib);
 
 static MYSQL_SYSVAR_ENUM(redo_log_encrypt, srv_redo_log_encrypt,
-                         PLUGIN_VAR_OPCMDARG,
+                         PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_NOPERSIST,
                          "Enable or disable Encryption of REDO tablespace."
                          "Possible values: OFF, ON, MASTER_KEY, KEYRING_KEY.",
-                         NULL, innodb_redo_encryption_update,
-                         REDO_LOG_ENCRYPT_OFF, &redo_log_encrypt_typelib);
+                         innodb_redo_log_encrypt_validate,
+                         update_innodb_redo_log_encrypt, REDO_LOG_ENCRYPT_OFF,
+                         &redo_log_encrypt_typelib);
 
 static MYSQL_SYSVAR_BOOL(
     print_ddl_logs, srv_print_ddl_logs, PLUGIN_VAR_OPCMDARG,
@@ -24741,11 +25022,6 @@ static MYSQL_SYSVAR_UINT(background_scrub_data_interval,
                          " innodb_background_scrub_data_interval seconds ago",
                          NULL, NULL, srv_background_scrub_data_interval, 1,
                          UINT_MAX32, 0);
-#ifdef UNIV_DEBUG
-static MYSQL_SYSVAR_BOOL(debug_force_scrubbing, srv_scrub_force_testing, 0,
-                         "Perform extra scrubbing to increase test exposure",
-                         NULL, NULL, FALSE);
-#endif /* UNIV_DEBUG */
 
 static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(api_trx_level),
@@ -24876,6 +25152,7 @@ static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(directories),
     MYSQL_SYSVAR(sync_spin_loops),
     MYSQL_SYSVAR(spin_wait_delay),
+    MYSQL_SYSVAR(spin_wait_pause_multiplier),
     MYSQL_SYSVAR(fsync_threshold),
     MYSQL_SYSVAR(table_locks),
     MYSQL_SYSVAR(thread_concurrency),
@@ -24924,6 +25201,7 @@ static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(buf_flush_list_now),
     MYSQL_SYSVAR(track_redo_log_now),
     MYSQL_SYSVAR(merge_threshold_set_all_debug),
+    MYSQL_SYSVAR(semaphore_wait_timeout_debug),
 #endif /* UNIV_DEBUG */
 #if defined UNIV_DEBUG || defined UNIV_PERF_DEBUG
     MYSQL_SYSVAR(page_hash_locks),
@@ -24980,7 +25258,6 @@ static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(compressed_columns_threshold),
     MYSQL_SYSVAR(ft_ignore_stopwords),
     MYSQL_SYSVAR(encrypt_online_alter_logs),
-    MYSQL_SYSVAR(encrypt_tables),
     MYSQL_SYSVAR(encryption_threads),
     MYSQL_SYSVAR(encryption_rotate_key_age),
     MYSQL_SYSVAR(encryption_rotation_iops),
@@ -24990,9 +25267,6 @@ static SYS_VAR *innobase_system_variables[] = {
     MYSQL_SYSVAR(background_scrub_data_compressed),
     MYSQL_SYSVAR(background_scrub_data_interval),
     MYSQL_SYSVAR(background_scrub_data_check_interval),
-#ifdef UNIV_DEBUG
-    MYSQL_SYSVAR(debug_force_scrubbing),
-#endif
     MYSQL_SYSVAR(scrub_log),
     MYSQL_SYSVAR(scrub_log_speed),
     NULL};
@@ -25828,35 +26102,56 @@ debug_set:
   return (0);
 }
 
-static int innodb_encrypt_tables_validate(
-    /*=================================*/
-    THD *thd,                     /*!< in: thread handle */
-    SYS_VAR *var,                 /*!< in: pointer to system
-                                                  variable */
-    void *save,                   /*!< out: immediate result
-                                  for update function */
-    struct st_mysql_value *value) /*!< in: incoming string */
-{
-  const char *innodb_encrypt_tables_input;
+/** Validates the possible innodb_redo_log_encrypt_values.
+memory needed for buffer pool resize.
+@param[in]	thd	thread handle
+@param[in]	var	pointer to system variable
+@param[out]	save	immediate result for update function
+@param[in]	value	incoming string
+@return 0 on success, 1 on failure.
+*/
+static int innodb_redo_log_encrypt_validate(THD *thd, SYS_VAR *var, void *save,
+                                            struct st_mysql_value *value) {
+  const char *redo_log_encrypt_input;
   char buff[STRING_BUFFER_USUAL_SIZE];
   int len = sizeof(buff);
 
-  ut_a(save != NULL);
-  ut_a(value != NULL);
+  ut_a(save != nullptr);
+  ut_a(value != nullptr);
 
-  innodb_encrypt_tables_input = value->val_str(value, buff, &len);
+  redo_log_encrypt_input = value->val_str(value, buff, &len);
 
   bool legit_value = false;
   uint use = 0;
-  for (; use < array_elements(srv_encrypt_tables_names); use++) {
-    if (!innobase_strcasecmp(innodb_encrypt_tables_input,
-                             srv_encrypt_tables_names[use])) {
+  for (; use < array_elements(redo_log_encrypt_names); use++) {
+    if (innobase_strcasecmp(redo_log_encrypt_input,
+                            redo_log_encrypt_names[use]) == 0) {
       legit_value = true;
       break;
     }
   }
 
-  if (legit_value == false) return 1;
+  if (innobase_strcasecmp(redo_log_encrypt_input, "0") == 0) {
+    use = 0;
+    legit_value = true;
+  }
+
+  if (innobase_strcasecmp(redo_log_encrypt_input, "false") == 0) {
+    use = 0;
+    legit_value = true;
+  }
+
+  if (innobase_strcasecmp(redo_log_encrypt_input, "1") == 0) {
+    use = 1;
+    legit_value = true;
+  }
+
+  if (innobase_strcasecmp(redo_log_encrypt_input, "true") == 0) {
+    use = 1;
+    legit_value = true;
+  }
+
+  if (!legit_value) return 1;
   *static_cast<ulong *>(save) = use;
 
   return 0;

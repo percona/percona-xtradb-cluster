@@ -19,7 +19,7 @@
 #    removed.
 # 5. Clean up.
 
-# Note - Currently there are 361 global variables
+# Note - Currently there are 571 global variables
 #      -> SELECT COUNT(*) FROM performance_schema.global_variables
 # In future, if a new global variable is added, it will be automatically
 # picked up from performance_schema.global_variables table.
@@ -29,16 +29,19 @@
 # added, it is the responsibility of the Dev to edit $total_persistent_vars.
 ################################################################################
 
+# Percona Server has further restricted the platform to Linux-only due to some
+# Linux-specific InnoDB system variables
 --echo ***********************************************************************
 --echo * Run only on debug build,non-windows as few server variables are not
 --echo * available on all platforms.
 --echo ***********************************************************************
 --source include/have_debug.inc
---source include/not_windows.inc
+--source include/linux.inc
 --source include/have_binlog_format_row.inc
+call mtr.add_suppression("Failed to set up SSL because of the following SSL library error");
 
 let $total_global_vars=`SELECT COUNT(*) FROM performance_schema.global_variables where variable_name NOT LIKE 'ndb_%'`;
-let $total_persistent_vars=418;
+let $total_persistent_vars=436;
 
 --echo ***************************************************************
 --echo * 0. Verify that variables present in performance_schema.global

@@ -178,7 +178,7 @@ static int execute_SQL(THD* thd, const char* sql, uint length) {
     thd->set_query((char*)sql, length);
     thd->set_query_id(next_query_id());
 
-    mysql_parse(thd, &parser_state, false, false);
+    mysql_parse(thd, &parser_state, false);
 
     if (thd->is_error()) {
       WSREP_WARN("Wsrep_schema::execute_sql() failed, %d %s\nSQL: %s",

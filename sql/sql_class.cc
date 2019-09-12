@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
    Copyright (c) 2016, Percona Inc. All Rights Reserved.
 
    This program is free software; you can redistribute it and/or modify
@@ -32,7 +32,6 @@
 #include <algorithm>
 #include <utility>
 
-#include "binary_log_types.h"
 #include "m_ctype.h"
 #include "m_string.h"
 #include "my_compiler.h"
@@ -71,6 +70,7 @@
 #include "sql/rpl_slave.h"  // rpl_master_erroneous_autoinc
 #include "sql/rpl_transaction_write_set_ctx.h"
 #include "sql/sp_cache.h"         // sp_cache_clear
+#include "sql/sp_head.h"          // sp_head
 #include "sql/sql_audit.h"        // mysql_audit_free_thd
 #include "sql/sql_backup_lock.h"  // release_backup_lock
 #include "sql/sql_base.h"         // close_temporary_tables
@@ -108,6 +108,7 @@ bool opt_log_slow_admin_statements = false;
 ulong opt_log_slow_sp_statements = 0;
 
 ulong kill_idle_transaction_timeout = 0;
+PSI_mutex_key key_LOCK_bloom_filter;
 
 /*
   The following is used to initialise Table_ident with a internal
@@ -381,6 +382,8 @@ THD::THD(bool enable_plugins)
       status_var_aggregated(false),
       m_current_query_cost(0),
       m_current_query_partial_plans(0),
+      m_main_security_ctx(this),
+      m_security_ctx(&m_main_security_ctx),
       query_plan(this),
       m_current_stage_key(0),
       current_mutex(NULL),
@@ -510,7 +513,6 @@ THD::THD(bool enable_plugins)
   m_catalog.str = "std";
   m_catalog.length = 3;
   event_scheduler.data = nullptr;
-  m_security_ctx = &m_main_security_ctx;
   password = 0;
   query_start_usec_used = false;
   check_for_truncated_fields = CHECK_FIELD_IGNORE;
@@ -607,8 +609,6 @@ THD::THD(bool enable_plugins)
   protocol_binary.init(this);
   protocol_text.set_client_capabilities(0);  // minimalistic client
 
-  substitute_null_with_insert_id = false;
-
   /*
     Make sure thr_lock_info_init() is called for threads which do not get
     assigned a proper thread_id value but keep using reserved_thread_id.
@@ -634,6 +634,7 @@ THD::THD(bool enable_plugins)
 #ifndef DBUG_OFF
   debug_binlog_xid_last.reset();
 #endif
+  set_system_user(false);
 }
 
 void THD::set_transaction(Transaction_ctx *transaction_ctx) {
@@ -977,7 +978,8 @@ void THD::set_new_thread_id() {
 
 void THD::cleanup_connection(void) {
   mysql_mutex_lock(&LOCK_status);
-  add_to_status(&global_status_var, &status_var, true);
+  add_to_status(&global_status_var, &status_var);
+  reset_system_status_vars(&status_var);
   mysql_mutex_unlock(&LOCK_status);
 
   cleanup();
@@ -1188,13 +1190,15 @@ void THD::release_resources() {
   if (current_thd == this) restore_globals();
 
   mysql_mutex_lock(&LOCK_status);
-  add_to_status(&global_status_var, &status_var, false);
-  /*
-    Status queries after this point should not aggregate THD::status_var
-    since the values has been added to global_status_var.
-    The status values are not reset so that they can still be read
-    by performance schema.
-  */
+  /* Add thread status to the global totals. */
+  add_to_status(&global_status_var, &status_var);
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  /* Aggregate thread status into the Performance Schema. */
+  if (m_psi != NULL) {
+    PSI_THREAD_CALL(aggregate_thread_status)(m_psi);
+  }
+#endif /* HAVE_PSI_THREAD_INTERFACE */
+  /* Ensure that the thread status is not re-aggregated to the global totals. */
   status_var_aggregated = true;
 
   mysql_mutex_unlock(&LOCK_status);
@@ -1281,7 +1285,8 @@ THD::~THD() {
 extern "C" void thd_report_innodb_stat(THD *thd, unsigned long long trx_id,
                                        enum mysql_trx_stat_type type,
                                        unsigned long long value) {
-  DBUG_ASSERT(thd && !thd_is_background_thread(thd));
+  DBUG_ASSERT(thd);
+  DBUG_ASSERT(!thd_is_background_thread(thd));
   thd->mark_innodb_used(trx_id);
   switch (type) {
     case MYSQL_TRX_STAT_IO_READ_BYTES:
@@ -1789,7 +1794,6 @@ void THD::cleanup_after_query() {
     first_successful_insert_id_in_prev_stmt =
         first_successful_insert_id_in_cur_stmt;
     first_successful_insert_id_in_cur_stmt = 0;
-    substitute_null_with_insert_id = true;
   }
   arg_of_last_insert_id_function = 0;
   /* Hack for cleaning up view security contexts */
@@ -1810,7 +1814,6 @@ void THD::cleanup_after_query() {
     lex->mi.repl_ignore_server_ids.clear();
   }
   if (rli_slave) rli_slave->cleanup_after_query();
-  approx_distinct_pages.clear();
   // Set the default "cute" mode for the execution environment:
   check_for_truncated_fields = CHECK_FIELD_IGNORE;
 
@@ -1859,35 +1862,6 @@ bool THD::convert_string(LEX_STRING *to, const CHARSET_INFO *to_cs,
   }
 
   DBUG_RETURN(0);
-}
-
-/*
-  Convert string from source character set to target character set inplace.
-
-  SYNOPSIS
-    THD::convert_string
-
-  DESCRIPTION
-    Convert string using convert_buffer - buffer for character set
-    conversion shared between all protocols.
-
-  RETURN
-    0   ok
-   !0   out of memory
-*/
-
-bool THD::convert_string(String *s, const CHARSET_INFO *from_cs,
-                         const CHARSET_INFO *to_cs) {
-  uint dummy_errors;
-  if (convert_buffer.copy(s->ptr(), s->length(), from_cs, to_cs, &dummy_errors))
-    return true;
-  /* If convert_buffer >> s copying is more efficient long term */
-  if (convert_buffer.alloced_length() >= convert_buffer.length() * 2 ||
-      !s->is_alloced()) {
-    return s->copy(convert_buffer);
-  }
-  s->swap(convert_buffer);
-  return false;
 }
 
 /*
@@ -1944,7 +1918,7 @@ int THD::send_explain_fields(Query_result *result) {
       this, field_list, Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF));
 }
 
-enum_vio_type THD::get_vio_type() {
+enum_vio_type THD::get_vio_type() const {
   DBUG_ENTER("THD::get_vio_type");
   DBUG_RETURN(get_protocol()->connection_type());
 }
@@ -2365,7 +2339,7 @@ void THD::clear_slow_extended() noexcept {
   tmp_tables_disk_used = 0;
   tmp_tables_size = 0;
   innodb_was_used = false;
-  if (!(server_status & SERVER_STATUS_IN_TRANS)) innodb_trx_id = 0;
+  innodb_trx_id = 0;
   innodb_io_reads = 0;
   innodb_io_read = 0;
   innodb_io_reads_wait_timer = 0;
@@ -3150,7 +3124,7 @@ void THD::rpl_reattach_engine_ha_data() {
   if (rli) rli->reattach_engine_ha_data(this);
 }
 
-bool THD::rpl_unflag_detached_engine_ha_data() {
+bool THD::rpl_unflag_detached_engine_ha_data() const {
   Relay_log_info *rli =
       is_binlog_applier() ? rli_fake : (slave_thread ? rli_slave : NULL);
   return rli ? rli->unflag_detached_engine_ha_data() : false;
@@ -3181,7 +3155,7 @@ bool THD::Query_plan::is_single_table_plan() const {
 
 const String THD::normalized_query() {
   m_normalized_query.mem_free();
-  lex->unit->print(&m_normalized_query, QT_NORMALIZED_FORMAT);
+  lex->unit->print(this, &m_normalized_query, QT_NORMALIZED_FORMAT);
   return m_normalized_query;
 }
 
@@ -3253,6 +3227,12 @@ bool THD::sql_parser() {
 
   Parse_tree_root *root = nullptr;
   if (MYSQLparse(this, &root) || is_error()) {
+    /*
+      Restore the original LEX if it was replaced when parsing
+      a stored procedure. We must ensure that a parsing error
+      does not leave any side effects in the THD.
+    */
+    cleanup_after_parse_error();
     return true;
   }
   if (root != nullptr && lex->make_sql_cmd(root)) {
@@ -3325,4 +3305,37 @@ int lock_keyrings(THD *thd) {
 
 int unlock_keyrings(THD *thd) {
   return KeyringsLocker::get_instance().unlock_keyrings(thd);
+}
+
+bool THD::secondary_storage_engine_eligible() const {
+  return secondary_engine_optimization() !=
+             Secondary_engine_optimization::PRIMARY_ONLY &&
+         variables.use_secondary_engine != SECONDARY_ENGINE_OFF &&
+         locked_tables_mode == LTM_NONE && !in_multi_stmt_transaction_mode() &&
+         sp_runtime_ctx == nullptr;
+}
+
+/**
+  Restore session state in case of parse error.
+
+  This is a clean up function that is invoked after the Bison generated
+  parser before returning an error from THD::sql_parser(). If your
+  semantic actions manipulate with the session state (which
+  is a very bad practice and should not normally be employed) and
+  need a clean-up in case of error, and you can not use %destructor
+  rule in the grammar file itself, this function should be used
+  to implement the clean up.
+*/
+
+void THD::cleanup_after_parse_error() {
+  sp_head *sp = lex->sphead;
+
+  if (sp) {
+    sp->m_parser_data.finish_parsing_sp_body(this);
+    //  Do not delete sp_head if is invoked in the context of sp execution.
+    if (sp_runtime_ctx == NULL) {
+      sp_head::destroy(sp);
+      lex->sphead = NULL;
+    }
+  }
 }

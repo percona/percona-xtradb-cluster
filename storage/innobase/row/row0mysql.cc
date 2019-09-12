@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2000, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -83,6 +83,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "current_thd.h"
 #include "my_dbug.h"
 #include "my_io.h"
+#include "sql/sql_zip_dict.h"
 
 static const char *MODIFICATIONS_NOT_ALLOWED_MSG_FORCE_RECOVERY =
     "innodb_force_recovery is on. We do not allow database modifications"
@@ -579,7 +580,8 @@ const byte *row_decompress_column(const byte *data, ulint *len,
 
   err = inflate(&d_stream, Z_FINISH);
   if (err == Z_NEED_DICT) {
-    ut_a(dict_data != 0 && dict_data_len != 0);
+    ut_a(dict_data != nullptr);
+    ut_a(dict_data_len != 0);
     err = inflateSetDictionary(&d_stream, dict_data, dict_data_len);
     ut_a(err == Z_OK);
     err = inflate(&d_stream, Z_FINISH);
@@ -1131,7 +1133,7 @@ handle_new_error:
         trx_rollback_to_savepoint(trx, NULL);
         break;
       }
-      /* fall through */
+    /* fall through */
     case DB_DUPLICATE_KEY:
     case DB_FOREIGN_DUPLICATE_KEY:
     case DB_TOO_BIG_RECORD:
@@ -1145,7 +1147,7 @@ handle_new_error:
     case DB_FTS_INVALID_DOCID:
     case DB_INTERRUPTED:
     case DB_CANT_CREATE_GEOMETRY_OBJECT:
-    case DB_DECRYPTION_FAILED:
+    case DB_IO_DECRYPT_FAIL:
     case DB_COMPUTE_VALUE_FAILED:
     case DB_LOCK_NOWAIT:
       DBUG_EXECUTE_IF("row_mysql_crash_if_error", {
@@ -1254,11 +1256,11 @@ row_prebuilt_t *row_create_prebuilt(
 
   ref_len = dict_index_get_n_unique(clust_index);
 
-  /* Maximum size of the buffer needed for conversion of INTs from
-  little endian format to big endian format in an index. An index
-  can have maximum 16 columns (MAX_REF_PARTS) in it. Therfore
-  Max size for PK: 16 * 8 bytes (BIGINT's size) = 128 bytes
-  Max size Secondary index: 16 * 8 bytes + PK = 256 bytes. */
+/* Maximum size of the buffer needed for conversion of INTs from
+little endian format to big endian format in an index. An index
+can have maximum 16 columns (MAX_REF_PARTS) in it. Therfore
+Max size for PK: 16 * 8 bytes (BIGINT's size) = 128 bytes
+Max size Secondary index: 16 * 8 bytes + PK = 256 bytes. */
 #define MAX_SRCH_KEY_VAL_BUFFER 2 * (8 * MAX_REF_PARTS)
 
 #define PREBUILT_HEAP_INITIAL_SIZE                                          \
@@ -1962,23 +1964,18 @@ or is tablespace .ibd file missing.
 @param[in] table                Table
 @param[in] trx                  Transaction
 @param[in] push_warning         true if we should push warning to user
-@retval DB_DECRYPTION_FAILED    table is encrypted but decryption failed
+@retval DB_IO_DECRYPT_FAIL    table is encrypted but decryption failed
 @retval DB_CORRUPTION           table is corrupted
 @retval DB_TABLESPACE_NOT_FOUND tablespace .ibd file not found */
 static dberr_t row_mysql_get_table_status(const dict_table_t *table, trx_t *trx,
                                           bool push_warning = true) {
   dberr_t err;
   if (fil_space_t *space = fil_space_acquire_silent(table->space)) {
-    if (space->crypt_data && space->crypt_data->is_encrypted()) {
+    if (space->is_encrypted) {
       if (push_warning) {
-        push_warning_printf(
-            trx->mysql_thd, Sql_condition::SL_WARNING, HA_ERR_DECRYPTION_FAILED,
-            "Table %s in tablespace %u encrypted."
-            "However key management plugin or used key_id is not found or"
-            " used encryption algorithm or method does not match.",
-            table->name.m_name, table->space);
+        ib::warn(ER_XB_MSG_4, table->name);
       }
-      err = DB_DECRYPTION_FAILED;
+      err = DB_IO_DECRYPT_FAIL;
     } else {
       if (push_warning) {
         push_warning_printf(trx->mysql_thd, Sql_condition::SL_WARNING,
@@ -2032,7 +2029,9 @@ static dberr_t row_insert_for_mysql_using_ins_graph(const byte *mysql_rec,
     return (row_mysql_get_table_status(prebuilt->table, trx, true));
   } else if (srv_force_recovery &&
              !(srv_force_recovery < SRV_FORCE_NO_UNDO_LOG_SCAN &&
-               dict_sys_t::is_dd_table_id(prebuilt->table->id))) {
+               (dict_sys_t::is_dd_table_id(prebuilt->table->id) ||
+                compression_dict::is_hardcoded(
+                    prebuilt->table->name.m_name)))) {
     /* Allow to modify hardcoded DD tables in some scenario to
     make DDL work */
 
@@ -2107,7 +2106,6 @@ run_again:
       goto run_again;
     }
 
-    node->duplicate = NULL;
     trx->op_info = "";
 
     if (blob_heap != NULL) {
@@ -2116,8 +2114,6 @@ run_again:
 
     return (err);
   }
-
-  node->duplicate = NULL;
 
   if (dict_table_has_fts_index(table)) {
     doc_id_t doc_id;
@@ -2405,6 +2401,54 @@ class ib_dec_counter {
   }
 };
 
+/** Do an in-place update in the intrinsic table.  The update should not
+modify any of the keys and it should not change the size of any fields.
+@param[in]	node	the update node.
+@return DB_SUCCESS on success, an error code on failure. */
+static dberr_t row_update_inplace_for_intrinsic(const upd_node_t *node) {
+  mtr_t mtr;
+  dict_table_t *table = node->table;
+  mem_heap_t *heap = node->heap;
+  dtuple_t *entry = node->row;
+  ulint offsets_[REC_OFFS_NORMAL_SIZE];
+  ulint *offsets = offsets_;
+
+  ut_ad(table->is_intrinsic());
+  rec_offs_init(offsets_);
+  mtr_start(&mtr);
+  mtr_set_log_mode(&mtr, MTR_LOG_NO_REDO);
+  btr_pcur_t pcur;
+
+  dict_index_t *index = table->first_index();
+
+  entry = row_build_index_entry(node->row, node->ext, index, heap);
+
+  btr_pcur_open(index, entry, PAGE_CUR_LE, BTR_MODIFY_LEAF, &pcur, &mtr);
+
+  rec_t *rec = btr_pcur_get_rec(&pcur);
+
+  ut_ad(!page_rec_is_infimum(rec));
+  ut_ad(!page_rec_is_supremum(rec));
+
+  offsets = rec_get_offsets(rec, index, offsets, ULINT_UNDEFINED, &heap);
+
+  ut_ad(!cmp_dtuple_rec(entry, rec, index, offsets));
+  ut_ad(!rec_get_deleted_flag(rec, dict_table_is_comp(index->table)));
+  ut_ad(btr_pcur_get_block(&pcur)->made_dirty_with_no_latch);
+
+  bool size_changes =
+      row_upd_changes_field_size_or_external(index, offsets, node->update);
+
+  if (size_changes) {
+    return (DB_FAIL);
+  }
+
+  row_upd_rec_in_place(rec, index, offsets, node->update, NULL);
+  mtr_commit(&mtr);
+
+  return (DB_SUCCESS);
+}
+
 typedef std::vector<btr_pcur_t, ut_allocator<btr_pcur_t>> cursors_t;
 
 /** Delete row from table (corresponding entries from all the indexes).
@@ -2421,7 +2465,7 @@ static dberr_t row_delete_for_mysql_using_cursor(const upd_node_t *node,
                                                  bool restore_delete) {
   mtr_t mtr;
   dict_table_t *table = node->table;
-  mem_heap_t *heap = mem_heap_create(1000);
+  mem_heap_t *heap = node->heap;
   dberr_t err = DB_SUCCESS;
   dtuple_t *entry;
 
@@ -2512,8 +2556,6 @@ static dberr_t row_delete_for_mysql_using_cursor(const upd_node_t *node,
 
   mtr_commit(&mtr);
 
-  mem_heap_free(heap);
-
   return (err);
 }
 
@@ -2527,7 +2569,7 @@ static dberr_t row_update_for_mysql_using_cursor(const upd_node_t *node,
                                                  que_thr_t *thr) {
   dberr_t err = DB_SUCCESS;
   dict_table_t *table = node->table;
-  mem_heap_t *heap = mem_heap_create(1000);
+  mem_heap_t *heap = node->heap;
   dtuple_t *entry;
   dfield_t *trx_id_field;
 
@@ -2598,9 +2640,6 @@ static dberr_t row_update_for_mysql_using_cursor(const upd_node_t *node,
     }
   }
 
-  if (heap != NULL) {
-    mem_heap_free(heap);
-  }
   return (err);
 }
 
@@ -2641,6 +2680,32 @@ static dberr_t row_del_upd_for_mysql_using_cursor(const byte *mysql_rec,
   /* Internal table is created by optimiser. So there
   should not be any virtual columns. */
   row_upd_store_row(prebuilt->trx, node, NULL, NULL);
+
+  if (!node->is_delete) {
+    /* UPDATE operation */
+
+    bool key_changed = false;
+
+    dict_table_t *table = prebuilt->table;
+
+    for (dict_index_t *index = UT_LIST_GET_FIRST(table->indexes); index != NULL;
+         index = UT_LIST_GET_NEXT(indexes, index)) {
+      key_changed = row_upd_changes_ord_field_binary(
+          index, node->update, thr, node->upd_row, node->upd_ext);
+
+      if (key_changed) {
+        break;
+      }
+    }
+
+    if (!key_changed) {
+      err = row_update_inplace_for_intrinsic(node);
+
+      if (err == DB_SUCCESS) {
+        return (err);
+      }
+    }
+  }
 
   /* Step-2: Execute DELETE operation. */
   err = row_delete_for_mysql_using_cursor(node, delete_entries, false);
@@ -2713,7 +2778,19 @@ static dberr_t row_update_for_mysql_using_upd_graph(const byte *mysql_rec,
   make DDL work */
   if (srv_force_recovery > 0 &&
       !(srv_force_recovery < SRV_FORCE_NO_UNDO_LOG_SCAN &&
-        dict_sys_t::is_dd_table_id(prebuilt->table->id))) {
+        (dict_sys_t::is_dd_table_id(prebuilt->table->id) ||
+         compression_dict::is_hardcoded(prebuilt->table->name.m_name)))) {
+    ib::error(ER_IB_MSG_985) << MODIFICATIONS_NOT_ALLOWED_MSG_FORCE_RECOVERY;
+    DBUG_RETURN(DB_READ_ONLY);
+  }
+
+  /* For compression dictionary delete, trx is already active because of the
+  search before delete. With the trx active, we cannot assign rseg with
+  srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO. See trx_set_rw_mode().
+  For srv_force_recovery > SRV_FORCE_NO_TRX_UNDO, DB is readonly mode.
+  So we disallow compression dictionary operation in SRV_FORCE_NO_TRX_UNDO.*/
+  if (srv_force_recovery == SRV_FORCE_NO_TRX_UNDO &&
+      compression_dict::is_hardcoded(prebuilt->table->name.m_name)) {
     ib::error(ER_IB_MSG_985) << MODIFICATIONS_NOT_ALLOWED_MSG_FORCE_RECOVERY;
     DBUG_RETURN(DB_READ_ONLY);
   }
@@ -3220,7 +3297,7 @@ dberr_t row_create_table_for_mysql(
     initialized and we don't need to write DDL logs too.
     This can only happen for CREATE TABLE. */
     if (log_ddl != nullptr) {
-      log_ddl->write_remove_cache_log(trx, table);
+      err = log_ddl->write_remove_cache_log(trx, table);
     }
 
     mem_heap_free(heap);
@@ -3266,11 +3343,16 @@ error_handling:
     case DB_SUCCESS:
     case DB_IO_NO_PUNCH_HOLE_FS:
       break;
-    case DB_OUT_OF_FILE_SPACE:
-      trx->error_state = DB_SUCCESS;
 
-      ib::warn(ER_IB_MSG_986) << "Cannot create table " << table->name
-                              << " because tablespace full";
+    case DB_OUT_OF_FILE_SPACE:
+    case DB_TOO_MANY_CONCURRENT_TRXS:
+
+      if (err == DB_OUT_OF_FILE_SPACE) {
+        ib::warn(ER_IB_MSG_986) << "Cannot create table " << table->name
+                                << " because the tablespace is full";
+      }
+
+      trx->error_state = DB_SUCCESS;
 
       /* Still do it here so that the table can always be freed */
       if (dd_table_open_on_name_in_mem(table->name.m_name, false)) {
@@ -3288,7 +3370,6 @@ error_handling:
       break;
 
     case DB_UNSUPPORTED:
-    case DB_TOO_MANY_CONCURRENT_TRXS:
     case DB_DUPLICATE_KEY:
     case DB_TABLESPACE_EXISTS:
     default:
@@ -4498,11 +4579,14 @@ dberr_t row_drop_table_for_mysql(const char *name, trx_t *trx, bool nonatomic,
 
   if (!table->is_temporary() && !file_per_table) {
     mutex_exit(&dict_sys->mutex);
-    for (dict_index_t *index = table->first_index(); index != NULL;
-         index = index->next()) {
-      log_ddl->write_free_tree_log(trx, index, true);
+    for (dict_index_t *index = table->first_index();
+         err == DB_SUCCESS && index != NULL; index = index->next()) {
+      err = log_ddl->write_free_tree_log(trx, index, true);
     }
     mutex_enter(&dict_sys->mutex);
+    if (err != DB_SUCCESS) {
+      goto funct_exit;
+    }
   }
 
   /* Mark all indexes unavailable in the data dictionary cache
@@ -4591,7 +4675,8 @@ dberr_t row_drop_table_for_mysql(const char *name, trx_t *trx, bool nonatomic,
   }
 
   ut_ad(file_per_table);
-  log_ddl->write_delete_space_log(trx, nullptr, space_id, filepath, true, true);
+  err = log_ddl->write_delete_space_log(trx, nullptr, space_id, filepath, true,
+                                        true);
 
 funct_exit:
 

@@ -10,6 +10,13 @@ int main() { return 0; }
 " TOKUDB_OK)
 ENDIF()
 
+IF (NOT DEFINED WITH_TOKUDB_BACKUP_PLUGIN)
+  IF (WITHOUT_TOKUDB_BACKUP_PLUGIN)
+    MESSAGE(STATUS "Skipping tokudb-backup-plugin")
+    RETURN()
+  ENDIF ()
+ENDIF ()
+
 include(CheckSymbolExists)
 check_symbol_exists(O_DIRECT "fcntl.h" HAVE_O_DIRECT)
 check_symbol_exists(CLOCK_REALTIME "time.h" HAVE_CLOCK_MONOTONIC)
@@ -53,7 +60,7 @@ IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Percona-TokuBackup/backup/CMakeLists.txt"
 ELSE()
   MESSAGE(STATUS "tokudb-backup-plugin no backup ${CMAKE_CURRENT_SOURCE_DIR}")
 ENDIF()
-MYSQL_ADD_PLUGIN(tokudb_backup ${TOKUDB_BACKUP_SOURCES} MODULE_ONLY MODULE_OUTPUT_NAME "tokudb_backup" LINK_LIBRARIES regex stdc++)
+MYSQL_ADD_PLUGIN(tokudb_backup ${TOKUDB_BACKUP_SOURCES} MODULE_ONLY MODULE_OUTPUT_NAME "tokudb_backup" LINK_LIBRARIES stdc++)
 #
 # RPM installs documentation directly from the source tree
 #

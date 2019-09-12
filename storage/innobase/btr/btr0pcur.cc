@@ -47,11 +47,11 @@ if forward_direction is true,
 prev_page_no otherwise.
 @param[in]	forward_direction	move direction: true means moving
 forward, false - backward. */
-static void btr_update_scan_stats(const page_t *page, ulint page_no,
+static void btr_update_scan_stats(const page_t *page, page_no_t page_no,
                                   bool forward_direction) {
   fragmentation_stats_t stats;
   memset(&stats, 0, sizeof(stats));
-  const ulint extracted_page_no = page_get_page_no(page);
+  const auto extracted_page_no = page_get_page_no(page);
   const ulint delta = forward_direction ? page_no - extracted_page_no
                                         : extracted_page_no - page_no;
 
@@ -74,6 +74,9 @@ void btr_pcur_t::store_position(mtr_t *mtr) {
   ut_ad(m_latch_mode != BTR_NO_LATCHES);
 
   auto block = get_block();
+
+  if (!block && !btr_cur_get_index(get_btr_cur())->table->is_readable())
+    return; /* decryption failure */
 
   SRV_CORRUPT_TABLE_CHECK(block, return;);
 

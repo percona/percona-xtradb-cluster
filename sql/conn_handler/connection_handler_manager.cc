@@ -90,6 +90,17 @@ static void scheduler_wait_sync_end() {
   if (likely(thd)) MYSQL_CALLBACK(thd->scheduler, thd_wait_end, (thd));
 }
 
+static void scheduler_wait_net_begin() {
+  THD *thd = current_thd;
+  if (likely(thd))
+    MYSQL_CALLBACK(thd->scheduler, thd_wait_begin, (thd, THD_WAIT_NET));
+}
+
+static void scheduler_wait_net_end() {
+  THD *thd = current_thd;
+  if (likely(thd)) MYSQL_CALLBACK(thd->scheduler, thd_wait_end, (thd));
+}
+
 bool Connection_handler_manager::valid_connection_count() {
   bool connection_accepted = true;
   mysql_mutex_lock(&LOCK_connection_count);
@@ -201,6 +212,7 @@ bool Connection_handler_manager::init() {
                              scheduler_wait_lock_end);
   thr_set_sync_wait_callback(scheduler_wait_sync_begin,
                              scheduler_wait_sync_end);
+  vio_set_wait_callback(scheduler_wait_net_begin, scheduler_wait_net_end);
   return false;
 }
 
@@ -282,6 +294,10 @@ void destroy_channel_info(Channel_info *channel_info) { delete channel_info; }
 
 void dec_connection_count() {
   Connection_handler_manager::dec_connection_count();
+}
+
+void increment_aborted_connects() {
+  Connection_handler_manager::get_instance()->inc_aborted_connects();
 }
 
 int my_connection_handler_set(Connection_handler_functions *chf,

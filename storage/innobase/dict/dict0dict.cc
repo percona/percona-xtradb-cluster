@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2019, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2012, Facebook Inc.
 
 This program is free software; you can redistribute it and/or modify it under
@@ -52,6 +52,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifndef UNIV_HOTBACKUP
 #include "clone0api.h"
+#include "fil0crypt.h"
 #include "mysqld.h"  // system_charset_info
 #include "que0types.h"
 #include "row0sel.h"
@@ -715,7 +716,7 @@ This function must not be called concurrently on the same table object.
 static void dict_table_autoinc_alloc(void *table_void) {
   dict_table_t *table = static_cast<dict_table_t *>(table_void);
 
-  table->autoinc_mutex = UT_NEW_NOKEY(ib_mutex_t());
+  table->autoinc_mutex = UT_NEW_NOKEY(AutoIncMutex());
   ut_a(table->autoinc_mutex != nullptr);
   mutex_create(LATCH_ID_AUTOINC, table->autoinc_mutex);
 
@@ -788,8 +789,8 @@ void dict_table_autoinc_log(dict_table_t *table, uint64_t value, mtr_t *mtr) {
     dict_persist->mutex. Above update to AUTOINC would be either
     written back to DDTableBuffer or not. But the redo logs for
     current change won't be counted into current checkpoint.
-    See how log_sys->dict_suggest_checkpoint_lsn is set. So
-    even a crash after below redo log flushed, no change lost.
+    See how log_sys->dict_max_allowed_checkpoint_lsn is set.
+    So even a crash after below redo log flushed, no change lost.
 
     If that function sets the dirty_status after below checking,
     which means current change would be written back to
@@ -1600,20 +1601,23 @@ dberr_t dict_table_rename_in_cache(
     std::string new_tablespace_name;
     dd_filename_to_spacename(new_name, &new_tablespace_name);
 
-    bool success = fil_rename_tablespace(table->space, old_path,
-                                         new_tablespace_name.c_str(), new_path);
+    dberr_t err = fil_rename_tablespace(table->space, old_path,
+                                        new_tablespace_name.c_str(), new_path);
 
     clone_mark_active();
 
     ut_free(old_path);
     ut_free(new_path);
 
-    if (!success) {
-      return (DB_ERROR);
+    if (err != DB_SUCCESS) {
+      return (err);
     }
   }
 
-  log_ddl->write_rename_table_log(table, new_name, table->name.m_name);
+  err = log_ddl->write_rename_table_log(table, new_name, table->name.m_name);
+  if (err != DB_SUCCESS) {
+    return (err);
+  }
 
   /* Remove table from the hash tables of tables */
   HASH_DELETE(dict_table_t, name_hash, dict_sys->table_hash,
@@ -5512,17 +5516,11 @@ void dict_persist_to_dd_table_buffer() {
   bool persisted = false;
 
   if (dict_sys == nullptr) {
-    log_sys->dict_suggest_checkpoint_lsn = 0;
+    log_sys->dict_max_allowed_checkpoint_lsn = 0;
     return;
   }
 
   mutex_enter(&dict_persist->mutex);
-
-  if (UT_LIST_GET_LEN(dict_persist->dirty_dict_tables) == 0) {
-    mutex_exit(&dict_persist->mutex);
-    log_sys->dict_suggest_checkpoint_lsn = 0;
-    return;
-  }
 
   for (dict_table_t *table = UT_LIST_GET_FIRST(dict_persist->dirty_dict_tables);
        table != NULL;) {
@@ -5542,17 +5540,23 @@ void dict_persist_to_dd_table_buffer() {
 
   ut_ad(dict_persist->num_dirty_tables == 0);
 
-  if (persisted) {
-    /* Get this lsn with dict_persist->mutex held,
-    so no other concurrent dynamic metadata change logs
-    would be before this lsn. */
-    log_sys->dict_suggest_checkpoint_lsn = log_get_lsn(*log_sys);
-  }
+  /* Get this lsn with dict_persist->mutex held,
+  so no other concurrent dynamic metadata change logs
+  would be before this lsn. */
+  const lsn_t persisted_lsn = log_get_lsn(*log_sys);
+
+  /* As soon as we release the dict_persist->mutex, new dynamic
+  metadata changes could happen. They would be not persisted
+  until next call to dict_persist_to_dd_table_buffer.
+  We must not remove redo which could allow to deduce them.
+  Therefore the maximum allowed lsn for checkpoint is the
+  current lsn. */
+  log_sys->dict_max_allowed_checkpoint_lsn = persisted_lsn;
 
   mutex_exit(&dict_persist->mutex);
 
   if (persisted) {
-    log_buffer_flush_to_disk();
+    log_write_up_to(*log_sys, persisted_lsn, true);
   }
 }
 
@@ -6294,8 +6298,8 @@ dict_table_t::flags |     0     |    1    |     1      |    1
 fil_space_t::flags  |     0     |    0    |     1      |    1
 @param[in]	table_flags	dict_table_t::flags
 @return tablespace flags (fil_space_t::flags) */
-ulint dict_tf_to_fsp_flags(ulint table_flags) {
-  DBUG_EXECUTE_IF("dict_tf_to_fsp_flags_failure", return (ULINT_UNDEFINED););
+uint32_t dict_tf_to_fsp_flags(uint32_t table_flags) {
+  DBUG_EXECUTE_IF("dict_tf_to_fsp_flags_failure", return (UINT32_UNDEFINED););
 
   bool has_atomic_blobs = DICT_TF_HAS_ATOMIC_BLOBS(table_flags);
   page_size_t page_size = dict_tf_get_page_size(table_flags);
@@ -6310,8 +6314,8 @@ ulint dict_tf_to_fsp_flags(ulint table_flags) {
     has_atomic_blobs = false;
   }
 
-  ulint fsp_flags = fsp_flags_init(page_size, has_atomic_blobs, has_data_dir,
-                                   is_shared, false);
+  uint32_t fsp_flags = fsp_flags_init(page_size, has_atomic_blobs, has_data_dir,
+                                      is_shared, false);
 
   return (fsp_flags);
 }
@@ -7421,7 +7425,7 @@ std::string dict_table_get_datadir(const dict_table_t *table) {
 @param[out]	dict_id		zip_dict id
 @retval	DB_SUCCESS		if OK
 @retval	DB_RECORD_NOT_FOUND	if not found */
-dberr_t dict_get_dictionary_id_by_key(ulint table_id, ulint column_pos,
+dberr_t dict_get_dictionary_id_by_key(table_id_t table_id, ulint column_pos,
                                       ulint *dict_id) {
   ut_ad(srv_is_upgrade_mode);
   ut_ad(!mutex_own(&dict_sys->mutex));
@@ -7473,27 +7477,151 @@ dberr_t dict_get_dictionary_info_by_id(ulint dict_id, char **name,
   return err;
 }
 
-bool dict_detect_encryption(bool is_upgrade, space_id_t mysql_plugin_space) {
-  bool encrypt_mysql = false;
-  if (is_upgrade) {
-    if (mysql_plugin_space == SYSTEM_TABLE_SPACE) {
-      return (srv_sys_space.is_encrypted());
-    }
-
-    space_id_t space_id = fil_space_get_id_by_name("mysql/plugin");
-    if (space_id == SPACE_UNKNOWN) {
-      return (false);
-    }
-
-    fil_space_t *space = fil_space_get(space_id);
-    ut_ad(space != nullptr);
-
-    if (space == nullptr) {
-      return (false);
-    }
-    encrypt_mysql = FSP_FLAGS_GET_ENCRYPTION(space->flags);
+/** Detect if database has encrypted mysql plugin space. This is
+ *  indication that system tablespace was encrypted.
+@param[in] mysql_plugin_space   space_id of mysql/plugin table.
+@return true if encrypted, false if not (or fail to open mysql/plugin table) */
+static bool dict_is_mysql_plugin_space_encrypted(
+    space_id_t mysql_plugin_space) {
+  /* It is possible that plugin table was created with
+  innodb_file_per_table == false, then this tablespace
+  will reside in system tablespace */
+  if (mysql_plugin_space == SYSTEM_TABLE_SPACE) {
+    return (srv_sys_space.is_encrypted());
   }
 
-  return (encrypt_mysql || srv_encrypt_tables == SRV_ENCRYPT_TABLES_ON ||
-          srv_encrypt_tables == SRV_ENCRYPT_TABLES_FORCE);
+  space_id_t space_id = fil_space_get_id_by_name("mysql/plugin");
+  if (space_id == SPACE_UNKNOWN) {
+    return (false);
+  }
+
+  const fil_space_t *space = fil_space_get(space_id);
+  ut_ad(space != nullptr);
+
+  if (space == nullptr) {
+    return false;
+  }
+  return FSP_FLAGS_GET_ENCRYPTION(space->flags);
+}
+
+/** Detect if innodb_encrypt_tables is set either to ON or FORCE or
+ONLINE_TO_KEYRING*
+@return true if innodb_encrypt_tables is equal to ON or FORCE or
+ONLINE_TO_KEYRING* */
+static bool dict_should_be_keyring_encrypted() {
+  return srv_default_table_encryption == DEFAULT_TABLE_ENC_ON ||
+         srv_default_table_encryption == DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING;
+}
+
+/** Reads mysql.ibd's page0 from buffer if the tablespace is already loaded
+into Fil_system cache
+@return tuple <0> success - true if no error
+              <1> true if encryption flag is set, false otherwise */
+static std::tuple<bool, bool> get_mysql_ibd_page_0_from_buffer() {
+  auto result = std::make_tuple(false, false);
+
+  fil_space_t *space = fil_space_acquire_silent(dict_sys_t::s_space_id);
+  if (space == nullptr) {
+    return (result);
+  }
+
+  const page_size_t page_size(space->flags);
+  mtr_t mtr;
+  mtr_start(&mtr);
+  buf_block_t *block = buf_page_get(page_id_t(dict_sys_t::s_space_id, 0),
+                                    univ_page_size, RW_X_LATCH, &mtr);
+
+  if (block == nullptr) {
+    mtr_commit(&mtr);
+    fil_space_release(space);
+    return (result);
+  }
+
+  const ulint flags = fsp_header_get_flags(buf_block_get_frame(block));
+  std::get<0>(result) = true;
+  std::get<1>(result) = FSP_FLAGS_GET_ENCRYPTION(flags);
+
+  mtr_commit(&mtr);
+  fil_space_release(space);
+  return (result);
+}
+
+/** Reads mysql.ibd's page0 directly from disk
+@param[in] buf - buffer for reading page0 into
+@return tuple <0> success - true if no error
+              <1> true if encryption flag is set, false otherwise */
+static std::tuple<bool, bool> get_mysql_ibd_page_0_io() {
+  auto result = std::make_tuple(false, false);
+
+  /* page0 of mysql.ibd is not in the buffer, try direct io */
+  auto buf = ut_make_unique_ptr_nokey(2 * UNIV_PAGE_SIZE);
+
+  bool successfully_opened = false;
+
+  pfs_os_file_t file = os_file_create_simple_no_error_handling(
+      innodb_data_file_key, dict_sys_t::s_dd_space_file_name, OS_FILE_OPEN,
+      OS_FILE_READ_ONLY, srv_read_only_mode, &successfully_opened);
+
+  if (!successfully_opened) {
+    return (result);
+  }
+
+  buf_frame_t *page =
+      static_cast<buf_frame_t *>(ut_align(buf.get(), UNIV_PAGE_SIZE));
+
+  ut_ad(page == page_align(page));
+
+  IORequest request(IORequest::READ);
+  dberr_t err =
+      os_file_read_first_page_noexit(request, file, page, UNIV_PAGE_SIZE);
+
+  os_file_close(file);
+
+  if (err != DB_SUCCESS) {
+    return (result);
+  }
+
+  const ulint flags = fsp_header_get_flags(page);
+  std::get<0>(result) = true;
+  std::get<1>(result) = FSP_FLAGS_GET_ENCRYPTION(flags);
+
+  return (result);
+}
+
+/** Detect if mysql.ibd's page0 has encryption flag set.
+The page 0 either read from buffer (if available) or
+directly from disk.
+@return tuple <0> success - true if no error
+              <1> true if encryption flag is set, false otherwise */
+static std::tuple<bool, bool> dict_mysql_ibd_page_0_has_encryption_flag_set() {
+  //<0> element - success, <1> element - encryption flag
+  auto result = std::make_tuple(false, false);
+
+  /* read from buffer */
+  result = get_mysql_ibd_page_0_from_buffer();
+  if (!std::get<0>(result)) {
+    result = get_mysql_ibd_page_0_io();
+  }
+  return (result);
+}
+
+bool dict_detect_encryption_of_mysql_ibd(dict_init_mode_t dict_init_mode,
+                                         space_id_t mysql_plugin_space,
+                                         bool &encrypt_mysql) {
+  bool success = false;
+  switch (dict_init_mode) {
+    case DICT_INIT_CREATE_FILES:
+      encrypt_mysql = dict_should_be_keyring_encrypted();
+      return true;
+    case DICT_INIT_UPGRADE_57_FILES:
+      encrypt_mysql = dict_is_mysql_plugin_space_encrypted(mysql_plugin_space);
+      return true;
+    case DICT_INIT_CHECK_FILES:
+      std::tie(success, encrypt_mysql) =
+          dict_mysql_ibd_page_0_has_encryption_flag_set();
+      return success;
+    default:
+      ut_ad(0);
+      return false;
+  }
 }

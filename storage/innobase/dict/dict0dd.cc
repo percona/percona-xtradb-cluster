@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2017, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2017, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -68,6 +68,7 @@ Data dictionary interface */
 #include "query_options.h"
 #include "sql_base.h"
 #include "sql_table.h"
+#include "thd_raii.h"
 #endif /* !UNIV_HOTBACKUP */
 
 const char *DD_instant_col_val_coder::encode(const byte *stream, size_t in_len,
@@ -361,7 +362,7 @@ int dd_table_open_on_dd_obj(dd::cache::Dictionary_client *client,
     TABLE td;
 
     error = open_table_from_share(thd, &ts, dd_table.name().c_str(), 0,
-                                  OPEN_FRM_FILE_ONLY, 0, &td, false, &dd_table);
+                                  SKIP_NEW_HANDLER, 0, &td, false, &dd_table);
     if (error == 0) {
       char tmp_name[MAX_FULL_NAME_LEN + 1];
       const char *tab_namep;
@@ -1034,12 +1035,11 @@ dberr_t dd_rename_tablespace(dd::Object_id dd_space_id,
 
   /* Get the dd tablespace */
   if (client->acquire_uncached_uncommitted<dd::Tablespace>(dd_space_id,
-                                                           &dd_space)) {
+                                                           &dd_space) ||
+      dd_space == nullptr) {
     ut_ad(false);
     DBUG_RETURN(DB_ERROR);
   }
-
-  ut_a(dd_space != nullptr);
 
   MDL_ticket *src_ticket = nullptr;
   if (dd_tablespace_get_mdl(dd_space->name().c_str(), &src_ticket)) {
@@ -2040,7 +2040,7 @@ void dd_update_v_cols(dd::Table *dd_table, table_id_t id) {
 @param[in]	fsp_flags	InnoDB tablespace flags
 @param[in]	state		InnoDB tablespace state */
 void dd_write_tablespace(dd::Tablespace *dd_space, space_id_t space_id,
-                         ulint fsp_flags, dd_space_states state) {
+                         uint32_t fsp_flags, dd_space_states state) {
   dd::Properties &p = dd_space->se_private_data();
   p.set(dd_space_key_strings[DD_SPACE_ID], space_id);
   p.set(dd_space_key_strings[DD_SPACE_FLAGS], static_cast<uint32>(fsp_flags));
@@ -3058,7 +3058,7 @@ void dd_filename_to_spacename(const char *space_name,
 @retval true on failure */
 bool dd_create_tablespace(dd::cache::Dictionary_client *dd_client, THD *thd,
                           const char *dd_space_name, space_id_t space_id,
-                          ulint flags, const char *filename, bool discarded,
+                          uint32_t flags, const char *filename, bool discarded,
                           dd::Object_id &dd_space_id) {
   std::unique_ptr<dd::Tablespace> dd_space(dd::create_object<dd::Tablespace>());
 
@@ -3089,6 +3089,16 @@ bool dd_create_tablespace(dd::cache::Dictionary_client *dd_client, THD *thd,
   dd_file->se_private_data().set(dd_space_key_strings[DD_SPACE_ID],
                                  static_cast<uint32>(space_id));
 
+  dd::Properties &toptions = dd_space->options();
+  if (!FSP_FLAGS_GET_ENCRYPTION(flags)) {
+    /* Update DD Option value, for Unencryption */
+    toptions.set("encryption", "N");
+
+  } else {
+    /* Update DD Option value, for Encryption */
+    toptions.set("encryption", "Y");
+  }
+
   if (dd_client->store(dd_space.get())) {
     return (true);
   }
@@ -3115,7 +3125,7 @@ bool dd_create_implicit_tablespace(dd::cache::Dictionary_client *dd_client,
                                    bool discarded, dd::Object_id &dd_space_id) {
   std::string tsn;
   fil_space_t *space = fil_space_get(space_id);
-  ulint flags = space->flags;
+  uint32_t flags = space->flags;
 
   dd_filename_to_spacename(space_name, &tsn);
 
@@ -3133,9 +3143,10 @@ bool dd_create_implicit_tablespace(dd::cache::Dictionary_client *dd_client,
 @retval true    On failure */
 bool dd_drop_tablespace(dd::cache::Dictionary_client *dd_client, THD *thd,
                         dd::Object_id dd_space_id) {
-  dd::Tablespace *dd_space;
+  dd::Tablespace *dd_space = nullptr;
 
-  if (dd_client->acquire_uncached_uncommitted(dd_space_id, &dd_space)) {
+  if (dd_client->acquire_uncached_uncommitted(dd_space_id, &dd_space) ||
+      dd_space == nullptr) {
     my_error(ER_INTERNAL_ERROR, MYF(0),
              " InnoDB can't get tablespace object"
              " for space ",
@@ -3517,7 +3528,7 @@ dberr_t dd_table_check_for_child(dd::cache::Dictionary_client *client,
 /** Get tablespace name of dd::Table
 @tparam		Table		dd::Table or dd::Partition
 @param[in]	dd_table	dd table object
-@return the tablespace name. */
+@return the tablespace name or nullptr if failed */
 template <typename Table>
 const char *dd_table_get_space_name(const Table *dd_table) {
   dd::Tablespace *dd_space = nullptr;
@@ -3533,12 +3544,12 @@ const char *dd_table_get_space_name(const Table *dd_table) {
   dd::Object_id dd_space_id = (*dd_table->indexes().begin())->tablespace_id();
 
   if (client->acquire_uncached_uncommitted<dd::Tablespace>(dd_space_id,
-                                                           &dd_space)) {
+                                                           &dd_space) ||
+      dd_space == nullptr) {
     ut_ad(false);
     DBUG_RETURN(nullptr);
   }
 
-  ut_a(dd_space != nullptr);
   space_name = dd_space->name().c_str();
 
   DBUG_RETURN(space_name);
@@ -3551,7 +3562,7 @@ for a given space_id.
 @param[in]	table		dict table
 @param[in]	dd_table	dd table obj
 @return First filepath (caller must invoke ut_free() on it)
-@retval NULL if no mysql.tablespace_datafilesentry was found. */
+@retval nullptr if no mysql.tablespace_datafiles entry was found. */
 template <typename Table>
 char *dd_get_first_path(mem_heap_t *heap, dict_table_t *table,
                         Table *dd_table) {
@@ -3592,7 +3603,8 @@ char *dd_get_first_path(mem_heap_t *heap, dict_table_t *table,
 
   if (client->acquire_uncached_uncommitted<dd::Tablespace>(dd_space_id,
                                                            &dd_space)) {
-    ut_a(false);
+    ut_ad(false);
+    return (nullptr);
   }
 
   if (dd_space != nullptr) {
@@ -3819,7 +3831,7 @@ void dd_load_tablespace(const Table *dd_table, dict_table_t *table,
 @param[in]	table		dict table
 @param[in]	dd_table	dd table obj
 @return First filepath (caller must invoke ut_free() on it)
-@retval NULL if no mysql.tablespace_datafilesentry was found. */
+@retval nullptr if no mysql.tablespace_datafiles entry was found. */
 template <typename Table>
 char *dd_space_get_name(mem_heap_t *heap, dict_table_t *table,
                         Table *dd_table) {
@@ -3859,11 +3871,11 @@ char *dd_space_get_name(mem_heap_t *heap, dict_table_t *table,
   }
 
   if (client->acquire_uncached_uncommitted<dd::Tablespace>(dd_space_id,
-                                                           &dd_space)) {
-    ut_a(false);
+                                                           &dd_space) ||
+      dd_space == nullptr) {
+    ut_ad(false);
+    return (nullptr);
   }
-
-  ut_a(dd_space != nullptr);
 
   return (mem_heap_strdup(heap, dd_space->name().c_str()));
 }
@@ -4030,7 +4042,8 @@ dict_table_t *dd_open_table_one(dd::cache::Dictionary_client *client,
       sid = dict_sys_t::s_temp_space_id;
     } else {
       if (client->acquire_uncached_uncommitted<dd::Tablespace>(index_space_id,
-                                                               &index_space)) {
+                                                               &index_space) ||
+          index_space == nullptr) {
         my_error(ER_TABLESPACE_MISSING, MYF(0), m_table->name.m_name);
         fail = true;
         break;
@@ -4050,8 +4063,7 @@ dict_table_t *dd_open_table_one(dd::cache::Dictionary_client *client,
 
       uint32 dd_fsp_flags;
       if (dd_table->tablespace_id() == dict_sys_t::s_dd_space_id) {
-        dd_fsp_flags =
-            static_cast<uint32>(dict_tf_to_fsp_flags(m_table->flags));
+        dd_fsp_flags = dict_tf_to_fsp_flags(m_table->flags);
       } else {
         ut_ad(dd_space != nullptr);
         dd_space->se_private_data().get(dd_space_key_strings[DD_SPACE_FLAGS],
@@ -4226,7 +4238,7 @@ static void dd_open_table_one_on_name(const char *name, bool dict_locked,
     TABLE td;
 
     error = open_table_from_share(thd, &ts, dd_table->name().c_str(), 0,
-                                  OPEN_FRM_FILE_ONLY, 0, &td, false, dd_table);
+                                  SKIP_NEW_HANDLER, 0, &td, false, dd_table);
 
     if (error != 0) {
       free_table_share(&ts);
@@ -5044,7 +5056,7 @@ bool dd_process_dd_indexes_rec_simple(mem_heap_t *heap, const rec_t *rec,
 @return true if data is retrived */
 bool dd_process_dd_tablespaces_rec(mem_heap_t *heap, const rec_t *rec,
                                    space_id_t *space_id, char **name,
-                                   uint *flags, uint32 *server_version,
+                                   uint32_t *flags, uint32 *server_version,
                                    uint32 *space_version, bool *is_encrypted,
                                    dd::String_type *state,
                                    dict_table_t *dd_spaces) {
@@ -5104,19 +5116,19 @@ bool dd_process_dd_tablespaces_rec(mem_heap_t *heap, const rec_t *rec,
     return (false);
   }
 
-  /* Get space flag. */
+  /* Get space flags. */
   if (p->get(dd_space_key_strings[DD_SPACE_FLAGS], flags)) {
     delete p;
     return (false);
   }
 
-  /* Get server flag. */
+  /* Get server version. */
   if (p->get(dd_space_key_strings[DD_SPACE_SERVER_VERSION], server_version)) {
     delete p;
     return (false);
   }
 
-  /* Get space flag. */
+  /* Get space version. */
   if (p->get(dd_space_key_strings[DD_SPACE_VERSION], space_version)) {
     delete p;
     return (false);
@@ -6066,11 +6078,11 @@ bool dd_is_table_in_encrypted_tablespace(const dict_table_t *table) {
     THD *thd = current_thd;
     dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
     dd::cache::Dictionary_client::Auto_releaser releaser(client);
-    dd::Tablespace *dd_space;
+    dd::Tablespace *dd_space = nullptr;
 
     if (!client->acquire_uncached_uncommitted<dd::Tablespace>(
-            table->dd_space_id, &dd_space)) {
-      ut_ad(dd_space);
+            table->dd_space_id, &dd_space) &&
+        dd_space != nullptr) {
       uint32 flags;
       dd_space->se_private_data().get(dd_space_key_strings[DD_SPACE_FLAGS],
                                       &flags);
@@ -6082,4 +6094,164 @@ bool dd_is_table_in_encrypted_tablespace(const dict_table_t *table) {
     return false;
   }
 }
+
+/* Updates tablespace's DD flags.
+@param[in] Thread       THD
+@param[in] space_name   name of the space that DD flags are to be updated
+@param[in] is_space_being_removed - pass by pointer as this can check outside
+this function
+@param[in] update       function object that will be invoked for updating DD
+flags
+@return false on success */
+static bool dd_update_tablespace_dd_flags(
+    THD *thd, const char *space_name, volatile bool *is_space_being_removed,
+    std::function<void(uint32 &)> update) {
+  Disable_autocommit_guard autocommit_guard(thd);
+  dd::cache::Dictionary_client *client = dd::get_dd_client(thd);
+  dd::cache::Dictionary_client::Auto_releaser releaser(client);
+
+  dd::Tablespace *dd_space = nullptr;
+
+  const unsigned long int lock_wait_timeout = 20;
+  unsigned long int waited_so_far_for_lock = 0;
+
+  auto handle_timeout_or_space_drop = [&]() {
+    if (*is_space_being_removed ||
+        waited_so_far_for_lock > thd->variables.lock_wait_timeout) {
+      dd::commit_or_rollback_tablespace_change(
+          thd, dd_space, true);  // need to unlock tablespace mdl
+      if (waited_so_far_for_lock > thd->variables.lock_wait_timeout) {
+        my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
+      }
+      return true;
+    }
+    return false;
+  };
+
+  while (dd::acquire_exclusive_tablespace_mdl(thd, space_name,
+                                              lock_wait_timeout)) {
+    waited_so_far_for_lock += lock_wait_timeout;
+    if (handle_timeout_or_space_drop()) {
+      return true;
+    }
+  }
+
+  waited_so_far_for_lock = 0;
+
+  while (
+      client->acquire_for_modification<dd::Tablespace>(space_name, &dd_space)) {
+    if (handle_timeout_or_space_drop()) {
+      return true;
+    }
+    os_thread_sleep(lock_wait_timeout);
+    waited_so_far_for_lock += lock_wait_timeout;
+  }
+
+  waited_so_far_for_lock = 0;
+  uint32_t dd_space_flags = 0;
+
+  if (dd_space == nullptr ||
+      dd_space->se_private_data().get(dd_space_key_strings[DD_SPACE_FLAGS],
+                                      &dd_space_flags)) {
+    dd::commit_or_rollback_tablespace_change(thd, dd_space, true);
+    return (true);
+  }
+
+  update(dd_space_flags);
+
+  /* Update DD flags for tablespace */
+  dd_space->se_private_data().set(dd_space_key_strings[DD_SPACE_FLAGS],
+                                  static_cast<uint32>(dd_space_flags));
+
+  /* Pass 'true' for 'release_mdl_on_commit' parameter because we want
+  transactional locks to be released only in case of successful commit */
+  while (dd::commit_or_rollback_tablespace_change(thd, dd_space, false, true)) {
+    if (handle_timeout_or_space_drop()) {
+      return true;
+    }
+    os_thread_sleep(lock_wait_timeout);
+    waited_so_far_for_lock += lock_wait_timeout;
+  }
+
+  return (false);
+}
+
+bool dd_set_encryption_flag(THD *thd, const char *space_name,
+                            volatile bool *is_space_being_removed) {
+  auto update_func = [](uint32_t &dd_space_flags) {
+    dd_space_flags |= (1U << FSP_FLAGS_POS_ENCRYPTION);
+  };
+  return dd_update_tablespace_dd_flags(thd, space_name, is_space_being_removed,
+                                       update_func);
+}
+
+bool dd_clear_encryption_flag(THD *thd, const char *space_name,
+                              volatile bool *is_space_being_removed) {
+  auto update_func = [](uint32_t &dd_space_flags) {
+    dd_space_flags &= ~(1U << FSP_FLAGS_POS_ENCRYPTION);
+  };
+  return dd_update_tablespace_dd_flags(thd, space_name, is_space_being_removed,
+                                       update_func);
+}
+
+static bool dd_get_tablespace_flags(THD *thd, const char *space_name,
+                                    uint32_t &dd_space_flags) {
+  const dd::Tablespace *dd_space = nullptr;
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+  return thd->dd_client()->acquire(space_name, &dd_space) ||
+         dd_space == nullptr ||
+         dd_space->se_private_data().get(dd_space_key_strings[DD_SPACE_FLAGS],
+                                         &dd_space_flags);
+}
+
+/* Sets tablespace's DD flags.
+@param[in] Thread       THD
+@param[in] space_name   name of the space for which DD flags are to be set
+@param[in] space_flags  DD flags that are to be assigned to space
+@param[in] is_space_being_removed - pass by pointer as this can check outside
+this function */
+static bool dd_set_flags(THD *thd, const char *space_name,
+                         const uint32_t space_flags,
+                         volatile bool *is_space_being_removed) {
+  auto set_flags = [](uint32_t &dd_space_flags, uint32_t space_flags) {
+    // currently we are using this function only for correcting encryption flag
+    ut_ad(dd_space_flags == space_flags ||
+          FSP_FLAGS_GET_ENCRYPTION(dd_space_flags) !=
+              FSP_FLAGS_GET_ENCRYPTION(space_flags));
+    dd_space_flags = space_flags;
+  };
+  auto update_func = std::bind(set_flags, std::placeholders::_1, space_flags);
+  return dd_update_tablespace_dd_flags(thd, space_name, is_space_being_removed,
+                                       update_func);
+}
+
+bool dd_fix_mysql_ibd_encryption_flag_if_needed(THD *thd,
+                                                uint32_t space_flags) {
+  uint32_t dd_space_flags;
+  if (dd_get_tablespace_flags(thd, dict_sys_t::s_dd_space_name,
+                              dd_space_flags)) {
+    return true;
+  }
+  if (FSP_FLAGS_GET_ENCRYPTION(dd_space_flags) ==
+      FSP_FLAGS_GET_ENCRYPTION(space_flags)) {
+    return false;
+  }
+  // exclude encryption flag from validation
+  dd_space_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
+  space_flags &= ~FSP_FLAGS_MASK_ENCRYPTION;
+  if (dd_space_flags != space_flags) {
+    // this should not happen - some other flags other than encryption flag are
+    // mismatched
+    ib::error(ER_IB_MSG_394)
+        << "Flags read from mysql.ibd file (" << space_flags
+        << ") are different from the flags read from DD (" << dd_space_flags
+        << ") This comparission does *not* include the encryption flag.";
+    return true;
+  }
+  bool is_space_being_removed{false};
+  return dd_set_flags(thd, dict_sys_t::s_dd_space_name, space_flags,
+                      &is_space_being_removed);
+}
+
 #endif /* !UNIV_HOTBACKUP */

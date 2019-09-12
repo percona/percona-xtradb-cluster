@@ -4111,10 +4111,8 @@ dberr_t row_search_no_mvcc(byte *buf, page_cur_mode_t mode,
       err = btr_pcur_open_at_index_side(mode == PAGE_CUR_G, index,
                                         BTR_SEARCH_LEAF, pcur, false, 0, mtr);
       if (err != DB_SUCCESS) {
-        if (err == DB_DECRYPTION_FAILED) {
-          ib::warn() << "Table is encrypted but encryption service or"
-                        " used key_id is not available. "
-                        " Can't continue reading table.";
+        if (err == DB_IO_DECRYPT_FAIL) {
+          ib::warn(ER_XB_MSG_4, index->table_name);
           index->table->set_file_unreadable();
         }
         return (err);
@@ -4370,7 +4368,7 @@ dberr_t row_search_mvcc(byte *buf, page_cur_mode_t mode,
 
   } else if (prebuilt->table->file_unreadable) {
     DBUG_RETURN(fil_space_get(prebuilt->table->space)
-                    ? DB_DECRYPTION_FAILED
+                    ? DB_IO_DECRYPT_FAIL
                     : DB_TABLESPACE_NOT_FOUND);
   } else if (!prebuilt->index_usable) {
     DBUG_RETURN(DB_MISSING_HISTORY);
@@ -4812,10 +4810,8 @@ dberr_t row_search_mvcc(byte *buf, page_cur_mode_t mode,
     err = btr_pcur_open_at_index_side(mode == PAGE_CUR_G, index,
                                       BTR_SEARCH_LEAF, pcur, false, 0, &mtr);
     if (err != DB_SUCCESS) {
-      if (err == DB_DECRYPTION_FAILED) {
-        ib::warn() << "Table is encrypted but encryption service or"
-                      " used key_id is not available. "
-                      " Can't continue reading table.";
+      if (err == DB_IO_DECRYPT_FAIL) {
+        ib::warn(ER_XB_MSG_4, index->table_name);
         index->table->set_file_unreadable();
       }
       rec = NULL;
@@ -4842,7 +4838,7 @@ rec_loop:
   rec = btr_pcur_get_rec(pcur);
 
   if (!index->table->is_readable() && !index->table->is_corrupt) {
-    err = DB_DECRYPTION_FAILED;
+    err = DB_IO_DECRYPT_FAIL;
     goto lock_wait_or_error;
   }
 
@@ -5366,7 +5362,7 @@ locks_ok:
       /* Condition (1) from above: is the field in the
       index (prefix or not)? */
       const mysql_row_templ_t *templ = prebuilt->mysql_template + i;
-      ulint secondary_index_field_no = templ->rec_prefix_field_no;
+      const auto secondary_index_field_no = templ->rec_prefix_field_no;
       if (secondary_index_field_no == ULINT_UNDEFINED) {
         row_contains_all_values = false;
         break;
@@ -5375,7 +5371,7 @@ locks_ok:
       prefix, is this row's value size shorter
       than the prefix? */
       if (templ->rec_field_is_prefix) {
-        ulint record_size =
+        const auto record_size =
             rec_offs_nth_size(offsets, secondary_index_field_no);
         const dict_field_t *field = index->get_field(secondary_index_field_no);
         ut_a(field->prefix_len > 0);
@@ -6088,10 +6084,8 @@ dberr_t row_count_rtree_recs(
 
   ret = row_search_mvcc(buf, PAGE_CUR_WITHIN, prebuilt, 0, 0);
 
-  /* TODO: This is for a temporary fix, will be removed later */
-  if (prebuilt->rtr_info != nullptr) {
-    prebuilt->rtr_info->is_dup = &is_dup;
-  }
+  prebuilt->rtr_info->is_dup = &is_dup;
+
 loop:
   /* Check thd->killed every 1,000 scanned rows */
   if (--cnt == 0) {
@@ -6115,6 +6109,9 @@ loop:
     case DB_END_OF_INDEX:
       ret = DB_SUCCESS;
     func_exit:
+      /* This may be pointing to a local variable. */
+      prebuilt->rtr_info->is_dup = nullptr;
+
       prebuilt->search_tuple = search_entry;
       ut_free(buf);
       mem_heap_free(heap);
