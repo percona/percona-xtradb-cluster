@@ -13,7 +13,7 @@ on |date|.  Binaries are available from the `downloads section
 
 - `Percona Server 5.6.45
   <https://www.percona.com/doc/percona-server/5.6/release-notes/Percona-Server-5.6.45-86.1.html>`_
-- Codership WSREP API release 5.6.45
+- Codership WSREP API release 5.6.44
 - Codership Galera library 3.28
 
 All Percona software is open-source and free.
@@ -27,4 +27,4 @@ Bugs Fixed
   took too long to detect if a child process was running.
 
 .. |release| replace:: 5.6.45-28.36
-.. |date| replace:: September 10, 2019
+.. |date| replace:: September 17, 2019
