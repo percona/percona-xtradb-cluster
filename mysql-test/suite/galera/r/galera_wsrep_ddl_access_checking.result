@@ -132,18 +132,18 @@ include/assert.inc [Database testdb still exists on node 2]
 # connection node_testme
 SHOW CREATE DATABASE testdb;
 Database	Create Database
-testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */
+testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */
 ALTER DATABASE testdb CHARACTER SET latin7;
 ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
 INSERT INTO counter(count) VALUES(10);;
 # connection node_1
 SHOW CREATE DATABASE testdb;
 Database	Create Database
-testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */
+testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */
 # connection node_2
 SHOW CREATE DATABASE testdb;
 Database	Create Database
-testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */
+testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */
 #
 # SQLCOM_REPAIR access test
 #

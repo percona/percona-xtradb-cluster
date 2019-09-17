@@ -28,6 +28,8 @@
 
 #define WSREP_UNDEFINED_TRX_ID ULLONG_MAX
 
+#define WSREP_MYSQL_DB (char *)"mysql"
+
 class set_var;
 class THD;
 

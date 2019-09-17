@@ -471,13 +471,26 @@ bool SslAcceptorContext::wsrep_ssl_artifacts_check(bool bootstrapping_node) {
     if (do_auto_cert_generation(auto_detection_status, &opt_ssl_ca,
                                 &opt_ssl_key, &opt_ssl_cert) == false)
       return true;
-  } else if (!bootstrapping_node &&
-             auto_detection_status != SSL_ARTIFACTS_AUTO_DETECTED) {
-    WSREP_ERROR("New cluster joining node didn't found needed SSL artifacts");
-    return true;
-  } else if (!bootstrapping_node &&
-             auto_detection_status == SSL_ARTIFACTS_AUTO_DETECTED) {
-    WSREP_INFO("New cluster joining node found needed SSL artifacts");
+  } else {
+    switch (auto_detection_status) {
+      case SSL_ARTIFACTS_AUTO_DETECTED:
+        WSREP_INFO("New joining cluster node found needed SSL artifacts");
+        break;
+      case SSL_ARTIFACTS_VIA_OPTIONS:
+        WSREP_INFO(
+            "New joining cluster node configured to use specified SSL "
+            "artificats");
+        break;
+      case SSL_ARTIFACT_TRACES_FOUND:
+      case SSL_ARTIFACTS_NOT_FOUND:
+        WSREP_ERROR(
+            "New joining cluster node didn't found %sneeded SSL artifacts",
+            (auto_detection_status == SSL_ARTIFACT_TRACES_FOUND) ? "all " : "");
+        return true;
+        break;
+      default:
+        break;
+    }
   }
 
   wsrep_context_initialized = true;

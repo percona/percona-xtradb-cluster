@@ -45,6 +45,10 @@
 #include "sql/transaction.h"
 #include "sql/tztime.h"  // struct Time_zone
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
+
 /**
   @addtogroup Event_Scheduler
   @{
@@ -179,6 +183,14 @@ bool Event_db_repository::update_event(THD *thd, Event_parse_data *parse_data,
   if (sctx->can_operate_with(definer, consts::system_user, true))
     DBUG_RETURN(true);
 
+#ifdef WITH_WSREP
+  /* Check is enforced before update event post SUPER_USER privilege check
+  check passes. */
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
+
   // Update Event in the data dictionary with altered event object attributes.
   bool ret = dd::update_event(
       thd, event, *schema, new_schema, new_name != nullptr ? new_name->str : "",
@@ -246,6 +258,14 @@ bool Event_db_repository::drop_event(THD *thd, LEX_STRING db, LEX_STRING name,
   Security_context *sctx = thd->security_context();
   if (sctx->can_operate_with(definer, consts::system_user, true))
     DBUG_RETURN(true);
+
+#ifdef WITH_WSREP
+  /* Check is enforced before update event post SUPER_USER privilege check
+  check passes. */
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
 
   *event_exists = true;
   DBUG_RETURN(thd->dd_client()->drop(event_ptr));

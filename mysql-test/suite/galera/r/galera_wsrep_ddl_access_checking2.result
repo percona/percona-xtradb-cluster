@@ -294,7 +294,7 @@ FLUSH PRIVILEGES;
 CREATE DATABASE testdbother;
 SHOW CREATE DATABASE testdbother;
 Database	Create Database
-testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */
+testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */
 # connection node_testme
 use testdb;
 ALTER DATABASE testdbother CHARACTER SET latin7;
@@ -302,11 +302,11 @@ INSERT INTO counter(count) VALUES(10);;
 # connection node_1
 SHOW CREATE DATABASE testdbother;
 Database	Create Database
-testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET latin7 */
+testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET latin7 */ /*!80016 DEFAULT ENCRYPTION='N' */
 # connection node_2
 SHOW CREATE DATABASE testdbother;
 Database	Create Database
-testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET latin7 */
+testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET latin7 */ /*!80016 DEFAULT ENCRYPTION='N' */
 # connection node_1
 DROP DATABASE testdbother;
 REVOKE ALTER ON *.* FROM 'testme'@'%';
@@ -349,6 +349,10 @@ FLUSH PRIVILEGES;
 # SQLCOM_DROP_FUNCTION access test
 #
 # connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE FUNCTION hello2 (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
 # connection node_1
 include/assert.inc [The hello2 function should exist on node 1]
@@ -359,8 +363,9 @@ GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
-GRANT SELECT, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
+GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
+GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `testdb`.`hello2` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -371,6 +376,7 @@ include/assert.inc [The hello2 function should not exist on node 1]
 # connection node_2
 include/assert.inc [The hello2 function should not exist on node 2]
 # connection node_1
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
@@ -701,6 +707,10 @@ FLUSH PRIVILEGES;
 # SQLCOM_DROP_PROCEDURE access test
 #
 # connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
 BEGIN
 END;
@@ -713,8 +723,9 @@ GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
-GRANT SELECT, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
+GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
+GRANT EXECUTE, ALTER ROUTINE ON PROCEDURE `testdb`.`hellop` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -724,6 +735,7 @@ INSERT INTO counter(count) VALUES(23);;
 include/assert.inc [The hellop procedure should not exist on node 1]
 # connection node_2
 include/assert.inc [The hellop procedure should not exist on node 2]
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
@@ -735,6 +747,10 @@ FLUSH PRIVILEGES;
 # SQLCOM_ALTER_PROCEDURE access test
 #
 # connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
 BEGIN
 END;
@@ -750,8 +766,9 @@ GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
-GRANT SELECT, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
+GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
+GRANT EXECUTE, ALTER ROUTINE ON PROCEDURE `testdb`.`hellop` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -763,6 +780,7 @@ include/assert.inc [The hellop procedure should use the invoker on node 1]
 include/assert.inc [The hellop procedure should use the invoker on node 2]
 # connection node_1
 DROP PROCEDURE hellop;
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
@@ -774,6 +792,10 @@ FLUSH PRIVILEGES;
 # SQLCOM_ALTER_FUNCTION access test
 #
 # connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE FUNCTION hellof (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
 # connection node_1
 include/assert.inc [The hellof function should exist on node 1]
@@ -787,8 +809,9 @@ GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
-GRANT SELECT, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
+GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
+GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `testdb`.`hellof` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -800,6 +823,7 @@ include/assert.inc [The hellof function should use the invoker on node 1]
 include/assert.inc [The hellof function should use the invoker on node 2]
 # connection node_1
 DROP FUNCTION hellof;
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
@@ -838,6 +862,10 @@ FLUSH PRIVILEGES;
 # SQLCOM_DROP_VIEW access test
 #
 # connection node_1
+GRANT CREATE VIEW ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE VIEW helloview AS SELECT * FROM t1;
 # connection node_1
 include/assert.inc [The helloview VIEW should exist on node 1]
@@ -848,7 +876,7 @@ GRANT DROP ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
 GRANT USAGE ON *.* TO `testme`@`%`
-GRANT SELECT, DROP ON `testdb`.* TO `testme`@`%`
+GRANT SELECT, DROP, CREATE VIEW ON `testdb`.* TO `testme`@`%`
 GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
@@ -860,6 +888,7 @@ include/assert.inc [The helloview VIEW should not exist on node 1]
 # connection node_2
 include/assert.inc [The helloview VIEW should not exist on node 2]
 # connection node_1
+REVOKE CREATE VIEW ON testdb.* FROM 'testme'@'%';
 REVOKE DROP ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
@@ -1021,6 +1050,10 @@ FLUSH PRIVILEGES;
 # SQLCOM_ALTER_EVENT access test
 #
 # connection node_1
+GRANT EVENT ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE EVENT helloevent
 ON SCHEDULE EVERY 1 HOUR
 DO INSERT INTO t1(f2) VALUES(3);

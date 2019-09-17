@@ -8461,18 +8461,15 @@ bool flush_relay_logs_cmd(THD *thd) {
         }
       } while (flush_was_deferred);
     }
-#if 0
-/* GR removed this hook following same for PXC wsrep channel. Need to run
-   test-case to understand the effect. */
 #ifdef WITH_WSREP
-  // Similar to GR, do not allow operations on the wsrep channel
+  // GR use to have check like this. Now removed. PXC continue to enforce it.
   } else if (lex->mi.channel && wsrep_is_wsrep_channel_name(lex->mi.channel)) {
     if (thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
         thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER) {
       /*
         Log warning on SQL or worker threads.
       */
-      LogErr(WARNING_LEVEL, ER_RPL_SLAVE_FLUSH_RELAY_LOGS_NOT_ALLOWED,
+      LogErr(WARNING_LEVEL, ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED,
              lex->mi.channel);
     } else {
       /*
@@ -8483,7 +8480,6 @@ bool flush_relay_logs_cmd(THD *thd) {
                "FLUSH RELAY LOGS", lex->mi.channel);
     }
 #endif /* WITH_WSREP */
-#endif /* 0 */
   } else {
     mi = channel_map.get_mi(lex->mi.channel);
 

@@ -811,6 +811,14 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
 CREATE FUNCTION hello2 (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
 
 --echo # connection node_1
@@ -864,6 +872,7 @@ DROP FUNCTION hello2;
 #
 --echo # connection node_1
 --connection node_1
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -1475,6 +1484,14 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
 BEGIN
 END;
@@ -1529,6 +1546,7 @@ DROP PROCEDURE hellop;
 # cleanup
 #
 --connection node_1
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -1548,6 +1566,14 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
 BEGIN
 END;
@@ -1609,6 +1635,7 @@ ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 DROP PROCEDURE hellop;
 
 --connection node_1
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -1628,6 +1655,14 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
 CREATE FUNCTION hellof (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
 
 --echo # connection node_1
@@ -1687,6 +1722,7 @@ ALTER FUNCTION hellof SQL SECURITY INVOKER;
 DROP FUNCTION hellof;
 
 --connection node_1
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -1759,6 +1795,14 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT CREATE VIEW ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
 CREATE VIEW helloview AS SELECT * FROM t1;
 
 --echo # connection node_1
@@ -1817,6 +1861,7 @@ DROP VIEW helloview;
 #
 --echo # connection node_1
 --connection node_1
+REVOKE CREATE VIEW ON testdb.* FROM 'testme'@'%';
 REVOKE DROP ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -2154,6 +2199,15 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT EVENT ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE EVENT helloevent
   ON SCHEDULE EVERY 1 HOUR
   DO INSERT INTO t1(f2) VALUES(3);
@@ -2193,7 +2247,7 @@ ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 --source include/wait_condition.inc
 
 --let $assert_text = The helloevent EVENT should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value LIKE "51";
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value LIKE "\'2 3\'";
 --let $assert_debug = SHOW EVENTS;
 --source include/assert.inc
 
@@ -2203,7 +2257,7 @@ ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 --source include/wait_condition.inc
 
 --let $assert_text = The helloevent EVENT should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value LIKE "51";
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value LIKE "\'2 3\'";
 --source include/assert.inc
 
 # No cleanup

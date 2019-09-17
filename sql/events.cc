@@ -530,12 +530,6 @@ bool Events::update_event(THD *thd, Event_parse_data *parse_data,
       DBUG_RETURN(true);
   }
 
-#ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
-    DBUG_RETURN(true);
-  }
-#endif /* WITH_WSREP */
-
   /*
     Turn off row binlogging of this statement and use statement-based
     so that all supporting tables are updated for CREATE EVENT command.
@@ -656,12 +650,6 @@ bool Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name,
   // Acquire exclusive MDL lock.
   if (lock_object_name(thd, MDL_key::EVENT, dbname.str, name.str))
     DBUG_RETURN(true);
-
-#ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
-    DBUG_RETURN(true);
-  }
-#endif /* WITH_WSREP */
 
   DEBUG_SYNC(thd, "after_acquiring_exclusive_lock_on_the_event");
 

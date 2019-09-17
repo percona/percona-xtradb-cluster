@@ -35,7 +35,7 @@ DECLARE i INT;
 DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
 SET SESSION wsrep_sync_wait = 0;
 SET i = 0;
-WHILE i < 10000 DO
+WHILE i < 1000 DO
 INSERT INTO t1 VALUES (DEFAULT);
 SET i = i + 1;
 END WHILE;
@@ -43,7 +43,7 @@ END|
 CALL proc_insert();
 SELECT COUNT(*) from t1;
 COUNT(*)
-10000
+1000
 #node-2 restarted (should get encrypted table through IST)
 # restart
 #node-2

@@ -5881,7 +5881,9 @@ static int init_server_components() {
 
   if (!wsrep_recovery) {
     if (pxc_encrypt_cluster_traffic) {
-      if (SslAcceptorContext::wsrep_ssl_artifacts_check(wsrep_new_cluster)) {
+      bool bootstrap = (wsrep_new_cluster ||
+                        (strcmp(wsrep_cluster_address, "gcomm://") == 0));
+      if (SslAcceptorContext::wsrep_ssl_artifacts_check(bootstrap)) {
         unireg_abort(MYSQLD_ABORT_EXIT);
       }
     }

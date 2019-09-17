@@ -884,6 +884,12 @@ enum_sp_return_code sp_drop_routine(THD *thd, enum_sp_type type,
   if (sctx->can_operate_with(definer, consts::system_user, true))
     DBUG_RETURN(SP_INTERNAL_ERROR);
 
+#ifdef WITH_WSREP
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    DBUG_RETURN(SP_INTERNAL_ERROR);
+  }
+#endif /* WITH_WSREP */
+
   // Drop routine.
   if (thd->dd_client()->drop(routine)) goto err_with_rollback;
 
@@ -1047,6 +1053,12 @@ bool sp_update_routine(THD *thd, enum_sp_type type, sp_name *name,
       DBUG_RETURN(true);
     }
   }
+
+#ifdef WITH_WSREP
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
 
   // Alter stored routine.
   if (DBUG_EVALUATE_IF("simulate_alter_routine_failure", true, false) ||

@@ -4961,7 +4961,11 @@ int mysql_execute_command(THD *thd, bool first_level) {
       */
 
 #ifdef WITH_WSREP
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+      // to isolation is now done as part of sp_update_routine as it does
+      // additional ACL based check that ensures the fact that if the
+      // definer has SUPER PRIVILIGES then DROP/ATLER should have same too.
+      // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+      // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
 
       /* Conditionally writes to binlog */
@@ -5021,7 +5025,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
         goto error;
 
 #ifdef WITH_WSREP
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+      // to isolation is now done as part of sp_drop_routine as it does
+      // additional ACL based check that ensures the fact that if the
+      // definer has SUPER PRIVILIGES then DROP/ATLER should have same too.
+      // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
 
       enum_sp_type sp_type = (lex->sql_command == SQLCOM_DROP_PROCEDURE)
@@ -5155,7 +5162,8 @@ int mysql_execute_command(THD *thd, bool first_level) {
         goto error;
 
 #ifdef WITH_WSREP
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+      // check is now done as part od drop view post definer SUPER PRIVILIGES check.
+      // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
 
       /* Conditionally writes to binlog. */
