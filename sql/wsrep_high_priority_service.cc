@@ -556,7 +556,7 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
   THD_STAGE_INFO(thd, stage_wsrep_applying_writeset);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: applying write-set (%lld)",
-           (long long)wsrep_thd_trx_seqno(thd));
+           ws_meta.seqno().get());
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -596,7 +596,7 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
   THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: %s write set (%lld)", !ret ? "applied" : "failed to apply",
-           (long long)wsrep_thd_trx_seqno(thd));
+           ws_meta.seqno().get());
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 

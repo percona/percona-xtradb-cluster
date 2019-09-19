@@ -1755,6 +1755,23 @@ RESET SLAVE FOR CHANNEL 'wsrep';
 ERROR HY000: RESET SLAVE [ALL] FOR CHANNEL cannot be performed on channel 'wsrep'.
 CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';
 ERROR HY000: CHANGE REPLICATION FILTER cannot be performed on channel 'wsrep'.
+#node-2 (cluster node)
+CHANGE MASTER TO MASTER_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
+ERROR HY000: CHANGE MASTER with the given parameters cannot be performed on channel 'wsrep'.
+START SLAVE FOR CHANNEL 'wsrep';
+ERROR HY000: START SLAVE FOR CHANNEL cannot be performed on channel 'wsrep'.
+STOP SLAVE FOR CHANNEL 'wsrep';
+ERROR HY000: STOP SLAVE FOR CHANNEL cannot be performed on channel 'wsrep'.
+SHOW RELAYLOG EVENTS FOR CHANNEL 'wsrep';
+ERROR HY000: SHOW RELAYLOG EVENTS cannot be performed on channel 'wsrep'.
+FLUSH RELAY LOGS FOR CHANNEL 'wsrep';
+ERROR HY000: FLUSH RELAY LOGS cannot be performed on channel 'wsrep'.
+SHOW SLAVE STATUS FOR CHANNEL 'wsrep';
+ERROR HY000: SHOW SLAVE STATUS cannot be performed on channel 'wsrep'.
+RESET SLAVE FOR CHANNEL 'wsrep';
+ERROR HY000: RESET SLAVE [ALL] FOR CHANNEL cannot be performed on channel 'wsrep'.
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("FLUSH RELAY LOGS cannot be performed on channel 'wsrep'");
+call mtr.add_suppression("Slave channel 'wsrep' does not exist");
