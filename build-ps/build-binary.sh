@@ -252,8 +252,7 @@ PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/src/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
 
 if [[ $COPYGALERA -eq 0 ]];then
-    #GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
-    GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; git log --pretty=oneline | head -1 | cut --delimiter=' ' -f 1 | cut -b 1-7)"
+    GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
 fi
 TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 

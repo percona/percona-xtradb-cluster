@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1271,25 +1271,38 @@ public:
 
 enum wsrep_thd_type   {APPLIER, COMMITTING};
 
-class Find_wsrep_thd: public Find_THD_Impl
+class Count_wsrep_thd: public Do_THD_Impl
 {
 public:
-  Find_wsrep_thd(enum wsrep_thd_type type): m_type(type) {}
-  virtual bool operator()(THD *thd)
+  Count_wsrep_thd(enum wsrep_thd_type type)
+    : m_type(type)
+    , m_count(0) 
+  {}
+  virtual void operator()(THD *thd)
   {
-    if (WSREP(thd))
-    { 
-      switch (m_type) 
-        {
-        case APPLIER:    return thd->wsrep_applier;
-        case COMMITTING: return thd->wsrep_query_state == QUERY_COMMITTING;
-        }
+    switch (m_type)
+    {
+      case APPLIER:
+      {
+        if (thd->wsrep_applier)
+          m_count++;
+      }
+      break;
+      case COMMITTING:
+      {
+        if (thd->wsrep_query_state == QUERY_COMMITTING)
+          m_count++;
+      }
+      break;
     }
-    return false;
+  }
+  int get_thd_count() const
+  {
+    return m_count;
   }
 private:
   enum wsrep_thd_type m_type;
-  bool is_server_shutdown;
+  int m_count;
 };
 
 class Count_wsrep_applier_threads : public Do_THD_Impl
@@ -4674,9 +4687,6 @@ static int init_server_components()
     if (open_error_log(errorlog_filename_buff, false))
       unireg_abort(MYSQLD_ABORT_EXIT);
 
-#ifdef _WIN32
-    FreeConsole();        // Remove window
-#endif
   }
   else
   {
@@ -7564,14 +7574,14 @@ static inline bool is_committing_connection(THD *thd)
    returns the number of wsrep appliers running.
    However, the caller (thd parameter) is not taken in account
  */
+MY_ATTRIBUTE((noinline))
 static int have_wsrep_appliers(THD *thd)
 {
-  Find_wsrep_thd find_wsrep_thd(APPLIER);
-  //Find_thd_with_bid find_thd_applier(10);
+  Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
+  Count_wsrep_thd count_wsrep_applier_thd(APPLIER);
 
-  THD* tmp= Global_THD_manager::get_instance()->find_thd(&find_wsrep_thd);
-  if (tmp) return true;
-  return false;
+  thd_manager->do_for_all_thd(&count_wsrep_applier_thd);
+  return count_wsrep_applier_thd.get_thd_count();
 }
 #endif /* 0 */
 
@@ -7589,14 +7599,14 @@ static void wsrep_close_thread(THD *thd)
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 }
 
+MY_ATTRIBUTE((noinline))
 static my_bool have_committing_connections()
 {
-  //Find_thd_committing find_thd_committing();
-  Find_wsrep_thd find_thd_committing(COMMITTING);
-
-  THD* tmp= Global_THD_manager::get_instance()->find_thd(&find_thd_committing);
-  if (tmp) return true;
-  return false;
+  Count_wsrep_thd count_thd_committing(COMMITTING);
+  Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
+  
+  thd_manager->do_for_all_thd(&count_thd_committing);
+  return (count_thd_committing.get_thd_count() != 0);
 }
 
 int wsrep_wait_committing_connections_close(int wait_time)
@@ -7651,7 +7661,7 @@ static void wsrep_close_threads(THD *thd)
   thd_manager->do_for_all_thd(&call_wsrep_close_wsrep_threads);
 }
 
-void wsrep_close_applier_threads(int count)
+void wsrep_close_applier_threads()
 {
   Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
 
@@ -8351,7 +8361,8 @@ show_ssl_get_server_not_after(THD *thd, SHOW_VAR *var, char *buff)
 #endif /* HAVE_OPENSSL && !EMBEDDED_LIBRARY */
 
 #ifdef HAVE_POOL_OF_THREADS
-int show_threadpool_idle_threads(THD *thd, SHOW_VAR *var, char *buff)
+static int
+show_threadpool_idle_threads(THD *thd, SHOW_VAR *var, char *buff)
 {
   var->type= SHOW_INT;
   var->value= buff;
@@ -9384,11 +9395,6 @@ mysql_getopt_value(const char *keyname, size_t key_length,
 
 C_MODE_END
 
-/* defined in sys_vars.cc */
-extern void init_log_slow_verbosity();
-extern void init_slow_query_log_use_global_control();
-extern void init_log_slow_sp_statements();
-
 /**
   Ensure all the deprecared options with 1 possible value are
   within acceptable range.
@@ -10399,6 +10405,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_RELAYLOG_LOCK_xids, "MYSQL_RELAY_LOG::LOCK_xids", 0},
   { &key_hash_filo_lock, "hash_filo::lock", 0},
   { &Gtid_set::key_gtid_executed_free_intervals_mutex, "Gtid_set::gtid_executed::free_intervals_mutex", 0 },
+  { &key_LOCK_bloom_filter, "Bloom_filter", 0},
   { &key_LOCK_crypt, "LOCK_crypt", PSI_FLAG_GLOBAL},
   { &key_LOCK_error_log, "LOCK_error_log", PSI_FLAG_GLOBAL},
   { &key_LOCK_global_user_client_stats,
