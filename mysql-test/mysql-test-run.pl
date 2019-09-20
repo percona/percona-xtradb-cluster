@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # -*- cperl -*-
 
-# Copyright (c) 2004, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2004, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -4983,7 +4983,7 @@ sub check_warnings ($) {
 	  return $result;
 	}
 	# Wait for next process to exit
-	next;
+	next if not $result;
       }
       else
       {
@@ -5430,6 +5430,13 @@ sub mysqld_arguments ($$$) {
 #    }
     elsif ($arg eq "--loose-skip-log-bin")
     {
+      if (grep { /--wsrep-provider=/ } @$extra_opts) {
+        # As an exception, allow --binlog-format if MTR is run with
+        # wsrep provider loaded.
+        mtr_add_arg($args, "%s", $arg);
+      } else {
+        ; # Dont add --binlog-format when running without binlog
+      }
     }
     elsif ($arg eq "--loose-skip-log-bin" and
            $mysqld->option("log-slave-updates"))

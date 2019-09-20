@@ -3858,7 +3858,7 @@ public:
     PSI_THREAD_CALL(set_thread_start_time)(start_time.tv_sec);
 #endif
   }
-  void get_time(QUERY_START_TIME_INFO *time_info)
+  void get_time(QUERY_START_TIME_INFO *time_info) const
   {
     time_info->start_time= start_time;
     time_info->start_utime= start_utime;
@@ -4344,15 +4344,6 @@ public:
     return FALSE;
   }
   thd_scheduler event_scheduler;
-
-  /* Returns string as 'IP:port' for the client-side
-     of the connnection represented
-     by 'client' as displayed by SHOW PROCESSLIST.
-     Allocates memory from the heap of
-     this THD and that is not reclaimed
-     immediately, so use sparingly. May return NULL.
-  */
-  char *get_client_host_port(THD *client);
 
 public:
   inline Internal_error_handler *get_internal_handler()
@@ -5873,8 +5864,6 @@ inline bool add_group_to_list(THD *thd, Item *item, bool asc)
 {
   return thd->lex->current_select->add_group_to_list(thd, item, asc);
 }
-
-extern pthread_attr_t *get_connection_attrib(void);
 
 #endif /* MYSQL_SERVER */
 

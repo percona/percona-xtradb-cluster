@@ -3332,7 +3332,7 @@ srv_get_meta_data_filename(
 	} else {
 		ut_ad(strncmp(suffix, ".ibd", suffix_len) == 0);
 
-		strncpy(filename, path, len - suffix_len);
+		strncpy(filename, path, max_len - suffix_len);
 		suffix = filename + (len - suffix_len);
 		strcpy(suffix, ".cfg");
 	}

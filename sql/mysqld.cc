@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights
    reserved.
 
    This program is free software; you can redistribute it and/or modify
@@ -9195,7 +9195,8 @@ show_ssl_get_server_not_after(THD *thd, SHOW_VAR *var, char *buff)
 #endif /* HAVE_OPENSSL && !EMBEDDED_LIBRARY */
 
 #ifdef HAVE_POOL_OF_THREADS
-int show_threadpool_idle_threads(THD *thd, SHOW_VAR *var, char *buff)
+static int
+show_threadpool_idle_threads(THD *thd, SHOW_VAR *var, char *buff)
 {
   var->type= SHOW_INT;
   var->value= buff;
@@ -10215,11 +10216,6 @@ static void option_error_reporter(enum loglevel level, const char *format, ...)
 }
 
 C_MODE_END
-
-/* defined in sys_vars.cc */
-extern void init_log_slow_verbosity();
-extern void init_slow_query_log_use_global_control();
-extern void init_log_slow_sp_statements();
 
 /**
   Get server options from the command line,
@@ -11780,7 +11776,7 @@ bool update_named_pipe_full_access_group(const char *new_group_name)
     {
       sql_print_error("my_security_attr_add_rights_to_group failed for group: %s",
                       new_group_name);
-      return false;
+      return true;
     }
   }
 
