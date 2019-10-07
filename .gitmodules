@@ -1,8 +1,8 @@
 [submodule "percona-xtradb-cluster-galera"]
 	path = percona-xtradb-cluster-galera
 	url = https://github.com/percona/galera
-	branch = 3.x-8.0
+	branch = 4.x-8.0
 [submodule "wsrep-lib"]
 	path = wsrep-lib
 	url = https://github.com/percona/wsrep-lib.git
-        branch = percona-3.x-8.0
+        branch = percona-4.x-8.0
