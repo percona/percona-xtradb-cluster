@@ -7601,6 +7601,6 @@ static Sys_var_ulong Sys_pxc_maint_transition_period(
 static Sys_var_bool Sys_pxc_encrypt_cluster_traffic(
     "pxc_encrypt_cluster_traffic", "PXC cluster traffic SSL auto-configuration",
     READ_ONLY GLOBAL_VAR(pxc_encrypt_cluster_traffic), CMD_LINE(OPT_ARG),
-    DEFAULT(false), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+    DEFAULT(true), NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
 #endif /* WITH_WSREP */
