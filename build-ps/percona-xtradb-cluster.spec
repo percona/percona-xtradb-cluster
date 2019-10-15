@@ -888,7 +888,7 @@ install -m 644 $MBD/%{galera_src_dir}/man/garbd.8  \
     $RBR%{_mandir}/man8/garbd.8
 install -d $RBR%{_libdir}/mysql
 %if 0%{?mecab}
-    cp -r $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
+    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 %endif
 # remove some unwanted router files
 rm -rf %{buildroot}/%{_libdir}/libmysqlharness.{a,so}
@@ -1472,7 +1472,6 @@ fi
 
 %if 0%{?mecab}
 %{_libdir}/mysql/mecab
-%{_libdir}/mecab
 %endif
 
 %if "%rhel" == "5"
