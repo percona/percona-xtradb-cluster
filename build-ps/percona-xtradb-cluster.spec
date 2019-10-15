@@ -989,7 +989,7 @@ install -m 644 $MBD/%{galera_src_dir}/man/garbd.8  \
     $RBR%{_mandir}/man8/garbd.8
 install -d $RBR%{_libdir}/mysql
 %if 0%{?mecab}
-    cp -r $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
+    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 %endif
 
 ##############################################################################
@@ -1614,7 +1614,6 @@ fi
 
 %if 0%{?mecab}
 %{_libdir}/mysql/mecab
-%{_libdir}/mecab
 %attr(755, root, root) %{_libdir}/mysql/plugin/libpluginmecab.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/libpluginmecab.so
 %endif
