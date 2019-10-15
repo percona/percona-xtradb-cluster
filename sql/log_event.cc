@@ -2,13 +2,20 @@
    Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -4624,6 +4631,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
   {
     thd->set_time(&(common_header->when));
     thd->set_query(query_arg, q_len_arg);
+    thd->set_query_for_display(query_arg, q_len_arg);
     thd->set_query_id(next_query_id());
     thd->variables.pseudo_thread_id= thread_id;		// for temp tables
     attach_temp_tables_worker(thd, rli);
@@ -4702,6 +4710,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
             to fix this if any refactoring happens here sometime.
           */
           thd->set_query(query_arg, q_len_arg);
+          thd->reset_query_for_display();
         }
       }
       if (time_zone_len)
@@ -7601,7 +7610,7 @@ int User_var_log_event::pack_info(Protocol* protocol)
   else
   {
     switch (type) {
-    case REAL_RESULT:
+    case REAL_TYPE:
       double real_val;
       float8get(&real_val, val);
       if (!(buf= (char*) my_malloc(key_memory_log_event,
@@ -7611,7 +7620,7 @@ int User_var_log_event::pack_info(Protocol* protocol)
       event_len+= my_gcvt(real_val, MY_GCVT_ARG_DOUBLE, MY_GCVT_MAX_FIELD_WIDTH,
                           buf + val_offset, NULL);
       break;
-    case INT_RESULT:
+    case INT_TYPE:
       if (!(buf= (char*) my_malloc(key_memory_log_event,
                                    val_offset + 22, MYF(MY_WME))))
         return 1;
@@ -7619,7 +7628,7 @@ int User_var_log_event::pack_info(Protocol* protocol)
                                    ((flags & User_var_log_event::UNSIGNED_F) ? 
                                     10 : -10))-buf;
       break;
-    case DECIMAL_RESULT:
+    case DECIMAL_TYPE:
     {
       if (!(buf= (char*) my_malloc(key_memory_log_event,
                                    val_offset + DECIMAL_MAX_STR_LENGTH + 1,
@@ -7633,7 +7642,7 @@ int User_var_log_event::pack_info(Protocol* protocol)
       event_len= str.length() + val_offset;
       break;
     } 
-    case STRING_RESULT:
+    case STRING_TYPE:
       /* 15 is for 'COLLATE' and other chars */
       buf= (char*) my_malloc(key_memory_log_event,
                              event_len+val_len*2+1+2*MY_CS_NAME_SIZE+15,
@@ -7654,7 +7663,7 @@ int User_var_log_event::pack_info(Protocol* protocol)
         event_len= p-buf;
       }
       break;
-    case ROW_RESULT:
+    case ROW_TYPE:
     default:
       DBUG_ASSERT(1);
       return 1;
@@ -7708,14 +7717,14 @@ bool User_var_log_event::write(IO_CACHE* file)
     int4store(buf1 + 2, charset_number);
 
     switch (type) {
-    case REAL_RESULT:
+    case REAL_TYPE:
       float8store(buf2, *(double*) val);
       break;
-    case INT_RESULT:
+    case INT_TYPE:
       int8store(buf2, *(longlong*) val);
       unsigned_len= 1;
       break;
-    case DECIMAL_RESULT:
+    case DECIMAL_TYPE:
     {
       my_decimal *dec= (my_decimal *)val;
       dec->sanity_check();
@@ -7725,10 +7734,10 @@ bool User_var_log_event::write(IO_CACHE* file)
       val_len= decimal_bin_size(buf2[0], buf2[1]) + 2;
       break;
     }
-    case STRING_RESULT:
+    case STRING_TYPE:
       pos= (uchar*) val;
       break;
-    case ROW_RESULT:
+    case ROW_TYPE:
     default:
       DBUG_ASSERT(1);
       return 0;
@@ -7783,20 +7792,20 @@ void User_var_log_event::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
   else
   {
     switch (type) {
-    case REAL_RESULT:
+    case REAL_TYPE:
       double real_val;
       char real_buf[FMT_G_BUFSIZE(14)];
       float8get(&real_val, val);
       sprintf(real_buf, "%.14g", real_val);
       my_b_printf(head, ":=%s%s\n", real_buf, print_event_info->delimiter);
       break;
-    case INT_RESULT:
+    case INT_TYPE:
       char int_buf[22];
       longlong10_to_str(uint8korr(val), int_buf, 
                         ((flags & User_var_log_event::UNSIGNED_F) ? 10 : -10));
       my_b_printf(head, ":=%s%s\n", int_buf, print_event_info->delimiter);
       break;
-    case DECIMAL_RESULT:
+    case DECIMAL_TYPE:
     {
       char str_buf[200];
       int str_len= sizeof(str_buf) - 1;
@@ -7813,7 +7822,7 @@ void User_var_log_event::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
       my_b_printf(head, ":=%s%s\n", str_buf, print_event_info->delimiter);
       break;
     }
-    case STRING_RESULT:
+    case STRING_TYPE:
     {
       /*
         Let's express the string in hex. That's the most robust way. If we
@@ -7856,7 +7865,7 @@ void User_var_log_event::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
       my_free(hex_str);
     }
       break;
-    case ROW_RESULT:
+    case ROW_TYPE:
     default:
       DBUG_ASSERT(1);
       return;
@@ -7913,7 +7922,7 @@ int User_var_log_event::do_apply_event(Relay_log_info const *rli)
   else
   {
     switch (type) {
-    case REAL_RESULT:
+    case REAL_TYPE:
       if (val_len != 8)
       {
         rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
@@ -7926,7 +7935,7 @@ int User_var_log_event::do_apply_event(Relay_log_info const *rli)
       val= (char*) &real_val;		// Pointer to value in native format
       val_len= 8;
       break;
-    case INT_RESULT:
+    case INT_TYPE:
       if (val_len != 8)
       {
         rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
@@ -7939,7 +7948,7 @@ int User_var_log_event::do_apply_event(Relay_log_info const *rli)
       val= (char*) &int_val;		// Pointer to value in native format
       val_len= 8;
       break;
-    case DECIMAL_RESULT:
+    case DECIMAL_TYPE:
     {
       if (val_len < 3)
       {
@@ -7954,10 +7963,10 @@ int User_var_log_event::do_apply_event(Relay_log_info const *rli)
       val_len= sizeof(my_decimal);
       break;
     }
-    case STRING_RESULT:
+    case STRING_TYPE:
       it= new Item_string(val, val_len, charset);
       break;
-    case ROW_RESULT:
+    case ROW_TYPE:
     default:
       DBUG_ASSERT(1);
       DBUG_RETURN(0);
@@ -13419,6 +13428,7 @@ int Rows_query_log_event::do_apply_event(Relay_log_info const *rli)
   DBUG_ASSERT(rli->info_thd == thd);
   /* Set query for writing Rows_query log event into binlog later.*/
   thd->set_query(m_rows_query, strlen(m_rows_query));
+  thd->set_query_for_display(m_rows_query, strlen(m_rows_query));
 
   DBUG_ASSERT(rli->rows_query_ev == NULL);
 
