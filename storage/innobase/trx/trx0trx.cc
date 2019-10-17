@@ -2332,11 +2332,11 @@ trx_commit_or_rollback_prepare(
 
 	switch (trx->state) {
 	case TRX_STATE_NOT_STARTED:
+	case TRX_STATE_FORCED_ROLLBACK:
 #ifdef WITH_WSREP
 		ut_d(trx->start_file = __FILE__);
 		ut_d(trx->start_line = __LINE__);
 #endif /* WITH_WSREP */
-	case TRX_STATE_FORCED_ROLLBACK:
 
 		trx_start_low(trx, true);
 		/* fall through */
