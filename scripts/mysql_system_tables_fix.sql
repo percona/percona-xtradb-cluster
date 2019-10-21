@@ -1060,7 +1060,8 @@ INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mys
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
 
-FLUSH PRIVILEGES;
+# flush privileges at this stage can cause problem with upgrade from 57 -> 80
+# FLUSH PRIVILEGES;
 
 # Move all system tables with InnoDB storage engine to mysql tablespace.
 SET @cmd="ALTER TABLE mysql.db TABLESPACE = mysql";

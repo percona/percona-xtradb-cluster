@@ -6304,6 +6304,21 @@ static int init_server_components() {
         unireg_abort(1);
       }
       delete_optimizer_cost_module();
+#ifdef WITH_WSREP
+      /* Create the wsrep state file.
+         If user decide to upgrade 5.7 node to 8.0 using offline approach
+         then for the first node SST is not invoked and it is auto-upgraded.
+         Post successfully upgrade PXC expect wsrep state file to be present. */
+      wsp::WSREPState wsrep_state;
+      wsrep_state.wsrep_schema_version = WSREP_SCHEMA_VERSION;
+      if (!wsrep_state.save_to(mysql_real_data_home_ptr,
+                               WSREP_STATE_FILENAME)) {
+        WSREP_ERROR("Could not create the wsrep state file : %s",
+                    WSREP_STATE_FILENAME);
+        WSREP_ERROR("Exiting");
+        unireg_abort(1);
+      }
+#endif /* WITH_WSREP */
     }
   }
 
@@ -7680,7 +7695,8 @@ int mysqld_main(int argc, char **argv)
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
   if (opt_initialize) {
-    /* Create the wsrep state file */
+    /* Create the wsrep state file. This path will be used when seed-db is
+       created using 8.x binaries */
     wsp::WSREPState wsrep_state;
     wsrep_state.wsrep_schema_version = WSREP_SCHEMA_VERSION;
     if (!wsrep_state.save_to(mysql_real_data_home_ptr, WSREP_STATE_FILENAME)) {
