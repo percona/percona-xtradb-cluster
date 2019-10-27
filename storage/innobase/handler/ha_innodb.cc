@@ -10845,7 +10845,7 @@ ha_innobase::wsrep_append_keys(
 		}
 
 		for (i=0; i<table->s->keys; ++i) {
-			uint  len;
+			uint  len0, len1;
 			char  keyval0[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
 			char  keyval1[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
 			char* key0 		= &keyval0[1];
@@ -10872,14 +10872,14 @@ ha_innobase::wsrep_append_keys(
 			    ((tab && wsrep_is_FK_index(tab, idx)) ||
 			     (!tab && referenced_by_foreign_key()))) {
 
-				len = wsrep_store_key_val_for_row(
+				len0 = wsrep_store_key_val_for_row(
 					thd, table, i, key0,
 					WSREP_MAX_SUPPORTED_KEY_LENGTH,
 					record0, &is_null, prebuilt);
 				if (!is_null) {
 					rcode = wsrep_append_key(
 						thd, trx, table_share, table,
-						keyval0, len+1, key_type);
+						keyval0, len0+1, key_type);
 					if (rcode) DBUG_RETURN(rcode);
 
 					if (key_info->flags & HA_NOSAME ||
@@ -10892,15 +10892,15 @@ ha_innobase::wsrep_append_keys(
 						    wsrep_thd_query(thd));
 				}
 				if (record1) {
-					len = wsrep_store_key_val_for_row(
+					len1 = wsrep_store_key_val_for_row(
 						thd, table, i, key1,
 						WSREP_MAX_SUPPORTED_KEY_LENGTH,
 						record1, &is_null, prebuilt);
-					if (!is_null && memcmp(key0, key1, len)) {
+					if (!is_null && (len0 != len1 || memcmp(key0, key1, len1))) {
 						rcode = wsrep_append_key(
 							thd, trx, table_share,
 							table,
-							keyval1, len+1, key_type);
+							keyval1, len1+1, key_type);
 						if (rcode) DBUG_RETURN(rcode);
 					}
 				}
