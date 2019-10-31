@@ -1425,8 +1425,8 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.server.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_tzinfo_to_sql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/perror.1*
-%doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
-%doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
+#%doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
+#%doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
 %doc %attr(644, root, man) %{_mandir}/man8/mysqld.8*
 %doc %attr(644, root, man) %{_mandir}/man1/lz4_decompress.1*
 %doc %attr(644, root, man) %{_mandir}/man1/zlib_decompress.1*
@@ -1449,8 +1449,8 @@ fi
 %attr(755, root, root) %{_bindir}/mysqldumpslow
 %attr(755, root, root) %{_bindir}/mysqltest
 %attr(755, root, root) %{_bindir}/perror
-%attr(755, root, root) %{_bindir}/resolve_stack_dump
-%attr(755, root, root) %{_bindir}/resolveip
+#%attr(755, root, root) %{_bindir}/resolve_stack_dump
+#%attr(755, root, root) %{_bindir}/resolveip
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
 %attr(755, root, root) %{_bindir}/wsrep_sst_rsync
@@ -1684,6 +1684,7 @@ fi
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
 %attr(755, root, root) %{_bindir}/mysqlxtest
+%attr(755, root, root) %{_bindir}/mysqltest_safe_process
 
 
 %files -n percona-xtradb-cluster-mysql-router
@@ -1693,6 +1694,7 @@ fi
 %config(noreplace) %{_sysconfdir}/mysqlrouter/mysqlrouter.conf
 %{_bindir}/mysqlrouter
 %{_bindir}/mysqlrouter_plugin_info
+%{_bindir}/mysqlrouter_passwd
 %if 0%{?systemd}
 %{_unitdir}/mysqlrouter.service
 %{_tmpfilesdir}/mysqlrouter.conf
@@ -1701,6 +1703,7 @@ fi
 %endif
 %{_libdir}/libmysqlharness.so.*
 %{_libdir}/libmysqlrouter.so.*
+%{_libdir}/libmysqlrouter_http.so*
 %dir %{_libdir}/mysqlrouter
 %{_libdir}/mysqlrouter/*.so
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/log/mysqlrouter
