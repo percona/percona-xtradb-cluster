@@ -602,6 +602,30 @@ fi
   %endif # 0%{?rhel} > 6
 %endif # 0%{?compatlib}
 
+mkdir pxc_extra
+pushd pxc_extra
+mkdir pxb-2.4
+pushd pxb-2.4
+yumdownloader percona-xtrabackup-24
+rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+mv usr/bin ./
+mv usr/lib* ./
+rm -rf usr
+rm -f *.rpm
+popd
+
+
+mkdir pxb-8.0
+pushd pxb-8.0
+yumdownloader percona-xtrabackup-80
+rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+mv usr/bin ./
+mv usr/lib* ./
+rm -rf usr
+rm -f *.rpm
+popd
+popd
+
 # Build debug mysqld and libmysqld.a
 mkdir debug
 (
@@ -741,6 +765,8 @@ install -D -m 0755 percona-compatlib/usr/lib64/libmysqlclient.so.18.1.0 %{buildr
 install -D -m 0755 percona-compatlib/usr/lib64/libmysqlclient_r.so.18.1.0 %{buildroot}%{_libdir}/mysql/libmysqlclient_r.so.18.1.0
 %endif # 0%{?rhel} > 6
 %endif # 0%{?compatlib}
+mkdir -p %{buildroot}%{_bindir}/
+cp -r pxc_extra %{buildroot}%{_bindir}/
 
 RBR=$RPM_BUILD_ROOT
 MBD=$RPM_BUILD_DIR/%{src_dir}
@@ -1432,6 +1458,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/zlib_decompress.1*
 %doc %attr(644, root, root) %{_mandir}/man1/mysql_ssl_rsa_setup.1*
 
+%attr(755, root, root) %{_bindir}/pxc_extra/*
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
 %attr(755, root, root) %{_bindir}/innochecksum

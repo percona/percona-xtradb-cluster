@@ -273,6 +273,7 @@ install_deps() {
         else
             yum -y install https://repo.percona.com/yum/percona-release-latest.noarch.rpm || true
             percona-release enable original release
+            percona-release enable tools release
             yum -y install epel-release
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc 
             yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata jemalloc-devel
@@ -283,22 +284,23 @@ install_deps() {
                 sleep 1
             done
             yum -y install  gcc-c++ devtoolset-7-gcc-c++ devtoolset-7-binutils
-        fi
-        if [ "x$RHEL" = "x6" ]; then
-            yum -y install Percona-Server-shared-56
-        fi
-        source /opt/rh/devtoolset-7/enable
-        yum -y install scons check-devel boost-devel cmake3
-        alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake 10 \
+            source /opt/rh/devtoolset-7/enable
+            yum -y install scons check-devel boost-devel cmake3
+            alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake 10 \
 --slave /usr/local/bin/ctest ctest /usr/bin/ctest \
 --slave /usr/local/bin/cpack cpack /usr/bin/cpack \
 --slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake \
 --family cmake
-        alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake3 20 \
+            alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake3 20 \
 --slave /usr/local/bin/ctest ctest /usr/bin/ctest3 \
 --slave /usr/local/bin/cpack cpack /usr/bin/cpack3 \
 --slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake3 \
 --family cmake
+        fi
+        if [ "x$RHEL" = "x6" ]; then
+            yum -y install Percona-Server-shared-56
+        fi
+	yum -y install yum-utils
     else
         apt-get -y install dirmngr || true
         add_percona_apt_repo
