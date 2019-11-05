@@ -1857,7 +1857,7 @@ static void wsrep_TOI_begin_failed(THD *thd,
       goto fail;
     }
     wsrep::client_state &cs(thd->wsrep_cs());
-    int const ret = cs.leave_toi();
+    int const ret= cs.leave_toi_local(wsrep::mutable_buffer());
     if (ret) {
       WSREP_ERROR(
           "Leaving critical section for failed TOI failed: thd: %lld, "
@@ -1939,9 +1939,10 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   thd_proc_info(thd, thd->wsrep_info);
 
   wsrep::client_state &cs(thd->wsrep_cs());
-  int ret = cs.enter_toi(
-      key_array, wsrep::const_buffer(buff.ptr, buff.len),
-      wsrep::provider::flag::start_transaction | wsrep::provider::flag::commit);
+  int ret= cs.enter_toi_local(key_array,
+                              wsrep::const_buffer(buff.ptr, buff.len),
+                              wsrep::provider::flag::start_transaction |
+                              wsrep::provider::flag::commit);
 
   if (ret) {
     DBUG_ASSERT(cs.current_error());
@@ -2028,7 +2029,7 @@ static void wsrep_TOI_end(THD *thd) {
       wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
     }
 
-    int ret = client_state.leave_toi();
+    int ret= client_state.leave_toi_local(wsrep::mutable_buffer());
     if (!ret) {
       WSREP_DEBUG("TO END: %lld", client_state.toi_meta().seqno().get());
       /* Reset XID on completion of DDL transactions */
@@ -2372,8 +2373,7 @@ int wsrep_must_ignore_error(THD *thd) {
   const uint flags = sql_command_flags[thd->lex->sql_command];
 
   DBUG_ASSERT(error);
-  DBUG_ASSERT((wsrep_thd_is_toi(thd)) ||
-              (wsrep_thd_is_applying(thd) && thd->wsrep_apply_toi));
+  DBUG_ASSERT(wsrep_thd_is_toi(thd) || wsrep_thd_is_applying(thd));
 
   if ((wsrep_ignore_apply_errors & WSREP_IGNORE_ERRORS_ON_DDL))
     goto ignore_error;

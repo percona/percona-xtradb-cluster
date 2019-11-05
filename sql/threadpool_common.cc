@@ -105,6 +105,11 @@ class Worker_thread_context {
   Attach/associate the connection with the OS thread,
 */
 static bool thread_attach(THD *thd) {
+#ifdef WITH_WSREP
+  /* Wait until possible background rollback has finished before
+     attaching the thd. */
+  wsrep_wait_rollback_complete_and_acquire_ownership(thd);
+#endif /* WITH_WSREP */
 #ifndef DBUG_OFF
   set_my_thread_var_id(thd->thread_id());
 #endif
@@ -233,23 +238,12 @@ int threadpool_process_request(THD *thd) {
     Vio *vio;
     thd_set_net_read_write(thd, 0);
 
-#ifdef WITH_WSREP
-    wsrep_open(thd);
-#endif /* WITH_WSREP */
-
     if ((retval = do_command(thd)) != 0) goto end;
 
     if (!thd_connection_alive(thd)) {
-#ifdef WITH_WSREP
-      wsrep_close(thd);
-#endif /* WITH_WSREP */
       retval = 1;
       goto end;
     }
-
-#ifdef WITH_WSREP
-    wsrep_close(thd);
-#endif /* WITH_WSREP */
 
     vio = thd->get_protocol_classic()->get_vio();
     if (!vio->has_data(vio)) {

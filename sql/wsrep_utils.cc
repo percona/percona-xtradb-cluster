@@ -23,6 +23,7 @@
 #include "wsrep_utils.h"
 #include "wsrep_mysqld.h"
 #include "mysql/components/services/log_builtins.h"
+#include "wsrep_thd.h"
 
 #include "sql_class.h"
 #include "wsrep_api.h"
@@ -954,7 +955,8 @@ void process::terminate() {
 thd::thd(bool won) : init(), ptr(new THD) {
   if (ptr) {
     ptr->thread_stack = (char *)&ptr;
-    ptr->store_globals();
+    wsrep_assign_from_threadvars(ptr);
+    wsrep_store_threadvars(ptr);
     ptr->variables.option_bits &= ~OPTION_BIN_LOG;  // disable binlog
     ptr->variables.wsrep_on = won;
     ptr->m_security_ctx->set_master_access(~(ulong)0);

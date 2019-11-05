@@ -308,18 +308,10 @@ static void *handle_connection(void *arg) {
     if (thd_prepare_connection(thd))
       handler_manager->inc_aborted_connects();
     else {
-#ifdef WITH_WSREP
-      wsrep_open(thd);
-#endif /* WITH_WSREP */
-
       while (thd_connection_alive(thd)) {
         if (do_command(thd)) break;
       }
       end_connection(thd);
-
-#ifdef WITH_WSREP
-      wsrep_close(thd);
-#endif /* WITH_WSREP */
     }
     close_connection(thd, 0, false, false);
 

@@ -16,6 +16,8 @@ SET SESSION innodb_lock_wait_timeout = 1000;
 SET SESSION wsrep_sync_wait = 0;
 SET SESSION wsrep_trx_fragment_size = 64;
 SET SESSION innodb_lock_wait_timeout = 1000;
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1'
+--source include/wait_condition.inc
 
 --let $count = 500
 --disable_query_log

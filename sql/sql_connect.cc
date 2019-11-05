@@ -117,6 +117,7 @@ using std::min;
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 user_stats_t *global_user_stats;
@@ -997,6 +998,16 @@ static bool login_connection(THD *thd) {
 void end_connection(THD *thd) {
   NET *net = thd->get_protocol_classic()->get_net();
 
+#ifdef WITH_WSREP
+  if (thd->wsrep_cs().state() == wsrep::client_state::s_exec) {
+    /* Error happened after the thread acquired ownership to wsrep
+       client state, but before command was processed. Clean up the
+       state before wsrep_close(). */
+    wsrep_after_command_ignore_result(thd);
+  }
+  wsrep_close(thd);
+#endif /* WITH_WSREP */
+
   mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_CONNECTION_DISCONNECT), 0);
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
@@ -1122,6 +1133,7 @@ bool thd_prepare_connection(THD *thd) {
   prepare_new_connection_state(thd);
 #ifdef WITH_WSREP
   thd->wsrep_client_thread = true;
+  wsrep_open(thd);
 #endif /* WITH_WSREP */
   return false;
 }

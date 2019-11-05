@@ -20,7 +20,7 @@ select count(*) from setup_instruments where name like '%galera%' or name like '
 #
 # List registers files.
 #
-select count(*) = 6 from performance_schema.threads where name like '%galera%' or name like '%wsrep%';
+select count(*) = 5 from performance_schema.threads where name like '%galera%' or name like '%wsrep%';
 select count(*) > 0 from performance_schema.file_instances where event_name like '%galera%' or event_name like '%wsrep%';
 
 #-------------------------------------------------------------------------------

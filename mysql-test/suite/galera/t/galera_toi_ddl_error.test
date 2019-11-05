@@ -19,6 +19,7 @@ INSERT INTO t1 (f1) SELECT MAX(f1) FROM t1;
 --connection node_1
 # to take care of duplicate entry that will cause alter to fail.
 call mtr.add_suppression("Query apply failed.*");
+call mtr.add_suppression("Ignoring error 'Duplicate entry '111110' for key 'PRIMARY''");
 
 --connection node_2
 --error ER_DUP_ENTRY

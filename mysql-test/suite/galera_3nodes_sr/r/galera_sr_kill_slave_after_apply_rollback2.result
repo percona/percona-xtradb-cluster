@@ -15,6 +15,7 @@ SET SESSION wsrep_sync_wait = 0;
 #node-1
 INSERT INTO t1 VALUES (6);
 ROLLBACK;
+#node-1a
 SET SESSION wsrep_sync_wait = 0;
 #node-2
 # restart

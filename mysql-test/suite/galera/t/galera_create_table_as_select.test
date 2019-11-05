@@ -25,6 +25,8 @@ CREATE TABLE t1 AS SELECT 1 FROM DUAL;
 --connection node_2
 call mtr.add_suppression("Slave SQL: Error \'Table \'t1\' already exists\' on query");
 call mtr.add_suppression("Slave SQL: Error \'Table \'test.t2\' doesn\'t exist\' on query");
+call mtr.add_suppression("Ignoring error 'Table 't1' already exists'");
+call mtr.add_suppression("Ignoring error 'Table 'test.t2' doesn't exist'");
 call mtr.add_suppression("Query apply failed.*");
 
 --connection node_2

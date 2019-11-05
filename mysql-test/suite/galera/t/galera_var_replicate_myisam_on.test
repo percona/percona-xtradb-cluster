@@ -139,6 +139,7 @@ SET AUTOCOMMIT=ON;
 #
 # for duplicate key error
 call mtr.add_suppression("Query apply failed.*");
+call mtr.add_suppression("Ignoring error 'Duplicate entry '1' for key 'PRIMARY''");
 
 DROP TABLE t1;
 DROP TABLE t2;

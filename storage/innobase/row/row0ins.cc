@@ -1269,9 +1269,9 @@ static NO_INLINE MY_ATTRIBUTE((warn_unused_result)) dberr_t
   cascade->state = UPD_NODE_UPDATE_CLUSTERED;
 
 #ifdef WITH_WSREP
-  err =
-      wsrep_append_foreign_key(thr_get_trx(thr), foreign, clust_rec,
-                               clust_index, false, WSREP_SERVICE_KEY_EXCLUSIVE);
+  err = wsrep_append_foreign_key(thr_get_trx(thr), foreign,
+                                 cascade->pcur->m_old_rec, clust_index, false,
+                                 WSREP_SERVICE_KEY_EXCLUSIVE);
   if (err != DB_SUCCESS) {
     ib::warn() << "WSREP: foreign key append failed: " << err;
   } else

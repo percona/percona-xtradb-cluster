@@ -75,7 +75,9 @@ select count(*) = 0 from ctas1;
 --connection node_2
 --echo #node-2
 call mtr.add_suppression("Slave SQL: Error \'Table \'test.tmp\' doesn\'t exist\' on query.*");
+call mtr.add_suppression("Ignoring error 'Table 'test.tmp' doesn't exist'");
 call mtr.add_suppression("Slave SQL: Error \'Unknown table \'test.ctas2\'\' on query.*");
+call mtr.add_suppression("Ignoring error 'Unknown table 'test.ctas2''");
 call mtr.add_suppression("Query apply failed.*");
 use test;
 select * from t1;

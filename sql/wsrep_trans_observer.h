@@ -170,6 +170,8 @@ static inline bool wsrep_run_commit_hook(THD *thd, bool all) {
                        wsrep_is_ordered(thd)));
   /* Is MST commit or autocommit? */
   bool ret = wsrep_is_active(thd) && wsrep_is_real(thd, all);
+  /* Do not commit if we are aborting */
+  ret= ret && (thd->wsrep_trx().state() != wsrep::transaction::s_aborting);
 
   /* Action below will log an empty group of GTID.
   This is done when the real action fails to generate any meaningful result on
@@ -473,6 +475,15 @@ static inline void wsrep_close(THD *thd) {
   DBUG_ENTER("wsrep_close");
   if (thd->wsrep_cs().state() != wsrep::client_state::s_none) {
     thd->wsrep_cs().close();
+  }
+  DBUG_VOID_RETURN;
+}
+
+static inline void wsrep_wait_rollback_complete_and_acquire_ownership(
+    THD *thd) {
+  DBUG_ENTER("wsrep_wait_rollback_complete_and_acquire_ownership");
+  if (thd->wsrep_cs().state() != wsrep::client_state::s_none) {
+    thd->wsrep_cs().wait_rollback_complete_and_acquire_ownership();
   }
   DBUG_VOID_RETURN;
 }
