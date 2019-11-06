@@ -42,4 +42,5 @@ INSERT INTO t1 (f2) VALUES ('d'),('e');
 --error ER_LOCK_DEADLOCK
 --reap
 
+--connection node_1
 DROP TABLE t1;
