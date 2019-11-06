@@ -1858,7 +1858,15 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
     case COM_RESET_CONNECTION: {
       thd->status_var.com_other++;
+#ifdef WITH_WSREP
+      wsrep_after_command_ignore_result(thd);
+      wsrep_close(thd);
+#endif /* WITH_WSREP */
       thd->cleanup_connection();
+#ifdef WITH_WSREP
+      wsrep_open(thd);
+      wsrep_before_command(thd);
+#endif /* WITH_WSREP */
       my_ok(thd);
       break;
     }
@@ -1881,7 +1889,18 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       int auth_rc;
       thd->status_var.com_other++;
 
+#ifdef WITH_WSREP
+      wsrep_after_command_ignore_result(thd);
+      wsrep_close(thd);
+#endif /* WITH_WSREP */
+
       thd->cleanup_connection();
+
+#ifdef WITH_WSREP
+      wsrep_open(thd);
+      wsrep_before_command(thd);
+#endif /* WITH_WSREP */
+
       USER_CONN *save_user_connect =
           const_cast<USER_CONN *>(thd->get_user_connect());
       LEX_CSTRING save_db = thd->db();

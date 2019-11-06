@@ -39,6 +39,7 @@
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
 #include "wsrep_xid.h"
+#include "wsrep_thd.h"
 
 extern const char wsrep_defaults_file[];
 extern const char wsrep_defaults_group_suffix[];
@@ -188,7 +189,7 @@ void wsrep_sst_received(THD *thd, const wsrep_uuid_t &uuid,
     wsrep thread pool. Restore original thd context before returning.
   */
   if (thd) {
-    thd->store_globals();
+    wsrep_store_threadvars(thd);
   }
 
   if (WSREP_ON) {
@@ -590,7 +591,8 @@ static void *sst_joiner_thread(void *a) {
     thd->security_context()->skip_grants();
     thd->system_thread = SYSTEM_THREAD_BACKGROUND;
     thd->real_id = pthread_self();
-    thd->store_globals();
+    wsrep_assign_from_threadvars(thd);
+    wsrep_store_threadvars(thd);
 
     /* */
     thd->variables.wsrep_on = 0;

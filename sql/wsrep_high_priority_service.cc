@@ -49,12 +49,12 @@ class Wsrep_non_trans_mode {
         m_server_status(thd->server_status) {
     m_thd->variables.option_bits &= ~OPTION_BEGIN;
     m_thd->server_status &= ~SERVER_STATUS_IN_TRANS;
-    m_thd->wsrep_cs().enter_toi(ws_meta);
+    m_thd->wsrep_cs().enter_toi_mode(ws_meta);
   }
   ~Wsrep_non_trans_mode() {
     m_thd->variables.option_bits = m_option_bits;
     m_thd->server_status = m_server_status;
-    m_thd->wsrep_cs().leave_toi();
+    m_thd->wsrep_cs().leave_toi_mode();
   }
 
  private:
@@ -382,7 +382,8 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
 }
 
 int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
-                                           const wsrep::const_buffer &data) {
+                                           const wsrep::const_buffer &data,
+                                           wsrep::mutable_buffer&) {
   DBUG_ENTER("Wsrep_high_priority_service::apply_toi");
   THD *thd = m_thd;
   Wsrep_non_trans_mode non_trans_mode(thd, ws_meta);
@@ -468,19 +469,12 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
 }
 
 void Wsrep_high_priority_service::store_globals() {
-  DBUG_ENTER("Wsrep_high_priority_service::store_globals");
-  /* In addition to calling THD::store_globals(), call
-     wsrep::client_state::store_globals() to gain ownership of
-     the client state */
-  m_thd->store_globals();
-  m_thd->wsrep_cs().store_globals();
-  DBUG_VOID_RETURN;
+  wsrep_store_threadvars(m_thd);
+  m_thd->wsrep_cs().acquire_ownership();
 }
 
 void Wsrep_high_priority_service::reset_globals() {
-  DBUG_ENTER("Wsrep_high_priority_service::reset_globals");
-  m_thd->restore_globals();
-  DBUG_VOID_RETURN;
+  wsrep_reset_threadvars(m_thd);
 }
 
 void Wsrep_high_priority_service::switch_execution_context(
@@ -492,28 +486,42 @@ void Wsrep_high_priority_service::switch_execution_context(
   DBUG_VOID_RETURN;
 }
 
+
+/* Dummy write-set is logged when the said transaction fails on cluster
+due to certification failure. dummy write set ensure that apply and commit
+monitor are entered and left to maintain same consistency across the cluster
+nodes. */
+
 int Wsrep_high_priority_service::log_dummy_write_set(
-    const wsrep::ws_handle &ws_handle, const wsrep::ws_meta &ws_meta) {
+    const wsrep::ws_handle &ws_handle, const wsrep::ws_meta &ws_meta,
+    wsrep::mutable_buffer &err) {
   DBUG_ENTER("Wsrep_high_priority_service::log_dummy_write_set");
   int ret = 0;
   DBUG_PRINT("info",
              ("Wsrep_high_priority_service::log_dummy_write_set: seqno=%lld",
               ws_meta.seqno().get()));
-  m_thd->wsrep_cs().start_transaction(ws_handle, ws_meta);
-  WSREP_DEBUG("Log dummy write set %lld", ws_meta.seqno().get());
+  if (ws_meta.ordered()) {
+    wsrep::client_state &cs(m_thd->wsrep_cs());
+    if (!cs.transaction().active()) {
+      cs.start_transaction(ws_handle, ws_meta);
+    }
+    adopt_apply_error(err);
+    WSREP_DEBUG("Log dummy write set %lld", ws_meta.seqno().get());
+    ret = cs.provider().commit_order_enter(ws_handle, ws_meta);
 
-  m_thd->wsrep_cs().before_rollback();
-  m_thd->wsrep_cs().after_rollback();
+    cs.before_rollback();
+    cs.after_rollback();
 
 #if 0
-  // TODO: G-4
-  if (!(opt_log_slave_updates && wsrep_gtid_mode &&
-        m_thd->variables.gtid_seq_no)) {
-    m_thd->wsrep_cs().before_rollback();
-    m_thd->wsrep_cs().after_rollback();
-  }
+    if (!(ret && opt_log_slave_updates && wsrep_gtid_mode &&
+          m_thd->variables.gtid_seq_no)) {
+      cs.before_rollback();
+      cs.after_rollback();
+    }
 #endif
-  m_thd->wsrep_cs().after_applying();
+    ret = ret || cs.provider().commit_order_leave(ws_handle, ws_meta, err);
+    cs.after_applying();
+  }
   DBUG_RETURN(ret);
 }
 
@@ -543,7 +551,8 @@ Wsrep_applier_service::~Wsrep_applier_service() {
 }
 
 int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
-                                           const wsrep::const_buffer &data) {
+                                           const wsrep::const_buffer &data,
+                                           wsrep::mutable_buffer&) {
   DBUG_ENTER("Wsrep_applier_service::apply_write_set");
   THD *thd = m_thd;
 
@@ -666,11 +675,14 @@ Wsrep_replayer_service::Wsrep_replayer_service(THD *replayer_thd, THD *orig_thd)
   thd_proc_info(orig_thd, orig_thd->wsrep_info);
 
   /*
-    Swith execution context to replayer_thd and prepare it for
+    Switch execution context to replayer_thd and prepare it for
     replay execution.
   */
-  orig_thd->restore_globals();
-  replayer_thd->store_globals();
+  /* Copy thd vars from orig_thd before reset, otherwise reset
+     for orig thd clears thread local storage before copy. */
+  wsrep_assign_from_threadvars(replayer_thd);
+  wsrep_reset_threadvars(orig_thd);
+  wsrep_store_threadvars(replayer_thd);
   replayer_thd->wsrep_replayer = true;
   wsrep_open(replayer_thd);
   wsrep_before_command(replayer_thd);
@@ -697,8 +709,8 @@ Wsrep_replayer_service::~Wsrep_replayer_service() {
     wsrep_close(replayer_thd);
   }
   replayer_thd->wsrep_replayer = false;
-  replayer_thd->restore_globals();
-  orig_thd->store_globals();
+  wsrep_reset_threadvars(replayer_thd);
+  wsrep_store_threadvars(orig_thd);
 
   DBUG_ASSERT(!orig_thd->get_stmt_da()->is_sent());
   DBUG_ASSERT(!orig_thd->get_stmt_da()->is_set());
@@ -718,7 +730,8 @@ Wsrep_replayer_service::~Wsrep_replayer_service() {
 }
 
 int Wsrep_replayer_service::apply_write_set(const wsrep::ws_meta &ws_meta,
-                                            const wsrep::const_buffer &data) {
+                                            const wsrep::const_buffer &data,
+                                            wsrep::mutable_buffer&) {
   DBUG_ENTER("Wsrep_replayer_service::apply_write_set");
   THD *thd = m_thd;
 

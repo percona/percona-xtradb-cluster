@@ -4978,7 +4978,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
 
 #ifdef WITH_WSREP
       /* If DDL evaluate if user has configured to ignore certain errors. */
-      if (thd->wsrep_apply_toi && wsrep_must_ignore_error(thd)) {
+      if (wsrep_thd_is_toi(thd) && wsrep_must_ignore_error(thd)) {
         thd->clear_error();
         thd->killed = THD::NOT_KILLED;
         thd->wsrep_has_ignored_error = true;

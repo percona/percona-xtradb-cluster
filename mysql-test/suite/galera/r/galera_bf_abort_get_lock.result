@@ -26,5 +26,6 @@ ERROR 23000: Duplicate entry '0' for key 'c1'
 set @@session.sql_log_bin = 1;
 set @@sql_mode = default;
 call mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query.*");
+call mtr.add_suppression("Ignoring error 'Unknown table 'test.t1'' on query.*");
 call mtr.add_suppression("Query apply failed.*");
 drop table t1;

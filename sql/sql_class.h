@@ -2842,7 +2842,6 @@ class THD : public MDL_context_owner,
   bool wsrep_po_in_trans;
   rpl_sid wsrep_po_sid;
   void *wsrep_apply_format;
-  bool wsrep_apply_toi; /* applier processing in TOI */
   uchar *wsrep_rbr_buf;
   ulong wsrep_affected_rows;
   bool wsrep_has_ignored_error;

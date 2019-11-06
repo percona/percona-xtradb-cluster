@@ -52,7 +52,7 @@ SET SESSION wsrep_trx_fragment_size = 1;
 
 SELECT COUNT(*) = 30000 FROM t1;
 SELECT COUNT(DISTINCT f1) = 30000 FROM t1;
-SELECT COUNT(*) = 6 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+SELECT COUNT(*) = 5 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 
 --disable_query_log
 --eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;

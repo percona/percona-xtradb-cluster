@@ -54,15 +54,11 @@ Wsrep_client_service::Wsrep_client_service(THD *thd,
     : wsrep::client_service(), m_thd(thd), m_client_state(client_state) {}
 
 void Wsrep_client_service::store_globals() {
-  DBUG_ENTER("Wsrep_client_service::store_globals");
-  m_thd->store_globals();
-  DBUG_VOID_RETURN;
+  wsrep_store_threadvars(m_thd);
 }
 
 void Wsrep_client_service::reset_globals() {
-  DBUG_ENTER("Wsrep_client_service::reset_globals");
-  m_thd->restore_globals();
-  DBUG_VOID_RETURN;
+  wsrep_reset_threadvars(m_thd);
 }
 
 bool Wsrep_client_service::interrupted(

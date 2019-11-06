@@ -55,7 +55,7 @@ call mtr.add_suppression("Query apply failed.*");
 # Once for the second node, in the 'Slave SQL' error
 --let $assert_text = <secret>
 --let $assert_select = <secret>
---let $assert_count = 1
+--let $assert_count = 2
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc

@@ -8876,7 +8876,8 @@ static int init_wsrep_thread(THD *thd) {
 #endif /* HAVE_PSI_INTERFACE */
 
   DBUG_EXECUTE_IF("simulate_wsrep_slave_error_on_init", simulate_error |= 1;);
-  thd->store_globals();
+  wsrep_assign_from_threadvars(thd);
+  wsrep_store_threadvars(thd);
 #if !defined(DBUG_OFF)
   if (simulate_error)
   {
@@ -8943,7 +8944,7 @@ extern "C" void *start_wsrep_THD(void *arg) {
 
   /* Wsrep may reset globals during thread context switches, store globals
      before cleanup. */
-  thd->store_globals();
+  wsrep_store_threadvars(thd);
 
 err:
   thd->clear_error();
