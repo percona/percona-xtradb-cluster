@@ -50,8 +50,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <list>
 #include <vector>
 
-#include "create_info_encryption_key.h"
 #include "fil0rkinfo.h"
+#include "keyring_encryption_key_info.h"
 
 #define REDO_LOG_ENCRYPT_NO_VERSION 0
 
@@ -390,14 +390,17 @@ class Fil_path {
   static char *SEPARATOR;
   static char *DOT_SLASH;
   static char *DOT_DOT_SLASH;
+  static char *SLASH_DOT_DOT_SLASH;
 #else
   static constexpr auto SEPARATOR = "\\/";
 #ifdef _WIN32
   static constexpr auto DOT_SLASH = ".\\";
   static constexpr auto DOT_DOT_SLASH = "..\\";
+  static constexpr auto SLASH_DOT_DOT_SLASH = "\\..\\";
 #else
   static constexpr auto DOT_SLASH = "./";
   static constexpr auto DOT_DOT_SLASH = "../";
+  static constexpr auto SLASH_DOT_DOT_SLASH = "/../";
 #endif /* _WIN32 */
 
 #endif /* __SUNPRO_CC */
@@ -508,6 +511,11 @@ class Fil_path {
   @return true if the path is valid. */
   bool is_valid() const MY_ATTRIBUTE((warn_unused_result));
 
+  /** Determine if m_path contains a circular section like "/anydir/../"
+  Fil_path::normalize() must be run before this.
+  @return true if a circular section if found, false if not */
+  bool is_circular() const MY_ATTRIBUTE((warn_unused_result));
+
   /** Remove quotes e.g., 'a;b' or "a;b" -> a;b.
   Assumes matching quotes.
   @return pathspec with the quotes stripped */
@@ -603,7 +611,7 @@ class Fil_path {
             std::equal(prefix.begin(), prefix.end(), path.begin()));
   }
 
-  /** Normalizes a directory path for the current OS:
+  /** Normalize a directory path for the current OS:
   On Windows, we convert '/' to '\', else we convert '\' to '/'.
   @param[in,out]	path	Directory and file path */
   static void normalize(std::string &path) {
@@ -614,7 +622,7 @@ class Fil_path {
     }
   }
 
-  /** Normalizes a directory path for the current OS:
+  /** Normalize a directory path for the current OS:
   On Windows, we convert '/' to '\', else we convert '\' to '/'.
   @param[in,out]	path	A NUL terminated path */
   static void normalize(char *path) {
@@ -1172,6 +1180,13 @@ system tablespace.
 dberr_t fil_write_flushed_lsn(lsn_t lsn) MY_ATTRIBUTE((warn_unused_result));
 
 #else /* !UNIV_HOTBACKUP */
+/** Frees a space object from the tablespace memory cache.
+Closes a tablespaces' files but does not delete them.
+There must not be any pending i/o's or flushes on the files.
+@param[in]	space_id	Tablespace ID
+@return true if success */
+bool meb_fil_space_free(space_id_t space_id);
+
 /** Extends all tablespaces to the size stored in the space header. During the
 mysqlbackup --apply-log phase we extended the spaces on-demand so that log
 records could be applied, but that may have left spaces still too small
@@ -1370,11 +1385,12 @@ dberr_t fil_rename_tablespace(space_id_t space_id, const char *old_path,
 @param[in]	flags		Tablespace flags
 @param[in]	size		Initial size of the tablespace file in pages,
                                 must be >= FIL_IBD_FILE_INITIAL_SIZE
+@param[in]      keyring_encryption_key_id info on keyring encryption key
 @return DB_SUCCESS or error code */
 dberr_t fil_ibd_create(
     space_id_t space_id, const char *name, const char *path, uint32_t flags,
     page_no_t size, fil_encryption_t mode,
-    const CreateInfoEncryptionKeyId &create_info_encryption_key_id)
+    const KeyringEncryptionKeyIdInfo &keyring_encryption_key_id)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Create a session temporary tablespace (IBT) file.
@@ -1780,6 +1796,7 @@ void fil_io_set_encryption(IORequest &req_type, const page_id_t &page_id,
 @param[in] algorithm		Encryption algorithm
 @param[in] key			Encryption key
 @param[in] iv			Encryption iv
+@param[in] acquire_mutex  if true acquire fil_sys mutex, else false
 @return DB_SUCCESS or error code */
 dberr_t fil_set_encryption(space_id_t space_id, Encryption::Type algorithm,
                            byte *key, byte *iv, bool aquire_mutex = true)
@@ -1926,13 +1943,6 @@ already be known.
 @param[in]	space_id	Tablespace ID to lookup
 @return true if open was successful */
 bool fil_tablespace_open_for_recovery(space_id_t space_id)
-    MY_ATTRIBUTE((warn_unused_result));
-
-/** Callback to check tablespace size with space header size and extend
-Caller must own the Fil_shard mutex that the file belongs to.
-@param[in]	file	file node
-@return	error code */
-dberr_t fil_check_extend_space(fil_node_t *file)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Replay a file rename operation for ddl replay.

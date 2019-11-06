@@ -72,6 +72,7 @@ use mtr_unique;
 require "lib/mtr_gcov.pl";
 require "lib/mtr_gprof.pl";
 require "lib/mtr_io.pl";
+require "lib/mtr_lock_order.pl";
 require "lib/mtr_misc.pl";
 require "lib/mtr_process.pl";
 
@@ -80,6 +81,23 @@ our $secondary_engine_support = eval 'use mtr_secondary_engine; 1';
 $SIG{INT} = sub { mtr_error("Got ^C signal"); };
 
 sub env_or_val($$) { defined $ENV{ $_[0] } ? $ENV{ $_[0] } : $_[1] }
+
+# set_term_args(user_specified_string, term_exe_variable, term_args_arr, title)
+sub set_term_args {
+  my $term_cmd = $_[0];
+  if ($term_cmd =~ /^ *$/) {
+    mtr_error("MTR_TERM is defined, but empty");
+  }
+  my @term_args = split / /, $term_cmd;
+  $_[1] = shift @term_args;
+  foreach my $t_arg (@term_args) {
+    if ($t_arg eq "%title%") {
+      mtr_add_arg($_[2], "$_[3]");
+    } else {
+      mtr_add_arg($_[2], $t_arg);
+    }
+  }
+}
 
 # Local variables
 my $opt_boot_dbx;
@@ -109,7 +127,6 @@ my $opt_start_exit;
 my $opt_strace_client;
 my $opt_strace_server;
 my $opt_stress;
-my $opt_suites;
 my $opt_tmpdir;
 my $opt_tmpdir_pid;
 my $opt_trace_protocol;
@@ -125,6 +142,7 @@ my $opt_debug_sync_timeout = 600;    # Default timeout for WAIT_FOR actions.
 my $opt_do_test_list       = "";
 my $opt_force_restart      = 0;
 my $opt_include_ndbcluster = 0;
+my $opt_lock_order         = env_or_val(MTR_LOCK_ORDER => 0);
 my $opt_max_save_core      = env_or_val(MTR_MAX_SAVE_CORE => 5);
 my $opt_max_save_datadir   = env_or_val(MTR_MAX_SAVE_DATADIR => 20);
 my $opt_max_test_fail      = env_or_val(MTR_MAX_TEST_FAIL => 10);
@@ -140,6 +158,8 @@ my $opt_testcase_timeout   = $ENV{MTR_TESTCASE_TIMEOUT} || 15;         # minutes
 my $opt_valgrind_clients   = 0;
 my $opt_valgrind_mysqld    = 0;
 my $opt_valgrind_mysqltest = 0;
+my $opt_mtr_term_args      = env_or_val(MTR_TERM => "xterm -title %title% -e");
+my $opt_lldb_cmd           = env_or_val(MTR_LLDB => "lldb");
 
 # Options used when connecting to an already running server
 my %opts_extern;
@@ -204,22 +224,29 @@ our $opt_record;
 our $opt_report_unstable_tests;
 our $opt_skip_combinations;
 our $opt_ssl;
+our $opt_suites;
 our $opt_suite_opt;
 our $opt_summary_report;
 our $opt_vardir;
 our $opt_xml_report;
-our $opt_gterm;
 
-our $DEFAULT_SUITES =
-"main,sys_vars,binlog,binlog_gtid,binlog_nogtid,binlog_57_decryption,encryption,rpl_encryption,federated,gis,rpl,rpl_gtid,rpl_nogtid,innodb,innodb_gis,innodb_fts,innodb_zip,innodb_undo,perfschema,funcs_1,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,test_service_sql_api,json,connection_control,test_services,collations,service_udf_registration,service_sys_var_registration,service_status_var_registration,x,secondary_engine,"
-  ."funcs_2,jp,stress,engines/iuds,engines/funcs,group_replication,audit_null,"
-  ."interactive_utilities,"
-  ."audit_log,"
+#
+# Suites run by default (i.e. when invoking ./mtr without parameters)
+#
+our $DEFAULT_SUITES = "auth_sec,binlog_gtid,binlog_nogtid,clone,collations,connection_control,encryption,federated,funcs_2,gcol,sysschema,gis,innodb,innodb_fts,innodb_gis,innodb_undo,innodb_zip,json,main,opt_trace,parts,perfschema,query_rewrite_plugins,rpl,rpl_gtid,rpl_nogtid,secondary_engine,service_status_var_registration,service_sys_var_registration,service_udf_registration,sys_vars,binlog,test_service_sql_api,test_services,x,"
+  # Percona suites
+  ."audit_log,binlog_57_decryption,percona-pam-for-mysql,"
+  ."data_masking,"
+  ."keyring_vault,"
+  ."rocksdb,rocksdb_rpl,rocksdb_sys_vars,"
+  ."rpl_encryption,"
+  ."tokudb,tokudb_add_index,tokudb_alter_table,tokudb_bugs,tokudb_parts,"
+  ."tokudb_perfschema,tokudb_rpl,"
   ."galera,galera_3nodes,galera_sr,galera_3nodes,sr,"
-  ."tokudb.add_index,tokudb.alter_table,tokudb,tokudb.bugs,tokudb.parts,"
-  ."tokudb.rpl,tokudb.perfschema,"
-  ."rocksdb,rocksdb.rpl,rocksdb.sys_vars,"
-  ."percona-pam-for-mysql";
+  # MySQL suites tested by Percona by default
+  ."audit_null,engines/iuds,engines/funcs,funcs_1,group_replication,interactive_utilities,jp,stress";
+
+# End of list of default suites
 
 our $opt_big_test                  = 0;
 our $opt_check_testcases           = 1;
@@ -386,9 +413,6 @@ sub main {
 
   command_line_setup();
 
-  # Append secondary engiene test suite to list of default suites.
-  add_secondary_engine_suite() if $secondary_engine_support;
-
   # Create build thread id directory
   create_unique_id_dir();
 
@@ -401,11 +425,21 @@ sub main {
   # --help will not reach here, so now it's safe to assume we have binaries
   My::SafeProcess::find_bin($bindir);
 
+  $secondary_engine_support = ($secondary_engine_support and
+                find_secondary_engine($bindir)) ? 1 : 0 ;
+
+  # Append secondary engine test suite to list of default suites if found.
+  add_secondary_engine_suite() if $secondary_engine_support;
+
   if ($opt_gcov) {
     gcov_prepare($basedir);
   }
 
   check_wsrep_support();
+
+  if ($opt_lock_order) {
+    lock_order_prepare($bindir);
+  }
 
   # Collect test cases from a file and put them into '@opt_cases'.
   if ($opt_do_test_list) {
@@ -473,6 +507,14 @@ sub main {
       if (not $ndbcluster_enabled) {
         for my $suite (split(",", $opt_suites)) {
           next if not $suite =~ /ndb/;
+          remove_suite_from_list($suite);
+        }
+      }
+
+      # Remove secondary engine test suites if not supported
+      if (defined $::secondary_engine and not $secondary_engine_support) {
+        for my $suite (split(",", $opt_suites)) {
+          next if not $suite =~ /$::secondary_engine/;
           remove_suite_from_list($suite);
         }
       }
@@ -549,6 +591,8 @@ sub main {
   mtr_report("Collecting tests");
   my $tests = collect_test_cases($opt_reorder, $opt_suites,
                                  \@opt_cases,  $opt_skip_test_list);
+  my $all_tests;
+  @$all_tests = @$tests;
   mark_time_used('collect');
 
   check_secondary_engine_option($tests) if $secondary_engine_support;
@@ -714,10 +758,23 @@ sub main {
   }
 
   if (@$completed != $num_tests) {
-    # Not all tests completed, failure
+    # Not all tests completed
     mtr_report();
     mtr_report("Only ", int(@$completed), " of $num_tests completed.");
-    mtr_error("Not all tests completed");
+    mtr_report("Not all tests completed. This means that a test scheduled for a worker did not report anything, the worker most likely crashed.");
+
+    my %comp;
+
+    foreach ( @$completed ) {
+      $comp{$_->{name}} = 1;
+    }
+    for (my $i = 0 ; $i <= @$all_tests ; $i++) {
+      my $t = $all_tests->[$i];
+      if (exists $t->{name} && !exists $comp{$t->{name}}) {
+        mtr_report("Missing result for testcase: ", $t->{name});
+      }
+    }
+
   }
 
   mark_time_used('init');
@@ -960,6 +1017,13 @@ sub run_test_server ($$$) {
                          "Terminating...");
               return undef;
             }
+          }
+          else {
+            # Remove testcase .log file produce in var/log/ to save space, if
+            # test has passed, since relevant part of logfile has already been
+            # appended to master log
+            my $logfile = "$opt_vardir/log/$result->{shortname}" . ".log";
+            unlink($logfile);
           }
 
           resfile_print_test();
@@ -1499,8 +1563,6 @@ sub command_line_setup {
     'debugger=s'           => \$opt_debugger,
     'gdb'                  => \$opt_gdb,
     'gdb-secondary-engine' => \$opt_gdb_secondary_engine,
-    # For using gnome-terminal when using --gdb option
-    'gterm'                => \$opt_gterm,
     'lldb'                 => \$opt_lldb,
     'manual-boot-gdb'      => \$opt_manual_boot_gdb,
     'manual-dbx'           => \$opt_manual_dbx,
@@ -1520,6 +1582,7 @@ sub command_line_setup {
     'gcov'                      => \$opt_gcov,
     'gprof'                     => \$opt_gprof,
     'helgrind'                  => \$opt_helgrind,
+    'lock-order'                => \$opt_lock_order,
     'sanitize'                  => \$opt_sanitize,
     'valgrind-clients'          => \$opt_valgrind_clients,
     'valgrind-mysqld'           => \$opt_valgrind_mysqld,
@@ -2656,21 +2719,22 @@ sub read_plugin_defs($) {
       $ENV{ $plug_var . '_OPT' } = "--plugin-dir=" . dirname($plugin);
 
       if ($plug_names) {
-        my $lib_name     = basename($plugin);
-        my $load_var     = "--plugin_load=";
-	my $early_load_var = "--early-plugin_load=";
-        my $load_add_var = "--plugin_load_add=";
-        my $semi         = '';
+        my $lib_name       = basename($plugin);
+        my $load_var       = "--plugin_load=";
+        my $early_load_var = "--early-plugin_load=";
+        my $load_add_var   = "--plugin_load_add=";
+        my $semi           = '';
 
         foreach my $plug_name (split(',', $plug_names)) {
-          $load_var     .= $semi . "$plug_name=$lib_name";
-	  $early_load_var .= $semi . "$plug_name=$lib_name";
-          $load_add_var .= $semi . "$plug_name=$lib_name";
+          $load_var       .= $semi . "$plug_name=$lib_name";
+          $early_load_var .= $semi . "$plug_name=$lib_name";
+          $load_add_var   .= $semi . "$plug_name=$lib_name";
           $semi = ';';
         }
 
 	$ENV{ $plug_var . '_EARLY_LOAD'} = $early_load_var;
         $ENV{ $plug_var . '_LOAD' }     = $load_var;
+        $ENV{ $plug_var . '_LOAD_EARLY' } = $early_load_var;
         $ENV{ $plug_var . '_LOAD_ADD' } = $load_add_var;
       }
     } else {
@@ -2868,7 +2932,8 @@ sub environment_setup {
   if ($secondary_engine_support) {
     secondary_engine_environment_setup(\&find_plugin, $bindir);
     initialize_function_pointers(\&gdb_arguments, \&mark_log, \&mysqlds,
-                                 \&run_query, \&valgrind_arguments);
+                                 \&run_query, \&valgrind_arguments,
+                                 \&report_failure_and_restart);
   }
 
   # mysql_fix_privilege_tables.sql
@@ -3159,7 +3224,7 @@ sub check_running_as_root () {
 sub check_debug_support ($) {
   my $mysqld_variables = shift;
 
-  if (!$mysqld_variables->{'debug'}) {
+  if (not exists $mysqld_variables->{'debug'}) {
     $debug_compiled_binaries = 0;
 
     if ($opt_debug) {
@@ -4840,7 +4905,9 @@ sub run_testcase ($) {
 
   my $test = start_mysqltest($tinfo);
 
-  # Set only when we have to keep waiting after expectedly died server
+  # Maintain a queue to keep track of server processes which have
+  # died expectedly in order to wait for them to be restarted.
+  my @waiting_procs = ();
   my $keep_waiting_proc = 0;
   my $print_timeout     = start_timer($print_freq * 60);
 
@@ -5026,16 +5093,6 @@ sub run_testcase ($) {
         }
         mtr_appendfile_to_file($path_current_testlog, $path_testlog);
         unlink($path_current_testlog);
-      }
-
-      # Remove testcase .log file produce in var/log/ to save space since
-      # relevant part of logfile has already been appended to master log
-      {
-        my $log_file_name =
-          $opt_vardir . "/log/" . $tinfo->{shortname} . ".log";
-        if (-e $log_file_name && ($tinfo->{'result'} ne 'MTR_RES_FAILED')) {
-          unlink($log_file_name);
-        }
       }
 
       return ($res == 62) ? 0 : $res;
@@ -5603,7 +5660,8 @@ sub check_warnings ($) {
 
   # Return immediately if no check proceess was started
   return 0 unless (keys %started);
-  wait_for_check_warnings(\%started, $tinfo);
+  my $res = wait_for_check_warnings(\%started, $tinfo);
+  return $res if $res;
 
   if ($tinfo->{'secondary-engine'}) {
     # Search for unexpected warnings in secondary engine server error
@@ -5620,7 +5678,8 @@ sub check_warnings ($) {
 
   # Return immediately if no check proceess was started
   return 0 unless (keys %started);
-  wait_for_check_warnings(\%started, $tinfo);
+  $res = wait_for_check_warnings(\%started, $tinfo);
+  return $res if $res;
 }
 
 # Loop through our list of processes and look for and entry with the
@@ -5987,6 +6046,22 @@ sub mysqld_arguments ($$$) {
     if ($mysql_version_id < 50100) {
       mtr_add_arg($args, "--skip-bdb");
     }
+  }
+
+  if ($opt_lock_order) {
+    my $lo_dep_1 = "$basedir/mysql-test/lock_order_dependencies.txt";
+    my $lo_dep_2 = "$basedir/internal/mysql-test/lock_order_extra_dependencies.txt";
+    my $lo_out = "$bindir/lock_order";
+    mtr_verbose("lock_order dep_1 = $lo_dep_1");
+    mtr_verbose("lock_order dep_2 = $lo_dep_2");
+    mtr_verbose("lock_order out = $lo_out");
+
+    mtr_add_arg($args, "--loose-lock_order");
+    mtr_add_arg($args, "--loose-lock_order_dependencies=$lo_dep_1");
+    if (-e $lo_dep_2) {
+# mtr_add_arg($args, "--loose-lock_order_extra_dependencies=$lo_dep_2");
+    }
+    mtr_add_arg($args, "--loose-lock_order_output_directory=$lo_out");
   }
 
   if ($mysql_version_id >= 50106 && !$opt_user_args) {
@@ -7033,16 +7108,8 @@ sub gdb_arguments {
   }
 
   $$args = [];
-  if ($opt_gterm) {
-    mtr_add_arg($$args, "--title");
-    mtr_add_arg($$args, "$type");
-    mtr_add_arg($$args, "--wait");
-    mtr_add_arg($$args, "--");
-  } else {
-    mtr_add_arg($$args, "-title");
-    mtr_add_arg($$args, "$type");
-    mtr_add_arg($$args, "-e");
-  }
+  my $term_exe;
+  set_term_args($opt_mtr_term_args, $term_exe, $$args, $type);
 
   if ($exe_libtool) {
     mtr_add_arg($$args, $exe_libtool);
@@ -7054,11 +7121,7 @@ sub gdb_arguments {
   mtr_add_arg($$args, "$gdb_init_file");
   mtr_add_arg($$args, "$$exe");
 
-  if ($opt_gterm) {
-    $$exe = "gnome-terminal";
-  } else {
-    $$exe = "xterm";
-  }
+  $$exe = $term_exe;
 }
 
 # Modify the exe and args so that program is run in lldb
@@ -7086,16 +7149,15 @@ sub lldb_arguments {
   }
 
   $$args = [];
-  mtr_add_arg($$args, "-title");
-  mtr_add_arg($$args, "$type");
-  mtr_add_arg($$args, "-e");
+  my $term_exe;
+  set_term_args($opt_mtr_term_args, $term_exe, $$args, $type);
 
-  mtr_add_arg($$args, "lldb");
+  mtr_add_arg($$args, $opt_lldb_cmd);
   mtr_add_arg($$args, "-s");
   mtr_add_arg($$args, "$lldb_init_file");
   mtr_add_arg($$args, "$$exe");
 
-  $$exe = "xterm";
+  $$exe = $term_exe;
 }
 
 # Modify the exe and args so that program is run in ddd
@@ -7526,7 +7588,7 @@ Options to control what test suites or cases to run
                         sysschema test suite. An empty sys database is
                         still created.
   skip-test-list=FILE   Skip the tests listed in FILE. Each line in the file
-                        is an entry and should be formatted as: 
+                        is an entry and should be formatted as:
                         <TESTNAME> : <COMMENT>
   skip-test=PREFIX or REGEX
                         Skip test cases which name are prefixed with PREFIX
@@ -7579,7 +7641,7 @@ Options for test case authoring
   test-progress[={0|1}] Print the percentage of tests completed. This setting
                         is enabled by default. To disable it, set the value to
                         0. Argument to '--test-progress' is optional.
-                        
+
 
 Options that pass on options (these may be repeated)
 
@@ -7647,6 +7709,26 @@ Options for debugging the product
                         0 for no limit. Set it's default with MTR_MAX_TEST_FAIL.
   strace-client         Create strace output for mysqltest client.
   strace-server         Create strace output for mysqltest server.
+
+Environment variables controlling debugging parameters
+  MTR_TERM              Configures the terminal command to run the debugger.
+                        Defaults to xterm, but most other visual terminals
+                        can also be specified. Examples:
+                        MTR_TERM="gnome-terminal --title %title% --wait -x"
+                        MTR_TERM="urxwt -title %title% -e"
+                        Note: older version of gnome-terminal did not support
+                        --wait - those versions aren't compatible.
+  MTR_LLDB              Configures the lldb executable when debugging with
+                        lldb, the default is "lldb". This is useful for
+                        using lldb on a non default path, or on distributions
+                        with versioned lldb binaries. Example:
+                        MTR_LLDB=lldb-8.0
+
+Options for lock_order
+
+  lock-order            Run tests under the lock_order tool.
+                        Set to 1 to enable, 0 to disable.
+                        Defaults to $opt_lock_order, set it's default with MTR_LOCK_ORDER.
 
 Options for valgrind
 

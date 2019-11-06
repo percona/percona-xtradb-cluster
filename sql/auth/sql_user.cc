@@ -59,6 +59,7 @@
 #include "sql/auth/auth_common.h"
 #include "sql/auth/dynamic_privilege_table.h"
 #include "sql/auth/sql_security_ctx.h"
+#include "sql/debug_sync.h"  // DEBUG_SYNC
 #include "sql/field.h"
 #include "sql/handler.h"
 #include "sql/item.h"
@@ -212,7 +213,8 @@ bool mysql_show_create_user(THD *thd, LEX_USER *user_name,
   USER_RESOURCES tmp_user_resource;
   enum SSL_type ssl_type;
   char *ssl_cipher, *x509_issuer, *x509_subject;
-  char buff[256];
+  static const int COMMAND_BUFFER_LENGTH = 2048;
+  char buff[COMMAND_BUFFER_LENGTH];
   Item_string *field = NULL;
   List<Item> field_list;
   String sql_text(buff, sizeof(buff), system_charset_info);
@@ -224,8 +226,8 @@ bool mysql_show_create_user(THD *thd, LEX_USER *user_name,
   DBUG_ENTER("mysql_show_create_user");
   if (are_both_users_same) {
     TABLE_LIST t1;
-    t1.init_one_table(C_STRING_WITH_LEN("mysql"), C_STRING_WITH_LEN("user"),
-                      "user", TL_READ);
+    t1.init_one_table(STRING_WITH_LEN("mysql"), STRING_WITH_LEN("user"), "user",
+                      TL_READ);
     hide_password_hash =
         check_table_access(thd, SELECT_ACL, &t1, false, UINT_MAX, true);
   }
@@ -350,7 +352,8 @@ bool mysql_show_create_user(THD *thd, LEX_USER *user_name,
   }
   lex->users_list.push_back(user_name);
   {
-    Show_user_params show_user_params(hide_password_hash);
+    Show_user_params show_user_params(
+        hide_password_hash, thd->variables.print_identified_with_as_hex);
     mysql_rewrite_acl_query(thd, Consumer_type::STDOUT, &show_user_params,
                             false);
     sql_text.takeover(thd->rewritten_query);
@@ -797,7 +800,8 @@ static bool validate_password_require_current(THD *thd, LEX_USER *Str,
         Current password is valid plain text password with len > 0.
         Erase that in memory. We don't need it any further
      */
-      memset((char *)(Str->current_auth.str), 0, Str->current_auth.length);
+      memset(const_cast<char *>(Str->current_auth.str), 0,
+             Str->current_auth.length);
     } else if (!is_privileged_user) {
       /*
         If the field value is set or field value is NULL and global sys
@@ -852,6 +856,8 @@ bool set_and_validate_user_attributes(
   enum_sql_command command = thd->lex->sql_command;
   bool current_password_empty = false;
   bool new_password_empty = false;
+
+  DBUG_ASSERT(!acl_is_utility_user(Str->user.str, Str->host.str, nullptr));
 
   what_to_set.m_what = NONE_ATTR;
   what_to_set.m_user_attributes = acl_table::USER_ATTRIBUTE_NONE;
@@ -1189,7 +1195,7 @@ bool set_and_validate_user_attributes(
       password = const_cast<char *>("");
     /* erase in memory copy of plain text password */
     if (Str->auth.length > 0)
-      memset((char *)(Str->auth.str), 0, Str->auth.length);
+      memset(const_cast<char *>(Str->auth.str), 0, Str->auth.length);
     /* Use the authentication_string field as password */
     Str->auth.str = password;
     Str->auth.length = buflen;
@@ -1217,7 +1223,7 @@ bool set_and_validate_user_attributes(
     */
     DBUG_ASSERT(!is_role);
     st_mysql_auth *auth = (st_mysql_auth *)plugin_decl(plugin)->info;
-    if (auth->validate_authentication_string((char *)Str->auth.str,
+    if (auth->validate_authentication_string(const_cast<char *>(Str->auth.str),
                                              (unsigned)Str->auth.length)) {
       my_error(ER_PASSWORD_FORMAT, MYF(0));
       plugin_unlock(0, plugin);
@@ -1338,6 +1344,7 @@ bool change_password(THD *thd, LEX_USER *lex_user, char *new_password,
   std::string authentication_plugin;
   bool is_role;
   int ret;
+  sql_mode_t old_sql_mode = thd->variables.sql_mode;
 
 #ifdef WITH_WSREP
   const LEX_CSTRING query_save = thd->query();
@@ -1407,6 +1414,12 @@ bool change_password(THD *thd, LEX_USER *lex_user, char *new_password,
     DBUG_RETURN(true);
   }
 
+  /* trying to change the password of the utility user? */
+  if (acl_is_utility_user(acl_user->user, acl_user->host.get_host(), nullptr)) {
+    my_error(ER_PASSWORD_NO_MATCH, MYF(0));
+    DBUG_RETURN(true);
+  }
+
   DBUG_ASSERT(acl_user->plugin.length != 0);
   is_role = acl_user->is_role;
 
@@ -1457,7 +1470,11 @@ bool change_password(THD *thd, LEX_USER *lex_user, char *new_password,
   // We must not have user with plain text password at this point
   thd->lex->contains_plaintext_password = false;
   authentication_plugin.assign(combo->plugin.str);
+
+  thd->variables.sql_mode &= ~MODE_PAD_CHAR_TO_FULL_LENGTH;
   ret = replace_user_table(thd, table, combo, 0, false, false, what_to_set);
+  thd->variables.sql_mode = old_sql_mode;
+
   if (ret) {
     result = 1;
     goto end;
@@ -1755,6 +1772,17 @@ static int handle_grant_data(THD *thd, TABLE_LIST *tables, bool drop,
   Acl_table_intact table_intact(thd);
   DBUG_ENTER("handle_grant_data");
 
+  /* Handle special utility user */
+  if (acl_utility_user.user) {
+    if (user_from && acl_is_utility_user(user_from->user.str,
+                                         user_from->host.str, nullptr)) {
+      DBUG_RETURN(-1);
+    } else if (user_to && acl_is_utility_user(user_to->user.str,
+                                              user_to->host.str, nullptr)) {
+      DBUG_RETURN(-1);
+    }
+  }
+
   if (drop) {
     /*
       Tables are defined by open_grant_tables()
@@ -1986,6 +2014,13 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
   }
 
   while ((tmp_user_name = user_list++)) {
+    if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
+                            nullptr)) {
+      log_user(thd, &wrong_users, tmp_user_name, wrong_users.length() > 0);
+      result = true;
+      continue;
+    }
+
     bool history_check_done = false;
     /*
       Ignore the current user as it already exists.
@@ -2133,6 +2168,14 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
   {
     if (!result) {
       LEX_USER *reset_user;
+      /*
+        reset_mqh() first acquires lock on user connection hash.
+        Then it may try and lock ACL caches. Other callers like
+        FLUSH PRIVILEGES may be contending for locks too. So,
+        we unlock ACL caches here.
+      */
+      acl_cache_lock.unlock();
+      DEBUG_SYNC(thd, "before_reset_mqh_in_create_user");
       for (LEX_USER *one_user : reset_users)
         if ((reset_user = get_current_user(thd, one_user))) {
           reset_mqh(thd, reset_user, 0);
@@ -2217,6 +2260,13 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
   thd->variables.sql_mode &= ~MODE_PAD_CHAR_TO_FULL_LENGTH;
 
   while ((tmp_user_name = user_list++)) {
+    if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
+                            nullptr)) {
+      log_user(thd, &wrong_users, tmp_user_name, wrong_users.length() > 0);
+      result = true;
+      continue;
+    }
+
     if (!(user_name = get_current_user(thd, tmp_user_name))) {
       result = 1;
       continue;
@@ -2533,6 +2583,13 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
     TABLE *history_tbl = nullptr;
     bool dummy_row_existed = false;
 
+    if (acl_is_utility_user(tmp_user_from->user.str, tmp_user_from->host.str,
+                            nullptr)) {
+      result = true;
+      log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0);
+      continue;
+    }
+
     /* add the defaults where needed */
     if (!(user_from = get_current_user(thd, tmp_user_from))) {
       log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0);
@@ -2696,6 +2753,14 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
 
     if (!result) {
       LEX_USER *extra_user;
+      /*
+        reset_mqh() first acquires lock on user connection hash.
+        Then it may try and lock ACL caches. Other callers like
+        FLUSH PRIVILEGES may be contending for locks too. So,
+        we unlock ACL caches here.
+      */
+      acl_cache_lock.unlock();
+      DEBUG_SYNC(thd, "before_reset_mqh_in_alter_user");
       for (LEX_USER *one_user : reset_users) {
         if ((extra_user = get_current_user(thd, one_user))) {
           reset_mqh(thd, extra_user, 0);

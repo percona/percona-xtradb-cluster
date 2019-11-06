@@ -111,7 +111,10 @@ st_alter_tablespace::st_alter_tablespace(
       file_block_size{opts.file_block_size},
       nodegroup_id{opts.nodegroup_id},
       wait_until_completed{opts.wait_until_completed},
-      ts_comment{opts.ts_comment.str} {}
+      ts_comment{opts.ts_comment.str},
+      explicit_encryption{opts.encryption.str != nullptr},
+      encryption_key_id{opts.encryption_key_id.was_encryption_key_id_set,
+                        opts.encryption_key_id.id} {}
 
 bool validate_tablespace_name_length(const char *tablespace_name) {
   DBUG_ASSERT(tablespace_name != nullptr);
@@ -290,13 +293,13 @@ Mod_pair<T> get_mod_pair(dd::cache::Dictionary_client *dcp,
   return ret;
 }
 
-const char *real_engine_name(THD *thd, const LEX_STRING &alias) {
+const char *real_engine_name(THD *thd, const LEX_CSTRING &alias) {
   plugin_ref pr = ha_resolve_by_name(thd, &alias, false);
   handlerton *hton = (pr != nullptr ? plugin_data<handlerton *>(pr) : nullptr);
   return hton != nullptr ? ha_resolve_storage_engine_name(hton) : "";
 }
 
-bool get_stmt_hton(THD *thd, const LEX_STRING &engine, const char *object_name,
+bool get_stmt_hton(THD *thd, const LEX_CSTRING &engine, const char *object_name,
                    const char *statement, handlerton **htonp) {
   handlerton *hton = nullptr;
   if (engine.str != nullptr &&
@@ -329,7 +332,7 @@ bool get_stmt_hton(THD *thd, const LEX_STRING &engine, const char *object_name,
 }
 
 bool get_dd_hton(THD *thd, const dd::String_type &dd_engine,
-                 const LEX_STRING &stmt_engine, const char *tblspc,
+                 const LEX_CSTRING &stmt_engine, const char *tblspc,
                  const char *stmt, handlerton **htonp) {
   if (stmt_engine.str && dd_engine != real_engine_name(thd, stmt_engine)) {
     my_error(ER_TABLESPACE_ENGINE_MISMATCH, MYF(0), stmt_engine.str,
@@ -1453,8 +1456,8 @@ bool Sql_cmd_create_undo_tablespace::execute(THD *thd) {
     return true;
   }
 
-  if (complete_stmt(thd, hton, [&]() { rollback_on_return.disable(); }, true,
-                    true)) {
+  if (complete_stmt(
+          thd, hton, [&]() { rollback_on_return.disable(); }, true, true)) {
     return true;
   }
 
@@ -1556,8 +1559,8 @@ bool Sql_cmd_alter_undo_tablespace::execute(THD *thd) {
     return true;
   }
 
-  if (complete_stmt(thd, hton, [&]() { rollback_on_return.disable(); }, true,
-                    true)) {
+  if (complete_stmt(
+          thd, hton, [&]() { rollback_on_return.disable(); }, true, true)) {
     return true;
   }
 
@@ -1664,8 +1667,8 @@ bool Sql_cmd_drop_undo_tablespace::execute(THD *thd) {
     return true; /* purecov: inspected */
   }
 
-  if (complete_stmt(thd, hton, [&]() { rollback_on_return.disable(); }, true,
-                    true)) {
+  if (complete_stmt(
+          thd, hton, [&]() { rollback_on_return.disable(); }, true, true)) {
     return true;
   }
 
@@ -1721,8 +1724,8 @@ bool Sql_cmd_logfile_group::execute(THD *thd) {
   // but does not modify the DD and thus there is no active transaction
   // -> turn off "using_trans"
   const bool using_trans = false;
-  if (complete_stmt(thd, hton, [&]() { rollback_on_return.disable(); },
-                    using_trans)) {
+  if (complete_stmt(
+          thd, hton, [&]() { rollback_on_return.disable(); }, using_trans)) {
     return true;
   }
   return false;

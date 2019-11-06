@@ -1,6 +1,6 @@
 /***********************************************************************
 
-Copyright (c) 1995, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2019, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2009, 2017, Percona Inc.
 
 Portions of this file contain modifications contributed and copyrighted
@@ -49,6 +49,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #ifndef _WIN32
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <time.h>
 #else
 #include <Strsafe.h>
@@ -59,6 +60,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 #include <functional>
 #include <stack>
+#include "keyring_encryption_key_info.h"
+
+/** Prefix all files and directory created under data directory with special
+string so that it never conflicts with MySQL schema directory. */
+#define OS_FILE_PREFIX "#"
 
 /** File node of a tablespace or the log data space */
 struct fil_node_t;
@@ -74,6 +80,11 @@ extern ulint os_n_pending_writes;
 
 /* Flush after each os_fsync_threshold bytes */
 extern unsigned long long os_fsync_threshold;
+
+/** Set to true when default master key is used. This variable
+main purpose is to avoid extra Encryption::get_master_key() when there
+are no encrypted tablespaces */
+extern bool default_master_key_used;
 
 /** File offset in bytes */
 typedef ib_uint64_t os_offset_t;
@@ -222,6 +233,8 @@ static const ulint OS_BUFFERED_FILE = 102;
 
 static const ulint OS_CLONE_DATA_FILE = 103;
 static const ulint OS_CLONE_LOG_FILE = 104;
+
+static const ulint OS_REDO_LOG_ARCHIVE_FILE = 105;
 /* @} */
 
 /** Error codes from os_file_get_last_error @{ */
@@ -242,12 +255,6 @@ static const ulint OS_FILE_ACCESS_VIOLATION = 81;
 static const ulint OS_FILE_NAME_TOO_LONG = 82;
 static const ulint OS_FILE_ERROR_MAX = 100;
 /* @} */
-
-static const uint ENCRYPTION_KEY_VERSION_INVALID = (~(uint)0);
-
-static const uint FIL_DEFAULT_ENCRYPTION_KEY = 0;
-
-static const uint ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED = 0;
 
 /** Encryption key length */
 static const ulint ENCRYPTION_KEY_LEN = 32;
@@ -444,6 +451,11 @@ struct Encryption {
   static dberr_t validate(const char *option)
       MY_ATTRIBUTE((warn_unused_result));
 
+  /** Validate the algorithm string for tablespace
+  @param[in]	option		Encryption option
+  @return DB_SUCCESS or error code */
+  MY_NODISCARD static dberr_t validate_for_tablespace(const char *option);
+
   /** Convert to a "string".
   @param[in]      type            The encryption type
   @return the string representation */
@@ -480,7 +492,9 @@ struct Encryption {
   @param[in,out]	value	Encryption value */
   static void random_value(byte *value);
 
-  // TODO:Robert: Czy to powinno być tutaj robione ?
+  /** Create tablespace key
+  @param[in,out]	tablespace_key	tablespace key - null if failure
+  @param[in]		key_id		tablespace key id */
   static void create_tablespace_key(byte **tablespace_key, uint key_id);
 
   /** Create new master key for key rotation.
@@ -507,6 +521,12 @@ struct Encryption {
   static bool get_tablespace_key(uint key_id, uint tablespace_key_version,
                                  byte **tablespace_key, size_t *key_len);
 
+  /** Create tablespace key
+  @param[in]	key_id          keyring encryption key info
+  @return true  failure
+          false success */
+  static bool create_tablespace_key(const EncryptionKeyId key_id);
+
   /** Get master key by key id.
   @param[in]	master_key_id	master key id
   @param[in]	srv_uuid	uuid of server instance
@@ -525,13 +545,14 @@ struct Encryption {
   static bool can_page_be_keyring_encrypted(byte *page);
 
   /** Fill the encryption information.
-  @param[in]	key		encryption key
-  @param[in]	iv		encryption iv
+  @param[in]		key		encryption key
+  @param[in]		iv		encryption iv
   @param[in,out]	encrypt_info	encryption information
-  @param[in]	is_boot		if it's for bootstrap
+  @param[in]		is_boot		if it's for bootstrap
+  @param[in]		encrypt_key	encrypt with master key
   @return true if success. */
   static bool fill_encryption_info(byte *key, byte *iv, byte *encrypt_info,
-                                   bool is_boot);
+                                   bool is_boot, bool encrypt_key);
 
   static bool fill_encryption_info(uint key_version, byte *iv,
                                    byte *encrypt_info);
@@ -552,9 +573,10 @@ struct Encryption {
   @param[in,out]	key		key
   @param[in,out]	iv		iv
   @param[in]		encryption_info	encryption info
+  @param[in]		decrypt_key	decrypt key using master key
   @return true if success */
-  static bool decode_encryption_info(byte *key, byte *iv,
-                                     byte *encryption_info);
+  static bool decode_encryption_info(byte *key, byte *iv, byte *encryption_info,
+                                     bool decrypt_key);
 
   /** Encrypt the redo log block.
   @param[in]	type		IORequest
@@ -2189,6 +2211,12 @@ void os_aio_print_pending_io(FILE *file);
 
 #endif /* UNIV_DEBUG */
 
+/** Get available free space on disk
+@param[in]	path		pathname of a directory or file in disk
+@param[out]	free_space	free space available in bytes
+@return DB_SUCCESS if all OK */
+dberr_t os_get_free_space(const char *path, uint64_t &free_space);
+
 /** This function returns information about the specified file
 @param[in]	path		pathname of the file
 @param[in]	stat_info	information of a file in a directory
@@ -2227,6 +2255,10 @@ ulint os_file_original_page_size(const byte *buf);
 @param[in]	umask		The umask to use for file creation. */
 void os_file_set_umask(ulint umask);
 
+/** Get the file create umask
+@return the umask to use for file creation. */
+ulint os_file_get_umask();
+
 /** Free storage space associated with a section of the file.
 @param[in]	fh		Open file handle
 @param[in]	off		Starting offset (SEEK_SET)
@@ -2260,6 +2292,18 @@ not then the source contents are left unchanged and DB_SUCCESS is returned.
 dberr_t os_file_decompress_page(bool dblwr_recover, byte *src, byte *dst,
                                 ulint dst_len)
     MY_ATTRIBUTE((warn_unused_result));
+
+/** Compress a data page
+@param[in]	compression	Compression algorithm
+@param[in]	block_size	File system block size
+@param[in]	src		Source contents to compress
+@param[in]	src_len		Length in bytes of the source
+@param[out]	dst		Compressed page contents
+@param[out]	dst_len		Length in bytes of dst contents
+@return buffer data, dst_len will have the length of the data */
+byte *os_file_compress_page(Compression compression, ulint block_size,
+                            byte *src, ulint src_len, byte *dst, ulint *dst_len,
+                            bool will_be_encrypted_with_keyring);
 
 /** Determine if O_DIRECT is supported.
 @retval	true	if O_DIRECT is supported.

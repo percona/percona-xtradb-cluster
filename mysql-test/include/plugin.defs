@@ -10,6 +10,7 @@
 # PLUGVAR_OPT: mysqld option --plugin_dir=....
 # PLUGVAR_LOAD: option --plugin_load=.... if the 4th element is present
 # PLUGVAR_LOAD_ADD: option --plugin_load_add=.... if the 4th element is present
+# PLUGVAR_LOAD_EARLY: option --early_plugin_load=.... if the 4th element is present
 #
 # If a listed plugin is not found, the corresponding variables will be
 # set to empty, they will not be unset.
@@ -44,6 +45,7 @@ mypluglib                               plugin_output_directory SIMPLE_PARSER
 libpluginmecab                          plugin_output_directory MECAB
 adt_null                                plugin_output_directory AUDIT_NULL
 keyring_udf                             plugin_output_directory KEYRING_UDF keyring_udf
+data_masking                            plugin_output_directory DATA_MASKING_PLUGIN data_masking
 keyring_file                            plugin_output_directory KEYRING_PLUGIN        keyring_file
 test_security_context                   plugin_output_directory TEST_SECURITY_CONTEXT  test_security_context
 libdaemon_example                       plugin_output_directory DAEMONEXAMPLE
@@ -131,6 +133,7 @@ component_validate_password     plugin_output_directory  VALIDATE_PASSWORD_COMPO
 # test application signal
 component_test_host_application_signal  plugin_output_directory  TEST_HOST_APPLICATION_SIGNAL_COMPONENT
 test_services_host_application_signal  plugin_output_directory  TEST_SERVICES_HOST_APPLICATION_SIGNAL_PLUGIN
+component_test_mysql_current_thread_reader  plugin_output_directory  TEST_MYSQL_CURRENT_THREAD_READER_COMPONENT
 
 # test mysql_runtime_error service
 component_test_mysql_runtime_error  plugin_output_directory  TEST_MYSQL_RUNTIME_ERROR_COMPONENT
