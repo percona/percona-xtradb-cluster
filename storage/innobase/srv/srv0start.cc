@@ -3223,6 +3223,8 @@ void srv_start_threads(bool bootstrap) {
     co-ordinate recovery (triggered using --wsrep-recover option). */
     srv_threads.m_buf_dump =
         os_thread_create(buf_dump_thread_key, buf_dump_thread);
+
+    srv_threads.m_buf_dump.start();
   } else {
     ib::warn() << "Skipping buffer pool dump/restore "
                   "during wsrep recovery.";
@@ -3231,9 +3233,9 @@ void srv_start_threads(bool bootstrap) {
   /* Create the buffer pool dump/load thread */
   srv_threads.m_buf_dump =
       os_thread_create(buf_dump_thread_key, buf_dump_thread);
-#endif /* WITH_WSREP */
 
   srv_threads.m_buf_dump.start();
+#endif /* WITH_WSREP */
 
   /* Create the dict stats gathering thread */
   srv_threads.m_dict_stats =

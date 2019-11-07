@@ -200,8 +200,8 @@ sys_vars.wsrep_start_position_basic          : BUG#0 This needs server to start 
 sys_vars.wsrep_preordered_basic              : BUG#0 TC pending.
 sys_vars.wsrep_reject_queries_basic          : BUG#0 TC pending.
 sys_vars.sql_mode_func                       : BUG#0 Differences in result likely due to configuration. Need more investigation.
-sys_vars.innodb_buffer_pool_populate_basic   : BUG#0 Some of the NUMA modes are not supported on some distros.
-sys_vars.innodb_support_xa_func              : BUG#0 XA is not supported by PXC
+#sys_vars.innodb_buffer_pool_populate_basic   : BUG#0 Some of the NUMA modes are not supported on some distros.
+#sys_vars.innodb_support_xa_func              : BUG#0 XA is not supported by PXC
 sys_vars.wsrep_max_ws_size_basic             : BUG#0 Setting this now also set repl.max_ws_size which is galera internal setting.
 
 # innodb_fts
@@ -210,10 +210,10 @@ innodb_fts.fulltext_table_evict : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 # rpl
 rpl.rpl_innodb_info_tbl_slave_tmp_tbl_mismatch : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 rpl.rpl_multi_source_channel_map_stress : BUG#0 Issue#330 2018-07-26 CODERSHIP mw-330
-rpl.rpl_relay_log_recovery_positions : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
+#rpl.rpl_relay_log_recovery_positions : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 rpl.rpl_seconds_behind_master : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
-rpl.rpl_semi_sync_ack_thread : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
-rpl.rpl_semi_sync_after_sync : BUG#0 Issue#330 2018-06-19 CODERSHIP mw-330
+#rpl.rpl_semi_sync_ack_thread : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
+#rpl.rpl_semi_sync_after_sync : BUG#0 Issue#330 2018-06-19 CODERSHIP mw-330
 
 # galera
 galera.galera_toi_ddl_online : BUG#0 fails randomly with "deadlock error" as sequence of action is causing an issue.

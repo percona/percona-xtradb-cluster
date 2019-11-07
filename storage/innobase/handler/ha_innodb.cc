@@ -24677,7 +24677,8 @@ static MYSQL_SYSVAR_ENUM(
     "LEGACY: Original Oracle MySQL handling with single page flushes; "
     "BACKOFF: (the default) Wait until cleaner produces a free page.",
     innodb_srv_empty_free_list_algorithm_validate, nullptr,
-    SRV_EMPTY_FREE_LIST_BACKOFF, &innodb_empty_free_list_algorithm_typelib);
+    /* Switching back to LEGACY due to bug PS-6065. */
+    SRV_EMPTY_FREE_LIST_LEGACY, &innodb_empty_free_list_algorithm_typelib);
 
 static MYSQL_SYSVAR_ULONG(buffer_pool_instances, srv_buf_pool_instances,
                           PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,

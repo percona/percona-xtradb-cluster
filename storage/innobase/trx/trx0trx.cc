@@ -2931,8 +2931,19 @@ static lsn_t trx_prepare_low(
 }
 
 bool trx_is_mysql_xa(trx_t *trx) {
+#ifdef WITH_WSREP
+  my_xid xid;
+  const XID *curr_xid = trx->xid;
+  if (wsrep_is_wsrep_xid(curr_xid)) {
+    xid = wsrep_xid_seqno(*curr_xid).get();
+  } else {
+    xid = curr_xid->get_my_xid();
+  }
+  return (xid != 0);
+#else
   auto my_xid = trx->xid->get_my_xid();
   return (my_xid != 0);
+#endif /* WITH_WSREP */
 }
 
 /** Prepares a transaction. */
