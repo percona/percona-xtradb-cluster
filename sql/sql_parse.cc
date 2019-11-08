@@ -1219,6 +1219,10 @@ static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables) {
   for (const TABLE_LIST *table = tables; table; table = table->next_global) {
     TABLE_CATEGORY c;
     LEX_CSTRING db, tn;
+
+    /* PXC-2557 : skip if NULL, otherwise lex_string_set will crash */
+    if (!table->db || !table->table_name) continue;
+
     lex_cstring_set(&db, const_cast<char*> (table->db));
     lex_cstring_set(&tn, const_cast<char*> (table->table_name));
     c = get_table_category(db, tn);

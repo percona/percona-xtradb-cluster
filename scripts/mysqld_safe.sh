@@ -415,7 +415,7 @@ parse_arguments() {
       --wsrep[-_]provider=*)
         if test -n "$val" && test "$val" != "none"
         then
-          wsrep_restart=0
+          wsrep_restart=1
         fi
         append_arg_to_args "$arg"
         ;;

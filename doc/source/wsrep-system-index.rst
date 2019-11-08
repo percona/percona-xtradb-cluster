@@ -571,6 +571,12 @@ The following methods are available:
   in the sequence of incoming transactions,
   and this DDL execution has to happen with high priority.
 
+  .. important::
+
+     Under the ``TOI`` method, when DDL operations are performed,
+     |abbr-mdl| is ignored. If |abr-mdl| is important, use the ``RSU``
+     method.
+
 * ``RSU``: When the *Rolling Schema Upgrade* method is selected,
   DDL statements won't be replicated across the cluster.
   Instead, it's up to the user to run them on each node separately.
@@ -1038,3 +1044,4 @@ is determined by bitmask:
 .. note:: Setting :variable:`wsrep_sync_wait` to ``1`` is the equivalent
    of setting the deprecated :variable:`wsrep_causal_reads` to ``ON``.
 
+.. |abbr-mdl| replace:: :abbr:`MDL (Metadata Locking)`

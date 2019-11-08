@@ -112,18 +112,47 @@ class Disable_gtid_state_update_guard {
 
 class Disable_binlog_guard {
  public:
+
+#ifdef WITH_WSREP
+  /* wsrep is turned off along with binlog as part of mysql-wsrep/issues/329
+  meant for tracking and handling leaking galera open transaction.
+
+  This fix was originally originated in 5.7 (7fb9b867a6df) but 8.x
+  with added transaction checks failed to uncover leaking transaction error
+  without the fix. That raises doubt if the fix really made sense even in 5.7.
+
+  For now disabling it in 8.x but if in future this fix is re-enabled
+  then ensure that PXC-2639 (9721695) is backported too. Will keep
+  all infrastructure ready for easy fix in future. */
+  Disable_binlog_guard(THD *thd, bool turn_off_wsrep = false)
+      : m_thd(thd),
+        m_wsrep_on(thd->variables.wsrep_on),
+        m_binlog_disabled(thd->variables.option_bits & OPTION_BIN_LOG) {
+    thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    if (turn_off_wsrep) {
+      thd->variables.wsrep_on = false;
+    }
+  }
+#else
   Disable_binlog_guard(THD *thd)
       : m_thd(thd),
         m_binlog_disabled(thd->variables.option_bits & OPTION_BIN_LOG) {
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
   }
+#endif /* WITH_WSREP */
 
   ~Disable_binlog_guard() {
     if (m_binlog_disabled) m_thd->variables.option_bits |= OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+    m_thd->variables.wsrep_on = m_wsrep_on;
+#endif /* WITH_WSREP */
   }
 
  private:
   THD *const m_thd;
+#ifdef WITH_WSREP
+  const bool m_wsrep_on;
+#endif /* WITH_WSREP */
   const bool m_binlog_disabled;
 };
 
