@@ -26,7 +26,7 @@ START SLAVE USER='root';
 SET SESSION binlog_format='STATEMENT';
 
 CREATE TABLE t1 (
-     i int(11) NOT NULL AUTO_INCREMENT,
+     i int NOT NULL AUTO_INCREMENT,
      c char(32) DEFAULT 'dummy_text',
      PRIMARY KEY (i)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

@@ -488,6 +488,13 @@ void Sql_cmd_truncate_table::truncate_base(THD *thd, TABLE_LIST *table_ref) {
   dd::Schema_MDL_locker mdl_locker(thd);
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
 
+#ifdef WITH_WSREP
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, table_ref->db,
+                                             table_ref->table_name, NULL)) {
+    DBUG_VOID_RETURN;
+  }
+#endif /* WITH_WSREP */
+
   // Actions needed to cleanup before leaving scope.
   auto cleanup_guard = create_scope_guard([&]() {
     end_transaction(thd, binlog_stmt, binlog_is_trans);
@@ -530,13 +537,6 @@ void Sql_cmd_truncate_table::truncate_base(THD *thd, TABLE_LIST *table_ref) {
       DBUG_VOID_RETURN;
     }
   }
-
-#ifdef WITH_WSREP
-    if (WSREP(thd) && wsrep_to_isolation_begin(thd, table_ref->db,
-                                               table_ref->table_name, NULL)) {
-      DBUG_VOID_RETURN;
-    }
-#endif /* WITH_WSREP */
 
   if (hton->flags & HTON_CAN_RECREATE) {
     // Set this before any potential error returns

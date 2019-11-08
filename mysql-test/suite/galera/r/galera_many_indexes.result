@@ -73,7 +73,7 @@ EXPLAIN SELECT COUNT(*) = 1 FROM t1 FORCE KEY (PRIMARY) WHERE f1 = REPEAT('a', 7
 id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t1	NULL	const	PRIMARY	PRIMARY	3070	const	1	100.00	Using index
 Warnings:
-Note	1003	/* select#1 */ select (count(0) = 1) AS `COUNT(*) = 1` from `test`.`t1` FORCE INDEX (PRIMARY) where 1
+Note	1003	/* select#1 */ select (count(0) = 1) AS `COUNT(*) = 1` from `test`.`t1` FORCE INDEX (PRIMARY) where true
 SELECT COUNT(*) = 1 FROM t1 FORCE KEY (PRIMARY) WHERE f1 = REPEAT('a', 767);
 COUNT(*) = 1
 1
@@ -81,7 +81,7 @@ EXPLAIN SELECT COUNT(*) = 1 FROM t1 FORCE KEY (i1) WHERE f1 = REPEAT('a', 767);
 id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t1	NULL	const	i1	i1	3070	const	1	100.00	Using index
 Warnings:
-Note	1003	/* select#1 */ select (count(0) = 1) AS `COUNT(*) = 1` from `test`.`t1` FORCE INDEX (`i1`) where 1
+Note	1003	/* select#1 */ select (count(0) = 1) AS `COUNT(*) = 1` from `test`.`t1` FORCE INDEX (`i1`) where true
 SELECT COUNT(*) = 1 FROM t1 FORCE KEY (i1) WHERE f1 = REPEAT('a', 767);
 COUNT(*) = 1
 1
@@ -89,7 +89,7 @@ EXPLAIN SELECT COUNT(*) = 1 FROM t1 FORCE KEY (i63) WHERE f1 = REPEAT('a', 767);
 id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t1	NULL	const	i63	i63	3070	const	1	100.00	Using index
 Warnings:
-Note	1003	/* select#1 */ select (count(0) = 1) AS `COUNT(*) = 1` from `test`.`t1` FORCE INDEX (`i63`) where 1
+Note	1003	/* select#1 */ select (count(0) = 1) AS `COUNT(*) = 1` from `test`.`t1` FORCE INDEX (`i63`) where true
 SELECT COUNT(*) = 1 FROM t1 FORCE KEY (i63) WHERE f1 = REPEAT('a', 767);
 COUNT(*) = 1
 1
