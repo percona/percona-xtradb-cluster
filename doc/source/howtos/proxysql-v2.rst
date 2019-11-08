@@ -858,14 +858,38 @@ is `singlewrite`.  This option can be used with `--enable` and `--update-cluster
 A single IP address and port combination is expected.  For instance,
 "--write-node=127.0.0.1:3306"
 
-ProxySQL Status
+The |proxysql-status| script
 ================================================================================
 
-Simple script to dump ProxySQL config and stats
+|proxysql-status| is a simple script to dump |proxysql| configuration
+and statistics. 
 
 .. code-block:: bash
 
    $ proxysql-status admin admin 127.0.0.1 6032
 
+The default behaviour is to display all tables and files. By using the following
+options, you can retrieve more specific information:
+
+======================  =========================================================================
+Option                  Use to display
+======================  =========================================================================
+--files                 The contents of proxysql-admin related files
+--main                  Main tables (both on-disk and runtime)
+--monitor               Monitor tables
+--runtime               Runtime-related data (implies --main)
+--stats                 Stats tables
+--table=<table_name>    Only tables that contain the table name (this is a case-sensitive match)
+--with-stats-reset      ``_reset`` tables, by default _reset tables will not be queried.
+
+======================  =========================================================================
+
+.. note::
+
+   If no credentials are specified the credentials in
+   ``/etc/proxysql-admin.cnf`` are used.
+
+
 .. |proxysql| replace:: ProxySQL
 .. |proxysql-admin| replace:: ``proxysql-admin``
+.. |proxysql-status| replace:: ``proxysql-status``
