@@ -2000,6 +2000,11 @@ static char *os_file_get_parent_dir(const char *path) {
     return (NULL);
   }
 
+  /* Make sure that mem_strdupl() will get non-negative "ulint len" */
+  if (last_slash - path < 0) {
+    return (NULL);
+  }
+
   /* Non-trivial directory component */
 
   return (mem_strdupl(path, last_slash - path));
@@ -5572,7 +5577,7 @@ static MY_ATTRIBUTE((warn_unused_result)) ssize_t
   meb_mutex.unlock();
 #endif /* UNIV_HOTBACKUP */
 
-  const ib_uint64_t start_time = trx_stats::start_io_read(trx, n);
+  const ib_time_monotonic_us_t start_time = trx_stats::start_io_read(trx, n);
 
   (void)os_atomic_increment_ulint(&os_n_pending_reads, 1);
   MONITOR_ATOMIC_INC(MONITOR_OS_PENDING_READS);
