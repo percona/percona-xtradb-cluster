@@ -1,6 +1,6 @@
+#
 --source include/have_debug.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --connection node_2
 SET GLOBAL wsrep_slave_threads=5;
