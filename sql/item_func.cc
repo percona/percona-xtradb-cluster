@@ -6148,6 +6148,15 @@ longlong Item_func_sleep::val_int()
       break;
     error= 0;
   }
+
+#ifdef WITH_WSREP
+  // PXC-2684 : If the sleep() is interrupted, return an error
+  if (thd->killed == THD::KILL_QUERY)
+  {
+    my_error(ER_QUERY_INTERRUPTED, MYF(0));
+  }
+#endif /* WITH_WSREP */
+
   thd_wait_end(thd);
   mysql_mutex_unlock(&LOCK_item_func_sleep);
   thd->EXIT_COND(NULL);
