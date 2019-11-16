@@ -59,3 +59,4 @@ innodb-truncate-debug : Concurrent DDL with sync points from different connectio
 xa_prepare_lock_release : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 ibuf_not_empty : InnoDB: Failing assertion: !srv_read_only_mode with server restart
 innodb_force_recovery : InnoDB: Failing assertion: !srv_read_only_mode with server restart
+iodku_debug: InnoDB: Failing assertion: ut_ad(trx_is_registered_for_2pc(trx))
