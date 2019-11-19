@@ -580,7 +580,7 @@ export CXX=${MYSQL_BUILD_CXX:-${CXX:-g++}}
 export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS}}
 export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
-export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-cmake}}
+export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake3}}
 export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:-${MAKE_JFLAG:-}}
 
 if test "x$(uname -m)" = "xx86_64" && echo "%{_libdir}" | fgrep -vq lib64
@@ -805,15 +805,7 @@ install -d -m 0755 %{buildroot}/var/log/mysqlrouter
 
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
-install -d %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d
-install -D -m 0644 $MBD/build-ps/rpm/percona-xtradb-cluster.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.cnf
-install -D -m 0644 $MBD/build-ps/rpm/mysqld.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld.cnf
-install -D -m 0644 $MBD/build-ps/rpm/mysqld_safe.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld_safe.cnf
-install -D -m 0644 $MBD/build-ps/rpm/wsrep.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/wsrep.cnf
-
-%if 0%{?rhel} > 6
-  install -D -m 0644 $MBD/build-ps/rpm/percona-xtradb-cluster.cnf %{buildroot}%{_sysconfdir}/my.cnf
-%endif
+install -D -m 0644 $MBD/build-ps/rpm/mysqld.cnf %{buildroot}%{_sysconfdir}/my.cnf
 install -d %{buildroot}%{_sysconfdir}/my.cnf.d
 %if 0%{?systemd}
   install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
@@ -884,10 +876,10 @@ install -d "$RBR/%{_sharedstatedir}/galera"
 
 install -m 755 "$MBD/%{galera_src_dir}/garb/garbd" \
   "$RBR/%{_bindir}/"
-install -d "$RBR/%{_libdir}/galera3"
+install -d "$RBR/%{_libdir}/galera4"
 install -m 755 "$MBD/%{galera_src_dir}/libgalera_smm.so" \
-  "$RBR/%{_libdir}/galera3/"
-ln -s "galera3/libgalera_smm.so" "$RBR/%{_libdir}/"
+  "$RBR/%{_libdir}/galera4/"
+ln -s "galera4/libgalera_smm.so" "$RBR/%{_libdir}/"
 
 install -d $RBR%{galera_docs}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
@@ -1076,6 +1068,14 @@ useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
 # (BUG#12823)
 usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
 
+if [ "$1" = 1 ]; then
+  if [ -f %{_sysconfdir}/my.cnf ]; then
+    timestamp=$(date '+%Y%m%d-%H%M')
+    cp %{_sysconfdir}/my.cnf \
+    %{_sysconfdir}/my.cnf.rpmsave-${timestamp}
+  fi
+fi
+
 
 %post -n percona-xtradb-cluster-server
 
@@ -1085,66 +1085,18 @@ fi
 if [ ! -e /var/log/mysqld.log ]; then
     /usr/bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
 fi
-#/bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
-#/bin/chmod 0640 /var/log/mysqld.log >/dev/null 2>&1 || :
-#/bin/chown mysql:mysql /var/log/mysqld.log >/dev/null 2>&1 || :
 %if 0%{?systemd}
   %systemd_post mysql
 %endif
 
-%if 0%{?rhel} > 6
-  MYCNF_PACKAGE="mariadb-libs"
-%else
-  MYCNF_PACKAGE="mysql-libs"
-%endif
+if [ -d /etc/percona-xtradb-clister.conf.d ]; then
+    CONF_EXISTS=$(grep "percona-xtradb-cluster.conf.d" /etc/my.cnf | wc -l)
+    if [ ${CONF_EXISTS} = 0 ]; then
+        echo "!includedir /etc/percona-xtradb-cluster.conf.d/" >> /etc/my.cnf
+    fi
+fi
 
-if [ -e /etc/my.cnf ]; then
-  MYCNF_PACKAGE=$(rpm -qi `rpm -qf /etc/my.cnf` | grep -m 1 Name | awk '{print $3}')
-fi
-if [ "$MYCNF_PACKAGE" == "mariadb-libs" -o "$MYCNF_PACKAGE" == "mysql-libs" -o "$MYCNF_PACKAGE" == "Percona-Server-server-57" -o "$MYCNF_PACKAGE" == "Percona-XtraDB-Cluster-server-57" ]; then
-  MODIFIED=$(rpm -Va "$MYCNF_PACKAGE" | grep '/etc/my.cnf' | awk '{print $1}' | grep -c 5)
-  if [ "$MODIFIED" == 1 ]; then
-      cp /etc/my.cnf /etc/my.cnf.old
-  fi
-else
-  cp /etc/my.cnf /etc/my.cnf.old
-fi
-if [ ! -f /etc/my.cnf ]; then
-  rm -rf /etc/my.cnf
-  for file in $(alternatives --display my.cnf | grep priority | awk '{print $1}'); do
-    alternatives --remove my.cnf $file
-  done
-  update-alternatives --install /etc/my.cnf my.cnf "/etc/percona-xtradb-cluster.cnf" 200
-else
-  if [ "$MYCNF_PACKAGE" == "Percona-XtraDB-Cluster-server-57" -o "$MYCNF_PACKAGE" == "Percona-Server-server-57" ]; then
-      real_file=$(readlink -f /etc/my.cnf)
-      if [ -L /etc/my.cnf ] && [ "x${real_file}" == "x/etc/percona-server.cnf" ]; then
-          rm -rf /etc/my.cnf
-          update-alternatives --remove my.cnf /etc/percona-server.cnf
-          update-alternatives --install /etc/my.cnf my.cnf "/etc/percona-xtradb-cluster.cnf" 200
-      fi
-      if [ -L /etc/my.cnf ] && [ "x${real_file}" == "x/etc/percona-xtradb-cluster.cnf" ]; then
-          rm -rf /etc/my.cnf
-          update-alternatives --remove my.cnf /etc/percona-xtradb-cluster.cnf
-          update-alternatives --install /etc/my.cnf my.cnf "/etc/percona-xtradb-cluster.cnf" 200
-      else
-          echo " -------------"
-          echo "   *  The suggested mysql options and settings are in /etc/percona-xtradb-cluster.conf.d/mysqld.cnf"
-          echo "   *  If you want to use mysqld.cnf as default configuration file please make backup of /etc/my.cnf"
-          echo "   *  Once it is done please execute the following commands:"
-          echo " rm -rf /etc/my.cnf"
-          echo " update-alternatives --install /etc/my.cnf my.cnf \"/etc/percona-xtradb-cluster.cnf\" 200"
-          echo " -------------"
-      fi
-  else
-          echo " -------------"
-          echo "   *  The suggested mysql options and settings are in /etc/percona-xtradb-cluster.conf.d/mysqld.cnf"
-          echo "   *  If you want to use mysqld.cnf as default configuration file please make backup of /etc/my.cnf"
-          echo "   *  Once it is done please execute the following commands:"
-          echo " rm -rf /etc/my.cnf"
-          echo " update-alternatives --install /etc/my.cnf my.cnf \"/etc/percona-xtradb-cluster.cnf\" 200"
-          echo " -------------"
-          cnflog=$(/usr/bin/my_print_defaults mysqld|grep -c log-error)
+            cnflog=$(/usr/bin/my_print_defaults mysqld|grep -c log-error)
           if [ $cnflog = 0 -a -f /etc/my.cnf ]; then
               sed -i "/^\[mysqld\]$/a log-error=/var/log/mysqld.log" /etc/my.cnf
           fi
@@ -1152,8 +1104,6 @@ else
           if [ $cnfpid = 0 -a -f /etc/my.cnf ]; then
               sed -i "/^\[mysqld\]$/a pid-file=/var/run/mysqld/mysqld.pid" /etc/my.cnf
           fi
-  fi
-fi
 
 if [ -x %{_bindir}/my_print_defaults ]
 then
@@ -1379,7 +1329,12 @@ fi
 echo "Trigger 'postun --community' finished at `date`"        >> $STATUS_HISTORY
 echo                                             >> $STATUS_HISTORY
 echo "====="                                     >> $STATUS_HISTORY
-
+if [ "$1" = 0 ]; then
+  if [ -f %{_sysconfdir}/my.cnf ]; then
+    cp %{_sysconfdir}/my.cnf \
+    %{_sysconfdir}/my.cnf.rpmsave
+  fi
+fi
 
 %pre -n percona-xtradb-cluster-mysql-router
 /usr/sbin/groupadd -r mysqlrouter >/dev/null 2>&1 || :
@@ -1529,7 +1484,7 @@ fi
 %attr(0755,nobody,nobody) %dir %{_sharedstatedir}/galera
 # This is a symlink
 %{_libdir}/libgalera_smm.so
-%{_libdir}/galera3/libgalera_smm.so
+%{_libdir}/galera4/libgalera_smm.so
 %attr(0755,root,root) %dir %{galera_docs}
 %doc %attr(0644,root,root) %{galera_docs}/COPYING
 %doc %attr(0644,root,root) %{galera_docs}/README
@@ -1537,16 +1492,8 @@ fi
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.crc32c
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.chromium
-%dir %{_sysconfdir}/my.cnf.d
-%dir %{_sysconfdir}/percona-xtradb-cluster.conf.d
-%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.cnf
-%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld.cnf
-%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/wsrep.cnf
-%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld_safe.cnf
-%if 0%{?rhel} > 6
 %config(noreplace) %{_sysconfdir}/my.cnf
-%endif
-
+%dir %{_sysconfdir}/my.cnf.d
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-client
@@ -1575,7 +1522,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlpump.1*
 
 # ----------------------------------------------------------------------------
-%files -n percona-xtradb-cluster-devel -f optional-files-devel
+%files -n percona-xtradb-cluster-devel
 %defattr(-, root, root, 0755)
 %doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config.1*

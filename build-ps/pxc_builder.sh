@@ -212,8 +212,20 @@ get_sources(){
     rsync -av ${WORKDIR}/percona-xtradb-cluster/percona-xtradb-cluster-galera/ ${PXCDIR}/percona-xtradb-cluster-galera --exclude .git
     rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep-lib/ ${PXCDIR}/wsrep-lib --exclude .git
 
-#    rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep/src/ ${PXCDIR}/percona-xtradb-cluster-galera/wsrep/src --exclude .git
-#    rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep/src/ ${PXCDIR}/wsrep/src --exclude .git
+    sed -i 's:ROUTER_RUNTIMEDIR:/var/run/mysqlrouter/:g' ${PXCDIR}/packaging/rpm-common/*
+    cd ${PXCDIR}/packaging/rpm-common
+        if [ ! -f mysqlrouter.service ]; then
+            cp -p mysqlrouter.service.in mysqlrouter.service
+        fi
+        if [ ! -f mysqlrouter.tmpfiles.d ]; then
+            cp -p mysqlrouter.tmpfiles.d.in mysqlrouter.tmpfiles.d
+        fi
+        if [ ! -f mysqlrouter.conf ]; then
+            cp -p mysqlrouter.conf.in mysqlrouter.conf
+        fi
+        if [ ! -f mysql.logrotate ]; then
+            cp -p mysql.logrotate.in mysql.logrotate
+        fi
 
     cd ${WORKDIR}
     #
@@ -300,7 +312,7 @@ install_deps() {
         if [ "x$RHEL" = "x6" ]; then
             yum -y install Percona-Server-shared-56
         fi
-	yum -y install yum-utils
+        yum -y install yum-utils
     else
         apt-get -y install dirmngr || true
         add_percona_apt_repo
