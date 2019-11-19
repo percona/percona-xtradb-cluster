@@ -1,0 +1,128 @@
+# This is a MySQ L-wsrep package description for ESP package manager
+# CentOS specific part
+
+%requires /bin/sh
+%requires /sbin/install-info
+%requires /sbin/ldconfig
+%requires /usr/sbin/useradd
+%requires bash
+%requires chkconfig
+%requires coreutils
+%requires grep
+%requires libc.so.6
+%requires libcrypt.so.1
+%requires libcrypto.so.6
+%requires libdl.so.2
+%requires libgcc_s.so.1
+%requires libm.so.6
+%requires libncurses.so.5
+%requires libnsl.so.1
+%requires libpthread.so.0
+%requires libssl.so.6
+%requires libstdc++.so.6
+%requires libz.so.1
+%requires procps
+%requires rtld(GNU_HASH)
+%requires shadow-utils
+
+# Required MySQL packages
+# for PHP-mysql on RHEL5:
+# %requires MySQL-shared-compat $MYSQL_VER
+# for mysqldump SST:
+# %requires MySQL-client-community $MYSQL_VER
+
+%provides MySQL
+%provides MySQL-server
+%provides mysql
+%provides mysql-server
+
+# Conflicting mysql packages
+#%incompat mysql-server
+
+$prefix=/usr
+
+$CONF_DST=/etc/mysql
+d 755 root root $CONF_DST              -
+c 644 root root /etc/my.cnf            $GALERA_SRC/scripts/mysql/centos/my.cnf
+d 755 root root $CONF_DST/conf.d
+d 755 root root /etc/rc.d/init.d       -
+f 755 root root /etc/rc.d/init.d/mysql $GALERA_SRC/scripts/mysql/centos/init.oracle
+d 755 root root /etc/rc.d/logrotate.d  -
+f 755 root root /etc/rc.d/logrotate.d/mysql $MYSQL_SRC/support-files/mysql-log-rotate
+
+%if x86_64 # CentOS (read Red Hat) never fails to screw up things
+$LIBS_DST=${prefix}/lib64/mysql
+%else
+$LIBS_DST=${prefix}/lib/mysql
+%endif
+$SHAR_DST=${prefix}/share/mysql
+$SBIN_DST=${prefix}/sbin
+$BINS_DST=${prefix}/bin
+$DOCS_DST=${prefix}/share/doc/MySQL-server-$MYSQL_VER
+$MAN_DST=${prefix}/share/man
+
+# Commented out CentOS pieces of code which don't seem to make sense here
+
+$mysql_datadir=/var/lib/mysql
+#d 755 root root ${mysql_data} -
+
+%preinstall <<EOF_PREINSTALL
+if [ -x /etc/init.d/mysql ] ; then
+    /etc/init.d/mysql stop > /dev/null 2>&1
+    echo "Giving mysqld 5 seconds to exit nicely"
+    sleep 5
+fi
+EOF_PREINSTALL
+
+# Postinstall script is a combination of those from CentOS and MySQL RPMs
+%postinstall <<EOF_POSTINSTALL
+ldconfig -n $LIBS_DST
+
+if [ ! -d $mysql_datadir ] ; then mkdir -m 755 $mysql_datadir ; fi
+if [ ! -d $mysql_datadir/mysql ] ; then mkdir $mysql_datadir/mysql ; fi
+if [ ! -d $mysql_datadir/test ] ; then mkdir $mysql_datadir/test ; fi
+
+if [ -x /sbin/chkconfig ] ; then
+    /sbin/chkconfig --add mysql
+fi
+
+groupadd -r mysql 2> /dev/null || true
+useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL Server" \
+        -g mysql mysql 2> /dev/null || true
+# in case user existed
+usermod -g mysql mysql 2> /dev/null || true
+
+/bin/chown -R mysql:mysql ${CONF_DST}
+
+/bin/chmod 0755 ${mysql_datadir}
+/bin/touch /var/log/mysqld.log
+/bin/chown -R mysql:mysql ${mysql_datadir}
+
+/usr/bin/mysql_install_db --rpm --user=mysql --wsrep-on=0
+
+/bin/chown -R mysql:mysql ${mysql_datadir}
+/bin/chmod -R og-rw ${mysql_datadir}/mysql
+
+if [ -x /etc/init.d/mysql ] ; then
+    /etc/init.d/mysql start
+    echo "Giving mysqld 2 seconds to start"
+    sleep 2
+fi
+sleep 2
+
+EOF_POSTINSTALL
+
+%preremove  <<EOF_PREREMOVE
+if [ $$1 = 0 ]; then
+    /sbin/service mysql stop >/dev/null 2>&1 || :
+    /sbin/chkconfig --del mysql
+fi
+EOF_PREREMOVE
+
+#%postremove <<EOF_POSTREMOVE
+#if [ $$1 -ge 1 ]; then
+#    /sbin/service mysql condrestart >/dev/null 2>&1 || :
+#fi
+#EOF_POSTREMOVE
+
+#

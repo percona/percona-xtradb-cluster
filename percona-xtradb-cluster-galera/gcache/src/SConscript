@@ -1,0 +1,32 @@
+
+Import('env')
+
+gcache_env = env.Clone()
+
+# Include paths
+gcache_env.Append(CPPPATH = Split('''
+                                     #/galerautils/src
+                                  '''))
+
+gcache_sources = Split ('''
+        GCache_seqno.cpp
+        gcache_params.cpp
+        gcache_page.cpp
+        gcache_page_store.cpp
+        gcache_rb_store.cpp
+        gcache_mem_store.cpp
+        GCache_memops.cpp
+        GCache.cpp
+''')
+
+gcache_env.StaticLibrary('gcache', gcache_sources)
+
+test_env = gcache_env.Clone()
+
+test_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
+test_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
+test_env.Prepend(LIBS=File('libgcache.a'))
+
+test_env.Program(source='test.cpp')
+
+env.Append(LIBGALERA_OBJS = gcache_env.SharedObject(gcache_sources))
