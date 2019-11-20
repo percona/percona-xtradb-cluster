@@ -1362,74 +1362,9 @@ fi
     %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
 %endif
 
-<<<<<<< HEAD:build-ps/percona-xtradb-cluster.spec
 %if "%rhel" >= "6"
     %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
 %endif 
-=======
-#plugins
-%attr(755, root, root) %{_libdir}/mysql/plugin/adt_null.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/auth.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/auth_socket.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/auth_test_plugin.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/innodb_engine.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/libdaemon_example.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/libfnv1a_udf.*
-%attr(755, root, root) %{_libdir}/mysql/plugin/libfnv_udf.*
-%attr(755, root, root) %{_libdir}/mysql/plugin/libmemcached.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/libmurmur_udf.*
-%attr(755, root, root) %{_libdir}/mysql/plugin/mypluglib.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_client.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_interface.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_server.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/semisync_master.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/semisync_slave.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/validate_password.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/auth_pam.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/auth_pam_compat.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/dialog.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/handlersocket.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/query_response_time.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/mysql_no_login.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/test_udf_services.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/connection_control.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/udf_example.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/ha_example.so
-# %attr(755, root, root) %{_libdir}/mysql/plugin/debug/*.so*
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/ha_example.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/adt_null.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_pam.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_pam_compat.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_socket.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_test_plugin.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/dialog.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/innodb_engine.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/libdaemon_example.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/libfnv1a_udf.*
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/libfnv_udf.*
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/libmemcached.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/libmurmur_udf.*
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/mypluglib.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_client.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_interface.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_server.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_master.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_slave.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/validate_password.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/handlersocket.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/query_response_time.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/mysql_no_login.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/test_udf_services.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/connection_control.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/udf_example.so
-
-# Audit Log and Scalability Metrics files
-%attr(755, root, root) %{_libdir}/mysql/plugin/audit_log.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/audit_log.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/scalability_metrics.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/scalability_metrics.so
->>>>>>> Percona-Server-5.6.46-86.2:build-ps/percona-server.spec
 
 %if %{WITH_TCMALLOC}
 %attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
