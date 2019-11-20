@@ -44,6 +44,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 #include "sql/sql_plugin_ref.h"
 #include "sql/sql_table.h" /* write_to_binlog */
 
+#ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
+#endif /* WITH_WSREP */
+
 /*
   @brief
   Log current command to binlog
@@ -86,6 +90,15 @@ bool Rotate_innodb_master_key::execute() {
              "SUPER or ENCRYPTION_KEY_ADMIN");
     return true;
   }
+
+#ifdef WITH_WSREP
+  if (WSREP(m_thd) &&
+      wsrep_to_isolation_begin(m_thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    WSREP_ERROR("Failed to replicate the %s command in cluster mode",
+                m_thd->query().str);
+    return (true);
+  }
+#endif /* WITH_WSREP */
 
   if ((se_plugin = ha_resolve_by_name(m_thd, &storage_engine, false))) {
     hton = plugin_data<handlerton *>(se_plugin);
@@ -149,6 +162,15 @@ bool Rotate_binlog_master_key::execute() {
     my_error(ER_RPL_ENCRYPTION_CANNOT_ROTATE_BINLOG_MASTER_KEY, MYF(0));
     DBUG_RETURN(true);
   }
+
+#ifdef WITH_WSREP
+  if (WSREP(m_thd) &&
+      wsrep_to_isolation_begin(m_thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    WSREP_ERROR("Failed to replicate the %s command in cluster mode",
+                m_thd->query().str);
+    return (true);
+  }
+#endif /* WITH_WSREP */
 
   if (rpl_encryption.remove_remaining_seqnos_from_keyring()) DBUG_RETURN(true);
 

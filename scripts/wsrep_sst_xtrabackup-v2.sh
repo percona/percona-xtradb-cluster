@@ -686,7 +686,7 @@ read_cnf()
     fi
 
     pxc_encrypt_cluster_traffic=$(parse_cnf mysqld pxc-encrypt-cluster-traffic "")
-    pxc_encrypt_cluster_traffic=$(normalize_boolean "$pxc_encrypt_cluster_traffic" "off")
+    pxc_encrypt_cluster_traffic=$(normalize_boolean "$pxc_encrypt_cluster_traffic" "on")
 
     auto_upgrade=$(parse_cnf sst auto-upgrade "")
     auto_upgrade=$(normalize_boolean "$auto_upgrade" "on")

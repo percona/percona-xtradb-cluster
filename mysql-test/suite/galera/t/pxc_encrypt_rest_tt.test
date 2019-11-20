@@ -28,6 +28,8 @@ CREATE TEMPORARY TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) En
 INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;
 #
 select purpose from information_schema.innodb_session_temp_tablespaces where space in (select space from information_schema.innodb_temp_table_info);
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
+#
 
 --connection node_2
 --echo #node-2
@@ -36,6 +38,7 @@ CREATE TEMPORARY TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) En
 INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;
 #
 select purpose from information_schema.innodb_session_temp_tablespaces where space in (select space from information_schema.innodb_temp_table_info);
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
 #
 DROP TABLE t1;
 
@@ -63,6 +66,8 @@ CREATE TEMPORARY TABLE e1 (
 INSERT INTO e1 VALUES(1, 'aaaaa');
 INSERT INTO e1 VALUES(2, 'bbbbb');
 SELECT * FROM e1;
+#
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
 
 --connection node_2
 --echo #node-2 restarted (should get encrypted table through SST)
@@ -70,6 +75,8 @@ SELECT * FROM e1;
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
+#
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
 
 CREATE TEMPORARY TABLE e1 (
   id INT NOT NULL,
@@ -80,6 +87,7 @@ INSERT INTO e1 VALUES(1, 'ccccc');
 INSERT INTO e1 VALUES(2, 'ddddd');
 SELECT * FROM e1;
 DROP TABLE e1;
+#
 
 --connection node_1
 --echo #node-1
@@ -104,6 +112,8 @@ CREATE TEMPORARY TABLE e1 (
 );
 INSERT INTO e1 VALUES(1, 'aaaaa');
 INSERT INTO e1 VALUES(2, 'bbbbb');
+#
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
 
 --connection node_2
 --echo #node-2 restarted (should get encrypted table through IST)
@@ -111,6 +121,9 @@ INSERT INTO e1 VALUES(2, 'bbbbb');
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
+
+#
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
 
 CREATE TEMPORARY TABLE e1 (
   id INT NOT NULL,

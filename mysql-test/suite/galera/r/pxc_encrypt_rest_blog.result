@@ -3,11 +3,20 @@ INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 #node-1
 CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
 INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
 #node-2
 SELECT COUNT(*) = 10000 from t1;
 COUNT(*) = 10000
 1
 DROP TABLE t1;
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
 #node-2 being killed
 Killing server ...
 #node-1
@@ -27,6 +36,10 @@ count(*)
 update t1 set f2 = 9999999 where f1 > 1000;
 begin;
 update t1 set f2 = 8888888 where f1 < 1000;
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
 #node-2 restarted
 # restart
 SELECT COUNT(*) = 0 from t1 where f2 = 8888888;
@@ -35,6 +48,11 @@ COUNT(*) = 0
 SELECT COUNT(*) from t1 where f2 = 9999999;
 COUNT(*)
 99000
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
 #node-1
 commit;
 #node-1a
@@ -61,8 +79,19 @@ CALL proc_insert();
 SELECT COUNT(*) from t1;
 COUNT(*)
 10000
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
 #node-2 restarted (should get encrypted table through IST)
 # restart
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
 #node-2
 DROP TABLE t1;
 DROP PROCEDURE proc_insert;
