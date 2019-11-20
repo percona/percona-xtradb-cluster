@@ -144,7 +144,7 @@ drop table t1;
 # and ca path to NULL
 #
 --replace_regex $ALLOWED_CIPHERS_REGEX
---exec $MYSQL --ssl --ssl-key=$MYSQL_TEST_DIR/std_data/client-key.pem --ssl-cert=$MYSQL_TEST_DIR/std_data/client-cert.pem -e "SHOW STATUS LIKE 'ssl_Cipher'" 2>&1
+--exec $MYSQL --ssl --ssl-key=$MYSQL_TEST_DIR/std_data/client-key.pem --ssl-cert=$MYSQL_TEST_DIR/std_data/client-cert.pem -e "SHOW STATUS LIKE 'ssl_Cipher'; SHOW STATUS LIKE 'ssl_version';" 2>&1
 --echo End of 5.0 tests
 
 #

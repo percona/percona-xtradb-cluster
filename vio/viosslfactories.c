@@ -32,15 +32,6 @@
 #define TLS_VERSION_OPTION_SIZE 256
 #define SSL_CIPHER_LIST_SIZE 4096
 
-#ifdef HAVE_YASSL
-static const char tls_ciphers_list[]="DHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA:"
-  "AES128-RMD:DES-CBC3-RMD:DHE-RSA-AES256-RMD:"
-  "DHE-RSA-AES128-RMD:DHE-RSA-DES-CBC3-RMD:"
-  "AES256-SHA:RC4-SHA:RC4-MD5:DES-CBC3-SHA:"
-  "DES-CBC-SHA:EDH-RSA-DES-CBC3-SHA:"
-  "EDH-RSA-DES-CBC-SHA:AES128-SHA:AES256-RMD";
-static const char tls_cipher_blocked[]= "!aNULL:!eNULL:!EXPORT:!LOW:!MD5:!DES:!RC2:!RC4:!PSK:";
-#else
 static const char tls_ciphers_list[]="ECDHE-ECDSA-AES128-GCM-SHA256:"
   "ECDHE-ECDSA-AES256-GCM-SHA384:"
   "ECDHE-RSA-AES128-GCM-SHA256:"
@@ -81,7 +72,6 @@ static const char tls_cipher_blocked[]= "!aNULL:!eNULL:!EXPORT:!LOW:!MD5:!DES:!R
   "!DHE-DSS-DES-CBC3-SHA:!DHE-RSA-DES-CBC3-SHA:"
   "!ECDH-RSA-DES-CBC3-SHA:!ECDH-ECDSA-DES-CBC3-SHA:"
   "!ECDHE-RSA-DES-CBC3-SHA:!ECDHE-ECDSA-DES-CBC3-SHA:";
-#endif
 
 
 static my_bool     ssl_algorithms_added    = FALSE;
@@ -358,6 +348,9 @@ new_VioSSLFd(const char *key_file, const char *cert_file,
                         SSL_OP_NO_TICKET;
   int ret_set_cipherlist= 0;
   char cipher_list[SSL_CIPHER_LIST_SIZE]= {0};
+#if defined(OPENSSL_EC_NAMED_CURVE) && (OPENSSL_VERSION_NUMBER < 0x10002000L)
+  EC_KEY *ecdh;
+#endif
   DBUG_ENTER("new_VioSSLFd");
   DBUG_PRINT("enter",
              ("key_file: '%s'  cert_file: '%s'  ca_file: '%s'  ca_path: '%s'  "
@@ -382,6 +375,9 @@ new_VioSSLFd(const char *key_file, const char *cert_file,
   ssl_ctx_options= (ssl_ctx_options | ssl_ctx_flags) &
     (SSL_OP_NO_SSLv2 |
      SSL_OP_NO_SSLv3 |
+#ifdef HAVE_TLSv13
+     SSL_OP_NO_TLSv1_3 |
+#endif /* HAVE_TLSv13 */
      SSL_OP_NO_TLSv1
 #ifdef SSL_OP_NO_TLSv1_1
      | SSL_OP_NO_TLSv1_1

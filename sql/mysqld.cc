@@ -132,7 +132,7 @@ int dummy_variable_to_pull_in_lf_hash_functions= LF_HASH_OVERHEAD;
 #include <poll.h>
 #endif
 
-#if defined(HAVE_OPENSSL) && !defined(HAVE_YASSL)
+#if defined(HAVE_OPENSSL)
 #include <openssl/crypto.h>
 #endif
 
@@ -3191,7 +3191,7 @@ bool one_thread_per_connection_end(THD *thd, bool block_pthread)
   }
 #endif /* WITH_WSREP */
   // Clean up errors now, before possibly waiting for a new connection.
-#ifndef EMBEDDED_LIBRARY
+#if !defined(EMBEDDED_LIBRARY) && (OPENSSL_VERSION_NUMBER < 0x10100000L)
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
   ERR_remove_thread_state(0);
 #endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
@@ -4867,6 +4867,15 @@ static void openssl_lock(int mode, openssl_lock_t *lock, const char *file,
 static int init_ssl()
 {
 #ifdef HAVE_OPENSSL
+  int fips_mode= FIPS_mode();
+  if (fips_mode != 0)
+  {
+    /* FIPS is enabled, Log warning and Disable it now */
+    sql_print_warning(
+        "Percona Server cannot operate under OpenSSL FIPS mode."
+        " Disabling FIPS.");
+    FIPS_mode_set(0);
+  }
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
   CRYPTO_malloc_init();
 #else /* OPENSSL_VERSION_NUMBER < 0x10100000L */

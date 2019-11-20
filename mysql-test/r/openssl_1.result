@@ -68,6 +68,8 @@ Variable_name	Value
 Ssl_cipher	DHE-RSA-AES256-SHA
 Variable_name	Value
 Ssl_cipher	SSL_CIPHER
+Variable_name	Value
+Ssl_version	TLSv1.2
 End of 5.0 tests
 DROP TABLE IF EXISTS thread_status;
 DROP EVENT IF EXISTS event_status;
