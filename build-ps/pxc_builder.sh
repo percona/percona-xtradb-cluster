@@ -100,7 +100,7 @@ enabled=1
 EOL
         else
             curl -o /etc/yum.repos.d/ https://jenkins.percona.com/yum-repo/percona-dev.repo
-	fi
+        fi
     fi
     return
 }
@@ -140,12 +140,20 @@ get_sources(){
         git clean -xdf
         git checkout "$BRANCH"
     fi
-
-    git submodule deinit -f .
+    rm -rf wsrep-lib || true
+    rm -rf percona-xtradb-cluster-galera || true
+    git submodule deinit -f . || true
     git submodule init
     git submodule update
 
-    WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/src/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
+    for dir in 'wsrep-lib' 'percona-xtradb-cluster-galera'; do
+        cd $dir
+        git submodule deinit -f . || true
+        git submodule init
+        git submodule update
+        cd ../
+    done
+    WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep-lib/wsrep-API/v26/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep-lib.cmake" | cut -d '"' -f2)"
     WSREP_REV="$(test -r WSREP-REVISION && cat WSREP-REVISION)"
     REVISION=$(git rev-parse --short HEAD)
     GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
@@ -175,7 +183,18 @@ get_sources(){
     echo "GALERA_REVNO=${GALERA_REVNO}" >>${WORKDIR}/pxc-80.properties
     DEST=${DESTINATION}
     echo "DEST=${DEST}" >> ${WORKDIR}/pxc-80.properties
-    cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost
+    if [ -f /etc/redhat-release ]; then
+      export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
+      RHEL=$(rpm --eval %rhel)
+      source /opt/rh/devtoolset-7/enable
+      if [ "x${RHEL}" = "x8" ]; then
+          cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1
+      else
+          cmake3 . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1
+      fi
+    else
+      cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1
+    fi
     make dist
     mv *.tar.gz ${WORKDIR}/
     cd ${WORKDIR}
@@ -191,9 +210,22 @@ get_sources(){
     rm -f ${EXPORTED_TAR}
     # add git submodules because make dist uses git archive which doesn't include them
     rsync -av ${WORKDIR}/percona-xtradb-cluster/percona-xtradb-cluster-galera/ ${PXCDIR}/percona-xtradb-cluster-galera --exclude .git
+    rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep-lib/ ${PXCDIR}/wsrep-lib --exclude .git
 
-    rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep/src/ ${PXCDIR}/percona-xtradb-cluster-galera/wsrep/src --exclude .git
-    rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep/src/ ${PXCDIR}/wsrep/src --exclude .git
+    sed -i 's:ROUTER_RUNTIMEDIR:/var/run/mysqlrouter/:g' ${PXCDIR}/packaging/rpm-common/*
+    cd ${PXCDIR}/packaging/rpm-common
+        if [ ! -f mysqlrouter.service ]; then
+            cp -p mysqlrouter.service.in mysqlrouter.service
+        fi
+        if [ ! -f mysqlrouter.tmpfiles.d ]; then
+            cp -p mysqlrouter.tmpfiles.d.in mysqlrouter.tmpfiles.d
+        fi
+        if [ ! -f mysqlrouter.conf ]; then
+            cp -p mysqlrouter.conf.in mysqlrouter.conf
+        fi
+        if [ ! -f mysql.logrotate ]; then
+            cp -p mysql.logrotate.in mysql.logrotate
+        fi
 
     cd ${WORKDIR}
     #
@@ -241,7 +273,7 @@ install_deps() {
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         add_percona_yum_repo
-	if [ "x${RHEL}" = "x8" ]; then
+        if [ "x${RHEL}" = "x8" ]; then
             yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++
             yum -y install git gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
             yum -y install libstdc++-devel libtirpc-devel make ncurses-devel numactl-devel
@@ -253,6 +285,7 @@ install_deps() {
         else
             yum -y install https://repo.percona.com/yum/percona-release-latest.noarch.rpm || true
             percona-release enable original release
+            percona-release enable tools release
             yum -y install epel-release
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc 
             yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata jemalloc-devel
@@ -263,12 +296,23 @@ install_deps() {
                 sleep 1
             done
             yum -y install  gcc-c++ devtoolset-7-gcc-c++ devtoolset-7-binutils
-	fi
+            source /opt/rh/devtoolset-7/enable
+            yum -y install scons check-devel boost-devel cmake3
+            alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake 10 \
+--slave /usr/local/bin/ctest ctest /usr/bin/ctest \
+--slave /usr/local/bin/cpack cpack /usr/bin/cpack \
+--slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake \
+--family cmake
+            alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake3 20 \
+--slave /usr/local/bin/ctest ctest /usr/bin/ctest3 \
+--slave /usr/local/bin/cpack cpack /usr/bin/cpack3 \
+--slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake3 \
+--family cmake
+        fi
         if [ "x$RHEL" = "x6" ]; then
             yum -y install Percona-Server-shared-56
         fi
-        source /opt/rh/devtoolset-7/enable
-        yum -y install scons check-devel boost-devel
+        yum -y install yum-utils
     else
         apt-get -y install dirmngr || true
         add_percona_apt_repo
@@ -277,8 +321,8 @@ install_deps() {
         apt-get -y install lsb-release wget
         export DEBIAN_FRONTEND="noninteractive"
         export DIST="$(lsb_release -sc)"
-	    until sudo apt-get update; do
-    	    sleep 1
+            until sudo apt-get update; do
+            sleep 1
             echo "waiting"
         done
         apt-get -y purge eatmydata || true
@@ -293,8 +337,8 @@ install_deps() {
         apt-get -y install libmecab2 mecab mecab-ipadic
         apt-get -y install build-essential devscripts
         apt-get -y install cmake autotools-dev autoconf automake build-essential devscripts debconf debhelper fakeroot
-	apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
-	apt-get -y install doxygen doxygen-gui graphviz rsync
+        apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
+        apt-get -y install doxygen doxygen-gui graphviz rsync
         if [ x"${DIST}" = xcosmic ]; then
             apt-get -y install libssl1.0-dev libeatmydata1
         fi
@@ -356,7 +400,7 @@ build_srpm(){
     get_tar "source_tarball"
     rm -fr rpmbuild
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
-
+    source ${WORKDIR}/pxc-80.properties
     TARFILE=$(basename $(find . -iname 'Percona-XtraDB-Cluster-*.tar.gz' | sort | tail -n1))
     NAME="Percona-XtraDB-Cluster"
     VERSION=$MYSQL_VERSION
@@ -508,6 +552,7 @@ build_rpm(){
     build_mecab_dict
 
     cd ${WORKDIR}
+    source /opt/rh/devtoolset-7/enable
     #
     if [ ${ARCH} = x86_64 ]; then
         rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
