@@ -1,0 +1,30 @@
+#node-1
+ALTER TABLESPACE mysql ENCRYPTION = 'Y';
+select name, encryption from information_schema.innodb_tablespaces where name like '%mysql';
+name	encryption
+mysql	Y
+#node-2
+select name, encryption from information_schema.innodb_tablespaces where name like '%mysql';
+name	encryption
+mysql	Y
+ALTER TABLESPACE mysql ENCRYPTION = 'N';
+select name, encryption from information_schema.innodb_tablespaces where name like '%mysql';
+name	encryption
+mysql	N
+#node-1
+select name, encryption from information_schema.innodb_tablespaces where name like '%mysql';
+name	encryption
+mysql	N
+#node-2 being killed
+Killing server ...
+#node-1
+ALTER TABLESPACE mysql ENCRYPTION = 'Y';
+select name, encryption from information_schema.innodb_tablespaces where name like '%mysql';
+name	encryption
+mysql	Y
+#node-2 restarted (should get encrypted table through SST)
+# restart
+select name, encryption from information_schema.innodb_tablespaces where name like '%mysql';
+name	encryption
+mysql	Y
+ALTER TABLESPACE mysql ENCRYPTION = 'N';

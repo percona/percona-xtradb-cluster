@@ -220,7 +220,6 @@ galera.galera_toi_ddl_online : BUG#0 fails randomly with "deadlock error" as seq
 galera.galera_fk_multitable : BUG#0 Bug#80821
 galera.galera_kill_nochanges : BUG#0 mysql-wsrep#24
 galera.galera_toi_ddl_fk_insert : BUG#0 qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically
-galera.pxc_encrypt_rest_blog : BUG#0 Currently PXC do not support binlog encryption
 galera.pxc_encrypt_rest_gt_vault : BUG#0 Vault server availability is unreliable
 galera.pxc_encrypt_rest_fpt_vault : BUG#0 Vault server availability is unreliable
 galera.galera_var_notify_cmd : BUG#0 Failing to invoke the external script

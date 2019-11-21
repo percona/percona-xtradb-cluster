@@ -1981,14 +1981,6 @@ static dberr_t srv_sys_enable_encryption(bool create_new_db) {
   fil_space_t *space = fil_space_get(TRX_SYS_SPACE);
   dberr_t err = DB_SUCCESS;
 
-#ifdef WITH_WSREP
-  if (WSREP_ON && srv_sys_tablespace_encrypt) {
-    ib::error() << "Percona XtraDB Cluster doesn't support"
-                << " system tablespace encryption.";
-    return (DB_ERROR);
-  }
-#endif /* WITH_WSREP */
-
   if (create_new_db && srv_sys_tablespace_encrypt) {
     fsp_flags_set_encryption(space->flags);
     srv_sys_space.set_flags(space->flags);

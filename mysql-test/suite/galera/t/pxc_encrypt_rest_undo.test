@@ -26,11 +26,13 @@ INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 --echo #node-1
 CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
 INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
 
 --connection node_2
 --echo #node-2
 SELECT COUNT(*) = 10000 from t1;
 DROP TABLE t1;
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
 
 #-------------------------------------------------------------------------------
 # sst of the encrypted table
@@ -60,6 +62,8 @@ begin; select count(*) from t1 where f1 < 1000;
 --echo #node-1 (open trx that would involve use of undo)
 update t1 set f2 = 9999999 where f1 > 1000;
 begin; update t1 set f2 = 8888888 where f1 < 1000;
+#
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
 
 --connection node_2
 --echo #node-2 restarted
@@ -67,6 +71,8 @@ begin; update t1 set f2 = 8888888 where f1 < 1000;
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 --source include/galera_wait_ready.inc
+#
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
 
 SELECT COUNT(*) = 0 from t1 where f2 = 8888888;
 SELECT COUNT(*) from t1 where f2 = 9999999;
@@ -119,6 +125,8 @@ DELIMITER ;|
 # 10000 independent transaction committed
 CALL proc_insert();
 SELECT COUNT(*) from t1;
+#
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
 
 --connection node_2
 --echo #node-2 restarted (should get encrypted table through IST)
@@ -127,6 +135,8 @@ SELECT COUNT(*) from t1;
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 --source include/galera_wait_ready.inc
+#
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
 
 --connection node_2
 --echo #node-2

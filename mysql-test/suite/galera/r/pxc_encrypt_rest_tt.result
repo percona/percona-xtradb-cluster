@@ -7,6 +7,9 @@ INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4
 select purpose from information_schema.innodb_session_temp_tablespaces where space in (select space from information_schema.innodb_temp_table_info);
 purpose
 USER ENCRYPTED
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
+name	encryption
+innodb_temporary	Y
 #node-2
 use test;
 CREATE TEMPORARY TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
@@ -14,6 +17,9 @@ INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4
 select purpose from information_schema.innodb_session_temp_tablespaces where space in (select space from information_schema.innodb_temp_table_info);
 purpose
 USER ENCRYPTED
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
+name	encryption
+innodb_temporary	Y
 DROP TABLE t1;
 #node-1
 DROP TABLE t1;
@@ -31,8 +37,14 @@ SELECT * FROM e1;
 id	text
 1	aaaaa
 2	bbbbb
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
+name	encryption
+innodb_temporary	Y
 #node-2 restarted (should get encrypted table through SST)
 # restart
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
+name	encryption
+innodb_temporary	Y
 CREATE TEMPORARY TABLE e1 (
 id INT NOT NULL,
 text VARCHAR(10) DEFAULT NULL,
@@ -56,8 +68,14 @@ PRIMARY KEY (id)
 );
 INSERT INTO e1 VALUES(1, 'aaaaa');
 INSERT INTO e1 VALUES(2, 'bbbbb');
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
+name	encryption
+innodb_temporary	Y
 #node-2 restarted (should get encrypted table through IST)
 # restart
+select name, encryption from information_schema.innodb_tablespaces where name like '%innodb_temporary%';
+name	encryption
+innodb_temporary	Y
 CREATE TEMPORARY TABLE e1 (
 id INT NOT NULL,
 text VARCHAR(10) DEFAULT NULL,
