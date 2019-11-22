@@ -338,10 +338,16 @@ install_deps() {
         apt-get -y install build-essential devscripts
         apt-get -y install cmake autotools-dev autoconf automake build-essential devscripts debconf debhelper fakeroot
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
-        apt-get -y install doxygen doxygen-gui graphviz rsync
+        apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
+        apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         if [ x"${DIST}" = xcosmic ]; then
             apt-get -y install libssl1.0-dev libeatmydata1
         fi
+        wget https://repo.percona.com/apt/percona-release_1.0-13.generic_all.deb
+        dpkg -i percona-release_1.0-13.generic_all.deb
+        apt-get update
+        apt-get -y install --download-only percona-xtrabackup-24
+        apt-get -y install --download-only percona-xtrabackup-80
     fi
     return;
 }
@@ -567,7 +573,6 @@ build_rpm(){
     mkdir -p ${CURDIR}/rpm
     cp rpmbuild/RPMS/*/*.rpm ${WORKDIR}/rpm
     cp rpmbuild/RPMS/*/*.rpm ${CURDIR}/rpm
-    
 }
 
 build_source_deb(){
@@ -581,6 +586,7 @@ build_source_deb(){
         echo "It is not possible to build source deb here"
         exit 1
     fi
+     source ${WORKDIR}/pxc-80.properties
     rm -rf percona-server*
     get_tar "source_tarball"
     rm -f *.dsc *.orig.tar.gz *.debian.tar.gz *.changes
@@ -648,6 +654,7 @@ build_deb(){
         get_deb_sources $file
     done
     cd $WORKDIR
+    source ${WORKDIR}/pxc-80.properties
     rm -fv *.deb
 
     export DEBIAN_VERSION="$(lsb_release -sc)"
@@ -677,6 +684,20 @@ build_deb(){
     dpkg-source -x ${DSC}
 
     cd ${DIRNAME}
+    
+    mkdir pxb-2.4
+    mkdir pxb-8.0
+    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-24* pxb-2.4
+    dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
+    cd pxb-2.4
+        mv usr/bin ./
+        mv usr/lib* ./
+        rm -rf usr *.deb DEBIAN
+    cd ../pxb-8.0
+        mv usr/bin ./
+        mv usr/lib* ./
+        rm -rf usr *.deb DEBIAN
+    cd ../
 
     if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" ]]; then
         sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
@@ -704,13 +725,14 @@ build_deb(){
         sed -i "s:libssl-dev:libssl1.0-dev:" debian/control
         sed -i "s:iproute:iproute2:g" debian/control
     fi
+    sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
     sudo chmod 777 debian/rules
     dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
     cd ${WORKSPACE}
-    rm -fv *.dsc *.orig.tar.gz *.debian.tar.gz *.changes 
+    rm -fv *.dsc *.orig.tar.gz *.debian.tar.gz *.changes
     rm -fr ${DIRNAME}
 
 
@@ -727,17 +749,19 @@ build_tarball(){
         echo "Binary tarball will not be created"
         return;
     fi
+    source ${WORKDIR}/pxc-80.properties
     get_tar "source_tarball"
     cd $WORKDIR
+    source ${WORKDIR}/pxc-80.properties
     TARFILE=$(basename $(find . -iname 'percona-xtradb-cluster*.tar.gz' | sort | tail -n1))
     if [ -f /etc/debian_version ]; then
-      export OS_RELEASE="$(lsb_release -sc)"
+        export OS_RELEASE="$(lsb_release -sc)"
     fi
     #
     if [ -f /etc/redhat-release ]; then
-      export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
-      RHEL=$(rpm --eval %rhel)
-      source /opt/rh/devtoolset-7/enable
+        export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
+        RHEL=$(rpm --eval %rhel)
+        source /opt/rh/devtoolset-7/enable
     fi
     #
 
@@ -748,7 +772,7 @@ build_tarball(){
         RHEL=$(rpm --eval %rhel 2>/dev/null||true)
         if [ ${RHEL} = 7 ]; then
             SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//'| awk -F':' '{print $2}')
-            export SSL_VER=".ssl${SSL_VER_TMP}"  
+            export SSL_VER=".ssl${SSL_VER_TMP}"
         else
             SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//')
             export SSL_VER=".ssl${SSL_VER_TMP}"
@@ -771,16 +795,63 @@ build_tarball(){
     rm -f $TARFILE
     #
     cd ${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION}
+
     BUILD_NUMBER=$(date "+%Y%m%d-%H%M%S")
     mkdir -p $BUILD_NUMBER
 
     BUILD_ROOT="$ROOT_FS/$PXC_DIRNAME/$BUILD_NUMBER"
     mkdir -p ${BUILD_ROOT}
+    CURDIR=$(pwd)
+    cd ${BUILD_ROOT}
+    if [ -f /etc/redhat-release ]; then
+        mkdir pxb-2.4
+        pushd pxb-2.4
+        yumdownloader percona-xtrabackup-24
+        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+        mv usr/bin ./
+        mv usr/lib* ./
+        rm -rf usr
+        rm -f *.rpm
+        popd
 
+        mkdir pxb-8.0
+        pushd pxb-8.0
+        yumdownloader percona-xtrabackup-80
+        rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+        mv usr/bin ./
+        mv usr/lib* ./
+        rm -rf usr
+        rm -f *.rpm
+        popd
+        tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
+        tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
+        rm -rf pxb-8.0 pxb-2.4
+    else
+        mkdir pxb-2.4
+        mkdir pxb-8.0
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-24* pxb-2.4
+        dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
+        cd pxb-2.4
+            mv usr/bin ./
+            mv usr/lib* ./
+            rm -rf usr *.deb DEBIAN
+        cd ../pxb-8.0
+            mv usr/bin ./
+            mv usr/lib* ./
+            rm -rf usr *.deb DEBIAN
+        cd ../
+        tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
+        tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
+        rm -rf pxb-8.0 pxb-2.4
+    fi
+    mkdir -p ${BUILD_ROOT}/target/pxc_extra/
+    cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
+    cp *.tar.gz ${BUILD_ROOT}/target
+    cd ${CURDIR}
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2
     tar xf jemalloc-$JVERSION.tar.bz2
-    mv jemalloc-$JVERSION jemalloc 
+    mv jemalloc-$JVERSION jemalloc
 
     export SCONS_ARGS=" strict_build_flags=0"
     bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t 1.1 $BUILD_ROOT
@@ -788,7 +859,7 @@ build_tarball(){
     mkdir -p ${CURDIR}/tarball
     cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/tarball
     cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/tarball
-    
+
 }
 
 #main

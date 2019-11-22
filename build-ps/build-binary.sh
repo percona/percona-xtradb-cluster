@@ -492,7 +492,7 @@ fi
             echo "Could not find percona-xtrabackup-2.4 tarball in $TARGETDIR.  Terminating."
             exit 1
         fi
-        pxb_dir=$(echo $pxb_tar | grep -oe ".*x86_64" )
+        pxb_dir=$(echo $pxb_tar | grep -oe ".tar*" )
 
         mkdir -p pxc_extra
         cd pxc_extra
@@ -505,7 +505,7 @@ fi
             echo "Extracting pxb 2.4 tarball"
             tar -xzf "../$pxb_tar"
         fi
-        rm -f "pxb-2.4"
+        #rm -f "pxb-2.4"
         echo "Creating symlink pxc_extra/pxb-2.4 --> $pxb_dir"
         ln -s "$pxb_dir" pxb-2.4
     ) || exit 1
@@ -534,7 +534,7 @@ fi
             echo "Extracting pxb 8.0 tarball"
             tar -xzf "../$pxb_tar"
         fi
-        rm -f "pxb-8.0"
+        #rm -f "pxb-8.0"
         echo "Creating symlink pxc_extra/pxb-8.0 --> $pxb_dir"
         ln -s "$pxb_dir" pxb-8.0
     ) || exit 1

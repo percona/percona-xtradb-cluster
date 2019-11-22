@@ -13,8 +13,7 @@ usr/bin/mysqld_multi
 usr/bin/mysqld_safe
 usr/bin/mysqltest
 usr/bin/perror
-usr/bin/resolve_stack_dump
-usr/bin/resolveip
+usr/bin/pxc_extra
 usr/bin/wsrep_sst_common
 usr/bin/wsrep_sst_xtrabackup-v2
 usr/bin/wsrep_sst_rsync
@@ -30,8 +29,6 @@ usr/share/man/man1/mysqld_safe.1
 usr/share/man/man1/mysql_secure_installation.1
 usr/share/man/man1/mysql_upgrade.1
 usr/share/man/man1/perror.1
-usr/share/man/man1/resolveip.1
-usr/share/man/man1/resolve_stack_dump.1
 usr/share/man/man1/innochecksum.1
 usr/share/man/man1/mysql_tzinfo_to_sql.1
 usr/share/man/man1/mysql.server.1
