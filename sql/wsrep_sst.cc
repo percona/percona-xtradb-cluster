@@ -400,6 +400,7 @@ static bool sst_cancelled = false;
 void wsrep_sst_cancel(bool call_wsrep_cb) {
   if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
   if (!sst_cancelled) {
+    WSREP_INFO("Initiating SST cancellation");
     sst_cancelled = true;
     /*
       When we launched the SST process, then we need
@@ -407,6 +408,7 @@ void wsrep_sst_cancel(bool call_wsrep_cb) {
       process:
     */
     if (sst_process) {
+      WSREP_INFO("Terminating SST process");
       sst_process->terminate();
       sst_process = NULL;
     }
