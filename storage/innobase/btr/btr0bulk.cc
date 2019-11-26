@@ -831,7 +831,6 @@ BtrBulk::insert(
 		}
 
 		DEBUG_SYNC_C("bulk_load_insert");
-
 		m_page_bulks->push_back(new_page_bulk);
 		ut_ad(level + 1 == m_page_bulks->size());
 		m_root_level = level;
@@ -965,8 +964,6 @@ dberr_t
 BtrBulk::finish(dberr_t	err)
 {
 	ulint		last_page_no = FIL_NULL;
-
-	ut_ad(!dict_table_is_temporary(m_index->table));
 
 #ifdef UNIV_DEBUG
 	/* Assert that the index online status has not changed */

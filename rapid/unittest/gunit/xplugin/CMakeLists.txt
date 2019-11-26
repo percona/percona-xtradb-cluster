@@ -158,12 +158,8 @@ TARGET_LINK_LIBRARIES(
   regex
   gmock
   mysqlservices
-<<<<<<< HEAD
-  perconaserverclient
-=======
   ${FORCE_SSL_SOLARIS}
-  mysqlclient
->>>>>>> wsrep_5.7.28-25.20
+  perconaserverclient
   ${LIBEVENT_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   ${PROTOBUF_LIBRARY}

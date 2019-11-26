@@ -149,8 +149,8 @@ int my_aes_encrypt(const unsigned char *source, uint32 source_length,
   unsigned char rkey[MAX_AES_KEY_LENGTH / 8];
 
   my_aes_create_key(key, key_length, rkey, mode);
-  if (!ctx || !cipher || (EVP_CIPHER_iv_length(cipher) > 0 && !iv))
-    return MY_AES_BAD_DATA;
+  if (!cipher || (EVP_CIPHER_iv_length(cipher) > 0 && !iv))
+    goto aes_error;                             /* Error */
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
   EVP_CIPHER_CTX_init(ctx);

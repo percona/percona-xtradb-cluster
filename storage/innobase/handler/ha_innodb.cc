@@ -681,6 +681,26 @@ uint get_global_default_encryption_key_id_value()
 	return THDVAR(NULL, default_encryption_key_id);
 }
 
+static MYSQL_THDVAR_UINT(records_in_range, PLUGIN_VAR_RQCMDARG,
+                         "Used to override the result of records_in_range(). "
+                         "Set to a positive number to override",
+                         NULL, NULL, 0,
+                         /* min */ 0, /* max */ INT_MAX, 0);
+
+static MYSQL_THDVAR_UINT(force_index_records_in_range, PLUGIN_VAR_RQCMDARG,
+                         "Used to override the result of records_in_range() "
+                         "when FORCE INDEX is used.",
+                         NULL, NULL, 0,
+                         /* min */ 0, /* max */ INT_MAX, 0);
+
+uint innodb_force_index_records_in_range(THD* thd) {
+	return THDVAR(thd, force_index_records_in_range);
+}
+
+uint innodb_records_in_range(THD* thd) {
+	return THDVAR(thd, records_in_range);
+}
+
 /** Set up InnoDB API callback function array */
 ib_cb_t innodb_api_cb[] = {
 	(ib_cb_t) ib_cursor_open_table,
@@ -4298,9 +4318,9 @@ innobase_init(
 	innobase_hton->fill_is_table = innobase_fill_i_s_table;
 	innobase_hton->flags =
 		HTON_SUPPORTS_EXTENDED_KEYS | HTON_SUPPORTS_FOREIGN_KEYS |
+		HTON_SUPPORTS_TABLE_ENCRYPTION |
 		HTON_SUPPORTS_ONLINE_BACKUPS |
-		HTON_SUPPORTS_COMPRESSED_COLUMNS |
-		HTON_SUPPORTS_TABLE_ENCRYPTION;
+		HTON_SUPPORTS_COMPRESSED_COLUMNS;
 
 	innobase_hton->release_temporary_latches =
 		innobase_release_temporary_latches;
@@ -25123,6 +25143,8 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(background_scrub_data_compressed),
   MYSQL_SYSVAR(background_scrub_data_interval),
   MYSQL_SYSVAR(background_scrub_data_check_interval),
+  MYSQL_SYSVAR(records_in_range),
+  MYSQL_SYSVAR(force_index_records_in_range),
   NULL
 };
 
@@ -26107,7 +26129,7 @@ innodb_encrypt_tables_validate(
 	bool legit_value= false;
 	uint use = 0;
 	for (;
-	    use < array_elements(srv_encrypt_tables_names);
+	    use < array_elements(srv_encrypt_tables_names) - 1;
 	    use++) {
 		if (!innobase_strcasecmp(
 		    innodb_encrypt_tables_input,
@@ -26148,7 +26170,7 @@ innodb_redo_log_encrypt_validate(
 
 	bool legit_value = false;
 	uint use = 0;
-	for (; use < array_elements(redo_log_encrypt_names); use++) {
+	for (; use < array_elements(redo_log_encrypt_names) - 1; use++) {
 		if (innobase_strcasecmp(redo_log_encrypt_input,
 					redo_log_encrypt_names[use]) == 0) {
 			legit_value = true;

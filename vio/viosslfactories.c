@@ -241,8 +241,6 @@ vio_set_cert_stuff(SSL_CTX *ctx, const char *cert_file, const char *key_file,
   so we don't need the following callback functions.
 */
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-/* OpenSSL specific */
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
 
 #ifdef HAVE_PSI_INTERFACE
 static PSI_rwlock_key key_rwlock_openssl;
@@ -402,7 +400,6 @@ static void deinit_lock_callback_functions()
 {
   set_lock_callback_functions(FALSE);
 }
-#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
 
 #endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
 
@@ -507,7 +504,7 @@ new_VioSSLFd(const char *key_file, const char *cert_file,
                         ;
   int ret_set_cipherlist= 0;
   char cipher_list[SSL_CIPHER_LIST_SIZE]= {0};
-#if !defined(HAVE_YASSL) && (OPENSSL_VERSION_NUMBER < 0x10002000L)
+#if (OPENSSL_VERSION_NUMBER < 0x10002000L)
   EC_KEY *ecdh;
 #endif
   DBUG_ENTER("new_VioSSLFd");
@@ -702,7 +699,6 @@ new_VioSSLFd(const char *key_file, const char *cert_file,
   }
   DH_free(dh);
 
-#ifndef HAVE_YASSL
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
   ecdh= EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
   if (!ecdh)
@@ -739,7 +735,6 @@ new_VioSSLFd(const char *key_file, const char *cert_file,
     DBUG_RETURN(0);
   }
 #endif /* OPENSSL_VERSION_NUMBER < 0x10002000L */
-#endif /* !HAVE_YASSL */
 
   DBUG_PRINT("exit", ("OK 1"));
 

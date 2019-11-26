@@ -738,7 +738,12 @@ srv_undo_tablespace_read_encryption(
  	/* Return if the encryption metadata is empty. */
 	if (memcmp(first_page + offset,
 		   ENCRYPTION_KEY_MAGIC_V2,
-		   ENCRYPTION_MAGIC_SIZE) != 0) {
+		   ENCRYPTION_MAGIC_SIZE) != 0
+	    &&
+	    memcmp(first_page + offset,
+		   ENCRYPTION_KEY_MAGIC_V3,
+		   ENCRYPTION_MAGIC_SIZE) != 0
+	    ) {
 		ut_free(first_page_buf);
 		return(DB_SUCCESS);
 	}
@@ -1481,6 +1486,12 @@ srv_shutdown_all_bg_threads()
 
 			if (srv_n_fil_crypt_threads_started) {
 				os_event_set(fil_crypt_threads_event);
+			}
+
+			/* Stop srv_redo_log_follow_thread thread */
+			if (srv_redo_log_thread_started) {
+				os_event_reset(srv_redo_log_tracked_event);
+				os_event_set(srv_checkpoint_completed_event);
 			}
 		}
 
@@ -2566,6 +2577,8 @@ files_checked:
 		if (err == DB_SUCCESS) {
 			/* Initialize the change buffer. */
 			err = dict_boot();
+			DBUG_EXECUTE_IF("ib_dic_boot_error",
+					err = DB_ERROR;);
 		}
 
 		if (err != DB_SUCCESS) {

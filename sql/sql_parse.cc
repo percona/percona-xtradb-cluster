@@ -150,7 +150,7 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables);
 static void sql_kill(THD *thd, my_thread_id id, bool only_kill_query);
 
 
-const LEX_STRING command_name[]={
+const LEX_STRING command_name[] MY_ATTRIBUTE((unused)) = {
   { C_STRING_WITH_LEN("Sleep") },
   { C_STRING_WITH_LEN("Quit") },
   { C_STRING_WITH_LEN("Init DB") },
@@ -2923,6 +2923,14 @@ bool lock_binlog_for_backup(THD *thd)
   if (thd->backup_binlog_lock.is_acquired() ||
       thd->global_read_lock.is_acquired())
     DBUG_RETURN(false);
+
+  DBUG_EXECUTE_IF("delay_slave_worker_0", {
+    static const char act[]= "now WAIT_FOR signal.w1.wait_for_its_turn";
+    DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+
+    static const char act2[]= "now SIGNAL signal.lock_binlog_for_backup";
+    DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act2)));
+  });
 
   DBUG_RETURN(thd->backup_binlog_lock.acquire(thd));
 }
@@ -6966,6 +6974,7 @@ void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat)
     update_global_user_stats(thd, true, time(NULL));
 #endif
   }
+
   DEBUG_SYNC(thd, "query_rewritten");
 
   DBUG_VOID_RETURN;
