@@ -747,7 +747,7 @@ read_cnf()
 
     # Buildup the list of files to keep in the datadir
     # (These files will not be REMOVED on the joiner node)
-    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*sst-xb-tmpdir$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
 
     # Keep the donor's keyring file
     cpat+="\|.*/${XB_DONOR_KEYRING_FILE}$"
@@ -1586,8 +1586,9 @@ fi
 # 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
 #         my.cnf.
 #
-XB_2x_REQUIRED_VERSION="2.4.13"
+XB_2x_REQUIRED_VERSION="2.4.16"
 
+wsrep_log_info "###### Looking for XB-2.4.x binaries"
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 2.x)."
@@ -1609,8 +1610,9 @@ fi
 
 # Verify our PXB 8.0 version
 #
-XB_8x_REQUIRED_VERSION="8.0.7"
+XB_8x_REQUIRED_VERSION="8.0.8"
 
+wsrep_log_info "###### Looking for XB-8.0.x binaries"
 if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 8.x)."
@@ -2048,14 +2050,18 @@ then
         initialize_pxb_commands "$DONOR_MYSQL_VERSION" "$MYSQL_VERSION"
 
         # For compatibility, if the tmpdir is not specified, then use
-        # the datadir to hold the .sst directory
+        # the datadir to hold the sst-xb-tmpdir directory
         if [[ -z "$(parse_cnf sst tmpdir "")" ]]; then
-            if [[ -d ${DATA}/.sst ]]; then
-                wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer. Removing"
-                rm -rf ${DATA}/.sst
+            if [[ -d ${DATA}/sst-xb-tmpdir ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "FATAL: Found existing $DATA/sst-xb-tmpdir"
+                wsrep_log_error "Please remove it or specify alternative temporary directory location by setting [sst]/tmpdir"
+                wsrep_log_error "Line $LINENO"
+                wsrep_log_error "****************************************************** "
+                exit 2
             fi
-            mkdir -p ${DATA}/.sst
-            JOINER_SST_DIR=$DATA/.sst
+            mkdir -p ${DATA}/sst-xb-tmpdir
+            JOINER_SST_DIR=$DATA/sst-xb-tmpdir
         else
             JOINER_SST_DIR=$(mktemp -p "${tmpdirbase}" -dt sst_XXXX)
         fi
