@@ -400,16 +400,7 @@ bool wsrep_safe_to_persist_xid(THD *thd) {
     return (true);
   }
 
-  // TODO: G-4: Need to block transaction rollback use-cases
   return (true);
-  
-#if 0
-  /* transaction rollback also invokes persist of XID.
-  Avoid persisting XID in this use-case. */
-  bool safe_to_persist_xid = false;
-  safe_to_persist_xid = true;
-  return (safe_to_persist_xid);
-#endif
 }
 
 int wsrep_create_threadvars() {

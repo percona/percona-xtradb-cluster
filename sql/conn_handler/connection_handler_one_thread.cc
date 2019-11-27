@@ -88,16 +88,10 @@ bool One_thread_connection_handler::add_connection(Channel_info *channel_info) {
     create_user = false;
   } else {
     delete channel_info;
-#ifdef WITH_WSREP
-    wsrep_open(thd);
-#endif /* WITH_WSREP */
     while (thd_connection_alive(thd)) {
       if (do_command(thd)) break;
     }
     end_connection(thd);
-#ifdef WITH_WSREP
-    wsrep_close(thd);
-#endif /* WITH_WSREP */
   }
   close_connection(thd, 0, false, false);
 

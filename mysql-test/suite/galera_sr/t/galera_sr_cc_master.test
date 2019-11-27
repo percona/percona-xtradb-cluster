@@ -2,6 +2,7 @@
 #
 
 --source include/galera_cluster.inc
+--source include/force_restart.inc
 
 #
 # Test the effect of Cluster Configuration Change on a concurrently-running SR transaction
