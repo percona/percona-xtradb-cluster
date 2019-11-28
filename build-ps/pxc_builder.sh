@@ -451,7 +451,7 @@ build_srpm(){
         SCONS_ARGS=""
     fi
     source ${WORKDIR}/pxc-80.properties
-    if [[ -n ${SRCRPM} ]]; then
+    if [ -n ${SRCRPM} ]; then
         if test "x${SCONS_ARGS}" == "x"
         then
             rpmbuild -bs --define "_topdir ${WORKDIR}/rpmbuild" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "dist generic" rpmbuild/SPECS/percona-xtradb-cluster.spec
@@ -772,7 +772,7 @@ build_tarball(){
         SSL_VER_TMP=$(dpkg -l|grep -i libssl|grep -v "libssl\-"|head -n1|awk '{print $2}'|awk -F ":" '{print $1}'|sed 's/libssl/ssl/g'|sed 's/\.//g')
         export SSL_VER=".${SSL_VER_TMP}"
     fi
-
+    export DIST_NAME=".${OS_NAME}"
     ROOT_FS=$(pwd)
 
     TARFILE=$(basename $(find . -iname 'Percona-XtraDB-Cluster*.tar.gz' | grep -v 'galera' | sort | tail -n1))
