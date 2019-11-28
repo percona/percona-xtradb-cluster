@@ -106,19 +106,19 @@ EOL
 }
 
 add_percona_apt_repo(){
-  if [ ! -f /etc/apt/sources.list.d/percona-dev.list ]; then
-    curl -o /etc/apt/sources.list.d/ https://jenkins.percona.com/apt-repo/percona-dev.list.template
-    mv /etc/apt/sources.list.d/percona-dev.list.template /etc/apt/sources.list.d/percona-dev.list
-    sed -i "s:@@DIST@@:$OS_NAME:g" /etc/apt/sources.list.d/percona-dev.list
-  fi
+    if [ ! -f /etc/apt/sources.list.d/percona-dev.list ]; then
+        curl -o /etc/apt/sources.list.d/ https://jenkins.percona.com/apt-repo/percona-dev.list.template
+        mv /etc/apt/sources.list.d/percona-dev.list.template /etc/apt/sources.list.d/percona-dev.list
+        sed -i "s:@@DIST@@:$OS_NAME:g" /etc/apt/sources.list.d/percona-dev.list
+    fi
 
-  wget -q -O - http://jenkins.percona.com/apt-repo/8507EFA5.pub | sudo apt-key add -
-  wget -q -O - http://jenkins.percona.com/apt-repo/CD2EFD2A.pub | sudo apt-key add -
-  return
+    wget -q -O - http://jenkins.percona.com/apt-repo/8507EFA5.pub | sudo apt-key add -
+    wget -q -O - http://jenkins.percona.com/apt-repo/CD2EFD2A.pub | sudo apt-key add -
+    return
 }
 
 get_sources(){
-    cd "${WORKDIR}"
+    cd "${WORKDIR}" || exit
     if [ "${SOURCE}" = 0 ]
     then
         echo "Sources will not be downloaded"
@@ -133,7 +133,7 @@ get_sources(){
         exit 1
     fi
 
-    cd percona-xtradb-cluster
+    cd percona-xtradb-cluster || exit
     if [ ! -z "$BRANCH" ]
     then
         git reset --hard
@@ -147,11 +147,11 @@ get_sources(){
     git submodule update
 
     for dir in 'wsrep-lib' 'percona-xtradb-cluster-galera'; do
-        cd $dir
+        cd $dir || exit
         git submodule deinit -f . || true
         git submodule init
         git submodule update
-        cd ../
+        cd ../ || exit
     done
     WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep-lib/wsrep-API/v26/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep-lib.cmake" | cut -d '"' -f2)"
     WSREP_REV="$(test -r WSREP-REVISION && cat WSREP-REVISION)"
@@ -197,9 +197,9 @@ get_sources(){
     fi
     make dist
     mv *.tar.gz ${WORKDIR}/
-    cd ${WORKDIR}
+    cd ${WORKDIR} || exit
     cat pxc-80.properties
-    cd ${WORKDIR}
+    cd ${WORKDIR} || exit
     ls
     #EXPORTED_TAR=$(basename $(find . -type f -name "*.tar.gz" | sort  | grep -v new | tail -n 1))
     EXPORTED_TAR=$(ls | grep tar.gz )
@@ -213,7 +213,7 @@ get_sources(){
     rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep-lib/ ${PXCDIR}/wsrep-lib --exclude .git
 
     sed -i 's:ROUTER_RUNTIMEDIR:/var/run/mysqlrouter/:g' ${PXCDIR}/packaging/rpm-common/*
-    cd ${PXCDIR}/packaging/rpm-common
+    cd ${PXCDIR}/packaging/rpm-common || exit
         if [ ! -f mysqlrouter.service ]; then
             cp -p mysqlrouter.service.in mysqlrouter.service
         fi
@@ -227,7 +227,7 @@ get_sources(){
             cp -p mysql.logrotate.in mysql.logrotate
         fi
 
-    cd ${WORKDIR}
+    cd ${WORKDIR} || exit
     #
     tar --owner=0 --group=0 --exclude=.bzr --exclude=.git -czf ${PXCDIR}.tar.gz ${PXCDIR}
     rm -fr ${PXCDIR}
@@ -237,7 +237,7 @@ get_sources(){
     mkdir $CURDIR/source_tarball
     cp ${PXCDIR}.tar.gz $WORKDIR/source_tarball
     cp ${PXCDIR}.tar.gz $CURDIR/source_tarball
-    cd $CURDIR
+    cd $CURDIR || exit
     rm -rf percona-xtradb-cluster
     return
 }
@@ -402,7 +402,7 @@ build_srpm(){
         echo "It is not possible to build src rpm here"
         exit 1
     fi
-    cd $WORKDIR
+    cd $WORKDIR || exit
     get_tar "source_tarball"
     rm -fr rpmbuild
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
@@ -414,20 +414,20 @@ build_srpm(){
 
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
     #
-    cd ${WORKDIR}/rpmbuild/SPECS
+    cd ${WORKDIR}/rpmbuild/SPECS || exit
     tar vxzf ${WORKDIR}/${TARFILE} --wildcards '*/build-ps/*.spec' --strip=2
     #
-    cd ${WORKDIR}
+    cd ${WORKDIR} || exit
     #
     mv -fv ${TARFILE} ${WORKDIR}/rpmbuild/SOURCES
-    cd ${WORKDIR}/rpmbuild/SOURCES
+    cd ${WORKDIR}/rpmbuild/SOURCES || exit
     tar -xzf ${TARFILE}
     rm -rf ${TARFILE}
     PXCDIR=$(ls | grep 'Percona-XtraDB-Cluster*' | sort | tail -n1)
     mv ${PXCDIR} Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
     tar -zcf Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}.tar.gz Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
     rm -rf ${PXCDIR}
-    cd ${WORKDIR}
+    cd ${WORKDIR} || exit
     #
     sed -i "s:@@MYSQL_VERSION@@:${VERSION}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
     sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" rpmbuild/SPECS/percona-xtradb-cluster.spec
@@ -451,7 +451,7 @@ build_srpm(){
         SCONS_ARGS=""
     fi
     source ${WORKDIR}/pxc-80.properties
-    if [ -n ${SRCRPM} ]; then
+    if [[ -n ${SRCRPM} ]]; then
         if test "x${SCONS_ARGS}" == "x"
         then
             rpmbuild -bs --define "_topdir ${WORKDIR}/rpmbuild" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "dist generic" rpmbuild/SPECS/percona-xtradb-cluster.spec
@@ -480,12 +480,12 @@ build_mecab_lib(){
     mkdir ${MECAB_INSTALL_DIR}
     wget ${MECAB_LINK}
     tar xf ${MECAB_TARBAL}
-    cd ${MECAB_DIR}
+    cd ${MECAB_DIR} || exit
     ./configure --with-pic --prefix=/usr
     make
     make check
     make DESTDIR=${MECAB_INSTALL_DIR} install
-    cd ${WORKDIR}
+    cd ${WORKDIR} || exit
 }
 
 build_mecab_dict(){
@@ -496,7 +496,7 @@ build_mecab_dict(){
     rm -rf ${MECAB_IPADIC_DIR}
     wget ${MECAB_IPADIC_LINK}
     tar xf ${MECAB_IPADIC_TARBAL}
-    cd ${MECAB_IPADIC_DIR}
+    cd ${MECAB_IPADIC_DIR} || exit
     # these two lines should be removed if proper packages are created and used for builds
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${MECAB_INSTALL_DIR}/usr/lib
     sed -i "/MECAB_DICT_INDEX=\"/c\MECAB_DICT_INDEX=\"${MECAB_INSTALL_DIR}\/usr\/libexec\/mecab\/mecab-dict-index\"" configure
@@ -504,12 +504,12 @@ build_mecab_dict(){
     ./configure --with-mecab-config=${MECAB_INSTALL_DIR}/usr/bin/mecab-config
     make
     make DESTDIR=${MECAB_INSTALL_DIR} install
-    cd ../
-    cd ${MECAB_INSTALL_DIR}
+    cd ../  || exit
+    cd ${MECAB_INSTALL_DIR}  || exit
     if [ -d usr/lib64 ]; then
         mv usr/lib64/* usr/lib
     fi
-    cd ${WORKDIR}
+    cd ${WORKDIR}  || exit
 }
 
 build_rpm(){
@@ -538,7 +538,7 @@ build_rpm(){
     else
         cp $WORKDIR/srpm/$SRC_RPM $WORKDIR
     fi
-    cd $WORKDIR
+    cd $WORKDIR  || exit
     rm -fr rpmbuild
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
     cp $SRC_RPM rpmbuild/SRPMS/
@@ -557,7 +557,7 @@ build_rpm(){
     build_mecab_lib
     build_mecab_dict
 
-    cd ${WORKDIR}
+    cd ${WORKDIR}  || exit
     source /opt/rh/devtoolset-7/enable
     #
     if [ ${ARCH} = x86_64 ]; then
@@ -609,7 +609,7 @@ build_source_deb(){
 
     #
     tar xzf ${NEWTAR}
-    cd ${HNAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION}
+    cd ${HNAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION} || exit
     cp -ap build-ps/debian/ .
     sed -i "s:@@MYSQL_VERSION@@:${VERSION}:g" debian/changelog
     sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" debian/changelog
@@ -624,7 +624,7 @@ build_source_deb(){
     #
     rm -fr ${HNAME}-${VERSION}-${RELEASE}
 
-    cd ${WORKDIR}
+    cd ${WORKDIR} || exit
 
     mkdir -p $WORKDIR/source_deb
     mkdir -p $CURDIR/source_deb
@@ -653,7 +653,7 @@ build_deb(){
     do
         get_deb_sources $file
     done
-    cd $WORKDIR
+    cd $WORKDIR || exit
     source ${WORKDIR}/pxc-80.properties
     rm -fv *.deb
 
@@ -683,21 +683,21 @@ build_deb(){
 
     dpkg-source -x ${DSC}
 
-    cd ${DIRNAME}
-    
+    cd ${DIRNAME} || exit
+
     mkdir pxb-2.4
     mkdir pxb-8.0
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-24* pxb-2.4
     dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-    cd pxb-2.4
+    cd pxb-2.4 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
-    cd ../pxb-8.0
+    cd ../pxb-8.0 || exit
         mv usr/bin ./
         mv usr/lib* ./
         rm -rf usr *.deb DEBIAN
-    cd ../
+    cd ../ || exit
 
     if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" ]]; then
         sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
@@ -709,15 +709,6 @@ build_deb(){
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
     export MYSQL_BUILD_CXXFLAGS="$CXXFLAGS"
 
-    #if [ ${DEBIAN_VERSION} = xenial -o ${DEBIAN_VERSION} = stretch -o ${DEBIAN_VERSION} = bionic ]; then
-    #    rm -rf debian
-    #    cp -r build-ps/ubuntu debian
-    #    sed -i "s:@@MYSQL_VERSION@@:${MYSQL_VERSION}:g" debian/changelog
-    #    sed -i "s:@@PERCONA_VERSION@@:${MYSQL_RELEASE}:g" debian/changelog
-    #    sed -i "s:@@REVISION@@:${REVISION}:g" debian/rules
-    #    sed -i "s:@@PERCONA_VERSION@@:${MYSQL_RELEASE}:g" debian/rules
-    #    sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" debian/rules
-    #fi
     if [ x"${DEBIAN_VERSION}" = xbionic ]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
@@ -731,12 +722,12 @@ build_deb(){
     #
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
-    cd ${WORKSPACE}
+    cd ${WORKSPACE} || exit
     rm -fv *.dsc *.orig.tar.gz *.debian.tar.gz *.changes
     rm -fr ${DIRNAME}
 
 
-    cd ${WORKDIR}
+    cd ${WORKDIR} || exit
     mkdir -p $CURDIR/deb
     mkdir -p $WORKDIR/deb
     cp $WORKDIR/*.deb $WORKDIR/deb
@@ -751,7 +742,7 @@ build_tarball(){
     fi
     source ${WORKDIR}/pxc-80.properties
     get_tar "source_tarball"
-    cd $WORKDIR
+    cd $WORKDIR || exit
     source ${WORKDIR}/pxc-80.properties
     TARFILE=$(basename $(find . -iname 'percona-xtradb-cluster*.tar.gz' | sort | tail -n1))
     if [ -f /etc/debian_version ]; then
@@ -794,7 +785,7 @@ build_tarball(){
     tar zxf $TARFILE
     rm -f $TARFILE
     #
-    cd ${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION}
+    cd ${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION} || exit
 
     BUILD_NUMBER=$(date "+%Y%m%d-%H%M%S")
     mkdir -p $BUILD_NUMBER
@@ -802,7 +793,7 @@ build_tarball(){
     BUILD_ROOT="$ROOT_FS/$PXC_DIRNAME/$BUILD_NUMBER"
     mkdir -p ${BUILD_ROOT}
     CURDIR=$(pwd)
-    cd ${BUILD_ROOT}
+    cd ${BUILD_ROOT} || exit
     if [ -f /etc/redhat-release ]; then
         mkdir pxb-2.4
         pushd pxb-2.4
@@ -831,15 +822,15 @@ build_tarball(){
         mkdir pxb-8.0
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-24* pxb-2.4
         dpkg-deb -R /var/cache/apt/archives/percona-xtrabackup-80* pxb-8.0
-        cd pxb-2.4
+        cd pxb-2.4 || exit
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
-        cd ../pxb-8.0
+        cd ../pxb-8.0 || exit
             mv usr/bin ./
             mv usr/lib* ./
             rm -rf usr *.deb DEBIAN
-        cd ../
+        cd ../ || exit
         tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
         rm -rf pxb-8.0 pxb-2.4
@@ -847,13 +838,16 @@ build_tarball(){
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
-    cd ${CURDIR}
+    cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2
     tar xf jemalloc-$JVERSION.tar.bz2
     mv jemalloc-$JVERSION jemalloc
 
     export SCONS_ARGS=" strict_build_flags=0"
+    if [ -f /etc/redhat-release ]; then
+        sed -i 's:cmake ../../:/usr/bin/cmake3 ../../:g' ./build-ps/build-binary.sh
+    fi
     bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t 1.1 $BUILD_ROOT
     mkdir -p ${WORKDIR}/tarball
     mkdir -p ${CURDIR}/tarball
