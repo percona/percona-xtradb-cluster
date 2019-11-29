@@ -100,7 +100,9 @@ Description: Percona XtraDB Cluster database development files
 Package: percona-xtradb-cluster-common
 Section: database
 Architecture: any
-Pre-depends: debconf (>= 0.2.17), mysql-common, debsums, ${misc:Pre-Depends}
+Pre-depends: debconf (>= 0.2.17), debsums, ${misc:Pre-Depends}
+Provides: mysql-common
+Replaces: mysql-common
 Multi-Arch: foreign
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Percona XtraDB Cluster database common files (e.g. /etc/mysql/my.cnf)

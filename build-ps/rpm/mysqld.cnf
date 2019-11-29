@@ -9,9 +9,8 @@ datadir=/var/lib/mysql
 socket=/var/lib/mysql/mysql.sock
 log-error=/var/log/mysqld.log
 pid-file=/var/run/mysqld/mysqld.pid
-log-bin
-log_slave_updates
 expire_logs_days=7
+log_error_verbosity=3
 
 # Disabling symbolic-links is recommended to prevent assorted security risks
 symbolic-links=0
@@ -27,9 +26,6 @@ wsrep_cluster_address=gcomm://
 
 # In order for Galera to work correctly binlog format should be ROW
 binlog_format=ROW
-
-# MyISAM storage engine has only experimental support
-default_storage_engine=InnoDB
 
 # Slave thread to use
 wsrep_slave_threads= 8
@@ -52,9 +48,6 @@ pxc_strict_mode=ENFORCING
 
 # SST method
 wsrep_sst_method=xtrabackup-v2
-
-#Authentication for SST method
-#wsrep_sst_auth="sstuser:s3cretPass"
 
 ###########################################
 
