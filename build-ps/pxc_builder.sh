@@ -718,7 +718,7 @@ build_deb(){
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
     sudo chmod 777 debian/rules
-    dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
+    dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
