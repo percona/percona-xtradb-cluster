@@ -72,10 +72,6 @@
 
 #include "mysql/psi/mysql_socket.h"
 
-#ifdef WITH_WSREP
-#include "sql/conn_handler/connection_handler_manager.h"
-#endif /* WITH_WSREP */
-
 /* Network io wait callbacks  for threadpool */
 static void (*before_io_wait)(void) = nullptr;
 static void (*after_io_wait)(void) = nullptr;
@@ -532,10 +528,7 @@ int vio_shutdown(Vio *vio, int how) {
   fail to deliver the said notification to the pooling worker thread.
   sleep help ensure that shutdown signal is delivered before the socket is
   closed. */
-  if (Connection_handler_manager::thread_handling ==
-      Connection_handler_manager::SCHEDULER_THREAD_POOL) {
-    sleep(0.5);
-  }
+  sleep(0.5);
 #endif /* WITH_WSREP */
 
   if (!vio->inactive) {
