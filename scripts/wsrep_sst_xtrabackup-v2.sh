@@ -1405,8 +1405,11 @@ fi
 #
 # 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
 #         my.cnf.
+#
+# 2.4.17  PXB added Data-At-Rest Encryption support found in PS/PXC 5.7.28
+#
 
-XB_REQUIRED_VERSION="2.4.12"
+XB_REQUIRED_VERSION="2.4.17"
 
 XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
 if [[ -z $XB_VERSION ]]; then
