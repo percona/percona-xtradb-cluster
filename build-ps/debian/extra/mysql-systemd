@@ -1,7 +1,7 @@
 #! /bin/bash -ue
 #
 # Scripts to run by PXC systemd service
-# 
+#
 
 parse_cnf()
 {
@@ -10,18 +10,18 @@ parse_cnf()
     shift
     local groups=$*
     reval=$(my_print_defaults $groups | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -n 1)
-    if [[ -z ${reval:-} ]];then 
+    if [[ -z ${reval:-} ]];then
         val=$(tr ' ' '\n' <<< "$env_args" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -n 1)
         if [[ -n ${val:-} ]];then
             reval=$val
-        else 
+        else
             reval=$def
         fi
     fi
     echo $reval
 }
 
-install_db () {    
+install_db () {
     # Note: something different than datadir=/var/lib/mysql requires SELinux policy changes (in enforcing mode)
     log=$(parse_cnf log-error server mysqld mysqld_safe)
 
@@ -31,7 +31,7 @@ install_db () {
     if [ ! -z $pidfiledir ]; then
         [ -d "$pidfiledir" ] || install -d -m 0755 -omysql -gmysql "$pidfiledir" || exit 1
     fi
-    
+
     # Restore log, dir, perms and SELinux contexts
     [ -d "$datadir" ] || install -d -m 0755 -omysql -gmysql "$datadir" || exit 1
     if [ -x /usr/sbin/restorecon ]; then
@@ -54,7 +54,7 @@ install_db () {
         fi
     fi
 
-    # If special mysql dir is in place, skip db install 
+    # If special mysql dir is in place, skip db install
     [ -d "$datadir/mysql" ] && exit 0
     if [ -f "$datadir/sst_in_progress" ]; then
         rm -rf $datadir/*
@@ -83,12 +83,12 @@ log_warning_msg() {
 }
 
 wait_for_pid () {
-  local verb=$1          
-  local pid_file_path="$2" 
+  local verb=$1
+  local pid_file_path="$2"
   local mpid=0
 
-  if [[ $verb = 'removed' ]];then 
-    if [[ ! -s $pid_file_path ]];then 
+  if [[ $verb = 'removed' ]];then
+    if [[ ! -s $pid_file_path ]];then
         log_success_msg
         return 0
     fi
@@ -103,16 +103,16 @@ wait_for_pid () {
     set +e
     case "$verb" in
       'created')
-            if [[ -s "$pid_file_path" ]]; then 
+            if [[ -s "$pid_file_path" ]]; then
                 mpid=$(cat $pid_file_path)
                 if kill -0 $mpid;then
-                    i='' 
+                    i=''
                     break
                 fi
             fi
         ;;
       'removed')
-            if [[ ! -s "$pid_file_path" ]] && ! kill -0 $mpid;then 
+            if [[ ! -s "$pid_file_path" ]] && ! kill -0 $mpid;then
                 i=''
                 break
             fi
@@ -125,7 +125,7 @@ wait_for_pid () {
     set -e
 
 
-    if [[ $verb = 'created' ]];then 
+    if [[ $verb = 'created' ]];then
         if ([[ -e $sst_progress_file ]] || grep -q -- '--wsrep-new-cluster' <<< "$env_args" ) \
             && [[ $startup_sleep -ne 10 ]];then
             echo "State transfer in progress, setting sleep higher"
@@ -136,8 +136,8 @@ wait_for_pid () {
     i=$(( i+1 ))
     sleep $startup_sleep
 
-    if [[ $verb = 'created' ]];then 
-        if ! kill -0 $manager;then 
+    if [[ $verb = 'created' ]];then
+        if ! kill -0 $manager;then
             log_failure_msg "mysqld_safe with PID $manager has already exited: FAILURE"
             exit 1
         fi
@@ -148,7 +148,7 @@ wait_for_pid () {
   if [[ -z "$i" ]]; then
     log_success_msg
     return 0
-  elif [[ -e $sst_progress_file ]]; then 
+  elif [[ -e $sst_progress_file ]]; then
     log_info_msg
     return 2
   else
@@ -201,7 +201,7 @@ service_startup_timeout=$(parse_cnf service-startup-timeout $service_startup_tim
 
 if [[ -z ${datadir:-} ]];then
     datadir="/var/lib/mysql"
-    if [[ ! -d $datadir ]];then 
+    if [[ ! -d $datadir ]];then
         echo "FATAL: datadir not found in cnf or is /var/lib/mysql"
         exit 2
     fi
@@ -219,25 +219,25 @@ else
 fi
 
 if [[ $action == 'reload' || $action == 'stop' || $action == 'stop-post' ]];then
-    if [[ ! -s $pid_path ]];then 
+    if [[ ! -s $pid_path ]];then
         log_warning_msg "mysql pid file $pid_path empty or not readable"
         [[ $action == 'stop' ]] && log_failure_msg "mysql already dead"
-        if [[ $action == 'stop-post' ]];then 
+        if [[ $action == 'stop-post' ]];then
             log_warning_msg "mysql may be already dead"
             exit
         fi
         exit 2
     fi
     mysql_pid=$(cat $pid_path)
-    if [[ $action == 'stop-post' && -n ${mysql_pid:-} ]]  && ! kill -0 $mysql_pid;then 
+    if [[ $action == 'stop-post' && -n ${mysql_pid:-} ]]  && ! kill -0 $mysql_pid;then
         log_warning_msg "mysql already dead"
         log_failure_msg "Stale PID file: $pid_path"
         exit 3
     fi
 fi
 
-if [[ $action == 'start-post' ]];then 
-    if ! kill -0 $manager;then 
+if [[ $action == 'start-post' ]];then
+    if ! kill -0 $manager;then
         log_failure_msg "mysqld_safe with PID $manager has already exited"
         exit 1
     fi
@@ -335,37 +335,37 @@ ret=0
 case $action in
     "galera-recovery") wsrep_recover_position ;;
     "start-pre") check_running; install_db ;;
-    "start-post") 
+    "start-post")
       wait_for_pid created  "$pid_path"; ret=$?
-      if [[ $ret -eq 1 ]];then 
+      if [[ $ret -eq 1 ]];then
           log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
       elif [[ $ret -eq 2 ]];then
           log_info_msg "MySQL (Percona XtraDB Cluster) server startup failed! State transfer still in progress"
       fi
       exit $ret
     ;;
-    "stop-post") 
+    "stop-post")
       wait_for_pid removed  "$pid_path"; ret=$?
-      if [[ $ret -ne 0 ]];then 
+      if [[ $ret -ne 0 ]];then
         log_failure_msg "MySQL (Percona XtraDB Cluster) server stop failed!"
       fi
       exit $ret
     ;;
     'reload')
         kill -HUP $mysql_pid || ret=$?
-        if [[ $ret -ne 0 ]]; then 
+        if [[ $ret -ne 0 ]]; then
             log_failure_msg "Failed to reload the server with PID: $mysql_pid with $ret status"
             exit $ret
-        else 
+        else
             log_success_msg "Reloaded the server"
         fi
         ;;
     'stop')
         kill -TERM $mysql_pid || ret=$?
-        if [[ $ret -ne 0 ]]; then 
+        if [[ $ret -ne 0 ]]; then
             log_failure_msg "Failed to stop the server with PID: $mysql_pid with $ret status"
             exit $ret
-        else 
+        else
             log_success_msg "Stopping Percona XtraDB Cluster......"
         fi
         ;;
