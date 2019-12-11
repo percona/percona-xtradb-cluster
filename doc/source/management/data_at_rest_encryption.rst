@@ -100,21 +100,9 @@ been relaxed in |PXC| 5.7.22 and now |xtrabackup| re-encrypts the data using
 transition-key and JOINER re-encrypts it using a new generated master-key.
 
 Keyring is sent from DONOR to JOINER as part of SST process (prior to |PXC|
-5.7.22) or generated on JOINER. SST can be done
-using xtrabackup (the recommended way), rsync, or mysqldump. In *xtrabackup*
-case, keyring is sent over explicitly before the real data backup/streaming
-starts. Other two SST variants behave differently: mysqldump uses logical
-backup so it doesn’t need to send keyring, while rsync will sync the keys when
-it syncs data directories. 
-
-.. warning:: rsync doesn’t provide a secure channel. This means keyring sent
-   using rsync SST could be vulnerable to attack. As an opposite, following the
-   recommended SST way with xtrabackup user can configure secure channel and so
-   keyring is fully secured (in fact, xtrabackup will not allow user to send
-   the keyring if the SST channel is not secured). 
-
-.. warning Percona doesn't recommend rsync-based SST for data-at-rest
-   encryption using keyring.
+5.7.22) or generated on JOINER. SST is done
+using the ``xtrabackup-v2` method. The keyring is sent over explicitly before the real data backup/streaming
+starts.
 
 |PXC| doesn't allow to combine nodes with encryption and nodes without 
 encryption. This is not allowed in order to maintain data consistency. For
@@ -163,9 +151,6 @@ keyring_vault
 The ``keyring_vault`` plugin is supported starting from PXC 5.7.22. This plugin
 allows storing the master-key in vault-server (vs. local file as in case of
 ``keyring_file``). 
-
-.. warning:: rsync doesn't support ``keyring_vault``, and SST on JOINER is
-   aborted if rsync is used on the node with ``keyring_vault`` configured. 
 
 Configuration
 *************

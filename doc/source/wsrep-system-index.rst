@@ -871,22 +871,6 @@ then the joining node will consider *only* ``node1`` and ``node2``.
    (or disable it completely
    if you don't mind joiner node waiting for state transfer indefinitely).
 
-.. variable:: wsrep_sst_donor_rejects_queries
-
-   :cli: ``--wsrep-sst-donor-rejects-queries``
-   :conf: Yes
-   :scope: Global
-   :dyn: Yes
-   :default: OFF
-
-Defines whether the node should reject blocking client sessions
-when it is serving as a donor during a blocking state transfer method
-(when :variable:`wsrep_sst_method` is set to ``mysqldump`` or ``rsync``).
-This is disabled by default, meaning that the node accepts such queries.
-
-If you enable this variable, queries will return the ``Unknown command`` error.
-This can be used to signal load-balancer that the node isn't available.
-
 .. variable:: wsrep_sst_method
 
    :cli: ``--wsrep-sst-method``
@@ -906,20 +890,7 @@ Available values are:
   can be found `in Percona XtraBackup documentation
   <https://www.percona.com/doc/percona-xtrabackup/2.4/using_xtrabackup/privileges.html>`_.
 
-  This is the **recommended** and default method for |PXC|.
   For more information, see :ref:`xtrabackup_sst`.
-
-* ``rsync``: Uses ``rsync`` to perform SST.
-  This method doesn't use the :variable:`wsrep_sst_auth` variable.
-
-* ``mysqldump``: Uses ``mysqldump`` to perform SST
-  This method requires superuser credentials for the donor node
-  to be specified in the :variable:`wsrep_sst_auth` variable.
-
-  .. note:: This method is deprecated as of :rn:`5.7.22-29.26`
-     and not recommended unless it is required for specific reasons.
-     Also, it is not compatible with ``bind_address`` set to ``127.0.0.1``
-     or ``localhost``, and will cause startup to fail in this case.
 
 * ``<custom_script_name>``: Galera supports `Scriptable State Snapshot Transfer
   <http://galeracluster.com/documentation-webpages/statetransfer.html#scriptable-state-snapshot-transfer>`_.
@@ -933,8 +904,9 @@ Available values are:
   It shouldn't be used permanently
   because it could lead to data inconsistency across the nodes.
 
-.. note:: Only ``xtrabackup-v2`` and ``rsync`` provide support
-   for clusters with GTIDs and async slaves.
+.. note::
+
+   ``xtrabackup-v2`` provides support for clusters with GTIDs and async slaves.
 
 .. variable:: wsrep_sst_receive_address
 

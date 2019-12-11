@@ -175,8 +175,7 @@ For more information, see :ref:`state_snapshot_transfer`.
           The cluster will not work if keyring configuration across nodes is
           different.
 
-The following SST methods are available:
-``xtrabackup``, ``rsync``, and ``mysqldump``.
+The default SST method is ``xtrabackup-v2`` which uses |Percona XtraBackup|.
 
 .. _xtrabackup:
 
@@ -223,81 +222,7 @@ Encryption mode for this method is selected using the :option:`encrypt` option:
 
    For more information, see `this blog post <https://www.percona.com/blog/2017/04/23/percona-xtradb-cluster-dh-key-too-small-error-during-an-sst-using-ssl/>`_.
 
-rsync
-*****
-
-This SST method does not support encryption.
-Avoid using this method if you need to secure traffic
-between DONOR and JOINER nodes. If you using keyring plugin then
-keyring file needs to be send over from DONOR to JOINER. Avoid using
-this method in such cases too.
-
 .. _mysqldump_sst:
-
-mysqldump
-*********
-
-This SST method dumps data from DONOR and imports it to JOINER.
-Encryption in this case is performed using the same certificates
-configured for :ref:`encrypt-client-server`,
-because ``mysqldump`` connects through the database client.
-
-Here is how to enable encryption for SST using ``mysqldump``
-in a running cluster:
-
-1. Create a user for SST on one of the nodes:
-
-   .. code-block:: guess
-
-      mysql> CREATE USER 'sst_user'$'%' IDENTIFIED BY PASSWORD 'sst_password';
-
-   .. note:: This user must have the same name and password on all nodes
-      where you want to use ``mysqldump`` for SST.
-
-#. Grant usage privileges to this user and require SSL:
-
-   .. code-block:: guess
-
-      mysql> GRANT USAGE ON *.* TO 'sst_user' REQUIRE SSL;
-
-#. To make sure that the SST user replicated across the cluster,
-   run the following query on another node:
-
-   .. code-block:: guess
-
-      mysql> SELECT User, Host, ssl_type FROM mysql.user WHERE User='sst_user';
-
-      +----------+------+----------+
-      | User     | Host | ssl_type |
-      +----------+------+----------+
-      | sst_user | %    | Any      |
-      +----------+------+----------+
-
-   .. note:: If the :variable:`wsrep_OSU_method` is set to ROI,
-      you need to manually create the SST user on each node in the cluster.
-
-#. Specify corresponding certificate files
-   in both ``[mysqld]`` and ``[client]`` sections
-   of the configuration file on each node::
-
-    [mysqld]
-    ssl-ca=/etc/mysql/certs/ca.pem
-    ssl-cert=/etc/mysql/certs/server-cert.pem
-    ssl-key=/etc/mysql/certs/server-key.pem
-
-    [client]
-    ssl-ca=/etc/mysql/certs/ca.pem
-    ssl-cert=/etc/mysql/certs/client-cert.pem
-    ssl-key=/etc/mysql/certs/client-key.pem
-
-   For more information, see :ref:`encrypt-client-server`.
-
-#. Restart the cluster with the new configuration.
-
-If you do everything correctly,
-``mysqldump`` will connect to DONOR with the SST user,
-generate a dump file, and import it to JOINER node.
-
 .. _encrypt-replication:
 
 Encrypting Replication/IST Traffic
