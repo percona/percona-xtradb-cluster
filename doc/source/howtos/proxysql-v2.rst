@@ -1,4 +1,4 @@
-.. _pxc.proxysql.v2:
+d.. _pxc.proxysql.v2:
 
 ================================================================================
 The |proxysql-admin| Tool with ProxySQL v2
@@ -84,7 +84,13 @@ To start ProxySQL, run the following command:
 
 .. code-block:: bash
 
-   $ sudo service proxysql2 start
+   $ sudo service proxysql start
+
+Alternatively, you can use ``systemctl``:
+
+.. code-block:: bash
+
+   $ sudo systemctl proxysql start
 
 .. _default-credentials:
 
