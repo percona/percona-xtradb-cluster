@@ -35,6 +35,7 @@
 #include <string>
 
 #include "client/client_priv.h"
+#include "compression.h"
 #include "m_ctype.h"
 #include "my_alloc.h"
 #include "my_compiler.h"
@@ -74,6 +75,8 @@ static char *opt_plugin_dir = 0, *opt_default_auth = 0;
 static uint opt_enable_cleartext_plugin = 0;
 static bool using_opt_enable_cleartext_plugin = 0;
 static bool opt_show_warnings = 0;
+static uint opt_zstd_compress_level = default_zstd_compression_level;
+static char *opt_compress_algorithm = nullptr;
 
 #ifdef WITH_WSREP
 static bool opt_use_set_password = 0;
@@ -291,12 +294,25 @@ static struct my_option my_long_options[] = {
     {"show_warnings", OPT_SHOW_WARNINGS, "Show warnings after execution",
      &opt_show_warnings, &opt_show_warnings, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0,
      0},
+    {"compression-algorithms", 0,
+     "Use compression algorithm in server/client protocol. Valid values "
+     "are any combination of 'zstd','zlib','uncompressed'.",
+     &opt_compress_algorithm, &opt_compress_algorithm, 0, GET_STR, REQUIRED_ARG,
+     0, 0, 0, 0, 0, 0},
+    {"zstd-compression-level", 0,
+     "Use this compression level in the client/server protocol, in case "
+     "--compression-algorithms=zstd. Valid range is between 1 and 22, "
+     "inclusive. Default is 3.",
+     &opt_zstd_compress_level, &opt_zstd_compress_level, 0, GET_UINT,
+     REQUIRED_ARG, 3, 1, 22, 0, 0, 0},
+
 #ifdef WITH_WSREP
     {"use_set_password", OPT_USE_SET_PASSWORD,
      "Use 'SET PASSWORD' instead of 'ALTER USER' to change passwords",
      &opt_use_set_password, &opt_use_set_password,
      0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
 #endif /* WITH_WSREP */
+
     {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}};
 
 static const char *load_default_groups[] = {"mysqladmin", "client", 0};
@@ -431,6 +447,13 @@ int main(int argc, char *argv[]) {
 #endif
   mysql_options(&mysql, MYSQL_SET_CHARSET_NAME, default_charset);
   error_flags = (myf)(opt_nobeep ? 0 : ME_BELL);
+
+  if (opt_compress_algorithm)
+    mysql_options(&mysql, MYSQL_OPT_COMPRESSION_ALGORITHMS,
+                  opt_compress_algorithm);
+
+  mysql_options(&mysql, MYSQL_OPT_ZSTD_COMPRESSION_LEVEL,
+                &opt_zstd_compress_level);
 
   if (opt_plugin_dir && *opt_plugin_dir)
     mysql_options(&mysql, MYSQL_PLUGIN_DIR, opt_plugin_dir);
@@ -962,8 +985,12 @@ static int execute_commands(MYSQL *mysql, int argc, char **argv) {
         break;
       }
       case ADMIN_PASSWORD: {
+#ifdef WITH_WSREP
         const int buff_len=128;
         char buff[buff_len];
+#else
+        char buff[128];
+#endif /* WITH_WSREP */
         time_t start_time;
         char *typed_password = NULL, *verified = NULL, *tmp = NULL;
         bool log_off = true, err = false;
@@ -1052,7 +1079,7 @@ static int execute_commands(MYSQL *mysql, int argc, char **argv) {
         /*
           PXC-2537: Use SET PASSWORD rather than ALTER USER USER()
           to avoid using USER() in a replicated statement (causes
-          problems on the repclia since the applier thread will use
+          problems on the replica since the applier thread will use
           a different user than the client).
         */
         if (opt_use_set_password)
@@ -1466,7 +1493,7 @@ static bool wait_pidfile(char *pidfile, time_t last_modified,
   char buff[FN_REFLEN];
   int error = 1;
   uint count = 0;
-  DBUG_ENTER("wait_pidfile");
+  DBUG_TRACE;
 
   system_filename(buff, pidfile);
   do {
@@ -1498,7 +1525,7 @@ static bool wait_pidfile(char *pidfile, time_t last_modified,
             "Warning;  Aborted waiting on pid file: '%s' after %d seconds\n",
             buff, count - 1);
   }
-  DBUG_RETURN(error);
+  return error;
 }
 
 /*
@@ -1508,7 +1535,7 @@ static void print_warnings(MYSQL *mysql) {
   const char *query;
   MYSQL_RES *result = NULL;
   MYSQL_ROW cur;
-  my_ulonglong num_rows;
+  uint64_t num_rows;
   uint error;
 
   /* Save current error before calling "show warnings" */

@@ -127,7 +127,7 @@ struct Cached_key {
 extern enum_default_table_encryption srv_default_table_encryption;
 
 struct fil_space_rotate_state_t {
-  fil_space_rotate_state_t() : trx(NULL), flush_observer(NULL) {}
+  fil_space_rotate_state_t() : trx(nullptr), flush_observer(nullptr) {}
 
   time_t start_time;          /*!< time when rotation started */
   ulint active_threads;       /*!< active threads in space */
@@ -379,6 +379,15 @@ class redo_log_keys final {
 };
 
 extern redo_log_keys redo_log_key_mgr;
+
+/**
+Exclude tablespace from encryption threads rotation
+@param[in] space tablespace to exclude
+@return false tablespace cannot be excluded because there are encryption
+              threads currently operating on it.
+        true  success
+*/
+bool fil_crypt_exclude_tablespace_from_rotation(fil_space_t *space);
 
 /*********************************************************************
 Init space crypt */

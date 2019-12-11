@@ -66,16 +66,18 @@ SELECT * FROM t1;
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER != 'system user' AND STATE = 'Updating';
 --source include/wait_condition.inc
 
-# Will deadlock
+# Will deadlock and will rollback streaming transaction
 --connection node_1b
 --echo #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
+--let $wait_condition = SELECT COUNT(*) = 2 FROM mysql.wsrep_streaming_log;
+--source include/wait_condition.inc
 --send UPDATE t1 SET f2 = 'b' WHERE f1 = 1
 
 # Wait until 1b hits rollback
 --connection node_1
 --echo #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
+--let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
+--source include/wait_condition.inc
 
 # UPDATE 12.06.2016: as of recent wsrep API changes, rollbacking thread no
 # longer queues ROLLBACKs and blocks on ROLLBACK replication before performing
@@ -94,9 +96,9 @@ SET DEBUG_SYNC = 'now WAIT_FOR wait';
 #
 # UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 
---connection node_1
---echo #node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
+#--connection node_1
+#--echo #node-1
+#SET DEBUG_SYNC = 'now SIGNAL continue';
 
 --connection node_1c
 --echo #node-1c

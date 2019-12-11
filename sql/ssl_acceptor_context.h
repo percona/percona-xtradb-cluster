@@ -28,6 +28,7 @@
 #include <sql/sql_class.h>
 #include <violite.h>
 #include <atomic>
+#include "my_sys.h"
 
 /** helper class to deal with optionally empty strings */
 class OptionalString {
@@ -63,7 +64,6 @@ class SslAcceptorContext {
     @retval false initialized ok
   */
   static bool singleton_init(bool use_ssl_arg);
-
   /** De-initialize the single instance of the acceptor */
   static void singleton_deinit();
   /**

@@ -277,7 +277,7 @@ static bool refresh_provider_options() {
     std::string opts = Wsrep_server_state::instance().provider().options();
     wsrep_provider_options_init(opts.c_str());
     get_provider_option_value(wsrep_provider_options,
-                              (char *)"repl.max_ws_size", &wsrep_max_ws_size);
+                              "repl.max_ws_size", &wsrep_max_ws_size);
     return false;
   } catch (...) {
     WSREP_ERROR("Failed to get provider options");
@@ -411,7 +411,7 @@ void wsrep_provider_init(const char *value) {
     return;
   }
 
-  if (wsrep_provider) my_free((void *)wsrep_provider);
+  if (wsrep_provider) my_free(const_cast<char*>(wsrep_provider));
   wsrep_provider = my_strdup(key_memory_wsrep, value, MYF(0));
 }
 
@@ -440,7 +440,7 @@ bool wsrep_provider_options_update(sys_var *, THD *, enum_var_type) {
 
 void wsrep_provider_options_init(const char *value) {
   if (wsrep_provider_options && wsrep_provider_options != value)
-    my_free((void *)wsrep_provider_options);
+    my_free(const_cast<char*>(wsrep_provider_options));
   wsrep_provider_options =
       (value) ? my_strdup(key_memory_wsrep, value, MYF(0)) : NULL;
 }
@@ -551,7 +551,7 @@ void wsrep_cluster_address_init(const char *value) {
               (wsrep_cluster_address) ? wsrep_cluster_address : "null",
               (value) ? value : "null");
 
-  if (wsrep_cluster_address) my_free((void *)wsrep_cluster_address);
+  if (wsrep_cluster_address) my_free(const_cast<char*>(wsrep_cluster_address));
   wsrep_cluster_address =
       my_strdup(PSI_NOT_INSTRUMENTED, (value) ? value : "", MYF(0));
 }
@@ -619,7 +619,7 @@ bool wsrep_node_address_update(sys_var *, THD *, enum_var_type) { return 0; }
 
 void wsrep_node_address_init(const char *value) {
   if (wsrep_node_address && strcmp(wsrep_node_address, value))
-    my_free((void *)wsrep_node_address);
+    my_free(const_cast<char*>(wsrep_node_address));
 
   wsrep_node_address =
       (value) ? my_strdup(key_memory_wsrep, value, MYF(0)) : NULL;
@@ -819,9 +819,9 @@ static void export_wsrep_status_to_mysql(THD *thd) {
 
   for (i = 0; i < wsrep_status_len; i++) {
     mysql_status_vars[i].name =
-        (char *)thd->wsrep_status_vars[i].name().c_str();
+        thd->wsrep_status_vars[i].name().c_str();
     mysql_status_vars[i].value =
-        (char *)thd->wsrep_status_vars[i].value().c_str();
+        const_cast<char*>(thd->wsrep_status_vars[i].value().c_str());
     mysql_status_vars[i].type = SHOW_CHAR;
     mysql_status_vars[i].scope = SHOW_SCOPE_ALL;
   }

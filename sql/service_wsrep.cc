@@ -114,7 +114,8 @@ extern "C" bool wsrep_thd_is_SR(const THD *thd) {
 
 extern "C" void wsrep_handle_SR_rollback(THD *bf_thd, THD *victim_thd) {
   DBUG_ASSERT(victim_thd);
-  if (!victim_thd || !wsrep_on(bf_thd)) return;
+  // if (!victim_thd || !wsrep_on(bf_thd)) return;
+  if (!victim_thd) return;
 
   WSREP_DEBUG("handle rollback, for deadlock: thd %u trx_id %" PRIu64
               " frags %zu conf %s",
@@ -146,7 +147,7 @@ extern "C" bool wsrep_thd_bf_abort(const THD *bf_thd, THD *victim_thd,
     wsrep_start_transaction(victim_thd, victim_thd->wsrep_next_trx_id());
   }
   bool ret = wsrep_bf_abort(bf_thd, victim_thd);
-  wsrep_store_threadvars((THD *)bf_thd);
+  wsrep_store_threadvars(const_cast<THD*>(bf_thd));
 
   /*
     Send awake signal if victim was BF aborted or does not
@@ -241,7 +242,8 @@ extern "C" void wsrep_commit_ordered(THD *thd) {
 }
 
 extern "C" bool wsrep_consistency_check(const MYSQL_THD thd) {
-  return ((THD *)thd)->wsrep_consistency_check == CONSISTENCY_CHECK_RUNNING;
+  return ((const_cast<THD *>(thd))->wsrep_consistency_check ==
+          CONSISTENCY_CHECK_RUNNING);
 }
 
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd) {

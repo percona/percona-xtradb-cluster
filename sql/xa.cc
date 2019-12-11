@@ -92,8 +92,7 @@ struct transaction_free_hash {
 
 static bool inited = false;
 static mysql_mutex_t LOCK_transaction_cache;
-static malloc_unordered_map<
-    std::string, std::unique_ptr<Transaction_ctx, transaction_free_hash>>
+static malloc_unordered_map<std::string, std::shared_ptr<Transaction_ctx>>
     transaction_cache{key_memory_XID};
 
 static const uint MYSQL_XID_PREFIX_LEN = 8;  // must be a multiple of 8
@@ -101,7 +100,7 @@ static const uint MYSQL_XID_OFFSET = MYSQL_XID_PREFIX_LEN + sizeof(server_id);
 static const uint MYSQL_XID_GTRID_LEN = MYSQL_XID_OFFSET + sizeof(my_xid);
 
 static void attach_native_trx(THD *thd);
-static Transaction_ctx *transaction_cache_search(XID *xid);
+static std::shared_ptr<Transaction_ctx> transaction_cache_search(XID *xid);
 static bool transaction_cache_insert(XID *xid, Transaction_ctx *transaction);
 static bool transaction_cache_insert_recovery(XID *xid);
 
@@ -378,7 +377,7 @@ static bool xarecover_handlerton(THD *, plugin_ref plugin, void *arg) {
 
 int ha_recover(const memroot_unordered_set<my_xid> *commit_list) {
   xarecover_st info;
-  DBUG_ENTER("ha_recover");
+  DBUG_TRACE;
   info.found_foreign_xids = info.found_my_xids = 0;
   info.commit_list = commit_list;
   info.dry_run =
@@ -391,7 +390,7 @@ int ha_recover(const memroot_unordered_set<my_xid> *commit_list) {
   /* if either is set, total_ha_2pc must be set too */
   DBUG_ASSERT(info.dry_run || total_ha_2pc > (ulong)opt_bin_log);
 
-  if (total_ha_2pc <= (ulong)opt_bin_log) DBUG_RETURN(0);
+  if (total_ha_2pc <= (ulong)opt_bin_log) return 0;
 
   if (info.commit_list) LogErr(SYSTEM_LEVEL, ER_XA_STARTING_RECOVERY);
 
@@ -404,7 +403,7 @@ int ha_recover(const memroot_unordered_set<my_xid> *commit_list) {
 #endif /* WITH_WSREP */
     if (tc_heuristic_recover == TC_HEURISTIC_RECOVER_ROLLBACK) {
       LogErr(ERROR_LEVEL, ER_XA_NO_MULTI_2PC_HEURISTIC_RECOVER);
-      DBUG_RETURN(1);
+      return 1;
     }
   } else {
     /*
@@ -423,12 +422,12 @@ int ha_recover(const memroot_unordered_set<my_xid> *commit_list) {
   if (!info.list) {
     LogErr(ERROR_LEVEL, ER_SERVER_OUTOFMEMORY,
            static_cast<int>(info.len * sizeof(XID)));
-    DBUG_RETURN(1);
+    return 1;
   }
 
   if (plugin_foreach(nullptr, xarecover_handlerton, MYSQL_STORAGE_ENGINE_PLUGIN,
                      &info)) {
-    DBUG_RETURN(1);
+    return 1;
   }
 
   delete[] info.list;
@@ -438,10 +437,10 @@ int ha_recover(const memroot_unordered_set<my_xid> *commit_list) {
   if (info.dry_run && info.found_my_xids) {
     LogErr(ERROR_LEVEL, ER_XA_RECOVER_EXPLANATION, info.found_my_xids,
            opt_tc_log_file);
-    DBUG_RETURN(1);
+    return 1;
   }
   if (info.commit_list) LogErr(SYSTEM_LEVEL, ER_XA_RECOVERY_DONE);
-  DBUG_RETURN(0);
+  return 0;
 }
 
 bool xa_trans_force_rollback(THD *thd) {
@@ -451,7 +450,6 @@ bool xa_trans_force_rollback(THD *thd) {
     by ha_rollback()/THD::transaction::cleanup().
   */
   thd->get_transaction()->xid_state()->reset_error();
-
   if (ha_rollback_trans(thd, true)) {
     my_error(ER_XAER_RMERR, MYF(0));
     return true;
@@ -480,8 +478,10 @@ void cleanup_trans_state(THD *thd) {
           sets an error in DA to specify a reason of search failure.
 */
 
-static Transaction_ctx *find_trn_for_recover_and_check_its_state(
-    THD *thd, xid_t *xid_for_trn_in_recover, XID_STATE *xid_state) {
+static std::shared_ptr<Transaction_ctx>
+find_trn_for_recover_and_check_its_state(THD *thd,
+                                         xid_t *xid_for_trn_in_recover,
+                                         XID_STATE *xid_state) {
   if (!xid_state->has_state(XID_STATE::XA_NOTR)) {
     my_error(ER_XAER_RMFAIL, MYF(0), xid_state->state_name());
     return nullptr;
@@ -497,7 +497,7 @@ static Transaction_ctx *find_trn_for_recover_and_check_its_state(
     transaction_cache_insert_recovery(XID), which is called before starting
     client connections, and thus is always single-threaded.
   */
-  Transaction_ctx *transaction =
+  std::shared_ptr<Transaction_ctx> transaction =
       transaction_cache_search(xid_for_trn_in_recover);
 
   XID_STATE *xs = (transaction ? transaction->xid_state() : nullptr);
@@ -601,7 +601,7 @@ static bool acquire_mandatory_metadata_locks(THD *thd, xid_t *external_xid) {
 bool Sql_cmd_xa_commit::process_external_xa_commit(THD *thd,
                                                    xid_t *external_xid,
                                                    XID_STATE *xid_state) {
-  Transaction_ctx *transaction =
+  std::shared_ptr<Transaction_ctx> transaction =
       find_trn_for_recover_and_check_its_state(thd, external_xid, xid_state);
 
   if (!transaction) return true;
@@ -617,6 +617,26 @@ bool Sql_cmd_xa_commit::process_external_xa_commit(THD *thd,
   */
   bool res = xs->xa_trans_rolled_back();
 
+  DEBUG_SYNC(thd, "external_xa_commit_before_acquire_xa_lock");
+  /*
+    Acquire XID_STATE::m_xa_lock to prevent concurrent running of two
+    XA COMMIT/XA ROLLBACK statements. Without acquiring this lock an attempt
+    to run two XA COMMIT/XA ROLLBACK statement for the same xid value may lead
+    to writing two events for the same xid into the binlog (e.g. twice
+    XA COMMIT event, that is an event for XA COMMIT some_xid_value
+    followed by an another event XA COMMIT with the same xid value).
+    As a consequences, presence of two XA COMMIT/XA ROLLACK statements for
+    the same xid value in binlog would break replication.
+  */
+  std::lock_guard<std::mutex> lk(xs->get_xa_lock());
+  /*
+    Double check that the XA transaction still does exist since the transaction
+    could be removed from the cache by another XA COMMIT/XA ROLLBACK statement
+    being executed concurrently from parallel session with the same xid value.
+  */
+  if (!find_trn_for_recover_and_check_its_state(thd, external_xid, xid_state))
+    return true;
+
   if (acquire_mandatory_metadata_locks(thd, external_xid)) {
     /*
       We can't rollback an XA transaction on lock failure due to
@@ -626,6 +646,8 @@ bool Sql_cmd_xa_commit::process_external_xa_commit(THD *thd,
     my_error(ER_XA_RETRY, MYF(0));
     return true;
   }
+
+  DEBUG_SYNC(thd, "external_xa_commit_after_acquire_commit_lock");
 
   /* Do not execute gtid wrapper whenever 'res' is true (rm error) */
   bool need_clear_owned_gtid = false;
@@ -650,7 +672,7 @@ bool Sql_cmd_xa_commit::process_external_xa_commit(THD *thd,
   MDL_context_backup_manager::instance().delete_backup(
       external_xid->key(), external_xid->key_length());
 
-  transaction_cache_delete(transaction);
+  transaction_cache_delete(transaction.get());
   gtid_state_commit_or_rollback(thd, need_clear_owned_gtid, !gtid_error);
 
   return res;
@@ -671,7 +693,7 @@ bool Sql_cmd_xa_commit::process_external_xa_commit(THD *thd,
 */
 bool Sql_cmd_xa_commit::process_internal_xa_commit(THD *thd,
                                                    XID_STATE *xid_state) {
-  DBUG_ENTER("Sql_cmd_xa_commit::process_internal_xa_commit");
+  DBUG_TRACE;
   bool res = false;
   bool gtid_error = false, need_clear_owned_gtid = false;
 
@@ -703,7 +725,7 @@ bool Sql_cmd_xa_commit::process_internal_xa_commit(THD *thd,
         Return error to user for a retry.
       */
       my_error(ER_XA_RETRY, MYF(0));
-      DBUG_RETURN(true);
+      return true;
     }
 
     gtid_error = commit_owned_gtids(thd, true, &need_clear_owned_gtid);
@@ -750,7 +772,7 @@ bool Sql_cmd_xa_commit::process_internal_xa_commit(THD *thd,
     }
   } else {
     my_error(ER_XAER_RMFAIL, MYF(0), xid_state->state_name());
-    DBUG_RETURN(true);
+    return true;
   }
 
   gtid_state_commit_or_rollback(thd, need_clear_owned_gtid, !gtid_error);
@@ -761,7 +783,7 @@ bool Sql_cmd_xa_commit::process_internal_xa_commit(THD *thd,
   trans_track_end_trx(thd);
   /* The transaction should be marked as complete in P_S. */
   DBUG_ASSERT(thd->m_transaction_psi == nullptr || res);
-  DBUG_RETURN(res);
+  return res;
 }
 
 bool Sql_cmd_xa_commit::execute(THD *thd) {
@@ -827,16 +849,35 @@ bool Sql_cmd_xa_rollback::trans_xa_rollback(THD *thd) {
 bool Sql_cmd_xa_rollback::process_external_xa_rollback(THD *thd,
                                                        xid_t *external_xid,
                                                        XID_STATE *xid_state) {
-  DBUG_ENTER("Sql_cmd_xa_rollback::process_external_xa_rollback");
+  DBUG_TRACE;
 
-  Transaction_ctx *transaction =
+  std::shared_ptr<Transaction_ctx> transaction =
       find_trn_for_recover_and_check_its_state(thd, external_xid, xid_state);
 
-  if (!transaction) DBUG_RETURN(true);
+  if (!transaction) return true;
 
   XID_STATE *xs = transaction->xid_state();
 
   DBUG_ASSERT(xs->get_xid()->eq(external_xid));
+
+  /*
+    Acquire XID_STATE::m_xa_lock to prevent concurrent running of two
+    XA COMMIT/XA ROLLBACK statements. Without acquiring this lock an attempt
+    to run two XA COMMIT/XA ROLLBACK statement for the same xid value may lead
+    to writing two events for the same xid into the binlog (e.g. twice
+    XA ROLLBACK event, that is an event for XA ROLLBACK some_xid_value
+    followed by an another event XA ROLLBACK with the same xid value).
+    As a consequences, presence of two XA COMMIT/XA ROLLACK statements for
+    the same xid value in binlog would break replication.
+  */
+  std::lock_guard<std::mutex> lk(xs->get_xa_lock());
+  /*
+    Double check that the XA transaction still does exist since the transaction
+    could be removed from the cache by another XA COMMIT/XA ROLLBACK statement
+    being executed concurrently from parallel session with the same xid value.
+  */
+  if (!find_trn_for_recover_and_check_its_state(thd, external_xid, xid_state))
+    return true;
 
   if (acquire_mandatory_metadata_locks(thd, external_xid)) {
     /*
@@ -845,7 +886,7 @@ bool Sql_cmd_xa_rollback::process_external_xa_rollback(THD *thd,
       Return error to user for a retry.
     */
     my_error(ER_XAER_RMERR, MYF(0));
-    DBUG_RETURN(true);
+    return true;
   }
 
   bool need_clear_owned_gtid = false;
@@ -864,9 +905,9 @@ bool Sql_cmd_xa_rollback::process_external_xa_rollback(THD *thd,
 
   MDL_context_backup_manager::instance().delete_backup(
       external_xid->key(), external_xid->key_length());
-  transaction_cache_delete(transaction);
+  transaction_cache_delete(transaction.get());
   gtid_state_commit_or_rollback(thd, need_clear_owned_gtid, !gtid_error);
-  DBUG_RETURN(res || gtid_error);
+  return res || gtid_error;
 }
 
 /**
@@ -884,12 +925,12 @@ bool Sql_cmd_xa_rollback::process_external_xa_rollback(THD *thd,
 */
 bool Sql_cmd_xa_rollback::process_internal_xa_rollback(THD *thd,
                                                        XID_STATE *xid_state) {
-  DBUG_ENTER("Sql_cmd_xa_rollback::process_internal_xa_rollback");
+  DBUG_TRACE;
 
   if (xid_state->has_state(XID_STATE::XA_NOTR) ||
       xid_state->has_state(XID_STATE::XA_ACTIVE)) {
     my_error(ER_XAER_RMFAIL, MYF(0), xid_state->state_name());
-    DBUG_RETURN(true);
+    return true;
   }
 
   /*
@@ -909,7 +950,7 @@ bool Sql_cmd_xa_rollback::process_internal_xa_rollback(THD *thd,
       Return error to user for a retry.
     */
     my_error(ER_XAER_RMERR, MYF(0));
-    DBUG_RETURN(true);
+    return true;
   }
 
   bool need_clear_owned_gtid = false;
@@ -930,7 +971,7 @@ bool Sql_cmd_xa_rollback::process_internal_xa_rollback(THD *thd,
   trans_track_end_trx(thd);
   /* The transaction should be marked as complete in P_S. */
   DBUG_ASSERT(thd->m_transaction_psi == nullptr);
-  DBUG_RETURN(res);
+  return res;
 }
 
 bool Sql_cmd_xa_rollback::execute(THD *thd) {
@@ -965,7 +1006,7 @@ bool Sql_cmd_xa_rollback::execute(THD *thd) {
 
 bool Sql_cmd_xa_start::trans_xa_start(THD *thd) {
   XID_STATE *xid_state = thd->get_transaction()->xid_state();
-  DBUG_ENTER("Sql_cmd_xa_start::trans_xa_start");
+  DBUG_TRACE;
 
   if (xid_state->has_state(XID_STATE::XA_IDLE) && m_xa_opt == XA_RESUME) {
     bool not_equal = !xid_state->has_same_xid(m_xid);
@@ -977,7 +1018,7 @@ bool Sql_cmd_xa_start::trans_xa_start(THD *thd) {
           thd->m_transaction_psi,
           (int)thd->get_transaction()->xid_state()->get_state());
     }
-    DBUG_RETURN(not_equal);
+    return not_equal;
   }
 
   /* TODO: JOIN is not supported yet. */
@@ -998,7 +1039,7 @@ bool Sql_cmd_xa_start::trans_xa_start(THD *thd) {
     }
   }
 
-  DBUG_RETURN(thd->is_error() || !xid_state->has_state(XID_STATE::XA_ACTIVE));
+  return thd->is_error() || !xid_state->has_state(XID_STATE::XA_ACTIVE);
 }
 
 bool Sql_cmd_xa_start::execute(THD *thd) {
@@ -1023,7 +1064,7 @@ bool Sql_cmd_xa_start::execute(THD *thd) {
 
 bool Sql_cmd_xa_end::trans_xa_end(THD *thd) {
   XID_STATE *xid_state = thd->get_transaction()->xid_state();
-  DBUG_ENTER("Sql_cmd_xa_end::trans_xa_end");
+  DBUG_TRACE;
 
   /* TODO: SUSPEND and FOR MIGRATE are not supported yet. */
   if (m_xa_opt != XA_NONE)
@@ -1041,7 +1082,7 @@ bool Sql_cmd_xa_end::trans_xa_end(THD *thd) {
                                    (int)xid_state->get_state());
   }
 
-  DBUG_RETURN(thd->is_error() || !xid_state->has_state(XID_STATE::XA_IDLE));
+  return thd->is_error() || !xid_state->has_state(XID_STATE::XA_IDLE);
 }
 
 bool Sql_cmd_xa_end::execute(THD *thd) {
@@ -1063,7 +1104,7 @@ bool Sql_cmd_xa_end::execute(THD *thd) {
 
 bool Sql_cmd_xa_prepare::trans_xa_prepare(THD *thd) {
   XID_STATE *xid_state = thd->get_transaction()->xid_state();
-  DBUG_ENTER("Sql_cmd_xa_prepare::trans_xa_prepare");
+  DBUG_TRACE;
 
   if (!xid_state->has_state(XID_STATE::XA_IDLE))
     my_error(ER_XAER_RMFAIL, MYF(0), xid_state->state_name());
@@ -1117,7 +1158,7 @@ bool Sql_cmd_xa_prepare::trans_xa_prepare(THD *thd) {
     }
   }
 
-  DBUG_RETURN(thd->is_error() || !xid_state->has_state(XID_STATE::XA_PREPARED));
+  return thd->is_error() || !xid_state->has_state(XID_STATE::XA_PREPARED);
 }
 
 bool Sql_cmd_xa_prepare::execute(THD *thd) {
@@ -1150,7 +1191,7 @@ bool Sql_cmd_xa_recover::trans_xa_recover(THD *thd) {
   List<Item> field_list;
   Protocol *protocol = thd->get_protocol();
 
-  DBUG_ENTER("Sql_cmd_xa_recover::trans_xa_recover");
+  DBUG_TRACE;
 
   field_list.push_back(
       new Item_int(NAME_STRING("formatID"), 0, MY_INT32_NUM_DECIMAL_DIGITS));
@@ -1162,7 +1203,7 @@ bool Sql_cmd_xa_recover::trans_xa_recover(THD *thd) {
 
   if (thd->send_result_metadata(&field_list,
                                 Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
-    DBUG_RETURN(true);
+    return true;
 
   mysql_mutex_lock(&LOCK_transaction_cache);
 
@@ -1175,14 +1216,14 @@ bool Sql_cmd_xa_recover::trans_xa_recover(THD *thd) {
 
       if (protocol->end_row()) {
         mysql_mutex_unlock(&LOCK_transaction_cache);
-        DBUG_RETURN(true);
+        return true;
       }
     }
   }
 
   mysql_mutex_unlock(&LOCK_transaction_cache);
   my_eof(thd);
-  DBUG_RETURN(false);
+  return false;
 }
 
 /**
@@ -1291,14 +1332,13 @@ void XID_STATE::store_xid_info(Protocol *protocol,
     xid_buf[1] = 'x';
 
     size_t xid_str_len =
-        bin_to_hex_str(xid_buf + 2, sizeof(xid_buf) - 2,
-                       const_cast<char *>(m_xid.data),
+        bin_to_hex_str(xid_buf + 2, sizeof(xid_buf) - 2, m_xid.data,
                        m_xid.gtrid_length + m_xid.bqual_length) +
         2;
-    protocol->store(xid_buf, xid_str_len, &my_charset_bin);
+    protocol->store_string(xid_buf, xid_str_len, &my_charset_bin);
   } else {
-    protocol->store(m_xid.data, m_xid.gtrid_length + m_xid.bqual_length,
-                    &my_charset_bin);
+    protocol->store_string(m_xid.data, m_xid.gtrid_length + m_xid.bqual_length,
+                           &my_charset_bin);
   }
 }
 
@@ -1403,10 +1443,13 @@ void transaction_cache_free() {
     @retval  != NULL  success
 */
 
-static Transaction_ctx *transaction_cache_search(XID *xid) {
+static std::shared_ptr<Transaction_ctx> transaction_cache_search(XID *xid) {
+  std::shared_ptr<Transaction_ctx> res{nullptr};
   mysql_mutex_lock(&LOCK_transaction_cache);
 
-  Transaction_ctx *res = find_or_nullptr(transaction_cache, to_string(*xid));
+  const auto it = transaction_cache.find(to_string(*xid));
+  if (it != transaction_cache.end()) res = it->second;
+
   mysql_mutex_unlock(&LOCK_transaction_cache);
   return res;
 }
@@ -1426,7 +1469,7 @@ static Transaction_ctx *transaction_cache_search(XID *xid) {
 
 bool transaction_cache_insert(XID *xid, Transaction_ctx *transaction) {
   mysql_mutex_lock(&LOCK_transaction_cache);
-  std::unique_ptr<Transaction_ctx, transaction_free_hash> ptr(transaction);
+  std::shared_ptr<Transaction_ctx> ptr(transaction, transaction_free_hash());
   bool res = !transaction_cache.emplace(to_string(*xid), std::move(ptr)).second;
   mysql_mutex_unlock(&LOCK_transaction_cache);
   if (res) {
@@ -1448,8 +1491,8 @@ inline bool create_and_insert_new_transaction(XID *xid, bool is_binlogged_arg) {
 
   return !transaction_cache
               .emplace(to_string(*xs->get_xid()),
-                       std::unique_ptr<Transaction_ctx, transaction_free_hash>(
-                           transaction))
+                       std::shared_ptr<Transaction_ctx>(
+                           transaction, transaction_free_hash()))
               .second;
 }
 
@@ -1553,7 +1596,7 @@ static void attach_native_trx(THD *thd) {
 */
 
 bool applier_reset_xa_trans(THD *thd) {
-  DBUG_ENTER("applier_reset_xa_trans");
+  DBUG_TRACE;
   Transaction_ctx *trn_ctx = thd->get_transaction();
   XID_STATE *xid_state = trn_ctx->xid_state();
 
@@ -1603,7 +1646,7 @@ bool applier_reset_xa_trans(THD *thd) {
   */
   trans_reset_one_shot_chistics(thd);
 
-  DBUG_RETURN(thd->is_error());
+  return thd->is_error();
 }
 
 /**
@@ -1621,7 +1664,7 @@ bool applier_reset_xa_trans(THD *thd) {
 */
 
 bool detach_native_trx(THD *thd, plugin_ref plugin, void *) {
-  DBUG_ENTER("detach_native_trx");
+  DBUG_TRACE;
   handlerton *hton = plugin_data<handlerton *>(plugin);
 
   if (hton->replace_native_transaction_in_thd) {
@@ -1632,11 +1675,11 @@ bool detach_native_trx(THD *thd, plugin_ref plugin, void *) {
         thd, NULL, &thd->get_ha_data(hton->slot)->ha_ptr_backup);
   }
 
-  DBUG_RETURN(false);
+  return false;
 }
 
 bool reattach_native_trx(THD *thd, plugin_ref plugin, void *) {
-  DBUG_ENTER("reattach_native_trx");
+  DBUG_TRACE;
   handlerton *hton = plugin_data<handlerton *>(plugin);
 
   if (hton->replace_native_transaction_in_thd) {
@@ -1646,5 +1689,5 @@ bool reattach_native_trx(THD *thd, plugin_ref plugin, void *) {
     hton->replace_native_transaction_in_thd(thd, *trx_backup, NULL);
     *trx_backup = NULL;
   }
-  DBUG_RETURN(false);
+  return false;
 }

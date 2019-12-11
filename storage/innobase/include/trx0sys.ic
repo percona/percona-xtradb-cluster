@@ -314,7 +314,6 @@ trx_t *trx_rw_is_active(trx_id_t trx_id, ibool *corrupt, bool do_ref_count) {
  @return new, allocated trx id */
 UNIV_INLINE
 trx_id_t trx_sys_get_new_trx_id() {
-
   ut_ad(trx_sys_mutex_own());
 
   /* VERY important: after the database is started, max_trx_id value is

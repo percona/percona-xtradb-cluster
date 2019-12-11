@@ -3340,9 +3340,8 @@ slow_path:
     mdl_request->ticket = ticket;
 
     mysql_mdl_set_status(ticket->m_psi, MDL_ticket::GRANTED);
-  } else {
+  } else
     *out_ticket = ticket;
-  }
 
   return false;
 }
@@ -3734,8 +3733,7 @@ bool MDL_context::acquire_lock(MDL_request *mdl_request,
   return false;
 }
 
-class MDL_request_cmp : public std::binary_function<const MDL_request *,
-                                                    const MDL_request *, bool> {
+class MDL_request_cmp {
  public:
   bool operator()(const MDL_request *req1, const MDL_request *req2) {
     int rc = req1->key.cmp(&req2->key);
@@ -3894,19 +3892,19 @@ bool MDL_context::upgrade_shared_lock(MDL_ticket *mdl_ticket,
   bool is_new_ticket;
   MDL_lock *lock;
 
-  DBUG_ENTER("MDL_context::upgrade_shared_lock");
+  DBUG_TRACE;
   DEBUG_SYNC(get_thd(), "mdl_upgrade_lock");
 
   /*
     Do nothing if already upgraded. Used when we FLUSH TABLE under
     LOCK TABLES and a table is listed twice in LOCK TABLES list.
   */
-  if (mdl_ticket->has_stronger_or_equal_type(new_type)) DBUG_RETURN(false);
+  if (mdl_ticket->has_stronger_or_equal_type(new_type)) return false;
 
   MDL_REQUEST_INIT_BY_KEY(&mdl_new_lock_request, &mdl_ticket->m_lock->key,
                           new_type, MDL_TRANSACTION);
 
-  if (acquire_lock(&mdl_new_lock_request, lock_wait_timeout)) DBUG_RETURN(true);
+  if (acquire_lock(&mdl_new_lock_request, lock_wait_timeout)) return true;
 
   is_new_ticket = !has_lock(mdl_svp, mdl_new_lock_request.ticket);
 
@@ -3989,7 +3987,7 @@ bool MDL_context::upgrade_shared_lock(MDL_ticket *mdl_ticket,
     MDL_ticket::destroy(mdl_new_lock_request.ticket);
   }
 
-  DBUG_RETURN(false);
+  return false;
 }
 
 /**
@@ -4238,7 +4236,7 @@ void MDL_context::find_deadlock() {
 void MDL_context::release_lock(enum_mdl_duration duration, MDL_ticket *ticket) {
   MDL_lock *lock = ticket->m_lock;
   MDL_key key_for_hton;
-  DBUG_ENTER("MDL_context::release_lock");
+  DBUG_TRACE;
   DBUG_PRINT("enter", ("db=%s name=%s", lock->key.db_name(), lock->key.name()));
 
   DBUG_ASSERT(this == ticket->get_ctx());
@@ -4340,8 +4338,6 @@ void MDL_context::release_lock(enum_mdl_duration duration, MDL_ticket *ticket) {
   }
 
   MDL_ticket::destroy(ticket);
-
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -4372,20 +4368,18 @@ void MDL_context::release_lock(MDL_ticket *ticket) {
 
 void MDL_context::release_locks_stored_before(enum_mdl_duration duration,
                                               MDL_ticket *sentinel) {
-  DBUG_ENTER("MDL_context::release_locks_stored_before");
+  DBUG_TRACE;
 
   MDL_ticket *ticket;
   MDL_ticket_store::List_iterator it = m_ticket_store.list_iterator(duration);
   if (m_ticket_store.is_empty(duration)) {
-    DBUG_VOID_RETURN;
+    return;
   }
 
   while ((ticket = it++) && ticket != sentinel) {
     DBUG_PRINT("info", ("found lock to release ticket=%p", ticket));
     release_lock(duration, ticket);
   }
-
-  DBUG_VOID_RETURN;
 }
 
 #ifdef WITH_WSREP
@@ -4634,13 +4628,11 @@ const MDL_key *MDL_ticket::get_key() const { return &m_lock->key; }
 */
 
 void MDL_context::rollback_to_savepoint(const MDL_savepoint &mdl_savepoint) {
-  DBUG_ENTER("MDL_context::rollback_to_savepoint");
+  DBUG_TRACE;
 
   /* If savepoint is NULL, it is from the start of the transaction. */
   release_locks_stored_before(MDL_STATEMENT, mdl_savepoint.m_stmt_ticket);
   release_locks_stored_before(MDL_TRANSACTION, mdl_savepoint.m_trans_ticket);
-
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -4653,19 +4645,17 @@ void MDL_context::rollback_to_savepoint(const MDL_savepoint &mdl_savepoint) {
 */
 
 void MDL_context::release_transactional_locks() {
-  DBUG_ENTER("MDL_context::release_transactional_locks");
+  DBUG_TRACE;
   release_locks_stored_before(MDL_STATEMENT, NULL);
   release_locks_stored_before(MDL_TRANSACTION, NULL);
 #ifdef WITH_WSREP
   wsrep_get_thd()->wsrep_safe_to_abort = true;
 #endif /* WITH_WSREP */
-  DBUG_VOID_RETURN;
 }
 
 void MDL_context::release_statement_locks() {
-  DBUG_ENTER("MDL_context::release_statement_locks");
+  DBUG_TRACE;
   release_locks_stored_before(MDL_STATEMENT, NULL);
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -5072,6 +5062,9 @@ void MDL_ticket_store::move_explicit_to_transaction_duration() {
 
   while ((ticket = it_ticket++)) {
     m_durations[MDL_EXPLICIT].m_ticket_list.remove(ticket);
+#ifdef WITH_WSREP
+    ticket->set_wsrep_non_preemptable_status(true);
+#endif /* WITH_WSREP */
     m_durations[MDL_TRANSACTION].m_ticket_list.push_front(ticket);
   }
 
@@ -5152,7 +5145,7 @@ void MDL_ticket::wsrep_report(bool debug) {
          ((m_lock->key.mdl_namespace() == MDL_key::TRIGGER)   ? "TRIGGER"      :
          ((m_lock->key.mdl_namespace() == MDL_key::EVENT)     ? "EVENT"        :
          ((m_lock->key.mdl_namespace() == MDL_key::COMMIT)    ? "COMMIT"       :
-         (char *)"UNKNOWN"))))))),
+         "UNKNOWN"))))))),
          m_lock->key.db_name(),
          m_lock->key.name());
   }

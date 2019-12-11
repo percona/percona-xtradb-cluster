@@ -301,16 +301,16 @@ select * from t10;
 1
 select * from t11;
 i	j
-1	1
 2	1
-1	2
+1	1
 2	2
+1	2
 select * from t12;
 i	j
-1	1
 2	1
-1	2
+1	1
 2	2
+1	2
 #node-2 (check if all the tables are replicate)
 select * from t1;
 i
@@ -352,16 +352,16 @@ select * from t10;
 1
 select * from t11;
 i	j
-1	1
 2	1
-1	2
+1	1
 2	2
+1	2
 select * from t12;
 i	j
-1	1
 2	1
-1	2
+1	1
 2	2
+1	2
 drop table t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12;
 #node-1 (Fire CTAS with wsrep_replicate_myisam = 0)
 set wsrep_replicate_myisam = 0;
@@ -420,16 +420,16 @@ select * from t10;
 1
 select * from t11;
 i	j
-1	1
 2	1
-1	2
+1	1
 2	2
+1	2
 select * from t12;
 i	j
-1	1
 2	1
-1	2
+1	1
 2	2
+1	2
 #node-2 (check if all the tables are replicate)
 select * from t1;
 i
@@ -471,16 +471,16 @@ select * from t10;
 1
 select * from t11;
 i	j
-1	1
 2	1
-1	2
+1	1
 2	2
+1	2
 select * from t12;
 i	j
-1	1
 2	1
-1	2
+1	1
 2	2
+1	2
 drop table t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12;
 #node-1 (Fire CREATE TABLE LIKE with wsrep_replicate_myisam = 1)
 create table tctl1 like src_i;

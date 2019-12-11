@@ -109,7 +109,7 @@ Wsrep_high_priority_service::Wsrep_high_priority_service(THD *thd)
   m_shadow.server_status = thd->server_status;
   m_shadow.vio = thd->active_vio;
   m_shadow.tx_isolation = thd->variables.transaction_isolation;
-  m_shadow.db = (char *)thd->db().str;
+  m_shadow.db = (char *)(const_cast<char*>(thd->db().str));
   m_shadow.db_length = thd->db().length;
   m_shadow.user_time = thd->user_time;
   m_shadow.row_count_func = thd->get_row_count_func();

@@ -73,10 +73,7 @@ static ib_mutex_t fil_crypt_key_mutex;
 static bool fil_crypt_threads_inited = false;
 
 /** No of key rotation threads requested */
-uint srv_n_fil_crypt_threads = 0;
-
-/** No of key rotation threads started */
-uint srv_n_fil_crypt_threads_started = 0;
+uint srv_n_fil_crypt_threads_requested = 0;
 
 /** At this age or older a space/page will be rotated */
 uint srv_fil_crypt_rotate_key_age;
@@ -344,15 +341,19 @@ void fil_space_rotate_state_t::create_flush_observer(space_id_t space_id) {
   trx_set_flush_observer(trx, flush_observer);
 }
 
+/* Forces flush of all pages observed by flush observer
+ * and destroys the transaction associated with flush observer.
+ * When called crypt_data->mutex cannot be owned because underlying
+ * i/o layer need to take this mutex */
 void fil_space_rotate_state_t::destroy_flush_observer() {
-  if (flush_observer != NULL) {
+  if (flush_observer != nullptr) {
     flush_observer->flush();
     UT_DELETE(flush_observer);
-    flush_observer = NULL;
+    flush_observer = nullptr;
   }
-  if (trx != NULL) {
+  if (trx != nullptr) {
     trx_free_for_background(trx);
-    trx = NULL;
+    trx = nullptr;
   }
 }
 
@@ -538,6 +539,7 @@ Write crypt data to a page (0)
 @param[in,out]	page0	first page of the tablespace
 @param[in,out]	mtr	mini-transaction */
 
+// TODO: Should be marked as const when PS-5738 is implemented
 void fil_space_crypt_t::write_page0(
     const fil_space_t *space, byte *page, mtr_t *mtr, uint a_min_key_version,
     uint a_type, Encryption::Encryption_rotation current_encryption_rotation) {
@@ -836,6 +838,57 @@ static inline void fil_crypt_read_crypt_data(fil_space_t *space) {
   mtr.commit();
 }
 
+/**
+Write crypt data belonging to space to page0
+@param space tablespace with crypt data to write
+*/
+static void fil_crypt_write_crypt_data_to_page0(fil_space_t *space) {
+  mtr_t mtr;
+  mtr.start();
+
+  if (buf_block_t *block = buf_page_get_gen(
+          page_id_t(space->id, 0), page_size_t(space->flags), RW_X_LATCH, NULL,
+          Page_fetch::NORMAL, __FILE__, __LINE__, &mtr)) {
+    space->crypt_data->write_page0(
+        space, block->frame, &mtr, space->crypt_data->min_key_version,
+        space->crypt_data->type, space->crypt_data->encryption_rotation);
+  }
+  mtr.commit();
+}
+
+bool fil_crypt_exclude_tablespace_from_rotation(fil_space_t *space) {
+  IB_mutex_guard fil_crypt_threads_mutex_guard(&fil_crypt_threads_mutex);
+
+  if (space->crypt_data == nullptr) {
+    space->crypt_data = fil_space_create_crypt_data(FIL_ENCRYPTION_OFF,
+                                                    FIL_DEFAULT_ENCRYPTION_KEY);
+    fil_crypt_write_crypt_data_to_page0(space);
+    return true;
+  }
+
+  fil_space_crypt_t *crypt_data = space->crypt_data;
+  IB_mutex_guard crypt_data_mutex_guard(&crypt_data->mutex);
+
+  if (crypt_data->encryption == FIL_ENCRYPTION_OFF) {
+    // nothing to do
+    return true;
+  }
+
+  if (crypt_data->rotate_state.active_threads != 0 ||
+      crypt_data->rotate_state.starting || crypt_data->rotate_state.flushing) {
+    return false;
+  }
+
+  ut_ad(crypt_data->type == CRYPT_SCHEME_UNENCRYPTED);
+
+  crypt_data->encryption = FIL_ENCRYPTION_OFF;
+  crypt_data->key_id = FIL_DEFAULT_ENCRYPTION_KEY;
+
+  fil_crypt_write_crypt_data_to_page0(space);
+
+  return true;
+}
+
 /***********************************************************************
 Start encrypting a space
 @param[in,out]		space		Tablespace
@@ -1024,7 +1077,7 @@ struct rotate_thread_t {
   bool should_shutdown() const {
     switch (srv_shutdown_state) {
       case SRV_SHUTDOWN_NONE:
-        return thread_no >= srv_n_fil_crypt_threads;
+        return thread_no >= srv_n_fil_crypt_threads_requested;
       case SRV_SHUTDOWN_EXIT_THREADS:
       /* srv_init_abort() must have been invoked */
       case SRV_SHUTDOWN_CLEANUP:
@@ -1439,6 +1492,7 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
                      "keyring is functional and try restarting the server";
       state->space->exclude_from_rotation = true;
       mutex_exit(&crypt_data->mutex);
+      crypt_data->rotate_state.destroy_flush_observer();
       mutex_exit(&crypt_data->start_rotate_mutex);
       return false;
     }
@@ -1452,8 +1506,6 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
     crypt_data->rotate_state.min_key_version_found = key_state->key_version;
 
     crypt_data->rotate_state.start_time = time(0);
-
-    crypt_data->rotate_state.create_flush_observer(state->space->id);
 
     if (crypt_data->type == CRYPT_SCHEME_UNENCRYPTED &&
         !crypt_data->is_encryption_disabled() &&
@@ -1471,6 +1523,20 @@ static bool fil_crypt_start_rotate_space(const key_state_t *key_state,
 
   mutex_exit(&crypt_data->mutex);
   mutex_exit(&crypt_data->start_rotate_mutex);
+
+  DBUG_EXECUTE_IF(
+      "hang_on_ts_with_encryption_key_id_rotation",
+      if (strcmp(state->space->name, "ts_with_encryption_key_id") == 0) {
+        // artifical key_id = 10 to let MTR test know that we are
+        // hanging
+        static EncryptionKeyId key_id = crypt_data->key_id;
+        crypt_data->key_id = 10;
+        while (DBUG_EVALUATE_IF("hang_on_ts_with_encryption_key_id_rotation",
+                                true, false))
+          os_thread_sleep(1000);
+        crypt_data->key_id = key_id;
+      });
+
   return true;
 }
 
@@ -2509,6 +2575,13 @@ static void fil_crypt_complete_rotate_space(const key_state_t *key_state,
     mutex_enter(&crypt_data->mutex);
     ut_a(crypt_data->rotate_state.active_threads > 0);
     crypt_data->rotate_state.active_threads--;
+    if (crypt_data->rotate_state.active_threads == 0) {
+      crypt_data->rotate_state.flushing = true;
+      mutex_exit(&crypt_data->mutex);
+      crypt_data->rotate_state.destroy_flush_observer();
+      mutex_enter(&crypt_data->mutex);
+      crypt_data->rotate_state.flushing = false;
+    }
     mutex_exit(&crypt_data->mutex);
   }
 }
@@ -2524,9 +2597,8 @@ void fil_crypt_thread() {
   THD *thd = create_thd(false, true, true, 0);
 
   mutex_enter(&fil_crypt_threads_mutex);
-  uint thread_no = srv_n_fil_crypt_threads_started;
-  srv_n_fil_crypt_threads_started++;
-  srv_threads.m_encryption_threads_active = true;
+  uint thread_no = srv_threads.m_crypt_threads_n;
+  srv_threads.m_crypt_threads_n++;
   os_event_set(fil_crypt_event); /* signal that we started */
   mutex_exit(&fil_crypt_threads_mutex);
 
@@ -2597,6 +2669,13 @@ void fil_crypt_thread() {
           if (thr.space->is_encrypted) {
             /* There were some pages that were corrupted or could not have been
              * decrypted - abort rotating space */
+            mutex_enter(&thr.space->crypt_data->mutex);
+            thr.space->crypt_data->rotate_state.flushing = true;
+            mutex_exit(&thr.space->crypt_data->mutex);
+            thr.space->crypt_data->rotate_state.destroy_flush_observer();
+            mutex_enter(&thr.space->crypt_data->mutex);
+            thr.space->crypt_data->rotate_state.flushing = false;
+            mutex_exit(&thr.space->crypt_data->mutex);
             fil_space_release(thr.space);
             thr.space = NULL;
             break;
@@ -2638,19 +2717,16 @@ void fil_crypt_thread() {
     thr.space = NULL;
   }
 
-  mutex_enter(&fil_crypt_threads_mutex);
-  srv_n_fil_crypt_threads_started--;
-  if (srv_n_fil_crypt_threads_started == 0) {
-    srv_threads.m_encryption_threads_active = false;
-  }
-  os_event_set(fil_crypt_event); /* signal that we stopped */
-  mutex_exit(&fil_crypt_threads_mutex);
-
   /* We count the number of threads in os_thread_exit(). A created
   thread should always use that to exit and not use return() to exit. */
 
   thr.thd = nullptr;
   destroy_thd(thd);
+
+  mutex_enter(&fil_crypt_threads_mutex);
+  srv_threads.m_crypt_threads_n--;
+  os_event_set(fil_crypt_event); /* signal that we stopped */
+  mutex_exit(&fil_crypt_threads_mutex);
 }
 
 /*********************************************************************
@@ -2665,30 +2741,30 @@ void fil_crypt_set_thread_cnt(const uint new_cnt) {
   mutex_enter(&fil_crypt_threads_set_cnt_mutex);
   mutex_enter(&fil_crypt_threads_mutex);
 
-  if (new_cnt > srv_n_fil_crypt_threads) {
-    uint add = new_cnt - srv_n_fil_crypt_threads;
-    srv_n_fil_crypt_threads = new_cnt;
+  if (new_cnt > srv_n_fil_crypt_threads_requested) {
+    uint add = new_cnt - srv_n_fil_crypt_threads_requested;
+    srv_n_fil_crypt_threads_requested = new_cnt;
     for (uint i = 0; i < add; i++) {
       auto thread = os_thread_create(PSI_NOT_INSTRUMENTED, fil_crypt_thread);
       ib::info() << "Creating #" << i + 1 << " encryption thread"
                  << " total threads " << new_cnt << ".";
       thread.start();
     }
-  } else if (new_cnt < srv_n_fil_crypt_threads) {
-    srv_n_fil_crypt_threads = new_cnt;
+  } else if (new_cnt < srv_n_fil_crypt_threads_requested) {
+    srv_n_fil_crypt_threads_requested = new_cnt;
     os_event_set(fil_crypt_threads_event);
   }
 
   mutex_exit(&fil_crypt_threads_mutex);
 
-  while (srv_n_fil_crypt_threads_started != srv_n_fil_crypt_threads) {
+  while (srv_threads.m_crypt_threads_n != srv_n_fil_crypt_threads_requested) {
     os_event_reset(fil_crypt_event);
     os_event_wait_time(fil_crypt_event, 100000);
   }
 
   /* Send a message to encryption threads that there could be
   something to do. */
-  if (srv_n_fil_crypt_threads) {
+  if (srv_n_fil_crypt_threads_requested) {
     os_event_set(fil_crypt_threads_event);
   }
 
@@ -2734,8 +2810,8 @@ void fil_crypt_threads_init() {
                  &fil_crypt_threads_set_cnt_mutex);
     mutex_create(LATCH_ID_FIL_CRYPT_LIST_MUTEX, &fil_crypt_list_mutex);
 
-    uint cnt = srv_n_fil_crypt_threads;
-    srv_n_fil_crypt_threads = 0;
+    uint cnt = srv_n_fil_crypt_threads_requested;
+    srv_n_fil_crypt_threads_requested = 0;
     fil_crypt_threads_inited = true;
     fil_crypt_set_thread_cnt(cnt);
   }
@@ -2748,7 +2824,7 @@ void fil_crypt_threads_cleanup() {
   if (!fil_crypt_threads_inited) {
     return;
   }
-  ut_a(!srv_n_fil_crypt_threads_started);
+  ut_a(!srv_threads.m_crypt_threads_n);
   os_event_destroy(fil_crypt_event);
   os_event_destroy(fil_crypt_threads_event);
   mutex_free(&fil_crypt_threads_mutex);

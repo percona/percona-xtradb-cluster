@@ -40,6 +40,7 @@ GRANT PERSIST_RO_VARIABLES_ADMIN ON *.* TO 'mysql.session'@localhost;
 GRANT CLONE_ADMIN ON *.* TO 'mysql.session'@localhost;
 GRANT BACKUP_ADMIN ON *.* TO 'mysql.session'@localhost;
 GRANT SHUTDOWN ON *.* TO 'mysql.session'@localhost;
+GRANT CONNECTION_ADMIN ON *.* TO 'mysql.session'@localhost;
 GRANT SYSTEM_USER ON *.* TO 'mysql.session'@localhost;
 
 -- Create an user that is definer for information_schema view
@@ -69,9 +70,9 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.internal.session'@localhost;
 -- Due to bugs with roles, we need to grant superuser access here
 GRANT ALL PRIVILEGES ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
---GRANT CREATE USER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
---GRANT SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
---GRANT RELOAD ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+-- GRANT CREATE USER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+-- GRANT SUPER ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
+-- GRANT RELOAD ON *.* TO 'mysql.pxc.internal.session'@localhost WITH GRANT OPTION;
 
 
 -- Create the PXC SST role
