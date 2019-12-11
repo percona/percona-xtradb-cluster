@@ -172,6 +172,10 @@ override_dh_auto_install:
 	(cd $(galeradir) && cp -r garb $(TMP)/)
 	(cd $(galeradir) && cp libgalera_smm.so $(TMP)/)
 	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
+	mkdir -p $(TMP)/usr/bin/pxc_extra/
+	(cp -r pxb-2.4 $(TMP)/usr/bin/pxc_extra/)
+	(cp -r pxb-8.0 $(TMP)/usr/bin/pxc_extra/)
+
 
 	# add PXC configuration file my.cnf to mysql-common package
 	#install -g root -o root -m 0644 -D debian/extra/my.cnf $(TMP)/etc/mysql/my.cnf
@@ -218,7 +222,6 @@ override_dh_auto_install:
 
 override_dh_strip:
 	dh_strip --dbg-package=percona-xtradb-cluster-dbg 
-	dh_strip -Xlibprotobuf-lite
 
 override_dh_installinit:
 	@echo "RULES.$@"

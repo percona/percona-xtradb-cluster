@@ -493,7 +493,7 @@ fi
             echo "Could not find percona-xtrabackup-2.4 tarball in $TARGETDIR.  Terminating."
             exit 1
         fi
-        pxb_dir=$(echo $pxb_tar | grep -oe ".*x86_64" )
+        pxb_dir="pxb-2.4"
 
         mkdir -p pxc_extra
         cd pxc_extra
@@ -506,23 +506,17 @@ fi
             echo "Extracting pxb 2.4 tarball"
             tar -xzf "../$pxb_tar"
         fi
-        rm -f "pxb-2.4"
         echo "Creating symlink pxc_extra/pxb-2.4 --> $pxb_dir"
-        ln -s "$pxb_dir" pxb-2.4
     ) || exit 1
 
-    pxb_dir=$(ls -1td $TARGETDIR/pxc_extra/percona-xtrabackup-2.* | sort --version-sort | tail -n1)
-    pxb2_version=$(echo $pxb_dir | grep -oe "[1-9]\.[0-9][0-9]*\.[0-9][0-9]*")
-
-    # Look for the pxb 8.0 tarball
     (
         cd "$TARGETDIR"
         pxb_tar=$(ls -1td percona-xtrabackup-8.0.* | grep ".tar" | sort --version-sort | tail -n1)
         if [[ -z $pxb_tar ]]; then
-            echo "Could not find percona-xtrabackup-8.0.x tarball in $TARGETDIR.  Terminating."
+            echo "Could not find percona-xtrabackup-8.0 tarball in $TARGETDIR.  Terminating."
             exit 1
         fi
-        pxb_dir=$(echo $pxb_tar | grep -oe ".*x86_64" )
+        pxb_dir="pxb-8.0"
 
         mkdir -p pxc_extra
         cd pxc_extra
@@ -535,25 +529,18 @@ fi
             echo "Extracting pxb 8.0 tarball"
             tar -xzf "../$pxb_tar"
         fi
-        rm -f "pxb-8.0"
         echo "Creating symlink pxc_extra/pxb-8.0 --> $pxb_dir"
-        ln -s "$pxb_dir" pxb-8.0
     ) || exit 1
-
-    pxb_dir=$(ls -1td $TARGETDIR/pxc_extra/percona-xtrabackup-8.* | sort --version-sort | tail -n1)
-    pxb8_version=$(echo $pxb_dir | grep -oe "[1-9]\.[0-9][0-9]*\.[0-9][0-9]*")
 
     # Only copy over the bin and lib portions of the xtrabackup packages
     # Test cases and other files are not copied
     mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4"
     (cp -v -r $TARGETDIR/pxc_extra/pxb-2.4/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4) || true
     (cp -v -r $TARGETDIR/pxc_extra/pxb-2.4/lib/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4) || true
-    echo "percona xtrabackup $pxb2_version in build in release mode"
 
     mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0"
     (cp -v -r $TARGETDIR/pxc_extra/pxb-8.0/bin/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0) || true
     (cp -v -r $TARGETDIR/pxc_extra/pxb-8.0/lib/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0) || true
-    echo "percona xtrabackup $pxb8_version in build in release mode"
 
 ) || exit 1
 
