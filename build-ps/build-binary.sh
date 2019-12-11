@@ -415,6 +415,7 @@ fi
             -DWITH_RE2=bundled \
             -DWITH_LIBEVENT=bundled \
             -DWITH_EDITLINE=bundled \
+            -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_BOOST="$TARGETDIR/libboost" \
             -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
@@ -448,6 +449,7 @@ fi
             -DWITH_RE2=bundled \
             -DWITH_EDITLINE=bundled \
             -DWITH_LIBEVENT=bundled \
+            -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_BOOST="$TARGETDIR/libboost" \
             -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
