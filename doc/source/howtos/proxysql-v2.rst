@@ -1,4 +1,4 @@
-d.. _pxc.proxysql.v2:
+.. _pxc.proxysql.v2:
 
 ================================================================================
 The |proxysql-admin| Tool with ProxySQL v2
@@ -18,36 +18,71 @@ Summary of Changes in |proxysql-admin| Tool with ProxySQL v2
 Added Features
 --------------------------------------------------------------------------------
 
-- New option ``--use-ssl`` to use SSL for connections between ProxySQL and the backend database servers
-- New option ``--max-transactions-behind`` to determine the maximum number of writesets that can be queued before the node is SHUNNED to avoid stale reads. The default value is 100
-- New operation ``--update-cluster`` to update the cluster membership by adding server nodes as found. (Note that nodes are added but not removed).  The ``--writer-hg`` option may be used to specify which galera hostgroup to update. The ``--remove-all-servers`` option instructs to remove all servers from the mysql_servers table before updating the cluster.
-- Hostgroups can be specified on the command-line: ``--writer-hg``, ``--reader-hg``, ``--backup-writer-hg``, and ``--offline-hg``.
-  Previously, these host groups were only read from the configuration file.
-- The ``--enable`` and ``--update-cluster`` options used simultaneously have special meaning. If the cluster has not been enabled, then ``--enable`` is run.  If the cluster has already been enabled, then ``--update-cluster`` is run.
-- New command ``--is-enabled`` to see if a cluster has been enabled. This command checks for the existence of a row in the mysql_galera_hostgroups table.  The ``--writer-hg`` option may be used to specify the writer hostgroup used to search the mysql_galera_hostgroups table.
-- New command ``--status`` to display galera hostgroup information. This command lists all rows in the current ``mysql_galera_hostgroups`` table as well as all servers that belong to these hostgroups.  With the ``--writer-hg`` option, only the information for the galera hostgroup with that writer hostgroup is displayed.
+- New option ``--use-ssl`` to use SSL for connections between ProxySQL and the
+  backend database servers
+- New option ``--max-transactions-behind`` to determine the maximum number of
+  writesets that can be queued before the node is SHUNNED to avoid stale
+  reads. The default value is 100
+- New operation ``--update-cluster`` to update the cluster membership by adding
+  server nodes as found. (Note that nodes are added but not removed).  The
+  ``--writer-hg`` option may be used to specify which galera hostgroup to
+  update. The ``--remove-all-servers`` option instructs to remove all servers
+  from the mysql_servers table before updating the cluster.
+- Hostgroups can be specified on the command-line: ``--writer-hg``,
+  ``--reader-hg``, ``--backup-writer-hg``, and ``--offline-hg``.  Previously,
+  these host groups were only read from the configuration file.
+- The ``--enable`` and ``--update-cluster`` options used simultaneously have
+  special meaning. If the cluster has not been enabled, then ``--enable`` is
+  run.  If the cluster has already been enabled, then ``--update-cluster`` is
+  run.
+- New command ``--is-enabled`` to see if a cluster has been enabled. This
+  command checks for the existence of a row in the mysql_galera_hostgroups
+  table.  The ``--writer-hg`` option may be used to specify the writer hostgroup
+  used to search the mysql_galera_hostgroups table.
+- New command ``--status`` to display galera hostgroup information. This command
+  lists all rows in the current ``mysql_galera_hostgroups`` table as well as all
+  servers that belong to these hostgroups.  With the ``--writer-hg`` option,
+  only the information for the galera hostgroup with that writer hostgroup is
+  displayed.
 
 Changed Features
 --------------------------------------------------------------------------------
 
-- Setting ``--node-check-interval`` changes the ProxySQL global variable ``mysql-monitor_galera_healthcheck_interval``. Note that this is a global variable, not a per-cluster variable.
-- The option ``--write-node``  takes only a single address as a parameter. In the singlewrite mode we only set the weight if ``--write-node`` specifies *address:port*.  A priority list of addresses is no longer accepted.
-- The option ``--writers-as-readers`` option accepts a different set of values. Due to changes in the behavior of ProxySQL between version 1.4 and version 2.0 related to Galera support, the values of ``--writers-as-readers`` have been changed.  This option accepts the following values: yes, no, and backup.
+- Setting ``--node-check-interval`` changes the ProxySQL global variable
+  ``mysql-monitor_galera_healthcheck_interval``. Note that this is a global
+  variable, not a per-cluster variable.
+- The option ``--write-node`` takes only a single address as a parameter. In the
+  singlewrite mode we only set the weight if ``--write-node`` specifies
+  *address:port*.  A priority list of addresses is no longer accepted.
+- The option ``--writers-as-readers`` option accepts a different set of
+  values. Due to changes in the behavior of ProxySQL between version 1.4 and
+  version 2.0 related to Galera support, the values of ``--writers-as-readers``
+  have been changed.  This option accepts the following values: yes, no, and
+  backup.
 
   :yes: writers, backup-writers, and read-only nodes can act as readers.
   :no: only read-only nodes can act as readers.
   :backup: only backup-writers can act as readers.
 
-- The commands ``--syncusers``, ``--sync-multi-cluster-users``, ``--adduser``, and ``--disable`` can use the ``--writer-hg`` option.
-- The command ``--disable`` removes all users associated with the galera cluster hostgroups. Previously, this command only removed the users with the **CLUSTER_APP_USERNAME**.
-- The command ``--disable`` accepts the ``--writer-hg`` option to disable the Galera cluster associated with that hostgroup overriding the value specified in the configuration file.
+- The commands ``--syncusers``, ``--sync-multi-cluster-users``, ``--adduser``,
+  and ``--disable`` can use the ``--writer-hg`` option.
+- The command ``--disable`` removes all users associated with the galera cluster
+  hostgroups. Previously, this command only removed the users with the
+  **CLUSTER_APP_USERNAME**.
+- The command ``--disable`` accepts the ``--writer-hg`` option to disable the
+  Galera cluster associated with that hostgroup overriding the value specified
+  in the configuration file.
 
 Removed Features
 --------------------------------------------------------------------------------
 
-- Asynchronous slave reader support has been removed: the ``--include-slaves`` option is not supported.
-- A list of nodes in the priority order is not supported in |proxysql| v2. Only a single node is supported at this time.
-- Since the galera_proxysql_checker and galera_node_monitor scripts are no longer run in the scheduler, automatic cluster membership updates are not supported.
+- Asynchronous slave reader support has been removed: the ``--include-slaves``
+  option is not supported.
+- A list of nodes in the priority order is not supported in |proxysql| v2. Only
+  a single node is supported at this time.
+- Since the galera_proxysql_checker and galera_node_monitor scripts are no
+  longer run in the scheduler, automatic cluster membership updates are not
+  supported.
 - Checking the pxc_maint_mode variable is no longer supported
 - Using desynced nodes if no other nodes are available is no longer supported.
 - The server status is no longer maintained in the mysql_servers table.
@@ -614,16 +649,17 @@ This option will check the Percona XtraDB Cluster to see if any new nodes have
 joined the cluster.  If so, the new nodes are added to ProxySQL.  Any offline
 nodes are not removed from the cluster by default.
 
-If used with ``--remove-all-servers``, then the server list for this configuration
-will be removed before running the update cluster function.
+If used with ``--remove-all-servers``, then the server list for this
+configuration will be removed before running the update cluster function.
 
 A specific galera cluster can be updated by using the ``--writer-hg`` option
 with ``--update-cluster``.  Otherwise the cluster specified in the config file
 will be updated.
 
-If ``--write-node`` is used with ``--update-cluster``, then that node will
-be made the writer node (by giving it a larger weight), if the node is in
-the server list and is ONLINE.  This should only be used if the mode is _singlewrite_.
+If ``--write-node`` is used with ``--update-cluster``, then that node will be
+made the writer node (by giving it a larger weight), if the node is in the
+server list and is ONLINE.  This should only be used if the mode is
+_singlewrite_.
 
 .. code-block:: bash
 
@@ -728,8 +764,8 @@ This will skip existing configuration checks with the ``--enable`` option in
 --------------------------------------------------------------------------------
 
 This option will updates mysql server version (specified by the writer
-hostgroup, either from ``--writer-hg`` or from the config file) in proxysql db based
-on online writer node.
+hostgroup, either from ``--writer-hg`` or from the config file) in proxysql db
+based on online writer node.
 
 .. code-block:: bash
 
@@ -759,8 +795,8 @@ All other remaining nodes will be read-only and will only receive read statement
 
 With the ``--write-node`` option we can control which node ProxySQL will use as
 the writer node. The writer node is specified as an address:port -
-**10.0.0.51:3306** If ``--write-node`` is used, the writer node is given a weight of
-**1000000** (the default weight is **1000**).
+**10.0.0.51:3306** If ``--write-node`` is used, the writer node is given a
+weight of **1000000** (the default weight is **1000**).
 
 The mode `loadbal` on the other hand is a load balanced set of evenly weighted
 read/write nodes.
@@ -859,7 +895,8 @@ used with ``--enable``.
 --------------------------------------------------------------------------------
 
 This option is used to choose which node will be the writer node when the mode
-is `singlewrite`.  This option can be used with `--enable` and `--update-cluster`.
+is `singlewrite`.  This option can be used with `--enable` and
+`--update-cluster`.
 
 A single IP address and port combination is expected.  For instance,
 "--write-node=127.0.0.1:3306"
