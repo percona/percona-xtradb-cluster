@@ -685,7 +685,11 @@ private:
   int process_flush_stage_queue(my_off_t *total_bytes_var, bool *rotate_var,
                                 THD **out_queue_var);
   int prepare_ordered_commit(THD *thd, bool all, bool skip_commit= false);
+#ifdef WITH_WSREP
+  int ordered_commit(THD *thd, bool all);
+#else
   int ordered_commit(THD *thd);
+#endif /* WITH_WSREP */
   void handle_binlog_flush_or_sync_error(THD *thd, bool need_lock_log);
 public:
   int open_binlog(const char *opt_name);
