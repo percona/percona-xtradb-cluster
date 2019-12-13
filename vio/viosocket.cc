@@ -529,7 +529,7 @@ int vio_shutdown(Vio *vio, int how) {
   fail to deliver the said notification to the pooling worker thread.
   sleep help ensure that shutdown signal is delivered before the socket is
   closed. */
-  sleep(0.5);
+  sleep(1);
 #endif /* WITH_WSREP */
 
   if (!vio->inactive) {
