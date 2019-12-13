@@ -27,4 +27,4 @@ Bugs Fixed
 Other bugs fixed: :pxcbug:`2670`
 
 .. |release| replace:: 5.7.28-31.41
-.. |date| replace:: December 11, 2019
+.. |date| replace:: December 16, 2019
