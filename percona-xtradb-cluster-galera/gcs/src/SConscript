@@ -1,0 +1,82 @@
+#
+
+Import('env')
+
+# Clone environment as we need to tune compilation flags
+libgcs_env = env.Clone()
+
+# Include paths
+libgcs_env.Append(CPPPATH = Split('''
+                                     #/galerautils/src
+                                     #/gcomm/src
+                                     #/gcache/src
+                                  '''))
+
+# Backends (TODO: Get from global options)
+libgcs_env.Append(CPPFLAGS = ' -DGCS_USE_GCOMM')
+# For C-style logging
+libgcs_env.Append(CPPFLAGS = ' -DGALERA_LOG_H_ENABLE_CXX')
+# Disable old style cast warns until code is fixed
+libgcs_env.Replace(CXXFLAGS = libgcs_env['CXXFLAGS'].replace('-Wold-style-cast', ''))
+libgcs_env.Replace(CXXFLAGS = libgcs_env['CXXFLAGS'].replace('-Weffc++', ''))
+# Allow zero sized arrays
+libgcs_env.Replace(CCFLAGS = libgcs_env['CCFLAGS'].replace('-pedantic', ''))
+libgcs_env.Append(CCFLAGS = ' -Wno-missing-field-initializers')
+libgcs_env.Append(CCFLAGS = ' -Wno-variadic-macros')
+
+print('gcs flags:')
+for f in ['CFLAGS', 'CXXFLAGS', 'CCFLAGS', 'CPPFLAGS']:
+    print(f + ': ' + libgcs_env[f].strip())
+
+gcs4garb_env = libgcs_env.Clone()
+
+libgcs_sources = Split('''
+                          gcs_params.cpp
+                          gcs_conf.cpp
+                          gcs_fifo_lite.cpp
+                          gcs_msg_type.cpp
+                          gcs_comp_msg.cpp
+                          gcs_sm.cpp
+                          gcs_backend.cpp
+                          gcs_dummy.cpp
+                          gcs_act_proto.cpp
+                          gcs_defrag.cpp
+                          gcs_state_msg.cpp
+                          gcs_node.cpp
+                          gcs_group.cpp
+                          gcs_core.cpp
+                          gcs_fc.cpp
+                          gcs.cpp
+                          gcs_gcomm.cpp
+                       ''')
+#libgcs_env.VariantDir('.gcs', '.', duplicate=0)
+libgcs_env.StaticLibrary('gcs', libgcs_sources)
+
+# TODO: How to tell scons portably that C++ linker should be used
+# and program should be linked statically
+gcs_test_env = libgcs_env.Clone()
+
+gcs_test_env.Prepend(LIBS = File('#/galerautils/src/libgalerautils.a'))
+gcs_test_env.Prepend(LIBS = File('#/galerautils/src/libgalerautils++.a'))
+gcs_test_env.Prepend(LIBS = File('#/gcomm/src/libgcomm.a'))
+gcs_test_env.Prepend(LIBS = File('#/gcache/src/libgcache.a'))
+gcs_test_env.Prepend(LIBS = File('#/gcs/src/libgcs.a'))
+
+gcs_test_env.Program(target = 'gcs_test',
+                     source = 'gcs_test.cpp',
+                     LINK = libgcs_env['CXX'])
+
+SConscript('unit_tests/SConscript')
+
+#
+env.Append(LIBGALERA_OBJS = libgcs_env.SharedObject(libgcs_sources))
+
+gcs4garb_env.Append(CPPFLAGS = ' -DGCS_FOR_GARB')
+garb_obj_dir = '.garb'
+gcs4garb_env.VariantDir(garb_obj_dir, '.', duplicate = 0)
+#garb_objects = [os.path.splitext(src)[0] + '_garb' + 
+#                env['OBJSUFFIX'] for src in libgcs_sources]
+garb_sources = [ garb_obj_dir + '/' + src for src in libgcs_sources ]
+gcs4garb_env.StaticLibrary('gcs4garb', garb_sources)
+
+Clean('.', garb_obj_dir)

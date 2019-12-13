@@ -1,13 +1,20 @@
-# Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; version 2 of the License.
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is also distributed with certain software (including
+# but not limited to OpenSSL) that is licensed under separate terms,
+# as designated in a particular file or component or in included license
+# documentation.  The authors of MySQL hereby grant you an additional
+# permission to link the program and your derivative works with the
+# separately licensed software that they have included with MySQL.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# GNU General Public License, version 2.0, for more details.
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; see the file COPYING. If not, write to the
@@ -227,11 +234,10 @@
 # Configuration based upon above user input, not to be set directly
 ##############################################################################
 
+%define license_files_server    %{src_dir}/LICENSE %{src_dir}/README
 %if 0%{?commercial}
-%define license_files_server    %{src_dir}/LICENSE.mysql
 %define license_type            Commercial
 %else
-%define license_files_server    %{src_dir}/COPYING %{src_dir}/README
 %define license_type            GPL
 %endif
 
@@ -484,7 +490,7 @@ export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-cmake}}
 export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:-}
 
-# By default, a build will include the bundeled "yaSSL" library for SSL.
+# By default, a build will include the system library for SSL.
 # However, there may be a need to override.
 # Protect against undefined variables if there is no override option.
 %if %{undefined with_ssl}
@@ -1210,7 +1216,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %endif
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
-<<<<<<< HEAD
 %attr(755, root, root) %{_bindir}/mysql_client_test_embedded
 %attr(755, root, root) %{_bindir}/mysqltest_embedded
 
@@ -1223,8 +1228,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/mysql_embedded
 %attr(644, root, root) %{_libdir}/mysql/libmysqld.a
 %attr(644, root, root) %{_libdir}/mysql/libmysqld-debug.a
-=======
->>>>>>> tag-wsrep_5.6.39-25.22
 
 ##############################################################################
 # The spec file changelog only includes changes made to the spec file
@@ -1232,47 +1235,14 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Thu Sep 05 2019 Bjorn Munch <bjorn.munch@oracle.com>
+- Add License Book, remove COPYING
+
 * Wed Jan 10 2018 Bjorn Munch <bjorn.munch@oracle.com>
 - No longer need to remove obsoleted mysqltest man pages
 
 * Tue Oct 31 2017 Bjorn Munch <bjorn.munch@oracle.com>
 - Remove obsoleted mysqltest man pages
-<<<<<<< HEAD
-=======
-
-* Fri Jun 10 2016 Joerg Bruehe <joerg.bruehe@fromdual.com>
-- Add missing "obsoletes" directives to handle Oracle's yum repository.
-- Fix comment about SO version of libmysqlclient.so.
-- Modify some changelog dates to match Oracle's (reduce differences).
-
-* Fri Oct 30 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
-- Combine "plugins.files" and "datadir.files" into one, it seems rpmbuild 4.4
-  (used on SLES 11) cannot handle two "-f" directives for one "%%files" section.
-  This solves issue Github-223.
-- Introduce a macro "previous_suffix" and set it to "-5.5", so that installing a
-  "mysql-wsrep-*-5.6" package will "obsolete" the corresponding "mysql-wsrep-*-5.5"
-  package. This solves issue Github-224.
-- Fix dependency: There is no "libopenssl1-devel", just "libopenssl-devel".
-
-* Tue Oct 27 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
-- Add the spec file changes coded in mysql-wsrep 5.5 to create "libs-compat",
-  visible and documented (Sep 11 - 17) in the 5.5 spec file.
-
-* Thu Jan 29 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
-- Add a meta-package "mysql-wsrep" that requires both "server" and "client".
-- Fix the fall-back definition of "dist", it must start with a period.
-
-* Mon Jan 26 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
-- Allow "rpmlint", but suppress "post-build-checks" (fail on SuSE 12 + 13).
-- Improve handling of undefined "%%{dist}".
-- Fix wrong changelog dates, to get rid of warnings about "bogus date".
-- Escape percent signs in changelog, to get rid of "rpmlint" warnings.
-
-* Tue Jan 20 2015 Teemu Ollakka <teemu.ollakka@galeracluster.com>
-
-- Reworked to build wsrep patched packages exclusively
-- OBS compatible
->>>>>>> tag-wsrep_5.6.39-25.22
 
 * Mon Oct 06 2014 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com>
 - Add license info in each subpackage

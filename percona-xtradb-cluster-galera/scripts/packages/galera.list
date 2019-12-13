@@ -1,0 +1,48 @@
+# This is Galera package description for ESP package manager
+
+%include galera-common.inc
+
+# this line is required by rpmbuild
+#d 755 root root /usr
+
+d 755 root root $CONF_DEST -
+c 644 root root $CONF_DEST/garb  $BUILD_BASE/garb/files/garb.cnf
+
+# i 755 root sys foo foo.sh - this creates links in rc*.d, we dont want it
+d 755 root root $INIT_DEST -
+f 755 root root $INIT_DEST/garb  $BUILD_BASE/garb/files/garb.sh
+
+d 755 root root $BINS_DEST -
+f 755 root root $BINS_DEST/garbd $BUILD_BASE/garb/garbd
+
+d 755 nobody nobody /var/lib/galera -
+
+d 755 root root $LIBS_DEST -
+f 755 root root $LIBS_DEST/libgalera_smm.so $BUILD_BASE/libgalera_smm.so
+
+d 755 root root $DOCS_DEST -
+f 644 root root $DOCS_DEST/COPYING          $BUILD_BASE/LICENSE
+f 644 root root $DOCS_DEST/LICENSE.asio     $BUILD_BASE/asio/LICENSE_1_0.txt
+f 644 root root $DOCS_DEST/LICENSE.crc32c   $BUILD_BASE/www.evanjones.ca/LICENSE
+f 644 root root $DOCS_DEST/LICENSE.chromium $BUILD_BASE/chromium/LICENSE
+f 644 root root $DOCS_DEST/README       README
+f 644 root root $DOCS_DEST/README-MySQL README-MySQL
+
+$LD_SO_CONF_D=/etc/ld.so.conf.d
+d 755 root root $LD_SO_CONF_D -
+# the reason we don't create this file in postinstall script is to have it
+# in the package database
+f 644 root root $LD_SO_CONF_D/galera.conf empty
+
+%postinstall <<EOF_POSTINSTALL
+# Debian packages come with bad file ownership
+#chown -R root.root $SBIN_DEST $LIBS_DEST
+echo $LIBS_DEST > $LD_SO_CONF_D/galera.conf
+ldconfig $LIBS_DEST
+EOF_POSTINSTALL
+
+%preremove <<EOF_PREREMOVE
+rm -f $$(find $LIBS_DEST -type l)
+EOF_PREREMOVE
+
+#

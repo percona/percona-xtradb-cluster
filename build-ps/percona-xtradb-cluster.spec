@@ -252,8 +252,8 @@ Prefix: %{_sysconfdir}
 %define license_files_server    LICENSE.mysql
 %define license_type            Commercial
 %else
-%define license_files_server    COPYING README
-%define license_type            GPL
+%define license_files_server    README
+%define license_type            GPLv2
 %endif
 
 ##############################################################################

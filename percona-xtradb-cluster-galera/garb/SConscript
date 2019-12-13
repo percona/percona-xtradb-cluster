@@ -1,0 +1,40 @@
+# Copyright (C) 2011 Codership Oy <info@codership.com>
+
+Import('env', 'libboost_program_options')
+
+garb_env = env.Clone()
+
+# Include paths
+garb_env.Append(CPPPATH = Split('''
+                                   #
+                                   #/common
+                                   #/galerautils/src
+                                   #/gcs/src
+                                '''))
+
+garb_env.Append(CPPFLAGS = ' -DGCS_FOR_GARB')
+
+garb_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
+garb_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
+garb_env.Prepend(LIBS=File('#/gcomm/src/libgcomm.a'))
+garb_env.Prepend(LIBS=File('#/gcs/src/libgcs4garb.a'))
+
+if libboost_program_options:
+    garb_env.Append(LIBS=libboost_program_options)
+
+# special environment for garb_config.cpp
+conf_env = garb_env.Clone()
+Import('GALERA_VER', 'GALERA_REV')
+conf_env.Append(CPPFLAGS = ' -DGALERA_VER=\\"' + GALERA_VER + '\\"')
+conf_env.Append(CPPFLAGS = ' -DGALERA_REV=\\"' + GALERA_REV + '\\"')
+
+garb = garb_env.Program(target = 'garbd',
+                        source = Split('''
+                                       garb_logger.cpp
+                                       garb_gcs.cpp
+                                       garb_recv_loop.cpp
+                                       garb_main.cpp
+                                   ''')
+                                   +
+                                   conf_env.SharedObject(['garb_config.cpp'])
+                       )

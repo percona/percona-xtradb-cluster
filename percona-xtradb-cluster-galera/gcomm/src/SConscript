@@ -1,0 +1,47 @@
+#
+
+Import('env')
+
+libgcomm_env = env.Clone()
+
+# Include paths
+libgcomm_env.Append(CPPPATH = Split('''
+                                       #
+                                       #/common
+                                       #/galerautils/src
+                                       #/gcomm/src
+                                    '''))
+
+libgcomm_env.Append(CXXFLAGS = ' -fno-strict-aliasing')
+
+libgcomm_sources = [
+    'conf.cpp',
+    'defaults.cpp',
+    'datagram.cpp',
+    'evs_consensus.cpp',
+    'evs_input_map2.cpp',
+    'evs_message2.cpp',
+    'evs_node.cpp',
+    'evs_proto.cpp',
+    'gmcast.cpp',
+    'gmcast_proto.cpp',
+    'pc.cpp',
+    'pc_proto.cpp',
+    'protonet.cpp',
+    'protostack.cpp',
+    'transport.cpp',
+    'uuid.cpp',
+    'view.cpp',
+    'socket.cpp']
+
+if '-DHAVE_ASIO_HPP' in libgcomm_env['CPPFLAGS']:
+    # ASIO sources need to be built with relaxed C++ flags
+    libgcomm_sources.extend([
+            'asio_tcp.cpp',
+            'asio_udp.cpp',
+            'asio_protonet.cpp'])
+
+
+libgcomm_env.StaticLibrary('gcomm', libgcomm_sources)
+
+env.Append(LIBGALERA_OBJS = libgcomm_env.SharedObject(libgcomm_sources))
