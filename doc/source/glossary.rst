@@ -25,6 +25,17 @@
      :term:`UUID` and an ordinal sequence number which denotes the position of
      the change in the sequence.
 
+     .. warning:: 
+
+	A node running |percona-server| may lose the :term:`GTID (Global
+	Transaction ID)` information if the variable ``max-binlog-files`` is set
+	to **1** either before the node is restarted or after :term:`SST`.
+
+	.. seealso::
+
+	   |percona-server| Documentation: Restricting the number of binlog files
+	      https://www.percona.com/doc/percona-server/5.6/flexibility/max_binlog_files.html
+
    HAProxy
      `HAProxy <http://haproxy.1wt.eu/>`_ is a free, very fast and reliable
      solution offering high availability, load balancing, and proxying for TCP
@@ -166,3 +177,5 @@
    .frm
      For each table, the server will create a file with the :file`.frm`
      extension containing the table definition (for all storage engines).
+
+.. |percona-server| replace:: Percona Server
