@@ -1,13 +1,20 @@
 /* Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -2834,7 +2841,14 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all)
       DBUG_ASSERT(0);
 #endif
 
-    error= ordered_commit(thd, all, /* skip_commit */ true);
+    error= prepare_ordered_commit(thd, all, /* skip_commit */ true);
+#ifdef WITH_WSREP
+    if (!error)
+      error= ordered_commit(thd, all);
+#else
+    if (!error)
+      error= ordered_commit(thd);
+#endif /* WITH_WSREP */
   }
 
 #ifdef WITH_WSREP
@@ -9624,6 +9638,10 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
       DBUG_RETURN(RESULT_ABORTED);
     }
 
+    int rc= prepare_ordered_commit(thd, all, skip_commit);
+    if (rc)
+      DBUG_RETURN(RESULT_INCONSISTENT);
+
     /*
       Block binlog updates if there's an active BINLOG lock.
 
@@ -9639,6 +9657,33 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
       DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
 
 #ifndef WITH_WSREP
+
+#ifdef HAVE_REPLICATION
+      DBUG_EXECUTE_IF("delay_slave_worker_0", {
+        if (has_commit_order_manager(thd))
+        {
+          Slave_worker *worker= dynamic_cast<Slave_worker *>(thd->rli_slave);
+
+          if (worker->id == 0)
+          {
+            static bool skip_first_query= true;
+            if (!skip_first_query)
+            {
+              static const char act[]= "now WAIT_FOR signal.lock_binlog_for_backup";
+              DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+
+              static const char act2[]= "now SIGNAL finished_delay_slave_worker_0";
+              DBUG_ASSERT(opt_debug_sync_timeout > 0);
+              DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act2)));
+
+              DBUG_SET("-d,delay_slave_worker_0");
+            }
+            skip_first_query= !skip_first_query;
+          }
+        }
+      });
+#endif /* HAVE_REPLICATION */
+
       if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT,
                                                      timeout))
 #else
@@ -9688,7 +9733,11 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
       binlog_prot_acquired= true;
     }
 
-    int rc= ordered_commit(thd, all, skip_commit);
+#ifdef WITH_WSREP
+    rc= ordered_commit(thd, all);
+#else
+    rc= ordered_commit(thd);
+#endif /* WITH_WSREP */
 
     if (binlog_prot_acquired)
     {
@@ -10355,32 +10404,15 @@ void MYSQL_BIN_LOG::handle_binlog_flush_or_sync_error(THD *thd,
                be skipped (it is handled by the caller somehow) and @c
                false otherwise (the normal case).
  */
-int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
+int MYSQL_BIN_LOG::prepare_ordered_commit(THD *thd, bool all,
+                                          bool skip_commit)
 {
-  DBUG_ENTER("MYSQL_BIN_LOG::ordered_commit");
-  int flush_error= 0, sync_error= 0;
-  my_off_t total_bytes= 0;
-  bool do_rotate= false;
+  DBUG_ENTER("MYSQL_BIN_LOG::prepare_ordered_commit");
 
 #ifdef WITH_WSREP
+  /* While running in emulation mode avoid flushing binary logs. */
   if (WSREP_EMULATE_BINLOG(thd))
-  {
-    /*
-      Skip group commit, just do storage engine commit.
-    */
-    int rcode = ha_commit_low(thd, all);
-
-    /* if there is myisam statement inside innodb transaction, we may
-       have events in stmt cache
-    */
-    binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
-    if(!cache_mngr->stmt_cache.is_binlog_empty())
-    {
-      WSREP_DEBUG("stmt transaction inside MST, SQL: %s", WSREP_QUERY(thd));
-      cache_mngr->stmt_cache.reset();
-    }
-    DBUG_RETURN(rcode);
-  }
+    DBUG_RETURN(0);
 #endif /* WITH_WSREP */
 
   /*
@@ -10442,12 +10474,45 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
       thd->commit_error= THD::CE_COMMIT_ERROR;
       DBUG_RETURN(thd->commit_error);
     }
-
-    if (change_stage(thd, Stage_manager::FLUSH_STAGE, thd, NULL, &LOCK_log))
-      DBUG_RETURN(finish_commit(thd));
   }
-  else
 #endif
+
+  DBUG_RETURN(0); /* no error */
+}
+
+
+#ifdef WITH_WSREP
+int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all)
+#else
+int MYSQL_BIN_LOG::ordered_commit(THD *thd)
+#endif /* WITH_WSREP */
+{
+  DBUG_ENTER("MYSQL_BIN_LOG::ordered_commit");
+  int      flush_error= 0, sync_error= 0;
+  my_off_t total_bytes= 0;
+  bool     do_rotate= false;
+
+#ifdef WITH_WSREP
+  if (WSREP_EMULATE_BINLOG(thd))
+  {
+    /*
+      Skip group commit, just do storage engine commit.
+    */
+    int rcode = ha_commit_low(thd, all);
+
+    /* if there is myisam statement inside innodb transaction, we may
+       have events in stmt cache
+    */
+    binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+    if(!cache_mngr->stmt_cache.is_binlog_empty())
+    {
+      WSREP_DEBUG("stmt transaction inside MST, SQL: %s", WSREP_QUERY(thd));
+      cache_mngr->stmt_cache.reset();
+    }
+    DBUG_RETURN(rcode);
+  }
+#endif /* WITH_WSREP */
+
   if (change_stage(thd, Stage_manager::FLUSH_STAGE, thd, NULL, &LOCK_log))
   {
     DBUG_PRINT("return", ("Thread ID: %u, commit_error: %d",

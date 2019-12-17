@@ -10,14 +10,21 @@ documentation. The contributions by Percona Inc. are incorporated with
 their permission, and subject to the conditions contained in the file
 COPYING.Percona.
 
-This program is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by the
-Free Software Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
-Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -2159,6 +2166,10 @@ os_file_get_parent_dir(
 
 	/* Check for the root of a drive. */
 	if (os_file_is_root(path, last_slash)) {
+		return(NULL);
+	}
+
+	if (last_slash - path < 0) {
 		return(NULL);
 	}
 
@@ -9792,7 +9803,12 @@ Encryption::get_master_key(ulint* master_key_id,
 	int	ret;
 
 	memset(key_name, 0, ENCRYPTION_KEY_LEN);
-	*version = Encryption::ENCRYPTION_VERSION_2;
+	*version = Encryption::ENCRYPTION_VERSION_3;
+
+	DBUG_EXECUTE_IF("force_v2_encryption",{
+			*version = Encryption::ENCRYPTION_VERSION_2;
+			});
+
 
 	if (Encryption::master_key_id == 0) {
 		/* If m_master_key is 0, means there's no encrypted
@@ -9910,15 +9926,21 @@ bool Encryption::fill_encryption_info(byte*	key,
 
 	if (version == ENCRYPTION_VERSION_1) {
 		memcpy(ptr, ENCRYPTION_KEY_MAGIC_V1, ENCRYPTION_MAGIC_SIZE);
-	} else {
+	} else if (version == ENCRYPTION_VERSION_2) {
 		memcpy(ptr, ENCRYPTION_KEY_MAGIC_V2, ENCRYPTION_MAGIC_SIZE);
+	} else  {
+		memcpy(ptr, ENCRYPTION_KEY_MAGIC_V3, ENCRYPTION_MAGIC_SIZE);
 	}
 	ptr += ENCRYPTION_MAGIC_SIZE;
 
 	mach_write_to_4(ptr, master_key_id);
-	ptr += sizeof(master_key_id);
+	if (version == ENCRYPTION_VERSION_3) {
+		ptr += sizeof(uint32);
+	} else {
+		ptr += sizeof(master_key_id);
+	}
 
-	if (version == ENCRYPTION_VERSION_2) {
+	if (version >= ENCRYPTION_VERSION_2) {
 		memcpy(ptr, uuid, ENCRYPTION_SERVER_UUID_LEN);
 		ptr += ENCRYPTION_SERVER_UUID_LEN;
 	}
@@ -9975,13 +9997,17 @@ Encryption::decode_encryption_info(byte*	key,
 	if (memcmp(ptr, ENCRYPTION_KEY_MAGIC_V1,
 		     ENCRYPTION_MAGIC_SIZE) == 0) {
 		version = ENCRYPTION_VERSION_1;
-	} else {
+	} else if (memcmp(ptr, ENCRYPTION_KEY_MAGIC_V2,
+		     ENCRYPTION_MAGIC_SIZE) == 0) {
 		version = ENCRYPTION_VERSION_2;
+	} else {
+		version = ENCRYPTION_VERSION_3;
 	}
 
 	/* Check magic. */
-	if (version == ENCRYPTION_VERSION_2
-	    && memcmp(ptr, ENCRYPTION_KEY_MAGIC_V2, ENCRYPTION_MAGIC_SIZE) != 0) {
+	if (version >= ENCRYPTION_VERSION_2
+	    && memcmp(ptr, ENCRYPTION_KEY_MAGIC_V2, ENCRYPTION_MAGIC_SIZE) != 0
+	    && memcmp(ptr, ENCRYPTION_KEY_MAGIC_V3, ENCRYPTION_MAGIC_SIZE) != 0) {
 		/* We ignore report error for recovery,
 		since the encryption info maybe hasn't writen
 		into datafile when the table is newly created. */
@@ -9992,10 +10018,14 @@ Encryption::decode_encryption_info(byte*	key,
 
 	/* Get master key id. */
 	const ulint m_key_id = mach_read_from_4(ptr);
-	ptr += sizeof(ptr);
+	if (version == ENCRYPTION_VERSION_3) {
+		ptr += sizeof(uint32);
+	} else {
+		ptr += sizeof(ptr);
+	}
 
 	/* Get server uuid. */
-	if (version == ENCRYPTION_VERSION_2) {
+	if (version >= ENCRYPTION_VERSION_2) {
 		memset(srv_uuid, 0, ENCRYPTION_SERVER_UUID_LEN + 1);
 		memcpy(srv_uuid, ptr, ENCRYPTION_SERVER_UUID_LEN);
 		ptr += ENCRYPTION_SERVER_UUID_LEN;
