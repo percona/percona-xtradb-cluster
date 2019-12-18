@@ -1,2 +1,0 @@
-
-SConscript(['src/SConscript', 'tests/SConscript'])

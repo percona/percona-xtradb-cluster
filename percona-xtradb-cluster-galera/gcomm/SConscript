@@ -1,3 +1,0 @@
-# SCons build script for building gcomm
-
-SConscript(Split('''src/SConscript test/SConscript'''))
