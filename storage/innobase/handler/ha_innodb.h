@@ -176,6 +176,11 @@ class ha_innobase : public handler {
 
   bool has_gap_locks() const noexcept override { return true; }
 
+  int read_range_first(const key_range *start_key, const key_range *end_key,
+                       bool eq_range_arg, bool sorted) override;
+
+  int read_range_next() override;
+
   int rnd_init(bool scan) override;
 
   int rnd_end() override;
@@ -1356,5 +1361,8 @@ MY_NODISCARD
 bool innobase_build_index_translation(const TABLE *table,
                                       dict_table_t *ib_table,
                                       INNOBASE_SHARE *share);
+
+uint innodb_force_index_records_in_range(THD *thd);
+uint innodb_records_in_range(THD *thd);
 
 #endif /* ha_innodb_h */

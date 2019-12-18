@@ -124,6 +124,13 @@ TARGET_INCLUDE_DIRECTORIES(http_server
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include/)
 
+# Suppress warnings for gcc-5 or older
+IF(CMAKE_COMPILER_IS_GNUCXX AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.0)
+  MY_CHECK_CXX_COMPILER_FLAG("-Wno-unused-value" HAVE_NO_UNUSED_VALUE)
+  IF(HAVE_NO_UNUSED_VALUE)
+    ADD_COMPILE_FLAGS(tls_server_context.cc COMPILE_FLAGS "-Wno-unused-value")
+  ENDIF()
+ENDIF()
 
 ADD_LIBRARY(http_client
   SHARED
@@ -190,7 +197,7 @@ TARGET_LINK_LIBRARIES(mysqlrouter_passwd
   harness-library
   router_lib
   http_auth_backend_lib mysys)
-SET_PROPERTY(TARGET mysqlrouter_passwd PROPERTY INSTALL_RPATH "${ROUTER_INSTALL_RPATH}")
+ADD_INSTALL_RPATH(mysqlrouter_passwd "${ROUTER_INSTALL_RPATH}")
 
 MY_INCLUDE_SYSTEM_DIRECTORIES(LIBEVENT)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/harness/include/)

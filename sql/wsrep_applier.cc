@@ -126,7 +126,7 @@ void wsrep_apply_error::store(const THD *const thd) {
 */
 int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
                        const void *events_buf, size_t buf_len) {
-  char *buf = (char *)events_buf;
+  char *buf = static_cast<char*>(const_cast<void*>(events_buf));
   int rcode = WSREP_RET_SUCCESS;
   int event = 1;
 

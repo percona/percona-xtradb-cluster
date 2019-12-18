@@ -343,7 +343,7 @@ int wsrep_abort_thd(const THD *bf_thd, THD *victim_thd, bool signal) {
                 (bf_thd) ? (long long)bf_thd->real_id : 0,
                 (long long)victim_thd->real_id);
     mysql_mutex_unlock(&victim_thd->LOCK_wsrep_thd);
-    ha_wsrep_abort_transaction((THD*) bf_thd, victim_thd, signal);
+    ha_wsrep_abort_transaction(const_cast<THD*>(bf_thd), victim_thd, signal);
     mysql_mutex_lock(&victim_thd->LOCK_wsrep_thd);
   } else {
     WSREP_DEBUG("wsrep_abort_thd not effective: %p %p", bf_thd, victim_thd);
@@ -353,7 +353,7 @@ int wsrep_abort_thd(const THD *bf_thd, THD *victim_thd, bool signal) {
 }
 
 bool wsrep_bf_abort(const THD *bf_thd, THD *victim_thd) {
-  WSREP_LOG_THD((THD *)bf_thd, "BF aborter before");
+  WSREP_LOG_THD(const_cast<THD *>(bf_thd), "BF aborter before");
   WSREP_LOG_THD(victim_thd, "victim before");
   wsrep::seqno bf_seqno(bf_thd->wsrep_trx().ws_meta().seqno());
 

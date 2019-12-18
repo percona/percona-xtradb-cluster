@@ -170,13 +170,13 @@ static int execute_SQL(THD* thd, const char* sql, uint length) {
 
   WSREP_DEBUG("SQL: %d %s thd: %u", length, sql, thd->thread_id());
 
-  if (parser_state.init(thd, (char*)sql, length) == 0) {
+  if (parser_state.init(thd, sql, length) == 0) {
     thd->reset_for_next_command();
     lex_start(thd);
 
     thd->m_statement_psi= NULL;
 
-    thd->set_query((char*)sql, length);
+    thd->set_query(sql, length);
     thd->set_query_id(next_query_id());
 
     mysql_parse(thd, &parser_state, false);
@@ -223,15 +223,13 @@ static int open_table(THD* thd,
 
   DBUG_ENTER("Wsrep_schema::open_table()");
 
-  TABLE_LIST tables;
   uint flags= (MYSQL_OPEN_IGNORE_GLOBAL_READ_LOCK |
                MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY |
                MYSQL_OPEN_IGNORE_FLUSH |
                MYSQL_LOCK_IGNORE_TIMEOUT);
 
-  tables.init_one_table(schema_name->str, schema_name->length,
-                        table_name->str, table_name->length,
-                        table_name->str, lock_type);
+  TABLE_LIST tables(schema_name->str, schema_name->length, table_name->str,
+                    table_name->length, table_name->str, lock_type);
 
   if (!open_n_lock_single_table(thd, &tables, lock_type, flags)) {
     close_thread_tables(thd);
@@ -1064,10 +1062,9 @@ int Wsrep_schema::remove_fragments(THD* thd,
   thd->lex->reset_n_backup_query_tables_list(&query_tables_list_backup);
   thd->reset_n_backup_open_tables_state(&open_tables_backup,
                                         Open_tables_state::SYSTEM_TABLES);
-  TABLE_LIST tables;
-  tables.init_one_table(wsrep_schema_str.c_str(), wsrep_schema_str.length(),
-                        sr_table_str.c_str(), sr_table_str.length(),
-                        sr_table_str.c_str(), TL_WRITE);
+  TABLE_LIST tables(wsrep_schema_str.c_str(), wsrep_schema_str.length(),
+                    sr_table_str.c_str(), sr_table_str.length(),
+                    sr_table_str.c_str(), TL_WRITE);
 
   if (!open_n_lock_single_table(thd, &tables, TL_WRITE, flags))
   {

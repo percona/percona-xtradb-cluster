@@ -14,7 +14,7 @@ INSERT INTO t1 VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 SET SESSION wsrep_trx_fragment_size=1;
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
-update t1 set f1 = 100 where f1 = 10;
+update t1 set f1 = 90 where f1 = 10;
 #node-2
 INSERT INTO t1 VALUES (11),(12),(13),(14),(15),(16),(17),(18),(19),(20);
 SET SESSION wsrep_trx_fragment_size=1;

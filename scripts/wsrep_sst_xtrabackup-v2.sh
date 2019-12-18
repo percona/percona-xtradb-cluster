@@ -1586,7 +1586,7 @@ fi
 # 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
 #         my.cnf.
 #
-XB_2x_REQUIRED_VERSION="2.4.16"
+XB_2x_REQUIRED_VERSION="2.4.17"
 
 wsrep_log_info "###### Looking for XB-2.4.x binaries"
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then

@@ -32,12 +32,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -97,12 +93,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -162,12 +154,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -227,12 +215,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -292,12 +276,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -357,12 +337,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -422,12 +398,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -487,12 +459,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -552,12 +520,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -617,12 +581,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -682,12 +642,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -747,12 +703,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -812,12 +764,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -877,12 +825,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -942,12 +886,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a
@@ -1007,12 +947,8 @@ f1	f2
 UPDATE t1 SET f2 = 'a' WHERE f1 = 2;
 #node-1
 #node-1b
-SET DEBUG_SYNC = 'wsrep_before_SR_rollback SIGNAL wait WAIT_FOR continue';
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 #node-1
-SET DEBUG_SYNC = 'now WAIT_FOR wait';
-#node-1
-SET DEBUG_SYNC = 'now SIGNAL continue';
 #node-1c
 UPDATE t1 SET f2 = 'x' WHERE f1 = 3;
 #node-1a

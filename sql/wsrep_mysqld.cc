@@ -1321,7 +1321,7 @@ enum wsrep::provider::status wsrep_sync_wait_upto(THD *thd
 
 void wsrep_keys_free(wsrep_key_arr_t *key_arr) {
   for (size_t i = 0; i < key_arr->keys_len; ++i) {
-    my_free((void *)key_arr->keys[i].key_parts);
+    my_free(const_cast<wsrep_buf_t*>(key_arr->keys[i].key_parts));
   }
   my_free(key_arr->keys);
   key_arr->keys = 0;
@@ -1391,7 +1391,7 @@ static bool wsrep_prepare_key_for_isolation(const char *db, const char *table,
   ka->keys[ka->keys_len].key_parts_num = 2;
   ++ka->keys_len;
   if (!wsrep_prepare_key_for_isolation(
-          db, table, (wsrep_buf_t *)ka->keys[ka->keys_len - 1].key_parts,
+          db, table, const_cast<wsrep_buf_t *>(ka->keys[ka->keys_len - 1].key_parts),
           &ka->keys[ka->keys_len - 1].key_parts_num)) {
     WSREP_ERROR("Preparing keys for isolation failed");
     return false;
@@ -1431,8 +1431,8 @@ static bool wsrep_prepare_keys_for_isolation(THD *, const char *db,
     TABLE_LIST tmp_table;
 
     memset(static_cast<void *>(&tmp_table), 0, sizeof(tmp_table));
-    tmp_table.table_name = (char *)table;
-    tmp_table.db = (char *)db;
+    tmp_table.table_name = const_cast<char *>(table);
+    tmp_table.db = const_cast<char *>(db);
     MDL_REQUEST_INIT(&tmp_table.mdl_request, MDL_key::GLOBAL, (db) ? db : "",
                      (table) ? table : "", MDL_INTENTION_EXCLUSIVE,
                      MDL_STATEMENT);
@@ -1489,10 +1489,14 @@ bool wsrep_prepare_key_for_innodb(const uchar *cache_key, size_t cache_key_len,
     case 3:
     case 4: {
       key[0].ptr = cache_key;
-      key[0].len = strlen((char *)cache_key);
+      key[0].len =
+          strlen(reinterpret_cast<char *>(const_cast<uchar *>(cache_key)));
 
-      key[1].ptr = cache_key + strlen((char *)cache_key) + 1;
-      key[1].len = strlen((char *)(key[1].ptr));
+      key[1].ptr =
+          cache_key +
+          strlen(reinterpret_cast<char *>(const_cast<uchar *>(cache_key))) + 1;
+      key[1].len =
+          strlen(static_cast<char *>(const_cast<void *>(key[1].ptr)));
 
       *key_len = 2;
       break;
@@ -1611,6 +1615,9 @@ int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,
 }
 
 #include "sql_show.h"
+
+#define C_STRING_WITH_LEN(X) (const_cast<char *>(X)), ((sizeof(X) - 1))
+
 static int create_view_query(THD *thd, uchar **buf, size_t *buf_len) {
   LEX *lex = thd->lex;
   SELECT_LEX *select_lex = lex->select_lex;

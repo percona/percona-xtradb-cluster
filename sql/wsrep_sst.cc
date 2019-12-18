@@ -780,7 +780,7 @@ std::string wsrep_sst_prepare() {
   mysql_mutex_unlock(&LOCK_wsrep_sst);
 
   if (addr_out != addr_in) /* malloc'ed */
-    free((char *)addr_out);
+    free(const_cast<char *>(addr_out));
 
   return ret;
 }
@@ -1080,7 +1080,7 @@ queries).
 **/
 static int run_sql_command(THD *thd, const char *query,
                            const char *safe_query) {
-  thd->set_query((char *)query, strlen(query));
+  thd->set_query(query, strlen(query));
 
   Parser_state ps;
   if (ps.init(thd, thd->query().str, thd->query().length)) {
@@ -1186,7 +1186,7 @@ const std::string get_allowed_pwd_chars() { return g_allowed_pwd_chars; }
 
 static void generate_password(std::string *password, int size) {
   std::stringstream ss;
-  rand_struct srnd;
+  bool srnd;
   while (size > 0) {
     int ch = ((int)(my_rnd_ssl(&srnd) * 100)) % get_allowed_pwd_chars().size();
     ss << get_allowed_pwd_chars()[ch];
@@ -1262,7 +1262,7 @@ static uint server_session_execute(MYSQL_SESSION session, std::string query,
                                    const char *safe_query) {
   COM_DATA cmd;
   wsp::Sql_resultset rset;
-  cmd.com_query.query = (char *)query.c_str();
+  cmd.com_query.query = query.c_str();
   cmd.com_query.length = static_cast<unsigned int>(query.length());
   wsp::Sql_service_context_base *ctx = new wsp::Sql_service_context(&rset);
   uint err(0);

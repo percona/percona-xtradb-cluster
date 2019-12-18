@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -217,7 +217,7 @@ static int check_lock(struct st_lock_list *list, const char *lock_type,
 static void check_locks(THR_LOCK *lock, const char *where,
                         bool allow_no_locks) {
   uint old_found_errors = found_errors;
-  DBUG_ENTER("check_locks");
+  DBUG_TRACE;
 
   if (found_errors < MAX_FOUND_ERRORS) {
     if (check_lock(&lock->write, "write", where, 1, 1) |
@@ -319,7 +319,6 @@ static void check_locks(THR_LOCK *lock, const char *where,
       DBUG_PRINT("error", ("Found wrong lock"));
     }
   }
-  DBUG_VOID_RETURN;
 }
 
 #else /* EXTRA_DEBUG */
@@ -329,7 +328,7 @@ static void check_locks(THR_LOCK *lock, const char *where,
 /* Initialize a lock */
 
 void thr_lock_init(THR_LOCK *lock) {
-  DBUG_ENTER("thr_lock_init");
+  DBUG_TRACE;
   new (lock) THR_LOCK();
 
   mysql_mutex_init(key_THR_LOCK_mutex, &lock->mutex, MY_MUTEX_INIT_FAST);
@@ -342,16 +341,14 @@ void thr_lock_init(THR_LOCK *lock) {
   lock->list.data = (void *)lock;
   thr_lock_thread_list = list_add(thr_lock_thread_list, &lock->list);
   mysql_mutex_unlock(&THR_LOCK_lock);
-  DBUG_VOID_RETURN;
 }
 
 void thr_lock_delete(THR_LOCK *lock) {
-  DBUG_ENTER("thr_lock_delete");
+  DBUG_TRACE;
   mysql_mutex_lock(&THR_LOCK_lock);
   thr_lock_thread_list = list_delete(thr_lock_thread_list, &lock->list);
   mysql_mutex_unlock(&THR_LOCK_lock);
   mysql_mutex_destroy(&lock->mutex);
-  DBUG_VOID_RETURN;
 }
 
 void thr_lock_info_init(THR_LOCK_INFO *info, my_thread_id thread_id,
@@ -388,7 +385,7 @@ static enum enum_thr_lock_result wait_for_lock(struct st_lock_list *wait,
   struct timespec wait_timeout;
   enum enum_thr_lock_result result = THR_LOCK_ABORTED;
   PSI_stage_info old_stage;
-  DBUG_ENTER("wait_for_lock");
+  DBUG_TRACE;
 
   /*
     One can use this to signal when a thread is going to wait for a lock.
@@ -502,7 +499,7 @@ static enum enum_thr_lock_result wait_for_lock(struct st_lock_list *wait,
 
   exit_cond_hook(NULL, &old_stage, __func__, __FILE__, __LINE__);
 
-  DBUG_RETURN(result);
+  return result;
 }
 
 #ifdef WITH_WSREP
@@ -594,7 +591,7 @@ enum enum_thr_lock_result thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
   bool wsrep_lock_inserted = false;
 #endif /* WITH_WSREP */
   MYSQL_TABLE_WAIT_VARIABLES(locker, state) /* no ';' */
-  DBUG_ENTER("thr_lock");
+  DBUG_TRACE;
 
   data->next = 0;
   data->cond = 0; /* safety */
@@ -816,17 +813,16 @@ enum enum_thr_lock_result thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
   /* Can't get lock yet;  Wait for it */
 #ifdef WITH_WSREP
   if (wsrep_on(data->owner->mysql_thd) && wsrep_lock_inserted) {
-    DBUG_RETURN(
-        wait_for_lock(wait_queue, data, owner, true, lock_wait_timeout));
+    return (wait_for_lock(wait_queue, data, owner, true, lock_wait_timeout));
   }
 #endif /* WITH_WSREP */
   result = wait_for_lock(wait_queue, data, owner, 0, lock_wait_timeout);
   MYSQL_END_TABLE_LOCK_WAIT(locker);
-  DBUG_RETURN(result);
+  return result;
 end:
   mysql_mutex_unlock(&lock->mutex);
   MYSQL_END_TABLE_LOCK_WAIT(locker);
-  DBUG_RETURN(result);
+  return result;
 }
 
 static inline void free_all_read_locks(THR_LOCK *lock,
@@ -879,7 +875,7 @@ static inline void free_all_read_locks(THR_LOCK *lock,
 void thr_unlock(THR_LOCK_DATA *data) {
   THR_LOCK *lock = data->lock;
   enum thr_lock_type lock_type = data->type;
-  DBUG_ENTER("thr_unlock");
+  DBUG_TRACE;
   DBUG_PRINT("lock", ("data: %p  thread: 0x%x  lock: %p", data,
                       data->owner->thread_id, lock));
   mysql_mutex_lock(&lock->mutex);
@@ -902,7 +898,6 @@ void thr_unlock(THR_LOCK_DATA *data) {
   check_locks(lock, "after releasing lock", 1);
   wake_up_waiters(lock);
   mysql_mutex_unlock(&lock->mutex);
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -917,7 +912,7 @@ static void wake_up_waiters(THR_LOCK *lock) {
   THR_LOCK_DATA *data;
   enum thr_lock_type lock_type;
 
-  DBUG_ENTER("wake_up_waiters");
+  DBUG_TRACE;
 
   if (!lock->write.data) /* If no active write locks */
   {
@@ -1012,7 +1007,6 @@ static void wake_up_waiters(THR_LOCK *lock) {
   }
 end:
   check_locks(lock, "after waking up waiters", 0);
-  DBUG_VOID_RETURN;
 }
 
 /*
@@ -1046,7 +1040,7 @@ enum enum_thr_lock_result thr_multi_lock(THR_LOCK_DATA **data, uint count,
                                          THR_LOCK_INFO *owner,
                                          ulong lock_wait_timeout) {
   THR_LOCK_DATA **pos, **end;
-  DBUG_ENTER("thr_multi_lock");
+  DBUG_TRACE;
   DBUG_PRINT("lock", ("data: %p  count: %d", data, count));
   if (count > 1) sort_locks(data, count);
   /* lock everything */
@@ -1055,7 +1049,7 @@ enum enum_thr_lock_result thr_multi_lock(THR_LOCK_DATA **data, uint count,
         thr_lock(*pos, owner, (*pos)->type, lock_wait_timeout);
     if (result != THR_LOCK_SUCCESS) { /* Aborted */
       thr_multi_unlock(data, (uint)(pos - data));
-      DBUG_RETURN(result);
+      return result;
     }
     DEBUG_SYNC_C("thr_multi_lock_after_thr_lock");
 #ifdef MAIN
@@ -1065,7 +1059,7 @@ enum enum_thr_lock_result thr_multi_lock(THR_LOCK_DATA **data, uint count,
 #endif
   }
   thr_lock_merge_status(data, count);
-  DBUG_RETURN(THR_LOCK_SUCCESS);
+  return THR_LOCK_SUCCESS;
 }
 
 /**
@@ -1134,7 +1128,7 @@ void thr_lock_merge_status(THR_LOCK_DATA **data, uint count) {
 
 void thr_multi_unlock(THR_LOCK_DATA **data, uint count) {
   THR_LOCK_DATA **pos, **end;
-  DBUG_ENTER("thr_multi_unlock");
+  DBUG_TRACE;
   DBUG_PRINT("lock", ("data: %p  count: %d", data, count));
 
   for (pos = data, end = data + count; pos < end; pos++) {
@@ -1150,7 +1144,6 @@ void thr_multi_unlock(THR_LOCK_DATA **data, uint count) {
                           (*pos)->owner->thread_id, (*pos)->lock));
     }
   }
-  DBUG_VOID_RETURN;
 }
 
 /*
@@ -1161,7 +1154,7 @@ void thr_multi_unlock(THR_LOCK_DATA **data, uint count) {
 
 void thr_abort_locks_for_thread(THR_LOCK *lock, my_thread_id thread_id) {
   THR_LOCK_DATA *data;
-  DBUG_ENTER("thr_abort_locks_for_thread");
+  DBUG_TRACE;
 
   mysql_mutex_lock(&lock->mutex);
   for (data = lock->read_wait.data; data; data = data->next) {
@@ -1195,7 +1188,6 @@ void thr_abort_locks_for_thread(THR_LOCK *lock, my_thread_id thread_id) {
   }
   wake_up_waiters(lock);
   mysql_mutex_unlock(&lock->mutex);
-  DBUG_VOID_RETURN;
 }
 
 /*
@@ -1231,7 +1223,7 @@ void thr_downgrade_write_lock(THR_LOCK_DATA *in_data,
 #ifndef DBUG_OFF
   enum thr_lock_type old_lock_type = in_data->type;
 #endif
-  DBUG_ENTER("thr_downgrade_write_only_lock");
+  DBUG_TRACE;
 
   mysql_mutex_lock(&lock->mutex);
   DBUG_ASSERT(old_lock_type == TL_WRITE_ONLY);
@@ -1240,7 +1232,6 @@ void thr_downgrade_write_lock(THR_LOCK_DATA *in_data,
   check_locks(lock, "after downgrading lock", 0);
 
   mysql_mutex_unlock(&lock->mutex);
-  DBUG_VOID_RETURN;
 }
 
 #include "my_sys.h"

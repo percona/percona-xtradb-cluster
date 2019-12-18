@@ -287,7 +287,7 @@ class thd {
  public:
   thd(bool wsrep_on);
   ~thd();
-  THD *const ptr;
+  THD *ptr;
 };
 
 class string {

@@ -41,9 +41,7 @@ TlsLibraryContext::TlsLibraryContext() {
   SSL_library_init();
 #endif
   SSL_load_error_strings();
-#if !defined(LIBWOLFSSL_VERSION_HEX)
   ERR_load_crypto_strings();
-#endif
 }
 
 TlsContext::TlsContext(const SSL_METHOD *method)
@@ -81,7 +79,7 @@ void TlsContext::curves_list(const std::string &curves) {
 }
 
 #if OPENSSL_VERSION_NUMBER >= ROUTER_OPENSSL_VERSION(1, 1, 0)
-static constexpr int o11x_version(TlsVersion version) {
+static int o11x_version(TlsVersion version) {
   switch (version) {
     case TlsVersion::AUTO:
       return 0;
@@ -228,11 +226,7 @@ void TlsContext::info_callback(TlsContext::InfoCallback cb) {
 }
 
 TlsContext::InfoCallback TlsContext::info_callback() const {
-#if defined(LIBWOLFSSL_VERSION_HEX)
-  return nullptr;
-#else
   return SSL_CTX_get_info_callback(ssl_ctx_.get());
-#endif
 }
 
 int TlsContext::security_level() const {

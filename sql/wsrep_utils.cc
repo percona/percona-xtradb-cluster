@@ -954,7 +954,7 @@ void process::terminate() {
 
 thd::thd(bool won) : init(), ptr(new THD) {
   if (ptr) {
-    ptr->thread_stack = (char *)&ptr;
+    ptr->thread_stack = (char*)(&ptr);
     wsrep_assign_from_threadvars(ptr);
     wsrep_store_threadvars(ptr);
     ptr->variables.option_bits &= ~OPTION_BIN_LOG;  // disable binlog
