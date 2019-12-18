@@ -672,6 +672,7 @@ mkdir debug
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZLIB=system \
+           -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            %{?mecab_option} \
@@ -710,6 +711,7 @@ mkdir release
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZLIB=system \
+           -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
@@ -841,7 +843,7 @@ ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 %endif
 
 install -d $RBR%{_bindir}
-ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
+#ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
 %if %{WITH_TCMALLOC}
 install -m 644 "%{malloc_lib_source}" \
@@ -905,12 +907,12 @@ install -d $RBR%{_mandir}/man8
 install -m 644 $MBD/%{galera_src_dir}/man/garbd.8  \
     $RBR%{_mandir}/man8/garbd.8
 install -d $RBR%{_libdir}/mysql
-%if 0%{?mecab}
-    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
-%endif
+#%if 0%{?mecab}
+#    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
+#%endif
 # remove some unwanted router files
-rm -rf %{buildroot}/%{_libdir}/libmysqlharness.{a,so}
-rm -rf %{buildroot}/%{_libdir}/libmysqlrouter.so
+rm -rf %{buildroot}/%{_libdir}/mysql/libmysqlharness.{a,so}
+rm -rf %{buildroot}/%{_libdir}/mysql/libmysqlrouter.so
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
@@ -1435,16 +1437,19 @@ fi
 #%attr(755, root, root) %{_bindir}/resolveip
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
-%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
+#%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
 %attr(755, root, root) %{_bindir}/wsrep_sst_upgrade
 %attr(755, root, root) %{_bindir}/ps_mysqld_helper
 # Explicit %attr() mode not applicaple to symlink
-%{_bindir}/wsrep_sst_rsync_wan
+#%{_bindir}/wsrep_sst_rsync_wan
 %attr(755, root, root) %{_bindir}/lz4_decompress
 %attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
+%dir %{_libdir}/mysql/private
+%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.6.1
+%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.6.1
 %if 0%{?systemd} == 0
 %attr(755, root, root) %{_sbindir}/rcmysql
 %endif
@@ -1533,15 +1538,15 @@ fi
 %{_includedir}/mysql/*
 %{_datadir}/aclocal/mysql.m4
 %{_libdir}/pkgconfig/*
-%{_libdir}/libperconaserverclient*.a
-%{_libdir}/libmysqlservices.a
+%{_libdir}/mysql/libperconaserverclient*.a
+%{_libdir}/mysql/libmysqlservices.a
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-shared
 %defattr(-, root, root, 0755)
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
-%{_libdir}/libperconaserver*.so*
+%{_libdir}/mysql/libperconaserver*.so*
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-garbd
@@ -1668,6 +1673,7 @@ fi
 %dir %{_sysconfdir}/mysqlrouter
 %config(noreplace) %{_sysconfdir}/mysqlrouter/mysqlrouter.conf
 %{_bindir}/mysqlrouter
+%{_bindir}/mysqlrouter_keyring
 %{_bindir}/mysqlrouter_plugin_info
 %{_bindir}/mysqlrouter_passwd
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter.1*
@@ -1679,11 +1685,11 @@ fi
 %else
 %{_sysconfdir}/init.d/mysqlrouter
 %endif
-%{_libdir}/libmysqlharness.so.*
-%{_libdir}/libmysqlrouter.so.*
-%{_libdir}/libmysqlrouter_http.so*
-%dir %{_libdir}/mysqlrouter
-%{_libdir}/mysqlrouter/*.so
+%{_libdir}/mysql/libmysqlharness.so.*
+%{_libdir}/mysql/libmysqlrouter.so.*
+%{_libdir}/mysql/libmysqlrouter_http.so*
+%dir %{_libdir}/mysql/mysqlrouter
+%{_libdir}/mysql/mysqlrouter/*.so*
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/log/mysqlrouter
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/run/mysqlrouter
 
