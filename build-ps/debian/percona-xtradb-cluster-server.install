@@ -19,9 +19,11 @@ usr/bin/wsrep_sst_xtrabackup-v2
 usr/bin/wsrep_sst_rsync
 usr/bin/wsrep_sst_upgrade
 usr/sbin/mysqld
+usr/bin/mysql-systemd
 # configuration files
 debian/extra/mysql.cnf  etc/mysql/
 debian/extra/mysqld.cnf /etc/mysql/mysql.conf.d/
+debian/extra/mysql.bootstrap etc/default/
 usr/share/man/man1/myisamchk.1
 usr/share/man/man1/myisamlog.1
 usr/share/man/man1/myisampack.1
@@ -41,3 +43,5 @@ usr/share/man/man8/mysqld.8
 usr/share/mysql
 etc/default/mysql
 libgalera_smm.so usr/lib/galera4
+lib/systemd/system/mysql.service
+lib/systemd/system/mysql@.service

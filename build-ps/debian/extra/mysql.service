@@ -55,7 +55,7 @@ ProtectHome=true
 # Execute pre and post scripts as root, otherwise it does it as User=
 PermissionsStartOnly=true
 
-EnvironmentFile=-/etc/sysconfig/mysql
+EnvironmentFile=-/etc/default/mysql
 
 # Needed to create system tables etc.
 ExecStartPre=/usr/bin/mysql-systemd start-pre

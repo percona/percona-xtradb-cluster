@@ -1,13 +1,37 @@
 # Systemd service file for Percona XtraDB Cluster
 
-# This service file is to start PXC
-# Usually in the non-bootstrapping case.
 
-# For bootstrapping or passing environment file
-# Refer to mysql@.service
+# This service file allows for instance specifier %i
+# to pass an Environment file
+# Example: systemctl start mysql@bootstrap.service
+# will check for EnvironmentFile named /etc/default/mysql.bootstrap
+
+# The environment file can  have any key=value
+# variables separated by newlines.
+
+# But, EXTRA_ARGS must be there - empty/set
+# EXTRA_ARGS=" --wsrep-new-cluster" for bootstrapping
+# /etc/default/mysql.bootstrap is provided for convenience
+# and as a template.
+
+
+# Note, this is NOT a replacement for my.cnf
+# This file is just to pass environment variables and/or
+# EXTRA_ARGS to mysqld_safe.
+#
+# For bootstrapping, you may not want to enable mysql@bootstrap
+# but start it directly since you don't want
+# a bootstrapped mysqld coming up on reboot.
+#
+# But, if you want to pass CUSTOM flags, create a file called
+# /etc/default/mysql.custom and then
+# add EXTRA_ARGS=" --wsrep-debug " etc. to it along
+# with any environment variables you may want to pass.
+# After that you can either enable it or start it as
+# systemctl start mysql@custom.service.
 
 [Unit]
-Description=Percona XtraDB Cluster
+Description=Percona XtraDB Cluster with config /etc/default/mysql.%i
 After=network.target syslog.target
 
 [Install]
@@ -55,7 +79,7 @@ ProtectHome=true
 # Execute pre and post scripts as root, otherwise it does it as User=
 PermissionsStartOnly=true
 
-EnvironmentFile=-/etc/sysconfig/mysql
+EnvironmentFile=/etc/default/mysql.%i
 
 # Needed to create system tables etc.
 ExecStartPre=/usr/bin/mysql-systemd start-pre
@@ -68,7 +92,7 @@ ExecStartPre=/bin/sh -c "systemctl unset-environment _WSREP_START_POSITION"
 ExecStartPre=/bin/sh -c "VAR=`/usr/bin/mysql-systemd galera-recovery`; [ $? -eq 0 ] && systemctl set-environment _WSREP_START_POSITION=$VAR || exit 1"
 
 # Start main service
-ExecStart=/usr/sbin/mysqld $_WSREP_START_POSITION
+ExecStart=/usr/sbin/mysqld $EXTRA_ARGS $_WSREP_START_POSITION
 
 # Unset _WSREP_START_POSITION environment variable.
 ExecStartPost=/bin/sh -c "systemctl unset-environment _WSREP_START_POSITION"

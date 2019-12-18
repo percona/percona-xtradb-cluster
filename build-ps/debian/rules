@@ -187,7 +187,11 @@ override_dh_auto_install:
 	mkdir -p $(TMP)/var/lib/mysql-files
 	mkdir -p $(TMP)/var/lib/mysql
 	mkdir -p $(TMP)/var/run/mysql
+	mkdir -p $(TMP)/lib/systemd/system
 	install -m 0755 debian/extra/mysql-systemd-start $(TMP)/usr/share/mysql/
+	install -m 0755 debian/extra/mysql-systemd $(TMP)/usr/bin/
+	install -m 0644 debian/extra/mysql.service $(TMP)/lib/systemd/system/
+	install -m 0644 debian/extra/mysql@.service $(TMP)/lib/systemd/system/
 
 	mkdir -p $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
 	cp -rp $(TMP)/usr/lib/mysql-test/* $(TMP)/usr/lib/percona-xtradb-cluster-testsuite

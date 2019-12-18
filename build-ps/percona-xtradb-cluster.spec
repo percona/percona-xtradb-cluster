@@ -1388,7 +1388,7 @@ fi
 %doc release/Docs/INFO_SRC
 %doc release/Docs/INFO_BIN
 %doc Docs/README-wsrep
-%doc release/support-files/wsrep.cnf
+#%doc release/support-files/wsrep.cnf
 
 %doc %attr(644, root, man) %{_mandir}/man1/innochecksum.1*
 %doc %attr(644, root, root) %{_mandir}/man1/ibd2sdi.1*
@@ -1449,6 +1449,7 @@ fi
 %attr(755, root, root) %{_sbindir}/rcmysql
 %endif
 %attr(644, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
+%attr(644, root, root) %{_libdir}/mysql/plugin/data_masking.ini
 %attr(755, root, root) %{_libdir}/mysql/plugin/*.so*
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/*.so*
 
@@ -1669,6 +1670,9 @@ fi
 %{_bindir}/mysqlrouter
 %{_bindir}/mysqlrouter_plugin_info
 %{_bindir}/mysqlrouter_passwd
+%doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter.1*
+%doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter_passwd.1*
+%doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter_plugin_info.1*
 %if 0%{?systemd}
 %{_unitdir}/mysqlrouter.service
 %{_tmpfilesdir}/mysqlrouter.conf
