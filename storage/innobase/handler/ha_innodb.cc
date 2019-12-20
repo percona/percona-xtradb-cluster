@@ -10218,7 +10218,9 @@ static int wsrep_calc_row_hash(byte *digest, const uchar *row, TABLE *table,
 
     field_mysql_type = field->type();
 
-    col_type = prebuilt->table->cols[i].mtype;
+    /* Get corresponding InnoDB type */
+    ulint unsigned_flag;
+    col_type = get_innobase_type_from_mysql_type(&unsigned_flag, field);
 
     switch (col_type) {
       case DATA_BLOB:

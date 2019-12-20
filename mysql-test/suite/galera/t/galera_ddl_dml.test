@@ -356,6 +356,21 @@ drop table t;
 
 #-------------------------------------------------------------------------------
 #
+# 2. virtual column with blob
+#
+use test;
+create table t (i int, c1 char(10), c2 char(10), c12 char(20) as (CONCAT(c1, c2)), b blob);
+insert into t (i, c1, c2, b) values (1, 'newyork', 'us', repeat('a', 1000));
+insert into t (i, c1, c2, b) values (2, 'zagreb', 'croatia', repeat('b', 1000));
+insert into t (i, c1, c2, b) values (3, 'pune', 'india', repeat('c', 1000));
+select c12 from t;
+update t set c1 = "mysql";
+select c12 from t;
+drop table t;
+
+
+#-------------------------------------------------------------------------------
+#
 # remove test-bed
 #
 --eval set @@wsrep_replicate_myisam = $wsrep_replicate_myisam_saved;

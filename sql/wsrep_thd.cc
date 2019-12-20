@@ -346,7 +346,9 @@ int wsrep_abort_thd(const THD *bf_thd, THD *victim_thd, bool signal) {
     ha_wsrep_abort_transaction(const_cast<THD*>(bf_thd), victim_thd, signal);
     mysql_mutex_lock(&victim_thd->LOCK_wsrep_thd);
   } else {
-    WSREP_DEBUG("wsrep_abort_thd not effective: %p %p", bf_thd, victim_thd);
+    WSREP_DEBUG(
+        "wsrep_abort_thd not effective: %p (thread-id: %u) %p (thread-id: %u)",
+        bf_thd, bf_thd->thread_id(), victim_thd, victim_thd->thread_id());
   }
   mysql_mutex_unlock(&victim_thd->LOCK_wsrep_thd);
   DBUG_RETURN(1);
