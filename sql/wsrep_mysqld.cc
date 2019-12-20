@@ -2398,6 +2398,26 @@ wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
   THD *granted_thd  = ticket->get_ctx()->wsrep_get_thd();
   bool ret          = FALSE;
 
+  /* If the said thd/transaction is already aborted and is in process of
+  rolling back avoid re-aborting it. During first abort (initated through
+  can_grant) bf-query-id is updated in trx->wsrep_killed_by_query field.
+  This field is reset to 0 on successful rollback. If before transaction
+  completes rollback flow (post resetting value to 0) and second attempt to kill
+  the same transaction is done it will reset the said field
+  (trx->wsrep_killed_by_query) one more time but this time there is no post
+  rollback action to clear it up.
+
+  Other approach of solving it could be clearing this field as part of
+  wsrep_cleanup_transaction but this action of double killing is anyway
+  redundant so better skip it. */
+  if (granted_thd->wsrep_conflict_state == MUST_ABORT)
+  {
+    /* Granted thd is already scheduled for abort.
+    No point in repeating the action .*/
+    WSREP_DEBUG("state of granted_thd: %d\n", granted_thd->killed);
+    return (ret);
+  }
+
   const char* schema= key->db_name();
   int schema_len= key->db_name_length();
 

@@ -7444,12 +7444,23 @@ lock_trx_handle_wait(
 
 #ifdef WITH_WSREP
         if (trx->wsrep_killed_by_query == 0) {
-#endif /* WITH_WSREP */
+            /* There is this gap between checking wsrep_killed_by_query value
+            and acquiring trx_mutex. If wsrep_killed_by_query is set between
+            this gap it can cause trx mutex to not get released.
+            This issue is now addressed by ensuring additional check below
+            post acquiring trx_mutex. */
+            lock_mutex_enter();
+            trx_mutex_enter(trx);
+
+            if (trx->wsrep_killed_by_query != 0) {
+                lock_mutex_exit();
+                trx_mutex_exit(trx);
+            }
+        }
+#else
 	lock_mutex_enter();
 
 	trx_mutex_enter(trx);
-#ifdef WITH_WSREP
-        }
 #endif /* WITH_WSREP */
 
 	if (trx->lock.was_chosen_as_deadlock_victim) {
