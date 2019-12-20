@@ -1952,7 +1952,7 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
     Ticket_iterator itw(ticket->get_lock()->m_waiting);
     Ticket_iterator itg(ticket->get_lock()->m_granted);
 
-    MDL_ticket *waiting, *granted;
+    MDL_ticket *waiting;
     MDL_ticket *prev = NULL;
     bool added = false;
 
@@ -1967,24 +1967,13 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
       prev = waiting;
     }
     if (!added) m_list.push_back(ticket);
-
-    while ((granted = itg++)) {
-      if (granted->get_ctx() != ticket->get_ctx() &&
-          granted->is_incompatible_when_granted(ticket->get_type())) {
-        DEBUG_SYNC(ticket->get_ctx()->wsrep_get_thd(),
-                   "pxc_add_ticket_trying_to_wait_for_victim");
-        if (!wsrep_handle_mdl_conflict(ticket->get_ctx(), granted,
-                                       &ticket->get_lock()->key)) {
-          WSREP_DEBUG("Initiated kill of victim thread (through add_ticket)");
-        }
-      }
-    }
-  } else
+  } else {
     /*
       Add ticket to the *back* of the queue to ensure fairness
       among requests with the same priority.
     */
     m_list.push_back(ticket);
+  }
 #else
   /*
     Add ticket to the *back* of the queue to ensure fairness

@@ -6965,8 +6965,18 @@ dberr_t lock_trx_handle_wait(trx_t *trx) /*!< in/out: trx lock state */
 #ifdef WITH_WSREP
   /* We already own mutexes. */
   if (!trx->lock.was_chosen_as_wsrep_victim) {
+    /* There is this gap between checking was_chosen_as_wsrep_victim value
+    and acquiring trx_mutex. If was_chosen_as_wsrep_victim is set between
+    this gap it can cause trx mutex to not get released.
+    This issue is now addressed by ensuring additional check below
+    post acquiring trx_mutex. */
     lock_mutex_enter();
     trx_mutex_enter(trx);
+
+    if (trx->lock.was_chosen_as_wsrep_victim) {
+      lock_mutex_exit();
+      trx_mutex_exit(trx);
+    }
   }
 #else
   lock_mutex_enter();
