@@ -149,6 +149,17 @@ extern "C" bool wsrep_thd_bf_abort(const THD *bf_thd, THD *victim_thd,
   bool ret = wsrep_bf_abort(bf_thd, victim_thd);
   wsrep_store_threadvars(const_cast<THD*>(bf_thd));
 
+#if 0
+  Normally this code flow is called by background applier thread (bf_thd)
+  but at times when a local thread is force aborted it would also call
+  this flow as part of reschedule_waiter (on release of locks) for other
+  thread handlers. In this use-case avoid restoring thd to bf_thd.
+
+  In theory, we should avoid invoking handle_mdl_conflict if invoking
+  thd is neither bf_thd or victim_thd.
+  wsrep_store_threadvars(const_cast<THD*>(bf_thd));
+#endif
+
   /*
     Send awake signal if victim was BF aborted or does not
     have wsrep on. Note that this should never interrupt RSU

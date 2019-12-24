@@ -2232,16 +2232,14 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
   THD *request_thd = requestor_ctx->wsrep_get_thd();
   THD *granted_thd = ticket->get_ctx()->wsrep_get_thd();
 
-#if 0
-  /* TODO: It would be good to enable this since it doesn't make sense to
-  double abort given thd. For now, leaving it as is for 5.7 compatibility */
-  if (granted_thd->wsrep_conflict_state == MUST_ABORT) {
-    /* Granted thd is already scheduled for abort.
-    No point in repeating the action .*/
-    WSREP_DEBUG("state of granted_thd: %d\n", granted_thd->killed.load());
-    return (false);
+  /* Normally this code flow is called by background applier thread (bf_thd)
+  but at times when a local thread is force aborted it would also call
+  this flow as part of reschedule_waiter (on release of locks) for other
+  thread handlers. In this use-case avoid processing the action and let
+  respective thd take needed action. */
+  if (!(request_thd == current_thd || granted_thd == current_thd)) {
+    return false;
   }
-#endif /* 0 */
 
   bool ret = false;
 
