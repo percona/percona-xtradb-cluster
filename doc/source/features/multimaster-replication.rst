@@ -29,3 +29,10 @@ The two important consequences of this architecture:
 The described behavior of *COMMIT* also has the second serious implication. If you run write transactions to two different nodes, the cluster will use an `optimistic locking model <http://en.wikipedia.org/wiki/Optimistic_concurrency_control>`_. That means a transaction will not check on possible locking conflicts during the individual queries, but rather on the *COMMIT* stage, and you may get *ERROR* response on *COMMIT*. This is mentioned because it is one of the incompatibilities with regular |InnoDB| that you might experience. In InnoDB usually *DEADLOCK* and *LOCK TIMEOUT* errors happen in response on particular query, but not on *COMMIT*. It's good practice to check the error codes after *COMMIT* query, but there are still many applications that do not do that.
 
 If you plan to use Multi-Master capabilities of |XtraDB Cluster| and run write transactions on several nodes, you may need to make sure you handle response on *COMMIT* query.
+
+.. seealso::
+
+   |Percona| Blogpost: Multi-node writing and Unexpected Deadlocks
+      https://www.percona.com/blog/2012/08/17/percona-xtradb-cluster-multi-node-writing-and-unexpected-deadlocks/
+   |Percona Server| Documentation: Count InnoDB Deadlocks
+      https://www.percona.com/doc/percona-server/5.6/diagnostics/innodb_deadlock_count.html
