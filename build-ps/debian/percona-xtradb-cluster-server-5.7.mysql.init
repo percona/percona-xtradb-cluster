@@ -89,6 +89,12 @@ mysql_data_dir=$(mysqld_get_param datadir)
 pid_file=$(mysqld_get_param pid-file)
 
 socket=$(mysqld_get_param socket)
+
+if test -z "$socket"
+then
+    socket="/var/run/mysqld/mysqld.sock"
+fi
+
 if test -z "$pid_file"
 then
     pid_file="$mysql_data_dir/$(hostname).pid"
