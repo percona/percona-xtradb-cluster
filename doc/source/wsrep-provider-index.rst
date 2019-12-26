@@ -663,6 +663,10 @@ When this variable is set to ``TRUE``, more recent primary components override o
 
 When this variable is set to ``true``, the node stores the Primary Component state to disk. The Primary Component can then recover automatically when all nodes that were part of the last saved state re-establish communication with each other. This feature allows automatic recovery from full cluster crashes, such as in the case of a data center power outage. A subsequent graceful full cluster restart will require explicit bootstrapping for a new Primary Component.
 
+.. note:: The cluster must have already been initially bootstrapped (see
+   :ref:`_bootstrap` for details). A ``gwvstate.dat`` file described in 
+   :ref:`_wsrep_file_index` must exist as well.
+
 .. variable::  pc.version
 
    :cli: Yes
