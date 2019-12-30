@@ -804,6 +804,10 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name) {
   SAVEPOINT *sv = *find_savepoint(thd, name);
   DBUG_TRACE;
 
+#ifdef WITH_WSREP
+  DEBUG_SYNC(thd, "pxc_rollback_to_savepoint");
+#endif /* WITH_WSREP */
+
   if (sv == NULL) {
     my_error(ER_SP_DOES_NOT_EXIST, MYF(0), "SAVEPOINT", name.str);
     return true;

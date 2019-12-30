@@ -3389,7 +3389,19 @@ int mysql_execute_command(THD *thd, bool first_level) {
     if (trans_check_state(thd)) return -1;
 
     /* Commit the normal transaction if one is active. */
+#ifdef WITH_WSREP
+    if (trans_commit_implicit(thd)) {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG(
+          "Transaction implicit commit failed"
+          " MDL released: %u",
+          thd->thread_id());
+      return -1;
+    }
+#else
     if (trans_commit_implicit(thd)) return -1;
+#endif /* WITH_WSREP */
+
     /* Release metadata locks acquired in this transaction. */
     thd->mdl_context.release_transactional_locks();
 
