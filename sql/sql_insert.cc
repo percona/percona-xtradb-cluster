@@ -2043,6 +2043,9 @@ ok_or_after_trg_err:
     thd->get_transaction()->mark_modified_non_trans_table(
         Transaction_ctx::STMT);
   free_root(&mem_root, MYF(0));
+#ifdef WITH_WSREP
+  thd->wsrep_post_insert_error |= trg_error;
+#endif /* WITH_WSREP */
   return trg_error;
 
 err : {
@@ -2058,6 +2061,9 @@ before_trg_err:
   if (key) my_safe_afree(key, table->s->max_unique_length, MAX_KEY_LENGTH);
   table->column_bitmaps_set(save_read_set, save_write_set);
   free_root(&mem_root, MYF(0));
+#ifdef WITH_WSREP
+  thd->wsrep_post_insert_error |= trg_error;
+#endif /* WITH_WSREP */
   return true;
 }
 

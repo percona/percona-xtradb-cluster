@@ -3735,7 +3735,7 @@ bool is_atomic_ddl(THD *thd, bool using_trans_arg) {
       /*
         MySQL-8.0 enabled atomic DDL but to PXC still needs time to adapt to
         real atomic DDL flow so for now DDL still use TOI sequence.
-        When the Query_log_event is generated for TOI replication skip
+        When the Query_log_event is generated for TOI replication, skip
         the said test/assert that check if the transaction is enabled for
         atomic ddl supporting statement. Use of wsrep_skip_wsrep_hton is really
         a hack or short-cut to avoid introducing another variable for this

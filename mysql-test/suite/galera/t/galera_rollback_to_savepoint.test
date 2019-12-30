@@ -103,3 +103,20 @@ select * from t3;
 #
 SET DEBUG_SYNC = 'RESET';
 drop table t1, t3;
+
+#-------------------------------------------------------------------------------
+#
+# Trigger action fails causing transaction to rollback and commit as emptry transaction.
+#
+create table t1 (id int, c char(10), primary key pk(id));
+create table t2 (id int, c char(10), primary key pk(id));
+create trigger ins_t2 after insert on t1 for each row insert into t2 values (new.id);
+begin;
+--error ER_WRONG_VALUE_COUNT_ON_ROW
+insert into t1 values (1, 'portugal');
+commit;
+select * from t1;
+select * from t2;
+#
+drop trigger ins_t2;
+drop table t1, t2;
