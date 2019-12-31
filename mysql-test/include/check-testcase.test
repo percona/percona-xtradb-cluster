@@ -12,6 +12,7 @@
 
 # ---- WITH_WSREP
 --source include/wait_until_connected_again.inc
+--source include/galera_wait_ready.inc
 # ---- WITH_WSREP
 --disable_query_log
 

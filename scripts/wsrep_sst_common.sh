@@ -467,6 +467,8 @@ function wait_for_mysqld_startup()
     local threshold=$3
     local err_log=$4
     local description=$5
+    local sst_user=$6
+    local sst_password=$7
 
     local -i timeout
     timeout=$threshold
@@ -483,7 +485,14 @@ function wait_for_mysqld_startup()
             return 3
         fi
 
-        $mysqladmin_path ping --socket=$mysqld_socket &> /dev/null
+        $mysqladmin_path \
+            --defaults-file=/dev/stdin \
+            --socket=$mysqld_socket \
+            ping &> /dev/null <<EOF
+[mysqladmin]
+user=${sst_user}
+password="${sst_password}"
+EOF
         errcode=$?
         [[ $errcode -eq 0 ]] && break
 
@@ -1055,7 +1064,7 @@ EOF
     #-----------------------------------------------------------------------
     # wait for mysql to come up
     wait_for_mysqld_startup $mysql_pid $upgrade_socket $timeout_threshold ${mysqld_err_log} \
-        "mysql server that executes mysql-upgrade"
+        $sst_user $sst_password "mysql server that executes mysql-upgrade"
     errcode=$?
     [[ $errcode -ne 0 ]] && return $errcode
     wsrep_log_debug "MySQL server($mysql_pid) started"
@@ -1142,7 +1151,7 @@ FLUSH PRIVILEGES;
 EOF
             mysql_pid=$!
             wait_for_mysqld_startup $mysql_pid $upgrade_socket $timeout_threshold ${mysqld_err_log} \
-                "mysql server that executes mysql-upgrade"
+                $sst_user $sst_password "mysql server that executes mysql-upgrade"
             errcode=$?
             [[ $errcode -ne 0 ]] && return $errcode
             wsrep_log_debug "MySQL server($mysql_pid) started"
