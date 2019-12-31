@@ -117,22 +117,12 @@ void Wsrep_client_service::cleanup_transaction() {
   if (WSREP_EMULATE_BINLOG(m_thd)) wsrep_thd_binlog_trx_reset(m_thd);
   m_thd->wsrep_affected_rows = 0;
 
-  if (m_thd->mdl_context.has_transactional_locks()) {
-    /* If thd has not yet released the locks then this thd
-    can conflict with background running applier thread or parallel
-    local running TOI thread that can cause this thd to get marked
-    with state = MUST_ABORT. Since existing query is already complete
-    this MUST_ABORT state can have 2 side effects:
-    - Can cause next query to get processed with MUST_ABORT
-    - Can cause retry of existing successfully completed query.
-    */
-    m_thd->wsrep_safe_to_abort = false;
-  }
   m_thd->wsrep_skip_wsrep_GTID = false;
   m_thd->wsrep_skip_SE_checkpoint = false;
   m_thd->run_wsrep_commit_hooks = false;
   m_thd->run_wsrep_ordered_commit = false;
   m_thd->wsrep_enforce_group_commit = false;
+  m_thd->wsrep_post_insert_error = false;
 
   if (m_thd->wsrep_non_replicating_atomic_ddl) {
     /* Restore the sql_log_bin mode back to original value

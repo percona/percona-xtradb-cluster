@@ -2866,7 +2866,9 @@ class THD : public MDL_context_owner,
 
   bool wsrep_skip_wsrep_GTID;
 
-  // DDL statement can fail in which case SE checkpoint shouldn't get updated.
+  /**
+    DDL statement can fail in which case SE checkpoint shouldn't get updated.
+  */
   bool wsrep_skip_SE_checkpoint;
 
   /**
@@ -2877,8 +2879,10 @@ class THD : public MDL_context_owner,
   */
   bool wsrep_skip_wsrep_hton;
 
-  /* Set to true if an intermediate commit is active. Use to skip
-  update of wsrep co-ordinates for an intermediate commit. */
+  /**
+    Set to true if an intermediate commit is active. Use to skip
+    update of wsrep co-ordinates for an intermediate commit.
+  */
   bool wsrep_intermediate_commit;
 
   /**
@@ -2900,34 +2904,29 @@ class THD : public MDL_context_owner,
   mysql_mutex_t LOCK_wsrep_thd_attachable_trx;
 
   /**
-    Normally a thd is safe to abort all the time but there is window
-    when thd is done with cleanup of transaction (through commit) but not yet
-    released the transaction lock(s). During this window it is not safe to abort.
-  */
-  bool wsrep_safe_to_abort;
-
-  /**
     Set to true if this thread handler (thd) is being use to replay
     a transaction. Galera flow will use a temporary intermediate thread handler
     to replay the aborted transaction caching the original thread handler.
     This temporary thread handler runs with thread_id = 0 that can cause
     cross-checks for gtid ownership by given thread to fail. This flag
-    help catch such situtation and suppress them. */
+    help catch such situtation and suppress them.
+  */
   bool wsrep_replayer;
 
   /**
-    Capture if transaction (running with binlog=off) needs to run the
-    wsrep commit hooks. MyISAM/Local state transaction are not replicated so no
-    need to run wsrep commit hook. Same way TOI replicated transaction may
-    still use group commit protocol (DDL) but should avoid wsrep commit hooks.
+    New PXC flow expect call to before and after commit hook.
+    With binlog=off, binlog handler is not register this would cause
+    check to run before and after commit hook to skip.
+    Set this variable during early evaluation at ha_commit_trans stage
+    so appropriate hooks are called when the real commit action is executed.
   */
   bool run_wsrep_commit_hooks;
 
   /**
-    While using ordered-commit if flow decide to execute commit hooks
-    then also execute ordered commit. Since ordered commit is executed
-    as part of transaction append stage (to flush queue) cache the decision
-    to execute commit hooks and re-use it to fire ordered commit.
+    If transaction qualifies to replicate in wsrep mode then while executing
+    ordered commit flow, cache this variable to ensure that the intermediate
+    commit action (invoked through wsrep_ordered_commit) is executed as part of
+    transaction append stage (Stage_manager::Mutex_queue::append).
   */
   bool run_wsrep_ordered_commit;
 
@@ -2937,13 +2936,26 @@ class THD : public MDL_context_owner,
     even though system wide setting may enforce binlog enabled.
     (this special setting is done to ensure update to wsrep_streaming_log
      is not replicated across the cluster).
-    Given binlog is disabled for some internal transaction and other
-    continue to work with binlog enabled (following group commit) some
-    co-ordination needs to be worked out to ensure wsrep co-ordinates
+
+    Given binlog is disabled for some internal transactions and external/user
+    transactions continue to work with binlog enabled (following group commit),
+    a co-ordination needs to be worked out to ensure wsrep co-ordinates
     are updated as per the seqno.
     Variable is set to true as part of this co-ordination framework.
   */
   bool wsrep_enforce_group_commit;
+
+  /**
+    Set to true if there is error post insert action.
+    for example: say trigger action.
+    Case depict a scenario where-in transaction may fail (due to trigger failure)
+    but leave open entries in galera/provider originating from append key of
+    original insert (before trigger action).
+    On commit, flow will execute wsrep_commit_empty. Said variable will help
+    suppress assert that expect no changes from transaction but there are left
+    over entries in this case.
+  */
+  bool wsrep_post_insert_error;
 
   /*
     Transaction id:

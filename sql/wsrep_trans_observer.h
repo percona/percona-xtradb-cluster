@@ -545,7 +545,8 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
        elsewhere. */
     DBUG_ASSERT(!wsrep_has_changes(thd) ||
                 (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
-                 !thd->is_current_stmt_binlog_format_row()));
+                 !thd->is_current_stmt_binlog_format_row()) ||
+                thd->wsrep_post_insert_error);
     bool have_error = wsrep_current_error(thd);
     int ret = wsrep_before_rollback(thd, all) ||
               wsrep_after_rollback(thd, all) || wsrep_after_statement(thd);

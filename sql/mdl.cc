@@ -4637,9 +4637,6 @@ void MDL_context::release_transactional_locks() {
   DBUG_TRACE;
   release_locks_stored_before(MDL_STATEMENT, NULL);
   release_locks_stored_before(MDL_TRANSACTION, NULL);
-#ifdef WITH_WSREP
-  wsrep_get_thd()->wsrep_safe_to_abort = true;
-#endif /* WITH_WSREP */
 }
 
 void MDL_context::release_statement_locks() {

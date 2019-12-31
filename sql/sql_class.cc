@@ -465,11 +465,11 @@ THD::THD(bool enable_plugins)
       wsrep_skip_wsrep_hton(false),
       wsrep_intermediate_commit(false),
       wsrep_non_replicating_atomic_ddl(false),
-      wsrep_safe_to_abort(true),
       wsrep_replayer(false),
       run_wsrep_commit_hooks(false),
       run_wsrep_ordered_commit(false),
       wsrep_enforce_group_commit(false),
+      wsrep_post_insert_error(false),
 
       /* wsrep-lib */
       m_wsrep_next_trx_id(WSREP_UNDEFINED_TRX_ID),
@@ -922,11 +922,10 @@ void THD::init(void) {
   wsrep_skip_wsrep_hton = false;
   wsrep_intermediate_commit = false;
   wsrep_non_replicating_atomic_ddl = false;
-  wsrep_safe_to_abort = true;
-  wsrep_replayer = false;
   run_wsrep_commit_hooks = false;
   run_wsrep_ordered_commit = false;
   wsrep_enforce_group_commit = false;
+  wsrep_post_insert_error = false;
 #endif /* WITH_WSREP */
 
   if (variables.sql_log_bin)
