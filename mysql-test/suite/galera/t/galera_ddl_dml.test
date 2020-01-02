@@ -356,7 +356,7 @@ drop table t;
 
 #-------------------------------------------------------------------------------
 #
-# 2. virtual column with blob
+# 7. virtual column with blob
 #
 use test;
 create table t (i int, c1 char(10), c2 char(10), c12 char(20) as (CONCAT(c1, c2)), b blob);
@@ -368,6 +368,37 @@ update t set c1 = "mysql";
 select c12 from t;
 drop table t;
 
+
+#-------------------------------------------------------------------------------
+#
+# 8. DDL with BACKUP LOCK
+#
+use test;
+create table t (i int, c1 char(10), c2 char(10), primary key pk(i));
+insert into t values (1, 'newyork', 'us');
+insert into t values (2, 'zagreb', 'croatia');
+insert into t values (3, 'pune', 'india');
+show create table t;
+
+--connection node_1a
+--echo #node-1a (obtain backup instance lock)
+lock instance for backup;
+
+--connection node_1b
+--echo #node-1b (fire alter table that should wait for explicit backup lock)
+--send alter table t add index idx(c1);
+
+--connection node_1a
+--echo #node-1a (release backup instance lock)
+--let wait_condition = select * from information_schema.processlist where state = 'Waiting for backup lock' and Info = 'alter table t add index idx(c1)';
+--source include/wait_condition.inc
+unlock instance;
+
+--connection node_1b
+--echo #node-1b (check if alter is complete)
+--reap
+show create table t;
+drop table t;
 
 #-------------------------------------------------------------------------------
 #
