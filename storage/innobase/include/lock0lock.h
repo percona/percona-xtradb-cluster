@@ -1145,4 +1145,10 @@ lock_cancel_waiting_and_release(
 #include "lock0lock.ic"
 #endif
 
+#ifdef WITH_WSREP
+void
+populate_locked_table_list(trx_t *			trx,
+			   std::vector<dict_table_t *> &locked_tables);
+#endif /* WITH_WSREP */
+
 #endif
