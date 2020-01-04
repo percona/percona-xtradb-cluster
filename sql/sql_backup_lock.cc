@@ -97,8 +97,18 @@ static bool acquire_mdl_for_backup(THD *thd, enum_mdl_type mdl_type,
 
   DBUG_ASSERT(mdl_type == MDL_SHARED || mdl_type == MDL_INTENTION_EXCLUSIVE);
 
+#ifdef WITH_WSREP
+  if (mdl_duration == MDL_EXPLICIT) {
+    MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, MDL_key::BACKUP_LOCK, "", "",
+                                   mdl_type, mdl_duration);
+  } else {
+    MDL_REQUEST_INIT(&mdl_request, MDL_key::BACKUP_LOCK, "", "", mdl_type,
+                     mdl_duration);
+  }
+#else
   MDL_REQUEST_INIT(&mdl_request, MDL_key::BACKUP_LOCK, "", "", mdl_type,
                    mdl_duration);
+#endif /* WITH_WSREP */
 
   return thd->mdl_context.acquire_lock(&mdl_request, lock_wait_timeout);
 }

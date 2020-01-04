@@ -153,5 +153,35 @@ mysqlus
 mysqlcroatia
 mysqlindia
 drop table t;
+use test;
+create table t (i int, c1 char(10), c2 char(10), primary key pk(i));
+insert into t values (1, 'newyork', 'us');
+insert into t values (2, 'zagreb', 'croatia');
+insert into t values (3, 'pune', 'india');
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `i` int(11) NOT NULL,
+  `c1` char(10) DEFAULT NULL,
+  `c2` char(10) DEFAULT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+#node-1a (obtain backup instance lock)
+lock instance for backup;
+#node-1b (fire alter table that should wait for explicit backup lock)
+alter table t add index idx(c1);;
+#node-1a (release backup instance lock)
+unlock instance;
+#node-1b (check if alter is complete)
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `i` int(11) NOT NULL,
+  `c1` char(10) DEFAULT NULL,
+  `c2` char(10) DEFAULT NULL,
+  PRIMARY KEY (`i`),
+  KEY `idx` (`c1`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+drop table t;
 set @@wsrep_replicate_myisam = 0;;
 SET DEBUG_SYNC = "reset";

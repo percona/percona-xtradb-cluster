@@ -147,7 +147,6 @@ extern "C" bool wsrep_thd_bf_abort(const THD *bf_thd, THD *victim_thd,
     wsrep_start_transaction(victim_thd, victim_thd->wsrep_next_trx_id());
   }
   bool ret = wsrep_bf_abort(bf_thd, victim_thd);
-  wsrep_store_threadvars(const_cast<THD*>(bf_thd));
 
 #if 0
   Normally this code flow is called by background applier thread (bf_thd)
@@ -157,6 +156,7 @@ extern "C" bool wsrep_thd_bf_abort(const THD *bf_thd, THD *victim_thd,
 
   In theory, we should avoid invoking handle_mdl_conflict if invoking
   thd is neither bf_thd or victim_thd.
+  This logic was enabled as part of pool-of-thread fix in upstream.
   wsrep_store_threadvars(const_cast<THD*>(bf_thd));
 #endif
 
