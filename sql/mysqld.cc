@@ -1430,6 +1430,7 @@ mysql_mutex_t LOCK_wsrep_group_commit;
 mysql_cond_t COND_wsrep_group_commit;
 mysql_mutex_t LOCK_wsrep_SR_pool;
 mysql_mutex_t LOCK_wsrep_SR_store;
+mysql_mutex_t LOCK_wsrep_alter_tablespace;
 
 // Track replaying thread handler(s).
 int wsrep_replaying = 0;
@@ -2736,6 +2737,7 @@ static void clean_up_mutexes() {
   mysql_cond_destroy(&COND_wsrep_group_commit);
   mysql_mutex_destroy(&LOCK_wsrep_SR_pool);
   mysql_mutex_destroy(&LOCK_wsrep_SR_store);
+  mysql_mutex_destroy(&LOCK_wsrep_alter_tablespace);
 #endif /* WITH_WSREP */
 }
 
@@ -5536,6 +5538,8 @@ static int init_thread_environment() {
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_SR_store, &LOCK_wsrep_SR_store,
                    MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_alter_tablespace,
+                   &LOCK_wsrep_alter_tablespace, MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
   return 0;
 }
@@ -11994,6 +11998,8 @@ PSI_mutex_key key_LOCK_wsrep_thd_attachable_trx;
 PSI_mutex_key key_LOCK_wsrep_sst_thread;
 
 PSI_mutex_key key_LOCK_wsrep_thd_queue;
+
+PSI_mutex_key key_LOCK_wsrep_alter_tablespace;
 #endif /* WITH_WSREP */
 
 /* clang-format off */
@@ -12109,7 +12115,8 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_thd_attachable_trx, "LOCK_wsrep_thd_attachable_trx", 0, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_sst_thread, "LOCK_wsrep_sst_thread", 0, 0, PSI_DOCUMENT_ME},
 
-  { &key_LOCK_wsrep_thd_queue, "LOCK_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME}
+  { &key_LOCK_wsrep_thd_queue, "LOCK_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_wsrep_alter_tablespace, "LOCK_wsrep_alter_tablespace", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };
 /* clang-format on */

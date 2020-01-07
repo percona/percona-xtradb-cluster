@@ -224,6 +224,13 @@ bool Sql_cmd_create_table::execute(THD *thd) {
       }
     }
 
+    /* This could be looked upon as too restrictive given it is taking
+    a global mutex but anyway being TOI if there is alter tablespace
+    operation active in parallel TOI would streamline it. */
+    if (create_info.tablespace) {
+      mysql_mutex_lock(&LOCK_wsrep_alter_tablespace);
+    }
+
     /* Replicate CTAS as TOI.
     Till PXC-5.7, it was being replicated through normal binlog replication.
     After MySQL-8.0, made DDL atomic, it introduces xid in-consistency
@@ -231,7 +238,14 @@ bool Sql_cmd_create_table::execute(THD *thd) {
     if (WSREP(thd) &&
         wsrep_to_isolation_begin(thd, create_table->db,
                                  create_table->table_name, NULL)) {
-        return true;
+      if (create_info.tablespace) {
+        mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+      }
+      return true;
+    }
+
+    if (create_info.tablespace) {
+      mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
     }
 #endif /* WITH_WSREP */
 
@@ -377,7 +391,14 @@ bool Sql_cmd_create_table::execute(THD *thd) {
          tables, like mysql replication does
       */
       if (!thd->is_current_stmt_binlog_format_row() ||
-          !(create_info.options & HA_LEX_CREATE_TMP_TABLE))
+          !(create_info.options & HA_LEX_CREATE_TMP_TABLE)) {
+
+        /* This could be looked upon as too restrictive given it is taking
+        a global mutex but anyway being TOI if there is alter tablespace
+        operation active in parallel TOI would streamline it. */
+        if (create_info.tablespace) {
+          mysql_mutex_lock(&LOCK_wsrep_alter_tablespace);
+        }
 
         /* Note we are explictly opening the macro as we need to perform
         cleanup action on TOI failure. */
@@ -386,8 +407,16 @@ bool Sql_cmd_create_table::execute(THD *thd) {
                                      create_table->table_name, NULL)) {
           if (!thd->lex->is_ignore() && thd->is_strict_mode())
             thd->pop_internal_handler();
+          if (create_info.tablespace) {
+            mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+          }
           return true;
         }
+
+        if (create_info.tablespace) {
+          mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+        }
+      }
 #endif /* WITH_WSREP */
 
       /* Regular CREATE TABLE */

@@ -25,6 +25,7 @@
 #include "rpl_gtid.h"
 #include <vector>
 #include "wsrep_server_state.h"
+#include "sql/dd/types/tablespace.h"       // dd::fetch_tablespace_table_refs
 
 #define WSREP_UNDEFINED_TRX_ID ULLONG_MAX
 
@@ -362,6 +363,7 @@ extern mysql_mutex_t LOCK_wsrep_group_commit;
 extern mysql_cond_t COND_wsrep_group_commit;
 extern mysql_mutex_t LOCK_wsrep_SR_pool;
 extern mysql_mutex_t LOCK_wsrep_SR_store;
+extern mysql_mutex_t LOCK_wsrep_alter_tablespace;
 
 extern bool wsrep_emulate_bin_log;
 extern int wsrep_to_isolation;
@@ -389,6 +391,8 @@ extern PSI_cond_key key_COND_wsrep_group_commit;
 extern PSI_mutex_key key_LOCK_wsrep_SR_pool;
 extern PSI_mutex_key key_LOCK_wsrep_SR_store;
 
+extern PSI_mutex_key key_LOCK_wsrep_alter_tablespace;
+
 extern PSI_mutex_key key_LOCK_wsrep_global_seqno;
 extern PSI_mutex_key key_LOCK_wsrep_thd_queue;
 extern PSI_cond_key  key_COND_wsrep_thd_queue;
@@ -412,6 +416,7 @@ struct TABLE_LIST;
 class Alter_info;
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const TABLE_LIST *table_list,
+                             dd::Tablespace_table_ref_vec* trefs = NULL,
                              Alter_info *alter_info = NULL);
 
 void wsrep_to_isolation_end(THD *thd);

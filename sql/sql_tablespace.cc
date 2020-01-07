@@ -905,13 +905,63 @@ bool Sql_cmd_alter_tablespace::execute(THD *thd) {
   }
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
-    return true;
+  /* While alter/renaming tablespace, ensure all its sub-objects
+  are part of TOI signature to detect conflict.
+
+  Position of this call is important. TOI call should be made
+  before lock_tablespace_names to avoid entering deadlock.
+  (this is to keep it inline with other alter table flows).
+
+  alter-of-table: toi done -> waiting for mdl lock on tablespace
+  alter-of-tablespace: mdl lock on tablespace -> waiting for toi
+
+  Also, this structure exposes a risk of race.
+  Post discovery of sub-objects if tablespace get new sub-object
+  it can cause said sub-object to get missed.
+  This problem is solved by co-ordination mutex that will block
+  if tablespace alter/rename toi discovery is in progress. */
+  {
+    mysql_mutex_lock(&LOCK_wsrep_alter_tablespace);
+
+    MDL_request request;
+    MDL_REQUEST_INIT(&request, MDL_key::TABLESPACE, "", m_tablespace_name.str,
+                     MDL_INTENTION_EXCLUSIVE, MDL_EXPLICIT);
+    thd->mdl_context.acquire_lock(&request, thd->variables.lock_wait_timeout);
+
+    dd::cache::Dictionary_client *dc = thd->dd_client();
+    dd::cache::Dictionary_client::Auto_releaser releaser(dc);
+
+    auto tsmp = get_mod_pair<dd::Tablespace>(dc, m_tablespace_name.str);
+    if (tsmp.first == nullptr) {
+      my_error(ER_TABLESPACE_MISSING_WITH_NAME, MYF(0), m_tablespace_name.str);
+      thd->mdl_context.release_lock(request.ticket);
+      mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+      return true;
+    }
+    dd::Tablespace_table_ref_vec trefs;
+    if (dd::fetch_tablespace_table_refs(thd, *tsmp.first, &trefs)) {
+      thd->mdl_context.release_lock(request.ticket);
+      mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+      return true;
+    }
+
+    thd->mdl_context.release_lock(request.ticket);
+
+    if (WSREP(thd) &&
+        wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL, &trefs)) {
+      mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+      return true;
+    }
+  }
 #endif /* WITH_WSREP */
 
   if (lock_tablespace_names(thd, m_tablespace_name)) {
     return true;
   }
+
+#ifdef WITH_WSREP
+  mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+#endif /* WITH_WSREP */
 
   auto &dc = *thd->dd_client();
   dd::cache::Dictionary_client::Auto_releaser releaser(&dc);
@@ -1224,8 +1274,54 @@ bool Sql_cmd_alter_tablespace_rename::execute(THD *thd) {
   }
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
-    return true;
+  /* While alter/renaming tablespace, ensure all its sub-objects
+  are part of TOI signature to detect conflict.
+
+  Position of this call is important. TOI call should be made
+  before lock_tablespace_names to avoid entering deadlock.
+  (this is to keep it inline with other alter table flows).
+
+  alter-of-table: toi done -> waiting for mdl lock on tablespace
+  alter-of-tablespace: mdl lock on tablespace -> waiting for toi
+
+  Also, this structure exposes a risk of race.
+  Post discovery of sub-objects if tablespace get new sub-object
+  it can cause said sub-object to get missed.
+  This problem is solved by co-ordination mutex that will block
+  if tablespace alter/rename toi discovery is in progress. */
+  {
+    mysql_mutex_lock(&LOCK_wsrep_alter_tablespace);
+
+    MDL_request request;
+    MDL_REQUEST_INIT(&request, MDL_key::TABLESPACE, "", m_tablespace_name.str,
+                     MDL_INTENTION_EXCLUSIVE, MDL_EXPLICIT);
+    thd->mdl_context.acquire_lock(&request, thd->variables.lock_wait_timeout);
+
+    dd::cache::Dictionary_client *dc = thd->dd_client();
+    dd::cache::Dictionary_client::Auto_releaser releaser(dc);
+
+    auto tsmp = get_mod_pair<dd::Tablespace>(dc, m_tablespace_name.str);
+    if (tsmp.first == nullptr) {
+      my_error(ER_TABLESPACE_MISSING_WITH_NAME, MYF(0), m_tablespace_name.str);
+      thd->mdl_context.release_lock(request.ticket);
+      mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+      return true;
+    }
+    dd::Tablespace_table_ref_vec trefs;
+    if (dd::fetch_tablespace_table_refs(thd, *tsmp.first, &trefs)) {
+      thd->mdl_context.release_lock(request.ticket);
+      mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+      return true;
+    }
+
+    thd->mdl_context.release_lock(request.ticket);
+
+    if (WSREP(thd) &&
+        wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL, &trefs)) {
+      mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+      return true;
+    }
+  }
 #endif /* WITH_WSREP */
 
   // Can't check the name in SE, yet. Need to acquire Tablespace
@@ -1233,8 +1329,14 @@ bool Sql_cmd_alter_tablespace_rename::execute(THD *thd) {
 
   // Lock both tablespace names in one go
   if (lock_tablespace_names(thd, m_tablespace_name, m_new_name)) {
+    mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
     return true;
   }
+
+#ifdef WITH_WSREP
+  mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+#endif /* WITH_WSREP */
+
   dd::cache::Dictionary_client *dc = thd->dd_client();
   dd::cache::Dictionary_client::Auto_releaser releaser(dc);
 

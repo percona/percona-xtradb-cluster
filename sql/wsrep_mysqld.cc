@@ -1545,6 +1545,7 @@ wsrep::key_array wsrep_prepare_keys_for_alter_add_fk(const char *child_table_db,
 
 wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
                                             const TABLE_LIST *table_list,
+                                            dd::Tablespace_table_ref_vec *trefs,
                                             Alter_info *alter_info) {
   wsrep::key_array ret;
   if (db || table) {
@@ -1560,6 +1561,13 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
         table_list->get_db_name(), alter_info));
     if (!fk.empty()) {
       ret.insert(ret.end(), fk.begin(), fk.end());
+    }
+  }
+  if (trefs) {
+    for (auto &tref : *trefs) {
+      ret.push_back(wsrep_prepare_key_for_toi(tref.m_schema_name.c_str(),
+                                              tref.m_name.c_str(),
+                                              wsrep::key::exclusive));
     }
   }
   return ret;
@@ -1889,6 +1897,7 @@ fail:
 
 static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
                            const TABLE_LIST *table_list,
+                           dd::Tablespace_table_ref_vec *trefs,
                            Alter_info *alter_info) {
   uchar *buf(0);
   size_t buf_len(0);
@@ -1936,7 +1945,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   struct wsrep_buf buff = {buf, buf_len};
 
   wsrep::key_array key_array =
-      wsrep_prepare_keys_for_toi(db_, table_, table_list, alter_info);
+      wsrep_prepare_keys_for_toi(db_, table_, table_list, trefs, alter_info);
 
   THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
@@ -2072,6 +2081,7 @@ static void wsrep_RSU_end(THD *thd) {
 
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const TABLE_LIST *table_list,
+                             dd::Tablespace_table_ref_vec *trefs,
                              Alter_info *alter_info) {
   /*
     No isolation for applier or replaying threads.
@@ -2154,7 +2164,7 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   if (thd->variables.wsrep_on && wsrep_thd_is_local(thd)) {
     switch (thd->variables.wsrep_OSU_method) {
       case WSREP_OSU_TOI:
-        ret = wsrep_TOI_begin(thd, db_, table_, table_list, alter_info);
+        ret = wsrep_TOI_begin(thd, db_, table_, table_list, trefs, alter_info);
         break;
       case WSREP_OSU_RSU:
         ret = wsrep_RSU_begin(thd, db_, table_);

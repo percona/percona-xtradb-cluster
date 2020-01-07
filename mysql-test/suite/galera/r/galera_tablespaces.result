@@ -165,3 +165,40 @@ innodb_undo_002	Undo	active
 SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
 count(*) = 1
 0
+#node-1 (issue dml that would conflict with parallel ALTER TABLESPACE)
+use test;
+create tablespace tab ADD DATAFILE 'tab.ibd';
+create table t1 (i int, primary key pk(i)) tablespace=tab;
+insert into t1 values (1), (2), (3), (4);
+select * from t1;
+i
+1
+2
+3
+4
+select name from information_schema.innodb_tablespaces where name='tab';
+name
+tab
+set session wsrep_retry_autocommit=0;
+SET GLOBAL wsrep_provider_options = 'dbug=d,before_replicate_sync';
+update t1 set i = i + 10 where i = 2;;
+#node-1a (issue ALTER TABLESPACE)
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+alter tablespace tab rename to tab_rename;;
+#node-1b (wait for both to get blocked)
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_provider_options = 'signal=before_replicate_sync';
+#node-1
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+select * from t1;
+i
+1
+2
+3
+4
+#node-1a
+#node-1
+drop table t1;
+drop tablespace tab_rename;

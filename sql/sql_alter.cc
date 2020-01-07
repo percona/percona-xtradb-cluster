@@ -549,6 +549,13 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
     }
   }
 
+  /* This could be looked upon as too restrictive given it is taking
+  a global mutex but anyway being TOI if there is alter tablespace
+  operation active in parallel TOI would streamline it. */
+  if (create_info.tablespace) {
+    mysql_mutex_lock(&LOCK_wsrep_alter_tablespace);
+  }
+
   {
     extern TABLE *find_temporary_table(THD * thd, const TABLE_LIST *tl);
 
@@ -558,11 +565,18 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
           wsrep_to_isolation_begin(
               thd, ((thd->lex->name.str) ? thd->lex->select_lex->db : NULL),
               ((thd->lex->name.str) ? thd->lex->name.str : NULL), first_table,
-              &alter_info)) {
+              NULL, &alter_info)) {
         WSREP_WARN("ALTER TABLE isolation failure");
+        if (create_info.tablespace) {
+          mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+        }
         return true;
       }
     }
+  }
+
+  if (create_info.tablespace) {
+    mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
   }
 #endif /* WITH_WSREP */
 
