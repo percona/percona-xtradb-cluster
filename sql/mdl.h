@@ -1568,8 +1568,14 @@ class MDL_context {
   inline bool has_locks() const { return !m_ticket_store.is_empty(); }
 
 #ifdef WITH_WSREP
+  inline bool has_stmt_locks() const {
+    return !(m_ticket_store.is_empty(MDL_STATEMENT));
+  }
   inline bool has_transactional_locks() const {
     return !(m_ticket_store.is_empty(MDL_TRANSACTION));
+  }
+  inline bool has_explicit_locks() const {
+    return !(m_ticket_store.is_empty(MDL_EXPLICIT));
   }
 #endif /* WITH_WSREP */
   bool has_locks(MDL_key::enum_mdl_namespace mdl_namespace) const;

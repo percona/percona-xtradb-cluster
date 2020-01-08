@@ -5124,6 +5124,7 @@ void MDL_ticket::wsrep_report(bool debug) {
        	 ((get_type() == MDL_EXCLUSIVE)            ? "exclusive"            :
           "UNKNOWN"))))))))))),
          (m_lock->key.mdl_namespace()  == MDL_key::GLOBAL)    ? "GLOBAL"       :
+         ((m_lock->key.mdl_namespace() == MDL_key::TABLESPACE)? "TABLESPACE"   :
          ((m_lock->key.mdl_namespace() == MDL_key::SCHEMA)    ? "SCHEMA"       :
          ((m_lock->key.mdl_namespace() == MDL_key::TABLE)     ? "TABLE"        :
          ((m_lock->key.mdl_namespace() == MDL_key::FUNCTION)  ? "FUNCTION"     :
@@ -5131,7 +5132,7 @@ void MDL_ticket::wsrep_report(bool debug) {
          ((m_lock->key.mdl_namespace() == MDL_key::TRIGGER)   ? "TRIGGER"      :
          ((m_lock->key.mdl_namespace() == MDL_key::EVENT)     ? "EVENT"        :
          ((m_lock->key.mdl_namespace() == MDL_key::COMMIT)    ? "COMMIT"       :
-         "UNKNOWN"))))))),
+         "UNKNOWN")))))))),
          m_lock->key.db_name(),
          m_lock->key.name());
   }

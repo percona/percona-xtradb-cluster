@@ -13,6 +13,8 @@
 # link though it introduces GTID backlog on failing node.
 #
 
+--source include/have_debug_sync.inc
+
 --source include/galera_cluster.inc
 
 #------------------------------------------------------------------------------
@@ -143,3 +145,55 @@ SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one
 --echo #node-1
 SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
 SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+
+
+
+#------------------------------------------------------------------------------
+#
+# ALTER OF TABLESPACE should add all sub-objects as part of it write-set
+# signature to properly detect conflict with parallel running DML command.
+#
+--connection node_1
+--echo #node-1 (issue dml that would conflict with parallel ALTER TABLESPACE)
+use test;
+create tablespace tab ADD DATAFILE 'tab.ibd';
+create table t1 (i int, primary key pk(i)) tablespace=tab;
+insert into t1 values (1), (2), (3), (4);
+select * from t1;
+select name from information_schema.innodb_tablespaces where name='tab';
+#
+set session wsrep_retry_autocommit=0;
+--let $galera_sync_point = before_replicate_sync
+--source include/galera_set_sync_point.inc
+--send update t1 set i = i + 10 where i = 2;
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--echo #node-1a (issue ALTER TABLESPACE)
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+#
+--send alter tablespace tab rename to tab_rename;
+
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--echo #node-1b (wait for both to get blocked)
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = select count(*) = 1 from information_schema.processlist where State like "innobase_commit_low%" and Info like "alter tablespace tab rename to tab_rename";
+--source include/wait_condition.inc
+--source include/galera_signal_sync_point.inc
+
+--connection node_1
+--echo #node-1
+--error ER_LOCK_DEADLOCK
+--reap
+select * from t1;
+
+--connection node_1a
+--echo #node-1a
+--reap
+--let $wait_condition = select count(*) = 1 from information_schema.innodb_tablespaces where name='tab_rename';
+--source include/wait_condition.inc
+
+--connection node_1
+--echo #node-1
+drop table t1;
+drop tablespace tab_rename;

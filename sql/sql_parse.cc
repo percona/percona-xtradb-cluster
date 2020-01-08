@@ -7570,6 +7570,15 @@ static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
     thd->wsrep_retry_command = COM_CONNECT;
   }
 
+#if 0
+  /* Keep this code here for easy validation.
+  If there is multi-stmt transaction then transaction locks are present at this
+  point. */
+  DBUG_ASSERT(!thd->mdl_context.has_stmt_locks());
+  DBUG_ASSERT(!thd->mdl_context.has_transactional_locks() || thd->in_multi_stmt_transaction_mode());
+  DBUG_ASSERT(!thd->mdl_context.has_explicit_locks());
+#endif
+
   DBUG_RETURN(false);
 }
 #endif /* WITH_WSREP */
