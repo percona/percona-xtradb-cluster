@@ -190,7 +190,7 @@ bool wsrep_start_position_check(sys_var *, THD *, set_var *var) {
             "wsrep_start_position can be set during server boot"
             " or before loading wsrep_provider");
     my_message(ER_UNKNOWN_ERROR, message, MYF(0));
-    return false;
+    return true;
   }
 
   char start_pos_buf[FN_REFLEN];
