@@ -225,6 +225,12 @@ static void trx_init(trx_t *trx) {
 
   trx->stats.set(false);
 
+#ifdef WITH_WSREP
+  if (trx->xid) {
+    trx->xid->reset();
+  }
+#endif /* WITH_WSREP */
+
   /* During asynchronous rollback, we should reset forced rollback flag
   only after rollback is complete to avoid race with the thread owning
   the transaction. */
@@ -1284,9 +1290,17 @@ static void trx_start_low(
     trx->ddl_operation = thd_is_dd_update_stmt(trx->mysql_thd);
   }
 
+#if 0
 #ifdef WITH_WSREP
-  trx->xid->reset();
+  /* Avoid resetting the trx xid if the ddl is metadata only changing.
+  In this case transaction is started as part of prepare phase and not
+  before prepare it would normally happen since there is nothing
+  to change during execution phase. */
+  if (!trx->ddl_md_only) {
+    trx->xid->reset();
+  }
 #endif /* WITH_WSREP */
+#endif
 
   /* The initial value for trx->no: TRX_ID_MAX is used in
   read_view_open_now: */
