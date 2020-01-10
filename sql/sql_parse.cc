@@ -4122,6 +4122,11 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
 #ifdef WITH_WSREP
       ulong cached_pxc_maint_mode = pxc_maint_mode;
+
+      ulong cached_osu_method = WSREP_OSU_NONE;
+      if (thd->variables.wsrep_on && wsrep_thd_is_local(thd)) {
+        cached_osu_method = thd->variables.wsrep_OSU_method;
+      }
 #endif /* WITH_WSREP */
 
       if (check_table_access(thd, SELECT_ACL, all_tables, false, UINT_MAX,
@@ -4146,6 +4151,26 @@ int mysql_execute_command(THD *thd, bool first_level) {
         WSREP_INFO("Sleep for %lu secs while switching to maintenance mode",
                    pxc_maint_transition_period);
         sleep(pxc_maint_transition_period);
+      }
+
+      if (thd->variables.wsrep_on && wsrep_thd_is_local(thd)) {
+        ulong osu_method = thd->variables.wsrep_OSU_method;
+        /* OSU method set to RSU.
+           Commit/Rollback existing transaction (if any) */
+        if (cached_osu_method == WSREP_OSU_TOI && osu_method == WSREP_OSU_RSU) {
+          if (trans_commit_implicit(thd)) {
+            thd->mdl_context.release_transactional_locks();
+            WSREP_DEBUG(
+                "Transaction implicit commit failed"
+                " MDL released: %u",
+                thd->thread_id());
+            return -1;
+          }
+          thd->mdl_context.release_transactional_locks();
+          if (wsrep_thd_is_local(thd) && wsrep_after_statement(thd)) {
+            return -1;
+          }
+        }
       }
 #endif /* WITH_WSREP */
 
