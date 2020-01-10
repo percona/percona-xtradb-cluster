@@ -434,7 +434,7 @@ fi
             -DFEATURE_SET=community \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
-            -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
+            -DCOMPILATION_COMMENT="$COMMENT" \
             -DWITH_PAM=ON \
             -DWITHOUT_ROCKSDB=ON \
             -DWITHOUT_TOKUDB=ON \
