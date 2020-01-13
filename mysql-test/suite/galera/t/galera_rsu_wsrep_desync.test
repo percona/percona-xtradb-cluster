@@ -296,3 +296,32 @@ DROP TABLE t1;
 ##SHOW VARIABLES LIKE 'wsrep_desync';
 ##show status like 'wsrep_desync_count';
 ##--enable_query_log
+
+#-------------------------------------------------------------------------------
+#
+# use-case: if mode is set to RSU in between transaction then ensure that
+#           existing open transaction (if any is committed)
+#
+--connection node_1
+--echo #node-1
+#
+create table t1 (i int, primary key pk(i));
+insert into t1 values (1), (2), (3), (4);
+select * from t1;
+#
+begin;
+update t1 set i = i + 100;
+select * from t1;
+SET SESSION wsrep_OSU_method=RSU;
+--error ER_NO_SUCH_TABLE
+CREATE TEMPORARY TABLE ch3 AS SELECT concat(b1.b, b2.b) AS ch FROM t2 b1, t2 b2;
+commit;
+SET SESSION wsrep_OSU_method=TOI;
+select * from t1;
+drop table t1;
+
+--connection node_2
+--echo #node-2
+#
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1'
+--source include/wait_condition.inc

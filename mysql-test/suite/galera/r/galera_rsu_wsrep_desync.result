@@ -118,3 +118,33 @@ wsrep_desync	OFF
 Variable_name	Value
 wsrep_desync_count	0
 DROP TABLE t1;
+#node-1
+create table t1 (i int, primary key pk(i));
+insert into t1 values (1), (2), (3), (4);
+select * from t1;
+i
+1
+2
+3
+4
+begin;
+update t1 set i = i + 100;
+select * from t1;
+i
+101
+102
+103
+104
+SET SESSION wsrep_OSU_method=RSU;
+CREATE TEMPORARY TABLE ch3 AS SELECT concat(b1.b, b2.b) AS ch FROM t2 b1, t2 b2;
+ERROR 42S02: Table 'test.t2' doesn't exist
+commit;
+SET SESSION wsrep_OSU_method=TOI;
+select * from t1;
+i
+101
+102
+103
+104
+drop table t1;
+#node-2
