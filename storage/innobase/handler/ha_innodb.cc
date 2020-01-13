@@ -9321,15 +9321,8 @@ ha_innobase::write_row(
 	if ((sql_command == SQLCOM_ALTER_TABLE
 	     || sql_command == SQLCOM_OPTIMIZE
 	     || sql_command == SQLCOM_CREATE_INDEX
-#ifdef WITH_WSREP
-	     || (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
-		 sql_command == SQLCOM_LOAD                      &&
-		 !thd_test_options(
-			m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
-#endif /* WITH_WSREP */
 	     || sql_command == SQLCOM_DROP_INDEX)
 	    && m_num_write_row >= 10000) {
-
 		/* ALTER TABLE is COMMITted at every 10000 copied rows.
 		The IX table lock for the original table has to be re-issued.
 		As this method will be called on a temporary table where the
@@ -9356,90 +9349,19 @@ no_commit:
 			/* Unknown situation: do not commit */
 			;
 		} else if (src_table == m_prebuilt->table) {
-
-#ifdef WITH_WSREP
-			bool set_next_trx_id = false;
-
-			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
-			    sql_command == SQLCOM_LOAD                      &&
-			    !thd_test_options(
-				m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
-			{
-				WSREP_DEBUG("Forcing split of large transaction"
-					    " for LOAD DATA INFILE: %s",
-					    wsrep_thd_query(m_user_thd));
-
-				switch (wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1))
-				{
-				case WSREP_TRX_OK:
-				  break;
-				case WSREP_TRX_SIZE_EXCEEDED:
-				case WSREP_TRX_CERT_FAIL:
-				case WSREP_TRX_ERROR:
-				  DBUG_RETURN(1);
-				}
-
-				wsrep_thd_mark_split_trx(m_user_thd, true);
-				if (tc_log->commit(m_user_thd, 1)) DBUG_RETURN(1);
-				wsrep_post_commit(m_user_thd, TRUE);
-				// wsrep_thd_set_next_trx_id(m_user_thd);
-				set_next_trx_id = true;
-			}
-#endif /* WITH_WSREP */
 			/* Source table is not in InnoDB format:
 			no need to re-acquire locks on it. */
 
 			/* Altering to InnoDB format */
 			innobase_commit(ht, m_user_thd, 1);
-#ifdef WITH_WSREP
-			/* Start new transaction after existing mini-transaction
-			is committed in all respect. Starting it early will
-			cause last bucket of left over rows (< 10K) to get
-			processed without active transaction (with log-bin=0).*/
-			if (set_next_trx_id) {
-				wsrep_thd_mark_split_trx(m_user_thd, false);
-				wsrep_thd_set_next_trx_id(m_user_thd);
-			}
-#endif /* WITH_WSREP */
 			/* Note that this transaction is still active. */
 			trx_register_for_2pc(m_prebuilt->trx);
 			/* We will need an IX lock on the destination table. */
 			m_prebuilt->sql_stat_start = TRUE;
 		} else {
-
-#ifdef WITH_WSREP
-			/* PXC-LDI will hit this case if the partition table
-			is being loaded. */
-			bool set_next_trx_id = false;
-
-			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
-			    sql_command == SQLCOM_LOAD                      &&
-			    !thd_test_options(
-				m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
-			{
-				WSREP_DEBUG("Forcing split of large transaction"
-					    " for LOAD DATA INFILE: %s",
-					    wsrep_thd_query(m_user_thd));
-
-				switch (wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1))
-				{
-				case WSREP_TRX_OK:
-				  break;
-				case WSREP_TRX_SIZE_EXCEEDED:
-				case WSREP_TRX_CERT_FAIL:
-				case WSREP_TRX_ERROR:
-				  DBUG_RETURN(1);
-				}
-
-				wsrep_thd_mark_split_trx(m_user_thd, true);
-				if (tc_log->commit(m_user_thd, 1)) DBUG_RETURN(1);
-				wsrep_post_commit(m_user_thd, TRUE);
-				// wsrep_thd_set_next_trx_id(m_user_thd);
-				set_next_trx_id = true;
-			}
-#endif /* WITH_WSREP */
 			/* Ensure that there are no other table locks than
 			LOCK_IX and LOCK_AUTO_INC on the destination table. */
+
 			if (!lock_is_table_exclusive(m_prebuilt->table,
 							m_prebuilt->trx)) {
 				goto no_commit;
@@ -9448,18 +9370,6 @@ no_commit:
 			/* Commit the transaction.  This will release the table
 			locks, so they have to be acquired again. */
 			innobase_commit(ht, m_user_thd, 1);
-
-#ifdef WITH_WSREP
-			/* Start new transaction after existing mini-transaction
-			is committed in all respect. Starting it early will
-			cause last bucket of left over rows (< 10K) to get
-			processed without active transaction (with log-bin=0).*/
-			if (set_next_trx_id) {
-				wsrep_thd_mark_split_trx(m_user_thd, false);
-				wsrep_thd_set_next_trx_id(m_user_thd);
-			}
-#endif /* WITH_WSREP */
-
 			/* Note that this transaction is still active. */
 			trx_register_for_2pc(m_prebuilt->trx);
 			/* Re-acquire the table lock on the source table. */
@@ -9468,6 +9378,80 @@ no_commit:
 			m_prebuilt->sql_stat_start = TRUE;
 		}
 	}
+
+#ifdef WITH_WSREP
+	if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
+	    sql_command == SQLCOM_LOAD &&
+	    !thd_test_options(m_user_thd,
+			      OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN) &&
+	    m_num_write_row >= 10000) {
+
+		/* LDI that qualifies for intermediate commit logic.
+		- Being LDI it suggest we are loading a table from
+                  external file.
+                - Check above also enforces that this LDI is not part of the
+                  existing transaction.
+                Based on above 2 conditions we can safely assume that the
+                transaction will touch only table to load. If table to load is
+                partitioned then main-table could be split into N sub-tables.
+                Same needs to be considered. */
+
+		std::vector<dict_table_t *> locked_table;
+		populate_locked_table_list(m_prebuilt->trx, locked_table);
+
+		WSREP_DEBUG(
+		    "Forcing split of large transaction at %u rows "
+		    " for LOAD DATA INFILE: %s",
+		    m_num_write_row, wsrep_thd_query(m_user_thd));
+
+		m_num_write_row = 0;
+
+		switch (
+		    wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, true)) {
+			case WSREP_TRX_OK:
+				break;
+			case WSREP_TRX_SIZE_EXCEEDED:
+			case WSREP_TRX_CERT_FAIL:
+			case WSREP_TRX_ERROR:
+				DBUG_RETURN(1);
+		}
+
+		/* this will avoid rotation of the binlog during
+		an intermediate commit */
+		wsrep_thd_mark_split_trx(m_user_thd, true);
+
+		if (tc_log->commit(m_user_thd, 1))
+			DBUG_RETURN(1);
+
+		wsrep_post_commit(m_user_thd, TRUE);
+
+		/* Commit the transaction.  This will release the table
+		locks, so they have to be acquired again. */
+		innobase_commit(ht, m_user_thd, 1);
+
+		wsrep_thd_mark_split_trx(m_user_thd, false);
+
+		/* Start new transaction after existing mini-transaction
+		is committed in all respect. Starting it early will
+		cause last bucket of left over rows (< 10K) to get
+		processed without active transaction (with log-bin=0).*/
+		wsrep_thd_set_next_trx_id(m_user_thd);
+
+		/* Note that this transaction is still active. */
+		trx_register_for_2pc(m_prebuilt->trx);
+
+		for (uint i = 0; i < locked_table.size(); ++i) {
+			/* Re-acquire the table lock on the source table. */
+			dberr_t err = row_lock_table_for_mysql(
+			    m_prebuilt, locked_table[i], LOCK_IX);
+			ut_ad(err == DB_SUCCESS);
+		}
+                locked_table.clear();
+
+		/* We will need an IX lock on the destination table. */
+		m_prebuilt->sql_stat_start = TRUE;
+	}
+#endif /* WITH_WSREP */
 
 	m_num_write_row++;
 

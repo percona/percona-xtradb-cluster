@@ -8233,3 +8233,23 @@ lock_trx_alloc_locks(trx_t* trx)
 	}
 
 }
+
+#ifdef WITH_WSREP
+void
+populate_locked_table_list(trx_t *			trx,
+			   std::vector<dict_table_t *> &locked_tables) {
+	trx_mutex_enter(trx);
+	lock_t *lock;
+	for (lock = UT_LIST_GET_FIRST(trx->lock.trx_locks); lock != NULL;
+	     lock = UT_LIST_GET_NEXT(trx_locks, lock)) {
+		lock_table_t *tab_lock;
+		if (!(lock_get_type_low(lock) & LOCK_TABLE)) {
+			/* We are only interested in table locks. */
+			continue;
+		}
+		tab_lock = &lock->un_member.tab_lock;
+		locked_tables.push_back(tab_lock->table);
+	}
+	trx_mutex_exit(trx);
+}
+#endif /* WITH_WSREP */
