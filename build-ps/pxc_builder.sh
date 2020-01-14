@@ -287,7 +287,7 @@ install_deps() {
             percona-release enable original release
             percona-release enable tools release
             yum -y install epel-release
-            yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc 
+            yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc zstd zstd-devel
             yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata jemalloc-devel
             yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static
             yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
@@ -298,6 +298,7 @@ install_deps() {
             yum -y install  gcc-c++ devtoolset-7-gcc-c++ devtoolset-7-binutils
             source /opt/rh/devtoolset-7/enable
             yum -y install scons check-devel boost-devel cmake3
+            yum -y install zstd libzstd libzstd-devel
             alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake 10 \
 --slave /usr/local/bin/ctest ctest /usr/bin/ctest \
 --slave /usr/local/bin/cpack cpack /usr/bin/cpack \
