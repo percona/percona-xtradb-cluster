@@ -9,11 +9,10 @@ datadir=/var/lib/mysql
 socket=/var/lib/mysql/mysql.sock
 log-error=/var/log/mysqld.log
 pid-file=/var/run/mysqld/mysqld.pid
-expire_logs_days=7
 log_error_verbosity=3
 
-# Disabling symbolic-links is recommended to prevent assorted security risks
-symbolic-links=0
+# Binary log expiration period is 604800 seconds, which equals 7 days
+binlog_expire_logs_seconds=604800
 
 ######## wsrep ###############
 # Path to Galera library
@@ -28,7 +27,7 @@ wsrep_cluster_address=gcomm://
 binlog_format=ROW
 
 # Slave thread to use
-wsrep_slave_threads= 8
+wsrep_slave_threads=8
 
 wsrep_log_conflicts
 
@@ -48,10 +47,3 @@ pxc_strict_mode=ENFORCING
 
 # SST method
 wsrep_sst_method=xtrabackup-v2
-
-###########################################
-
-[mysqld_safe]
-pid-file = /var/run/mysqld/mysqld.pid
-socket   = /var/run/mysqld/mysqld.sock
-nice     = 0
