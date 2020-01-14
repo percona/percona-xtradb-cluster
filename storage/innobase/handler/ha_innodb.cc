@@ -10173,6 +10173,9 @@ report_error:
                           NULL)) {
       DBUG_PRINT("wsrep", ("row key failed"));
       error_result = HA_ERR_INTERNAL_ERROR;
+      /* If we hit error during append key then we mark for complete
+      transaction rollback */
+      thd_mark_for_rollback(m_user_thd);
       goto wsrep_error;
     }
   }
@@ -11005,6 +11008,9 @@ func_exit:
                           old_row, new_row)) {
       DBUG_PRINT("wsrep", ("row key failed"));
       err = HA_ERR_INTERNAL_ERROR;
+      /* If we hit error during append key then we mark for complete
+      transaction rollback */
+      thd_mark_for_rollback(m_user_thd);
       goto wsrep_error;
     }
   }
@@ -11099,6 +11105,9 @@ int ha_innobase::delete_row(
                           NULL)) {
       DBUG_PRINT("wsrep", ("delete fail"));
       error = DB_ERROR;
+      /* If we hit error during append key then we mark for complete
+      transaction rollback */
+      thd_mark_for_rollback(m_user_thd);
       goto wsrep_error;
     }
   }

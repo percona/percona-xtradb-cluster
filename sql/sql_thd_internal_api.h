@@ -275,4 +275,8 @@ void thd_get_fragmentation_stats(const THD *thd,
 void thd_add_fragmentation_stats(THD *thd,
                                  const fragmentation_stats_t &stats) noexcept;
 
+/** Mark for complete transaction rollback
+@param[in] thd   the calling thread */
+void thd_mark_for_rollback(THD *thd);
+
 #endif  // SQL_THD_INTERNAL_API_INCLUDED
