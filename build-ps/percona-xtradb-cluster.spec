@@ -354,6 +354,9 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
+%if 0%{?compatlib}
+Requires:             percona-xtradb-cluster-shared-compat = %{version}-%{release}
+%endif
 Requires:             socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
@@ -469,6 +472,7 @@ Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:      Percona-Server-shared-56
+Conflicts:      Percona-Server-shared-57
 %if "%rhel" > "6"
 #Provides:       mariadb-libs >= 5.5.37
 Obsoletes:      mariadb-libs >= 5.5.37
@@ -500,9 +504,11 @@ Provides:       MySQL-shared-compat%{?_isa} = %{version}-%{release}
 Provides:       libmysqlclient.so.18()(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_16)(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_18)(64bit)
-Obsoletes:      mariadb-libs
+Obsoletes:      mariadb-libs Percona-XtraDB-Cluster-shared-compat-57
 Conflicts:      Percona-XtraDB-Cluster-shared-55
 Conflicts:      Percona-XtraDB-Cluster-shared-56
+Conflicts:      Percona-XtraDB-Cluster-shared-57
+Conflicts:      Percona-XtraDB-Cluster-shared-compat-57
 %endif
 
 %description -n percona-xtradb-cluster-shared-compat
@@ -1085,7 +1091,7 @@ if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
 if [ ! -e /var/log/mysqld.log ]; then
-    /usr/bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
+    /usr/bin/install -m0640 -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
 fi
 %if 0%{?systemd}
   %systemd_post mysql
