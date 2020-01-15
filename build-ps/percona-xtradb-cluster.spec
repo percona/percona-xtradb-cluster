@@ -354,6 +354,9 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
+%if 0%{?compatlib}
+Requires:             percona-xtradb-cluster-shared-compat = %{version}-%{release}
+%endif
 Requires:             socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
@@ -501,10 +504,11 @@ Provides:       MySQL-shared-compat%{?_isa} = %{version}-%{release}
 Provides:       libmysqlclient.so.18()(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_16)(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_18)(64bit)
-Obsoletes:      mariadb-libs
+Obsoletes:      mariadb-libs Percona-XtraDB-Cluster-shared-compat-57
 Conflicts:      Percona-XtraDB-Cluster-shared-55
 Conflicts:      Percona-XtraDB-Cluster-shared-56
 Conflicts:      Percona-XtraDB-Cluster-shared-57
+Conflicts:      Percona-XtraDB-Cluster-shared-compat-57
 %endif
 
 %description -n percona-xtradb-cluster-shared-compat
