@@ -1087,7 +1087,7 @@ if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
 if [ ! -e /var/log/mysqld.log ]; then
-    /usr/bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
+    /usr/bin/install -m0640 -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
 fi
 %if 0%{?systemd}
   %systemd_post mysql
