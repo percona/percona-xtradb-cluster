@@ -30,3 +30,4 @@ call mtr.add_suppression('fragment replication failed:');
 call mtr.add_suppression('post commit failed for SR rollback');
 call mtr.add_suppression('pre_commit for SR rollback returned 2, thd:*');
 call mtr.add_suppression('wsrep_rollback failed to send SR ROLLBACK for *');
+call mtr.add_suppression('Appending row key failed.*');

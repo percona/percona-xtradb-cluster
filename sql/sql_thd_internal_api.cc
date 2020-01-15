@@ -343,3 +343,13 @@ void thd_add_fragmentation_stats(THD *thd,
         stats.scan_deleted_recs_size;
   }
 }
+
+#ifdef WITH_WSREP
+/** Mark for complete transaction rollback
+@param[in] thd   the calling thread */
+void thd_mark_for_rollback(THD *thd) {
+  if (thd) {
+    thd->transaction_rollback_request = true;
+  }
+}
+#endif /* WITH_WSREP */

@@ -24,7 +24,7 @@ SET GLOBAL wsrep_provider_options='repl.max_ws_size=128';
 
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
---error ER_ERROR_DURING_COMMIT,ER_ERROR_ON_WRITE,ER_BINLOG_ROW_LOGGING_FAILED
+--error ER_GET_ERRNO,ER_ERROR_DURING_COMMIT,ER_ERROR_ON_WRITE,ER_BINLOG_ROW_LOGGING_FAILED
 INSERT INTO t1 (f2) SELECT REPEAT('x', 254) FROM ten AS a1, ten AS a2;
 
 #
@@ -64,3 +64,4 @@ call mtr.add_suppression('fragment replication failed:');
 call mtr.add_suppression('post commit failed for SR rollback');
 call mtr.add_suppression('pre_commit for SR rollback returned 2, thd:*');
 call mtr.add_suppression('wsrep_rollback failed to send SR ROLLBACK for *');
+call mtr.add_suppression('Appending row key failed.*');
