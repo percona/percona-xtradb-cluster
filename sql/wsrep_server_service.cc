@@ -206,6 +206,7 @@ void Wsrep_server_service::log_view(
   mysql_mutex_lock(&LOCK_status);
   wsrep_cluster_size= view.members().size();
   wsrep_local_index= view.own_index();
+  wsrep_cluster_conf_id= view.view_seqno().get();
   std::ostringstream os;
   os << view.state_id().id();
   wsrep_update_cluster_state_uuid(os.str().c_str());
