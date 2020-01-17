@@ -1030,6 +1030,13 @@ int wsrep_init() {
     return 1;
   }
 
+  if (Wsrep_server_state::get_provider().capabilities() == 0) {
+    WSREP_ERROR("Unable to discover capabilities for the given provider."
+                " Check if protocol version is correctly configured");
+    Wsrep_server_state::instance().unload_provider();
+    return 1;
+  }
+
   if (!wsrep_provider_is_SR_capable() &&
       global_system_variables.wsrep_trx_fragment_size > 0) {
     WSREP_ERROR(
