@@ -469,8 +469,21 @@ get_transfer()
                 tcmd="nc $ncsockopt -dl ${TSST_PORT}"
             fi
         else
+            # Check to see if netcat supports the '-N' flag.
+            #      -N Shutdown the network socket after EOF on stdin
+            # If it supports the '-N' flag, then we need to use the '-N'
+            # flag, otherwise the transfer will stay open after the file
+            # transfer and cause the command to timeout.
+            # Older versions of netcat did not need this flag and will
+            # return an error if the flag is used.
+            #
+            tcmd_extra=""
+            if nc -h 2>&1 | grep -qw -- -N; then
+                tcmd_extra+=" -N "
+            fi
+
             # netcat doesn't understand [] around IPv6 address
-            tcmd="nc ${REMOTEIP//[\[\]]/} ${TSST_PORT}"
+            tcmd="nc ${tcmd_extra} ${REMOTEIP//[\[\]]/} ${TSST_PORT}"
         fi
     else
         tfmt='socat'
@@ -1319,8 +1332,38 @@ send_data_from_donor_to_joiner()
     local msg=$2
 
     pushd ${dir} 1>/dev/null
+
+    # Check that we have a valid FILE_TO_STREAM
+    if [[ -n $FILE_TO_STREAM && ! -r $FILE_TO_STREAM ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Error while attempting to send a file to the joiner"
+        wsrep_log_error "Could not find/read the file: $FILE_TO_STREAM"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "****************************************************** "
+        exit 2
+    fi
+
     set +e
-    timeit "$msg" "$strmcmd | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+
+    if [[ $tfmt == "nc" ]]; then
+        # if using nc as a transfer method, then implement the retry
+        # logic ourselves
+        local rc=1
+        local counter=1
+
+        while [[ $rc -ne 0 && counter -le 30 ]]; do
+            timeit "$msg" "$strmcmd | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+
+            # Retry if nc returns an error
+            rc=${RC[1]}
+            counter=$((counter+1))
+            sleep 1
+        done
+    else
+        # If using socat, then we can rely on the built-in socat retry logic
+        timeit "$msg" "$strmcmd | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+    fi
+
     set -e
     popd 1>/dev/null
 
