@@ -1386,6 +1386,11 @@ fi
 ##############################################################################
 #  Files section
 ##############################################################################
+# Empty section for metapackage
+%files
+
+# Empty section for metapackage
+%files -n percona-xtradb-cluster-full
 
 %files -n percona-xtradb-cluster-server
 %defattr(-,root,root,0755)
