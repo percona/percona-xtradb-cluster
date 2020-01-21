@@ -74,7 +74,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 3.33 
+ %define galera_version 4.3 
 %endif
 
 %if %{undefined galera_revision}
@@ -1386,6 +1386,11 @@ fi
 ##############################################################################
 #  Files section
 ##############################################################################
+# Empty section for metapackage
+%files
+
+# Empty section for metapackage
+%files -n percona-xtradb-cluster-full
 
 %files -n percona-xtradb-cluster-server
 %defattr(-,root,root,0755)
