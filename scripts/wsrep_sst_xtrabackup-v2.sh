@@ -27,6 +27,9 @@ ealgo=""
 ekey=""
 ekeyfile=""
 encrypt=0
+
+xbstream_opts=""
+
 nproc=1
 ecode=0
 ssyslog=""
@@ -561,6 +564,7 @@ read_cnf()
         sockopt+=",retry=30"
     fi
 
+    xbstream_opts=$(parse_cnf sst xbstream-opts "")
 }
 
 #
@@ -574,9 +578,9 @@ get_stream()
     if [[ $sfmt == 'xbstream' ]];then 
         wsrep_log_info "Streaming with xbstream"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-            strmcmd="xbstream -x"
+            strmcmd="xbstream -x $xbstream_opts"
         else
-            strmcmd="xbstream -c \${FILE_TO_STREAM}"
+            strmcmd="xbstream -c $xbstream_opts \${FILE_TO_STREAM}"
         fi
     else
         sfmt="tar"
