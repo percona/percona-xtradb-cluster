@@ -38,9 +38,11 @@ ekey=""
 ekeyfile=""
 encrypt=0
 ieopts=""
-xbstreameopts=""
-xbstreameopts_sst=""
-xbstreameopts_other=""
+xbstream_eopts=""
+xbstream_eopts_sst=""
+xbstream_eopts_other=""
+
+xbstream_opts=""
 
 nproc=1
 ecode=0
@@ -285,13 +287,13 @@ get_keys()
     # Assumes that we are using PXB >= 2.4.7
     if [[ "$WSREP_SST_OPT_ROLE" == "joiner" ]]; then
         # Decryption is done by xbstream for SST
-        xbstreameopts_sst=" --decrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
-        xbstreameopts_other=""
+        xbstream_eopts_sst=" --decrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
+        xbstream_eopts_other=""
         ieopts=""
     else
         # Encryption is done by xtrabackup for SST
-        xbstreameopts_sst=""
-        xbstreameopts_other=""
+        xbstream_eopts_sst=""
+        xbstream_eopts_other=""
         ieopts=" --encrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
     fi
 
@@ -784,6 +786,7 @@ read_cnf()
         sockopt+=",retry=30"
     fi
 
+    xbstream_opts=$(parse_cnf sst xbstream-opts "")
 }
 
 #
@@ -854,9 +857,9 @@ get_stream()
         # It's ok to use the 8.0 xbstream, it's compatible with
         # the 2.4 xbstream.
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream \$xbstreameopts -x"
+            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream -x $xbstream_opts \$xbstream_eopts"
         else
-            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream \$xbstreameopts -c \${FILE_TO_STREAM}"
+            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream -c $xbstream_opts \$xbstream_eopts \${FILE_TO_STREAM}"
         fi
     else
         wsrep_check_program tar
@@ -1868,7 +1871,7 @@ then
             tcmd=" \$ecmd_other | $tcmd "
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_other
+            xbstream_eopts=$xbstream_eopts_other
         fi
 
         # Before the real SST,send the sst-info
@@ -1906,7 +1909,7 @@ then
             tcmd=" \$ecmd | $tcmd "
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_sst
+            xbstream_eopts=$xbstream_eopts_sst
         fi
 
         set +e
@@ -1944,7 +1947,7 @@ then
             tcmd=" \$ecmd_other | $tcmd "
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_other
+            xbstream_eopts=$xbstream_eopts_other
         fi
 
         strmcmd+=" \${IST_FILE}"
@@ -2002,7 +2005,7 @@ then
         strmcmd=" $sdecomp | $strmcmd"
     fi
     if [[ $encrypt -eq 1 ]]; then
-        xbstreameopts=$xbstreameopts_other
+        xbstream_eopts=$xbstream_eopts_other
     fi
 
     initialize_tmpdir
@@ -2209,7 +2212,7 @@ then
             strmcmd=" $sdecomp | $strmcmd"
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_sst
+            xbstream_eopts=$xbstream_eopts_sst
         fi
 
         (recv_data_from_donor_to_joiner "$JOINER_SST_DIR" "${stagemsg}-SST" 0 0) &
