@@ -470,6 +470,7 @@ THD::THD(bool enable_plugins)
       run_wsrep_ordered_commit(false),
       wsrep_enforce_group_commit(false),
       wsrep_post_insert_error(false),
+      wsrep_force_savept_rollback(false),
 
       /* wsrep-lib */
       m_wsrep_next_trx_id(WSREP_UNDEFINED_TRX_ID),
@@ -926,6 +927,7 @@ void THD::init(void) {
   run_wsrep_ordered_commit = false;
   wsrep_enforce_group_commit = false;
   wsrep_post_insert_error = false;
+  wsrep_force_savept_rollback = false;
 #endif /* WITH_WSREP */
 
   if (variables.sql_log_bin)

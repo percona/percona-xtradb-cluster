@@ -2957,6 +2957,18 @@ class THD : public MDL_context_owner,
   */
   bool wsrep_post_insert_error;
 
+  /**
+    Set to true if local transaction is aborted while executing
+    rollback to savepoint. rollback to savepoint will get statement
+    rollback but transaction as a whole needs to get rolled back.
+    PXC flow will invoke wsrep_after_statement -> bf_rollback sequence
+    for the same but given the check in MYSQL_BIN_LOG::rollback to avoid
+    rolling back transaction is
+    thd->lex->sql_command == SQLCOM_ROLLBACK_TO_SAVEPOINT skips actual
+    rollback. */
+  bool wsrep_force_savept_rollback;
+
+
   /*
     Transaction id:
     * m_next_wsrep_trx_id is assigned on the first query after

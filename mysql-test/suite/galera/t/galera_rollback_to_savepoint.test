@@ -100,6 +100,62 @@ SET DEBUG_SYNC = "now SIGNAL continue1";
 --reap
 select * from t1;
 select * from t3;
+insert into t1 values (100, 1);
+select * from t1;
+rollback;
+select * from t1;
+#
+SET DEBUG_SYNC = 'RESET';
+drop table t1, t3;
+
+#-------------------------------------------------------------------------------
+#
+# Background running applier/high priority transaction kills local transaction
+# at ROLLBACK TO SAVEPOINT stage.
+# local transaction has all changes part of the savepoint
+#
+
+--connection node_1
+--echo #node-1
+#
+use test;
+create table t1 (i int, j int, primary key pk(i));
+create table t3 (i int, primary key pk(i));
+insert into t1 values (1, 1), (2, 2), (3, 3), (4, 4);
+insert into t3 values (100), (200), (300), (400);
+select * from t1;
+select * from t3;
+
+#
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_rollback_to_savepoint SIGNAL entered1 WAIT_FOR continue1";
+#
+begin;
+savepoint s1;
+update t1 set i = i + 10;
+update t3 set i = i + 1000;
+select * from t1;
+select * from t3;
+--send rollback to savepoint s1;
+
+--connection node_1a
+--echo #node-1a
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+use test;
+alter table t1 add index idx(j);
+SET DEBUG_SYNC = "now SIGNAL continue1";
+
+--connection node_1
+--echo #node-1
+--error ER_LOCK_DEADLOCK
+--reap
+select * from t1;
+select * from t3;
+insert into t1 values (100, 1);
+select * from t1;
+rollback;
+select * from t1;
 #
 SET DEBUG_SYNC = 'RESET';
 drop table t1, t3;

@@ -96,6 +96,97 @@ i
 200
 300
 400
+insert into t1 values (100, 1);
+select * from t1;
+i	j
+1	1
+100	1
+2	2
+3	3
+4	4
+rollback;
+select * from t1;
+i	j
+1	1
+100	1
+2	2
+3	3
+4	4
+SET DEBUG_SYNC = 'RESET';
+drop table t1, t3;
+#node-1
+use test;
+create table t1 (i int, j int, primary key pk(i));
+create table t3 (i int, primary key pk(i));
+insert into t1 values (1, 1), (2, 2), (3, 3), (4, 4);
+insert into t3 values (100), (200), (300), (400);
+select * from t1;
+i	j
+1	1
+2	2
+3	3
+4	4
+select * from t3;
+i
+100
+200
+300
+400
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_rollback_to_savepoint SIGNAL entered1 WAIT_FOR continue1";
+begin;
+savepoint s1;
+update t1 set i = i + 10;
+update t3 set i = i + 1000;
+select * from t1;
+i	j
+11	1
+12	2
+13	3
+14	4
+select * from t3;
+i
+1100
+1200
+1300
+1400
+rollback to savepoint s1;;
+#node-1a
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+use test;
+alter table t1 add index idx(j);
+SET DEBUG_SYNC = "now SIGNAL continue1";
+#node-1
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+select * from t1;
+i	j
+1	1
+2	2
+3	3
+4	4
+select * from t3;
+i
+100
+200
+300
+400
+insert into t1 values (100, 1);
+select * from t1;
+i	j
+1	1
+100	1
+2	2
+3	3
+4	4
+rollback;
+select * from t1;
+i	j
+1	1
+100	1
+2	2
+3	3
+4	4
 SET DEBUG_SYNC = 'RESET';
 drop table t1, t3;
 create table t1 (id int, c char(10), primary key pk(id));
