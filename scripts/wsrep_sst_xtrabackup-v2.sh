@@ -1634,7 +1634,6 @@ fi
 #
 XB_2x_REQUIRED_VERSION="2.4.18"
 
-wsrep_log_info "###### Looking for XB-2.4.x binaries"
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 2.x)."
@@ -1658,7 +1657,6 @@ fi
 #
 XB_8x_REQUIRED_VERSION="8.0.9"
 
-wsrep_log_info "###### Looking for XB-8.0.x binaries"
 if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "Could not find the $XTRABACKUP_BIN executable (version 8.x)."

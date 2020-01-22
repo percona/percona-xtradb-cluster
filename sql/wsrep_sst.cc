@@ -492,6 +492,12 @@ static void *sst_joiner_thread(void *a) {
         if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
         // Print error message if SST is not cancelled:
         if (!sst_cancelled) {
+          // The process has exited, so the logger thread should
+          // also have exited
+          if (logger_thd) {
+            pthread_join(logger_thd, NULL);
+            logger_thd = 0;
+          }
           // Null-pointer is not valid argument for %s formatting (even
           // though it is supported by many compilers):
           WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '%s'",
@@ -531,9 +537,15 @@ static void *sst_joiner_thread(void *a) {
     mysql_mutex_unlock(&arg->LOCK_wsrep_sst_thread);
 
     if (err)
+    {
+      // The process has exited, so the logger thread should
+      // also have exited
+      if (logger_thd) pthread_join(logger_thd, NULL);
+
       return NULL; /* lp:808417 - return immediately, don't signal
                     * initializer thread to ensure single thread of
                     * shutdown. */
+    }
 
     wsrep_uuid_t ret_uuid = WSREP_UUID_UNDEFINED;
     wsrep_seqno_t ret_seqno = WSREP_SEQNO_UNDEFINED;
