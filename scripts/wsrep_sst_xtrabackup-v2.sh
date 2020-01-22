@@ -1451,7 +1451,11 @@ function initialize_pxb_commands()
     fi
 
     pxb_bin_path="${pxb_root}/bin/xtrabackup"
-    pxb_plugin_dir="${pxb_root}/lib/plugin"
+    if [ -d "${pxb_root}/lib64" ]; then
+        pxb_plugin_dir="${pxb_root}/lib64/plugin"
+    else
+        pxb_plugin_dir="${pxb_root}/lib/plugin"
+    fi
 
     wsrep_log_debug "local:$local_version_str donor:$donor_version_str"
     wsrep_log_debug "pxb-bin-path:$pxb_bin_path"
