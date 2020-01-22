@@ -31,6 +31,7 @@ Prefix: %{_sysconfdir}
 %define percona_server_version @@PERCONA_VERSION@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}
+%define xb_version @@XB_VERSION@@
 %define galera_version @@GALERA_VERSION@@
 
 #
@@ -339,7 +340,7 @@ Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-galera-3 = %{galera_version}
-Requires:	percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:	percona-xtrabackup >= %{xb_version} socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}
 Requires(post):   systemd
