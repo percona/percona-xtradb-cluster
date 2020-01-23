@@ -2348,6 +2348,9 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv) {
     if (WSREP(thd) && (ht->flags & HTON_WSREP_REPLICATION)) {
       WSREP_DEBUG("ha_rollback_to_savepoint: run after_rollback hook");
       (void)wsrep_after_rollback(thd, !thd->in_sub_stmt);
+      if (thd->wsrep_trx().bf_aborted()) {
+        thd->wsrep_cs().mark_force_bf_abort();
+      }
     }
 #endif /* WITH_WSREP */
 
@@ -2458,6 +2461,16 @@ int ha_prepare_low(THD *thd, bool all) {
   SAVEPOINT is *not* transaction-initiating SQL-statement
 */
 int ha_savepoint(THD *thd, SAVEPOINT *sv) {
+
+
+#if 0
+/* commenting it out for now.
+   it was not present in 5.7. there is no reason explained why
+   it was added in 8.x. out-of-order registering binlog handler
+   for savepoint causes issues rolling back acting local trx
+   executing rollback to savepoint when it is killed by high priority
+   trx.
+*/
 #ifdef WITH_WSREP
   /*
     Register binlog hton for savepoint processing if wsrep binlog
@@ -2467,6 +2480,7 @@ int ha_savepoint(THD *thd, SAVEPOINT *sv) {
     wsrep_register_binlog_handler(thd, thd->in_multi_stmt_transaction_mode());
   }
 #endif /* WITH_WSREP */
+#endif
 
   int error = 0;
   Transaction_ctx::enum_trx_scope trx_scope =

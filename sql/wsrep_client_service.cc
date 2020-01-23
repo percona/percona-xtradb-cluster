@@ -123,6 +123,7 @@ void Wsrep_client_service::cleanup_transaction() {
   m_thd->run_wsrep_ordered_commit = false;
   m_thd->wsrep_enforce_group_commit = false;
   m_thd->wsrep_post_insert_error = false;
+  m_thd->wsrep_force_savept_rollback = false;
 
   if (m_thd->wsrep_non_replicating_atomic_ddl) {
     /* Restore the sql_log_bin mode back to original value
@@ -304,7 +305,20 @@ int Wsrep_client_service::bf_rollback() {
   DBUG_ASSERT(m_thd == current_thd);
   DBUG_ENTER("Wsrep_client_service::rollback");
 
+  /* If local transaction is aborted while it is executing rollback
+  to savepoint then bf_rollback sequence is invoked by PXC.
+  For normal command it will rollback a transaction but due to
+  special check it will skip rollback action if command is
+  rollback to savepoint. Enforce rolling back for such case
+  as complete transaction needs to be aborted.
+  PXC-5.7, sets wsrep_conflict_state to ABORTING this helps to exercise
+  the rollback hook inside binlog rollback. */
+  if (m_thd->lex->sql_command == SQLCOM_ROLLBACK_TO_SAVEPOINT) {
+    m_thd->wsrep_force_savept_rollback = true;
+  }
   int ret = (trans_rollback_stmt(m_thd) || trans_rollback(m_thd));
+  m_thd->wsrep_force_savept_rollback = false;
+
   if (m_thd->locked_tables_mode && m_thd->lock) {
     m_thd->locked_tables_list.unlock_locked_tables(m_thd);
     m_thd->variables.option_bits &= ~OPTION_TABLE_LOCK;
