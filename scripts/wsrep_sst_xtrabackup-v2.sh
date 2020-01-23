@@ -1450,6 +1450,7 @@ function initialize_pxb_commands()
         pxb_root="${XTRABACKUP_80_PATH}"
     fi
 
+    pxb_bin_path="${pxb_root}/bin/xtrabackup"
     pxb_plugin_dir="${pxb_root}/lib/plugin"
 
     wsrep_log_debug "local:$local_version_str donor:$donor_version_str"
