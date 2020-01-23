@@ -174,7 +174,11 @@ override_dh_auto_install:
 	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
 	mkdir -p $(TMP)/usr/bin/pxc_extra/
 	(cp -r pxb-2.4 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/xtrabackup)
 	(cp -r pxb-8.0 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/xtrabackup)
 
 
 	# add PXC configuration file my.cnf to mysql-common package
