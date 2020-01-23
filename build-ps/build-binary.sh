@@ -493,12 +493,16 @@ fi
             echo "Could not find percona-xtrabackup-2.4 tarball in $TARGETDIR.  Terminating."
             exit 1
         fi
+        # Remove the .tar.gz extension
+        pxb_basename=${pxb_tar%.tar*}
+        # Remove the libXXX (such as libgcrypt)
+        pxb_basename=${pxb_basename%.lib*}
         pxb_dir="pxb-2.4"
 
         mkdir -p pxc_extra
         cd pxc_extra
-        if [[ -d ${pxb_dir} ]]; then
-            echo "Using existing pxb 2.4 directory"
+        if [[ -d ${pxb_basename} ]]; then
+            echo "Using existing pxb 2.4 directory : ${pxb_basename}"
         else
             echo "Removing existing percona-xtrabackup-2.4 basedir (if found)"
             find . -maxdepth 1 -type d -name 'percona-xtrabackup-2.*' -exec rm -rf {} \+
@@ -506,7 +510,9 @@ fi
             echo "Extracting pxb 2.4 tarball"
             tar -xzf "../$pxb_tar"
         fi
-        echo "Creating symlink pxc_extra/pxb-2.4 --> $pxb_dir"
+        echo "Creating symlink $pxb_dir --> $pxb_basename"
+        rm -f pxb-2.4
+        ln -s ./${pxb_basename} pxb-2.4
     ) || exit 1
 
     (
@@ -516,12 +522,16 @@ fi
             echo "Could not find percona-xtrabackup-8.0 tarball in $TARGETDIR.  Terminating."
             exit 1
         fi
+        # Remove the .tar.gz extension
+        pxb_basename=${pxb_tar%.tar*}
+        # Remove the libXXX (such as libgcrypt) extension
+        pxb_basename=${pxb_basename%.lib*}
         pxb_dir="pxb-8.0"
 
         mkdir -p pxc_extra
         cd pxc_extra
-        if [[ -d ${pxb_dir} ]]; then
-            echo "Using existing pxb 8.0 directory"
+        if [[ -d ${pxb_basename} ]]; then
+            echo "Using existing pxb 8.0 directory : ${pxb_basename}"
         else
             echo "Removing existing percona-xtrabackup-8.0 basedir (if found)"
             find . -maxdepth 1 -type d -name 'percona-xtrabackup-8.*' -exec rm -rf {} \+
@@ -529,7 +539,9 @@ fi
             echo "Extracting pxb 8.0 tarball"
             tar -xzf "../$pxb_tar"
         fi
-        echo "Creating symlink pxc_extra/pxb-8.0 --> $pxb_dir"
+        echo "Creating symlink $pxb_dir --> $pxb_basename"
+        rm -f pxb-8.0
+        ln -s ./${pxb_basename} pxb-8.0
     ) || exit 1
 
     # Only copy over the bin and lib portions of the xtrabackup packages

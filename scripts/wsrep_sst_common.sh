@@ -392,9 +392,20 @@ function normalize_version()
 #
 function compare_versions()
 {
-    local version_1="$( normalize_version $1 )"
+    local version_1="$1"
     local op=$2
-    local version_2="$( normalize_version $3 )"
+    local version_2="$3"
+
+    if [[ -z $version_1 || -z $version_2 ]]; then
+        wsrep_log_error "******************* ERROR ********************** "
+        wsrep_log_error "Missing version string in comparison"
+        wsrep_log_error "left-side:$version_1  operation:$op  right-side:$version_2"
+        wsrep_log_error "******************* ERROR ********************** "
+        return 1
+    fi
+
+    version_1="$( normalize_version "$version_1" )"
+    version_2="$( normalize_version "$version_2" )"
 
     if [[ ! " = == > >= < <= != " =~ " $op " ]]; then
         wsrep_log_error "******************* ERROR ********************** "
