@@ -760,20 +760,7 @@ build_tarball(){
     ARCH=$(uname -m 2>/dev/null||true)
     JVERSION=${JEMALLOC_VERSION:-4.0.0}
 
-    if [ -f /etc/redhat-release ]; then
-        RHEL=$(rpm --eval %rhel 2>/dev/null||true)
-        if [ ${RHEL} = 7 ]; then
-            SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//'| awk -F':' '{print $2}')
-            export SSL_VER=".ssl${SSL_VER_TMP}"
-        else
-            SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//')
-            export SSL_VER=".ssl${SSL_VER_TMP}"
-        fi
-    else
-        SSL_VER_TMP=$(dpkg -l|grep -i libssl|grep -v "libssl\-"|head -n1|awk '{print $2}'|awk -F ":" '{print $1}'|sed 's/libssl/ssl/g'|sed 's/\.//g')
-        export SSL_VER=".${SSL_VER_TMP}"
-    fi
-    export DIST_NAME=".${OS_NAME}"
+    export SSL_VER=".${OS_NAME}"
     ROOT_FS=$(pwd)
 
     TARFILE=$(basename $(find . -iname 'Percona-XtraDB-Cluster*.tar.gz' | grep -v 'galera' | sort | tail -n1))
