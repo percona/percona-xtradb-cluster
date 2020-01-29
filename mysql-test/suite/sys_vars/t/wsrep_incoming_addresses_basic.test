@@ -1,0 +1,58 @@
+--source include/have_wsrep_provider.inc
+--source include/have_wsrep.inc
+
+--echo #
+--echo # wsrep_incoming_addresses
+--echo #
+
+# the default value of wsrep_node_incoming_address should be AUTO
+SHOW VARIABLES LIKE 'wsrep_node_incoming_address';
+
+# wsrep_incoming_addresses should contain ip like ipv4:port or [ipv6]:port of current server 
+# (value should not be AUTO).
+# Simple replacement for ipv4, ipv6, but not AUTO
+--replace_regex /[0-9.]+:[0-9]+$/IP_ADDR:PORT/ /[0-9,a-f,A-F\[\]:]+:[0-9]+$/IP_ADDR:PORT/
+SHOW STATUS LIKE 'wsrep_incoming_addresses';
+
+# IPv4
+# Now restart the server with specified wsrep_node_incoming_address
+# wsrep_incoming_addresses should point to specified address 
+--let $restart_parameters = "restart:--wsrep_node_incoming_address=4.3.2.1:98765"
+--replace_regex /# restart:.*//
+--source include/restart_mysqld.inc
+SHOW STATUS LIKE 'wsrep_incoming_addresses';
+
+# Invalid address. 
+# Unfortunately validation of provided IP inside wsrep_server_incoming_address() wsrep_mysql.cc
+# is weak and deals only with port strtol overflow (values like a.b:wrong are considered as valid ones)
+call mtr.add_suppression("Could not parse wsrep_node_incoming_address : 4.3.2.1:123456789123456789123456789123456789");
+--let $restart_parameters = "restart:--wsrep_node_incoming_address=4.3.2.1:123456789123456789123456789123456789"
+--replace_regex /# restart:.*//
+--source include/restart_mysqld.inc
+SHOW STATUS LIKE 'wsrep_incoming_addresses';
+
+# Ensure that invalid value for wsrep_node_incoming_address was logged
+--let SEARCH_FILE = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let SEARCH_PATTERN = Could not parse wsrep_node_incoming_address : 4.3.2.1:123456789123456789123456789123456789
+--source include/search_pattern.inc
+
+
+# IPv6
+--let $restart_parameters = "restart:--wsrep_node_incoming_address=[2001:db8::1:0:0:1]:98765"
+--replace_regex /# restart:.*//
+--source include/restart_mysqld.inc
+SHOW STATUS LIKE 'wsrep_incoming_addresses';
+
+# Invalid address. 
+call mtr.add_suppression("Could not parse wsrep_node_incoming_address : .2001:db8::1:0:0:1.:123456789123456789123456789123456789");
+--let $restart_parameters = "restart:--wsrep_node_incoming_address=[2001:db8::1:0:0:1]:123456789123456789123456789123456789"
+--replace_regex /# restart:.*//
+--source include/restart_mysqld.inc
+SHOW STATUS LIKE 'wsrep_incoming_addresses';
+
+# Ensure that invalid value for wsrep_node_incoming_address was logged
+--let SEARCH_FILE = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let SEARCH_PATTERN = Could not parse wsrep_node_incoming_address : \[2001:db8::1:0:0:1\]:123456789123456789123456789123456789
+--source include/search_pattern.inc
+
+
