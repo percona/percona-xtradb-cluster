@@ -812,7 +812,6 @@ static std::string wsrep_server_incoming_address() {
           WSREP_WARN(
               "Guessing address for incoming client connections: "
               "address too long.");
-          inc_addr[0] = '\0';
         }
       }
 
@@ -843,7 +842,9 @@ static std::string wsrep_server_incoming_address() {
   }
 
 done:
-  ret = wsrep_node_incoming_address;
+
+  // inc_addr contains proper address, or is empty string
+  ret = inc_addr;
   return ret;
 }
 
