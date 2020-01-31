@@ -6,4 +6,4 @@
    :maxdepth: 1
    :glob:
 
-   Percona-XtraDB-Cluster-8.0.15
+   Percona-XtraDB-Cluster-*

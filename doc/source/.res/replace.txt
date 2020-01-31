@@ -23,3 +23,5 @@
 .. |changed-version| replace:: 8.0.15-5
 .. |version.prev| replace:: 5.7
 .. |version.previous| replace:: 5.7
+
+.. |author| replace:: *DOCUMENTATION AUTHOR*

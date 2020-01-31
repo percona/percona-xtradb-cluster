@@ -6,30 +6,32 @@ Percona XtraDB Cluster Limitations
 
 The following limitations apply to |PXC|:
 
-* Replication works only with |InnoDB| storage engine.
-  Any writes to tables of other types, including system (``mysql.*``) tables,
-  are not replicated.
-  However, ``DDL`` statements are replicated in statement level,
-  and changes to ``mysql.*`` tables will get replicated that way.
-  So you can safely issue ``CREATE USER...``,
-  but issuing ``INSERT INTO mysql.user...`` will not be replicated.
-  You can enable experimental |MyISAM| replication support
-  using the :variable:`wsrep_replicate_myisam` variable.
+Replication works only with |InnoDB| storage engine.
+   Any writes to tables of other types, including system (``mysql.*``)
+   tables, are not replicated.
 
-* Unsupported queries:
+   However, ``DDL`` statements are replicated in statement level, and
+   changes to ``mysql.*`` tables will get replicated that way.  So you
+   can safely issue ``CREATE USER...``, but issuing ``INSERT INTO
+   mysql.user...`` will not be replicated.  You can enable
+   experimental |MyISAM| replication support using the
+   :variable:`wsrep_replicate_myisam` variable.
 
-  * ``LOCK TABLES`` and ``UNLOCK TABLES`` is not supported
-    in multi-master setups
+Unsupported queries:
+   ``LOCK TABLES`` and ``UNLOCK TABLES`` is not supported in multi-master setups
 
-  * Lock functions, such as ``GET_LOCK()``, ``RELEASE_LOCK()``, and so on
+   Lock functions, such as ``GET_LOCK()``, ``RELEASE_LOCK()``, and so on
 
-* Query log cannot be directed to table.
-  If you enable query logging, you must forward the log to a file: ::
+Query log cannot be directed to table.
+   |author| TODO: Explain where to set log_output
+   If you enable query logging, you must forward the log to a file:
 
-    log_output = FILE
+   .. code-block:: guess
 
-  Use ``general_log`` and ``general_log_file`` to choose query logging
-  and the log file name.
+      log_output = FILE
+
+   Use ``general_log`` and ``general_log_file`` to choose query logging
+   and the log file name.
 
 * Maximum allowed transaction size is defined by the
   :variable:`wsrep_max_ws_rows` and :variable:`wsrep_max_ws_size` variables.
