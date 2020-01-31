@@ -365,7 +365,6 @@ is for connecting to the PXC Cluster node via the ProxySQL console.
       Percona XtraDB Cluster (currently only PXC in combination
       with ProxySQL is supported)
 
-
       ProxySQL read/write configuration mode is singlewrite
 
       Configuring the ProxySQL monitoring user.
