@@ -259,6 +259,32 @@ state. Possible values are:
 
 The :term:`UUID` of the state stored on the node.
 
+.. variable:: wsrep_monitor_status
+
+The status of the local monitor (local and replicating actions), apply monitor
+(apply actions of write-set), and commit monitor (commit actions of write
+sets). In the value of this variable, each monitor (L: Local, A: Apply, C:
+Commit) is represented as a *last_entered*, and *last_left* pair:
+
+.. code-block:: text
+
+   wsrep_monitor_status (L/A/C)	[ ( 7, 5), (2, 2), ( 2, 2) ]
+
+last_entered
+   Shows which transaction or write-set has recently entered the queue
+last_left
+   Shows which last transaction or write-set has been executed and left the queue
+
+According to the Galera protocol, transactions can be applied in parallel but
+must be committed in a given order. This rule implies that there can be multiple
+transactions in the *apply* state at a given point of time but transactions are
+*committed* sequentially.
+
+.. seealso::
+
+   Galera Documentation: Database replication
+      https://galeracluster.com/library/documentation/tech-desc-introduction.html
+
 .. variable:: wsrep_protocol_version
 
 Version of the wsrep protocol used.
