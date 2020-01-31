@@ -7804,11 +7804,19 @@ static Sys_var_bool Sys_wsrep_dirty_reads(
     SESSION_VAR(wsrep_dirty_reads), CMD_LINE(OPT_ARG), DEFAULT(false),
     NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
-static Sys_var_uint Sys_wsrep_ignore_apply_errors (
-       "wsrep_ignore_apply_errors", "Ignore replication errors",
-       GLOBAL_VAR(wsrep_ignore_apply_errors), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(WSREP_IGNORE_ERRORS_NONE, WSREP_IGNORE_ERRORS_MAX),
-       DEFAULT(7), BLOCK_SIZE(1));
+static Sys_var_uint Sys_wsrep_ignore_apply_errors(
+    "wsrep_ignore_apply_errors", "Ignore replication errors",
+    GLOBAL_VAR(wsrep_ignore_apply_errors), CMD_LINE(REQUIRED_ARG),
+    VALID_RANGE(WSREP_IGNORE_ERRORS_NONE, WSREP_IGNORE_ERRORS_MAX), DEFAULT(7),
+    BLOCK_SIZE(1));
+
+static Sys_var_uint Sys_wsrep_min_log_verbosity(
+    "wsrep_min_log_verbosity",
+    "Set the minimum logging verbosity "
+    "level of wsrep plugin and Galera",
+    GLOBAL_VAR(wsrep_min_log_verbosity), CMD_LINE(REQUIRED_ARG),
+    VALID_RANGE(1, 3), DEFAULT(3), BLOCK_SIZE(1), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG);
 
 static const char *pxc_strict_modes[] = {"DISABLED", "PERMISSIVE", "ENFORCING",
                                          "MASTER", NullS};

@@ -64,5 +64,7 @@ tls_ciphersuites
 tls_version
 tls_version
 use_secondary_engine
+wsrep_min_log_verbosity
+wsrep_min_log_verbosity
 drop table t1;
 drop table t2;
