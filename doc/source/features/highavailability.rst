@@ -18,15 +18,7 @@ there are two options that the node may use when it joins the cluster again:
 
   SST is usually used when a new node joins the cluster
   and receives all data from an existing node.
-  There are three methods of SST available in |PXC|:
-
-  * :program:`mysqldump`
-  * :program:`rsync`
-  * :program:`xtrabackup`.
-
-  The downside of ``mysqldump`` and ``rsync`` is that your cluster
-  becomes **READ-ONLY** while data is being copied
-  (SST applies the :command:`FLUSH TABLES WITH READ LOCK` command).
+  |PXC| uses :program:`xtrabackup` for SST.
 
   SST using ``xtrabackup`` does not require the :command:`READ LOCK` command
   for the entire syncing process, only for syncing |.FRM| files

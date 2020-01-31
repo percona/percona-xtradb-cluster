@@ -53,7 +53,7 @@ To set up |PXC|:
 
     wsrep_slave_threads=2
     wsrep_cluster_name=trimethylxanthine
-    wsrep_sst_method=rsync
+    wsrep_sst_method=xtrabackup-v2
     wsrep_node_name=node1
 
     innodb_autoinc_lock_mode=2

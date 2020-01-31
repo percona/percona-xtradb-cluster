@@ -15,17 +15,9 @@ it automatically joins the cluster and synchronizes with it.
    Do not join several nodes at the same time
    to avoid overhead due to large amounts of traffic when a new node joins.
 
-By default, |PXC| uses |PXB|_ for *State Snapshot Transfer* (:term:`SST`).
-This requires the following:
+By default, |PXC| uses |PXB|_ for :term:`State Snapshot Transfer <SST>`.
+This requires setting the :variable:`wsrep_sst_method`` variable to ``xtrabackup-v2``.
 
-* Set the :variable:`wsrep_sst_method`` variable to ``xtrabackup-v2`` and
-  provide SST user credentials with the :variable:`wsrep_sst_auth`` variable.
-
-  For more information, see :ref:`configure`.
-
-* Create a user for SST on the initial node.
-
-  For more information, see :ref:`bootstrap`.
 
 Starting the Second Node
 ========================
@@ -59,17 +51,17 @@ To check the status of the second node, run the following:
    +----------------------------+--------------------------------------+
    40 rows in set (0.01 sec)
 
-Previous output shows that the new node
-has been successfully added to the cluster.
-Cluster size is now 2 nodes, it is the primary component,
-and it is fully connected and ready to receive write-set replication.
+The output of ``SHOW STATUS`` shows that the new node has been successfully
+added to the cluster.  The cluster size is now 2 nodes, it is the primary
+component, and it is fully connected and ready to receive write-set replication.
 
-If the state of the second node is ``Synced`` as in the previous example,
-then the node received full SST, is synchronized with the cluster,
-and you can proceed to add the next node.
+If the state of the second node is ``Synced`` as in the previous example, then
+the node received full :term:`SST` is synchronized with the cluster, and you can
+proceed to add the next node.
 
-.. note:: If the state of the node is ``Joiner``,
-   it means that SST hasn't finished.
+.. note::
+
+   If the state of the node is ``Joiner``, it means that SST hasn't finished.
    Do not add new nodes until all others are in ``Synced`` state.
 
 Starting the Third Node
@@ -102,16 +94,14 @@ To check the status of the third node, run the following:
    +----------------------------+--------------------------------------+
    40 rows in set (0.01 sec)
 
-Previous output shows that the new node
-has been successfully added to the cluster.
-Cluster size is now 3 nodes, it is the primary component,
-and it is fully connected and ready to receive write-set replication.
+Previous output shows that the new node has been successfully added to the
+cluster.  Cluster size is now 3 nodes, it is the primary component, and it is
+fully connected and ready to receive write-set replication.
 
 Next Steps
 ==========
 
-When you add all nodes to the cluster,
-you can :ref:`verify replication <verify>`
-by running queries and manipulating data on nodes
-to see if these changes are synchronized accross the cluster.
+When you add all nodes to the cluster, you can :ref:`verify replication
+<verify>` by running queries and manipulating data on nodes to see if these
+changes are synchronized accross the cluster.
 
