@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -112,19 +112,64 @@ class Disable_gtid_state_update_guard {
 
 class Disable_binlog_guard {
  public:
+
+#ifdef WITH_WSREP
+  /* wsrep is turned off along with binlog as part of mysql-wsrep/issues/329
+  meant for tracking and handling leaking galera open transaction.
+
+  This fix was originally originated in 5.7 (7fb9b867a6df) but 8.x
+  with added transaction checks failed to uncover leaking transaction error
+  without the fix. That raises doubt if the fix really made sense even in 5.7.
+
+  For now disabling it in 8.x but if in future this fix is re-enabled
+  then ensure that PXC-2639 (9721695) is backported too. Will keep
+  all infrastructure ready for easy fix in future. */
+  Disable_binlog_guard(THD *thd, bool turn_off_wsrep = false)
+      : m_thd(thd),
+        m_wsrep_on(thd->variables.wsrep_on),
+        m_binlog_disabled(thd->variables.option_bits & OPTION_BIN_LOG) {
+    thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    if (turn_off_wsrep) {
+      thd->variables.wsrep_on = false;
+    }
+  }
+#else
   Disable_binlog_guard(THD *thd)
       : m_thd(thd),
         m_binlog_disabled(thd->variables.option_bits & OPTION_BIN_LOG) {
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
   }
+#endif /* WITH_WSREP */
 
   ~Disable_binlog_guard() {
     if (m_binlog_disabled) m_thd->variables.option_bits |= OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+    m_thd->variables.wsrep_on = m_wsrep_on;
+#endif /* WITH_WSREP */
   }
 
  private:
   THD *const m_thd;
+#ifdef WITH_WSREP
+  const bool m_wsrep_on;
+#endif /* WITH_WSREP */
   const bool m_binlog_disabled;
+};
+
+class Disable_sql_log_bin_guard {
+ public:
+  Disable_sql_log_bin_guard(THD *thd)
+      : m_thd(thd), m_saved_sql_log_bin(thd->variables.sql_log_bin) {
+    thd->variables.sql_log_bin = false;
+  }
+
+  ~Disable_sql_log_bin_guard() {
+    m_thd->variables.sql_log_bin = m_saved_sql_log_bin;
+  }
+
+ private:
+  THD *const m_thd;
+  const bool m_saved_sql_log_bin;
 };
 
 /**
@@ -208,6 +253,23 @@ class Sql_mode_parse_guard {
  private:
   THD *m_thd;
   const sql_mode_t m_old_sql_mode;
+};
+
+/**
+  RAII class to temporarily swap thd->mem_root to a different mem_root.
+*/
+class Swap_mem_root_guard {
+ public:
+  Swap_mem_root_guard(THD *thd, MEM_ROOT *mem_root)
+      : m_thd(thd), m_old_mem_root(thd->mem_root) {
+    thd->mem_root = mem_root;
+  }
+
+  ~Swap_mem_root_guard() { m_thd->mem_root = m_old_mem_root; }
+
+ private:
+  THD *m_thd;
+  MEM_ROOT *m_old_mem_root;
 };
 
 #endif  // THD_RAII_INCLUDED

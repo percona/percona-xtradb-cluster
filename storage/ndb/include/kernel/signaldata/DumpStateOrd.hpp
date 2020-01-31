@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2017, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -87,6 +87,9 @@ public:
     SetSchedulerResponsiveness = 103000,
     EnableEventLoggerDebug = 103001,
     DisableEventLoggerDebug = 103002,
+    CmvmiRelayDumpStateOrd = 103003,
+    CmvmiDummySignal = 103004,
+    CmvmiSendDummySignal = 103005,
     _CMVMIMax = 103099,
 
     // 1 QMGR Dump information about phase 1 variables
@@ -111,6 +114,7 @@ public:
     NdbfsDumpAllFiles = 401,
     NdbfsDumpOpenFiles = 402,
     NdbfsDumpIdleFiles = 403,
+    NdbfsDumpRequests = 406,
     CmvmiSchedulerExecutionTimer = 502,
     CmvmiRealtimeScheduler = 503,
     CmvmiExecuteLockCPU = 504,
@@ -137,6 +141,7 @@ public:
     AccDumpFreeOpRecs = 2405,
     AccDumpNotFreeOpRecs = 2406,
     DumpPageMemory = 1000, // Acc & TUP
+    DumpPageMemoryOnFail = 1001,
     TcDumpSetOfScanFragRec = 2500,
     TcDumpOneScanFragRec = 2501,
     TcDumpSetOfScanRec = 2502,
@@ -151,6 +156,8 @@ public:
     TcDumpOneTcConnectRec = 2516,
     TcDumpSetOfTcConnectRec = 2517,
     TcDumpPoolLevels = 2555,
+    TcSetTransientPoolMaxSize = 2556,
+    TcResetTransientPoolMaxSize = 2557,
     CmvmiDumpConnections = 2600,
     CmvmiDumpLongSignalMemory = 2601,
     CmvmiSetRestartOnErrorInsert = 2602,

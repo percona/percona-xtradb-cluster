@@ -38,9 +38,11 @@ ekey=""
 ekeyfile=""
 encrypt=0
 ieopts=""
-xbstreameopts=""
-xbstreameopts_sst=""
-xbstreameopts_other=""
+xbstream_eopts=""
+xbstream_eopts_sst=""
+xbstream_eopts_other=""
+
+xbstream_opts=""
 
 nproc=1
 ecode=0
@@ -285,13 +287,13 @@ get_keys()
     # Assumes that we are using PXB >= 2.4.7
     if [[ "$WSREP_SST_OPT_ROLE" == "joiner" ]]; then
         # Decryption is done by xbstream for SST
-        xbstreameopts_sst=" --decrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
-        xbstreameopts_other=""
+        xbstream_eopts_sst=" --decrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
+        xbstream_eopts_other=""
         ieopts=""
     else
         # Encryption is done by xtrabackup for SST
-        xbstreameopts_sst=""
-        xbstreameopts_other=""
+        xbstream_eopts_sst=""
+        xbstream_eopts_other=""
         ieopts=" --encrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
     fi
 
@@ -469,8 +471,21 @@ get_transfer()
                 tcmd="nc $ncsockopt -dl ${TSST_PORT}"
             fi
         else
+            # Check to see if netcat supports the '-N' flag.
+            #      -N Shutdown the network socket after EOF on stdin
+            # If it supports the '-N' flag, then we need to use the '-N'
+            # flag, otherwise the transfer will stay open after the file
+            # transfer and cause the command to timeout.
+            # Older versions of netcat did not need this flag and will
+            # return an error if the flag is used.
+            #
+            tcmd_extra=""
+            if nc -h 2>&1 | grep -qw -- -N; then
+                tcmd_extra+=" -N "
+            fi
+
             # netcat doesn't understand [] around IPv6 address
-            tcmd="nc ${REMOTEIP//[\[\]]/} ${TSST_PORT}"
+            tcmd="nc ${tcmd_extra} ${REMOTEIP//[\[\]]/} ${TSST_PORT}"
         fi
     else
         tfmt='socat'
@@ -686,7 +701,7 @@ read_cnf()
     fi
 
     pxc_encrypt_cluster_traffic=$(parse_cnf mysqld pxc-encrypt-cluster-traffic "")
-    pxc_encrypt_cluster_traffic=$(normalize_boolean "$pxc_encrypt_cluster_traffic" "off")
+    pxc_encrypt_cluster_traffic=$(normalize_boolean "$pxc_encrypt_cluster_traffic" "on")
 
     auto_upgrade=$(parse_cnf sst auto-upgrade "")
     auto_upgrade=$(normalize_boolean "$auto_upgrade" "on")
@@ -747,7 +762,7 @@ read_cnf()
 
     # Buildup the list of files to keep in the datadir
     # (These files will not be REMOVED on the joiner node)
-    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*sst-xb-tmpdir$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
 
     # Keep the donor's keyring file
     cpat+="\|.*/${XB_DONOR_KEYRING_FILE}$"
@@ -771,6 +786,7 @@ read_cnf()
         sockopt+=",retry=30"
     fi
 
+    xbstream_opts=$(parse_cnf sst xbstream-opts "")
 }
 
 #
@@ -841,9 +857,9 @@ get_stream()
         # It's ok to use the 8.0 xbstream, it's compatible with
         # the 2.4 xbstream.
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream \$xbstreameopts -x"
+            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream -x $xbstream_opts \$xbstream_eopts"
         else
-            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream \$xbstreameopts -c \${FILE_TO_STREAM}"
+            strmcmd="${XTRABACKUP_80_PATH}/bin/xbstream -c $xbstream_opts \$xbstream_eopts \${FILE_TO_STREAM}"
         fi
     else
         wsrep_check_program tar
@@ -1125,7 +1141,7 @@ wait_for_listen()
 
             # Now get the processtree for this pid
             # If the parentpid is NOT in the process tree, then ignore
-            if ! echo $(get_parent_pids $pid) | grep -q " $parentpid "; then
+            if ! echo "$(get_parent_pids $pid)" | grep -qw "$parentpid"; then
                 wsrep_log_debug "$LINENO: $parentpid is not in the process tree: $(get_parent_pids $pid)"
                 continue
             fi
@@ -1319,8 +1335,38 @@ send_data_from_donor_to_joiner()
     local msg=$2
 
     pushd ${dir} 1>/dev/null
+
+    # Check that we have a valid FILE_TO_STREAM
+    if [[ -n $FILE_TO_STREAM && ! -r $FILE_TO_STREAM ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Error while attempting to send a file to the joiner"
+        wsrep_log_error "Could not find/read the file: $FILE_TO_STREAM"
+        wsrep_log_error "Line $LINENO"
+        wsrep_log_error "****************************************************** "
+        exit 2
+    fi
+
     set +e
-    timeit "$msg" "$strmcmd | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+
+    if [[ $tfmt == "nc" ]]; then
+        # if using nc as a transfer method, then implement the retry
+        # logic ourselves
+        local rc=1
+        local counter=1
+
+        while [[ $rc -ne 0 && counter -le 30 ]]; do
+            timeit "$msg" "$strmcmd | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+
+            # Retry if nc returns an error
+            rc=${RC[1]}
+            counter=$((counter+1))
+            sleep 1
+        done
+    else
+        # If using socat, then we can rely on the built-in socat retry logic
+        timeit "$msg" "$strmcmd | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+    fi
+
     set -e
     popd 1>/dev/null
 
@@ -1586,7 +1632,7 @@ fi
 # 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
 #         my.cnf.
 #
-XB_2x_REQUIRED_VERSION="2.4.13"
+XB_2x_REQUIRED_VERSION="2.4.18"
 
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1609,7 +1655,7 @@ fi
 
 # Verify our PXB 8.0 version
 #
-XB_8x_REQUIRED_VERSION="8.0.5"
+XB_8x_REQUIRED_VERSION="8.0.9"
 
 if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1823,7 +1869,7 @@ then
             tcmd=" \$ecmd_other | $tcmd "
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_other
+            xbstream_eopts=$xbstream_eopts_other
         fi
 
         # Before the real SST,send the sst-info
@@ -1861,7 +1907,7 @@ then
             tcmd=" \$ecmd | $tcmd "
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_sst
+            xbstream_eopts=$xbstream_eopts_sst
         fi
 
         set +e
@@ -1899,7 +1945,7 @@ then
             tcmd=" \$ecmd_other | $tcmd "
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_other
+            xbstream_eopts=$xbstream_eopts_other
         fi
 
         strmcmd+=" \${IST_FILE}"
@@ -1957,7 +2003,7 @@ then
         strmcmd=" $sdecomp | $strmcmd"
     fi
     if [[ $encrypt -eq 1 ]]; then
-        xbstreameopts=$xbstreameopts_other
+        xbstream_eopts=$xbstream_eopts_other
     fi
 
     initialize_tmpdir
@@ -2048,14 +2094,18 @@ then
         initialize_pxb_commands "$DONOR_MYSQL_VERSION" "$MYSQL_VERSION"
 
         # For compatibility, if the tmpdir is not specified, then use
-        # the datadir to hold the .sst directory
+        # the datadir to hold the sst-xb-tmpdir directory
         if [[ -z "$(parse_cnf sst tmpdir "")" ]]; then
-            if [[ -d ${DATA}/.sst ]]; then
-                wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer. Removing"
-                rm -rf ${DATA}/.sst
+            if [[ -d ${DATA}/sst-xb-tmpdir ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "FATAL: Found existing $DATA/sst-xb-tmpdir"
+                wsrep_log_error "Please remove it or specify alternative temporary directory location by setting [sst]/tmpdir"
+                wsrep_log_error "Line $LINENO"
+                wsrep_log_error "****************************************************** "
+                exit 2
             fi
-            mkdir -p ${DATA}/.sst
-            JOINER_SST_DIR=$DATA/.sst
+            mkdir -p ${DATA}/sst-xb-tmpdir
+            JOINER_SST_DIR=$DATA/sst-xb-tmpdir
         else
             JOINER_SST_DIR=$(mktemp -p "${tmpdirbase}" -dt sst_XXXX)
         fi
@@ -2160,7 +2210,7 @@ then
             strmcmd=" $sdecomp | $strmcmd"
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_sst
+            xbstream_eopts=$xbstream_eopts_sst
         fi
 
         (recv_data_from_donor_to_joiner "$JOINER_SST_DIR" "${stagemsg}-SST" 0 0) &

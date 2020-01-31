@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -26,6 +26,7 @@
 #include "my_inttypes.h"
 #include "sql/field.h"
 #include "sql/my_decimal.h"
+#include "sql/protocol.h"
 #include "sql/sql_class.h"
 #include "sql/sql_time.h"
 #include "unittest/gunit/fake_table.h"
@@ -38,8 +39,8 @@ using my_testing::Server_initializer;
 
 class FieldTest : public ::testing::Test {
  protected:
-  virtual void SetUp() { initializer.SetUp(); }
-  virtual void TearDown() { initializer.TearDown(); }
+  void SetUp() override { initializer.SetUp(); }
+  void TearDown() override { initializer.TearDown(); }
 
   THD *thd() { return initializer.thd(); }
 
@@ -80,66 +81,73 @@ class Mock_protocol : public Protocol {
  public:
   Mock_protocol(THD *) {}
 
-  virtual bool store_time(MYSQL_TIME *time, uint precision) {
-    t = *time;
+  bool store_time(const MYSQL_TIME &time, uint precision) override {
+    t = time;
     p = precision;
     return false;
   }
 
-  void verify_time(MYSQL_TIME *time, uint precision) {
-    compareMysqlTime(*time, t);
+  void verify_time(const MYSQL_TIME &time, uint precision) {
+    compareMysqlTime(time, t);
     EXPECT_EQ(precision, p);
   }
 
   // Lots of functions that require implementation
-  int read_packet() { return 0; }
-  ulong get_client_capabilities() { return 0; }
-  bool has_client_capability(unsigned long) { return false; }
-  void end_partial_result_set() {}
-  int shutdown(bool server_shutdown MY_ATTRIBUTE((unused)) = false) {
+  int read_packet() override { return 0; }
+  ulong get_client_capabilities() override { return 0; }
+  bool has_client_capability(unsigned long) override { return false; }
+  void end_partial_result_set() override {}
+  int shutdown(bool server_shutdown MY_ATTRIBUTE((unused)) = false) override {
     return 0;
   }
   SSL_handle get_ssl() { return 0; }
-  void start_row() {}
-  bool end_row() { return false; }
-  bool connection_alive() { return false; }
-  void abort_row() {}
-  uint get_rw_status() { return 0; }
-  bool get_compression() { return false; }
-  bool start_result_metadata(uint, uint, const CHARSET_INFO *) { return false; }
+  void start_row() override {}
+  bool end_row() override { return false; }
+  bool connection_alive() const override { return false; }
+  void abort_row() override {}
+  uint get_rw_status() override { return 0; }
+  bool get_compression() override { return false; }
+  bool start_result_metadata(uint, uint, const CHARSET_INFO *) override {
+    return false;
+  }
 
-  bool store_ps_status(ulong, uint, uint, ulong) { return false; }
-  virtual bool send_parameters(List<Item_param> *, bool) { return false; }
+  char *get_compression_algorithm() override { return nullptr; }
+  uint get_compression_level() override { return 0; }
+
+  bool store_ps_status(ulong, uint, uint, ulong) override { return false; }
+  bool send_parameters(List<Item_param> *, bool) override { return false; }
 
   void send_num_fields(uint) {}
   void send_num_rows(uint) {}
-  bool send_field_metadata(Send_field *, const CHARSET_INFO *) { return false; }
-  virtual bool send_ok(uint, uint, ulonglong, ulonglong, const char *) {
+  bool send_field_metadata(Send_field *, const CHARSET_INFO *) override {
+    return false;
+  }
+  bool send_ok(uint, uint, ulonglong, ulonglong, const char *) override {
     return false;
   }
 
-  virtual bool send_eof(uint, uint) { return false; }
-  virtual bool send_error(uint, const char *, const char *) { return false; }
-  bool end_result_metadata() { return false; }
+  bool send_eof(uint, uint) override { return false; }
+  bool send_error(uint, const char *, const char *) override { return false; }
+  bool end_result_metadata() override { return false; }
 
-  virtual bool store_null() { return false; }
-  virtual bool store_tiny(longlong) { return false; }
-  virtual bool store_short(longlong) { return false; }
-  virtual bool store_long(longlong) { return false; }
-  virtual bool store_longlong(longlong, bool) { return false; }
-  virtual bool store_decimal(const my_decimal *, uint, uint) { return false; }
-  virtual bool store(const char *, size_t, const CHARSET_INFO *) {
+  bool store_null() override { return false; }
+  bool store_tiny(longlong, uint32) override { return false; }
+  bool store_short(longlong, uint32) override { return false; }
+  bool store_long(longlong, uint32) override { return false; }
+  bool store_longlong(longlong, bool, uint32) override { return false; }
+  bool store_decimal(const my_decimal *, uint, uint) override { return false; }
+  bool store_string(const char *, size_t, const CHARSET_INFO *) override {
     return false;
   }
-  virtual bool store(float, uint32, String *) { return false; }
-  virtual bool store(double, uint32, String *) { return false; }
-  virtual bool store(MYSQL_TIME *, uint) { return false; }
-  virtual bool store_date(MYSQL_TIME *) { return false; }
-  virtual bool store(Proto_field *) { return false; }
-  virtual enum enum_protocol_type type() { return PROTOCOL_LOCAL; }
-  virtual enum enum_vio_type connection_type() { return NO_VIO_TYPE; }
-  virtual int get_command(COM_DATA *, enum_server_command *) { return -1; }
-  virtual bool flush() { return true; }
+  bool store_float(float, uint32, uint32) override { return false; }
+  bool store_double(double, uint32, uint32) override { return false; }
+  bool store_datetime(const MYSQL_TIME &, uint) override { return false; }
+  bool store_date(const MYSQL_TIME &) override { return false; }
+  bool store_field(const Field *) override { return false; }
+  enum enum_protocol_type type() const override { return PROTOCOL_LOCAL; }
+  enum enum_vio_type connection_type() const override { return NO_VIO_TYPE; }
+  int get_command(COM_DATA *, enum_server_command *) override { return -1; }
+  bool flush() override { return true; }
 };
 
 TEST_F(FieldTest, FieldTimef) {
@@ -147,14 +155,14 @@ TEST_F(FieldTest, FieldTimef) {
   uchar nullPtr[1] = {0};
   MYSQL_TIME time = {0, 0, 0, 12, 23, 12, 123400, false, MYSQL_TIMESTAMP_TIME};
 
-  Field_timef *field = new (*THR_MALLOC)
+  Field_timef *field = new (thd()->mem_root)
       Field_timef(fieldBuf, nullPtr, false, Field::NONE, "f1", 4);
   // Test public member functions
   EXPECT_EQ(4UL, field->decimals());  // TS-TODO
   EXPECT_EQ(MYSQL_TYPE_TIME, field->type());
   EXPECT_EQ(MYSQL_TYPE_TIME2, field->binlog_type());
 
-  longlong packed = TIME_to_longlong_packed(&time);
+  longlong packed = TIME_to_longlong_packed(time);
 
   EXPECT_EQ(0, field->store_packed(packed));
   EXPECT_DOUBLE_EQ(122312.1234, field->val_real());
@@ -223,9 +231,8 @@ TEST_F(FieldTest, FieldTimef) {
 
   Mock_protocol protocol(thd());
   EXPECT_EQ(protocol.connection_type(), NO_VIO_TYPE);
-  EXPECT_FALSE(field->send_binary(&protocol));
-  // The verification below fails because send_binary move hours to days
-  // protocol.verify_time(&bigTime, 0);  // Why 0?
+  EXPECT_FALSE(field->send_to_protocol(&protocol));
+  protocol.verify_time(bigTime, 4);
 
   // Function inherited from Field_temporal
   EXPECT_TRUE(field->is_temporal());
@@ -312,10 +319,10 @@ TEST_F(FieldTest, FieldTimefCompare) {
   for (int i = 0; i < nFields; ++i) {
     char fieldName[3];
     sprintf(fieldName, "f%c", i);
-    fields[i] = new (*THR_MALLOC) Field_timef(fieldBufs[i], nullPtrs + i, false,
-                                              Field::NONE, fieldName, 6);
+    fields[i] = new (thd()->mem_root) Field_timef(
+        fieldBufs[i], nullPtrs + i, false, Field::NONE, fieldName, 6);
 
-    longlong packed = TIME_to_longlong_packed(&times[i]);
+    longlong packed = TIME_to_longlong_packed(times[i]);
     EXPECT_EQ(0, fields[i]->store_packed(packed));
     fields[i]->make_sort_key(sortStrings[i], fields[i]->pack_length());
   }
@@ -357,8 +364,8 @@ TEST_F(FieldTest, FieldTime) {
   MYSQL_TIME bigTime = {
       0, 0, 0, 123, 45, 45, 555500, false, MYSQL_TIMESTAMP_TIME};
 
-  Field_time *field =
-      new (*THR_MALLOC) Field_time(fieldBuf, nullPtr, false, Field::NONE, "f1");
+  Field_time *field = new (thd()->mem_root)
+      Field_time(fieldBuf, nullPtr, false, Field::NONE, "f1");
   EXPECT_EQ(0, field->store_time(&bigTime, 4));
   MYSQL_TIME t;
   EXPECT_FALSE(field->get_time(&t));
@@ -392,7 +399,7 @@ Field_set *FieldTest::create_field_set(TYPELIB *tl) {
 TEST_F(FieldTest, CopyFieldSet) {
   int err;
   char fields[] = "one,two";
-  my_ulonglong typeset = find_typeset(fields, &tl3, &err);
+  uint64_t typeset = find_typeset(fields, &tl3, &err);
   EXPECT_EQ(0, err);
 
   // Using two different TYPELIBs will set cf->do_copy to do_field_string().
@@ -551,7 +558,7 @@ TEST_F(FieldTest, MakeSortKey) {
   }
   {
     SCOPED_TRACE("Field_short");
-    Field_short fs(0, false, "", true);
+    Field_short fs(0, "", true);
     test_integer_field(&fs);
   }
   {
@@ -606,7 +613,7 @@ TEST_F(FieldTest, MakeSortKey) {
   }
   {
     SCOPED_TRACE("Field_time");
-    Field_time ft(false, "");
+    Field_time ft("");
     uchar from[] = {3, 2, 1};
     uchar expected[] = {129, 2, 3};
     test_make_sort_key(&ft, from, expected, 3);

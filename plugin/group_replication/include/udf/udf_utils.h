@@ -1,4 +1,4 @@
-/* Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -25,6 +25,7 @@
 
 #include "my_dbug.h"
 #include "plugin/group_replication/include/group_actions/group_action.h"
+#include "plugin/group_replication/include/member_version.h"
 
 const char *const member_offline_or_minority_str =
     "Member must be ONLINE and in the majority partition.";
@@ -32,6 +33,12 @@ const char *const unreachable_member_on_group_str =
     "All members in the group must be reachable.";
 const char *const recovering_member_on_group_str =
     "A member is joining the group, wait for it to be ONLINE.";
+const char *const server_uuid_not_present_str =
+    "Wrong arguments: You need to specify a server uuid.";
+const char *const server_uuid_not_valid_str =
+    "Wrong arguments: The server uuid is not valid.";
+const char *const server_uuid_not_on_group_str =
+    "The requested uuid is not a member of the group.";
 
 /**
  * Result data type for user_has_gr_admin_privilege.
@@ -153,6 +160,37 @@ bool group_contains_unreachable_member();
 bool group_contains_recovering_member();
 
 /**
+ * Checks if the uuid is valid to use in a function
+ * It checks:
+ *   1. It is not empty
+ *   2. It is a valid uuid
+ *   3. It belongs to the group
+ *
+ * @param      uuid    the uuid string
+ * @param      ulength the length of the uuid string
+ * @param[out] error_message the returned error message
+ *
+ * @retval true if uuid is not valid
+ * @retval false otherwise
+ */
+bool validate_uuid_parameter(std::string &uuid, size_t ulength,
+                             const char **error_message);
+
+/**
+ * Throw a error on a UDF function with mysql_error_service_printf
+ *
+ * @param  action_name   the action name when the error occurred
+ * @param  error_message the error message to print
+ * @param  log_error     should the error also go to the log (default = false)
+ *
+ * @retval true the function failed to use the mysql_runtime_error service to
+ *              throw the error
+ * @retval false everything went OK
+ */
+bool throw_udf_error(const char *action_name, const char *error_message,
+                     bool log_error = false);
+
+/**
  * Logs the group action @c action_name result from @c result_area into
  * @c result_message.
  *
@@ -160,8 +198,12 @@ bool group_contains_recovering_member();
  * @param action_name group action name
  * @param[out] result_message buffer where the log message will be written
  * @param[out] length size of the log message written to @c result_message
+ *
+ * @retval true the group action failed and this function threw/logged the group
+ *              action's error
+ * @retval false everything went OK
  */
-void log_group_action_result_message(Group_action_diagnostics *result_area,
+bool log_group_action_result_message(Group_action_diagnostics *result_area,
                                      const char *action_name,
                                      char *result_message,
                                      unsigned long *length);
@@ -174,5 +216,14 @@ void log_group_action_result_message(Group_action_diagnostics *result_area,
  * @retval false if tables are locked (@c message is written to)
  */
 bool check_locked_tables(char *message);
+
+/**
+ * Checks whether the group contains a member older than the specified version.
+ *
+ * @param min_required_version Minimum version required
+ * @returns true if there is some older member, false otherwise
+ */
+bool group_contains_member_older_than(
+    Member_version const &min_required_version);
 
 #endif /* PLUGIN_GR_INCLUDE_UDF_UTILS_H */

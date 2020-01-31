@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -82,7 +82,7 @@
 /* WSAStartup needs winsock library*/
 #pragma comment(lib, "ws2_32")
 bool have_tcpip = 0;
-static bool my_win_init();
+static void my_win_init();
 #endif
 
 #define SCALE_SEC 100
@@ -162,20 +162,20 @@ bool my_init() {
     home_dir = intern_filename(home_dir_buff, home_dir);
 
   {
-    DBUG_ENTER("my_init");
-    DBUG_PROCESS((char *)(my_progname ? my_progname : "unknown"));
+    DBUG_TRACE;
+    DBUG_PROCESS(my_progname ? my_progname : "unknown");
 #ifdef _WIN32
-    if (my_win_init()) DBUG_RETURN(TRUE);
+    my_win_init();
 #endif
     DBUG_PRINT("exit", ("home: '%s'", home_dir));
-    DBUG_RETURN(false);
+    return false;
   }
 } /* my_init */
 
 /* End my_sys */
 void my_end(int infoflag) {
   /*
-    We do not use DBUG_ENTER here, as after cleanup DBUG is no longer
+    We do not use DBUG_TRACE here, as after cleanup DBUG is no longer
     operational, so we cannot use DBUG_RETURN.
   */
 
@@ -306,42 +306,6 @@ int handle_rtc_failure(int err_type, const char *file, int line,
 #pragma runtime_checks("", restore)
 #endif
 
-#define OFFSET_TO_EPOC ((__int64)134774 * 24 * 60 * 60 * 1000 * 1000 * 10)
-#define MS 10000000
-
-extern bool win_init_get_system_time_as_file_time();
-/**
-Windows specific timing function initialization.
-  @return Initialization result
-    @retval FALSE Success
-    @retval TRUE  Error. Couldn't initialize environment
-
-*/
-static bool win_init_time() {
-  if (win_init_get_system_time_as_file_time()) return true;
-  /* The following is used by time functions */
-  FILETIME ft;
-  LARGE_INTEGER li, t_cnt;
-
-  DBUG_ASSERT(sizeof(LARGE_INTEGER) == sizeof(query_performance_frequency));
-
-  QueryPerformanceFrequency((LARGE_INTEGER *)&query_performance_frequency);
-
-  GetSystemTimeAsFileTime(&ft);
-  li.LowPart = ft.dwLowDateTime;
-  li.HighPart = ft.dwHighDateTime;
-  query_performance_offset = li.QuadPart - OFFSET_TO_EPOC;
-  QueryPerformanceCounter(&t_cnt);
-  query_performance_offset -=
-      (t_cnt.QuadPart / query_performance_frequency * MS +
-       t_cnt.QuadPart % query_performance_frequency * MS /
-           query_performance_frequency);
-
-  query_performance_offset_micros = query_performance_offset / 10;
-
-  return false;
-}
-
 /*
   Open HKEY_LOCAL_MACHINE\SOFTWARE\MySQL and set any strings found
   there as environment variables
@@ -386,12 +350,12 @@ static void win_init_registry() {
   }
 }
 
-  /*------------------------------------------------------------------
-    Name: CheckForTcpip| Desc: checks if tcpip has been installed on system
-    According to Microsoft Developers documentation the first registry
-    entry should be enough to check if TCP/IP is installed, but as expected
-    this doesn't work on all Win32 machines :(
-  ------------------------------------------------------------------*/
+/*------------------------------------------------------------------
+  Name: CheckForTcpip| Desc: checks if tcpip has been installed on system
+  According to Microsoft Developers documentation the first registry
+  entry should be enough to check if TCP/IP is installed, but as expected
+  this doesn't work on all Win32 machines :(
+------------------------------------------------------------------*/
 
 #define TCPIPKEY "SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters"
 #define WINSOCK2KEY "SYSTEM\\CurrentControlSet\\Services\\Winsock2\\Parameters"
@@ -438,13 +402,9 @@ static bool win32_init_tcp_ip() {
 
 /**
 Windows specific initialization of my_sys functions, resources and variables
-
-  @return Initialization result
-    @retval FALSE Success
-    @retval TRUE  Error. Couldn't initialize environment
 */
-static bool my_win_init() {
-  DBUG_ENTER("my_win_init");
+static void my_win_init() {
+  DBUG_TRACE;
 
   /* this is required to make crt functions return -1 appropriately */
   _set_invalid_parameter_handler(my_parameter_handler);
@@ -459,12 +419,8 @@ static bool my_win_init() {
 
   _tzset();
 
-  if (win_init_time()) DBUG_RETURN(TRUE);
-
   win_init_registry();
   win32_init_tcp_ip();
-
-  DBUG_RETURN(FALSE);
 }
 #endif /* _WIN32 */
 

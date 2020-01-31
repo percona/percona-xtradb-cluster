@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License, version 2.0,
@@ -47,7 +47,7 @@ class AuthenticationTestSuite : public Test {
     ON_CALL(mock_data_context, authenticate(_, _, _, _, _, _, _))
         .WillByDefault(Return(default_error));
     EXPECT_CALL(mock_connection, get_type())
-        .WillRepeatedly(Return(ngs::Connection_tls));
+        .WillRepeatedly(Return(Connection_tls));
     EXPECT_CALL(mock_client, connection())
         .WillRepeatedly(ReturnRef(mock_connection));
     EXPECT_CALL(mock_session, data_context())
@@ -170,6 +170,7 @@ TEST_F(ExpectedValuesSaslAuthenticationTestSuite,
       .WillOnce(Return(false));
   EXPECT_CALL(mock_client, client_hostname())
       .WillOnce(Return(expected_hostname.c_str()));
+  EXPECT_CALL(mock_data_context, password_expired()).WillOnce(Return(false));
   EXPECT_CALL(
       mock_data_context,
       authenticate(StrEq(expected_login), StrEq(expected_hostname.c_str()),
@@ -197,6 +198,7 @@ TEST_F(ExpectedValuesSaslAuthenticationTestSuite,
       authenticate(StrEq(expected_login), StrEq(expected_hostname),
                    StrEq(expected_host), StrEq(expected_database), _, _, false))
       .WillOnce(Return(ec_success));
+  EXPECT_CALL(mock_data_context, password_expired()).WillOnce(Return(false));
 
   ngs::Authentication_interface::Response result =
       sut->handle_start("", sasl_login_string, "");

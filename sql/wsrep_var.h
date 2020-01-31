@@ -16,6 +16,8 @@
 #ifndef WSREP_VAR_H
 #define WSREP_VAR_H
 
+#include <my_config.h>
+
 #define WSREP_CLUSTER_NAME "my_wsrep_cluster"
 #define WSREP_NODE_INCOMING_AUTO "AUTO"
 #define WSREP_START_POSITION_ZERO "00000000-0000-0000-0000-000000000000:-1"
@@ -82,9 +84,16 @@ extern bool wsrep_slave_threads_update UPDATE_ARGS;
 extern bool wsrep_desync_check CHECK_ARGS;
 extern bool wsrep_desync_update UPDATE_ARGS;
 
+extern bool wsrep_trx_fragment_size_check CHECK_ARGS;
+extern bool wsrep_trx_fragment_size_update UPDATE_ARGS;
+
+extern bool wsrep_trx_fragment_unit_update UPDATE_ARGS;
+
 extern bool wsrep_max_ws_size_update UPDATE_ARGS;
 
 extern bool wsrep_reject_queries_update UPDATE_ARGS;
+
+extern bool wsrep_debug_update UPDATE_ARGS;
 
 extern bool wsrep_replicate_myisam_check CHECK_ARGS;
 

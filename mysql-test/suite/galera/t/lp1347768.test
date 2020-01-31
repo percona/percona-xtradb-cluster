@@ -6,14 +6,15 @@
 
 --disable_warnings
 SET SESSION SQL_MODE='';
+--enable_warnings
 
 CREATE TABLE `r8kmb_redirect_links` (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
   `old_url` varchar(255) DEFAULT NULL,
   `new_url` varchar(255) NOT NULL,
   `referer` varchar(150) NOT NULL,
   `comment` varchar(255) NOT NULL,
-  `published` tinyint(4) NOT NULL,
+  `published` tinyint NOT NULL,
   `created_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
   `modified_date` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
   PRIMARY KEY (`id`),

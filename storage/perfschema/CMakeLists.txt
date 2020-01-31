@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 #
 # This program is free software; you can redistribute it and/or modify
@@ -22,6 +22,11 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 ADD_DEFINITIONS(-DMYSQL_SERVER)
+
+IF(WITH_WSREP)
+  INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/include)
+  INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/wsrep-API/v26/)
+ENDIF()
 
 #
 # Maintainer: keep this list sorted, to avoid merge collisions.
@@ -251,6 +256,7 @@ table_file_instances.cc
 table_md_locks.cc
 table_data_locks.cc
 table_data_lock_waits.cc
+table_keyring_keys.cc
 table_mems_global_by_event_name.cc
 table_mems_by_account_by_event_name.cc
 table_mems_by_host_by_event_name.cc
@@ -312,8 +318,9 @@ table_pxc_cluster_view.cc
 # -- WITH_WSREP
 )
 
-MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES} STORAGE_ENGINE MANDATORY STATIC_ONLY)
-IF(WITH_PERFSCHEMA_STORAGE_ENGINE AND WITH_UNIT_TESTS)
+MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES}
+  STORAGE_ENGINE MANDATORY STATIC_ONLY)
+IF(WITH_UNIT_TESTS)
   ENABLE_TESTING()
   ADD_SUBDIRECTORY(unittest)
 ENDIF()

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -71,6 +71,7 @@ enum RequestStatusCode {
   AlreadyStopped = 4
 };
 
+std::string getCpcdVersion();
 /**
  *  @class CPCD
  *  @brief Manages processes, letting them be controlled with a TCP connection.
@@ -147,12 +148,16 @@ class CPCD {
      */
     int readPid();
 
+    /** @brief Returns operating system process identifier */
+
+    int getPid();
+
     /**
      *  @brief Writes the pid from stable storage
      *
      *  @return
      *          - 0 if successful
-                - -1 and sets errno if an error occured
+                - -1 and sets errno if an error occurred
      */
     int writePid(int pid);
 
@@ -255,6 +260,9 @@ class CPCD {
     /** @brief Status of the process */
     enum ProcessStatus m_status;
 
+    /** @brief Status of the process before it's status is logged */
+    enum ProcessStatus m_previous_monitored_status;
+
     /** @bried Indicator that process should be removed when STOPPED */
     bool m_remove_on_stopped;
 
@@ -332,7 +340,7 @@ class CPCD {
    *          - true if the addition was successful,
    *          - false if not
    *          - RequestStatus will be filled in with a suitable error
-   *            if an error occured.
+   *            if an error occurred.
    */
   bool defineProcess(RequestStatus *rs, Process *arg);
 
@@ -344,7 +352,7 @@ class CPCD {
    *          - true if the removal was successful,
    *          - false if not
    *          - The RequestStatus will be filled in with a suitable error
-   *            if an error occured.
+   *            if an error occurred.
    */
   bool undefineProcess(RequestStatus *rs, int id);
 
@@ -358,7 +366,7 @@ class CPCD {
    *          - true if the marking was successful
    *          - false if not
    *          - RequestStatus will be filled in with a suitable error
-   *            if an error occured.
+   *            if an error occurred.
    */
   bool startProcess(RequestStatus *rs, int id);
 
@@ -368,7 +376,7 @@ class CPCD {
    *          - true if the marking was successful
    *          - false if not
    *          - The RequestStatus will be filled in with a suitable error
-   *            if an error occured.
+   *            if an error occurred.
    */
   bool stopProcess(RequestStatus *rs, int id);
 

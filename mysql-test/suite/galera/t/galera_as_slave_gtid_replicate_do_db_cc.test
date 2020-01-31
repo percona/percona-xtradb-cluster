@@ -8,7 +8,7 @@
 
 # As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
---source include/galera_cluster.inc
+--source include/galera_cluster_master_slave.inc
 
 --connection node_1
 RESET MASTER;
@@ -163,8 +163,7 @@ DROP SCHEMA test2;
 STOP SLAVE;
 RESET SLAVE ALL;
 CALL mtr.add_suppression("GTID replication failed");
-CALL mtr.add_suppression("Slave SQL for channel '': Error in Xid_log_event: Commit could not be completed, 'Deadlock found when trying to get lock; try restarting transaction'");
-CALL mtr.add_suppression("Slave SQL for channel '': Error in Xid_log_event: Commit could not be completed, 'WSREP GTID replication was interrupted', Error_code: MY-001180");
+CALL mtr.add_suppression("Slave SQL for channel '': Error in Xid_log_event: Commit could not be completed");
 CALL mtr.add_suppression("Slave SQL for channel '': Node has dropped from cluster");
 CALL mtr.add_suppression("MySQL GTID event pending");
 CALL mtr.add_suppression("Pending to replicate MySQL GTID event.*");

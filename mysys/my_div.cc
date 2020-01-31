@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -43,11 +43,12 @@
       fd	File descriptor
 */
 
-char *my_filename(File fd) {
-  DBUG_ENTER("my_filename");
-  if ((uint)fd >= (uint)my_file_limit) DBUG_RETURN((char *)"UNKNOWN");
+const char *my_filename(File fd) {
+  DBUG_TRACE;
+  if (static_cast<uint>(fd) >= static_cast<uint>(my_file_limit))
+    return "UNKNOWN";
   if (fd >= 0 && my_file_info[fd].type != UNOPEN) {
-    DBUG_RETURN(my_file_info[fd].name);
+    return my_file_info[fd].name;
   } else
-    DBUG_RETURN((char *)"UNOPENED"); /* Debug message */
+    return "UNOPENED"; /* Debug message */
 }

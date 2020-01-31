@@ -8,7 +8,7 @@
 
 # As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
---source include/galera_cluster.inc
+--source include/galera_cluster_master_slave.inc
 
 --connection node_2
 --disable_query_log
@@ -26,7 +26,7 @@ START SLAVE USER='root';
 SET SESSION binlog_format='STATEMENT';
 
 CREATE TABLE t1 (
-     i int(11) NOT NULL AUTO_INCREMENT,
+     i int NOT NULL AUTO_INCREMENT,
      c char(32) DEFAULT 'dummy_text',
      PRIMARY KEY (i)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

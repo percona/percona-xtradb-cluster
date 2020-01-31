@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -43,6 +43,7 @@
 #include "my_inttypes.h"
 #include "my_io.h"
 #include "my_macros.h"
+#include "my_systime.h"  // get_date
 #include "print_version.h"
 #include "storage/myisam/fulltext.h"
 #include "storage/myisam/myisam_sys.h"
@@ -803,7 +804,7 @@ static int myisamchk(MI_CHECK *param, char *filename) {
   char llbuff[22], llbuff2[22];
   bool state_updated = 0;
   MYISAM_SHARE *share;
-  DBUG_ENTER("myisamchk");
+  DBUG_TRACE;
 
   param->out_flag = error = param->warning_printed = param->error_printed =
       recreate = 0;
@@ -861,7 +862,7 @@ static int myisamchk(MI_CHECK *param, char *filename) {
                              my_errno(), filename);
         break;
     }
-    DBUG_RETURN(1);
+    return 1;
   }
   share = info->s;
   share->options &= ~HA_OPTION_READ_ONLY_DATA; /* We are modifing it */
@@ -903,9 +904,9 @@ static int myisamchk(MI_CHECK *param, char *filename) {
       if (mi_close(info)) {
         mi_check_print_error(param, "%d when closing MyISAM-table '%s'",
                              my_errno(), filename);
-        DBUG_RETURN(1);
+        return 1;
       }
-      DBUG_RETURN(0);
+      return 0;
     }
   }
   if ((param->testflag &
@@ -928,7 +929,7 @@ static int myisamchk(MI_CHECK *param, char *filename) {
       (void)fprintf(stderr,
                     "MyISAM-table '%s' is not fixed because of errors\n",
                     filename);
-      DBUG_RETURN(-1);
+      return -1;
     }
     recreate = 1;
     if (!(param->testflag & T_REP_ANY)) {
@@ -1127,7 +1128,7 @@ end2:
   if (mi_close(info)) {
     mi_check_print_error(param, "%d when closing MyISAM-table '%s'", my_errno(),
                          filename);
-    DBUG_RETURN(1);
+    return 1;
   }
   if (error == 0) {
     if (param->out_flag & O_NEW_DATA)
@@ -1162,7 +1163,7 @@ end2:
     (void)fprintf(stderr, "MyISAM-table '%s' is usable but should be fixed\n",
                   filename);
   (void)fflush(stderr);
-  DBUG_RETURN(error);
+  return error;
 } /* myisamchk */
 
 /* Write info about table */
@@ -1176,7 +1177,7 @@ static void descript(MI_CHECK *param, MI_INFO *info, char *name) {
   enum en_fieldtype type;
   MYISAM_SHARE *share = info->s;
   char llbuff[22], llbuff2[22];
-  DBUG_ENTER("describe");
+  DBUG_TRACE;
 
   printf("\nMyISAM file:         %s\n", name);
   fputs("Record format:       ", stdout);
@@ -1231,7 +1232,7 @@ static void descript(MI_CHECK *param, MI_INFO *info, char *name) {
   }
   printf("Data records:        %13s  Deleted blocks:     %13s\n",
          llstr(info->state->records, llbuff), llstr(info->state->del, llbuff2));
-  if (param->testflag & T_SILENT) DBUG_VOID_RETURN; /* This is enough */
+  if (param->testflag & T_SILENT) return; /* This is enough */
 
   if (param->testflag & T_VERBOSE) {
     printf("Datafile parts:      %13s  Deleted data:       %13s\n",
@@ -1380,7 +1381,6 @@ static void descript(MI_CHECK *param, MI_INFO *info, char *name) {
       start += share->rec[field].length;
     }
   }
-  DBUG_VOID_RETURN;
 } /* describe */
 
 /* Sort records according to one key */
@@ -1397,7 +1397,7 @@ static int mi_sort_records(MI_CHECK *param, MI_INFO *info, char *name,
   char llbuff[22], llbuff2[22];
   SORT_INFO sort_info;
   MI_SORT_PARAM sort_param;
-  DBUG_ENTER("sort_records");
+  DBUG_TRACE;
 
   memset(&sort_info, 0, sizeof(sort_info));
   memset(&sort_param, 0, sizeof(sort_param));
@@ -1413,18 +1413,18 @@ static int mi_sort_records(MI_CHECK *param, MI_INFO *info, char *name,
                            "Can't sort table '%s' on key %d;  No such key",
                            name, sort_key + 1);
     param->error_printed = 0;
-    DBUG_RETURN(0); /* Nothing to do */
+    return 0; /* Nothing to do */
   }
   if (keyinfo->flag & HA_FULLTEXT) {
     mi_check_print_warning(param, "Can't sort table '%s' on FULLTEXT key %d",
                            name, sort_key + 1);
     param->error_printed = 0;
-    DBUG_RETURN(0); /* Nothing to do */
+    return 0; /* Nothing to do */
   }
   if (share->data_file_type == COMPRESSED_RECORD) {
     mi_check_print_warning(param, "Can't sort read-only table '%s'", name);
     param->error_printed = 0;
-    DBUG_RETURN(0); /* Nothing to do */
+    return 0; /* Nothing to do */
   }
   if (!(param->testflag & T_SILENT)) {
     printf("- Sorting records for MyISAM-table '%s'\n", name);
@@ -1434,7 +1434,7 @@ static int mi_sort_records(MI_CHECK *param, MI_INFO *info, char *name,
              llstr(info->state->del, llbuff2));
   }
   if (share->state.key_root[sort_key] == HA_OFFSET_ERROR)
-    DBUG_RETURN(0); /* Nothing to do */
+    return 0; /* Nothing to do */
 
   init_key_cache(dflt_key_cache, opt_key_cache_block_size,
                  (size_t)param->use_buffers, 0, 0);
@@ -1532,7 +1532,7 @@ err:
   my_free(sort_info.buff);
   sort_info.buff = 0;
   share->state.sortkey = sort_key;
-  DBUG_RETURN(flush_blocks(param, share->key_cache, share->kfile) | got_error);
+  return flush_blocks(param, share->key_cache, share->kfile) | got_error;
 } /* sort_records */
 
 /* Sort records recursive using one index */
@@ -1547,7 +1547,7 @@ static int sort_record_index(MI_SORT_PARAM *sort_param, MI_INFO *info,
   char llbuff[22];
   SORT_INFO *sort_info = sort_param->sort_info;
   MI_CHECK *param = sort_info->param;
-  DBUG_ENTER("sort_record_index");
+  DBUG_TRACE;
 
   nod_flag = mi_test_if_nod(buff);
   temp_buff = 0;
@@ -1555,7 +1555,7 @@ static int sort_record_index(MI_SORT_PARAM *sort_param, MI_INFO *info,
   if (nod_flag) {
     if (!(temp_buff = (uchar *)my_alloca((uint)keyinfo->block_length))) {
       mi_check_print_error(param, "Not Enough memory");
-      DBUG_RETURN(-1);
+      return -1;
     }
   }
   used_length = mi_getint(buff);
@@ -1603,9 +1603,9 @@ static int sort_record_index(MI_SORT_PARAM *sort_param, MI_INFO *info,
     mi_check_print_error(param, "%d when updating keyblock", my_errno());
     goto err;
   }
-  DBUG_RETURN(0);
+  return 0;
 err:
-  DBUG_RETURN(1);
+  return 1;
 } /* sort_record_index */
 
 /*
@@ -1637,7 +1637,7 @@ void mi_check_print_info(MI_CHECK *param MY_ATTRIBUTE((unused)),
 
 void mi_check_print_warning(MI_CHECK *param, const char *fmt, ...) {
   va_list args;
-  DBUG_ENTER("mi_check_print_warning");
+  DBUG_TRACE;
 
   fflush(stdout);
   if (!param->warning_printed && !param->error_printed) {
@@ -1653,14 +1653,13 @@ void mi_check_print_warning(MI_CHECK *param, const char *fmt, ...) {
   (void)fputc('\n', stderr);
   fflush(stderr);
   va_end(args);
-  DBUG_VOID_RETURN;
 }
 
 /* VARARGS */
 
 void mi_check_print_error(MI_CHECK *param, const char *fmt, ...) {
   va_list args;
-  DBUG_ENTER("mi_check_print_error");
+  DBUG_TRACE;
   DBUG_PRINT("enter", ("format: %s", fmt));
 
   fflush(stdout);
@@ -1677,7 +1676,14 @@ void mi_check_print_error(MI_CHECK *param, const char *fmt, ...) {
   (void)fputc('\n', stderr);
   fflush(stderr);
   va_end(args);
-  DBUG_VOID_RETURN;
+}
+
+bool get_global_encrypt_tmp_files() { return false; }
+
+bool open_cached_file_encrypted(IO_CACHE *cache, const char *dir,
+                                const char *prefix, size_t cache_size,
+                                myf cache_myflags, bool /*encrypted*/) {
+  return open_cached_file(cache, dir, prefix, cache_size, cache_myflags);
 }
 
 #include "storage/myisam/mi_extrafunc.h"

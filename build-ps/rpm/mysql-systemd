@@ -207,7 +207,7 @@ if [[ -z ${datadir:-} ]];then
     fi
 fi
 
-
+grastate_loc="${datadir}/grastate.dat"
 
 if [[ -z "${pid_path:-}" ]];then
   pid_path=$datadir/`hostname`.pid
@@ -260,11 +260,80 @@ check_running()
     fi
 }
 
+# Run mysqld with --wsrep-recover and parse recovered position from log.
+# Position will be stored in wsrep_start_position_opt global.
+wsrep_start_position_opt=""
+wsrep_recover_position() {
+  local mysqld_cmd="/usr/sbin/mysqld"
+  local ret=0
+  local uuid=""
+  local seqno=0
+  local wsrep_logfile=$(mktemp $datadir/wsrep_recovery.XXXXXX)
+  local err_log=$(parse_cnf log-error server mysqld)
+  if [ -f $grastate_loc ]; then
+    uuid=$(grep 'uuid:' $grastate_loc | cut -d: -f2 | tr -d ' ')
+    seqno=$(grep 'seqno:' $grastate_loc | cut -d: -f2 | tr -d ' ')
+
+  # If sequence number is not equal to -1, wsrep-recover co-ordinates aren't used.
+  # So, directly pass whatever is obtained from grastate.dat
+    if [ ! -z $seqno ] && [ $seqno -ne -1 ]; then
+      log_info_msg "Skipping wsrep-recover for $uuid:$seqno pair" >> $wsrep_logfile
+      log_info_msg "Assigning $uuid:$seqno to wsrep_start_position" >> $wsrep_logfile
+
+      wsrep_start_position_opt="--wsrep_start_position=$uuid:$seqno"
+      if [ -f $err_log ]; then
+        cat $wsrep_logfile >> $err_log
+      fi
+      rm $wsrep_logfile
+
+      echo ${wsrep_start_position_opt}
+      return $ret
+    fi
+  fi
+
+  local euid=$(id -u)
+  local wsrep_pidfile="$datadir/"`hostname`"-recover.pid"
+  local wsrep_verbose_logfile=$(mktemp $datadir/wsrep_recovery_verbose.XXXXXX)
+  local wr_options="--log_error='$wsrep_verbose_logfile' --pid-file='$wsrep_pidfile'"
+
+  [ "$euid" = "0" ] && chown 'mysql' $wsrep_logfile $wsrep_verbose_logfile
+  chmod 600 $wsrep_logfile $wsrep_verbose_logfile
+
+  log_info_msg "WSREP: Running position recovery with $wr_options" >> $wsrep_logfile
+
+  eval "$mysqld_cmd --user=mysql --log-error-verbosity=3 --wsrep_recover $wr_options"
+  local rp="$(grep '\[WSREP\] Recovered position:' $wsrep_verbose_logfile)"
+  if [ -z "$rp" ]; then
+    local skipped="$(grep WSREP $wsrep_verbose_logfile | grep 'skipping position recovery')"
+    if [ -z "$skipped" ]; then
+      log_failure_msg "WSREP: Failed to recover position: " >> $wsrep_logfile
+      cat $wsrep_verbose_logfile >> $wsrep_logfile
+      ret=2
+    else
+      log_info_msg "WSREP: Position recovery skipped" >> $wsrep_logfile
+    fi
+  else
+    local start_pos="$(echo $rp | sed 's/.*WSREP\]\ Recovered\ position://' \
+        | sed 's/^[ \t]*//')"
+    log_info_msg "WSREP: Recovered position $start_pos" >> $wsrep_logfile
+    wsrep_start_position_opt="--wsrep_start_position=$start_pos"
+  fi
+
+  if [ -f $err_log ]; then
+      echo "Log of wsrep recovery (--wsrep-recover):" >> $err_log
+      cat $wsrep_logfile >> $err_log
+  fi
+  rm $wsrep_logfile $wsrep_verbose_logfile
+
+  echo ${wsrep_start_position_opt}
+  return $ret
+}
 
 
 ret=0
 
 case $action in
+    "galera-recovery") wsrep_recover_position ;;
     "start-pre") check_running; install_db ;;
     "start-post") 
       wait_for_pid created  "$pid_path"; ret=$?

@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License, version 2.0,
@@ -66,7 +66,7 @@ class User_verification_test : public Test {
 
   ngs::Authentication_info m_auth_info;
 
-  xpl::Account_verification_handler handler{
+  Account_verification_handler handler{
       &mock_session, ngs::Account_verification_interface::Account_native,
       mock_account_verification};
 
@@ -202,7 +202,7 @@ INSTANTIATE_TEST_CASE_P(User_verification, User_verification_param_test,
 
 struct Test_param_connection_type {
   bool requires_secure;
-  ngs::Connection_type type;
+  Connection_type type;
   int expected_error;
 };
 
@@ -246,15 +246,14 @@ TEST_P(User_verification_param_test_with_connection_type_combinations,
 }
 
 Test_param_connection_type connection_combinations[] = {
-    {NOT REQUIRE_SECURE_TRANSPORT, ngs::Connection_tcpip, ER_SUCCESS},
-    {NOT REQUIRE_SECURE_TRANSPORT, ngs::Connection_namedpipe, ER_SUCCESS},
-    {NOT REQUIRE_SECURE_TRANSPORT, ngs::Connection_tls, ER_SUCCESS},
-    {NOT REQUIRE_SECURE_TRANSPORT, ngs::Connection_unixsocket, ER_SUCCESS},
-    {REQUIRE_SECURE_TRANSPORT, ngs::Connection_unixsocket, ER_SUCCESS},
-    {REQUIRE_SECURE_TRANSPORT, ngs::Connection_tls, ER_SUCCESS},
-    {REQUIRE_SECURE_TRANSPORT, ngs::Connection_tcpip,
-     ER_SECURE_TRANSPORT_REQUIRED},
-    {REQUIRE_SECURE_TRANSPORT, ngs::Connection_namedpipe,
+    {NOT REQUIRE_SECURE_TRANSPORT, Connection_tcpip, ER_SUCCESS},
+    {NOT REQUIRE_SECURE_TRANSPORT, Connection_namedpipe, ER_SUCCESS},
+    {NOT REQUIRE_SECURE_TRANSPORT, Connection_tls, ER_SUCCESS},
+    {NOT REQUIRE_SECURE_TRANSPORT, Connection_unixsocket, ER_SUCCESS},
+    {REQUIRE_SECURE_TRANSPORT, Connection_unixsocket, ER_SUCCESS},
+    {REQUIRE_SECURE_TRANSPORT, Connection_tls, ER_SUCCESS},
+    {REQUIRE_SECURE_TRANSPORT, Connection_tcpip, ER_SECURE_TRANSPORT_REQUIRED},
+    {REQUIRE_SECURE_TRANSPORT, Connection_namedpipe,
      ER_SECURE_TRANSPORT_REQUIRED}};
 
 INSTANTIATE_TEST_CASE_P(
@@ -286,6 +285,8 @@ TEST_P(Split_sasl_message_test, Split_sasl_message_on_given_param) {
     EXPECT_CALL(mock_client, client_address());
     EXPECT_CALL(mock_client, client_hostname());
     EXPECT_CALL(mock_client, supports_expired_passwords());
+    EXPECT_CALL(mock_sql_data_context, password_expired())
+        .WillOnce(Return(false));
     EXPECT_CALL(mock_session, data_context())
         .WillOnce(ReturnRef(mock_sql_data_context));
     EXPECT_CALL(

@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -72,6 +72,11 @@ Alter_info::Alter_info(const Alter_info &rhs, MEM_ROOT *mem_root)
       alter_index_visibility_list(mem_root,
                                   rhs.alter_index_visibility_list.begin(),
                                   rhs.alter_index_visibility_list.end()),
+      alter_state_list(mem_root, rhs.alter_state_list.begin(),
+                       rhs.alter_state_list.end()),
+      check_constraint_spec_list(mem_root,
+                                 rhs.check_constraint_spec_list.begin(),
+                                 rhs.check_constraint_spec_list.end()),
       create_list(rhs.create_list, mem_root),
       delayed_key_list(mem_root, rhs.delayed_key_list.cbegin(),
                        rhs.delayed_key_list.cend()),
@@ -261,17 +266,17 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
   ulong priv_needed = ALTER_ACL;
   bool result;
 
-  DBUG_ENTER("Sql_cmd_alter_table::execute");
+  DBUG_TRACE;
 
   if (thd->is_fatal_error()) /* out of memory creating a copy of alter_info */
-    DBUG_RETURN(true);
+    return true;
 
   {
     partition_info *part_info = thd->lex->part_info;
     if (part_info != NULL && has_external_data_or_index_dir(*part_info) &&
         check_access(thd, FILE_ACL, any_db, NULL, NULL, false, false))
 
-      DBUG_RETURN(true);
+      return true;
   }
   /*
     We also require DROP priv for ALTER TABLE ... DROP PARTITION, as well
@@ -292,7 +297,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
                    &priv,
                    NULL, /* Don't use first_tab->grant with sel_lex->db */
                    0, 0))
-    DBUG_RETURN(true); /* purecov: inspected */
+    return true; /* purecov: inspected */
 
   /* If it is a merge table, check privileges for merge children. */
   if (create_info.merge_list.first) {
@@ -334,11 +339,11 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
     if (check_table_access(thd, SELECT_ACL | UPDATE_ACL | DELETE_ACL,
                            create_info.merge_list.first, false, UINT_MAX,
                            false))
-      DBUG_RETURN(true);
+      return true;
   }
 
   if (check_grant(thd, priv_needed, first_table, false, UINT_MAX, false))
-    DBUG_RETURN(true); /* purecov: inspected */
+    return true; /* purecov: inspected */
 
   if (alter_info.new_table_name.str &&
       !test_all_bits(priv, INSERT_ACL | CREATE_ACL)) {
@@ -350,7 +355,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
     tmp_table.grant.privilege = priv;
     if (check_grant(thd, INSERT_ACL | CREATE_ACL, &tmp_table, false, UINT_MAX,
                     false))
-      DBUG_RETURN(true); /* purecov: inspected */
+      return true; /* purecov: inspected */
   }
 
   /* Don't yet allow changing of symlinks with ALTER TABLE */
@@ -394,20 +399,20 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
 
       if (thd->dd_client()->acquire(schema_name, table_name, &table_ref)) {
         thd->mdl_context.release_lock(mdl_request.ticket);
-        DBUG_RETURN(true);
+        return true;
       }
 
       if (table_ref == nullptr ||
           table_ref->hidden() == dd::Abstract_table::HT_HIDDEN_SE) {
         my_error(ER_NO_SUCH_TABLE, MYF(0), schema_name, table_name);
         thd->mdl_context.release_lock(mdl_request.ticket);
-        DBUG_RETURN(true);
+        return true;
       }
 
       handlerton *hton = nullptr;
       if (dd::table_storage_engine(thd, table_ref, &hton)) {
         thd->mdl_context.release_lock(mdl_request.ticket);
-        DBUG_RETURN(true);
+        return true;
       }
 
       existing_db_type = hton->db_type;
@@ -496,7 +501,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
             break;
         }
 
-        if (block) DBUG_RETURN(true);
+        if (block) return true;
       } else if (!safe_ops && existing_db_type == DB_TYPE_INNODB) {
         bool block = false;
 
@@ -539,9 +544,16 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
             break;
         }
 
-        if (block) DBUG_RETURN(true);
+        if (block) return true;
       }
     }
+  }
+
+  /* This could be looked upon as too restrictive given it is taking
+  a global mutex but anyway being TOI if there is alter tablespace
+  operation active in parallel TOI would streamline it. */
+  if (create_info.tablespace) {
+    mysql_mutex_lock(&LOCK_wsrep_alter_tablespace);
   }
 
   {
@@ -553,11 +565,18 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
           wsrep_to_isolation_begin(
               thd, ((thd->lex->name.str) ? thd->lex->select_lex->db : NULL),
               ((thd->lex->name.str) ? thd->lex->name.str : NULL), first_table,
-              &alter_info)) {
+              NULL, &alter_info)) {
         WSREP_WARN("ALTER TABLE isolation failure");
-        DBUG_RETURN(true);
+        if (create_info.tablespace) {
+          mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+        }
+        return true;
       }
     }
+  }
+
+  if (create_info.tablespace) {
+    mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
   }
 #endif /* WITH_WSREP */
 
@@ -572,7 +591,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
 
   if (!thd->lex->is_ignore() && thd->is_strict_mode())
     thd->pop_internal_handler();
-  DBUG_RETURN(result);
+  return result;
 }
 
 bool Sql_cmd_discard_import_tablespace::execute(THD *thd) {

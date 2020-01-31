@@ -3,11 +3,19 @@ INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 #node-1
 CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
 INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
+name	encryption
+innodb_undo_001	Y
+innodb_undo_002	Y
 #node-2
 SELECT COUNT(*) = 10000 from t1;
 COUNT(*) = 10000
 1
 DROP TABLE t1;
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
+name	encryption
+innodb_undo_001	Y
+innodb_undo_002	Y
 #node-2 being killed
 Killing server ...
 #node-1
@@ -27,8 +35,16 @@ count(*)
 update t1 set f2 = 9999999 where f1 > 1000;
 begin;
 update t1 set f2 = 8888888 where f1 < 1000;
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
+name	encryption
+innodb_undo_001	Y
+innodb_undo_002	Y
 #node-2 restarted
 # restart
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
+name	encryption
+innodb_undo_001	Y
+innodb_undo_002	Y
 SELECT COUNT(*) = 0 from t1 where f2 = 8888888;
 COUNT(*) = 0
 1
@@ -61,8 +77,16 @@ CALL proc_insert();
 SELECT COUNT(*) from t1;
 COUNT(*)
 10000
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
+name	encryption
+innodb_undo_001	Y
+innodb_undo_002	Y
 #node-2 restarted (should get encrypted table through IST)
 # restart
+select name, encryption from information_schema.innodb_tablespaces where name like 'innodb_undo%';
+name	encryption
+innodb_undo_001	Y
+innodb_undo_002	Y
 #node-2
 DROP TABLE t1;
 DROP PROCEDURE proc_insert;

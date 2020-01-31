@@ -97,20 +97,18 @@ int srv_session_attach(MYSQL_SESSION session, MYSQL_THD *ret_previous_thd);
 #include "my_inttypes.h"
 #include "my_config.h"
 typedef unsigned char uchar;
-typedef signed char int8;
-typedef unsigned char uint8;
-typedef short int16;
-typedef unsigned short uint16;
-typedef int int32;
-typedef unsigned int uint32;
-typedef unsigned long long int ulonglong;
 typedef long long int longlong;
-typedef longlong int64;
-typedef ulonglong uint64;
-typedef unsigned long long my_ulonglong;
+typedef unsigned long long int ulonglong;
+typedef int8_t int8;
+typedef uint8_t uint8;
+typedef int16_t int16;
+typedef uint16_t uint16;
+typedef int32_t int32;
+typedef uint32_t uint32;
+typedef int64_t int64;
+typedef uint64_t uint64;
 typedef intptr_t intptr;
 typedef ulonglong my_off_t;
-typedef ptrdiff_t my_ptrdiff_t;
 typedef int myf;
 #include "my_macros.h"
 typedef enum {
@@ -226,7 +224,7 @@ enum enum_locking_service_lock_type {
 typedef int (*mysql_acquire_locks_t)(
     void * opaque_thd, const char *lock_namespace, const char **lock_names,
     size_t lock_num, enum enum_locking_service_lock_type lock_type,
-    unsigned long lock_timeout);
+    uint64_t lock_timeout);
 typedef int (*mysql_release_locks_t)(void * opaque_thd,
                                      const char *lock_namespace);
 extern "C" struct mysql_locking_service_st {
@@ -236,7 +234,7 @@ extern "C" struct mysql_locking_service_st {
 int mysql_acquire_locking_service_locks(
     void * opaque_thd, const char *lock_namespace, const char **lock_names,
     size_t lock_num, enum enum_locking_service_lock_type lock_type,
-    unsigned long lock_timeout);
+    uint64_t lock_timeout);
 int mysql_release_locking_service_locks(void * opaque_thd,
                                         const char *lock_namespace);
 #include <mysql/service_my_plugin_log.h>

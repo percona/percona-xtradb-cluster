@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2014, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2014, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 Portions of this file contain modifications contributed and copyrighted by
 Google, Inc. Those modifications are gratefully acknowledged and are described
@@ -113,8 +113,7 @@ struct LatchDebug {
   typedef OSMutex Mutex;
 
   /** Comparator for the ThreadMap. */
-  struct os_thread_id_less
-      : public std::binary_function<os_thread_id_t, os_thread_id_t, bool> {
+  struct os_thread_id_less {
     /** @return true if lhs < rhs */
     bool operator()(const os_thread_id_t &lhs,
                     const os_thread_id_t &rhs) const UNIV_NOTHROW {
@@ -352,8 +351,7 @@ struct LatchDebug {
 
  private:
   /** Comparator for the Levels . */
-  struct latch_level_less
-      : public std::binary_function<latch_level_t, latch_level_t, bool> {
+  struct latch_level_less {
     /** @return true if lhs < rhs */
     bool operator()(const latch_level_t &lhs,
                     const latch_level_t &rhs) const UNIV_NOTHROW {
@@ -430,6 +428,7 @@ LatchDebug::LatchDebug() {
   LEVEL_MAP_INSERT(SYNC_RECV);
   LEVEL_MAP_INSERT(SYNC_LOG_ONLINE);
   LEVEL_MAP_INSERT(SYNC_LOG_SN);
+  LEVEL_MAP_INSERT(SYNC_LOG_LIMITS);
   LEVEL_MAP_INSERT(SYNC_LOG_WRITER);
   LEVEL_MAP_INSERT(SYNC_LOG_WRITE_NOTIFIER);
   LEVEL_MAP_INSERT(SYNC_LOG_FLUSH_NOTIFIER);
@@ -439,6 +438,7 @@ LatchDebug::LatchDebug() {
   LEVEL_MAP_INSERT(SYNC_LOG_ARCH);
   LEVEL_MAP_INSERT(SYNC_PAGE_ARCH);
   LEVEL_MAP_INSERT(SYNC_PAGE_ARCH_OPER);
+  LEVEL_MAP_INSERT(SYNC_PAGE_ARCH_CLIENT);
   LEVEL_MAP_INSERT(SYNC_PAGE_CLEANER);
   LEVEL_MAP_INSERT(SYNC_PURGE_QUEUE);
   LEVEL_MAP_INSERT(SYNC_TRX_SYS_HEADER);
@@ -696,9 +696,11 @@ Latches *LatchDebug::check_order(const latch_t *latch,
     case SYNC_LOG_FLUSHER:
     case SYNC_LOG_WRITE_NOTIFIER:
     case SYNC_LOG_FLUSH_NOTIFIER:
+    case SYNC_LOG_LIMITS:
     case SYNC_LOG_ARCH:
     case SYNC_PAGE_ARCH:
     case SYNC_PAGE_ARCH_OPER:
+    case SYNC_PAGE_ARCH_CLIENT:
     case SYNC_DOUBLEWRITE:
     case SYNC_SEARCH_SYS:
     case SYNC_THREADS:
@@ -1204,7 +1206,7 @@ LatchMetaData latch_meta;
 
 /** Load the latch meta data. */
 static void sync_latch_meta_init() UNIV_NOTHROW {
-  latch_meta.resize(LATCH_ID_MAX);
+  latch_meta.resize(LATCH_ID_MAX + 1);
 
   /* The latches should be ordered on latch_id_t. So that we can
   index directly into the vector to update and fetch meta-data. */
@@ -1298,6 +1300,8 @@ static void sync_latch_meta_init() UNIV_NOTHROW {
   LATCH_ADD_MUTEX(LOG_FLUSH_NOTIFIER, SYNC_LOG_FLUSH_NOTIFIER,
                   log_flush_notifier_mutex_key);
 
+  LATCH_ADD_MUTEX(LOG_LIMITS, SYNC_LOG_LIMITS, log_limits_mutex_key);
+
   LATCH_ADD_RWLOCK(LOG_SN, SYNC_LOG_SN, log_sn_lock_key);
 
   LATCH_ADD_MUTEX(LOG_ARCH, SYNC_LOG_ARCH, log_sys_arch_mutex_key);
@@ -1306,6 +1310,9 @@ static void sync_latch_meta_init() UNIV_NOTHROW {
 
   LATCH_ADD_MUTEX(PAGE_ARCH_OPER, SYNC_PAGE_ARCH_OPER,
                   page_sys_arch_oper_mutex_key);
+
+  LATCH_ADD_MUTEX(PAGE_ARCH_CLIENT, SYNC_PAGE_ARCH_CLIENT,
+                  page_sys_arch_client_mutex_key);
 
   LATCH_ADD_MUTEX(PAGE_CLEANER, SYNC_PAGE_CLEANER, page_cleaner_mutex_key);
 
@@ -1370,6 +1377,8 @@ static void sync_latch_meta_init() UNIV_NOTHROW {
 
   LATCH_ADD_MUTEX(TEMP_POOL_MANAGER, SYNC_TEMP_POOL_MANAGER,
                   temp_pool_manager_mutex_key);
+
+  LATCH_ADD_MUTEX(TEMP_POOL_TBLSP, SYNC_NO_ORDER_CHECK, PFS_NOT_INSTRUMENTED);
 
   LATCH_ADD_MUTEX(TRX, SYNC_TRX, trx_mutex_key);
 
@@ -1468,12 +1477,18 @@ static void sync_latch_meta_init() UNIV_NOTHROW {
   LATCH_ADD_MUTEX(MASTER_KEY_ID_MUTEX, SYNC_NO_ORDER_CHECK,
                   master_key_id_mutex_key);
 
+  LATCH_ADD_MUTEX(SCRUB_STAT_MUTEX, SYNC_NO_ORDER_CHECK, scrub_stat_mutex_key);
+
   LATCH_ADD_MUTEX(FIL_CRYPT_MUTEX, SYNC_NO_ORDER_CHECK, PFS_NOT_INSTRUMENTED);
   LATCH_ADD_MUTEX(FIL_CRYPT_STAT_MUTEX, SYNC_NO_ORDER_CHECK,
                   PFS_NOT_INSTRUMENTED);
   LATCH_ADD_MUTEX(FIL_CRYPT_DATA_MUTEX, SYNC_NO_ORDER_CHECK,
                   PFS_NOT_INSTRUMENTED);
   LATCH_ADD_MUTEX(FIL_CRYPT_THREADS_MUTEX, SYNC_NO_ORDER_CHECK,
+                  PFS_NOT_INSTRUMENTED);
+  LATCH_ADD_MUTEX(FIL_CRYPT_THREADS_SET_CNT_MUTEX, SYNC_NO_ORDER_CHECK,
+                  PFS_NOT_INSTRUMENTED);
+  LATCH_ADD_MUTEX(FIL_CRYPT_LIST_MUTEX, SYNC_NO_ORDER_CHECK,
                   PFS_NOT_INSTRUMENTED);
   LATCH_ADD_MUTEX(FIL_CRYPT_START_ROTATE_MUTEX, SYNC_NO_ORDER_CHECK,
                   PFS_NOT_INSTRUMENTED);
@@ -1484,6 +1499,16 @@ static void sync_latch_meta_init() UNIV_NOTHROW {
 
   LATCH_ADD_MUTEX(CLONE_SNAPSHOT, SYNC_NO_ORDER_CHECK,
                   clone_snapshot_mutex_key);
+
+  LATCH_ADD_MUTEX(PARALLEL_READ, SYNC_NO_ORDER_CHECK, parallel_read_mutex_key);
+
+  LATCH_ADD_MUTEX(REDO_LOG_ARCHIVE_ADMIN_MUTEX, SYNC_NO_ORDER_CHECK,
+                  PFS_NOT_INSTRUMENTED);
+
+  LATCH_ADD_MUTEX(REDO_LOG_ARCHIVE_QUEUE_MUTEX, SYNC_NO_ORDER_CHECK,
+                  PFS_NOT_INSTRUMENTED);
+
+  LATCH_ADD_MUTEX(TEST_MUTEX, SYNC_NO_ORDER_CHECK, PFS_NOT_INSTRUMENTED);
 
   latch_id_t id = LATCH_ID_NONE;
 

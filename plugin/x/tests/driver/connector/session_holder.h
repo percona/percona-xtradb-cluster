@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -27,10 +27,12 @@
 
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "my_macros.h"
 #include "plugin/x/client/mysqlxclient/xconnection.h"
@@ -40,6 +42,7 @@
 struct Connection_options {
   std::string socket;
   std::string host;
+  std::string network_namespace;
   int port{0};
 
   std::string user;
@@ -54,12 +57,19 @@ struct Connection_options {
   std::string ssl_cipher;
   std::string ssl_key;
   std::string allowed_tls;
-  int64_t io_timeout{-1};
+  std::int64_t io_timeout{-1};
+  std::int64_t session_connect_timeout{-1};
   bool dont_wait_for_disconnect{false};
   bool trace_protocol{false};
   xcl::Internet_protocol ip_mode{xcl::Internet_protocol::V4};
   std::vector<std::string> auth_methods;
   bool compatible{false};
+  std::vector<std::string> compression_server_style{"GROUP", "MULTIPLE",
+                                                    "SINGLE"};
+  std::vector<std::string> compression_client_style{"SINGLE", "MULTIPLE",
+                                                    "GROUP"};
+  std::vector<std::string> compression_algorithm{"DEFLATE", "LZ4"};
+  std::string compression_mode{"DISABLED"};
 
   bool is_ssl_set() const {
     return !ssl_ca.empty() || !ssl_ca_path.empty() || !ssl_cert.empty() ||

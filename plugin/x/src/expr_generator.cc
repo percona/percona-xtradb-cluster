@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -25,17 +25,19 @@
 #include "plugin/x/src/expr_generator.h"
 
 #include <algorithm>
+#include <functional>
 #include <string>
 #include <utility>
 
-#include "plugin/x/ngs/include/ngs_common/bind.h"
-#include "plugin/x/ngs/include/ngs_common/to_string.h"
+#include "plugin/x/src/helper/string_case.h"
+#include "plugin/x/src/helper/to_string.h"
 #include "plugin/x/src/json_utils.h"
 #include "plugin/x/src/mysql_function_names.h"
 #include "plugin/x/src/xpl_error.h"
 #include "plugin/x/src/xpl_regex.h"
 
 namespace xpl {
+using Placeholder_type = Placeholder_info::Type;
 
 Expression_generator::Error::Error(int error_code, const std::string &message)
     : std::invalid_argument(message), m_error(error_code) {}
@@ -77,9 +79,9 @@ void Expression_generator::generate(const Mysqlx::Expr::Expr &arg) const {
       break;
 
     default:
-      throw Error(ER_X_EXPR_BAD_TYPE_VALUE,
-                  "Invalid value for Mysqlx::Expr::Expr_Type " +
-                      ngs::to_string(arg.type()));
+      throw Error(
+          ER_X_EXPR_BAD_TYPE_VALUE,
+          "Invalid value for Mysqlx::Expr::Expr_Type " + to_string(arg.type()));
   }
 }
 
@@ -167,7 +169,7 @@ void Expression_generator::generate(const Document_path &arg) const {
       default:
         throw Error(ER_X_EXPR_BAD_TYPE_VALUE,
                     "Invalid value for Mysqlx::Expr::DocumentPathItem::Type " +
-                        ngs::to_string(item->type()));
+                        to_string(item->type()));
     }
   }
   m_qb->equote();
@@ -193,7 +195,7 @@ void Expression_generator::generate(const Mysqlx::Datatypes::Any &arg) const {
     default:
       throw Error(ER_X_EXPR_BAD_TYPE_VALUE,
                   "Invalid value for Mysqlx::Datatypes::Any::Type " +
-                      ngs::to_string(arg.type()));
+                      to_string(arg.type()));
   }
 }
 
@@ -240,7 +242,7 @@ void Expression_generator::generate(
     default:
       throw Error(ER_X_EXPR_BAD_TYPE_VALUE,
                   "Invalid value for Mysqlx::Datatypes::Scalar::Type " +
-                      ngs::to_string(arg.type()));
+                      to_string(arg.type()));
   }
 }
 
@@ -267,26 +269,20 @@ void Expression_generator::generate(
       throw Error(
           ER_X_EXPR_BAD_TYPE_VALUE,
           "Invalid content type for Mysqlx::Datatypes::Scalar::Octets " +
-              ngs::to_string(arg.content_type()));
+              to_string(arg.content_type()));
   }
 }
 
-void Expression_generator::generate_placeholder(
-    const Placeholder &arg,
-    void (Expression_generator::*generate_fun)(
-        const Mysqlx::Datatypes::Scalar &) const) const {
+void Expression_generator::generate(const Placeholder &arg) const {
   if (arg < static_cast<Placeholder>(m_args.size())) {
-    (this->*generate_fun)(m_args.Get(arg));
+    generate(m_args.Get(arg));
     return;
   }
   if (!is_prep_stmt_mode())
     throw Error(ER_X_EXPR_BAD_VALUE, "Invalid value of placeholder");
-  m_placeholder_ids->push_back(arg - static_cast<Placeholder>(m_args.size()));
+  m_placeholders->emplace_back(arg - static_cast<Placeholder>(m_args.size()),
+                               Placeholder_type::k_raw);
   m_qb->put("?");
-}
-
-void Expression_generator::generate(const Placeholder &arg) const {
-  generate_placeholder(arg, &Expression_generator::generate);
 }
 
 void Expression_generator::generate(const Mysqlx::Expr::Object &arg) const {
@@ -463,40 +459,40 @@ void Expression_generator::generate_json_literal_param(
   }
 }
 
-void Expression_generator::generate_cont_in_param(
-    const Mysqlx::Expr::Expr &arg) const {
+void Expression_generator::generate_json_only_param(
+    const Mysqlx::Expr::Expr &arg, const std::string &expr_name) const {
   switch (arg.type()) {
-    case Mysqlx::Expr::Expr::IDENT:
-      if (arg.identifier().document_path_size() < 1)
-        throw Error(ER_X_EXPR_BAD_VALUE,
-                    "CONT_IN expression requires identifier"
-                    " that produce a JSON value.");
-      generate(arg);
-      break;
-
     case Mysqlx::Expr::Expr::LITERAL:
       generate_json_literal_param(arg.literal());
       break;
 
     case Mysqlx::Expr::Expr::FUNC_CALL:
       if (!is_json_function_call(arg.function_call()))
-        throw Error(ER_X_EXPR_BAD_VALUE,
-                    "CONT_IN expression requires function"
-                    " that produce a JSON value.");
+        throw Error(ER_X_EXPR_BAD_VALUE, expr_name +
+                                             " expression requires function"
+                                             " that produce a JSON value.");
       generate(arg);
       break;
 
     case Mysqlx::Expr::Expr::OPERATOR:
       if (!is_cast_to_json(arg.operator_()))
-        throw Error(ER_X_EXPR_BAD_VALUE,
-                    "CONT_IN expression requires operator"
-                    " that produce a JSON value.");
+        throw Error(ER_X_EXPR_BAD_VALUE, expr_name +
+                                             " expression requires operator"
+                                             " that produce a JSON value.");
       generate(arg);
       break;
 
     case Mysqlx::Expr::Expr::PLACEHOLDER:
-      generate_placeholder(arg.position(),
-                           &Expression_generator::generate_json_literal_param);
+      if (arg.position() < static_cast<Placeholder>(m_args.size())) {
+        generate_json_literal_param(m_args.Get(arg.position()));
+        break;
+      }
+      if (!is_prep_stmt_mode())
+        throw Error(ER_X_EXPR_BAD_VALUE, "Invalid value of placeholder");
+      m_placeholders->emplace_back(
+          arg.position() - static_cast<Placeholder>(m_args.size()),
+          Placeholder_type::k_json);
+      m_qb->put("CAST(? AS JSON)");
       break;
 
     default:
@@ -511,9 +507,9 @@ void Expression_generator::cont_in_expression(const Mysqlx::Expr::Operator &arg,
                 "CONT_IN expression requires two parameters.");
 
   m_qb->put(str).put("JSON_CONTAINS(");
-  generate_cont_in_param(arg.param(1));
+  generate_json_only_param(arg.param(1), "CONT_IN");
   m_qb->put(",");
-  generate_cont_in_param(arg.param(0));
+  generate_json_only_param(arg.param(0), "CONT_IN");
   m_qb->put(")");
 }
 
@@ -595,13 +591,11 @@ struct Cast_type_validator {
 
   bool operator()(const char *str) const {
     static const xpl::Regex re(
-        "^("
-        "BINARY(\\([[:digit:]]+\\))?|"
+        "BINARY(?:\\([[:digit:]]+\\))?|"
         "DATE|DATETIME|TIME|JSON|"
-        "CHAR(\\([[:digit:]]+\\))?|"
-        "DECIMAL(\\([[:digit:]]+(,[[:digit:]]+)?\\))?|"
-        "SIGNED( INTEGER)?|UNSIGNED( INTEGER)?"
-        "){1}$");
+        "CHAR(?:\\([[:digit:]]+\\))?|"
+        "DECIMAL(?:\\([[:digit:]]+(?:,[[:digit:]]+)?\\))?|"
+        "SIGNED(?: INTEGER)?|UNSIGNED(?: INTEGER)?");
     return re.match(str);
   }
 
@@ -643,11 +637,22 @@ void Expression_generator::cast_expression(
     throw Error(ER_X_EXPR_BAD_NUM_ARGS,
                 "CAST expression requires exactly two parameters.");
 
+  std::string as_type =
+      get_valid_string(arg.param(1), Cast_type_validator("CAST type invalid."));
+
   m_qb->put("CAST(");
-  generate_unquote_param(arg.param(0));
+  if (is_prep_stmt_mode() && as_type == "JSON" &&
+      arg.param(0).type() == Mysqlx::Expr::Expr::PLACEHOLDER &&
+      arg.param(0).position() >= static_cast<Placeholder>(m_args.size())) {
+    m_placeholders->emplace_back(
+        arg.param(0).position() - static_cast<Placeholder>(m_args.size()),
+        Placeholder_type::k_json);
+    m_qb->put("?");
+  } else {
+    generate_unquote_param(arg.param(0));
+  }
   m_qb->put(" AS ");
-  m_qb->put(get_valid_string(arg.param(1),
-                             Cast_type_validator("CAST type invalid.")));
+  m_qb->put(as_type);
   m_qb->put(")");
 }
 
@@ -667,7 +672,7 @@ void Expression_generator::binary_expression(const Mysqlx::Expr::Operator &arg,
 }
 
 namespace {
-using Operator_ptr = ngs::function<void(const Expression_generator *,
+using Operator_ptr = std::function<void(const Expression_generator *,
                                         const Mysqlx::Expr::Operator &)>;
 using Operator_bind = std::pair<const char *const, Operator_ptr>;
 
@@ -681,55 +686,57 @@ struct Is_operator_less {
 }  // namespace
 
 void Expression_generator::generate(const Mysqlx::Expr::Operator &arg) const {
-  using ngs::placeholders::_1;
-  using ngs::placeholders::_2;
+  using std::placeholders::_1;
+  using std::placeholders::_2;
   using Gen = Expression_generator;
 
   // keep binding in asc order
   static const Operator_bind operators[] = {
-      {"!", ngs::bind(&Gen::unary_operator, _1, _2, "!")},
-      {"!=", ngs::bind(&Gen::binary_operator, _1, _2, " != ")},
-      {"%", ngs::bind(&Gen::binary_operator, _1, _2, " % ")},
-      {"&", ngs::bind(&Gen::binary_operator, _1, _2, " & ")},
-      {"&&", ngs::bind(&Gen::binary_operator, _1, _2, " AND ")},
-      {"*", ngs::bind(&Gen::asterisk_operator, _1, _2)},
-      {"+", ngs::bind(&Gen::binary_operator, _1, _2, " + ")},
-      {"-", ngs::bind(&Gen::binary_operator, _1, _2, " - ")},
-      {"/", ngs::bind(&Gen::binary_operator, _1, _2, " / ")},
-      {"<", ngs::bind(&Gen::binary_operator, _1, _2, " < ")},
-      {"<<", ngs::bind(&Gen::binary_operator, _1, _2, " << ")},
-      {"<=", ngs::bind(&Gen::binary_operator, _1, _2, " <= ")},
-      {"==", ngs::bind(&Gen::binary_operator, _1, _2, " = ")},
-      {">", ngs::bind(&Gen::binary_operator, _1, _2, " > ")},
-      {">=", ngs::bind(&Gen::binary_operator, _1, _2, " >= ")},
-      {">>", ngs::bind(&Gen::binary_operator, _1, _2, " >> ")},
-      {"^", ngs::bind(&Gen::binary_operator, _1, _2, " ^ ")},
-      {"between", ngs::bind(&Gen::between_expression, _1, _2, " BETWEEN ")},
-      {"cast", ngs::bind(&Gen::cast_expression, _1, _2)},
-      {"cont_in", ngs::bind(&Gen::cont_in_expression, _1, _2, "")},
-      {"date_add", ngs::bind(&Gen::date_expression, _1, _2, "DATE_ADD")},
-      {"date_sub", ngs::bind(&Gen::date_expression, _1, _2, "DATE_SUB")},
-      {"default", ngs::bind(&Gen::nullary_operator, _1, _2, "DEFAULT")},
-      {"div", ngs::bind(&Gen::binary_operator, _1, _2, " DIV ")},
-      {"in", ngs::bind(&Gen::in_expression, _1, _2, "")},
-      {"is", ngs::bind(&Gen::binary_operator, _1, _2, " IS ")},
-      {"is_not", ngs::bind(&Gen::binary_operator, _1, _2, " IS NOT ")},
-      {"like", ngs::bind(&Gen::like_expression, _1, _2, " LIKE ")},
-      {"not", ngs::bind(&Gen::unary_operator, _1, _2, "NOT ")},
+      {"!", std::bind(&Gen::unary_operator, _1, _2, "!")},
+      {"!=", std::bind(&Gen::binary_operator, _1, _2, " != ")},
+      {"%", std::bind(&Gen::binary_operator, _1, _2, " % ")},
+      {"&", std::bind(&Gen::binary_operator, _1, _2, " & ")},
+      {"&&", std::bind(&Gen::binary_operator, _1, _2, " AND ")},
+      {"*", std::bind(&Gen::asterisk_operator, _1, _2)},
+      {"+", std::bind(&Gen::binary_operator, _1, _2, " + ")},
+      {"-", std::bind(&Gen::binary_operator, _1, _2, " - ")},
+      {"/", std::bind(&Gen::binary_operator, _1, _2, " / ")},
+      {"<", std::bind(&Gen::binary_operator, _1, _2, " < ")},
+      {"<<", std::bind(&Gen::binary_operator, _1, _2, " << ")},
+      {"<=", std::bind(&Gen::binary_operator, _1, _2, " <= ")},
+      {"==", std::bind(&Gen::binary_operator, _1, _2, " = ")},
+      {">", std::bind(&Gen::binary_operator, _1, _2, " > ")},
+      {">=", std::bind(&Gen::binary_operator, _1, _2, " >= ")},
+      {">>", std::bind(&Gen::binary_operator, _1, _2, " >> ")},
+      {"^", std::bind(&Gen::binary_operator, _1, _2, " ^ ")},
+      {"between", std::bind(&Gen::between_expression, _1, _2, " BETWEEN ")},
+      {"cast", std::bind(&Gen::cast_expression, _1, _2)},
+      {"cont_in", std::bind(&Gen::cont_in_expression, _1, _2, "")},
+      {"date_add", std::bind(&Gen::date_expression, _1, _2, "DATE_ADD")},
+      {"date_sub", std::bind(&Gen::date_expression, _1, _2, "DATE_SUB")},
+      {"default", std::bind(&Gen::nullary_operator, _1, _2, "DEFAULT")},
+      {"div", std::bind(&Gen::binary_operator, _1, _2, " DIV ")},
+      {"in", std::bind(&Gen::in_expression, _1, _2, "")},
+      {"is", std::bind(&Gen::binary_operator, _1, _2, " IS ")},
+      {"is_not", std::bind(&Gen::binary_operator, _1, _2, " IS NOT ")},
+      {"like", std::bind(&Gen::like_expression, _1, _2, " LIKE ")},
+      {"not", std::bind(&Gen::unary_operator, _1, _2, "NOT ")},
       {"not_between",
-       ngs::bind(&Gen::between_expression, _1, _2, " NOT BETWEEN ")},
-      {"not_cont_in", ngs::bind(&Gen::cont_in_expression, _1, _2, "NOT ")},
-      {"not_in", ngs::bind(&Gen::in_expression, _1, _2, "NOT ")},
-      {"not_like", ngs::bind(&Gen::like_expression, _1, _2, " NOT LIKE ")},
+       std::bind(&Gen::between_expression, _1, _2, " NOT BETWEEN ")},
+      {"not_cont_in", std::bind(&Gen::cont_in_expression, _1, _2, "NOT ")},
+      {"not_in", std::bind(&Gen::in_expression, _1, _2, "NOT ")},
+      {"not_like", std::bind(&Gen::like_expression, _1, _2, " NOT LIKE ")},
+      {"not_overlaps", std::bind(&Gen::overlaps_expression, _1, _2, "NOT ")},
       {"not_regexp",
-       ngs::bind(&Gen::binary_expression, _1, _2, " NOT REGEXP ")},
-      {"regexp", ngs::bind(&Gen::binary_expression, _1, _2, " REGEXP ")},
-      {"sign_minus", ngs::bind(&Gen::unary_operator, _1, _2, "-")},
-      {"sign_plus", ngs::bind(&Gen::unary_operator, _1, _2, "+")},
-      {"xor", ngs::bind(&Gen::binary_operator, _1, _2, " XOR ")},
-      {"|", ngs::bind(&Gen::binary_operator, _1, _2, " | ")},
-      {"||", ngs::bind(&Gen::binary_operator, _1, _2, " OR ")},
-      {"~", ngs::bind(&Gen::unary_operator, _1, _2, "~")}};
+       std::bind(&Gen::binary_expression, _1, _2, " NOT REGEXP ")},
+      {"overlaps", std::bind(&Gen::overlaps_expression, _1, _2, "")},
+      {"regexp", std::bind(&Gen::binary_expression, _1, _2, " REGEXP ")},
+      {"sign_minus", std::bind(&Gen::unary_operator, _1, _2, "-")},
+      {"sign_plus", std::bind(&Gen::unary_operator, _1, _2, "+")},
+      {"xor", std::bind(&Gen::binary_operator, _1, _2, " XOR ")},
+      {"|", std::bind(&Gen::binary_operator, _1, _2, " | ")},
+      {"||", std::bind(&Gen::binary_operator, _1, _2, " OR ")},
+      {"~", std::bind(&Gen::unary_operator, _1, _2, "~")}};
 
   const Operator_bind *op =
       std::lower_bound(std::begin(operators), std::end(operators), arg.name(),
@@ -776,6 +783,19 @@ void Expression_generator::nullary_operator(const Mysqlx::Expr::Operator &arg,
 Expression_generator Expression_generator::clone(
     Query_string_builder *qb) const {
   return Expression_generator(qb, m_args, m_default_schema, m_is_relational);
+}
+
+void Expression_generator::overlaps_expression(
+    const Mysqlx::Expr::Operator &arg, const char *str) const {
+  if (arg.param_size() != 2)
+    throw Error(ER_X_EXPR_BAD_NUM_ARGS,
+                "OVERLAPS expression requires two parameters.");
+
+  m_qb->put(str).put("JSON_OVERLAPS(");
+  generate_json_only_param(arg.param(0), "OVERLAPS");
+  m_qb->put(",");
+  generate_json_only_param(arg.param(1), "OVERLAPS");
+  m_qb->put(")");
 }
 
 }  // namespace xpl

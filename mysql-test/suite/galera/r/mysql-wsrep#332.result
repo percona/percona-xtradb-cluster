@@ -13,14 +13,14 @@ ALTER TABLE c ADD FOREIGN KEY (p_id) REFERENCES p(f1);
 SET SESSION wsrep_on = 0;
 SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
-SET GLOBAL wsrep_provider_options = 'dbug=d,local_monitor_enter_sync';
+SET GLOBAL wsrep_provider_options = 'dbug=d,local_monitor_master_enter_sync';
 COMMIT;
 SET SESSION wsrep_on = 0;
 SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
-SET GLOBAL wsrep_provider_options = 'signal=local_monitor_enter_sync';
+SET GLOBAL wsrep_provider_options = 'signal=local_monitor_master_enter_sync';
 SET GLOBAL wsrep_provider_options = 'dbug=';
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SELECT * FROM p;
 f1	f2
 1	0
@@ -47,14 +47,14 @@ ALTER TABLE c ADD FOREIGN KEY (p_id1) REFERENCES p1(f1), ADD FOREIGN KEY (p_id2)
 SET SESSION wsrep_on = 0;
 SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
-SET GLOBAL wsrep_provider_options = 'dbug=d,local_monitor_enter_sync';
+SET GLOBAL wsrep_provider_options = 'dbug=d,local_monitor_master_enter_sync';
 COMMIT;
 SET SESSION wsrep_on = 0;
 SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
-SET GLOBAL wsrep_provider_options = 'signal=local_monitor_enter_sync';
+SET GLOBAL wsrep_provider_options = 'signal=local_monitor_master_enter_sync';
 SET GLOBAL wsrep_provider_options = 'dbug=';
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SELECT * FROM p1;
 f1	f2
 1	0
@@ -86,14 +86,14 @@ ALTER TABLE c ADD FOREIGN KEY (p_id1) REFERENCES p1(f1), ADD FOREIGN KEY (p_id2)
 SET SESSION wsrep_on = 0;
 SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
-SET GLOBAL wsrep_provider_options = 'dbug=d,local_monitor_enter_sync';
+SET GLOBAL wsrep_provider_options = 'dbug=d,local_monitor_master_enter_sync';
 COMMIT;
 SET SESSION wsrep_on = 0;
 SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
-SET GLOBAL wsrep_provider_options = 'signal=local_monitor_enter_sync';
+SET GLOBAL wsrep_provider_options = 'signal=local_monitor_master_enter_sync';
 SET GLOBAL wsrep_provider_options = 'dbug=';
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SELECT * FROM p1;
 f1	f2
 1	0

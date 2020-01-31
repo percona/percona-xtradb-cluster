@@ -1,0 +1,47 @@
+#node-1
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+SET SESSION wsrep_trx_fragment_size = 1;
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+INSERT INTO t1 VALUES (1);
+INSERT INTO t1 VALUES (2);
+INSERT INTO t1 VALUES (3);
+INSERT INTO t1 VALUES (4);
+INSERT INTO t1 VALUES (5);
+INSERT INTO t1 VALUES (6);
+INSERT INTO t1 VALUES (7);
+SET SESSION wsrep_sync_wait = 0;
+SELECT COUNT(*) > 0 FROM mysql.wsrep_streaming_log;
+COUNT(*) > 0
+1
+#node-2
+#node-1a
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=1';
+SET SESSION wsrep_on = OFF;
+SELECT COUNT(*) > 0 FROM mysql.wsrep_streaming_log;
+COUNT(*) > 0
+1
+#node-2
+#node-3
+#node-1a
+#node-1a
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=0';
+#node-3
+#node-1a
+#node-2
+SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
+COUNT(*) = 0
+1
+#node-1
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+#node-1a
+SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
+COUNT(*) = 0
+1
+#node-2
+SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
+COUNT(*) = 0
+1
+#node-2
+DROP TABLE t1;

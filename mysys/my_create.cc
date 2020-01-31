@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -58,13 +58,13 @@
 File my_create(const char *FileName, int CreateFlags, int access_flags,
                myf MyFlags) {
   int fd, rc;
-  DBUG_ENTER("my_create");
+  DBUG_TRACE;
   DBUG_PRINT("my", ("Name: '%s' CreateFlags: %d  AccessFlags: %d  MyFlags: %d",
                     FileName, CreateFlags, access_flags, MyFlags));
 #if defined(_WIN32)
   fd = my_win_open(FileName, access_flags | O_CREAT);
 #else
-  fd = open((char *)FileName, access_flags | O_CREAT,
+  fd = open(FileName, access_flags | O_CREAT,
             CreateFlags ? CreateFlags : my_umask);
 #endif
 
@@ -89,5 +89,5 @@ File my_create(const char *FileName, int CreateFlags, int access_flags,
     set_my_errno(tmp);
   }
 
-  DBUG_RETURN(rc);
+  return rc;
 } /* my_create */

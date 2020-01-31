@@ -7,12 +7,24 @@ UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 SELECT * FROM t1 WHERE f1 = 2 FOR UPDATE;
 f1	f2
 2	a
-SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
-COMMIT;;
-SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait=0;
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
 UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
-SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_master_enter_sync';
+COMMIT;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'dbug=d,abort_trx_end';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=abort_trx_end';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_master_enter_sync';
 SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
 COUNT(*) = 1
 1
@@ -31,19 +43,25 @@ DROP TABLE t1;
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
 INSERT INTO t1 VALUES (1, 'a');
 INSERT INTO t1 VALUES (2, 'a');
-SET AUTOCOMMIT=OFF;
+SET AUTOCOMMIT=ON;
 START TRANSACTION;
 UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
 SELECT * FROM t1 WHERE f1 = 2 FOR UPDATE;
 f1	f2
 2	a
-SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
-COMMIT;;
-SET SESSION wsrep_sync_wait = 0;
-UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_master_enter_sync';
+COMMIT;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
-SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
-SET AUTOCOMMIT=ON;
+SET GLOBAL wsrep_provider_options = 'dbug=d,abort_trx_end';
+UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=abort_trx_end';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_master_enter_sync';
 SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
 COUNT(*) = 1
 1
@@ -59,61 +77,34 @@ SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
 COUNT(*) = 1
 1
 DROP TABLE t1;
-#node_1
-create table t1 (i int primary key, c char(1)) engine=innodb;
-insert into t1 values (1, 'a'), (2, 'a'), (5, 'a'), (6, 'a');
-select * from t1;
-i	c
-1	a
-2	a
-5	a
-6	a
-prepare stmt1 from "update t1 set c = 'b' where i > 2 and i < 6";
-SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
-execute stmt1;;
-#node_1a
-set session wsrep_sync_wait = 0;
-SET SESSION wsrep_on = 0;
-SET SESSION wsrep_on = 1;
-#node_2
-insert into t1 values (3, 'a');
-#node_1a
-SET GLOBAL wsrep_provider_options = 'dbug=';
-SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
-#node_1
-select * from t1;
-i	c
-1	a
-2	a
-3	a
-5	b
-6	a
-#node_2
-select * from t1;
-i	c
-1	a
-2	a
-3	a
-5	b
-6	a
-#node_1
-deallocate prepare stmt1;
-drop table t1;
 CREATE TABLE t1 (i int primary key, j int) ENGINE=INNODB;
 INSERT INTO t1 VALUES (1, 0), (3, 0);
 SELECT * FROM t1;
 i	j
 1	0
 3	0
+SET AUTOCOMMIT=ON;
 PREPARE stmt1 FROM "UPDATE t1 SET j = 1 where i > 0";
-SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
-EXECUTE stmt1;;
-SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait=0;
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+INSERT INTO t1 VALUES(2,2);
 SET SESSION wsrep_on = 0;
 SET SESSION wsrep_on = 1;
-INSERT INTO t1 VALUES(2,2);
 SET GLOBAL wsrep_provider_options = 'dbug=';
-SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_master_enter_sync';
+SET SESSION wsrep_sync_wait=0;
+EXECUTE stmt1;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'dbug=d,abort_trx_end';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=abort_trx_end';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_master_enter_sync';
+SET SESSION wsrep_sync_wait=7;
 SELECT * FROM t1;
 i	j
 1	1
@@ -124,5 +115,7 @@ i	j
 1	1
 2	2
 3	1
+wsrep_local_replays
+1
 DEALLOCATE PREPARE stmt1;
 DROP TABLE t1;

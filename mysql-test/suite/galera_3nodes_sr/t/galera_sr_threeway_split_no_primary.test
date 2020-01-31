@@ -1,0 +1,137 @@
+#
+# This test verifies that an orphaned SR gets cleanup upon cluster
+# reconnection.  Specifically, the case where the cluster goes through
+# a state of no primary components, and the nodes rejoin with the
+# same IDs.
+#
+
+--source include/galera_cluster.inc
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--connect node_3a, 127.0.0.1, root, , test, $NODE_MYPORT_3
+
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY);
+SET SESSION wsrep_trx_fragment_size=1;
+BEGIN;
+INSERT INTO t1 VALUES (11);
+INSERT INTO t1 VALUES (12);
+
+--connection node_2
+--echo #node-2
+SET SESSION wsrep_trx_fragment_size=1;
+BEGIN;
+INSERT INTO t1 VALUES (21);
+INSERT INTO t1 VALUES (22);
+
+--connection node_3
+--echo #node-3
+SET SESSION wsrep_trx_fragment_size=1;
+BEGIN;
+INSERT INTO t1 VALUES (31);
+INSERT INTO t1 VALUES (32);
+
+--connection node_2a
+--echo #node-2a
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate = 1';
+
+--connection node_3a
+--echo #node-3a
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate = 1';
+
+--connection node_1a
+--echo #node-1a
+# wait until cluster is partitioned
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+SHOW STATUS LIKE 'wsrep_cluster_status';
+SET SESSION wsrep_sync_wait = DEFAULT;
+
+--connection node_2a
+--echo #node-2a
+# wait until cluster is partitioned
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+SHOW STATUS LIKE 'wsrep_cluster_status';
+SET SESSION wsrep_sync_wait = DEFAULT;
+
+--connection node_3a
+--echo #node-3a
+# wait until cluster is partitioned
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+SHOW STATUS LIKE 'wsrep_cluster_status';
+SET SESSION wsrep_sync_wait = DEFAULT;
+
+--connection node_2a
+--echo #node-2a
+# reconnect node 2
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate = 0';
+
+--connection node_3a
+--echo #node-3a
+# reconnect node 3
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate = 0';
+
+# wait for the cluster to whole again
+--connection node_1a
+--echo #node-1a
+--let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+--connection node_2a
+--echo #node-2a
+--let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+--connection node_3a
+--echo #node-3a
+--let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+--connection node_1a
+--echo #node-1a
+# check that the streaming log has been cleared and there are no locks
+# from the SRs by issuing conflicting inserts
+SELECT COUNT(*) `expect 0` FROM mysql.wsrep_streaming_log;
+INSERT INTO t1 VALUES(11);
+INSERT INTO t1 VALUES(21);
+INSERT INTO t1 VALUES(31);
+SELECT * FROM t1;
+
+--connection node_2a
+--echo #node-2a
+SELECT COUNT(*) `expect 0` FROM mysql.wsrep_streaming_log;
+--connection node_3a
+--echo #node-3a
+SELECT COUNT(*) `expect 0` FROM mysql.wsrep_streaming_log;
+
+
+# check that all 3 SRs have been rolled back
+--connection node_1
+--echo #node-1
+--error ER_LOCK_DEADLOCK
+INSERT INTO t1 VALUES(103);
+
+--connection node_2
+--echo #node-2
+--error ER_LOCK_DEADLOCK
+INSERT INTO t1 VALUES(203);
+
+--connection node_3
+--echo #node-3
+--error ER_LOCK_DEADLOCK
+INSERT INTO t1 VALUES(303);
+
+--connection node_1
+--echo #node-1
+DROP TABLE t1;

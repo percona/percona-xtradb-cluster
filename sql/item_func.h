@@ -1,7 +1,7 @@
 #ifndef ITEM_FUNC_INCLUDED
 #define ITEM_FUNC_INCLUDED
 
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -29,7 +29,6 @@
 #include <cmath>  // isfinite
 #include <functional>
 
-#include "binary_log_types.h"
 #include "decimal.h"
 #include "ft_global.h"
 #include "lex_string.h"
@@ -53,7 +52,7 @@
 #include "sql/field.h"
 #include "sql/handler.h"
 #include "sql/item.h"        // Item_result_field
-#include "sql/my_decimal.h"  // string2my_decimal
+#include "sql/my_decimal.h"  // str2my_decimal
 #include "sql/parse_tree_node_base.h"
 #include "sql/set_var.h"  // enum_var_type
 #include "sql/sql_const.h"
@@ -71,6 +70,7 @@ class sp_rcontext;
 struct MY_BITMAP;
 template <class T>
 class List;
+class QEP_TAB;
 
 /* Function items used by mysql */
 
@@ -127,9 +127,11 @@ class Item_func : public Item_result_field {
     GE_FUNC,
     GT_FUNC,
     FT_FUNC,
+    MATCH_FUNC,
     LIKE_FUNC,
     ISNULL_FUNC,
     ISNOTNULL_FUNC,
+    ISTRUTH_FUNC,
     COND_AND_FUNC,
     COND_OR_FUNC,
     XOR_FUNC,
@@ -169,7 +171,50 @@ class Item_func : public Item_result_field {
     GSYSVAR_FUNC,
     GROUPING_FUNC,
     TABLE_FUNC,
-    DD_INTERNAL_FUNC
+    DD_INTERNAL_FUNC,
+    PLUS_FUNC,
+    MINUS_FUNC,
+    MUL_FUNC,
+    DIV_FUNC,
+    CEILING_FUNC,
+    ROUND_FUNC,
+    TRUNCATE_FUNC,
+    SQRT_FUNC,
+    ABS_FUNC,
+    FLOOR_FUNC,
+    LOG_FUNC,
+    LN_FUNC,
+    LOG10_FUNC,
+    SIN_FUNC,
+    TAN_FUNC,
+    COS_FUNC,
+    ASIN_FUNC,
+    ATAN_FUNC,
+    ACOS_FUNC,
+    MOD_FUNC,
+    IF_FUNC,
+    NULLIF_FUNC,
+    CASE_FUNC,
+    YEAR_FUNC,
+    MONTH_FUNC,
+    DAY_FUNC,
+    TO_DAYS_FUNC,
+    DATE_FUNC,
+    HOUR_FUNC,
+    MINUTE_FUNC,
+    SECOND_FUNC,
+    MICROSECOND_FUNC,
+    WEEK_FUNC,
+    WEEKDAY_FUNC,
+    DATEADD_FUNC,
+    TIMESTAMPDIFF_FUNC,
+    DATETIME_LITERAL,
+    GREATEST_FUNC,
+    COALESCE_FUNC,
+    LEAST_FUNC,
+    JSON_CONTAINS,
+    JSON_OVERLAPS,
+    MEMBER_OF_FUNC
   };
   enum optimize_type {
     OPTIMIZE_NONE,
@@ -211,7 +256,7 @@ class Item_func : public Item_result_field {
   }
 
   Item_func(Item *a, Item *b, Item *c) : arg_count(3) {
-    if ((args = (Item **)sql_alloc(sizeof(Item *) * 3))) {
+    if ((args = (Item **)(*THR_MALLOC)->Alloc(sizeof(Item *) * 3))) {
       args[0] = a;
       args[1] = b;
       args[2] = c;
@@ -225,7 +270,7 @@ class Item_func : public Item_result_field {
 
   Item_func(const POS &pos, Item *a, Item *b, Item *c)
       : super(pos), arg_count(3) {
-    if ((args = (Item **)sql_alloc(sizeof(Item *) * 3))) {
+    if ((args = (Item **)(*THR_MALLOC)->Alloc(sizeof(Item *) * 3))) {
       args[0] = a;
       args[1] = b;
       args[2] = c;
@@ -234,7 +279,7 @@ class Item_func : public Item_result_field {
   }
 
   Item_func(Item *a, Item *b, Item *c, Item *d) : arg_count(4) {
-    if ((args = (Item **)sql_alloc(sizeof(Item *) * 4))) {
+    if ((args = (Item **)(*THR_MALLOC)->Alloc(sizeof(Item *) * 4))) {
       args[0] = a;
       args[1] = b;
       args[2] = c;
@@ -249,7 +294,7 @@ class Item_func : public Item_result_field {
   }
   Item_func(const POS &pos, Item *a, Item *b, Item *c, Item *d)
       : super(pos), arg_count(4) {
-    if ((args = (Item **)sql_alloc(sizeof(Item *) * 4))) {
+    if ((args = (Item **)(*THR_MALLOC)->Alloc(sizeof(Item *) * 4))) {
       args[0] = a;
       args[1] = b;
       args[2] = c;
@@ -259,7 +304,7 @@ class Item_func : public Item_result_field {
   }
 
   Item_func(Item *a, Item *b, Item *c, Item *d, Item *e) : arg_count(5) {
-    if ((args = (Item **)sql_alloc(sizeof(Item *) * 5))) {
+    if ((args = (Item **)(*THR_MALLOC)->Alloc(sizeof(Item *) * 5))) {
       args[0] = a;
       args[1] = b;
       args[2] = c;
@@ -276,7 +321,7 @@ class Item_func : public Item_result_field {
   }
   Item_func(const POS &pos, Item *a, Item *b, Item *c, Item *d, Item *e)
       : super(pos), arg_count(5) {
-    if ((args = (Item **)sql_alloc(sizeof(Item *) * 5))) {
+    if ((args = (Item **)(*THR_MALLOC)->Alloc(sizeof(Item *) * 5))) {
       args[0] = a;
       args[1] = b;
       args[2] = c;
@@ -309,7 +354,7 @@ class Item_func : public Item_result_field {
   void update_used_tables() override;
   void set_used_tables(table_map map) { used_tables_cache = map; }
   bool eq(const Item *item, bool binary_cmp) const override;
-  virtual optimize_type select_optimize() const { return OPTIMIZE_NONE; }
+  virtual optimize_type select_optimize(const THD *) { return OPTIMIZE_NONE; }
   virtual bool have_rev_func() const { return 0; }
   virtual Item *key_item() const { return args[0]; }
   inline Item **arguments() const {
@@ -328,9 +373,11 @@ class Item_func : public Item_result_field {
   inline uint argument_count() const { return arg_count; }
   void split_sum_func(THD *thd, Ref_item_array ref_item_array,
                       List<Item> &fields) override;
-  void print(String *str, enum_query_type query_type) override;
-  void print_op(String *str, enum_query_type query_type);
-  void print_args(String *str, uint from, enum_query_type query_type);
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
+  void print_op(const THD *thd, String *str, enum_query_type query_type) const;
+  void print_args(const THD *thd, String *str, uint from,
+                  enum_query_type query_type) const;
   virtual void fix_num_length_and_dec();
   virtual bool is_deprecated() const { return false; }
   bool get_arg0_date(MYSQL_TIME *ltime, my_time_flags_t fuzzy_date) {
@@ -355,40 +402,6 @@ class Item_func : public Item_result_field {
   Item *get_tmp_table_item(THD *thd) override;
 
   my_decimal *val_decimal(my_decimal *) override;
-
-  /**
-    Same as save_in_field() except that special logic is added to
-    avoid serialization to string followed by parsing of the string
-    when saving a JSON value in a JSON column.
-
-    Unless both the return type of the function and the type of the
-    target column are JSON, this function works exactly as
-    save_in_field(). For the JSON type, this means:
-
-    - JSON values saved in non-JSON columns: The JSON value is
-      serialized to a character string and then attempted saved in the
-      target column. The usual conversions are performed if the target
-      column is not a character string column.
-
-    - Non-JSON values saved in JSON columns: Strings are parsed as
-      JSON text, converted to JSON binary representation and saved in
-      the target column. Non-strings cause a conversion error to be
-      raised.
-
-    A better solution might be to put this logic into
-    Item_func::save_in_field_inner() or even Item::save_in_field_inner().
-    But that would mean providing val_json() overrides for
-    more Item subclasses. And that feels like pulling on a
-    ball of yarn late in the release cycle for 5.7. FIXME.
-
-    @param[out] field          The field to set the value to.
-    @param      no_conversions Passed to save_in_field_inner().
-
-    @retval 0  On success.
-    @retval >0 On error.
-  */
-  virtual type_conversion_status save_possibly_as_json(Field *field,
-                                                       bool no_conversions);
 
   bool agg_arg_charsets(DTCollation &c, Item **items, uint nitems, uint flags,
                         int item_sep) {
@@ -433,25 +446,7 @@ class Item_func : public Item_result_field {
                 Item_transformer transformer, uchar *arg_t) override;
   void traverse_cond(Cond_traverser traverser, void *arg,
                      traverse_order order) override;
-  inline void raise_numeric_overflow(const char *type_name) {
-    char buf[256];
-    String str(buf, sizeof(buf), system_charset_info);
-    str.length(0);
-    print(&str, QT_NO_DATA_EXPANSION);
-    my_error(ER_DATA_OUT_OF_RANGE, MYF(0), type_name, str.c_ptr_safe());
-  }
-  inline double raise_float_overflow() {
-    raise_numeric_overflow("DOUBLE");
-    return 0.0;
-  }
-  inline longlong raise_integer_overflow() {
-    raise_numeric_overflow(unsigned_flag ? "BIGINT UNSIGNED" : "BIGINT");
-    return 0;
-  }
-  inline int raise_decimal_overflow() {
-    raise_numeric_overflow(unsigned_flag ? "DECIMAL UNSIGNED" : "DECIMAL");
-    return E_DEC_OVERFLOW;
-  }
+
   /**
      Throw an error if the input double number is not finite, i.e. is either
      +/-INF or NAN.
@@ -540,6 +535,46 @@ class Item_func : public Item_result_field {
   */
   virtual void replace_argument(THD *thd, Item **oldpp, Item *newp);
 
+  /**
+    Whether an arg of a JSON function can be cached to avoid repetitive
+    string->JSON conversion. This function returns true only for those args,
+    which are the source of JSON data. JSON path args are cached independently
+    and for them this function returns false. Same as for all other type of
+    args.
+
+    @param arg  the arg to cache
+
+    @returns
+      true   arg can be cached
+      false  otherwise
+  */
+  virtual enum_const_item_cache can_cache_json_arg(
+      Item *arg MY_ATTRIBUTE((unused))) {
+    return CACHE_NONE;
+  }
+
+  /// Returns true if this Item has at least one condition that can be
+  /// implemented as hash join. A hash join condition is an equi-join condition
+  /// where one side of the condition refers to the right table, and the other
+  /// side of the condition refers to one or more of the left tables.
+  ///
+  /// @param left_tables the left tables in the join
+  /// @param right_table the right table of the join
+  ///
+  /// @retval true if the Item has at least one hash join condition
+  virtual bool has_any_hash_join_condition(
+      const table_map left_tables MY_ATTRIBUTE((unused)),
+      const QEP_TAB &right_table MY_ATTRIBUTE((unused))) const {
+    return false;
+  }
+
+  /// Returns true if this Item has at least one non equi-join condition.
+  /// A non equi-join condition is a condition where both sides refer to at
+  /// least one table, and the operator is not equals '='.
+  ///
+  /// @retval true if the Item has at least one non equi-join condition
+  virtual bool has_any_non_equi_join_condition() const { return false; }
+
  protected:
   /**
     Whether or not an item should contribute to the filtering effect
@@ -608,10 +643,11 @@ class Item_func : public Item_result_field {
   virtual bool may_have_named_parameters() const { return false; }
   virtual bool is_non_const_over_literals(uchar *) override { return false; }
 
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     if (is_deprecated()) {
       Check_function_as_value_generator_parameters *func_arg =
-          pointer_cast<Check_function_as_value_generator_parameters *>(args);
+          pointer_cast<Check_function_as_value_generator_parameters *>(
+              checker_args);
       func_arg->banned_function_name = func_name();
       return true;
     }
@@ -647,10 +683,7 @@ class Item_real_func : public Item_func {
   my_decimal *val_decimal(my_decimal *decimal_value) override;
   longlong val_int() override {
     DBUG_ASSERT(fixed);
-    const double realval = val_real();
-    // Rounding error, llrint() may return LLONG_MIN.
-    const longlong retval = realval == LLONG_MAX ? LLONG_MAX : llrint(realval);
-    return retval;
+    return llrint_with_overflow_check(val_real());
   }
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate) override {
     return get_date_from_real(ltime, fuzzydate);
@@ -792,8 +825,9 @@ class Item_num_op : public Item_func_numhybrid {
 
   virtual void result_precision() = 0;
 
-  void print(String *str, enum_query_type query_type) override {
-    print_op(str, query_type);
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override {
+    print_op(thd, str, query_type);
   }
 
   void set_numeric_type() override;
@@ -883,46 +917,49 @@ class Item_func_connection_id final : public Item_int_func {
     DBUG_ASSERT(fixed);
     return value;
   }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
-    return func_arg->is_gen_col;
+    return ((func_arg->source == VGS_GENERATED_COLUMN) ||
+            (func_arg->source == VGS_CHECK_CONSTRAINT));
   }
 };
 
-class Item_func_signed : public Item_int_func {
+class Item_typecast_signed : public Item_int_func {
  public:
-  Item_func_signed(const POS &pos, Item *a) : Item_int_func(pos, a) {
+  Item_typecast_signed(const POS &pos, Item *a) : Item_int_func(pos, a) {
     unsigned_flag = false;
   }
   const char *func_name() const override { return "cast_as_signed"; }
   longlong val_int() override;
   longlong val_int_from_str(int *error);
   bool resolve_type(THD *thd) override;
-  void print(String *str, enum_query_type query_type) override;
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
   uint decimal_precision() const override {
     return args[0]->decimal_precision();
   }
   enum Functype functype() const override { return TYPECAST_FUNC; }
 };
 
-class Item_func_unsigned final : public Item_func_signed {
+class Item_typecast_unsigned final : public Item_typecast_signed {
  public:
-  Item_func_unsigned(const POS &pos, Item *a) : Item_func_signed(pos, a) {
-    unsigned_flag = 1;
+  Item_typecast_unsigned(const POS &pos, Item *a)
+      : Item_typecast_signed(pos, a) {
+    unsigned_flag = true;
   }
   const char *func_name() const override { return "cast_as_unsigned"; }
   longlong val_int() override;
-  void print(String *str, enum_query_type query_type) override;
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
   enum Functype functype() const override { return TYPECAST_FUNC; }
 };
 
-class Item_decimal_typecast final : public Item_func {
-  my_decimal decimal_value;
-
+class Item_typecast_decimal final : public Item_func {
  public:
-  Item_decimal_typecast(const POS &pos, Item *a, int len, int dec)
+  Item_typecast_decimal(const POS &pos, Item *a, int len, int dec)
       : Item_func(pos, a) {
     set_data_type_decimal(len, dec);
   }
@@ -938,9 +975,37 @@ class Item_decimal_typecast final : public Item_func {
   my_decimal *val_decimal(my_decimal *) override;
   enum Item_result result_type() const override { return DECIMAL_RESULT; }
   bool resolve_type(THD *) override { return false; }
-  const char *func_name() const override { return "decimal_typecast"; }
+  const char *func_name() const override { return "cast_as_decimal"; }
   enum Functype functype() const override { return TYPECAST_FUNC; }
-  void print(String *str, enum_query_type query_type) override;
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
+};
+
+/**
+  Class used to implement CAST to floating-point data types.
+*/
+class Item_typecast_real final : public Item_func {
+ public:
+  Item_typecast_real(const POS &pos, Item *a, bool as_double)
+      : Item_func(pos, a) {
+    if (as_double)
+      set_data_type_double();
+    else
+      set_data_type_float();
+  }
+  Item_typecast_real(Item *a) : Item_func(a) { set_data_type_double(); }
+  String *val_str(String *str) override;
+  double val_real() override;
+  longlong val_int() override;
+  bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate) override;
+  bool get_time(MYSQL_TIME *ltime) override;
+  my_decimal *val_decimal(my_decimal *decimal_value) override;
+  enum Item_result result_type() const override { return REAL_RESULT; }
+  bool resolve_type(THD *) override { return false; }
+  const char *func_name() const override { return "cast_as_real"; }
+  enum Functype functype() const override { return TYPECAST_FUNC; }
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
 };
 
 class Item_func_additive_op : public Item_num_op {
@@ -967,6 +1032,7 @@ class Item_func_plus final : public Item_func_additive_op {
 
   double real_op() override;
   my_decimal *decimal_op(my_decimal *) override;
+  enum Functype functype() const override { return PLUS_FUNC; }
 };
 
 class Item_func_minus final : public Item_func_additive_op {
@@ -983,6 +1049,7 @@ class Item_func_minus final : public Item_func_additive_op {
   double real_op() override;
   my_decimal *decimal_op(my_decimal *) override;
   bool resolve_type(THD *thd) override;
+  enum Functype functype() const override { return MINUS_FUNC; }
 };
 
 class Item_func_mul final : public Item_num_op {
@@ -997,6 +1064,7 @@ class Item_func_mul final : public Item_num_op {
   void result_precision() override;
   bool check_partition_func_processor(uchar *) override { return false; }
   bool check_function_as_value_generator(uchar *) override { return false; }
+  enum Functype functype() const override { return MUL_FUNC; }
 };
 
 class Item_func_div final : public Item_num_op {
@@ -1012,6 +1080,7 @@ class Item_func_div final : public Item_num_op {
   const char *func_name() const override { return "/"; }
   bool resolve_type(THD *thd) override;
   void result_precision() override;
+  enum Functype functype() const override { return DIV_FUNC; }
 };
 
 class Item_func_int_div final : public Item_int_func {
@@ -1023,8 +1092,9 @@ class Item_func_int_div final : public Item_int_func {
   const char *func_name() const override { return "DIV"; }
   bool resolve_type(THD *thd) override;
 
-  void print(String *str, enum_query_type query_type) override {
-    print_op(str, query_type);
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override {
+    print_op(thd, str, query_type);
   }
 
   bool check_partition_func_processor(uchar *) override { return false; }
@@ -1044,6 +1114,7 @@ class Item_func_mod final : public Item_num_op {
   bool resolve_type(THD *thd) override;
   bool check_partition_func_processor(uchar *) override { return false; }
   bool check_function_as_value_generator(uchar *) override { return false; }
+  enum Functype functype() const override { return MOD_FUNC; }
 };
 
 class Item_func_neg final : public Item_func_num1 {
@@ -1075,6 +1146,7 @@ class Item_func_abs final : public Item_func_num1 {
   bool resolve_type(THD *) override;
   bool check_partition_func_processor(uchar *) override { return false; }
   bool check_function_as_value_generator(uchar *) override { return false; }
+  enum Functype functype() const override { return ABS_FUNC; }
 };
 
 // A class to handle logarithmic and trigonometric functions
@@ -1100,6 +1172,7 @@ class Item_func_ln final : public Item_dec_func {
   Item_func_ln(const POS &pos, Item *a) : Item_dec_func(pos, a) {}
   double val_real() override;
   const char *func_name() const override { return "ln"; }
+  enum Functype functype() const override { return LN_FUNC; }
 };
 
 class Item_func_log final : public Item_dec_func {
@@ -1108,6 +1181,7 @@ class Item_func_log final : public Item_dec_func {
   Item_func_log(const POS &pos, Item *a, Item *b) : Item_dec_func(pos, a, b) {}
   double val_real() override;
   const char *func_name() const override { return "log"; }
+  enum Functype functype() const override { return LOG_FUNC; }
 };
 
 class Item_func_log2 final : public Item_dec_func {
@@ -1122,6 +1196,7 @@ class Item_func_log10 final : public Item_dec_func {
   Item_func_log10(const POS &pos, Item *a) : Item_dec_func(pos, a) {}
   double val_real() override;
   const char *func_name() const override { return "log10"; }
+  enum Functype functype() const override { return LOG10_FUNC; }
 };
 
 class Item_func_sqrt final : public Item_dec_func {
@@ -1129,6 +1204,7 @@ class Item_func_sqrt final : public Item_dec_func {
   Item_func_sqrt(const POS &pos, Item *a) : Item_dec_func(pos, a) {}
   double val_real() override;
   const char *func_name() const override { return "sqrt"; }
+  enum Functype functype() const override { return SQRT_FUNC; }
 };
 
 class Item_func_pow final : public Item_dec_func {
@@ -1143,6 +1219,7 @@ class Item_func_acos final : public Item_dec_func {
   Item_func_acos(const POS &pos, Item *a) : Item_dec_func(pos, a) {}
   double val_real() override;
   const char *func_name() const override { return "acos"; }
+  enum Functype functype() const override { return ACOS_FUNC; }
 };
 
 class Item_func_asin final : public Item_dec_func {
@@ -1150,6 +1227,7 @@ class Item_func_asin final : public Item_dec_func {
   Item_func_asin(const POS &pos, Item *a) : Item_dec_func(pos, a) {}
   double val_real() override;
   const char *func_name() const override { return "asin"; }
+  enum Functype functype() const override { return ASIN_FUNC; }
 };
 
 class Item_func_atan final : public Item_dec_func {
@@ -1158,6 +1236,7 @@ class Item_func_atan final : public Item_dec_func {
   Item_func_atan(const POS &pos, Item *a, Item *b) : Item_dec_func(pos, a, b) {}
   double val_real() override;
   const char *func_name() const override { return "atan"; }
+  enum Functype functype() const override { return ATAN_FUNC; }
 };
 
 class Item_func_cos final : public Item_dec_func {
@@ -1165,6 +1244,7 @@ class Item_func_cos final : public Item_dec_func {
   Item_func_cos(const POS &pos, Item *a) : Item_dec_func(pos, a) {}
   double val_real() override;
   const char *func_name() const override { return "cos"; }
+  enum Functype functype() const override { return COS_FUNC; }
 };
 
 class Item_func_sin final : public Item_dec_func {
@@ -1172,6 +1252,7 @@ class Item_func_sin final : public Item_dec_func {
   Item_func_sin(const POS &pos, Item *a) : Item_dec_func(pos, a) {}
   double val_real() override;
   const char *func_name() const override { return "sin"; }
+  enum Functype functype() const override { return SIN_FUNC; }
 };
 
 class Item_func_tan final : public Item_dec_func {
@@ -1179,6 +1260,7 @@ class Item_func_tan final : public Item_dec_func {
   Item_func_tan(const POS &pos, Item *a) : Item_dec_func(pos, a) {}
   double val_real() override;
   const char *func_name() const override { return "tan"; }
+  enum Functype functype() const override { return TAN_FUNC; }
 };
 
 class Item_func_cot final : public Item_dec_func {
@@ -1212,6 +1294,7 @@ class Item_func_ceiling final : public Item_func_int_val {
   my_decimal *decimal_op(my_decimal *) override;
   bool check_partition_func_processor(uchar *) override { return false; }
   bool check_function_as_value_generator(uchar *) override { return false; }
+  enum Functype functype() const override { return CEILING_FUNC; }
 };
 
 class Item_func_floor final : public Item_func_int_val {
@@ -1224,6 +1307,7 @@ class Item_func_floor final : public Item_func_int_val {
   my_decimal *decimal_op(my_decimal *) override;
   bool check_partition_func_processor(uchar *) override { return false; }
   bool check_function_as_value_generator(uchar *) override { return false; }
+  enum Functype functype() const override { return FLOOR_FUNC; }
 };
 
 /* This handles round and truncate */
@@ -1244,6 +1328,9 @@ class Item_func_round final : public Item_func_num1 {
   longlong int_op() override;
   my_decimal *decimal_op(my_decimal *) override;
   bool resolve_type(THD *) override;
+  enum Functype functype() const override {
+    return truncate ? TRUNCATE_FUNC : ROUND_FUNC;
+  }
 };
 
 class Item_func_rand final : public Item_real_func {
@@ -1274,11 +1361,13 @@ class Item_func_rand final : public Item_real_func {
     first_eval = true;
     Item_real_func::cleanup();
   }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
-    return func_arg->is_gen_col;
+    return ((func_arg->source == VGS_GENERATED_COLUMN) ||
+            (func_arg->source == VGS_CHECK_CONSTRAINT));
   }
 
  private:
@@ -1381,6 +1470,7 @@ class Item_func_min final : public Item_func_min_max {
   Item_func_min(const POS &pos, PT_item_list *opt_list)
       : Item_func_min_max(pos, opt_list, true) {}
   const char *func_name() const override { return "least"; }
+  enum Functype functype() const override { return LEAST_FUNC; }
 };
 
 class Item_func_max final : public Item_func_min_max {
@@ -1388,6 +1478,7 @@ class Item_func_max final : public Item_func_min_max {
   Item_func_max(const POS &pos, PT_item_list *opt_list)
       : Item_func_min_max(pos, opt_list, false) {}
   const char *func_name() const override { return "greatest"; }
+  enum Functype functype() const override { return GREATEST_FUNC; }
 };
 
 /*
@@ -1496,7 +1587,8 @@ class Item_func_locate : public Item_int_func {
   const char *func_name() const override { return "locate"; }
   longlong val_int() override;
   bool resolve_type(THD *thd) override;
-  void print(String *str, enum_query_type query_type) override;
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
 };
 
 class Item_func_instr final : public Item_func_locate {
@@ -1597,8 +1689,9 @@ class Item_func_bit : public Item_func {
   double val_real() override;
   my_decimal *val_decimal(my_decimal *decimal_value) override;
 
-  void print(String *str, enum_query_type query_type) override {
-    print_op(str, query_type);
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override {
+    print_op(thd, str, query_type);
   }
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate) override {
     if (hybrid_type == INT_RESULT)
@@ -1741,8 +1834,9 @@ class Item_func_bit_neg final : public Item_func_bit {
  public:
   Item_func_bit_neg(const POS &pos, Item *a) : Item_func_bit(pos, a) {}
   const char *func_name() const override { return "~"; }
-  void print(String *str, enum_query_type query_type) override {
-    Item_func::print(str, query_type);
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override {
+    Item_func::print(thd, str, query_type);
   }
 
  private:
@@ -1754,6 +1848,7 @@ class Item_func_last_insert_id final : public Item_int_func {
   typedef Item_int_func super;
 
  public:
+  Item_func_last_insert_id() : Item_int_func() {}
   explicit Item_func_last_insert_id(const POS &pos) : Item_int_func(pos) {}
   Item_func_last_insert_id(const POS &pos, Item *a) : Item_int_func(pos, a) {}
 
@@ -1765,9 +1860,10 @@ class Item_func_last_insert_id final : public Item_int_func {
     if (arg_count) max_length = args[0]->max_length;
     return false;
   }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -1793,10 +1889,12 @@ class Item_func_benchmark final : public Item_int_func {
     maybe_null = true;
     return false;
   }
-  void print(String *str, enum_query_type query_type) override;
-  bool check_function_as_value_generator(uchar *args) override {
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -1822,9 +1920,10 @@ class Item_func_sleep final : public Item_int_func {
   table_map get_initial_pseudo_tables() const override {
     return RAND_TABLE_BIT;
   }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -1901,11 +2000,13 @@ class Item_udf_func : public Item_func {
   void cleanup() override;
   Item_result result_type() const override { return udf.result_type(); }
   bool is_expensive() override { return true; }
-  void print(String *str, enum_query_type query_type) override;
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
 
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -1990,10 +2091,10 @@ class Item_func_udf_str : public Item_udf_func {
   String *val_str(String *) override;
   double val_real() override {
     int err_not_used;
-    char *end_not_used;
+    const char *end_not_used;
     String *res;
     res = val_str(&str_value);
-    return res ? my_strntod(res->charset(), (char *)res->ptr(), res->length(),
+    return res ? my_strntod(res->charset(), res->ptr(), res->length(),
                             &end_not_used, &err_not_used)
                : 0.0;
   }
@@ -2002,13 +2103,14 @@ class Item_func_udf_str : public Item_udf_func {
     String *res;
     res = val_str(&str_value);
     return res ? my_strntoll(res->charset(), res->ptr(), res->length(), 10,
-                             (char **)0, &err_not_used)
+                             nullptr, &err_not_used)
                : (longlong)0;
   }
   my_decimal *val_decimal(my_decimal *dec_buf) override {
     String *res = val_str(&str_value);
     if (!res) return NULL;
-    string2my_decimal(E_DEC_FATAL_ERROR, res, dec_buf);
+    str2my_decimal(E_DEC_FATAL_ERROR, res->ptr(), res->length(), res->charset(),
+                   dec_buf);
     return dec_buf;
   }
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate) override {
@@ -2042,9 +2144,10 @@ class Item_func_get_lock final : public Item_int_func {
     return false;
   }
   bool is_non_const_over_literals(uchar *) override { return true; }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -2068,9 +2171,10 @@ class Item_func_release_lock final : public Item_int_func {
     return false;
   }
   bool is_non_const_over_literals(uchar *) override { return true; }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -2091,9 +2195,10 @@ class Item_func_release_all_locks final : public Item_int_func {
     return false;
   }
   bool is_non_const_over_literals(uchar *) override { return true; }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -2121,9 +2226,10 @@ class Item_master_pos_wait final : public Item_int_func {
     maybe_null = true;
     return false;
   }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -2162,11 +2268,9 @@ class Item_master_gtid_set_wait final : public Item_int_func {
   String value;
 
  public:
-  Item_master_gtid_set_wait(const POS &pos, Item *a) : Item_int_func(pos, a) {}
-  Item_master_gtid_set_wait(const POS &pos, Item *a, Item *b)
-      : Item_int_func(pos, a, b) {}
-  Item_master_gtid_set_wait(const POS &pos, Item *a, Item *b, Item *c)
-      : Item_int_func(pos, a, b, c) {}
+  Item_master_gtid_set_wait(const POS &pos, Item *a);
+  Item_master_gtid_set_wait(const POS &pos, Item *a, Item *b);
+  Item_master_gtid_set_wait(const POS &pos, Item *a, Item *b, Item *c);
 
   bool itemize(Parse_context *pc, Item **res) override;
   longlong val_int() override;
@@ -2727,10 +2831,13 @@ class Item_var_func : public Item_func {
   bool get_time(MYSQL_TIME *ltime) override {
     return get_time_from_non_temporal(ltime);
   }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
-    func_arg->err_code = ER_DEFAULT_VAL_GENERATED_VARIABLES;
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
+    func_arg->err_code = (func_arg->source == VGS_CHECK_CONSTRAINT)
+                             ? ER_CHECK_CONSTRAINT_VARIABLES
+                             : ER_DEFAULT_VAL_GENERATED_VARIABLES;
     return true;
   }
 };
@@ -2761,15 +2868,15 @@ class user_var_entry {
     String values with length longer than 8 are stored in a separate
     memory buffer, which is allocated when needed using the method realloc().
   */
-  char *internal_buffer_ptr() const {
-    return (char *)this + ALIGN_SIZE(sizeof(user_var_entry));
+  char *internal_buffer_ptr() {
+    return pointer_cast<char *>(this) + ALIGN_SIZE(sizeof(user_var_entry));
   }
 
   /**
     Position inside a user_var_entry where a null-terminates array
     of characters representing the variable name is stored.
   */
-  char *name_ptr() const { return internal_buffer_ptr() + extra_size; }
+  char *name_ptr() { return internal_buffer_ptr() + extra_size; }
 
   /**
     Initialize m_ptr to the internal buffer (if the value is small enough),
@@ -2995,8 +3102,10 @@ class Item_func_set_user_var : public Item_var_func {
   enum Item_result result_type() const override { return cached_result_type; }
   bool fix_fields(THD *thd, Item **ref) override;
   bool resolve_type(THD *) override;
-  void print(String *str, enum_query_type query_type) override;
-  void print_assignment(String *str, enum_query_type query_type);
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
+  void print_assignment(const THD *thd, String *str,
+                        enum_query_type query_type) const;
   const char *func_name() const override { return "set_user_var"; }
 
   type_conversion_status save_in_field(Field *field, bool no_conversions,
@@ -3036,7 +3145,8 @@ class Item_func_get_user_var : public Item_var_func,
   String *val_str(String *str) override;
   bool resolve_type(THD *) override;
   void update_used_tables() override {}  // Keep existing used tables
-  void print(String *str, enum_query_type query_type) override;
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
   enum Item_result result_type() const override;
   /*
     We must always return variables as strings to guard against selects of type
@@ -3090,7 +3200,8 @@ class Item_user_var_as_out_param : public Item {
 
   /* fix_fields() binds variable name with its entry structure */
   bool fix_fields(THD *thd, Item **ref) override;
-  void print(String *str, enum_query_type query_type) override;
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
   void set_null_value(const CHARSET_INFO *cs);
   void set_value(const char *str, size_t length, const CHARSET_INFO *cs);
 };
@@ -3156,7 +3267,8 @@ class Item_func_get_system_var final : public Item_var_func {
                            size_t name_len_arg);
   enum Functype functype() const override { return GSYSVAR_FUNC; }
   bool resolve_type(THD *) override;
-  void print(String *str, enum_query_type query_type) override;
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
   table_map used_tables() const override { return 0; }
   bool is_non_const_over_literals(uchar *) override { return true; }
   enum Item_result result_type() const override;
@@ -3195,7 +3307,7 @@ class Item_func_match final : public Item_real_func {
   FT_INFO *ft_handler;
   TABLE_LIST *table_ref;
   /**
-     Master item means that if idendical items are present in the
+     Master item means that if identical items are present in the
      statement, they use the same FT handler. FT handler is initialized
      only for master item and slave items just use it. FT hints initialized
      for master only, slave items HINTS are not accessed.
@@ -3231,7 +3343,7 @@ class Item_func_match final : public Item_real_func {
   bool itemize(Parse_context *pc, Item **res) override;
 
   void cleanup() override {
-    DBUG_ENTER("Item_func_match::cleanup");
+    DBUG_TRACE;
     Item_real_func::cleanup();
     if (!master && ft_handler) {
       ft_handler->please->close_search(ft_handler);
@@ -3241,7 +3353,7 @@ class Item_func_match final : public Item_real_func {
     concat_ws = NULL;
     table_ref = NULL;  // required by Item_func_match::eq()
     master = NULL;
-    DBUG_VOID_RETURN;
+    return;
   }
   Item *key_item() const override { return against; }
   enum Functype functype() const override { return FT_FUNC; }
@@ -3255,13 +3367,15 @@ class Item_func_match final : public Item_real_func {
     return val_real() != 0.0;
   }
   double val_real() override;
-  void print(String *str, enum_query_type query_type) override;
+  void print(const THD *thd, String *str,
+             enum_query_type query_type) const override;
 
   bool fix_index(const THD *thd);
   bool init_search(THD *thd);
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -3468,9 +3582,10 @@ class Item_func_is_free_lock final : public Item_int_func {
     return false;
   }
   bool is_non_const_over_literals(uchar *) override { return true; }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -3493,9 +3608,10 @@ class Item_func_is_used_lock final : public Item_int_func {
     return false;
   }
   bool is_non_const_over_literals(uchar *) override { return true; }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -3515,9 +3631,10 @@ class Item_func_row_count final : public Item_int_func {
     maybe_null = false;
     return false;
   }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -3552,8 +3669,6 @@ class Item_func_sp final : public Item_func {
 
  protected:
   bool is_expensive_processor(uchar *) override { return true; }
-  type_conversion_status save_in_field_inner(Field *field,
-                                             bool no_conversions) override;
 
  public:
   Item_func_sp(const POS &pos, const LEX_STRING &db_name,
@@ -3638,9 +3753,10 @@ class Item_func_sp final : public Item_func {
   bool is_expensive() override { return true; }
 
   inline Field *get_sp_result_field() { return sp_result_field; }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -3659,9 +3775,10 @@ class Item_func_found_rows final : public Item_int_func {
     maybe_null = false;
     return false;
   }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -3683,11 +3800,13 @@ class Item_func_uuid_short final : public Item_int_func {
     return false;
   }
   bool check_partition_func_processor(uchar *) override { return false; }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     Check_function_as_value_generator_parameters *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
-    return func_arg->is_gen_col;
+    return ((func_arg->source == VGS_GENERATED_COLUMN) ||
+            (func_arg->source == VGS_CHECK_CONSTRAINT));
   }
 };
 
@@ -3702,12 +3821,13 @@ class Item_func_version final : public Item_static_string_func {
 
 Item *get_system_var(Parse_context *pc, enum_var_type var_type, LEX_STRING name,
                      LEX_STRING component);
-extern bool check_reserved_words(LEX_STRING *name);
+extern bool check_reserved_words(const char *name);
 extern enum_field_types agg_field_type(Item **items, uint nitems);
 double my_double_round(double value, longlong dec, bool dec_unsigned,
                        bool truncate);
 bool eval_const_cond(THD *thd, Item *cond, bool *value);
-Item_field *get_gc_for_expr(Item_func **func, Field *fld, Item_result type);
+Item_field *get_gc_for_expr(Item_func **func, Field *fld, Item_result type,
+                            Field **found = NULL);
 
 void retrieve_tablespace_statistics(THD *thd, Item **args, bool *null_value);
 

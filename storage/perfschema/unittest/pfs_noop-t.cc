@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -108,9 +108,9 @@ static void test_noop() {
   psi_thread_service->set_thread_db(NULL, 0);
   psi_thread_service->set_thread_command(1);
   psi_thread_service->set_thread_start_time(1);
-  psi_thread_service->set_thread_state(NULL);
   psi_thread_service->set_thread_info(NULL, 0);
   psi_thread_service->set_thread(NULL);
+  psi_thread_service->aggregate_thread_status(NULL);
   psi_thread_service->delete_current_thread();
   psi_thread_service->delete_thread(NULL);
   file_locker = psi_file_service->get_thread_file_name_locker(
@@ -123,7 +123,7 @@ static void test_noop() {
       NULL, 0, PSI_FILE_OPEN);
   ok(file_locker == NULL, "no file_locker");
   psi_mutex_service->unlock_mutex(NULL);
-  psi_rwlock_service->unlock_rwlock(NULL);
+  psi_rwlock_service->unlock_rwlock(NULL, PSI_RWLOCK_UNLOCK);
   psi_cond_service->signal_cond(NULL);
   psi_cond_service->broadcast_cond(NULL);
   idle_locker = psi_idle_service->start_idle_wait(NULL, NULL, 0);

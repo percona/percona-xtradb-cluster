@@ -57,6 +57,12 @@ SET(BUILD_TESTING OFF CACHE BOOL "")
 SET(USE_VALGRIND OFF CACHE BOOL "")
 SET(TOKU_DEBUG_PARANOID OFF CACHE BOOL "")
 
+MY_CHECK_CXX_COMPILER_FLAG("-Wcast-qual" HAVE_CAST_EQUAL)
+IF(HAVE_CAST_EQUAL)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-cast-qual")
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-cast-qual")
+ENDIF()
+
 # Enable TokuDB's TOKUDB_DEBUG in debug builds
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DTOKUDB_DEBUG")
 
@@ -78,8 +84,32 @@ IF(DEFINED TOKUDB_NOPATCH_CONFIG)
     ADD_DEFINITIONS("-DTOKUDB_NOPATCH_CONFIG=${TOKUDB_NOPATCH_CONFIG}")
 ENDIF()
 
-prepend_cflags_if_supported(-Wno-missing-field-initializers)
-append_cflags_if_supported(-Wno-vla)
+
+
+# Suppress warnings for all compilers
+append_cflags_if_supported(-Wno-missing-field-initializers)
+remove_compile_flags(-Wvla)
+
+
+# Suppress warnings for all clang versions
+IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  append_cflags_if_supported(-Wno-deprecated-dynamic-exception-spec -Wno-inconsistent-missing-override)
+  remove_compile_flags(-Wextra-semi -Wheader-hygiene -Wconditional-uninitialized -Winconsistent-missing-destructor-override)
+ENDIF()
+
+
+# Suppress warnings for clang-8 or newer
+IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8.0)
+  remove_compile_flags(-Wshadow-field)
+ENDIF()
+
+
+# Suppress warnings for gcc-9 or newer
+IF(CMAKE_COMPILER_IS_GNUCXX AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+  append_cflags_if_supported(-Wno-address-of-packed-member)
+ENDIF()
+
+
 
 IF (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/PerconaFT/")
     SET(TOKU_FT_DIR_NAME "PerconaFT")

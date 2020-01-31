@@ -1,6 +1,6 @@
 # Systemd service file for Percona XtraDB Cluster
 
-# This service file is to start PXC just with mysqld_safe
+# This service file is to start PXC
 # Usually in the non-bootstrapping case.
 
 # For bootstrapping or passing environment file
@@ -15,12 +15,63 @@ WantedBy=multi-user.target
 Alias=mysqld.service
 
 [Service]
+
+##############################################################################
+## Core requirements
+##
+
+Type=notify
+#TimeoutStartSec=300
+# Setting this to true can break replication and the Type=notify settings
+# See also bind-address mysqld option.
+PrivateNetwork=false
+
+##############################################################################
+## Package maintainers
+##
+
+User=mysql
+Group=mysql
+
+# CAP_IPC_LOCK To allow memlock to be used as non-root user
+# CAP_DAC_OVERRIDE To allow auth_pam_tool (which is SUID root) to read /etc/shadow when it's chmod 0
+#   does nothing for non-root, not needed if /etc/shadow is u+r
+# CAP_AUDIT_WRITE auth_pam_tool needs it on Debian for whatever reason
+CapabilityBoundingSet=CAP_IPC_LOCK CAP_DAC_OVERRIDE CAP_AUDIT_WRITE
+
+# PrivateDevices=true implies NoNewPrivileges=true and
+# SUID auth_pam_tool suddenly doesn't do setuid anymore
+PrivateDevices=false
+
+# Prevent writes to /usr, /boot, and /etc
+ProtectSystem=full
+
+# Doesn't yet work properly with SELinux enabled
+# NoNewPrivileges=true
+
+# Prevent accessing /home, /root and /run/user
+ProtectHome=true
+
+# Execute pre and post scripts as root, otherwise it does it as User=
+PermissionsStartOnly=true
+
+EnvironmentFile=-/etc/sysconfig/mysql
+
 # Needed to create system tables etc.
 ExecStartPre=/usr/bin/mysql-systemd start-pre
 
-EnvironmentFile=-/etc/sysconfig/mysql
+# Perform automatic wsrep recovery. When server is started without wsrep,
+# mysql-systemd galera_recovery simply returns an empty string.
+# It is always safe to unset _WSREP_START_POSITION environment variable.
+
+ExecStartPre=/bin/sh -c "systemctl unset-environment _WSREP_START_POSITION"
+ExecStartPre=/bin/sh -c "VAR=`/usr/bin/mysql-systemd galera-recovery`; [ $? -eq 0 ] && systemctl set-environment _WSREP_START_POSITION=$VAR || exit 1"
+
 # Start main service
-ExecStart=/usr/bin/mysqld_safe --basedir=/usr
+ExecStart=/usr/sbin/mysqld $_WSREP_START_POSITION
+
+# Unset _WSREP_START_POSITION environment variable.
+ExecStartPost=/bin/sh -c "systemctl unset-environment _WSREP_START_POSITION"
 
 # Don't signal startup success before a ping works
 ExecStartPost=/usr/bin/mysql-systemd start-post $MAINPID
@@ -31,17 +82,53 @@ ExecStopPost=/usr/bin/mysql-systemd stop-post
 
 ExecReload=/usr/bin/mysql-systemd reload
 
-# Timeout is handled elsewhere
-# service-startup-timeout in my.cnf 
-# Default is 900 seconds
-TimeoutStartSec=0
+KillSignal=SIGTERM
 
-# Maximum time to stop
-TimeoutStopSec=900
+# Don't want to see an automated SIGKILL ever
+SendSIGKILL=no
 
-# Unsafe for PXC
-# mysqld_safe handles this too.
+# Restart crashed server only, on-failure would also restart, for example, when
+# my.cnf contains unknown option
+Restart=on-abort
+RestartSec=5s
 
+UMask=007
+
+##############################################################################
+## USERs can override
+
+# If you don't use the /tmp directory for SELECT ... OUTFILE and
+# LOAD DATA INFILE you can enable PrivateTmp=true for a little more security.
 PrivateTmp=false
 
+##
+## Options previously available to be set via [mysqld_safe]
+## that now needs to be set by systemd config files as mysqld_safe
+## isn't executed.
+##
+
+# Number of files limit. previously [mysqld_safe] open-file-limit
+LimitNOFILE=16364
+
+# Maximium core size. previously [mysqld_safe] core-file-size
+# LimitCore=
+
+# Nice priority. previously [mysqld_safe] nice
+Nice=0
+
+# Timezone. previously [mysqld_safe] timezone
+# Environment="TZ=UTC"
+
+# Library substitutions. previously [mysqld_safe] malloc-lib with explicit paths
+# (in LD_LIBRARY_PATH) and library name (in LD_PRELOAD).
+# Environment="LD_LIBRARY_PATH=/path1 /path2" "LD_PRELOAD=
+
+# Flush caches. previously [mysqld_safe] flush-caches=1
+# ExecStartPre=sync
+# ExecStartPre=sysctl -q -w vm.drop_caches=3
+# numa-interleave=1 equalivant
+# Change ExecStart=numactl --interleave=all /usr/sbin/mysqld......
+
+# crash-script equalivent
+# FailureAction=
 

@@ -1,6 +1,9 @@
 CALL mtr.add_suppression("Aborting");
 CALL mtr.add_suppression("unknown option '--galera-unknown-option'");
 call mtr.add_suppression("The privilege system failed to initialize correctly");
+call mtr.add_suppression("SST failed/interrupted");
+call mtr.add_suppression("IST was interrupted");
+call mtr.add_suppression("IST didn't contain all write sets");
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
 INSERT INTO t1 VALUES (1, 'a'), (2, 'a'), (3, 'a');
 SELECT * FROM t1;

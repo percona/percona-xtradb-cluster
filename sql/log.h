@@ -1,4 +1,4 @@
-/* Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -212,7 +212,7 @@ class Log_event_handler {
      indicated in the return value.
 
      @retval  false   OK
-     @retval  true    error occured
+     @retval  true    error occurred
   */
   virtual bool log_general(THD *thd, ulonglong event_utime,
                            const char *user_host, size_t user_host_len,
@@ -1485,16 +1485,5 @@ int log_builtins_exit();
   @param         length       number of bytes in buffer
 */
 void log_write_errstream(const char *buffer, size_t length);
-
-#ifdef WITH_WSREP
-
-#include "sql/binlog_ostream.h"
-
-IO_CACHE_binlog_cache_storage *wsrep_get_trans_log(THD *thd, bool transaction);
-bool wsrep_trans_cache_is_empty(THD *thd);
-void wsrep_thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
-void wsrep_thd_binlog_trx_reset(THD *thd);
-
-#endif /* WITH_WSREP */
 
 #endif /* LOG_H */

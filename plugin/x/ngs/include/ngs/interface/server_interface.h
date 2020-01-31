@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -25,9 +25,10 @@
 #ifndef PLUGIN_X_NGS_INCLUDE_NGS_INTERFACE_SERVER_INTERFACE_H_
 #define PLUGIN_X_NGS_INCLUDE_NGS_INTERFACE_SERVER_INTERFACE_H_
 
+#include <memory>
+
 #include "plugin/x/ngs/include/ngs/interface/authentication_interface.h"
 #include "plugin/x/ngs/include/ngs/interface/document_id_generator_interface.h"
-#include "plugin/x/ngs/include/ngs_common/smart_ptr.h"
 #include "plugin/x/src/helper/multithread/mutex.h"
 
 namespace ngs {
@@ -38,7 +39,7 @@ class Session_interface;
 class Protocol_encoder_interface;
 class Scheduler_dynamic;
 class Protocol_encoder;
-class Protocol_config;
+class Protocol_global_config;
 class Sql_session_interface;
 class Ssl_context_interface;
 
@@ -49,10 +50,10 @@ class Server_interface {
   virtual void get_authentication_mechanisms(
       std::vector<std::string> &auth_mech, Client_interface &client) = 0;
 
-  virtual ngs::shared_ptr<Scheduler_dynamic> get_worker_scheduler() const = 0;
+  virtual std::shared_ptr<Scheduler_dynamic> get_worker_scheduler() const = 0;
   virtual Authentication_interface_ptr get_auth_handler(
       const std::string &name, Session_interface *session) = 0;
-  virtual ngs::shared_ptr<Protocol_config> get_config() const = 0;
+  virtual std::shared_ptr<Protocol_global_config> get_config() const = 0;
 
   virtual Document_id_generator_interface &get_document_id_generator()
       const = 0;
@@ -61,7 +62,7 @@ class Server_interface {
 
   virtual Ssl_context_interface *ssl_context() const = 0;
 
-  virtual ngs::shared_ptr<Session_interface> create_session(
+  virtual std::shared_ptr<Session_interface> create_session(
       Client_interface &client, Protocol_encoder_interface &proto,
       const int session_id) = 0;
 

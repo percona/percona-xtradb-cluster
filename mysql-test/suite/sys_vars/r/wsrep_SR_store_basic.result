@@ -1,0 +1,22 @@
+select @@wsrep_SR_store;
+@@wsrep_SR_store
+table
+# set default value
+set global wsrep_SR_store = default;
+ERROR HY000: Variable 'wsrep_SR_store' is a read only variable
+select @@wsrep_SR_store;
+@@wsrep_SR_store
+table
+# set a valid value
+set global wsrep_SR_store = 'table';
+ERROR HY000: Variable 'wsrep_SR_store' is a read only variable
+select @@wsrep_SR_store;
+@@wsrep_SR_store
+table
+# set an invalid value
+set global wsrep_SR_store = 'logfile';
+ERROR HY000: Variable 'wsrep_SR_store' is a read only variable
+select @@wsrep_SR_store;
+@@wsrep_SR_store
+table
+# End of test

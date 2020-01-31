@@ -24,14 +24,14 @@ INSERT INTO t1 VALUES (1);
 SET GLOBAL wsrep_slave_threads = 10;
 
 --let $wait_condition = SELECT COUNT(*) = 11 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
---let $wait_condition_on_error_output = SELECT COUNT(*), 11 as EXPECTED_VALUE FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user'; show processlist
+--let $wait_condition_on_error_output = SELECT COUNT(*), 12 as EXPECTED_VALUE FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user'; show processlist
 --source include/wait_condition_with_debug.inc
 SELECT COUNT(*) = 11 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 
 SET GLOBAL wsrep_slave_threads = 20;
 
 --let $wait_condition = SELECT COUNT(*) = 21 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
---let $wait_condition_on_error_output = SELECT COUNT(*), 21 as EXPECTED_VALUE FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user'; show processlist
+--let $wait_condition_on_error_output = SELECT COUNT(*), 22 as EXPECTED_VALUE FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user'; show processlist
 --source include/wait_condition_with_debug.inc
 SELECT COUNT(*) = 21 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -63,16 +63,16 @@ extern const std::string kDefaultMetadataCluster;
 extern const unsigned int kDefaultConnectTimeout;
 extern const unsigned int kDefaultReadTimeout;
 
-METADATA_API enum class ReplicasetStatus {
+enum class ReplicasetStatus {
   AvailableWritable,
   AvailableReadOnly,
   UnavailableRecovering,
   Unavailable
 };
 
-METADATA_API enum class ServerMode { ReadWrite, ReadOnly, Unavailable };
+enum class ServerMode { ReadWrite, ReadOnly, Unavailable };
 
-METADATA_API enum class InstanceStatus {
+enum class InstanceStatus {
   Reachable,
   InvalidHost,  // Network connection cannot even be attempted (ie bad IP)
   Unreachable,  // TCP connection cannot be opened
@@ -90,8 +90,8 @@ class METADATA_API ManagedInstance {
                   const std::string &p_mysql_server_uuid,
                   const std::string &p_role, const ServerMode p_mode,
                   const float p_weight, const unsigned int p_version_token,
-                  const std::string &p_location, const std::string &p_host,
-                  const unsigned int p_port, const unsigned int p_xport);
+                  const std::string &p_host, const uint16_t p_port,
+                  const uint16_t p_xport);
 
   using TCPAddress = mysql_harness::TCPAddress;
   explicit ManagedInstance(const TCPAddress &addr);
@@ -110,14 +110,12 @@ class METADATA_API ManagedInstance {
   float weight;
   /** @brief The version token of the server */
   unsigned int version_token;
-  /** @brief The location of the server */
-  std::string location;
   /** @brief The host name on which the server is running */
   std::string host;
   /** The port number in which the server is running */
-  unsigned int port;
+  uint16_t port;
   /** The X protocol port number in which the server is running */
-  unsigned int xport;
+  uint16_t xport;
 };
 
 /** @class ManagedReplicaSet
@@ -195,6 +193,14 @@ class METADATA_API ReplicasetStateListenerInterface {
    */
   virtual void notify(const LookupResult &instances,
                       const bool md_servers_reachable) = 0;
+
+  ReplicasetStateListenerInterface() = default;
+  // disable copy as it isn't needed right now. Feel free to enable
+  // must be explicitly defined though.
+  explicit ReplicasetStateListenerInterface(
+      const ReplicasetStateListenerInterface &) = delete;
+  ReplicasetStateListenerInterface &operator=(
+      const ReplicasetStateListenerInterface &) = delete;
   virtual ~ReplicasetStateListenerInterface();
 };
 
@@ -231,10 +237,18 @@ class METADATA_API ReplicasetStateNotifierInterface {
    */
   virtual void remove_listener(const std::string &replicaset_name,
                                ReplicasetStateListenerInterface *listener) = 0;
+
+  ReplicasetStateNotifierInterface() = default;
+  // disable copy as it isn't needed right now. Feel free to enable
+  // must be explicitly defined though.
+  explicit ReplicasetStateNotifierInterface(
+      const ReplicasetStateNotifierInterface &) = delete;
+  ReplicasetStateNotifierInterface &operator=(
+      const ReplicasetStateNotifierInterface &) = delete;
   virtual ~ReplicasetStateNotifierInterface();
 };
 
-METADATA_API class MetadataCacheAPIBase
+class METADATA_API MetadataCacheAPIBase
     : public ReplicasetStateNotifierInterface {
  public:
   /** @brief Initialize a MetadataCache object and start caching
@@ -256,8 +270,7 @@ METADATA_API class MetadataCacheAPIBase
    *
    * @param group_replication_id id of the replication group
    * @param metadata_servers The list of cluster metadata servers
-   * @param user MySQL Metadata username
-   * @param password MySQL Metadata password
+   * @param user_credentials MySQL Metadata username and password
    * @param ttl The time to live for the cached data
    * @param ssl_options SSL relatd options for connection
    * @param cluster_name The name of the cluster to be used.
@@ -266,15 +279,21 @@ METADATA_API class MetadataCacheAPIBase
    * @param read_timeout The time in seconds after which read from metadata
    *                     server should time out.
    * @param thread_stack_size memory in kilobytes allocated for thread's stack
+   * @param use_gr_notifications Flag indicating if the metadata cache should
+   *                             use GR notifications as an additional trigger
+   *                             for metadata refresh
    */
   virtual void cache_init(
       const std::string &group_replication_id,
       const std::vector<mysql_harness::TCPAddress> &metadata_servers,
-      const std::string &user, const std::string &password,
+      const mysqlrouter::UserCredentials &user_credentials,
       std::chrono::milliseconds ttl, const mysqlrouter::SSLOptions &ssl_options,
       const std::string &cluster_name, int connect_timeout, int read_timeout,
-      size_t thread_stack_size =
-          mysql_harness::kDefaultStackSizeInKiloBytes) = 0;
+      size_t thread_stack_size = mysql_harness::kDefaultStackSizeInKiloBytes,
+      bool use_gr_notifications = false) = 0;
+
+  virtual void instance_name(const std::string &inst_name) = 0;
+  virtual std::string instance_name() const = 0;
 
   virtual bool is_initialized() noexcept = 0;
 
@@ -345,20 +364,47 @@ METADATA_API class MetadataCacheAPIBase
   virtual void remove_listener(const std::string &replicaset_name,
                                ReplicasetStateListenerInterface *listener) = 0;
 
+  MetadataCacheAPIBase() = default;
+  // disable copy as it isn't needed right now. Feel free to enable
+  // must be explicitly defined though.
+  explicit MetadataCacheAPIBase(const MetadataCacheAPIBase &) = delete;
+  MetadataCacheAPIBase &operator=(const MetadataCacheAPIBase &) = delete;
   virtual ~MetadataCacheAPIBase() {}
+
+  struct RefreshStatus {
+    uint64_t refresh_failed;
+    uint64_t refresh_succeeded;
+    std::chrono::system_clock::time_point last_refresh_succeeded;
+    std::chrono::system_clock::time_point last_refresh_failed;
+
+    std::string last_metadata_server_host;
+    uint16_t last_metadata_server_port;
+  };
+
+  virtual RefreshStatus get_refresh_status() = 0;
+  virtual std::string group_replication_id() const = 0;
+  virtual std::string cluster_name() const = 0;
+  virtual std::chrono::milliseconds ttl() const = 0;
 };
 
-METADATA_API class MetadataCacheAPI : public MetadataCacheAPIBase {
+class METADATA_API MetadataCacheAPI : public MetadataCacheAPIBase {
  public:
-  static METADATA_API MetadataCacheAPIBase *instance();
+  static MetadataCacheAPIBase *instance();
 
   void cache_init(
       const std::string &group_replication_id,
       const std::vector<mysql_harness::TCPAddress> &metadata_servers,
-      const std::string &user, const std::string &password,
+      const mysqlrouter::UserCredentials &user_credentials,
       std::chrono::milliseconds ttl, const mysqlrouter::SSLOptions &ssl_options,
       const std::string &cluster_name, int connect_timeout, int read_timeout,
-      size_t thread_stack_size) override;
+      size_t thread_stack_size, bool use_gr_notifications) override;
+
+  void instance_name(const std::string &inst_name) override;
+  std::string instance_name() const override;
+
+  std::string group_replication_id() const override;
+  std::string cluster_name() const override;
+  std::chrono::milliseconds ttl() const override;
 
   bool is_initialized() noexcept override { return is_initialized_; }
   void cache_start() override;
@@ -378,7 +424,11 @@ METADATA_API class MetadataCacheAPI : public MetadataCacheAPIBase {
   void remove_listener(const std::string &replicaset_name,
                        ReplicasetStateListenerInterface *listener) override;
 
+  RefreshStatus get_refresh_status() override;
+
  private:
+  std::string inst_name_;
+
   std::atomic<bool> is_initialized_{false};
   MetadataCacheAPI() {}
   MetadataCacheAPI(const MetadataCacheAPI &) = delete;

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -80,9 +80,10 @@
 #include "sql/filesort.h"  // filesort_free_buffers
 #include "sql/gis/srid.h"
 #include "sql/item.h"
-#include "sql/item_cmpfunc.h"  // and_conds
-#include "sql/json_diff.h"     // Json_diff_vector
-#include "sql/json_dom.h"      // Json_wrapper
+#include "sql/item_cmpfunc.h"    // and_conds
+#include "sql/item_json_func.h"  // Item_func_array_cast
+#include "sql/json_diff.h"       // Json_diff_vector
+#include "sql/json_dom.h"        // Json_wrapper
 #include "sql/json_path.h"
 #include "sql/key.h"  // find_ref_key
 #include "sql/log.h"
@@ -97,7 +98,8 @@
 #include "sql/query_options.h"
 #include "sql/query_result.h"  // Query_result
 #include "sql/sql_base.h"
-#include "sql/sql_class.h"  // THD
+#include "sql/sql_check_constraint.h"  // Sql_table_check_constraint
+#include "sql/sql_class.h"             // THD
 #include "sql/sql_error.h"
 #include "sql/sql_lex.h"
 #include "sql/sql_opt_exec_shared.h"
@@ -123,40 +125,39 @@
 #include "sql/log.h"
 #endif /* WITH_WSREP */
 
-
 /* INFORMATION_SCHEMA name */
-LEX_STRING INFORMATION_SCHEMA_NAME = {C_STRING_WITH_LEN("information_schema")};
+LEX_CSTRING INFORMATION_SCHEMA_NAME = {STRING_WITH_LEN("information_schema")};
 
 /* PERFORMANCE_SCHEMA name */
-LEX_STRING PERFORMANCE_SCHEMA_DB_NAME = {
-    C_STRING_WITH_LEN("performance_schema")};
+LEX_CSTRING PERFORMANCE_SCHEMA_DB_NAME = {
+    STRING_WITH_LEN("performance_schema")};
 
 /* MYSQL_SCHEMA name */
-LEX_STRING MYSQL_SCHEMA_NAME = {C_STRING_WITH_LEN("mysql")};
+LEX_CSTRING MYSQL_SCHEMA_NAME = {STRING_WITH_LEN("mysql")};
 
 /* MYSQL_TABLESPACE name */
-LEX_STRING MYSQL_TABLESPACE_NAME = {C_STRING_WITH_LEN("mysql")};
+LEX_CSTRING MYSQL_TABLESPACE_NAME = {STRING_WITH_LEN("mysql")};
 
 /* GENERAL_LOG name */
-LEX_STRING GENERAL_LOG_NAME = {C_STRING_WITH_LEN("general_log")};
+LEX_CSTRING GENERAL_LOG_NAME = {STRING_WITH_LEN("general_log")};
 
 /* SLOW_LOG name */
-LEX_STRING SLOW_LOG_NAME = {C_STRING_WITH_LEN("slow_log")};
+LEX_CSTRING SLOW_LOG_NAME = {STRING_WITH_LEN("slow_log")};
 
 /* RLI_INFO name */
-LEX_STRING RLI_INFO_NAME = {C_STRING_WITH_LEN("slave_relay_log_info")};
+LEX_CSTRING RLI_INFO_NAME = {STRING_WITH_LEN("slave_relay_log_info")};
 
 /* MI_INFO name */
-LEX_STRING MI_INFO_NAME = {C_STRING_WITH_LEN("slave_master_info")};
+LEX_CSTRING MI_INFO_NAME = {STRING_WITH_LEN("slave_master_info")};
 
 /* WORKER_INFO name */
-LEX_STRING WORKER_INFO_NAME = {C_STRING_WITH_LEN("slave_worker_info")};
+LEX_CSTRING WORKER_INFO_NAME = {STRING_WITH_LEN("slave_worker_info")};
 
 /* GTID_EXECUTED name */
-LEX_STRING GTID_EXECUTED_NAME = {C_STRING_WITH_LEN("gtid_executed")};
+LEX_CSTRING GTID_EXECUTED_NAME = {STRING_WITH_LEN("gtid_executed")};
 
 /* Keyword for parsing generated column functions */
-LEX_STRING PARSE_GCOL_KEYWORD = {C_STRING_WITH_LEN("parse_gcol_expr")};
+LEX_CSTRING PARSE_GCOL_KEYWORD = {STRING_WITH_LEN("parse_gcol_expr")};
 
 /* Functions defined in this file */
 
@@ -174,12 +175,12 @@ inline bool is_system_table_name(const char *name, size_t length);
 
 Object_creation_ctx *Object_creation_ctx::set_n_backup(THD *thd) {
   Object_creation_ctx *backup_ctx;
-  DBUG_ENTER("Object_creation_ctx::set_n_backup");
+  DBUG_TRACE;
 
   backup_ctx = create_backup_ctx(thd);
   change_env(thd);
 
-  DBUG_RETURN(backup_ctx);
+  return backup_ctx;
 }
 
 void Object_creation_ctx::restore_env(THD *thd,
@@ -301,10 +302,24 @@ char *fn_rext(char *name) {
   return name + strlen(name);
 }
 
-TABLE_CATEGORY get_table_category(const LEX_STRING &db,
-                                  const LEX_STRING &name) {
+const char *fn_rext(const char *name) {
+  const char *res = strrchr(name, '.');
+  if (res && !strcmp(res, reg_ext)) return res;
+  return name + strlen(name);
+}
+
+TABLE_CATEGORY get_table_category(const LEX_CSTRING &db,
+                                  const LEX_CSTRING &name) {
   DBUG_ASSERT(db.str != NULL);
   DBUG_ASSERT(name.str != NULL);
+
+#ifdef WITH_WSREP
+  if (my_strcasecmp(system_charset_info, db.str, "mysql") == 0 &&
+      my_strcasecmp(system_charset_info, name.str, "wsrep_streaming_log") ==
+          0) {
+    return TABLE_CATEGORY_INFORMATION;
+  }
+#endif /* WITH_WSREP */
 
   if (is_infoschema_db(db.str, db.length)) return TABLE_CATEGORY_INFORMATION;
 
@@ -374,7 +389,7 @@ TABLE_SHARE *alloc_table_share(const char *db, const char *table_name,
   size_t path_length;
   Table_cache_element **cache_element_array;
   bool was_truncated = false;
-  DBUG_ENTER("alloc_table_share");
+  DBUG_TRACE;
   DBUG_PRINT("enter", ("table: '%s'.'%s'", db, table_name));
 
   /*
@@ -392,7 +407,7 @@ TABLE_SHARE *alloc_table_share(const char *db, const char *table_name,
   */
   if (was_truncated) {
     my_error(ER_IDENT_CAUSES_TOO_LONG_PATH, MYF(0), sizeof(path) - 1, path);
-    DBUG_RETURN(NULL);
+    return NULL;
   }
 
   init_sql_alloc(key_memory_table_share, &mem_root, TABLE_ALLOC_BLOCK_SIZE, 0);
@@ -430,7 +445,7 @@ TABLE_SHARE *alloc_table_share(const char *db, const char *table_name,
     mysql_mutex_init(key_TABLE_SHARE_LOCK_ha_data, &share->LOCK_ha_data,
                      MY_MUTEX_INIT_FAST);
   }
-  DBUG_RETURN(share);
+  return share;
 }
 
 /**
@@ -459,7 +474,7 @@ TABLE_SHARE *alloc_table_share(const char *db, const char *table_name,
 void init_tmp_table_share(THD *thd, TABLE_SHARE *share, const char *key,
                           size_t key_length, const char *table_name,
                           const char *path, MEM_ROOT *mem_root) {
-  DBUG_ENTER("init_tmp_table_share");
+  DBUG_TRACE;
   DBUG_PRINT("enter", ("table: '%s'.'%s'", key, table_name));
 
   new (share) TABLE_SHARE();
@@ -472,14 +487,14 @@ void init_tmp_table_share(THD *thd, TABLE_SHARE *share, const char *key,
 
   share->table_category = TABLE_CATEGORY_TEMPORARY;
   share->tmp_table = INTERNAL_TMP_TABLE;
-  share->db.str = (char *)key;
+  share->db.str = key;
   share->db.length = strlen(key);
-  share->table_cache_key.str = (char *)key;
+  share->table_cache_key.str = key;
   share->table_cache_key.length = key_length;
-  share->table_name.str = (char *)table_name;
+  share->table_name.str = table_name;
   share->table_name.length = strlen(table_name);
-  share->path.str = (char *)path;
-  share->normalized_path.str = (char *)path;
+  share->path.str = const_cast<char *>(path);
+  share->normalized_path.str = path;
   share->path.length = share->normalized_path.length = strlen(path);
 
   share->cached_row_logging_check = -1;
@@ -491,8 +506,6 @@ void init_tmp_table_share(THD *thd, TABLE_SHARE *share, const char *key,
   share->table_map_id = (ulonglong)thd->query_id;
 
   share->m_flush_tickets.empty();
-
-  DBUG_VOID_RETURN;
 }
 
 Key_map TABLE_SHARE::usable_indexes(const THD *thd) const {
@@ -536,7 +549,7 @@ void TABLE_SHARE::destroy() {
   uint idx;
   KEY *info_it;
 
-  DBUG_ENTER("TABLE_SHARE::destroy");
+  DBUG_TRACE;
   DBUG_PRINT("info", ("db: %s table: %s", db.str, table_name.str));
 
   if (ha_share) {
@@ -585,7 +598,6 @@ void TABLE_SHARE::destroy() {
   */
   MEM_ROOT own_root = std::move(mem_root);
   free_root(&own_root, MYF(0));
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -611,7 +623,7 @@ bool TABLE_SHARE::has_compressed_columns() const {
 */
 
 void free_table_share(TABLE_SHARE *share) {
-  DBUG_ENTER("free_table_share");
+  DBUG_TRACE;
   DBUG_PRINT("enter", ("table: %s.%s", share->db.str, share->table_name.str));
   DBUG_ASSERT(share->ref_count() == 0);
 
@@ -641,7 +653,6 @@ void free_table_share(TABLE_SHARE *share) {
       for this thread to do the work.
     */
   }
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -765,22 +776,23 @@ void setup_key_part_field(TABLE_SHARE *share, handler *handler_file,
 
   const bool full_length_key_part =
       (field->key_length() == key_part->length && !(field->flags & BLOB_FLAG));
+  /*
+    part_of_key contains all non-prefix keys, part_of_prefixkey
+    contains prefix keys.
+    Note that prefix keys in the extended PK key parts
+    (part_of_key_not_extended is false) are not considered.
+  */
+  if (full_length_key_part) {
+    field->part_of_key.set_bit(key_n);
+    if (part_of_key_not_extended)
+      field->part_of_key_not_extended.set_bit(key_n);
+  } else if (part_of_key_not_extended) {
+    field->part_of_prefixkey.set_bit(key_n);
+  }
   if ((handler_file->index_flags(key_n, key_part_n, 0) & HA_KEYREAD_ONLY) &&
       field->type() != MYSQL_TYPE_GEOMETRY) {
-    /*
-      Set the key as 'keys_for_keyread' even if it is prefix key.
-      part_of_key contains all non-prefix keys, part_of_prefixkey
-      contains prefix keys.
-      Note that prefix keys in the extended PK key parts
-      (part_of_key_not_extended is false) are not considered.
-    */
+    // Set the key as 'keys_for_keyread' even if it is prefix key.
     share->keys_for_keyread.set_bit(key_n);
-    if (full_length_key_part) {
-      field->part_of_key.set_bit(key_n);
-      if (part_of_key_not_extended)
-        field->part_of_key_not_extended.set_bit(key_n);
-    } else if (part_of_key_not_extended)
-      field->part_of_prefixkey.set_bit(key_n);
   }
 
   if (full_length_key_part &&
@@ -872,20 +884,20 @@ end:
   return (sk->actual_key_parts - sk->user_defined_key_parts);
 }
 
-  //////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 
-  /*
-    The following section adds code for the interface with the .frm file.
-    These defines and functions comes from the file sql/field.h in 5.7
+/*
+  The following section adds code for the interface with the .frm file.
+  These defines and functions comes from the file sql/field.h in 5.7
 
-    Note:
-    These functions should not be used any where else in the code.
-    They are only used in upgrade scenario for migrating old data directory
-    to be compatible with current server. They will be removed in future
-    release.
+  Note:
+  These functions should not be used any where else in the code.
+  They are only used in upgrade scenario for migrating old data directory
+  to be compatible with current server. They will be removed in future
+  release.
 
-    Any new code should not be added in this section.
-  */
+  Any new code should not be added in this section.
+*/
 
 #define FIELDFLAG_DECIMAL 1
 #define FIELDFLAG_BINARY 1  // Shares same flag
@@ -970,18 +982,18 @@ inline int f_bit_as_char(int x) { return (x & FIELDFLAG_TREAT_BIT_AS_CHAR); }
 */
 
 static int read_string(File file, uchar **to, size_t length) {
-  DBUG_ENTER("read_string");
+  DBUG_TRACE;
 
   my_free(*to);
   if (!(*to = (uchar *)my_malloc(PSI_NOT_INSTRUMENTED, length + 1,
                                  MYF(MY_WME))) ||
       mysql_file_read(file, *to, length, MYF(MY_NABP))) {
-    my_free(*to);   /* purecov: inspected */
-    *to = 0;        /* purecov: inspected */
-    DBUG_RETURN(1); /* purecov: inspected */
+    my_free(*to); /* purecov: inspected */
+    *to = 0;      /* purecov: inspected */
+    return 1;     /* purecov: inspected */
   }
   *((char *)*to + length) = '\0';
-  DBUG_RETURN(0);
+  return 0;
 } /* read_string */
 
 /**
@@ -996,7 +1008,7 @@ static int read_string(File file, uchar **to, size_t length) {
 static void unhex_type2(TYPELIB *interval) {
   for (uint pos = 0; pos < interval->count; pos++) {
     char *from, *to;
-    for (from = to = (char *)interval->type_names[pos]; *from;) {
+    for (from = to = const_cast<char *>(interval->type_names[pos]); *from;) {
       /*
         Note, hexchar_to_int(*from++) doesn't work
         one some compilers, e.g. IRIX. Looks like a compiler
@@ -1102,11 +1114,11 @@ static ulong get_form_pos(File file, uchar *head) {
   uchar *pos, *buf;
   uint names, length;
   ulong ret_value = 0;
-  DBUG_ENTER("get_form_pos");
+  DBUG_TRACE;
 
   names = uint2korr(head + 8);
 
-  if (!(names = uint2korr(head + 8))) DBUG_RETURN(0);
+  if (!(names = uint2korr(head + 8))) return 0;
 
   length = uint2korr(head + 4);
 
@@ -1114,11 +1126,11 @@ static ulong get_form_pos(File file, uchar *head) {
 
   if (!(buf = (uchar *)my_malloc(PSI_NOT_INSTRUMENTED, length + names * 4,
                                  MYF(MY_WME))))
-    DBUG_RETURN(0);
+    return 0;
 
   if (mysql_file_read(file, buf, length + names * 4, MYF(MY_NABP))) {
     my_free(buf);
-    DBUG_RETURN(0);
+    return 0;
   }
 
   pos = buf + length;
@@ -1126,7 +1138,7 @@ static ulong get_form_pos(File file, uchar *head) {
 
   my_free(buf);
 
-  DBUG_RETURN(ret_value);
+  return ret_value;
 }
 
 #define STORAGE_TYPE_MASK 7
@@ -1190,7 +1202,7 @@ static int make_field_from_frm(THD *thd, TABLE_SHARE *share,
   enum_field_types field_type;
   const CHARSET_INFO *charset = NULL;
   Field::geometry_type geom_type = Field::GEOM_GEOMETRY;
-  LEX_STRING comment;
+  LEX_CSTRING comment;
   Value_generator *gcol_info = nullptr;
   bool fld_stored_in_db = true;
   Field *reg_field;
@@ -1221,7 +1233,7 @@ static int make_field_from_frm(THD *thd, TABLE_SHARE *share,
     }
 
     if (!comment_length) {
-      comment.str = (char *)"";
+      comment.str = "";
       comment.length = 0;
     } else {
       comment.str = *comment_pos;
@@ -1239,7 +1251,7 @@ static int make_field_from_frm(THD *thd, TABLE_SHARE *share,
                         1 - field is physically stored
         byte 5-...  = generated column expression (text data)
       */
-      gcol_info = new (*THR_MALLOC) Value_generator();
+      gcol_info = new (thd->mem_root) Value_generator();
       if ((uint)(*gcol_screen_pos)[0] != 1) return 4;
 
       gcol_info_length = uint2korr(*gcol_screen_pos + 1);
@@ -1331,14 +1343,16 @@ static int make_field_from_frm(THD *thd, TABLE_SHARE *share,
   if (unireg == FRM_context::NEXT_NUMBER) auto_flags |= Field::NEXT_NUMBER;
 
   share->field[field_idx] = reg_field = make_field(
-      share,
+      thd->mem_root, share,
       share->default_values - 1 + recpos,  // recpos starts from 1.
       (uint32)field_length, *null_pos, *null_bit_pos, field_type, charset,
       geom_type, auto_flags,
       (interval_nr ? share->intervals + interval_nr - 1 : (TYPELIB *)0),
       frm_context->fieldnames.type_names[field_idx], f_maybe_null(pack_flag),
       f_is_zerofill(pack_flag) != 0, f_is_dec(pack_flag) == 0,
-      f_decimals(pack_flag), f_bit_as_char(pack_flag), 0, {});
+      f_decimals(pack_flag), f_bit_as_char(pack_flag), 0, {},
+      // Array fields aren't supported in .frm-based tables
+      false);
   if (!reg_field) {
     // Not supported field type
     return 4;
@@ -1436,7 +1450,7 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
   const uint format_section_header_size = 8;
   uchar *format_section_fields = 0;
   bool has_vgc = false;
-  DBUG_ENTER("open_binary_frm");
+  DBUG_TRACE;
 
   new_field_pack_flag = head[27];
   new_frm_ver = (head[2] - FRM_VER);
@@ -1666,7 +1680,7 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
     buff_end = extra_segment_buff + n_length;
     if (next_chunk + 2 < buff_end) {
       uint str_db_type_length = uint2korr(next_chunk);
-      LEX_STRING name;
+      LEX_CSTRING name;
       name.str = (char *)next_chunk + 2;
       name.length = str_db_type_length;
 
@@ -1688,12 +1702,6 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
         share->db_plugin = my_plugin_lock(NULL, &tmp_plugin);
         DBUG_PRINT("info", ("setting dbtype to '%.*s' (%d)", str_db_type_length,
                             next_chunk + 2, ha_legacy_type(share->db_type())));
-      } else if (!tmp_plugin && str_db_type_length == 9 &&
-                 !strncmp((char *)next_chunk + 2, "partition", 9)) {
-        error = 8;
-        my_error(ER_FEATURE_NOT_AVAILABLE, MYF(0), "partitioning",
-                 "--skip-partition", "-DWITH_PARTITION_STORAGE_ENGINE=1");
-        goto err;
       } else if (!tmp_plugin && name.length == 18 &&
                  !strncmp(name.str, "PERFORMANCE_SCHEMA", name.length)) {
         /*
@@ -1717,7 +1725,7 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
       } else if (!tmp_plugin) {
         /* purecov: begin inspected */
         error = 8;
-        name.str[name.length] = 0;
+        const_cast<char *>(name.str)[name.length] = 0;
         my_error(ER_UNKNOWN_STORAGE_ENGINE, MYF(0), name.str);
         goto err;
         /* purecov: end */
@@ -1869,7 +1877,7 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
   extra_rec_buf_length = uint2korr(head + 59);
   rec_buff_length = ALIGN_SIZE(share->reclength + 1 + extra_rec_buf_length);
   share->rec_buff_length = rec_buff_length;
-  if (!(record = (uchar *)alloc_root(&share->mem_root, rec_buff_length)))
+  if (!(record = (uchar *)share->mem_root.Alloc(rec_buff_length)))
     goto err; /* purecov: inspected */
   share->default_values = record;
   if (mysql_file_pread(file, record, (size_t)share->reclength, record_offset,
@@ -1899,13 +1907,11 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
                       "int_length: %d  com_length: %d  gcol_screen_length: %d",
                       interval_count, interval_parts, share->keys, n_length,
                       int_length, com_length, gcol_screen_length));
-  if (!(field_ptr = (Field **)alloc_root(
-            &share->mem_root,
-            (uint)((share->fields + 1) * sizeof(Field *) +
-                   interval_count * sizeof(TYPELIB) +
-                   (share->fields + interval_parts + keys + 3) *
-                       sizeof(char *) +
-                   (n_length + int_length + com_length + gcol_screen_length)))))
+  if (!(field_ptr = (Field **)share->mem_root.Alloc((uint)(
+            (share->fields + 1) * sizeof(Field *) +
+            interval_count * sizeof(TYPELIB) +
+            (share->fields + interval_parts + keys + 3) * sizeof(char *) +
+            (n_length + int_length + com_length + gcol_screen_length)))))
     goto err; /* purecov: inspected */
 
   share->field = field_ptr;
@@ -1941,11 +1947,10 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
     for (interval = share->intervals;
          interval < share->intervals + interval_count; interval++) {
       uint count = (uint)(interval->count + 1) * sizeof(uint);
-      if (!(interval->type_lengths =
-                (uint *)alloc_root(&share->mem_root, count)))
+      if (!(interval->type_lengths = (uint *)share->mem_root.Alloc(count)))
         goto err;
       for (count = 0; count < interval->count; count++) {
-        char *val = (char *)interval->type_names[count];
+        const char *val = interval->type_names[count];
         interval->type_lengths[count] = strlen(val);
       }
       interval->type_lengths[count] = 0;
@@ -2098,7 +2103,7 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
 
     for (uint key = 0; key < share->keys; key++, keyinfo++) {
       uint usable_parts = 0;
-      keyinfo->name = (char *)share->keynames.type_names[key];
+      keyinfo->name = share->keynames.type_names[key];
       /* Fix fulltext keys for old .frm files */
       if (share->key_info[key].flags & HA_FULLTEXT)
         share->key_info[key].algorithm = HA_KEY_ALG_FULLTEXT;
@@ -2318,8 +2323,8 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
     uint k, *save;
 
     /* Store offsets to blob fields to find them fast */
-    if (!(share->blob_field = save = (uint *)alloc_root(
-              &share->mem_root, (uint)(share->blob_fields * sizeof(uint)))))
+    if (!(share->blob_field = save = (uint *)share->mem_root.Alloc(
+              (uint)(share->blob_fields * sizeof(uint)))))
       goto err;
     for (k = 0, ptr = share->field; *ptr; ptr++, k++) {
       if ((*ptr)->flags & BLOB_FLAG) (*save++) = k;
@@ -2336,15 +2341,15 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share,
   share->db_low_byte_first = handler_file->low_byte_first();
   share->column_bitmap_size = bitmap_buffer_size(share->fields);
 
-  if (!(bitmaps = (my_bitmap_map *)alloc_root(&share->mem_root,
-                                              share->column_bitmap_size)))
+  if (!(bitmaps =
+            (my_bitmap_map *)share->mem_root.Alloc(share->column_bitmap_size)))
     goto err;
   bitmap_init(&share->all_set, bitmaps, share->fields, false);
   bitmap_set_all(&share->all_set);
 
   destroy(handler_file);
   my_free(extra_segment_buff);
-  DBUG_RETURN(0);
+  return 0;
 
 err:
   my_free(disk_buff);
@@ -2356,7 +2361,7 @@ err:
   share->name_hash = nullptr;
 
   open_table_error(thd, share, error, my_errno());
-  DBUG_RETURN(error);
+  return error;
 } /*open_binary_frm*/
 
 //////////////////////////////////////////////////////////////////////////
@@ -2365,47 +2370,61 @@ err:
   Validate the expression to see whether there are invalid Item objects.
 
   Needs to be done after fix_fields to allow checking references
-  to other generated columns or default value expressions.
+  to other generated columns, default value expressions or check constraints.
 
   @param expr         Pointer to the expression
-  @param column_name  The name of the column, to be used for error reporting.
-  @param column_index The column order
-  @param is_gen_col   Wheather it is a generated column or a regular column
-                      with generated default value.
+  @param source       Source of value generator(a generated column, a regular
+                      column with generated default value or
+                      a check constraint).
+  @param source_name  Name of the source (generated column, a reguler column
+                      with generated default value or a check constraint).
+  @param column_index The column order.
 
   @retval true  The generated expression has some invalid objects
   @retval false No illegal objects in the generated expression
  */
-static bool validate_value_generator_expr(Item *expr, const char *column_name,
-                                          int column_index, bool is_gen_col) {
-  DBUG_ENTER("validate_value_generator_expr");
+static bool validate_value_generator_expr(Item *expr,
+                                          Value_generator_source source,
+                                          const char *source_name,
+                                          int column_index) {
+  DBUG_TRACE;
   DBUG_ASSERT(expr);
 
-  int err_code = is_gen_col
-                     ? ER_GENERATED_COLUMN_NAMED_FUNCTION_IS_NOT_ALLOWED
-                     : ER_DEFAULT_VAL_GENERATED_NAMED_FUNCTION_IS_NOT_ALLOWED;
+  // Map to get actual error code from error_type for the source.
+  enum error_type { ER_NAME_FUNCTION, ER_FUNCTION, ER_VARIABLES, MAX_ERROR };
+  uint error_code_map[][MAX_ERROR] = {
+      // Generated column errors.
+      {ER_GENERATED_COLUMN_NAMED_FUNCTION_IS_NOT_ALLOWED,
+       ER_GENERATED_COLUMN_FUNCTION_IS_NOT_ALLOWED,
+       ER_GENERATED_COLUMN_VARIABLES},
+      // Default expressions errors.
+      {ER_DEFAULT_VAL_GENERATED_NAMED_FUNCTION_IS_NOT_ALLOWED,
+       ER_DEFAULT_VAL_GENERATED_FUNCTION_IS_NOT_ALLOWED,
+       ER_DEFAULT_VAL_GENERATED_VARIABLES},
+      // Check constraint errors.
+      {ER_CHECK_CONSTRAINT_NAMED_FUNCTION_IS_NOT_ALLOWED,
+       ER_CHECK_CONSTRAINT_FUNCTION_IS_NOT_ALLOWED,
+       ER_CHECK_CONSTRAINT_VARIABLES}};
+  uint err_code = error_code_map[source][ER_NAME_FUNCTION];
+
   // No non-deterministic functions are allowed as GC but most of them are
   // allowed as default value expressions
-  if ((expr->used_tables() & RAND_TABLE_BIT && is_gen_col)) {
+  if ((expr->used_tables() & RAND_TABLE_BIT &&
+       (source == VGS_GENERATED_COLUMN))) {
     Item_func *func_item;
     if (expr->type() == Item::FUNC_ITEM &&
         ((func_item = down_cast<Item_func *>(expr)))) {
-      my_error(err_code, MYF(0), column_name, func_item->func_name());
-      DBUG_RETURN(true);
+      my_error(err_code, MYF(0), source_name, func_item->func_name());
+      return true;
     } else {
-      // Error codes without specifying the function name
-      err_code = is_gen_col ? ER_GENERATED_COLUMN_FUNCTION_IS_NOT_ALLOWED
-                            : ER_DEFAULT_VAL_GENERATED_FUNCTION_IS_NOT_ALLOWED;
-      my_error(err_code, MYF(0), column_name);
-      DBUG_RETURN(true);
+      my_error(error_code_map[source][ER_FUNCTION], MYF(0), source_name);
+      return true;
     }
   }
   // System variables or parameters are not allowed
   else if (expr->used_tables() & INNER_TABLE_BIT) {
-    err_code = is_gen_col ? ER_GENERATED_COLUMN_VARIABLES
-                          : ER_DEFAULT_VAL_GENERATED_VARIABLES;
-    my_error(err_code, MYF(0), column_name);
-    DBUG_RETURN(true);
+    my_error(error_code_map[source][ER_VARIABLES], MYF(0), source_name);
+    return true;
   }
 
   // Assert that we aren't dealing with ROW values (rejected in
@@ -2418,15 +2437,13 @@ static bool validate_value_generator_expr(Item *expr, const char *column_name,
     Walk through the Item tree, checking the validity of items
     belonging to the expression.
   */
-  Check_function_as_value_generator_parameters checker_args(err_code,
-                                                            is_gen_col);
+  Check_function_as_value_generator_parameters checker_args(err_code, source);
   checker_args.col_index = column_index;
-
-  if (expr->walk(&Item::check_function_as_value_generator, Item::WALK_POSTFIX,
+  if (expr->walk(&Item::check_function_as_value_generator, enum_walk::POSTFIX,
                  pointer_cast<uchar *>(&checker_args))) {
-    my_error(checker_args.err_code, MYF(0), column_name,
+    my_error(checker_args.err_code, MYF(0), source_name,
              checker_args.banned_function_name);
-    DBUG_RETURN(true);
+    return true;
   }
 
   // Stored programs are not allowed. This case is already covered, but still
@@ -2434,30 +2451,36 @@ static bool validate_value_generator_expr(Item *expr, const char *column_name,
   if (expr->has_stored_program()) {
     /* purecov: begin deadcode */
     DBUG_ASSERT(false);
-    my_error(err_code, MYF(0), column_name, "stored progam");
-    DBUG_RETURN(true);
+    my_error(err_code, MYF(0), source_name, "stored progam");
+    return true;
     /* purecov: end */
   }
 
-  DBUG_RETURN(false);
+  return false;
 }
 
 /**
-  Process the generated expression or generated default value of the column.
+  Process the generated expression, generated default value of the column or
+  check constraint expression.
 
-  @param thd                The thread object
-  @param table              The table to which the column belongs
-  @param field              Field to which the val_generator is attached to
-  @param val_generator      The expression to unpack
-  @param is_gen_col         Whether is a column or just the expression for a
-                            default value
+  @param thd             The thread object
+  @param table           The table to which the column belongs
+  @param val_generator   The expression to unpack
+  @param source          Source of value generator(a generated column, a regular
+                         column with generated default value or
+                         a check constraint).
+  @param source_name     Name of the source (generated column, a reguler column
+                         with generated default value or a check constraint).
+  @param field           Field to which the val_generator is attached to for
+                         generated columns and default expression.
 
   @retval true An error occurred, something was wrong with the function.
   @retval false Ok, generated expression is fixed sucessfully
  */
-static bool fix_value_generators_fields(THD *thd, TABLE *table, Field *field,
+static bool fix_value_generators_fields(THD *thd, TABLE *table,
                                         Value_generator *val_generator,
-                                        bool is_gen_col) {
+                                        Value_generator_source source,
+                                        const char *source_name, Field *field) {
   uint dir_length, home_dir_length;
   bool result = true;
   Item *func_expr = val_generator->expr_item;
@@ -2469,15 +2492,20 @@ static bool fix_value_generators_fields(THD *thd, TABLE *table, Field *field,
   char *db_name;
   char db_name_string[FN_REFLEN];
   bool save_use_only_table_context;
+  std::unique_ptr<Functional_index_error_handler>
+      functional_index_error_handler;
   enum_mark_columns save_mark_used_columns = thd->mark_used_columns;
   DBUG_ASSERT(func_expr);
-  DBUG_ENTER("fix_value_generators_fields");
+  DBUG_TRACE;
 
   // Insert a error handler that takes care of converting column names to
   // functional index names. Since functional indexes is implemented as
   // indexed hidden generated columns, we may end up printing out the
   // auto-generated column name if we don't have an extra error handler.
-  Functional_index_error_handler functional_index_error_handler(field, thd);
+  if (source == VGS_GENERATED_COLUMN)
+    functional_index_error_handler =
+        std::unique_ptr<Functional_index_error_handler>(
+            new Functional_index_error_handler(field, thd));
 
   /*
     Set-up the TABLE_LIST object to be a list with a single table
@@ -2505,15 +2533,22 @@ static bool fix_value_generators_fields(THD *thd, TABLE *table, Field *field,
   context->table_list = &tables;
   context->first_name_resolution_table = &tables;
   context->last_name_resolution_table = nullptr;
-  func_expr->walk(&Item::change_context_processor, Item::WALK_POSTFIX,
+  func_expr->walk(&Item::change_context_processor, enum_walk::POSTFIX,
                   (uchar *)context);
   save_where = thd->where;
 
-  if (field->is_field_for_functional_index()) {
-    thd->where = "functional index";
+  dd::String_type where_str;
+  if (source == VGS_GENERATED_COLUMN || source == VGS_DEFAULT_EXPRESSION) {
+    thd->where = field->is_field_for_functional_index()
+                     ? "functional index"
+                     : (source == VGS_GENERATED_COLUMN)
+                           ? "generated column function"
+                           : "default value expression";
   } else {
-    thd->where =
-        is_gen_col ? "generated column function" : "default value expression";
+    DBUG_ASSERT(source == VGS_CHECK_CONSTRAINT);
+    where_str =
+        "check constraint " + dd::String_type(source_name) + " expression";
+    thd->where = where_str.c_str();
   }
 
   /* Save the context before fixing the fields*/
@@ -2528,7 +2563,12 @@ static bool fix_value_generators_fields(THD *thd, TABLE *table, Field *field,
   }
 
   Item *new_func = func_expr;
+  if (field && field->is_field_for_functional_index())
+    func_expr->allow_array_cast();
   error = func_expr->fix_fields(thd, &new_func);
+
+  /* Virtual columns expressions that substitute themselves are invalid */
+  DBUG_ASSERT(new_func == func_expr);
 
   /* Restore the current connection character set and collation. */
   if (charset_switched)
@@ -2549,7 +2589,7 @@ static bool fix_value_generators_fields(THD *thd, TABLE *table, Field *field,
     (top query, subquery). So, underlying items are not situated in a defined
     place: give them a null context.
   */
-  func_expr->walk(&Item::change_context_processor, Item::WALK_POSTFIX, nullptr);
+  func_expr->walk(&Item::change_context_processor, enum_walk::POSTFIX, nullptr);
 
   if (unlikely(error)) {
     DBUG_PRINT("info",
@@ -2560,18 +2600,19 @@ static bool fix_value_generators_fields(THD *thd, TABLE *table, Field *field,
   /*
     Checking if all items are valid to be part of the expression.
   */
-  if (validate_value_generator_expr(func_expr, field->field_name,
-                                    field->field_index, is_gen_col))
+  if (validate_value_generator_expr(func_expr, source, source_name,
+                                    field ? field->field_index : 0))
     goto end;
 
-  // Virtual columns expressions that substitute themselves are invalid
-  DBUG_ASSERT(new_func == func_expr);
   result = false;
+
+  func_expr->walk(&Item::strip_db_table_name_processor, enum_walk::POSTFIX,
+                  nullptr);
 
 end:
   table->get_fields_in_item_tree = false;
   thd->mark_used_columns = save_mark_used_columns;
-  DBUG_RETURN(result);
+  return result;
 }
 
 /**
@@ -2584,16 +2625,16 @@ end:
  */
 
 bool Value_generator::register_base_columns(TABLE *table) {
-  DBUG_ENTER("register_base_columns");
+  DBUG_TRACE;
   my_bitmap_map *bitbuf = static_cast<my_bitmap_map *>(
-      alloc_root(&table->mem_root, bitmap_buffer_size(table->s->fields)));
+      table->mem_root.Alloc(bitmap_buffer_size(table->s->fields)));
   DBUG_ASSERT(num_non_virtual_base_cols == 0);
   bitmap_init(&base_columns_map, bitbuf, table->s->fields, 0);
 
   MY_BITMAP *save_old_read_set = table->read_set;
   table->read_set = &base_columns_map;
   Mark_field mark_fld(MARK_COLUMNS_TEMP);
-  expr_item->walk(&Item::mark_field_in_map, Item::WALK_PREFIX,
+  expr_item->walk(&Item::mark_field_in_map, enum_walk::PREFIX,
                   (uchar *)&mark_fld);
   table->read_set = save_old_read_set;
 
@@ -2604,7 +2645,7 @@ bool Value_generator::register_base_columns(TABLE *table) {
         field->stored_in_db)
       num_non_virtual_base_cols++;
   }
-  DBUG_RETURN(false);
+  return false;
 }
 
 void Value_generator::dup_expr_str(MEM_ROOT *root, const char *src,
@@ -2618,15 +2659,17 @@ void Value_generator::print_expr(THD *thd, String *out) {
   Sql_mode_parse_guard parse_guard(thd);
   // Printing db and table name is useless
   auto flags = enum_query_type(QT_NO_DB | QT_NO_TABLE | QT_FORCE_INTRODUCERS);
-  expr_item->print(out, flags);
+  expr_item->print(thd, out, flags);
 }
 
-bool unpack_value_generator(THD *thd, TABLE *table, Field *field,
+bool unpack_value_generator(THD *thd, TABLE *table,
                             Value_generator **val_generator,
-                            bool is_create_table, bool is_gen_col,
-                            bool *error_reported) {
-  DBUG_ENTER("unpack_value_generator");
-  DBUG_ASSERT(field->table == table);
+                            Value_generator_source source,
+                            const char *source_name, Field *field,
+                            bool is_create_table, bool *error_reported) {
+  DBUG_TRACE;
+  DBUG_ASSERT(field == nullptr || field->table == table);
+
   LEX_STRING *val_gen_expr = &(*val_generator)->expr_str;
   DBUG_ASSERT(val_gen_expr);
   DBUG_ASSERT(!(*val_generator)->expr_item);  // No Item in TABLE_SHARE
@@ -2648,13 +2691,12 @@ bool unpack_value_generator(THD *thd, TABLE *table, Field *field,
   thd->lex = &new_lex;
   if (lex_start(thd)) {
     thd->lex = old_lex;
-    DBUG_RETURN(true);  // OOM
+    return true;  // OOM
   }
 
-  if (!(gcol_expr_str = (char *)alloc_root(
-            &table->mem_root,
+  if (!(gcol_expr_str = (char *)table->mem_root.Alloc(
             val_gen_expr->length + PARSE_GCOL_KEYWORD.length + 3))) {
-    DBUG_RETURN(true);
+    return true;
   }
   memcpy(gcol_expr_str, PARSE_GCOL_KEYWORD.str, PARSE_GCOL_KEYWORD.length);
   str_len = PARSE_GCOL_KEYWORD.length;
@@ -2695,12 +2737,12 @@ bool unpack_value_generator(THD *thd, TABLE *table, Field *field,
   thd->lex->expr_allows_subselect = save_allow_subselects;
 
   /*
-    From now on use val_generator generated by the parser. It has an expr_item,
-    and no expr_str.
+    From now on use val_generator generated by the parser. It has an
+    expr_item, and no expr_str.
   */
   *val_generator = parser_state.result;
   /* Keep attribute of generated column */
-  (*val_generator)->set_field_stored(field->stored_in_db);
+  if (field != nullptr) (*val_generator)->set_field_stored(field->stored_in_db);
 
   DBUG_ASSERT((*val_generator)->expr_item && !(*val_generator)->expr_str.str);
 
@@ -2712,8 +2754,8 @@ bool unpack_value_generator(THD *thd, TABLE *table, Field *field,
   }
 
   /* Validate the Item tree. */
-  status = fix_value_generators_fields(thd, table, field, (*val_generator),
-                                       is_gen_col);
+  status = fix_value_generators_fields(thd, table, (*val_generator), source,
+                                       source_name, field);
 
   // Permanent changes to the item_tree are completed.
   if (!thd->lex->is_ps_or_view_context_analysis())
@@ -2746,7 +2788,7 @@ bool unpack_value_generator(THD *thd, TABLE *table, Field *field,
   thd->want_privilege = save_old_privilege;
   thd->lex->expr_allows_subselect = save_allow_subselects;
 
-  DBUG_RETURN(false);
+  return false;
 
 parse_err:
   // Any created window is eliminated as not allowed:
@@ -2759,7 +2801,7 @@ parse_err:
   thd->variables.character_set_client = old_character_set_client;
   thd->want_privilege = save_old_privilege;
   thd->lex->expr_allows_subselect = save_allow_subselects;
-  DBUG_RETURN(true);
+  return true;
 }
 
 // Unpack partition
@@ -2841,6 +2883,25 @@ bool unpack_partition_info(THD *thd, TABLE *outparam, TABLE_SHARE *share,
   DBUG_ASSERT(!share->m_part_info ||
               outparam->part_info->list_of_part_fields ==
                   share->m_part_info->list_of_part_fields);
+
+  // part_info->part_expr->table_name and
+  // part_info->subpart_expr->table_name will have been set to
+  // TABLE::alias (passed on from Field). But part_info cannot refer
+  // to TABLE::alias since this may be changed when the table object
+  // is reused. Traverse part_expr and subpart_expr and set table_name
+  // to nullptr, to avoid dereferencing an invalid pointer.
+
+  // @todo bug#29354690: When part_info handling is refactored and properly
+  // attached to a single TABLE object, this extra code can be
+  // deleted.
+  if (outparam->part_info->part_expr != nullptr) {
+    outparam->part_info->part_expr->walk(&Item::set_table_name,
+                                         enum_walk::SUBQUERY_POSTFIX, nullptr);
+  }
+  if (outparam->part_info->subpart_expr != nullptr) {
+    outparam->part_info->subpart_expr->walk(
+        &Item::set_table_name, enum_walk::SUBQUERY_POSTFIX, nullptr);
+  }
   return tmp;
 }
 
@@ -2878,13 +2939,14 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
   int error;
   uint records, i, bitmap_size;
   bool error_reported = false;
+  bool has_default_values = false;
   const bool internal_tmp = share->table_category == TABLE_CATEGORY_TEMPORARY;
   DBUG_ASSERT(!internal_tmp || share->ref_count() != 0);
   uchar *record, *bitmaps;
   Field **field_ptr;
   Field *fts_doc_id_field = NULL;
-  my_ptrdiff_t move_offset;
-  DBUG_ENTER("open_table_from_share");
+  ptrdiff_t move_offset;
+  DBUG_TRACE;
   DBUG_PRINT("enter", ("name: '%s.%s'  form: %p", share->db.str,
                        share->table_name.str, outparam));
 
@@ -2920,7 +2982,7 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
 
   /* Allocate handler */
   outparam->file = 0;
-  if (!(prgflag & OPEN_FRM_FILE_ONLY)) {
+  if (!(prgflag & SKIP_NEW_HANDLER)) {
     if (!(outparam->file = get_new_handler(share, share->m_part_info != NULL,
                                            root, share->db_type())))
       goto err;
@@ -2936,13 +2998,14 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
   if ((db_stat & HA_OPEN_KEYFILE) || (prgflag & DELAYED_OPEN)) records = 1;
   if (prgflag & (READ_ALL + EXTRA_RECORD)) records++;
 
-  record = pointer_cast<uchar *>(
-      alloc_root(root, share->rec_buff_length * records + share->null_bytes));
+  record = root->ArrayAlloc<uchar>(share->rec_buff_length * records +
+                                   share->null_bytes);
   if (record == NULL) goto err; /* purecov: inspected */
 
   if (records == 0) {
     /* We are probably in hard repair, and the buffers should not be used */
     outparam->record[0] = outparam->record[1] = share->default_values;
+    has_default_values = true;
   } else {
     outparam->record[0] = record;
     if (records > 1)
@@ -2951,9 +3014,9 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
       outparam->record[1] = outparam->record[0];  // Safety
   }
   outparam->null_flags_saved = record + (records * share->rec_buff_length);
+  memset(outparam->null_flags_saved, '\0', share->null_bytes);
 
-  if (!(field_ptr = (Field **)alloc_root(
-            root, (uint)((share->fields + 1) * sizeof(Field *)))))
+  if (!(field_ptr = root->ArrayAlloc<Field *>(share->fields + 1)))
     goto err; /* purecov: inspected */
 
   outparam->field = field_ptr;
@@ -2981,6 +3044,12 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
     if (new_field == NULL) goto err;
     new_field->init(outparam);
     new_field->move_field_offset(move_offset);
+    /*
+       Initialize Field::pack_length() number of bytes for new_field->ptr
+       only if there are no default values for the field.
+    */
+    if (!has_default_values)
+      memset(new_field->ptr, 0, new_field->pack_length());
     /* Check if FTS_DOC_ID column is present in the table */
     if (outparam->file &&
         (outparam->file->ha_table_flags() & HA_CAN_FULLTEXT_EXT) &&
@@ -3001,7 +3070,7 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
     n_length =
         share->keys * sizeof(KEY) + share->key_parts * sizeof(KEY_PART_INFO);
 
-    if (!(key_info = (KEY *)alloc_root(root, n_length))) goto err;
+    if (!(key_info = (KEY *)root->Alloc(n_length))) goto err;
     outparam->key_info = key_info;
     key_part = (reinterpret_cast<KEY_PART_INFO *>(key_info + share->keys));
 
@@ -3071,7 +3140,7 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
   */
 
   bitmap_size = share->column_bitmap_size;
-  if (!(bitmaps = (uchar *)alloc_root(root, bitmap_size * 7))) goto err;
+  if (!(bitmaps = root->ArrayAlloc<uchar>(bitmap_size * 7))) goto err;
   bitmap_init(&outparam->def_read_set, (my_bitmap_map *)bitmaps, share->fields,
               false);
   bitmap_init(&outparam->def_write_set,
@@ -3100,17 +3169,17 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
   */
   outparam->vfield = nullptr;
   if (share->vfields) {
-    Field **vfield_ptr = pointer_cast<Field **>(
-        alloc_root(root, (uint)((share->vfields + 1) * sizeof(Field *))));
+    Field **vfield_ptr = root->ArrayAlloc<Field *>(share->vfields + 1);
     if (!vfield_ptr) goto err;
 
     outparam->vfield = vfield_ptr;
 
     for (field_ptr = outparam->field; *field_ptr; field_ptr++) {
       if ((*field_ptr)->gcol_info) {
-        if (unpack_value_generator(thd, outparam, *field_ptr,
-                                   &(*field_ptr)->gcol_info, is_create_table,
-                                   true, &error_reported)) {
+        if (unpack_value_generator(thd, outparam, &(*field_ptr)->gcol_info,
+                                   VGS_GENERATED_COLUMN,
+                                   (*field_ptr)->field_name, *field_ptr,
+                                   is_create_table, &error_reported)) {
           *vfield_ptr = nullptr;
           error = 4;  // in case no error is reported
           goto err;
@@ -3139,16 +3208,17 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
   // Unpack generated default fields and store reference to this type of fields
   outparam->gen_def_fields_ptr = nullptr;
   if (share->gen_def_field_count) {
-    Field **gen_def_field = pointer_cast<Field **>(alloc_root(
-        root, (uint)((share->gen_def_field_count + 1) * sizeof(Field *))));
+    Field **gen_def_field =
+        root->ArrayAlloc<Field *>(share->gen_def_field_count + 1);
     if (!gen_def_field) goto err;
 
     outparam->gen_def_fields_ptr = gen_def_field;
     for (field_ptr = outparam->field; *field_ptr; field_ptr++) {
       if ((*field_ptr)->has_insert_default_general_value_expression()) {
-        if (unpack_value_generator(thd, outparam, *field_ptr,
-                                   &(*field_ptr)->m_default_val_expr,
-                                   is_create_table, false, &error_reported)) {
+        if (unpack_value_generator(
+                thd, outparam, &(*field_ptr)->m_default_val_expr,
+                VGS_DEFAULT_EXPRESSION, (*field_ptr)->field_name, *field_ptr,
+                is_create_table, &error_reported)) {
           (*field_ptr)->m_default_val_expr = nullptr;
           *gen_def_field = nullptr;
           // In case no error is reported
@@ -3161,13 +3231,64 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
     *gen_def_field = nullptr;  // End marker
   }
 
+  /*
+    Set up table check constraints from the table share and unpack check
+    constraint expression.
+  */
+  if (share->check_constraint_share_list != nullptr) {
+    DBUG_ASSERT(share->check_constraint_share_list->size() > 0);
+
+    outparam->table_check_constraint_list =
+        new (root) Sql_table_check_constraint_list(root);
+    if (outparam->table_check_constraint_list == nullptr) goto err;  // OOM
+
+    for (auto &cc_share : *share->check_constraint_share_list) {
+      // Check constraint name.
+      LEX_CSTRING name;
+      if (lex_string_strmake(root, &name, cc_share->name().str,
+                             cc_share->name().length))
+        goto err;  // OOM
+
+      // Check constraint expression.
+      LEX_CSTRING expr_str;
+      if (lex_string_strmake(root, &expr_str, cc_share->expr_str().str,
+                             cc_share->expr_str().length))
+        goto err;  // OOM
+
+      /*
+        Value generator instance for the check constraint expression. Memory
+        for val_gen is allocated in the thd->mem_root here intentionally.
+        Parser instantiate another value generator object in TABLE's mem_root
+        in unpack_value_generator().
+      */
+      Value_generator *val_gen = new (thd->mem_root) Value_generator();
+      val_gen->dup_expr_str(thd->mem_root, expr_str.str, expr_str.length);
+
+      Sql_table_check_constraint *table_cc =
+          new (root) Sql_table_check_constraint(
+              name, expr_str, cc_share->is_enforced(), val_gen, outparam);
+      if (table_cc == nullptr) goto err;  // OOM
+
+      // Unpack check constraint expression.
+      if (unpack_value_generator(thd, outparam, &val_gen, VGS_CHECK_CONSTRAINT,
+                                 table_cc->name().str, nullptr, is_create_table,
+                                 &error_reported))
+        goto err;
+
+      // Use value generator obtained from the parser.
+      table_cc->set_value_generator(val_gen);
+
+      if (outparam->table_check_constraint_list->push_back(table_cc)) goto err;
+    }
+  }
+
   /* The table struct is now initialized;  Open the table */
   error = 2;
   if (db_stat) {
     const dd::Table *table_def = table_def_param;
     dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
 
-    if (!table_def && !(prgflag & OPEN_NO_DD_TABLE)) {
+    if (!table_def) {
       if (thd->dd_client()->acquire(share->db.str, share->table_name.str,
                                     &table_def)) {
         error_reported = true;
@@ -3257,7 +3378,7 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
   /* Increment the opened_tables counter, only when open flags set. */
   if (db_stat) thd->status_var.opened_tables++;
 
-  DBUG_RETURN(0);
+  return 0;
 
 err:
   if (!error_reported) open_table_error(thd, share, error, my_errno());
@@ -3271,11 +3392,16 @@ err:
     for (Field **gen_def = outparam->gen_def_fields_ptr; *gen_def; gen_def++)
       free_items((*gen_def)->m_default_val_expr->item_list);
   }
+  if (outparam->table_check_constraint_list != nullptr) {
+    for (auto &table_cc : *outparam->table_check_constraint_list) {
+      free_items(table_cc->value_generator()->item_list);
+    }
+  }
   outparam->file = 0;  // For easier error checking
   outparam->db_stat = 0;
   if (!internal_tmp) free_root(root, MYF(0));
-  my_free((void *)outparam->alias);
-  DBUG_RETURN(error);
+  my_free(const_cast<char *>(outparam->alias));
+  return error;
 }
 
 /**
@@ -3287,11 +3413,11 @@ err:
 
 int closefrm(TABLE *table, bool free_share) {
   int error = 0;
-  DBUG_ENTER("closefrm");
+  DBUG_TRACE;
   DBUG_PRINT("enter", ("table: %p", table));
 
   if (table->db_stat) error = table->file->ha_close();
-  my_free((void *)table->alias);
+  my_free(const_cast<char *>(table->alias));
   table->alias = 0;
   if (table->field) {
     for (Field **ptr = table->field; *ptr; ptr++) {
@@ -3301,6 +3427,11 @@ int closefrm(TABLE *table, bool free_share) {
       destroy(*ptr);
     }
     table->field = 0;
+  }
+  if (table->table_check_constraint_list != nullptr) {
+    for (auto &table_cc : *table->table_check_constraint_list) {
+      free_items(table_cc->value_generator()->item_list);
+    }
   }
   destroy(table->file);
   table->file = 0; /* For easier errorchecking */
@@ -3317,7 +3448,7 @@ int closefrm(TABLE *table, bool free_share) {
       free_table_share(table->s);
   }
   free_root(&table->mem_root, MYF(0));
-  DBUG_RETURN(error);
+  return error;
 }
 
 /* Deallocate temporary blob storage */
@@ -3362,7 +3493,7 @@ static void open_table_error(THD *thd, TABLE_SHARE *share, int error,
   int err_no;
   char buff[FN_REFLEN];
   char errbuf[MYSYS_STRERROR_SIZE];
-  DBUG_ENTER("open_table_error");
+  DBUG_TRACE;
 
   switch (error) {
     case 8:
@@ -3423,7 +3554,6 @@ static void open_table_error(THD *thd, TABLE_SHARE *share, int error,
       LogErr(ERROR_LEVEL, ER_SERVER_NOT_FORM_FILE, buff);
       break;
   }
-  DBUG_VOID_RETURN;
 } /* open_table_error */
 
 /* Check that the integer is in the internal */
@@ -3485,7 +3615,7 @@ void append_unescaped(String *res, const char *pos, size_t length) {
 
 void update_create_info_from_table(HA_CREATE_INFO *create_info, TABLE *table) {
   TABLE_SHARE *share = table->s;
-  DBUG_ENTER("update_create_info_from_table");
+  DBUG_TRACE;
 
   create_info->max_rows = share->max_rows;
   create_info->min_rows = share->min_rows;
@@ -3499,9 +3629,11 @@ void update_create_info_from_table(HA_CREATE_INFO *create_info, TABLE *table) {
   create_info->tablespace = share->tablespace;
   create_info->compress = share->compress;
   create_info->encrypt_type = share->encrypt_type;
+  create_info->was_encryption_key_id_set = share->was_encryption_key_id_set;
+  if (create_info->was_encryption_key_id_set) {
+    create_info->encryption_key_id = share->encryption_key_id;
+  }
   create_info->secondary_engine = share->secondary_engine;
-
-  DBUG_VOID_RETURN;
 }
 
 int rename_file_ext(const char *from, const char *to, const char *ext) {
@@ -3554,7 +3686,7 @@ char *get_field(MEM_ROOT *mem, Field *field) {
 
   field->val_str(&str);
   length = str.length();
-  if (!length || !(to = (char *)alloc_root(mem, length + 1))) return NullS;
+  if (!length || !(to = (char *)mem->Alloc(length + 1))) return NullS;
   memcpy(to, str.ptr(), length);
   to[length] = 0;
   return to;
@@ -3715,12 +3847,12 @@ bool check_column_name(const char *name) {
   @retval  true   There was an error.
 */
 
-bool Table_check_intact::check(THD *thd, TABLE *table,
+bool Table_check_intact::check(THD *thd MY_ATTRIBUTE((unused)), TABLE *table,
                                const TABLE_FIELD_DEF *table_def) {
   uint i;
   bool error = false;
   const TABLE_FIELD_TYPE *field_def = table_def->field;
-  DBUG_ENTER("table_check_intact");
+  DBUG_TRACE;
   DBUG_PRINT("info",
              ("table: %s  expected_count: %d", table->alias, table_def->count));
 
@@ -3737,13 +3869,13 @@ bool Table_check_intact::check(THD *thd, TABLE *table,
                    table->s->db.str, table->alias, table_def->count,
                    table->s->fields, static_cast<int>(table->s->mysql_version),
                    MYSQL_VERSION_ID);
-      DBUG_RETURN(true);
+      return true;
     } else if (MYSQL_VERSION_ID == table->s->mysql_version) {
       report_error(ER_COL_COUNT_DOESNT_MATCH_CORRUPTED_V2,
                    ER_THD(thd, ER_COL_COUNT_DOESNT_MATCH_CORRUPTED_V2),
                    table->s->db.str, table->s->table_name.str, table_def->count,
                    table->s->fields);
-      DBUG_RETURN(true);
+      return true;
     }
     /*
       Something has definitely changed, but we're running an older
@@ -3841,7 +3973,7 @@ end:
     error = true;
   }
 
-  DBUG_RETURN(error);
+  return error;
 }
 
 /**
@@ -3897,7 +4029,7 @@ bool TABLE_SHARE::visit_subgraph(Wait_for_flush *wait_for_flush,
     over the same loop twice and shortcut the search.
     Do it after taking the lock to weed out unnecessary races.
   */
-  if (src_ctx->m_wait.get_status() != MDL_wait::EMPTY) {
+  if (src_ctx->m_wait.get_status() != MDL_wait::WS_EMPTY) {
     result = false;
     goto end;
   }
@@ -4088,9 +4220,9 @@ void TABLE::init(THD *thd, TABLE_LIST *tl) {
   /* Fix alias if table name changes. */
   if (strcmp(alias, tl->alias)) {
     size_t length = strlen(tl->alias) + 1;
-    alias = (char *)my_realloc(key_memory_TABLE, (char *)alias, length,
-                               MYF(MY_WME));
-    memcpy((char *)alias, tl->alias, length);
+    alias = static_cast<char *>(my_realloc(
+        key_memory_TABLE, const_cast<char *>(alias), length, MYF(MY_WME)));
+    memcpy(const_cast<char *>(alias), tl->alias, length);
   }
 
   const_table = false;
@@ -4104,9 +4236,9 @@ void TABLE::init(THD *thd, TABLE_LIST *tl) {
   file->ft_handler = 0;
   reginfo.impossible_range = 0;
 
-  /* Catch wrong handling of the auto_increment_field_not_null. */
-  DBUG_ASSERT(!auto_increment_field_not_null);
-  auto_increment_field_not_null = false;
+  /* Catch wrong handling of the autoinc_field_has_explicit_non_null_value. */
+  DBUG_ASSERT(!autoinc_field_has_explicit_non_null_value);
+  autoinc_field_has_explicit_non_null_value = false;
 
   pos_in_table_list = tl;
 
@@ -4116,7 +4248,7 @@ void TABLE::init(THD *thd, TABLE_LIST *tl) {
   no_keyread = false;
 
   /* Tables may be reused in a sub statement. */
-  DBUG_ASSERT(!db_stat || !file->extra(HA_EXTRA_IS_ATTACHED_CHILDREN));
+  DBUG_ASSERT(!db_stat || !file->ha_extra(HA_EXTRA_IS_ATTACHED_CHILDREN));
 
   /*
     Do not call refix_value_generator_items() for tables which are not directly
@@ -4165,7 +4297,7 @@ bool TABLE::init_tmp_table(THD *thd, TABLE_SHARE *share, MEM_ROOT *m_root,
             thd->tmp_table++);
     fn_format(path, path, mysql_tmpdir, "",
               MY_REPLACE_EXT | MY_UNPACK_FILENAME);
-    if (!(name = (char *)alloc_root(m_root, strlen(path) + 1))) return true;
+    if (!(name = (char *)m_root->Alloc(strlen(path) + 1))) return true;
     my_stpcpy(name, path);
 
     init_tmp_table_share(thd, share, "", 0, name, name, m_root);
@@ -4208,7 +4340,8 @@ bool TABLE::refix_value_generator_items(THD *thd) {
       Field *vfield = *vfield_ptr;
       DBUG_ASSERT(vfield->gcol_info && vfield->gcol_info->expr_item);
       refix_inner_value_generator_items(thd, vfield->gcol_info, vfield,
-                                        vfield->table, true);
+                                        vfield->table, VGS_GENERATED_COLUMN,
+                                        vfield->field_name);
     }
   }
 
@@ -4217,16 +4350,28 @@ bool TABLE::refix_value_generator_items(THD *thd) {
          gen_def_col++) {
       Value_generator *gen_def_expr = (*gen_def_col)->m_default_val_expr;
       DBUG_ASSERT(gen_def_expr && gen_def_expr->expr_item);
-      refix_inner_value_generator_items(thd, gen_def_expr, (*gen_def_col),
-                                        (*gen_def_col)->table, false);
+      refix_inner_value_generator_items(
+          thd, gen_def_expr, (*gen_def_col), (*gen_def_col)->table,
+          VGS_DEFAULT_EXPRESSION, (*gen_def_col)->field_name);
     }
+
+  if (table_check_constraint_list != nullptr) {
+    for (auto &table_cc : *table_check_constraint_list) {
+      Value_generator *cc_expr = table_cc->value_generator();
+      DBUG_ASSERT(cc_expr != nullptr && cc_expr->expr_item != nullptr);
+      refix_inner_value_generator_items(thd, cc_expr, nullptr,
+                                        table_cc->table(), VGS_CHECK_CONSTRAINT,
+                                        table_cc->name().str);
+    }
+  }
 
   return false;
 }
 
 bool TABLE::refix_inner_value_generator_items(THD *thd, Value_generator *g_expr,
                                               Field *field, TABLE *table,
-                                              bool is_gen_col) {
+                                              Value_generator_source source,
+                                              const char *source_name) {
   if (!g_expr->expr_item->fixed) {
     bool res = false;
     /*
@@ -4257,7 +4402,8 @@ bool TABLE::refix_inner_value_generator_items(THD *thd, Value_generator *g_expr,
     ulong sav_want_priv = thd->want_privilege;
     thd->want_privilege = 0;
 
-    if (fix_value_generators_fields(thd, table, field, g_expr, is_gen_col))
+    if (fix_value_generators_fields(thd, table, g_expr, source, source_name,
+                                    field))
       res = true;
 
     if (!g_expr->permanent_changes_completed &&
@@ -4289,6 +4435,11 @@ void TABLE::cleanup_value_generator_items() {
   if (gen_def_fields_ptr)
     for (Field **vfield_ptr = gen_def_fields_ptr; *vfield_ptr; vfield_ptr++)
       cleanup_items((*vfield_ptr)->m_default_val_expr->item_list);
+
+  if (table_check_constraint_list != nullptr) {
+    for (auto &table_cc : *table_check_constraint_list)
+      cleanup_items(table_cc->value_generator()->item_list);
+  }
 
   if (!has_gcol()) return;
 
@@ -4370,11 +4521,11 @@ TABLE_LIST *TABLE_LIST::new_nested_join(MEM_ROOT *allocator, const char *alias,
   join_nest->nested_join = new (allocator) NESTED_JOIN;
   if (join_nest->nested_join == nullptr) return nullptr;
 
-  join_nest->db = (char *)"";
+  join_nest->db = "";
   join_nest->db_length = 0;
-  join_nest->table_name = (char *)"";
+  join_nest->table_name = "";
   join_nest->table_name_length = 0;
-  join_nest->alias = (char *)alias;
+  join_nest->alias = alias;
 
   join_nest->embedding = embedding;
   join_nest->join_list = belongs_to;
@@ -4443,13 +4594,13 @@ void TABLE_LIST::reset() {
 */
 
 bool TABLE_LIST::merge_where(THD *thd) {
-  DBUG_ENTER("TABLE_LIST::merge_where");
+  DBUG_TRACE;
 
   DBUG_ASSERT(is_merged());
 
   Item *const condition = derived_unit()->first_select()->where_cond();
 
-  if (!condition) DBUG_RETURN(false);
+  if (!condition) return false;
 
   /*
     Save the WHERE condition separately. This is needed because it is already
@@ -4465,9 +4616,9 @@ bool TABLE_LIST::merge_where(THD *thd) {
     and attach it to join nest representing this derived table.
   */
   set_join_cond(and_conds(join_cond(), condition));
-  if (!join_cond()) DBUG_RETURN(true); /* purecov: inspected */
+  if (!join_cond()) return true; /* purecov: inspected */
 
-  DBUG_RETURN(false);
+  return false;
 }
 
 /**
@@ -4531,25 +4682,25 @@ bool TABLE_LIST::create_field_translation(THD *thd) {
 */
 
 static bool merge_join_conditions(THD *thd, TABLE_LIST *table, Item **pcond) {
-  DBUG_ENTER("merge_join_conditions");
+  DBUG_TRACE;
 
   *pcond = NULL;
   DBUG_PRINT("info", ("alias: %s", table->alias));
   if (table->join_cond()) {
     if (!(*pcond = table->join_cond()->copy_andor_structure(thd)))
-      DBUG_RETURN(true); /* purecov: inspected */
+      return true; /* purecov: inspected */
   }
-  if (!table->nested_join) DBUG_RETURN(false);
+  if (!table->nested_join) return false;
   List_iterator<TABLE_LIST> li(table->nested_join->join_list);
   while (TABLE_LIST *tbl = li++) {
     if (tbl->is_view()) continue;
     Item *cond;
     if (merge_join_conditions(thd, tbl, &cond))
-      DBUG_RETURN(true); /* purecov: inspected */
+      return true; /* purecov: inspected */
     if (cond && !(*pcond = and_conds(*pcond, cond)))
-      DBUG_RETURN(true); /* purecov: inspected */
+      return true; /* purecov: inspected */
   }
-  DBUG_RETURN(false);
+  return false;
 }
 
 /**
@@ -4582,7 +4733,7 @@ static bool merge_join_conditions(THD *thd, TABLE_LIST *table, Item **pcond) {
 */
 
 bool TABLE_LIST::prepare_check_option(THD *thd, bool is_cascaded) {
-  DBUG_ENTER("TABLE_LIST::prepare_check_option");
+  DBUG_TRACE;
   DBUG_ASSERT(is_view());
 
   /*
@@ -4593,19 +4744,19 @@ bool TABLE_LIST::prepare_check_option(THD *thd, bool is_cascaded) {
 
   for (TABLE_LIST *tbl = merge_underlying_list; tbl; tbl = tbl->next_local) {
     if (tbl->is_view() && tbl->prepare_check_option(thd, is_cascaded))
-      DBUG_RETURN(true); /* purecov: inspected */
+      return true; /* purecov: inspected */
   }
 
   if (!check_option_processed) {
     Prepared_stmt_arena_holder ps_arena_holder(thd);
     if ((with_check || is_cascaded) &&
         merge_join_conditions(thd, this, &check_option))
-      DBUG_RETURN(true); /* purecov: inspected */
+      return true; /* purecov: inspected */
 
     for (TABLE_LIST *tbl = merge_underlying_list; tbl; tbl = tbl->next_local) {
       if (tbl->check_option &&
           !(check_option = and_conds(check_option, tbl->check_option)))
-        DBUG_RETURN(true); /* purecov: inspected */
+        return true; /* purecov: inspected */
     }
 
     check_option_processed = true;
@@ -4616,11 +4767,11 @@ bool TABLE_LIST::prepare_check_option(THD *thd, bool is_cascaded) {
     thd->where = "check option";
     if (check_option->fix_fields(thd, &check_option) ||
         check_option->check_cols(1))
-      DBUG_RETURN(true); /* purecov: inspected */
+      return true; /* purecov: inspected */
     thd->where = save_where;
   }
 
-  DBUG_RETURN(false);
+  return false;
 }
 
 /**
@@ -4641,21 +4792,21 @@ bool TABLE_LIST::prepare_check_option(THD *thd, bool is_cascaded) {
 */
 
 bool TABLE_LIST::prepare_replace_filter(THD *thd) {
-  DBUG_ENTER("TABLE_LIST::prepare_replace_filter");
+  DBUG_TRACE;
 
   for (TABLE_LIST *tbl = merge_underlying_list; tbl; tbl = tbl->next_local) {
-    if (tbl->is_view() && tbl->prepare_replace_filter(thd)) DBUG_RETURN(true);
+    if (tbl->is_view() && tbl->prepare_replace_filter(thd)) return true;
   }
 
   if (!replace_filter_processed) {
     Prepared_stmt_arena_holder ps_arena_holder(thd);
 
     if (merge_join_conditions(thd, this, &replace_filter))
-      DBUG_RETURN(true); /* purecov: inspected */
+      return true; /* purecov: inspected */
     for (TABLE_LIST *tbl = merge_underlying_list; tbl; tbl = tbl->next_local) {
       if (tbl->replace_filter) {
         if (!(replace_filter = and_conds(replace_filter, tbl->replace_filter)))
-          DBUG_RETURN(true);
+          return true;
       }
     }
     replace_filter_processed = true;
@@ -4666,11 +4817,11 @@ bool TABLE_LIST::prepare_replace_filter(THD *thd) {
     thd->where = "replace filter";
     if (replace_filter->fix_fields(thd, &replace_filter) ||
         replace_filter->check_cols(1))
-      DBUG_RETURN(true);
+      return true;
     thd->where = save_where;
   }
 
-  DBUG_RETURN(false);
+  return false;
 }
 
 /**
@@ -4682,7 +4833,7 @@ void TABLE_LIST::cleanup_items() {
 
   for (Field_translator *transl = field_translation;
        transl < field_translation_end; transl++)
-    transl->item->walk(&Item::cleanup_processor, Item::WALK_POSTFIX, NULL);
+    transl->item->walk(&Item::cleanup_processor, enum_walk::POSTFIX, NULL);
 }
 
 /**
@@ -4742,8 +4893,9 @@ bool TABLE_LIST::check_single_table(TABLE_LIST **table_ref, table_map map) {
 bool TABLE_LIST::set_insert_values(MEM_ROOT *mem_root) {
   if (table) {
     DBUG_ASSERT(table->insert_values == NULL);
-    if (!table->insert_values && !(table->insert_values = (uchar *)alloc_root(
-                                       mem_root, table->s->rec_buff_length)))
+    if (!table->insert_values &&
+        !(table->insert_values =
+              (uchar *)mem_root->Alloc(table->s->rec_buff_length)))
       return true; /* purecov: inspected */
   } else {
     DBUG_ASSERT(view && merge_underlying_list);
@@ -4869,16 +5021,15 @@ TABLE_LIST *TABLE_LIST::last_leaf_for_name_resolution() {
 */
 
 bool TABLE_LIST::prepare_view_security_context(THD *thd) {
-  DBUG_ENTER("TABLE_LIST::prepare_view_securety_context");
+  DBUG_TRACE;
   DBUG_PRINT("enter", ("table: %s", alias));
 
   DBUG_ASSERT(!prelocking_placeholder && view);
   if (view_suid) {
     DBUG_PRINT("info", ("This table is suid view => load contest"));
     DBUG_ASSERT(view && view_sctx);
-    if (acl_getroot(thd, view_sctx, const_cast<char *>(definer.user.str),
-                    const_cast<char *>(definer.host.str),
-                    const_cast<char *>(definer.host.str), thd->db().str)) {
+    if (acl_getroot(thd, view_sctx, definer.user.str, definer.host.str,
+                    definer.host.str, thd->db().str)) {
       if ((thd->lex->sql_command == SQLCOM_SHOW_CREATE) ||
           (thd->lex->sql_command == SQLCOM_SHOW_FIELDS)) {
         push_warning_printf(thd, Sql_condition::SL_NOTE, ER_NO_SUCH_USER,
@@ -4900,11 +5051,11 @@ bool TABLE_LIST::prepare_view_security_context(THD *thd) {
                 thd->security_context()->priv_host().str,
                 (thd->password ? ER_THD(thd, ER_YES) : ER_THD(thd, ER_NO)));
         }
-        DBUG_RETURN(true);
+        return true;
       }
     }
   }
-  DBUG_RETURN(false);
+  return false;
 }
 
 /**
@@ -4917,7 +5068,7 @@ bool TABLE_LIST::prepare_view_security_context(THD *thd) {
 Security_context *TABLE_LIST::find_view_security_context(THD *thd) {
   Security_context *sctx;
   TABLE_LIST *upper_view = this;
-  DBUG_ENTER("TABLE_LIST::find_view_security_context");
+  DBUG_TRACE;
 
   DBUG_ASSERT(view);
   while (upper_view && !upper_view->view_suid) {
@@ -4933,7 +5084,7 @@ Security_context *TABLE_LIST::find_view_security_context(THD *thd) {
     DBUG_PRINT("info", ("Current global context will be used"));
     sctx = thd->security_context();
   }
-  DBUG_RETURN(sctx);
+  return sctx;
 }
 
 /**
@@ -4948,11 +5099,11 @@ Security_context *TABLE_LIST::find_view_security_context(THD *thd) {
 bool TABLE_LIST::prepare_security(THD *thd) {
   List_iterator_fast<TABLE_LIST> tb(*view_tables);
   TABLE_LIST *tbl;
-  DBUG_ENTER("TABLE_LIST::prepare_security");
+  DBUG_TRACE;
   Security_context *save_security_ctx = thd->security_context();
 
   DBUG_ASSERT(!prelocking_placeholder);
-  if (prepare_view_security_context(thd)) DBUG_RETURN(true);
+  if (prepare_view_security_context(thd)) return true;
   /* Acl_map was previously checked out by get_aclroot */
   thd->set_security_context(find_view_security_context(thd));
   opt_trace_disable_if_no_security_context_access(thd);
@@ -4974,7 +5125,7 @@ bool TABLE_LIST::prepare_security(THD *thd) {
                                     local_table_name);
   }
   thd->set_security_context(save_security_ctx);
-  DBUG_RETURN(false);
+  return false;
 }
 
 Natural_join_column::Natural_join_column(Field_translator *field_param,
@@ -5067,7 +5218,10 @@ Item *Field_iterator_table::create_item(THD *thd) {
     This function creates Item-s which don't go through fix_fields(); see same
     code in Item_field::fix_fields().
     */
-  if (is_null_on_empty_table(thd, item)) item->maybe_null = true;
+  if (is_null_on_empty_table(thd, item)) {
+    item->maybe_null = true;
+    (*ptr)->table->set_nullable();
+  }
 
   return item;
 }
@@ -5084,7 +5238,7 @@ static Item *create_view_field(THD *thd, TABLE_LIST *view, Item **field_ref,
                                Name_resolution_context *context) {
   Item *field = *field_ref;
   const char *table_name;
-  DBUG_ENTER("create_view_field");
+  DBUG_TRACE;
 
   if (view->schema_table_reformed) {
     /*
@@ -5093,13 +5247,12 @@ static Item *create_view_field(THD *thd, TABLE_LIST *view, Item **field_ref,
       field. This case happens only for 'show & where' commands.
     */
     DBUG_ASSERT(field && field->fixed);
-    DBUG_RETURN(field);
+    return field;
   }
 
   DBUG_ASSERT(field);
   if (!field->fixed) {
-    if (field->fix_fields(thd, field_ref))
-      DBUG_RETURN(NULL); /* purecov: inspected */
+    if (field->fix_fields(thd, field_ref)) return NULL; /* purecov: inspected */
     field = *field_ref;
   }
 
@@ -5130,7 +5283,7 @@ static Item *create_view_field(THD *thd, TABLE_LIST *view, Item **field_ref,
   */
   Item *item = new Item_view_ref(context, field_ref, view->alias, table_name,
                                  name, view);
-  DBUG_RETURN(item);
+  return item;
 }
 
 void Field_iterator_natural_join::set(TABLE_LIST *table_ref) {
@@ -5147,7 +5300,7 @@ void Field_iterator_natural_join::next() {
 }
 
 void Field_iterator_table_ref::set_field_iterator() {
-  DBUG_ENTER("Field_iterator_table_ref::set_field_iterator");
+  DBUG_TRACE;
   /*
     If the table reference we are iterating over is a natural join, or it is
     an operand of a natural join, and TABLE_LIST::join_columns contains all
@@ -5187,7 +5340,6 @@ void Field_iterator_table_ref::set_field_iterator() {
                ("field_it for '%s' is Field_iterator_table", table_ref->alias));
   }
   field_it->set(table_ref);
-  DBUG_VOID_RETURN;
 }
 
 void Field_iterator_table_ref::set(TABLE_LIST *table) {
@@ -5300,12 +5452,13 @@ Natural_join_column *Field_iterator_table_ref::get_or_create_column_ref(
     Item_field *tmp_item =
         new Item_field(thd, &thd->lex->current_select()->context, tmp_field);
     if (!tmp_item) return NULL;
-    nj_col = new (*THR_MALLOC) Natural_join_column(tmp_item, table_ref);
+    nj_col = new (thd->mem_root) Natural_join_column(tmp_item, table_ref);
     field_count = table_ref->table->s->fields;
   } else if (field_it == &view_field_it) {
     /* The field belongs to a merge view or information schema table. */
     Field_translator *translated_field = view_field_it.field_translator();
-    nj_col = new (*THR_MALLOC) Natural_join_column(translated_field, table_ref);
+    nj_col =
+        new (thd->mem_root) Natural_join_column(translated_field, table_ref);
     field_count =
         table_ref->field_translation_end - table_ref->field_translation;
   } else {
@@ -5333,7 +5486,7 @@ Natural_join_column *Field_iterator_table_ref::get_or_create_column_ref(
     if (!add_table_ref->join_columns) {
       /* Create a list of natural join columns on demand. */
       if (!(add_table_ref->join_columns =
-                new (*THR_MALLOC) List<Natural_join_column>))
+                new (thd->mem_root) List<Natural_join_column>))
         return NULL;
       add_table_ref->is_join_columns_complete = false;
     }
@@ -5418,7 +5571,7 @@ void TABLE::clear_column_bitmaps() {
 */
 
 void TABLE::prepare_for_position() {
-  DBUG_ENTER("TABLE::prepare_for_position");
+  DBUG_TRACE;
 
   if ((file->ha_table_flags() & HA_PRIMARY_KEY_REQUIRED_FOR_POSITION) &&
       s->primary_key < MAX_KEY) {
@@ -5426,7 +5579,6 @@ void TABLE::prepare_for_position() {
     /* signal change */
     file->column_bitmaps_signal();
   }
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -5438,7 +5590,6 @@ void TABLE::prepare_for_position() {
   @note If TABLE::get_fields_in_item_tree is set, set the flag bit
         GET_FIXED_FIELDS_FLAG for the field.
 
-  @param thd      Thread handler (only used for duplicate handling)
   @param field    The column to be marked as used
   @param mark      =MARK_COLUMNS_NONE: Only update flag field, if applicable
                    =MARK_COLUMNS_READ: Mark column as read
@@ -5447,9 +5598,8 @@ void TABLE::prepare_for_position() {
                                        and processing of generated columns
 */
 
-void TABLE::mark_column_used(THD *thd, Field *field,
-                             enum enum_mark_columns mark) {
-  DBUG_ENTER("TABLE::mark_column_used");
+void TABLE::mark_column_used(Field *field, enum enum_mark_columns mark) {
+  DBUG_TRACE;
 
   switch (mark) {
     case MARK_COLUMNS_NONE:
@@ -5461,7 +5611,6 @@ void TABLE::mark_column_used(THD *thd, Field *field,
       bitmap_set_bit(read_set, field->field_index);
 
       part_of_key.merge(field->part_of_prefixkey);
-      // Update covering_keys and merge_keys based on all fields that are read:
       covering_keys.intersect(part_of_key);
       merge_keys.merge(field->part_of_key);
       if (get_fields_in_item_tree) field->flags |= GET_FIXED_FIELDS_FLAG;
@@ -5469,14 +5618,7 @@ void TABLE::mark_column_used(THD *thd, Field *field,
       break;
     }
     case MARK_COLUMNS_WRITE:
-      if (bitmap_fast_test_and_set(write_set, field->field_index)) {
-        /*
-          This is relevant for INSERT only, but duplicate indication is set
-          for all fields that are updated.
-        */
-        DBUG_PRINT("warning", ("Found duplicated field"));
-        thd->dup_field = field;
-      }
+      bitmap_set_bit(write_set, field->field_index);
       DBUG_ASSERT(!get_fields_in_item_tree);
 
       if (field->is_gcol()) mark_gcol_in_maps(field);
@@ -5487,7 +5629,6 @@ void TABLE::mark_column_used(THD *thd, Field *field,
       if (field->is_virtual_gcol()) mark_gcol_in_maps(field);
       break;
   }
-  DBUG_VOID_RETURN;
 }
 
 /*
@@ -5501,13 +5642,12 @@ void TABLE::mark_column_used(THD *thd, Field *field,
 
 void TABLE::mark_columns_used_by_index(uint index) {
   MY_BITMAP *bitmap = &tmp_set;
-  DBUG_ENTER("TABLE::mark_columns_used_by_index");
+  DBUG_TRACE;
 
   set_keyread(true);
   bitmap_clear_all(bitmap);
   mark_columns_used_by_index_no_reset(index, bitmap);
   column_bitmaps_set(bitmap, bitmap);
-  DBUG_VOID_RETURN;
 }
 
 /*
@@ -5539,7 +5679,7 @@ void TABLE::mark_columns_used_by_index(uint index) {
 */
 
 void TABLE::mark_columns_used_by_index_no_reset(uint index, MY_BITMAP *bitmap,
-                                                uint key_parts) {
+                                                uint key_parts) const {
   // If key_parts has the default value, then include user defined key parts
   if (key_parts == 0)
     key_parts = key_info[index].user_defined_key_parts;
@@ -5678,7 +5818,7 @@ void TABLE::mark_columns_needed_for_delete(THD *thd) {
 */
 
 void TABLE::mark_columns_needed_for_update(THD *thd, bool mark_binlog_columns) {
-  DBUG_ENTER("mark_columns_needed_for_update");
+  DBUG_TRACE;
   if (mark_binlog_columns) mark_columns_per_binlog_row_image(thd);
   if (file->ha_table_flags() & HA_REQUIRES_KEY_COLUMNS_FOR_DELETE) {
     /* Mark all used key columns for read */
@@ -5722,7 +5862,9 @@ void TABLE::mark_columns_needed_for_update(THD *thd, bool mark_binlog_columns) {
   }
   /* Mark dependent generated columns as writable */
   if (vfield) mark_generated_columns(true);
-  DBUG_VOID_RETURN;
+  /* Mark columns needed for check constraints evaluation */
+  if (table_check_constraint_list != nullptr)
+    mark_check_constraint_columns(true);
 }
 
 /*
@@ -5757,7 +5899,7 @@ void TABLE::mark_columns_needed_for_update(THD *thd, bool mark_binlog_columns) {
   execution).
  */
 void TABLE::mark_columns_per_binlog_row_image(THD *thd) {
-  DBUG_ENTER("mark_columns_per_binlog_row_image");
+  DBUG_TRACE;
   DBUG_ASSERT(read_set->bitmap);
   DBUG_ASSERT(write_set->bitmap);
 
@@ -5814,8 +5956,6 @@ void TABLE::mark_columns_per_binlog_row_image(THD *thd) {
     }
     file->column_bitmaps_signal();
   }
-
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -5848,7 +5988,7 @@ bool TABLE::alloc_tmp_keys(uint key_count, bool modify_share) {
       reference to the same CTE in another query block.
     */
     KEY *old_ki = s->key_info;
-    if (!(s->key_info = static_cast<KEY *>(alloc_root(&s->mem_root, bytes))))
+    if (!(s->key_info = static_cast<KEY *>(s->mem_root.Alloc(bytes))))
       return true; /* purecov: inspected */
     memset(s->key_info, 0, bytes);
     if (old_ki) memcpy(s->key_info, old_ki, sizeof(KEY) * s->keys);
@@ -5858,7 +5998,7 @@ bool TABLE::alloc_tmp_keys(uint key_count, bool modify_share) {
   DBUG_ASSERT(s->max_tmp_keys == key_count);
 
   KEY *old_ki = key_info;
-  if (!(key_info = static_cast<KEY *>(alloc_root(&s->mem_root, bytes))))
+  if (!(key_info = static_cast<KEY *>(s->mem_root.Alloc(bytes))))
     return true; /* purecov: inspected */
   memset(key_info, 0, bytes);
   if (old_ki) memcpy(key_info, old_ki, sizeof(KEY) * s->keys);
@@ -6084,16 +6224,16 @@ void TABLE::set_keyread(bool flag) {
   DBUG_ASSERT(file);
   if (flag && !key_read) {
     key_read = 1;
-    if (is_created()) file->extra(HA_EXTRA_KEYREAD);
+    if (is_created()) file->ha_extra(HA_EXTRA_KEYREAD);
   } else if (!flag && key_read) {
     key_read = 0;
-    if (is_created()) file->extra(HA_EXTRA_NO_KEYREAD);
+    if (is_created()) file->ha_extra(HA_EXTRA_NO_KEYREAD);
   }
 }
 
 void TABLE::set_created() {
   if (created) return;
-  if (key_read) file->extra(HA_EXTRA_KEYREAD);
+  if (key_read) file->ha_extra(HA_EXTRA_KEYREAD);
   created = true;
 }
 
@@ -6110,6 +6250,9 @@ void TABLE::mark_columns_needed_for_insert(THD *thd) {
   if (found_next_number_field) mark_auto_increment_column();
   /* Mark all generated columns as writable */
   if (vfield) mark_generated_columns(false);
+  /* Mark columns needed for check constraints evaluation */
+  if (table_check_constraint_list != nullptr)
+    mark_check_constraint_columns(false);
 }
 
 /*
@@ -6189,11 +6332,9 @@ void TABLE::mark_generated_columns(bool is_update) {
           bitmap_is_overlapping(write_set,
                                 &tmp_vfield->gcol_info->base_columns_map)) {
         // The GC needs to be updated
-        tmp_vfield->table->mark_column_used(in_use, tmp_vfield,
-                                            MARK_COLUMNS_WRITE);
+        tmp_vfield->table->mark_column_used(tmp_vfield, MARK_COLUMNS_WRITE);
         // In order to update the new value, we have to read the old value
-        tmp_vfield->table->mark_column_used(in_use, tmp_vfield,
-                                            MARK_COLUMNS_READ);
+        tmp_vfield->table->mark_column_used(tmp_vfield, MARK_COLUMNS_READ);
         bitmap_updated = true;
       }
     }
@@ -6202,8 +6343,7 @@ void TABLE::mark_generated_columns(bool is_update) {
     for (vfield_ptr = vfield; *vfield_ptr; vfield_ptr++) {
       tmp_vfield = *vfield_ptr;
       DBUG_ASSERT(tmp_vfield->gcol_info && tmp_vfield->gcol_info->expr_item);
-      tmp_vfield->table->mark_column_used(in_use, tmp_vfield,
-                                          MARK_COLUMNS_WRITE);
+      tmp_vfield->table->mark_column_used(tmp_vfield, MARK_COLUMNS_WRITE);
       bitmap_updated = true;
     }
   }
@@ -6212,44 +6352,47 @@ void TABLE::mark_generated_columns(bool is_update) {
 }
 
 /*
-  Check whether a base field is dependent on any generated columns.
+  Update the read_map with columns needed for check constraint evaluation when
+  doing update and insert operations.
 
-  @return
-    true     The field is dependent by some GC.
+  The read_map is filled with the base columns and generated columns to be read
+  to evaluate check constraints. Prerequisites for UPDATE is, write_map is
+  filled with the base columns to be updated and generated columns that are
+  dependent on updated base columns.
 
+  @param        is_update  true means the operation is UPDATE.
+                           false means it's INSERT.
+
+  @return       void
 */
-bool TABLE::is_field_used_by_generated_columns(uint field_index,
-                                               int *error_no) {
-  MY_BITMAP dependent_fields;
-  my_bitmap_map bitbuf[bitmap_buffer_size(MAX_FIELDS) / sizeof(my_bitmap_map)];
-  bitmap_init(&dependent_fields, bitbuf, s->fields, 0);
-  MY_BITMAP *save_old_read_set = read_set;
-  read_set = &dependent_fields;
+void TABLE::mark_check_constraint_columns(bool is_update) {
+  DBUG_ASSERT(table_check_constraint_list != nullptr);
 
-  for (Field **vfield_ptr = field; *vfield_ptr; vfield_ptr++) {
-    Field *tmp_vfield = *vfield_ptr;
-    if (tmp_vfield->is_gcol() ||
-        tmp_vfield->has_insert_default_general_value_expression()) {
-      DBUG_ASSERT((tmp_vfield->gcol_info && tmp_vfield->gcol_info->expr_item) ||
-                  (tmp_vfield->m_default_val_expr &&
-                   tmp_vfield->m_default_val_expr->expr_item));
-      Mark_field mark_fld(MARK_COLUMNS_TEMP);
-      Item *expr = tmp_vfield->is_gcol()
-                       ? tmp_vfield->gcol_info->expr_item
-                       : tmp_vfield->m_default_val_expr->expr_item;
-      expr->walk(&Item::mark_field_in_map, Item::WALK_PREFIX,
-                 (uchar *)&mark_fld);
-      if (bitmap_is_set(read_set, field_index)) {
-        *error_no = tmp_vfield->is_gcol()
-                        ? ER_DEPENDENT_BY_GENERATED_COLUMN
-                        : ER_DEPENDENT_BY_DEFAULT_GENERATED_VALUE;
-        read_set = save_old_read_set;
-        return true;
+  bool bitmap_updated = false;
+  for (Sql_table_check_constraint *tbl_cc : *table_check_constraint_list) {
+    if (tbl_cc->is_enforced()) {
+      /*
+        For update operation, check constraint should be evaluated if it is
+        dependent on any of the updated column.
+      */
+      if (is_update &&
+          !bitmap_is_overlapping(write_set,
+                                 &tbl_cc->value_generator()->base_columns_map))
+        continue;
+
+      // Mark all the columns used in the check constraint.
+      const MY_BITMAP *columns_map =
+          &tbl_cc->value_generator()->base_columns_map;
+      for (uint i = bitmap_get_first_set(columns_map); i != MY_BIT_NONE;
+           i = bitmap_get_next_set(columns_map, i)) {
+        DBUG_ASSERT(i < s->fields);
+        mark_column_used(field[i], MARK_COLUMNS_READ);
       }
+      bitmap_updated = true;
     }
   }
-  read_set = save_old_read_set;
-  return false;
+
+  if (bitmap_updated) file->column_bitmaps_signal();
 }
 
 /**
@@ -6493,10 +6636,12 @@ bool TABLE_LIST::is_mergeable() const {
          derived->is_mergeable();
 }
 
-///  @returns true if materializable table contains one or zero rows
 bool TABLE_LIST::materializable_is_const() const {
   DBUG_ASSERT(uses_materialization());
-  return derived_unit()->query_result()->estimated_rowcount <= 1;
+  const SELECT_LEX_UNIT *unit = derived_unit();
+  return unit->query_result()->estimated_rowcount <= 1 &&
+         (unit->first_select()->active_options() &
+          OPTION_NO_SUBQUERY_DURING_OPTIMIZATION) == 0;
 }
 
 /**
@@ -6794,10 +6939,12 @@ static bool add_derived_key(List<Derived_key> &derived_key_list, Field *field,
   @brief
   Update derived table's list of possible keys
 
+  @param thd        session context
   @param field      derived table's field to take part in a key
-  @param values     array of values that a part of equality predicate with the
-                    field above
+  @param values     array of values. Each value combined with "field"
+                    forms an equality predicate.
   @param num_values number of elements in the array values
+  @param[out] allocated true if key was allocated, false if unsupported
 
   @details
   This function creates/extends a list of possible keys for this derived
@@ -6807,19 +6954,24 @@ static bool add_derived_key(List<Derived_key> &derived_key_list, Field *field,
   part_of_key bitmaps are updated accordingly.
   @see add_derived_key
 
-  @return true  new possible key can't be allocated.
-  @return false list of possible keys successfully updated.
+  @returns false if success, true if error
 */
 
-bool TABLE_LIST::update_derived_keys(Field *field, Item **values,
-                                     uint num_values) {
+bool TABLE_LIST::update_derived_keys(THD *thd, Field *field, Item **values,
+                                     uint num_values, bool *allocated) {
+  *allocated = false;
   /*
     Don't bother with keys for CREATE VIEW, BLOB fields and fields with
     zero length.
   */
-  if (field->table->in_use->lex->is_ps_or_view_context_analysis() ||
-      field->flags & BLOB_FLAG || field->field_length == 0)
+  if (thd->lex->is_ps_or_view_context_analysis() || field->flags & BLOB_FLAG ||
+      field->field_length == 0)
     return false;
+
+  const Sql_cmd *const cmd = thd->lex->m_sql_cmd;
+
+  // Secondary storage engines do not support use of indexes on derived tables
+  if (cmd != nullptr && cmd->using_secondary_storage_engine()) return false;
 
   /* Allow all keys to be used. */
   if (derived_key_list.elements == 0) table->keys_in_use_for_query.set_all();
@@ -6834,6 +6986,8 @@ bool TABLE_LIST::update_derived_keys(Field *field, Item **values,
   }
   /* Extend key which includes all referenced fields. */
   if (add_derived_key(derived_key_list, field, (table_map)0)) return true;
+  *allocated = true;
+
   return false;
 }
 
@@ -6977,12 +7131,12 @@ bool TABLE::update_const_key_parts(Item *conds) {
 bool TABLE::check_read_removal(uint index) {
   bool retval = false;
 
-  DBUG_ENTER("check_read_removal");
+  DBUG_TRACE;
   DBUG_ASSERT(file->ha_table_flags() & HA_READ_BEFORE_WRITE_REMOVAL);
   DBUG_ASSERT(index != MAX_KEY);
 
   // Index must be unique
-  if ((key_info[index].flags & HA_NOSAME) == 0) DBUG_RETURN(false);
+  if ((key_info[index].flags & HA_NOSAME) == 0) return false;
 
   // Full index must be used
   bitmap_clear_all(&tmp_set);
@@ -6994,7 +7148,7 @@ bool TABLE::check_read_removal(uint index) {
   }
 
   bitmap_clear_all(&tmp_set);
-  DBUG_RETURN(retval);
+  return retval;
 }
 
 /**
@@ -7073,7 +7227,7 @@ bool is_simple_order(ORDER *order) {
 
 void repoint_field_to_record(TABLE *table, uchar *old_rec, uchar *new_rec) {
   Field **fields = table->field;
-  my_ptrdiff_t ptrdiff = new_rec - old_rec;
+  ptrdiff_t ptrdiff = new_rec - old_rec;
   for (uint i = 0; i < table->s->fields; i++)
     fields[i]->move_field_offset(ptrdiff);
 }
@@ -7094,9 +7248,9 @@ void repoint_field_to_record(TABLE *table, uchar *old_rec, uchar *new_rec) {
   @todo see below for potential conflict with Bug#21815348 .
  */
 bool update_generated_read_fields(uchar *buf, TABLE *table, uint active_index) {
-  DBUG_ENTER("update_generated_read_fields");
+  DBUG_TRACE;
   DBUG_ASSERT(table && table->vfield);
-  if (table->in_use->is_error()) DBUG_RETURN(true);
+  if (table->in_use->is_error()) return true;
   if (active_index != MAX_KEY && table->key_read) {
     /*
       The covering index is providing all necessary columns, including
@@ -7111,7 +7265,7 @@ bool update_generated_read_fields(uchar *buf, TABLE *table, uint active_index) {
       Currently MySQL doesn't choose an index scan in that case because it
       considers B as independent from A, in its index-scan decision logic.
     */
-    DBUG_RETURN(false);
+    return false;
   }
 
   int error = 0;
@@ -7133,7 +7287,7 @@ bool update_generated_read_fields(uchar *buf, TABLE *table, uint active_index) {
     */
     if (vfield->is_virtual_gcol() &&
         bitmap_is_set(table->read_set, vfield->field_index)) {
-      if ((vfield->flags & BLOB_FLAG) != 0) {
+      if (vfield->handle_old_value()) {
         (down_cast<Field_blob *>(vfield))->keep_old_value();
         (down_cast<Field_blob *>(vfield))->set_keep_old_value(true);
       }
@@ -7155,7 +7309,7 @@ bool update_generated_read_fields(uchar *buf, TABLE *table, uint active_index) {
   if (buf != table->record[0])
     repoint_field_to_record(table, buf, table->record[0]);
 
-  DBUG_RETURN(error != 0);
+  return error != 0;
   /*
     @todo
     this function is used by ha_rnd/etc, those ha_* functions are expected to
@@ -7186,11 +7340,11 @@ bool update_generated_read_fields(uchar *buf, TABLE *table, uint active_index) {
                field value
  */
 bool update_generated_write_fields(const MY_BITMAP *bitmap, TABLE *table) {
-  DBUG_ENTER("update_generated_write_fields");
+  DBUG_TRACE;
   Field **field_ptr;
   int error = 0;
 
-  if (table->in_use->is_error()) DBUG_RETURN(true);
+  if (table->in_use->is_error()) return true;
 
   if (table->vfield) {
     /* Iterate over generated fields in the table */
@@ -7205,8 +7359,9 @@ bool update_generated_write_fields(const MY_BITMAP *bitmap, TABLE *table) {
           For a virtual generated column of blob type, we have to keep
           the current blob value since this might be needed by the
           storage engine during updates.
+          All arrays are BLOB fields.
         */
-        if ((vfield->flags & BLOB_FLAG) != 0 && vfield->is_virtual_gcol()) {
+        if (vfield->handle_old_value()) {
           (down_cast<Field_blob *>(vfield))->keep_old_value();
           (down_cast<Field_blob *>(vfield))->set_keep_old_value(true);
         }
@@ -7224,8 +7379,8 @@ bool update_generated_write_fields(const MY_BITMAP *bitmap, TABLE *table) {
     }
   }
 
-  if (error > 0) DBUG_RETURN(true);
-  DBUG_RETURN(false);
+  if (error > 0) return true;
+  return false;
 }
 
 /**
@@ -7244,6 +7399,13 @@ bool update_generated_write_fields(const MY_BITMAP *bitmap, TABLE *table) {
 */
 void TABLE::mark_gcol_in_maps(Field *field) {
   bitmap_set_bit(write_set, field->field_index);
+
+  /*
+    Typed array fields internally are using a conversion field, it needs to
+    marked as readable in order to do conversions.
+  */
+  if (field->is_array()) bitmap_set_bit(read_set, field->field_index);
+
   /*
     Note that underlying base columns are here added to read_set but not added
     to requirements for an index to be covering (covering_keys is not touched).
@@ -7321,6 +7483,7 @@ LEX_USER *LEX_USER::alloc(THD *thd, LEX_STRING *user_arg,
   ret->uses_identified_by_clause = false;
   ret->uses_identified_with_clause = false;
   ret->uses_authentication_string_clause = false;
+  ret->has_password_generator = false;
   ret->retain_current_password = false;
   ret->discard_old_password = false;
   ret->alter_status.account_locked = false;
@@ -7364,15 +7527,14 @@ struct Partial_update_info {
     MEM_ROOT *const mem_root = table->in_use->mem_root;
     const size_t bitmap_size = table->s->column_bitmap_size;
 
-    auto buffer =
-        static_cast<my_bitmap_map *>(alloc_root(mem_root, bitmap_size));
+    auto buffer = static_cast<my_bitmap_map *>(mem_root->Alloc(bitmap_size));
     if (buffer != nullptr) {
       bitmap_init(&m_enabled_binary_diff_columns, buffer, table->s->fields,
                   false);
       bitmap_copy(&m_enabled_binary_diff_columns, columns);
     }
 
-    buffer = static_cast<my_bitmap_map *>(alloc_root(mem_root, bitmap_size));
+    buffer = static_cast<my_bitmap_map *>(mem_root->Alloc(bitmap_size));
     if (buffer != nullptr) {
       bitmap_init(&m_enabled_logical_diff_columns, buffer, table->s->fields,
                   false);
@@ -7448,8 +7610,8 @@ bool TABLE::mark_column_for_partial_update(const Field *field) {
   DBUG_ASSERT(field->table == this);
   if (m_partial_update_columns == nullptr) {
     MY_BITMAP *map = new (&mem_root) MY_BITMAP;
-    my_bitmap_map *buf = static_cast<my_bitmap_map *>(
-        alloc_root(&mem_root, s->column_bitmap_size));
+    my_bitmap_map *buf =
+        static_cast<my_bitmap_map *>(mem_root.Alloc(s->column_bitmap_size));
     if (map == nullptr || buf == nullptr ||
         bitmap_init(map, buf, s->fields, false))
       return true; /* purecov: inspected */
@@ -7485,10 +7647,10 @@ bool TABLE::has_binary_diff_columns() const {
 }
 
 bool TABLE::setup_partial_update(bool logical_diffs) {
-  DBUG_ENTER("TABLE::setup_partial_update(bool)");
+  DBUG_TRACE;
   DBUG_ASSERT(m_partial_update_info == nullptr);
 
-  if (!has_columns_marked_for_partial_update()) DBUG_RETURN(false);
+  if (!has_columns_marked_for_partial_update()) return false;
 
   Opt_trace_context *trace = &in_use->opt_trace;
   if (trace->is_started()) {
@@ -7505,7 +7667,7 @@ bool TABLE::setup_partial_update(bool logical_diffs) {
 
   m_partial_update_info = new (in_use->mem_root)
       Partial_update_info(this, m_partial_update_columns, logical_diffs);
-  DBUG_RETURN(in_use->is_error());
+  return in_use->is_error();
 }
 
 bool TABLE::setup_partial_update() {
@@ -7548,10 +7710,9 @@ bool TABLE::has_columns_marked_for_partial_update() const {
 }
 
 void TABLE::cleanup_partial_update() {
-  DBUG_ENTER("TABLE::cleanup_partial_update");
+  DBUG_TRACE;
   destroy(m_partial_update_info);
   m_partial_update_info = nullptr;
-  DBUG_VOID_RETURN;
 }
 
 String *TABLE::get_partial_update_buffer() {
@@ -7560,7 +7721,7 @@ String *TABLE::get_partial_update_buffer() {
 }
 
 void TABLE::clear_partial_update_diffs() {
-  DBUG_ENTER("TABLE::clear_partial_update_diffs");
+  DBUG_TRACE;
   if (m_partial_update_info != nullptr) {
     for (auto v : m_partial_update_info->m_binary_diff_vectors)
       if (v != nullptr) v->clear();
@@ -7576,7 +7737,6 @@ void TABLE::clear_partial_update_diffs() {
                   m_partial_update_columns);
     }
   }
-  DBUG_VOID_RETURN;
 }
 
 const Binary_diff_vector *TABLE::get_binary_diffs(const Field *field) const {
@@ -7654,7 +7814,7 @@ const char *Binary_diff::new_data(Field *field) const {
 }
 
 const char *Binary_diff::old_data(Field *field) const {
-  my_ptrdiff_t ptrdiff = field->table->record[1] - field->table->record[0];
+  ptrdiff_t ptrdiff = field->table->record[1] - field->table->record[0];
   field->move_field_offset(ptrdiff);
   const char *data = new_data(field);
   field->move_field_offset(-ptrdiff);
@@ -7704,7 +7864,7 @@ bool TABLE::is_binary_diff_enabled(const Field *field) const {
 }
 
 bool TABLE::is_logical_diff_enabled(const Field *field) const {
-  DBUG_ENTER("TABLE::is_logical_diff_enabled");
+  DBUG_TRACE;
   bool ret =
       m_partial_update_info != nullptr &&
       bitmap_is_set(&m_partial_update_info->m_enabled_logical_diff_columns,
@@ -7722,7 +7882,7 @@ bool TABLE::is_logical_diff_enabled(const Field *field) const {
                          ? "1"
                          : "0")
                   : "unknown"));
-  DBUG_RETURN(ret);
+  return ret;
 }
 
 void TABLE::disable_logical_diffs_for_current_row(const Field *field) const {
@@ -7859,7 +8019,7 @@ bool create_table_share_for_upgrade(THD *thd, const char *path,
                                     FRM_context *frm_context,
                                     const char *db_name, const char *table_name,
                                     bool is_fix_view_cols_and_deps) {
-  DBUG_ENTER("create_table_share_for_upgrade");
+  DBUG_TRACE;
 
   init_tmp_table_share(thd, share, db_name, 0, table_name, path, nullptr);
 
@@ -7872,9 +8032,9 @@ bool create_table_share_for_upgrade(THD *thd, const char *path,
   if (read_frm_file(thd, share, frm_context, table_name,
                     is_fix_view_cols_and_deps)) {
     free_table_share(share);
-    DBUG_RETURN(true);
+    return true;
   }
-  DBUG_RETURN(false);
+  return false;
 }
 
 void TABLE::blobs_need_not_keep_old_value() {
@@ -7883,7 +8043,7 @@ void TABLE::blobs_need_not_keep_old_value() {
     /*
       Set this flag so that all blob columns can keep the old value.
     */
-    if (vfield->type() == MYSQL_TYPE_BLOB && vfield->is_virtual_gcol())
+    if (vfield->handle_old_value())
       (down_cast<Field_blob *>(vfield))->set_keep_old_value(false);
   }
 }
@@ -7900,7 +8060,7 @@ bool TABLE::empty_result_table() {
   materialized = false;
   set_not_started();
   if (!is_created()) return false;
-  if (file->ha_index_or_rnd_end() || file->extra(HA_EXTRA_RESET_STATE) ||
+  if (file->ha_index_or_rnd_end() || file->ha_extra(HA_EXTRA_RESET_STATE) ||
       file->ha_delete_all_rows())
     return true;
   free_io_cache(this);

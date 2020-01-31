@@ -1,12 +1,25 @@
-call mtr.add_suppression("Slave SQL: Error 'InnoDB : ENCRYPTION is not accepted syntax for CREATE/ALTER table, for tables in general/shared tablespace.'");
+call mtr.add_suppression("Slave SQL: Error 'Request to create 'unencrypted' table while using an 'encrypted' tablespace.'");
+call mtr.add_suppression("Ignoring error 'Request to create 'unencrypted' table while using an 'encrypted' tablespace.'");
+call mtr.add_suppression("Query apply failed.");
 #node-1
 use test;
 CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
-create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
-ERROR HY000: InnoDB : ENCRYPTION is not accepted syntax for CREATE/ALTER table, for tables in general/shared tablespace.
-create table t2 (i int, primary key pk(i)) tablespace foo encryption='n';
-ERROR HY000: InnoDB : ENCRYPTION is not accepted syntax for CREATE/ALTER table, for tables in general/shared tablespace.
+CREATE TABLESPACE foo2 ADD DATAFILE 'foo2.ibd';
+set session default_table_encryption=ON;
+CREATE TABLESPACE foo3 ADD DATAFILE 'foo3.ibd';
+set session default_table_encryption=OFF;
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
+name	encryption
+foo	Y
+foo2	N
+foo3	Y
 create table t1 (i int, primary key pk(i)) tablespace foo;
+ERROR HY000: Request to create 'unencrypted' table while using an 'encrypted' tablespace.
+create table t2 (i int, primary key pk(i)) tablespace foo encryption='n';
+ERROR HY000: Request to create 'unencrypted' table while using an 'encrypted' tablespace.
+create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
+create table foo2_t1 (i int, primary key pk(i)) tablespace foo encryption='y';
+create table foo3_t1 (i int, primary key pk(i)) tablespace foo encryption='y';
 insert into t1 values (1), (2), (3);
 select * from t1;
 i
@@ -18,7 +31,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `i` int(11) NOT NULL,
   PRIMARY KEY (`i`)
-) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 #node-2
 select * from t1;
 i
@@ -30,8 +43,25 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `i` int(11) NOT NULL,
   PRIMARY KEY (`i`)
-) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
-create table t2 (i int, primary key pk(i)) tablespace foo;
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
+show create table foo2_t1;
+Table	Create Table
+foo2_t1	CREATE TABLE `foo2_t1` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
+show create table foo3_t1;
+Table	Create Table
+foo3_t1	CREATE TABLE `foo3_t1` (
+  `i` int(11) NOT NULL,
+  PRIMARY KEY (`i`)
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
+name	encryption
+foo	Y
+foo2	N
+foo3	Y
+create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
 insert into t2 values (10), (20), (30);
 #node-1
 show create table t2;
@@ -39,15 +69,18 @@ Table	Create Table
 t2	CREATE TABLE `t2` (
   `i` int(11) NOT NULL,
   PRIMARY KEY (`i`)
-) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 drop table t1, t2;
+drop table foo2_t1, foo3_t1;
 drop tablespace foo;
+drop tablespace foo2;
+drop tablespace foo3;
 #node-2 being killed
 Killing server ...
 #node-1
 use test;
 CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
-create table t1 (i int, primary key pk(i)) tablespace foo;
+create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
 insert into t1 values (1), (2), (3);
 select * from t1;
 i
@@ -59,7 +92,16 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `i` int(11) NOT NULL,
   PRIMARY KEY (`i`)
-) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
+CREATE TABLESPACE foo2 ADD DATAFILE 'foo2.ibd';
+set session default_table_encryption=ON;
+CREATE TABLESPACE foo3 ADD DATAFILE 'foo3.ibd';
+set session default_table_encryption=OFF;
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
+name	encryption
+foo	Y
+foo2	N
+foo3	Y
 #node-2 restarted (should get encrypted table through SST)
 # restart
 call mtr.add_suppression(".*can contain only an ENCRYPTED tables.*");
@@ -73,23 +115,30 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `i` int(11) NOT NULL,
   PRIMARY KEY (`i`)
-) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
-create table t2 (i int, primary key pk(i)) tablespace foo;
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
+create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
 insert into t2 values (10), (20), (30);
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
+name	encryption
+foo	Y
+foo2	N
+foo3	Y
 #node-1
 show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
   `i` int(11) NOT NULL,
   PRIMARY KEY (`i`)
-) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 drop table t1, t2;
 drop tablespace foo;
+drop tablespace foo2;
+drop tablespace foo3;
 #node-2 being shutdown
 #node-1
 use test;
 CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
-create table t1 (i int, primary key pk(i)) tablespace foo;
+create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
 insert into t1 values (1);
 select * from t1;
 i
@@ -99,7 +148,16 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `i` int(11) NOT NULL,
   PRIMARY KEY (`i`)
-) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
+CREATE TABLESPACE foo2 ADD DATAFILE 'foo2.ibd';
+set session default_table_encryption=ON;
+CREATE TABLESPACE foo3 ADD DATAFILE 'foo3.ibd';
+set session default_table_encryption=OFF;
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
+name	encryption
+foo	Y
+foo2	N
+foo3	Y
 #node-2 restarted (should get encrypted table through IST)
 # restart
 call mtr.add_suppression(".*can contain only an ENCRYPTED tables.*");
@@ -111,18 +169,25 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `i` int(11) NOT NULL,
   PRIMARY KEY (`i`)
-) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
-create table t2 (i int, primary key pk(i)) tablespace foo;
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
+create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
 insert into t2 values (10), (20), (30);
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
+name	encryption
+foo	Y
+foo2	N
+foo3	Y
 #node-1
 show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
   `i` int(11) NOT NULL,
   PRIMARY KEY (`i`)
-) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 drop table t1, t2;
 drop tablespace foo;
+drop tablespace foo2;
+drop tablespace foo3;
 #node-1
 CREATE TABLESPACE `ts1` ADD DATAFILE 'ts1.ibd' ENCRYPTION = 'Y' Engine=InnoDB;
 CREATE TABLE t1 (c1 INT) ENCRYPTION = 'Y';
@@ -145,3 +210,43 @@ DROP TABLESPACE `ts1`;
 #node-2
 select name, flag, encryption from information_schema.innodb_tablespaces where name = "ts1" OR name = "test/t1";
 name	flag	encryption
+#node-1 (issue dml that would conflict with parallel ALTER TABLESPACE)
+use test;
+create tablespace tab ADD DATAFILE 'tab.ibd' ENCRYPTION='Y';
+create table t1 (i int, primary key pk(i)) tablespace=tab encryption='y';
+insert into t1 values (1), (2), (3), (4);
+select * from t1;
+i
+1
+2
+3
+4
+select name, encryption from information_schema.innodb_tablespaces where name='tab';
+name	encryption
+tab	Y
+set session wsrep_retry_autocommit=0;
+SET GLOBAL wsrep_provider_options = 'dbug=d,before_replicate_sync';
+update t1 set i = i + 10 where i = 2;;
+#node-1a (issue ALTER TABLESPACE)
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+alter tablespace tab encryption = 'n';
+#node-1b (wait for both to get blocked)
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_provider_options = 'signal=before_replicate_sync';
+#node-1
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+select * from t1;
+i
+1
+2
+3
+4
+#node-1a
+select name, encryption from information_schema.innodb_tablespaces where name='tab';
+name	encryption
+tab	N
+#node-1
+drop table t1;
+drop tablespace tab;

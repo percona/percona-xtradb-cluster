@@ -81,8 +81,6 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
     # Cluster name
     wsrep_cluster_name=my_ubuntu_cluster
 
-    # Authentication for SST method
-    wsrep_sst_auth="sstuser:s3cretPass"
 
 #. Start the first node with the following command: ::
 
@@ -162,8 +160,6 @@ Step 3. Configuring the second node
     # SST method
     wsrep_sst_method=xtrabackup-v2
 
-    #Authentication for SST method
-    wsrep_sst_auth="sstuser:s3cretPass"
 
 #. Start the second node with the following command: ::
 
@@ -229,9 +225,6 @@ Step 4. Configuring the third node
 
     # SST method
     wsrep_sst_method=xtrabackup-v2
-
-    #Authentication for SST method
-    wsrep_sst_auth="sstuser:s3cretPass"
 
 #. Start the third node with the following command: ::
 

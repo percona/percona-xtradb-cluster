@@ -25,6 +25,7 @@ CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
 CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
+
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 VARIABLE_VALUE
 Synced

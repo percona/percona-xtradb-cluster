@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -27,7 +27,7 @@
 #include "plugin/x/ngs/include/ngs/interface/client_interface.h"
 #include "plugin/x/ngs/include/ngs/interface/document_id_generator_interface.h"
 #include "plugin/x/ngs/include/ngs/interface/server_interface.h"
-#include "plugin/x/ngs/include/ngs_common/protocol_protobuf.h"
+#include "plugin/x/ngs/include/ngs/protocol/protocol_protobuf.h"
 #include "plugin/x/src/delete_statement_builder.h"
 #include "plugin/x/src/expr_generator.h"
 #include "plugin/x/src/find_statement_builder.h"
@@ -58,11 +58,11 @@ ngs::Error_code Crud_command_handler::execute(
     return error;
   }
   log_debug("CRUD query: %s", m_qb.get().c_str());
-  ngs::Error_code error = m_session->data_context().execute(
+  ngs::Error_code error = m_session->data_context().execute_sql(
       m_qb.get().data(), m_qb.get().length(), &resultset);
   if (error) return error_handling(error, msg);
   notice_handling(resultset.get_info(), builder, msg);
-  (m_session->proto().*send_ok)();
+  if (send_ok) (m_session->proto().*send_ok)();
   return ngs::Success();
 }
 
@@ -81,7 +81,7 @@ void Crud_command_handler::notice_handling_common(
     notices::send_warnings(m_session->data_context(), m_session->proto());
 
   if (!info.message.empty())
-    notices::send_message(m_session->proto(), info.message);
+    m_session->proto().send_notice_txt_message(info.message);
 }
 
 namespace {
@@ -142,14 +142,13 @@ void Crud_command_handler::notice_handling(
     const Insert_statement_builder &builder,
     const Mysqlx::Crud::Insert &msg) const {
   notice_handling_common(info);
-  notices::send_rows_affected(m_session->proto(), info.affected_rows);
+  m_session->proto().send_notice_rows_affected(info.affected_rows);
   if (is_table_data_model(msg)) {
     if (info.last_insert_id > 0)
-      notices::send_generated_insert_id(m_session->proto(),
-                                        info.last_insert_id);
+      m_session->proto().send_notice_last_insert_id(info.last_insert_id);
   } else {
-    notices::send_generated_document_ids(
-        m_session->proto(), m_session->get_document_id_aggregator().get_ids());
+    m_session->proto().send_notice_generated_document_ids(
+        m_session->get_document_id_aggregator().get_ids());
   }
 }
 
@@ -188,7 +187,7 @@ void Crud_command_handler::notice_handling(
     const Update_statement_builder & /*builder*/,
     const Mysqlx::Crud::Update & /*msg*/) const {
   notice_handling_common(info);
-  notices::send_rows_affected(m_session->proto(), info.affected_rows);
+  m_session->proto().send_notice_rows_affected(info.affected_rows);
 }
 
 // -- Delete
@@ -208,7 +207,7 @@ void Crud_command_handler::notice_handling(
     const Delete_statement_builder & /*builder*/,
     const Mysqlx::Crud::Delete & /*msg*/) const {
   notice_handling_common(info);
-  notices::send_rows_affected(m_session->proto(), info.affected_rows);
+  m_session->proto().send_notice_rows_affected(info.affected_rows);
 }
 
 // -- Find
@@ -216,12 +215,16 @@ ngs::Error_code Crud_command_handler::execute_crud_find(
     const Mysqlx::Crud::Find &msg) {
   Expression_generator gen(&m_qb, msg.args(), msg.collection().schema(),
                            is_table_data_model(msg));
-  Streaming_resultset rset(&m_session->proto(),
-                           &m_session->get_notice_output_queue(), false);
+  Streaming_resultset<Crud_command_delegate> rset(m_session, false);
   return execute(Find_statement_builder(gen), msg, rset,
-                 &ngs::Common_status_variables::m_crud_find,
-                 &ngs::Protocol_encoder_interface::send_exec_ok);
+                 &ngs::Common_status_variables::m_crud_find, nullptr);
 }
+
+template <>
+void Crud_command_handler::notice_handling(
+    const ngs::Resultset_interface::Info &info,
+    const Find_statement_builder & /*builder*/,
+    const Mysqlx::Crud::Find & /*msg*/) const {}
 
 template <>
 ngs::Error_code Crud_command_handler::error_handling(

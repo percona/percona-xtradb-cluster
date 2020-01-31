@@ -23,7 +23,7 @@ START TRANSACTION;
 LOCK TABLE conflict_stored WRITE;
 INSERT INTO conflict_stored (f1) VALUES (1);
 INSERT INTO conflict_stored (f1) VALUES (2);
-COMMIT;
-Got one of the listed errors
+SET SESSION wsrep_sync_wait = 0;
 UNLOCK TABLES;
+Got one of the listed errors
 DROP TABLE conflict_stored;

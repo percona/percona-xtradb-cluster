@@ -1,4 +1,4 @@
-/* Copyright (c) 2008, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2008, 2019, Oracle and/or its affiliates. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -56,6 +56,7 @@ class THD;
 #endif
 #include "lf.h"
 #include "my_compiler.h"
+#include "my_hostname.h" /* HOSTNAME_LENGTH */
 #include "sql/mdl.h"
 #include "storage/perfschema/pfs_column_types.h"
 #include "storage/perfschema/pfs_con_slice.h"
@@ -714,7 +715,8 @@ void destroy_cond(PFS_cond *pfs);
 PFS_thread *create_thread(PFS_thread_class *klass, const void *identity,
                           ulonglong processlist_id);
 
-PFS_thread *find_thread(ulonglong thread_id);
+PFS_thread *find_thread_by_processlist_id(ulonglong processlist_id);
+PFS_thread *find_thread_by_internal_id(ulonglong thread_id);
 
 void destroy_thread(PFS_thread *pfs);
 

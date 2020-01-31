@@ -941,7 +941,7 @@ DELIMITER ;|
 #    reasonable time like 4 seconds. Till ~ 2 seconds could pass on a heavy
 #    loaded testing box before something gets executed).
 #    Detection of execution is via the records inserted by the event.
---echo Sleep till the first INSERT into events_test.event_log occured
+--echo Sleep till the first INSERT into events_test.event_log occurred
 let $wait_timeout= 4;
 let $wait_condition=
 SELECT COUNT(*) > 0 FROM events_test.event_log;
@@ -1367,6 +1367,14 @@ SHOW CREATE EVENT очень_очень_очень_очень_очень_оче�
 DROP EVENT очень_очень_очень_очень_очень_очень_очень_очень_длинная_строка_é;
 
 SET NAMES default;
+
+--echo #
+--echo # BUG#29269819 - WRONG METADATA WHILE CREATE AN EVENT
+--echo #
+
+CREATE EVENT Fortnight_Event ON SCHEDULE EVERY 2 WEEK DO SELECT 1;
+SELECT EVENT_NAME, INTERVAL_VALUE, INTERVAL_FIELD FROM information_schema.events;
+DROP EVENT Fortnight_Event;
 
 ###########################################################################
 #

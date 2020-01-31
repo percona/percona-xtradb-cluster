@@ -1,5 +1,5 @@
 # -*- cperl -*-
-# Copyright (c) 2007, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2007, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -48,6 +48,7 @@ my @pre_rules=
 (
   \&add_opt_values,
 );
+#my @pre_rules = ();
 
 sub get_basedir {
   my ($self, $group) = @_;
@@ -114,8 +115,8 @@ sub fix_pidfile {
 
 sub fix_port {
   my ($self, $config, $group_name, $group)= @_;
-#  my $port= $self->{PORT}++;
-#  return $port;
+  #my $hostname = $group->value('#host');
+  #return $self->{HOSTS}->{$hostname}++;
   return $self->{PORT}++;
 }
 
@@ -237,12 +238,7 @@ sub fix_std_data {
   return "$testdir/std_data";
 }
 
-sub ssl_supported {
-  return $::ssl_supported;
-}
-
 sub fix_ssl_disabled {
-  return if !ssl_supported(@_);
 
   # Add ssl-mode=DISABLED to avoid that mysqltest
   # connects with SSL by default.
@@ -250,19 +246,16 @@ sub fix_ssl_disabled {
 }
 
 sub fix_ssl_ca {
-  return if !ssl_supported(@_);
   my $std_data = fix_std_data(@_);
   return "$std_data/cacert.pem";
 }
 
 sub fix_ssl_server_cert {
-  return if !ssl_supported(@_);
   my $std_data = fix_std_data(@_);
   return "$std_data/server-cert.pem";
 }
 
 sub fix_ssl_server_key {
-  return if !ssl_supported(@_);
   my $std_data = fix_std_data(@_);
   return "$std_data/server-key.pem";
 }
@@ -286,6 +279,8 @@ my @mysqld_rules = (
   { '#log-error'                                   => \&fix_log_error },
   { 'caching_sha2_password_private_key_path'       => \&fix_rsa_private_key },
   { 'caching_sha2_password_public_key_path'        => \&fix_rsa_public_key },
+  { 'loose-sha256_password_private_key_path'       => \&fix_rsa_private_key },
+  { 'loose-sha256_password_public_key_path'        => \&fix_rsa_public_key },
   { 'character-sets-dir'                           => \&fix_charset_dir },
   { 'datadir'                                      => \&fix_datadir },
   { 'port'                                         => \&fix_port },
@@ -665,6 +660,14 @@ sub new_config {
   # Additional rules required for [mysqltest]
   $self->run_rules_for_group($config, $config->insert('mysqltest'),
                              @mysqltest_rules);
+
+  if ($::secondary_engine_support) {
+    eval 'use mtr_secondary_engine_config; 1';
+    # Additional rules required for secondary engine server
+    push(@post_rules, \&post_check_secondary_engine_group);
+    # Additional rules required for [mysqld] when secondary engine is enabled
+    push(@post_rules, \&post_check_secondary_engine_mysqld_group);
+  }
 
   # Run post rules
   foreach my $rule (@post_rules) {

@@ -8,8 +8,6 @@
 --source include/have_log_bin.inc
 
 SET SESSION wsrep_sync_wait = 0;
-# freeze gcache purge to ensure that node-2 always joins using IST
-set global wsrep_provider_options="gcache.freeze_purge_at_seqno = now";
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY AUTO_INCREMENT, f2 LONGBLOB) ENGINE=InnoDB;
 CREATE TABLE ten (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
@@ -138,7 +136,7 @@ SET SESSION wsrep_sync_wait = 0;
 
 --source include/kill_galera.inc
 
---sleep 10
+--sleep 18
 --connection node_1
 --source include/kill_galera.inc
 
@@ -175,7 +173,6 @@ SET SESSION wsrep_sync_wait = 0;
 --source suite/galera/include/galera_wsrep_recover.inc
 --let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --source include/start_mysqld.inc
-show status like 'wsrep_local_cached_downto';
 
 --connection node_2
 --let $galera_wsrep_recover_server_id=2
@@ -184,10 +181,8 @@ show status like 'wsrep_local_cached_downto';
 --source include/start_mysqld.inc
 
 --connection node_1
-show status like 'wsrep_local_cached_downto';
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
-show status like 'wsrep_local_cached_downto';
 
 --let $diff_servers = 1 2
 --source include/diff_servers.inc

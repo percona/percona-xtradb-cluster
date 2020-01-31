@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -192,25 +192,25 @@ associated page_size_shift which is the power of 2 for this page size.
 @return an associated page_size_shift if valid, 0 if invalid. */
 static int innodb_page_size_validate(ulong page_size) {
 
-  DBUG_ENTER("innodb_page_size_validate");
+  DBUG_TRACE;
 
 #ifdef WITH_WSREP
   /* With a 4K page_size, Galera triggers an assert upon restart.
    * Until that gets resolved, require using the default page size (16K).
    */
   if (page_size == UNIV_PAGE_SIZE_ORIG) {
-    DBUG_RETURN(UNIV_PAGE_SIZE_SHIFT_ORIG);
+    return UNIV_PAGE_SIZE_SHIFT_ORIG;
   }
 #else
   ulong n;
   for (n = UNIV_PAGE_SIZE_SHIFT_MIN; n <= UNIV_PAGE_SIZE_SHIFT_MAX; n++) {
     if (page_size == (ulong)(1 << n)) {
-      DBUG_RETURN(n);
+      return n;
     }
   }
 #endif /* WITH_WSREP */
 
-  DBUG_RETURN(0);
+  return 0;
 }
 
 /** Get the page size of the filespace from the filespace header.
@@ -269,7 +269,7 @@ static char *error_message(int error) {
 
 /***********************************************/ /*
   @param>>_______[in] name>_____name of file.
-  @retval file pointer; file pointer is NULL when error occured.
+  @retval file pointer; file pointer is NULL when error occurred.
  */
 
 static FILE *open_file(const char *name) {
@@ -1135,7 +1135,7 @@ static void parse_page(const byte *page, FILE *file) {
 /**
 @param [in/out] file_name	name of the filename
 
-@retval FILE pointer if successfully created else NULL when error occured.
+@retval FILE pointer if successfully created else NULL when error occurred.
 */
 static FILE *create_file(char *file_name) {
   FILE *file = NULL;
@@ -1486,38 +1486,38 @@ int main(int argc, char **argv) {
   ut_crc32_init();
   MY_INIT(argv[0]);
 
-  DBUG_ENTER("main");
+  DBUG_TRACE;
   DBUG_PROCESS(argv[0]);
 
   if (get_options(&argc, &argv)) {
-    DBUG_RETURN(1);
+    return 1;
   }
 
   if (strict_verify && no_check) {
     fprintf(stderr,
             "Error: --strict-check option cannot be used "
             "together with --no-check option.\n");
-    DBUG_RETURN(1);
+    return 1;
   }
 
   if (no_check && !do_write) {
     fprintf(stderr,
             "Error: --no-check must be associated with "
             "--write option.\n");
-    DBUG_RETURN(1);
+    return 1;
   }
 
   if (page_type_dump) {
     fil_page_type = create_file(page_dump_filename);
     if (!fil_page_type) {
-      DBUG_RETURN(1);
+      return 1;
     }
   }
 
   if (is_log_enabled) {
     log_file = create_file(log_filename);
     if (!log_file) {
-      DBUG_RETURN(1);
+      return 1;
     }
     fprintf(log_file, "InnoDB File Checksum Utility.\n");
   }
@@ -1557,7 +1557,7 @@ int main(int argc, char **argv) {
 #endif /* _WIN32 */
       fprintf(stderr, "Error: %s cannot be found\n", filename);
 
-      DBUG_RETURN(1);
+      return 1;
     }
 
     if (!read_from_stdin) {
@@ -1565,29 +1565,27 @@ int main(int argc, char **argv) {
       fil_in = open_file(filename);
       /*If fil_in is NULL, terminate as some error encountered */
       if (fil_in == NULL) {
-        DBUG_RETURN(1);
+        return 1;
       }
       /* Save the current file pointer in pos variable.*/
       if (0 != fgetpos(fil_in, &pos)) {
         perror("fgetpos");
-        DBUG_RETURN(1);
+        return 1;
       }
     }
 
-      /* Testing for lock mechanism. The innochecksum
-      acquire lock on given file. So other tools accessing the same
-      file for processsing must fail. */
+    /* Testing for lock mechanism. The innochecksum
+    acquire lock on given file. So other tools accessing the same
+    file for processsing must fail. */
 #ifdef _WIN32
-    DBUG_EXECUTE_IF("innochecksum_cause_mysqld_crash",
-                    ut_ad(page_dump_filename);
-                    while ((_access(page_dump_filename, 0)) == 0) {
-                      sleep(1);
-                    } DBUG_RETURN(0););
+    DBUG_EXECUTE_IF(
+        "innochecksum_cause_mysqld_crash", ut_ad(page_dump_filename);
+        while ((_access(page_dump_filename, 0)) == 0) { sleep(1); } return 0;);
 #else
     DBUG_EXECUTE_IF(
         "innochecksum_cause_mysqld_crash", ut_ad(page_dump_filename);
         struct stat status_buf; while (stat(page_dump_filename, &status_buf) ==
-                                       0) { sleep(1); } DBUG_RETURN(0););
+                                       0) { sleep(1); } return 0;);
 #endif /* _WIN32 */
 
     /* Read the minimum page size. */
@@ -1601,7 +1599,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "of %d bytes.  Bytes read was %lu\n", UNIV_ZIP_SIZE_MIN,
               bytes);
 
-      DBUG_RETURN(1);
+      return 1;
     }
 
     /* enable variable is_system_tablespace when space_id of given
@@ -1664,14 +1662,14 @@ int main(int argc, char **argv) {
               "Error: Unable to seek to "
               "necessary offset");
 
-          DBUG_RETURN(1);
+          return 1;
         }
         /* Save the current file pointer in
         pos variable. */
         if (0 != fgetpos(fil_in, &pos)) {
           perror("fgetpos");
 
-          DBUG_RETURN(1);
+          return 1;
         }
       } else {
         ulong count = 0;
@@ -1698,7 +1696,7 @@ int main(int argc, char **argv) {
                     "to seek to necessary "
                     "offset");
 
-            DBUG_RETURN(1);
+            return 1;
           }
         }
       }
@@ -1732,7 +1730,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Error reading %u bytes", page_size.physical());
         perror(" ");
 
-        DBUG_RETURN(1);
+        return 1;
       }
 
       if (bytes != page_size.physical()) {
@@ -1740,7 +1738,7 @@ int main(int argc, char **argv) {
                 "Error: bytes read (%lu) "
                 "doesn't match page size (%u)\n",
                 bytes, page_size.physical());
-        DBUG_RETURN(1);
+        return 1;
       }
 
       if (display_format) {
@@ -1758,7 +1756,7 @@ int main(int argc, char **argv) {
         if (!page_decompress(buf.begin(), tbuf, page_size)) {
           fprintf(stderr, "Page decompress failed");
 
-          DBUG_RETURN(1);
+          return 1;
         }
       }
 
@@ -1785,7 +1783,7 @@ int main(int argc, char **argv) {
                       "count::%" PRIuMAX "\n",
                       allow_mismatches);
 
-              DBUG_RETURN(1);
+              return 1;
             }
           }
         }
@@ -1794,7 +1792,7 @@ int main(int argc, char **argv) {
       /* Rewrite checksum */
       if (do_write &&
           !write_file(filename, fil_in, buf.begin(), &pos, page_size)) {
-        DBUG_RETURN(1);
+        return 1;
       }
 
       /* end if this was the last page we were supposed to check */
@@ -1847,7 +1845,7 @@ int main(int argc, char **argv) {
     fclose(log_file);
   }
 
-  DBUG_RETURN(0);
+  return 0;
 }
 
 /** Report a failed assertion

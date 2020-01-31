@@ -37,7 +37,7 @@ CREATE TABLE t2 (
 c01 INT,
 c02 INT,
 PRIMARY KEY (c01),
-FOREIGN KEY fk1 (c02) REFERENCES t1 (c01)
+CONSTRAINT fk1 FOREIGN KEY (c02) REFERENCES t1 (c01)
 ) ENGINE=INNODB STATS_AUTO_RECALC=0;
 INSERT INTO t2 VALUES
 (1,1),(2,2),(3,3);
@@ -55,7 +55,7 @@ trx_rows_locked, trx_rows_modified, trx_concurrency_tickets,
 trx_isolation_level, trx_unique_checks, trx_foreign_key_checks
 FROM INFORMATION_SCHEMA.INNODB_TRX;
 trx_state	trx_weight	trx_tables_in_use	trx_tables_locked	trx_rows_locked	trx_rows_modified	trx_concurrency_tickets	trx_isolation_level	trx_unique_checks	trx_foreign_key_checks
-RUNNING	4	0	1	7	1	0	REPEATABLE READ	1	1
+RUNNING	5	0	1	7	1	0	REPEATABLE READ	1	1
 ROLLBACK;
 SET FOREIGN_KEY_CHECKS = 0;
 SET UNIQUE_CHECKS = 0;

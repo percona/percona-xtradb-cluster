@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -79,6 +79,19 @@ class XSession {
       Capability type: BOOL. Value: enable/disable the support.
      */
     Capability_client_interactive,
+
+    /**
+      The server may want know more about the client. MySQL X clients connection
+      the server may differ in: application version, MySQL library version,
+      OS, CPU, CPU endianess, programming language. Having more information
+      about clients/statistics is going to help server administrators with
+      finding faulty clients, targeting potential issues and allow better
+      optimizing.
+      Capability type: OBJECT. Value: associative array of strings where
+      key name must not exceed 32 characters and value must not exceed
+      1024 characters.
+     */
+    Capability_session_connect_attrs,
   };
 
   /**
@@ -112,6 +125,19 @@ class XSession {
       Option type: INTEGER.
     */
     Connect_timeout,
+    /**
+      Define session establishment timeout, which involves the following steps:
+      * hostname resolve
+      * socket-connection
+      * X Protocol handshake
+      * X Protocol authentication until AuthenticationOk
+      Default value of this parameter is set to "-1", which means infinite
+      block. Values greater than "-1" define the timeout in milliseconds.
+
+      Default: -1.
+      Option type: INTEGER.
+     */
+    Session_connect_timeout,
     /**
       Define timeout behavior when reading from the connection.
 
@@ -230,14 +256,21 @@ class XSession {
       Option type: BOOL
      */
     Consume_all_notices,
-    /** Determine what should be the lenght of a DATETIME field so that it
+    /** Determine what should be the length of a DATETIME field so that it
         would be possible to distinguish if it contain only date or both
         date and time parts.
 
       Default: 10
       Option type: INT
     */
-    Datetime_length_discriminator
+    Datetime_length_discriminator,
+    /** Network namespace (if any) which should be used at connection
+      establishment.
+
+      Default:
+      Option type: STRING
+    */
+    Network_namespace,
   };
 
  public:
@@ -350,13 +383,16 @@ class XSession {
 
     @param capability   capability to set or modify
     @param value        assign bool value to the capability
+    @param required     define if connection should be accepted by client when
+                        server rejected the capability
 
     @return Error code with description
       @retval != true     OK
       @retval == true     error occurred
   */
   virtual XError set_capability(const Mysqlx_capability capability,
-                                const bool value) = 0;
+                                const bool value,
+                                const bool required = true) = 0;
 
   /**
     Set X protocol capabilities.
@@ -366,13 +402,16 @@ class XSession {
 
     @param capability   capability to set or modify
     @param value        assign string value to the capability
+    @param required     define if connection should be accepted by client when
+                        server rejected the capability
 
     @return Error code with description
       @retval != true     OK
       @retval == true     error occurred
   */
   virtual XError set_capability(const Mysqlx_capability capability,
-                                const std::string &value) = 0;
+                                const std::string &value,
+                                const bool required = true) = 0;
 
   /**
     Set X protocol capabilities.
@@ -382,13 +421,16 @@ class XSession {
 
     @param capability   capability to set or modify
     @param value        assign "C" string value to the capability
+    @param required     define if connection should be accepted by client when
+                        server rejected the capability
 
     @return Error code with description
       @retval != true     OK
       @retval == true     error occurred
   */
   virtual XError set_capability(const Mysqlx_capability capability,
-                                const char *value) = 0;
+                                const char *value,
+                                const bool required = true) = 0;
 
   /**
     Set X protocol capabilities.
@@ -398,13 +440,54 @@ class XSession {
 
     @param capability   capability to set or modify
     @param value        assign integer value to the capability
+    @param required     define if connection should be accepted by client when
+                        server rejected the capability
 
     @return Error code with description
       @retval != true     OK
       @retval == true     error occurred
   */
   virtual XError set_capability(const Mysqlx_capability capability,
-                                const int64_t value) = 0;
+                                const int64_t value,
+                                const bool required = true) = 0;
+
+  /**
+    Set X protocol capabilities.
+
+    All capabilities set before calling `XSession::connect` method are
+    committed to the server (other side of the connection).
+
+    @param capability   capability to set or modify
+    @param value        assign object value to the capability
+    @param required     define if connection should be accepted by client when
+                        server rejected the capability
+
+    @return Error code with description
+      @retval != true     OK
+      @retval == true     error occurred
+  */
+  virtual XError set_capability(const Mysqlx_capability capability,
+                                const Argument_object &value,
+                                const bool required = true) = 0;
+
+  /**
+    Set X protocol capabilities.
+
+    All capabilities set before calling `XSession::connect` method are
+    committed to the server (other side of the connection).
+
+    @param capability   capability to set or modify
+    @param value        assign 'unordered' object value to the capability
+    @param required     define if connection should be accepted by client when
+                        server rejected the capability
+
+    @return Error code with description
+      @retval != true     OK
+      @retval == true     error occurred
+  */
+  virtual XError set_capability(const Mysqlx_capability capability,
+                                const Argument_uobject &value,
+                                const bool required = true) = 0;
 
   /**
     Establish and authenticate connection using TCP.
@@ -495,10 +578,9 @@ class XSession {
       @retval != nullptr  OK
       @retval == nullptr  error occurred
   */
-  virtual std::unique_ptr<XQuery_result> execute_stmt(const std::string &ns,
-                                                      const std::string &stmt,
-                                                      const Arguments &args,
-                                                      XError *out_error) = 0;
+  virtual std::unique_ptr<XQuery_result> execute_stmt(
+      const std::string &ns, const std::string &stmt,
+      const Argument_array &args, XError *out_error) = 0;
 
   /**
     Graceful shutdown maintaing the close connection message flow.
@@ -507,6 +589,13 @@ class XSession {
     object.
   */
   virtual void close() = 0;
+
+  /**
+   Get pre-filled session connection attributes.
+   If necessary could be supplemented with additional information before
+   sending it as capability to the server.
+   */
+  virtual Argument_uobject get_connect_attrs() const = 0;
 };
 
 /**

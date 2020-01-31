@@ -21,7 +21,7 @@ BEGIN;
 UPDATE t1 SET j=1 WHERE i=1;
 UPDATE t1 SET j=2 WHERE i=1;
 COMMIT;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SELECT * FROM t1;
 i	j
 1	2

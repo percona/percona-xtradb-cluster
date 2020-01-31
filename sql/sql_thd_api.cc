@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -350,6 +350,11 @@ void **thd_ha_data(const MYSQL_THD thd, const struct handlerton *hton) {
 }
 
 #ifdef WITH_WSREP
+/*
+  Handler private data is cached in thd. If thd is use to execute dd
+  action through attachable-trx concept in MySQL-8.0 then to access private
+  data of native transaction needs traversal through attachable-trx list.
+*/
 void **wsrep_thd_ha_data(const MYSQL_THD thd, const struct handlerton *hton) {
   return &(const_cast<THD *>(thd))
               ->wsrep_get_backup_ha_data(hton->slot)
@@ -376,12 +381,12 @@ void thd_set_ha_data(MYSQL_THD thd, const struct handlerton *hton,
                      const void *ha_data) {
   plugin_ref *lock = &thd->get_ha_data(hton->slot)->lock;
   if (ha_data && !*lock)
-    *lock = ha_lock_engine(NULL, (handlerton *)hton);
+    *lock = ha_lock_engine(NULL, hton);
   else if (!ha_data && *lock) {
     plugin_unlock(NULL, *lock);
     *lock = NULL;
   }
-  *thd_ha_data(thd, hton) = (void *)ha_data;
+  *thd_ha_data(thd, hton) = const_cast<void *>(ha_data);
 }
 
 long long thd_test_options(const MYSQL_THD thd, long long test_options) {
@@ -500,7 +505,8 @@ char *thd_security_context(MYSQL_THD thd, char *buffer, size_t length,
 }
 
 void thd_get_xid(const MYSQL_THD thd, MYSQL_XID *xid) {
-  *xid = *(MYSQL_XID *)thd->get_transaction()->xid_state()->get_xid();
+  *xid = *pointer_cast<const MYSQL_XID *>(
+      thd->get_transaction()->xid_state()->get_xid());
 }
 
 /**
@@ -550,7 +556,7 @@ int thd_allow_batch(MYSQL_THD thd) {
 }
 
 void thd_mark_transaction_to_rollback(MYSQL_THD thd, int all) {
-  DBUG_ENTER("thd_mark_transaction_to_rollback");
+  DBUG_TRACE;
   DBUG_ASSERT(thd);
   /*
     The parameter "all" has type int since the function is defined
@@ -560,7 +566,6 @@ void thd_mark_transaction_to_rollback(MYSQL_THD thd, int all) {
     specifically.
   */
   thd->mark_transaction_to_rollback((all != 0));
-  DBUG_VOID_RETURN;
 }
 
 //////////////////////////////////////////////////////////
@@ -656,13 +661,11 @@ void thd_wait_end(MYSQL_THD thd) {
    called.
 */
 void thd_report_row_lock_wait(THD *self, THD *wait_for) {
-  DBUG_ENTER("thd_report_row_lock_wait");
+  DBUG_TRACE;
 
   if (self != NULL && wait_for != NULL && is_mts_worker(self) &&
       is_mts_worker(wait_for))
     commit_order_manager_check_deadlock(self, wait_for);
-
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -670,7 +673,7 @@ void thd_report_row_lock_wait(THD *self, THD *wait_for) {
 */
 
 void remove_ssl_err_thread_state() {
-#if !defined(HAVE_WOLFSSL) && !defined(HAVE_OPENSSL11)
+#if !defined(HAVE_OPENSSL11)
   ERR_remove_thread_state(nullptr);
 #endif
 }

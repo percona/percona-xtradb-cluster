@@ -10,10 +10,6 @@
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
 
---connection node_1
-SET DEBUG_SYNC = 'alter_table_before_open_tables SIGNAL parked WAIT_FOR continue';
---send ALTER TABLE t1 ADD COLUMN f2 INTEGER;
-
 --let $galera_connection_name = node_1a
 --let $galera_server_number = 1
 --source include/galera_connect.inc
@@ -22,11 +18,24 @@ SET DEBUG_SYNC = 'alter_table_before_open_tables SIGNAL parked WAIT_FOR continue
 --let $galera_server_number = 1
 --source include/galera_connect.inc
 
+# node_1c tests write to unrelated table through a transaction
+--let $galera_connection_name = node_1c
+--let $galera_server_number = 1
+--source include/galera_connect.inc
+
+--connection node_1 
+SET DEBUG_SYNC= 'RESET';
+SET DEBUG_SYNC = 'alter_table_before_open_tables SIGNAL before_open_tables WAIT_FOR continue';
+--send ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+
 --connection node_1a
-SET DEBUG_SYNC = "now WAIT_FOR parked";
+SET DEBUG_SYNC = "now WAIT_FOR before_open_tables";
+
+# if we would retry the insert, it would fail for wrong column count
+# on second try
+SET wsrep_retry_autocommit=0;
 
 SET SESSION wsrep_sync_wait = 0;
-
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: alter_table_before_open_tables'
 --source include/wait_condition.inc
 
@@ -36,14 +45,22 @@ SELECT COUNT(*) = 0 FROM t1;
 # Allowed
 SELECT COUNT(*) = 0 FROM t2;
 
-# Not allowed
---error ER_LOCK_DEADLOCK
-INSERT INTO t1 VALUES (1);
+# Not allowed, this will hang because of ALTER
+--send INSERT INTO t1 VALUES (1);
+
+--connection node_1c
+SET SESSION wsrep_sync_wait = 0;
 
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 
 # Allowed
+SELECT COUNT(*) = 0 FROM t1;
+
+# Allowed
+SELECT COUNT(*) = 0 FROM t2;
+
+# Allowed (until commit)
 INSERT INTO t2 VALUES (1);
 
 # Hangs
@@ -59,6 +76,11 @@ SELECT COUNT(*) = 0 FROM t2;
 SET DEBUG_SYNC= 'now SIGNAL continue';
 
 --connection node_1a
+--error ER_LOCK_DEADLOCK
+--reap
+
+--connection node_1c
+# this will succeeed, becaus the query will be replayed
 --reap
 
 --connection node_1

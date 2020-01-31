@@ -5,6 +5,9 @@ metadata_table_handles_opened	disabled
 metadata_table_handles_closed	disabled
 metadata_table_reference_count	disabled
 lock_deadlocks	disabled
+lock_deadlock_false_positives	disabled
+lock_deadlock_rounds	disabled
+lock_threads_waiting	disabled
 lock_timeouts	disabled
 lock_rec_lock_waits	disabled
 lock_table_lock_waits	disabled
@@ -165,6 +168,16 @@ purge_undo_log_pages	disabled
 purge_dml_delay_usec	disabled
 purge_stop_count	disabled
 purge_resume_count	disabled
+purge_truncate_history_count	disabled
+purge_truncate_history_usec	disabled
+undo_truncate_count	disabled
+undo_truncate_sweep_count	disabled
+undo_truncate_sweep_usec	disabled
+undo_truncate_start_logging_count	disabled
+undo_truncate_flush_count	disabled
+undo_truncate_flush_usec	disabled
+undo_truncate_done_logging_count	disabled
+undo_truncate_usec	disabled
 log_lsn_last_flush	disabled
 log_lsn_last_checkpoint	disabled
 log_lsn_current	disabled
@@ -178,6 +191,7 @@ log_max_modified_age_sync	disabled
 log_waits	disabled
 log_write_requests	disabled
 log_writes	disabled
+log_lsn_tracked	disabled
 log_flush_total_time	disabled
 log_flush_max_time	disabled
 log_flush_avg_time	disabled
@@ -289,6 +303,11 @@ cpu_stime_abs	disabled
 cpu_utime_pct	disabled
 cpu_stime_pct	disabled
 cpu_n	disabled
+module_page_track	disabled
+page_track_resets	disabled
+page_track_partial_block_writes	disabled
+page_track_full_block_writes	disabled
+page_track_checkpoint_partial_flush_request	disabled
 set global innodb_monitor_enable = all;
 select name from information_schema.innodb_metrics where status!='enabled';
 name
@@ -309,6 +328,9 @@ select name, status from information_schema.innodb_metrics
 where name like "%lock%";
 name	status
 lock_deadlocks	disabled
+lock_deadlock_false_positives	disabled
+lock_deadlock_rounds	disabled
+lock_threads_waiting	disabled
 lock_timeouts	disabled
 lock_rec_lock_waits	disabled
 lock_table_lock_waits	disabled
@@ -335,6 +357,8 @@ innodb_rwlock_sx_spin_rounds	disabled
 innodb_rwlock_s_os_waits	disabled
 innodb_rwlock_x_os_waits	disabled
 innodb_rwlock_sx_os_waits	disabled
+page_track_partial_block_writes	disabled
+page_track_full_block_writes	disabled
 set global innodb_monitor_enable = "%lock*";
 ERROR 42000: Variable 'innodb_monitor_enable' can't be set to the value of '%lock*'
 set global innodb_monitor_enable="%%%%%%%%%%%%%%%%%%%%%%%%%%%";

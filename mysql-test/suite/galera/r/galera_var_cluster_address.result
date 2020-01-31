@@ -10,7 +10,7 @@ Variable_name	Value
 wsrep_ready	OFF
 SHOW STATUS LIKE 'wsrep_cluster_status';
 Variable_name	Value
-wsrep_cluster_status	non-Primary
+wsrep_cluster_status	Disconnected
 SHOW STATUS LIKE 'wsrep_local_state';
 Variable_name	Value
 wsrep_local_state	0
@@ -29,15 +29,6 @@ VARIABLE_VALUE = 'Primary'
 SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
-CALL mtr.add_suppression("Backend not supported: foo");
-CALL mtr.add_suppression("Failed to initialize backend using 'foo");
-CALL mtr.add_suppression("Failed to open channel 'my_wsrep_cluster' at 'foo");
-CALL mtr.add_suppression("gcs connect failed: Socket type not supported");
-CALL mtr.add_suppression("Provider.*Node.*failed to establish connection with cluster.*");
-CALL mtr.add_suppression("gcs_caused\\(\\) returned -103 \\(Software caused connection abort\\)");
-CALL mtr.add_suppression("failed to open gcomm backend connection: 110: failed to reach primary view: 110");
-CALL mtr.add_suppression("Failed to open backend connection: -110 \\(Connection timed out\\)");
-CALL mtr.add_suppression("gcs connect failed: Connection timed out");
 INSTALL PLUGIN audit_log SONAME 'audit_log.so';
 show status like 'wsrep_local_state_comment';
 Variable_name	Value
@@ -49,3 +40,17 @@ Warning	1620	Plugin is busy and will be uninstalled on shutdown
 show status like 'wsrep_cluster_size';
 Variable_name	Value
 wsrep_cluster_size	2
+#shutdown node-2 to get rid of audit plugin that is marked deleted but not removed
+#restart node-1 to get rid of audit plugin that is marked deleted but not removed
+# restart
+#restart node-2
+# restart
+CALL mtr.add_suppression("Backend not supported: foo");
+CALL mtr.add_suppression("Failed to initialize backend using 'foo");
+CALL mtr.add_suppression("Failed to open channel 'my_wsrep_cluster' at 'foo");
+CALL mtr.add_suppression("gcs connect failed: Socket type not supported");
+CALL mtr.add_suppression("Provider.*Node.*failed to establish connection with cluster.*");
+CALL mtr.add_suppression("gcs_caused\\(\\) returned -103 \\(Software caused connection abort\\)");
+CALL mtr.add_suppression("failed to open gcomm backend connection: 110: failed to reach primary view: 110");
+CALL mtr.add_suppression("Failed to open backend connection: -110 \\(Connection timed out\\)");
+CALL mtr.add_suppression("gcs connect failed: Connection timed out");

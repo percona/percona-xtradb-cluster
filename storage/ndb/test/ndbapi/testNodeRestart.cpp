@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -962,8 +962,6 @@ int runBug15587(NDBT_Context* ctx, NDBT_Step* step)
 }
 
 #define NO_NODE_GROUP int(-1)
-#define MAX_NDB_NODES 49
-#define MAX_NDB_NODE_GROUPS 48
 
 static int numNodeGroups;
 static int numNoNodeGroups;
@@ -1150,22 +1148,19 @@ crash_one_node_per_node_group(NdbRestarter & restarter,
 }
 
 void
-crash_two_nodes_per_node_group(NdbRestarter & restarter,
-                               int *dead_nodes,
-                               int & num_dead_nodes,
-                               bool crash_three)
+crash_x_nodes_per_node_group(NdbRestarter & restarter,
+                             int *dead_nodes,
+                             int & num_dead_nodes,
+                             int crash_node_count_per_ng)
 {
   num_dead_nodes = 0;
   for (int i = 0 ; i < numNodeGroups; i++)
   {
     int node_id = getFirstNodeInNodeGroup(restarter, nodeGroupIds[i]);
-    dead_nodes[num_dead_nodes++] = node_id;
-    node_id = getNextNodeInNodeGroup(restarter, node_id, nodeGroupIds[i]);
-    dead_nodes[num_dead_nodes++] = node_id;
-    if (crash_three)
+    for (int j = 0; j < crash_node_count_per_ng; j++)
     {
-      node_id = getNextNodeInNodeGroup(restarter, node_id, nodeGroupIds[i]);
       dead_nodes[num_dead_nodes++] = node_id;
+      node_id = getNextNodeInNodeGroup(restarter, node_id, nodeGroupIds[i]);
     }
   }
   crash_nodes_together(restarter, dead_nodes, num_dead_nodes);
@@ -1329,10 +1324,10 @@ int runMultiCrashTest(NDBT_Context *ctx, NDBT_Step *step)
   {
     prepare_all_nodes_for_death(restarter);
   }
-  crash_two_nodes_per_node_group(restarter,
-                                 dead_nodes,
-                                 num_dead_nodes,
-                                 false);
+  crash_x_nodes_per_node_group(restarter,
+                               dead_nodes,
+                               num_dead_nodes,
+                               2);
   if (num_replicas == 3)
   {
     set_all_dead(restarter, dead_nodes, num_dead_nodes);
@@ -1349,10 +1344,12 @@ int runMultiCrashTest(NDBT_Context *ctx, NDBT_Step *step)
 
   if (num_replicas == 4)
   {
-    crash_two_nodes_per_node_group(restarter,
-                                   dead_nodes,
-                                   num_dead_nodes,
-                                   true);
+    ndbout_c("Crash three nodes per node group");
+    prepare_all_nodes_for_death(restarter);
+    crash_x_nodes_per_node_group(restarter,
+                                 dead_nodes,
+                                 num_dead_nodes,
+                                 3);
     set_all_dead(restarter, dead_nodes, num_dead_nodes);
     if (!restarter.checkClusterState(dead_nodes, num_dead_nodes))
     {
@@ -2754,10 +2751,10 @@ runBug28717(NDBT_Context* ctx, NDBT_Step* step)
   
   if (res.insertErrorInNode(node0, 5010))
     return NDBT_FAILED;
-  
+
   if (res.insertErrorInNode(node1, 1001))
     return NDBT_FAILED;
-  
+
   if (res.startNodes(&node0, 1))
     return NDBT_FAILED;
   
@@ -7965,8 +7962,8 @@ setupTestVariant(NdbRestarter& res,
   }
 
   return NDBT_OK;
-};
-                 
+}
+
 
 int
 runGcpStop(NDBT_Context* ctx, NDBT_Step* step)
@@ -7974,7 +7971,7 @@ runGcpStop(NDBT_Context* ctx, NDBT_Step* step)
   /* Intention here is to :
    *   a) Use DUMP code to lower GCP stop detection threshold
    *   b) Use ERROR INSERT to trigger GCP stop
-   *   c) (Optional : Use ERROR INSERT to cause 'kill-self' 
+   *   c) (Optional : Use ERROR INSERT to cause 'kill-self'
    *       handling of GCP Stop to fail, so that isolation
    *       is required)
    *   d) Check that GCP is resumed
@@ -8170,8 +8167,6 @@ runGcpStop(NDBT_Context* ctx, NDBT_Step* step)
 }
 
 
-static const Uint32 numTables = 20;
-
 int CMT_createTableHook(Ndb* ndb,
                         NdbDictionary::Table& table,
                         int when,
@@ -8197,6 +8192,7 @@ int CMT_createTableHook(Ndb* ndb,
 int createManyTables(NDBT_Context* ctx, NDBT_Step* step)
 {
   Ndb* pNdb = GETNDB(step);
+  const Uint32 numTables=ctx->getProperty("NumTables", Uint32(20));
 
   for (Uint32 tn = 0; tn < numTables; tn++)
   {
@@ -8222,6 +8218,8 @@ int dropManyTables(NDBT_Context* ctx, NDBT_Step* step)
   Ndb* pNdb = GETNDB(step);
 
   char buf[100];
+
+  const Uint32 numTables=ctx->getProperty("NumTables", Uint32(20));
 
   for (Uint32 tn = 0; tn < numTables; tn++)
   {
@@ -8823,13 +8821,16 @@ int runTestStartNode(NDBT_Context* ctx, NDBT_Step* step){
 int run_PLCP_many_parts(NDBT_Context *ctx, NDBT_Step *step)
 {
   Ndb *pNdb = GETNDB(step);
-  int loops = 2800;
+  int loops = 2200;
   int records = ctx->getNumRecords();
+  bool drop_table = (bool)ctx->getProperty("DropTable", 1);
   HugoTransactions hugoTrans(*ctx->getTab());
   NdbRestarter restarter;
   const Uint32 nodeCount = restarter.getNumDbNodes();
   int nodeId = 2;
-  HugoOperations hugoOps(*ctx->getTab());
+  NdbDictionary::Dictionary* pDict = GETNDB(step)->getDictionary();
+  NdbDictionary::Table tab = * ctx->getTab();
+  HugoOperations hugoOps(tab);
   NdbMgmd mgmd;
   if (nodeCount != 2)
   {
@@ -8906,6 +8907,26 @@ int run_PLCP_many_parts(NDBT_Context *ctx, NDBT_Step *step)
       g_err << "Update failed" << endl;
       //return NDBT_FAILED;
     }
+  }
+  if (drop_table)
+  {
+    /**
+     * In this case we will drop this table, this will verify that
+     * BUG#92955 is fixed. After this we create a new table and
+     * perform a scan against the new table.
+     * This will cause a crash if the bug isn't fixed.
+     */
+    pDict->dropTable(tab.getName());
+    int res = pDict->createTable(tab);
+    if (res)
+    {
+      ndbout_c("Failed to create table again");
+      return NDBT_FAILED;
+    }
+    HugoTransactions trans(* pDict->getTable(tab.getName()));
+    trans.loadTable(pNdb, ctx->getNumRecords());
+    trans.scanUpdateRecords(pNdb, ctx->getNumRecords());
+    return NDBT_OK;
   }
   /**
    * Finally after creating a complex restore situation we test this
@@ -9153,6 +9174,57 @@ int run_PLCP_I2(NDBT_Context *ctx, NDBT_Step *step)
   return NDBT_OK;
 }
 
+int runNodeFailLcpStall(NDBT_Context* ctx, NDBT_Step* step)
+{
+  NdbRestarter restarter;
+  int master = restarter.getMasterNodeId();
+  int other = restarter.getRandomNodeSameNodeGroup(master, rand());
+
+  ndbout_c("Master %u  Other %u",
+           master, other);
+
+  ndbout_c("Stalling lcp in node %u", other);
+  restarter.insertErrorInNode(other, 5073);
+
+  int dump[] = { 7099 };
+  ndbout_c("Triggering LCP");
+  restarter.dumpStateOneNode(master, dump, 1);
+
+  ndbout_c("Giving time for things to stall");
+  NdbSleep_MilliSleep(10000);
+
+  ndbout_c("Getting Master to kill other when Master LCP complete %u", master);
+  restarter.insertErrorInNode(master, 7178);
+
+  ndbout_c("Releasing scans in node %u", other);
+  restarter.insertErrorInNode(other, 0);
+
+  ndbout_c("Expect other node failure");
+  Uint32 retries=100;
+  while (restarter.getNodeStatus(other) == NDB_MGM_NODE_STATUS_STARTED)
+  {
+    if ((--retries) == 0)
+    {
+      ndbout_c("Timeout waiting for other node to restart");
+      return NDBT_FAILED;
+    }
+    NdbSleep_MilliSleep(500);
+  }
+
+  ndbout_c("Other node failed, now wait for it to restart");
+  restarter.insertErrorInNode(master, 0);
+
+  if (restarter.waitNodesStarted(&other, 1) != 0)
+  {
+    ndbout_c("Timed out waiting for restart");
+    return NDBT_FAILED;
+  }
+
+  ndbout_c("Restart succeeded");
+
+  return NDBT_OK;
+}
+
 NDBT_TESTSUITE(testNodeRestart);
 TESTCASE("NoLoad", 
 	 "Test that one node at a time can be stopped and then restarted "\
@@ -9318,8 +9390,9 @@ TESTCASE("RestartMasterNodeError",
 TESTCASE("GetTabInfoOverload",
          "Test behaviour of GET_TABINFOREQ overload + LCP + restart")
 {
+  TC_PROPERTY("NumTables", 20);
   INITIALIZER(createManyTables);
-  STEPS(runGetTabInfo, (int) numTables);
+  STEPS(runGetTabInfo, 20);
   STEP(runLCPandRestart);
   FINALIZER(dropManyTables);
 };
@@ -9851,6 +9924,13 @@ TESTCASE("MultiCrashTest",
 TESTCASE("LCP_with_many_parts",
          "Ensure that LCP has many parts")
 {
+  TC_PROPERTY("DropTable", (Uint32)0);
+  INITIALIZER(run_PLCP_many_parts);
+}
+TESTCASE("LCP_with_many_parts_drop_table",
+         "Ensure that LCP has many parts")
+{
+  TC_PROPERTY("DropTable", (Uint32)1);
   INITIALIZER(run_PLCP_many_parts);
 }
 TESTCASE("PLCP_R1",
@@ -9909,8 +9989,16 @@ TESTCASE("StartDuringNodeRestart",
 {
   STEP(runTestStartNode);
 }
+TESTCASE("NodeFailLcpStall",
+         "Check that node failure does not result in LCP stall")
+{
+  TC_PROPERTY("NumTables", Uint32(100));
+  INITIALIZER(createManyTables);
+  STEP(runNodeFailLcpStall);
+  FINALIZER(dropManyTables);
+}
 
-NDBT_TESTSUITE_END(testNodeRestart);
+NDBT_TESTSUITE_END(testNodeRestart)
 
 int main(int argc, const char** argv){
   ndb_init();

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2015, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2015, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -177,7 +177,7 @@ int zReader::setup_zstream() {
 /** Fetch the BLOB.
 @return DB_SUCCESS on success, DB_FAIL on error. */
 dberr_t zReader::fetch() {
-  DBUG_ENTER("zReader::fetch");
+  DBUG_TRACE;
 
   dberr_t err = DB_SUCCESS;
 
@@ -239,7 +239,7 @@ end_of_blob:
   inflateEnd(&m_stream);
   mem_heap_free(m_heap);
   UNIV_MEM_ASSERT_RW(m_rctx.m_buf, m_stream.total_out);
-  DBUG_RETURN(err);
+  return err;
 }
 
 #ifdef UNIV_DEBUG
@@ -315,6 +315,12 @@ struct Being_modified {
       UNCOMMITTED transactions don't read an inconsistent BLOB. */
       if (index->is_compressed()) {
         blobref.set_being_modified(true, nullptr);
+
+        if (m_op == OPCODE_INSERT_UPDATE) {
+          /* Inserting by updating a del-marked record. */
+          blobref.set_page_no(FIL_NULL, nullptr);
+        }
+
         if (!m_btr_ctx.is_bulk()) {
           buf_block_t *rec_block = btr_pcur_get_block(m_pcur);
           page_zip_des_t *page_zip = buf_block_get_page_zip(rec_block);
@@ -506,7 +512,17 @@ dberr_t btr_store_big_rec_extern_fields(trx_t *trx, btr_pcur_t *pcur,
       }
 
       if (do_insert) {
-        error = lob::z_insert(&ctx, trx, blobref, &big_rec_vec->fields[i], i);
+        const ulint lob_len = big_rec_vec->fields[i].len;
+        if (ref_t::use_single_z_stream(lob_len)) {
+          zInserter zblob_writer(&ctx);
+          error = zblob_writer.prepare();
+          if (error == DB_SUCCESS) {
+            zblob_writer.write_one_blob(i);
+            error = zblob_writer.finish();
+          }
+        } else {
+          error = lob::z_insert(&ctx, trx, blobref, &big_rec_vec->fields[i], i);
+        }
 
         if (op == lob::OPCODE_UPDATE && upd != nullptr) {
           /* Get the corresponding upd_field_t
@@ -696,7 +712,7 @@ static void btr_check_blob_fil_page_type(space_id_t space_id, page_no_t page_no,
   ut_a(page_no == page_get_page_no(page));
 
   switch (type) {
-    ulint flags;
+    uint32_t flags;
     case FIL_PAGE_TYPE_BLOB:
     case FIL_PAGE_SDI_BLOB:
       break;
@@ -948,7 +964,12 @@ byte *btr_copy_externally_stored_field_func(
     return (buf);
   }
 
-  ut_ad(extern_len > 0);
+  if (extern_len == 0) {
+    /* The lob has already been purged. */
+    ut_ad(ref_t::page_no(field_ref) == FIL_NULL);
+    *len = 0;
+    return (buf);
+  }
 
   if (page_size.is_compressed()) {
     ut_ad(local_len == 0);
@@ -1066,7 +1087,7 @@ mark as extern storage in a record inserted for an update.
 @return number of flagged external columns */
 ulint btr_push_update_extern_fields(dtuple_t *tuple, const upd_t *update,
                                     mem_heap_t *heap) {
-  DBUG_ENTER("btr_push_update_extern_fields");
+  DBUG_TRACE;
 
   ulint n_pushed = 0;
   ulint n;
@@ -1131,7 +1152,7 @@ ulint btr_push_update_extern_fields(dtuple_t *tuple, const upd_t *update,
     }
   }
 
-  DBUG_RETURN(n_pushed);
+  return n_pushed;
 }
 
 /** Gets the externally stored size of a record, in units of a database page.
@@ -1281,6 +1302,11 @@ bool ref_t::is_lob_partially_updatable(const dict_index_t *index) const {
   }
 
   const page_size_t page_size = dict_table_page_size(index->table);
+
+  if (page_size.is_compressed() && use_single_z_stream()) {
+    return (false);
+  }
+
   bool can_do_partial_update = false;
   ulint page_type = get_lob_page_info(index, page_size, can_do_partial_update);
 
@@ -1293,7 +1319,8 @@ bool ref_t::is_lob_partially_updatable(const dict_index_t *index) const {
 std::ostream &ref_t::print(std::ostream &out) const {
   out << "[ref_t: m_ref=" << (void *)m_ref << ", space_id=" << space_id()
       << ", page_no=" << page_no() << ", offset=" << offset()
-      << ", length=" << length() << "]";
+      << ", length=" << length()
+      << ", is_being_modified=" << is_being_modified() << "]";
   return (out);
 }
 

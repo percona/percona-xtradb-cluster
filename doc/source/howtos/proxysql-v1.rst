@@ -209,14 +209,6 @@ The ``proxysql-admin`` tool will do the following:
   ProxySQL uses one user for monitoring cluster nodes,
   and the other one is used for communicating with the cluster.
 
-.. note::
-
-Does this mean that we should give super user credentials to these users? What is meant by 'default' users.
-
-
-   Please make sure to use super user credentials from Cluster
-   to setup the default users.
-
 The following example shows how to add a |PXC| node
 using the ProxySQL configuration file
 with all necessary connection and authentication information:
@@ -309,8 +301,6 @@ The following extra options can be used:
   This option works in the same way as --syncusers but it does not delete ProxySQL
   users that are not present in the Percona XtraDB Cluster. It is to be used when
   syncing proxysql instances that manage multiple clusters.
-
-
 
 
 * ``--node-check-interval``

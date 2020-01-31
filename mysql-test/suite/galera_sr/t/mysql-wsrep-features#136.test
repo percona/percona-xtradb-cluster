@@ -1,0 +1,46 @@
+# SR transactions are not binlogged #136
+
+--source include/galera_cluster.inc
+
+--connection node_1
+--echo #node-1
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+--connection node_2
+--echo #node-2
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+--connection node_1
+--echo #node-1
+SET SESSION wsrep_trx_fragment_size = 1;
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1),(2);
+COMMIT;
+
+SET SESSION wsrep_trx_fragment_size = 0;
+INSERT INTO t1 VALUES (3),(4);
+COMMIT;
+
+--connection node_1
+--echo #node-1
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 362;
+
+--connection node_2
+--echo #node-2
+# Wait for all updates to arrive before dumping binlog
+--let $wait_condition = SELECT COUNT(*) = 4  FROM t1;
+--source include/wait_condition.inc
+SELECT COUNT(*) = 4 FROM t1;
+
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 362;
+
+--connection node_1
+DROP TABLE t1;

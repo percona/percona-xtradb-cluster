@@ -1,4 +1,4 @@
-/* Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -102,7 +102,7 @@ struct MYSQL_XID {
   Plugin API. Common for all plugin types.
 */
 
-#define MYSQL_PLUGIN_INTERFACE_VERSION 0x0109
+#define MYSQL_PLUGIN_INTERFACE_VERSION 0x010A
 
 /*
   The allowable types of plugins
@@ -165,6 +165,7 @@ struct MYSQL_XID {
 
 #define PLUGIN_OPT_NO_INSTALL 1UL   /* Not dynamically loadable */
 #define PLUGIN_OPT_NO_UNINSTALL 2UL /* Not dynamically unloadable */
+#define PLUGIN_OPT_ALLOW_EARLY 4UL  /* allow --early-plugin-load */
 
 /*
   declarations for server variables and command line options

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -23,6 +23,10 @@
  */
 
 #include "plugin/x/tests/driver/connector/session_holder.h"
+
+#include "my_dbug.h"
+
+#include "plugin/x/tests/driver/connector/mysqlx_all_msgs.h"
 
 namespace details {
 
@@ -50,6 +54,7 @@ Session_holder::Session_holder(std::unique_ptr<xcl::XSession> session,
 xcl::XSession *Session_holder::get_session() { return m_session.get(); }
 
 xcl::XError Session_holder::connect(const bool is_raw_connection) {
+  DBUG_TRACE;
   setup_ssl();
   setup_msg_callbacks();
   setup_other_options();
@@ -80,6 +85,7 @@ bool Session_holder::try_get_number_of_received_messages(
 }
 
 xcl::XError Session_holder::setup_session() {
+  DBUG_TRACE;
   xcl::XError error;
 
   if (m_options.socket.empty()) {
@@ -114,25 +120,29 @@ xcl::XError Session_holder::setup_connection() {
 }
 
 void Session_holder::setup_other_options() {
+  DBUG_TRACE;
+  using Mysqlx_option = xcl::XSession::Mysqlx_option;
   const auto text_ip_mode = details::get_ip_mode_to_text(m_options.ip_mode);
 
   if (m_options.compatible) {
-    m_session->set_mysql_option(
-        xcl::XSession::Mysqlx_option::Authentication_method, "FALLBACK");
+    m_session->set_mysql_option(Mysqlx_option::Authentication_method,
+                                "FALLBACK");
   }
 
   m_session->set_mysql_option(xcl::XSession::Mysqlx_option::Hostname_resolve_to,
                               text_ip_mode);
 
   if (!m_options.auth_methods.empty())
-    m_session->set_mysql_option(
-        xcl::XSession::Mysqlx_option::Authentication_method,
-        m_options.auth_methods);
+    m_session->set_mysql_option(Mysqlx_option::Authentication_method,
+                                m_options.auth_methods);
 }
 
 void Session_holder::setup_ssl() {
+  DBUG_TRACE;
+
   auto error = m_session->set_mysql_option(
-      xcl::XSession::Mysqlx_option::Ssl_fips_mode, m_options.ssl_fips_mode);
+      xcl::XSession::Mysqlx_option::Ssl_fips_mode,
+      m_options.ssl_fips_mode.empty() ? "off" : m_options.ssl_fips_mode);
 
   if (error) throw error;
 
@@ -165,6 +175,11 @@ void Session_holder::setup_ssl() {
                               m_options.io_timeout);
   m_session->set_mysql_option(xcl::XSession::Mysqlx_option::Write_timeout,
                               m_options.io_timeout);
+  m_session->set_mysql_option(
+      xcl::XSession::Mysqlx_option::Session_connect_timeout,
+      m_options.session_connect_timeout);
+  m_session->set_mysql_option(xcl::XSession::Mysqlx_option::Network_namespace,
+                              m_options.network_namespace);
 }
 
 void Session_holder::setup_msg_callbacks() {
@@ -242,22 +257,30 @@ xcl::Handler_result Session_holder::count_received_messages(
     xcl::XProtocol *protocol,
     const xcl::XProtocol::Server_message_type_id msg_id,
     const xcl::XProtocol::Message &msg) {
-  const std::string &msg_name = msg.GetDescriptor()->full_name();
+  const auto protobuf_message_name = msg.GetDescriptor()->full_name();
+  const auto server_message_name =
+      Mysqlx::ServerMessages::descriptor()->full_name();
+  const bool is_empty_message = (protobuf_message_name == server_message_name);
+  const std::string &msg_name = !is_empty_message
+                                    ? msg.GetDescriptor()->full_name()
+                                    : server_msgs_by_id[msg_id].second;
+
   ++m_received_msg_counters[msg_name];
 
   if (msg_name != Mysqlx::Notice::Frame::descriptor()->full_name())
     return xcl::Handler_result::Continue;
 
-  static const std::string *notice_type_id[] = {
-      &Mysqlx::Notice::Warning::descriptor()->full_name(),
-      &Mysqlx::Notice::SessionVariableChanged::descriptor()->full_name(),
-      &Mysqlx::Notice::SessionStateChanged::descriptor()->full_name(),
-      &Mysqlx::Notice::GroupReplicationStateChanged::descriptor()->full_name()};
+  static const std::string notice_type_id[] = {
+      Mysqlx::Notice::Warning::descriptor()->full_name(),
+      Mysqlx::Notice::SessionVariableChanged::descriptor()->full_name(),
+      Mysqlx::Notice::SessionStateChanged::descriptor()->full_name(),
+      Mysqlx::Notice::GroupReplicationStateChanged::descriptor()->full_name(),
+      Mysqlx::Notice::ServerHello::descriptor()->full_name()};
 
   const auto notice_type =
       static_cast<const Mysqlx::Notice::Frame *>(&msg)->type() - 1u;
   if (notice_type < array_elements(notice_type_id))
-    ++m_received_msg_counters[*notice_type_id[notice_type]];
+    ++m_received_msg_counters[notice_type_id[notice_type]];
 
   /** None of processed messages should be filtered out*/
   return xcl::Handler_result::Continue;

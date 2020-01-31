@@ -14,7 +14,7 @@ SET GLOBAL DEBUG = "";
 SET DEBUG_SYNC = "now SIGNAL signal.wsrep_before_mdl_wait";
 SET DEBUG_SYNC = "now SIGNAL signal.wsrep_after_BF_victim_lock";
 UNLOCK TABLES;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'a';
 COUNT(*) = 1
 1

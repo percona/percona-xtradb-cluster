@@ -78,6 +78,9 @@ static bool field_valid_for_tokudb_table(Field *field) {
     case MYSQL_TYPE_DECIMAL:
     case MYSQL_TYPE_VAR_STRING:
     case MYSQL_TYPE_NULL:
+
+    // NOT SUPPORTED in 8.0
+    case MYSQL_TYPE_TYPED_ARRAY:
       ret_val = false;
   }
 exit:
@@ -222,6 +225,9 @@ static TOKU_TYPE mysql_to_toku_type(const Field &field) {
     case MYSQL_TYPE_DECIMAL:
     case MYSQL_TYPE_VAR_STRING:
     case MYSQL_TYPE_NULL:
+
+    // NOT SUPPORTED in 8.0
+    case MYSQL_TYPE_TYPED_ARRAY:
       assert_unreachable();
   }
 exit:
@@ -876,8 +882,8 @@ static inline int cmp_toku_varstring(uchar *a_buf, uchar *b_buf,
 static inline int tokudb_compare_two_hidden_keys(
     const void *new_key_data, const uint32_t new_key_size,
     const void *saved_key_data, const uint32_t saved_key_size) {
-  assert_always((new_key_size >= TOKUDB_HIDDEN_PRIMARY_KEY_LENGTH) &&
-                (saved_key_size >= TOKUDB_HIDDEN_PRIMARY_KEY_LENGTH));
+  assert_always(new_key_size >= TOKUDB_HIDDEN_PRIMARY_KEY_LENGTH);
+  assert_always(saved_key_size >= TOKUDB_HIDDEN_PRIMARY_KEY_LENGTH);
   ulonglong a = hpk_char_to_num((uchar *)new_key_data);
   ulonglong b = hpk_char_to_num((uchar *)saved_key_data);
   return a < b ? -1 : (a > b ? 1 : 0);
@@ -2456,7 +2462,8 @@ static uint32_t create_toku_secondary_key_pack_descriptor(
     bool is_col_in_pk = false;
 
     if (bitmap_is_set(&kc_info->key_filters[pk_index], field_index)) {
-      assert_always(!has_hpk && prim_key != NULL);
+      assert_always(!has_hpk);
+      assert_always(prim_key != nullptr);
       is_col_in_pk = true;
     } else {
       is_col_in_pk = false;
@@ -3055,6 +3062,9 @@ static bool fields_are_same_type(Field *a, Field *b) {
     case MYSQL_TYPE_DECIMAL:
     case MYSQL_TYPE_VAR_STRING:
     case MYSQL_TYPE_NULL:
+
+    // NOT SUPPORTED in 8.0
+    case MYSQL_TYPE_TYPED_ARRAY:
       assert_unreachable();
   }
 

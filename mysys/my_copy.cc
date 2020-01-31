@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -82,14 +82,14 @@ int my_copy(const char *from, const char *to, myf MyFlags) {
   File from_file, to_file;
   uchar buff[IO_SIZE];
   MY_STAT stat_buff, new_stat_buff;
-  DBUG_ENTER("my_copy");
+  DBUG_TRACE;
   DBUG_PRINT("my", ("from %s to %s MyFlags %d", from, to, MyFlags));
 
   from_file = to_file = -1;
   memset(&new_stat_buff, 0, sizeof(MY_STAT));
   DBUG_ASSERT(!(MyFlags & (MY_FNABP | MY_NABP))); /* for my_read/my_write */
   if (MyFlags & MY_HOLD_ORIGINAL_MODES)           /* Copy stat if possible */
-    new_file_stat = my_stat((char *)to, &new_stat_buff, MYF(0)) != nullptr;
+    new_file_stat = my_stat(to, &new_stat_buff, MYF(0)) != nullptr;
 
   if ((from_file = my_open(from, O_RDONLY, MyFlags)) >= 0) {
     if (!my_stat(from, &stat_buff, MyFlags)) {
@@ -116,7 +116,7 @@ int my_copy(const char *from, const char *to, myf MyFlags) {
     }
 
     if (my_close(from_file, MyFlags) | my_close(to_file, MyFlags))
-      DBUG_RETURN(-1); /* Error on close */
+      return -1; /* Error on close */
 
     /* Reinitialize closed fd, so they won't be closed again. */
     from_file = -1;
@@ -125,7 +125,7 @@ int my_copy(const char *from, const char *to, myf MyFlags) {
     /* Copy modes if possible */
 
     if (MyFlags & MY_HOLD_ORIGINAL_MODES && !new_file_stat)
-      DBUG_RETURN(0); /* File copyed but not stat */
+      return 0; /* File copyed but not stat */
     /* Copy modes */
     if (chmod(to, stat_buff.st_mode & 07777)) {
       set_my_errno(errno);
@@ -153,10 +153,10 @@ int my_copy(const char *from, const char *to, myf MyFlags) {
       struct utimbuf timep;
       timep.actime = stat_buff.st_atime;
       timep.modtime = stat_buff.st_mtime;
-      (void)utime((char *)to, &timep); /* last accessed and modified times */
+      (void)utime(to, &timep); /* last accessed and modified times */
     }
 
-    DBUG_RETURN(0);
+    return 0;
   }
 
 err:
@@ -166,5 +166,5 @@ err:
     /* attempt to delete the to-file we've partially written */
     (void)my_delete(to, MyFlags);
   }
-  DBUG_RETURN(-1);
+  return -1;
 } /* my_copy */

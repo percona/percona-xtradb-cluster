@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -238,18 +238,18 @@ bool Table_trigger_dispatcher::create_trigger(
     that the current user has SUPER privilege (in order to create trigger
     under another user one must have SUPER privilege).
   */
-
+  Security_context *sctx = thd->security_context();
   if (lex->definer &&
-      (strcmp(lex->definer->user.str,
-              thd->security_context()->priv_user().str) ||
+      (strcmp(lex->definer->user.str, sctx->priv_user().str) ||
        my_strcasecmp(system_charset_info, lex->definer->host.str,
-                     thd->security_context()->priv_host().str))) {
-    Security_context *sctx = thd->security_context();
+                     sctx->priv_host().str))) {
     if (!sctx->check_access(SUPER_ACL) &&
         !sctx->has_global_grant(STRING_WITH_LEN("SET_USER_ID")).first) {
       my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER or SET_USER_ID");
       return true;
     }
+    if (sctx->can_operate_with({lex->definer}, consts::system_user, true))
+      return true;
   }
 
   if (lex->definer &&
@@ -331,9 +331,8 @@ bool Table_trigger_dispatcher::prepare_record1_accessors() {
 
   DBUG_ASSERT(m_subject_table);
 
-  m_record1_field =
-      (Field **)alloc_root(&m_subject_table->mem_root,
-                           (m_subject_table->s->fields + 1) * sizeof(Field *));
+  m_record1_field = (Field **)m_subject_table->mem_root.Alloc(
+      (m_subject_table->s->fields + 1) * sizeof(Field *));
 
   if (!m_record1_field) return true;
 
@@ -348,8 +347,8 @@ bool Table_trigger_dispatcher::prepare_record1_accessors() {
 
     if (!(*old_fld)) return true;
 
-    (*old_fld)->move_field_offset((my_ptrdiff_t)(m_subject_table->record[1] -
-                                                 m_subject_table->record[0]));
+    (*old_fld)->move_field_offset(
+        (ptrdiff_t)(m_subject_table->record[1] - m_subject_table->record[0]));
   }
 
   *old_fld = 0;

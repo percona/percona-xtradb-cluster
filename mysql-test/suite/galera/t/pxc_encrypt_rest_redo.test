@@ -91,13 +91,13 @@ BEGIN
         SET SESSION wsrep_sync_wait = 0;
 
         SET i = 0;
-        WHILE i < 10000 DO
+        WHILE i < 1000 DO
             INSERT INTO t1 VALUES (DEFAULT);
             SET i = i + 1;
         END WHILE;
 END|
 DELIMITER ;|
-# 10000 independent transaction committed
+# 1000 independent transaction committed
 CALL proc_insert();
 SELECT COUNT(*) from t1;
 
@@ -111,7 +111,7 @@ SELECT COUNT(*) from t1;
 
 --connection node_2
 --echo #node-2
---let $wait_condition = SELECT COUNT(*) = 10000 FROM t1
+--let $wait_condition = SELECT COUNT(*) = 1000 FROM t1
 --source include/wait_condition.inc
 DROP TABLE t1;
 DROP PROCEDURE proc_insert;

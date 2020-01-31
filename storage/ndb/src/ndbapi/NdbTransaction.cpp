@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -1323,6 +1323,8 @@ NdbTransaction::releaseCompletedOperations()
   releaseOps(theCompletedFirstOp);
   theCompletedFirstOp = NULL;
   theCompletedLastOp = NULL;
+  theErrorLine = 0;
+  theErrorOperation = NULL;
 }//NdbTransaction::releaseCompletedOperations()
 
 
@@ -1423,6 +1425,12 @@ NdbTransaction::releaseScanOperation(NdbIndexScanOperation** listhead,
   
   if (op != NULL)
   {
+    if (unlikely(theErrorOperation == op))
+    {
+      /* Remove ref to scan op before release */
+      theErrorLine = 0;
+      theErrorOperation = NULL;
+    }
     op->release();
     theNdb->releaseScanOperation(op);
     return true;
@@ -2199,7 +2207,7 @@ transactions.
     }
 
     /**********************************************************************/
-    /*	A serious error has occured. This could be due to deadlock or */
+    /*	A serious error has occurred. This could be due to deadlock or */
     /*	lack of resources or simply a programming error in NDB. This  */
     /*	transaction will be aborted. Actually it has already been     */
     /*	and we only need to report completion and return with the     */
@@ -2333,7 +2341,7 @@ NdbTransaction::receiveTCKEY_FAILCONF(const TcKeyFailConf * failConf)
   */
   if(checkState_TransId(&failConf->transId1)){
     /*
-      A node failure of the TC node occured. The transaction has
+      A node failure of the TC node occurred. The transaction has
       been committed.
     */
     theCommitStatus = Committed;
@@ -3009,7 +3017,7 @@ NdbTransaction::getMaxPendingBlobReadBytes() const
   /* 0 == max */
   return (maxPendingBlobReadBytes == 
           (~Uint32(0)) ? 0 : maxPendingBlobReadBytes);
-};
+}
 
 Uint32
 NdbTransaction::getMaxPendingBlobWriteBytes() const
@@ -3017,7 +3025,7 @@ NdbTransaction::getMaxPendingBlobWriteBytes() const
   /* 0 == max */
   return (maxPendingBlobWriteBytes == 
           (~Uint32(0)) ? 0 : maxPendingBlobWriteBytes);
-};
+}
 
 void
 NdbTransaction::setMaxPendingBlobReadBytes(Uint32 bytes)

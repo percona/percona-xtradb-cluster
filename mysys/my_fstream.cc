@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -40,6 +40,7 @@
 #include "my_sys.h"
 #include "my_thread_local.h"
 #include "mysys_err.h"
+#include "template_utils.h"
 #if defined(_WIN32)
 #include "mysys/mysys_priv.h"
 #endif
@@ -68,7 +69,7 @@
 
 size_t my_fread(FILE *stream, uchar *Buffer, size_t Count, myf MyFlags) {
   size_t readbytes;
-  DBUG_ENTER("my_fread");
+  DBUG_TRACE;
   DBUG_PRINT("my", ("stream: %p  Buffer: %p  Count: %u  MyFlags: %d", stream,
                     Buffer, (uint)Count, MyFlags));
 
@@ -87,10 +88,10 @@ size_t my_fread(FILE *stream, uchar *Buffer, size_t Count, myf MyFlags) {
     }
     set_my_errno(errno ? errno : -1);
     if (ferror(stream) || MyFlags & (MY_NABP | MY_FNABP))
-      DBUG_RETURN((size_t)-1); /* Return with error */
+      return (size_t)-1; /* Return with error */
   }
-  if (MyFlags & (MY_NABP | MY_FNABP)) DBUG_RETURN(0); /* Read ok */
-  DBUG_RETURN(readbytes);
+  if (MyFlags & (MY_NABP | MY_FNABP)) return 0; /* Read ok */
+  return readbytes;
 } /* my_fread */
 
 /*
@@ -111,16 +112,16 @@ size_t my_fwrite(FILE *stream, const uchar *Buffer, size_t Count, myf MyFlags) {
   size_t writtenbytes = 0;
   my_off_t seekptr;
 
-  DBUG_ENTER("my_fwrite");
+  DBUG_TRACE;
   DBUG_PRINT("my", ("stream: %p  Buffer: %p  Count: %u  MyFlags: %d", stream,
                     Buffer, (uint)Count, MyFlags));
-  DBUG_EXECUTE_IF("simulate_fwrite_error", DBUG_RETURN(-1););
+  DBUG_EXECUTE_IF("simulate_fwrite_error", return -1;);
 
   seekptr = ftell(stream);
   for (;;) {
-    size_t written;
-    if ((written = (size_t)fwrite((char *)Buffer, sizeof(char), Count,
-                                  stream)) != Count) {
+    size_t written =
+        fwrite(pointer_cast<const char *>(Buffer), sizeof(char), Count, stream);
+    if (written != Count) {
       DBUG_PRINT("error", ("Write only %d bytes", (int)writtenbytes));
       set_my_errno(errno);
       if (written != (size_t)-1) {
@@ -149,28 +150,28 @@ size_t my_fwrite(FILE *stream, const uchar *Buffer, size_t Count, myf MyFlags) {
       writtenbytes += written;
     break;
   }
-  DBUG_RETURN(writtenbytes);
+  return writtenbytes;
 } /* my_fwrite */
 
 /* Seek to position in file */
 
 my_off_t my_fseek(FILE *stream, my_off_t pos, int whence) {
-  DBUG_ENTER("my_fseek");
+  DBUG_TRACE;
   DBUG_PRINT("my",
              ("stream: %p  pos: %lu  whence: %d", stream, (long)pos, whence));
-  DBUG_RETURN(fseek(stream, (off_t)pos, whence) ? MY_FILEPOS_ERROR
-                                                : (my_off_t)ftell(stream));
+  return fseek(stream, (off_t)pos, whence) ? MY_FILEPOS_ERROR
+                                           : (my_off_t)ftell(stream);
 } /* my_seek */
 
 /* Tell current position of file */
 
 my_off_t my_ftell(FILE *stream) {
   off_t pos;
-  DBUG_ENTER("my_ftell");
+  DBUG_TRACE;
   DBUG_PRINT("my", ("stream: %p", stream));
   pos = ftell(stream);
   DBUG_PRINT("exit", ("ftell: %lu", (ulong)pos));
-  DBUG_RETURN((my_off_t)pos);
+  return (my_off_t)pos;
 } /* my_ftell */
 
 /* Get a File corresponding to the stream*/

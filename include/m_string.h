@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "decimal.h"
 #include "lex_string.h"
 #include "my_config.h"
 #include "my_inttypes.h"
@@ -64,7 +65,7 @@ extern char _dig_vec_lower[];
 /* Prototypes for string functions */
 
 extern char *strmake(char *dst, const char *src, size_t length);
-extern char *strcont(const char *src, const char *set);
+extern char *strcont(char *src, const char *set);
 extern char *strxmov(char *dst, const char *src, ...);
 extern char *strxnmov(char *dst, size_t len, const char *src, ...);
 
@@ -85,20 +86,26 @@ static inline void bchange(uchar *dst, size_t old_length, const uchar *src,
   the end of strings.  It is redundant, because  strchr(s,'\0')  could
   be used instead, but this is clearer and faster.
 */
-static inline char *strend(const char *s) {
+static inline const char *strend(const char *s) {
   while (*s++)
     ;
-  return (char *)(s - 1);
+  return s - 1;
+}
+
+static inline char *strend(char *s) {
+  while (*s++)
+    ;
+  return s - 1;
 }
 
 /*
   strcend(s, c) returns a pointer to the  first  place  in  s where  c
   occurs,  or a pointer to the end-null of s if c does not occur in s.
 */
-static inline char *strcend(const char *s, char c) {
+static inline const char *strcend(const char *s, char c) {
   for (;;) {
-    if (*s == (char)c) return (char *)s;
-    if (!*s++) return (char *)s - 1;
+    if (*s == c) return s;
+    if (!*s++) return s - 1;
   }
 }
 
@@ -239,21 +246,20 @@ static inline int is_prefix(const char *s, const char *t) {
 /* Conversion routines */
 typedef enum { MY_GCVT_ARG_FLOAT, MY_GCVT_ARG_DOUBLE } my_gcvt_arg_type;
 
-double my_strtod(const char *str, char **end, int *error);
+double my_strtod(const char *str, const char **end, int *error);
 double my_atof(const char *nptr);
 size_t my_fcvt(double x, int precision, char *to, bool *error);
 size_t my_fcvt_compact(double x, char *to, bool *error);
 size_t my_gcvt(double x, my_gcvt_arg_type type, int width, char *to,
                bool *error);
 
-#define NOT_FIXED_DEC 31
-
 /*
   The longest string my_fcvt can return is 311 + "precision" bytes.
-  Here we assume that we never cal my_fcvt() with precision >= NOT_FIXED_DEC
+  Here we assume that we never call my_fcvt() with precision >=
+  DECIMAL_NOT_SPECIFIED
   (+ 1 byte for the terminating '\0').
 */
-#define FLOATING_POINT_BUFFER (311 + NOT_FIXED_DEC)
+static constexpr int FLOATING_POINT_BUFFER{311 + DECIMAL_NOT_SPECIFIED};
 
 /*
   We want to use the 'e' format in some cases even if we have enough space
@@ -277,9 +283,9 @@ extern char *int2str(long val, char *dst, int radix, int upcase);
 C_MODE_START
 extern char *int10_to_str(long val, char *dst, int radix);
 C_MODE_END
-extern char *str2int(const char *src, int radix, long lower, long upper,
-                     long *val);
-longlong my_strtoll10(const char *nptr, char **endptr, int *error);
+extern const char *str2int(const char *src, int radix, long lower, long upper,
+                           long *val);
+longlong my_strtoll10(const char *nptr, const char **endptr, int *error);
 #if SIZEOF_LONG == SIZEOF_LONG_LONG
 #define ll2str(A, B, C, D) int2str((A), (B), (C), (D))
 #define longlong10_to_str(A, B, C) int10_to_str((A), (B), (C))
@@ -307,8 +313,6 @@ static inline char *ullstr(longlong value, char *buff) {
 }
 
 #define STRING_WITH_LEN(X) (X), ((sizeof(X) - 1))
-#define USTRING_WITH_LEN(X) ((uchar *)X), ((sizeof(X) - 1))
-#define C_STRING_WITH_LEN(X) ((char *)(X)), ((sizeof(X) - 1))
 
 /**
   Skip trailing space (ASCII spaces only).
@@ -353,8 +357,8 @@ static inline void human_readable_num_bytes(char *buf, int buf_len,
     snprintf(buf, buf_len, "%llu%c", (unsigned long long)dbl_val, mult);
 }
 
-static inline void lex_string_set(LEX_STRING *lex_str, const char *c_str) {
-  lex_str->str = (char *)c_str;
+static inline void lex_string_set(LEX_STRING *lex_str, char *c_str) {
+  lex_str->str = c_str;
   lex_str->length = strlen(c_str);
 }
 

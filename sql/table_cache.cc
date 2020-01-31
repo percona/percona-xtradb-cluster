@@ -306,9 +306,9 @@ void Table_cache_manager::free_table(THD *thd MY_ATTRIBUTE((unused)),
 #ifdef WITH_WSREP
       {
         if (!cache_el[i]->used_tables.is_empty()) {
-          WSREP_DEBUG("ASSERT skipped, thd: %u mode %d conf %d query %s",
-                      thd->thread_id(), thd->wsrep_exec_mode,
-                      thd->wsrep_conflict_state, thd->query().str);
+          WSREP_DEBUG("ASSERT skipped, thd: %u mode %s conf %s query %s",
+                      thd->thread_id(), wsrep_thd_client_mode_str(thd),
+                      wsrep_thd_transaction_state_str(thd), thd->query().str);
         }
       }
 #else
@@ -320,17 +320,21 @@ void Table_cache_manager::free_table(THD *thd MY_ATTRIBUTE((unused)),
         while ((table = it2++)) {
 #ifdef WITH_WSREP
           mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-          if (table->in_use != thd &&
-              !(table->in_use->wsrep_conflict_state == MUST_ABORT ||
-                table->in_use->wsrep_conflict_state == ABORTING ||
-                table->in_use->wsrep_conflict_state == ABORTED ||
-                table->in_use->wsrep_conflict_state == MUST_REPLAY ||
-                table->in_use->wsrep_conflict_state == CERT_FAILURE)) {
+          if (table->in_use != thd && !((table->in_use->wsrep_trx().state() ==
+                                         wsrep::transaction::s_must_abort) ||
+                                        (table->in_use->wsrep_trx().state() ==
+                                         wsrep::transaction::s_aborting) ||
+                                        (table->in_use->wsrep_trx().state() ==
+                                         wsrep::transaction::s_aborted) ||
+                                        (table->in_use->wsrep_trx().state() ==
+                                         wsrep::transaction::s_must_replay) ||
+                                        (table->in_use->wsrep_trx().state() ==
+                                         wsrep::transaction::s_cert_failed))) {
             mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-            WSREP_DEBUG("ASSERT  BF me %d BF other %d conf %d",
+            WSREP_DEBUG("ASSERT  BF me %d BF other %d conf %s",
                         wsrep_thd_is_BF(thd, false),
                         wsrep_thd_is_BF(table->in_use, false),
-                        table->in_use->wsrep_conflict_state);
+                        wsrep_thd_transaction_state_str(table->in_use));
             DBUG_ASSERT(0);
           }
           mysql_mutex_unlock(&thd->LOCK_wsrep_thd);

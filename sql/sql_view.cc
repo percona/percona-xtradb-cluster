@@ -1,4 +1,4 @@
-/* Copyright (c) 2004, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2004, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -157,22 +157,22 @@ static void make_unique_view_field_name(Item *target, List<Item> &item_list,
 
 bool check_duplicate_names(const Create_col_name_list *column_names,
                            List<Item> &item_list, bool gen_unique_view_name) {
-  DBUG_ENTER("check_duplicate_names");
+  DBUG_TRACE;
   if (column_names) {
     const uint count = column_names->size();
     if (count != item_list.elements) {
       my_error(ER_VIEW_WRONG_LIST, MYF(0));
-      DBUG_RETURN(true);
+      return true;
     }
     for (uint i = 0; i < count; ++i)
       for (uint j = i + 1; j < count; ++j) {
         if (!my_strcasecmp(system_charset_info, (*column_names)[i].str,
                            (*column_names)[j].str)) {
           my_error(ER_DUP_FIELDNAME, MYF(0), (*column_names)[i].str);
-          DBUG_RETURN(true);
+          return true;
         }
       }
-    DBUG_RETURN(false);
+    return false;
   }
 
   Item *item;
@@ -197,11 +197,11 @@ bool check_duplicate_names(const Create_col_name_list *column_names,
       }
     }
   }
-  DBUG_RETURN(false);
+  return false;
 
 err:
   my_error(ER_DUP_FIELDNAME, MYF(0), item->item_name.ptr());
-  DBUG_RETURN(true);
+  return true;
 }
 
 /**
@@ -309,7 +309,7 @@ static bool fill_defined_view_parts(THD *thd, TABLE_LIST *view) {
   @param mode VIEW_CREATE_NEW, VIEW_ALTER, VIEW_CREATE_OR_REPLACE
 
   @retval false Operation was a success.
-  @retval true An error occured.
+  @retval true An error occurred.
 */
 
 bool create_view_precheck(THD *thd, TABLE_LIST *tables, TABLE_LIST *view,
@@ -318,7 +318,7 @@ bool create_view_precheck(THD *thd, TABLE_LIST *tables, TABLE_LIST *view,
   /* first table in list is target VIEW name => cut off it */
   SELECT_LEX *const select_lex = lex->select_lex;
   bool res = true;
-  DBUG_ENTER("create_view_precheck");
+  DBUG_TRACE;
 
   /*
     Privilege check for view creation:
@@ -395,7 +395,7 @@ bool create_view_precheck(THD *thd, TABLE_LIST *tables, TABLE_LIST *view,
   res = false;
 
 err:
-  DBUG_RETURN(res || thd->is_error());
+  return res || thd->is_error();
 }
 
 /**
@@ -420,7 +420,7 @@ err:
   @note This function handles both create and alter view commands.
 
   @retval false Operation was a success.
-  @retval true  An error occured.
+  @retval true  An error occurred.
 */
 
 bool mysql_create_view(THD *thd, TABLE_LIST *views,
@@ -436,7 +436,7 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
   SELECT_LEX_UNIT *const unit = lex->unit;
   bool res = false;
   bool exists = false;
-  DBUG_ENTER("mysql_create_view");
+  DBUG_TRACE;
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
 
   /* This is ensured in the parser. */
@@ -539,6 +539,10 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
     if (!(sctx->check_access(SUPER_ACL) ||
           sctx->has_global_grant(STRING_WITH_LEN("SET_USER_ID")).first)) {
       my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER or SET_USER_ID");
+      res = true;
+      goto err;
+    } else if (sctx->can_operate_with({lex->definer}, consts::system_user,
+                                      true)) {
       res = true;
       goto err;
     } else {
@@ -691,9 +695,9 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
   // Binlog CREATE/ALTER/CREATE OR REPLACE event.
   if (mysql_bin_log.is_open()) {
     String buff;
-    const LEX_STRING command[3] = {{C_STRING_WITH_LEN("CREATE ")},
-                                   {C_STRING_WITH_LEN("ALTER ")},
-                                   {C_STRING_WITH_LEN("CREATE OR REPLACE ")}};
+    const LEX_CSTRING command[3] = {{STRING_WITH_LEN("CREATE ")},
+                                    {STRING_WITH_LEN("ALTER ")},
+                                    {STRING_WITH_LEN("CREATE OR REPLACE ")}};
 
     buff.append(command[static_cast<int>(thd->lex->create_view_mode)].str,
                 command[static_cast<int>(thd->lex->create_view_mode)].length);
@@ -731,7 +735,7 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
 
   my_ok(thd);
   lex->link_first_table_back(view, link_to_local);
-  DBUG_RETURN(false);
+  return false;
 
 err_with_rollback:
   DBUG_EXECUTE_IF("simulate_create_view_failure",
@@ -748,9 +752,9 @@ err_with_rollback:
 err:
   THD_STAGE_INFO(thd, stage_end);
   lex->link_first_table_back(view, link_to_local);
-  unit->cleanup(true);
+  unit->cleanup(thd, true);
 
-  DBUG_RETURN(res || thd->is_error());
+  return res || thd->is_error();
 }
 
 /*
@@ -877,7 +881,7 @@ bool mysql_register_view(THD *thd, TABLE_LIST *view,
   char is_query_buff[4096];
   String is_query(is_query_buff, sizeof(is_query_buff), system_charset_info);
 
-  DBUG_ENTER("mysql_register_view");
+  DBUG_TRACE;
 
   /*
     A view can be merged if it is technically possible and if the user didn't
@@ -902,9 +906,10 @@ bool mysql_register_view(THD *thd, TABLE_LIST *view,
     // view definition.
     Sql_mode_parse_guard parse_guard(thd);
 
-    lex->unit->print(&view_query, QT_TO_ARGUMENT_CHARSET);
-    lex->unit->print(&is_query, enum_query_type(QT_TO_SYSTEM_CHARSET |
-                                                QT_WITHOUT_INTRODUCERS));
+    lex->unit->print(thd, &view_query, QT_TO_ARGUMENT_CHARSET);
+    lex->unit->print(
+        thd, &is_query,
+        enum_query_type(QT_TO_SYSTEM_CHARSET | QT_WITHOUT_INTRODUCERS));
   }
   DBUG_PRINT("info",
              ("View: %*.s", (int)view_query.length(), view_query.ptr()));
@@ -915,7 +920,7 @@ bool mysql_register_view(THD *thd, TABLE_LIST *view,
   if (lex_string_strmake(thd->mem_root, &view->select_stmt, view_query.ptr(),
                          view_query.length())) {
     my_error(ER_OUT_OF_RESOURCES, MYF(0));
-    DBUG_RETURN(true);
+    return true;
   }
 
   if (lex->create_view_algorithm == VIEW_ALGORITHM_MERGE && !can_be_merged) {
@@ -937,19 +942,18 @@ bool mysql_register_view(THD *thd, TABLE_LIST *view,
   /* check old definition */
   bool update_view = false;
   const dd::Abstract_table *at = nullptr;
-  if (thd->dd_client()->acquire(view->db, view->table_name, &at))
-    DBUG_RETURN(true);
+  if (thd->dd_client()->acquire(view->db, view->table_name, &at)) return true;
 
   if (at != nullptr) {
     if (mode == enum_view_create_mode::VIEW_CREATE_NEW) {
       my_error(ER_TABLE_EXISTS_ERROR, MYF(0), view->alias);
-      DBUG_RETURN(true);
+      return true;
     }
 
     if (at->type() != dd::enum_table_type::USER_VIEW &&
         at->type() != dd::enum_table_type::SYSTEM_VIEW) {
       my_error(ER_WRONG_OBJECT, MYF(0), view->db, view->table_name, "VIEW");
-      DBUG_RETURN(true);
+      return true;
     }
 
     update_view = true;
@@ -961,7 +965,7 @@ bool mysql_register_view(THD *thd, TABLE_LIST *view,
   } else {
     if (mode == enum_view_create_mode::VIEW_ALTER) {
       my_error(ER_NO_SUCH_TABLE, MYF(0), view->db, view->alias);
-      DBUG_RETURN(true);
+      return true;
     }
   }
 
@@ -974,11 +978,11 @@ bool mysql_register_view(THD *thd, TABLE_LIST *view,
     frm-file.
   */
 
-  lex_string_set(&view->view_client_cs_name,
-                 view->view_creation_ctx->get_client_cs()->csname);
+  lex_cstring_set(&view->view_client_cs_name,
+                  view->view_creation_ctx->get_client_cs()->csname);
 
-  lex_string_set(&view->view_connection_cl_name,
-                 view->view_creation_ctx->get_connection_cl()->name);
+  lex_cstring_set(&view->view_connection_cl_name,
+                  view->view_creation_ctx->get_connection_cl()->name);
 
   /*
     Our parser allows incorrect invalid UTF8 characters in literals.
@@ -993,17 +997,17 @@ bool mysql_register_view(THD *thd, TABLE_LIST *view,
   */
   if (is_invalid_string(LEX_CSTRING{is_query.ptr(), is_query.length()},
                         system_charset_info))
-    DBUG_RETURN(true);
+    return true;
 
   if (lex_string_strmake(thd->mem_root, &view->view_body_utf8, is_query.ptr(),
                          is_query.length())) {
     my_error(ER_OUT_OF_RESOURCES, MYF(0));
-    DBUG_RETURN(true);
+    return true;
   }
 
   if (view->with_check != VIEW_CHECK_NONE && !view->updatable_view) {
     my_error(ER_VIEW_NONUPD_CHECK, MYF(0), view->db, view->table_name);
-    DBUG_RETURN(true);
+    return true;
   }
 
   // It is either ALTER or CREATE OR REPLACE of an existing view.
@@ -1011,23 +1015,23 @@ bool mysql_register_view(THD *thd, TABLE_LIST *view,
     dd::View *new_view = nullptr;
     if (thd->dd_client()->acquire_for_modification(view->db, view->table_name,
                                                    &new_view))
-      DBUG_RETURN(true);
+      return true;
 
     DBUG_ASSERT(new_view != nullptr);
 
-    DBUG_RETURN(dd::update_view(thd, new_view, view));
+    return dd::update_view(thd, new_view, view);
   }
 
   // It is either CREATE or CREATE OR REPLACE of non-existent view.
   const dd::Schema *schema = nullptr;
-  if (thd->dd_client()->acquire(view->db, &schema)) DBUG_RETURN(true);
+  if (thd->dd_client()->acquire(view->db, &schema)) return true;
 
   if (schema == nullptr) {
     my_error(ER_BAD_DB_ERROR, MYF(0), view->db);
-    DBUG_RETURN(true);
+    return true;
   }
 
-  DBUG_RETURN(dd::create_view(thd, *schema, view));
+  return dd::create_view(thd, *schema, view);
 }
 
 /// RAII class to ease error handling in parse_view_definition()
@@ -1066,14 +1070,14 @@ class Make_view_tracker {
 */
 
 bool open_and_read_view(THD *thd, TABLE_SHARE *share, TABLE_LIST *view_ref) {
-  DBUG_ENTER("open_and_read_view");
+  DBUG_TRACE;
 
   TABLE_LIST *const top_view = view_ref->top_table();
 
   if (view_ref->required_type == dd::enum_table_type::BASE_TABLE) {
     my_error(ER_WRONG_OBJECT, MYF(0), share->db.str, share->table_name.str,
              "BASE TABLE");
-    DBUG_RETURN(true);
+    return true;
   }
 
   Prepared_stmt_arena_holder ps_arena_holder(thd);
@@ -1082,13 +1086,13 @@ bool open_and_read_view(THD *thd, TABLE_SHARE *share, TABLE_LIST *view_ref) {
     DBUG_PRINT("info",
                ("VIEW %s.%s is already processed on previous PS/SP execution",
                 view_ref->view_db.str, view_ref->view_name.str));
-    DBUG_RETURN(false);
+    return false;
   }
 
   if (view_ref->index_hints && view_ref->index_hints->elements) {
     my_error(ER_KEY_DOES_NOT_EXITS, MYF(0),
              view_ref->index_hints->head()->key_name.str, view_ref->table_name);
-    DBUG_RETURN(true);
+    return true;
   }
 
   // Check that view is not referenced recursively
@@ -1102,7 +1106,7 @@ bool open_and_read_view(THD *thd, TABLE_SHARE *share, TABLE_LIST *view_ref) {
                       view_ref->db) == 0) {
       my_error(ER_VIEW_RECURSIVE, MYF(0), top_view->view_db.str,
                top_view->view_name.str);
-      DBUG_RETURN(true);
+      return true;
     }
   }
 
@@ -1119,7 +1123,7 @@ bool open_and_read_view(THD *thd, TABLE_SHARE *share, TABLE_LIST *view_ref) {
 
   // Read view details from the view object.
   if (dd::read_view(view_ref, *share->view_object, thd->mem_root))
-    DBUG_RETURN(true); /* purecov: inspected */
+    return true; /* purecov: inspected */
 
   // Check old format view.
   if (!view_ref->definer.user.str) {
@@ -1138,7 +1142,7 @@ bool open_and_read_view(THD *thd, TABLE_SHARE *share, TABLE_LIST *view_ref) {
   */
   view_ref->view_creation_ctx = View_creation_ctx::create(thd, view_ref);
 
-  DBUG_RETURN(false);
+  return false;
 }
 
 /**
@@ -1183,7 +1187,7 @@ void merge_query_blocks(LEX *view_lex, LEX *parent_lex) {
 */
 
 bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
-  DBUG_ENTER("parse_view_definition");
+  DBUG_TRACE;
 
   TABLE_LIST *const top_view = view_ref->top_table();
 
@@ -1205,9 +1209,9 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
       prepare_security() below.
     */
     if (!view_ref->prelocking_placeholder && view_ref->prepare_security(thd))
-      DBUG_RETURN(true);
+      return true;
 
-    DBUG_RETURN(false);
+    return false;
   }
 
   // Save view's name, which will be wiped out by materialization
@@ -1233,7 +1237,7 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
   // A parsed view requires its own LEX object
   LEX *const old_lex = thd->lex;
   LEX *const view_lex = (LEX *)new (thd->mem_root) st_lex_local;
-  if (!view_lex) DBUG_RETURN(true);
+  if (!view_lex) return true;
 
   bool result = false;
   Make_view_tracker view_tracker(thd, view_ref, &result);
@@ -1246,7 +1250,7 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
   Parser_state parser_state;
   if ((result = parser_state.init(thd, view_ref->select_stmt.str,
                                   view_ref->select_stmt.length)))
-    DBUG_RETURN(true); /* purecov: inspected */
+    return true; /* purecov: inspected */
   /*
     Use view db name as thread default database, in order to ensure
     that the view is parsed and prepared correctly.
@@ -1310,7 +1314,7 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
   thd->reset_db(current_db_name_saved);
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 
-  if (result) DBUG_RETURN(true); /* purecov: inspected */
+  if (result) return true; /* purecov: inspected */
 
   // sql_calc_found_rows is only relevant for outer-most query expression
   view_lex->select_lex->remove_base_options(OPTION_FOUND_ROWS);
@@ -1370,7 +1374,7 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
       if (!is_infoschema_db(view_ref->db) && view_ref->view_no_explain) {
         my_error(ER_VIEW_NO_EXPLAIN, MYF(0));
         result = true;
-        DBUG_RETURN(true);
+        return true;
       }
     } else if ((old_lex->sql_command == SQLCOM_SHOW_CREATE) &&
                !view_ref->belong_to_view) {
@@ -1380,14 +1384,14 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
           check_table_access(thd, SHOW_VIEW_ACL, view_ref, false, UINT_MAX,
                              false)) {
         result = true;
-        DBUG_RETURN(true);
+        return true;
       }
     }
   }
 
   if (!(view_ref->view_tables = new (thd->mem_root) List<TABLE_LIST>)) {
     result = true;
-    DBUG_RETURN(true);
+    return true;
   }
   /*
     Apply necessary updates to the tables underlying this view.
@@ -1529,7 +1533,7 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
     this view serves as simple placeholder and we should not continue
     further processing.
   */
-  if (view_ref->prelocking_placeholder) DBUG_RETURN(false);
+  if (view_ref->prelocking_placeholder) return false;
 
   // Move nondeterminism information to whole query.
   old_lex->safe_to_cache_query &= view_lex->safe_to_cache_query;
@@ -1543,16 +1547,15 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
       For suid views prepare a security context for checking underlying
       objects of the view.
     */
-    if (!(view_ref->view_sctx =
-              (Security_context *)thd->stmt_arena->mem_aligned_calloc(
-                  sizeof(Security_context), alignof(Security_context)))) {
-      result = true;
-      DBUG_RETURN(true);
+    try {
+      DBUG_ASSERT(thd->stmt_arena->mem_root);
+      view_ref->view_sctx = new (thd->stmt_arena->mem_root)
+          Security_context(thd->stmt_arena->mem_root);
+      if (view_ref->view_sctx == nullptr) return true;
+    } catch (...) {
+      return true;
     }
-    // TODO Do we need to initialize this context to get the correct active
-    // roles (ie the default roles)
     security_ctx = view_ref->view_sctx;
-    security_ctx->init();
     DBUG_PRINT("info",
                ("Allocated suid view. Active roles: %lu",
                 (ulong)view_ref->view_sctx->get_active_roles()->size()));
@@ -1613,7 +1616,7 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
 
   lex_end(view_lex);
 
-  DBUG_RETURN(result);
+  return result;
 }
 
 /**
@@ -1642,7 +1645,7 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref) {
 bool mysql_drop_view(THD *thd, TABLE_LIST *views) {
   bool some_views_deleted = false;
 
-  DBUG_ENTER("mysql_drop_view");
+  DBUG_TRACE;
 
   /*
     We can't allow dropping of unlocked view under LOCK TABLES since this
@@ -1651,13 +1654,14 @@ bool mysql_drop_view(THD *thd, TABLE_LIST *views) {
   */
   if (thd->locked_tables_mode) {
     my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
-    DBUG_RETURN(true);
+    return true;
   }
 
   if (lock_table_names(thd, views, 0, thd->variables.lock_wait_timeout, 0))
-    DBUG_RETURN(true);
+    return true;
 
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+  Security_context *sctx = thd->security_context();
 
   // First check which views exist
   String non_existant_views;
@@ -1671,8 +1675,7 @@ bool mysql_drop_view(THD *thd, TABLE_LIST *views) {
       different actions depending on the table type.
     */
     const dd::Abstract_table *at = nullptr;
-    if (thd->dd_client()->acquire(view->db, view->table_name, &at))
-      DBUG_RETURN(true);
+    if (thd->dd_client()->acquire(view->db, view->table_name, &at)) return true;
 
     if (at == nullptr) {
       String tbl_name(view->db, system_charset_info);
@@ -1688,13 +1691,35 @@ bool mysql_drop_view(THD *thd, TABLE_LIST *views) {
       }
     } else if (at->type() == dd::enum_table_type::BASE_TABLE) {
       my_error(ER_WRONG_OBJECT, MYF(0), view->db, view->table_name, "VIEW");
-      DBUG_RETURN(true);
+      return true;
     }
+
+#ifdef WITH_WSREP
+    /* WSREP flow does this check before kick-starting final view drop
+    so that it can safely initiate TOI replication. */
+    if (at != NULL) {
+      const dd::View *vw = dynamic_cast<const dd::View *>(at);
+
+      /*
+        If definer has the SYSTEM_USER privilege then invoker can drop view
+        only if latter also has same privilege.
+      */
+      Auth_id definer(vw->definer_user().c_str(), vw->definer_host().c_str());
+      if (sctx->can_operate_with(definer, consts::system_user, true))
+        return true;
+    }
+#endif /* WITH_WSREP */
   }
   if (non_existant_views.length()) {
     my_error(ER_BAD_TABLE_ERROR, MYF(0), non_existant_views.c_ptr());
-    DBUG_RETURN(true);
+    return true;
   }
+
+#ifdef WITH_WSREP
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    return true;
+  }
+#endif /* WITH_WSREP */
 
   // Then actually start dropping views.
   for (TABLE_LIST *view = views; view; view = view->next_local) {
@@ -1715,7 +1740,7 @@ bool mysql_drop_view(THD *thd, TABLE_LIST *views) {
       trans_rollback_stmt(thd);
       // Full rollback in case we have THD::transaction_rollback_request.
       trans_rollback(thd);
-      DBUG_RETURN(true);
+      return true;
     }
 
     if (at == nullptr) {
@@ -1725,6 +1750,15 @@ bool mysql_drop_view(THD *thd, TABLE_LIST *views) {
 
     DBUG_ASSERT(at->type() == dd::enum_table_type::SYSTEM_VIEW ||
                 at->type() == dd::enum_table_type::USER_VIEW);
+
+    const dd::View *vw = dynamic_cast<const dd::View *>(at);
+    DBUG_ASSERT(vw);
+    /*
+      If definer has the SYSTEM_USER privilege then invoker can drop view
+      only if latter also has same privilege.
+    */
+    Auth_id definer(vw->definer_user().c_str(), vw->definer_host().c_str());
+    if (sctx->can_operate_with(definer, consts::system_user, true)) return true;
 
     Uncommitted_tables_guard uncommitted_tables(thd);
     /*
@@ -1748,7 +1782,7 @@ bool mysql_drop_view(THD *thd, TABLE_LIST *views) {
         rollback doesn't clear DD cache of modified uncommitted objects).
       */
       trans_rollback(thd);
-      DBUG_RETURN(true);
+      return true;
     }
 
     thd->add_to_binlog_accessed_dbs(view->db);
@@ -1769,13 +1803,13 @@ bool mysql_drop_view(THD *thd, TABLE_LIST *views) {
       rollback doesn't clear DD cache of modified uncommitted objects).
     */
     trans_rollback(thd);
-    DBUG_RETURN(true);
+    return true;
   }
 
-  if (trans_commit_stmt(thd) || trans_commit(thd)) DBUG_RETURN(true);
+  if (trans_commit_stmt(thd) || trans_commit(thd)) return true;
 
   my_ok(thd);
-  DBUG_RETURN(false);
+  return false;
 }
 
 /**
@@ -1797,7 +1831,7 @@ bool mysql_drop_view(THD *thd, TABLE_LIST *views) {
 
 bool check_key_in_view(THD *thd, TABLE_LIST *view,
                        const TABLE_LIST *table_ref) {
-  DBUG_ENTER("check_key_in_view");
+  DBUG_TRACE;
 
   /*
     we do not support updatable UNIONs in VIEW, so we can check just limit of
@@ -1807,7 +1841,7 @@ bool check_key_in_view(THD *thd, TABLE_LIST *view,
   if ((!view->is_view() && !view->belong_to_view) ||
       thd->lex->sql_command == SQLCOM_INSERT ||
       thd->lex->select_lex->select_limit == 0)
-    DBUG_RETURN(false); /* it is normal table or query without LIMIT */
+    return false; /* it is normal table or query without LIMIT */
 
   TABLE *const table = table_ref->table;
   view = view->top_table();
@@ -1831,7 +1865,7 @@ bool check_key_in_view(THD *thd, TABLE_LIST *view,
     thd->want_privilege = 0;
     for (Field_translator *fld = trans; fld < end_of_trans; fld++) {
       if (!fld->item->fixed && fld->item->fix_fields(thd, &fld->item))
-        DBUG_RETURN(true); /* purecov: inspected */
+        return true; /* purecov: inspected */
     }
     thd->mark_used_columns = save_mark_used_columns;
     thd->want_privilege = want_privilege_saved;
@@ -1851,8 +1885,8 @@ bool check_key_in_view(THD *thd, TABLE_LIST *view,
               field->field == key_part->field)
             break;
         }
-        if (k == end_of_trans) break;  // Key is not possible
-        if (++key_part == key_part_end) DBUG_RETURN(false);  // Found usable key
+        if (k == end_of_trans) break;                  // Key is not possible
+        if (++key_part == key_part_end) return false;  // Found usable key
       }
     }
   }
@@ -1880,14 +1914,14 @@ bool check_key_in_view(THD *thd, TABLE_LIST *view,
           /* update allowed, but issue warning */
           push_warning(thd, Sql_condition::SL_NOTE, ER_WARN_VIEW_WITHOUT_KEY,
                        ER_THD(thd, ER_WARN_VIEW_WITHOUT_KEY));
-          DBUG_RETURN(false);
+          return false;
         }
         /* prohibit update */
-        DBUG_RETURN(true);
+        return true;
       }
     }
   }
-  DBUG_RETURN(false);
+  return false;
 }
 
 /*
@@ -1906,19 +1940,19 @@ bool check_key_in_view(THD *thd, TABLE_LIST *view,
 bool insert_view_fields(List<Item> *list, TABLE_LIST *view) {
   Field_translator *trans_end;
   Field_translator *trans;
-  DBUG_ENTER("insert_view_fields");
+  DBUG_TRACE;
 
-  if (!(trans = view->field_translation)) DBUG_RETURN(false);
+  if (!(trans = view->field_translation)) return false;
   trans_end = view->field_translation_end;
 
   for (Field_translator *entry = trans; entry < trans_end; entry++) {
     Item_field *fld = entry->item->field_for_view_update();
     if (fld == NULL) {
       my_error(ER_NONUPDATEABLE_COLUMN, MYF(0), entry->name);
-      DBUG_RETURN(true);
+      return true;
     }
 
     list->push_back(fld);
   }
-  DBUG_RETURN(false);
+  return false;
 }

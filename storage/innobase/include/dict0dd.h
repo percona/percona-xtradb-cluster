@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2015, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2015, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -278,6 +278,7 @@ const innodb_dd_table_t innodb_dd_table[] = {
 
     INNODB_DD_TABLE("catalogs", 2),
     INNODB_DD_TABLE("character_sets", 3),
+    INNODB_DD_TABLE("check_constraints", 3),
     INNODB_DD_TABLE("collations", 3),
     INNODB_DD_TABLE("column_statistics", 3),
     INNODB_DD_TABLE("column_type_elements", 1),
@@ -601,7 +602,7 @@ void dd_update_v_cols(dd::Table *dd_table, table_id_t id);
 @param[in]	fsp_flags	InnoDB tablespace flags
 @param[in]	state		InnoDB tablespace state */
 void dd_write_tablespace(dd::Tablespace *dd_space, space_id_t space_id,
-                         ulint fsp_flags, dd_space_states state);
+                         uint32_t fsp_flags, dd_space_states state);
 
 /** Add fts doc id column and index to new table
 when old table has hidden fts doc id without fulltext index
@@ -631,6 +632,11 @@ UNIV_INLINE MY_ATTRIBUTE((warn_unused_result)) bool dd_mdl_acquire(
 @param[in,out]	thd	current thread
 @param[in,out]	mdl	metadata lock */
 void dd_mdl_release(THD *thd, MDL_ticket **mdl);
+
+/** Returns thd associated with the trx or current_thd
+@param[in]	trx	transaction
+@return	trx->mysql_thd or current_thd */
+THD *dd_thd_for_undo(const trx_t *trx);
 
 /** Check if current undo needs a MDL or not
 @param[in]	trx	transaction
@@ -766,7 +772,7 @@ bool dd_process_dd_indexes_rec_simple(mem_heap_t *heap, const rec_t *rec,
 @return true if data is retrived */
 bool dd_process_dd_tablespaces_rec(mem_heap_t *heap, const rec_t *rec,
                                    space_id_t *space_id, char **name,
-                                   uint *flags, uint32 *server_version,
+                                   uint32_t *flags, uint32 *server_version,
                                    uint32 *space_version, bool *is_encrypted,
                                    dd::String_type *state,
                                    dict_table_t *dd_spaces);
@@ -936,15 +942,15 @@ operation.
 @param[in]	new_space_name	dd_tablespace name
 @param[in]	new_path	new data file path
 @retval DB_SUCCESS on success. */
-dberr_t dd_rename_tablespace(dd::Object_id dd_space_id,
+dberr_t dd_tablespace_rename(dd::Object_id dd_space_id,
                              const char *new_space_name, const char *new_path);
 #endif /* !UNIV_HOTBACKUP */
 
 /** Parse the tablespace name from filename charset to table name charset
-@param[in]      space_name      tablespace name
+@param[in]      file_name      tablespace name
 @param[in,out]	tablespace_name	tablespace name which is in table name
                                 charset. */
-void dd_filename_to_spacename(const char *space_name,
+void dd_filename_to_spacename(const char *file_name,
                               std::string *tablespace_name);
 
 #ifndef UNIV_HOTBACKUP
@@ -961,7 +967,7 @@ void dd_filename_to_spacename(const char *space_name,
 @retval true on failure */
 bool dd_create_tablespace(dd::cache::Dictionary_client *dd_client, THD *thd,
                           const char *dd_space_name, space_id_t space_id,
-                          ulint flags, const char *filename, bool discarded,
+                          uint32_t flags, const char *filename, bool discarded,
                           dd::Object_id &dd_space_id);
 
 /** Create metadata for implicit tablespace
@@ -1179,17 +1185,18 @@ dd_space_states dd_tablespace_get_state_enum(
 bool dd_tablespace_is_discarded(const dd::Tablespace *dd_space);
 
 /** Get the MDL for the named tablespace.  The mdl_ticket pointer can
-be provided if it is needed by the caller.  If for_trx is set to false,
+be provided if it is needed by the caller.  If foreground is set to false,
 then the caller must explicitly release that ticket with dd_release_mdl().
 Otherwise, it will ne released with the transaction.
 @param[in]  space_name  tablespace name
 @param[in]  mdl_ticket  tablespace MDL ticket, default to nullptr
-@param[in]  for_trx     How long will the MDL be held. defaults to true for
-                        MDL_TRANSACTION, false for MDL_EXPLICIT
-@return DB_SUCCESS or DD_FAILURE. */
+@param[in]  foreground  true, if the caller is foreground thread. Default
+                        is true. For foreground, the lock duration is
+                        MDL_TRANSACTION. Otherwise, it is MDL_EXPLICIT.
+@return DD_SUCCESS or DD_FAILURE. */
 bool dd_tablespace_get_mdl(const char *space_name,
                            MDL_ticket **mdl_ticket = nullptr,
-                           bool for_trx = true);
+                           bool foreground = true);
 /** Set discard attribute value in se_private_dat of tablespace
 @param[in]  dd_space  dd::Tablespace object
 @param[in]  discard   true if discarded, else false */
@@ -1221,6 +1228,31 @@ bool dd_tablespace_update_cache(THD *thd);
 /* Check if the table belongs to an encrypted tablespace.
 @return true if it does. */
 bool dd_is_table_in_encrypted_tablespace(const dict_table_t *table);
+
+bool dd_is_table_in_encrypted_tablespace(const char *name);
+
+/* Sets tablespace's DD encryption flag.
+@param[in] Thread       THD
+@param[in] space_name   name of the space for which DD encryption flag is to be
+@param[in] *is_space_being_removed - whether space is being removed
+set */
+bool dd_set_encryption_flag(THD *thd, const char *space_name,
+                            volatile bool *is_space_being_removed);
+
+/* Clears tablespace's DD encryption flag.
+@param[in] Thread       THD
+@param[in] space_name   name of the space for which DD encryption flag is to be
+@param[in] *is_space_being_removed - whether space is being removed
+cleared */
+bool dd_clear_encryption_flag(THD *thd, const char *space_name,
+                              volatile bool *is_space_being_removed);
+
+/* If mysql_ibd's DD encryption flag is different from the encryption flag in
+ * space_flag   the mysql_ibd's encryption flag will be set to the
+ * one from space_flags.
+@param[in] Thread       THD
+@param[in] space_flags  with correct encryption flag */
+bool dd_fix_mysql_ibd_encryption_flag_if_needed(THD *thd, uint32_t space_flags);
 
 #include "dict0dd.ic"
 #endif

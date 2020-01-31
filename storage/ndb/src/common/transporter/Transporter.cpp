@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -72,6 +72,7 @@ Transporter::Transporter(TransporterRegistry &t_reg,
   // Initialize member variables
   ndb_socket_invalidate(&theSocket);
 
+  DBUG_ASSERT(rHostName);
   if (rHostName && strlen(rHostName) > 0){
     strncpy(remoteHostName, rHostName, sizeof(remoteHostName));
   }
@@ -353,7 +354,7 @@ Transporter::resetCounters()
   m_bytes_received = 0;
   m_overload_count = 0;
   m_slowdown_count = 0;
-};
+}
 
 void
 Transporter::checksum_state::dumpBadChecksumInfo(Uint32 inputSum,

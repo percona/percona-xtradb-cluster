@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -47,11 +47,11 @@ if forward_direction is true,
 prev_page_no otherwise.
 @param[in]	forward_direction	move direction: true means moving
 forward, false - backward. */
-static void btr_update_scan_stats(const page_t *page, ulint page_no,
+static void btr_update_scan_stats(const page_t *page, page_no_t page_no,
                                   bool forward_direction) {
   fragmentation_stats_t stats;
   memset(&stats, 0, sizeof(stats));
-  const ulint extracted_page_no = page_get_page_no(page);
+  const auto extracted_page_no = page_get_page_no(page);
   const ulint delta = forward_direction ? page_no - extracted_page_no
                                         : extracted_page_no - page_no;
 
@@ -74,6 +74,9 @@ void btr_pcur_t::store_position(mtr_t *mtr) {
   ut_ad(m_latch_mode != BTR_NO_LATCHES);
 
   auto block = get_block();
+
+  if (!block && !btr_cur_get_index(get_btr_cur())->table->is_readable())
+    return; /* decryption failure */
 
   SRV_CORRUPT_TABLE_CHECK(block, return;);
 
@@ -328,7 +331,6 @@ void btr_pcur_t::move_to_next_page(mtr_t *mtr) {
 
   switch (mode) {
     case BTR_SEARCH_TREE:
-    case BTR_PARALLEL_READ_INIT:
       mode = BTR_SEARCH_LEAF;
       break;
     case BTR_MODIFY_TREE:
@@ -471,4 +473,23 @@ void btr_pcur_t::open_on_user_rec(dict_index_t *index, const dtuple_t *tuple,
 
     ut_error;
   }
+}
+
+void btr_pcur_t::open_on_user_rec(const page_cur_t &page_cursor,
+                                  page_cur_mode_t mode, ulint latch_mode) {
+  auto btr_cur = get_btr_cur();
+
+  btr_cur->index = const_cast<dict_index_t *>(page_cursor.index);
+
+  auto page_cur = get_page_cur();
+
+  memcpy(page_cur, &page_cursor, sizeof(*page_cur));
+
+  m_search_mode = mode;
+
+  m_pos_state = BTR_PCUR_IS_POSITIONED;
+
+  m_latch_mode = BTR_LATCH_MODE_WITHOUT_FLAGS(latch_mode);
+
+  m_trx_if_known = nullptr;
 }

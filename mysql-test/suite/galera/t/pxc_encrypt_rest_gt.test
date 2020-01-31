@@ -3,6 +3,7 @@
 #
 --source include/big_test.inc
 --source include/galera_cluster.inc
+--source include/have_debug_sync.inc
 
 # Force a restart at the end of the test
 --source include/force_restart.inc
@@ -16,7 +17,9 @@
 # - temporary tablespace
 # - binlog encryption
 
-call mtr.add_suppression("Slave SQL: Error 'InnoDB : ENCRYPTION is not accepted syntax for CREATE/ALTER table, for tables in general/shared tablespace.'");
+call mtr.add_suppression("Slave SQL: Error 'Request to create 'unencrypted' table while using an 'encrypted' tablespace.'");
+call mtr.add_suppression("Ignoring error 'Request to create 'unencrypted' table while using an 'encrypted' tablespace.'");
+call mtr.add_suppression("Query apply failed.");
 
 #===============================================================================
 # general tablespace encryption support
@@ -28,17 +31,27 @@ call mtr.add_suppression("Slave SQL: Error 'InnoDB : ENCRYPTION is not accepted 
 --echo #node-1
 use test;
 CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
+
+CREATE TABLESPACE foo2 ADD DATAFILE 'foo2.ibd';
+set session default_table_encryption=ON;
+CREATE TABLESPACE foo3 ADD DATAFILE 'foo3.ibd';
+set session default_table_encryption=OFF;
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
 #
 
 #
-# encryption="y/n" options are not allowed in shared tablesapces
+# encryption="n" options are not allowed in shared tablesapces
 #
---error ER_ILLEGAL_HA_CREATE_OPTION
-create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
---error ER_ILLEGAL_HA_CREATE_OPTION
+--error ER_INVALID_ENCRYPTION_REQUEST
+create table t1 (i int, primary key pk(i)) tablespace foo;
+
+--error ER_INVALID_ENCRYPTION_REQUEST
 create table t2 (i int, primary key pk(i)) tablespace foo encryption='n';
 
-create table t1 (i int, primary key pk(i)) tablespace foo;
+create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
+
+create table foo2_t1 (i int, primary key pk(i)) tablespace foo encryption='y';
+create table foo3_t1 (i int, primary key pk(i)) tablespace foo encryption='y';
 
 #
 insert into t1 values (1), (2), (3);
@@ -49,15 +62,22 @@ show create table t1;
 --echo #node-2
 select * from t1;
 show create table t1;
+show create table foo2_t1;
+show create table foo3_t1;
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
+
 #
-create table t2 (i int, primary key pk(i)) tablespace foo;
+create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
 insert into t2 values (10), (20), (30);
 
 --connection node_1
 --echo #node-1
 show create table t2;
 drop table t1, t2;
+drop table foo2_t1, foo3_t1;
 drop tablespace foo;
+drop tablespace foo2;
+drop tablespace foo3;
 
 #-------------------------------------------------------------------------------
 # sst of the encrypted table
@@ -74,11 +94,17 @@ drop tablespace foo;
 use test;
 CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
 #
-create table t1 (i int, primary key pk(i)) tablespace foo;
+create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
 #
 insert into t1 values (1), (2), (3);
 select * from t1;
 show create table t1;
+
+CREATE TABLESPACE foo2 ADD DATAFILE 'foo2.ibd';
+set session default_table_encryption=ON;
+CREATE TABLESPACE foo3 ADD DATAFILE 'foo3.ibd';
+set session default_table_encryption=OFF;
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
 
 --connection node_2
 --echo #node-2 restarted (should get encrypted table through SST)
@@ -91,14 +117,18 @@ call mtr.add_suppression(".*can contain only an ENCRYPTED tables.*");
 select * from t1;
 show create table t1;
 #
-create table t2 (i int, primary key pk(i)) tablespace foo;
+create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
 insert into t2 values (10), (20), (30);
+#
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
 
 --connection node_1
 --echo #node-1
 show create table t2;
 drop table t1, t2;
 drop tablespace foo;
+drop tablespace foo2;
+drop tablespace foo3;
 
 
 #-------------------------------------------------------------------------------
@@ -117,11 +147,17 @@ drop tablespace foo;
 use test;
 CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
 #
-create table t1 (i int, primary key pk(i)) tablespace foo;
+create table t1 (i int, primary key pk(i)) tablespace foo encryption='y';
 #
 insert into t1 values (1);
 select * from t1;
 show create table t1;
+#
+CREATE TABLESPACE foo2 ADD DATAFILE 'foo2.ibd';
+set session default_table_encryption=ON;
+CREATE TABLESPACE foo3 ADD DATAFILE 'foo3.ibd';
+set session default_table_encryption=OFF;
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
 
 --connection node_2
 --echo #node-2 restarted (should get encrypted table through IST)
@@ -134,15 +170,18 @@ call mtr.add_suppression(".*can contain only an ENCRYPTED tables.*");
 select * from t1;
 show create table t1;
 #
-create table t2 (i int, primary key pk(i)) tablespace foo;
+create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
 insert into t2 values (10), (20), (30);
+#
+select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
 
 --connection node_1
 --echo #node-1
 show create table t2;
 drop table t1, t2;
 drop tablespace foo;
-
+drop tablespace foo2;
+drop tablespace foo3;
 
 #-------------------------------------------------------------------------------
 # alter encrypted general tablespace
@@ -169,3 +208,56 @@ DROP TABLESPACE `ts1`;
 --connection node_2
 --echo #node-2
 select name, flag, encryption from information_schema.innodb_tablespaces where name = "ts1" OR name = "test/t1";
+
+
+#------------------------------------------------------------------------------
+#
+# ALTER OF TABLESPACE should add all sub-objects as part of it write-set
+# signature to properly detect conflict with parallel running DML command.
+#
+--connection node_1
+--echo #node-1 (issue dml that would conflict with parallel ALTER TABLESPACE)
+use test;
+create tablespace tab ADD DATAFILE 'tab.ibd' ENCRYPTION='Y';
+create table t1 (i int, primary key pk(i)) tablespace=tab encryption='y';
+insert into t1 values (1), (2), (3), (4);
+select * from t1;
+select name, encryption from information_schema.innodb_tablespaces where name='tab';
+#
+set session wsrep_retry_autocommit=0;
+--let $galera_sync_point = before_replicate_sync
+--source include/galera_set_sync_point.inc
+--send update t1 set i = i + 10 where i = 2;
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--echo #node-1a (issue ALTER TABLESPACE)
+--let $galera_sync_point = before_replicate_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+#
+--send alter tablespace tab encryption = 'n'
+
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--echo #node-1b (wait for both to get blocked)
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = select count(*) = 1 from information_schema.processlist where State like "innobase_commit_low%" and Info like "alter tablespace tab encryption%";
+--source include/wait_condition.inc
+--source include/galera_signal_sync_point.inc
+
+--connection node_1
+--echo #node-1
+--error ER_LOCK_DEADLOCK
+--reap
+select * from t1;
+
+--connection node_1a
+--echo #node-1a
+--reap
+--let $wait_condition = select encryption = 'n' from information_schema.innodb_tablespaces where name='tab';
+--source include/wait_condition.inc
+select name, encryption from information_schema.innodb_tablespaces where name='tab';
+
+--connection node_1
+--echo #node-1
+drop table t1;
+drop tablespace tab;

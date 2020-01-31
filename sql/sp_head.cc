@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2002, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -58,6 +58,7 @@
 #include "sql/dd/dictionary.h"  // is_dd_table_access_allowed
 #include "sql/derror.h"         // ER_THD
 #include "sql/discrete_interval.h"
+#include "sql/field.h"
 #include "sql/gis/srid.h"
 #include "sql/handler.h"
 #include "sql/item.h"
@@ -93,6 +94,7 @@
 #include "mysql/components/services/log_builtins.h"
 #include "sql/log.h"
 #include "wsrep_thd.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 /**
@@ -1739,8 +1741,8 @@ sp_head::sp_head(MEM_ROOT &&mem_root, enum_sp_type type)
   m_params = NULL_STR;
 
   m_defstr = NULL_STR;
-  m_body = NULL_STR;
-  m_body_utf8 = NULL_STR;
+  m_body = NULL_CSTR;
+  m_body_utf8 = NULL_CSTR;
 
   m_trg_chistics.ordering_clause = TRG_ORDER_NONE;
   m_trg_chistics.anchor_trigger_name = NULL_CSTR;
@@ -1797,17 +1799,21 @@ void sp_head::set_body_end(THD *thd) {
 
   /* Make the string of body (in the original character set). */
 
-  m_body.length = end_ptr - m_parser_data.get_body_start_ptr();
-  m_body.str = thd->strmake(m_parser_data.get_body_start_ptr(), m_body.length);
-  trim_whitespace(thd->charset(), &m_body);
+  LEX_STRING body;
+  body.length = end_ptr - m_parser_data.get_body_start_ptr();
+  body.str = thd->strmake(m_parser_data.get_body_start_ptr(), body.length);
+  trim_whitespace(thd->charset(), &body);
+  m_body = to_lex_cstring(body);
 
   /* Make the string of UTF-body. */
 
   lip->body_utf8_append(end_ptr);
 
-  m_body_utf8.length = lip->get_body_utf8_length();
-  m_body_utf8.str = thd->strmake(lip->get_body_utf8_str(), m_body_utf8.length);
-  trim_whitespace(thd->charset(), &m_body_utf8);
+  LEX_STRING body_utf8;
+  body_utf8.length = lip->get_body_utf8_length();
+  body_utf8.str = thd->strmake(lip->get_body_utf8_str(), body_utf8.length);
+  trim_whitespace(thd->charset(), &body_utf8);
+  m_body_utf8 = to_lex_cstring(body_utf8);
 
   /*
     Make the string of whole stored-program-definition query (in the
@@ -1919,6 +1925,7 @@ sp_head::~sp_head() {
 Field *sp_head::create_result_field(size_t field_max_length,
                                     const char *field_name_or_null,
                                     TABLE *table) {
+  DBUG_ASSERT(!m_return_field_def.is_array);
   size_t field_length = !m_return_field_def.max_display_width_in_bytes()
                             ? field_max_length
                             : m_return_field_def.max_display_width_in_bytes();
@@ -2181,7 +2188,7 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success) {
     if (thd->rewritten_query.length()) thd->rewritten_query.mem_free();
 
 #ifdef WITH_WSREP
-    if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID) {
+    if (WSREP(thd) && thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID) {
       if (thd->query_id == 0) thd->set_query_id(next_query_id());
       thd->set_wsrep_next_trx_id(thd->query_id);
       WSREP_DEBUG("Assigned new next trx-id (%lu) to Store-Procedure execution",
@@ -2196,28 +2203,48 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success) {
 #endif
 
 #ifdef WITH_WSREP
-    if (m_type == enum_sp_type::PROCEDURE || m_type == enum_sp_type::EVENT) {
-      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-      if (thd->wsrep_conflict_state == MUST_REPLAY) {
-        wsrep_replay_sp_transaction(thd);
-        err_status = thd->get_stmt_da()->is_set();
-        thd->wsrep_conflict_state = NO_CONFLICT;
-      } else if (thd->wsrep_conflict_state == ABORTED ||
-                 thd->wsrep_conflict_state == CERT_FAILURE) {
+    if (WSREP(thd) &&
+        (m_type == enum_sp_type::PROCEDURE || m_type == enum_sp_type::EVENT)) {
+      if ((thd->is_fatal_error() || thd->is_killed()) &&
+          (thd->wsrep_trx().state() == wsrep::transaction::s_executing)) {
         /*
-          If the statement execution was BF aborted or was aborted
-          due to certification failure, clean up transaction here
-          and reset conflict state to NO_CONFLICT and thd->killed
-          to THD::NOT_KILLED. Error handling is done based on err_status
-          below. Error must have been raised by wsrep hton code before
-          entering here.
-         */
-        DBUG_ASSERT(err_status);
-        DBUG_ASSERT(thd->get_stmt_da()->is_error());
-        thd->wsrep_conflict_state = NO_CONFLICT;
-        thd->killed = THD::NOT_KILLED;
+          SP was killed, and it is not due to a wsrep conflict.
+          We skip after_statement hook at this point because
+          otherwise it clears the error, and cleans up the
+          whole transaction. For now we just return and finish
+          our handling once we are back to mysql_parse.
+        */
+        WSREP_DEBUG("Skipping after_command hook for killed SP");
+      } else {
+
+        const bool must_replay = wsrep_must_replay(thd);
+
+        (void)wsrep_after_statement(thd);
+
+        /*
+          Reset the return code to zero if the transaction was
+          replayed succesfully.
+        */
+        if (err_status && must_replay && !wsrep_current_error(thd)) {
+          err_status = false;
+        }
+
+        /*
+          Final wsrep error status for statement is known only after
+          wsrep_after_statement() call. If the error is set, override
+          error in thd diagnostics area and reset wsrep client_state error
+          so that the error does not get propagated via client-server protocol.
+        */
+        if (wsrep_current_error(thd)) {
+          wsrep_override_error(thd, wsrep_current_error(thd),
+                               wsrep_current_error_status(thd));
+          thd->wsrep_cs().reset_error();
+          /* Reset also thd->killed if it has been set during BF abort. */
+          if (thd->killed == THD::KILL_QUERY) {
+            thd->killed = THD::NOT_KILLED;
+          }
+        }
       }
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     }
 #endif /* WITH_WSREP */
 
@@ -2412,7 +2439,7 @@ bool sp_head::execute_trigger(THD *thd, const LEX_CSTRING &db_name,
   Query_arena call_arena(&call_mem_root, Query_arena::STMT_INITIALIZED_FOR_SP);
   Query_arena backup_arena;
 
-  DBUG_ENTER("sp_head::execute_trigger");
+  DBUG_TRACE;
   DBUG_PRINT("info", ("trigger %s", m_name.str));
 
   Security_context *save_ctx = NULL;
@@ -2426,8 +2453,8 @@ bool sp_head::execute_trigger(THD *thd, const LEX_CSTRING &db_name,
   */
   DBUG_ASSERT(m_chistics->suid != SP_IS_NOT_SUID);
   if (m_security_ctx.change_security_context(thd, definer_user, definer_host,
-                                             &m_db, &save_ctx))
-    DBUG_RETURN(true);
+                                             m_db.str, &save_ctx))
+    return true;
 
   /*
     Fetch information about table-level privileges for subject table into
@@ -2449,7 +2476,7 @@ bool sp_head::execute_trigger(THD *thd, const LEX_CSTRING &db_name,
              thd->security_context()->host_or_ip().str, table_name.str);
 
     m_security_ctx.restore_security_context(thd, save_ctx);
-    DBUG_RETURN(true);
+    return true;
   }
   /*
     Optimizer trace note: we needn't explicitly test here that the connected
@@ -2509,7 +2536,7 @@ err_with_cleanup:
 
   if (thd->killed) thd->send_kill_message();
 
-  DBUG_RETURN(err_status);
+  return err_status;
 }
 
 bool sp_head::execute_function(THD *thd, Item **argp, uint argcount,
@@ -2525,7 +2552,7 @@ bool sp_head::execute_function(THD *thd, Item **argp, uint argcount,
   Query_arena call_arena(&call_mem_root, Query_arena::STMT_INITIALIZED_FOR_SP);
   Query_arena backup_arena;
 
-  DBUG_ENTER("sp_head::execute_function");
+  DBUG_TRACE;
   DBUG_PRINT("info", ("function %s", m_name.str));
 
   // Resetting THD::where to its default value
@@ -2543,7 +2570,7 @@ bool sp_head::execute_function(THD *thd, Item **argp, uint argcount,
     */
     my_error(ER_SP_WRONG_NO_OF_ARGS, MYF(0), "FUNCTION", m_qname.str,
              m_root_parsing_ctx->context_var_count(), argcount);
-    DBUG_RETURN(true);
+    return true;
   }
 
   /*
@@ -2736,7 +2763,7 @@ err_with_cleanup:
       !thd->binlog_evt_union.do_union)
     thd->issue_unsafe_warnings();
 
-  DBUG_RETURN(err_status);
+  return err_status;
 }
 
 bool sp_head::execute_procedure(THD *thd, List<Item> *args) {
@@ -2749,7 +2776,7 @@ bool sp_head::execute_procedure(THD *thd, List<Item> *args) {
   bool save_enable_slow_log = false;
   bool save_log_general = false;
 
-  DBUG_ENTER("sp_head::execute_procedure");
+  DBUG_TRACE;
   DBUG_PRINT("info", ("procedure %s", m_name.str));
 
   // Argument count has been validated in prepare function.
@@ -2759,7 +2786,7 @@ bool sp_head::execute_procedure(THD *thd, List<Item> *args) {
     // Create a temporary old context. We need it to pass OUT-parameter values.
     parent_sp_runtime_ctx = sp_rcontext::create(thd, m_root_parsing_ctx, NULL);
 
-    if (!parent_sp_runtime_ctx) DBUG_RETURN(true);
+    if (!parent_sp_runtime_ctx) return true;
 
     parent_sp_runtime_ctx->sp = 0;
     thd->sp_runtime_ctx = parent_sp_runtime_ctx;
@@ -2776,7 +2803,7 @@ bool sp_head::execute_procedure(THD *thd, List<Item> *args) {
 
     if (!sp_runtime_ctx_saved) ::destroy(parent_sp_runtime_ctx);
 
-    DBUG_RETURN(true);
+    return true;
   }
 
   proc_runtime_ctx->sp = this;
@@ -2833,7 +2860,7 @@ bool sp_head::execute_procedure(THD *thd, List<Item> *args) {
       arguments evaluation. If arguments evaluation required prelocking mode,
       we'll leave it here.
     */
-    thd->lex->unit->cleanup(true);
+    thd->lex->unit->cleanup(thd, true);
 
     if (!thd->in_sub_stmt) {
       thd->get_stmt_da()->set_overwrite_status(true);
@@ -2960,7 +2987,7 @@ bool sp_head::execute_procedure(THD *thd, List<Item> *args) {
       !thd->binlog_evt_union.do_union)
     thd->issue_unsafe_warnings();
 
-  DBUG_RETURN(err_status);
+  return err_status;
 }
 
 bool sp_head::reset_lex(THD *thd) {
@@ -3219,8 +3246,8 @@ bool sp_head::show_routine_code(THD *thd) {
     protocol->store((longlong)ip);
 
     buffer.set("", 0, system_charset_info);
-    i->print(&buffer);
-    protocol->store(buffer.ptr(), buffer.length(), system_charset_info);
+    i->print(thd, &buffer);
+    protocol->store_string(buffer.ptr(), buffer.length(), system_charset_info);
     if ((res = protocol->end_row())) break;
   }
 
@@ -3241,7 +3268,7 @@ bool sp_head::merge_table_list(THD *thd, TABLE_LIST *table,
   }
 
   for (; table; table = table->next_global)
-    if (!table->is_derived() && !table->schema_table) {
+    if (!table->is_internal() && !table->schema_table) {
       /* Fail if this is an inaccessible DD table. */
       const dd::Dictionary *dictionary = dd::get_dictionary();
       if (dictionary &&
@@ -3250,8 +3277,8 @@ bool sp_head::merge_table_list(THD *thd, TABLE_LIST *table,
               table->mdl_request.is_ddl_or_lock_tables_lock_request(),
               table->db, table->db_length, table->table_name)) {
         my_error(ER_NO_SYSTEM_TABLE_ACCESS, MYF(0),
-                 ER_THD(thd, dictionary->table_type_error_code(
-                                 table->db, table->table_name)),
+                 ER_THD_NONCONST(thd, dictionary->table_type_error_code(
+                                          table->db, table->table_name)),
                  table->db, table->table_name);
         return true;
       }
@@ -3407,7 +3434,7 @@ bool sp_head::check_show_access(THD *thd, bool *full_access) {
     WL#9049.
   */
   *full_access =
-      (thd->security_context()->check_access(SELECT_ACL) ||
+      (thd->security_context()->check_access(SELECT_ACL, m_db.str) ||
        (!strcmp(m_definer_user.str, thd->security_context()->priv_user().str) &&
         !strcmp(m_definer_host.str, thd->security_context()->priv_host().str)));
 
@@ -3424,7 +3451,7 @@ bool sp_head::set_security_ctx(THD *thd, Security_context **save_ctx) {
 
   if (m_chistics->suid != SP_IS_NOT_SUID &&
       m_security_ctx.change_security_context(thd, definer_user, definer_host,
-                                             &m_db, save_ctx)) {
+                                             m_db.str, save_ctx)) {
     return true;
   }
 
@@ -3461,7 +3488,8 @@ void sp_parser_data::start_parsing_sp_body(THD *thd, sp_head *sp) {
 }
 
 bool sp_parser_data::add_backpatch_entry(sp_branch_instr *i, sp_label *label) {
-  Backpatch_info *bp = (Backpatch_info *)sql_alloc(sizeof(Backpatch_info));
+  Backpatch_info *bp =
+      (Backpatch_info *)(*THR_MALLOC)->Alloc(sizeof(Backpatch_info));
 
   if (!bp) return true;
 

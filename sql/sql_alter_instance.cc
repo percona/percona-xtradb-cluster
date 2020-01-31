@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -26,20 +26,27 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 #include "lex_string.h"
 #include "m_string.h"
+#include "mutex_lock.h"
 #include "my_dbug.h"
 #include "my_inttypes.h"
 #include "my_sys.h" /* my_error */
 #include "mysqld_error.h"
 #include "sql/auth/auth_acls.h"
 #include "sql/auth/sql_security_ctx.h"
-#include "sql/derror.h"          /* ER_THD */
-#include "sql/handler.h"         /* ha_resolve_by_legacy_type */
+#include "sql/derror.h"  /* ER_THD */
+#include "sql/handler.h" /* ha_resolve_by_legacy_type */
+#include "sql/mysqld.h"
+#include "sql/rpl_log_encryption.h"
 #include "sql/sql_backup_lock.h" /* acquire_shared_backup_lock */
 #include "sql/sql_class.h"       /* THD */
 #include "sql/sql_error.h"
 #include "sql/sql_lex.h"
 #include "sql/sql_plugin_ref.h"
 #include "sql/sql_table.h" /* write_to_binlog */
+
+#ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
+#endif /* WITH_WSREP */
 
 /*
   @brief
@@ -72,7 +79,7 @@ bool Alter_instance::log_to_binlog() {
 */
 
 bool Rotate_innodb_master_key::execute() {
-  const LEX_STRING storage_engine = {C_STRING_WITH_LEN("innodb")};
+  const LEX_CSTRING storage_engine = {STRING_WITH_LEN("innodb")};
   plugin_ref se_plugin;
   handlerton *hton;
 
@@ -83,6 +90,15 @@ bool Rotate_innodb_master_key::execute() {
              "SUPER or ENCRYPTION_KEY_ADMIN");
     return true;
   }
+
+#ifdef WITH_WSREP
+  if (WSREP(m_thd) &&
+      wsrep_to_isolation_begin(m_thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    WSREP_ERROR("Failed to replicate the %s command in cluster mode",
+                m_thd->query().str);
+    return (true);
+  }
+#endif /* WITH_WSREP */
 
   if ((se_plugin = ha_resolve_by_name(m_thd, &storage_engine, false))) {
     hton = plugin_data<handlerton *>(se_plugin);
@@ -96,7 +112,14 @@ bool Rotate_innodb_master_key::execute() {
     return true;
   }
 
-  if (acquire_shared_backup_lock(m_thd, m_thd->variables.lock_wait_timeout)) {
+  /*
+    Acquire shared backup lock to block concurrent backup. Acquire exclusive
+    backup lock to block any concurrent DDL. The fact that we acquire both
+    these locks also ensures that concurrent KEY rotation requests are blocked.
+  */
+  if (acquire_exclusive_backup_lock(m_thd, m_thd->variables.lock_wait_timeout,
+                                    true) ||
+      acquire_shared_backup_lock(m_thd, m_thd->variables.lock_wait_timeout)) {
     // MDL subsystem has to set an error in Diagnostics Area
     DBUG_ASSERT(m_thd->get_stmt_da()->is_error());
     return true;
@@ -123,6 +146,42 @@ bool Rotate_innodb_master_key::execute() {
                  ER_MASTER_KEY_ROTATION_BINLOG_FAILED,
                  ER_THD(m_thd, ER_MASTER_KEY_ROTATION_BINLOG_FAILED));
   }
+
+  my_ok(m_thd);
+  return false;
+}
+
+bool Rotate_binlog_master_key::execute() {
+  DBUG_TRACE;
+
+  MUTEX_LOCK(lock, &LOCK_rotate_binlog_master_key);
+
+  Security_context *sctx = m_thd->security_context();
+  if (!sctx->check_access(SUPER_ACL) &&
+      !sctx->has_global_grant(STRING_WITH_LEN("BINLOG_ENCRYPTION_ADMIN"))
+           .first) {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0),
+             "SUPER or BINLOG_ENCRYPTION_ADMIN");
+    return true;
+  }
+
+  if (!rpl_encryption.is_enabled()) {
+    my_error(ER_RPL_ENCRYPTION_CANNOT_ROTATE_BINLOG_MASTER_KEY, MYF(0));
+    return true;
+  }
+
+#ifdef WITH_WSREP
+  if (WSREP(m_thd) &&
+      wsrep_to_isolation_begin(m_thd, WSREP_MYSQL_DB, NULL, NULL)) {
+    WSREP_ERROR("Failed to replicate the %s command in cluster mode",
+                m_thd->query().str);
+    return (true);
+  }
+#endif /* WITH_WSREP */
+
+  if (rpl_encryption.remove_remaining_seqnos_from_keyring()) return true;
+
+  if (rpl_encryption.rotate_master_key()) return true;
 
   my_ok(m_thd);
   return false;

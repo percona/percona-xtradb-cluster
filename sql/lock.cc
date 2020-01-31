@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -115,6 +115,7 @@
 #include "mysql/components/services/log_builtins.h"
 #include "wsrep_mysqld.h"
 #include "sql/log.h"
+#include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
 /**
@@ -153,7 +154,7 @@ static int lock_tables_check(THD *thd, TABLE **tables, size_t count,
   */
   bool log_table_write_query = false;
 
-  DBUG_ENTER("lock_tables_check");
+  DBUG_TRACE;
 
   log_table_write_query = is_log_table_write_query(thd->lex->sql_command);
 
@@ -179,7 +180,7 @@ static int lock_tables_check(THD *thd, TABLE **tables, size_t count,
       if (t->reginfo.lock_type >= TL_READ_NO_INSERT ||
           thd->lex->sql_command == SQLCOM_LOCK_TABLES) {
         my_error(ER_CANT_LOCK_LOG_TABLE, MYF(0));
-        DBUG_RETURN(1);
+        return 1;
       }
     }
 
@@ -188,7 +189,7 @@ static int lock_tables_check(THD *thd, TABLE **tables, size_t count,
 
       if (t->db_stat & HA_READ_ONLY) {
         my_error(ER_OPEN_AS_READONLY, MYF(0), t->alias);
-        DBUG_RETURN(1);
+        return 1;
       }
     }
 
@@ -215,7 +216,7 @@ static int lock_tables_check(THD *thd, TABLE **tables, size_t count,
         !is_perfschema_db(t->s->db.str, t->s->db.length)) {
       if (t->reginfo.lock_type >= TL_WRITE_ALLOW_WRITE &&
           check_readonly(thd, true))
-        DBUG_RETURN(1);
+        return 1;
     }
   }
 
@@ -226,10 +227,10 @@ static int lock_tables_check(THD *thd, TABLE **tables, size_t count,
   */
   if ((system_count > 0) && (system_count < count)) {
     my_error(ER_WRONG_LOCK_OF_SYSTEM_TABLE, MYF(0));
-    DBUG_RETURN(1);
+    return 1;
   }
 
-  DBUG_RETURN(0);
+  return 0;
 }
 
 /**
@@ -254,7 +255,7 @@ static int lock_tables_check(THD *thd, TABLE **tables, size_t count,
 
 static void reset_lock_data(MYSQL_LOCK *sql_lock) {
   THR_LOCK_DATA **ldata, **ldata_end;
-  DBUG_ENTER("reset_lock_data");
+  DBUG_TRACE;
 
   /* Clear the lock type of all lock data to avoid reusage. */
   for (ldata = sql_lock->locks, ldata_end = ldata + sql_lock->lock_count;
@@ -262,7 +263,6 @@ static void reset_lock_data(MYSQL_LOCK *sql_lock) {
     /* Reset lock type. */
     (*ldata)->type = TL_UNLOCK;
   }
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -326,12 +326,12 @@ MYSQL_LOCK *mysql_lock_tables(THD *thd, TABLE **tables, size_t count,
                       ? LONG_TIMEOUT
                       : thd->variables.lock_wait_timeout;
 
-  DBUG_ENTER("mysql_lock_tables");
+  DBUG_TRACE;
 
-  if (lock_tables_check(thd, tables, count, flags)) DBUG_RETURN(NULL);
+  if (lock_tables_check(thd, tables, count, flags)) return NULL;
 
   if (!(sql_lock = get_lock_data(thd, tables, count, GET_LOCK_STORE_LOCKS)))
-    DBUG_RETURN(NULL);
+    return NULL;
 
   if (!(thd->state_flags & Open_tables_state::SYSTEM_TABLES))
     THD_STAGE_INFO(thd, stage_system_lock);
@@ -378,13 +378,13 @@ end:
     track_table_access(thd, tables, count);
 
   thd->set_time_after_lock();
-  DBUG_RETURN(sql_lock);
+  return sql_lock;
 }
 
 static int lock_external(THD *thd, TABLE **tables, uint count) {
   uint i;
   int lock_type, error;
-  DBUG_ENTER("lock_external");
+  DBUG_TRACE;
 
   DBUG_PRINT("info", ("count %d", count));
   for (i = 1; i <= count; i++, tables++) {
@@ -402,23 +402,22 @@ static int lock_external(THD *thd, TABLE **tables, uint count) {
         (*tables)->file->ha_external_lock(thd, F_UNLCK);
         (*tables)->current_lock = F_UNLCK;
       }
-      DBUG_RETURN(error);
+      return error;
     } else {
       (*tables)->db_stat &= ~HA_BLOCK_LOCK;
       (*tables)->current_lock = lock_type;
     }
   }
-  DBUG_RETURN(0);
+  return 0;
 }
 
 void mysql_unlock_tables(THD *thd, MYSQL_LOCK *sql_lock) {
-  DBUG_ENTER("mysql_unlock_tables");
+  DBUG_TRACE;
   if (sql_lock->lock_count)
     thr_multi_unlock(sql_lock->locks, sql_lock->lock_count);
   if (sql_lock->table_count)
     (void)unlock_external(thd, sql_lock->table, sql_lock->table_count);
   my_free(sql_lock);
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -439,7 +438,7 @@ void mysql_unlock_some_tables(THD *thd, TABLE **table, uint count) {
 
 void mysql_unlock_read_tables(THD *thd, MYSQL_LOCK *sql_lock) {
   uint i, found;
-  DBUG_ENTER("mysql_unlock_read_tables");
+  DBUG_TRACE;
 
   /* Move all write locks first */
   THR_LOCK_DATA **lock = sql_lock->locks;
@@ -482,7 +481,6 @@ void mysql_unlock_read_tables(THD *thd, MYSQL_LOCK *sql_lock) {
     found += tbl->lock_count;
     table++;
   }
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -559,7 +557,7 @@ void mysql_lock_remove(THD *thd, MYSQL_LOCK *locked, TABLE *table) {
 
 void mysql_lock_abort_for_thread(THD *thd, TABLE *table) {
   MYSQL_LOCK *locked;
-  DBUG_ENTER("mysql_lock_abort_for_thread");
+  DBUG_TRACE;
 
   if ((locked = get_lock_data(thd, &table, 1, GET_LOCK_UNLOCK))) {
     for (uint i = 0; i < locked->lock_count; i++) {
@@ -568,13 +566,12 @@ void mysql_lock_abort_for_thread(THD *thd, TABLE *table) {
     }
     my_free(locked);
   }
-  DBUG_VOID_RETURN;
 }
 
 MYSQL_LOCK *mysql_lock_merge(MYSQL_LOCK *a, MYSQL_LOCK *b) {
   MYSQL_LOCK *sql_lock;
   TABLE **table, **end_table;
-  DBUG_ENTER("mysql_lock_merge");
+  DBUG_TRACE;
 
   if (!(sql_lock = (MYSQL_LOCK *)my_malloc(
             key_memory_MYSQL_LOCK,
@@ -582,7 +579,7 @@ MYSQL_LOCK *mysql_lock_merge(MYSQL_LOCK *a, MYSQL_LOCK *b) {
                 sizeof(THR_LOCK_DATA *) * (a->lock_count + b->lock_count) +
                 sizeof(TABLE *) * (a->table_count + b->table_count),
             MYF(MY_WME))))
-    DBUG_RETURN(0);  // Fatal error
+    return 0;  // Fatal error
   sql_lock->lock_count = a->lock_count + b->lock_count;
   sql_lock->table_count = a->table_count + b->table_count;
   sql_lock->locks = (THR_LOCK_DATA **)(sql_lock + 1);
@@ -610,14 +607,14 @@ MYSQL_LOCK *mysql_lock_merge(MYSQL_LOCK *a, MYSQL_LOCK *b) {
   my_free(b);
 
   thr_lock_merge_status(sql_lock->locks, sql_lock->lock_count);
-  DBUG_RETURN(sql_lock);
+  return sql_lock;
 }
 
 /** Unlock a set of external. */
 
 static int unlock_external(THD *thd, TABLE **table, uint count) {
   int error, error_code;
-  DBUG_ENTER("unlock_external");
+  DBUG_TRACE;
 
   error_code = 0;
   do {
@@ -630,7 +627,7 @@ static int unlock_external(THD *thd, TABLE **table, uint count) {
     }
     table++;
   } while (--count);
-  DBUG_RETURN(error_code);
+  return error_code;
 }
 
 /**
@@ -650,7 +647,7 @@ static MYSQL_LOCK *get_lock_data(THD *thd, TABLE **table_ptr, size_t count,
   MYSQL_LOCK *sql_lock;
   THR_LOCK_DATA **locks, **locks_buf, **locks_start;
   TABLE **to, **table_buf;
-  DBUG_ENTER("get_lock_data");
+  DBUG_TRACE;
 
   DBUG_ASSERT((flags == GET_LOCK_UNLOCK) || (flags == GET_LOCK_STORE_LOCKS));
   DBUG_PRINT("info", ("count %zu", count));
@@ -675,7 +672,7 @@ static MYSQL_LOCK *get_lock_data(THD *thd, TABLE **table_ptr, size_t count,
             sizeof(*sql_lock) + sizeof(THR_LOCK_DATA *) * tables * 2 +
                 sizeof(table_ptr) * lock_count,
             MYF(0))))
-    DBUG_RETURN(0);
+    return 0;
   locks = locks_buf = sql_lock->locks = (THR_LOCK_DATA **)(sql_lock + 1);
   to = table_buf = sql_lock->table = (TABLE **)(locks + tables * 2);
   sql_lock->table_count = lock_count;
@@ -723,7 +720,7 @@ static MYSQL_LOCK *get_lock_data(THD *thd, TABLE **table_ptr, size_t count,
   sql_lock->lock_count = locks - locks_buf;
   DBUG_PRINT("info", ("sql_lock->table_count %d sql_lock->lock_count %d",
                       sql_lock->table_count, sql_lock->lock_count));
-  DBUG_RETURN(sql_lock);
+  return sql_lock;
 }
 
 /**
@@ -902,7 +899,7 @@ bool lock_object_name(THD *thd, MDL_key::enum_mdl_namespace mdl_type,
 }
 
 static void print_lock_error(int error, const char *table) {
-  DBUG_ENTER("print_lock_error");
+  DBUG_TRACE;
 
   switch (error) {
     case HA_ERR_LOCK_WAIT_TIMEOUT:
@@ -923,8 +920,6 @@ static void print_lock_error(int error, const char *table) {
                my_strerror(errbuf, sizeof(errbuf), error));
     } break;
   }
-
-  DBUG_VOID_RETURN;
 }
 
 std::atomic<int32> Global_read_lock::m_atomic_active_requests;
@@ -1024,12 +1019,11 @@ bool acquire_shared_global_read_lock(THD *thd,
 
 #ifdef WITH_WSREP
 bool Global_read_lock::lock_global_read_lock(THD *thd, bool *own_lock) {
-  DBUG_ENTER("lock_global_read_lock");
   *own_lock = false;
 #else
 bool Global_read_lock::lock_global_read_lock(THD *thd) {
-  DBUG_ENTER("lock_global_read_lock");
 #endif /* WITH_WSREP */
+  DBUG_TRACE;
 
   if (!m_state) {
     MDL_request mdl_request;
@@ -1041,9 +1035,10 @@ bool Global_read_lock::lock_global_read_lock(THD *thd) {
       up with deadlocks being reported for queries previously blocked on a
       backup lock.
     */
-    if (thd->backup_tables_lock.abort_if_acquired()) DBUG_RETURN(true);
+    if (thd->backup_tables_lock.abort_if_acquired()) return true;
 
 #ifdef WITH_WSREP
+    /* Take an explict lock that is not wsrep-preemptable. */
     MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, MDL_key::GLOBAL, "", "",
                                    MDL_SHARED, MDL_EXPLICIT);
 #else
@@ -1057,7 +1052,7 @@ bool Global_read_lock::lock_global_read_lock(THD *thd) {
     if (thd->mdl_context.acquire_lock(&mdl_request,
                                       thd->variables.lock_wait_timeout)) {
       Global_read_lock::m_atomic_active_requests--;
-      DBUG_RETURN(1);
+      return 1;
     }
 
     m_mdl_global_shared_lock = mdl_request.ticket;
@@ -1074,7 +1069,7 @@ bool Global_read_lock::lock_global_read_lock(THD *thd) {
     forbid it before, or we can have a 3-thread deadlock if 2 do SELECT FOR
     UPDATE and one does FLUSH TABLES WITH READ LOCK).
   */
-  DBUG_RETURN(0);
+  return 0;
 }
 
 /**
@@ -1088,7 +1083,7 @@ bool Global_read_lock::lock_global_read_lock(THD *thd) {
 */
 
 void Global_read_lock::unlock_global_read_lock(THD *thd) {
-  DBUG_ENTER("unlock_global_read_lock");
+  DBUG_TRACE;
 
   DBUG_ASSERT(m_mdl_global_shared_lock && m_state);
 
@@ -1097,24 +1092,22 @@ void Global_read_lock::unlock_global_read_lock(THD *thd) {
     m_mdl_blocks_commits_lock = NULL;
 
 #ifdef WITH_WSREP
-    if (thd->wsrep_sst_donor) {
-      /* If this is sst_donor then it is resync internally.
-      So only resume the cluster. */
-      wsrep_resume();
-    } else if (WSREP(thd) && provider_desynced_paused) {
-      /* Function will take care of decrementing reference count
-      if it is not the last one to get called. Last one will
-      perform the resume action. */
-      wsrep_resume();
+    Wsrep_server_state &server_state = Wsrep_server_state::instance();
 
-      int ret = wsrep->resync(wsrep);
-      if (ret != WSREP_OK) {
-        WSREP_WARN("resync failed %d for FTWRL: db: %s, query: %s", ret,
-                   (thd->db().length ? thd->db().str : "(null)"),
-                   WSREP_QUERY(thd));
-        DBUG_VOID_RETURN;
+    /* If node not part of the cluster avoid running the resume/pause action */
+    if (server_state.state() != Wsrep_server_state::s_disconnected) {
+      if (server_state.state() == Wsrep_server_state::s_donor ||
+          (wsrep_on(thd) &&
+           server_state.state() != Wsrep_server_state::s_synced)) {
+        /* TODO: maybe redundant here?: */
+        wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
+        server_state.resume();
+        pause_provider(false);
+      } else if (wsrep_on(thd) &&
+                 server_state.state() == Wsrep_server_state::s_synced) {
+        server_state.resume_and_resync();
+        pause_provider(false);
       }
-      provider_desynced_paused = false;
     }
 #endif /* WITH_WSREP */
   }
@@ -1122,8 +1115,6 @@ void Global_read_lock::unlock_global_read_lock(THD *thd) {
   Global_read_lock::m_atomic_active_requests--;
   m_mdl_global_shared_lock = NULL;
   m_state = GRL_NONE;
-
-  DBUG_VOID_RETURN;
 }
 
 /**
@@ -1143,7 +1134,7 @@ void Global_read_lock::unlock_global_read_lock(THD *thd) {
 
 bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
   MDL_request mdl_request;
-  DBUG_ENTER("make_global_read_lock_block_commit");
+  DBUG_TRACE;
   /*
     If we didn't succeed lock_global_read_lock(), or if we already suceeded
     make_global_read_lock_block_commit(), do nothing.
@@ -1154,13 +1145,14 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
     WSREP_DEBUG(
         "GRL was in block commit mode when entering "
         "make_global_read_lock_block_commit");
-    DBUG_RETURN(false);
+    return false;
   }
 #endif /* WITH_WSREP */
 
-  if (m_state != GRL_ACQUIRED) DBUG_RETURN(0);
+  if (m_state != GRL_ACQUIRED) return 0;
 
 #ifdef WITH_WSREP
+  /* Take an explict lock that is not wsrep-preemptable. */
   MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, MDL_key::COMMIT, "", "",
                                  MDL_SHARED, MDL_EXPLICIT);
 #else
@@ -1170,48 +1162,41 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
 
   if (thd->mdl_context.acquire_lock(&mdl_request,
                                     thd->variables.lock_wait_timeout))
-    DBUG_RETURN(true);
+    return true;
 
   m_mdl_blocks_commits_lock = mdl_request.ticket;
   m_state = GRL_ACQUIRED_AND_BLOCKS_COMMIT;
 
 #ifdef WITH_WSREP
-  if (thd->wsrep_sst_donor) {
-    /* If this is sst_donor then it is already desync internally.
-    So only pause the cluster */
-    if (!wsrep_pause()) {
-      WSREP_DEBUG("Trying to pause SST DONOR (GRL) failed");
-      DBUG_RETURN(true);
+  /* Native threads should bail out before wsrep operations to follow.
+     Donor servicing thread is an exception, it should pause provider
+     but not desync, as it is already desynced in donor state.
+     Desync should be called only when we are in synced state.
+  */
+  Wsrep_server_state &server_state = Wsrep_server_state::instance();
+
+  /* If node has left the cluster no point in pausing and resuming it. */
+  if (server_state.state() != Wsrep_server_state::s_disconnected) {
+    wsrep::seqno paused_seqno;
+    if (server_state.state() == Wsrep_server_state::s_donor ||
+        (wsrep_on(thd) &&
+         server_state.state() != Wsrep_server_state::s_synced)) {
+      paused_seqno = server_state.pause();
+    } else if (wsrep_on(thd) &&
+               server_state.state() == Wsrep_server_state::s_synced) {
+      paused_seqno = server_state.desync_and_pause();
+    } else {
+      return false;
     }
-  } else if (WSREP(thd) && !provider_desynced_paused) {
-    int rcode;
-    WSREP_DEBUG("Running implicit desync for node from FTWRL");
-
-    rcode = wsrep->desync(wsrep);
-
-    if (rcode == WSREP_TRX_FAIL &&
-        strcmp(wsrep_cluster_status, "Primary") != 0) {
-      WSREP_DEBUG("desync failed while non-Primary, ignoring failure");
-    } else if (rcode != WSREP_OK) {
-      WSREP_WARN("FTWRL desync failed %d for schema: %s, query: %s", rcode,
-                 (thd->db().length ? thd->db().str : "(null)"),
-                 WSREP_QUERY(thd));
-      my_message(ER_LOCK_DEADLOCK, "wsrep desync failed for FTWRL", MYF(0));
-      DBUG_RETURN(true);
+    WSREP_INFO("Server paused at: %lld", paused_seqno.get());
+    if (paused_seqno.get() >= 0) {
+      wsrep_locked_seqno = paused_seqno.get();
+      pause_provider(true);
     }
-
-    if (!wsrep_pause()) {
-      /* pause failed so rollback desync action too. */
-      WSREP_DEBUG("Trying to pause a node (GRL) failed");
-      wsrep->resync(wsrep);
-      DBUG_RETURN(true);
-    }
-
-    provider_desynced_paused = true;
   }
 #endif /* WITH_WSREP */
 
-  DBUG_RETURN(false);
+  return false;
 }
 
 #ifdef WITH_WSREP
@@ -1223,17 +1208,21 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
   @retval True   Provider has been paused.
 */
 bool Global_read_lock::wsrep_pause() {
-  wsrep_seqno_t ret = wsrep->pause(wsrep);
+  Wsrep_server_state &server_state = Wsrep_server_state::instance();
 
-  if (ret >= 0) {
-    wsrep_locked_seqno = ret;
+  if (server_state.state() == Wsrep_server_state::s_disconnected) {
+    /* Nothing to do if node is disconnected from cluster */
+    return true;
+  }
+
+  wsrep::seqno paused_seqno = server_state.pause();
+  if (paused_seqno.get() >= 0) {
+    wsrep_locked_seqno = paused_seqno.get();
     pause_provider(true);
-  } else if (ret != -ENOSYS) { /* -ENOSYS - no provider */
-
-    WSREP_ERROR("Failed to pause provider: %lld (%s)", (long long)-ret,
-                strerror(-ret));
-
-    /* m_mdl_blocks_commits_lock is always NULL here */
+    WSREP_INFO("Server paused at: %lld", paused_seqno.get());
+  } else {
+    WSREP_ERROR("Failed to pause provider (ret-code: %lld)",
+                paused_seqno.get());
     wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return false;
@@ -1249,19 +1238,18 @@ bool Global_read_lock::wsrep_pause() {
   @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
   @retval True   Provider has been paused.
 */
-wsrep_status_t Global_read_lock::wsrep_resume() {
-  wsrep_status_t ret;
+int Global_read_lock::wsrep_resume() {
+  Wsrep_server_state &server_state = Wsrep_server_state::instance();
 
-  wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
-  ret = wsrep->resume(wsrep);
-
-  if (ret != WSREP_OK) {
-    WSREP_WARN("failed to resume provider: %d", ret);
-  } else {
-    pause_provider(false);
+  if (server_state.state() == Wsrep_server_state::s_disconnected) {
+    /* Nothing to do if node is disconnected from cluster */
+    return 0;
   }
 
-  return ret;
+  wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
+  server_state.resume();
+  pause_provider(false);
+  return 0;
 }
 
 bool Global_read_lock::wsrep_pause_once(bool *already_paused) {
@@ -1273,9 +1261,9 @@ bool Global_read_lock::wsrep_pause_once(bool *already_paused) {
   return true;
 }
 
-wsrep_status_t Global_read_lock::wsrep_resume_once(void) {
+int Global_read_lock::wsrep_resume_once(void) {
   if (provider_paused) return wsrep_resume();
-  return WSREP_OK;
+  return 0;
 }
 
 #endif /* WITH_WSREP */
@@ -1316,11 +1304,12 @@ bool Global_backup_lock::acquire(THD *thd) {
 
   DBUG_ENTER("Global_backup_lock::acquire");
 
-  DBUG_ASSERT(m_lock == nullptr &&
-              !thd->mdl_context.owns_equal_or_stronger_lock(m_namespace, "", "",
+  DBUG_ASSERT(m_lock == nullptr);
+  DBUG_ASSERT(!thd->mdl_context.owns_equal_or_stronger_lock(m_namespace, "", "",
                                                             MDL_SHARED));
 
 #ifdef WITH_WSREP
+  /* Take an explict lock that is not wsrep-preemptable. */
   MDL_EXPLICIT_LOCK_REQUEST_INIT(&mdl_request, m_namespace, "", "", MDL_SHARED,
                                  MDL_EXPLICIT);
 #else
@@ -1345,8 +1334,9 @@ bool Global_backup_lock::acquire(THD *thd) {
 void Global_backup_lock::release(THD *thd) noexcept {
   DBUG_ENTER("Global_backup_lock::release");
 
-  DBUG_ASSERT(m_lock != nullptr && thd->mdl_context.owns_equal_or_stronger_lock(
-                                       m_namespace, "", "", MDL_SHARED));
+  DBUG_ASSERT(m_lock != nullptr);
+  DBUG_ASSERT(thd->mdl_context.owns_equal_or_stronger_lock(m_namespace, "", "",
+                                                           MDL_SHARED));
 
   thd->mdl_context.release_lock(m_lock);
 
@@ -1398,6 +1388,7 @@ void Global_backup_lock::init_protection_request(
   DBUG_ENTER("Global_backup_lock::init_protection_request");
 
 #ifdef WITH_WSREP
+  /* Take an explict lock that is not wsrep-preemptable. */
   MDL_EXPLICIT_LOCK_REQUEST_INIT(mdl_request, m_namespace, "", "",
                                  MDL_INTENTION_EXCLUSIVE, duration);
 #else

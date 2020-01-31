@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -45,9 +45,9 @@
 
 namespace item_unittest {
 
-using ::testing::Return;
 using my_testing::Mock_error_handler;
 using my_testing::Server_initializer;
+using ::testing::Return;
 
 class ItemTest : public ::testing::Test {
  protected:
@@ -202,7 +202,7 @@ TEST_F(ItemTest, ItemInt) {
   EXPECT_TRUE(item_int->eq(item_int, true));
 
   String print_val;
-  item_int->print(&print_val, QT_ORDINARY);
+  item_int->print(thd(), &print_val, QT_ORDINARY);
   EXPECT_STREQ(stringbuf, print_val.c_ptr_safe());
 
   const uint precision = item_int->decimal_precision();
@@ -507,7 +507,7 @@ TEST_F(ItemTest, ItemFuncSetUserVar) {
   Item_decimal *item_dec = new Item_decimal(val1, false);
   Item_string *item_str = new Item_string("1", 1, &my_charset_latin1);
 
-  LEX_STRING var_name = {C_STRING_WITH_LEN("a")};
+  LEX_CSTRING var_name = {STRING_WITH_LEN("a")};
   Item_func_set_user_var *user_var =
       new Item_func_set_user_var(var_name, item_str, false);
   EXPECT_FALSE(user_var->set_entry(thd(), true));
@@ -572,10 +572,10 @@ TEST_F(ItemTest, ItemFuncXor) {
   EXPECT_FALSE(item_xor_same->is_null());
 
   String print_buffer;
-  item_xor->print(&print_buffer, QT_ORDINARY);
+  item_xor->print(thd(), &print_buffer, QT_ORDINARY);
   EXPECT_STREQ("(0 xor 1)", print_buffer.c_ptr_safe());
 
-  Item *neg_xor = item_xor->neg_transformer(thd());
+  Item *neg_xor = item_xor->truth_transformer(thd(), Item::BOOL_NEGATED);
   EXPECT_FALSE(neg_xor->fix_fields(thd(), NULL));
   EXPECT_EQ(0, neg_xor->val_int());
   EXPECT_DOUBLE_EQ(0.0, neg_xor->val_real());
@@ -583,7 +583,7 @@ TEST_F(ItemTest, ItemFuncXor) {
   EXPECT_FALSE(neg_xor->is_null());
 
   print_buffer = String();
-  neg_xor->print(&print_buffer, QT_ORDINARY);
+  neg_xor->print(thd(), &print_buffer, QT_ORDINARY);
   EXPECT_STREQ("((not(0)) xor 1)", print_buffer.c_ptr_safe());
 
   Item_func_xor *item_xor_null = new Item_func_xor(item_zero, new Item_null());
@@ -720,8 +720,8 @@ TEST_F(ItemTest, MysqlTimeCache) {
 
 extern "C" {
 // Verifies that Item_func_conv::val_str does not call my_strntoll()
-longlong fail_strntoll(const CHARSET_INFO *, const char *, size_t, int, char **,
-                       int *) {
+longlong fail_strntoll(const CHARSET_INFO *, const char *, size_t, int,
+                       const char **, int *) {
   ADD_FAILURE() << "Unexpected call";
   return 0;
 }
@@ -806,12 +806,12 @@ TEST_F(ItemTest, NormalizedPrint) {
   Item_null *item_null = new Item_null;
   {
     String s;
-    item_null->print(&s, QT_ORDINARY);
+    item_null->print(thd(), &s, QT_ORDINARY);
     EXPECT_STREQ("NULL", s.c_ptr());
   }
   {
     String s;
-    item_null->print(&s, QT_NORMALIZED_FORMAT);
+    item_null->print(thd(), &s, QT_NORMALIZED_FORMAT);
     EXPECT_STREQ("?", s.c_ptr());
   }
 }

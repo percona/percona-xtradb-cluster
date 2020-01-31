@@ -638,39 +638,6 @@ DROP TABLE t1, t2, t3;
 #
 # End of 5.1 tests
 #
-# Should use myisam
-create logfile group ndb_lg1 add undofile 'ndb_undo1.dat' initial_size=32M engine=myisam;
-ERROR HY000: Table storage engine 'MyISAM' does not support the create option 'CREATE/ALTER/DROP LOGFILE GROUP'
-create logfile group ndb_lg1 add undofile 'ndb_undo1.dat' engine=myisam;
-ERROR HY000: Table storage engine 'MyISAM' does not support the create option 'CREATE/ALTER/DROP LOGFILE GROUP'
-create logfile group ndb_lg1 add undofile 'ndb_undo1.dat' engine=innodb;
-ERROR HY000: Feature LOGFILE GROUP is unsupported (by InnoDB).
-create tablespace ndb_ts1 add datafile 'ndb_ts1.dat' use logfile group ndb_lg1 engine=myisam initial_size=32M;
-ERROR HY000: Table storage engine 'MyISAM' does not support the create option 'CREATE TABLESPACE'
-create tablespace ndb_ts1 add datafile 'ndb_ts1.dat' use logfile group ndb_lg1 engine=myisam;
-ERROR HY000: Table storage engine 'MyISAM' does not support the create option 'CREATE TABLESPACE'
-create tablespace ndb_ts1 add datafile 'ndb_ts1.dat' use logfile group ndb_lg1 engine=myisam;
-ERROR HY000: Table storage engine 'MyISAM' does not support the create option 'CREATE TABLESPACE'
-alter logfile group ndb_lg1 add undofile 'ndb_undo1.dat' wait engine=myisam;
-ERROR HY000: Table storage engine 'MyISAM' does not support the create option 'CREATE/ALTER/DROP LOGFILE GROUP'
-alter logfile group ndb_lg1 add undofile 'ndb_undo1.dat' engine=myisam;
-ERROR HY000: Table storage engine 'MyISAM' does not support the create option 'CREATE/ALTER/DROP LOGFILE GROUP'
-alter logfile group ndb_lg1 add undofile 'ndb_undo1.dat' engine=myisam;
-ERROR HY000: Table storage engine 'MyISAM' does not support the create option 'CREATE/ALTER/DROP LOGFILE GROUP'
-alter tablespace ndb_ts1 add datafile 'ndb_ts1.dat' initial_size=32M engine=myisam;
-ERROR HY000: Tablespace ndb_ts1 doesn't exist.
-alter tablespace ndb_ts1 add datafile 'ndb_ts1.dat' engine=myisam;
-ERROR HY000: Tablespace ndb_ts1 doesn't exist.
-alter tablespace ndb_ts1 add datafile 'ndb_ts1.dat' engine=myisam;
-ERROR HY000: Tablespace ndb_ts1 doesn't exist.
-drop logfile group ndb_lg1 engine=myisam;
-ERROR HY000: Table storage engine 'MyISAM' does not support the create option 'CREATE/ALTER/DROP LOGFILE GROUP'
-drop logfile group ndb_lg1 engine=myisam;
-ERROR HY000: Table storage engine 'MyISAM' does not support the create option 'CREATE/ALTER/DROP LOGFILE GROUP'
-drop tablespace ndb_ts1 engine=myisam;
-ERROR HY000: Tablespace ndb_ts1 doesn't exist.
-drop tablespace ndb_ts1 engine=myisam;
-ERROR HY000: Tablespace ndb_ts1 doesn't exist.
 CREATE TABLE t (id INT PRIMARY KEY);
 ALTER TABLE t RENAME TO `t1';;
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '`t1'' at line 1
@@ -1311,6 +1278,8 @@ UNION
 a
 1
 2
+Warnings:
+Warning	1287	SQL_CALC_FOUND_ROWS is deprecated and will be removed in a future release. Consider using two separate queries instead.
 DROP TABLE t1, t2, t3;
 CREATE PROCEDURE p1() BEGIN IF whatever THEN SELECT 1; END IF; END|
 CALL p1();
@@ -2374,3 +2343,250 @@ Bug #27714748: @@PARSER_MAX_MEM_SIZE DOES NOT WORK FOR ROUTINES
 SET parser_max_mem_size = 10000000;
 ERROR HY000: Memory capacity of 10000000 bytes for 'parser_max_mem_size' exceeded. Parser bailed out for this query.
 SET parser_max_mem_size = default;
+#
+# Bug #28968848: SIMPLIFY MYSQL_YYABORT
+#
+CREATE PROCEDURE p1 () wrong syntax;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'syntax' at line 1
+#
+# Bug #25220656: THE "PERSIST" EXTENSION IS A RESERVED KEYWORD
+#
+SELECT 1 AS PERSIST, 2 AS PERSIST_ONLY;
+PERSIST	PERSIST_ONLY
+1	2
+CREATE ROLE EVENT;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EVENT' at line 1
+CREATE ROLE FILE;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FILE' at line 1
+CREATE ROLE NONE;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NONE' at line 1
+CREATE ROLE PROCESS;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'PROCESS' at line 1
+CREATE ROLE PROXY;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'PROXY' at line 1
+CREATE ROLE RELOAD;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RELOAD' at line 1
+CREATE ROLE REPLICATION;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REPLICATION' at line 1
+CREATE ROLE RESOURCE;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RESOURCE' at line 1
+CREATE ROLE SUPER;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SUPER' at line 1
+SET GLOBAL = DEFAULT;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '= DEFAULT' at line 1
+SET LOCAL = DEFAULT;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '= DEFAULT' at line 1
+SET PERSIST = DEFAULT;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '= DEFAULT' at line 1
+SET PERSIST_ONLY = DEFAULT;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '= DEFAULT' at line 1
+SET SESSION = DEFAULT;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '= DEFAULT' at line 1
+#
+# Bug#29033659: SOME NON-RESERVED WORDS CAN'T BE USED AS SP LABELS
+#
+CREATE FUNCTION f1() RETURNS INT
+BEGIN
+ACCOUNT: LOOP RETURN 1; END LOOP;
+ALWAYS: LOOP RETURN 1; END LOOP;
+BACKUP: LOOP RETURN 1; END LOOP;
+CLOSE: LOOP RETURN 1; END LOOP;
+FORMAT: LOOP RETURN 1; END LOOP;
+GROUP_REPLICATION: LOOP RETURN 1; END LOOP;
+HOST: LOOP RETURN 1; END LOOP;
+INVISIBLE: LOOP RETURN 1; END LOOP;
+OPEN: LOOP RETURN 1; END LOOP;
+OPTIONS: LOOP RETURN 1; END LOOP;
+OWNER: LOOP RETURN 1; END LOOP;
+PARSER: LOOP RETURN 1; END LOOP;
+PORT: LOOP RETURN 1; END LOOP;
+REMOVE: LOOP RETURN 1; END LOOP;
+RESTORE: LOOP RETURN 1; END LOOP;
+ROLE: LOOP RETURN 1; END LOOP;
+SECONDARY: LOOP RETURN 1; END LOOP;
+SECONDARY_ENGINE: LOOP RETURN 1; END LOOP;
+SECONDARY_LOAD: LOOP RETURN 1; END LOOP;
+SECONDARY_UNLOAD: LOOP RETURN 1; END LOOP;
+SECURITY: LOOP RETURN 1; END LOOP;
+SERVER: LOOP RETURN 1; END LOOP;
+SOCKET: LOOP RETURN 1; END LOOP;
+SONAME: LOOP RETURN 1; END LOOP;
+UPGRADE: LOOP RETURN 1; END LOOP;
+VISIBLE: LOOP RETURN 1; END LOOP;
+WRAPPER: LOOP RETURN 1; END LOOP;
+END|
+DROP FUNCTION f1;
+#
+# Bug#29205289: PARSER ACCEPTS UNDOCUMENTED SYNTAX: `... = TABLE_ALIAS`
+#
+CREATE TABLE t1 (i INT);
+LOCK TABLES t1=a READ;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '=a READ' at line 1
+HANDLER t1 OPEN=a;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '=a' at line 1
+SELECT * FROM t1=a;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '=a' at line 1
+SELECT * FROM (SELECT 1)=a;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '=a' at line 1
+SELECT * FROM t1 JOIN t1=a;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '=a' at line 1
+UPDATE t1=a SET i=0;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '=a SET i=0' at line 1
+DROP TABLE t1;
+#
+# Bug #22320942: ODBC OUTER JOIN ESCAPE SEQUENCE SYNTAX IS BROKEN
+#
+CREATE TEMPORARY TABLE t1 (i INT);
+CREATE TEMPORARY TABLE t2 (i INT);
+SELECT * FROM { OJ t1 LEFT JOIN t2 ON TRUE };
+i	i
+SELECT * FROM { `OJ` t1 LEFT JOIN t2 ON TRUE };
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '`OJ` t1 LEFT JOIN t2 ON TRUE }' at line 1
+SELECT * FROM { random_identifier t1 LEFT JOIN t2 ON TRUE };
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'random_identifier t1 LEFT JOIN t2 ON TRUE }' at line 1
+DROP TABLE t1, t2;
+#
+# Bug #28997518: "COLLATE X GENERATED ALWAYS ... COLLATE Y": X HAS
+#                 A PRIORITY OVER Y
+#
+CREATE TABLE t1 (
+x VARCHAR(10)
+COLLATE ascii_bin
+COLLATE ascii_bin
+);
+ERROR 42000: Multiple COLLATE clauses near 'ascii_bin
+)' at line 4
+CREATE TABLE t2 (
+x VARCHAR(10)
+COLLATE ascii_bin
+COLLATE ascii_general_ci
+);
+ERROR 42000: Multiple COLLATE clauses near 'ascii_general_ci
+)' at line 4
+CREATE TABLE t3 (
+x VARCHAR(10)
+COLLATE ascii_bin
+NOT NULL
+COLLATE ascii_bin
+);
+ERROR 42000: Multiple COLLATE clauses near 'ascii_bin
+)' at line 5
+CREATE TABLE t3 (
+x VARCHAR(10)
+COLLATE ascii_bin
+GENERATED ALWAYS AS(NULL)
+COLLATE ascii_bin
+);
+ERROR 42000: Multiple COLLATE clauses near 'COLLATE ascii_bin
+GENERATED ALWAYS AS(NULL)
+COLLATE ascii_bin
+)' at line 3
+CREATE TABLE t4 (
+x VARCHAR(10)
+GENERATED ALWAYS AS(NULL)
+COLLATE ascii_bin
+COLLATE ascii_bin
+);
+ERROR 42000: Multiple COLLATE clauses near 'ascii_bin
+)' at line 5
+#
+# Bug#28961997: REMOVE PARENTHESES INFORMATION FROM AST
+#
+CREATE VIEW v1 AS (SELECT 1 ORDER BY 1) UNION (SELECT 3 ORDER BY 1) ORDER BY 1;
+SHOW CREATE VIEW v1;
+View	Create View	character_set_client	collation_connection
+v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select 1 AS `1` union select 3 AS `3` order by `1`	utf8mb4	utf8mb4_0900_ai_ci
+DROP VIEW v1;
+#
+# Bug#29871803: REQUIRED PARENTHESES NO LONGER PRINTED FOR CERTAIN UNION
+# STATEMENTS
+#
+CREATE TABLE t1(a INTEGER);
+CREATE TABLE t2(a INTEGER);
+CREATE TABLE t3(a INTEGER, b INTEGER, c INTEGER);
+INSERT INTO t3 VALUES(1, 10, 100), (2, 20, 200), (3, 30, 300), (4, 40, 400);
+EXPLAIN (SELECT a FROM t1 ORDER BY a LIMIT 1) UNION SELECT a FROM t2;
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	PRIMARY	t1	NULL	ALL	NULL	NULL	NULL	NULL	1	100.00	Using filesort
+2	UNION	t2	NULL	ALL	NULL	NULL	NULL	NULL	1	100.00	NULL
+NULL	UNION RESULT	<union1,2>	NULL	ALL	NULL	NULL	NULL	NULL	NULL	NULL	Using temporary
+Warnings:
+Note	1003	(/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` order by `test`.`t1`.`a` limit 1) union /* select#2 */ select `test`.`t2`.`a` AS `a` from `test`.`t2`
+EXPLAIN SELECT a FROM t1 UNION (SELECT a FROM t2 LIMIT 1);
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	PRIMARY	t1	NULL	ALL	NULL	NULL	NULL	NULL	1	100.00	NULL
+2	UNION	t2	NULL	ALL	NULL	NULL	NULL	NULL	1	100.00	NULL
+NULL	UNION RESULT	<union1,2>	NULL	ALL	NULL	NULL	NULL	NULL	NULL	NULL	Using temporary
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` union (/* select#2 */ select `test`.`t2`.`a` AS `a` from `test`.`t2` limit 1)
+CREATE VIEW v1 as (SELECT a FROM t1 ORDER BY a LIMIT 1) UNION SELECT a FROM t2;
+SHOW CREATE VIEW v1;
+View	Create View	character_set_client	collation_connection
+v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS (select `t1`.`a` AS `a` from `t1` order by `t1`.`a` limit 1) union select `t2`.`a` AS `a` from `t2`	utf8mb4	utf8mb4_0900_ai_ci
+CREATE VIEW v2 as SELECT a FROM t1 UNION (SELECT a FROM t2 ORDER BY a LIMIT 1);
+SHOW CREATE VIEW v2;
+View	Create View	character_set_client	collation_connection
+v2	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2` AS select `t1`.`a` AS `a` from `t1` union (select `t2`.`a` AS `a` from `t2` order by `t2`.`a` limit 1)	utf8mb4	utf8mb4_0900_ai_ci
+EXPLAIN (SELECT * FROM t3 ORDER BY a LIMIT 3) ORDER BY b DESC LIMIT 2;
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t3	NULL	ALL	NULL	NULL	NULL	NULL	4	100.00	Using filesort
+Warnings:
+Note	1003	(/* select#1 */ select `test`.`t3`.`a` AS `a`,`test`.`t3`.`b` AS `b`,`test`.`t3`.`c` AS `c` from `test`.`t3` order by `test`.`t3`.`a` limit 3) order by `test`.`t3`.`b` desc limit 2
+EXPLAIN ((SELECT * FROM t3 ORDER BY a LIMIT 3)
+ORDER BY b DESC LIMIT 2)
+ORDER BY c LIMIT 1;
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t3	NULL	ALL	NULL	NULL	NULL	NULL	4	100.00	Using filesort
+Warnings:
+Note	1003	(/* select#1 */ select `test`.`t3`.`a` AS `a`,`test`.`t3`.`b` AS `b`,`test`.`t3`.`c` AS `c` from `test`.`t3` order by `test`.`t3`.`a` limit 3) order by `test`.`t3`.`c` limit 1
+DROP VIEW v1;
+DROP VIEW v2;
+DROP TABLE t1, t2, t3;
+#
+# Bug#30131161: SYNTAX ERROR WITH || WHEN USING PIPES_AS_CONCAT AFTER
+#               UPGRADING TO 8.0.17
+#
+SET sql_mode=(SELECT CONCAT(@@sql_mode, ',PIPES_AS_CONCAT'));
+SELECT 'ab' LIKE 'a%', 'ab' LIKE 'a' || '%';
+'ab' LIKE 'a%'	'ab' LIKE 'a' || '%'
+1	1
+SELECT 'ab' NOT LIKE 'a%', 'ab' NOT LIKE 'a' || '%';
+'ab' NOT LIKE 'a%'	'ab' NOT LIKE 'a' || '%'
+0	0
+SELECT 'ab' LIKE 'ac', 'ab' LIKE 'a' || 'c';
+'ab' LIKE 'ac'	'ab' LIKE 'a' || 'c'
+0	0
+SELECT 'ab' NOT LIKE 'ac', 'ab' NOT LIKE 'a' || 'c';
+'ab' NOT LIKE 'ac'	'ab' NOT LIKE 'a' || 'c'
+1	1
+SELECT 'a%' LIKE 'a!%' ESCAPE '!', 'a%' LIKE 'a!' || '%' ESCAPE '!';
+'a%' LIKE 'a!%' ESCAPE '!'	'a%' LIKE 'a!' || '%' ESCAPE '!'
+1	1
+SELECT 'a%' NOT LIKE 'a!%' ESCAPE '!', 'a%' NOT LIKE 'a!' || '%' ESCAPE '!';
+'a%' NOT LIKE 'a!%' ESCAPE '!'	'a%' NOT LIKE 'a!' || '%' ESCAPE '!'
+0	0
+SELECT 'a%' LIKE 'a!%' ESCAPE '$', 'a%' LIKE 'a!' || '%' ESCAPE '$';
+'a%' LIKE 'a!%' ESCAPE '$'	'a%' LIKE 'a!' || '%' ESCAPE '$'
+0	0
+SELECT 'a%' NOT LIKE 'a!%' ESCAPE '$', 'a%' NOT LIKE 'a!' || '%' ESCAPE '$';
+'a%' NOT LIKE 'a!%' ESCAPE '$'	'a%' NOT LIKE 'a!' || '%' ESCAPE '$'
+1	1
+SELECT 'a%' LIKE 'a!%' ESCAPE '!', 'a%' LIKE 'a!%' ESCAPE '' || '!';
+'a%' LIKE 'a!%' ESCAPE '!'	'a%' LIKE 'a!%' ESCAPE '' || '!'
+1	1
+SELECT 'a%' NOT LIKE 'a!%' ESCAPE '!', 'a%' NOT LIKE 'a!%' ESCAPE '' || '!';
+'a%' NOT LIKE 'a!%' ESCAPE '!'	'a%' NOT LIKE 'a!%' ESCAPE '' || '!'
+0	0
+SELECT 'a%' LIKE 'a!%' ESCAPE '' || '$', 'a%' LIKE 'a!%' ESCAPE '' || '$';
+'a%' LIKE 'a!%' ESCAPE '' || '$'	'a%' LIKE 'a!%' ESCAPE '' || '$'
+0	0
+SELECT 'a%' NOT LIKE 'a!%' ESCAPE '' || '$', 'a%' NOT LIKE 'a!%' ESCAPE '' || '$';
+'a%' NOT LIKE 'a!%' ESCAPE '' || '$'	'a%' NOT LIKE 'a!%' ESCAPE '' || '$'
+1	1
+SELECT 1 ^ 100, 1 ^ '10' || '0';
+1 ^ 100	1 ^ '10' || '0'
+101	101
+SELECT -1 || '0';
+-1 || '0'
+-10
+SET sql_mode=DEFAULT;

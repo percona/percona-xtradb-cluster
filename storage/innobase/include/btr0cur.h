@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -357,7 +357,7 @@ dberr_t btr_cur_update_in_place(
     MY_ATTRIBUTE((warn_unused_result));
 /** Writes a redo log record of updating a record in-place. */
 void btr_cur_update_in_place_log(
-    ulint flags,         /*!< in: flags */
+    ulint flags,         /*!< in: undo logging and locking flags */
     const rec_t *rec,    /*!< in: record */
     dict_index_t *index, /*!< in: index of the record */
     const upd_t *update, /*!< in: update vector */
@@ -651,19 +651,19 @@ struct btr_path_t {
   (index in alphabetical order). Value ULINT_UNDEFINED denotes array
   end. In the above example, if the search stopped on record 'c', then
   nth_rec will be 3. */
-  ulint nth_rec;
+  ulint nth_rec{ULINT_UNDEFINED};
 
   /** Number of the records on the page, not counting inf and sup.
   In the above example n_recs will be 4. */
-  ulint n_recs;
+  ulint n_recs{ULINT_UNDEFINED};
 
   /** Number of the page containing the record. */
-  page_no_t page_no;
+  page_no_t page_no{FIL_NULL};
 
   /** Level of the page. If later we fetch the page under page_no
-  and it is no different level then we know that the tree has been
+  and it is on a different level then we know that the tree has been
   reorganized. */
-  ulint page_level;
+  ulint page_level{ULINT_UNDEFINED};
 };
 
 #define BTR_PATH_ARRAY_N_SLOTS 250 /*!< size of path array (in slots) */
@@ -757,6 +757,9 @@ struct btr_cur_t {
                          information of the path through
                          the tree */
   rtr_info_t *rtr_info{nullptr}; /*!< rtree search info */
+
+  /** Ownership of the above rtr_info member. */
+  bool m_own_rtr_info = true;
 
   /** If cursor is used in a scan or simple page fetch. */
   Page_fetch m_fetch_mode{Page_fetch::NORMAL};

@@ -26,6 +26,7 @@ innodb-log-file-size=5M
 # galera.cnf file for this setting
 pxc_strict_mode=DISABLED
 pxc_maint_transition_period=0
+pxc_encrypt_cluster_traffic=OFF
 log_error_verbosity=3
 
 # MAINTAINER:

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -74,21 +74,21 @@
 
 int my_getwd(char *buf, size_t size, myf MyFlags) {
   char *pos;
-  DBUG_ENTER("my_getwd");
+  DBUG_TRACE;
   DBUG_PRINT("my", ("buf: %p  size: %u  MyFlags %d", buf, (uint)size, MyFlags));
 
-  if (size < 1) DBUG_RETURN(-1);
+  if (size < 1) return -1;
 
   if (curr_dir[0]) /* Current pos is saved here */
     (void)strmake(buf, &curr_dir[0], size - 1);
   else {
-    if (size < 2) DBUG_RETURN(-1);
+    if (size < 2) return -1;
     if (!getcwd(buf, (uint)(size - 2)) && MyFlags & MY_WME) {
       char errbuf[MYSYS_STRERROR_SIZE];
       set_my_errno(errno);
       my_error(EE_GETWD, MYF(0), errno,
                my_strerror(errbuf, sizeof(errbuf), errno));
-      DBUG_RETURN(-1);
+      return -1;
     }
     if (*((pos = strend(buf)) - 1) != FN_LIBCHAR) /* End with FN_LIBCHAR */
     {
@@ -97,7 +97,7 @@ int my_getwd(char *buf, size_t size, myf MyFlags) {
     }
     (void)strmake(&curr_dir[0], buf, (size_t)(FN_REFLEN - 1));
   }
-  DBUG_RETURN(0);
+  return 0;
 } /* my_getwd */
 
 /* Set new working directory */
@@ -105,13 +105,13 @@ int my_getwd(char *buf, size_t size, myf MyFlags) {
 int my_setwd(const char *dir, myf MyFlags) {
   int res;
   size_t length;
-  char *start, *pos;
-  DBUG_ENTER("my_setwd");
+  char *pos;
+  DBUG_TRACE;
   DBUG_PRINT("my", ("dir: '%s'  MyFlags %d", dir, MyFlags));
 
-  start = (char *)dir;
+  const char *start = dir;
   if (!dir[0] || (dir[0] == FN_LIBCHAR && dir[1] == 0)) dir = FN_ROOTDIR;
-  if ((res = chdir((char *)dir)) != 0) {
+  if ((res = chdir(dir)) != 0) {
     set_my_errno(errno);
     if (MyFlags & MY_WME) {
       char errbuf[MYSYS_STRERROR_SIZE];
@@ -129,7 +129,7 @@ int my_setwd(const char *dir, myf MyFlags) {
     } else
       curr_dir[0] = '\0'; /* Don't save name */
   }
-  DBUG_RETURN(res);
+  return res;
 } /* my_setwd */
 
 /* Test if hard pathname */

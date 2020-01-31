@@ -1,6 +1,6 @@
 #ifndef MDL_H
 #define MDL_H
-/* Copyright (c) 2009, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -35,6 +35,7 @@
 #include "my_inttypes.h"
 #include "my_psi_config.h"
 #include "my_sys.h"
+#include "my_systime.h"  // Timout_type
 #include "mysql/components/services/mysql_cond_bits.h"
 #include "mysql/components/services/mysql_mutex_bits.h"
 #include "mysql/components/services/mysql_rwlock_bits.h"
@@ -43,6 +44,7 @@
 #include "mysql/psi/mysql_rwlock.h"
 #include "mysql_com.h"
 #include "sql/sql_plist.h"
+#include "template_utils.h"
 
 class MDL_context;
 class MDL_lock;
@@ -164,7 +166,7 @@ class MDL_context_owner {
     Get random seed specific to this THD to be used for initialization
     of PRNG for the MDL_context.
   */
-  virtual uint get_rand_seed() = 0;
+  virtual uint get_rand_seed() const = 0;
 };
 
 /**
@@ -374,6 +376,7 @@ struct MDL_key {
        and some administrative statements.
      - RESOURCE_GROUPS is for resource groups.
      - FOREIGN_KEY is for foreign key names.
+     - CHECK_CONSTRAINT is for check constraint names.
     Note that requests waiting for user-level locks get special
     treatment - waiting is aborted if connection to client is lost.
   */
@@ -395,12 +398,13 @@ struct MDL_key {
     BACKUP_LOCK, /* Oracle LOCK INSTANCE FOR BACKUP */
     RESOURCE_GROUPS,
     FOREIGN_KEY,
+    CHECK_CONSTRAINT,
     BACKUP_TABLES, /* Percona LOCK TABLES FOR BACKUP */
     /* This should be the last ! */
     NAMESPACE_END
   };
 
-  const uchar *ptr() const { return (uchar *)m_ptr; }
+  const uchar *ptr() const { return pointer_cast<const uchar *>(m_ptr); }
   uint length() const { return m_length; }
 
   const char *db_name() const { return m_ptr + 1; }
@@ -812,7 +816,7 @@ class MDL_request {
   static void *operator new(size_t size, MEM_ROOT *mem_root,
                             const std::nothrow_t &arg MY_ATTRIBUTE((unused)) =
                                 std::nothrow) noexcept {
-    return alloc_root(mem_root, size);
+    return mem_root->Alloc(size);
   }
 
   static void operator delete(void *, MEM_ROOT *,
@@ -864,8 +868,8 @@ class MDL_request {
 
     - TABLE_LIST objects are sometimes default-constructed. We plan to remove
       this as there is no practical reason, the call to the default
-      constructor is always followed by either a call to
-      TABLE_LIST::init_one_table() or memberwise assignments.
+      constructor is always followed by either a call to TABLE_LIST::operator=
+      or memberwise assignments.
 
     - In some legacy cases TABLE_LIST objects are copy-assigned without
       intention to copy the TABLE_LIST::mdl_request member. In this cases they
@@ -1446,7 +1450,9 @@ class MDL_wait {
   MDL_wait();
   ~MDL_wait();
 
-  enum enum_wait_status { EMPTY = 0, GRANTED, VICTIM, TIMEOUT, KILLED };
+  // WS_EMPTY since EMPTY conflicts with #define in system headers on some
+  // platforms.
+  enum enum_wait_status { WS_EMPTY = 0, GRANTED, VICTIM, TIMEOUT, KILLED };
 
   bool set_status(enum_wait_status result_arg);
   enum_wait_status get_status();
@@ -1520,10 +1526,11 @@ class MDL_context {
   void destroy();
 
   bool try_acquire_lock(MDL_request *mdl_request);
-  bool acquire_lock(MDL_request *mdl_request, ulong lock_wait_timeout);
-  bool acquire_locks(MDL_request_list *requests, ulong lock_wait_timeout);
+  bool acquire_lock(MDL_request *mdl_request, Timeout_type lock_wait_timeout);
+  bool acquire_locks(MDL_request_list *requests,
+                     Timeout_type lock_wait_timeout);
   bool upgrade_shared_lock(MDL_ticket *mdl_ticket, enum_mdl_type new_type,
-                           ulong lock_wait_timeout);
+                           Timeout_type lock_wait_timeout);
 
   bool clone_ticket(MDL_request *mdl_request);
 
@@ -1561,8 +1568,14 @@ class MDL_context {
   inline bool has_locks() const { return !m_ticket_store.is_empty(); }
 
 #ifdef WITH_WSREP
+  inline bool has_stmt_locks() const {
+    return !(m_ticket_store.is_empty(MDL_STATEMENT));
+  }
   inline bool has_transactional_locks() const {
     return !(m_ticket_store.is_empty(MDL_TRANSACTION));
+  }
+  inline bool has_explicit_locks() const {
+    return !(m_ticket_store.is_empty(MDL_EXPLICIT));
   }
 #endif /* WITH_WSREP */
   bool has_locks(MDL_key::enum_mdl_namespace mdl_namespace) const;

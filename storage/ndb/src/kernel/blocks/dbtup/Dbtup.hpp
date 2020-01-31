@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -49,6 +49,7 @@
 #include <EventLogger.hpp>
 #include "../backup/BackupFormat.hpp"
 #include <portlib/ndb_prefetch.h>
+#include "util/ndb_math.h"
 
 #define JAM_FILE_ID 414
 
@@ -68,7 +69,7 @@ inline const char* dbgmask(const Uint32 bm[2]) {
 #define ZMIN_PAGE_LIMIT_TUPKEYREQ 5
 #define ZTUP_VERSION_BITS 15
 #define ZTUP_VERSION_MASK ((1 << ZTUP_VERSION_BITS) - 1)
-#define MAX_FREE_LIST 4
+#define MAX_FREE_LIST 5
 
 inline Uint32* ALIGN_WORD(void * ptr)
 {
@@ -560,12 +561,7 @@ typedef Ptr<Fragoperrec> FragoperrecPtr;
   STATIC_CONST( EXTENT_SEARCH_MATRIX_ROWS = 5 ); // Total size
   STATIC_CONST( EXTENT_SEARCH_MATRIX_SIZE = 20 );
   
-  struct Extent_list_t
-  {
-    Uint32 nextList;
-  };
-
-  struct Extent_info : public Extent_list_t
+  struct Extent_info
   {
     Uint32 m_magic;
     Uint32 m_first_page_no;
@@ -580,6 +576,7 @@ typedef Ptr<Fragoperrec> FragoperrecPtr;
     };
     Uint32 prevList;
     Uint32 nextHash, prevHash;
+    Uint32 nextFragment;
 
     Uint32 hashValue() const {
       return (m_key.m_file_no << 16) ^ m_key.m_page_idx;
@@ -596,8 +593,8 @@ typedef Ptr<Fragoperrec> FragoperrecPtr;
   typedef DLList<Extent_info_pool> Extent_info_list;
   typedef LocalDLList<Extent_info_pool> Local_extent_info_list;
   typedef DLHashTable<Extent_info_pool> Extent_info_hash;
-  typedef SLList<Extent_info_pool, Extent_list_t> Fragment_extent_list;
-  typedef LocalSLList<Extent_info_pool, Extent_list_t> Local_fragment_extent_list;
+  typedef SLList<Extent_info_pool, IA_Fragment> Fragment_extent_list;
+  typedef LocalSLList<Extent_info_pool, IA_Fragment> Local_fragment_extent_list;
   struct Tablerec;
   struct Disk_alloc_info 
   {
@@ -625,13 +622,13 @@ typedef Ptr<Fragoperrec> FragoperrecPtr;
      * Free list of pages in different size
      *   that are dirty
      */
-    Page_list::Head m_dirty_pages[MAX_FREE_LIST];   // In real page id's
+    Page_list::Head m_dirty_pages[EXTENT_SEARCH_MATRIX_COLS];   // In real page id's
 
     /**
      * Requests (for update) that have sufficient space left after request
      *   these are currently being "mapped"
      */
-    Page_request_list::Head m_page_requests[MAX_FREE_LIST];
+    Page_request_list::Head m_page_requests[EXTENT_SEARCH_MATRIX_COLS];
 
     Page_list::Head m_unmap_pages;
 
@@ -727,7 +724,8 @@ struct Fragrecord {
     UC_LCP = 1,
     UC_CREATE = 2,
     UC_SET_LCP = 3,
-    UC_DROP = 4
+    UC_NO_LCP = 4,
+    UC_DROP = 5
   };
   /* Calculated average row size of the rows in the fragment */
   Uint32 m_average_row_size;
@@ -1214,7 +1212,8 @@ TupTriggerData_pool c_triggerPool;
     State tableStatus;
     Local_key m_default_value_location;
   };  
-  Uint32 m_read_ctl_file_data[BackupFormat::NDB_LCP_CTL_FILE_SIZE_BIG / 4];
+  Uint32
+    m_read_ctl_file_data[BackupFormat::LCP_CTL_FILE_BUFFER_SIZE_IN_WORDS];
   /*
     It is more space efficient to store dynamic fixed-size attributes
     of more than about 16 words as variable-sized internally.
@@ -1502,6 +1501,15 @@ typedef Ptr<HostBuffer> HostBufferPtr;
      data. In the case of abort, the varpart must then be shrunk. For a
      MM_GROWN tuple, the original size is stored in the last word of the
      varpart until commit.
+
+     DELETE_WAIT: When a tuple has been marked to be deleted, the tuple header
+     has the DELETE_WAIT bit set. Note that DELETE_WAIT means that the tuple
+     hasn't actually been deleted. When a tuple has been deleted, it is marked
+     with the FREE flag and DELETE_WAIT is reset.
+     The need for DELETE_WAIT arises due to the real-time break between the
+     marking of the tuple and the actual deletion of the tuple for disk data
+     rows. This information would be useful for reads since they'd know the
+     proper state of the row. (Related Bug #27584165)
     */
     STATIC_CONST( TUP_VERSION_MASK = 0xFFFF );
     STATIC_CONST( COPY_TUPLE  = 0x00010000 ); // Is this a copy tuple
@@ -1516,6 +1524,7 @@ typedef Ptr<HostBuffer> HostBufferPtr;
     STATIC_CONST( VAR_PART    = 0x04000000 ); // Is there a varpart
     STATIC_CONST( REORG_MOVE  = 0x08000000 ); // Tuple will be moved in reorg
     STATIC_CONST( LCP_DELETE  = 0x10000000 ); // Tuple deleted at LCP start
+    STATIC_CONST( DELETE_WAIT = 0x20000000 ); // Waiting for delete tuple page
 
     Tuple_header() {}
     Uint32 get_tuple_version() const { 
@@ -1592,6 +1601,33 @@ typedef Ptr<HostBuffer> HostBufferPtr;
 
     STATIC_CONST( SZ32 = 1 );
   };
+
+  static constexpr Uint32 MAX_EXPANDED_TUPLE_SIZE_IN_WORDS =
+    Tuple_header::HeaderSize +
+
+    /* Fixpart without null bits (see below) */
+    1 /* checksum */ +
+    1 /* GCI */ +
+    Var_part_ref::SZ32 +
+    Disk_part_ref::SZ32 +
+
+    /* Varpart without dynamic column bits (see below) */
+    1 /* Length word, only in expanded tuple */ +
+    ndb_ceil_div(MAX_ATTRIBUTES_IN_TABLE + 1 /* dynamic part */, 2) +
+    1 /* Dynamic bit length (8bit) plus padding */ +
+
+    /* Diskpart */
+    0 +
+
+    /* Null bits and dynamic columns bits.  Dynamic columns do not have null
+       bits so total number of bits will not be more than
+       MAX_ATTRIBUTES_IN_TABLE.  But since bits are splitted on two parts an
+       extra word for padding may be needed.
+     */
+    ndb_ceil_div(MAX_ATTRIBUTES_IN_TABLE, 32) + 1 +
+
+    /* Tuple data for all parts */
+    MAX_TUPLE_SIZE_IN_WORDS;
 
   enum When
   {
@@ -2295,6 +2331,16 @@ private:
    *   is called
    */
   void execFIRE_TRIG_REQ(Signal* signal);
+  void sendFIRE_TRIG_ORD(Signal* signal);
+  void sendBatchedFIRE_TRIG_ORD(Signal* signal,
+                                Uint32 ref,
+                                Uint32 siglen,
+                                SectionHandle* handle);
+  void sendBatchedFIRE_TRIG_ORD(Signal* signal,
+                                Uint32 ref,
+                                Uint32 siglen,
+                                LinearSectionPtr ptr[],
+                                Uint32 nptr);
 
 // *****************************************************************
 // Setting up the environment for reads, inserts, updates and deletes.
@@ -3056,10 +3102,15 @@ private:
 
   struct SumaTriggerBuffer
   {
-    SumaTriggerBuffer() { m_out_of_memory = 0;m_pageId = RNIL; m_freeWords = 0;}
+    SumaTriggerBuffer()
+    : m_out_of_memory(0),
+      m_pageId(RNIL),
+      m_freeWords(0),
+      m_usedWords(0) {}
     Uint32 m_out_of_memory;
     Uint32 m_pageId;
     Uint32 m_freeWords;
+    Uint32 m_usedWords;
   } m_suma_trigger_buffer;
 
 // *****************************************************************
@@ -3451,7 +3502,8 @@ private:
   }
 #endif
 
-  Uint32 calculate_free_list_impl(Uint32) const ;
+  Uint32 calculate_free_list_impl(Uint32) const;
+  Uint32 calculate_free_list_for_alloc(Uint32) const;
   Uint64 calculate_used_var_words(Fragrecord* fragPtr);
   void remove_free_page(Fragrecord*, Var_page*, Uint32);
   void insert_free_page(Fragrecord*, Var_page*, Uint32);
@@ -3596,6 +3648,20 @@ private:
   Uint32 clogMemBuffer[ZATTR_BUFFER_SIZE + 16];
   Uint32 coutBuffer[ZATTR_BUFFER_SIZE + 16];
   Uint32 cinBuffer[ZATTR_BUFFER_SIZE + 16];
+
+  /*
+   * In executeTrigger()
+   *   - cinBuffer also used for key
+   *   - coutBuffer also used for after values
+   *   - clogMemBuffer also used for before values
+   */
+  static_assert(sizeof(clogMemBuffer) >=
+      sizeof(Uint32) * (MAX_TUPLE_SIZE_IN_WORDS + MAX_ATTRIBUTES_IN_TABLE), "");
+  static_assert(sizeof(coutBuffer) >=
+      sizeof(Uint32) * (MAX_TUPLE_SIZE_IN_WORDS + MAX_ATTRIBUTES_IN_TABLE), "");
+  static_assert(sizeof(cinBuffer) >=
+      sizeof(Uint32) * (MAX_KEY_SIZE_IN_WORDS + MAX_ATTRIBUTES_IN_INDEX), "");
+
   Uint32 ctemp_page[ZWORDS_ON_PAGE];
   Uint32 ctemp_var_record[ZWORDS_ON_PAGE];
 

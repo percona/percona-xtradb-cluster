@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -32,11 +32,14 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
+
+#include "mysqlxclient/xmessage.h"
 
 #include "mysqlxclient/xargument.h"
+#include "mysqlxclient/xcompression.h"
 #include "mysqlxclient/xconnection.h"
 #include "mysqlxclient/xerror.h"
-#include "mysqlxclient/xmessage.h"
 #include "mysqlxclient/xquery_result.h"
 
 #ifdef USE_MYSQLX_FULL_PROTO
@@ -47,6 +50,7 @@
 
 #define XCL_CLIENT_ID_NOT_VALID 0
 #define XCL_SESSION_ID_NOT_VALID 0
+#define XCL_HANDLER_ID_NOT_VALID -1
 
 namespace xcl {
 

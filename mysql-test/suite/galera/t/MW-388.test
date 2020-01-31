@@ -43,15 +43,15 @@ SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_apply_cb_reached";
 
 --connection node_1
 SET SESSION wsrep_sync_wait = 0;
-SET SESSION DEBUG_SYNC = 'wsrep_after_replication SIGNAL wsrep_after_replication_reached WAIT_FOR wsrep_after_replication_continue';
+SET SESSION DEBUG_SYNC = 'wsrep_after_certification SIGNAL wsrep_after_certification_reached WAIT_FOR wsrep_after_certification_continue';
 --send CALL insert_proc ();
 
 --connection node_1a
-SET SESSION DEBUG_SYNC = "now WAIT_FOR wsrep_after_replication_reached";
+SET SESSION DEBUG_SYNC = "now WAIT_FOR wsrep_after_certification_reached";
 
 
 SET GLOBAL DEBUG = "";
-SET DEBUG_SYNC = "now SIGNAL wsrep_after_replication_continue";
+SET DEBUG_SYNC = "now SIGNAL wsrep_after_certification_continue";
 --sleep 3
 SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
 
@@ -73,6 +73,7 @@ SELECT * FROM t1;
 
 --connection node_1
 SET DEBUG_SYNC = "reset";
+DROP PROCEDURE insert_proc;
 DROP TABLE t1;
 
 
@@ -86,6 +87,18 @@ DROP TABLE t1;
 --echo #
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(255)) Engine=InnoDB;
+
+DELIMITER |;
+CREATE PROCEDURE insert_proc ()
+BEGIN
+        DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+        BEGIN
+                GET DIAGNOSTICS CONDITION 1 @errno = MYSQL_ERRNO;
+        END;
+        INSERT INTO t1 VALUES (1, 'node 1'),(2, 'node 1');
+        INSERT INTO t1 VALUES (3, 'node 1');
+END|
+DELIMITER ;|
 
 # We need two slave threads here to guarantee progress.
 # If we use only one thread the following could happen
@@ -109,17 +122,17 @@ SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_apply_cb_reached";
 
 --connection node_1
 SET SESSION wsrep_sync_wait = 0;
-SET SESSION DEBUG_SYNC = 'wsrep_after_replication SIGNAL wsrep_after_replication_reached WAIT_FOR wsrep_after_replication_continue';
+SET SESSION DEBUG_SYNC = 'wsrep_after_certification SIGNAL wsrep_after_certification_reached WAIT_FOR wsrep_after_certification_continue';
 --send CALL insert_proc ();
 
 --connection node_1a
-SET SESSION DEBUG_SYNC = "now WAIT_FOR wsrep_after_replication_reached";
+SET SESSION DEBUG_SYNC = "now WAIT_FOR wsrep_after_certification_reached";
 
-
+# this change in sequence of unblocking will cause BFA (vs LCF above)
 SET GLOBAL DEBUG = "";
 SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
 --sleep 3
-SET DEBUG_SYNC = "now SIGNAL wsrep_after_replication_continue";
+SET DEBUG_SYNC = "now SIGNAL wsrep_after_certification_continue";
 
 --connection node_2
 --reap

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -29,16 +29,16 @@
 #include <string>
 
 #include "my_inttypes.h"
-#include "plugin/x/ngs/include/ngs/capabilities/configurator.h"
 #include "plugin/x/ngs/include/ngs/interface/client_interface.h"
 #include "plugin/x/ngs/include/ngs/interface/protocol_encoder_interface.h"
 #include "plugin/x/ngs/include/ngs/interface/vio_interface.h"
 #include "plugin/x/ngs/include/ngs/memory.h"
 #include "plugin/x/ngs/include/ngs/protocol/message.h"
+#include "plugin/x/ngs/include/ngs/protocol/page_pool.h"
 #include "plugin/x/ngs/include/ngs/protocol_decoder.h"
-#include "plugin/x/ngs/include/ngs/protocol_encoder.h"
-#include "plugin/x/ngs/include/ngs_common/chrono.h"
+#include "plugin/x/src/capabilities/configurator.h"
 #include "plugin/x/src/global_timeouts.h"
+#include "plugin/x/src/helper/chrono.h"
 #include "plugin/x/src/helper/multithread/mutex.h"
 #include "plugin/x/src/xpl_system_variables.h"
 
@@ -58,7 +58,7 @@ class Client : public Client_interface {
 
   xpl::Mutex &get_session_exit_mutex() override { return m_session_exit_mutex; }
   Session_interface *session() override { return m_session.get(); }
-  ngs::shared_ptr<Session_interface> session_smart_ptr() const override {
+  std::shared_ptr<Session_interface> session_smart_ptr() const override {
     return m_session;
   }
 
@@ -90,8 +90,8 @@ class Client : public Client_interface {
   Client_id client_id_num() const override { return m_client_id; }
   int client_port() const override { return m_client_port; }
 
-  Client_state get_state() const override { return m_state.load(); }
-  chrono::time_point get_accept_time() const override;
+  State get_state() const override { return m_state.load(); }
+  xpl::chrono::Time_point get_accept_time() const override;
 
   void set_supports_expired_passwords(bool flag) {
     m_supports_expired_passwords = flag;
@@ -107,78 +107,103 @@ class Client : public Client_interface {
   void set_read_timeout(const uint32_t) override;
   void set_write_timeout(const uint32_t) override;
 
+  bool handle_session_connect_attr_set(ngs::Message_request &command);
+  void handle_message(Message_request *message) override;
+
+ private:
+  class Message_dispatcher
+      : public Message_decoder::Message_dispatcher_interface {
+   public:
+    explicit Message_dispatcher(Client_interface *client) : m_client(client) {}
+
+    virtual void handle(Message_request *message) {
+      m_client->handle_message(message);
+    }
+
+   private:
+    Client_interface *m_client;
+  };
+
  protected:
   char m_id[2 + sizeof(Client_id) * 2 + 1];  // 64bits in hex, plus 0x plus \0
   Client_id m_client_id;
   Server_interface &m_server;
 
   std::shared_ptr<Vio_interface> m_connection;
+  std::shared_ptr<Protocol_config> m_config;
+  // TODO(lkotula): benchmark m_memory_block_pool as global in Xpl (shouldn't be
+  // in review)
+  ngs::Memory_block_pool m_memory_block_pool{{10, k_minimum_page_size}};
+  Message_dispatcher m_dispatcher;
   Protocol_decoder m_decoder;
 
-  ngs::chrono::time_point m_accept_time;
+  xpl::chrono::Time_point m_accept_time;
 
-  ngs::Memory_instrumented<Protocol_encoder_interface>::Unique_ptr m_encoder;
+  Memory_instrumented<Protocol_encoder_interface>::Unique_ptr m_encoder;
   std::string m_client_addr;
   std::string m_client_host;
   uint16 m_client_port;
-  std::atomic<Client_state> m_state;
+  std::atomic<State> m_state;
   std::atomic<bool> m_removed;
 
-  ngs::shared_ptr<Session_interface> m_session;
+  std::shared_ptr<Session_interface> m_session;
 
   Protocol_monitor_interface *m_protocol_monitor;
 
   mutable xpl::Mutex m_session_exit_mutex;
 
-  enum {
-    Not_closing,
-    Close_net_error,
-    Close_error,
-    Close_reject,
-    Close_normal,
-    Close_connect_timeout,
-    Close_write_timeout,
-    Close_read_timeout
-  } m_close_reason;
+  enum class Close_reason {
+    k_none,
+    k_net_error,
+    k_error,
+    k_reject,
+    k_normal,
+    k_connect_timeout,
+    k_write_timeout,
+    k_read_timeout
+  };
+
+  Close_reason m_close_reason{Close_reason::k_none};
 
   char *m_msg_buffer;
   size_t m_msg_buffer_size;
   bool m_supports_expired_passwords;
   bool m_is_interactive = false;
+  bool m_is_compression_encoder_injected = false;
 
   uint32_t m_read_timeout = Global_timeouts::Default::k_read_timeout;
   uint32_t m_write_timeout = Global_timeouts::Default::k_write_timeout;
 
-  Error_code read_one_message(Message_request *out_message);
+  Error_code read_one_message_and_dispatch();
 
-  virtual ngs::Capabilities_configurator *capabilities_configurator();
-  void get_capabilities(const Mysqlx::Connection::CapabilitiesGet &msg);
-  void set_capabilities(const Mysqlx::Connection::CapabilitiesSet &msg);
+  virtual xpl::Capabilities_configurator *capabilities_configurator();
+  void get_capabilities(
+      const Mysqlx::Connection::CapabilitiesGet &msg) override;
+  void set_capabilities(
+      const Mysqlx::Connection::CapabilitiesSet &msg) override;
 
   void remove_client_from_server();
 
-  void handle_message(Message_request &message);
   virtual std::string resolve_hostname() = 0;
-  virtual void on_network_error(int error);
+  virtual void on_network_error(const int error);
   void on_read_timeout();
 
   Protocol_monitor_interface &get_protocol_monitor();
 
-  void set_encoder(ngs::Protocol_encoder_interface *enc);
+  void set_encoder(Protocol_encoder_interface *enc);
 
  private:
-  using Waiting_for_io_interface =
-      ngs::Protocol_decoder::Waiting_for_io_interface;
-
   Client(const Client &) = delete;
   Client &operator=(const Client &) = delete;
 
-  Waiting_for_io_interface *get_idle_processing();
+  xpl::iface::Waiting_for_io *get_idle_processing();
   void get_last_error(int *out_error_code, std::string *out_message);
-  void shutdown_connection();
+  void set_close_reason_if_non_fatal(const Close_reason reason);
+  void update_counters();
 
   void on_client_addr(const bool skip_resolve_name);
   void on_accept();
+  bool create_session();
 };
 
 }  // namespace ngs

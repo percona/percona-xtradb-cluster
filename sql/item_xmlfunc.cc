@@ -1,4 +1,4 @@
-/* Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -188,9 +188,10 @@ class Item_nodeset_func : public Item_str_func {
     return false;
   }
   const char *func_name() const override { return "nodeset"; }
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     auto *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -199,8 +200,9 @@ class Item_nodeset_func : public Item_str_func {
 /* Returns an XML root */
 class Item_nodeset_func_rootelement : public Item_nodeset_func {
  public:
-  Item_nodeset_func_rootelement(const ParsedXML &pxml, const CHARSET_INFO *cs)
-      : Item_nodeset_func(pxml, cs) {}
+  Item_nodeset_func_rootelement(const ParsedXML &pxml_arg,
+                                const CHARSET_INFO *cs)
+      : Item_nodeset_func(pxml_arg, cs) {}
   const char *func_name() const override { return "xpath_rootelement"; }
   void val_nodeset(XPathFilter *nodeset) const override;
 };
@@ -208,9 +210,9 @@ class Item_nodeset_func_rootelement : public Item_nodeset_func {
 /* Returns a Union of two node sets */
 class Item_nodeset_func_union : public Item_nodeset_func {
  public:
-  Item_nodeset_func_union(Item *a, Item *b, const ParsedXML &pxml,
+  Item_nodeset_func_union(Item *a, Item *b, const ParsedXML &pxml_arg,
                           const CHARSET_INFO *cs)
-      : Item_nodeset_func(a, b, pxml, cs) {}
+      : Item_nodeset_func(a, b, pxml_arg, cs) {}
   const char *func_name() const override { return "xpath_union"; }
   void val_nodeset(XPathFilter *nodeset) const override;
 };
@@ -222,8 +224,11 @@ class Item_nodeset_func_axisbyname : public Item_nodeset_func {
 
  public:
   Item_nodeset_func_axisbyname(Item *a, const char *n_arg, uint l_arg,
-                               const ParsedXML &pxml, const CHARSET_INFO *cs)
-      : Item_nodeset_func(a, pxml, cs), node_name(n_arg), node_namelen(l_arg) {}
+                               const ParsedXML &pxml_arg,
+                               const CHARSET_INFO *cs)
+      : Item_nodeset_func(a, pxml_arg, cs),
+        node_name(n_arg),
+        node_namelen(l_arg) {}
   const char *func_name() const override { return "xpath_axisbyname"; }
   bool validname(const MY_XML_NODE &n) const {
     if (node_name[0] == '*') return true;
@@ -236,8 +241,9 @@ class Item_nodeset_func_axisbyname : public Item_nodeset_func {
 class Item_nodeset_func_selfbyname : public Item_nodeset_func_axisbyname {
  public:
   Item_nodeset_func_selfbyname(Item *a, const char *n_arg, uint l_arg,
-                               const ParsedXML &pxml, const CHARSET_INFO *cs)
-      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml, cs) {}
+                               const ParsedXML &pxml_arg,
+                               const CHARSET_INFO *cs)
+      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml_arg, cs) {}
   const char *func_name() const override { return "xpath_selfbyname"; }
   void val_nodeset(XPathFilter *nodeset) const override;
 };
@@ -246,8 +252,9 @@ class Item_nodeset_func_selfbyname : public Item_nodeset_func_axisbyname {
 class Item_nodeset_func_childbyname : public Item_nodeset_func_axisbyname {
  public:
   Item_nodeset_func_childbyname(Item *a, const char *n_arg, uint l_arg,
-                                const ParsedXML &pxml, const CHARSET_INFO *cs)
-      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml, cs) {}
+                                const ParsedXML &pxml_arg,
+                                const CHARSET_INFO *cs)
+      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml_arg, cs) {}
   const char *func_name() const override { return "xpath_childbyname"; }
   void val_nodeset(XPathFilter *nodeset) const override;
 };
@@ -258,9 +265,9 @@ class Item_nodeset_func_descendantbyname : public Item_nodeset_func_axisbyname {
 
  public:
   Item_nodeset_func_descendantbyname(Item *a, const char *n_arg, uint l_arg,
-                                     const ParsedXML &pxml,
+                                     const ParsedXML &pxml_arg,
                                      const CHARSET_INFO *cs, bool need_self_arg)
-      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml, cs),
+      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml_arg, cs),
         need_self(need_self_arg) {}
   const char *func_name() const override { return "xpath_descendantbyname"; }
   void val_nodeset(XPathFilter *nodeset) const override;
@@ -272,9 +279,9 @@ class Item_nodeset_func_ancestorbyname : public Item_nodeset_func_axisbyname {
 
  public:
   Item_nodeset_func_ancestorbyname(Item *a, const char *n_arg, uint l_arg,
-                                   const ParsedXML &pxml,
+                                   const ParsedXML &pxml_arg,
                                    const CHARSET_INFO *cs, bool need_self_arg)
-      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml, cs),
+      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml_arg, cs),
         need_self(need_self_arg) {}
   const char *func_name() const override { return "xpath_ancestorbyname"; }
   void val_nodeset(XPathFilter *nodeset) const override;
@@ -284,8 +291,9 @@ class Item_nodeset_func_ancestorbyname : public Item_nodeset_func_axisbyname {
 class Item_nodeset_func_parentbyname : public Item_nodeset_func_axisbyname {
  public:
   Item_nodeset_func_parentbyname(Item *a, const char *n_arg, uint l_arg,
-                                 const ParsedXML &pxml, const CHARSET_INFO *cs)
-      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml, cs) {}
+                                 const ParsedXML &pxml_arg,
+                                 const CHARSET_INFO *cs)
+      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml_arg, cs) {}
   const char *func_name() const override { return "xpath_parentbyname"; }
   void val_nodeset(XPathFilter *nodeset) const override;
 };
@@ -294,9 +302,9 @@ class Item_nodeset_func_parentbyname : public Item_nodeset_func_axisbyname {
 class Item_nodeset_func_attributebyname : public Item_nodeset_func_axisbyname {
  public:
   Item_nodeset_func_attributebyname(Item *a, const char *n_arg, uint l_arg,
-                                    const ParsedXML &pxml,
+                                    const ParsedXML &pxml_arg,
                                     const CHARSET_INFO *cs)
-      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml, cs) {}
+      : Item_nodeset_func_axisbyname(a, n_arg, l_arg, pxml_arg, cs) {}
   const char *func_name() const override { return "xpath_attributebyname"; }
   void val_nodeset(XPathFilter *nodeset) const override;
 };
@@ -312,10 +320,10 @@ class Item_nodeset_func_predicate : public Item_nodeset_func {
   Item_nodeset_context_cache *m_context_cache;
 
  public:
-  Item_nodeset_func_predicate(Item *a, Item *b, const ParsedXML &pxml,
+  Item_nodeset_func_predicate(Item *a, Item *b, const ParsedXML &pxml_arg,
                               const CHARSET_INFO *cs,
                               Item_nodeset_context_cache *context_cache)
-      : Item_nodeset_func(a, b, pxml, cs), m_context_cache(context_cache) {}
+      : Item_nodeset_func(a, b, pxml_arg, cs), m_context_cache(context_cache) {}
   const char *func_name() const override { return "xpath_predicate"; }
   void val_nodeset(XPathFilter *nodeset) const override;
 };
@@ -325,10 +333,10 @@ class Item_nodeset_func_elementbyindex : public Item_nodeset_func {
   Item_nodeset_context_cache *m_context_cache;
 
  public:
-  Item_nodeset_func_elementbyindex(Item *a, Item *b, const ParsedXML &pxml,
+  Item_nodeset_func_elementbyindex(Item *a, Item *b, const ParsedXML &pxml_arg,
                                    const CHARSET_INFO *cs,
                                    Item_nodeset_context_cache *context_cache)
-      : Item_nodeset_func(a, b, pxml, cs), m_context_cache(context_cache) {}
+      : Item_nodeset_func(a, b, pxml_arg, cs), m_context_cache(context_cache) {}
   const char *func_name() const override { return "xpath_elementbyindex"; }
   void val_nodeset(XPathFilter *nodeset) const override;
 };
@@ -385,8 +393,8 @@ class Item_nodeset_context_cache : public Item_nodeset_func {
   size_t m_size;
 
  public:
-  Item_nodeset_context_cache(const ParsedXML &pxml, const CHARSET_INFO *cs)
-      : Item_nodeset_func(pxml, cs),
+  Item_nodeset_context_cache(const ParsedXML &pxml_arg, const CHARSET_INFO *cs)
+      : Item_nodeset_func(pxml_arg, cs),
         m_is_empty(true),
         m_num(0),
         m_pos(0),
@@ -464,11 +472,10 @@ class Item_func_xpath_sum : public Item_real_func {
         const MY_XML_NODE *node = &pxml->at(j);
         if (node->level <= self->level) break;
         if ((node->parent == flt.num) && (node->type == MY_XML_NODE_TEXT)) {
-          char *end;
+          const char *end;
           int err;
-          double add =
-              my_strntod(collation.collation, const_cast<char *>(node->beg),
-                         node->end - node->beg, &end, &err);
+          double add = my_strntod(collation.collation, node->beg,
+                                  node->end - node->beg, &end, &err);
           if (!err) sum += add;
         }
       }
@@ -513,9 +520,10 @@ class Item_nodeset_to_const_comparator final : public Item_bool_func {
     return 0;
   }
 
-  bool check_function_as_value_generator(uchar *args) override {
+  bool check_function_as_value_generator(uchar *checker_args) override {
     auto *func_arg =
-        pointer_cast<Check_function_as_value_generator_parameters *>(args);
+        pointer_cast<Check_function_as_value_generator_parameters *>(
+            checker_args);
     func_arg->banned_function_name = func_name();
     return true;
   }
@@ -2179,7 +2187,6 @@ static int my_xpath_parse_QName(MY_XPATH *xpath) {
 */
 
 static int my_xpath_parse_VariableReference(MY_XPATH *xpath) {
-  LEX_STRING name;
   int user_var;
   const char *dollar_pos;
   if (!my_xpath_parse_term(xpath, MY_XPATH_LEX_DOLLAR) ||
@@ -2189,19 +2196,20 @@ static int my_xpath_parse_VariableReference(MY_XPATH *xpath) {
        !my_xpath_parse_term(xpath, MY_XPATH_LEX_IDENT)))
     return 0;
 
-  name.length = xpath->prevtok.end - xpath->prevtok.beg;
-  name.str = const_cast<char *>(xpath->prevtok.beg);
+  size_t name_length = xpath->prevtok.end - xpath->prevtok.beg;
+  const char *name_str = xpath->prevtok.beg;
 
   if (user_var)
-    xpath->item = new Item_func_get_user_var(Name_string(name, false));
+    xpath->item =
+        new Item_func_get_user_var(Name_string(name_str, name_length, false));
   else {
     sp_variable *spv;
     sp_pcontext *spc;
     LEX *lex;
     if ((lex = current_thd->lex) && (spc = lex->get_sp_current_parsing_ctx()) &&
-        (spv = spc->find_variable(name, false))) {
-      Item_splocal *splocal =
-          new Item_splocal(Name_string(name, false), spv->offset, spv->type, 0);
+        (spv = spc->find_variable(name_str, name_length, false))) {
+      Item_splocal *splocal = new Item_splocal(
+          Name_string(name_str, name_length, false), spv->offset, spv->type, 0);
 #ifndef DBUG_OFF
       if (splocal) splocal->m_sp = lex->sphead;
 #endif
@@ -2300,10 +2308,11 @@ bool Item_xml_str_func::resolve_type(THD *) {
 }
 
 bool Item_xml_str_func::parse_xpath(Item *xpath_expr) {
-  String *xp, tmp;
+  String *xp;
   MY_XPATH xpath;
 
-  if (!(xp = xpath_expr->val_str(&tmp))) return current_thd->is_error();
+  if (!(xp = xpath_expr->val_str(&xpath_tmp_value)))
+    return current_thd->is_error();
 
   my_xpath_init(&xpath);
   xpath.cs = collation.collation;

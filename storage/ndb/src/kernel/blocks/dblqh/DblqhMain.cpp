@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -36,7 +36,6 @@
 #include <signaldata/CopyFrag.hpp>
 #include <signaldata/CreateTrigImpl.hpp>
 #include <signaldata/DropTrigImpl.hpp>
-#include <signaldata/EmptyLcp.hpp>
 #include <signaldata/EventReport.hpp>
 #include <signaldata/ExecFragReq.hpp>
 #include <signaldata/GCP.hpp>
@@ -112,9 +111,23 @@ extern EventLogger * g_eventLogger;
 //#define DEBUG_GCP 1
 //#define DEBUG_CUT_REDO 1
 //#define DEBUG_LOCAL_LCP 1
-//#define DEBUG_LOCAL_LCP_EXTRA
-//#define DEBUG_REDO_FLAG
-//#define DEBUG_TRANSACTION_TIMEOUT
+//#define DEBUG_LOCAL_LCP_EXTRA 1
+//#define DEBUG_REDO_FLAG 1
+//#define DEBUG_TRANSACTION_TIMEOUT 1
+//#define DEBUG_SCHEMA_VERSION 1
+#endif
+#define DEBUG_EARLY_LCP 1
+
+#ifdef DEBUG_EARLY_LCP
+#define DEB_EARLY_LCP(arglist) do { g_eventLogger->info arglist ; } while (0)
+#else
+#define DEB_EARLY_LCP(arglist) do { } while (0)
+#endif
+
+#ifdef DEBUG_SCHEMA_VERSION
+#define DEB_SCHEMA_VERSION(arglist) do { g_eventLogger->info arglist ; } while (0)
+#else
+#define DEB_SCHEMA_VERSION(arglist) do { } while (0)
 #endif
 
 #ifdef DEBUG_EXTRA_LCP
@@ -857,7 +870,7 @@ void Dblqh::execSTTOR(Signal* signal)
     init_elapsed_time(signal, c_latestTIME_SIGNAL);
     sendsttorryLab(signal);
     break;
-  case 49:
+  case 9:
     jam();
     /**
      * We add this wait phase to avoid having to handle multiple
@@ -872,26 +885,23 @@ void Dblqh::execSTTOR(Signal* signal)
     ndbrequire(cstartRecReq == SRR_FIRST_LCP_DONE);
     if (is_first_instance())
     {
-      if (c_outstanding_write_local_sysfile)
-      {
-        jam();
-        c_start_phase_49_waiting = true;
-        DEB_LCP(("(%u)Start phase 49 wait started", instance()));
-        return;
-      }
-    }
-    sendsttorryLab(signal);
-    return;
-  case 50:
-    jam();
-    if (is_first_instance())
-    {
-      jam();
-      write_local_sysfile_restart_complete(signal);
+      c_start_phase_9_waiting = true;
+      /**
+       * Restart is completed, we need to wait until this has been
+       * reflected in the local sysfile. It becomes reflected in
+       * local sysfile in the next processing of GCP_SAVEREQ. This
+       * avoids complex interaction handling of writes to the
+       * local sysfile.
+       */
+      DEB_LCP(("(%u)Start phase 9 wait started", instance()));
     }
     else
     {
       jam();
+      /**
+       * Restart is done, record this fact and move on in restart
+       * processing.
+       */
       write_local_sysfile_restart_complete_done(signal);
     }
     return;
@@ -905,21 +915,11 @@ void Dblqh::execSTTOR(Signal* signal)
 }//Dblqh::execSTTOR()
 
 void
-Dblqh::check_start_phase_49_waiting(Signal *signal)
-{
-  if (c_start_phase_49_waiting)
-  {
-    jam();
-    c_start_phase_49_waiting = false;
-    DEB_LCP(("(%u)Start phase 49 wait completed", instance()));
-    sendsttorryLab(signal);
-  }
-}
-void
 Dblqh::write_local_sysfile_restart_complete_done(Signal *signal)
 {
   cstartPhase = ZNIL;
   cstartType = ZNIL;
+  c_start_phase_9_waiting = false;
   sendsttorryLab(signal);
 }
 
@@ -953,16 +953,26 @@ Dblqh::define_backup(Signal* signal)
   req->clientRef = 0;
   req->clientData = 0;
   req->senderRef = reference();
+  req->masterRef = reference();
   req->backupPtr = 0;
   req->backupKey[0] = 0;
   req->backupKey[1] = 0;
-  req->nodes.clear();
-  req->nodes.set(getOwnNodeId());
   req->backupDataLen = ~0;
 
+  NdbNodeBitmask nodes;
+  nodes.set(getOwnNodeId());
+
   BlockReference backupRef = calcInstanceBlockRef(BACKUP);
-  sendSignal(backupRef, GSN_DEFINE_BACKUP_REQ, signal, 
-	     DefineBackupReq::SignalLength, JBB);
+  Uint32 packed_length = nodes.getPackedLengthInWords();
+
+  // Backup is not allowed for mixed versions of data nodes
+  ndbrequire(ndbd_send_node_bitmask_in_section(getNodeInfo(refToNode(backupRef)).m_version));
+
+  LinearSectionPtr lsptr[3];
+  lsptr[0].p = nodes.rep.data;
+  lsptr[0].sz = packed_length;
+  sendSignal(backupRef, GSN_DEFINE_BACKUP_REQ, signal,
+       DefineBackupReq::SignalLength_v1, JBB, lsptr, 1);
 }
 
 void
@@ -1015,8 +1025,12 @@ void Dblqh::execNDB_STTOR(Signal* signal)
   switch (cstartPhase) {
   case ZSTART_PHASE1:
     jam();
+    /* Which bits in request info should 'pass through' replicas */
     preComputedRequestInfoMask = 0;
-    LqhKeyReq::setKeyLen(preComputedRequestInfoMask, LqhKeyReq::RI_KEYLEN_MASK);
+    // Dont setDisableFkconstraints - handled on primary
+    LqhKeyReq::setNoTriggersFlag(preComputedRequestInfoMask, 1);
+    LqhKeyReq::setUtilFlag(preComputedRequestInfoMask, 1);
+    // Dont setNoWaitFlag - handled on primary
     LqhKeyReq::setLastReplicaNo(preComputedRequestInfoMask, LqhKeyReq::RI_LAST_REPL_MASK);
     // Dont LqhKeyReq::setApplicationAddressFlag
     LqhKeyReq::setDirtyFlag(preComputedRequestInfoMask, 1);
@@ -1359,14 +1373,25 @@ void Dblqh::execREAD_NODESCONF(Signal* signal)
   ReadNodesConf * const readNodes = (ReadNodesConf *)&signal->theData[0];
   cnoOfNodes = readNodes->noOfNodes;
 
+  {
+    ndbrequire(signal->getNoOfSections() == 1);
+    SegmentedSectionPtr ptr;
+    SectionHandle handle(this, signal);
+    handle.getSection(ptr, 0);
+    ndbrequire(ptr.sz == 5 * NdbNodeBitmask::Size);
+    copy((Uint32*)&readNodes->definedNodes.rep.data, ptr);
+    releaseSections(handle);
+  }
+
   unsigned ind = 0;
   unsigned i = 0;
   for (i = 1; i < MAX_NDB_NODES; i++) {
     jam();
-    if (NdbNodeBitmask::get(readNodes->allNodes, i)) {
+    if (readNodes->definedNodes.get(i))
+    {
       jam();
       cnodeData[ind]    = i;
-      cnodeStatus[ind]  = NdbNodeBitmask::get(readNodes->inactiveNodes, i);
+      cnodeStatus[ind]  = readNodes->inactiveNodes.get(i);
 
       {
         HostRecordPtr Thostptr;
@@ -1376,7 +1401,7 @@ void Dblqh::execREAD_NODESCONF(Signal* signal)
       }
 
       //readNodes->getVersionId(i, readNodes->theVersionIds) not used
-      if (!NodeBitmask::get(readNodes->inactiveNodes, i))
+      if (!readNodes->inactiveNodes.get(i))
       {
 	jam();
 	m_sr_nodes.set(i);
@@ -1456,11 +1481,10 @@ void Dblqh::sendsttorryLab(Signal* signal)
   signal->theData[4] = 3;
   signal->theData[5] = 4;
   signal->theData[6] = 6;
-  signal->theData[7] = 49;
-  signal->theData[8] = 50;
-  signal->theData[9] = 255;
+  signal->theData[7] = 9;
+  signal->theData[8] = 255;
   BlockReference cntrRef = !isNdbMtLqh() ? NDBCNTR_REF : DBLQH_REF;
-  sendSignal(cntrRef, GSN_STTORRY, signal, 10, JBB);
+  sendSignal(cntrRef, GSN_STTORRY, signal, 9, JBB);
   return;
 }//Dblqh::sendsttorryLab()
 
@@ -1790,11 +1814,19 @@ Dblqh::execCREATE_TAB_REQ(Signal* signal)
   addfragptr.p->m_createTabReq = *req;
   req = &addfragptr.p->m_createTabReq;
 
+  DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = ADD_TABLE_ONGOING",
+                      instance(),
+                      tabptr.i));
   tabptr.p->tableStatus = Tablerec::ADD_TABLE_ONGOING;
   tabptr.p->tableType = req->tableType;
+  tabptr.p->m_addfragptr_i = RNIL;
   tabptr.p->primaryTableId = (req->primaryTableId == RNIL ? tabptr.i :
                               req->primaryTableId);
   tabptr.p->schemaVersion = req->tableVersion;
+  DEB_SCHEMA_VERSION(("(%u)tab(%u): %u tableStatus = ADD_TABLE_ONGOING",
+                      instance(),
+                      tabptr.p->schemaVersion,
+                      tabptr.i));
   tabptr.p->m_disk_table= 0;
 
   addfragptr.p->addfragStatus = AddFragRecord::WAIT_TUP;
@@ -1856,6 +1888,7 @@ Dblqh::execCREATE_TAB_REF(Signal* signal)
   sendSignal(addfragptr.p->m_createTabReq.senderRef,
              GSN_CREATE_TAB_REF, signal, CreateTabConf::SignalLength, JBB);
 
+  
   releaseAddfragrec(signal);
 }
 
@@ -2219,14 +2252,27 @@ Uint32 Dblqh::getCreateSchemaVersion(Uint32 tableId)
   TablerecPtr tabPtr;
   tabPtr.i = tableId;
   ptrCheckGuard(tabPtr, ctabrecFileSize, tablerec);
-  if (tabPtr.p->tableStatus == Tablerec::TABLE_DEFINED)
+  Uint32 schemaVersion;
+  if (tabPtr.p->tableStatus == Tablerec::TABLE_DEFINED ||
+      tabPtr.p->tableStatus == Tablerec::TABLE_READ_ONLY)
   {
-    return (tabPtr.p->schemaVersion & 0xFFFFFF);
+    schemaVersion = (tabPtr.p->schemaVersion & 0xFFFFFF);
   }
   else
   {
-    return 0;
+    schemaVersion = 0;
   }
+#ifdef DEBUG_SCHEMA_VERSION
+  if (schemaVersion == 0)
+  {
+    g_eventLogger->info("(%u) table: %u, schemaVersion: %u, tableStatus: %u",
+                        instance(),
+                        tableId,
+                        tabPtr.p->schemaVersion,
+                        tabPtr.p->tableStatus);
+  }
+#endif
+  return schemaVersion;
 }
 
 void Dblqh::execLQHFRAGREQ(Signal* signal)
@@ -2550,7 +2596,234 @@ Dblqh::sendAddFragReq(Signal* signal)
 /* ************************************************************************>> */
 /*  TAB_COMMITREQ: Commit the new table for use in transactions. Sender DICT. */
 /* ************************************************************************>> */
-void Dblqh::execTAB_COMMITREQ(Signal* signal) 
+void Dblqh::insert_new_fragments_into_lcp(Signal *signal)
+{
+  /**
+   * When a disk data table is recovered its recovery will start by executing
+   * the UNDO. The idea is that each fragment LCP records the LCP identity
+   * that the fragment LCP will assist to restore. This means that the UNDO
+   * log will at least be executed until the UNDO log record indicating the
+   * start of this LCP id is found in the UNDO log. If no LCP have yet been
+   * executed the UNDO log will be executed until the beginning of the UNDO
+   * log.
+   *
+   * Thus we are safe that all UNDO logs will be executed to restore exactly
+   * the page state at the moment the checkpoint was started. The LCP code in
+   * the BACKUP block ensures that for each fragment LCP this is a well
+   * defined time to ensure that the disk data record is synchronized with the
+   * in-memory records. In particular this refers to the pointers from disk
+   * data record to in-memory record and pointer from in-memory record to disk
+   * data record.
+   *
+   * When a crash occurs and there is no fragment LCP yet executed for the
+   * table we have a some what more complicated problem to handle. In this
+   * case we want to UNDO everything until the table was created.
+   *
+   * If we do nothing special we cannot trust that the UNDO log is executed
+   * to this point. As an example we could be creating the table while LCP
+   * 14 is ongoing. However since the table didn't exist when LCP 14 was
+   * started in the master DIH, there will not be any LCP_FRAG_ORD sent to
+   * execute this fragment LCP. This means that the first LCP the table will
+   * participate in is LCP 15.
+   *
+   * Now if the node crashes when all fragment LCPs from LCP 14 have completed
+   * but not all of them have completed LCP 15 we are still safe since at least
+   * one fragment LCP will require restore from LCP 14. Since the table was
+   * created after the start of LCP 14 we know that the UNDO log execution will
+   * undo all rows inserted since the table was created.
+   *
+   * However one case exists that we cannot handle. This is when all fragment
+   * LCPs have completed  LCP 15 except the fragment LCPs of the new table.
+   *
+   * This is not necessarily a rare event since the new table is likely to get
+   * the highest table id of all tables and thus its fragment LCPs are executed
+   * after all other fragment LCPs have completed.
+   *
+   * There are many ways to solve this problem. One problem would be to ensure
+   * that a fragment LCP has been executed before the API users are allowed to
+   * execute any writes to the table.
+   *
+   * Another approach would be to know that all extents belonging to the table
+   * must be returned at recovery and thus ensuring that we create an empty
+   * set of disk data records which is the desired outcome.
+   *
+   * None of those approaches are well suited to the current code in NDB, they
+   * would both require substantial changes to the LCP code and UNDO log
+   * recovery code.
+   *
+   * The approach we have followed here is to ensure that the LCP is started
+   * from LQH independent of when DIH decides to start it. This approach is
+   * well aligned with the current development that makes LCPs more and more
+   * local to LQH. LQH already maintains a queue of fragments to execute
+   * fragment LCPs on.
+   *
+   * So the basic idea of our approach is to insert the fragment into the
+   * queue of fragment LCPs. By so doing the above problem is no longer an
+   * issue since we will execute the first fragment LCP already in LCP 14
+   * and thus there is no chance that we can find ourself in the situation
+   * described above.
+   *
+   * So now we need to describe a proof that our approach works.
+   * The basis of this proof is to consider how the insert into the LCP
+   * fragment queue is handled dependent on the progress of the LCPs.
+   *
+   * Case 1:
+   * We create the table during execution of an LCP, say for example LCP 14.
+   * We will insert the table last in the LCP fragment queue in this
+   * function. This function is called from execTAB_COMMITREQ, this signal
+   * is called before any write operation can start against the table.
+   *
+   * We conclude that since we insert the fragment into the LCP queue before
+   * the LCP 14 is completed we know that the first fragment LCP of the new
+   * table will happen in LCP 14. Thus recovery after LCP 15 have started is
+   * trivial since there will a fragment LCP to restore.
+   *
+   * Thus the only case to consider is when the node crashes before the
+   * fragment LCP has been made restorable. This happens before LCP 14 is
+   * completed and thus any recovery will at least execute UNDO log records
+   * until the start of LCP 14.
+   *
+   * One exception is that some fragment LCP might even require execution of
+   * UNDO log records back to LCP 13 (or beginning of UNDO log if LCP 14 was
+   * the first LCP in the UNDO log).
+   *
+   * Another very rare exception is that during recovery the new table is the
+   * only fragment to restore (or that all fragments are new fragments
+   * without an LCP to execute). This can happen in nodes added where not
+   * even SYSTAB_0 is available.
+   *
+   * In this special case the LCP id that we will execute UNDO log unto is
+   * LCP (0,0). There is a rare case that could cause issues here. This is
+   * when we have had older tables that made us fill the UNDO log at least
+   * once. In this case we might execute the UNDO log and never find the
+   * UNDO log record referring to the end of the UNDO log and neither will
+   * we find the LCP record of the LCP (0,0).
+   *
+   * In this we get the LCP identity from DIH by using SYSFILE->latestLCP_ID.
+   * If SYSFILE->latestLCP_ID is 15 it means that LCP 14 was fully completed
+   * before the crash. It is important that we grab the SYSFILE->latestLCP_ID
+   * from the local node and not from the master DIH. This number is sent to
+   * NDBCNTR in the early phases. We make sure that this LCP id is also
+   * present in DBLQH to handle this rare special case.
+   *
+   * If NDBCNTR reports this number as 15, we know that LCP 14 was fully
+   * completed before the crash. The only reason why LCP 14 might not be fully
+   * completed is if we had a cluster restart that failed, but in that case we
+   * have completed executing the UNDO log fully before we crashed the cluster
+   * restart. Thus there will be no UNDO log execution required at all in this
+   * case for the new tables since they have already been undone.
+   *
+   * Thus we have proven that with those two extra measures, first to insert
+   * the fragment into the LCP queue before the CREATE TABLE completes and
+   * by ensuring that DBLQH receives the latest LCP id we are sure that the
+   * UNDO recovery of the new table will be performed in a correct manner.
+   *
+   * Case 2:
+   * The second option is that the table is created after an LCP has
+   * completed and before the next LCP has started.
+   *
+   * In this case we need to ensure that the fragment LCPs are not
+   * executed at the end of the LCP. This comes natural by inserting
+   * them into the LCP queue before any other fragment has been
+   * inserted into the LCP queue.
+   *
+   * However we need another step to be safe in this case. The problem
+   * here is that checkpoints are not completed one at a time, they are
+   * executed in parallel. Especially the next fragment LCP is executed
+   * while earlier fragment LCPs are still waiting for the UNDO log to
+   * be written up to a certain LSN.
+   *
+   * To handle this in a safe we introduce a synchronisation point. All
+   * fragment LCPs that are inserted when no LCP was ongoing are first
+   * in the queue of fragment scheduled to execute an LCP. We introduce
+   * a new signal that ensures that all of those fragment LCPs are
+   * completed before we start with any fragment LCPs requested by DIH.
+   *
+   * This method ensures that the fragment LCPs for new tables are not
+   * placed at the end of the LCP, rather it is placed even before any
+   * other fragment LCP is executed. Thus a stronger condition than
+   * required, but certainly strong enough.
+   *
+   * With this we are safe that if the table is created between LCP
+   * 14 and 15, then the table have been checkpointed if any normal
+   * table has its LCP executed for LCP 15. Thus we know that if
+   * the recovery has a new table without a fragment LCP, then we know
+   * that no fragment LCP has been executed in LCP 15. Thus we are
+   * certain that the UNDO log will be executed back to the start of
+   * LCP 14.
+   *
+   * Again the same reasoning as above on Case 1: also applies to
+   * Case 2: when it comes to the case of no fragment with any
+   * LCP executed on it.
+   *
+   * Thus we have proven the thesis that disk data recovery will be
+   * ok for new table fragments that haven't executed their first LCP
+   * at a node restart.
+   *
+   * A new table have been created. We must ensure that the table is
+   * inserted into the list of waiting LCPs. The
+   * m_create_table_flag_lcp_frag_ord indicates that there is no LCP_FRAG_ORD
+   * outstanding for this fragment. The fragment is new and it should not be
+   * possible for it to be part of any checkpoint yet. It will not be executed
+   * until a checkpoint is started.
+   *
+   * m_create_table_insert_lcp indicates that this checkpoint requested has
+   * been requested by a table creation. This only needs to be signalled when
+   * no LCP is ongoing at the time when it is inserted. It is used to ensure
+   * that the set of checkpoints on new tables between LCPs are executed AND
+   * completed before any other checkpoints on any other fragments are
+   * performed as described above.
+   */
+  lcpPtr.i = 0;
+  ptrCheckGuard(lcpPtr, clcpFileSize, lcpRecord);
+  for (Uint32 i = 0; i < NDB_ARRAY_SIZE(tabptr.p->fragid); i++)
+  {
+    FragrecordPtr curr_fragptr;
+    curr_fragptr.i = tabptr.p->fragrec[i];
+    if (curr_fragptr.i != RNIL)
+    {
+      jam();
+      c_fragment_pool.getPtr(curr_fragptr);
+      jamLine(Uint16(curr_fragptr.p->fragId));
+      ndbrequire(curr_fragptr.p->lcp_frag_ord_state ==
+                 Fragrecord::LCP_EXECUTED);
+      curr_fragptr.p->m_create_table_flag_lcp_frag_ord = true;
+      curr_fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_QUEUED;
+
+      DEB_EARLY_LCP(("(%u)Create table tab(%u,%u), insert into LCP, "
+                     "LCP running: %u",
+                     instance(),
+                     curr_fragptr.p->tabRef,
+                     curr_fragptr.p->fragId,
+                     clcpCompletedState == LCP_RUNNING));
+
+      c_queued_lcp_frag_ord.addLast(curr_fragptr);
+      if (clcpCompletedState != LCP_RUNNING)
+      {
+        jam();
+        curr_fragptr.p->m_create_table_insert_lcp = true;
+      }
+      else
+      {
+        jam();
+        /**
+         * It is possible that we have received all LCP_FRAG_ORD except
+         * the last one containing lastFragmentFlag. Thus it is vital to
+         * ensure that we kick-start the next fragment checkpoint here if
+         * there is no LCP being neither prepared nor running.
+         */
+        if (is_lcp_idle(lcpPtr.p))
+        {
+          jam();
+          ndbrequire(lcpPtr.p->lastFragmentFlag == false);
+          prepare_next_fragment_checkpoint(signal, false);
+        }
+      }
+    }
+  }
+}
+
+void Dblqh::execTAB_COMMITREQ(Signal* signal)
 {
   jamEntry();
   Uint32 dihPtr = signal->theData[0];
@@ -2580,9 +2853,18 @@ void Dblqh::execTAB_COMMITREQ(Signal* signal)
     ndbabort();
     return;
   }//if
+  if (cstartPhase == ZNIL &&
+      !DictTabInfo::isOrderedIndex(tabptr.p->tableType))
+  {
+    jam();
+    insert_new_fragments_into_lcp(signal);
+  }
   tabptr.p->usageCountR = 0;
   tabptr.p->usageCountW = 0;
   tabptr.p->tableStatus = Tablerec::TABLE_DEFINED;
+  DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = TABLE_DEFINED",
+                      instance(),
+                      tabptr.i));
   signal->theData[0] = dihPtr;
   signal->theData[1] = cownNodeid;
   signal->theData[2] = tabptr.i;
@@ -2832,6 +3114,9 @@ Dblqh::execPREP_DROP_TAB_REQ(Signal* signal){
   }
   
   tabPtr.p->tableStatus = Tablerec::PREP_DROP_TABLE_DONE;
+  DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = PREP_DROP_TABLE_DONE",
+                      instance(),
+                      tabPtr.i));
   
   PrepDropTabConf * conf = (PrepDropTabConf*)signal->getDataPtrSend();
   conf->tableId = tabPtr.i;
@@ -2873,8 +3158,7 @@ Dblqh::dropTab_wait_usage(Signal* signal){
   bool lcpDone = true;
   lcpPtr.i = 0;
   ptrAss(lcpPtr, lcpRecord);
-  if(lcpPtr.p->lcpPrepareState != LcpRecord::LCP_IDLE ||
-     lcpPtr.p->lcpRunState != LcpRecord::LCP_IDLE)
+  if (!is_lcp_idle(lcpPtr.p))
   {
     jam();
 
@@ -2903,15 +3187,26 @@ Dblqh::dropTab_wait_usage(Signal* signal){
           jam();
           CLEAR_ERROR_INSERT_VALUE;
           c_queued_lcp_frag_ord.remove(loc_fragptr);
-
-          fragOrd.lcpFragOrd.lcpNo = loc_fragptr.p->lcp_frag_ord_lcp_no;
-          fragOrd.lcpFragOrd.lcpId = loc_fragptr.p->lcp_frag_ord_lcp_id;
-          fragOrd.lcpFragOrd.fragmentId = loc_fragptr.p->fragId;
-          fragOrd.lcpFragOrd.tableId = loc_fragptr.p->tabRef;
-
           loc_fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTED;
 
-          sendLCP_FRAG_REP(signal, fragOrd, loc_fragptr.p);
+          if (!loc_fragptr.p->m_create_table_flag_lcp_frag_ord)
+          {
+            jam();
+            fragOrd.lcpFragOrd.lcpNo = loc_fragptr.p->lcp_frag_ord_lcp_no;
+            fragOrd.lcpFragOrd.lcpId = loc_fragptr.p->lcp_frag_ord_lcp_id;
+            fragOrd.lcpFragOrd.fragmentId = loc_fragptr.p->fragId;
+            fragOrd.lcpFragOrd.tableId = loc_fragptr.p->tabRef;
+            sendLCP_FRAG_REP(signal, fragOrd, loc_fragptr.p);
+          }
+          else
+          {
+            DEB_EARLY_LCP(("(%u)Remove tab(%u,%u) with flag for lcp_frag_ord",
+                           instance(),
+                           loc_fragptr.p->tabRef,
+                           loc_fragptr.p->fragId));
+          }
+          loc_fragptr.p->m_create_table_flag_lcp_frag_ord = false;
+          loc_fragptr.p->m_create_table_insert_lcp = false;
         }
         else if (loc_fragptr.p->lcp_frag_ord_state ==
                  Fragrecord::LCP_EXECUTING)
@@ -2937,10 +3232,36 @@ Dblqh::dropTab_wait_usage(Signal* signal){
       }
     }
   }
-  else if (ERROR_INSERTED(5088) || ERROR_INSERTED(5089))
+  else
   {
-    jam();
-    CLEAR_ERROR_INSERT_VALUE;
+    for (Uint32 i = 0; i < NDB_ARRAY_SIZE(tabPtr.p->fragrec); i++)
+    {
+      loc_fragptr.i = tabPtr.p->fragrec[i];
+      if (loc_fragptr.i != RNIL)
+      {
+        c_fragment_pool.getPtr(loc_fragptr);
+        if (loc_fragptr.p->lcp_frag_ord_state == Fragrecord::LCP_QUEUED)
+        {
+          jam();
+          jamLine(Uint16(loc_fragptr.p->fragId));
+          ndbrequire(loc_fragptr.p->m_create_table_flag_lcp_frag_ord == true);
+          c_queued_lcp_frag_ord.remove(loc_fragptr);
+          loc_fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTED;
+          loc_fragptr.p->m_create_table_flag_lcp_frag_ord = false;
+          loc_fragptr.p->m_create_table_insert_lcp = false;
+          DEB_EARLY_LCP(("(%u)Remove tab(%u,%u) with flag for lcp_frag_ord, "
+                         "No LCP running",
+                         instance(),
+                         loc_fragptr.p->tabRef,
+                         loc_fragptr.p->fragId));
+        }
+      }
+    }
+    if (ERROR_INSERTED(5088) || ERROR_INSERTED(5089))
+    {
+      jam();
+      CLEAR_ERROR_INSERT_VALUE;
+    }
   }
   
   if(!lcpDone)
@@ -2969,13 +3290,28 @@ Dblqh::dropTab_wait_usage(Signal* signal){
     return;
   }
   tabPtr.p->tableStatus = Tablerec::DROP_TABLE_WAIT_DONE;
+  DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = DROP_TABLE_WAIT_DONE",
+                      instance(),
+                      tabPtr.i));
 
-  DropTabConf * conf = (DropTabConf*)signal->getDataPtrSend();
-  conf->tableId = tabPtr.i;
-  conf->senderRef = reference();
-  conf->senderData = senderData;
-  sendSignal(senderRef, GSN_DROP_TAB_CONF, signal,
-	     DropTabConf::SignalLength, JBB);
+  if (tabPtr.p->m_addfragptr_i == RNIL)
+  {
+    jam();
+    DropTabConf * conf = (DropTabConf*)signal->getDataPtrSend();
+    conf->tableId = tabPtr.i;
+    conf->senderRef = reference();
+    conf->senderData = senderData;
+    sendSignal(senderRef, GSN_DROP_TAB_CONF, signal,
+	       DropTabConf::SignalLength, JBB);
+  }
+  else
+  {
+    jam();
+    Ptr<AddFragRecord> addFragPtr;
+    addFragPtr.i = senderData;
+    ptrCheckGuard(addFragPtr, caddfragrecFileSize, addFragRecord);
+    dropTable_nextStep(signal, addFragPtr);
+  }
 }
 
 void
@@ -3018,11 +3354,35 @@ Dblqh::execDROP_TAB_REQ(Signal* signal){
   switch((DropTabReq::RequestType)req->requestType) {
   case DropTabReq::RestartDropTab:
     jam();
-    tabPtr.p->tableStatus = Tablerec::DROP_TABLE_WAIT_DONE;
-    break;
+    // Fall through
   case DropTabReq::CreateTabDrop:
-    jam();
-    tabPtr.p->tableStatus = Tablerec::DROP_TABLE_WAIT_DONE;
+    if (tabPtr.p->tableStatus == Tablerec::TABLE_DEFINED)
+    {
+      jam();
+      ndbrequire(tabPtr.p->usageCountR == 0 && tabPtr.p->usageCountW == 0);
+      seizeAddfragrec(signal);
+      tabPtr.p->m_addfragptr_i = addfragptr.i;
+      addfragptr.p->m_dropTabReq = * req;
+      tabPtr.p->m_informed_backup_drop_tab = false;
+      tabPtr.p->tableStatus = Tablerec::DROP_TABLE_WAIT_USAGE;
+      DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = DROP_TABLE_WAIT_USAGE(2)",
+                          instance(),
+                          tabPtr.i));
+      signal->theData[0] = ZDROP_TABLE_WAIT_USAGE;
+      signal->theData[1] = tabPtr.i;
+      signal->theData[2] = req->senderRef;
+      signal->theData[3] = addfragptr.i;
+      dropTab_wait_usage(signal);
+      return;
+    }
+    else
+    {
+      jam();
+      tabPtr.p->tableStatus = Tablerec::DROP_TABLE_WAIT_DONE;
+      DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = DROP_TABLE_WAIT_DONE(2)",
+                          instance(),
+                          tabPtr.i));
+    }
     break;
   case DropTabReq::OnlineDropTab:
     jam();
@@ -3043,6 +3403,9 @@ Dblqh::execDROP_TAB_REQ(Signal* signal){
       jam();
       tabPtr.p->m_informed_backup_drop_tab = false;
       tabPtr.p->tableStatus = Tablerec::DROP_TABLE_WAIT_USAGE;
+      DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = DROP_TABLE_WAIT_USAGE",
+                          instance(),
+                          tabPtr.i));
       signal->theData[0] = ZDROP_TABLE_WAIT_USAGE;
       signal->theData[1] = tabPtr.i;
       signal->theData[2] = req->senderRef;
@@ -3132,12 +3495,18 @@ Dblqh::dropTable_nextStep(Signal* signal, Ptr<AddFragRecord> addFragPtr)
       jam();
       ref = calcInstanceBlockRef(DBACC);
       tabPtr.p->tableStatus = Tablerec::DROP_TABLE_ACC;
+      DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = DROP_TABLE_ACC",
+                          instance(),
+                          tabPtr.i));
     }
     else
     {
       jam();
       ref = calcInstanceBlockRef(DBTUP);
       tabPtr.p->tableStatus = Tablerec::DROP_TABLE_TUP;
+      DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = DROP_TABLE_TUP",
+                          instance(),
+                          tabPtr.i));
     }
   }
   else if (tabPtr.p->tableStatus == Tablerec::DROP_TABLE_ACC)
@@ -3145,6 +3514,9 @@ Dblqh::dropTable_nextStep(Signal* signal, Ptr<AddFragRecord> addFragPtr)
     jam();
     ref = calcInstanceBlockRef(DBTUP);
     tabPtr.p->tableStatus = Tablerec::DROP_TABLE_TUP;
+    DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = DROP_TABLE_TUP(2)",
+                        instance(),
+                        tabPtr.i));
   }
   else if (tabPtr.p->tableStatus == Tablerec::DROP_TABLE_TUP)
   {
@@ -3154,6 +3526,9 @@ Dblqh::dropTable_nextStep(Signal* signal, Ptr<AddFragRecord> addFragPtr)
       jam();
       ref = calcInstanceBlockRef(DBTUX);
       tabPtr.p->tableStatus = Tablerec::DROP_TABLE_TUX;
+      DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = DROP_TABLE_TUX",
+                          instance(),
+                          tabPtr.i));
     }
   }
 
@@ -3172,7 +3547,11 @@ Dblqh::dropTable_nextStep(Signal* signal, Ptr<AddFragRecord> addFragPtr)
   }
 
   removeTable(tabPtr.i);
+  tabPtr.p->m_addfragptr_i = RNIL;
   tabPtr.p->tableStatus = Tablerec::NOT_DEFINED;
+  DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = NOT_DEFINED",
+                       instance(),
+                       tabPtr.i));
 
   DropTabConf* conf = (DropTabConf*)signal->getDataPtrSend();
   conf->senderRef = reference();
@@ -3218,8 +3597,8 @@ void Dblqh::removeTable(Uint32 tableId)
  *
  * The max record size is used to ensure that the LCP scan have
  * buffer space to receive at least 16 rows with maximum size.
- * This is checked before executing the next SCAN_FRAGREQ, so changing
- * the max record size immediately after receiving SCAN_FRAGCONF
+ * This is checked before executing the next SCAN_NEXTREQ or SCAN_FRAGREQ,
+ * so changing the max record size immediately after receiving SCAN_FRAGCONF
  * is a working solution. This means that at most we have to wait
  * for a scan of 16 rows, so normally the wait here should be very
  * small and practically unnoticeable for all practical purposes.
@@ -3252,6 +3631,11 @@ Dblqh::handleLCPSurfacing(Signal *signal)
   ptrCheckGuard(tablePtr, ctabrecFileSize, tablerec);
 
   tablePtr.p->schemaVersion = newTableVersion;
+  DEB_SCHEMA_VERSION(("(%u)tab(%u): %u tableStatus = %u",
+                      instance(),
+                      tablePtr.p->schemaVersion,
+                      tablePtr.i,
+                      tablePtr.p->tableStatus));
   if (AlterTableReq::getReorgFragFlag(req->changeMask))
   {
     jam();
@@ -3305,6 +3689,11 @@ Dblqh::execALTER_TAB_REQ(Signal* signal)
   case AlterTabReq::AlterTableRevert:
     jam();
     tablePtr.p->schemaVersion = tableVersion;
+    DEB_SCHEMA_VERSION(("(%u)tab(%u): %u tableStatus = %u (2)",
+                        instance(),
+                        tablePtr.p->schemaVersion,
+                        tablePtr.i,
+                        tablePtr.p->tableStatus));
     break;
   case AlterTabReq::AlterTableCommit:
     jam();
@@ -3327,6 +3716,11 @@ Dblqh::execALTER_TAB_REQ(Signal* signal)
       }
     }
     tablePtr.p->schemaVersion = newTableVersion;
+    DEB_SCHEMA_VERSION(("(%u)tab(%u): %u tableStatus = %u (3)",
+                        instance(),
+                        tablePtr.p->schemaVersion,
+                        tablePtr.i,
+                        tablePtr.p->tableStatus));
     if (AlterTableReq::getReorgFragFlag(req->changeMask))
     {
       jam();
@@ -3347,6 +3741,9 @@ Dblqh::execALTER_TAB_REQ(Signal* signal)
     jam();
     ndbrequire(tablePtr.p->tableStatus == Tablerec::TABLE_DEFINED);
     tablePtr.p->tableStatus = Tablerec::TABLE_READ_ONLY;
+    DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = TABLE_READ_ONLY",
+                        instance(),
+                        tablePtr.i));
     signal->theData[0] = ZWAIT_READONLY;
     signal->theData[1] = tablePtr.i;
     signal->theData[2] = senderRef;
@@ -3357,6 +3754,9 @@ Dblqh::execALTER_TAB_REQ(Signal* signal)
     jam();
     ndbrequire(tablePtr.p->tableStatus == Tablerec::TABLE_READ_ONLY);
     tablePtr.p->tableStatus = Tablerec::TABLE_DEFINED;
+    DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = TABLE_DEFINED(2)",
+                        instance(),
+                        tablePtr.i));
     break;
   default:
     ndbabort();
@@ -3601,8 +4001,6 @@ void Dblqh::timer_handling(Signal *signal)
 	 << "   firstLcpLocTup=" << TlcpPtr.p->firstLcpLocTup << endl
 	 << "   lcpAccptr=" << TlcpPtr.p->lcpAccptr << endl
 	 << "   lastFragmentFlag=" << TlcpPtr.p->lastFragmentFlag << endl
-	 << "   reportEmptyref=" << TlcpPtr.p->reportEmptyRef << endl
-	 << "   reportEmpty=" << TlcpPtr.p->reportEmpty << endl;
 #endif
 }//Dblqh::execTIME_SIGNAL()
 
@@ -3654,9 +4052,9 @@ void Dblqh::earlyKeyReqAbort(Signal* signal,
     remove_commit_marker(tcConnectptr.p);
     
     /* Could have long key/attr sections linked */
-    ndbrequire(tcConnectptr.p->m_dealloc == 0);
-    releaseOprec(signal, tcConnectptr.p);
-    
+    ndbrequire(tcConnectptr.p->m_dealloc_state == TcConnectionrec::DA_IDLE);
+    ndbrequire(tcConnectptr.p->m_dealloc_data.m_unused == RNIL);
+    releaseOprec(signal, tcConnectptr);
     
     /* 
      * Free the TcConnectRecord, ensuring that the
@@ -5124,6 +5522,8 @@ void Dblqh::seizeTcrec(TcConnectionrecPtr& tcConnectptr)
   locTcConnectptr.p->tableref = RNIL;
   locTcConnectptr.p->hashIndex = RNIL;
   locTcConnectptr.p->m_committed_log_space = 0;
+  locTcConnectptr.p->m_dealloc_state = TcConnectionrec::DA_IDLE;
+  locTcConnectptr.p->m_dealloc_data.m_unused = RNIL;
 
   ctcNumFree = numFree - 1;
   cfirstfreeTcConrec = nextTc;
@@ -5330,6 +5730,11 @@ static inline Uint32 getProgramWordCount(SegmentedSectionPtr attrInfo)
 /* ------------------------------------------------------------------------- */
 void Dblqh::execLQHKEYREQ(Signal* signal) 
 {
+  if (unlikely(!assembleFragments(signal)))
+  {
+    jam();
+    return;
+  }
   UintR sig0, sig1, sig2, sig3, sig4, sig5;
   Uint8 tfragDistKey;
 
@@ -5576,7 +5981,8 @@ void Dblqh::execLQHKEYREQ(Signal* signal)
   regTcPtr->opSimple      = LqhKeyReq::getSimpleFlag(Treqinfo);
   regTcPtr->seqNoReplica  = LqhKeyReq::getSeqNoReplica(Treqinfo);
   regTcPtr->m_use_rowid   = LqhKeyReq::getRowidFlag(Treqinfo);
-  regTcPtr->m_dealloc     = 0;
+  regTcPtr->m_dealloc_state     = TcConnectionrec::DA_IDLE;
+  regTcPtr->m_dealloc_data.m_dealloc_ref_count = RNIL;
   if (unlikely(senderVersion < NDBD_ROWID_VERSION))
   {
     regTcPtr->operation = op;
@@ -5592,6 +5998,35 @@ void Dblqh::execLQHKEYREQ(Signal* signal)
       (Operation_t) op == ZUNLOCK ? ZREAD : // lockType not relevant for unlock req
       (Operation_t) op;
   }
+  if (LqhKeyReq::getNoWaitFlag(Treqinfo))
+  {
+    /* Check sender version before processing - older versions sent junk */
+    if (likely(isLongReq &&
+               senderVersion >= NDBD_NOWAIT_KEYREQ))
+    {
+      ndbassert(!regTcPtr->dirtyOp);
+      ndbrequire((op == ZREAD) || (op == ZREAD_EX)); // For now
+      regTcPtr->m_flags |= TcConnectionrec::OP_NOWAIT;
+    }
+  }
+#ifdef VM_TRACE
+  if (unlikely(isLongReq &&
+               LqhKeyReq::getLongClearBits(Treqinfo) != 0))
+  {
+    jam();
+    /* Bits set which should not be - definite error on same version */
+    const Uint32 ownVersion = getNodeInfo(getOwnNodeId()).m_version;
+    if (senderVersion == ownVersion)
+    {
+      jam();
+      ndbout_c("Received bad long request info %x from same version node %x %x",
+               Treqinfo,
+               senderVersion,
+               ownVersion);
+      ndbrequire(false);
+    }
+  }
+#endif
 
   if (regTcPtr->dirtyOp)
   {
@@ -5670,6 +6105,7 @@ void Dblqh::execLQHKEYREQ(Signal* signal)
 
   if (isLongReq)
   {
+    jamDebug();
     /* Long LQHKEYREQ indicates Key and AttrInfo presence and
      * size via section lengths
      */
@@ -5703,6 +6139,7 @@ void Dblqh::execLQHKEYREQ(Signal* signal)
   }
   else
   {
+    jamDebug();
     /* Short LQHKEYREQ, Key and Attr sizes are in
      * signal, along with some data
      *
@@ -5739,6 +6176,7 @@ void Dblqh::execLQHKEYREQ(Signal* signal)
   /* Only node restart copy allowed to send no KeyInfo */
   if (unlikely(keyLenWithLQHReq == 0))
   {
+    jamDebug();
     /**
      * Only allowed use case for no primary key is DELETE by ROWID.
      */
@@ -5768,6 +6206,8 @@ void Dblqh::execLQHKEYREQ(Signal* signal)
   regTcPtr->m_row_id.m_page_no = sig0;
   regTcPtr->m_row_id.m_page_idx = sig1;
   nextPos += 2 * LqhKeyReq::getRowidFlag(Treqinfo);
+
+  jamLineDebug(Uint16(nextPos));
 
   sig2 = lqhKeyReq->variableData[nextPos + 0];
   sig3 = cnewestGci;
@@ -6333,6 +6773,8 @@ Dblqh::exec_acckeyreq(Signal* signal, TcConnectionrecPtr regTcPtr)
     taccreq = AccKeyReq::setDirtyOp(taccreq, regTcPtr.p->dirtyOp);
     taccreq = AccKeyReq::setReplicaType(taccreq, regTcPtr.p->replicaType);
     taccreq = AccKeyReq::setTakeOver(taccreq, regTcPtr.p->indTakeOver);
+    taccreq = AccKeyReq::setNoWait(taccreq,
+                                   ((regTcPtr.p->m_flags & TcConnectionrec::OP_NOWAIT) != 0));
     taccreq = AccKeyReq::setLockReq(taccreq, false);
 
     AccKeyReq * const req = reinterpret_cast<AccKeyReq*>(&signal->theData[0]);
@@ -6799,7 +7241,8 @@ Dblqh::nr_copy_delete_row(Signal* signal,
   /**
    * We found row (and have it locked in ACC)
    */
-  ndbrequire(regTcPtr.p->m_dealloc == 0);
+  ndbrequire(regTcPtr.p->m_dealloc_state == TcConnectionrec::DA_IDLE);
+  ndbrequire(regTcPtr.p->m_dealloc_data.m_dealloc_ref_count == RNIL);
   Local_key save = regTcPtr.p->m_row_id;
 
   c_acc->execACCKEY_ORD(signal, accPtr);
@@ -6807,7 +7250,8 @@ Dblqh::nr_copy_delete_row(Signal* signal,
   EXECUTE_DIRECT(ref, GSN_ACC_COMMITREQ, signal, 1);
   jamEntry();
   
-  ndbrequire(regTcPtr.p->m_dealloc == 1);  
+  ndbrequire(regTcPtr.p->m_dealloc_state == TcConnectionrec::DA_DEALLOC_COUNT);
+  ndbrequire(regTcPtr.p->m_dealloc_data.m_dealloc_ref_count == 1);
   int ret = c_tup->nr_delete(signal, regTcPtr.i, 
 			     fragPtr.p->tupFragptr, &regTcPtr.p->m_row_id, 
 			     regTcPtr.p->gci_hi);
@@ -6828,7 +7272,8 @@ Dblqh::nr_copy_delete_row(Signal* signal,
   
   TRACENR("DELETED: " << regTcPtr.p->m_row_id << endl);
   
-  regTcPtr.p->m_dealloc = 0;
+  regTcPtr.p->m_dealloc_state = TcConnectionrec::DA_IDLE;
+  regTcPtr.p->m_dealloc_data.m_dealloc_ref_count = RNIL;
   regTcPtr.p->m_row_id = save;
   fragptr = fragPtr;
 }
@@ -7140,12 +7585,249 @@ void Dblqh::handleUserUnlockRequest(Signal* signal,
   return;
 }
 
+/**
+ * TUPle deallocation
+ *
+ * ACC informs LQH via TUP_DEALLOCREQ when a TUPle (ROWID)
+ * is no longer needed by active ACC operations (Key ops,
+ * scans with locks etc)
+ * LQH then informs TUP via TUP_DEALLOCREQ when TUP should
+ * release the storage, making it available for some other
+ * insert to the fragment.
+ *
+ * It is important that ROWIDs are released on Backup
+ * replicas before the Primary replica.
+ *
+ * To ensure this:
+ *   ACC :
+ *   - Informs LQH of each of the operations involved in releasing
+ *     a ROWID at commit time
+ *   - Informs LQH when the last operation involved in releasing
+ *     a ROWID has committed
+ *
+ *   LQH :
+ *   - Tracks these details as a reference count on one of the
+ *     operations involved in releasing the ROWID (the dealloc op).
+ *   - Marks the other operations to point to the dealloc op
+ *   - Decrements the reference count when :
+ *       - ACC informs LQH that the last involved operation
+ *         has committed
+ *       - Referring operations complete locally
+ *       - The dealloc op completes locally
+ *   - When the reference count hits zero, TUP is told to release
+ *     the row storage
+ *
+ * Using a reference count avoids problems with premature release when
+ * the order of completion of the involved operations varies.
+ *
+ * Since the dealloc operation can complete before the ref count hits
+ * zero, it supports a 'zombie' state where it is not yet deallocated
+ * as it is hosting a count
+ */
+
+/**
+ * incrDeallocRefCount
+ *
+ * Called when ACC notifies LQH of operations involved in TUPle
+ * deallocation
+ */
+void Dblqh::incrDeallocRefCount(Signal* signal,
+                                Uint32 opPtrI,
+                                Uint32 countOpPtrI)
+{
+  jam();
+  ndbrequire(opPtrI != RNIL);
+  ndbrequire(countOpPtrI != RNIL);
+
+  TcConnectionrecPtr opPtr;
+  opPtr.i = opPtrI;
+  ptrCheckGuard(opPtr, ctcConnectrecFileSize, tcConnectionrec);
+
+  TcConnectionrecPtr countOpPtr;
+  countOpPtr.i = countOpPtrI;
+  ptrCheckGuard(countOpPtr, ctcConnectrecFileSize, tcConnectionrec);
+
+  const bool referring_op = (opPtrI != countOpPtrI);
+
+  if (referring_op)
+  {
+    jam();
+    ndbrequire(opPtr.p->m_dealloc_state == TcConnectionrec::DA_IDLE);
+    ndbrequire(opPtr.p->m_dealloc_data.m_dealloc_ref_count == RNIL);
+    opPtr.p->m_dealloc_state = TcConnectionrec::DA_DEALLOC_REFERENCE;
+    opPtr.p->m_dealloc_data.m_dealloc_op_id = countOpPtr.i;
+  }
+
+  if (countOpPtr.p->m_dealloc_state == TcConnectionrec::DA_IDLE)
+  {
+    jam();
+    ndbrequire(countOpPtr.p->m_dealloc_data.m_dealloc_op_id == RNIL);
+
+    // init count to 1 so that final refcount = op count + 1
+    // this ensures that dealloc cannot happen until ACC sends
+    // additional signal to decrement refcount to 0.
+    countOpPtr.p->m_dealloc_state = TcConnectionrec::DA_DEALLOC_COUNT;
+    countOpPtr.p->m_dealloc_data.m_dealloc_ref_count = 1;
+  }
+
+  /* Increment count */
+  ndbrequire(countOpPtr.p->m_dealloc_state == TcConnectionrec::DA_DEALLOC_COUNT ||
+             countOpPtr.p->m_dealloc_state == TcConnectionrec::DA_DEALLOC_COUNT_ZOMBIE);
+  ndbrequire(countOpPtr.p->m_dealloc_data.m_dealloc_ref_count != RNIL);
+
+  countOpPtr.p->m_dealloc_data.m_dealloc_ref_count++;
+}
+
+/**
+ * decrDeallocRefCount
+ *
+ * Called when ACC triggers deallocation, and when involved
+ * operations complete.
+ *
+ * Returns the new count of references on the rowID
+ */
+Uint32 Dblqh::decrDeallocRefCount(Signal* signal,
+                                  Uint32 opPtrI)
+{
+  jam();
+  ndbrequire(opPtrI != RNIL);
+
+  TcConnectionrecPtr opPtr;
+  opPtr.i = opPtrI;
+  ptrCheckGuard(opPtr, ctcConnectrecFileSize, tcConnectionrec);
+
+  TcConnectionrecPtr countOpPtr = opPtr;
+
+  if (opPtr.p->m_dealloc_state == TcConnectionrec::DA_DEALLOC_REFERENCE)
+  {
+    jam();
+    ndbrequire(opPtr.p->m_dealloc_data.m_dealloc_op_id != RNIL);
+    countOpPtr.i = opPtr.p->m_dealloc_data.m_dealloc_op_id;
+    ptrCheckGuard(countOpPtr, ctcConnectrecFileSize, tcConnectionrec);
+  }
+
+  ndbrequire(countOpPtr.p->m_dealloc_state == TcConnectionrec::DA_DEALLOC_COUNT ||
+             countOpPtr.p->m_dealloc_state == TcConnectionrec::DA_DEALLOC_COUNT_ZOMBIE);
+  ndbrequire(countOpPtr.p->m_dealloc_data.m_dealloc_ref_count != RNIL);
+  ndbrequire(countOpPtr.p->m_dealloc_data.m_dealloc_ref_count > 0);
+
+  const Uint32 newCount = --countOpPtr.p->m_dealloc_data.m_dealloc_ref_count;
+
+  if (newCount == 0)
+  {
+    jam();
+    /* Dealloc TUPle now */
+    signal->theData[0] = countOpPtr.p->fragmentid;
+    signal->theData[1] = countOpPtr.p->tableref;
+    signal->theData[2] = countOpPtr.p->m_row_id.m_page_no;
+    signal->theData[3] = countOpPtr.p->m_row_id.m_page_idx;
+    signal->theData[4] = RNIL;
+
+    EXECUTE_DIRECT(DBTUP, GSN_TUP_DEALLOCREQ, signal, 5);
+
+    bool countOpIsZombie =
+      (countOpPtr.p->m_dealloc_state == TcConnectionrec::DA_DEALLOC_COUNT_ZOMBIE);
+
+    countOpPtr.p->m_dealloc_state = TcConnectionrec::DA_IDLE;
+    countOpPtr.p->m_dealloc_data.m_dealloc_ref_count = RNIL;
+
+    if (countOpIsZombie)
+    {
+      jam();
+      /**
+       * Op was not released during COMPLETE because it is a zombie dealloc op
+       * Release it now.
+       */
+      releaseTcrec(signal, countOpPtr);
+    }
+  }
+
+  return newCount;
+}
+
+/**
+ * handleDeallocOp
+ *
+ * Called when LQH is releasing an operation record which has
+ * a non idle m_dealloc_state state
+ *
+ * The relevant counting operation is found, the deallocation
+ * ref count is decremented, the tuple is freed if the count
+ * hits zero, and the counting op is freed if it is a zombie.
+ *
+ * If the counting op is released before the count is zero
+ * it becomes a zombie.
+ */
+void Dblqh::handleDeallocOp(Signal* signal,
+                            TcConnectionrecPtr regTcPtr)
+{
+  jam();
+
+  ndbrequire(regTcPtr.p->m_dealloc_state != TcConnectionrec::DA_IDLE);
+  const bool referringOpReleased =
+    (regTcPtr.p->m_dealloc_state == TcConnectionrec::DA_DEALLOC_REFERENCE);
+
+  const Uint32 newCount = decrDeallocRefCount(signal,
+                                              regTcPtr.i);
+
+  if (referringOpReleased)
+  {
+    jam();
+    regTcPtr.p->m_dealloc_state = TcConnectionrec::DA_IDLE;
+    regTcPtr.p->m_dealloc_data.m_dealloc_op_id = RNIL;
+  }
+  else
+  {
+    jam();
+    // The dealloc op hosts the refcount, so it cannot be released until
+    // the refcount reaches zero. Mark the dealloc op as a zombie op to
+    // prevent its release.
+    if (newCount != 0)
+    {
+      jam();
+      regTcPtr.p->m_dealloc_state = TcConnectionrec::DA_DEALLOC_COUNT_ZOMBIE;
+    }
+  }
+}
+
+/**
+ * execTUP_DEALLOCREQ
+ *
+ * Receive notification from ACC that a TUPle is no longer needed
+ * ACC informs LQH of each operation involved in deallocation
+ * so that LQH can determine when it is safe to ask TUP to release
+ * the storage.
+ *
+ * 2 cases :
+ *   i)  theData[5] != RNIL : Notification(s) of pending deallocation
+ *   ii) theData[5] == RNIL : Deallocation triggered
+ *
+ * For commit, there can be 1 or more invocations of i) followed
+ * by one invocation of ii)
+ *
+ * For abort, there will be 1 invocation of ii)
+ *
+ * From LQH's point of view :
+ * 1) ACC informs LQH of a set of operations involved in deallocating a tuple
+ *   - LQH should not release the tuple before *all* of those operations are
+ *     complete
+ *   - For each tuple + set of operations involved in deallocating it, ACC
+ *     informs LQH of a single designated 'counting op' which is a member of
+ *     the set and which might help LQH track the state of the set + the tuple
+ * 2) ACC requires that LQH does not deallocate the tuple before
+ *    ACC gives permission to do so.
+ * 3) Special case (aborts) : Just a single trigger notification - LQH should
+ *    deallocate on operation completion
+ *
+ * LQH : dealloc_iff (All notified ops complete && Trigger from ACC received)
+ */
 void Dblqh::execTUP_DEALLOCREQ(Signal* signal)
 {
   TcConnectionrecPtr regTcPtr;  
   
   jamEntry();
   regTcPtr.i = signal->theData[4];
+  ptrCheckGuard(regTcPtr, ctcConnectrecFileSize, tcConnectionrec);
   
   if (TRACENR_FLAG)
   {
@@ -7153,36 +7835,52 @@ void Dblqh::execTUP_DEALLOCREQ(Signal* signal)
     tmp.m_page_no = signal->theData[2];
     tmp.m_page_idx = signal->theData[3];
     TRACENR("TUP_DEALLOC: " << tmp << 
-      (signal->theData[5] ? " DIRECT " : " DELAYED") << endl);
+      (signal->theData[5] == RNIL ? " TRIGGER" : " NOTIFICATION") << endl);
   }
+
+  regTcPtr.p->m_row_id.m_page_no = signal->theData[2];
+  regTcPtr.p->m_row_id.m_page_idx = signal->theData[3];
   
-  if (signal->theData[5])
+  if (signal->theData[5] != RNIL)
   {
     jam();
-    Local_key tmp;
-
-    tmp.m_page_no = signal->theData[2];
-    tmp.m_page_idx = signal->theData[3];
-
-    if (ERROR_INSERTED(5712))
-    {
-      ndbout << "TUP_DEALLOC: " << tmp << endl;
-    }
-
-    EXECUTE_DIRECT(DBTUP, GSN_TUP_DEALLOCREQ, signal, signal->getLength());
-    return;
+    /**
+     * Notification of Op involved in deallocation
+     */
+    incrDeallocRefCount(signal,
+                        signal->theData[4],
+                        signal->theData[5]);
   }
   else
   {
     jam();
-    ptrCheckGuard(regTcPtr, ctcConnectrecFileSize, tcConnectionrec);
-    regTcPtr.p->m_row_id.m_page_no = signal->theData[2];
-    regTcPtr.p->m_row_id.m_page_idx = signal->theData[3];
-
-    TRACE_OP(regTcPtr.p, "SET DEALLOC");
-    
-    ndbrequire(regTcPtr.p->m_dealloc == 0);
-    regTcPtr.p->m_dealloc = 1;
+    /**
+     * Deallocation triggered by ACC
+     * Now LQH decides what to do next.
+     */
+    if (regTcPtr.p->m_dealloc_state == TcConnectionrec::DA_IDLE)
+    {
+      jam();
+      /**
+       * ABORT case
+       * Set count to 1 for quick dealloc on complete of this op
+       */
+      ndbrequire(regTcPtr.p->m_dealloc_data.m_dealloc_ref_count == RNIL);
+      regTcPtr.p->m_dealloc_state = TcConnectionrec::DA_DEALLOC_COUNT;
+      /* Init count to 1 as we are processing report_dealloc*/
+      regTcPtr.p->m_dealloc_data.m_dealloc_ref_count = 1;
+    }
+    else
+    {
+      jam();
+      /**
+       * [Multi-op] COMMIT case
+       * Decrement count to indicate 'permission to dealloc'
+       * from ACC
+       */
+      decrDeallocRefCount(signal,
+                          signal->theData[4]);
+    }
   }
 }//Dblqh::execTUP_DEALLOCREQ()
 
@@ -7192,6 +7890,32 @@ void Dblqh::execTUP_DEALLOCREQ(Signal* signal)
 void Dblqh::execACCKEYCONF(Signal* signal) 
 {
   jamEntry();
+  if (ERROR_INSERTED(5095))
+  {
+    jam();
+    g_eventLogger->info("LQH %u : ERRINS 5095 Delaying ACCKEYCONF",
+                        instance());
+    sendSignalWithDelay(reference(), GSN_ACCKEYCONF, signal, 10, 5);
+    return;
+  }
+
+  if (ERROR_INSERTED(5094))
+  {
+    jam();
+    g_eventLogger->info("LQH %u : ERRINS 5094 Passing ACCKEYCONF 1 and setting ERRINS 5095",
+                        instance());
+    SET_ERROR_INSERT_VALUE(5095);
+  }
+
+  if (ERROR_INSERTED(5096))
+  {
+    jam();
+    g_eventLogger->info("LQH %u : ERRINS 5096 set when processing ACCKEYCONF, clearing",
+                        instance());
+    CLEAR_ERROR_INSERT_VALUE;
+    //SET_ERROR_INSERT_VALUE(5097); // Kill on scan
+  }
+
   Uint32 tcIndex = signal->theData[0];
 
   setup_key_pointers(tcIndex);
@@ -7205,6 +7929,12 @@ void Dblqh::execACCKEYCONF(Signal* signal)
     LQHKEY_abort(signal, 3, m_tc_connect_ptr);
     return;
   }//if
+  if (unlikely(c_acc->checkOpPendingAbort(regTcPtr->accConnectrec)))
+  {
+    jam();
+    /* Wait for Abort */
+    return;
+  }
   c_tup->prepareTUPKEYREQ(localKey1, localKey2, fragptr.p->tupFragptr);
   continueACCKEYCONF(signal, localKey1, localKey2, m_tc_connect_ptr);
 }
@@ -7426,7 +8156,16 @@ Dblqh::acckeyconf_load_diskpage(Signal* signal, TcConnectionrecPtr regTcPtr,
     regTcPtr.p->transactionState = TcConnectionrec::WAIT_TUP;
     TupKeyRef * ref = (TupKeyRef *)signal->getDataPtr();
     ref->userRef= regTcPtr.i;
-    ref->errorCode= ~0;
+    if (res == -1)
+    {
+      jam();
+      ref->errorCode= ~0;
+    }
+    else
+    {
+      jam();
+      ref->errorCode = -res;
+    }
     execTUPKEYREF(signal);
     return;
   }
@@ -7568,6 +8307,33 @@ void Dblqh::tupkeyConfLab(Signal* signal,
   rwConcludedLab(signal, tcConnectptr);
   return;
 }//Dblqh::tupkeyConfLab()
+
+void Dblqh::sendBatchedLqhkeyreq(Signal* signal, Uint32 lqhRef, Uint32 siglen, SectionHandle* handle)
+{
+  jam();
+  const Uint32 version = getNodeInfo(refToNode(lqhRef)).m_version;
+  if (ndbd_frag_lqhkeyreq(version))
+  {
+    jam();
+    sendBatchedFragmentedSignal(lqhRef,
+                                GSN_LQHKEYREQ,
+                                signal,
+                                siglen,
+                                JBB,
+                                handle,
+                                false);
+  }
+  else
+  {
+    jam();
+    sendSignal(lqhRef,
+               GSN_LQHKEYREQ,
+               signal,
+               siglen,
+               JBB,
+               handle);
+  }
+}
 
 /* --------------------------------------------------------------------------
  *     THE CODE IS FOUND IN THE SIGNAL RECEPTION PART OF LQH                 
@@ -7734,7 +8500,7 @@ void Dblqh::logLqhkeyreqLab(Signal* signal,
 /* -------------------------------------------------- */
   LogPartRecord * const regLogPartPtr = logPartPtr.p;
   const bool problem = out_of_log_buffer || regLogPartPtr->m_log_problems != 0;
-  if (unlikely(problem || ERROR_INSERTED(5083)))
+  if (unlikely(problem || ERROR_INSERTED(5083) || ERROR_INSERTED(5032)))
   {
     /* -----------------------------------------------------------------*/
     /* P_TAIL_PROBLEM indicates that the redo log is full. If redo      */
@@ -7745,9 +8511,19 @@ void Dblqh::logLqhkeyreqLab(Signal* signal,
     /* in case of a P_TAIL_PROBLEM.                                     */
     /* -----------------------------------------------------------------*/
     if (abort_on_redo_problems || 
-        regLogPartPtr->m_log_problems & LogPartRecord::P_TAIL_PROBLEM)
+        regLogPartPtr->m_log_problems & LogPartRecord::P_TAIL_PROBLEM ||
+        ERROR_INSERTED(5032))
     {
       jam();
+      if (ERROR_INSERTED_CLEAR(5032))
+      {
+        const Uint32 saved_cnoOfLogPages = cnoOfLogPages;
+        // simulate abort on temporary out-of-redo error
+        cnoOfLogPages = ZMIN_LOG_PAGES_OPERATION - 1;
+        logLqhkeyreqLab_problems(signal, tcConnectptr);
+        cnoOfLogPages = saved_cnoOfLogPages;
+        return;
+      }
       logLqhkeyreqLab_problems(signal, tcConnectptr);
       return;
     }
@@ -7980,7 +8756,7 @@ void Dblqh::packLqhkeyreqLab(Signal* signal,
     {
       jamDebug();
       regTcPtr->transactionState = TcConnectionrec::PREPARED;
-      releaseOprec(signal, tcConnectptr.p);
+      releaseOprec(signal, tcConnectptr);
     } else {
       jamDebug();
 
@@ -8228,14 +9004,13 @@ void Dblqh::packLqhkeyreqLab(Signal* signal,
        * AttrInfo
        */
       ndbrequire(regTcPtr->totSendlenAi == 0);
-      ndbassert(regTcPtr->keyInfoIVal == RNIL);
-      ndbassert(regTcPtr->attrInfoIVal == RNIL);
+      ndbrequire(regTcPtr->keyInfoIVal == RNIL);
+      ndbrequire(regTcPtr->attrInfoIVal == RNIL);
+      ndbrequire(LqhKeyReq::getRowidFlag(Treqinfo));
+      ndbrequire(LqhKeyReq::getNrCopyFlag(Treqinfo));
     }
 
-    sendSignal(lqhRef, GSN_LQHKEYREQ, signal,
-               LqhKeyReq::FixedSignalLength + nextPos,
-               JBB,
-               &handle);
+    sendBatchedLqhkeyreq(signal, lqhRef, LqhKeyReq::FixedSignalLength + nextPos, &handle);
     
     /* Long sections were freed as part of sendSignal */
     ndbassert( handle.m_cnt == 0);
@@ -8351,7 +9126,7 @@ void Dblqh::packLqhkeyreqLab(Signal* signal,
    *   RESOURCES WE DEALLOCATE THE ATTRINFO RECORD AND KEY RECORDS 
    *   AS SOON AS POSSIBLE.
    * ------------------------------------------------------------------------ */
-  releaseOprec(signal, tcConnectptr.p);
+  releaseOprec(signal, tcConnectptr);
 }//Dblqh::packLqhkeyreqLab()
 
 /* ========================================================================= */
@@ -8545,7 +9320,7 @@ void Dblqh::sendTupkey(Signal* signal, const TcConnectionrec* regTcPtr)
 
 void Dblqh::cleanUp(Signal* signal, TcConnectionrecPtr tcConnectptr)
 {
-  releaseOprec(signal, tcConnectptr.p);
+  releaseOprec(signal, tcConnectptr);
   deleteTransidHash(signal, tcConnectptr);
   releaseTcrec(signal, tcConnectptr);
 }//Dblqh::cleanUp()
@@ -8554,36 +9329,18 @@ void Dblqh::cleanUp(Signal* signal, TcConnectionrecPtr tcConnectptr)
  * ---- RELEASE ALL RECORDS CONNECTED TO THE OPERATION RECORD AND THE    ---- 
  *      OPERATION RECORD ITSELF
  * ------------------------------------------------------------------------- */
-void Dblqh::releaseOprec(Signal* signal, TcConnectionrec* regTcPtr)
+void Dblqh::releaseOprec(Signal* signal, TcConnectionrecPtr regTcPtr)
 {
-  /* Release long sections if present */
-  releaseSection(regTcPtr->keyInfoIVal);
-  regTcPtr->keyInfoIVal = RNIL;
-  releaseSection(regTcPtr->attrInfoIVal);
-  regTcPtr->attrInfoIVal = RNIL;
-
-  if (regTcPtr->m_dealloc)
+  if (regTcPtr.p->m_dealloc_state != TcConnectionrec::DA_IDLE)
   {
-    jam();
-    regTcPtr->m_dealloc = 0;
-
-    if (TRACENR_FLAG)
-      TRACENR("DELETED: " << regTcPtr->m_row_id << endl);
-
-    TRACE_OP(regTcPtr, "DO DEALLOC");
-    
-    const Uint32 sig0 = regTcPtr->fragmentid;
-    const Uint32 sig1 = regTcPtr->tableref;
-    const Uint32 sig2 = regTcPtr->m_row_id.m_page_no;
-    const Uint32 sig3 = regTcPtr->m_row_id.m_page_idx;
-
-    signal->theData[0] = sig0;
-    signal->theData[1] = sig1;
-    signal->theData[2] = sig2;
-    signal->theData[3] = sig3;
-    signal->theData[4] = RNIL;
-    EXECUTE_DIRECT(DBTUP, GSN_TUP_DEALLOCREQ, signal, 5);
+    handleDeallocOp(signal, regTcPtr);
   }
+
+  /* Release long sections if present */
+  releaseSection(regTcPtr.p->keyInfoIVal);
+  regTcPtr.p->keyInfoIVal = RNIL;
+  releaseSection(regTcPtr.p->attrInfoIVal);
+  regTcPtr.p->attrInfoIVal = RNIL;
 }//Dblqh::releaseOprec()
 
 /* ------------------------------------------------------------------------- */
@@ -9007,7 +9764,18 @@ void Dblqh::execCOMMIT(Signal* signal)
     {
       SET_ERROR_INSERT_VALUE(5048);
     }
-    
+    if (ERROR_INSERTED(5093))
+    {
+      if (tcConnectptr.p->operation == ZREAD)
+      {
+        jam();
+        CLEAR_ERROR_INSERT_VALUE;
+        g_eventLogger->info("Delaying COMMIT for READ");
+        sendSignalWithDelay(cownref, GSN_COMMIT, signal, 3000, 5);
+        return;
+      }
+    }
+
     commitReqLab(signal, gci_hi, gci_lo, tcConnectptr);
     return;
   }//if
@@ -9158,6 +9926,18 @@ void Dblqh::execCOMPLETE(Signal* signal)
       (tcConnectptr.p->transid[1] == transid2)) {
 
     TcConnectionrec * const regTcPtr = tcConnectptr.p;
+    if (ERROR_INSERTED(5093))
+    {
+      if ((tcConnectptr.p->seqNoReplica != 0) &&
+          (tcConnectptr.p->operation == ZDELETE))
+      {
+        jam();
+        CLEAR_ERROR_INSERT_VALUE;
+        g_eventLogger->info("Delaying COMPLETE for DELETE at Backup replica");
+        sendSignalWithDelay(cownref, GSN_COMPLETE, signal, 1000, 3);
+        return;
+      }
+    }
     TRACE_OP(regTcPtr, "COMPLETE");
 
     if (tcConnectptr.p->seqNoReplica != 0 && 
@@ -9810,6 +10590,17 @@ void Dblqh::completeUnusualLab(Signal* signal,
 void Dblqh::releaseTcrec(Signal* signal, TcConnectionrecPtr locTcConnectptr) 
 {
   jamDebug();
+  if (unlikely(locTcConnectptr.p->m_dealloc_state ==
+               TcConnectionrec::DA_DEALLOC_COUNT_ZOMBIE))
+  {
+    jam();
+    /**
+     * Need to keep this Tcrec around a little extra time to track
+     * the ref count on TUP storage deallocation
+     */
+    return;
+  }
+
   ndbassert(locTcConnectptr.p->hashIndex==RNIL);
   const Uint32 op = locTcConnectptr.p->operation;
   const Uint32 firstFree = cfirstfreeTcConrec;
@@ -9945,6 +10736,22 @@ Dblqh::remove_commit_marker(TcConnectionrec * const regTcPtr)
 void Dblqh::execABORT(Signal* signal) 
 {
   jamEntry();
+  if (ERROR_INSERTED(5096))
+  {
+    jam();
+    g_eventLogger->info("LQH %u : ERRINS 5096 Stalling ABORT",
+                        instance());
+    sendSignalWithDelay(reference(), GSN_ABORT, signal, 10, 4);
+    return;
+  }
+  if (ERROR_INSERTED(5095))
+  {
+    jam();
+    g_eventLogger->info("LQH %u : ERRINS 5095 Passing abort and setting ERRINS 5096",
+                        instance());
+    SET_ERROR_INSERT_VALUE(5096);
+  }
+
   Uint32 tcOprec = signal->theData[0];
   BlockReference tcBlockref = signal->theData[1];
   Uint32 transid1 = signal->theData[2];
@@ -10654,6 +11461,23 @@ void Dblqh::execNODE_FAILREP(Signal* signal)
 
   NodeFailRep * const nodeFail = (NodeFailRep *)&signal->theData[0];
 
+  if(signal->getLength() == NodeFailRep::SignalLength)
+  {
+    jam();
+    ndbrequire(signal->getNoOfSections() == 1);
+    ndbrequire(getNodeInfo(refToNode(signal->getSendersBlockRef())).m_version);
+    SegmentedSectionPtr ptr;
+    SectionHandle handle(this, signal);
+    handle.getSection(ptr, 0);
+    memset(nodeFail->theNodes, 0, sizeof(nodeFail->theNodes));
+    copy(nodeFail->theNodes, ptr);
+    releaseSections(handle);
+  }
+  else
+  {
+    memset(nodeFail->theNodes + NdbNodeBitmask48::Size, 0,
+           _NDB_NBM_DIFF_BYTES);
+  }
   TnoOfNodes = nodeFail->noOfNodes;
   UintR index = 0;
   for (i = 1; i < MAX_NDB_NODES; i++) {
@@ -10684,8 +11508,6 @@ void Dblqh::execNODE_FAILREP(Signal* signal)
       Thostptr.p->nodestatus = ZNODE_DOWN;
     }
 
-    lcpPtr.p->m_EMPTY_LCP_REQ.clear(nodeId);
-    
     for (Uint32 j = 0; j < cnoOfNodes; j++) {
       jam();
       if (cnodeData[j] == nodeId){
@@ -12546,6 +13368,11 @@ void Dblqh::execSCAN_FRAGREQ(Signal* signal)
     return;
   }
 
+  if (ERROR_INSERTED(5097))
+  {
+    ndbrequire(false);
+  }
+
   ScanFragReq * const scanFragReq = (ScanFragReq *)&signal->theData[0];
   ScanFragRef * ref;
   Uint32 errorCode= 0;
@@ -12814,7 +13641,7 @@ error_handler2:
 error_handler:
   regTcPtr->abortState = TcConnectionrec::ABORT_ACTIVE;
   regTcPtr->tcScanRec = RNIL;
-  releaseOprec(signal, tcConnectptr.p);
+  releaseOprec(signal, tcConnectptr);
   releaseTcrec(signal, tcConnectptr);
 
 error_handler_early:
@@ -13685,7 +14512,16 @@ Dblqh::next_scanconf_load_diskpage(Signal* signal,
     jam();
     TupKeyRef * ref = (TupKeyRef *)signal->getDataPtr();
     ref->userRef= regTcPtr.i;
-    ref->errorCode= ~0;
+    if (res == -1)
+    {
+      jam();
+      ref->errorCode= ~0;
+    }
+    else
+    {
+      jam();
+      ref->errorCode= -res;
+    }
     execTUPKEYREF(signal);
     return;
   }
@@ -14136,7 +14972,7 @@ void Dblqh::handle_finish_scan(Signal* signal,
   }
   tcConnectptr.p->tcScanRec = RNIL;
   deleteTransidHash(signal, tcConnectptr);
-  releaseOprec(signal, tcConnectptr.p);
+  releaseOprec(signal, tcConnectptr);
   releaseTcrec(signal, tcConnectptr);
   if (restart_flag)
   {
@@ -14275,7 +15111,8 @@ Uint32 Dblqh::initScanrec(const ScanFragReq* scanFragReq,
 
   const Uint32 scanPrio = ScanFragReq::getScanPrio(reqinfo);
 
-  if (max_rows == 0 || (max_bytes > 0 && max_rows > max_bytes)){
+  if (unlikely(max_rows == 0 || (max_bytes > 0 && max_rows > max_bytes)))
+  {
     jam();
     return ScanFragRef::ZWRONG_BATCH_SIZE;
   }
@@ -14290,7 +15127,8 @@ Uint32 Dblqh::initScanrec(const ScanFragReq* scanFragReq,
   {
     DEBUG_RES_OWNER_GUARD(refToBlock(reference()) << 16 | 999);
 
-    if (!seize_acc_ptr_list(scanPtr, 0, max_rows)){
+    if (unlikely(!seize_acc_ptr_list(scanPtr, 0, max_rows)))
+    {
       jam();
       return ScanFragRef::ZTOO_MANY_ACTIVE_SCAN_ERROR;
     }
@@ -14482,7 +15320,8 @@ void Dblqh::initScanTc(const ScanFragReq* req,
   regTcPtr->currTupAiLen = 0;
   regTcPtr->reclenAiLqhkey = 0;
   regTcPtr->m_scan_curr_range_no = 0;
-  regTcPtr->m_dealloc = 0;
+  regTcPtr->m_dealloc_state = TcConnectionrec::DA_IDLE;
+  regTcPtr->m_dealloc_data.m_dealloc_ref_count = RNIL;
   regTcPtr->operation = ZREAD;
   regTcPtr->opExec = 1;
   regTcPtr->abortState = TcConnectionrec::ABORT_IDLE;
@@ -15953,8 +16792,6 @@ void Dblqh::copyTupkeyConfLab(Signal* signal,
     return;
   }
 
-  LqhKeyReq::setKeyLen(tcConP->reqinfo, len);
-
 /*---------------------------------------------------------------------------*/
 // To avoid using up to many operation records in ACC we will increase the
 // constant to ensure that we never send more than 40 records at a time.
@@ -17090,7 +17927,8 @@ Dblqh::start_lcp_on_table(Signal *signal)
     jam();
     tabptr.i = c_current_local_lcp_table_id;
     ptrAss(tabptr, tablerec);
-    if (tabptr.p->tableStatus == Tablerec::TABLE_DEFINED &&
+    if ((tabptr.p->tableStatus == Tablerec::TABLE_DEFINED ||
+         tabptr.p->tableStatus == Tablerec::TABLE_READ_ONLY) &&
         (!DictTabInfo::isOrderedIndex(tabptr.p->tableType)))
     {
       jam();
@@ -17937,8 +18775,7 @@ void Dblqh::execLCP_FRAG_ORD(Signal* signal)
 #endif
 
     c_lcpId = lcpFragOrd->lcpId;
-    ndbrequire(lcpPtr.p->lcpPrepareState == LcpRecord::LCP_IDLE);
-    ndbrequire(lcpPtr.p->lcpRunState == LcpRecord::LCP_IDLE);
+    ndbrequire(is_lcp_idle(lcpPtr.p));
     if (signal->getSendersBlockRef() != reference())
     {
       jam();
@@ -17988,6 +18825,30 @@ void Dblqh::execLCP_FRAG_ORD(Signal* signal)
     lcpPtr.p->currentPrepareFragment.lcpFragOrd.tableId = RNIL;
     lcpPtr.p->currentPrepareFragment.lcpFragOrd.fragmentId = RNIL;
     lcpPtr.p->currentPrepareFragment.lcpFragOrd.lcpNo = RNIL;
+
+    if (!c_queued_lcp_frag_ord.isEmpty())
+    {
+      jam();
+      lcpPtr.p->m_early_lcps_need_synch = true;
+    }
+    else
+    {
+      jam();
+      lcpPtr.p->m_early_lcps_need_synch = false;
+    }
+    ndbrequire(lcpPtr.p->m_wait_early_lcp_synch == false);
+    {
+      Logfile_client lgman(this, c_lgman, 0);
+      if (lgman.exists_logfile_group())
+      {
+        jam();
+        LcpFragOrd *ord = (LcpFragOrd*)signal->getDataPtr();
+        ord->tableId = 0;
+        ord->fragmentId = 0;
+        ord->lcpId = c_lcpId;
+        lgman.exec_lcp_frag_ord(signal, get_current_local_lcp_id());
+      }
+    }
   }
   else
   {
@@ -18016,8 +18877,7 @@ void Dblqh::execLCP_FRAG_ORD(Signal* signal)
     lcpPtr.p->lastFragmentFlag = true;
     DEB_LCP(("(%u)Received last fragment flag", instance()));
     CRASH_INSERTION(5054);
-    if (lcpPtr.p->lcpPrepareState == LcpRecord::LCP_IDLE &&
-        lcpPtr.p->lcpRunState == LcpRecord::LCP_IDLE)
+    if (is_lcp_idle(lcpPtr.p))
     {
       jam();
       /* ----------------------------------------------------------
@@ -18031,7 +18891,7 @@ void Dblqh::execLCP_FRAG_ORD(Signal* signal)
   c_fragments_in_lcp++;
   tabptr.i = lcpFragOrd->tableId;
   ptrCheckGuard(tabptr, ctabrecFileSize, tablerec);
-  
+ 
   if (unlikely(tabptr.p->tableStatus != Tablerec::TABLE_DEFINED &&
                tabptr.p->tableStatus != Tablerec::TABLE_READ_ONLY))
   {
@@ -18055,6 +18915,95 @@ void Dblqh::execLCP_FRAG_ORD(Signal* signal)
   }
 
   ndbrequire(getFragmentrec(signal, lcpFragOrd->fragmentId));
+  bool add_to_queue = true;
+  if (fragptr.p->m_create_table_flag_lcp_frag_ord)
+  {
+    jam();
+    fragptr.p->m_create_table_flag_lcp_frag_ord = false;
+    ndbrequire(fragptr.p->lcp_frag_ord_state == Fragrecord::LCP_QUEUED ||
+               fragptr.p->lcp_frag_ord_state == Fragrecord::LCP_EXECUTING);
+    if (!is_lcp_idle(lcpPtr.p))
+    {
+      jam();
+      /**
+       * Checkpoint has already started, we only need to record the fact that
+       * this table has received an order to execute fragment as part of LCP.
+       *
+       * LCP_QUEUED:
+       * -----------
+       * Fragment have been inserted into the LCP list already. But it is still
+       * in the queue. We will remove it from queue and insert it as for a normal
+       * fragment and also reset the variables from the CREATE TABLE insert.
+       * LCP_EXECUTING:
+       * --------------
+       * We are already in the process of executing this checkpoint.
+       * We cannot have received any LCP_FRAG_ORD previous to this
+       * since any such signal would clear the m_create_table_flag_lcp_frag_ord
+       * flag. Thus we only need to update the fragment record to ensure
+       * it contains the necessary information received in the LCP_FRAG_ORD
+       * signal.
+       */
+      jam();
+      fragptr.p->lcp_frag_ord_lcp_no = lcpFragOrd->lcpNo;
+      fragptr.p->lcp_frag_ord_lcp_id = lcpFragOrd->lcpId;
+      cnoOfFragsCheckpointed++;
+      c_fragments_in_lcp++;
+      DEB_EARLY_LCP(("(%u)LCP_FRAG_ORD for tab(%u,%u), clear flag",
+                     instance(),
+                     fragptr.p->tabRef,
+                     fragptr.p->fragId));
+      return;
+    }
+    DEB_EARLY_LCP(("(%u)LCP_FRAG_ORD for tab(%u,%u), clear flag and start",
+                   instance(),
+                   fragptr.p->tabRef,
+                   fragptr.p->fragId));
+    ndbrequire(fragptr.p->lcp_frag_ord_state == Fragrecord::LCP_QUEUED);
+    /**
+     * We will insert it into LCP queue below, so we need to remove it
+     * here to avoid inserting it twice.
+     */
+    add_to_queue = false;
+  }
+  if (fragptr.p->lcp_frag_ord_state ==
+        Fragrecord::LCP_EXECUTED_BY_CREATE_TABLE)
+  {
+    jam();
+    if (fragptr.p->lcp_frag_ord_lcp_no == lcpFragOrd->lcpNo &&
+        fragptr.p->lcp_frag_ord_lcp_id == lcpFragOrd->lcpId)
+    {
+      /**
+       * We already executed a checkpoint as part of this LCP. Send
+       * an LCP_FRAG_REP based on this information.
+       */
+      jam();
+      DEB_EARLY_LCP(("(%u)LCP_FRAG_ORD for tab(%u,%u), already executed",
+                     instance(),
+                     fragptr.p->tabRef,
+                     fragptr.p->fragId));
+      LcpRecord::FragOrd fragOrd;
+      fragOrd.lcpFragOrd.lcpNo = fragptr.p->lcp_frag_ord_lcp_no;
+      fragOrd.lcpFragOrd.lcpId = fragptr.p->lcp_frag_ord_lcp_id;
+      fragOrd.lcpFragOrd.fragmentId = fragptr.p->fragId;
+      fragOrd.lcpFragOrd.tableId = fragptr.p->tabRef;
+      fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTED;
+      sendLCP_FRAG_REP(signal, fragOrd, fragptr.p);
+      ndbrequire(lcpPtr.p->lastFragmentFlag == false);
+      c_fragments_in_lcp++;
+      return;
+    }
+    DEB_EARLY_LCP(("(%u)LCP_FRAG_ORD for tab(%u,%u), executed, new LCP",
+                   instance(),
+                   fragptr.p->tabRef,
+                   fragptr.p->fragId));
+    /**
+     * This is the next LCP, continue as normal and set the state to the
+     * expected state at this point.
+     */
+    fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTED;
+    ndbrequire(fragptr.p->m_create_table_flag_lcp_frag_ord == false);
+    ndbrequire(fragptr.p->m_create_table_insert_lcp == false);
+  }
 
   if (fragptr.p->lcp_frag_ord_lcp_id == lcpFragOrd->lcpId &&
       c_localLcpId == 0)
@@ -18095,8 +19044,11 @@ void Dblqh::execLCP_FRAG_ORD(Signal* signal)
   fragptr.p->lcp_frag_ord_lcp_no = lcpFragOrd->lcpNo;
   fragptr.p->lcp_frag_ord_lcp_id = lcpFragOrd->lcpId;
   fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_QUEUED;
-  c_queued_lcp_frag_ord.addLast(fragptr);
-
+  if (add_to_queue)
+  {
+    jam();
+    c_queued_lcp_frag_ord.addLast(fragptr);
+  }
   cnoOfFragsCheckpointed++;
 
   if (lcpPtr.p->lcpPrepareState != LcpRecord::LCP_IDLE)
@@ -18104,7 +19056,7 @@ void Dblqh::execLCP_FRAG_ORD(Signal* signal)
     jam();
     return;
   }//if
-  prepare_next_fragment_checkpoint(signal);
+  prepare_next_fragment_checkpoint(signal, false);
 }//Dblqh::execLCP_FRAGORD()
 
 void Dblqh::handleFirstFragment(Signal *signal)
@@ -18192,24 +19144,7 @@ void Dblqh::execLCP_PREPARE_REF(Signal* signal)
     lcpPtr.p->lcpRunState = LcpRecord::LCP_IDLE;
   }
   completed_fragment_checkpoint(signal, lcpPtr.p->currentPrepareFragment);
-  prepare_next_fragment_checkpoint(signal);
-  if (lcpPtr.p->lcpPrepareState == LcpRecord::LCP_IDLE &&
-      lcpPtr.p->lcpRunState == LcpRecord::LCP_IDLE)
-  {
-    /**
-     * We have no queued fragments waiting to be prepared. We also
-     * have no ongoing fragment executing its LCP. If we also received
-     * the last fragment then we have completed this LCP.
-     */
-    jam();
-    if (lcpPtr.p->lastFragmentFlag)
-    {
-      jam();
-      completeLcpRoundLab(signal, c_lcpId);
-      return;
-    }
-    return;
-  }
+  prepare_next_fragment_checkpoint(signal, true);
 }
 
 void Dblqh::execLCP_PREPARE_CONF(Signal* signal) 
@@ -18244,7 +19179,7 @@ void Dblqh::execLCP_PREPARE_CONF(Signal* signal)
     jam();
     lcpPtr.p->currentRunFragment = lcpPtr.p->currentPrepareFragment;
     perform_fragment_checkpoint(signal);
-    prepare_next_fragment_checkpoint(signal);
+    prepare_next_fragment_checkpoint(signal, false);
   }
   ndbrequire(lcpPtr.p->lcpRunState == LcpRecord::LCP_CHECKPOINTING);
 }
@@ -18287,6 +19222,7 @@ void Dblqh::perform_fragment_checkpoint(Signal *signal)
   req->backupPtr = m_backup_ptr;
   req->backupId = lcpPtr.p->currentRunFragment.lcpFragOrd.lcpId;
   req->count = 0;
+  req->senderRef = reference();
    
 #ifdef NDB_DEBUG_FULL
   if(ERROR_INSERTED(5904))
@@ -18600,11 +19536,6 @@ void Dblqh::execBACKUP_FRAGMENT_CONF(Signal* signal)
   completed_fragment_checkpoint(signal, lcpPtr.p->currentRunFragment);
   handleLCPSurfacing(signal);
 
-  if (lcpPtr.p->reportEmpty)
-  {
-    jam();
-    sendEMPTY_LCP_CONF(signal, false);
-  }
   if (lcpPtr.p->lcpPrepareState == LcpRecord::LCP_PREPARED)
   {
     /**
@@ -18617,7 +19548,7 @@ void Dblqh::execBACKUP_FRAGMENT_CONF(Signal* signal)
     jam();
     lcpPtr.p->currentRunFragment = lcpPtr.p->currentPrepareFragment;
     perform_fragment_checkpoint(signal);
-    prepare_next_fragment_checkpoint(signal);
+    prepare_next_fragment_checkpoint(signal, false);
     return;
   }
   else if (lcpPtr.p->lcpPrepareState == LcpRecord::LCP_PREPARING)
@@ -18696,44 +19627,160 @@ Dblqh::completed_fragment_checkpoint(Signal *signal,
   FragrecordPtr curr_fragptr;
   curr_fragptr.i = fragOrd.fragPtrI;
   c_fragment_pool.getPtr(curr_fragptr);
-  curr_fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTED;
-  if (c_localLcpId == 0)
+  if (curr_fragptr.p->m_create_table_flag_lcp_frag_ord)
+  {
+    /**
+     * At this point we have accomplished the desired action of running an
+     * LCP to ensure that we can deduce how far back we need to UNDO for
+     * this table.
+     *
+     * We set state to LCP_EXECUTED_BY_CREATE_TABLE to ensure that we know
+     * that an LCP have been executed this LCP. When an LCP_FRAG_ORD is
+     * received we will send LCP_FRAG_REP immediately if it is part of
+     * the same LCP.
+     *
+     * No need to send LCP_FRAG_REP since no LCP_FRAG_ORD was requested in
+     * this case.
+     */
+    jam();
+    curr_fragptr.p->lcp_frag_ord_state =
+      Fragrecord::LCP_EXECUTED_BY_CREATE_TABLE;
+    curr_fragptr.p->m_create_table_flag_lcp_frag_ord = false;
+    DEB_EARLY_LCP(("(%u)LCP executed for tab(%u,%u), flag cleared",
+                   instance(),
+                   curr_fragptr.p->tabRef,
+                   curr_fragptr.p->fragId));
+  }
+  else
   {
     jam();
-    /* Only need to send LCP_FRAG_REP during distributed LCP. */
-    jam();
-    sendLCP_FRAG_REP(signal, fragOrd, curr_fragptr.p);
+    curr_fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTED;
+    if (c_localLcpId == 0)
+    {
+      /* Only need to send LCP_FRAG_REP during distributed LCP. */
+      jam();
+      sendLCP_FRAG_REP(signal, fragOrd, curr_fragptr.p);
+    }
   }
 }
 
-void Dblqh::prepare_next_fragment_checkpoint(Signal* signal) 
+void Dblqh::prepare_next_fragment_checkpoint(Signal* signal,
+                                             bool complete_possible)
 {
   FragrecordPtr curr_fragptr;
-  TablerecPtr tabPtr;
 
-restart:
-  if (c_queued_lcp_frag_ord.isEmpty())
+  if (lcpPtr.p->m_wait_early_lcp_synch)
   {
     jam();
-    lcpPtr.p->lcpPrepareState = LcpRecord::LCP_IDLE;
+    /**
+     * We are waiting for a signal back from Backup block containing
+     * a signal that all outstanding fragments that was put into LCP
+     * queue by CREATE TABLE statements have been executed and have
+     * completed.
+     * We could receive the lastFragmentFlag while waiting and it is
+     * important to not be in IDLE state when this arrives since this
+     * will flag that the LCP is completed which is not the case here.
+     */
+    lcpPtr.p->lcpPrepareState = LcpRecord::LCP_PREPARING;
     return;
   }
-  jam();
-  /* ----------------------------------------------------------------------
-   *  Remove first queued fragment from queue.
-   *  Transfer the state from the queued to the active LCP.
-   * --------------------------------------------------------------------- */
-  c_queued_lcp_frag_ord.first(curr_fragptr);
-  c_queued_lcp_frag_ord.removeFirst(curr_fragptr);
+  do
+  {
+    if (c_queued_lcp_frag_ord.isEmpty())
+    {
+      jam();
+      lcpPtr.p->lcpPrepareState = LcpRecord::LCP_IDLE;
+      break;
+    }
+    jam();
+    /* ----------------------------------------------------------------------
+     *  Remove first queued fragment from queue.
+     *  Transfer the state from the queued to the active LCP.
+     * --------------------------------------------------------------------- */
+    c_queued_lcp_frag_ord.first(curr_fragptr);
+    c_queued_lcp_frag_ord.removeFirst(curr_fragptr);
+    curr_fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTING;
+    if (exec_prepare_next_fragment_checkpoint(signal, curr_fragptr))
+    {
+      jam();
+      break;
+    }
+  } while (1);
+  if (is_lcp_idle(lcpPtr.p))
+  {
+    /**
+     * We have no queued fragments waiting to be prepared. We also
+     * have no ongoing fragment executing its LCP. If we also received
+     * the last fragment then we have completed this LCP.
+     */
+    jam();
+    if (lcpPtr.p->lastFragmentFlag)
+    {
+      jam();
+      ndbrequire(complete_possible);
+      completeLcpRoundLab(signal, c_lcpId);
+    }
+  }
+}
 
+bool
+Dblqh::exec_prepare_next_fragment_checkpoint(Signal* signal,
+                                             FragrecordPtr curr_fragptr)
+{
+  TablerecPtr tabPtr;
   tabPtr.i = curr_fragptr.p->tabRef;
   ptrCheckGuard(tabPtr, ctabrecFileSize, tablerec);
-  curr_fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTING;
   lcpPtr.p->currentPrepareFragment.fragPtrI = curr_fragptr.i;
+  if (curr_fragptr.p->m_create_table_flag_lcp_frag_ord)
+  {
+    jam();
+    curr_fragptr.p->lcp_frag_ord_lcp_id =
+      lcpPtr.p->currentPrepareFragment.lcpFragOrd.lcpId;
+    curr_fragptr.p->lcp_frag_ord_lcp_no = 0;
+  }
   lcpPtr.p->currentPrepareFragment.lcpFragOrd.lcpNo =
-    curr_fragptr.p->lcp_frag_ord_lcp_no;
+       curr_fragptr.p->lcp_frag_ord_lcp_no;
   lcpPtr.p->currentPrepareFragment.lcpFragOrd.fragmentId = curr_fragptr.p->fragId;
   lcpPtr.p->currentPrepareFragment.lcpFragOrd.tableId = tabPtr.i;
+
+  if (lcpPtr.p->m_early_lcps_need_synch)
+  {
+    if (curr_fragptr.p->m_create_table_insert_lcp)
+    {
+      jam();
+      ndbrequire(lcpPtr.p->m_wait_early_lcp_synch == false);
+    }
+    else
+    {
+      jam();
+      /**
+       * One or more tables were created between two LCPs.
+       * We need to ensure that those fragments complete their
+       * LCP before any other fragment is allowed to complete.
+       * This will ensure that the LCP that any table requires
+       * the UNDO log to roll back to is sufficient for these
+       * tables
+       *
+       * See comment in insert_new_fragments_into_lcp for more
+       * details.
+       */
+      DEB_EARLY_LCP(("(%u)WAIT_LCP_IDLE_REQ: tab(%u,%u)",
+                     instance(),
+                     curr_fragptr.p->tabRef,
+                     curr_fragptr.p->fragId));
+      lcpPtr.p->lcpPrepareState = LcpRecord::LCP_PREPARING;
+      lcpPtr.p->m_early_lcps_need_synch = false;
+      lcpPtr.p->m_wait_early_lcp_synch = true;
+      curr_fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTING;
+      BlockReference backupRef = calcInstanceBlockRef(BACKUP);
+      signal->theData[0] = m_backup_ptr;
+      sendSignal(backupRef, GSN_WAIT_LCP_IDLE_REQ,
+                 signal, 1, JBB);
+      return true;
+    }
+  }
+
+  curr_fragptr.p->m_create_table_insert_lcp = false;
 
   if (unlikely(tabPtr.p->tableStatus != Tablerec::TABLE_DEFINED &&
                tabPtr.p->tableStatus != Tablerec::TABLE_READ_ONLY))
@@ -18745,8 +19792,7 @@ restart:
     ndbrequire(c_localLcpId == 0);
     completed_fragment_checkpoint(signal,
                                   lcpPtr.p->currentPrepareFragment);
-    goto restart; /* To avoid potential stack problems */
-    return;
+    return false;
   }
 
   /**
@@ -18785,7 +19831,56 @@ restart:
     jam();
     startLcpFragWatchdog(signal);
   }
+  return true;
 }//Dblqh::prepare_next_fragment_checkpoint()
+
+void
+Dblqh::execWAIT_LCP_IDLE_CONF(Signal *signal)
+{
+  FragrecordPtr curr_fragptr;
+  lcpPtr.i = signal->theData[0];
+  ptrCheckGuard(lcpPtr, clcpFileSize, lcpRecord);
+  ndbrequire(lcpPtr.p->m_wait_early_lcp_synch);
+  ndbrequire(!lcpPtr.p->m_early_lcps_need_synch);
+
+  /**
+   * No action is supposed to remove the fragment from the LCP list
+   * while we are waiting for the previous fragments to complete. Only
+   * completion of checkpoint for this fragment and an attempt to
+   * prepare the fragment could cause this fragment to be removed and
+   * none of those actions are possible while we are waiting for
+   * WAIT_LCP_IDLE_CONF to return from the Backup block.
+   *
+   * It is also possible for Drop Table to remove if the state is
+   * LCP_QUEUED, to ensure this won't happen the state of the fragment
+   * was set to LCP_EXECUTING before starting the wait.
+   *
+   * The reason to be so careful with this protection against removal
+   * is to avoid having to handle that the LCP completes while we are
+   * waiting for the other fragments to complete. If that was possible
+   * we would have to check for completion of LCP here as well. Now we
+   * can skip that since it is safe that we are not arriving here in
+   * that state.
+   *
+   * It is possible for the fragment LCP to be generated by a table
+   * creation. This table should not be removed when the table is
+   * in the state LCP_EXECUTING, so we rely on that this fragment is
+   * still here when we return here. The fragment LCP can be dropped
+   * however when we restart it again.
+   */
+  curr_fragptr.i = lcpPtr.p->currentPrepareFragment.fragPtrI;
+  c_fragment_pool.getPtr(curr_fragptr);
+  ndbrequire(curr_fragptr.p->lcp_frag_ord_state == Fragrecord::LCP_EXECUTING);
+  c_queued_lcp_frag_ord.addFirst(curr_fragptr);
+  curr_fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_QUEUED;
+  ndbrequire(curr_fragptr.p->m_create_table_insert_lcp == false);
+  lcpPtr.p->m_wait_early_lcp_synch = false;
+  DEB_EARLY_LCP(("(%u) WAIT_LCP_IDLE_CONF, tab(%u,%u)",
+                 instance(),
+                 curr_fragptr.p->tabRef,
+                 curr_fragptr.p->fragId));
+  prepare_next_fragment_checkpoint(signal, true);
+}
 
 /* --------------------------------------------------------------------------
  *       THE LOCAL CHECKPOINT ROUND IS NOW COMPLETED. SEND COMPLETED MESSAGE
@@ -18921,11 +20016,6 @@ void Dblqh::execLCP_ALL_COMPLETE_CONF(Signal *signal)
 
   sendSignal(ref, GSN_LCP_COMPLETE_REP, signal,
              LcpCompleteRep::SignalLength, JBA);
-  
-  if(lcpPtr.p->reportEmpty){
-    jam();
-    sendEMPTY_LCP_CONF(signal, true);
-  }
   
   if (cstartRecReq < SRR_FIRST_LCP_DONE)
   {
@@ -19200,91 +20290,6 @@ next:
   }//for
 }//Dblqh::setLogTail()
 
-/**
- * The EMPTY_LCP protocol was made obsolete in MySQL Cluster 7.4. It is kept here
- * to handle upgrade from 7.3 and earlier to 7.4 and newer versions.
- */
-void Dblqh::execEMPTY_LCP_REQ(Signal* signal)
-{
-  /**
-   * This code executes only in ndbd nodes. In ndbmtd the Dblqh Proxy will
-   * take over of this processing. But since ndbd have no proxy block we have
-   * to handle it for ndbd here in the local Dblqh block.
-   */
-  jamEntry();
-  CRASH_INSERTION(5008);
-  EmptyLcpReq * const emptyLcpOrd = (EmptyLcpReq*)&signal->theData[0];
-
-  ndbrequire(!isNdbMtLqh()); // Handled by DblqhProxy
-
-  lcpPtr.i = 0;
-  ptrAss(lcpPtr, lcpRecord);
-  
-  Uint32 nodeId = refToNode(emptyLcpOrd->senderRef);
-
-  lcpPtr.p->m_EMPTY_LCP_REQ.set(nodeId);
-  lcpPtr.p->reportEmpty = true;
-
-  if (lcpPtr.p->lcpPrepareState == LcpRecord::LCP_IDLE &&
-      lcpPtr.p->lcpRunState == LcpRecord::LCP_IDLE)
-  { 
-    jam();
-    bool ok = false;
-    switch(clcpCompletedState){
-    case LCP_IDLE:
-      ok = true;
-      sendEMPTY_LCP_CONF(signal, true);
-      break;
-    case LCP_RUNNING:
-      jam();
-      sendEMPTY_LCP_CONF(signal, false);
-      break;
-    case LCP_CLOSE_STARTED:
-      jam();
-      ok = true;
-      break;
-    }
-    ndbrequire(ok);
-    
-  }//if
-  return;
-}//Dblqh::execEMPTY_LCPREQ()
-
-void Dblqh::sendEMPTY_LCP_CONF(Signal* signal, bool idle)
-{
-  EmptyLcpRep * sig = (EmptyLcpRep*)signal->getDataPtrSend();
-  EmptyLcpConf * rep = (EmptyLcpConf*)sig->conf;
-
-  /* ----------------------------------------------------------------------
-   *       We have been requested to report when there are no more local
-   *       waiting to be started or ongoing. In this signal we also report
-   *       the last completed fragments state.
-   * ---------------------------------------------------------------------- */
-  rep->senderNodeId = getOwnNodeId();
-  if(!idle){
-    jam();
-    rep->idle = 0 ;
-    rep->tableId = lcpPtr.p->currentRunFragment.lcpFragOrd.tableId;
-    rep->fragmentId = lcpPtr.p->currentRunFragment.lcpFragOrd.fragmentId;
-    rep->lcpNo = lcpPtr.p->currentRunFragment.lcpFragOrd.lcpNo;
-    rep->lcpId = lcpPtr.p->currentRunFragment.lcpFragOrd.lcpId;
-  } else {
-    jam();
-    rep->idle = 1;
-    rep->tableId = ~0;
-    rep->fragmentId = ~0;
-    rep->lcpNo = ~0;
-    rep->lcpId = c_lcpId;
-  }
-
-  lcpPtr.p->m_EMPTY_LCP_REQ.copyto(NdbNodeBitmask::Size, sig->receiverGroup);
-  sendSignal(DBDIH_REF, GSN_EMPTY_LCP_REP, signal,
-             EmptyLcpRep::SignalLength + EmptyLcpConf::SignalLength, JBB);
-
-  lcpPtr.p->reportEmpty = false;
-  lcpPtr.p->m_EMPTY_LCP_REQ.clear();
-}//Dblqh::sendEMPTY_LCPCONF()
-
 /* ######################################################################### */
 /* #######                       GLOBAL CHECKPOINT MODULE            ####### */
 /*                                                                           */
@@ -19472,7 +20477,7 @@ void Dblqh::execGCP_SAVEREQ(Signal* signal)
      * also we won't report the GCI as restorable just yet.
      * This will not have any major impact since after the restart LCP
      * is completed a very short time should pass before we get to
-     * phase 50 where the LQH restart is fully completed and we know
+     * phase 9 where the LQH restart is fully completed and we know
      * that we are restorable again.
      */
     sendRESTORABLE_GCI_REP(signal, gci);
@@ -19485,6 +20490,46 @@ void Dblqh::execGCP_SAVEREQ(Signal* signal)
   gcpPtr.p->gcpBlockref = dihBlockRef;
   gcpPtr.p->gcpUserptr = dihPtr;
   gcpPtr.p->gcpId = gci;
+
+  if (cstartPhase != ZNIL)
+  {
+    jam();
+    if (is_first_instance())
+    {
+      if (c_start_phase_9_waiting)
+      {
+        jam();
+        /**
+         * We have reached Start phase 9 and no one is writing local sysfile
+         * since we arrive here. Thus we will write restart completed into the
+         * local sysfile before we flush the GCI into the REDO logs.
+         */
+        write_local_sysfile_restart_complete(signal);
+      }
+      else
+      {
+        jam();
+        /**
+         * We need to keep the local sysfile up to date with the
+         * maximum restartable GCI until the restart is completed.
+         * This GCI is not necessarily restartable, it is only a
+         * maximum GCI that can be restarted. DIH decides what is
+         * restartable. LQH keeps this information only to verify
+         * that DIH is performing its action correctly.
+         */
+        write_local_sysfile_gcp_complete_late(signal, gci);
+      }
+      return;
+    }
+  }
+  start_synch_gcp(signal);
+}
+
+void Dblqh::start_synch_gcp(Signal *signal)
+{
+  ccurrentGcprec = 0;
+  gcpPtr.i = ccurrentGcprec;
+  ptrCheckGuard(gcpPtr, cgcprecFileSize, gcpRecord);
   bool tlogActive = false;
   for (logPartPtr.i = 0; logPartPtr.i < clogPartFileSize; logPartPtr.i++) {
     ptrAss(logPartPtr, logPartRecord);
@@ -19517,7 +20562,7 @@ void Dblqh::execGCP_SAVEREQ(Signal* signal)
   initGcpRecLab(signal);
   startTimeSupervision(signal);
   return;
-}//Dblqh::execGCP_SAVEREQ()
+}
 
 void Dblqh::sendRESTORABLE_GCI_REP(Signal *signal, Uint32 gci)
 {
@@ -21938,6 +22983,9 @@ void Dblqh::execSTART_FRAGREQ(Signal* signal)
     return;
   }//if
   tabptr.p->tableStatus = Tablerec::TABLE_DEFINED;
+  DEB_SCHEMA_VERSION(("(%u)tab: %u tableStatus = TABLE_DEFINED(3)",
+                      instance(),
+                      tabptr.i));
   
   Uint32 lcpNo = startFragReq->lcpNo;
   Uint32 noOfLogNodes = startFragReq->noOfLogNodes;
@@ -22508,11 +23556,30 @@ void Dblqh::execRESTORE_LCP_CONF(Signal* signal)
 
 #define WLS_GCP_COMPLETE 0
 #define WLS_RESTART_COMPLETE 2
+#define WLS_GCP_COMPLETE_LATE 3
 
+/**
+ * The local sysfile ensures that we keep track of what is recoverable
+ * locally. It doesn't have to be updated all the time since this is
+ * the job of the distributed sysfile in DBDIH. It is used to keep
+ * track of GCI restorable during restarts. We also validate that
+ * GCI coming from DBDIH is recoverable. We need to maintain the
+ * maximum restorable GCI until we have written that the restart
+ * is completed into the local sysfile.
+ *
+ * After the restart is completed we need not update the local sysfile
+ * anymore.
+ */
 void
 Dblqh::write_local_sysfile_gcp_complete(Signal *signal, Uint32 gci)
 {
   write_local_sysfile(signal, WLS_GCP_COMPLETE, gci);
+}
+
+void
+Dblqh::write_local_sysfile_gcp_complete_late(Signal *signal, Uint32 gci)
+{
+  write_local_sysfile(signal, WLS_GCP_COMPLETE_LATE, gci);
 }
 
 void
@@ -22532,6 +23599,7 @@ Dblqh::write_local_sysfile(Signal *signal, Uint32 type, Uint32 gci)
   switch (type)
   {
     case WLS_GCP_COMPLETE:
+    case WLS_GCP_COMPLETE_LATE:
     {
       jam();
       nodeRestorableFlag = ReadLocalSysfileReq::NODE_NOT_RESTORABLE_ON_ITS_OWN;
@@ -22575,17 +23643,65 @@ Dblqh::execWRITE_LOCAL_SYSFILE_CONF(Signal *signal)
        * taken care of by the NDBCNTR block in this case.
        */
       ndbrequire(cstartPhase != ZNIL);
-      check_start_phase_49_waiting(signal);
-      write_local_sysfile_gcp_complete_done(signal);
+      if (c_start_phase_9_waiting)
+      {
+        jam();
+        /**
+         * We have reached phase 9 during writing of the local sysfile.
+         * We proceed immediately to update the local sysfile with the
+         * fact that the restart is complete. After this we can synchronize
+         * the GCP and report GCP_SAVECONF.
+         */
+        c_send_gcp_saveref_needed = false;
+        write_local_sysfile_restart_complete(signal);
+      }
+      else
+      {
+        jam();
+        write_local_sysfile_gcp_complete_done(signal);
+      }
+      return;
+    }
+    case WLS_GCP_COMPLETE_LATE:
+    {
+      jam();
+      ndbrequire(cstartPhase != ZNIL);
+      if (c_start_phase_9_waiting)
+      {
+        jam();
+        /**
+         * We have reached phase 9 during writing of local sysfile, proceed
+         * to write local sysfile with the information that the restart is
+         * completed before synching the GCP.
+         */
+        write_local_sysfile_restart_complete(signal);
+      }
+      else
+      {
+        jam();
+        /**
+         * We have completed the first LCP, but the restart isn't quite done
+         * yet. We wrote the local sysfile to keep the maximum restartable
+         * GCI value up to date. Now proceed to synch the GCP in this first
+         * instance of LDM threads.
+         */
+        start_synch_gcp(signal);
+      }
       return;
     }
     case WLS_RESTART_COMPLETE:
     {
       jam();
+      /**
+       * Restart is complete, we have written this into the local sysfile
+       * and we are ready to proceed with the last phases of restart and
+       * synching this GCP as requested.
+       */
       ndbrequire(cstartPhase != ZNIL);
-      ndbrequire(!c_start_phase_49_waiting);
+      ndbrequire(c_start_phase_9_waiting);
       g_eventLogger->info("Restart complete, updated local sysfile");
       write_local_sysfile_restart_complete_done(signal);
+      start_synch_gcp(signal);
       return;
     }
     default:
@@ -22604,6 +23720,27 @@ void Dblqh::execSTART_RECREQ(Signal* signal)
 
   jamEntry();
   StartRecReq * const req = (StartRecReq*)&signal->theData[0];
+
+  if (signal->getNoOfSections() >= 1)
+  {
+    jam();
+    Uint32 senderVersion = getNodeInfo(refToNode(signal->getSendersBlockRef())).m_version;
+    ndbrequire(ndbd_send_node_bitmask_in_section(senderVersion));
+    SegmentedSectionPtr ptr;
+    SectionHandle handle(this,signal);
+    handle.getSection(ptr, 0);
+    ndbrequire(ptr.sz <= NdbNodeBitmask::Size);
+    memset(req->sr_nodes, 0 , sizeof(req->sr_nodes));
+    copy(req->sr_nodes, ptr);
+    releaseSections(handle);
+  }
+  else
+  {
+    memset(req->sr_nodes + NdbNodeBitmask48::Size,
+           0,
+           _NDB_NBM_DIFF_BYTES);
+  }
+
   cmasterDihBlockref = req->senderRef;
 
   ndbrequire(crestartNewestGci == 0 ||
@@ -22633,7 +23770,8 @@ void Dblqh::execSTART_RECREQ(Signal* signal)
     tmp.assign(NdbNodeBitmask::Size, req->sr_nodes);
     if (!tmp.equal(m_sr_nodes))
     {
-      char buf0[100], buf1[100];
+      char buf0[NdbNodeBitmask::TextLength + 1];
+      char buf1[NdbNodeBitmask::TextLength + 1];
       ndbout_c("execSTART_RECREQ changing srnodes from %s to %s",
                m_sr_nodes.getText(buf0),
                tmp.getText(buf1));
@@ -22686,6 +23824,18 @@ void Dblqh::execSTART_RECREQ(Signal* signal)
       return;
     }
 
+    if (c_restart_lcpId == 0 &&
+        c_restart_localLcpId == 0 &&
+        m_restart_local_latest_lcp_id > 1)
+    {
+      /**
+       * Not a single fragment was restored using an LCP. This should only
+       * in nodes added in new node groups since SYSTAB_0 should be in all
+       * original nodes from the initial start.
+       */
+      jam();
+      c_restart_lcpId = m_restart_local_latest_lcp_id - 1;
+    }
     if (!isNdbMtLqh())
     {
       jam();
@@ -26052,11 +27202,29 @@ void Dblqh::deleteFragrec(Uint32 fragId)
   if (fragptr.i != RNIL) {
     jam();
     c_fragment_pool.getPtr(fragptr);
+    if (fragptr.p->lcp_frag_ord_state == Fragrecord::LCP_QUEUED)
+    {
+      jam();
+      /**
+       * We delete the fragment even before it has been checkpointed
+       * its first time. Need to remove it from LCP queue.
+       */
+      ndbrequire(fragptr.p->m_create_table_flag_lcp_frag_ord);
+      c_queued_lcp_frag_ord.remove(fragptr);
+      fragptr.p->m_create_table_flag_lcp_frag_ord = false;
+      fragptr.p->m_create_table_insert_lcp = false;
+      fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTED;
+    }
+    ndbrequire(fragptr.p->lcp_frag_ord_state == Fragrecord::LCP_EXECUTED ||
+      fragptr.p->lcp_frag_ord_state ==
+        Fragrecord::LCP_EXECUTED_BY_CREATE_TABLE);
+    fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTED;
+    ndbrequire(fragptr.p->fragStatus != Fragrecord::FREE);
     tabptr.p->fragid[indexFound] = ZNIL;
     tabptr.p->fragrec[indexFound] = RNIL;
     fragptr.p->fragStatus = Fragrecord::FREE;
     c_fragment_pool.release(fragptr);
-  }//if
+  }
 }//Dblqh::deleteFragrec()
 
 /* ------------------------------------------------------------------------- */
@@ -26394,7 +27562,6 @@ void Dblqh::initialiseLcpRec(Signal* signal)
   if (clcpFileSize != 0) {
     for (lcpPtr.i = 0; lcpPtr.i < clcpFileSize; lcpPtr.i++) {
       ptrAss(lcpPtr, lcpRecord);
-      lcpPtr.p->m_EMPTY_LCP_REQ.clear();
       lcpPtr.p->currentPrepareFragment.fragPtrI = RNIL;
       lcpPtr.p->currentPrepareFragment.lcpFragOrd.fragmentId = Uint32(~0);
       lcpPtr.p->currentPrepareFragment.lcpFragOrd.tableId = Uint32(~0);
@@ -26406,9 +27573,10 @@ void Dblqh::initialiseLcpRec(Signal* signal)
       lcpPtr.p->m_no_of_bytes = 0;
       lcpPtr.p->lcpPrepareState = LcpRecord::LCP_IDLE;
       lcpPtr.p->lcpRunState = LcpRecord::LCP_IDLE;
-      lcpPtr.p->reportEmpty = false;
       lcpPtr.p->firstFragmentFlag = false;
       lcpPtr.p->lastFragmentFlag = false;
+      lcpPtr.p->m_early_lcps_need_synch = false;
+      lcpPtr.p->m_wait_early_lcp_synch = false;
     }//for
   }//if
 }//Dblqh::initialiseLcpRec()
@@ -26693,6 +27861,7 @@ void Dblqh::initialiseTabrec(Signal* signal)
       tabptr.p->tableStatus = Tablerec::NOT_DEFINED;
       tabptr.p->usageCountR = 0;
       tabptr.p->usageCountW = 0;
+      tabptr.p->m_addfragptr_i = RNIL;
       for (Uint32 i = 0; i < NDB_ARRAY_SIZE(tabptr.p->fragid); i++) {
         tabptr.p->fragid[i] = ZNIL;
         tabptr.p->fragrec[i] = RNIL;
@@ -26793,6 +27962,8 @@ void Dblqh::initFragrec(Signal* signal,
   fragptr.p->tableFragptr = RNIL;
   fragptr.p->m_copy_started_state = Fragrecord::AC_NORMAL;
   fragptr.p->lcp_frag_ord_state = Fragrecord::LCP_EXECUTED;
+  fragptr.p->m_create_table_flag_lcp_frag_ord = false;
+  fragptr.p->m_create_table_insert_lcp = false;
   fragptr.p->lcp_frag_ord_lcp_no = 0;
   fragptr.p->lcp_frag_ord_lcp_id = 0;
   fragptr.p->m_completed_gci = 0;
@@ -26925,7 +28096,6 @@ void Dblqh::initReqinfoExecSr(Signal* signal,
 {
   UintR Treqinfo = 0;
   TcConnectionrec * const regTcPtr = tcConnectptr.p;
-  LqhKeyReq::setKeyLen(Treqinfo, regTcPtr->primKeyLen);
 /* ------------------------------------------------------------------------- */
 /* NUMBER OF BACKUPS AND STANDBYS ARE ZERO AND NEED NOT BE SET.              */
 /* REPLICA TYPE IS CLEARED BY SEND_LQHKEYREQ.                                */
@@ -26964,6 +28134,8 @@ void Dblqh::initReqinfoExecSr(Signal* signal,
   regTcPtr->dirtyOp = ZFALSE;
   regTcPtr->tcBlockref = cownref;
   regTcPtr->m_reorg = ScanFragReq::REORG_ALL;
+  regTcPtr->m_dealloc_state = TcConnectionrec::DA_IDLE;
+  regTcPtr->m_dealloc_data.m_unused = RNIL;
 }//Dblqh::initReqinfoExecSr()
 
 /* -------------------------------------------------------------------------- 
@@ -26978,6 +28150,7 @@ bool Dblqh::insertFragrec(Signal* signal, Uint32 fragId)
     terrorCode = ZNO_FREE_FRAGMENTREC;
     return false;
   }
+  ndbrequire(fragptr.p->fragStatus == Fragrecord::FREE);
   for (Uint32 i = 0; i < NDB_ARRAY_SIZE(tabptr.p->fragid); i++) {
     jam();
     if (tabptr.p->fragid[i] == ZNIL) {
@@ -28807,12 +29980,6 @@ Dblqh::execDUMP_STATE_ORD(Signal* signal)
     infoEvent("currentRunFragment.lcpFragOrd.fragmentId=%d",
 	      TlcpPtr.p->currentRunFragment.lcpFragOrd.fragmentId);
 
-    infoEvent(" reportEmpty=%d",
-	      TlcpPtr.p->reportEmpty);
-    char buf[8*_NDB_NODE_BITMASK_SIZE+1];
-    infoEvent(" m_EMPTY_LCP_REQ=%s",
-	      TlcpPtr.p->m_EMPTY_LCP_REQ.getText(buf));
-    
     if ((signal->length() == 2) &&
         (dumpState->args[1] == 0))
     {
@@ -30069,8 +31236,9 @@ void Dblqh::execDBINFO_SCANREQ(Signal *signal)
         m_commitAckMarkerPool.getSize(),
         m_commitAckMarkerPool.getEntrySize(),
         m_commitAckMarkerPool.getUsedHi(),
-        { CFG_DB_NO_LOCAL_OPS, CFG_DB_NO_OPS,0,0 }},
-      { NULL, 0,0,0,0,{0,0,0,0} }
+        { CFG_DB_NO_LOCAL_OPS, CFG_DB_NO_OPS,0,0 },
+        RT_DBLQH_COMMIT_ACK_MARKER},
+      { NULL, 0,0,0,0,{0,0,0,0},0 }
     };
 
     const size_t num_config_params =
@@ -30092,6 +31260,8 @@ void Dblqh::execDBINFO_SCANREQ(Signal *signal)
       row.write_uint64(pools[pool].entry_size);
       for (size_t i = 0; i < num_config_params; i++)
         row.write_uint32(pools[pool].config_params[i]);
+      row.write_uint32(GET_RG(pools[pool].record_type));
+      row.write_uint32(GET_TID(pools[pool].record_type));
       ndbinfo_send_row(signal, req, row, rl);
       pool++;
       if (rl.need_break(req))
@@ -30496,6 +31666,16 @@ Dblqh::checkLcpFragWatchdog(Signal* signal)
         /* LQH : */
         ds->args[0] = DumpStateOrd::LqhDumpLcpState;
         sendSignal(cownref, GSN_DUMP_STATE_ORD, signal, 1, JBA);
+
+        /* NDBFS : */
+        ds->args[0] = DumpStateOrd::NdbfsDumpFileStat;
+        sendSignal(NDBFS_REF, GSN_DUMP_STATE_ORD, signal, 1, JBA);
+
+        ds->args[0] = DumpStateOrd::NdbfsDumpOpenFiles;
+        sendSignal(NDBFS_REF, GSN_DUMP_STATE_ORD, signal, 1, JBA);
+
+        ds->args[0] = DumpStateOrd::NdbfsDumpRequests;
+        sendSignal(NDBFS_REF, GSN_DUMP_STATE_ORD, signal, 1, JBA);
         
         const Uint32 ShutdownDelayMillis = 5 * 1000;
         /* Delay self-execution to give time for dump output */
@@ -30547,7 +31727,7 @@ Dblqh::stopLcpFragWatchdog()
   DEB_LCP(("(%u)stopLcpFragWatchdog", instance()));
   ndbrequire(c_lcpFragWatchdog.scan_running);
   c_lcpFragWatchdog.reset();
-};
+}
     
 /* **************************************************************** */
 /* ---------------------------------------------------------------- */
@@ -31528,4 +32708,10 @@ void Dblqh::decrement_committed_mbytes(LogPartRecord* logPartPtrP,
   logPartPtrP->m_committed_words -= (ZCOMMIT_LOG_SIZE + 1);
   ndbassert(regTcPtr->m_committed_log_space == 1);
   regTcPtr->m_committed_log_space = 0;
+}
+
+void Dblqh::execLOCAL_LATEST_LCP_ID_REP(Signal *signal)
+{
+  jamEntry();
+  m_restart_local_latest_lcp_id = signal->theData[0];
 }

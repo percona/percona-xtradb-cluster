@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -50,10 +50,12 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <list>
 #include <vector>
 
-#include "create_info_encryption_key.h"
 #include "fil0rkinfo.h"
+#include "keyring_encryption_key_info.h"
 
 #define REDO_LOG_ENCRYPT_NO_VERSION 0
+
+struct redo_log_key;
 
 /** Structure containing encryption specification */
 struct fil_space_crypt_t;
@@ -313,6 +315,9 @@ struct fil_space_t {
 
   ulint encryption_key_version;
 
+  /** Only used for redo log encryption: the currently active key handle */
+  redo_log_key *encryption_redo_key;
+
   /** Encryption is in progress */
   encryption_op_type encryption_op_in_progress;
 
@@ -381,21 +386,16 @@ class Fil_path {
   static constexpr auto OS_SEPARATOR = OS_PATH_SEPARATOR;
 
   /** Directory separators that are supported. */
-#if defined(__SUNPRO_CC)
-  static char *SEPARATOR;
-  static char *DOT_SLASH;
-  static char *DOT_DOT_SLASH;
-#else
   static constexpr auto SEPARATOR = "\\/";
 #ifdef _WIN32
   static constexpr auto DOT_SLASH = ".\\";
   static constexpr auto DOT_DOT_SLASH = "..\\";
+  static constexpr auto SLASH_DOT_DOT_SLASH = "\\..\\";
 #else
   static constexpr auto DOT_SLASH = "./";
   static constexpr auto DOT_DOT_SLASH = "../";
+  static constexpr auto SLASH_DOT_DOT_SLASH = "/../";
 #endif /* _WIN32 */
-
-#endif /* __SUNPRO_CC */
 
   /** Various types of file paths. */
   enum path_type { absolute, relative, file_name_only, invalid };
@@ -503,6 +503,31 @@ class Fil_path {
   @return true if the path is valid. */
   bool is_valid() const MY_ATTRIBUTE((warn_unused_result));
 
+  /** Determine if m_path contains a circular section like "/anydir/../"
+  Fil_path::normalize() must be run before this.
+  @return true if a circular section if found, false if not */
+  bool is_circular() const MY_ATTRIBUTE((warn_unused_result));
+
+  /** Determine if the file or directory is considered HIDDEN.
+  Most file systems identify the HIDDEN attribute by a '.' preceeding the
+  basename.  On Windows, a HIDDEN path is identified by a file attribute.
+  We will use the preceeding '.' to indicate a HIDDEN attribute on ALL
+  file systems so that InnoDB tablespaces and their directory structure
+  remain portable.
+  @param[in]  path  The full or relative path of a file or directory.
+  @return true if the directory or path is HIDDEN. */
+  static bool is_hidden(std::string path);
+
+#ifdef _WIN32
+  /** Use the WIN32_FIND_DATA struncture to determine if the file or
+  directory is HIDDEN.  Consider a SYSTEM attribute also as an indicator
+  that it is HIDDEN to InnoDB.
+  @param[in]  dirent  A directory entry obtained from a call to FindFirstFile()
+  or FindNextFile()
+  @return true if the directory or path is HIDDEN. */
+  static bool is_hidden(WIN32_FIND_DATA &dirent);
+#endif /* WIN32 */
+
   /** Remove quotes e.g., 'a;b' or "a;b" -> a;b.
   Assumes matching quotes.
   @return pathspec with the quotes stripped */
@@ -598,7 +623,7 @@ class Fil_path {
             std::equal(prefix.begin(), prefix.end(), path.begin()));
   }
 
-  /** Normalizes a directory path for the current OS:
+  /** Normalize a directory path for the current OS:
   On Windows, we convert '/' to '\', else we convert '\' to '/'.
   @param[in,out]	path	Directory and file path */
   static void normalize(std::string &path) {
@@ -609,7 +634,7 @@ class Fil_path {
     }
   }
 
-  /** Normalizes a directory path for the current OS:
+  /** Normalize a directory path for the current OS:
   On Windows, we convert '/' to '\', else we convert '\' to '/'.
   @param[in,out]	path	A NUL terminated path */
   static void normalize(char *path) {
@@ -1051,7 +1076,7 @@ Error messages are issued to the server log.
 @return pointer to created tablespace, to be filled in with fil_node_create()
 @retval nullptr on failure (such as when the same tablespace exists) */
 fil_space_t *fil_space_create(const char *name, space_id_t space_id,
-                              ulint flags, fil_type_t purpose,
+                              uint32_t flags, fil_type_t purpose,
                               fil_space_crypt_t *crypt_data,
                               fil_encryption_t mode = FIL_ENCRYPTION_DEFAULT)
     MY_ATTRIBUTE((warn_unused_result));
@@ -1084,14 +1109,14 @@ page_no_t fil_space_get_size(space_id_t space_id)
 in the memory cache.
 @param[in]	space_id	Tablespace ID for which to get the flags
 @return flags, ULINT_UNDEFINED if space not found */
-ulint fil_space_get_flags(space_id_t space_id)
+uint32_t fil_space_get_flags(space_id_t space_id)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Sets the flags of the tablespace. The tablespace must be locked
 in MDL_EXCLUSIVE MODE.
 @param[in]	space		tablespace in-memory struct
 @param[in]	flags		tablespace flags */
-void fil_space_set_flags(fil_space_t *space, ulint flags);
+void fil_space_set_flags(fil_space_t *space, uint32_t flags);
 
 /** Open each file of a tablespace if not already open.
 @param[in]	space_id	Tablespace ID
@@ -1167,6 +1192,13 @@ system tablespace.
 dberr_t fil_write_flushed_lsn(lsn_t lsn) MY_ATTRIBUTE((warn_unused_result));
 
 #else /* !UNIV_HOTBACKUP */
+/** Frees a space object from the tablespace memory cache.
+Closes a tablespaces' files but does not delete them.
+There must not be any pending i/o's or flushes on the files.
+@param[in]	space_id	Tablespace ID
+@return true if success */
+bool meb_fil_space_free(space_id_t space_id);
+
 /** Extends all tablespaces to the size stored in the space header. During the
 mysqlbackup --apply-log phase we extended the spaces on-demand so that log
 records could be applied, but that may have left spaces still too small
@@ -1205,7 +1237,14 @@ when it could be dropped concurrently.
 @param[in]	id	tablespace ID
 @return	the tablespace
 @retval	NULL if missing */
-fil_space_t *fil_space_acquire_for_io(ulint id);
+fil_space_t *fil_space_acquire_for_io(space_id_t id);
+
+/** Load and acquire a tablespace for reading or writing a block,
+when it could be dropped concurrently.
+@param[in]	id	tablespace ID
+@return	the tablespace
+@retval	NULL if missing */
+fil_space_t *fil_space_acquire_for_io_with_load(space_id_t space_id);
 
 /** Release a tablespace acquired with fil_space_acquire_for_io().
 @param[in,out]	space	tablespace to release  */
@@ -1242,7 +1281,7 @@ class FilSpace {
   /** Constructor: Look up the tablespace and increment the
   referece count if found.
   @param[in]	space_id	tablespace ID */
-  explicit FilSpace(ulint space_id, bool silent = false)
+  explicit FilSpace(space_id_t space_id, bool silent = false)
       : m_space(silent ? fil_space_acquire_silent(space_id)
                        : fil_space_acquire(space_id)) {}
 
@@ -1344,9 +1383,9 @@ The tablespace must exist in the memory cache.
 @param[in]	new_name	New tablespace name in the schema/name format
 @param[in]	new_path_in	New file name, or nullptr if it is located in
                                 The normal data directory
-@return true if success */
-bool fil_rename_tablespace(space_id_t space_id, const char *old_path,
-                           const char *new_name, const char *new_path_in)
+@return InnoDB error code */
+dberr_t fil_rename_tablespace(space_id_t space_id, const char *old_path,
+                              const char *new_name, const char *new_path_in)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Create a tablespace file.
@@ -1358,11 +1397,12 @@ bool fil_rename_tablespace(space_id_t space_id, const char *old_path,
 @param[in]	flags		Tablespace flags
 @param[in]	size		Initial size of the tablespace file in pages,
                                 must be >= FIL_IBD_FILE_INITIAL_SIZE
+@param[in]      keyring_encryption_key_id info on keyring encryption key
 @return DB_SUCCESS or error code */
 dberr_t fil_ibd_create(
-    space_id_t space_id, const char *name, const char *path, ulint flags,
+    space_id_t space_id, const char *name, const char *path, uint32_t flags,
     page_no_t size, fil_encryption_t mode,
-    const CreateInfoEncryptionKeyId &create_info_encryption_key_id)
+    const KeyringEncryptionKeyIdInfo &keyring_encryption_key_id)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Create a session temporary tablespace (IBT) file.
@@ -1374,7 +1414,7 @@ dberr_t fil_ibd_create(
                                 must be >= FIL_IBT_FILE_INITIAL_SIZE
 @return DB_SUCCESS or error code */
 dberr_t fil_ibt_create(space_id_t space_id, const char *name, const char *path,
-                       ulint flags, page_no_t size)
+                       uint32_t flags, page_no_t size)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Deletes an IBD tablespace, either general or single-table.
@@ -1414,7 +1454,7 @@ from it
                                 by upgrade
 @return DB_SUCCESS or error code */
 dberr_t fil_ibd_open(bool validate, fil_type_t purpose, space_id_t space_id,
-                     ulint flags, const char *space_name,
+                     uint32_t flags, const char *space_name,
                      const char *table_name, const char *path_in, bool strict,
                      bool old_space,
                      Keyring_encryption_info &keyring_encryption_info)
@@ -1768,6 +1808,7 @@ void fil_io_set_encryption(IORequest &req_type, const page_id_t &page_id,
 @param[in] algorithm		Encryption algorithm
 @param[in] key			Encryption key
 @param[in] iv			Encryption iv
+@param[in] acquire_mutex  if true acquire fil_sys mutex, else false
 @return DB_SUCCESS or error code */
 dberr_t fil_set_encryption(space_id_t space_id, Encryption::Type algorithm,
                            byte *key, byte *iv, bool aquire_mutex = true)
@@ -1916,13 +1957,6 @@ already be known.
 bool fil_tablespace_open_for_recovery(space_id_t space_id)
     MY_ATTRIBUTE((warn_unused_result));
 
-/** Callback to check tablespace size with space header size and extend
-Caller must own the Fil_shard mutex that the file belongs to.
-@param[in]	file	file node
-@return	error code */
-dberr_t fil_check_extend_space(fil_node_t *file)
-    MY_ATTRIBUTE((warn_unused_result));
-
 /** Replay a file rename operation for ddl replay.
 @param[in]	page_id		Space ID and first page number in the file
 @param[in]	old_name	old file name
@@ -1971,7 +2005,7 @@ void fil_space_update_name(fil_space_t *space, const char *name);
 @param space_id	space id */
 void fil_space_set_corrupt(space_id_t space_id);
 
-void fil_space_set_encrypted(ulint space_id);
+void fil_space_set_encrypted(space_id_t space_id);
 
 using space_id_vec = std::vector<space_id_t>;
 
@@ -1985,7 +2019,12 @@ bool fil_encryption_rotate_global(const space_id_vec &space_ids);
 void fil_system_acquire();
 void fil_system_release();
 
-void fil_lock_shard_by_id(ulint space_id);
-void fil_unlock_shard_by_id(ulint space_id);
+void fil_lock_shard_by_id(space_id_t space_id);
+void fil_unlock_shard_by_id(space_id_t space_id);
+
+/** Rotate the tablespace key by new master key.
+@param[in]	space	tablespace object
+@return true if the re-encrypt suceeds */
+bool encryption_rotate_low(fil_space_t *space);
 
 #endif /* fil0fil_h */

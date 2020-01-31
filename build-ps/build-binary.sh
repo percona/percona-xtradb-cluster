@@ -67,6 +67,9 @@ KEEP_BUILD=0
 # enable asan
 ENABLE_ASAN=0
 
+# build comment
+BUILD_COMMENT=""
+
 #-------------------------------------------------------------------------------
 #
 # Step-1: Set default configuration.
@@ -95,7 +98,7 @@ do
     -d | --debug )
         shift
         CMAKE_BUILD_TYPE='Debug'
-        BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
+        BUILD_COMMENT="debug."
         DEBUG_EXTRA="-DDEBUG_EXTNAME=ON"
         SCONS_ARGS+=' debug=0'
         ;;
@@ -110,7 +113,7 @@ do
     -v | --valgrind )
         shift
         CMAKE_OPTS="${CMAKE_OPTS:-} -DWITH_VALGRIND=ON"
-        BUILD_COMMENT="${BUILD_COMMENT:-}-valgrind"
+        BUILD_COMMENT="valgrind."
         ;;
     -q | --verbose )
         shift
@@ -244,22 +247,21 @@ fi
 
 source "$SOURCEDIR/VERSION"
 MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
-PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
+PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/./')"
 PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 
 # Note: WSREP_INTERFACE_VERSION act as compatibility check between wsrep-plugin
 # and galera plugin so we include it as part of our component.
-WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/src/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep-lib/wsrep-API/v26/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep-lib.cmake" | cut -d '"' -f2)"
 
 if [[ $COPYGALERA -eq 0 ]];then
-    #GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
-    GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; git log --pretty=oneline | head -1 | cut --delimiter=' ' -f 1 | cut -b 1-7)"
+    GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
 fi
 TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
-PRODUCT_NAME="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
-PRODUCT_FULL_NAME="$PRODUCT_NAME-$RELEASE_TAG$WSREP_VERSION${BUILD_COMMENT:-}.$TAG.$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
+PRODUCT_NAME="Percona-XtraDB-Cluster_$MYSQL_VERSION$PERCONA_SERVER_EXTENSION"
+PRODUCT_FULL_NAME="${PRODUCT_NAME}-${WSREP_VERSION}_${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
 
 #
 # This corresponds to GIT revision when the build/package is created.
@@ -413,6 +415,7 @@ fi
             -DWITH_RE2=bundled \
             -DWITH_LIBEVENT=bundled \
             -DWITH_EDITLINE=bundled \
+            -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_BOOST="$TARGETDIR/libboost" \
             -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
@@ -431,7 +434,7 @@ fi
             -DFEATURE_SET=community \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
-            -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
+            -DCOMPILATION_COMMENT="$COMMENT" \
             -DWITH_PAM=ON \
             -DWITHOUT_ROCKSDB=ON \
             -DWITHOUT_TOKUDB=ON \
@@ -446,6 +449,7 @@ fi
             -DWITH_RE2=bundled \
             -DWITH_EDITLINE=bundled \
             -DWITH_LIBEVENT=bundled \
+            -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_BOOST="$TARGETDIR/libboost" \
             -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
@@ -489,12 +493,16 @@ fi
             echo "Could not find percona-xtrabackup-2.4 tarball in $TARGETDIR.  Terminating."
             exit 1
         fi
-        pxb_dir=$(echo $pxb_tar | grep -oe ".*x86_64" )
+        # Remove the .tar.gz extension
+        pxb_basename=${pxb_tar%.tar*}
+        # Remove the libXXX (such as libgcrypt)
+        pxb_basename=${pxb_basename%.lib*}
+        pxb_dir="pxb-2.4"
 
         mkdir -p pxc_extra
         cd pxc_extra
-        if [[ -d ${pxb_dir} ]]; then
-            echo "Using existing pxb 2.4 directory"
+        if [[ -d ${pxb_basename} ]]; then
+            echo "Using existing pxb 2.4 directory : ${pxb_basename}"
         else
             echo "Removing existing percona-xtrabackup-2.4 basedir (if found)"
             find . -maxdepth 1 -type d -name 'percona-xtrabackup-2.*' -exec rm -rf {} \+
@@ -502,28 +510,28 @@ fi
             echo "Extracting pxb 2.4 tarball"
             tar -xzf "../$pxb_tar"
         fi
-        rm -f "pxb-2.4"
-        echo "Creating symlink pxc_extra/pxb-2.4 --> $pxb_dir"
-        ln -s "$pxb_dir" pxb-2.4
+        echo "Creating symlink $pxb_dir --> $pxb_basename"
+        rm -f pxb-2.4
+        ln -s ./${pxb_basename} pxb-2.4
     ) || exit 1
 
-    pxb_dir=$(ls -1td $TARGETDIR/pxc_extra/percona-xtrabackup-2.* | sort --version-sort | tail -n1)
-    pxb2_version=$(echo $pxb_dir | grep -oe "[1-9]\.[0-9][0-9]*\.[0-9][0-9]*")
-
-    # Look for the pxb 8.0 tarball
     (
         cd "$TARGETDIR"
         pxb_tar=$(ls -1td percona-xtrabackup-8.0.* | grep ".tar" | sort --version-sort | tail -n1)
         if [[ -z $pxb_tar ]]; then
-            echo "Could not find percona-xtrabackup-8.0.x tarball in $TARGETDIR.  Terminating."
+            echo "Could not find percona-xtrabackup-8.0 tarball in $TARGETDIR.  Terminating."
             exit 1
         fi
-        pxb_dir=$(echo $pxb_tar | grep -oe ".*x86_64" )
+        # Remove the .tar.gz extension
+        pxb_basename=${pxb_tar%.tar*}
+        # Remove the libXXX (such as libgcrypt) extension
+        pxb_basename=${pxb_basename%.lib*}
+        pxb_dir="pxb-8.0"
 
         mkdir -p pxc_extra
         cd pxc_extra
-        if [[ -d ${pxb_dir} ]]; then
-            echo "Using existing pxb 8.0 directory"
+        if [[ -d ${pxb_basename} ]]; then
+            echo "Using existing pxb 8.0 directory : ${pxb_basename}"
         else
             echo "Removing existing percona-xtrabackup-8.0 basedir (if found)"
             find . -maxdepth 1 -type d -name 'percona-xtrabackup-8.*' -exec rm -rf {} \+
@@ -531,25 +539,20 @@ fi
             echo "Extracting pxb 8.0 tarball"
             tar -xzf "../$pxb_tar"
         fi
-        rm -f "pxb-8.0"
-        echo "Creating symlink pxc_extra/pxb-8.0 --> $pxb_dir"
-        ln -s "$pxb_dir" pxb-8.0
+        echo "Creating symlink $pxb_dir --> $pxb_basename"
+        rm -f pxb-8.0
+        ln -s ./${pxb_basename} pxb-8.0
     ) || exit 1
-
-    pxb_dir=$(ls -1td $TARGETDIR/pxc_extra/percona-xtrabackup-8.* | sort --version-sort | tail -n1)
-    pxb8_version=$(echo $pxb_dir | grep -oe "[1-9]\.[0-9][0-9]*\.[0-9][0-9]*")
 
     # Only copy over the bin and lib portions of the xtrabackup packages
     # Test cases and other files are not copied
     mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4"
     (cp -v -r $TARGETDIR/pxc_extra/pxb-2.4/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4) || true
     (cp -v -r $TARGETDIR/pxc_extra/pxb-2.4/lib/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4) || true
-    echo "percona xtrabackup $pxb2_version in build in release mode"
 
     mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0"
     (cp -v -r $TARGETDIR/pxc_extra/pxb-8.0/bin/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0) || true
     (cp -v -r $TARGETDIR/pxc_extra/pxb-8.0/lib/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0) || true
-    echo "percona xtrabackup $pxb8_version in build in release mode"
 
 ) || exit 1
 

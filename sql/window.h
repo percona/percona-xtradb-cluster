@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -180,7 +180,7 @@ class Window {
     int64 m_rowno;
     bool m_from_last;
     st_offset() : m_rowno(0), m_from_last(false) {}
-    /*
+    /**
       Used for sorting offsets in ascending order for faster traversal of
       frame buffer tmp file
     */
@@ -190,7 +190,7 @@ class Window {
   struct st_ll_offset {
     int64 m_rowno;  ///< negative values is LEAD
     st_ll_offset() : m_rowno(INT_MIN64 /* uninitialized marker*/) {}
-    /*
+    /**
       Used for sorting offsets in ascending order for faster traversal of
       frame buffer tmp file
     */
@@ -198,7 +198,8 @@ class Window {
   };
 
   struct st_nth {
-    Mem_root_array_YY<st_offset> m_offsets;  // sorted set of NTH_VALUE offsets
+    Mem_root_array_YY<st_offset>
+        m_offsets;  ///< sorted set of NTH_VALUE offsets
   };
 
   struct st_lead_lag {
@@ -262,7 +263,7 @@ class Window {
   };
 
   /**
-    Execution state: used iff m_needs_frame_buffering. Holds four pointers to
+    Execution state: used iff m_needs_frame_buffering. Holds pointers to
     positions in the file in m_frame_buffer. We use these saved positions to
     avoid having to position to the first row in the partition and then
     making many read calls to find the desired row. By repositioning to a
@@ -1295,7 +1296,8 @@ class Window {
   void reset_partition_state() { reset_execution_state(RL_PARTITION); }
 
   /**
-    Reset execution state for next call to JOIN::exec, cf. JOIN::reset.
+    Reset execution state for next call to JOIN::exec, cf. JOIN::reset,
+    or using [Buffering]WindowingIterator::Init.
   */
   void reset_round() { reset_execution_state(RL_ROUND); }
 
@@ -1380,7 +1382,7 @@ class Window {
     return m_name->val_str(nullptr)->ptr();
   }
 
-  void print(THD *thd, String *str, enum_query_type qt,
+  void print(const THD *thd, String *str, enum_query_type qt,
              bool expand_definition) const;
 
   bool has_windowing_steps() const;
@@ -1401,8 +1403,9 @@ class Window {
     @param  before  True if 'before' is wanted; false if 'after' is.
   */
   bool before_or_after_frame(bool before);
-  void print_frame(String *str, enum_query_type qt) const;
-  void print_border(String *str, PT_border *b, enum_query_type qt) const;
+  void print_frame(const THD *thd, String *str, enum_query_type qt) const;
+  void print_border(const THD *thd, String *str, PT_border *b,
+                    enum_query_type qt) const;
 
   /**
     Reorder windows and eliminate redundant ordering. If a window has the

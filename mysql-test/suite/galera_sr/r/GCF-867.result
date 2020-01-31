@@ -1,0 +1,3 @@
+#node-1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+DROP TABLE t1;

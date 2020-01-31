@@ -44,7 +44,7 @@
 # As node #1 is not a Galera node, we connect to node #2 in order to run
 # include/galera_cluster.inc
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
---source include/galera_cluster.inc
+--source include/galera_cluster_master_slave.inc
 
 --connection node_2
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
@@ -6691,6 +6691,33 @@ CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';
 
 # ==== PXC-2368 test cases end ====
 
+--connection node_2
+--echo #node-2 (cluster node)
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+CHANGE MASTER TO MASTER_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+START SLAVE FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+STOP SLAVE FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+SHOW RELAYLOG EVENTS FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+FLUSH RELAY LOGS FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+SHOW SLAVE STATUS FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+RESET SLAVE FOR CHANNEL 'wsrep';
+
+#--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+#CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';
+
 
 --connection node_1
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
@@ -6700,3 +6727,6 @@ call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 
 --connection node_3
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("FLUSH RELAY LOGS cannot be performed on channel 'wsrep'");
+call mtr.add_suppression("Slave channel 'wsrep' does not exist");
+

@@ -31,11 +31,23 @@ insert into t values (1), (2), (3);
 select * from t;
 show create table t;
 
+create schema work2;
+set session default_table_encryption=ON;
+create schema work3;
+set session default_table_encryption=OFF;
+select schema_name, default_encryption from information_schema.schemata where schema_name like 'work%';
+
 --connection node_2
 --echo #node-2
+#
 select * from t;
 show create table t;
+#
+select schema_name, default_encryption from information_schema.schemata where schema_name like 'work%';
+#
 drop table t;
+drop database work2;
+drop database work3;
 
 #-------------------------------------------------------------------------------
 # sst of the encrypted table
@@ -56,6 +68,12 @@ CREATE TABLE e1 (
 ) ENCRYPTION='Y';
 INSERT INTO e1 VALUES(1, 'aaaaa');
 INSERT INTO e1 VALUES(2, 'bbbbb');
+#
+create schema work2;
+set session default_table_encryption=ON;
+create schema work3;
+set session default_table_encryption=OFF;
+select schema_name, default_encryption from information_schema.schemata where schema_name like 'work%';
 
 --connection node_2
 --echo #node-2 restarted (should get encrypted table through SST)
@@ -63,10 +81,14 @@ INSERT INTO e1 VALUES(2, 'bbbbb');
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
+#
+select schema_name, default_encryption from information_schema.schemata where schema_name like 'work%';
 
 select * from e1;
 show create table e1;
 drop table e1;
+drop database work2;
+drop database work3;
 
 #-------------------------------------------------------------------------------
 # ist of the encrypted table
@@ -87,6 +109,12 @@ CREATE TABLE e1 (
 ) ENCRYPTION='Y';
 INSERT INTO e1 VALUES(1, 'aaaaa');
 INSERT INTO e1 VALUES(2, 'bbbbb');
+#
+create schema work2;
+set session default_table_encryption=ON;
+create schema work3;
+set session default_table_encryption=OFF;
+select schema_name, default_encryption from information_schema.schemata where schema_name like 'work%';
 
 --connection node_2
 --echo #node-2 restarted (should get encrypted table through IST)
@@ -94,7 +122,11 @@ INSERT INTO e1 VALUES(2, 'bbbbb');
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
+#
+select schema_name, default_encryption from information_schema.schemata where schema_name like 'work%';
 
 select * from e1;
 show create table e1;
 drop table e1;
+drop database work2;
+drop database work3;

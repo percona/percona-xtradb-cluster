@@ -34,95 +34,95 @@ SELECT COUNT(*) = 2 FROM t1;
 DROP TABLE t1;
 
 
-#
-# RSU with parallely active commit connection
-#
-
---connection node_1
---echo #node-1
-call mtr.add_suppression("RSU failed due to pending transactions");
-call mtr.add_suppression("ALTER TABLE isolation failure");
-
---connection node_1
---echo #node-1
-CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) Engine=InnoDB;
-
-#------------------------------------------------------------------------------
-# try with default wsrep_RSU_commit_timeout
-
-# block DML during commit action
---connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
---echo #node-1a
---let $galera_sync_point = commit_monitor_enter_sync
---source include/galera_set_sync_point.inc
---send INSERT INTO t1 VALUES (1);
-
-# Wait until commit is blocked then issue RSU.
-# RSU needs no pending commit action.
---connection node_1
---echo #node-1
-SET SESSION wsrep_sync_wait = 0;
---source include/galera_wait_sync_point.inc
-#
-SET SESSION wsrep_OSU_method = "RSU";
---error ER_LOCK_DEADLOCK
-ALTER TABLE t1 ADD COLUMN f2 INTEGER;
-SET SESSION wsrep_OSU_method = default;
-#
---source include/galera_clear_sync_point.inc
---source include/galera_signal_sync_point.inc
-
-# Commit succeeds
---connection node_1a
---echo #node-1a
---reap
-SELECT * from t1;
-
-#------------------------------------------------------------------------------
-# try with csutomer wsrep_RSU_commit_timeout
-
-# increase timeout to 60 sec (timeout unit is micro-seconds)
---connection node_1
---echo #node-1
---let $RSU_timeout = `SELECT @@wsrep_RSU_commit_timeout`
-set global wsrep_RSU_commit_timeout=(60*1000000);
-select @@wsrep_RSU_commit_timeout;
-
-# block DML during commit action
---connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
---echo #node-1b
---let $galera_sync_point = commit_monitor_enter_sync
---source include/galera_set_sync_point.inc
---send INSERT INTO t1 VALUES (2);
-
-# Wait until commit is blocked then issue RSU.
-# RSU needs no pending commit action.
---connection node_1
---echo #node-1
-SET SESSION wsrep_sync_wait = 0;
---source include/galera_wait_sync_point.inc
-#
-SET SESSION wsrep_OSU_method = "RSU";
---send ALTER TABLE t1 ADD COLUMN f2 INTEGER;
-
---connection node_1a
---echo #node-1a
---sleep 2
---source include/galera_clear_sync_point.inc
---source include/galera_signal_sync_point.inc
-
-# Commit succeeds
---connection node_1b
---echo #node-1b
---reap
-
-# RSU succeeds
---connection node_1
---echo #node-1
---reap
-SET SESSION wsrep_OSU_method = default;
---eval set global wsrep_RSU_commit_timeout=$RSU_timeout
-SELECT * from t1;
-DROP TABLE t1;
-
-
+###
+### RSU with parallely active commit connection
+###
+##
+##--connection node_1
+##--echo #node-1
+##call mtr.add_suppression("RSU failed due to pending transactions");
+##call mtr.add_suppression("ALTER TABLE isolation failure");
+##
+##--connection node_1
+##--echo #node-1
+##CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) Engine=InnoDB;
+##
+###------------------------------------------------------------------------------
+### try with default wsrep_RSU_commit_timeout
+##
+### block DML during commit action
+##--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+##--echo #node-1a
+##--let $galera_sync_point = commit_monitor_enter_sync
+##--source include/galera_set_sync_point.inc
+##--send INSERT INTO t1 VALUES (1);
+##
+### Wait until commit is blocked then issue RSU.
+### RSU needs no pending commit action.
+##--connection node_1
+##--echo #node-1
+##SET SESSION wsrep_sync_wait = 0;
+##--source include/galera_wait_sync_point.inc
+###
+##SET SESSION wsrep_OSU_method = "RSU";
+##--error ER_LOCK_DEADLOCK
+##ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+##SET SESSION wsrep_OSU_method = default;
+###
+##--source include/galera_clear_sync_point.inc
+##--source include/galera_signal_sync_point.inc
+##
+### Commit succeeds
+##--connection node_1a
+##--echo #node-1a
+##--reap
+##SELECT * from t1;
+##
+###------------------------------------------------------------------------------
+### try with csutomer wsrep_RSU_commit_timeout
+##
+### increase timeout to 60 sec (timeout unit is micro-seconds)
+##--connection node_1
+##--echo #node-1
+##--let $RSU_timeout = `SELECT @@wsrep_RSU_commit_timeout`
+##set global wsrep_RSU_commit_timeout=(60*1000000);
+##select @@wsrep_RSU_commit_timeout;
+##
+### block DML during commit action
+##--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+##--echo #node-1b
+##--let $galera_sync_point = commit_monitor_enter_sync
+##--source include/galera_set_sync_point.inc
+##--send INSERT INTO t1 VALUES (2);
+##
+### Wait until commit is blocked then issue RSU.
+### RSU needs no pending commit action.
+##--connection node_1
+##--echo #node-1
+##SET SESSION wsrep_sync_wait = 0;
+##--source include/galera_wait_sync_point.inc
+###
+##SET SESSION wsrep_OSU_method = "RSU";
+##--send ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+##
+##--connection node_1a
+##--echo #node-1a
+##--sleep 2
+##--source include/galera_clear_sync_point.inc
+##--source include/galera_signal_sync_point.inc
+##
+### Commit succeeds
+##--connection node_1b
+##--echo #node-1b
+##--reap
+##
+### RSU succeeds
+##--connection node_1
+##--echo #node-1
+##--reap
+##SET SESSION wsrep_OSU_method = default;
+##--eval set global wsrep_RSU_commit_timeout=$RSU_timeout
+##SELECT * from t1;
+##DROP TABLE t1;
+##
+##

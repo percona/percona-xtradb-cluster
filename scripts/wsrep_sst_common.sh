@@ -174,12 +174,12 @@ parse_cnf()
 
     # look in group+suffix
     if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
-        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | awk -F= '{st=index($0,"="); cur=$0; if ($1 ~ /_/) { gsub(/_/,"-",$1);} if (st != 0) { print $1"="substr(cur,st+1) } else { print cur }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
     fi
 
     # look in group
     if [[ -z $reval ]]; then
-        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}" | awk -F= '{st=index($0,"="); cur=$0; if ($1 ~ /_/) { gsub(/_/,"-",$1);} if (st != 0) { print $1"="substr(cur,st+1) } else { print cur }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
     fi
 
     # use default if we haven't found a value
@@ -392,9 +392,20 @@ function normalize_version()
 #
 function compare_versions()
 {
-    local version_1="$( normalize_version $1 )"
+    local version_1="$1"
     local op=$2
-    local version_2="$( normalize_version $3 )"
+    local version_2="$3"
+
+    if [[ -z $version_1 || -z $version_2 ]]; then
+        wsrep_log_error "******************* ERROR ********************** "
+        wsrep_log_error "Missing version string in comparison"
+        wsrep_log_error "left-side:$version_1  operation:$op  right-side:$version_2"
+        wsrep_log_error "******************* ERROR ********************** "
+        return 1
+    fi
+
+    version_1="$( normalize_version "$version_1" )"
+    version_2="$( normalize_version "$version_2" )"
 
     if [[ ! " = == > >= < <= != " =~ " $op " ]]; then
         wsrep_log_error "******************* ERROR ********************** "
@@ -467,6 +478,8 @@ function wait_for_mysqld_startup()
     local threshold=$3
     local err_log=$4
     local description=$5
+    local sst_user=$6
+    local sst_password=$7
 
     local -i timeout
     timeout=$threshold
@@ -483,7 +496,14 @@ function wait_for_mysqld_startup()
             return 3
         fi
 
-        $mysqladmin_path ping --socket=$mysqld_socket &> /dev/null
+        $mysqladmin_path \
+            --defaults-file=/dev/stdin \
+            --socket=$mysqld_socket \
+            ping &> /dev/null <<EOF
+[mysqladmin]
+user=${sst_user}
+password="${sst_password}"
+EOF
         errcode=$?
         [[ $errcode -eq 0 ]] && break
 
@@ -1055,7 +1075,7 @@ EOF
     #-----------------------------------------------------------------------
     # wait for mysql to come up
     wait_for_mysqld_startup $mysql_pid $upgrade_socket $timeout_threshold ${mysqld_err_log} \
-        "mysql server that executes mysql-upgrade"
+        $sst_user $sst_password "mysql server that executes mysql-upgrade"
     errcode=$?
     [[ $errcode -ne 0 ]] && return $errcode
     wsrep_log_debug "MySQL server($mysql_pid) started"
@@ -1142,7 +1162,7 @@ FLUSH PRIVILEGES;
 EOF
             mysql_pid=$!
             wait_for_mysqld_startup $mysql_pid $upgrade_socket $timeout_threshold ${mysqld_err_log} \
-                "mysql server that executes mysql-upgrade"
+                $sst_user $sst_password "mysql server that executes mysql-upgrade"
             errcode=$?
             [[ $errcode -ne 0 ]] && return $errcode
             wsrep_log_debug "MySQL server($mysql_pid) started"

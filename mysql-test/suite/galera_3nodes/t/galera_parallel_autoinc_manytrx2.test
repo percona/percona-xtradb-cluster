@@ -59,7 +59,8 @@ while ($count)
 --connection node_1
 SELECT COUNT(*) = 6000 FROM t1;
 SELECT COUNT(DISTINCT f1) = 6000 FROM t1;
-SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
+--let $wait_condition = SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
+--source include/wait_condition.inc
 
 # Check against runaway auto-increment numbers
 SELECT MAX(f1) < 15000 FROM t1;
@@ -68,14 +69,20 @@ SELECT AUTO_INCREMENT < 15000 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 
 --connection node_2
 SELECT COUNT(*) = 6000 FROM t1;
 SELECT COUNT(DISTINCT f1) = 6000 FROM t1;
-SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
+--let $wait_condition = SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
+--source include/wait_condition.inc
+
+# Check against runaway auto-increment numbers
 SELECT MAX(f1) < 15000 FROM t1;
 SELECT AUTO_INCREMENT < 15000 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 
 --connection node_3
 SELECT COUNT(*) = 6000 FROM t1;
 SELECT COUNT(DISTINCT f1) = 6000 FROM t1;
-SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
+--let $wait_condition = SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
+--source include/wait_condition.inc
+
+# Check against runaway auto-increment numbers
 SELECT MAX(f1) < 15000 FROM t1;
 SELECT AUTO_INCREMENT < 15000 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 

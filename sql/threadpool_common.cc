@@ -14,6 +14,11 @@
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
    USA */
 
+#ifdef WITH_WSREP
+#include "mysql/components/services/log_builtins.h"
+#include "wsrep_trans_observer.h"
+#endif /* WITH_WSREP */
+
 #include "my_thread_local.h"
 #include "mysql/psi/mysql_idle.h"
 #include "mysql/psi/mysql_socket.h"
@@ -26,6 +31,7 @@
 #include "sql/sql_audit.h"
 #include "sql/sql_class.h"
 #include "sql/sql_connect.h"
+#include "sql/protocol_classic.h"
 #include "sql/sql_parse.h"
 #include "sql/threadpool.h"
 #include "violite.h"
@@ -100,6 +106,11 @@ class Worker_thread_context {
   Attach/associate the connection with the OS thread,
 */
 static bool thread_attach(THD *thd) {
+#ifdef WITH_WSREP
+  /* Wait until possible background rollback has finished before
+     attaching the thd. */
+  wsrep_wait_rollback_complete_and_acquire_ownership(thd);
+#endif /* WITH_WSREP */
 #ifndef DBUG_OFF
   set_my_thread_var_id(thd->thread_id());
 #endif

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -28,6 +28,7 @@
 #include "mysql/harness/config_parser.h"
 #include "mysql/harness/loader.h"
 #include "mysql/harness/logging/registry.h"
+#include "mysql/harness/vt100_filter.h"
 #include "mysqlrouter/utils.h"
 #include "router_app.h"
 #include "router_config.h"
@@ -40,7 +41,7 @@
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #endif
 
-#include "gmock/gmock.h"
+#include <gmock/gmock.h>
 #include "gtest_consoleoutput.h"
 
 #ifdef __clang__
@@ -56,19 +57,14 @@
 #include <unistd.h>
 #endif
 
-#ifdef __clang__
-// ignore GMock warnings
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wsign-conversion"
-#include "gmock/gmock.h"
-#pragma clang diagnostic pop
-#else
-#include "gmock/gmock.h"
-#endif
+static const std::string kPluginNameMagic("routertestplugin_magic");
+static const std::string kPluginNameLifecycle("routertestplugin_lifecycle");
+static const std::string kPluginNameLifecycle3("routertestplugin_lifecycle3");
 
 using std::string;
 using std::vector;
 
+using ::testing::_;
 using ::testing::EndsWith;
 using ::testing::Ge;
 using ::testing::HasSubstr;
@@ -78,7 +74,6 @@ using ::testing::Return;
 using ::testing::SizeIs;
 using ::testing::StartsWith;
 using ::testing::StrEq;
-using ::testing::_;
 
 #ifndef _WIN32
 using mysqlrouter::SysUserOperationsBase;
@@ -113,8 +108,7 @@ Path g_origin;
 class AppTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    orig_cout_ = std::cout.rdbuf();
-    std::cout.rdbuf(ssout.rdbuf());
+    init_test_logger();
 #ifndef _WIN32
     mock_sys_user_operations.reset(new MockSysUserOperations());
 #endif
@@ -122,19 +116,7 @@ class AppTest : public ::testing::Test {
     config_dir = Path(mysql_harness::get_tests_data_dir(g_origin.str()));
   }
 
-  virtual void TearDown() {
-    if (orig_cout_) {
-      std::cout.rdbuf(orig_cout_);
-    }
-  }
-
-  void reset_ssout() {
-    ssout.str("");
-    ssout.clear();
-  }
-
-  std::stringstream ssout;
-  std::streambuf *orig_cout_;
+  virtual void TearDown() {}
 
 #ifndef _WIN32
   std::unique_ptr<MockSysUserOperations> mock_sys_user_operations;
@@ -363,47 +345,59 @@ TEST_F(AppTest, CmdLineUserShortBeforeBootstrap) {
 TEST_F(AppTest, CmdLineVersion) {
   vector<string> argv = {"--version"};
 
-  reset_ssout();
+  // filter out the ANSI ESC sequences
+  std::stringstream out_stream;
+  Vt100Filter filtered_out_streambuf(out_stream.rdbuf());
+  std::ostream filtered_out_stream(&filtered_out_streambuf);
 
-  MySQLRouter r(g_origin, argv);
-  ASSERT_THAT(ssout.str(), StartsWith(r.get_version_line()));
+  MySQLRouter r(g_origin, argv, filtered_out_stream);
+  ASSERT_THAT(out_stream.str(), StartsWith(r.get_version_line()));
 }
 
 TEST_F(AppTest, CmdLineVersionShort) {
   vector<string> argv = {"-V"};
 
-  reset_ssout();
+  // filter out the ANSI ESC sequences
+  std::stringstream out_stream;
+  Vt100Filter filtered_out_streambuf(out_stream.rdbuf());
+  std::ostream filtered_out_stream(&filtered_out_streambuf);
 
-  MySQLRouter r(g_origin, argv);
-  ASSERT_THAT(ssout.str(), StartsWith("MySQL Router"));
+  MySQLRouter r(g_origin, argv, filtered_out_stream);
+  ASSERT_THAT(out_stream.str(), StartsWith("MySQL Router"));
 }
 
 TEST_F(AppTest, CmdLineHelp) {
   vector<string> argv = {"--help"};
-  reset_ssout();
-  MySQLRouter r(g_origin, argv);
+  // filter out the ANSI ESC sequences
+  std::stringstream out_stream;
+  Vt100Filter filtered_out_streambuf(out_stream.rdbuf());
+  std::ostream filtered_out_stream(&filtered_out_streambuf);
+
+  MySQLRouter r(g_origin, argv, filtered_out_stream);
 
   // several substrings from help output that are unlikely to change soon
-  EXPECT_THAT(ssout.str(), HasSubstr("MySQL Router  V"));
+  EXPECT_THAT(out_stream.str(), HasSubstr("MySQL Router  V"));
   EXPECT_THAT(
-      ssout.str(),
+      out_stream.str(),
       HasSubstr(
           "Oracle is a registered trademark of Oracle Corporation and/or its"));
-  EXPECT_THAT(ssout.str(), HasSubstr("Usage: mysqlrouter"));
+  EXPECT_THAT(out_stream.str(), HasSubstr("Usage\n\nmysqlrouter"));
 }
 
 TEST_F(AppTest, CmdLineHelpShort) {
   vector<string> argv = {"-?"};
-  reset_ssout();
-  MySQLRouter r(g_origin, argv);
+  std::stringstream out_stream;
+  Vt100Filter filtered_out_streambuf(out_stream.rdbuf());
+  std::ostream filtered_out_stream(&filtered_out_streambuf);
+  MySQLRouter r(g_origin, argv, filtered_out_stream);
 
   // several substrings from help output that are unlikely to change soon
-  EXPECT_THAT(ssout.str(), HasSubstr("MySQL Router  V"));
+  EXPECT_THAT(out_stream.str(), HasSubstr("MySQL Router  V"));
   EXPECT_THAT(
-      ssout.str(),
+      out_stream.str(),
       HasSubstr(
           "Oracle is a registered trademark of Oracle Corporation and/or its"));
-  EXPECT_THAT(ssout.str(), HasSubstr("Usage: mysqlrouter"));
+  EXPECT_THAT(out_stream.str(), HasSubstr("Usage\n\nmysqlrouter"));
 }
 
 TEST_F(AppTest, ConfigFileParseError) {
@@ -441,7 +435,7 @@ TEST_F(AppTest, SectionOverMultipleConfigFiles) {
   // let the Loader load the configuration files
   ASSERT_NO_THROW(r.start());
 
-  auto section = r.loader_->get_config().get("magic", "");
+  auto section = r.loader_->get_config().get(kPluginNameMagic, "");
   ASSERT_THAT(section.get("foo"), StrEq("bar"));
   ASSERT_THROW(section.get("NotInTheSection"), mysql_harness::bad_option);
 }
@@ -511,14 +505,19 @@ TEST_F(AppTest, SetCommandLineUserBeforeInitializingLogger) {
       .WillOnce(Return(0));
   EXPECT_CALL(*mock_sys_user_operations, setuid(user_info.pw_uid))
       .Times(1)
-      .WillOnce(testing::DoAll(testing::InvokeWithoutArgs([&] {
-                                 ASSERT_FALSE(mysql_harness::DIM::instance()
-                                                  .get_LoggingRegistry()
-                                                  .is_ready());
-                               }),
-                               (Return(0))));
+      .WillOnce(testing::DoAll(
+          testing::InvokeWithoutArgs([&] {
+            ASSERT_FALSE(mysql_harness::DIM::instance()
+                             .get_LoggingRegistry()
+                             .is_ready());
+          }),
+          // we proved that the user got set first, now init the logger properly
+          // for the further loader to use it
+          testing::InvokeWithoutArgs([&] { init_test_logger(); }),
+          (Return(0))));
 
-  MySQLRouter r(g_origin, argv, mock_sys_user_operations.get());
+  MySQLRouter r(g_origin, argv, std::cout, std::cerr,
+                mock_sys_user_operations.get());
   ASSERT_NO_THROW(r.start());
 }
 
@@ -580,14 +579,19 @@ TEST_F(AppTest, SetConfigUserBeforeInitializingLogger) {
       .WillOnce(Return(0));
   EXPECT_CALL(*mock_sys_user_operations, setuid(user_info.pw_uid))
       .Times(1)
-      .WillOnce(testing::DoAll(testing::InvokeWithoutArgs([&] {
-                                 ASSERT_FALSE(mysql_harness::DIM::instance()
-                                                  .get_LoggingRegistry()
-                                                  .is_ready());
-                               }),
-                               (Return(0))));
+      .WillOnce(testing::DoAll(
+          testing::InvokeWithoutArgs([&] {
+            ASSERT_FALSE(mysql_harness::DIM::instance()
+                             .get_LoggingRegistry()
+                             .is_ready());
+          }),
+          // we proved that the user got set first, now init the logger properly
+          // for the further loader to use it
+          testing::InvokeWithoutArgs([&] { init_test_logger(); }),
+          (Return(0))));
 
-  MySQLRouter r(g_origin, argv, mock_sys_user_operations.get());
+  MySQLRouter r(g_origin, argv, std::cout, std::cerr,
+                mock_sys_user_operations.get());
   ASSERT_NO_THROW(r.start());
 }
 
@@ -595,20 +599,24 @@ TEST_F(AppTest, SetConfigUserBeforeInitializingLogger) {
 
 TEST_F(AppTest, ShowingInfoTrue) {
   vector<vector<string>> cases = {
-      {"--version"},
       {"--help"},
+      {"--version"},
       {"--help", "--config", config_dir.join("mysqlrouter.conf").str()},
       {"--config", config_dir.join("mysqlrouter.conf").str(), "--help"},
   };
 
   // Make sure we do not start when showing information
   for (auto &argv : cases) {
+    // filter out the ANSI ESC sequences
+    std::stringstream out_stream;
+    Vt100Filter filtered_out_streambuf(out_stream.rdbuf());
+    std::ostream filtered_out_stream(&filtered_out_streambuf);
+
     ASSERT_NO_THROW({
-      MySQLRouter r(g_origin, argv);
+      MySQLRouter r(g_origin, argv, filtered_out_stream);
       r.start();
     });
-    ASSERT_THAT(ssout.str(), HasSubstr("MySQL Router  V"));
-    reset_ssout();
+    ASSERT_THAT(out_stream.str(), HasSubstr("MySQL Router  V")) << argv[0];
   }
 }
 
@@ -958,7 +966,8 @@ TEST_F(AppTest, BootstrapSuperuserNoUserOption) {
       .WillOnce(Return(0));
 
   try {
-    MySQLRouter r(g_origin, argv, mock_sys_user_operations.get());
+    MySQLRouter r(g_origin, argv, std::cout, std::cerr,
+                  mock_sys_user_operations.get());
     FAIL() << "Should throw";
   } catch (const std::runtime_error &exc) {
     EXPECT_THAT(exc.what(), StartsWith("You are bootstraping as a superuser."));
@@ -972,7 +981,8 @@ TEST_F(AppTest, BootstrapSuperuserNoUserOption) {
  */
 TEST_F(AppTest, ThrowWhenMasterKeyReaderUsedWithoutBootstrap) {
   vector<string> argv = {"--master-key-reader=reader.sh"};
-  ASSERT_THROW_LIKE(MySQLRouter(g_origin, argv, mock_sys_user_operations.get()),
+  ASSERT_THROW_LIKE(MySQLRouter(g_origin, argv, std::cout, std::cerr,
+                                mock_sys_user_operations.get()),
                     std::runtime_error,
                     "Option --master-key-reader can only be used together with "
                     "-B/--bootstrap");
@@ -985,7 +995,8 @@ TEST_F(AppTest, ThrowWhenMasterKeyReaderUsedWithoutBootstrap) {
  */
 TEST_F(AppTest, ThrowWhenMasterKeyWriterUsedWithoutBootstrap) {
   vector<string> argv = {"--master-key-writer=writer.sh"};
-  ASSERT_THROW_LIKE(MySQLRouter(g_origin, argv, mock_sys_user_operations.get()),
+  ASSERT_THROW_LIKE(MySQLRouter(g_origin, argv, std::cout, std::cerr,
+                                mock_sys_user_operations.get()),
                     std::runtime_error,
                     "Option --master-key-writer can only be used together with "
                     "-B/--bootstrap");
@@ -999,9 +1010,11 @@ TEST_F(AppTest, ThrowWhenMasterKeyWriterUsedWithoutBootstrap) {
 TEST_F(AppTest, ThrowWhenMasterKeyReaderUsedWithoutValue) {
   vector<string> argv = {"--bootstrap", "127.0.0.1:3060",
                          "--master-key-reader"};
-  ASSERT_THROW_LIKE(MySQLRouter(g_origin, argv, mock_sys_user_operations.get()),
-                    std::runtime_error,
-                    "option '--master-key-reader' requires a value.");
+  ASSERT_THROW_LIKE(
+      MySQLRouter(g_origin, argv, std::cout, std::cerr,
+                  mock_sys_user_operations.get()),
+      std::runtime_error,
+      "option '--master-key-reader' expects a value, got nothing");
 }
 
 /**
@@ -1012,9 +1025,11 @@ TEST_F(AppTest, ThrowWhenMasterKeyReaderUsedWithoutValue) {
 TEST_F(AppTest, ThrowWhenMasterKeyWriterUsedWithoutValue) {
   vector<string> argv = {"--bootstrap", "127.0.0.1:3060",
                          "--master-key-writer"};
-  ASSERT_THROW_LIKE(MySQLRouter(g_origin, argv, mock_sys_user_operations.get()),
-                    std::runtime_error,
-                    "option '--master-key-writer' requires a value.");
+  ASSERT_THROW_LIKE(
+      MySQLRouter(g_origin, argv, std::cout, std::cerr,
+                  mock_sys_user_operations.get()),
+      std::runtime_error,
+      "option '--master-key-writer' expects a value, got nothing");
 }
 
 /**
@@ -1025,7 +1040,8 @@ TEST_F(AppTest, ThrowWhenMasterKeyWriterUsedWithoutValue) {
 TEST_F(AppTest, ThrowWhenMasterKeyReaderUsedWithoutMasterKeyWriter) {
   vector<string> argv = {"--bootstrap", "127.0.0.1:3060",
                          "--master-key-reader=reader.sh"};
-  ASSERT_THROW_LIKE(MySQLRouter(g_origin, argv, mock_sys_user_operations.get()),
+  ASSERT_THROW_LIKE(MySQLRouter(g_origin, argv, std::cout, std::cerr,
+                                mock_sys_user_operations.get()),
                     std::runtime_error,
                     "Option --master-key-reader can only be used together with "
                     "--master-key-writer.");
@@ -1039,7 +1055,8 @@ TEST_F(AppTest, ThrowWhenMasterKeyReaderUsedWithoutMasterKeyWriter) {
 TEST_F(AppTest, ThrowWhenMasterKeyWriterUsedWithoutMasterKeyReader) {
   vector<string> argv = {"--bootstrap", "127.0.0.1:3060",
                          "--master-key-writer=writer.sh"};
-  ASSERT_THROW_LIKE(MySQLRouter(g_origin, argv, mock_sys_user_operations.get()),
+  ASSERT_THROW_LIKE(MySQLRouter(g_origin, argv, std::cout, std::cerr,
+                                mock_sys_user_operations.get()),
                     std::runtime_error,
                     "Option --master-key-writer can only be used together with "
                     "--master-key-reader.");
@@ -1074,12 +1091,14 @@ TEST_F(AppLoggerTest, TestLogger) {
     ofs_config << "[logger]\n";
     ofs_config << "level = DEBUG\n";  // override the default (WARNING)
     ofs_config << "\n";
-    ofs_config << "[magic]\n";  // magic plugin
+    ofs_config << "[" << kPluginNameMagic << "]\n";  // magic plugin
     ofs_config << "do_magic = yes\n";
     ofs_config << "message = It is some kind of magic\n";
     ofs_config << "\n";
-    ofs_config << "[lifecycle3]\n";  // lifecycle3 plugin (lifecycle dependency)
-    ofs_config << "[lifecycle:instance1]\n";  // lifecycle plugin
+    ofs_config << "[" << kPluginNameLifecycle3
+               << "]\n";  // lifecycle3 plugin (lifecycle dependency)
+    ofs_config << "[" << kPluginNameLifecycle
+               << ":instance1]\n";  // lifecycle plugin
     ofs_config.close();
   } else {
     throw std::runtime_error("Failed creating config file '" +
@@ -1090,31 +1109,28 @@ TEST_F(AppLoggerTest, TestLogger) {
   reset_ssout();
   vector<string> argv = {"-c", config_path.c_str()};
   MySQLRouter r(g_origin, argv);
-  ASSERT_NO_THROW(r.start());
+  ASSERT_NO_THROW(r.start()) << get_log_stream().str();
 
   // verify that all plugins have a module registered with the logger
   auto loggers =
       mysql_harness::DIM::instance().get_LoggingRegistry().get_logger_names();
   EXPECT_THAT(loggers, testing::UnorderedElementsAre(
-                           mysql_harness::logging::kMainLogger, "magic",
-                           "lifecycle", "lifecycle3", "sql"));
+                           mysql_harness::logging::kMainLogger,
+                           kPluginNameMagic, kPluginNameLifecycle,
+                           kPluginNameLifecycle3, "sql", "logger"));
 
   // verify the log contains what we expect it to contain. We're looking for
   // lines like this:
   {
-    // 2017-05-03 11:30:23 main DEBUG [7ffff7fd4780] Main logger initialized,
-    // logging to STDERR
-    EXPECT_THAT(get_log_stream().str(), HasSubstr(" main DEBUG "));
-    EXPECT_THAT(get_log_stream().str(),
-                HasSubstr(" Main logger initialized, logging to STDERR"));
-
     // 2017-05-03 11:30:25 magic INFO [7ffff5e34700] It is some kind of magic
-    EXPECT_THAT(get_log_stream().str(), HasSubstr(" magic INFO "));
+    EXPECT_THAT(get_log_stream().str(),
+                HasSubstr(" " + kPluginNameMagic + " INFO "));
     EXPECT_THAT(get_log_stream().str(), HasSubstr(" It is some kind of magic"));
 
     // 2017-05-03 11:30:25 lifecycle INFO [7faefa705780] lifecycle:all
     // init():begin
-    EXPECT_THAT(get_log_stream().str(), HasSubstr(" lifecycle INFO "));
+    EXPECT_THAT(get_log_stream().str(),
+                HasSubstr(" " + kPluginNameLifecycle + " INFO "));
     EXPECT_THAT(get_log_stream().str(),
                 HasSubstr(" lifecycle:all init():begin"));
   }
@@ -1128,7 +1144,6 @@ TEST_F(AppTest, EmptyConfigPath) {
 int main(int argc, char *argv[]) {
   g_origin = Path(argv[0]).dirname();
 
-  register_test_logger();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

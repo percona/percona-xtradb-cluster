@@ -1,3 +1,4 @@
+#
 --source include/have_wsrep.inc
 
 --echo #
@@ -32,10 +33,13 @@ SELECT @@global.wsrep_desync;
 --error 0,ER_WRONG_ARGUMENTS
 SET @@global.wsrep_desync='OFF';
 SELECT @@global.wsrep_desync;
+#
 # expected as no wsrep provider is currently loaded
 --error ER_CANNOT_USER,ER_WRONG_ARGUMENTS
 SET @@global.wsrep_desync=ON;
 SELECT @@global.wsrep_desync;
+#
+--error 0,ER_WRONG_ARGUMENTS
 SET @@global.wsrep_desync=default;
 SELECT @@global.wsrep_desync;
 

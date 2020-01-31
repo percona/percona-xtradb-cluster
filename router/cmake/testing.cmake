@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -30,7 +30,7 @@ ENDMACRO()
 
 FUNCTION(add_test_file FILE)
   SET(one_value_args MODULE LABEL ENVIRONMENT)
-  SET(multi_value_args LIB_DEPENDS INCLUDE_DIRS SYSTEM_INCLUDE_DIRS DEPENDS)
+  SET(multi_value_args LIB_DEPENDS INCLUDE_DIRS SYSTEM_INCLUDE_DIRS DEPENDS EXTRA_SOURCES)
   cmake_parse_arguments(TEST "" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
   IF(NOT TEST_MODULE)
@@ -47,7 +47,7 @@ FUNCTION(add_test_file FILE)
     ROUTERTEST_GET_TARGET(test_target ${FILE} ${TEST_MODULE})
 
     SET(test_name "${test_target}")
-    MYSQL_ADD_EXECUTABLE(${test_target} ${FILE} ADD_TEST ${test_name})
+    MYSQL_ADD_EXECUTABLE(${test_target} ${FILE} ${TEST_EXTRA_SOURCES} ADD_TEST ${test_name})
 
     IF(MYSQL_ROUTER_BUILD_ALL_TARGET)
       ADD_DEPENDENCIES(${MYSQL_ROUTER_BUILD_ALL_TARGET} ${test_target})
@@ -94,35 +94,6 @@ FUNCTION(add_test_file FILE)
   ENDIF()
 
 ENDFUNCTION(add_test_file)
-
-FUNCTION(add_test_dir DIR_NAME)
-  SET(one_value_args MODULE ENVIRONMENT)
-  SET(multi_value_args LIB_DEPENDS INCLUDE_DIRS SYSTEM_INCLUDE_DIRS DEPENDS)
-  cmake_parse_arguments(TEST "" "${one_value_args}" "${multi_value_args}" ${ARGN})
-
-  IF(NOT TEST_MODULE)
-    MESSAGE(FATAL_ERROR "Module name missing for test folder ${DIR_NAME}")
-  ENDIF()
-
-  GET_FILENAME_COMPONENT(abs_path ${DIR_NAME} ABSOLUTE)
-
-  FILE(GLOB test_files RELATIVE ${abs_path}
-    ${abs_path}/*.cc)
-
-  FOREACH(test_file ${test_files})
-    IF(NOT ${test_file} MATCHES "^helper")
-      add_test_file(${abs_path}/${test_file}
-        MODULE ${TEST_MODULE}
-        ENVIRONMENT ${TEST_ENVIRONMENT}
-        LIB_DEPENDS ${TEST_LIB_DEPENDS}
-        DEPENDS ${TEST_DEPENDS}
-        INCLUDE_DIRS ${TEST_INCLUDE_DIRS}
-        SYSTEM_INCLUDE_DIRS ${TEST_SYSTEM_INCLUDE_DIRS}
-        )
-    ENDIF()
-  ENDFOREACH(test_file)
-
-ENDFUNCTION(add_test_dir)
 
 # Copy and configure configuration files templates
 # from selected directory to common place in tests/data

@@ -1,7 +1,7 @@
 
 #------------------------------------------------------------------------------
 ## InnoDB transparent tablespace data encryption
-## This test case will test basic recovery from know DBUG_SUICIDE point .
+## This test case will test basic recovery from known DBUG_SUICIDE point .
 ##  - ib_crash_during_rotation_for_encryption (assert during key rotation)
 ##  - ib_crash_during_create_for_encryption (assert during create)
 ##  - ib_crash_during_decrypt_page (assert during page decryption)
@@ -150,14 +150,18 @@ DROP TABLE tde_db.t1;
 
 CREATE TABLE tde_db.test_tbl(c1 int) ENCRYPTION="Y" ENGINE=InnoDB;
 
-# Crash the server while executing ALTER INSTANCE ROTATE
-SET SESSION debug="+d,keyring_file_backup_fail";
---error CR_SERVER_LOST
-ALTER INSTANCE ROTATE INNODB MASTER KEY;
---enable_reconnect
---source include/wait_until_connected_again.inc
---disable_reconnect
-SET SESSION debug="-d,keyring_file_backup_fail";
+# keyring_file specific
+if ($keyring_file_test)
+{
+  # Crash the server while executing ALTER INSTANCE ROTATE
+  SET SESSION debug="+d,keyring_file_backup_fail";
+  --error CR_SERVER_LOST
+  ALTER INSTANCE ROTATE INNODB MASTER KEY;
+  --enable_reconnect
+  --source include/wait_until_connected_again.inc
+  --disable_reconnect
+  SET SESSION debug="-d,keyring_file_backup_fail";
+}
 #--echo # Restart the server
 #--source include/start_mysqld.inc
 

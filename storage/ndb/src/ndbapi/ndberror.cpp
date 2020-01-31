@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2004, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2004, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -203,6 +203,7 @@ ErrorBundle ErrorCodes[] = {
   { 21031, DMEC, IE, "Create foreign key failed in NDB - no more object records in TC" },
   { 21032, DMEC, IE, "Create foreign key failed in NDB - invalid request to TC" },
   { 21033, HA_ERR_CANNOT_ADD_FOREIGN, AE, "Create foreign key failed in NDB - No parent row found" },
+  { 21034, HA_ERR_CANNOT_ADD_FOREIGN, AE, "Create foreign key failed - child table has Blob or Text column and on-delete-cascade is not allowed" },
   /* DropFKRef + DropFKImplRef */
   { 21040, DMEC, AE, "Drop foreign key failed in NDB - foreign key not found" },
   { 21041, DMEC, SE, "Drop foreign key failed in NDB - invalid foreign key version" },
@@ -338,6 +339,7 @@ ErrorBundle ErrorCodes[] = {
   { 237,  HA_ERR_LOCK_WAIT_TIMEOUT, TO, "Transaction had timed out when trying to commit it" },
   { 5024, DMEC, TO, "Time-out due to node shutdown not starting in time" },
   { 5025, DMEC, TO, "Time-out due to node shutdown not completing in time" },
+  { 635,  HA_ERR_LOCK_WAIT_TIMEOUT, TO, "Lock already taken, not waiting" }, // HA_ERR_NO_WAIT_LOCK
   
   /**
    * OverloadError
@@ -427,14 +429,14 @@ ErrorBundle ErrorCodes[] = {
   { 281,  HA_ERR_NO_CONNECTION, AE, "Operation not allowed due to cluster shutdown in progress" },
   { 299,  DMEC, AE, "Operation not allowed or aborted due to single user mode" },
   { 261,  DMEC, AE,
-    "DML count in transaction exceeds config parameter MaxDMLOperationsPerTransaction" },
+    "DML count in transaction exceeds config parameter MaxDMLOperationsPerTransaction/MaxNoOfConcurrentOperations" },
   { 763,  DMEC, AE, "DDL is not supported with mixed data-node versions" },
   { 823,  DMEC, AE, "Too much attrinfo from application in tuple manager" },
   { 829,  DMEC, AE, "Corrupt data received for insert/update" },
   { 831,  DMEC, AE, "Too many nullable/bitfields in table definition" },
+  { 851,  DMEC, AE, "Fixed-size column offset exceeded max."
+    "Use VARCHAR or COLUMN_FORMAT DYNAMIC for memory-stored columns"},
   { 850,  DMEC, AE, "Too long or too short default value"},
-  { 851,  DMEC, AE, "Maximum 8052 bytes of FIXED columns supported"
-    ", use varchar or COLUMN_FORMAT DYNAMIC instead" },
   { 876,  DMEC, AE, "876" },
   { 877,  DMEC, AE, "877" },
   { 878,  DMEC, AE, "878" },
@@ -564,6 +566,8 @@ ErrorBundle ErrorCodes[] = {
   { 908,  DMEC, IS, "Invalid ordered index tree node size" },
   { 909,  DMEC, IE, "No free index scan op" },
   { 910, HA_ERR_NO_SUCH_TABLE, SE, "Index is being dropped" },
+  { 911,  DMEC, SE, "Index stat scan requested on index with unsupported key size" },
+  { 912,  DMEC, AE, "Index stat scan requested with wrong lock mode" },
   { 913,  DMEC, AE, "Invalid index for index stats update" },
   { 914,  DMEC, IE, "Invalid index stats request" },
   { 915,  DMEC, TR, "No free index stats op" },
@@ -595,6 +599,7 @@ ErrorBundle ErrorCodes[] = {
   { 1514, DMEC, SE, "Currently there is a limit of one logfile group" },
   { 1515, DMEC, SE, "Currently there is a 4G limit of one undo/data-file in 32-bit host" },
   { 1516, DMEC, SE, "File too small" },
+  { 1517, DMEC, SE, "Insufficient disk page buffer memory. Increase DiskPageBufferMemory or reduce data file size." },
 
   { 773,  DMEC, SE, "Out of string memory, please modify StringMemory config parameter" },
   { 775,  DMEC, SE, "Create file is not supported when Diskless=1" },
@@ -655,6 +660,7 @@ ErrorBundle ErrorCodes[] = {
   { 1702, DMEC, AE, "Node already connected" },
   { 1703, DMEC, IT, "Node failure handling not completed" },
   { 1704, DMEC, AE, "Node type mismatch" },
+  { 1705, DMEC, IT, "Not ready for connection allocation yet" },
 
   /*
    * Index stats error codes
@@ -801,6 +807,7 @@ ErrorBundle ErrorCodes[] = {
   { 4554, DMEC, AE, "NdbBlob can only be closed from Active state" },
   { 4555, DMEC, AE, "NdbBlob cannot be closed with pending operations" },
   { 4556, DMEC, AE, "RecordSpecification has illegal value in column_flags" },
+  { 4557, DMEC, AE, "Column types must be identical when comparing two columns" },
 
   { 4200, DMEC, AE, "Status Error when defining an operation" },
   { 4201, DMEC, AE, "Variable Arrays not yet supported" },

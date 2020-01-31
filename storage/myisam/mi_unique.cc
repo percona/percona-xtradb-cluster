@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -36,7 +36,7 @@ bool mi_check_unique(MI_INFO *info, MI_UNIQUEDEF *def, uchar *record,
   my_off_t lastpos = info->lastpos;
   MI_KEYDEF *key = &info->s->keyinfo[def->key];
   uchar *key_buff = info->lastkey2;
-  DBUG_ENTER("mi_check_unique");
+  DBUG_TRACE;
 
   mi_unique_store(record + key->seg->start, unique_hash);
   _mi_make_key(info, def->key, key_buff, record, 0);
@@ -46,7 +46,7 @@ bool mi_check_unique(MI_INFO *info, MI_UNIQUEDEF *def, uchar *record,
                  info->s->state.key_root[def->key])) {
     info->page_changed = 1; /* Can't optimize read next */
     info->lastpos = lastpos;
-    DBUG_RETURN(0); /* No matching rows */
+    return 0; /* No matching rows */
   }
 
   for (;;) {
@@ -58,7 +58,7 @@ bool mi_check_unique(MI_INFO *info, MI_UNIQUEDEF *def, uchar *record,
       info->page_changed = 1; /* Can't optimize read next */
       info->lastpos = lastpos;
       DBUG_PRINT("info", ("Found duplicate"));
-      DBUG_RETURN(1); /* Found identical  */
+      return 1; /* Found identical  */
     }
     if (_mi_search_next(info, info->s->keyinfo + def->key, info->lastkey,
                         MI_UNIQUE_HASH_LENGTH, SEARCH_BIGGER,
@@ -66,7 +66,7 @@ bool mi_check_unique(MI_INFO *info, MI_UNIQUEDEF *def, uchar *record,
         memcmp(info->lastkey, key_buff, MI_UNIQUE_HASH_LENGTH)) {
       info->page_changed = 1; /* Can't optimize read next */
       info->lastpos = lastpos;
-      DBUG_RETURN(0); /* end of tree */
+      return 0; /* end of tree */
     }
   }
 }
@@ -79,10 +79,9 @@ bool mi_check_unique(MI_INFO *info, MI_UNIQUEDEF *def, uchar *record,
 */
 
 ha_checksum mi_unique_hash(MI_UNIQUEDEF *def, const uchar *record) {
-  uchar *pos;
+  const uchar *pos;
   const uchar *end;
   ha_checksum crc = 0;
-  ulong seed1 = 0, seed2 = 4;
   HA_KEYSEG *keyseg;
 
   for (keyseg = def->seg; keyseg < def->end; keyseg++) {
@@ -100,7 +99,7 @@ ha_checksum mi_unique_hash(MI_UNIQUEDEF *def, const uchar *record) {
         continue;
       }
     }
-    pos = (uchar *)record + keyseg->start;
+    pos = record + keyseg->start;
     if (keyseg->flag & HA_VAR_LENGTH_PART) {
       uint pack_length = keyseg->bit_start;
       uint tmp_length = (pack_length == 1 ? (uint)*pos : uint2korr(pos));
@@ -115,12 +114,13 @@ ha_checksum mi_unique_hash(MI_UNIQUEDEF *def, const uchar *record) {
     end = pos + length;
     if (type == HA_KEYTYPE_TEXT || type == HA_KEYTYPE_VARTEXT1 ||
         type == HA_KEYTYPE_VARTEXT2) {
+      uint64 seed1 = 0, seed2 = 4;
       keyseg->charset->coll->hash_sort(keyseg->charset, (const uchar *)pos,
                                        length, &seed1, &seed2);
-      crc ^= seed1;
+      crc ^= static_cast<ulong>(seed1);
     } else
       while (pos != end)
-        crc = ((crc << 8) + (((uchar) * (uchar *)pos++))) +
+        crc = ((crc << 8) + (((uchar)*pos++))) +
               (crc >> (8 * sizeof(ha_checksum) - 8));
   }
   return crc;
@@ -139,7 +139,7 @@ ha_checksum mi_unique_hash(MI_UNIQUEDEF *def, const uchar *record) {
 
 int mi_unique_comp(MI_UNIQUEDEF *def, const uchar *a, const uchar *b,
                    bool null_are_equal) {
-  uchar *pos_a, *pos_b;
+  const uchar *pos_a, *pos_b;
   const uchar *end;
   HA_KEYSEG *keyseg;
 
@@ -159,8 +159,8 @@ int mi_unique_comp(MI_UNIQUEDEF *def, const uchar *a, const uchar *b,
         continue;
       }
     }
-    pos_a = (uchar *)a + keyseg->start;
-    pos_b = (uchar *)b + keyseg->start;
+    pos_a = a + keyseg->start;
+    pos_b = b + keyseg->start;
     if (keyseg->flag & HA_VAR_LENGTH_PART) {
       uint pack_length = keyseg->bit_start;
       if (pack_length == 1) {

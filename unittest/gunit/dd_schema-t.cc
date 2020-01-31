@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -35,29 +35,23 @@
 #include "unittest/gunit/dd.h"
 #include "unittest/gunit/test_utils.h"
 
-/*
-  HAVE_UBSAN: undefined behaviour in gmock.
-  runtime error: member call on null pointer of type 'const struct ResultHolder'
- */
-#if !defined(HAVE_UBSAN)
-
 namespace dd_schema_unittest {
 
 using namespace dd;
 using namespace dd_unittest;
 
-using dd_unittest::Mock_dd_HANDLER;
 using dd_unittest::Mock_dd_field_longlong;
 using dd_unittest::Mock_dd_field_varstring;
+using dd_unittest::Mock_dd_HANDLER;
 
+using my_testing::Server_initializer;
+using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::SetArgPointee;
 using ::testing::StrictMock;
 using ::testing::WithArgs;
-using ::testing::_;
-using my_testing::Server_initializer;
 
 /**
   Test fixture for testing the dd::Schema, Schema_impl and Raw_* classes.
@@ -494,5 +488,3 @@ TEST_F(SchemaTest, GetSchema) {
   delete schema;
 }
 }  // namespace dd_schema_unittest
-
-#endif  // HAVE_UBSAN

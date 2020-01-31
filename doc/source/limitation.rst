@@ -62,8 +62,6 @@ The following limitations apply to |PXC|:
 * ``enforce_storage_engine=InnoDB`` is not compatible with
   ``wsrep_replicate_myisam=OFF`` (default).
 
-* The :variable:`binlog_rows_query_log_events` variable is not supported.
-
 * When running |PXC| in cluster mode,
   avoid ``ALTER TABLE ... IMPORT/EXPORT`` workloads.
   It can lead to node inconsistency if not executed in sync on all nodes.

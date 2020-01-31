@@ -3,12 +3,12 @@
 
 namespace keyring {
 
-bool Vault_key::get_next_key(IKey **key) {
+bool Vault_key::get_next_key(IKey **key_out) {
   if (was_key_retrieved) {
-    *key = nullptr;
+    *key_out = nullptr;
     return true;
   }
-  *key = new Vault_key(*this);
+  *key_out = new Vault_key(*this);
   was_key_retrieved = true;
   return false;
 }
@@ -16,6 +16,13 @@ bool Vault_key::get_next_key(IKey **key) {
 bool Vault_key::has_next_key() { return !was_key_retrieved; }
 
 void Vault_key::xor_data() { /* We do not xor data in keyring_vault */
+}
+
+void Vault_key::xor_data(uchar *,
+                         size_t) { /* We do not xor data in keyring_vault */
+}
+
+void xor_data(uchar *, size_t) { /* We do not xor data in keyring_vault */
 }
 
 uchar *Vault_key::get_key_data() const { return key.get(); }

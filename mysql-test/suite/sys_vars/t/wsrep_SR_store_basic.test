@@ -1,0 +1,23 @@
+#
+# Test different setting option for wsrep_SR_store
+
+
+select @@wsrep_SR_store;
+
+--echo # set default value
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+set global wsrep_SR_store = default;
+select @@wsrep_SR_store;
+
+--echo # set a valid value
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+set global wsrep_SR_store = 'table';
+select @@wsrep_SR_store;
+
+--echo # set an invalid value
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+set global wsrep_SR_store = 'logfile';
+select @@wsrep_SR_store;
+
+--echo # End of test
+#--eval set global pxc_strict_mode = $pxc_strict_mode_saved;

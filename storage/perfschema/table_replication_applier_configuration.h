@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2013, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -54,6 +54,7 @@ struct st_row_applier_config {
   uint channel_name_length;
   time_t desired_delay;
   bool desired_delay_is_set;
+  std::string privilege_checks_user{""};
 };
 
 class PFS_index_rpl_applier_config : public PFS_engine_index {

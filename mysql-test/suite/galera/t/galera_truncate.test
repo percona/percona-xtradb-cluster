@@ -8,6 +8,10 @@
 
 --source include/galera_cluster.inc
 
+--connection node_2
+--echo #node-2 (restarting at start)
+--source include/restart_mysqld.inc
+
 #
 # Simple case
 #

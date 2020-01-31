@@ -23,7 +23,7 @@ SELECT @@wsrep_slave_threads = 1;
 SET GLOBAL wsrep_slave_threads = 1;
 # There is a separate wsrep_aborter thread at all times
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep aborter idle';
 
 #
 # Increase the number of slave threads. The change takes effect immediately
@@ -45,7 +45,7 @@ SELECT COUNT(*) = 1 FROM t1;
 --source include/wait_condition.inc
 --echo # this should emit presence of 64 applier threads
 SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep aborter idle';
 
 #
 # Reduce the number of slave threads. The change is not immediate -- a thread will only exit after a replication event
@@ -75,7 +75,7 @@ SET wsrep_sync_wait=0;
 
 --echo # this should emit presence of 1 applier thread
 SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep aborter idle';
 
 --let $wsrep_cluster_address_node2 = `SELECT @@wsrep_cluster_address`
 --let $wsrep_provider_node2 = `SELECT @@wsrep_provider`
@@ -87,7 +87,7 @@ SET GLOBAL wsrep_slave_threads = 5;
 
 --echo # this should emit presence of 5 applier threads
 SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep aborter idle';
 
 #
 # test phase for bug https://github.com/codership/mysql-wsrep/issues/319

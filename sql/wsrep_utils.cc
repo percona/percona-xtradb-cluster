@@ -23,8 +23,10 @@
 #include "wsrep_utils.h"
 #include "wsrep_mysqld.h"
 #include "mysql/components/services/log_builtins.h"
+#include "wsrep_thd.h"
 
 #include "sql_class.h"
+#include "wsrep_api.h"
 
 #include <errno.h>   // errno
 #include <netdb.h>   // getaddrinfo()
@@ -99,7 +101,7 @@ void wsrep_prepend_PATH(const char *path) {
 
 /**
  * This is a wrapper around the WSREP_ON macro.  This allows this check
- * to be called from plugins.
+ * to be called from plugins (like memcached, keyring, etc....).
  */
 extern "C" bool wsrep_is_wsrep_on(void) { return WSREP_ON; }
 
@@ -952,8 +954,9 @@ void process::terminate() {
 
 thd::thd(bool won) : init(), ptr(new THD) {
   if (ptr) {
-    ptr->thread_stack = (char *)&ptr;
-    ptr->store_globals();
+    ptr->thread_stack = (char*)(&ptr);
+    wsrep_assign_from_threadvars(ptr);
+    wsrep_store_threadvars(ptr);
     ptr->variables.option_bits &= ~OPTION_BIN_LOG;  // disable binlog
     ptr->variables.wsrep_on = won;
     ptr->m_security_ctx->set_master_access(~(ulong)0);
@@ -1169,7 +1172,7 @@ bool WSREPState::node_needs_upgrading()
 }  // namespace wsp
 
 /* Returns INADDR_NONE, INADDR_ANY, INADDR_LOOPBACK or something else */
-unsigned int wsrep_check_ip(const char *const addr) {
+unsigned int wsrep_check_ip(const char *const addr, bool *is_ipv6) {
   if (addr && 0 == strcasecmp(addr, MY_BIND_ALL_ADDRESSES)) return INADDR_ANY;
 
   unsigned int ret = INADDR_NONE;
@@ -1195,6 +1198,8 @@ unsigned int wsrep_check_ip(const char *const addr) {
         ret = INADDR_LOOPBACK;
       else
         ret = 0xdeadbeef;
+
+      *is_ipv6 = true;
     }
     freeaddrinfo(res);
   } else {
@@ -1214,7 +1219,8 @@ size_t wsrep_guess_ip(char *buf, size_t buf_len) {
   size_t ip_len = 0;
 
   if (my_bind_addr_str && my_bind_addr_str[0] != '\0') {
-    unsigned int const ip_type = wsrep_check_ip(my_bind_addr_str);
+    bool unused;
+    unsigned int const ip_type = wsrep_check_ip(my_bind_addr_str, &unused);
 
     if (INADDR_NONE == ip_type) {
       WSREP_ERROR("Networking not configured, cannot receive state transfer.");

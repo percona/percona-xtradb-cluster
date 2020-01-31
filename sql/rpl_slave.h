@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -342,7 +342,8 @@ extern MY_BITMAP slave_error_mask;
 extern char slave_skip_error_names[];
 extern bool use_slave_mask;
 extern char *slave_load_tmpdir;
-extern char *master_info_file, *relay_log_info_file;
+extern const char *master_info_file;
+extern const char *relay_log_info_file;
 extern char *opt_relay_logname, *opt_relaylog_index_name;
 extern bool opt_relaylog_index_name_supplied;
 extern bool opt_relay_logname_supplied;
@@ -383,8 +384,14 @@ int change_master(THD *thd, Master_info *mi, LEX_MASTER_INFO *lex_mi,
 bool reset_slave_cmd(THD *thd);
 bool show_slave_status_cmd(THD *thd);
 bool flush_relay_logs_cmd(THD *thd);
+/**
+  Re-encrypt previous relay logs with current master key for all slave channels.
 
-bool flush_relay_logs(Master_info *mi);
+  @retval false Success.
+  @retval true Error.
+*/
+bool reencrypt_relay_logs();
+int flush_relay_logs(Master_info *mi, THD *thd);
 int reset_slave(THD *thd, Master_info *mi, bool reset_all);
 int reset_slave(THD *thd);
 int init_slave();
@@ -522,7 +529,9 @@ extern int disconnect_slave_event_count, abort_slave_event_count;
 
 /* the master variables are defaults read from my.cnf or command line */
 extern uint report_port;
-extern char *master_info_file, *relay_log_info_file, *report_user;
+extern const char *master_info_file;
+extern const char *relay_log_info_file;
+extern char *report_user;
 extern char *report_host, *report_password;
 
 bool mts_recovery_groups(Relay_log_info *rli);

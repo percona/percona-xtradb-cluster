@@ -1,4 +1,4 @@
-# Copyright (c) 2010, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, 2015, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -87,12 +87,13 @@ SET(CPACK_COMPONENT_GROUP_DEVEL_DESCRIPTION "Installs C/C++ header files and lib
  #Subfeature "Development"
  SET(CPACK_COMPONENT_DEVELOPMENT_GROUP "Devel")
  SET(CPACK_COMPONENT_DEVELOPMENT_HIDDEN 1)
- 
- #Subfeature "Shared libraries"
- SET(CPACK_COMPONENT_SHAREDLIBRARIES_GROUP "Devel")
- SET(CPACK_COMPONENT_SHAREDLIBRARIES_DISPLAY_NAME "Client C API library (shared)")
- SET(CPACK_COMPONENT_SHAREDLIBRARIES_DESCRIPTION "Installs shared client library")
   
+ #Subfeature "Embedded"
+ SET(CPACK_COMPONENT_EMBEDDED_GROUP "Devel")
+ SET(CPACK_COMPONENT_EMBEDDED_DISPLAY_NAME "Embedded server library")
+ SET(CPACK_COMPONENT_EMBEDDED_DESCRIPTION "Installs embedded server library")
+ SET(CPACK_COMPONENT_EMBEDDED_WIX_LEVEL 2)
+
 #Feature Debug Symbols
 SET(CPACK_COMPONENT_GROUP_DEBUGSYMBOLS_DISPLAY_NAME "Debug Symbols")
 SET(CPACK_COMPONENT_GROUP_DEBUGSYMBOLS_DESCRIPTION "Installs Debug Symbols")

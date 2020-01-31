@@ -74,7 +74,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 3.33 
+ %define galera_version 4.3 
 %endif
 
 %if %{undefined galera_revision}
@@ -354,7 +354,10 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
-Requires:             percona-xtrabackup-24 >= 2.4.12 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+%if 0%{?compatlib}
+Requires:             percona-xtradb-cluster-shared-compat = %{version}-%{release}
+%endif
+Requires:             socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -469,6 +472,7 @@ Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:      Percona-Server-shared-56
+Conflicts:      Percona-Server-shared-57
 %if "%rhel" > "6"
 #Provides:       mariadb-libs >= 5.5.37
 Obsoletes:      mariadb-libs >= 5.5.37
@@ -500,9 +504,11 @@ Provides:       MySQL-shared-compat%{?_isa} = %{version}-%{release}
 Provides:       libmysqlclient.so.18()(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_16)(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_18)(64bit)
-Obsoletes:      mariadb-libs
+Obsoletes:      mariadb-libs Percona-XtraDB-Cluster-shared-compat-57
 Conflicts:      Percona-XtraDB-Cluster-shared-55
 Conflicts:      Percona-XtraDB-Cluster-shared-56
+Conflicts:      Percona-XtraDB-Cluster-shared-57
+Conflicts:      Percona-XtraDB-Cluster-shared-compat-57
 %endif
 
 %description -n percona-xtradb-cluster-shared-compat
@@ -580,7 +586,7 @@ export CXX=${MYSQL_BUILD_CXX:-${CXX:-g++}}
 export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS}}
 export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
-export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-cmake}}
+export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-/usr/bin/cmake3}}
 export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:-${MAKE_JFLAG:-}}
 
 if test "x$(uname -m)" = "xx86_64" && echo "%{_libdir}" | fgrep -vq lib64
@@ -601,6 +607,30 @@ fi
   )
   %endif # 0%{?rhel} > 6
 %endif # 0%{?compatlib}
+
+mkdir pxc_extra
+pushd pxc_extra
+mkdir pxb-2.4
+pushd pxb-2.4
+yumdownloader percona-xtrabackup-24
+rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+mv usr/bin ./
+mv usr/lib* ./
+rm -rf usr
+rm -f *.rpm
+popd
+
+
+mkdir pxb-8.0
+pushd pxb-8.0
+yumdownloader percona-xtrabackup-80
+rpm2cpio *.rpm | cpio --extract --make-directories --verbose
+mv usr/bin ./
+mv usr/lib* ./
+rm -rf usr
+rm -f *.rpm
+popd
+popd
 
 # Build debug mysqld and libmysqld.a
 mkdir debug
@@ -648,6 +678,7 @@ mkdir debug
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZLIB=system \
+           -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            %{?mecab_option} \
@@ -686,6 +717,7 @@ mkdir release
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZLIB=system \
+           -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
@@ -741,6 +773,8 @@ install -D -m 0755 percona-compatlib/usr/lib64/libmysqlclient.so.18.1.0 %{buildr
 install -D -m 0755 percona-compatlib/usr/lib64/libmysqlclient_r.so.18.1.0 %{buildroot}%{_libdir}/mysql/libmysqlclient_r.so.18.1.0
 %endif # 0%{?rhel} > 6
 %endif # 0%{?compatlib}
+mkdir -p %{buildroot}%{_bindir}/
+cp -r pxc_extra %{buildroot}%{_bindir}/
 
 RBR=$RPM_BUILD_ROOT
 MBD=$RPM_BUILD_DIR/%{src_dir}
@@ -779,15 +813,7 @@ install -d -m 0755 %{buildroot}/var/log/mysqlrouter
 
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
-install -d %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d
-install -D -m 0644 $MBD/build-ps/rpm/percona-xtradb-cluster.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.cnf
-install -D -m 0644 $MBD/build-ps/rpm/mysqld.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld.cnf
-install -D -m 0644 $MBD/build-ps/rpm/mysqld_safe.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld_safe.cnf
-install -D -m 0644 $MBD/build-ps/rpm/wsrep.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/wsrep.cnf
-
-%if 0%{?rhel} > 6
-  install -D -m 0644 $MBD/build-ps/rpm/percona-xtradb-cluster.cnf %{buildroot}%{_sysconfdir}/my.cnf
-%endif
+install -D -m 0644 $MBD/build-ps/rpm/mysqld.cnf %{buildroot}%{_sysconfdir}/my.cnf
 install -d %{buildroot}%{_sysconfdir}/my.cnf.d
 %if 0%{?systemd}
   install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
@@ -823,7 +849,7 @@ ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 %endif
 
 install -d $RBR%{_bindir}
-ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
+#ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
 %if %{WITH_TCMALLOC}
 install -m 644 "%{malloc_lib_source}" \
@@ -858,10 +884,10 @@ install -d "$RBR/%{_sharedstatedir}/galera"
 
 install -m 755 "$MBD/%{galera_src_dir}/garb/garbd" \
   "$RBR/%{_bindir}/"
-install -d "$RBR/%{_libdir}/galera3"
+install -d "$RBR/%{_libdir}/galera4"
 install -m 755 "$MBD/%{galera_src_dir}/libgalera_smm.so" \
-  "$RBR/%{_libdir}/galera3/"
-ln -s "galera3/libgalera_smm.so" "$RBR/%{_libdir}/"
+  "$RBR/%{_libdir}/galera4/"
+ln -s "galera4/libgalera_smm.so" "$RBR/%{_libdir}/"
 
 install -d $RBR%{galera_docs}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
@@ -887,12 +913,12 @@ install -d $RBR%{_mandir}/man8
 install -m 644 $MBD/%{galera_src_dir}/man/garbd.8  \
     $RBR%{_mandir}/man8/garbd.8
 install -d $RBR%{_libdir}/mysql
-%if 0%{?mecab}
-    cp -r $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
-%endif
+#%if 0%{?mecab}
+#    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
+#%endif
 # remove some unwanted router files
-rm -rf %{buildroot}/%{_libdir}/libmysqlharness.{a,so}
-rm -rf %{buildroot}/%{_libdir}/libmysqlrouter.so
+rm -rf %{buildroot}/%{_libdir}/mysql/libmysqlharness.{a,so}
+rm -rf %{buildroot}/%{_libdir}/mysql/libmysqlrouter.so
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
@@ -1050,6 +1076,14 @@ useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
 # (BUG#12823)
 usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
 
+if [ "$1" = 1 ]; then
+  if [ -f %{_sysconfdir}/my.cnf ]; then
+    timestamp=$(date '+%Y%m%d-%H%M')
+    cp %{_sysconfdir}/my.cnf \
+    %{_sysconfdir}/my.cnf.rpmsave-${timestamp}
+  fi
+fi
+
 
 %post -n percona-xtradb-cluster-server
 
@@ -1057,68 +1091,20 @@ if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
 if [ ! -e /var/log/mysqld.log ]; then
-    /usr/bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
+    /usr/bin/install -m0640 -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
 fi
-#/bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
-#/bin/chmod 0640 /var/log/mysqld.log >/dev/null 2>&1 || :
-#/bin/chown mysql:mysql /var/log/mysqld.log >/dev/null 2>&1 || :
 %if 0%{?systemd}
   %systemd_post mysql
 %endif
 
-%if 0%{?rhel} > 6
-  MYCNF_PACKAGE="mariadb-libs"
-%else
-  MYCNF_PACKAGE="mysql-libs"
-%endif
+if [ -d /etc/percona-xtradb-clister.conf.d ]; then
+    CONF_EXISTS=$(grep "percona-xtradb-cluster.conf.d" /etc/my.cnf | wc -l)
+    if [ ${CONF_EXISTS} = 0 ]; then
+        echo "!includedir /etc/percona-xtradb-cluster.conf.d/" >> /etc/my.cnf
+    fi
+fi
 
-if [ -e /etc/my.cnf ]; then
-  MYCNF_PACKAGE=$(rpm -qi `rpm -qf /etc/my.cnf` | grep -m 1 Name | awk '{print $3}')
-fi
-if [ "$MYCNF_PACKAGE" == "mariadb-libs" -o "$MYCNF_PACKAGE" == "mysql-libs" -o "$MYCNF_PACKAGE" == "Percona-Server-server-57" -o "$MYCNF_PACKAGE" == "Percona-XtraDB-Cluster-server-57" ]; then
-  MODIFIED=$(rpm -Va "$MYCNF_PACKAGE" | grep '/etc/my.cnf' | awk '{print $1}' | grep -c 5)
-  if [ "$MODIFIED" == 1 ]; then
-      cp /etc/my.cnf /etc/my.cnf.old
-  fi
-else
-  cp /etc/my.cnf /etc/my.cnf.old
-fi
-if [ ! -f /etc/my.cnf ]; then
-  rm -rf /etc/my.cnf
-  for file in $(alternatives --display my.cnf | grep priority | awk '{print $1}'); do
-    alternatives --remove my.cnf $file
-  done
-  update-alternatives --install /etc/my.cnf my.cnf "/etc/percona-xtradb-cluster.cnf" 200
-else
-  if [ "$MYCNF_PACKAGE" == "Percona-XtraDB-Cluster-server-57" -o "$MYCNF_PACKAGE" == "Percona-Server-server-57" ]; then
-      real_file=$(readlink -f /etc/my.cnf)
-      if [ -L /etc/my.cnf ] && [ "x${real_file}" == "x/etc/percona-server.cnf" ]; then
-          rm -rf /etc/my.cnf
-          update-alternatives --remove my.cnf /etc/percona-server.cnf
-          update-alternatives --install /etc/my.cnf my.cnf "/etc/percona-xtradb-cluster.cnf" 200
-      fi
-      if [ -L /etc/my.cnf ] && [ "x${real_file}" == "x/etc/percona-xtradb-cluster.cnf" ]; then
-          rm -rf /etc/my.cnf
-          update-alternatives --remove my.cnf /etc/percona-xtradb-cluster.cnf
-          update-alternatives --install /etc/my.cnf my.cnf "/etc/percona-xtradb-cluster.cnf" 200
-      else
-          echo " -------------"
-          echo "   *  The suggested mysql options and settings are in /etc/percona-xtradb-cluster.conf.d/mysqld.cnf"
-          echo "   *  If you want to use mysqld.cnf as default configuration file please make backup of /etc/my.cnf"
-          echo "   *  Once it is done please execute the following commands:"
-          echo " rm -rf /etc/my.cnf"
-          echo " update-alternatives --install /etc/my.cnf my.cnf \"/etc/percona-xtradb-cluster.cnf\" 200"
-          echo " -------------"
-      fi
-  else
-          echo " -------------"
-          echo "   *  The suggested mysql options and settings are in /etc/percona-xtradb-cluster.conf.d/mysqld.cnf"
-          echo "   *  If you want to use mysqld.cnf as default configuration file please make backup of /etc/my.cnf"
-          echo "   *  Once it is done please execute the following commands:"
-          echo " rm -rf /etc/my.cnf"
-          echo " update-alternatives --install /etc/my.cnf my.cnf \"/etc/percona-xtradb-cluster.cnf\" 200"
-          echo " -------------"
-          cnflog=$(/usr/bin/my_print_defaults mysqld|grep -c log-error)
+            cnflog=$(/usr/bin/my_print_defaults mysqld|grep -c log-error)
           if [ $cnflog = 0 -a -f /etc/my.cnf ]; then
               sed -i "/^\[mysqld\]$/a log-error=/var/log/mysqld.log" /etc/my.cnf
           fi
@@ -1126,8 +1112,6 @@ else
           if [ $cnfpid = 0 -a -f /etc/my.cnf ]; then
               sed -i "/^\[mysqld\]$/a pid-file=/var/run/mysqld/mysqld.pid" /etc/my.cnf
           fi
-  fi
-fi
 
 if [ -x %{_bindir}/my_print_defaults ]
 then
@@ -1353,7 +1337,12 @@ fi
 echo "Trigger 'postun --community' finished at `date`"        >> $STATUS_HISTORY
 echo                                             >> $STATUS_HISTORY
 echo "====="                                     >> $STATUS_HISTORY
-
+if [ "$1" = 0 ]; then
+  if [ -f %{_sysconfdir}/my.cnf ]; then
+    cp %{_sysconfdir}/my.cnf \
+    %{_sysconfdir}/my.cnf.rpmsave
+  fi
+fi
 
 %pre -n percona-xtradb-cluster-mysql-router
 /usr/sbin/groupadd -r mysqlrouter >/dev/null 2>&1 || :
@@ -1397,6 +1386,11 @@ fi
 ##############################################################################
 #  Files section
 ##############################################################################
+# Empty section for metapackage
+%files
+
+# Empty section for metapackage
+%files -n percona-xtradb-cluster-full
 
 %files -n percona-xtradb-cluster-server
 %defattr(-,root,root,0755)
@@ -1407,7 +1401,7 @@ fi
 %doc release/Docs/INFO_SRC
 %doc release/Docs/INFO_BIN
 %doc Docs/README-wsrep
-%doc release/support-files/wsrep.cnf
+#%doc release/support-files/wsrep.cnf
 
 %doc %attr(644, root, man) %{_mandir}/man1/innochecksum.1*
 %doc %attr(644, root, root) %{_mandir}/man1/ibd2sdi.1*
@@ -1425,13 +1419,14 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.server.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_tzinfo_to_sql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/perror.1*
-%doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
-%doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
+#%doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
+#%doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
 %doc %attr(644, root, man) %{_mandir}/man8/mysqld.8*
 %doc %attr(644, root, man) %{_mandir}/man1/lz4_decompress.1*
 %doc %attr(644, root, man) %{_mandir}/man1/zlib_decompress.1*
 %doc %attr(644, root, root) %{_mandir}/man1/mysql_ssl_rsa_setup.1*
 
+%attr(755, root, root) %{_bindir}/pxc_extra/*
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
 %attr(755, root, root) %{_bindir}/innochecksum
@@ -1449,30 +1444,33 @@ fi
 %attr(755, root, root) %{_bindir}/mysqldumpslow
 %attr(755, root, root) %{_bindir}/mysqltest
 %attr(755, root, root) %{_bindir}/perror
-%attr(755, root, root) %{_bindir}/resolve_stack_dump
-%attr(755, root, root) %{_bindir}/resolveip
+#%attr(755, root, root) %{_bindir}/resolve_stack_dump
+#%attr(755, root, root) %{_bindir}/resolveip
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
-%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
+#%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
 %attr(755, root, root) %{_bindir}/wsrep_sst_upgrade
 %attr(755, root, root) %{_bindir}/ps_mysqld_helper
 # Explicit %attr() mode not applicaple to symlink
-%{_bindir}/wsrep_sst_rsync_wan
+#%{_bindir}/wsrep_sst_rsync_wan
 %attr(755, root, root) %{_bindir}/lz4_decompress
 %attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
+%dir %{_libdir}/mysql/private
+%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.6.1
+%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.6.1
 %if 0%{?systemd} == 0
 %attr(755, root, root) %{_sbindir}/rcmysql
 %endif
 %attr(644, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
+%attr(644, root, root) %{_libdir}/mysql/plugin/data_masking.ini
 %attr(755, root, root) %{_libdir}/mysql/plugin/*.so*
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/*.so*
 
 %if 0%{?mecab}
 %{_libdir}/mysql/mecab
-%{_libdir}/mecab
 %endif
 
 %if "%rhel" == "5"
@@ -1503,7 +1501,7 @@ fi
 %attr(0755,nobody,nobody) %dir %{_sharedstatedir}/galera
 # This is a symlink
 %{_libdir}/libgalera_smm.so
-%{_libdir}/galera3/libgalera_smm.so
+%{_libdir}/galera4/libgalera_smm.so
 %attr(0755,root,root) %dir %{galera_docs}
 %doc %attr(0644,root,root) %{galera_docs}/COPYING
 %doc %attr(0644,root,root) %{galera_docs}/README
@@ -1511,16 +1509,8 @@ fi
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.crc32c
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.chromium
-%dir %{_sysconfdir}/my.cnf.d
-%dir %{_sysconfdir}/percona-xtradb-cluster.conf.d
-%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.cnf
-%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld.cnf
-%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/wsrep.cnf
-%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld_safe.cnf
-%if 0%{?rhel} > 6
 %config(noreplace) %{_sysconfdir}/my.cnf
-%endif
-
+%dir %{_sysconfdir}/my.cnf.d
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-client
@@ -1549,7 +1539,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlpump.1*
 
 # ----------------------------------------------------------------------------
-%files -n percona-xtradb-cluster-devel -f optional-files-devel
+%files -n percona-xtradb-cluster-devel
 %defattr(-, root, root, 0755)
 %doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config.1*
@@ -1559,15 +1549,15 @@ fi
 %{_includedir}/mysql/*
 %{_datadir}/aclocal/mysql.m4
 %{_libdir}/pkgconfig/*
-%{_libdir}/libperconaserverclient*.a
-%{_libdir}/libmysqlservices.a
+%{_libdir}/mysql/libperconaserverclient*.a
+%{_libdir}/mysql/libmysqlservices.a
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-shared
 %defattr(-, root, root, 0755)
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
-%{_libdir}/libperconaserver*.so*
+%{_libdir}/mysql/libperconaserver*.so*
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-garbd
@@ -1685,6 +1675,7 @@ fi
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
 %attr(755, root, root) %{_bindir}/mysqlxtest
+%attr(755, root, root) %{_bindir}/mysqltest_safe_process
 
 
 %files -n percona-xtradb-cluster-mysql-router
@@ -1693,17 +1684,23 @@ fi
 %dir %{_sysconfdir}/mysqlrouter
 %config(noreplace) %{_sysconfdir}/mysqlrouter/mysqlrouter.conf
 %{_bindir}/mysqlrouter
+%{_bindir}/mysqlrouter_keyring
 %{_bindir}/mysqlrouter_plugin_info
+%{_bindir}/mysqlrouter_passwd
+%doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter.1*
+%doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter_passwd.1*
+%doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter_plugin_info.1*
 %if 0%{?systemd}
 %{_unitdir}/mysqlrouter.service
 %{_tmpfilesdir}/mysqlrouter.conf
 %else
 %{_sysconfdir}/init.d/mysqlrouter
 %endif
-%{_libdir}/libmysqlharness.so.*
-%{_libdir}/libmysqlrouter.so.*
-%dir %{_libdir}/mysqlrouter
-%{_libdir}/mysqlrouter/*.so
+%{_libdir}/mysql/libmysqlharness.so.*
+%{_libdir}/mysql/libmysqlrouter.so.*
+%{_libdir}/mysql/libmysqlrouter_http.so*
+%dir %{_libdir}/mysql/mysqlrouter
+%{_libdir}/mysql/mysqlrouter/*.so*
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/log/mysqlrouter
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/run/mysqlrouter
 

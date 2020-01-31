@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -44,13 +44,12 @@ struct THR_LOCK;
 extern ulong locks_immediate, locks_waited;
 
 #ifdef WITH_WSREP
-
-typedef bool (*wsrep_thd_is_brute_force_func)(void *, bool);
-typedef int (*wsrep_abort_thd_func)(void *, void *, bool);
-typedef int (*wsrep_on_func)(void *);
-
+class THD;
+typedef bool (*wsrep_thd_is_brute_force_func)(const THD *, bool);
+typedef int (*wsrep_abort_thd_func)(const THD *, THD *, bool);
+typedef bool (*wsrep_on_func)(const THD *);
 void wsrep_thr_lock_init(wsrep_thd_is_brute_force_func bf_func,
-                         wsrep_abort_thd_func abort_func, bool debug,
+                         wsrep_abort_thd_func abort_func, ulong debug,
                          wsrep_on_func on_func);
 #endif /* WITH_WSREP */
 
@@ -107,18 +106,6 @@ enum thr_lock_type {
 enum thr_locked_row_action { THR_DEFAULT, THR_WAIT, THR_NOWAIT, THR_SKIP };
 
 struct Lock_descriptor {
-  /*
-    These constructors are no longer needed when we go to C++14, where
-    aggregate initialization is allowed on classes that have default
-    member initializers.
-  */
-  Lock_descriptor() {}
-
-  explicit Lock_descriptor(thr_lock_type type_arg) : type(type_arg) {}
-
-  Lock_descriptor(thr_lock_type type_arg, thr_locked_row_action action_arg)
-      : type(type_arg), action(action_arg) {}
-
   thr_lock_type type{TL_UNLOCK};
   thr_locked_row_action action{THR_DEFAULT};
 };
@@ -141,7 +128,7 @@ extern enum thr_lock_type thr_upgraded_concurrent_insert_lock;
 struct THR_LOCK_INFO {
   my_thread_id thread_id;
 #ifdef WITH_WSREP
-  void *mysql_thd;      // THD pointer
+  THD *mysql_thd;       // THD pointer
   bool in_lock_tables;  // true, if inside locking session
 #endif /* WITH_WSREP */
   mysql_cond_t *suspend;
