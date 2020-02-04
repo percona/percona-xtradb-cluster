@@ -1465,6 +1465,9 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock)
     if (!trans->no_2pc && (rw_ha_count > 1))
       error= tc_log->prepare(thd, all);
   }
+#ifdef WITH_WSREP
+  DEBUG_SYNC(thd, "wsrep_before_commit");
+#endif /* WITH_WSREP */
   if (error || (error= tc_log->commit(thd, all)))
   {
     ha_rollback_trans(thd, all);
