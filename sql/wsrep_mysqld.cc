@@ -80,6 +80,7 @@ rpl_sidno wsrep_sidno = -1;
 
 const char *wsrep_data_home_dir = NULL;
 const char *wsrep_dbug_option = "";
+uint wsrep_min_log_verbosity = 3;
 long wsrep_slave_threads = 1;           // # of slave action appliers wanted
 int wsrep_slave_count_change = 0;       // # of appliers to stop or start
 ulong wsrep_debug = 0;                   // enable debug level logging
@@ -812,7 +813,6 @@ static std::string wsrep_server_incoming_address() {
           WSREP_WARN(
               "Guessing address for incoming client connections: "
               "address too long.");
-          inc_addr[0] = '\0';
         }
       }
 
@@ -843,7 +843,9 @@ static std::string wsrep_server_incoming_address() {
   }
 
 done:
-  ret = wsrep_node_incoming_address;
+
+  // inc_addr contains proper address, or is empty string
+  ret = inc_addr;
   return ret;
 }
 

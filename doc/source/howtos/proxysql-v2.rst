@@ -119,13 +119,7 @@ To start ProxySQL, run the following command:
 
 .. code-block:: bash
 
-   $ sudo service proxysql start
-
-Alternatively, you can use ``systemctl``:
-
-.. code-block:: bash
-
-   $ sudo systemctl proxysql start
+   $ sudo service proxysql2 start
 
 .. _default-credentials:
 
@@ -164,6 +158,7 @@ To view the usage information, run ``proxysql-admin`` without any options:
 .. code-block:: text
 
    Usage: proxysql-admin [ options ]
+
    Options:
 
    --config-file=<config-file>        Read login credentials from a configuration file
@@ -369,33 +364,33 @@ is for connecting to the PXC Cluster node via the ProxySQL console.
       This script will assist with configuring ProxySQL for use with
       Percona XtraDB Cluster (currently only PXC in combination
       with ProxySQL is supported)
-      
+
       ProxySQL read/write configuration mode is singlewrite
-      
+
       Configuring the ProxySQL monitoring user.
       ProxySQL monitor user name as per command line/config-file is monitor
-      
+
       User 'monitor'@'127.%' has been added with USAGE privileges
-      
+
       Configuring the Percona XtraDB Cluster application user to connect through ProxySQL
       Percona XtraDB Cluster application user name as per command line/config-file is proxysql_user
-      
+
       Percona XtraDB Cluster application user 'proxysql_user'@'127.%' has been added with ALL privileges, this user is created for testing purposes
       Adding the Percona XtraDB Cluster server nodes to ProxySQL
-      
+
       Write node info
       +-----------+--------------+-------+--------+
       | hostname  | hostgroup_id | port  | weight |
       +-----------+--------------+-------+--------+
       | 127.0.0.1 | 10           | 26100 | 1000   |
       +-----------+--------------+-------+--------+
-      
+
       ProxySQL configuration completed!
-      
+
       ProxySQL has been successfully configured to use with Percona XtraDB Cluster
-      
+   
       You can use the following login credentials to connect your application through ProxySQL
-      
+
       mysql --user=proxysql_user -p --host=localhost --port=6033 --protocol=tcp
    
 You can use the following login credentials to connect your application through
@@ -649,17 +644,17 @@ This option will check the Percona XtraDB Cluster to see if any new nodes have
 joined the cluster.  If so, the new nodes are added to ProxySQL.  Any offline
 nodes are not removed from the cluster by default.
 
-If used with ``--remove-all-servers``, then the server list for this
-configuration will be removed before running the update cluster function.
+
+If used with ``--remove-all-servers``, then the server list for this configuration
+will be removed before running the update cluster function.
 
 A specific galera cluster can be updated by using the ``--writer-hg`` option
 with ``--update-cluster``.  Otherwise the cluster specified in the config file
 will be updated.
 
-If ``--write-node`` is used with ``--update-cluster``, then that node will be
-made the writer node (by giving it a larger weight), if the node is in the
-server list and is ONLINE.  This should only be used if the mode is
-_singlewrite_.
+If ``--write-node`` is used with ``--update-cluster``, then that node will
+be made the writer node (by giving it a larger weight), if the node is in
+the server list and is ONLINE.  This should only be used if the mode is _singlewrite_.
 
 .. code-block:: bash
 
@@ -795,8 +790,8 @@ All other remaining nodes will be read-only and will only receive read statement
 
 With the ``--write-node`` option we can control which node ProxySQL will use as
 the writer node. The writer node is specified as an address:port -
-**10.0.0.51:3306** If ``--write-node`` is used, the writer node is given a
-weight of **1000000** (the default weight is **1000**).
+**10.0.0.51:3306** If ``--write-node`` is used, the writer node is given a weight of
+**1000000** (the default weight is **1000**).
 
 The mode `loadbal` on the other hand is a load balanced set of evenly weighted
 read/write nodes.
@@ -895,8 +890,7 @@ used with ``--enable``.
 --------------------------------------------------------------------------------
 
 This option is used to choose which node will be the writer node when the mode
-is `singlewrite`.  This option can be used with `--enable` and
-`--update-cluster`.
+is `singlewrite`.  This option can be used with `--enable` and `--update-cluster`.
 
 A single IP address and port combination is expected.  For instance,
 "--write-node=127.0.0.1:3306"

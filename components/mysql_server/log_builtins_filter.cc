@@ -645,6 +645,9 @@ int log_builtins_filter_run(log_filter_ruleset *ruleset, log_line *ll) {
   log_filter_rule *r;  // current  rule
   int processed = 0;
   log_filter_match cond_result;
+#ifdef WITH_WSREP
+  bool skip_filter_matching;
+#endif
 
   DBUG_ASSERT(filter_inited);
 
@@ -688,6 +691,40 @@ int log_builtins_filter_run(log_filter_ruleset *ruleset, log_line *ll) {
 
     ln = log_line_index_by_item(ll, &r->match);
 
+#ifdef WITH_WSREP
+    /*
+      If this is item defining log priority, we possibly have to
+      cheat the filter to allow this log even if its priority
+      is lower than log_error_verbosity.
+      'mlv' item contains requested priority threshold for forcing logs.
+      (Short 'mlv' string for quicker strcmp inside log_line_item_by_name.
+      It stands for 'minimum log verbosity')
+
+      If we detect that log should be forced, we set the filter result
+      as 'unsatisfied' and skip real filtering.
+
+      If log is not forced, we allow filter do the job
+      according to current log_error_verbosity value.
+
+      Of course we do filter matching also if this is another filter type.
+    */
+    skip_filter_matching = false;
+    if (ln >= 0 && r->verb == LOG_FILTER_DROP &&
+        r->match.type == LOG_ITEM_LOG_PRIO) {
+      log_item *item = log_line_item_by_name(ll, "mlv");
+      if (item) {
+        if (ll->item[ln].data.data_integer <= item->data.data_integer) {
+          cond_result = LOG_FILTER_MATCH_UNSATISFIED;
+          skip_filter_matching = true;
+        }
+      }
+    }
+
+    if (!skip_filter_matching) {
+      cond_result =
+          log_filter_try_match((ln >= 0) ? &ll->item[ln] : nullptr, r);
+    }
+#else
     /*
       If we found a suitable field, see whether its value satisfies
       the condition given in the rule.  If so, apply the action.
@@ -696,6 +733,7 @@ int log_builtins_filter_run(log_filter_ruleset *ruleset, log_line *ll) {
       match against for cases like, "if one doesn't exist, create one now."
     */
     cond_result = log_filter_try_match((ln >= 0) ? &ll->item[ln] : nullptr, r);
+#endif  // WITH_WSREP
 
     if (cond_result == LOG_FILTER_MATCH_SUCCESS) {
       /*

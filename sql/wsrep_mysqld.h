@@ -92,6 +92,7 @@ extern std::atomic<ulong> wsrep_running_threads;
 extern ulong wsrep_certification_rules;
 extern ulong wsrep_RSU_commit_timeout;
 extern bool wsrep_allow_server_session;
+extern uint wsrep_min_log_verbosity;
 
 enum enum_wsrep_reject_types {
   WSREP_REJECT_NONE,    /* nothing rejected */
@@ -265,6 +266,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
         .source_line(__LINE__)                                     \
         .source_file(MY_BASENAME)                                  \
         .function(__FUNCTION__)                                    \
+        .int_value("mlv", wsrep_min_log_verbosity)                 \
         .message(fmt, ##__VA_ARGS__);                              \
     if (pxc_force_flush_error_message) flush_error_log_messages(); \
   } while (0);
@@ -322,6 +324,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
         .source_line(__LINE__)                                     \
         .source_file(MY_BASENAME)                                  \
         .function(__FUNCTION__)                                    \
+        .int_value("mlv", wsrep_min_log_verbosity)                 \
         .verbatim(s);                                              \
     if (pxc_force_flush_error_message) flush_error_log_messages(); \
   } while (0);
@@ -336,6 +339,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
         .source_line(__LINE__)                                     \
         .source_file(MY_BASENAME)                                  \
         .function(__FUNCTION__)                                    \
+        .int_value("mlv", wsrep_min_log_verbosity)                 \
         .verbatim(s);                                              \
     if (pxc_force_flush_error_message) flush_error_log_messages(); \
   } while (0);

@@ -36,7 +36,7 @@ To set up the cluster:
         wsrep_slave_threads=2
         wsrep_cluster_name=trimethylxanthine
         wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:4030;"
-        wsrep_sst_method=rsync
+        wsrep_sst_method=xtrabackup-v2
         wsrep_node_name=node4000
         innodb_autoinc_lock_mode=2
 
@@ -59,7 +59,7 @@ To set up the cluster:
         wsrep_slave_threads=2
         wsrep_cluster_name=trimethylxanthine
         wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:5030;"
-        wsrep_sst_method=rsync
+        wsrep_sst_method=xtrabackup-v2
         wsrep_node_name=node5000
         innodb_autoinc_lock_mode=2
 
@@ -82,7 +82,7 @@ To set up the cluster:
         wsrep_slave_threads=2
         wsrep_cluster_name=trimethylxanthine
         wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:6030;"
-        wsrep_sst_method=rsync
+        wsrep_sst_method=xtrabackup-v2
         wsrep_node_name=node6000
         innodb_autoinc_lock_mode=2
 

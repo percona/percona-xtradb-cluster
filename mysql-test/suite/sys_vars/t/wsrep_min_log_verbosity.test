@@ -1,0 +1,125 @@
+--source include/have_wsrep_provider.inc
+--source include/have_wsrep.inc
+--source include/wait_wsrep_ready.inc
+
+--echo #
+--echo # wsrep_min_log_verbosity
+--echo #
+
+--let SEARCH_FILE = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $create_db_pattern = .Note. .+ .WSREP. Executing Query .CREATE DATABASE
+--let $wsrep_min_log_verbosity_tmp = `SELECT @@wsrep_min_log_verbosity`
+--let $log_error_verbosity_tmp = `SELECT @@log_error_verbosity`
+
+# 8.0 defaults
+# log_error_verbosity=2, wsrep_min_log_verbosity=3
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+SHOW VARIABLES LIKE 'log_error_verbosity';
+
+CREATE DATABASE db1;
+--echo expected match
+--let SEARCH_PATTERN = $create_db_pattern db1
+--source include/search_pattern.inc
+DROP DATABASE db1;
+
+# log_error_verbosity=2, wsrep_min_log_verbosity=2
+SET GLOBAL wsrep_min_log_verbosity=2;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+SHOW VARIABLES LIKE 'log_error_verbosity';
+
+CREATE DATABASE db2;
+--echo expected no match
+--let SEARCH_PATTERN = $create_db_pattern db2
+--source include/search_pattern.inc
+DROP DATABASE db2;
+
+# log_error_verbosity=2, wsrep_min_log_verbosity=1
+SET GLOBAL wsrep_min_log_verbosity=1;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+SHOW VARIABLES LIKE 'log_error_verbosity';
+
+CREATE DATABASE db3;
+--echo expected no match
+--let SEARCH_PATTERN = $create_db_pattern db3
+--source include/search_pattern.inc
+DROP DATABASE db3;
+
+
+SET GLOBAL log_error_verbosity=3;
+
+
+# log_error_verbosity=3, wsrep_min_log_verbosity=3
+SET GLOBAL wsrep_min_log_verbosity=3;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+SHOW VARIABLES LIKE 'log_error_verbosity';
+
+CREATE DATABASE db4;
+--echo expected match
+--let SEARCH_PATTERN = $create_db_pattern db4
+--source include/search_pattern.inc
+DROP DATABASE db4;
+
+# log_error_verbosity=3, wsrep_min_log_verbosity=2
+SET GLOBAL wsrep_min_log_verbosity=2;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+SHOW VARIABLES LIKE 'log_error_verbosity';
+
+CREATE DATABASE db5;
+--echo expected match
+--let SEARCH_PATTERN = $create_db_pattern db5
+--source include/search_pattern.inc
+DROP DATABASE db5;
+
+# log_error_verbosity=3, wsrep_min_log_verbosity=1
+SET GLOBAL wsrep_min_log_verbosity=1;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+SHOW VARIABLES LIKE 'log_error_verbosity';
+
+CREATE DATABASE db6;
+--echo expected match
+--let SEARCH_PATTERN = $create_db_pattern db6
+--source include/search_pattern.inc
+DROP DATABASE db6;
+
+
+SET GLOBAL log_error_verbosity=1;
+
+
+# log_error_verbosity=1, wsrep_min_log_verbosity=3
+SET GLOBAL wsrep_min_log_verbosity=3;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+SHOW VARIABLES LIKE 'log_error_verbosity';
+
+CREATE DATABASE db7;
+--echo expected match
+--let SEARCH_PATTERN = $create_db_pattern db7
+--source include/search_pattern.inc
+DROP DATABASE db7;
+
+# log_error_verbosity=1, wsrep_min_log_verbosity=2
+SET GLOBAL wsrep_min_log_verbosity=2;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+SHOW VARIABLES LIKE 'log_error_verbosity';
+
+CREATE DATABASE db8;
+--echo expected no match
+--let SEARCH_PATTERN = $create_db_pattern db8
+--source include/search_pattern.inc
+DROP DATABASE db8;
+
+# log_error_verbosity=1, wsrep_min_log_verbosity=1
+SET GLOBAL wsrep_min_log_verbosity=1;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+SHOW VARIABLES LIKE 'log_error_verbosity';
+
+CREATE DATABASE db9;
+--echo expected no match
+--let SEARCH_PATTERN = $create_db_pattern db9
+--source include/search_pattern.inc
+DROP DATABASE db9;
+
+
+# cleanup
+--eval SET GLOBAL wsrep_min_log_verbosity = $wsrep_min_log_verbosity_tmp;
+--eval SET GLOBAL log_error_verbosity = $log_error_verbosity_tmp;
+
