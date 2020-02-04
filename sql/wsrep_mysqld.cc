@@ -80,6 +80,7 @@ rpl_sidno wsrep_sidno = -1;
 
 const char *wsrep_data_home_dir = NULL;
 const char *wsrep_dbug_option = "";
+uint wsrep_min_log_verbosity = 3;
 long wsrep_slave_threads = 1;           // # of slave action appliers wanted
 int wsrep_slave_count_change = 0;       // # of appliers to stop or start
 ulong wsrep_debug = 0;                   // enable debug level logging
