@@ -709,8 +709,8 @@ can be set only during startup.
 On session level, you can change it during runtime as well.
 
 For older nodes in the cluster, :variable:`wsrep_replicate_myisam` should work
-since the TOI decision (for MyISAM DDL) is done on origin node.
-Mixing of non-MyISAM and MyISAM tables in the same DDL statement
+since the TOI decision (for MyISAM DDL) is done on the origin node.
+Mixing non-MyISAM and MyISAM tables in the same DDL statement
 is not recommended when :variable:`wsrep_replicate_myisam` is disabled,
 since if any table in the list is MyISAM,
 the whole DDL statement is not put under TOI.
@@ -729,10 +729,9 @@ the whole DDL statement is not put under TOI.
     <https://www.percona.com/doc/percona-server/5.7/management/enforce_engine.html>`_
     front may result in picking up different engine for the same table
     on different nodes
-  * ``CREATE TABLE AS SELECT`` (CTAS) statements use non-TOI replication
-    and are replicated only if there is involvement of InnoDB table
-    that needs transactions
-    (in case of MyISAM table, CTAS statements will not be replicated).
+  * ``CREATE TABLE AS SELECT`` (CTAS) statements use TOI
+    replication. MyISAM tables are created and loaded even if
+    :variable:`wsrep_replicate_myisam` is set to **ON**.
 
 .. variable:: wsrep_restart_slave
 
