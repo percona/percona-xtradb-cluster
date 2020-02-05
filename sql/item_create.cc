@@ -1727,9 +1727,10 @@ static const std::pair<const char *, Create_func *> func_array[] = {
     {"INTERNAL_GET_DD_COLUMN_EXTRA",
      SQL_FN_LIST_INTERNAL(Item_func_internal_get_dd_column_extra, 6)}
 #ifdef WITH_WSREP
-    , {"WSREP_LAST_WRITTEN_GTID", SQL_FN(Item_func_wsrep_last_written_gtid, 0)}
-    , {"WSREP_LAST_SEEN_GTID", SQL_FN(Item_func_wsrep_last_seen_gtid, 0)}
-    , {"WSREP_SYNC_WAIT_UPTO", SQL_FN_V(Item_func_wsrep_sync_wait_upto, 1, 2)}
+    ,
+    {"WSREP_LAST_WRITTEN_GTID", SQL_FN(Item_func_wsrep_last_written_gtid, 0)},
+    {"WSREP_LAST_SEEN_GTID", SQL_FN(Item_func_wsrep_last_seen_gtid, 0)},
+    {"WSREP_SYNC_WAIT_UPTO", SQL_FN_V(Item_func_wsrep_sync_wait_upto, 1, 2)}
 #endif /* WITH_WSREP */
 };
 

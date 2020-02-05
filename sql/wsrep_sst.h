@@ -23,8 +23,8 @@
 #include "wsrep_api.h"
 
 #include <my_config.h>
-#include "wsrep/gtid.hpp"
 #include <string>
+#include "wsrep/gtid.hpp"
 
 /* system variables */
 extern const char *wsrep_sst_method;

@@ -15,21 +15,21 @@
 
 #include "wsrep_applier.h"
 
+#include "mysql/components/services/log_builtins.h"
 #include "wsrep_binlog.h"  // wsrep_dump_rbr_buf()
 #include "wsrep_priv.h"
 #include "wsrep_xid.h"
-#include "mysql/components/services/log_builtins.h"
 
 #include "debug_sync.h"
 #include "log_event.h"  // class THD, EVENT_LEN_OFFSET, etc.
-#include "sql/sql_lex.h"
 #include "mysql/plugin.h"
 #include "sql/binlog_reader.h"
+#include "sql/sql_lex.h"
 
-#include "wsrep_thd.h"
-#include "wsrep_trans_observer.h"
 #include "service_wsrep.h"
 #include "wsrep_priv.h"
+#include "wsrep_thd.h"
+#include "wsrep_trans_observer.h"
 
 /*
   read the first event from (*buf). The size of the (*buf) is (*buf_len).
@@ -126,7 +126,7 @@ void wsrep_apply_error::store(const THD *const thd) {
 */
 int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
                        const void *events_buf, size_t buf_len) {
-  char *buf = static_cast<char*>(const_cast<void*>(events_buf));
+  char *buf = static_cast<char *>(const_cast<void *>(events_buf));
   int rcode = WSREP_RET_SUCCESS;
   int event = 1;
 
@@ -219,22 +219,23 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
     event++;
 
     switch (ev->get_type_code()) {
-    case binary_log::ROWS_QUERY_LOG_EVENT:
-      /*
-        Setting binlog_rows_query_log_events to ON will generate
-        ROW_QUERY_LOG_EVENT. This event logs an extra information while logging
-        row information and so event should be kept infact till ROW_LOG_EVENT
-        is processed and should be freed once ROW_LOG_EVENT is done.
+      case binary_log::ROWS_QUERY_LOG_EVENT:
+        /*
+          Setting binlog_rows_query_log_events to ON will generate
+          ROW_QUERY_LOG_EVENT. This event logs an extra information while
+          logging row information and so event should be kept infact till
+          ROW_LOG_EVENT is processed and should be freed once ROW_LOG_EVENT is
+          done.
 
-        Keeping Rows_log event, it will be needed still, and will be deleted later
-        in rli->cleanup_context()
-        Also FORMAT_DESCRIPTION_EVENT is needed further, but it skipped from this loop
-        by 'continue' above, and thus  avoids the following 'delete ev'
-      */
-      continue;
-    default:
-      delete ev;
-      break;
+          Keeping Rows_log event, it will be needed still, and will be deleted
+          later in rli->cleanup_context() Also FORMAT_DESCRIPTION_EVENT is
+          needed further, but it skipped from this loop by 'continue' above, and
+          thus  avoids the following 'delete ev'
+        */
+        continue;
+      default:
+        delete ev;
+        break;
     }
   }
 

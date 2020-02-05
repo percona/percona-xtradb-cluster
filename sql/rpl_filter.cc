@@ -457,13 +457,13 @@ bool Rpl_filter::db_ok(const char *db, bool need_increase_counter) {
   if (do_db.is_empty() && ignore_db.is_empty())
     return 1;  // Ok to replicate if the user puts no constraints
 
-  /*
-    Previous behaviour "if the user has specified restrictions on which
-    databases to replicate and db was not selected, do not replicate" has
-    been replaced with "do replicate".
-    Since the filtering criteria is not equal to "NULL" the statement should
-    be logged into binlog.
-  */
+    /*
+      Previous behaviour "if the user has specified restrictions on which
+      databases to replicate and db was not selected, do not replicate" has
+      been replaced with "do replicate".
+      Since the filtering criteria is not equal to "NULL" the statement should
+      be logged into binlog.
+    */
 #ifdef WITH_WSREP
   // TODO: check the need for strlen(db) == 0
   if (!db || strlen(db) == 0) return 1;

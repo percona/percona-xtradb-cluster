@@ -102,12 +102,11 @@
 #include "template_utils.h"
 #include "thr_lock.h"
 
-
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
-#include "sql_parse.h"                // WSREP_TO_ISOLATION
 #include "sql/log.h"
-#endif /* WITH_WSREP */
+#include "sql_parse.h"  // WSREP_TO_ISOLATION
+#endif                  /* WITH_WSREP */
 
 namespace dd {
 class Table;

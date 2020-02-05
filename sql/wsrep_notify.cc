@@ -13,16 +13,15 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
+#include "mysql/components/services/log_builtins.h"
 #include "mysqld.h"
 #include "wsrep_priv.h"
 #include "wsrep_utils.h"
-#include "mysql/components/services/log_builtins.h"
 
 const char *wsrep_notify_cmd = "";
 
 void wsrep_notify_status(enum wsrep::server_state::state status,
-                         const wsrep::view* view)
-{
+                         const wsrep::view *view) {
   if (!wsrep_notify_cmd || 0 == strlen(wsrep_notify_cmd)) {
     WSREP_INFO("wsrep_notify_cmd is not defined, skipping notification.");
     return;
@@ -82,4 +81,3 @@ void wsrep_notify_status(enum wsrep::server_state::state status,
                 strerror(err), cmd_ptr);
   }
 }
-

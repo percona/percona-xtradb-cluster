@@ -1279,7 +1279,7 @@ static NO_INLINE MY_ATTRIBUTE((warn_unused_result)) dberr_t
   } else
 #endif /* WITH_WSREP */
 
-  err = row_update_cascade_for_mysql(thr, cascade, foreign->foreign_table);
+    err = row_update_cascade_for_mysql(thr, cascade, foreign->foreign_table);
 
   /* Release the data dictionary latch for a while, so that we do not
   starve other threads from doing CREATE TABLE etc. if we have a huge

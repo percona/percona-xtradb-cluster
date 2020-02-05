@@ -55,8 +55,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifdef WITH_WSREP
 #include "ha_prototypes.h" /* wsrep_is_wsrep_xid() */
-#include "wsrep_mysqld.h"
 #include "wsrep_binlog.h"
+#include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
 
 /** The transaction system */
@@ -405,7 +405,7 @@ void trx_sys_update_wsrep_checkpoint(
     char uuid_str[40] = {
         0,
     };
-    wsrep_uuid_print((const wsrep_uuid_t*)xid_uuid, uuid_str,
+    wsrep_uuid_print((const wsrep_uuid_t *)xid_uuid, uuid_str,
                      sizeof(uuid_str));
     WSREP_DEBUG("Updating WSREPXid: %s:%lld", uuid_str, xid_seqno);
 
@@ -428,7 +428,6 @@ void trx_sys_update_wsrep_checkpoint(
         else
           return;
       } else {
-
         /* Wait and unregister from wsrep group commit */
         wsrep_wait_for_turn_in_group_commit(current_thd);
 
@@ -445,7 +444,6 @@ void trx_sys_update_wsrep_checkpoint(
         wsrep_unregister_from_group_commit(current_thd);
       }
     } else {
-
       /* Wait and unregister from wsrep group commit */
       wsrep_wait_for_turn_in_group_commit(current_thd);
 
@@ -486,8 +484,7 @@ void trx_sys_update_wsrep_checkpoint(
       (const unsigned char *)xid->get_data(), XIDDATASIZE, mtr);
 }
 
-void trx_sys_read_wsrep_checkpoint(XID *xid)
-{
+void trx_sys_read_wsrep_checkpoint(XID *xid) {
   trx_sysf_t *sys_header;
   mtr_t mtr;
   ulint magic;
@@ -501,7 +498,7 @@ void trx_sys_read_wsrep_checkpoint(XID *xid)
   if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO +
                                 TRX_SYS_WSREP_XID_MAGIC_N_FLD)) !=
       TRX_SYS_WSREP_XID_MAGIC_N) {
-    memset(static_cast<void*>(xid), 0, sizeof(*xid));
+    memset(static_cast<void *>(xid), 0, sizeof(*xid));
     xid->set_format_id(-1);
     trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
     mtr_commit(&mtr);

@@ -3208,7 +3208,7 @@ void Item_func_rand::seed_random(Item *arg) {
   */
 #ifdef WITH_WSREP
   uint32 tmp;
-  THD* thd = current_thd;
+  THD *thd = current_thd;
   if (WSREP(thd)) {
     /* This ensures same random value is assigned to replicated transaction. */
     if (wsrep_thd_is_applying(thd))
@@ -7974,7 +7974,7 @@ static bool check_table_and_trigger_access(Item **args, bool check_trigger_acl,
   // Don't show compression dictionary tables in "SHOW TABLES"
   if (compression_dict::is_hardcoded(dd::String_type(sch_name),
                                      dd::String_type(tbl_name))) {
-	  return false;
+    return false;
   }
 
   // Skip INFORMATION_SCHEMA database

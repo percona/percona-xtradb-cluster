@@ -15,19 +15,19 @@
 
 #include "wsrep_high_priority_service.h"
 #include "mysql/components/services/log_builtins.h"
+#include "sql/rpl_info_factory.h"
 #include "wsrep_applier.h"
 #include "wsrep_binlog.h"
 #include "wsrep_schema.h"
 #include "wsrep_trans_observer.h"
 #include "wsrep_xid.h"
-#include "sql/rpl_info_factory.h"
 
 #include "debug_sync.h"
+#include "item_func.h"
 #include "sql_class.h" /* THD */
 #include "transaction.h"
-#include "item_func.h"
 
-#include "sql_base.h"     // close_temporary_table()
+#include "sql_base.h"  // close_temporary_table()
 
 extern handlerton *binlog_hton;
 
@@ -109,7 +109,7 @@ Wsrep_high_priority_service::Wsrep_high_priority_service(THD *thd)
   m_shadow.server_status = thd->server_status;
   m_shadow.vio = thd->active_vio;
   m_shadow.tx_isolation = thd->variables.transaction_isolation;
-  m_shadow.db = (char *)(const_cast<char*>(thd->db().str));
+  m_shadow.db = (char *)(const_cast<char *>(thd->db().str));
   m_shadow.db_length = thd->db().length;
   m_shadow.user_time = thd->user_time;
   m_shadow.row_count_func = thd->get_row_count_func();
@@ -314,7 +314,6 @@ int Wsrep_high_priority_service::commit(const wsrep::ws_handle &ws_handle,
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
-
   if (!is_ordered) {
     m_thd->wsrep_cs().before_rollback();
     m_thd->wsrep_cs().after_rollback();
@@ -383,7 +382,7 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
 
 int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
                                            const wsrep::const_buffer &data,
-                                           wsrep::mutable_buffer&) {
+                                           wsrep::mutable_buffer &) {
   DBUG_ENTER("Wsrep_high_priority_service::apply_toi");
   THD *thd = m_thd;
   Wsrep_non_trans_mode non_trans_mode(thd, ws_meta);
@@ -486,7 +485,6 @@ void Wsrep_high_priority_service::switch_execution_context(
   DBUG_VOID_RETURN;
 }
 
-
 /* Dummy write-set is logged when the said transaction fails on cluster
 due to certification failure. dummy write set ensure that apply and commit
 monitor are entered and left to maintain same consistency across the cluster
@@ -552,7 +550,7 @@ Wsrep_applier_service::~Wsrep_applier_service() {
 
 int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
                                            const wsrep::const_buffer &data,
-                                           wsrep::mutable_buffer&) {
+                                           wsrep::mutable_buffer &) {
   DBUG_ENTER("Wsrep_applier_service::apply_write_set");
   THD *thd = m_thd;
 
@@ -564,8 +562,7 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
   // thd_proc_info(thd, "applying write set");
   THD_STAGE_INFO(thd, stage_wsrep_applying_writeset);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: applying write-set (%lld)",
-           ws_meta.seqno().get());
+           "wsrep: applying write-set (%lld)", ws_meta.seqno().get());
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -731,7 +728,7 @@ Wsrep_replayer_service::~Wsrep_replayer_service() {
 
 int Wsrep_replayer_service::apply_write_set(const wsrep::ws_meta &ws_meta,
                                             const wsrep::const_buffer &data,
-                                            wsrep::mutable_buffer&) {
+                                            wsrep::mutable_buffer &) {
   DBUG_ENTER("Wsrep_replayer_service::apply_write_set");
   THD *thd = m_thd;
 
@@ -752,7 +749,6 @@ int Wsrep_replayer_service::apply_write_set(const wsrep::ws_meta &ws_meta,
   if (ret || thd->wsrep_has_ignored_error) {
     wsrep_dump_rbr_buf(thd, data.data(), data.size());
   }
-
 
   TABLE *tmp;
   while ((tmp = thd->temporary_tables)) {

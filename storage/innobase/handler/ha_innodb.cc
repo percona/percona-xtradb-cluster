@@ -189,9 +189,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifdef WITH_WSREP
 #include "my_md5.h"
+#include "tc_log.h"
 #include "wsrep_api.h"
 #include "wsrep_mysqld.h"
-#include "tc_log.h"
 
 /* Must always init to false. */
 static bool innobase_disallow_writes = false;
@@ -10081,8 +10081,7 @@ int ha_innobase::write_row(uchar *record) /*!< in: a row in MySQL format */
             through server level autoinc processing, therefore m_prebuilt
             autoinc values don't get properly assigned. Fetch values from
             server side. */
-            if (wsrep_on(current_thd) &&
-                wsrep_thd_is_applying(m_user_thd)) {
+            if (wsrep_on(current_thd) && wsrep_thd_is_applying(m_user_thd)) {
               wsrep_thd_auto_increment_variables(current_thd, &offset,
                                                  &increment);
             } else {
@@ -10163,8 +10162,7 @@ report_error:
   With that there comes another existing dependency.
   Why not allow LDI operating with binlog-format = STATEMENT.
   There is no reason documented so will leave it as is for now. */
-  if (!error_result && wsrep_thd_is_local(m_user_thd) &&
-      wsrep_on(m_user_thd) &&
+  if (!error_result && wsrep_thd_is_local(m_user_thd) && wsrep_on(m_user_thd) &&
       (thd_sql_command(m_user_thd) != SQLCOM_CREATE_TABLE) &&
       !wsrep_consistency_check(m_user_thd) &&
       (thd_binlog_format(m_user_thd) == BINLOG_FORMAT_ROW ||
@@ -12420,9 +12418,9 @@ extern dberr_t wsrep_append_foreign_key(
 
   wsrep_buf_t wkey_part[3];
   wsrep_key_t wkey = {wkey_part, 3};
-  if (!wsrep_prepare_key_for_innodb((const uchar *)cache_key,
-                                    cache_key_len + 1, (const uchar *)key,
-                                    len + 1, wkey_part, &wkey.key_parts_num)) {
+  if (!wsrep_prepare_key_for_innodb((const uchar *)cache_key, cache_key_len + 1,
+                                    (const uchar *)key, len + 1, wkey_part,
+                                    &wkey.key_parts_num)) {
     WSREP_WARN("key prepare failed for cascaded FK: %s",
                (wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
     return DB_ERROR;
@@ -12439,8 +12437,8 @@ extern dberr_t wsrep_append_foreign_key(
 }
 
 static int wsrep_append_key(
-    THD *thd, trx_t *trx, TABLE_SHARE *table_share,
-    const char *key, uint16_t key_len,
+    THD *thd, trx_t *trx, TABLE_SHARE *table_share, const char *key,
+    uint16_t key_len,
     Wsrep_service_key_type key_type /*!< in: access type of this key
                             (shared, exclusive, semi...) */
 ) {
@@ -12497,7 +12495,7 @@ bool wsrep_is_FK_index(dict_table_t *table, dict_index_t *index) {
 }
 
 int ha_innobase::wsrep_append_keys(
-    THD* thd,                        /*!< in: thread handler */
+    THD *thd,                        /*!< in: thread handler */
     Wsrep_service_key_type key_type, /*!< in: access type of this key
                                        (shared, exclusive, reference...) */
     const uchar *record0,            /* in: row in MySQL format */
@@ -12515,10 +12513,9 @@ int ha_innobase::wsrep_append_keys(
   trx_t *trx = thd_to_trx(thd);
 
 #ifdef WSREP_DEBUG_PRINT
-	fprintf(stderr, "%s conn %lu, trx " TRX_ID_FMT ", table %s\nSQL: %s\n",
-		wsrep_key_type_to_str(key_type),
-		thd_get_thread_id(thd), trx->id,
-		table_share->table_name.str, wsrep_thd_query(thd));
+  fprintf(stderr, "%s conn %lu, trx " TRX_ID_FMT ", table %s\nSQL: %s\n",
+          wsrep_key_type_to_str(key_type), thd_get_thread_id(thd), trx->id,
+          table_share->table_name.str, wsrep_thd_query(thd));
 #endif /* WSREP_DEBUG_PRINT */
 
   if (table_share && table_share->tmp_table != NO_TMP_TABLE &&
@@ -12542,8 +12539,7 @@ int ha_innobase::wsrep_append_keys(
                                       &is_null, m_prebuilt);
 
     if (!is_null) {
-      rcode =
-          wsrep_append_key(thd, trx, table_share, keyval, len, key_type);
+      rcode = wsrep_append_key(thd, trx, table_share, keyval, len, key_type);
       if (rcode) DBUG_RETURN(rcode);
     } else {
       WSREP_DEBUG("Skip appending NULL key (proto 0): %s",
@@ -12641,15 +12637,15 @@ int ha_innobase::wsrep_append_keys(
     int rcode;
 
     wsrep_calc_row_hash(digest, record0, table, m_prebuilt, thd);
-    if ((rcode = wsrep_append_key(thd, trx, table_share,
-                                  (const char *)digest, 16, key_type))) {
+    if ((rcode = wsrep_append_key(thd, trx, table_share, (const char *)digest,
+                                  16, key_type))) {
       DBUG_RETURN(rcode);
     }
 
     if (record1) {
       wsrep_calc_row_hash(digest, record1, table, m_prebuilt, thd);
-      if ((rcode = wsrep_append_key(thd, trx, table_share,
-                                    (const char *)digest, 16, key_type))) {
+      if ((rcode = wsrep_append_key(thd, trx, table_share, (const char *)digest,
+                                    16, key_type))) {
         DBUG_RETURN(rcode);
       }
     }

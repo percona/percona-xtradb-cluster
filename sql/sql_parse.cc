@@ -180,8 +180,8 @@
 #ifdef WITH_WSREP
 #include "wsrep_binlog.h"
 #include "wsrep_mysqld.h"
-#include "wsrep_thd.h"
 #include "wsrep_sst.h"
+#include "wsrep_thd.h"
 #include "wsrep_trans_observer.h"
 
 static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
@@ -1223,8 +1223,8 @@ static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables) {
     /* PXC-2557 : skip if NULL, otherwise lex_string_set will crash */
     if (!table->db || !table->table_name) continue;
 
-    lex_cstring_set(&db, const_cast<char*> (table->db));
-    lex_cstring_set(&tn, const_cast<char*> (table->table_name));
+    lex_cstring_set(&db, const_cast<char *>(table->db));
+    lex_cstring_set(&tn, const_cast<char *>(table->table_name));
     c = get_table_category(db, tn);
     if (c != TABLE_CATEGORY_INFORMATION && c != TABLE_CATEGORY_PERFORMANCE) {
       return false;
@@ -1620,7 +1620,6 @@ static void check_secondary_engine_statement(THD *thd,
                                              Parser_state *parser_state,
                                              const char *query_string,
                                              size_t query_length) {
-
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     /* While running in cluster mode disable the check for now */
@@ -2521,31 +2520,31 @@ dispatch_end:
     thd->send_statement_status();
   } else {
 #endif /* WITH_WSREP */
-done:
-  DBUG_ASSERT(thd->open_tables == NULL ||
-              (thd->locked_tables_mode == LTM_LOCK_TABLES));
+  done:
+    DBUG_ASSERT(thd->open_tables == NULL ||
+                (thd->locked_tables_mode == LTM_LOCK_TABLES));
 
-  /* Update user statistics only if at least one timer was initialized */
-  if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0)) {
-    userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
-                          &thd->cpu_time);
-    /* Updates THD stats and the global user stats. */
-    thd->update_stats(true);
-    update_global_user_stats(thd, true, my_getsystime());
-  }
+    /* Update user statistics only if at least one timer was initialized */
+    if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0)) {
+      userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
+                            &thd->cpu_time);
+      /* Updates THD stats and the global user stats. */
+      thd->update_stats(true);
+      update_global_user_stats(thd, true, my_getsystime());
+    }
 
-  /* Finalize server status flags after executing a command. */
-  thd->update_slow_query_status();
-  if (thd->killed) thd->send_kill_message();
-  thd->send_statement_status();
+    /* Finalize server status flags after executing a command. */
+    thd->update_slow_query_status();
+    if (thd->killed) thd->send_kill_message();
+    thd->send_statement_status();
 
-  /* After sending response, switch to clone protocol */
-  if (clone_cmd != nullptr) {
-    DBUG_ASSERT(command == COM_CLONE);
-    error = clone_cmd->execute_server(thd);
-  }
+    /* After sending response, switch to clone protocol */
+    if (clone_cmd != nullptr) {
+      DBUG_ASSERT(command == COM_CLONE);
+      error = clone_cmd->execute_server(thd);
+    }
 
-  thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
+    thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
 
 #ifdef WITH_WSREP
   }
@@ -2640,7 +2639,7 @@ bool shutdown(THD *thd, enum mysql_enum_shutdown_level level) {
     goto error; /* purecov: inspected */
 
 #ifdef WITH_WSREP
-  (void) wsrep_remove_sst_user(false);
+  (void)wsrep_remove_sst_user(false);
 #endif /* WITH_WSREP */
 
   if (level == SHUTDOWN_DEFAULT)
@@ -3388,7 +3387,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
     */
     if (trans_check_state(thd)) return -1;
 
-    /* Commit the normal transaction if one is active. */
+      /* Commit the normal transaction if one is active. */
 #ifdef WITH_WSREP
     if (trans_commit_implicit(thd)) {
       thd->mdl_context.release_transactional_locks();
@@ -4219,7 +4218,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
     }
 
     case SQLCOM_UNLOCK_TABLES: {
-
 #ifdef WITH_WSREP
       /* UNLOCK Tables is generic statement and not all lock table variants
       are blocked (only one with explict table lock are blocked). */
@@ -4333,7 +4331,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
       break;
     case SQLCOM_CREATE_COMPRESSION_DICTIONARY: {
-
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
@@ -4357,7 +4354,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       break;
     }
     case SQLCOM_DROP_COMPRESSION_DICTIONARY: {
-
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
@@ -5127,10 +5123,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
         goto error;
 
 #ifdef WITH_WSREP
-      // to isolation is now done as part of sp_drop_routine as it does
-      // additional ACL based check that ensures the fact that if the
-      // definer has SUPER PRIVILIGES then DROP/ATLER should have same too.
-      // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+        // to isolation is now done as part of sp_drop_routine as it does
+        // additional ACL based check that ensures the fact that if the
+        // definer has SUPER PRIVILIGES then DROP/ATLER should have same too.
+        // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
 
       enum_sp_type sp_type = (lex->sql_command == SQLCOM_DROP_PROCEDURE)
@@ -5264,8 +5260,8 @@ int mysql_execute_command(THD *thd, bool first_level) {
         goto error;
 
 #ifdef WITH_WSREP
-      // check is now done as part od drop view post definer SUPER PRIVILIGES check.
-      // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+        // check is now done as part od drop view post definer SUPER PRIVILIGES
+        // check. WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
 
       /* Conditionally writes to binlog. */

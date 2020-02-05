@@ -39,7 +39,6 @@
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
 #include "wsrep_xid.h"
-#include "wsrep_thd.h"
 
 extern const char wsrep_defaults_file[];
 extern const char wsrep_defaults_group_suffix[];
@@ -159,7 +158,7 @@ has been received. Also update the local checkpoint.
 void wsrep_sst_received(THD *thd, const wsrep_uuid_t &uuid,
                         wsrep_seqno_t const seqno,
                         const void *const state __attribute__((unused)),
-                        size_t const state_len __attribute__ ((unused))) {
+                        size_t const state_len __attribute__((unused))) {
   /*
     To keep track of whether the local uuid:seqno should be updated. Also, note
     that local state (uuid:seqno) is updated/checkpointed only after we get an
@@ -449,7 +448,7 @@ static void *sst_joiner_thread(void *a) {
 #endif /* HAVE_PSI_INTERFACE */
 
   {
-    THD* thd;
+    THD *thd;
     const char magic[] = "ready";
     const size_t magic_len = sizeof(magic) - 1;
     const int out_len = 512;
@@ -572,22 +571,20 @@ static void *sst_joiner_thread(void *a) {
       err = sst_scan_uuid_seqno(out, &ret_uuid, &ret_seqno);
     }
 
-
     wsrep::gtid ret_gtid;
 
-    if (err)
-    {
-      ret_gtid= wsrep::gtid::undefined();
+    if (err) {
+      ret_gtid = wsrep::gtid::undefined();
     } else {
       ret_gtid = wsrep::gtid(wsrep::id(ret_uuid.data, sizeof(ret_uuid.data)),
                              wsrep::seqno(ret_seqno));
     }
 
     // Tell initializer thread that SST is complete
-    if (my_thread_init())
-    {
-      WSREP_ERROR("my_thread_init() failed, can't signal end of SST. "
-                  "Aborting.");
+    if (my_thread_init()) {
+      WSREP_ERROR(
+          "my_thread_init() failed, can't signal end of SST. "
+          "Aborting.");
       unireg_abort(1);
     }
 
@@ -655,25 +652,18 @@ static ssize_t sst_prepare_other(const char *method, const char *addr_in,
   if (strlen(binlog_opt_val)) binlog_opt = WSREP_SST_OPT_BINLOG;
 
   ret = snprintf(cmd_str(), cmd_len,
-                 "wsrep_sst_%s "
-                 WSREP_SST_OPT_ROLE " 'joiner' "
-                 WSREP_SST_OPT_ADDR " '%s' "
-                 WSREP_SST_OPT_DATA " '%s' "
-                 WSREP_SST_OPT_BASEDIR " '%s' "
-                 WSREP_SST_OPT_PLUGINDIR " '%s' "
-                 WSREP_SST_OPT_CONF " '%s' "
-                 WSREP_SST_OPT_CONF_SUFFIX " '%s' "
-                 WSREP_SST_OPT_PARENT " '%d' "
-                 WSREP_SST_OPT_VERSION " '%s' "
+                 "wsrep_sst_%s " WSREP_SST_OPT_ROLE
+                 " 'joiner' " WSREP_SST_OPT_ADDR " '%s' " WSREP_SST_OPT_DATA
+                 " '%s' " WSREP_SST_OPT_BASEDIR " '%s' " WSREP_SST_OPT_PLUGINDIR
+                 " '%s' " WSREP_SST_OPT_CONF " '%s' " WSREP_SST_OPT_CONF_SUFFIX
+                 " '%s' " WSREP_SST_OPT_PARENT " '%d' " WSREP_SST_OPT_VERSION
+                 " '%s' "
                  " %s '%s' ",
-                 method, addr_in,
-                 mysql_real_data_home,
+                 method, addr_in, mysql_real_data_home,
                  mysql_home_ptr ? mysql_home_ptr : "",
                  opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "",
-                 wsrep_defaults_file,
-                 wsrep_defaults_group_suffix,
-                 (int)getpid(),
-                 MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+                 wsrep_defaults_file, wsrep_defaults_group_suffix,
+                 (int)getpid(), MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
                  binlog_opt, binlog_opt_val);
   my_free(binlog_opt_val);
 
@@ -720,7 +710,7 @@ std::string wsrep_sst_prepare() {
   char ip_buf[ip_max];
   const char *addr_in = NULL;
   const char *addr_out = NULL;
-  const char* method;
+  const char *method;
 
   if (!strcmp(wsrep_sst_method, WSREP_SST_SKIP)) {
     return WSREP_STATE_TRANSFER_TRIVIAL;
@@ -755,7 +745,7 @@ std::string wsrep_sst_prepare() {
     }
   }
 
-  ssize_t addr_len= -ENOSYS;
+  ssize_t addr_len = -ENOSYS;
   method = wsrep_sst_method;
   if (Wsrep_server_state::instance().is_initialized() &&
       Wsrep_server_state::instance().state() == Wsrep_server_state::s_joiner) {
@@ -905,10 +895,10 @@ static void *sst_upgrade_thread(void *a) {
     }
 
     // Tell initializer thread that SST is complete
-    if (my_thread_init())
-    {
-      WSREP_ERROR("my_thread_init() failed, can't signal end of SST. "
-                  "Aborting.");
+    if (my_thread_init()) {
+      WSREP_ERROR(
+          "my_thread_init() failed, can't signal end of SST. "
+          "Aborting.");
       unireg_abort(1);
     }
 
@@ -972,22 +962,16 @@ static ssize_t sst_prepare_upgrade() {
   if (strlen(binlog_opt_val)) binlog_opt = WSREP_SST_OPT_BINLOG;
 
   ret = snprintf(cmd_str(), cmd_len,
-                 "wsrep_sst_upgrade "
-                 WSREP_SST_OPT_DATA " '%s' "
-                 WSREP_SST_OPT_BASEDIR " '%s' "
-                 WSREP_SST_OPT_PLUGINDIR " '%s' "
-                 WSREP_SST_OPT_CONF " '%s' "
-                 WSREP_SST_OPT_CONF_SUFFIX " '%s' "
-                 WSREP_SST_OPT_PARENT " '%d' "
-                 WSREP_SST_OPT_VERSION " '%s' "
+                 "wsrep_sst_upgrade " WSREP_SST_OPT_DATA
+                 " '%s' " WSREP_SST_OPT_BASEDIR " '%s' " WSREP_SST_OPT_PLUGINDIR
+                 " '%s' " WSREP_SST_OPT_CONF " '%s' " WSREP_SST_OPT_CONF_SUFFIX
+                 " '%s' " WSREP_SST_OPT_PARENT " '%d' " WSREP_SST_OPT_VERSION
+                 " '%s' "
                  " %s '%s' ",
-                 mysql_real_data_home,
-                 mysql_home_ptr ? mysql_home_ptr : "",
+                 mysql_real_data_home, mysql_home_ptr ? mysql_home_ptr : "",
                  opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "",
-                 wsrep_defaults_file,
-                 wsrep_defaults_group_suffix,
-                 (int)getpid(),
-                 MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+                 wsrep_defaults_file, wsrep_defaults_group_suffix,
+                 (int)getpid(), MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
                  binlog_opt, binlog_opt_val);
   my_free(binlog_opt_val);
 
@@ -1310,10 +1294,13 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
   // The second entry is the string to be displayed if the query fails
   //  (this can be NULL, in which case the actual query will be used)
   const char *cmds[] = {
-    "SET SESSION sql_log_bin = OFF;", nullptr,
-    "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "SET SESSION sql_log_bin = OFF;",
+    nullptr,
+    "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;",
+    nullptr,
     "CREATE USER 'mysql.pxc.sst.user'@localhost IDENTIFIED WITH "
-    "'mysql_native_password' BY '%s' ACCOUNT LOCK;", "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
+    "'mysql_native_password' BY '%s' ACCOUNT LOCK;",
+    "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
   /*
     This is the code that uses the mysql.pxc.sst.role
     However there is a bug in 8.0.15 where the "GRANT CREATE ON DBNAME.*" when
@@ -1329,15 +1316,21 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
       to the bug in 8.0.15 described above.
     */
     "GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, "
-    "SUPER ON *.* TO 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "SUPER ON *.* TO 'mysql.pxc.sst.user'@localhost;",
+    nullptr,
     "GRANT CREATE, INSERT, SELECT ON PERCONA_SCHEMA.xtrabackup_history TO "
-    "'mysql.pxc.sst.user'@localhost;", nullptr,
-    "GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.user'@localhost;", nullptr,
-    "GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.user'@localhost;", nullptr,
+    "'mysql.pxc.sst.user'@localhost;",
+    nullptr,
+    "GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.user'@localhost;",
+    nullptr,
+    "GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.user'@localhost;",
+    nullptr,
 #endif
 
-    "ALTER USER 'mysql.pxc.sst.user'@localhost ACCOUNT UNLOCK;", nullptr,
-    nullptr, nullptr
+    "ALTER USER 'mysql.pxc.sst.user'@localhost ACCOUNT UNLOCK;",
+    nullptr,
+    nullptr,
+    nullptr
   };
 
   wsrep_allow_server_session = true;
@@ -1374,9 +1367,12 @@ int wsrep_remove_sst_user(bool initialize_thread) {
   // The first entry is the actual query to be run
   // The second entry is the string to be displayed if the query fails
   //  (this can be NULL, in which case the actual query will be used)
-  const char *cmds[] = {"SET SESSION sql_log_bin = OFF;", nullptr,
-                        "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;", nullptr,
-                        nullptr, nullptr};
+  const char *cmds[] = {"SET SESSION sql_log_bin = OFF;",
+                        nullptr,
+                        "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;",
+                        nullptr,
+                        nullptr,
+                        nullptr};
 
   wsrep_allow_server_session = true;
   session = setup_server_session(initialize_thread);
@@ -1557,11 +1553,9 @@ static void *sst_donor_thread(void *a) {
   return NULL;
 }
 
-static int sst_donate_other (const char*        method,
-                             const char*        addr,
-                             const wsrep::gtid& gtid,
-                             bool               bypass,
-                             char**             env) // carries auth info
+static int sst_donate_other(const char *method, const char *addr,
+                            const wsrep::gtid &gtid, bool bypass,
+                            char **env)  // carries auth info
 {
   int const cmd_len = 4096;
   wsp::string cmd_str(cmd_len);
@@ -1590,29 +1584,20 @@ static int sst_donate_other (const char*        method,
 
   ret = snprintf(
       cmd_str(), cmd_len,
-      "wsrep_sst_%s "
-      WSREP_SST_OPT_ROLE " 'donor' "
-      WSREP_SST_OPT_ADDR " '%s' "
-      WSREP_SST_OPT_SOCKET " '%s' "
-      WSREP_SST_OPT_DATA " '%s' "
-      WSREP_SST_OPT_BASEDIR " '%s' "
-      WSREP_SST_OPT_PLUGINDIR " '%s' "
-      WSREP_SST_OPT_CONF " '%s' "
-      WSREP_SST_OPT_CONF_SUFFIX " '%s' "
-      WSREP_SST_OPT_VERSION " '%s' "
-      " %s '%s' "
-      WSREP_SST_OPT_GTID " '%s:%lld' "
+      "wsrep_sst_%s " WSREP_SST_OPT_ROLE " 'donor' " WSREP_SST_OPT_ADDR
+      " '%s' " WSREP_SST_OPT_SOCKET " '%s' " WSREP_SST_OPT_DATA
+      " '%s' " WSREP_SST_OPT_BASEDIR " '%s' " WSREP_SST_OPT_PLUGINDIR
+      " '%s' " WSREP_SST_OPT_CONF " '%s' " WSREP_SST_OPT_CONF_SUFFIX
+      " '%s' " WSREP_SST_OPT_VERSION
+      " '%s' "
+      " %s '%s' " WSREP_SST_OPT_GTID
+      " '%s:%lld' "
       "%s",
-      method, addr,
-      mysqld_unix_port,
-      mysql_real_data_home,
+      method, addr, mysqld_unix_port, mysql_real_data_home,
       mysql_home_ptr ? mysql_home_ptr : "",
-      opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "",
-      wsrep_defaults_file,
-      wsrep_defaults_group_suffix,
-      MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
-      binlog_opt, binlog_opt_val,
-      uuid_oss.str().c_str(), gtid.seqno().get(),
+      opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "", wsrep_defaults_file,
+      wsrep_defaults_group_suffix, MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+      binlog_opt, binlog_opt_val, uuid_oss.str().c_str(), gtid.seqno().get(),
       bypass ? " " WSREP_SST_OPT_BYPASS : "");
   my_free(binlog_opt_val);
 
@@ -1639,18 +1624,15 @@ static int sst_donate_other (const char*        method,
   return arg.err;
 }
 
-
-int wsrep_sst_donate(const std::string& msg,
-                     const wsrep::gtid& current_gtid,
-                     const bool         bypass)
-{
+int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
+                     const bool bypass) {
   /* This will be reset when sync callback is called.
    * Should we set wsrep_ready to false here too? */
   local_status.set(wsrep::server_state::s_donor);
 
-  const char* method= msg.data();
-  size_t method_len= strlen (method);
-  const char* data= method + method_len + 1;
+  const char *method = msg.data();
+  size_t method_len = strlen(method);
+  const char *data = method + method_len + 1;
 
   wsp::env env(NULL);
   if (env.error()) {

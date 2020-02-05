@@ -13,14 +13,13 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
-
-#include "mysql/psi/mysql_mutex.h"
-#include "mysql/psi/mysql_cond.h"
 #include "mysql/components/services/log_builtins.h"
+#include "mysql/psi/mysql_cond.h"
+#include "mysql/psi/mysql_mutex.h"
 
-#include "service_wsrep.h"
 #include "debug_sync.h"
 #include "log.h"
+#include "service_wsrep.h"
 #include "sql_class.h"
 #include "wsrep/key.hpp"
 #include "wsrep_thd.h"
@@ -29,11 +28,11 @@
 extern "C" bool wsrep_on(const THD *thd) { return bool(WSREP(thd)); }
 
 extern "C" void wsrep_thd_LOCK(const THD *thd) {
-  mysql_mutex_lock(const_cast<mysql_mutex_t*>(&thd->LOCK_wsrep_thd));
+  mysql_mutex_lock(const_cast<mysql_mutex_t *>(&thd->LOCK_wsrep_thd));
 }
 
 extern "C" void wsrep_thd_UNLOCK(const THD *thd) {
-  mysql_mutex_unlock(const_cast<mysql_mutex_t*>(&thd->LOCK_wsrep_thd));
+  mysql_mutex_unlock(const_cast<mysql_mutex_t *>(&thd->LOCK_wsrep_thd));
 }
 
 extern "C" const char *wsrep_thd_client_state_str(const THD *thd) {
@@ -139,7 +138,7 @@ extern "C" void wsrep_handle_SR_rollback(THD *bf_thd, THD *victim_thd) {
 }
 
 extern "C" bool wsrep_thd_bf_abort(const THD *bf_thd, THD *victim_thd,
-                                      bool signal) {
+                                   bool signal) {
   /* Note: do not store/reset globals before wsrep_bf_abort() call
      to avoid losing BF thd context. */
   if (WSREP(victim_thd) && !victim_thd->wsrep_trx().active()) {
@@ -242,7 +241,6 @@ extern "C" int wsrep_thd_append_key(THD *thd, const struct wsrep_key *key,
 }
 
 extern "C" void wsrep_commit_ordered(THD *thd) {
-
   // WSREP_DEBUG("wsrep_commit_ordered");
 
   if (wsrep_is_active(thd) &&
@@ -260,4 +258,3 @@ extern "C" bool wsrep_consistency_check(const MYSQL_THD thd) {
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd) {
   return thd->thread_id();
 }
-

@@ -67,8 +67,8 @@
 
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
-#include "wsrep_mysqld.h"
 #include "sql/log.h"
+#include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
 
 namespace dd {

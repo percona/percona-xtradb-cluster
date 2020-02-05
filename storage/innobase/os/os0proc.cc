@@ -49,8 +49,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #endif
 
 #if defined(WITH_WSREP) && defined(UNIV_LINUX)
-#include <sys/mman.h>		/* madvise() */
-#endif /* WITH_WSREP && UNIV_LINUX */
+#include <sys/mman.h> /* madvise() */
+#endif                /* WITH_WSREP && UNIV_LINUX */
 
 /* FreeBSD for example has only MAP_ANON, Linux has MAP_ANONYMOUS and
 MAP_ANON but MAP_ANON is marked as deprecated */

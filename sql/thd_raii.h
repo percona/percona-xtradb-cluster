@@ -112,7 +112,6 @@ class Disable_gtid_state_update_guard {
 
 class Disable_binlog_guard {
  public:
-
 #ifdef WITH_WSREP
   /* wsrep is turned off along with binlog as part of mysql-wsrep/issues/329
   meant for tracking and handling leaking galera open transaction.

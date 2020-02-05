@@ -974,8 +974,7 @@ bool Rpl_info_factory::configure_channel_replication_filters(
   /* Similar to Group Replication, we do not allow the wsrep
      channel to be configurable
   */
-  if (wsrep_is_wsrep_channel_name(channel_name))
-    return false;
+  if (wsrep_is_wsrep_channel_name(channel_name)) return false;
 #endif /* WITH_WSREP */
 
   if (Master_info::is_configured(rli->mi)) {

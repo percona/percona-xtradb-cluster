@@ -529,7 +529,6 @@ static inline bool wsrep_break_lock(THR_LOCK_DATA *data,
                                     struct st_lock_list *lock_queue2,
                                     struct st_lock_list *wait_queue,
                                     THR_LOCK_INFO *owner) {
-
   if (wsrep_on(data->owner->mysql_thd) && wsrep_thd_is_brute_force &&
       wsrep_thd_is_brute_force(data->owner->mysql_thd, true)) {
     THR_LOCK_DATA *holder;
@@ -589,7 +588,7 @@ enum enum_thr_lock_result thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
   struct st_lock_list *wait_queue;
 #ifdef WITH_WSREP
   bool wsrep_lock_inserted = false;
-#endif /* WITH_WSREP */
+#endif                                      /* WITH_WSREP */
   MYSQL_TABLE_WAIT_VARIABLES(locker, state) /* no ';' */
   DBUG_TRACE;
 

@@ -47,143 +47,130 @@ size_t wsrep_host_len(const char *addr, size_t addr_len);
 namespace wsp {
 
 class Address {
-public:
-  Address()
-    : m_address_len(0), m_family(UNSPEC), m_port(0), m_valid(false)
-  {
+ public:
+  Address() : m_address_len(0), m_family(UNSPEC), m_port(0), m_valid(false) {
     memset(m_address, 0, sizeof(m_address));
   }
   Address(const char *addr_in)
-    : m_address_len(0), m_family(UNSPEC), m_port(0), m_valid(false)
-  {
+      : m_address_len(0), m_family(UNSPEC), m_port(0), m_valid(false) {
     memset(m_address, 0, sizeof(m_address));
     parse_addr(addr_in);
   }
   bool is_valid() { return m_valid; }
   bool is_ipv6() { return (m_family == INET6); }
 
-  const char* get_address() { return m_address; }
+  const char *get_address() { return m_address; }
   size_t get_address_len() { return m_address_len; }
   int get_port() { return m_port; }
 
-private:
+ private:
   enum family {
-    UNSPEC= 0,
-    INET,                                       /* IPv4 */
-    INET6,                                      /* IPv6 */
+    UNSPEC = 0,
+    INET,  /* IPv4 */
+    INET6, /* IPv6 */
   };
 
-  char   m_address[256];
+  char m_address[256];
   size_t m_address_len;
   family m_family;
-  int    m_port;
-  bool   m_valid;
+  int m_port;
+  bool m_valid;
 
   void parse_addr(const char *addr_in) {
     const char *start;
     const char *end;
     const char *port;
-    const char* open_bracket= strchr(const_cast<char *>(addr_in), '[');
-    const char* close_bracket= strchr(const_cast<char *>(addr_in), ']');
-    const char* colon= strchr(const_cast<char *>(addr_in), ':');
-    const char* dot= strchr(const_cast<char *>(addr_in), '.');
+    const char *open_bracket = strchr(const_cast<char *>(addr_in), '[');
+    const char *close_bracket = strchr(const_cast<char *>(addr_in), ']');
+    const char *colon = strchr(const_cast<char *>(addr_in), ':');
+    const char *dot = strchr(const_cast<char *>(addr_in), '.');
 
-    int cc= colon_count(addr_in);
+    int cc = colon_count(addr_in);
 
-    if (open_bracket != NULL ||
-        dot == NULL ||
-        (colon != NULL && (dot == NULL || colon < dot)))
-    {
+    if (open_bracket != NULL || dot == NULL ||
+        (colon != NULL && (dot == NULL || colon < dot))) {
       // This could be an IPv6 address or a hostname
       if (open_bracket != NULL) {
         /* Sanity check: Address with '[' must include ']' */
         if (close_bracket == NULL &&
-            open_bracket < close_bracket)       /* Error: malformed address */
+            open_bracket < close_bracket) /* Error: malformed address */
         {
-          m_valid= false;
+          m_valid = false;
           return;
         }
 
-        start= open_bracket + 1;
-        end= close_bracket;
+        start = open_bracket + 1;
+        end = close_bracket;
 
         /* Check for port */
-        port= strchr(close_bracket, ':');
-        if ((port != NULL) && parse_port(port + 1))
-        {
-          return;                               /* Error: invalid port */
+        port = strchr(close_bracket, ':');
+        if ((port != NULL) && parse_port(port + 1)) {
+          return; /* Error: invalid port */
         }
-        m_family= INET6;
-      }
-      else
-      {
-        switch (cc) {
-        case 0:
-          /* Hostname with no port */
-          start= addr_in;
-          end= addr_in + strlen(addr_in);
-          break;
-        case 1:
-          /* Hostname with port (host:port) */
-          start= addr_in;
-          end= colon;
-          if (parse_port(colon + 1))
-            return;                             /* Error: invalid port */
-          break;
-        default:
-          /* IPv6 address */
-          start= addr_in;
-          end= addr_in + strlen(addr_in);
-          m_family= INET6;
-          break;
-        }
-      }
-    } else {                                    /* IPv4 address or hostname */
-      start= addr_in;
-      if (colon != NULL) {                      /* Port */
-        end= colon;
-        if (parse_port(colon + 1))
-          return;                               /* Error: invalid port */
+        m_family = INET6;
       } else {
-        end= addr_in + strlen(addr_in);
+        switch (cc) {
+          case 0:
+            /* Hostname with no port */
+            start = addr_in;
+            end = addr_in + strlen(addr_in);
+            break;
+          case 1:
+            /* Hostname with port (host:port) */
+            start = addr_in;
+            end = colon;
+            if (parse_port(colon + 1)) return; /* Error: invalid port */
+            break;
+          default:
+            /* IPv6 address */
+            start = addr_in;
+            end = addr_in + strlen(addr_in);
+            m_family = INET6;
+            break;
+        }
+      }
+    } else { /* IPv4 address or hostname */
+      start = addr_in;
+      if (colon != NULL) { /* Port */
+        end = colon;
+        if (parse_port(colon + 1)) return; /* Error: invalid port */
+      } else {
+        end = addr_in + strlen(addr_in);
       }
     }
 
-    size_t len= end - start;
+    size_t len = end - start;
 
     /* Safety */
-    if (len >= sizeof(m_address))
-    {
+    if (len >= sizeof(m_address)) {
       // The supplied address is too large to fit into the internal buffer.
-      m_valid= false;
+      m_valid = false;
       return;
     }
 
     memcpy(m_address, start, len);
-    m_address[len]= '\0';
-    m_address_len= ++ len;
-    m_valid= true;
+    m_address[len] = '\0';
+    m_address_len = ++len;
+    m_valid = true;
     return;
   }
 
   int colon_count(const char *addr) {
-    int count= 0, i= 0;
+    int count = 0, i = 0;
 
-    while(addr[i] != '\0')
-    {
+    while (addr[i] != '\0') {
       if (addr[i] == ':') ++count;
-      ++ i;
+      ++i;
     }
     return count;
   }
 
   bool parse_port(const char *port) {
-    errno= 0;                                   /* Reset the errno */
-    m_port= strtol(port, NULL, 10);
-    if (errno == EINVAL || errno == ERANGE)
-    {
-      m_port= 0;                                /* Error: invalid port */
-      m_valid= false;
+    errno = 0; /* Reset the errno */
+    m_port = strtol(port, NULL, 10);
+    if (errno == EINVAL || errno == ERANGE) {
+      m_port = 0; /* Error: invalid port */
+      m_valid = false;
       return true;
     }
     return false;
@@ -235,7 +222,8 @@ class process {
            due to dealing with errors, so the ability to execute the
            command separately was added.
    */
-  process(const char *cmd, const char *type, char **env, bool execute_immediately=true);
+  process(const char *cmd, const char *type, char **env,
+          bool execute_immediately = true);
   ~process();
 
   /* If type is 'r' or 'rw' this is the read pipe
@@ -247,14 +235,14 @@ class process {
      Else if type is 'r' or 'w' this is NULL
      This variable is only set if the type is 'rw'
   */
-  FILE* write_pipe() { return io_w_; }
+  FILE *write_pipe() { return io_w_; }
 
   /* This is the read end of a stderr pipe.
      The process being started will write to stderr.
      This is where we will read from stderr.
      All processses will have their stderr redirected to this pipe.
   */
-  FILE * err_pipe() { return io_err_; }
+  FILE *err_pipe() { return io_err_; }
 
   /* Closes the write pipe so that the other side will get an EOF
      (and not hang while waiting for the rest of the data).
@@ -399,39 +387,36 @@ class critical {
 };
 #endif
 
+class WSREPState {
+ public:
+  static bool node_needs_upgrading();
 
-class WSREPState
-{
-  public:
-    static bool node_needs_upgrading();
+  /* Resets all of the data to default values */
+  void clear() { wsrep_schema_version.clear(); }
 
-    /* Resets all of the data to default values */
-    void clear() { wsrep_schema_version.clear(); }
+  bool load_from(const char *dir, const char *filename);
+  bool save_to(const char *dir, const char *filename);
 
-    bool load_from(const char *dir, const char *filename);
-    bool save_to(const char *dir, const char *filename);
+  /* Compare the server version with the wsrep version
+     Returns true if the wsrep version matches the server version EXACTLY
+     (to the major.minor.revision values).
+  */
+  bool wsrep_schema_version_equals(const char *server_version);
 
-    /* Compare the server version with the wsrep version
-       Returns true if the wsrep version matches the server version EXACTLY
-       (to the major.minor.revision values).
-    */
-    bool wsrep_schema_version_equals(const char *server_version);
+  /* Before saving and after loading, the version string
+     may be modified/truncated to conform to "x.y.z"
+     e.g. "8.0.15-5" would be shortened to "8.0.15"
+     and "8.0" would be lengthened to "8.0.0"
+  */
+  std::string wsrep_schema_version;
 
-    /* Before saving and after loading, the version string
-       may be modified/truncated to conform to "x.y.z"
-       e.g. "8.0.15-5" would be shortened to "8.0.15"
-       and "8.0" would be lengthened to "8.0.0"
-    */
-    std::string wsrep_schema_version;
-
-  private:
-    /* Parses a "a.b.c" version string into it's three component
-       parts.  If a compoenent is missing, it will be assinged
-       a value of 0.
-    */
-    void parse_version(const char *str, uint &major, uint &minor, uint &revision);
+ private:
+  /* Parses a "a.b.c" version string into it's three component
+     parts.  If a compoenent is missing, it will be assinged
+     a value of 0.
+  */
+  void parse_version(const char *str, uint &major, uint &minor, uint &revision);
 };
-
 
 }  // namespace wsp
 

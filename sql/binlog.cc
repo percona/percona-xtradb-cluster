@@ -130,9 +130,9 @@ using binary_log::checksum_crc32;
 using std::list;
 
 #ifdef WITH_WSREP
-#include "wsrep_xid.h"
 #include "wsrep_binlog.h"
 #include "wsrep_trans_observer.h"
+#include "wsrep_xid.h"
 #endif /* WITH_WSREP */
 
 using std::max;
@@ -1418,7 +1418,6 @@ static int binlog_close_connection(handlerton *, THD *thd) {
 
 #ifdef WITH_WSREP
   if (!cache_mngr->is_binlog_empty()) {
-
     /* binlog should be empty during close connection. pending binlog represent
     node was shutdown with replication leftover. */
     uchar *buf;
@@ -1431,7 +1430,8 @@ static int binlog_close_connection(handlerton *, THD *thd) {
         (unsigned long long)len, (unsigned long long)thd->thread_id());
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
 
-    IO_CACHE_binlog_cache_storage *stmt_cache = wsrep_get_trans_cache(thd, false);
+    IO_CACHE_binlog_cache_storage *stmt_cache =
+        wsrep_get_trans_cache(thd, false);
     wsrep_write_cache_buf(stmt_cache, &buf, &len);
     WSREP_WARN(
         "binlog stmt cache not empty (%llu bytes) @ connection close %llu",
@@ -2752,7 +2752,11 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all) {
      */
   } else if (thd->lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT ||
              thd->wsrep_trx().state() == wsrep::transaction::s_aborting ||
-             thd->wsrep_force_savept_rollback) {
+             (thd->lex->sql_command == SQLCOM_ROLLBACK_TO_SAVEPOINT &&
+              thd->wsrep_trx().state() == wsrep::transaction::s_must_abort)) {
+    /* If transaction has save point and while local transaction is trying to
+    rollback savepoint it is killed by high priority transaction ensure rollback
+    is processed. */
 #else
   } else if (thd->lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT) {
 #endif /* WITH_WSREP */
@@ -5576,7 +5580,6 @@ void MYSQL_BIN_LOG::report_cache_write_error(THD *thd, bool is_transactional) {
     trans_register_ha(thd, false, binlog_hton, NULL);
   }
 #endif /* WITH_WSREP */
-
 }
 
 static int compare_log_name(const char *log_1, const char *log_2) {
@@ -7351,11 +7354,11 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info) {
                                            event_info->is_using_trans_cache()))
     return error;
 
-  /*
-     In most cases this is only called if 'is_open()' is true; in fact this is
-     mostly called if is_open() *was* true a few instructions before, but it
-     could have changed since.
-  */
+    /*
+       In most cases this is only called if 'is_open()' is true; in fact this is
+       mostly called if is_open() *was* true a few instructions before, but it
+       could have changed since.
+    */
 #ifdef WITH_WSREP
   /* If applier thread can have log-slave-updates=1 there-by causing
   applier action to get binlogged.
@@ -9793,7 +9796,6 @@ static int binlog_recover(Binlog_file_reader *binlog_file_reader,
      */
     if (total_ha_2pc > 1 && ha_recover(&xids)) goto err1;
   }
-
 
 #ifdef WITH_WSREP
   if (WSREP_ON) {

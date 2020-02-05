@@ -19,29 +19,18 @@
 /* wsrep-lib */
 #include "wsrep/mutex.hpp"
 
-class Wsrep_mutex : public wsrep::mutex
-{
-public:
-  Wsrep_mutex(mysql_mutex_t& mutex)
-    : m_mutex(mutex)
-  { }
+class Wsrep_mutex : public wsrep::mutex {
+ public:
+  Wsrep_mutex(mysql_mutex_t &mutex) : m_mutex(mutex) {}
 
-  void lock()
-  {
-    mysql_mutex_lock(&m_mutex);
-  }
+  void lock() { mysql_mutex_lock(&m_mutex); }
 
-  void unlock()
-  {
-    mysql_mutex_unlock(&m_mutex);
-  }
+  void unlock() { mysql_mutex_unlock(&m_mutex); }
 
-  void* native()
-  {
-    return &m_mutex;
-  }
-private:
-  mysql_mutex_t& m_mutex;
+  void *native() { return &m_mutex; }
+
+ private:
+  mysql_mutex_t &m_mutex;
 };
 
 #endif /* WSREP_MUTEX_H */

@@ -453,7 +453,6 @@ int SslAcceptorContext::show_ssl_get_ssl_crlpath(THD *, SHOW_VAR *var,
 
 #ifdef WITH_WSREP
 bool SslAcceptorContext::wsrep_ssl_artifacts_check(bool bootstrapping_node) {
-
   if (!WSREP_ON) {
     /* No-op if node is running in non-cluster mode. */
     return false;

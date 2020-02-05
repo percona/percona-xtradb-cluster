@@ -95,12 +95,11 @@
 #include "thr_mutex.h"
 
 #ifdef WITH_WSREP
+#include "sql/log.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
-#include "sql/log.h"
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
-
 
 using std::max;
 using std::min;
@@ -481,7 +480,7 @@ THD::THD(bool enable_plugins)
           this, m_wsrep_mutex, m_wsrep_cond, Wsrep_server_state::instance(),
           m_wsrep_client_service, wsrep::client_id(m_thread_id)),
       wsrep_applier_service(NULL),
-      // wsrep_wfc()
+// wsrep_wfc()
 #endif /* WITH_WSREP */
       m_parser_state(NULL),
       work_part_info(NULL),
@@ -594,7 +593,7 @@ THD::THD(bool enable_plugins)
   lock_info.mysql_thd = this;
   lock_info.in_lock_tables = false;
   wsrep_info[sizeof(wsrep_info) - 1] = '\0'; /* make sure it is 0-terminated */
-#endif /* WITH_WSREP */
+#endif                                       /* WITH_WSREP */
 
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1226,8 +1225,7 @@ void THD::release_resources() {
       delete wsrep_rli->current_mts_submode;
     wsrep_rli->current_mts_submode = 0;
 
-    if (wsrep_rli->deferred_events != NULL)
-      delete wsrep_rli->deferred_events;
+    if (wsrep_rli->deferred_events != NULL) delete wsrep_rli->deferred_events;
     wsrep_rli->deferred_events = 0;
 
     delete wsrep_rli;
@@ -3025,8 +3023,7 @@ void THD::send_statement_status() {
     sanity check, don't send end statement while replaying
   */
   DBUG_ASSERT(wsrep_trx().state() != wsrep::transaction::s_replaying);
-  if (WSREP(this) &&
-      wsrep_trx().state() == wsrep::transaction::s_replaying) {
+  if (WSREP(this) && wsrep_trx().state() == wsrep::transaction::s_replaying) {
     WSREP_ERROR("attempting net_end_statement while replaying");
     return;
   }
