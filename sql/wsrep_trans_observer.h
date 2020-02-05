@@ -429,6 +429,10 @@ static inline int wsrep_before_rollback(THD *thd, bool all) {
 static inline int wsrep_after_rollback(THD *thd, bool all) {
   DBUG_ENTER("wsrep_after_rollback");
   // WSREP_DEBUG("wsrep_after_rollback %u", thd->thread_id());
+  if (!wsrep_is_real(thd, all)) {
+    WSREP_DEBUG("wsrep_after_rollback stmt transaction rolled back");
+    thd->wsrep_stmt_transaction_rolled_back = true;
+  }
   DBUG_RETURN(
       (wsrep_is_real(thd, all) && wsrep_is_active(thd) &&
        thd->wsrep_cs().transaction().state() != wsrep::transaction::s_aborted)
@@ -544,6 +548,7 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
        seems to be committing empty. Figure out why and try to fix
        elsewhere. */
     DBUG_ASSERT(!wsrep_has_changes(thd) ||
+                thd->wsrep_stmt_transaction_rolled_back ||
                 (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
                  !thd->is_current_stmt_binlog_format_row()) ||
                 thd->wsrep_post_insert_error);
