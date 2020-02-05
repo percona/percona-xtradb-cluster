@@ -2318,10 +2318,19 @@ trx_get_trx_by_xid_low(
 		    && memcmp(xid->data, trx->xid.data,
 			      xid->gtrid_length + xid->bqual_length) == 0) {
 
+#ifdef WITH_WSREP
+			/* The commit of a prepared recovered Galera
+			transaction needs a valid trx->xid for
+			invoking trx_sys_update_wsrep_checkpoint(). */
+			if (!wsrep_is_wsrep_xid(&trx->xid)) {
+#endif
 			/* Invalidate the XID, so that subsequent calls
 			will not find it. */
 			memset(&trx->xid, 0, sizeof(trx->xid));
 			trx->xid.formatID = -1;
+#ifdef WITH_WSREP
+			}
+#endif /* WITH_WSREP */
 			break;
 		}
 	}
