@@ -375,6 +375,8 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(m_thd, m_thd->wsrep_info);
 
+  /* This being a background thread doesn't take a global read
+  lock and backup lock. */
   m_thd->mdl_context.release_transactional_locks();
   mysql_ull_cleanup(m_thd);
   m_thd->mdl_context.release_explicit_locks();

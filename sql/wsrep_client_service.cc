@@ -323,6 +323,9 @@ int Wsrep_client_service::bf_rollback() {
     m_thd->locked_tables_list.unlock_locked_tables(m_thd);
     m_thd->variables.option_bits &= ~OPTION_TABLE_LOCK;
   }
+  if (m_thd->backup_tables_lock.is_acquired()) {
+    m_thd->backup_tables_lock.release(m_thd);
+  }
   if (m_thd->global_read_lock.is_acquired()) {
     m_thd->global_read_lock.unlock_global_read_lock(m_thd);
   }
