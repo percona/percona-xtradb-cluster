@@ -99,3 +99,18 @@ The following is an example of the HAProxy configuration file in this case::
             server db02 10.4.29.99:3306 check port 9200 inter 12000 rise 3 fall 3
             server db03 10.4.29.98:3306 check port 9200 inter 12000 rise 3 fall 3
 
+.. important::
+
+   In |PXC| |version|, the default authentication plugin is
+   ``caching_sha2_password``. HAProxy does not support this authentication
+   plugin. Create a mysql user using the ``mysql_native_password``
+   authentication plugin.
+
+   .. code-block:: guess
+
+      mysql> CREATE USER 'haproxy_user'@'%' IDENTIFIED WITH mysql_native_password by '$3Kr$t';
+
+      .. seealso::
+
+	 |MySQL| Documentation: CREATE USER statement
+	    https://dev.mysql.com/doc/refman/8.0/en/create-user.html

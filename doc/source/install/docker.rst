@@ -20,7 +20,7 @@ For more information about using Docker, see the `Docker Docs`_.
 
 The following procedure describes how to set up a simple 3-node cluster
 for evaluation and testing purposes,
-with all nodes running |PXC| 5.7 in separate containers on one host:
+with all nodes running |PXC| 8.0 in separate containers on one host:
 
 1. Create a Docker network::
 
@@ -33,7 +33,7 @@ with all nodes running |PXC| 5.7 in separate containers on one host:
       -e CLUSTER_NAME=cluster1 \
       --name=node1 \
       --net=pxc-network \
-      percona/percona-xtradb-cluster:5.7
+      percona/percona-xtradb-cluster:8.0
 
 #. Join the second node::
 
@@ -43,7 +43,7 @@ with all nodes running |PXC| 5.7 in separate containers on one host:
       -e CLUSTER_JOIN=node1 \
       --name=node2 \
       --net=pxc-network \
-      percona/percona-xtradb-cluster:5.7
+      percona/percona-xtradb-cluster:8.0
 
 #. Join the third node::
 
@@ -53,7 +53,7 @@ with all nodes running |PXC| 5.7 in separate containers on one host:
       -e CLUSTER_JOIN=node1 \
       --name=node3 \
       --net=pxc-network \
-      percona/percona-xtradb-cluster:5.7
+      percona/percona-xtradb-cluster:8.0
 
 To ensure that the cluster is running:
 
@@ -63,10 +63,10 @@ To ensure that the cluster is running:
     mysql: [Warning] Using a password on the command line interface can be insecure.
     Welcome to the MySQL monitor.  Commands end with ; or \g.
     Your MySQL connection id is 12
-    Server version: 5.7.19-17-57-log Percona XtraDB Cluster (GPL), Release rel17, Revision c10027a, WSREP version 29.22, wsrep_29.22
+    Server version: |!version|-log Percona XtraDB Cluster (GPL), Release rel17, Revision c10027a, WSREP version 29.22, wsrep_29.22
     
-    Copyright (c) 2009-2017 Percona LLC and/or its affiliates
-    Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+    Copyright (c) 2009-2020 Percona LLC and/or its affiliates
+    Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
     
     Oracle is a registered trademark of Oracle Corporation and/or its
     affiliates. Other names may be trademarks of their respective

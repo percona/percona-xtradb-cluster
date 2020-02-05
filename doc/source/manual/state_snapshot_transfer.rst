@@ -14,7 +14,7 @@ that is already part of the cluster.
 |PXC| enables :abbr:`SST (State Snapshot Transfer)` via :program:`xtrabackup`.
 
 Xtrabackup SST uses `backup locks
-<http://www.percona.com/doc/percona-server/5.7/management/backup_locks.html>`_,
+<http://www.percona.com/doc/percona-server/8.0/management/backup_locks.html>`_,
 which means the Galera provider is not paused at all as with :abbr:`FTWRL
 (Flush Tables with Read Lock)` earlier.
 The SST method can be configured
@@ -45,7 +45,7 @@ Using Percona Xtrabackup
 
 The default SST method is ``xtrabackup-v2`` which uses |Percona XtraBackup|.
 This is the least blocking method that leverages `backup locks
-<http://www.percona.com/doc/percona-server/5.7/management/backup_locks.html>`_.
+<http://www.percona.com/doc/percona-server/8.0/management/backup_locks.html>`_.
 XtraBackup is run locally on the donor node.
 
 The :term:`datadir` needs to be specified in the server configuration file

@@ -29,7 +29,7 @@
       /*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;
       DELIMITER /*!*/;
       # at 4
-      #160809  16:04:05 server id 3  end_log_pos 123     Start: binlog v 4, server v 5.7.12-5rc1-log created 160809 16:04:05 at startup
+      #160809  16:04:05 server id 3  end_log_pos 123     Start: binlog v 4, server v 8.0-log created 160809 16:04:05 at startup
       # Warning: this binlog is either in use or was not closed properly.
       ROLLBACK/*!*/;
       BINLOG '

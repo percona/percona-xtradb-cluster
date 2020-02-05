@@ -4,17 +4,17 @@
 Installing |PXC| on Red Hat Enterprise Linux and CentOS
 =======================================================
 
-Percona provides :file:`.rpm` packages for 64-bit versions
-of Red Hat Enterprise Linux 6 (Santiago) and 7 (Maipo),
-including its derivatives that claim full binary compatibility,
-for example: CentOS, Oracle Linux, Amazon Linux AMI, and so on.
+Percona provides :file:`.rpm` packages for 64-bit versions of Red Hat Enterprise
+Linux 7 (Maipo) and Red Hat Enterprise Linux 8 (Ootpa) including its derivatives
+that claim full binary compatibility, for example: CentOS, Oracle Linux, Amazon
+Linux AMI, and so on.
 
 .. note:: |PXC| should work on other RPM-based distributions,
-   but it is tested only on RHEL and CentOS versions 6 and 7.
+   but it is tested only on RHEL and CentOS 7 and 8.
 
 The packages are available in the official Percona software repository
 and on the `download page
-<http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST/>`_.
+<http://www.percona.com/downloads/Percona-XtraDB-Cluster-80/LATEST/>`_.
 It is recommended to intall |PXC| from the official repository
 using :command:`yum`.
 
@@ -57,17 +57,19 @@ Installing from Percona Repository
 
    .. code-block:: bash
 
-      $ sudo yum install Percona-XtraDB-Cluster-57
+      $ sudo yum install percona-xtradb-cluster
 
-   .. note:: Alternatively you can install
-      the ``Percona-XtraDB-Cluster-full-57`` meta package,
-      which contains the following additional packages:
+   .. note::
 
-      * ``Percona-XtraDB-Cluster-devel-57``
-      * ``Percona-XtraDB-Cluster-test-57``
-      * ``Percona-XtraDB-Cluster-debuginfo-57``
-      * ``Percona-XtraDB-Cluster-galera-3-debuginfo``
-      * ``Percona-XtraDB-Cluster-shared-57``
+      Alternatively you can install the ``percona-xtradb-cluster-full`` meta
+      package, which contains the following additional packages:
+
+      * ``percona-xtradb-cluster-devel``
+      * ``percona-xtradb-cluster-test``
+      * ``percona-xtradb-cluster-debuginfo``
+      * ``percona-xtradb-cluster-client``
+      * ``percona-xtradb-cluster-garbd``
+      * ``percona-xtradb-cluster-server``
 
 #. Start the |PXC| server:
 
@@ -84,7 +86,7 @@ Installing from Percona Repository
 
 #. Use this password to log in as ``root``:
 
-   .. code-block:: bash
+   .. code-block:: sql
 
       $ mysql -u root -p
 

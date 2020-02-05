@@ -1,8 +1,8 @@
 .. _sandbox:
 
-==================================================
-Setting up PXC reference architecture with HAProxy
-==================================================
+================================================================================
+Setting up PXC reference architecture with ProxySQL
+================================================================================
 
 This manual describes how to set up |PXC| in a virtualized test sandbox.
 
@@ -11,8 +11,8 @@ However, it should apply to any virtualization technology
 (for example, VirtualBox) with any Linux distribution.
 
 This manual requires three virtual machines for |PXC| nodes,
-and one for HAProxy client, which redirects requests to the nodes.
-Running HAProxy on an application server,
+and one for the ProxySQL, which redirects requests to the nodes.
+Running ProxySQL on an application server,
 instead of having it as a dedicated entity,
 removes the unnecessary extra network roundtrip,
 because the load balancing layer in |PXC| scales well
@@ -20,11 +20,11 @@ with application servers.
 
 1. Install |PXC| on the three cluster nodes, as described in :ref:`yum`.
 
-#. Install HAProxy and ``sysbench`` on the client node:
+#. Install :ref:`ProxySQL <load_balancing_with_proxysql>` and ``sysbench`` on the client node:
 
    .. code-block:: bash
 
-      yum -y install haproxy sysbench
+      yum -y install proxysql2 sysbench
 
 #. Make sure that the :file:`my.cnf` configuration file on the first node
    contains the following::
@@ -77,7 +77,7 @@ with application servers.
 
    When a new node joins the cluster,
    |SST| is performed by taking a backup using XtraBackup,
-   then copying it to the new node with ``netcat``.
+   then copying it to the new node.
    After a successful |SST|, you should see the following in the error log::
 
       120619 13:20:17 [Note] WSREP: State transfer required:
@@ -85,47 +85,8 @@ with application servers.
            Local state: 00000000-0000-0000-0000-000000000000:-1
       120619 13:20:17 [Note] WSREP: New cluster view: global state: 77c9da88-b965-11e1-0800-ea53b7b12451:97, view# 18: Primary, number of nodes: 3, my index: 0, protocol version 2
       120619 13:20:17 [Warning] WSREP: Gap in state sequence. Need state transfer.
-      120619 13:20:19 [Note] WSREP: Running: 'wsrep_sst_xtrabackup 'joiner' '10.195.206.117' '' '/var/lib/mysql/' '/etc/my.cnf' '20758' 2>sst.err'
-      120619 13:20:19 [Note] WSREP: Prepared |SST| request: xtrabackup|10.195.206.117:4444/xtrabackup_sst
-      120619 13:20:19 [Note] WSREP: wsrep_notify_cmd is not defined, skipping notification.
-      120619 13:20:19 [Note] WSREP: Assign initial position for certification: 97, protocol version: 2
-      120619 13:20:19 [Warning] WSREP: Failed to prepare for incremental state transfer: Local state UUID (00000000-0000-0000-0000-000000000000) does not match group state UUID (77c9da88-b965-11e1-0800-ea53b7b12451): 1 (Operation not permitted)
-            at galera/src/replicator_str.cpp:prepare_for_IST():439. IST will be unavailable.
-      120619 13:20:19 [Note] WSREP: Node 0 (ip-10-244-33-92) requested state transfer from '*any*'. Selected 1 (ip-10-112-39-98)(SYNCED) as donor.
-      120619 13:20:19 [Note] WSREP: Shifting PRIMARY -> JOINER (TO: 102)
-      120619 13:20:19 [Note] WSREP: Requesting state transfer: success, donor: 1
-      120619 13:20:59 [Note] WSREP: 1 (ip-10-112-39-98): State transfer to 0 (ip-10-244-33-92) complete.
-      120619 13:20:59 [Note] WSREP: Member 1 (ip-10-112-39-98) synced with group.
-      120619 13:21:17 [Note] WSREP: |SST| complete, seqno: 105
-      120619 13:21:17 [Note] Plugin 'FEDERATED' is disabled.
-      120619 13:21:17 InnoDB: The InnoDB memory heap is disabled
-      120619 13:21:17 InnoDB: Mutexes and rw_locks use GCC atomic builtins
-      120619 13:21:17 InnoDB: Compressed tables use zlib 1.2.3
-      120619 13:21:17 InnoDB: Using Linux native AIO
-      120619 13:21:17 InnoDB: Initializing buffer pool, size = 400.0M
-      120619 13:21:17 InnoDB: Completed initialization of buffer pool
-      120619 13:21:18 InnoDB: highest supported file format is Barracuda.
-      120619 13:21:18  InnoDB: Waiting for the background threads to start
-      120619 13:21:19 Percona XtraDB (http://www.percona.com) 1.1.8-rel25.3 started; log sequence number 246661644
-      120619 13:21:19 [Note] Recovering after a crash using mysql-bin
-      120619 13:21:19 [Note] Starting crash recovery...
-      120619 13:21:19 [Note] Crash recovery finished.
-      120619 13:21:19 [Note] Server hostname (bind-address): '(null)'; port: 3306
-      120619 13:21:19 [Note]   - '(null)' resolves to '0.0.0.0';
-      120619 13:21:19 [Note]   - '(null)' resolves to '::';
-      120619 13:21:19 [Note] Server socket created on IP: '0.0.0.0'.
-      120619 13:21:19 [Note] Event Scheduler: Loaded 0 events
-      120619 13:21:19 [Note] WSREP: Signalling provider to continue.
-      120619 13:21:19 [Note] WSREP: Received |SST|: 77c9da88-b965-11e1-0800-ea53b7b12451:105
-      120619 13:21:19 [Note] WSREP: |SST| received: 77c9da88-b965-11e1-0800-ea53b7b12451:105
-      120619 13:21:19 [Note] WSREP: 0 (ip-10-244-33-92): State transfer from 1 (ip-10-112-39-98) complete.
-      120619 13:21:19 [Note] WSREP: Shifting JOINER -> JOINED (TO: 105)
-      120619 13:21:19 [Note] /usr/sbin/mysqld: ready for connections.
-      Version: '5.5.24-log'  socket: '/var/lib/mysql/mysql.sock'  port: 3306  Percona XtraDB Cluster (GPL), wsrep_23.6.r340
-      120619 13:21:19 [Note] WSREP: Member 0 (ip-10-244-33-92) synced with group.
-      120619 13:21:19 [Note] WSREP: Shifting JOINED -> SYNCED (TO: 105)
-      120619 13:21:20 [Note] WSREP: Synchronized with group, ready for connections
-
+      ...
+      
    For debugging information about the |SST|,
    you can check the :file:`sst.err` file and the error log.
 
@@ -141,169 +102,259 @@ with application servers.
       +--------------------+-------+
       1 row in set (0.00 sec)
 
-#. When all cluster nodes are started, configure HAProxy on the client node.
-   This will enable the application to connect to localhost
-   as if it were a single MySQL server, instead of a |PXC| node.
+#. When all cluster nodes are started, configure ProxySQL using the admin interface.
 
-   You can configure HAProxy to connect and write to all cluster nodes
-   or to one node at a time.
-   The former method can lead to rollbacks due to conflicting writes
-   when optimistic locking at commit time is triggered,
-   while the latter method avoids rollbacks.
+   To connect to the ProxySQL admin interface, you need a ``mysql`` client.
+   You can either connect to the admin interface from |PXC| nodes
+   that already have the ``mysql`` client installed (Node 1, Node 2, Node 3)
+   or install the client on Node 4 and connect locally:
 
-   However, most good applications should be able to handle rollbacks,
-   so either method is fine in this case.
+   To connect to the admin interface, use the credentials, host name and port
+   specified in the `global variables
+   <https://github.com/sysown/proxysql/blob/master/doc/global_variables.md>`_.
 
-   To configure HAProxy, add the following to :file:`/etc/haproxy/haproxy.cfg`::
+   .. warning::
 
-      global
-      log 127.0.0.1 local0
-      log 127.0.0.1 local1 notice
-      maxconn 4096
-      chroot /usr/share/haproxy
-      user haproxy
-      group haproxy
-      daemon
+      Do not use default credentials in production!
 
-      defaults
-      log global
-      mode http
-      option tcplog
-      option dontlognull
-      retries 3
-      option redispatch
-      maxconn 2000
-      contimeout 5000
-      clitimeout 50000
-      srvtimeout 50000
+   The following example shows how to connect to the ProxySQL admin interface
+   with default credentials:
 
-      frontend pxc-front
-      bind *:3307
-      mode tcp
-      default_backend pxc-back
+   .. code-block:: bash
 
-      frontend stats-front
-      bind *:80
-      mode http
-      default_backend stats-back
+      root@proxysql:~# mysql -u admin -padmin -h 127.0.0.1 -P 6032
 
-      frontend pxc-onenode-front
-      bind *:3306
-      mode tcp
-      default_backend pxc-onenode-back
+      Welcome to the MySQL monitor.  Commands end with ; or \g.
+      Your MySQL connection id is 2
+      Server version: 5.5.30 (ProxySQL Admin Module)
 
-      backend pxc-back
-      mode tcp
-      balance leastconn
-      option httpchk
-      server c1 10.116.39.76:3306 check port 9200 inter 12000 rise 3 fall 3
-      server c2 10.195.206.117:3306 check port 9200 inter 12000 rise 3 fall 3
-      server c3 10.202.23.92:3306 check port 9200 inter 12000 rise 3 fall 3
+      Copyright (c) 2009-2020 Percona LLC and/or its affiliates
+      Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
-      backend stats-back
-      mode http
-      balance roundrobin
-      stats uri /haproxy/stats
-      stats auth pxcstats:secret
+      Oracle is a registered trademark of Oracle Corporation and/or its
+      affiliates. Other names may be trademarks of their respective
+      owners.
 
-      backend pxc-onenode-back
-      mode tcp
-      balance leastconn
-      option httpchk
-      server c1 10.116.39.76:3306 check port 9200 inter 12000 rise 3 fall 3
-      server c2 10.195.206.117:3306 check port 9200 inter 12000 rise 3 fall 3 backup
-      server c3 10.202.23.92:3306 check port 9200 inter 12000 rise 3 fall 3 backup
+      Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-   In this configuration, three frontend-backend pairs are defined:
+      mysql>
 
-   * The ``stats`` pair is for HAProxy statistics page (port 80).
+   To see the ProxySQL databases and tables use the following commands:
 
-     You can access it at ``/haproxy/stats`` using the credential
-     specified in the ``stats auth`` parameter.
+   .. code-block:: text
 
-   * The ``pxc`` pair is for connecting to all three nodes (port 3307).
+      mysql> SHOW DATABASES;
+      +-----+---------+-------------------------------+
+      | seq | name    | file                          |
+      +-----+---------+-------------------------------+
+      | 0   | main    |                               |
+      | 2   | disk    | /var/lib/proxysql/proxysql.db |
+      | 3   | stats   |                               |
+      | 4   | monitor |                               |
+      +-----+---------+-------------------------------+
+      4 rows in set (0.00 sec)
 
-     In this case, the *leastconn* load balancing method is used,
-     instead of round-robin, which means connection is made to the backend
-     with the least connections established.
+   .. code-block:: text
 
-   * The ``pxc-onenode`` pair is for connecting to one node at a time
-     (port 3306) to avoid rollbacks because of optimistic locking.
+      mysql> SHOW TABLES;
+      +--------------------------------------+
+      | tables                               |
+      +--------------------------------------+
+      | global_variables                     |
+      | mysql_collations                     |
+      | mysql_query_rules                    |
+      | mysql_replication_hostgroups         |
+      | mysql_servers                        |
+      | mysql_users                          |
+      | runtime_global_variables             |
+      | runtime_mysql_query_rules            |
+      | runtime_mysql_replication_hostgroups |
+      | runtime_mysql_servers                |
+      | runtime_scheduler                    |
+      | scheduler                            |
+      +--------------------------------------+
+      12 rows in set (0.00 sec)
 
-     If the node goes offline, HAProxy will connect to another one.
+   For more information about admin databases and tables,
+   see `Admin Tables
+   <https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md>`_
 
-   .. note:: MySQL is checked via ``httpchk``.
-      MySQL will not serve these requests by default.
-      You have to set up the ``clustercheck`` utility,
-      which is distributed with |PXC|.
-      This will enable HAProxy to check MySQL via HTTP.
+   .. note::
 
-      The ``clustercheck`` script is a simple shell script
-      that accepts HTTP requests
-      and checks the node via the :option:`wsrep_local_state` variable.
-      If the node's status is fine,
-      it will send a response with HTTP code ``200 OK``.
-      Otherwise, it sends ``503``.
+      ProxySQL has 3 areas where the configuration can reside:
 
-      To create the ``clustercheck`` user, run the following:
+      * MEMORY (your current working place)
+      * RUNTIME (the production settings)
+      * DISK (durable configuration, saved inside an SQLITE database)
 
-      .. code-block:: mysql
+      When you change a parameter, you change it in MEMORY area.
+      That is done by design to allow you to test the changes
+      before pushing to production (RUNTIME), or save them to disk.
 
-         mysql> grant process on *.* to 'clustercheckuser'@'localhost' identified by 'clustercheckpassword!';
-         Query OK, 0 rows affected (0.00 sec)
+   .. rubric:: Adding cluster nodes to ProxySQL
 
-         mysql> flush privileges;
-         Query OK, 0 rows affected (0.00 sec)
+   To configure the backend |PXC| nodes in ProxySQL, insert corresponding
+   records into the ``mysql_servers`` table.
 
-      If you want to use a different user name or password,
-      you have to modify them in the ``clustercheck`` script.
+   .. note::
 
-      If you run the script on a running node, you should see the following::
+      ProxySQL uses the concept of *hostgroups* to group cluster nodes.
+      This enables you to balance the load in a cluster by
+      routing different types of traffic to different groups.
+      There are many ways you can configure hostgroups
+      (for example master and slaves, read and write load, etc.)
+      and a every node can be a member of multiple hostgroups.
 
-         # clustercheck
-         HTTP/1.1 200 OK
+   This example adds three |PXC| nodes to the default hostgroup (``0``),
+   which receives both write and read traffic:
 
-         Content-Type: Content-Type: text/plain
+   .. code-block:: text
 
-      You can use ``xinetd`` to daemonize the script.
-      If `xinetd` is not installed, you can install it with ``yum``::
+      mysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.61',3306);
+      mysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.62',3306);
+      mysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.63',3306);
 
-         # yum -y install xinetd
+   To see the nodes:
 
-      The service is configured in :file:`/etc/xinetd.d/mysqlchk`::
+   .. code-block:: text
 
-         # default: on
-         # description: mysqlchk
-         service mysqlchk
-         {
-         # this is a config for xinetd, place it in /etc/xinetd.d/
-         disable = no
-         flags = REUSE
-         socket_type = stream
-         port = 9200
-         wait = no
-         user = nobody
-         server = /usr/bin/clustercheck
-         log_on_failure += USERID
-         only_from = 0.0.0.0/0
-         # recommended to put the IPs that need
-         # to connect exclusively (security purposes)
-         per_source = UNLIMITED
-         }
+      mysql> SELECT * FROM mysql_servers;
 
-      Add the new service to :file:`/etc/services`::
+      +--------------+---------------+------+--------+     +---------+
+      | hostgroup_id | hostname      | port | status | ... | comment |
+      +--------------+---------------+------+--------+     +---------+
+      | 0            | 192.168.70.61 | 3306 | ONLINE |     |         | 
+      | 0            | 192.168.70.62 | 3306 | ONLINE |     |         | 
+      | 0            | 192.168.70.63 | 3306 | ONLINE |     |         | 
+      +--------------+---------------+------+--------+     +---------+
+      3 rows in set (0.00 sec)
 
-         mysqlchk 9200/tcp # mysqlchk
+ .. rubric:: Creating ProxySQL Monitoring User
 
-      Clustercheck will now listen on port 9200 after ``xinetd`` restarts
-      and HAProxy is ready to check MySQL via HTTP::
+ To enable monitoring of |PXC| nodes in ProxySQL, create a user with ``USAGE``
+ privilege on any node in the cluster and configure the user in ProxySQL.
 
-         # service xinetd restart
+ The following example shows how to add a monitoring user on Node 2:
 
-If you did everything correctly,
-the statistics page for HAProxy should look like this:
+ .. code-block:: text
 
-.. image:: ../_static/pxc_haproxy_status_example.png
+    mysql> CREATE USER 'proxysql'@'%' IDENTIFIED BY 'ProxySQLPa55';
+    mysql> GRANT USAGE ON *.* TO 'proxysql'@'%';
+
+ The following example shows how to configure this user on the ProxySQL node:
+
+ .. code-block:: text
+
+  mysql> UPDATE global_variables SET variable_value='proxysql'
+         WHERE variable_name='mysql-monitor_username';
+  mysql> UPDATE global_variables SET variable_value='ProxySQLPa55'
+         WHERE variable_name='mysql-monitor_password';
+
+  To load this configuration at runtime, issue a ``LOAD`` command.  To save
+  these changes to disk (ensuring that they persist after ProxySQL shuts down),
+  issue a ``SAVE`` command.
+
+  .. code-block:: text
+
+     mysql> LOAD MYSQL VARIABLES TO RUNTIME;
+     mysql> SAVE MYSQL VARIABLES TO DISK;
+
+  To ensure that monitoring is enabled, check the monitoring logs:
+
+  .. code-block:: text
+
+     mysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start_us DESC LIMIT 6;
+     +---------------+------+------------------+----------------------+---------------+
+     | hostname      | port | time_start_us    | connect_success_time | connect_error |
+     +---------------+------+------------------+----------------------+---------------+
+     | 192.168.70.61 | 3306 | 1469635762434625 | 1695                 | NULL          |
+     | 192.168.70.62 | 3306 | 1469635762434625 | 1779                 | NULL          |
+     | 192.168.70.63 | 3306 | 1469635762434625 | 1627                 | NULL          |
+     | 192.168.70.61 | 3306 | 1469635642434517 | 1557                 | NULL          |
+     | 192.168.70.62 | 3306 | 1469635642434517 | 2737                 | NULL          |
+     | 192.168.70.63 | 3306 | 1469635642434517 | 1447                 | NULL          |
+     +---------------+------+------------------+----------------------+---------------+
+     6 rows in set (0.00 sec)
+
+  .. code-block:: text
+
+     mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start_us DESC LIMIT 6;
+     +---------------+------+------------------+-------------------+------------+
+     | hostname      | port | time_start_us    | ping_success_time | ping_error |
+     +---------------+------+------------------+-------------------+------------+
+     | 192.168.70.61 | 3306 | 1469635762416190 | 948               | NULL       |
+     | 192.168.70.62 | 3306 | 1469635762416190 | 803               | NULL       |
+     | 192.168.70.63 | 3306 | 1469635762416190 | 711               | NULL       |
+     | 192.168.70.61 | 3306 | 1469635702416062 | 783               | NULL       |
+     | 192.168.70.62 | 3306 | 1469635702416062 | 631               | NULL       |
+     | 192.168.70.63 | 3306 | 1469635702416062 | 542               | NULL       |
+     +---------------+------+------------------+-------------------+------------+
+     6 rows in set (0.00 sec)
+
+  The previous examples show that ProxySQL is able to connect and ping the nodes
+  you added.
+
+  To enable monitoring of these nodes, load them at runtime:
+
+  .. code-block:: text
+
+     mysql> LOAD MYSQL SERVERS TO RUNTIME;
+
+  .. _proxysql-client-user:
+
+  .. rubric:: Creating ProxySQL Client User
+
+  ProxySQL must have users that can access backend nodes
+  to manage connections.
+
+  To add a user, insert credentials into ``mysql_users`` table:
+
+  .. code-block:: text
+
+     mysql> INSERT INTO mysql_users (username,password) VALUES ('sbuser','sbpass');
+     Query OK, 1 row affected (0.00 sec)
+
+  .. note::
+
+     ProxySQL currently doesn't encrypt passwords.
+
+  Load the user into runtime space and save these changes to disk
+  (ensuring that they persist after ProxySQL shuts down):
+
+  .. code-block:: text
+
+     mysql> LOAD MYSQL USERS TO RUNTIME;
+     mysql> SAVE MYSQL USERS TO DISK;
+
+  To confirm that the user has been set up correctly, you can try to log in:
+
+  .. code-block:: bash
+
+     root@proxysql:~# mysql -u sbuser -psbpass -h 127.0.0.1 -P 6033
+
+     Welcome to the MySQL monitor.  Commands end with ; or \g.
+     Your MySQL connection id is 1491
+     Server version: 5.5.30 (ProxySQL)
+
+     Copyright (c) 2009-2020 Percona LLC and/or its affiliates
+     Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+
+     Oracle is a registered trademark of Oracle Corporation and/or its
+     affiliates. Other names may be trademarks of their respective
+     owners.
+
+     Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+  To provide read/write access to the cluster for ProxySQL,
+  add this user on one of the |PXC| nodes:
+
+  .. code-block:: text
+
+     mysql> CREATE USER 'sbuser'@'192.168.70.64' IDENTIFIED BY 'sbpass';
+     Query OK, 0 rows affected (0.01 sec)
+
+     mysql> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.64';
+     Query OK, 0 rows affected (0.00 sec)
 
 Testing the cluster with sysbench
 =================================

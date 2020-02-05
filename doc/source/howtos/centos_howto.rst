@@ -78,14 +78,11 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
       # Authentication for SST method
       wsrep_sst_auth="sstuser:s3cret"
 
-#. Start the first node with the following command::
+#. Start the first node with the following command:
 
-      [root@percona1 ~]# /etc/init.d/mysql bootstrap-pxc
+   .. code-block:: text
 
-   .. note:: In case you're running CentOS 7,
-      the bootstrap service should be used instead: ::
-
-         [root@percona1 ~]#  systemctl start mysql@bootstrap.service
+      [root@percona1 ~]#  systemctl start mysql@bootstrap.service
 
    The previous command will start the cluster
    with initial :variable:`wsrep_cluster_address` variable
@@ -113,7 +110,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
       ...
       | wsrep_ready                | ON                                   |
       +----------------------------+--------------------------------------+
-      40 rows in set (0.01 sec)
+      75 rows in set (0.00 sec)
 
    This output shows that the cluster has been successfully bootstrapped.
 
@@ -124,18 +121,6 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
 
       mysql@percona1> UPDATE mysql.user SET password=PASSWORD("Passw0rd") where user='root';
       mysql@percona1> FLUSH PRIVILEGES;
-
-To perform :ref:`state_snapshot_transfer` using |XtraBackup|,
-set up a new user with proper `privileges <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_:
-
-.. code-block:: mysql
-
-   mysql@percona1> CREATE USER 'sstuser'@'localhost' IDENTIFIED BY 's3cret';
-   mysql@percona1> GRANT PROCESS, RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'localhost';
-   mysql@percona1> FLUSH PRIVILEGES;
-
-.. note:: MySQL root account can also be used for performing SST,
-   but it is more secure to use a different (non-root) user for this.
 
 Step 3. Configuring the second node
 ===================================

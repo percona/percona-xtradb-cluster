@@ -10,10 +10,6 @@ for a growing environment.
 
 .. rubric:: Features of |PXC|
 
-.. admonition:: |author|
-   
-   TODO: For all features, provide links to relevant sections in documentation.
-
 .. list-table::
    :header-rows: 1
 
@@ -42,27 +38,27 @@ for a growing environment.
      - |PXC| performance is optimized to scale with a growing production
        workload
 
-  .. admonition:: |author|
 
-     The following blog posts are not relevant. TODO: Find or prepare alternatives
+|PXC| |version| is fully compatible with |MySQL| Server Community Edition
+|version| and |ps-last|.
 
 .. seealso::
+
+   |MySQL| Community Edition
+      https://www.mysql.com/products/community/
+   |percona-server|
+      https://www.percona.com/doc/percona-server/LATEST/index.html
    How We Made Percona XtraDB Cluster Scale
        https://www.percona.com/blog/2017/04/19/how-we-made-percona-xtradb-cluster-scale
-   Performance improvements in Percona XtraDB Cluster 5.7.17-29.20
-       https://www.percona.com/blog/2017/04/19/performance-improvements-percona-xtradb-cluster-5-7-17
+      
+..   Performance improvements in Percona XtraDB Cluster 5.7.17-29.20
+..   https://www.percona.com/blog/2017/04/19/performance-improvements-percona-xtradb-cluster-5-7-17
 
-|PXC| |version| is fully compatible with `MySQL Server Community Edition <MySQL>`_,
-|PS|_, and MariaDB_ in the following sense:
 
 Data compatibility
    You can use data created by any MySQL variant.
 Application compatibility
    There is no or minimal application changes required.
-
-.. admonition:: |author|
-
-   TODO: Restructure to make the TOC easier to manage
 
 Introduction
 ============
@@ -81,7 +77,7 @@ Getting Started
    :includehidden:
    :titlesonly:
 
-   Overview
+   overview
    install/index
    configure
    bootstrap
@@ -125,17 +121,6 @@ User\'s Manual
    manual/performance_schema_instrumentation
    management/data_at_rest_encryption
 
-Flexibility
-================================================================================
-
-.. toctree::
-   :maxdepth: 1
-   
-   flexibility/binlogging_replication_improvements
-   flexibility/innodb_fts_improvements
-   diagnostics/innodb_fragmentation_count
-   performance/aio_page_requests
-
 How-tos
 =======
 
@@ -150,6 +135,7 @@ How-tos
    howtos/3nodesec2
    howtos/haproxy
    howtos/proxysql
+   howtos/proxysql-v2
    howtos/virt_sandbox
 
 Reference

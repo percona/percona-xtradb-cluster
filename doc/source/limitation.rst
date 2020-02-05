@@ -23,7 +23,7 @@ Unsupported queries:
    Lock functions, such as ``GET_LOCK()``, ``RELEASE_LOCK()``, and so on
 
 Query log cannot be directed to table.
-   |author| TODO: Explain where to set log_output
+
    If you enable query logging, you must forward the log to a file:
 
    .. code-block:: guess

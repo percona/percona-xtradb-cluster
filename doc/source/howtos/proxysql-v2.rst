@@ -514,15 +514,17 @@ It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL d
 
 .. admonition:: Output
 
-   +---------------+
-   | username      |
-   +---------------+
-   | monitor       |
-   | one           |
-   | proxysql_user |
-   | two           |
-   +---------------+
-   4 rows in set (0.00 sec)
+   .. code-block:: guess
+
+      +---------------+
+      | username      |
+      +---------------+
+      | monitor       |
+      | one           |
+      | proxysql_user |
+      | two           |
+      +---------------+
+      4 rows in set (0.00 sec)
 
 .. rubric:: From PXC
 
@@ -532,15 +534,17 @@ It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL d
 
 .. admonition:: Output
 
-   +---------------+-------+
-   | user          | host  |
-   +---------------+-------+
-   | monitor       | 192.% |
-   | proxysql_user | 192.% |
-   | two           | %     |
-   | one           | %     |
-   +---------------+-------+
-   4 rows in set (0.00 sec)
+   .. code-block:: guess
+
+      +---------------+-------+
+      | user          | host  |
+      +---------------+-------+
+      | monitor       | 192.% |
+      | proxysql_user | 192.% |
+      | two           | %     |
+      | one           | %     |
+      +---------------+-------+
+      4 rows in set (0.00 sec)
 
 .. _pxc.proxysql.v2.admin-tool.sync-multi-cluster-users:
 
