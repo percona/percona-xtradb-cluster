@@ -480,12 +480,12 @@ bool SslAcceptorContext::wsrep_ssl_artifacts_check(bool bootstrapping_node) {
       case SSL_ARTIFACTS_VIA_OPTIONS:
         WSREP_INFO(
             "New joining cluster node configured to use specified SSL "
-            "artificats");
+            "artifacts");
         break;
       case SSL_ARTIFACT_TRACES_FOUND:
       case SSL_ARTIFACTS_NOT_FOUND:
         WSREP_ERROR(
-            "New joining cluster node didn't found %sneeded SSL artifacts",
+            "New joining cluster node didn't find %sneeded SSL artifacts",
             (auto_detection_status == SSL_ARTIFACT_TRACES_FOUND) ? "all " : "");
         return true;
         break;

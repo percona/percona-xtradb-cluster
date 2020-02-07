@@ -387,13 +387,13 @@ class critical {
 };
 #endif
 
-class WSREPState {
+class WSREPState
+{
  public:
-  static bool node_needs_upgrading();
-
   /* Resets all of the data to default values */
   void clear() { wsrep_schema_version.clear(); }
 
+  bool exists(const char *dir, const char *filename);
   bool load_from(const char *dir, const char *filename);
   bool save_to(const char *dir, const char *filename);
 
