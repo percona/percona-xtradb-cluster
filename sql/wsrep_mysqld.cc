@@ -1311,10 +1311,10 @@ bool wsrep_sync_wait(THD *thd, uint mask) {
   return false;
 }
 
-enum wsrep::provider::status wsrep_sync_wait_upto(THD *thd
-                                                  __attribute__((unused)),
-                                                  wsrep_gtid_t *upto,
-                                                  int timeout) {
+enum wsrep::provider::status wsrep_sync_wait_upto_gtid(THD *thd
+                                                       __attribute__((unused)),
+                                                       wsrep_gtid_t *upto,
+                                                       int timeout) {
   DBUG_ASSERT(upto);
   enum wsrep::provider::status ret;
   if (upto) {
@@ -1324,7 +1324,7 @@ enum wsrep::provider::status wsrep_sync_wait_upto(THD *thd
   } else {
     ret = Wsrep_server_state::instance().causal_read(timeout).second;
   }
-  WSREP_DEBUG("wsrep_sync_wait_upto: %d", ret);
+  WSREP_DEBUG("wsrep_sync_wait_upto_gtid: %d", ret);
   return ret;
 }
 
