@@ -2827,7 +2827,11 @@ dberr_t Encryption::set_algorithm(const char *option, Encryption *encryption) {
     encryption->m_type = AES;
 
   } else if (innobase_strcasecmp(option, "KEYRING") == 0) {
+#ifdef WITH_WSREP
+    return (DB_UNSUPPORTED);
+#else
     encryption->m_type = KEYRING;
+#endif
   } else {
     return (DB_UNSUPPORTED);
   }

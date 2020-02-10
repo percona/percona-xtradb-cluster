@@ -1678,14 +1678,14 @@ class Item_func_wsrep_last_seen_gtid : public Item_str_func {
   const char *func_name() const { return "wsrep_last_seen_gtid"; }
 };
 
-class Item_func_wsrep_sync_wait_upto : public Item_bool_func {
+class Item_func_wsrep_sync_wait_upto_gtid : public Item_bool_func {
   typedef Item_bool_func super;
   String value;
 
  public:
-  Item_func_wsrep_sync_wait_upto(const POS &pos, Item *a)
+  Item_func_wsrep_sync_wait_upto_gtid(const POS &pos, Item *a)
       : Item_bool_func(pos, a) {}
-  Item_func_wsrep_sync_wait_upto(const POS &pos, Item *a, Item *b)
+  Item_func_wsrep_sync_wait_upto_gtid(const POS &pos, Item *a, Item *b)
       : Item_bool_func(pos, a, b) {}
 
   longlong val_int() override;

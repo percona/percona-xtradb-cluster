@@ -226,9 +226,9 @@ extern void wsrep_shutdown_replication();
 extern bool wsrep_must_sync_wait(THD *thd,
                                  uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
 extern bool wsrep_sync_wait(THD *thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
-extern enum wsrep::provider::status wsrep_sync_wait_upto(THD *thd,
-                                                         wsrep_gtid_t *upto,
-                                                         int timeout);
+extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(THD *thd,
+                                                              wsrep_gtid_t *upto,
+                                                              int timeout);
 extern void wsrep_last_committed_id(wsrep_gtid_t *gtid);
 extern int wsrep_check_opts(int argc, char *const *argv);
 extern void wsrep_prepend_PATH(const char *path);

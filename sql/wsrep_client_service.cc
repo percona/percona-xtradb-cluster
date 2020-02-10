@@ -119,6 +119,7 @@ void Wsrep_client_service::cleanup_transaction() {
   m_thd->run_wsrep_ordered_commit = false;
   m_thd->wsrep_enforce_group_commit = false;
   m_thd->wsrep_post_insert_error = false;
+  m_thd->wsrep_stmt_transaction_rolled_back = false;
   m_thd->wsrep_force_savept_rollback = false;
 
   if (m_thd->wsrep_non_replicating_atomic_ddl) {
@@ -318,6 +319,9 @@ int Wsrep_client_service::bf_rollback() {
   if (m_thd->locked_tables_mode && m_thd->lock) {
     m_thd->locked_tables_list.unlock_locked_tables(m_thd);
     m_thd->variables.option_bits &= ~OPTION_TABLE_LOCK;
+  }
+  if (m_thd->backup_tables_lock.is_acquired()) {
+    m_thd->backup_tables_lock.release(m_thd);
   }
   if (m_thd->global_read_lock.is_acquired()) {
     m_thd->global_read_lock.unlock_global_read_lock(m_thd);

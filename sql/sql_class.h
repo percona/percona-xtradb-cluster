@@ -2958,6 +2958,20 @@ class THD : public MDL_context_owner,
   bool wsrep_post_insert_error;
 
   /**
+    Similar to wsrep_post_insert_error. We could reuse wsrep_post_insert_error,
+    but to keep things clear let's flag what happened explicitly.
+
+    Set to true if stmt transaction inside real transaction
+    was rolled back.
+    It may happen that stmt transaction opens entries in galera/provider
+    and then statement transaction fails and rolls back.
+    On commit, flow will execute wsrep_commit_empty. Said variable will help
+    suppress assert that expect no changes from transaction but there are left
+    over entries in this case.
+   */
+  bool wsrep_stmt_transaction_rolled_back;
+
+  /**
     Set to true if local transaction is aborted while executing
     rollback to savepoint. rollback to savepoint will get statement
     rollback but transaction as a whole needs to get rolled back.

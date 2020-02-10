@@ -1,5 +1,6 @@
 --source include/have_wsrep_provider.inc
 --source include/have_wsrep.inc
+--source include/galera_wait_ready.inc
 
 --echo #
 --echo # wsrep_incoming_addresses

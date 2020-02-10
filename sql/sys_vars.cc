@@ -7349,6 +7349,16 @@ static bool check_set_default_table_encryption_access(
   // the value is unchanged.
   longlong previous_val = thd->variables.default_table_encryption;
   longlong val = (longlong)var->save_result.ulonglong_value;
+
+#ifdef WITH_WSREP
+  if (val > 1) {
+    my_message(ER_WRONG_VALUE_FOR_VAR,
+               "Keyring encryption is not supported in Percona XtraDB Cluster.",
+               MYF(0));
+    return true;
+  }
+#endif
+
   if ((!var->is_global_persist() && val == previous_val) ||
       thd->security_context()->check_access(SUPER_ACL) ||
       (thd->security_context()

@@ -56,6 +56,53 @@ SELECT COUNT(*) = 0 FROM t1;
 DROP TABLE t1;
 
 #
+# Error in the middle of multi-row INSERT/UPDATE that is the only statement 
+# in the transaction followed by implicit commit (PXC-2900)
+#
+
+--connection node_1
+CREATE TABLE t1(f1 INTEGER, f2 INTEGER, PRIMARY KEY pkf1(f1)) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 2), (2, 2);
+
+BEGIN;
+--error ER_DUP_ENTRY
+INSERT INTO t1 VALUES (3, 2), (2, 2);
+
+# Implicit commit
+BEGIN;
+SELECT * FROM t1;
+
+--connection node_2
+SELECT * FROM t1;
+
+--connection node_1
+--error ER_DUP_ENTRY
+UPDATE t1 SET f1 = 100 WHERE f2 = 2;
+
+# Implicit commit
+BEGIN;
+SELECT * FROM t1;
+
+--connection node_2
+SELECT * FROM t1;
+
+--connection node_1
+--disable_warnings
+INSERT IGNORE INTO t1 VALUES (3, 2), (2, 2);
+--enable_warnings
+
+# Implicit commit
+BEGIN;
+SELECT * FROM t1;
+COMMIT;
+
+--connection node_2
+SELECT * FROM t1;
+
+DROP TABLE t1;
+
+
+#
 # Deadlock
 #
 
