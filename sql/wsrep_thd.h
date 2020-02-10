@@ -16,12 +16,12 @@
 #ifndef WSREP_THD_H
 #define WSREP_THD_H
 
-#include "sql_class.h"
+#include <deque>
 #include "service_wsrep.h"
+#include "sql/sql_lex.h"
+#include "sql_class.h"
 #include "wsrep/client_state.hpp"
 #include "wsrep_utils.h"
-#include <deque>
-#include "sql/sql_lex.h"
 
 #include "mysql/psi/mysql_stage.h"
 #include "mysql/psi/psi_file.h"
@@ -148,7 +148,7 @@ int wsrep_show_bf_aborts(THD *thd, SHOW_VAR *var, char *buff);
 void wsrep_create_appliers(long threads);
 void wsrep_create_rollbacker();
 
-bool wsrep_bf_abort(const THD*, THD*);
+bool wsrep_bf_abort(const THD *, THD *);
 int wsrep_abort_thd(const THD *bf_thd_ptr, THD *victim_thd_ptr, bool signal);
 
 extern void wsrep_thd_set_PA_safe(void *thd_ptr, bool safe);
@@ -206,7 +206,7 @@ void wsrep_assign_from_threadvars(THD *);
  */
 struct Wsrep_threadvars {
   THD *cur_thd;
-  //st_my_thread_var *mysys_var;
+  // st_my_thread_var *mysys_var;
   void *mysys_var;
 };
 
@@ -245,18 +245,13 @@ void wsrep_reset_threadvars(THD *);
      so don't override those by default
  */
 
-static inline void wsrep_override_error(THD *thd, uint error)
-{
+static inline void wsrep_override_error(THD *thd, uint error) {
   DBUG_ASSERT(error != ER_ERROR_DURING_COMMIT);
-  Diagnostics_area *da= thd->get_stmt_da();
-  if (da->is_ok() ||
-      da->is_eof() ||
-      !da->is_set() ||
-      (da->is_error() &&
-       da->mysql_errno() != error &&
+  Diagnostics_area *da = thd->get_stmt_da();
+  if (da->is_ok() || da->is_eof() || !da->is_set() ||
+      (da->is_error() && da->mysql_errno() != error &&
        da->mysql_errno() != ER_ERROR_DURING_COMMIT &&
-       da->mysql_errno() != ER_LOCK_DEADLOCK))
-  {
+       da->mysql_errno() != ER_LOCK_DEADLOCK)) {
     da->reset_diagnostics_area();
     my_error(error, MYF(0));
   }
@@ -267,7 +262,7 @@ static inline void wsrep_override_error(THD *thd, uint error)
  */
 static inline void wsrep_override_error(THD *thd, uint error,
                                         enum wsrep::provider::status status,
-                                        const char* errorstring = "") {
+                                        const char *errorstring = "") {
   Diagnostics_area *da = thd->get_stmt_da();
   if (da->is_ok() || !da->is_set() ||
       (da->is_error() && da->mysql_errno() != error &&

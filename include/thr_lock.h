@@ -130,7 +130,7 @@ struct THR_LOCK_INFO {
 #ifdef WITH_WSREP
   THD *mysql_thd;       // THD pointer
   bool in_lock_tables;  // true, if inside locking session
-#endif /* WITH_WSREP */
+#endif                  /* WITH_WSREP */
   mysql_cond_t *suspend;
 };
 

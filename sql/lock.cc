@@ -113,8 +113,8 @@
 #include "thr_lock.h"
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
-#include "wsrep_mysqld.h"
 #include "sql/log.h"
+#include "wsrep_mysqld.h"
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 

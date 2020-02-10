@@ -14,6 +14,8 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 #include "wsrep_client_service.h"
+#include "debug_sync.h"
+#include "item_func.h"
 #include "mysql/components/services/log_builtins.h"
 #include "wsrep_applier.h" /* wsrep_apply_events() */
 #include "wsrep_binlog.h"  /* wsrep_dump_rbr_buf() */
@@ -22,8 +24,6 @@
 #include "wsrep_thd.h"
 #include "wsrep_trans_observer.h"
 #include "wsrep_xid.h"
-#include "item_func.h"
-#include "debug_sync.h"
 
 #include "log.h"         /* stmt_has_updated_trans_table() */
 #include "rpl_filter.h"  /* binlog_filter */
@@ -53,13 +53,9 @@ Wsrep_client_service::Wsrep_client_service(THD *thd,
                                            Wsrep_client_state &client_state)
     : wsrep::client_service(), m_thd(thd), m_client_state(client_state) {}
 
-void Wsrep_client_service::store_globals() {
-  wsrep_store_threadvars(m_thd);
-}
+void Wsrep_client_service::store_globals() { wsrep_store_threadvars(m_thd); }
 
-void Wsrep_client_service::reset_globals() {
-  wsrep_reset_threadvars(m_thd);
-}
+void Wsrep_client_service::reset_globals() { wsrep_reset_threadvars(m_thd); }
 
 bool Wsrep_client_service::interrupted(
     wsrep::unique_lock<wsrep::mutex> &lock WSREP_UNUSED) const {
@@ -158,7 +154,7 @@ int Wsrep_client_service::prepare_fragment_for_replication(
 
   int ret = 0;
   size_t total_length = 0;
-  unsigned char* read_pos = NULL;
+  unsigned char *read_pos = NULL;
   my_off_t read_len = 0;
 
   if (cache->begin(&read_pos, &read_len, thd->wsrep_sr().bytes_certified())) {

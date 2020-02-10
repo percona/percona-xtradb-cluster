@@ -1476,9 +1476,11 @@ bool mysql_show_relaylog_events(THD *thd) {
   }
 
 #ifdef WITH_WSREP
-  if (thd->lex->mi.channel && wsrep_is_wsrep_channel_name(thd->lex->mi.channel)) {
-    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0), "SHOW RELAYLOG EVENTS",
-             thd->lex->mi.channel, "SHOW RELAYLOG EVENTS");
+  if (thd->lex->mi.channel &&
+      wsrep_is_wsrep_channel_name(thd->lex->mi.channel)) {
+    my_error(ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED, MYF(0),
+             "SHOW RELAYLOG EVENTS", thd->lex->mi.channel,
+             "SHOW RELAYLOG EVENTS");
     res = true;
     goto err;
   }

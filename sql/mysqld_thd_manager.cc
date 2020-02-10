@@ -24,8 +24,8 @@
 
 #include "my_config.h"
 #ifdef WITH_WSREP
-#include "wsrep_sst.h"
 #include "mysql/components/services/log_builtins.h"
+#include "wsrep_sst.h"
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
@@ -105,7 +105,8 @@ class Find_THD {
 };
 
 #ifdef WITH_WSREP
-Do_THD_Impl::Do_THD_Impl() { /* Empty constructor */ }
+Do_THD_Impl::Do_THD_Impl() { /* Empty constructor */
+}
 #endif /* WITH_WSREP */
 
 #ifdef HAVE_PSI_INTERFACE
@@ -178,8 +179,7 @@ class Print_conn : public Do_THD_Impl {
   virtual void operator()(THD *thd) {
     WSREP_INFO("THD %u applier %s exec_mode %s killed %s", thd->thread_id(),
                thd->wsrep_applier ? "true" : "false",
-               wsrep_thd_client_mode_str(thd),
-               thd->killed ? "true" : "false");
+               wsrep_thd_client_mode_str(thd), thd->killed ? "true" : "false");
   }
 };
 #endif /* WITH_WSREP */
@@ -205,8 +205,8 @@ Global_THD_manager::~Global_THD_manager() {
     mysql_cond_destroy(&COND_thd_list[i]);
   }
 #ifdef WITH_WSREP
-    /* TODO: If sst fails then there could be left over thread.
-    Information of this applier thread is printed above. */
+  /* TODO: If sst fails then there could be left over thread.
+  Information of this applier thread is printed above. */
 #else
   DBUG_ASSERT(thread_ids.empty());
 #endif /* WITH_WSREP */

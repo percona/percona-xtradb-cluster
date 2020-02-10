@@ -256,13 +256,12 @@ void trx_sys_close(void);
 
 #ifdef WITH_WSREP
 /** Update WSREP checkpoint XID in sys header. */
-void
-trx_sys_update_wsrep_checkpoint(
-        const XID*      xid,         /*!< in: WSREP XID */
-        trx_sysf_t*     sys_header,  /*!< in: sys_header */
-        mtr_t*          mtr,         /*!< in: mtr       */
-        bool            recovery = false);
-                                     /*!< in: running recovery */
+void trx_sys_update_wsrep_checkpoint(
+    const XID *xid,         /*!< in: WSREP XID */
+    trx_sysf_t *sys_header, /*!< in: sys_header */
+    mtr_t *mtr,             /*!< in: mtr       */
+    bool recovery = false);
+/*!< in: running recovery */
 
 void
 /** Read WSREP checkpoint XID from sys header. */
@@ -379,11 +378,11 @@ are persisted to table */
 #define TRX_SYS_WSREP_XID_MAGIC_N 0x77737265
 
 /* XID field: formatID, gtrid_len, bqual_len, xid_data */
-#define TRX_SYS_WSREP_XID_LEN        (4 + 4 + 4 + XIDDATASIZE)
-#define TRX_SYS_WSREP_XID_FORMAT     4
-#define TRX_SYS_WSREP_XID_GTRID_LEN  8
+#define TRX_SYS_WSREP_XID_LEN (4 + 4 + 4 + XIDDATASIZE)
+#define TRX_SYS_WSREP_XID_FORMAT 4
+#define TRX_SYS_WSREP_XID_GTRID_LEN 8
 #define TRX_SYS_WSREP_XID_BQUAL_LEN 12
-#define TRX_SYS_WSREP_XID_DATA      16
+#define TRX_SYS_WSREP_XID_DATA 16
 #endif /* WITH_WSREP */
 
 /** Doublewrite buffer */

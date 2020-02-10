@@ -51,7 +51,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <ha_prototypes.h>
 #endif /* WITH_WSREP */
 
-
 /*			PHYSICAL RECORD (OLD STYLE)
                         ===========================
 
@@ -1883,4 +1882,3 @@ err_out:
   return DB_ERROR;
 }
 #endif /* WITH_WSREP */
-

@@ -160,11 +160,11 @@ class Check_constraints_adjusted_names_map;
 
 #ifdef WITH_WSREP
 /* wsrep-lib */
-#include "wsrep_mysqld.h"
 #include "wsrep_client_service.h"
 #include "wsrep_client_state.h"
-#include "wsrep_mutex.h"
 #include "wsrep_condition_variable.h"
+#include "wsrep_mutex.h"
+#include "wsrep_mysqld.h"
 
 class Wsrep_applier_service;
 #endif /* WITH_WSREP */
@@ -802,7 +802,8 @@ class Global_read_lock {
         provider_paused(false),
 #endif /* WITH_WSREP */
         m_mdl_global_shared_lock(NULL),
-        m_mdl_blocks_commits_lock(NULL) {}
+        m_mdl_blocks_commits_lock(NULL) {
+  }
 
 #ifdef WITH_WSREP
   bool lock_global_read_lock(THD *thd, bool *own_lock);
@@ -2016,8 +2017,8 @@ class THD : public MDL_context_owner,
     virtual bool is_read_only() const { return true; }
 
 #ifdef WITH_WSREP
-    Ha_data* wsrep_get_main_trx_ha_data(int slot) {
-       return &m_trx_state.m_ha_data[slot];
+    Ha_data *wsrep_get_main_trx_ha_data(int slot) {
+      return &m_trx_state.m_ha_data[slot];
     }
 #endif /* WITH_WSREP */
 
@@ -2948,12 +2949,11 @@ class THD : public MDL_context_owner,
   /**
     Set to true if there is error post insert action.
     for example: say trigger action.
-    Case depict a scenario where-in transaction may fail (due to trigger failure)
-    but leave open entries in galera/provider originating from append key of
-    original insert (before trigger action).
-    On commit, flow will execute wsrep_commit_empty. Said variable will help
-    suppress assert that expect no changes from transaction but there are left
-    over entries in this case.
+    Case depict a scenario where-in transaction may fail (due to trigger
+    failure) but leave open entries in galera/provider originating from append
+    key of original insert (before trigger action). On commit, flow will execute
+    wsrep_commit_empty. Said variable will help suppress assert that expect no
+    changes from transaction but there are left over entries in this case.
   */
   bool wsrep_post_insert_error;
 

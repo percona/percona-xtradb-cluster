@@ -1730,8 +1730,7 @@ static const std::pair<const char *, Create_func *> func_array[] = {
     ,
     {"WSREP_LAST_WRITTEN_GTID", SQL_FN(Item_func_wsrep_last_written_gtid, 0)},
     {"WSREP_LAST_SEEN_GTID", SQL_FN(Item_func_wsrep_last_seen_gtid, 0)},
-    {"WSREP_SYNC_WAIT_UPTO_GTID",
-     SQL_FN_V(Item_func_wsrep_sync_wait_upto_gtid, 1, 2)}
+    {"WSREP_SYNC_WAIT_UPTO_GTID", SQL_FN_V(Item_func_wsrep_sync_wait_upto_gtid, 1, 2)}
 #endif /* WITH_WSREP */
 };
 

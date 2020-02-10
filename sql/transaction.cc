@@ -199,7 +199,8 @@ bool trans_begin(THD *thd, uint flags) {
     DBUG_ASSERT(thd->tx_priority == 0);
 
 #ifdef WITH_WSREP
-    WSREP_WARN("InnoDB High Priority being used: %d -> %d", thd->tx_priority, 1);
+    WSREP_WARN("InnoDB High Priority being used: %d -> %d", thd->tx_priority,
+               1);
 #endif /* WITH_WSREP */
 
     thd->tx_priority = 1;
@@ -213,7 +214,6 @@ bool trans_begin(THD *thd, uint flags) {
       return true;
   }
 #endif /* WITH_WSREP */
-
 
   thd->variables.option_bits |= OPTION_BEGIN;
   thd->server_status |= SERVER_STATUS_IN_TRANS;

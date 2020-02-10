@@ -21,8 +21,8 @@
 #endif
 
 #include "wsrep_utils.h"
-#include "wsrep_mysqld.h"
 #include "mysql/components/services/log_builtins.h"
+#include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
 
 #include "sql_class.h"
@@ -337,15 +337,18 @@ static int execvpe(const char *file, char *const argv[], char *const envp[]) {
 #define STDOUT_FD 1
 #define STDERR_FD 2
 
-process::process(const char *cmd, const char *type, char **env, bool execute_immediately)
-    : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), io_w_(NULL), io_err_(NULL), err_(0), pid_(0)
-  {
-    if (execute_immediately)
-      execute(type, env);
-  }
+process::process(const char *cmd, const char *type, char **env,
+                 bool execute_immediately)
+    : str_(cmd ? strdup(cmd) : strdup("")),
+      io_(NULL),
+      io_w_(NULL),
+      io_err_(NULL),
+      err_(0),
+      pid_(0) {
+  if (execute_immediately) execute(type, env);
+}
 
-void process::execute(const char *type, char **env)
-{
+void process::execute(const char *type, char **env) {
   int sig;
   struct sigaction sa;
 
@@ -360,7 +363,8 @@ void process::execute(const char *type, char **env)
     return;
   }
 
-  if (NULL == type || (strcmp(type, "w") && strcmp(type, "r") && strcmp(type, "rw"))) {
+  if (NULL == type ||
+      (strcmp(type, "w") && strcmp(type, "r") && strcmp(type, "rw"))) {
     WSREP_ERROR("type argument should be either \"r\" or \"w\" or \"rw\".");
     return;
   }
@@ -369,9 +373,9 @@ void process::execute(const char *type, char **env)
     env = environ;
   }  // default to global environment
 
-  int pipe_fds[2] = { -1, -1 };
-  int pipe2_fds[2] = { -1, -1 };
-  int pipeerr_fds[2] = { -1, -1 };
+  int pipe_fds[2] = {-1, -1};
+  int pipe2_fds[2] = {-1, -1};
+  int pipeerr_fds[2] = {-1, -1};
 
   if (::pipe(pipe_fds)) {
     err_ = errno;
@@ -388,16 +392,17 @@ void process::execute(const char *type, char **env)
 
   // Create the second pipe (needed only if type = "rw")
   // One pipe for reading and one pipe for writing
-  if (strcmp(type, "rw") == 0 && ::pipe(pipe2_fds))
-  {
+  if (strcmp(type, "rw") == 0 && ::pipe(pipe2_fds)) {
     err_ = errno;
-    WSREP_ERROR ("pipe() failed to create the second pipe: %d (%s)", err_, strerror(err_));
+    WSREP_ERROR("pipe() failed to create the second pipe: %d (%s)", err_,
+                strerror(err_));
     goto cleanup_pipe;
   }
 
   if (::pipe(pipeerr_fds)) {
     err_ = errno;
-    WSREP_ERROR("pipe() failed to create the error pipe: %d (%s)", err_, strerror(err_));
+    WSREP_ERROR("pipe() failed to create the error pipe: %d (%s)", err_,
+                strerror(err_));
     goto cleanup_pipe;
   }
 
@@ -420,7 +425,7 @@ void process::execute(const char *type, char **env)
     /* Parent */
 
     // Treat 'rw' as an 'r'
-    io_ = fdopen(pipe_fds[parent_end],  (strcmp(type,"rw") == 0 ? "r" : type));
+    io_ = fdopen(pipe_fds[parent_end], (strcmp(type, "rw") == 0 ? "r" : type));
 
     if (io_) {
       pipe_fds[parent_end] = -1;  // skip close on cleanup
@@ -429,30 +434,23 @@ void process::execute(const char *type, char **env)
       WSREP_ERROR("fdopen() failed: %d (%s)", err_, strerror(err_));
     }
 
-    if (strcmp(type, "rw") == 0)
-    {
+    if (strcmp(type, "rw") == 0) {
       // Need to open the write end of the pipe
       io_w_ = fdopen(pipe2_fds[PIPE_WRITE], "w");
-      if (io_w_)
-      {
-        pipe2_fds[PIPE_WRITE] = -1; // skip close on cleanup
-      }
-      else
-      {
+      if (io_w_) {
+        pipe2_fds[PIPE_WRITE] = -1;  // skip close on cleanup
+      } else {
         err_ = errno;
-        WSREP_ERROR ("fdopen() failed: %d (%s)", err_, strerror(err_));
+        WSREP_ERROR("fdopen() failed: %d (%s)", err_, strerror(err_));
       }
     }
 
     io_err_ = fdopen(pipeerr_fds[PIPE_READ], "r");
-    if (io_err_)
-    {
+    if (io_err_) {
       pipeerr_fds[PIPE_READ] = -1;  // skip close on cleanup
-    }
-    else
-    {
+    } else {
       err = errno;
-      WSREP_ERROR ("fdopen() failed: %d (%s)", err_, strerror(err_));
+      WSREP_ERROR("fdopen() failed: %d (%s)", err_, strerror(err_));
     }
 
     goto cleanup_pipe;
@@ -523,8 +521,7 @@ void process::execute(const char *type, char **env)
     WSREP_ERROR("dup2() failed");
     _exit(EXIT_FAILURE);
   }
-  if ((strcmp(type, "rw") == 0) && dup2(pipe2_fds[PIPE_READ], STDIN_FD) < 0)
-  {
+  if ((strcmp(type, "rw") == 0) && dup2(pipe2_fds[PIPE_READ], STDIN_FD) < 0) {
     WSREP_ERROR("dup2() failed");
     _exit(EXIT_FAILURE);
   }
@@ -545,26 +542,22 @@ void process::execute(const char *type, char **env)
     _exit(EXIT_FAILURE);
   }
 
-  if (close(pipe2_fds[child_end]) < 0)
-  {
+  if (close(pipe2_fds[child_end]) < 0) {
     WSREP_ERROR("close() failed");
     _exit(EXIT_FAILURE);
   }
 
-  if (close(pipe2_fds[parent_end]) < 0)
-  {
+  if (close(pipe2_fds[parent_end]) < 0) {
     WSREP_ERROR("close() failed");
     _exit(EXIT_FAILURE);
   }
 
-  if (close(pipeerr_fds[PIPE_WRITE]) < 0)
-  {
+  if (close(pipeerr_fds[PIPE_WRITE]) < 0) {
     WSREP_ERROR("close() failed");
     _exit(EXIT_FAILURE);
   }
 
-  if (close(pipeerr_fds[PIPE_READ]) < 0)
-  {
+  if (close(pipeerr_fds[PIPE_READ]) < 0) {
     WSREP_ERROR("close() failed");
     _exit(EXIT_FAILURE);
   }
@@ -690,31 +683,32 @@ void process::execute(const char *type, char **env)
     goto cleanup_actions;
   }
 
-  if (strcmp(type, "rw") == 0)
-  {
-    err_ = posix_spawn_file_actions_adddup2(&sfa, pipe2_fds[PIPE_READ], STDIN_FD);
-    if (err_)
-    {
-      WSREP_ERROR ("posix_spawn_file_actions_adddup2() failed: %d (%s)", err_, strerror(err_));
+  if (strcmp(type, "rw") == 0) {
+    err_ =
+        posix_spawn_file_actions_adddup2(&sfa, pipe2_fds[PIPE_READ], STDIN_FD);
+    if (err_) {
+      WSREP_ERROR("posix_spawn_file_actions_adddup2() failed: %d (%s)", err_,
+                  strerror(err_));
       goto cleanup_actions;
     }
 
     err_ = posix_spawn_file_actions_addclose(&sfa, pipe2_fds[PIPE_READ]);
-    if (err_)
-    {
-      WSREP_ERROR ("posix_spawn_file_actions_addclose() failed: %d (%s)", err_, strerror(err_));
+    if (err_) {
+      WSREP_ERROR("posix_spawn_file_actions_addclose() failed: %d (%s)", err_,
+                  strerror(err_));
       goto cleanup_actions;
     }
 
     err_ = posix_spawn_file_actions_addclose(&sfa, pipe2_fds[PIPE_WRITE]);
-    if (err_)
-    {
-      WSREP_ERROR ("posix_spawn_file_actions_addclose() failed: %d (%s)", err_, strerror(err_));
+    if (err_) {
+      WSREP_ERROR("posix_spawn_file_actions_addclose() failed: %d (%s)", err_,
+                  strerror(err_));
       goto cleanup_actions;
     }
   }
 
-  err_ = posix_spawn_file_actions_adddup2(&sfa, pipeerr_fds[PIPE_WRITE], STDERR_FD);
+  err_ = posix_spawn_file_actions_adddup2(&sfa, pipeerr_fds[PIPE_WRITE],
+                                          STDERR_FD);
   if (err_) {
     WSREP_ERROR("posix_spawn_file_actions_adddup2() failed: %d (%s)", err_,
                 strerror(err_));
@@ -734,7 +728,6 @@ void process::execute(const char *type, char **env)
                 strerror(err_));
     goto cleanup_actions;
   }
-
 
   /* Launch the child process: */
 
@@ -770,18 +763,14 @@ void process::execute(const char *type, char **env)
     WSREP_ERROR("fdopen() failed: %d (%s)", err_, strerror(err_));
   }
 
-  if (strcmp(type, "rw") == 0)
-  {
+  if (strcmp(type, "rw") == 0) {
     io_w_ = fdopen(pipe2_fds[PIPE_WRITE], "w");
 
-    if (io_w_)
-    {
-      pipe2_fds[PIPE_WRITE] = -1; // skip close on cleanup
-    }
-    else
-    {
+    if (io_w_) {
+      pipe2_fds[PIPE_WRITE] = -1;  // skip close on cleanup
+    } else {
       err_ = errno;
-      WSREP_ERROR ("fdopen() failed: %d (%s)", err_, strerror(err_));
+      WSREP_ERROR("fdopen() failed: %d (%s)", err_, strerror(err_));
     }
   }
 
@@ -794,16 +783,15 @@ void process::execute(const char *type, char **env)
     WSREP_ERROR("fdopen() failed: %d (%s)", err_, strerror(err_));
   }
 
-
 #endif
 
 cleanup_pipe:
   if (pipe_fds[0] >= 0) close(pipe_fds[0]);
   if (pipe_fds[1] >= 0) close(pipe_fds[1]);
-  if (pipe2_fds[0] >= 0) close (pipe2_fds[0]);
-  if (pipe2_fds[1] >= 0) close (pipe2_fds[1]);
-  if (pipeerr_fds[0] >= 0) close (pipeerr_fds[0]);
-  if (pipeerr_fds[1] >= 0) close (pipeerr_fds[1]);
+  if (pipe2_fds[0] >= 0) close(pipe2_fds[0]);
+  if (pipe2_fds[1] >= 0) close(pipe2_fds[1]);
+  if (pipeerr_fds[0] >= 0) close(pipeerr_fds[0]);
+  if (pipeerr_fds[1] >= 0) close(pipeerr_fds[1]);
 
   free(pargv[0]);
   free(pargv[1]);
@@ -838,23 +826,22 @@ process::~process() {
     }
   }
 
-  if (io_w_)
-  {
-      assert (pid_);
-      assert (str_);
+  if (io_w_) {
+    assert(pid_);
+    assert(str_);
 
-      WSREP_WARN("Closing write pipe to child process: %s, PID(%ld) "
-                 "which might still be running.", str_, (long)pid_);
+    WSREP_WARN(
+        "Closing write pipe to child process: %s, PID(%ld) "
+        "which might still be running.",
+        str_, (long)pid_);
 
-      if (fclose (io_w_) == -1)
-      {
-          err_ = errno;
-          WSREP_ERROR("fclose() failed: %d (%s)", err_, strerror(err_));
-      }
+    if (fclose(io_w_) == -1) {
+      err_ = errno;
+      WSREP_ERROR("fclose() failed: %d (%s)", err_, strerror(err_));
+    }
   }
 
-  if (io_err_)
-  {
+  if (io_err_) {
     WSREP_WARN(
         "Closing pipe to child process: %s, PID(%ld) "
         "which might still be running.",
@@ -869,20 +856,17 @@ process::~process() {
   if (str_) free(const_cast<char *>(str_));
 }
 
-void process::close_write_pipe()
-{
-    if (io_w_)
-    {
-        assert (pid_);
-        assert (str_);
+void process::close_write_pipe() {
+  if (io_w_) {
+    assert(pid_);
+    assert(str_);
 
-        if (fclose (io_w_) == -1)
-        {
-            err_ = errno;
-            WSREP_ERROR("fclose() failed: %d (%s)", err_, strerror(err_));
-        }
-        io_w_ = NULL;
+    if (fclose(io_w_) == -1) {
+      err_ = errno;
+      WSREP_ERROR("fclose() failed: %d (%s)", err_, strerror(err_));
     }
+    io_w_ = NULL;
+  }
 }
 
 int process::wait() {
@@ -954,7 +938,7 @@ void process::terminate() {
 
 thd::thd(bool won) : init(), ptr(new THD) {
   if (ptr) {
-    ptr->thread_stack = (char*)(&ptr);
+    ptr->thread_stack = (char *)(&ptr);
     wsrep_assign_from_threadvars(ptr);
     wsrep_store_threadvars(ptr);
     ptr->variables.option_bits &= ~OPTION_BIN_LOG;  // disable binlog
@@ -970,20 +954,16 @@ thd::~thd() {
   }
 }
 
-
-void WSREPState::parse_version(const char *str, uint& major, uint& minor, uint& revision)
-{
-  char * end;
+void WSREPState::parse_version(const char *str, uint &major, uint &minor,
+                               uint &revision) {
+  char *end;
   major = minor = revision = 0;
 
-  if (!str || !*str)
-    return;
+  if (!str || !*str) return;
 
   major = strtoul(str, &end, 10);
-  if (*end)
-    minor = strtoul(end+1, &end, 10);
-  if (*end)
-    revision = strtoul(end+1, &end, 10);
+  if (*end) minor = strtoul(end + 1, &end, 10);
+  if (*end) revision = strtoul(end + 1, &end, 10);
 
   /* Ensure that we aren't overflowing any values */
   if (major > 99) major = 99;
@@ -992,39 +972,34 @@ void WSREPState::parse_version(const char *str, uint& major, uint& minor, uint& 
   return;
 }
 
-bool WSREPState::wsrep_schema_version_equals(const char *server_version)
-{
-  uint  wsrep_major, wsrep_minor, wsrep_revision;
-  uint  server_major, server_minor, server_revision;
+bool WSREPState::wsrep_schema_version_equals(const char *server_version) {
+  uint wsrep_major, wsrep_minor, wsrep_revision;
+  uint server_major, server_minor, server_revision;
 
-  parse_version(this->wsrep_schema_version.c_str(), wsrep_major, wsrep_minor, wsrep_revision);
+  parse_version(this->wsrep_schema_version.c_str(), wsrep_major, wsrep_minor,
+                wsrep_revision);
   parse_version(server_version, server_major, server_minor, server_revision);
 
-  return wsrep_major == server_major &&
-         wsrep_minor == server_minor &&
+  return wsrep_major == server_major && wsrep_minor == server_minor &&
          wsrep_revision == server_revision;
 }
 
-
-bool WSREPState::load_from(const char *dir, const char *filename)
-{
+bool WSREPState::load_from(const char *dir, const char *filename) {
   MYSQL_FILE *file;
-  int         errcode = 0;
-  const int   full_path_len = 1024;
-  char        full_path[full_path_len];
-  const int   buf_len = 256;
-  char        buf[buf_len];
+  int errcode = 0;
+  const int full_path_len = 1024;
+  char full_path[full_path_len];
+  const int buf_len = 256;
+  char buf[buf_len];
 
-  if (snprintf(full_path, full_path_len,
-               "%s/%s", dir ? dir : "", filename ? filename : "") <= 0)
-  {
+  if (snprintf(full_path, full_path_len, "%s/%s", dir ? dir : "",
+               filename ? filename : "") <= 0) {
     WSREP_ERROR("WSREPState::load_from() snprintf failed");
     return false;
   }
 
   file = mysql_file_fopen(key_file_misc, full_path, O_RDONLY, MYF(0));
-  if (!file)
-  {
+  if (!file) {
     WSREP_WARN("Could not open the wsrep state file : %s", full_path);
     return false;
   }
@@ -1033,24 +1008,19 @@ bool WSREPState::load_from(const char *dir, const char *filename)
   clear();
 
   /* Loop over the file and read it in */
-  while (mysql_file_fgets(buf, buf_len, file) != NULL)
-  {
+  while (mysql_file_fgets(buf, buf_len, file) != NULL) {
     /* Examine the line */
     char *line = buf;
-    while (*line && isspace(*line))
-      line++;
+    while (*line && isspace(*line)) line++;
 
     /* Are we at the end of the line? */
-    if (*line == 0)
-      continue;
+    if (*line == 0) continue;
 
     /* If the line starts with a '#', then it's a comment */
-    if (line[0] == '#')
-      continue;
+    if (line[0] == '#') continue;
 
     char *sep = strchr(line, '=');
-    if (sep == NULL)
-    {
+    if (sep == NULL) {
       WSREP_ERROR("Unexpected line formatting (expected '=') : %s", buf);
       errcode = EINVAL;
       break;
@@ -1058,37 +1028,32 @@ bool WSREPState::load_from(const char *dir, const char *filename)
 
     /* Separate the name/value */
     *sep = 0;
-    char * name = line;
-    char * value = sep+1;
+    char *name = line;
+    char *value = sep + 1;
 
-    if (strcmp(name, WSREP_SCHEMA_VERSION_NAME) == 0)
-    {
-      uint  major, minor, revision;
-      const int buf_len=32;
+    if (strcmp(name, WSREP_SCHEMA_VERSION_NAME) == 0) {
+      uint major, minor, revision;
+      const int buf_len = 32;
       char buf[buf_len];
       this->parse_version(value, major, minor, revision);
-      if (snprintf(buf, buf_len, "%d.%d.%d", major, minor, revision) <= 0)
-      {
-        WSREP_ERROR("WSREPState::load_from() snprintf failed to format the version");
+      if (snprintf(buf, buf_len, "%d.%d.%d", major, minor, revision) <= 0) {
+        WSREP_ERROR(
+            "WSREPState::load_from() snprintf failed to format the version");
         errcode = EINVAL;
         break;
       }
       this->wsrep_schema_version = buf;
-    }
-    else if (strcmp(name, WSREP_STATE_FILE_VERSION_NAME) == 0)
-    {
+    } else if (strcmp(name, WSREP_STATE_FILE_VERSION_NAME) == 0) {
       /* Only allow version 1.x */
-      uint  major, minor, revision;
+      uint major, minor, revision;
       this->parse_version(value, major, minor, revision);
-      if (major != 1)
-      {
-        WSREP_ERROR("WSREPState::load_from() unsupported/unknown version: %s", value);
+      if (major != 1) {
+        WSREP_ERROR("WSREPState::load_from() unsupported/unknown version: %s",
+                    value);
         errcode = EINVAL;
         break;
       }
-    }
-    else
-    {
+    } else {
       /*
        Unknown name
        Issue a warning, but continue to process the entire file
@@ -1097,52 +1062,51 @@ bool WSREPState::load_from(const char *dir, const char *filename)
     }
   }
 
-  if (this->wsrep_schema_version.empty())
-  {
-    WSREP_ERROR("Could not locate the wsrep schema version in the wsrep_state.dat file");
+  if (this->wsrep_schema_version.empty()) {
+    WSREP_ERROR(
+        "Could not locate the wsrep schema version in the wsrep_state.dat "
+        "file");
     errcode = EINVAL;
   }
   mysql_file_fclose(file, MYF(0));
   return errcode == 0;
 }
 
-bool WSREPState::save_to(const char *dir, const char *filename)
-{
+bool WSREPState::save_to(const char *dir, const char *filename) {
   MYSQL_FILE *file;
-  const int   buf_len=1024;
-  char        buf[buf_len];
+  const int buf_len = 1024;
+  char buf[buf_len];
 
   /* Normalize the wsrep_schema_version */
-  uint        major, minor, revision;
+  uint major, minor, revision;
   parse_version(this->wsrep_schema_version.c_str(), major, minor, revision);
-  if (snprintf(buf, buf_len, "%d.%d.%d", major, minor, revision) <= 0)
-  {
+  if (snprintf(buf, buf_len, "%d.%d.%d", major, minor, revision) <= 0) {
     /* Failure to format */
     WSREP_ERROR("WSREPState::save_to() snprintf failed to format the version");
     return false;
   }
   this->wsrep_schema_version = buf;
 
-  if (snprintf(buf, buf_len, "%s/%s", dir ? dir : "", filename ? filename : "") <= 0)
-  {
+  if (snprintf(buf, buf_len, "%s/%s", dir ? dir : "",
+               filename ? filename : "") <= 0) {
     WSREP_ERROR("WSREPState::save_to() snprintf failed");
     return false;
   }
 
-  file = mysql_file_fopen(key_file_misc, buf, O_TRUNC | O_CREAT | O_WRONLY, MYF(0));
-  if (!file)
-  {
+  file = mysql_file_fopen(key_file_misc, buf, O_TRUNC | O_CREAT | O_WRONLY,
+                          MYF(0));
+  if (!file) {
     WSREP_ERROR("Could not open the wsrep state file : %s", buf);
     return false;
   }
   int errcode;
-  errcode = mysql_file_fprintf(file,
-        "# WSREP state file (created on initialization)\n"
-        "%s=%s\n"
-        "%s=%s\n",
-        WSREP_STATE_FILE_VERSION_NAME, WSREP_STATE_FILE_VERSION,
-        WSREP_SCHEMA_VERSION_NAME, this->wsrep_schema_version.c_str()
-      );
+  errcode = mysql_file_fprintf(
+      file,
+      "# WSREP state file (created on initialization)\n"
+      "%s=%s\n"
+      "%s=%s\n",
+      WSREP_STATE_FILE_VERSION_NAME, WSREP_STATE_FILE_VERSION,
+      WSREP_SCHEMA_VERSION_NAME, this->wsrep_schema_version.c_str());
   mysql_file_fclose(file, MYF(0));
 
   if (errcode <= 0) {
@@ -1152,21 +1116,21 @@ bool WSREPState::save_to(const char *dir, const char *filename)
   return true;
 }
 
-bool WSREPState::node_needs_upgrading()
-{
-    wsp::WSREPState  wsrep_state;
+bool WSREPState::node_needs_upgrading() {
+  wsp::WSREPState wsrep_state;
 
-    /* If we can't load the data file, assume the node is out-of-date (i.e. from 5.7) */
-    if (!wsrep_state.load_from(mysql_real_data_home_ptr, WSREP_STATE_FILENAME))
-      return true;
+  /* If we can't load the data file, assume the node is out-of-date (i.e.
+   * from 5.7) */
+  if (!wsrep_state.load_from(mysql_real_data_home_ptr, WSREP_STATE_FILENAME))
+    return true;
 
-    if (!wsrep_state.wsrep_schema_version_equals(WSREP_SCHEMA_VERSION))
-    {
-      WSREP_WARN("WSREP schema versions  server:%s  datadir:%s", MYSQL_SERVER_VERSION, wsrep_state.wsrep_schema_version.c_str());
-      return true;
-    }
+  if (!wsrep_state.wsrep_schema_version_equals(WSREP_SCHEMA_VERSION)) {
+    WSREP_WARN("WSREP schema versions  server:%s  datadir:%s",
+               MYSQL_SERVER_VERSION, wsrep_state.wsrep_schema_version.c_str());
+    return true;
+  }
 
-    return false;
+  return false;
 }
 
 }  // namespace wsp

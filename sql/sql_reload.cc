@@ -57,8 +57,8 @@
 #include "sql/table.h"
 
 #ifdef WITH_WSREP
-#include "sql_parse.h"
 #include "sql/sql_lex.h"
+#include "sql_parse.h"
 #endif /* WITH_WSREP */
 
 /**

@@ -97,9 +97,9 @@
 #include "violite.h"
 
 #ifdef WITH_WSREP
-#include "sql/dd/types/table.h"                // dd::Table
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
-#endif /* WITH_WSREP */
+#include "sql/dd/types/table.h"              // dd::Table
+#endif                                       /* WITH_WSREP */
 
 bool Column_name_comparator::operator()(const String *lhs,
                                         const String *rhs) const {
@@ -1489,10 +1489,8 @@ static bool pxc_strict_mode_admin_check(THD *thd, TABLE_LIST *tables) {
   enum legacy_db_type db_type;
 
   for (TABLE_LIST *table = tables; table; table = table->next_local) {
-
     /* Skip check for temporary table */
-    if (is_temporary_table(table))
-      continue;
+    if (is_temporary_table(table)) continue;
 
     bool block = false;
 
@@ -2211,7 +2209,7 @@ bool Sql_cmd_show_grants::execute(THD *thd) {
       const List_of_auth_id_refs *active_list =
           thd->security_context()->get_active_roles();
       return mysql_show_grants(thd, &current_user, *active_list,
-                                    show_mandatory_roles, effective_grants);
+                               show_mandatory_roles, effective_grants);
     }
   } else if (strcmp(thd->security_context()->priv_user().str,
                     for_user->user.str) != 0) {
@@ -2235,8 +2233,8 @@ bool Sql_cmd_show_grants::execute(THD *thd) {
 
   LEX_USER *tmp_user = const_cast<LEX_USER *>(for_user);
   tmp_user = get_current_user(thd, tmp_user);
-  return mysql_show_grants(thd, tmp_user, authid_list,
-                                show_mandatory_roles, effective_grants);
+  return mysql_show_grants(thd, tmp_user, authid_list, show_mandatory_roles,
+                           effective_grants);
 }
 
 bool Sql_cmd_show::execute(THD *thd) {

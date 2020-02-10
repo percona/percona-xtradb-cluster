@@ -2026,7 +2026,7 @@ loop:
 #if defined(WITH_WSREP)
     if (os_event_is_set(srv_allow_writes_event)) {
 #endif /* WITH_WSREP */
-    fatal_cnt++;
+      fatal_cnt++;
 #if defined(WITH_WSREP)
     } else {
       ib::warn() << "WSREP: avoiding InnoDB self crash due to long "

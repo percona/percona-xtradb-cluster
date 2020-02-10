@@ -16,8 +16,8 @@
 #ifndef WSREP_BINLOG_H
 #define WSREP_BINLOG_H
 
-#include "sql_class.h"  // THD, IO_CACHE
 #include "sql/binlog_ostream.h"
+#include "sql_class.h"  // THD, IO_CACHE
 
 #define HEAP_PAGE_SIZE 65536         /* 64K */
 #define WSREP_MAX_WS_SIZE 2147483647 /* 2GB */
@@ -40,8 +40,8 @@ int wsrep_write_cache_buf(IO_CACHE_binlog_cache_storage *cache, uchar **buf,
   @param len  total amount of data written
   @return     wsrep error status
  */
-int wsrep_write_cache(THD *thd,
-                      IO_CACHE_binlog_cache_storage *cache, size_t *len);
+int wsrep_write_cache(THD *thd, IO_CACHE_binlog_cache_storage *cache,
+                      size_t *len);
 
 /* Dump replication buffer to disk */
 void wsrep_dump_rbr_buf(THD *thd, const void *rbr_buf, size_t buf_len);
@@ -86,7 +86,7 @@ void wsrep_register_binlog_handler(THD *thd, bool trx);
 bool wsrep_commit_will_write_binlog(THD *thd);
 
 void wsrep_register_for_group_commit(THD *thd);
-void wsrep_wait_for_turn_in_group_commit(THD* thd);
+void wsrep_wait_for_turn_in_group_commit(THD *thd);
 void wsrep_unregister_from_group_commit(THD *thd);
 
 #endif /* WSREP_BINLOG_H */

@@ -521,7 +521,7 @@ bool net_request_file(NET *net, const char *fname);
 #ifdef WITH_WSREP
 /* keep the pointer to async replication master */
 extern Master_info *active_mi; /* active_mi  for multi-master */
-#endif /* WITH_WSREP */
+#endif                         /* WITH_WSREP */
 
 extern bool replicate_same_server_id;
 

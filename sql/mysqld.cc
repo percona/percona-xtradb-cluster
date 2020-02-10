@@ -768,13 +768,13 @@ The documentation is based on the source files such as:
 #include "unicode/uclean.h"  // u_cleanup()
 
 #ifdef WITH_WSREP
+#include "sql/protocol_classic.h"
 #include "sql_thd_internal_api.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_sst.h"
 #include "wsrep_thd.h"
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
-#include "sql/protocol_classic.h"
 #endif /* WITH_WSREP */
 
 #include <algorithm>
@@ -1423,7 +1423,7 @@ mysql_cond_t COND_wsrep_sst_init;
 mysql_mutex_t LOCK_wsrep_replaying;
 mysql_cond_t COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
-mysql_cond_t  COND_wsrep_slave_threads;
+mysql_cond_t COND_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_cluster_config;
 mysql_mutex_t LOCK_wsrep_desync;
 mysql_mutex_t LOCK_wsrep_group_commit;
@@ -4871,7 +4871,7 @@ int init_common_variables() {
 
 #ifdef WITH_WSREP
   if (0 == wsrep_node_name || 0 == wsrep_node_name[0]) {
-    my_free(const_cast<char*>(wsrep_node_name));
+    my_free(const_cast<char *>(wsrep_node_name));
     /* hostname on linux is bounded by HOST_NAME_MAX (64 bytes). */
     wsrep_node_name = my_strndup(key_memory_wsrep, glob_hostname,
                                  WSREP_HOSTNAME_LENGTH, MYF(MY_WME));
@@ -4966,7 +4966,7 @@ int init_common_variables() {
   pxc-strict-mode, validation for valid value would be difficult. */
   bool wsrep_provider_loaded =
       !(strlen(wsrep_provider) == 0 || !strcmp(wsrep_provider, WSREP_NONE));
- 
+
   /* Turn-off WSREP_ON since the loader is not yet loaded and if the checks
   below hit some error then error flow should operate with wsrep_on=off. */
   global_system_variables.wsrep_on = false;
@@ -6033,7 +6033,7 @@ static int init_server_components() {
     }
 
 #ifdef WITH_WSREP
-  } /* closing opt_binlog */
+  }    /* closing opt_binlog */
 #endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP /* WSREP BEFORE SE */
@@ -6760,14 +6760,15 @@ static int init_server_components() {
   if (!wsrep_recovery) {
 #endif /* WITH_WSREP */
 
-  /// @todo: this looks suspicious, revisit this /sven
-  enum_gtid_mode gtid_mode = get_gtid_mode(GTID_MODE_LOCK_NONE);
+    /// @todo: this looks suspicious, revisit this /sven
+    enum_gtid_mode gtid_mode = get_gtid_mode(GTID_MODE_LOCK_NONE);
 
-  if (gtid_mode == GTID_MODE_ON &&
-      _gtid_consistency_mode != GTID_CONSISTENCY_MODE_ON) {
-    LogErr(ERROR_LEVEL, ER_RPL_GTID_MODE_REQUIRES_ENFORCE_GTID_CONSISTENCY_ON);
-    unireg_abort(MYSQLD_ABORT_EXIT);
-  }
+    if (gtid_mode == GTID_MODE_ON &&
+        _gtid_consistency_mode != GTID_CONSISTENCY_MODE_ON) {
+      LogErr(ERROR_LEVEL,
+             ER_RPL_GTID_MODE_REQUIRES_ENFORCE_GTID_CONSISTENCY_ON);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
 #ifdef WITH_WSREP
   }
 #endif /* WITH_WSREP */
@@ -6829,41 +6830,40 @@ static int init_server_components() {
   /* In wsrep_recovery mode, PXC avoid creation of new binlog file for
   the reason mentioned above. In light of the said flow avoid purge
   action on binlog. */
-  if (!wsrep_recovery)
-  {
+  if (!wsrep_recovery) {
 #endif /* WITH_WSREP */
-  /*
-    When we pass non-zero values for both expire_logs_days and
-    binlog_expire_logs_seconds at the server start-up, the value of
-    expire_logs_days will be ignored and only binlog_expire_logs_seconds
-    will be used.
-  */
-  if (binlog_expire_logs_seconds_supplied && expire_logs_days_supplied) {
-    if (binlog_expire_logs_seconds != 0 && expire_logs_days != 0) {
-      LogErr(WARNING_LEVEL, ER_EXPIRE_LOGS_DAYS_IGNORED);
-      expire_logs_days = 0;
-    }
-  } else if (expire_logs_days_supplied)
-    binlog_expire_logs_seconds = 0;
-  DBUG_ASSERT(expire_logs_days == 0 || binlog_expire_logs_seconds == 0);
+    /*
+      When we pass non-zero values for both expire_logs_days and
+      binlog_expire_logs_seconds at the server start-up, the value of
+      expire_logs_days will be ignored and only binlog_expire_logs_seconds
+      will be used.
+    */
+    if (binlog_expire_logs_seconds_supplied && expire_logs_days_supplied) {
+      if (binlog_expire_logs_seconds != 0 && expire_logs_days != 0) {
+        LogErr(WARNING_LEVEL, ER_EXPIRE_LOGS_DAYS_IGNORED);
+        expire_logs_days = 0;
+      }
+    } else if (expire_logs_days_supplied)
+      binlog_expire_logs_seconds = 0;
+    DBUG_ASSERT(expire_logs_days == 0 || binlog_expire_logs_seconds == 0);
 
-  if (opt_bin_log) {
-    if (expire_logs_days > 0 || binlog_expire_logs_seconds > 0) {
-      time_t purge_time = my_time(0) - binlog_expire_logs_seconds -
-                          expire_logs_days * 24 * 60 * 60;
-      DBUG_EXECUTE_IF("expire_logs_always_at_start",
-                      { purge_time = my_time(0); });
-      mysql_bin_log.purge_logs_before_date(purge_time, true);
+    if (opt_bin_log) {
+      if (expire_logs_days > 0 || binlog_expire_logs_seconds > 0) {
+        time_t purge_time = my_time(0) - binlog_expire_logs_seconds -
+                            expire_logs_days * 24 * 60 * 60;
+        DBUG_EXECUTE_IF("expire_logs_always_at_start",
+                        { purge_time = my_time(0); });
+        mysql_bin_log.purge_logs_before_date(purge_time, true);
+      }
+      if (binlog_space_limit) mysql_bin_log.purge_logs_by_size(true);
+    } else {
+      if (binlog_expire_logs_seconds_supplied)
+        LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-expire-logs-seconds");
+      if (expire_logs_days_supplied)
+        LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--expire_logs_days");
+      if (binlog_space_limit)
+        LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-space-limit");
     }
-    if (binlog_space_limit) mysql_bin_log.purge_logs_by_size(true);
-  } else {
-    if (binlog_expire_logs_seconds_supplied)
-      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-expire-logs-seconds");
-    if (expire_logs_days_supplied)
-      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--expire_logs_days");
-    if (binlog_space_limit)
-      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-space-limit");
-  }
 #ifdef WITH_WSREP
   }
 #endif /* WITH_WSREP */
@@ -8690,76 +8690,77 @@ vector<my_option> all_options;
 
 struct my_option my_long_early_options[] = {
 #if !defined(_WIN32)
-    {"daemonize", 'D', "Run mysqld as sysv daemon", &opt_daemonize,
-     &opt_daemonize, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"daemonize", 'D', "Run mysqld as sysv daemon", &opt_daemonize,
+   &opt_daemonize, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
 #endif
-    {"skip-grant-tables", 0,
-     "Start without grant tables. This gives all users FULL ACCESS to all "
-     "tables.",
-     &opt_noacl, &opt_noacl, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"help", '?', "Display this help and exit.", &opt_help, &opt_help, 0,
-     GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"verbose", 'v', "Used with --help option for detailed help.", &opt_verbose,
-     &opt_verbose, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"version", 'V', "Output version information and exit.", 0, 0, 0,
-     GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"initialize", 'I',
-     "Create the default database and exit."
-     " Create a super user with a random expired password and store it into "
-     "the log.",
-     &opt_initialize, &opt_initialize, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"initialize-insecure", 0,
-     "Create the default database and exit."
-     " Create a super user with empty password.",
-     &opt_initialize_insecure, &opt_initialize_insecure, 0, GET_BOOL, NO_ARG, 0,
-     0, 0, 0, 0, 0},
-    {"keyring-migration-source", OPT_KEYRING_MIGRATION_SOURCE,
-     "Keyring plugin from where the keys needs to "
-     "be migrated to. This option must be specified along with "
-     "--keyring-migration-destination.",
-     &opt_keyring_migration_source, &opt_keyring_migration_source, 0, GET_STR,
-     REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"keyring-migration-destination", OPT_KEYRING_MIGRATION_DESTINATION,
-     "Keyring plugin to which the keys are "
-     "migrated to. This option must be specified along with "
-     "--keyring-migration-source.",
-     &opt_keyring_migration_destination, &opt_keyring_migration_destination, 0,
-     GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"keyring-migration-user", OPT_KEYRING_MIGRATION_USER,
-     "User to login to server.", &opt_keyring_migration_user,
-     &opt_keyring_migration_user, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"keyring-migration-host", OPT_KEYRING_MIGRATION_HOST, "Connect to host.",
-     &opt_keyring_migration_host, &opt_keyring_migration_host, 0, GET_STR,
-     REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"keyring-migration-password", 'p',
-     "Password to use when connecting to server during keyring migration. "
-     "If password value is not specified then it will be asked from the tty.",
-     0, 0, 0, GET_PASSWORD, OPT_ARG, 0, 0, 0, 0, 0, 0},
-    {"keyring-migration-socket", OPT_KEYRING_MIGRATION_SOCKET,
-     "The socket file to use for connection.", &opt_keyring_migration_socket,
-     &opt_keyring_migration_socket, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"keyring-migration-port", OPT_KEYRING_MIGRATION_PORT,
-     "Port number to use for connection.", &opt_keyring_migration_port,
-     &opt_keyring_migration_port, 0, GET_ULONG, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"no-dd-upgrade", 0,
-     "Abort restart if automatic upgrade or downgrade of the data dictionary "
-     "is needed. Deprecated option. Use --upgrade=NONE instead.",
-     &opt_no_dd_upgrade, &opt_no_dd_upgrade, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0,
-     0},
-    {"validate-config", 0,
-     "Validate the server configuration specified by the user.",
-     &opt_validate_config, &opt_validate_config, 0, GET_BOOL, NO_ARG, 0, 0, 0,
-     0, 0, 0},
-    {"core-file", OPT_WANT_CORE, "Write core on errors.", 0, 0, 0, GET_NO_ARG,
-     NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"skip-stack-trace", OPT_SKIP_STACK_TRACE,
-     "Don't print a stack trace on failure.", 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0,
-     0, 0, 0, 0},
-    /* We must always support the next option to make scripts like mysqltest
-       easier to do */
-    {"gdb", 0, "Set up signals usable for debugging.", &opt_debugging,
-     &opt_debugging, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}};
+  {"skip-grant-tables", 0,
+   "Start without grant tables. This gives all users FULL ACCESS to all "
+   "tables.",
+   &opt_noacl, &opt_noacl, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"help", '?', "Display this help and exit.", &opt_help, &opt_help, 0,
+   GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"verbose", 'v', "Used with --help option for detailed help.", &opt_verbose,
+   &opt_verbose, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"version", 'V', "Output version information and exit.", 0, 0, 0, GET_NO_ARG,
+   NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"initialize", 'I',
+   "Create the default database and exit."
+   " Create a super user with a random expired password and store it into "
+   "the log.",
+   &opt_initialize, &opt_initialize, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"initialize-insecure", 0,
+   "Create the default database and exit."
+   " Create a super user with empty password.",
+   &opt_initialize_insecure, &opt_initialize_insecure, 0, GET_BOOL, NO_ARG, 0,
+   0, 0, 0, 0, 0},
+  {"keyring-migration-source", OPT_KEYRING_MIGRATION_SOURCE,
+   "Keyring plugin from where the keys needs to "
+   "be migrated to. This option must be specified along with "
+   "--keyring-migration-destination.",
+   &opt_keyring_migration_source, &opt_keyring_migration_source, 0, GET_STR,
+   REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-destination", OPT_KEYRING_MIGRATION_DESTINATION,
+   "Keyring plugin to which the keys are "
+   "migrated to. This option must be specified along with "
+   "--keyring-migration-source.",
+   &opt_keyring_migration_destination, &opt_keyring_migration_destination, 0,
+   GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-user", OPT_KEYRING_MIGRATION_USER,
+   "User to login to server.", &opt_keyring_migration_user,
+   &opt_keyring_migration_user, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-host", OPT_KEYRING_MIGRATION_HOST, "Connect to host.",
+   &opt_keyring_migration_host, &opt_keyring_migration_host, 0, GET_STR,
+   REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-password", 'p',
+   "Password to use when connecting to server during keyring migration. "
+   "If password value is not specified then it will be asked from the tty.",
+   0, 0, 0, GET_PASSWORD, OPT_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-socket", OPT_KEYRING_MIGRATION_SOCKET,
+   "The socket file to use for connection.", &opt_keyring_migration_socket,
+   &opt_keyring_migration_socket, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-port", OPT_KEYRING_MIGRATION_PORT,
+   "Port number to use for connection.", &opt_keyring_migration_port,
+   &opt_keyring_migration_port, 0, GET_ULONG, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"no-dd-upgrade", 0,
+   "Abort restart if automatic upgrade or downgrade of the data dictionary "
+   "is needed. Deprecated option. Use --upgrade=NONE instead.",
+   &opt_no_dd_upgrade, &opt_no_dd_upgrade, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0,
+   0},
+  {"validate-config", 0,
+   "Validate the server configuration specified by the user.",
+   &opt_validate_config, &opt_validate_config, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0,
+   0, 0},
+  {"core-file", OPT_WANT_CORE, "Write core on errors.", 0, 0, 0, GET_NO_ARG,
+   NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"skip-stack-trace", OPT_SKIP_STACK_TRACE,
+   "Don't print a stack trace on failure.", 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0,
+   0, 0, 0, 0},
+  /* We must always support the next option to make scripts like mysqltest
+     easier to do */
+  {"gdb", 0, "Set up signals usable for debugging.", &opt_debugging,
+   &opt_debugging, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}
+};
 
 /**
   System variables are automatically command-line options (few
@@ -8768,355 +8769,352 @@ struct my_option my_long_early_options[] = {
 */
 
 struct my_option my_long_options[] = {
-    {"abort-slave-event-count", 0,
-     "Option used by mysql-test for debugging and testing of replication.",
-     &abort_slave_event_count, &abort_slave_event_count, 0, GET_INT,
-     REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"allow-suspicious-udfs", 0,
-     "Allows use of UDFs consisting of only one symbol xxx() "
-     "without corresponding xxx_init() or xxx_deinit(). That also means "
-     "that one can load any function from any library, for example exit() "
-     "from libc.so",
-     &opt_allow_suspicious_udfs, &opt_allow_suspicious_udfs, 0, GET_BOOL,
-     NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"ansi", 'a',
-     "Use ANSI SQL syntax instead of MySQL syntax. This mode "
-     "will also set transaction isolation level 'serializable'.",
-     0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
-    /*
-      Because Sys_var_bit does not support command-line options, we need to
-      explicitly add one for --autocommit
-    */
-    {"autocommit", 0, "Set default value for autocommit (0 or 1)",
-     &opt_autocommit, &opt_autocommit, 0, GET_BOOL, OPT_ARG, 1, 0, 0,
-     &source_autocommit, /* arg_source, to be copied to Sys_var */
-     0, NULL},
-    {"binlog-do-db", OPT_BINLOG_DO_DB,
-     "Tells the master it should log updates for the specified database, "
-     "and exclude all others not explicitly mentioned.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"binlog-ignore-db", OPT_BINLOG_IGNORE_DB,
-     "Tells the master that updates to the given database should not be logged "
-     "to the binary log.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"character-set-client-handshake", 0,
-     "Don't ignore client side character set value sent during handshake.",
-     &opt_character_set_client_handshake, &opt_character_set_client_handshake,
-     0, GET_BOOL, NO_ARG, 1, 0, 0, 0, 0, 0},
-    {"character-set-filesystem", 0, "Set the filesystem character set.",
-     &character_set_filesystem_name, &character_set_filesystem_name, 0, GET_STR,
-     REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"character-set-server", 'C', "Set the default character set.",
-     &default_character_set_name, &default_character_set_name, 0, GET_STR,
-     REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"chroot", 'r', "Chroot mysqld daemon during startup.", &mysqld_chroot,
-     &mysqld_chroot, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"collation-server", 0, "Set the default collation.",
-     &default_collation_name, &default_collation_name, 0, GET_STR, REQUIRED_ARG,
-     0, 0, 0, 0, 0, 0},
-    {"console", OPT_CONSOLE,
-     "Write error output on screen; don't remove the console window on "
-     "windows.",
-     &opt_console, &opt_console, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-    /* default-storage-engine should have "MyISAM" as def_value. Instead
-       of initializing it here it is done in init_common_variables() due
-       to a compiler bug in Sun Studio compiler. */
-    {"default-storage-engine", 0, "The default storage engine for new tables",
-     &default_storage_engine, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"default-tmp-storage-engine", 0,
-     "The default storage engine for new explicit temporary tables",
-     &default_tmp_storage_engine, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0,
-     0},
-    {"default-time-zone", 0, "Set the default time zone.", &default_tz_name,
-     &default_tz_name, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"disconnect-slave-event-count", 0,
-     "Option used by mysql-test for debugging and testing of replication.",
-     &disconnect_slave_event_count, &disconnect_slave_event_count, 0, GET_INT,
-     REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"exit-info", 'T', "Used for debugging. Use at your own risk.", 0, 0, 0,
-     GET_LONG, OPT_ARG, 0, 0, 0, 0, 0, 0},
+  {"abort-slave-event-count", 0,
+   "Option used by mysql-test for debugging and testing of replication.",
+   &abort_slave_event_count, &abort_slave_event_count, 0, GET_INT, REQUIRED_ARG,
+   0, 0, 0, 0, 0, 0},
+  {"allow-suspicious-udfs", 0,
+   "Allows use of UDFs consisting of only one symbol xxx() "
+   "without corresponding xxx_init() or xxx_deinit(). That also means "
+   "that one can load any function from any library, for example exit() "
+   "from libc.so",
+   &opt_allow_suspicious_udfs, &opt_allow_suspicious_udfs, 0, GET_BOOL, NO_ARG,
+   0, 0, 0, 0, 0, 0},
+  {"ansi", 'a',
+   "Use ANSI SQL syntax instead of MySQL syntax. This mode "
+   "will also set transaction isolation level 'serializable'.",
+   0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
+  /*
+    Because Sys_var_bit does not support command-line options, we need to
+    explicitly add one for --autocommit
+  */
+  {"autocommit", 0, "Set default value for autocommit (0 or 1)",
+   &opt_autocommit, &opt_autocommit, 0, GET_BOOL, OPT_ARG, 1, 0, 0,
+   &source_autocommit, /* arg_source, to be copied to Sys_var */
+   0, NULL},
+  {"binlog-do-db", OPT_BINLOG_DO_DB,
+   "Tells the master it should log updates for the specified database, "
+   "and exclude all others not explicitly mentioned.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"binlog-ignore-db", OPT_BINLOG_IGNORE_DB,
+   "Tells the master that updates to the given database should not be logged "
+   "to the binary log.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"character-set-client-handshake", 0,
+   "Don't ignore client side character set value sent during handshake.",
+   &opt_character_set_client_handshake, &opt_character_set_client_handshake, 0,
+   GET_BOOL, NO_ARG, 1, 0, 0, 0, 0, 0},
+  {"character-set-filesystem", 0, "Set the filesystem character set.",
+   &character_set_filesystem_name, &character_set_filesystem_name, 0, GET_STR,
+   REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"character-set-server", 'C', "Set the default character set.",
+   &default_character_set_name, &default_character_set_name, 0, GET_STR,
+   REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"chroot", 'r', "Chroot mysqld daemon during startup.", &mysqld_chroot,
+   &mysqld_chroot, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"collation-server", 0, "Set the default collation.", &default_collation_name,
+   &default_collation_name, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"console", OPT_CONSOLE,
+   "Write error output on screen; don't remove the console window on "
+   "windows.",
+   &opt_console, &opt_console, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  /* default-storage-engine should have "MyISAM" as def_value. Instead
+     of initializing it here it is done in init_common_variables() due
+     to a compiler bug in Sun Studio compiler. */
+  {"default-storage-engine", 0, "The default storage engine for new tables",
+   &default_storage_engine, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"default-tmp-storage-engine", 0,
+   "The default storage engine for new explicit temporary tables",
+   &default_tmp_storage_engine, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"default-time-zone", 0, "Set the default time zone.", &default_tz_name,
+   &default_tz_name, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"disconnect-slave-event-count", 0,
+   "Option used by mysql-test for debugging and testing of replication.",
+   &disconnect_slave_event_count, &disconnect_slave_event_count, 0, GET_INT,
+   REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"exit-info", 'T', "Used for debugging. Use at your own risk.", 0, 0, 0,
+   GET_LONG, OPT_ARG, 0, 0, 0, 0, 0, 0},
 
-    {"external-locking", 0,
-     "Use system (external) locking (disabled by "
-     "default).  With this option enabled you can run myisamchk to test "
-     "(not repair) tables while the MySQL server is running. Disable with "
-     "--skip-external-locking.",
-     &opt_external_locking, &opt_external_locking, 0, GET_BOOL, NO_ARG, 0, 0, 0,
-     0, 0, 0},
+  {"external-locking", 0,
+   "Use system (external) locking (disabled by "
+   "default).  With this option enabled you can run myisamchk to test "
+   "(not repair) tables while the MySQL server is running. Disable with "
+   "--skip-external-locking.",
+   &opt_external_locking, &opt_external_locking, 0, GET_BOOL, NO_ARG, 0, 0, 0,
+   0, 0, 0},
 #if defined(HAVE_LINUX_LARGE_PAGES) || defined(HAVE_SOLARIS_LARGE_PAGES)
-    {"super-large-pages", 0, "Enable support for super large pages.",
-     &opt_super_large_pages, &opt_super_large_pages, 0, GET_BOOL, OPT_ARG, 0, 0,
-     1, 0, 1, 0},
+  {"super-large-pages", 0, "Enable support for super large pages.",
+   &opt_super_large_pages, &opt_super_large_pages, 0, GET_BOOL, OPT_ARG, 0, 0,
+   1, 0, 1, 0},
 #endif
-    {"language", 'L',
-     "Client error messages in given language. May be given as a full path. "
-     "Deprecated. Use --lc-messages-dir instead.",
-     &lc_messages_dir_ptr, &lc_messages_dir_ptr, 0, GET_STR, REQUIRED_ARG, 0, 0,
-     0, 0, 0, 0},
-    {"lc-messages", 0, "Set the language used for the error messages.",
-     &lc_messages, &lc_messages, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"lc-time-names", 0,
-     "Set the language used for the month names and the days of the week.",
-     &lc_time_names_name, &lc_time_names_name, 0, GET_STR, REQUIRED_ARG, 0, 0,
-     0, 0, 0, 0},
-    {"log-bin", OPT_BIN_LOG,
-     "Configures the name prefix to use for binary log files. If the --log-bin "
-     "option is not supplied, the name prefix defaults to \"binlog\". If the "
-     "--log-bin option is supplied without argument, the name prefix defaults "
-     "to \"HOSTNAME-bin\", where HOSTNAME is the machine's hostname. To set a "
-     "different name prefix for binary log files, use --log-bin=name. To "
-     "disable "
-     "binary logging, use the --skip-log-bin or --disable-log-bin option.",
-     &opt_bin_logname, &opt_bin_logname, 0, GET_STR_ALLOC, OPT_ARG, 0, 0, 0, 0,
-     0, 0},
-    {"log-bin-index", 0, "File that holds the names for binary log files.",
-     &opt_binlog_index_name, &opt_binlog_index_name, 0, GET_STR, REQUIRED_ARG,
-     0, 0, 0, 0, 0, 0},
-    {"relay-log-index", 0, "File that holds the names for relay log files.",
-     &opt_relaylog_index_name, &opt_relaylog_index_name, 0, GET_STR,
-     REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"log-isam", OPT_ISAM_LOG, "Log all MyISAM changes to file.",
-     &myisam_log_filename, &myisam_log_filename, 0, GET_STR, OPT_ARG, 0, 0, 0,
-     0, 0, 0},
-    {"log-raw", 0,
-     "Log to general log before any rewriting of the query. For use in "
-     "debugging, not production as "
-     "sensitive information may be logged.",
-     &opt_general_log_raw, &opt_general_log_raw, 0, GET_BOOL, NO_ARG, 0, 0, 1,
-     0, 1, 0},
-    {"log-short-format", 0,
-     "Don't log extra information to update and slow-query logs.",
-     &opt_short_log_format, &opt_short_log_format, 0, GET_BOOL, NO_ARG, 0, 0, 0,
-     0, 0, 0},
-    {"log-tc", 0,
-     "Path to transaction coordinator log (used for transactions that affect "
-     "more than one storage engine, when binary log is disabled).",
-     &opt_tc_log_file, &opt_tc_log_file, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0,
-     0, 0},
-    {"log-tc-size", 0, "Size of transaction coordinator log.", &opt_tc_log_size,
-     &opt_tc_log_size, 0, GET_ULONG, REQUIRED_ARG,
-     TC_LOG_MIN_PAGES *my_getpagesize(), TC_LOG_MIN_PAGES *my_getpagesize(),
-     ULONG_MAX, 0, my_getpagesize(), 0},
-    {"master-info-file", OPT_MASTER_INFO_FILE,
-     "The location and name of the file that remembers the master and where "
-     "the I/O replication thread is in the master's binlogs. "
-     "Deprecated option that shall be removed eventually without a "
-     "replacement.",
-     &master_info_file, &master_info_file, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0,
-     0, 0},
-    {"master-retry-count", OPT_MASTER_RETRY_COUNT,
-     "The number of tries the slave will make to connect to the master before "
-     "giving up. "
-     "Deprecated option, use 'CHANGE MASTER TO master_retry_count = <num>' "
-     "instead.",
-     &master_retry_count, &master_retry_count, 0, GET_ULONG, REQUIRED_ARG,
-     3600 * 24, 0, 0, 0, 0, 0},
-    {"max-binlog-dump-events", 0,
-     "Option used by mysql-test for debugging and testing of replication.",
-     &max_binlog_dump_events, &max_binlog_dump_events, 0, GET_INT, REQUIRED_ARG,
-     0, 0, 0, 0, 0, 0},
-    {"memlock", 0, "Lock mysqld in memory.", &locked_in_memory,
-     &locked_in_memory, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"old-style-user-limits", 0,
-     "Enable old-style user limits (before 5.0.3, user resources were counted "
-     "per each user+host vs. per account).",
-     &opt_old_style_user_limits, &opt_old_style_user_limits, 0, GET_BOOL,
-     NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"port-open-timeout", 0,
-     "Maximum time in seconds to wait for the port to become free. "
-     "(Default: No wait).",
-     &mysqld_port_timeout, &mysqld_port_timeout, 0, GET_UINT, REQUIRED_ARG, 0,
-     0, 0, 0, 0, 0},
-    {"replicate-do-db", OPT_REPLICATE_DO_DB,
-     "Tells the slave thread to restrict replication to the specified "
-     "database. "
-     "To specify more than one database, use the directive multiple times, "
-     "once for each database. Note that this will only work if you do not use "
-     "cross-database queries such as UPDATE some_db.some_table SET foo='bar' "
-     "while having selected a different or no database. If you need cross "
-     "database updates to work, make sure you have 3.23.28 or later, and use "
-     "replicate-wild-do-table=db_name.%.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"replicate-do-table", OPT_REPLICATE_DO_TABLE,
-     "Tells the slave thread to restrict replication to the specified table. "
-     "To specify more than one table, use the directive multiple times, once "
-     "for each table. This will work for cross-database updates, in contrast "
-     "to replicate-do-db.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"replicate-ignore-db", OPT_REPLICATE_IGNORE_DB,
-     "Tells the slave thread to not replicate to the specified database. To "
-     "specify more than one database to ignore, use the directive multiple "
-     "times, once for each database. This option will not work if you use "
-     "cross database updates. If you need cross database updates to work, "
-     "make sure you have 3.23.28 or later, and use replicate-wild-ignore-"
-     "table=db_name.%. ",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"replicate-ignore-table", OPT_REPLICATE_IGNORE_TABLE,
-     "Tells the slave thread to not replicate to the specified table. To "
-     "specify "
-     "more than one table to ignore, use the directive multiple times, once "
-     "for "
-     "each table. This will work for cross-database updates, in contrast to "
-     "replicate-ignore-db.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"replicate-rewrite-db", OPT_REPLICATE_REWRITE_DB,
-     "Updates to a database with a different name than the original. Example: "
-     "replicate-rewrite-db=master_db_name->slave_db_name.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"replicate-same-server-id", 0,
-     "In replication, if set to 1, do not skip events having our server id. "
-     "Default value is 0 (to break infinite loops in circular replication). "
-     "Can't be set to 1 if --log-slave-updates is used.",
-     &replicate_same_server_id, &replicate_same_server_id, 0, GET_BOOL, NO_ARG,
-     0, 0, 0, 0, 0, 0},
-    {"replicate-wild-do-table", OPT_REPLICATE_WILD_DO_TABLE,
-     "Tells the slave thread to restrict replication to the tables that match "
-     "the specified wildcard pattern. To specify more than one table, use the "
-     "directive multiple times, once for each table. This will work for cross-"
-     "database updates. Example: replicate-wild-do-table=foo%.bar% will "
-     "replicate only updates to tables in all databases that start with foo "
-     "and whose table names start with bar.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"replicate-wild-ignore-table", OPT_REPLICATE_WILD_IGNORE_TABLE,
-     "Tells the slave thread to not replicate to the tables that match the "
-     "given wildcard pattern. To specify more than one table to ignore, use "
-     "the directive multiple times, once for each table. This will work for "
-     "cross-database updates. Example: replicate-wild-ignore-table=foo%.bar% "
-     "will not do updates to tables in databases that start with foo and whose "
-     "table names start with bar.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"safe-user-create", 0,
-     "Don't allow new user creation by the user who has no write privileges to "
-     "the mysql.user table.",
-     &opt_safe_user_create, &opt_safe_user_create, 0, GET_BOOL, NO_ARG, 0, 0, 0,
-     0, 0, 0},
-    {"show-slave-auth-info", 0,
-     "Show user and password in SHOW SLAVE HOSTS on this master.",
-     &opt_show_slave_auth_info, &opt_show_slave_auth_info, 0, GET_BOOL, NO_ARG,
-     0, 0, 0, 0, 0, 0},
-    {"skip-host-cache", OPT_SKIP_HOST_CACHE, "Don't cache host names.", 0, 0, 0,
-     GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"skip-new", OPT_SKIP_NEW, "Don't use new, possibly wrong routines.", 0, 0,
-     0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"skip-slave-start", 0, "If set, slave is not autostarted.",
-     &opt_skip_slave_start, &opt_skip_slave_start, 0, GET_BOOL, NO_ARG, 0, 0, 0,
-     0, 0, 0},
+  {"language", 'L',
+   "Client error messages in given language. May be given as a full path. "
+   "Deprecated. Use --lc-messages-dir instead.",
+   &lc_messages_dir_ptr, &lc_messages_dir_ptr, 0, GET_STR, REQUIRED_ARG, 0, 0,
+   0, 0, 0, 0},
+  {"lc-messages", 0, "Set the language used for the error messages.",
+   &lc_messages, &lc_messages, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"lc-time-names", 0,
+   "Set the language used for the month names and the days of the week.",
+   &lc_time_names_name, &lc_time_names_name, 0, GET_STR, REQUIRED_ARG, 0, 0, 0,
+   0, 0, 0},
+  {"log-bin", OPT_BIN_LOG,
+   "Configures the name prefix to use for binary log files. If the --log-bin "
+   "option is not supplied, the name prefix defaults to \"binlog\". If the "
+   "--log-bin option is supplied without argument, the name prefix defaults "
+   "to \"HOSTNAME-bin\", where HOSTNAME is the machine's hostname. To set a "
+   "different name prefix for binary log files, use --log-bin=name. To "
+   "disable "
+   "binary logging, use the --skip-log-bin or --disable-log-bin option.",
+   &opt_bin_logname, &opt_bin_logname, 0, GET_STR_ALLOC, OPT_ARG, 0, 0, 0, 0, 0,
+   0},
+  {"log-bin-index", 0, "File that holds the names for binary log files.",
+   &opt_binlog_index_name, &opt_binlog_index_name, 0, GET_STR, REQUIRED_ARG, 0,
+   0, 0, 0, 0, 0},
+  {"relay-log-index", 0, "File that holds the names for relay log files.",
+   &opt_relaylog_index_name, &opt_relaylog_index_name, 0, GET_STR, REQUIRED_ARG,
+   0, 0, 0, 0, 0, 0},
+  {"log-isam", OPT_ISAM_LOG, "Log all MyISAM changes to file.",
+   &myisam_log_filename, &myisam_log_filename, 0, GET_STR, OPT_ARG, 0, 0, 0, 0,
+   0, 0},
+  {"log-raw", 0,
+   "Log to general log before any rewriting of the query. For use in "
+   "debugging, not production as "
+   "sensitive information may be logged.",
+   &opt_general_log_raw, &opt_general_log_raw, 0, GET_BOOL, NO_ARG, 0, 0, 1, 0,
+   1, 0},
+  {"log-short-format", 0,
+   "Don't log extra information to update and slow-query logs.",
+   &opt_short_log_format, &opt_short_log_format, 0, GET_BOOL, NO_ARG, 0, 0, 0,
+   0, 0, 0},
+  {"log-tc", 0,
+   "Path to transaction coordinator log (used for transactions that affect "
+   "more than one storage engine, when binary log is disabled).",
+   &opt_tc_log_file, &opt_tc_log_file, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0,
+   0},
+  {"log-tc-size", 0, "Size of transaction coordinator log.", &opt_tc_log_size,
+   &opt_tc_log_size, 0, GET_ULONG, REQUIRED_ARG,
+   TC_LOG_MIN_PAGES *my_getpagesize(), TC_LOG_MIN_PAGES *my_getpagesize(),
+   ULONG_MAX, 0, my_getpagesize(), 0},
+  {"master-info-file", OPT_MASTER_INFO_FILE,
+   "The location and name of the file that remembers the master and where "
+   "the I/O replication thread is in the master's binlogs. "
+   "Deprecated option that shall be removed eventually without a "
+   "replacement.",
+   &master_info_file, &master_info_file, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0,
+   0, 0},
+  {"master-retry-count", OPT_MASTER_RETRY_COUNT,
+   "The number of tries the slave will make to connect to the master before "
+   "giving up. "
+   "Deprecated option, use 'CHANGE MASTER TO master_retry_count = <num>' "
+   "instead.",
+   &master_retry_count, &master_retry_count, 0, GET_ULONG, REQUIRED_ARG,
+   3600 * 24, 0, 0, 0, 0, 0},
+  {"max-binlog-dump-events", 0,
+   "Option used by mysql-test for debugging and testing of replication.",
+   &max_binlog_dump_events, &max_binlog_dump_events, 0, GET_INT, REQUIRED_ARG,
+   0, 0, 0, 0, 0, 0},
+  {"memlock", 0, "Lock mysqld in memory.", &locked_in_memory, &locked_in_memory,
+   0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"old-style-user-limits", 0,
+   "Enable old-style user limits (before 5.0.3, user resources were counted "
+   "per each user+host vs. per account).",
+   &opt_old_style_user_limits, &opt_old_style_user_limits, 0, GET_BOOL, NO_ARG,
+   0, 0, 0, 0, 0, 0},
+  {"port-open-timeout", 0,
+   "Maximum time in seconds to wait for the port to become free. "
+   "(Default: No wait).",
+   &mysqld_port_timeout, &mysqld_port_timeout, 0, GET_UINT, REQUIRED_ARG, 0, 0,
+   0, 0, 0, 0},
+  {"replicate-do-db", OPT_REPLICATE_DO_DB,
+   "Tells the slave thread to restrict replication to the specified "
+   "database. "
+   "To specify more than one database, use the directive multiple times, "
+   "once for each database. Note that this will only work if you do not use "
+   "cross-database queries such as UPDATE some_db.some_table SET foo='bar' "
+   "while having selected a different or no database. If you need cross "
+   "database updates to work, make sure you have 3.23.28 or later, and use "
+   "replicate-wild-do-table=db_name.%.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"replicate-do-table", OPT_REPLICATE_DO_TABLE,
+   "Tells the slave thread to restrict replication to the specified table. "
+   "To specify more than one table, use the directive multiple times, once "
+   "for each table. This will work for cross-database updates, in contrast "
+   "to replicate-do-db.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"replicate-ignore-db", OPT_REPLICATE_IGNORE_DB,
+   "Tells the slave thread to not replicate to the specified database. To "
+   "specify more than one database to ignore, use the directive multiple "
+   "times, once for each database. This option will not work if you use "
+   "cross database updates. If you need cross database updates to work, "
+   "make sure you have 3.23.28 or later, and use replicate-wild-ignore-"
+   "table=db_name.%. ",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"replicate-ignore-table", OPT_REPLICATE_IGNORE_TABLE,
+   "Tells the slave thread to not replicate to the specified table. To "
+   "specify "
+   "more than one table to ignore, use the directive multiple times, once "
+   "for "
+   "each table. This will work for cross-database updates, in contrast to "
+   "replicate-ignore-db.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"replicate-rewrite-db", OPT_REPLICATE_REWRITE_DB,
+   "Updates to a database with a different name than the original. Example: "
+   "replicate-rewrite-db=master_db_name->slave_db_name.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"replicate-same-server-id", 0,
+   "In replication, if set to 1, do not skip events having our server id. "
+   "Default value is 0 (to break infinite loops in circular replication). "
+   "Can't be set to 1 if --log-slave-updates is used.",
+   &replicate_same_server_id, &replicate_same_server_id, 0, GET_BOOL, NO_ARG, 0,
+   0, 0, 0, 0, 0},
+  {"replicate-wild-do-table", OPT_REPLICATE_WILD_DO_TABLE,
+   "Tells the slave thread to restrict replication to the tables that match "
+   "the specified wildcard pattern. To specify more than one table, use the "
+   "directive multiple times, once for each table. This will work for cross-"
+   "database updates. Example: replicate-wild-do-table=foo%.bar% will "
+   "replicate only updates to tables in all databases that start with foo "
+   "and whose table names start with bar.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"replicate-wild-ignore-table", OPT_REPLICATE_WILD_IGNORE_TABLE,
+   "Tells the slave thread to not replicate to the tables that match the "
+   "given wildcard pattern. To specify more than one table to ignore, use "
+   "the directive multiple times, once for each table. This will work for "
+   "cross-database updates. Example: replicate-wild-ignore-table=foo%.bar% "
+   "will not do updates to tables in databases that start with foo and whose "
+   "table names start with bar.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"safe-user-create", 0,
+   "Don't allow new user creation by the user who has no write privileges to "
+   "the mysql.user table.",
+   &opt_safe_user_create, &opt_safe_user_create, 0, GET_BOOL, NO_ARG, 0, 0, 0,
+   0, 0, 0},
+  {"show-slave-auth-info", 0,
+   "Show user and password in SHOW SLAVE HOSTS on this master.",
+   &opt_show_slave_auth_info, &opt_show_slave_auth_info, 0, GET_BOOL, NO_ARG, 0,
+   0, 0, 0, 0, 0},
+  {"skip-host-cache", OPT_SKIP_HOST_CACHE, "Don't cache host names.", 0, 0, 0,
+   GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"skip-new", OPT_SKIP_NEW, "Don't use new, possibly wrong routines.", 0, 0, 0,
+   GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"skip-slave-start", 0, "If set, slave is not autostarted.",
+   &opt_skip_slave_start, &opt_skip_slave_start, 0, GET_BOOL, NO_ARG, 0, 0, 0,
+   0, 0, 0},
 #if defined(_WIN32)
-    {"slow-start-timeout", 0,
-     "Maximum number of milliseconds that the service control manager should "
-     "wait "
-     "before trying to kill the windows service during startup"
-     "(Default: 15000).",
-     &slow_start_timeout, &slow_start_timeout, 0, GET_ULONG, REQUIRED_ARG,
-     15000, 0, 0, 0, 0, 0},
+  {"slow-start-timeout", 0,
+   "Maximum number of milliseconds that the service control manager should "
+   "wait "
+   "before trying to kill the windows service during startup"
+   "(Default: 15000).",
+   &slow_start_timeout, &slow_start_timeout, 0, GET_ULONG, REQUIRED_ARG, 15000,
+   0, 0, 0, 0, 0},
 #endif
-    {"sporadic-binlog-dump-fail", 0,
-     "Option used by mysql-test for debugging and testing of replication.",
-     &opt_sporadic_binlog_dump_fail, &opt_sporadic_binlog_dump_fail, 0,
-     GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"ssl", 0,
-     "Enable SSL for connection (automatically enabled with other flags).",
-     &opt_use_ssl, &opt_use_ssl, 0, GET_BOOL, OPT_ARG, 1, 0, 0, 0, 0, 0},
+  {"sporadic-binlog-dump-fail", 0,
+   "Option used by mysql-test for debugging and testing of replication.",
+   &opt_sporadic_binlog_dump_fail, &opt_sporadic_binlog_dump_fail, 0, GET_BOOL,
+   NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"ssl", 0,
+   "Enable SSL for connection (automatically enabled with other flags).",
+   &opt_use_ssl, &opt_use_ssl, 0, GET_BOOL, OPT_ARG, 1, 0, 0, 0, 0, 0},
 #ifdef _WIN32
-    {"standalone", 0, "Dummy option to start as a standalone program (NT).", 0,
-     0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"no-monitor", 0, "Disable monitor process.", &opt_no_monitor,
-     &opt_no_monitor, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"standalone", 0, "Dummy option to start as a standalone program (NT).", 0, 0,
+   0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"no-monitor", 0, "Disable monitor process.", &opt_no_monitor,
+   &opt_no_monitor, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
 #endif
-    {"symbolic-links", 's',
-     "Enable symbolic link support (deprecated and will be  removed in a future"
-     " release).",
-     &my_enable_symlinks, &my_enable_symlinks, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0,
-     0, 0},
-    {"sysdate-is-now", 0,
-     "Non-default option to alias SYSDATE() to NOW() to make it "
-     "safe-replicable. "
-     "Since 5.0, SYSDATE() returns a `dynamic' value different for different "
-     "invocations, even within the same statement.",
-     &global_system_variables.sysdate_is_now, 0, 0, GET_BOOL, NO_ARG, 0, 0, 1,
-     0, 1, 0},
-    {"tc-heuristic-recover", 0,
-     "Decision to use in heuristic recover process. Possible values are OFF, "
-     "COMMIT or ROLLBACK.",
-     &tc_heuristic_recover, &tc_heuristic_recover,
-     &tc_heuristic_recover_typelib, GET_ENUM, REQUIRED_ARG,
-     TC_HEURISTIC_NOT_USED, 0, 0, 0, 0, 0},
+  {"symbolic-links", 's',
+   "Enable symbolic link support (deprecated and will be  removed in a future"
+   " release).",
+   &my_enable_symlinks, &my_enable_symlinks, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0,
+   0},
+  {"sysdate-is-now", 0,
+   "Non-default option to alias SYSDATE() to NOW() to make it "
+   "safe-replicable. "
+   "Since 5.0, SYSDATE() returns a `dynamic' value different for different "
+   "invocations, even within the same statement.",
+   &global_system_variables.sysdate_is_now, 0, 0, GET_BOOL, NO_ARG, 0, 0, 1, 0,
+   1, 0},
+  {"tc-heuristic-recover", 0,
+   "Decision to use in heuristic recover process. Possible values are OFF, "
+   "COMMIT or ROLLBACK.",
+   &tc_heuristic_recover, &tc_heuristic_recover, &tc_heuristic_recover_typelib,
+   GET_ENUM, REQUIRED_ARG, TC_HEURISTIC_NOT_USED, 0, 0, 0, 0, 0},
 #if defined(ENABLED_DEBUG_SYNC)
-    {"debug-sync-timeout", OPT_DEBUG_SYNC_TIMEOUT,
-     "Enable the debug sync facility "
-     "and optionally specify a default wait timeout in seconds. "
-     "A zero value keeps the facility disabled.",
-     &opt_debug_sync_timeout, 0, 0, GET_UINT, OPT_ARG, 0, 0, UINT_MAX, 0, 0, 0},
+  {"debug-sync-timeout", OPT_DEBUG_SYNC_TIMEOUT,
+   "Enable the debug sync facility "
+   "and optionally specify a default wait timeout in seconds. "
+   "A zero value keeps the facility disabled.",
+   &opt_debug_sync_timeout, 0, 0, GET_UINT, OPT_ARG, 0, 0, UINT_MAX, 0, 0, 0},
 #endif /* defined(ENABLED_DEBUG_SYNC) */
-    {"transaction-isolation", 0, "Default transaction isolation level.",
-     &global_system_variables.transaction_isolation,
-     &global_system_variables.transaction_isolation, &tx_isolation_typelib,
-     GET_ENUM, REQUIRED_ARG, ISO_REPEATABLE_READ, 0, 0, 0, 0, 0},
-    {"transaction-read-only", 0,
-     "Default transaction access mode. "
-     "True if transactions are read-only.",
-     &global_system_variables.transaction_read_only,
-     &global_system_variables.transaction_read_only, 0, GET_BOOL, OPT_ARG, 0, 0,
-     0, 0, 0, 0},
-    {"user", 'u', "Run mysqld daemon as user.", 0, 0, 0, GET_STR, REQUIRED_ARG,
-     0, 0, 0, 0, 0, 0},
-    {"early-plugin-load", OPT_EARLY_PLUGIN_LOAD,
-     "Optional semicolon-separated list of plugins to load before storage "
-     "engine "
-     "initialization, where each plugin is identified as name=library, where "
-     "name is the plugin name and library is the plugin library in plugin_dir.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"plugin-load", OPT_PLUGIN_LOAD,
-     "Optional semicolon-separated list of plugins to load, where each plugin "
-     "is "
-     "identified as name=library, where name is the plugin name and library "
-     "is the plugin library in plugin_dir.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"plugin-load-add", OPT_PLUGIN_LOAD_ADD,
-     "Optional semicolon-separated list of plugins to load, where each plugin "
-     "is "
-     "identified as name=library, where name is the plugin name and library "
-     "is the plugin library in plugin_dir. This option adds to the list "
-     "specified by --plugin-load in an incremental way. "
-     "Multiple --plugin-load-add are supported.",
-     0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"transaction-isolation", 0, "Default transaction isolation level.",
+   &global_system_variables.transaction_isolation,
+   &global_system_variables.transaction_isolation, &tx_isolation_typelib,
+   GET_ENUM, REQUIRED_ARG, ISO_REPEATABLE_READ, 0, 0, 0, 0, 0},
+  {"transaction-read-only", 0,
+   "Default transaction access mode. "
+   "True if transactions are read-only.",
+   &global_system_variables.transaction_read_only,
+   &global_system_variables.transaction_read_only, 0, GET_BOOL, OPT_ARG, 0, 0,
+   0, 0, 0, 0},
+  {"user", 'u', "Run mysqld daemon as user.", 0, 0, 0, GET_STR, REQUIRED_ARG, 0,
+   0, 0, 0, 0, 0},
+  {"early-plugin-load", OPT_EARLY_PLUGIN_LOAD,
+   "Optional semicolon-separated list of plugins to load before storage "
+   "engine "
+   "initialization, where each plugin is identified as name=library, where "
+   "name is the plugin name and library is the plugin library in plugin_dir.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"plugin-load", OPT_PLUGIN_LOAD,
+   "Optional semicolon-separated list of plugins to load, where each plugin "
+   "is "
+   "identified as name=library, where name is the plugin name and library "
+   "is the plugin library in plugin_dir.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"plugin-load-add", OPT_PLUGIN_LOAD_ADD,
+   "Optional semicolon-separated list of plugins to load, where each plugin "
+   "is "
+   "identified as name=library, where name is the plugin name and library "
+   "is the plugin library in plugin_dir. This option adds to the list "
+   "specified by --plugin-load in an incremental way. "
+   "Multiple --plugin-load-add are supported.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
 
-    {"innodb", OPT_SKIP_INNODB,
-     "Deprecated option. Provided for backward compatibility only. "
-     "The option has no effect on the server behaviour. InnoDB is always "
-     "enabled. "
-     "The option will be removed in a future release.",
-     0, 0, 0, GET_BOOL, OPT_ARG, 0, 0, 0, 0, 0, 0},
+  {"innodb", OPT_SKIP_INNODB,
+   "Deprecated option. Provided for backward compatibility only. "
+   "The option has no effect on the server behaviour. InnoDB is always "
+   "enabled. "
+   "The option will be removed in a future release.",
+   0, 0, 0, GET_BOOL, OPT_ARG, 0, 0, 0, 0, 0, 0},
 
-    {"upgrade", 0,
-     "Set server upgrade mode. NONE to abort server if automatic upgrade of "
-     "the server is needed; MINIMAL to start the server, but skip upgrade "
-     "steps that are not absolutely necessary; AUTO (default) to upgrade the "
-     "server if required; FORCE to force upgrade server.",
-     &opt_upgrade_mode, &opt_upgrade_mode, &upgrade_mode_typelib, GET_ENUM,
-     REQUIRED_ARG, UPGRADE_AUTO, 0, 0, 0, 0, 0},
+  {"upgrade", 0,
+   "Set server upgrade mode. NONE to abort server if automatic upgrade of "
+   "the server is needed; MINIMAL to start the server, but skip upgrade "
+   "steps that are not absolutely necessary; AUTO (default) to upgrade the "
+   "server if required; FORCE to force upgrade server.",
+   &opt_upgrade_mode, &opt_upgrade_mode, &upgrade_mode_typelib, GET_ENUM,
+   REQUIRED_ARG, UPGRADE_AUTO, 0, 0, 0, 0, 0},
 
-    {"utility_user", 0,
-     "Specifies a MySQL user that will be added to the "
-     "internal list of users and recognized as the utility user.",
-     &utility_user, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"utility_user_password", 0,
-     "Specifies the password required for the "
-     "utility user.",
-     &utility_user_password, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"utility_user_privileges", 0,
-     "Specifies the privileges that the utility "
-     "user will have in a comma delimited list. See the manual for a complete "
-     "list of privileges.",
-     &utility_user_privileges, 0, &utility_user_privileges_typelib, GET_SET,
-     REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-    {"utility_user_schema_access", 0,
-     "Specifies the schemas that the utility "
-     "user has access to in a comma delimited list.",
-     &utility_user_schema_access, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0,
-     0},
+  {"utility_user", 0,
+   "Specifies a MySQL user that will be added to the "
+   "internal list of users and recognized as the utility user.",
+   &utility_user, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"utility_user_password", 0,
+   "Specifies the password required for the "
+   "utility user.",
+   &utility_user_password, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"utility_user_privileges", 0,
+   "Specifies the privileges that the utility "
+   "user will have in a comma delimited list. See the manual for a complete "
+   "list of privileges.",
+   &utility_user_privileges, 0, &utility_user_privileges_typelib, GET_SET,
+   REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"utility_user_schema_access", 0,
+   "Specifies the schemas that the utility "
+   "user has access to in a comma delimited list.",
+   &utility_user_schema_access, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
 
-    {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}};
+  {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}
+};
 
 static int show_queries(THD *thd, SHOW_VAR *var, char *) {
   var->type = SHOW_LONGLONG;
@@ -9243,8 +9241,7 @@ static int init_wsrep_thread(THD *thd) {
   wsrep_assign_from_threadvars(thd);
   wsrep_store_threadvars(thd);
 #if !defined(DBUG_OFF)
-  if (simulate_error)
-  {
+  if (simulate_error) {
     DBUG_RETURN(-1);
   }
 #endif
@@ -10691,8 +10688,10 @@ bool mysqld_get_one_option(int optid,
         parse_filter_arg(&channel_name, &filter_val, argument);
 #ifdef WITH_WSREP
         if (wsrep_is_wsrep_channel_name(channel_name)) {
-          WSREP_ERROR("Configuration of the '%s' channel by replicate-ignore-db is not allowed.",
-            WSREP_CHANNEL_NAME);
+          WSREP_ERROR(
+              "Configuration of the '%s' channel by replicate-ignore-db is not "
+              "allowed.",
+              WSREP_CHANNEL_NAME);
           return 1;
         }
 #endif /* WITH_WSREP */
@@ -10712,8 +10711,10 @@ bool mysqld_get_one_option(int optid,
         parse_filter_arg(&channel_name, &filter_val, argument);
 #ifdef WITH_WSREP
         if (wsrep_is_wsrep_channel_name(channel_name)) {
-          WSREP_ERROR("Configuration of the '%s' channel by replicate-do-db is not allowed.",
-            WSREP_CHANNEL_NAME);
+          WSREP_ERROR(
+              "Configuration of the '%s' channel by replicate-do-db is not "
+              "allowed.",
+              WSREP_CHANNEL_NAME);
           return 1;
         }
 #endif /* WITH_WSREP */
@@ -10735,8 +10736,10 @@ bool mysqld_get_one_option(int optid,
         parse_filter_arg(&channel_name, &filter_val, argument);
 #ifdef WITH_WSREP
         if (wsrep_is_wsrep_channel_name(channel_name)) {
-          WSREP_ERROR("Configuration of the '%s' channel by replicate-rewrite-db is not allowed.",
-            WSREP_CHANNEL_NAME);
+          WSREP_ERROR(
+              "Configuration of the '%s' channel by replicate-rewrite-db is "
+              "not allowed.",
+              WSREP_CHANNEL_NAME);
           return 1;
         }
 #endif /* WITH_WSREP */
@@ -10769,8 +10772,10 @@ bool mysqld_get_one_option(int optid,
         parse_filter_arg(&channel_name, &filter_val, argument);
 #ifdef WITH_WSREP
         if (wsrep_is_wsrep_channel_name(channel_name)) {
-          WSREP_ERROR("Configuration of the '%s' channel by replicate-do-table is not allowed.",
-            WSREP_CHANNEL_NAME);
+          WSREP_ERROR(
+              "Configuration of the '%s' channel by replicate-do-table is not "
+              "allowed.",
+              WSREP_CHANNEL_NAME);
           return 1;
         }
 #endif /* WITH_WSREP */
@@ -10796,8 +10801,10 @@ bool mysqld_get_one_option(int optid,
         parse_filter_arg(&channel_name, &filter_val, argument);
 #ifdef WITH_WSREP
         if (wsrep_is_wsrep_channel_name(channel_name)) {
-          sql_print_error("Configuration of the '%s' channel by replicate-wild-do-table is not allowed.",
-            WSREP_CHANNEL_NAME);
+          sql_print_error(
+              "Configuration of the '%s' channel by replicate-wild-do-table is "
+              "not allowed.",
+              WSREP_CHANNEL_NAME);
           return 1;
         }
 #endif /* WITH_WSREP */
@@ -10824,8 +10831,10 @@ bool mysqld_get_one_option(int optid,
         parse_filter_arg(&channel_name, &filter_val, argument);
 #ifdef WITH_WSREP
         if (wsrep_is_wsrep_channel_name(channel_name)) {
-          WSREP_ERROR("Configuration of the '%s' channel by replicate-wild-ignore-table is not allowed.",
-            WSREP_CHANNEL_NAME);
+          WSREP_ERROR(
+              "Configuration of the '%s' channel by "
+              "replicate-wild-ignore-table is not allowed.",
+              WSREP_CHANNEL_NAME);
           return 1;
         }
 #endif /* WITH_WSREP */
@@ -10852,8 +10861,10 @@ bool mysqld_get_one_option(int optid,
         parse_filter_arg(&channel_name, &filter_val, argument);
 #ifdef WITH_WSREP
         if (wsrep_is_wsrep_channel_name(channel_name)) {
-          WSREP_ERROR("Configuration of the '%s' channel by replicate-ignore-table is not allowed.",
-            WSREP_CHANNEL_NAME);
+          WSREP_ERROR(
+              "Configuration of the '%s' channel by replicate-ignore-table is "
+              "not allowed.",
+              WSREP_CHANNEL_NAME);
           return 1;
         }
 #endif /* WITH_WSREP */
@@ -12467,39 +12478,63 @@ PSI_stage_info stage_restoring_secondary_keys= { 0, "restoring secondary keys", 
 extern PSI_stage_info stage_waiting_for_disk_space;
 
 #ifdef WITH_WSREP
-PSI_stage_info stage_wsrep_writing_rows= { 0, "wsrep: writing rows", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_deleting_rows = { 0, "wsrep: deleting rows", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_updating_rows = { 0, "wsrep: updating rows", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_writing_rows = {0, "wsrep: writing rows", 0,
+                                           PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_deleting_rows = {0, "wsrep: deleting rows", 0,
+                                            PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_updating_rows = {0, "wsrep: updating rows", 0,
+                                            PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_applying_writeset = { 0, "wsrep: applying write set", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_applied_writeset = { 0, "wsrep: applied write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_applying_writeset = {0, "wsrep: applying write set",
+                                                0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_applied_writeset = {0, "wsrep: applied write set", 0,
+                                               PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_applying_toi_writeset = { 0, "wsrep: applying TOI write set", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_applied_toi_writeset = { 0, "wsrep: applied TOI write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_applying_toi_writeset = {
+    0, "wsrep: applying TOI write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_applied_toi_writeset = {
+    0, "wsrep: applied TOI write set", 0, PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_committing = { 0, "wsrep: committing write set", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_committed = { 0, "wsrep: committed write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_committing = {0, "wsrep: committing write set", 0,
+                                         PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_committed = {0, "wsrep: committed write set", 0,
+                                        PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_toi_committing = { 0, "wsrep: committing TOI write set", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_toi_committed = { 0, "wsrep: TOI committed write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_toi_committing = {
+    0, "wsrep: committing TOI write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_toi_committed = {0, "wsrep: TOI committed write set",
+                                            0, PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_rolling_back = { 0, "wsrep: rolling back", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_rolled_back = { 0, "wsrep: rolled back", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_rolling_back = {0, "wsrep: rolling back", 0,
+                                           PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_rolled_back = {0, "wsrep: rolled back", 0,
+                                          PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_replicating_commit = { 0, "wsrep: replicating and certifying write set", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_write_set_replicated= { 0, "wsrep: write-set replicated and certified", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_replicating_commit = {
+    0, "wsrep: replicating and certifying write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_write_set_replicated = {
+    0, "wsrep: write-set replicated and certified", 0, PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_replaying_trx = { 0, "wsrep: replaying transaction", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_replayed_write_set = { 0, "wsrep: replayed write set", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_replaying_trx = {0, "wsrep: replaying transaction",
+                                            0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_replayed_write_set = {0, "wsrep: replayed write set",
+                                                 0, PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_preparing_for_TO_isolation = { 0, "wsrep: preparing for TO isolation", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_TO_isolation_initiated = { 0, "wsrep: TO isolation initiated", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_completed_TO_isolation = { 0, "wsrep: completed TO isolation", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_preparing_for_TO_isolation = {
+    0, "wsrep: preparing for TO isolation", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_TO_isolation_initiated = {
+    0, "wsrep: TO isolation initiated", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_completed_TO_isolation = {
+    0, "wsrep: completed TO isolation", 0, PSI_DOCUMENT_ME};
 
-PSI_stage_info stage_wsrep_applier_idle = { 0, "wsrep: applier idle", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_in_rollback_thread = { 0, "wsrep: in rollback thread", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_aborter_idle = { 0, "wsrep: aborter idle", 0, PSI_DOCUMENT_ME};
-PSI_stage_info stage_wsrep_aborter_active = { 0, "wsrep: aborter active", 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_applier_idle = {0, "wsrep: applier idle", 0,
+                                           PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_in_rollback_thread = {0, "wsrep: in rollback thread",
+                                                 0, PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_aborter_idle = {0, "wsrep: aborter idle", 0,
+                                           PSI_DOCUMENT_ME};
+PSI_stage_info stage_wsrep_aborter_active = {0, "wsrep: aborter active", 0,
+                                             PSI_DOCUMENT_ME};
 
 #endif /* WITH_WSREP */
 
@@ -12594,49 +12629,35 @@ PSI_stage_info *all_server_stages[] = {
     &stage_restoring_secondary_keys};
 
 #ifdef WITH_WSREP
-PSI_stage_info *wsrep_server_stages[]=
-{
-  // log_event
-  & stage_wsrep_writing_rows,
-  & stage_wsrep_deleting_rows,
-  & stage_wsrep_updating_rows,
+PSI_stage_info *wsrep_server_stages[] = {
+    // log_event
+    &stage_wsrep_writing_rows, &stage_wsrep_deleting_rows,
+    &stage_wsrep_updating_rows,
 
-  // wsrep_applier
-  & stage_wsrep_applying_writeset,
-  & stage_wsrep_applied_writeset,
+    // wsrep_applier
+    &stage_wsrep_applying_writeset, &stage_wsrep_applied_writeset,
 
-  & stage_wsrep_applying_toi_writeset,
-  & stage_wsrep_applied_toi_writeset,
+    &stage_wsrep_applying_toi_writeset, &stage_wsrep_applied_toi_writeset,
 
-  & stage_wsrep_committing,
-  & stage_wsrep_committed,
+    &stage_wsrep_committing, &stage_wsrep_committed,
 
-  & stage_wsrep_toi_committing,
-  & stage_wsrep_toi_committed,
+    &stage_wsrep_toi_committing, &stage_wsrep_toi_committed,
 
-  & stage_wsrep_rolling_back,
-  & stage_wsrep_rolled_back,
+    &stage_wsrep_rolling_back, &stage_wsrep_rolled_back,
 
-  & stage_wsrep_replicating_commit,
-  & stage_wsrep_write_set_replicated,
+    &stage_wsrep_replicating_commit, &stage_wsrep_write_set_replicated,
 
-  & stage_wsrep_replaying_trx,
-  & stage_wsrep_replayed_write_set,
+    &stage_wsrep_replaying_trx, &stage_wsrep_replayed_write_set,
 
-  // wsrep_mysqld
-  & stage_wsrep_preparing_for_TO_isolation,
-  & stage_wsrep_TO_isolation_initiated,
-  & stage_wsrep_completed_TO_isolation,
+    // wsrep_mysqld
+    &stage_wsrep_preparing_for_TO_isolation,
+    &stage_wsrep_TO_isolation_initiated, &stage_wsrep_completed_TO_isolation,
 
-  // wsrep_thd
-  & stage_wsrep_applier_idle,
-  & stage_wsrep_in_rollback_thread,
-  & stage_wsrep_aborter_idle,
-  & stage_wsrep_aborter_active
-};
+    // wsrep_thd
+    &stage_wsrep_applier_idle, &stage_wsrep_in_rollback_thread,
+    &stage_wsrep_aborter_idle, &stage_wsrep_aborter_active};
 
 #endif /* WITH_WSREP */
-
 
 PSI_socket_key key_socket_tcpip;
 PSI_socket_key key_socket_unix;

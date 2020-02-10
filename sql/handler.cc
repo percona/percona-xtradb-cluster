@@ -221,9 +221,9 @@ using std::min;
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
-#include "wsrep_xid.h"
 #include "wsrep_thd.h"
 #include "wsrep_trans_observer.h" /* wsrep transaction hooks */
+#include "wsrep_xid.h"
 #endif /* WITH_WSREP */
 
 /**
@@ -2397,14 +2397,14 @@ int ha_prepare_low(THD *thd, bool all) {
           (err = wsrep_before_prepare(thd, all))) {
         // before prepare can fail during certify due to local certification
         // failure but it should get communicated as generic deadlock error.
-        WSREP_DEBUG("wsrep_before_prepare hook (replication + certification)"
-                    " failed to execute");
+        WSREP_DEBUG(
+            "wsrep_before_prepare hook (replication + certification)"
+            " failed to execute");
         mysql_mutex_lock(&thd->LOCK_wsrep_thd);
         bool must_replay = wsrep_must_replay(thd);
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         if (!must_replay) {
-          if (thd->wsrep_cs().current_error() ==
-              wsrep::e_size_exceeded_error) {
+          if (thd->wsrep_cs().current_error() == wsrep::e_size_exceeded_error) {
             // retain existing error code and message
           } else {
             /* set error only if transaction is not marked for replay. */
@@ -2430,8 +2430,9 @@ int ha_prepare_low(THD *thd, bool all) {
 
       if (run_wsrep_hooks && !error && (ht->flags & HTON_WSREP_REPLICATION) &&
           wsrep_after_prepare(thd, all)) {
-        WSREP_DEBUG("wsrep_after_prepare hook (replication + certification)"
-                    " failed to execute");
+        WSREP_DEBUG(
+            "wsrep_after_prepare hook (replication + certification)"
+            " failed to execute");
         char errbuf[MYSQL_ERRMSG_SIZE];
         my_error(ER_LOCK_DEADLOCK, MYF(0), err,
                  my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
@@ -8344,8 +8345,7 @@ int handler::ha_write_row(uchar *buf) {
 
   DBUG_TRACE;
   DEBUG_SYNC(ha_thd(), "start_ha_write_row");
-  DBUG_EXECUTE_IF("inject_error_ha_write_row",
-                  return HA_ERR_INTERNAL_ERROR;);
+  DBUG_EXECUTE_IF("inject_error_ha_write_row", return HA_ERR_INTERNAL_ERROR;);
   DBUG_EXECUTE_IF("simulate_storage_engine_out_of_memory",
                   return HA_ERR_SE_OUT_OF_MEMORY;);
   mark_trx_read_write();

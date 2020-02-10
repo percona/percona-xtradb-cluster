@@ -14,7 +14,6 @@
    along with this program; if not, write to the Free Software Foundation,
    51 Franklin Street, Suite 500, Boston, MA 02110-1335 USA */
 
-
 #ifndef WSREP_SERVICE_H
 #define WSREP_SERVICE_H
 
@@ -25,8 +24,7 @@
 
 namespace wsp {
 
-typedef struct
-{
+typedef struct {
   std::string db_name;
   std::string table_name;
   std::string org_table_name;
@@ -39,19 +37,17 @@ typedef struct
   enum_field_types type;
 } Field_type;
 
-struct Field_value
-{
+struct Field_value {
   Field_value();
-  Field_value(const Field_value& other);
+  Field_value(const Field_value &other);
   Field_value(const longlong &num, bool unsign = false);
   Field_value(const decimal_t &decimal);
   Field_value(const double num);
   Field_value(const MYSQL_TIME &time);
   Field_value(const char *str, size_t length);
-  Field_value& operator=(const Field_value& other);
+  Field_value &operator=(const Field_value &other);
   ~Field_value();
-  union
-  {
+  union {
     longlong v_long;
     double v_double;
     decimal_t v_decimal;
@@ -62,33 +58,26 @@ struct Field_value
   bool is_unsigned;
   bool has_ptr;
 
-private:
+ private:
   void copy_string(const char *str, size_t length);
 };
 
+class Sql_resultset {
+ public:
+  Sql_resultset()
+      : current_row(0),
+        num_cols(0),
+        num_rows(0),
+        num_metarow(0),
+        m_resultcs(NULL),
+        m_server_status(0),
+        m_warn_count(0),
+        m_affected_rows(0),
+        m_last_insert_id(0),
+        m_sql_errno(0),
+        m_killed(false) {}
 
-class Sql_resultset
-{
-public:
-  Sql_resultset() :
-    current_row(0),
-    num_cols(0),
-    num_rows(0),
-    num_metarow(0),
-    m_resultcs(NULL),
-    m_server_status(0),
-    m_warn_count(0),
-    m_affected_rows(0),
-    m_last_insert_id(0),
-    m_sql_errno(0),
-    m_killed(false)
-  {}
-
-  ~Sql_resultset()
-  {
-    clear();
-  }
-
+  ~Sql_resultset() { clear(); }
 
   /* new row started for resultset */
   void new_row();
@@ -111,17 +100,16 @@ public:
 
     @param row  row position to set
   */
-  void absolute(int row) { current_row= row; }
+  void absolute(int row) { current_row = row; }
 
   /* move row index to first row */
-  void first() { current_row= 0; }
+  void first() { current_row = 0; }
 
   /* move row index to last row */
-  void last() { current_row= num_rows > 0 ? num_rows - 1 : 0; }
+  void last() { current_row = num_rows > 0 ? num_rows - 1 : 0; }
 
   /* increment number of rows in resulset */
   void increment_rows() { ++num_rows; }
-
 
   /** Set Methods **/
 
@@ -130,33 +118,29 @@ public:
 
     @param rows  number of rows in resultset
   */
-  void set_rows(uint rows) { num_rows= rows; }
+  void set_rows(uint rows) { num_rows = rows; }
 
   /*
     set number of cols in resulset
 
     @param rows  number of cols in resultset
   */
-  void set_cols(uint cols) { num_cols= cols; }
+  void set_cols(uint cols) { num_cols = cols; }
 
   /**
     set resultset charset info
 
     @param result_cs   charset of resulset
   */
-  void set_charset(const CHARSET_INFO *result_cs)
-  {
-    m_resultcs= result_cs;
-  }
+  void set_charset(const CHARSET_INFO *result_cs) { m_resultcs = result_cs; }
 
   /**
     set server status. check mysql_com for more details
 
     @param server_status   server status
   */
-  void set_server_status(uint server_status)
-  {
-    m_server_status= server_status;
+  void set_server_status(uint server_status) {
+    m_server_status = server_status;
   }
 
   /**
@@ -164,19 +148,15 @@ public:
 
     @param warn_count  number of warning
   */
-  void set_warn_count(uint warn_count)
-  {
-    m_warn_count= warn_count;
-  }
+  void set_warn_count(uint warn_count) { m_warn_count = warn_count; }
 
   /**
     set rows affected due to last command execution
 
     @param affected_rows  number of rows affected due to last operation
   */
-  void set_affected_rows(ulonglong affected_rows)
-  {
-    m_affected_rows= affected_rows;
+  void set_affected_rows(ulonglong affected_rows) {
+    m_affected_rows = affected_rows;
   }
 
   /**
@@ -184,9 +164,8 @@ public:
 
     @param last_insert_id   last inserted value in AUTOINCREMENT column
   */
-  void set_last_insert_id(ulonglong last_insert_id)
-  {
-    m_last_insert_id= last_insert_id;
+  void set_last_insert_id(ulonglong last_insert_id) {
+    m_last_insert_id = last_insert_id;
   }
 
   /**
@@ -194,10 +173,7 @@ public:
 
     @param msg  client message
   */
-  void set_message(std::string msg)
-  {
-   m_message= msg;
-  }
+  void set_message(std::string msg) { m_message = msg; }
 
   /**
     set sql error number saved during error in
@@ -205,10 +181,7 @@ public:
 
     @param sql_errno  sql error number
   */
-  void set_sql_errno(uint sql_errno)
-  {
-    m_sql_errno= sql_errno;
-  }
+  void set_sql_errno(uint sql_errno) { m_sql_errno = sql_errno; }
 
   /**
     set sql error message saved during error in
@@ -216,10 +189,7 @@ public:
 
     @param msg  sql error message
   */
-  void set_err_msg(std::string msg)
-  {
-    m_err_msg= msg;
-  }
+  void set_err_msg(std::string msg) { m_err_msg = msg; }
 
   /**
     set sql error state saved during error in
@@ -227,17 +197,10 @@ public:
 
     @param state  sql error state
   */
-  void set_sqlstate(std::string state)
-  {
-    m_sqlstate= state;
-  }
+  void set_sqlstate(std::string state) { m_sqlstate = state; }
 
   /* Session was shutdown while command was running */
-  void set_killed()
-  {
-    m_killed= true; /* purecov: inspected */
-  }
-
+  void set_killed() { m_killed = true; /* purecov: inspected */ }
 
   /** Get Methods **/
 
@@ -260,7 +223,7 @@ public:
 
     @return charset info
   */
-  const CHARSET_INFO * get_charset() { return m_resultcs; }
+  const CHARSET_INFO *get_charset() { return m_resultcs; }
 
   /**
     get server status. check mysql_com for more details
@@ -297,7 +260,6 @@ public:
   */
   std::string get_message() { return m_message; }
 
-
   /** Getting error info **/
   /**
     get sql error number saved during error in last command execution
@@ -307,7 +269,6 @@ public:
       @retval !=0    SQL Error Number
   */
   uint sql_errno() { return m_sql_errno; }
-
 
   /**
     get sql error message saved during error in last command execution
@@ -323,87 +284,73 @@ public:
   */
   std::string sqlstate() { return m_sqlstate; }
 
-
   /* get long field type column */
-  longlong getLong(uint columnIndex)
-  {
+  longlong getLong(uint columnIndex) {
     return result_value[current_row][columnIndex]->value.v_long;
   }
 
   /* get decimal field type column */
-  decimal_t getDecimal(uint columnIndex)
-  {
+  decimal_t getDecimal(uint columnIndex) {
     return result_value[current_row][columnIndex]->value.v_decimal;
   }
 
   /* get double field type column */
-  double getDouble(uint columnIndex)
-  {
+  double getDouble(uint columnIndex) {
     return result_value[current_row][columnIndex]->value.v_double;
   }
 
   /* get time field type column */
-  MYSQL_TIME getTime(uint columnIndex)
-  {
+  MYSQL_TIME getTime(uint columnIndex) {
     return result_value[current_row][columnIndex]->value.v_time;
   }
 
   /* get string field type column */
-  char *getString(uint columnIndex)
-  {
+  char *getString(uint columnIndex) {
     if (result_value[current_row][columnIndex] != NULL)
       return result_value[current_row][columnIndex]->value.v_string;
-    return const_cast<char*>("");
+    return const_cast<char *>("");
   }
 
   /* resultset metadata functions */
 
   /* set metadata info */
-  void set_metadata(Field_type ftype)
-  {
+  void set_metadata(Field_type ftype) {
     result_meta.push_back(ftype);
     ++num_metarow;
   }
 
   /* get database */
-  std::string get_database(uint rowIndex= 0)
-  {
+  std::string get_database(uint rowIndex = 0) {
     return result_meta[rowIndex].db_name;
   }
 
   /* get table alias */
-  std::string get_table(uint rowIndex= 0)
-  {
+  std::string get_table(uint rowIndex = 0) {
     return result_meta[rowIndex].table_name;
   }
 
   /* get original table */
-  std::string get_org_table(uint rowIndex= 0)
-  {
+  std::string get_org_table(uint rowIndex = 0) {
     return result_meta[rowIndex].org_table_name;
   }
 
   /* get column name alias */
-  std::string get_column_name(uint rowIndex= 0)
-  {
+  std::string get_column_name(uint rowIndex = 0) {
     return result_meta[rowIndex].col_name;
   }
 
   /* get original column name */
-  std::string get_org_column_name(uint rowIndex= 0)
-  {
+  std::string get_org_column_name(uint rowIndex = 0) {
     return result_meta[rowIndex].org_col_name;
   }
 
   /* get field width */
-  unsigned long get_length(uint rowIndex= 0)
-  {
+  unsigned long get_length(uint rowIndex = 0) {
     return result_meta[rowIndex].length;
   }
 
   /* get field charsetnr */
-  unsigned int get_charsetnr(uint rowIndex= 0)
-  {
+  unsigned int get_charsetnr(uint rowIndex = 0) {
     return result_meta[rowIndex].charsetnr;
   }
 
@@ -413,20 +360,17 @@ public:
       https://dev.mysql.com/doc/refman/5.7/en/c-api-data-structures.html
     for all flags
   */
-  unsigned int get_flags(uint rowIndex= 0)
-  {
+  unsigned int get_flags(uint rowIndex = 0) {
     return result_meta[rowIndex].flags;
   }
 
   /* get the number of decimals for numeric fields */
-  unsigned int get_decimals(uint rowIndex= 0)
-  {
+  unsigned int get_decimals(uint rowIndex = 0) {
     return result_meta[rowIndex].decimals;
   }
 
   /* get field type. Check enum enum_field_types for whole list */
-  enum_field_types get_field_type(uint rowIndex= 0)
-  {
+  enum_field_types get_field_type(uint rowIndex = 0) {
     return result_meta[rowIndex].type;
   }
 
@@ -437,20 +381,17 @@ public:
       @retval true   session was stopped
       @retval false  session was not stopped
   */
-  bool get_killed_status()
-  {
-    return m_killed;
-  }
+  bool get_killed_status() { return m_killed; }
 
-private:
+ private:
   /* resultset store */
-  std::vector< std::vector< Field_value* > > result_value;
+  std::vector<std::vector<Field_value *>> result_value;
   /* metadata store */
-  std::vector< Field_type > result_meta;
+  std::vector<Field_type> result_meta;
 
-  int current_row; /* current row position */
-  uint num_cols; /* number of columns in resultset/metadata */
-  uint num_rows; /* number of rows in resultset */
+  int current_row;  /* current row position */
+  uint num_cols;    /* number of columns in resultset/metadata */
+  uint num_rows;    /* number of rows in resultset */
   uint num_metarow; /* number of rows in metadata */
 
   const CHARSET_INFO *m_resultcs; /* result charset */
@@ -461,20 +402,17 @@ private:
   /* rows affected mostly useful for command like update */
   ulonglong m_affected_rows;
   ulonglong m_last_insert_id; /* last auto-increment column value */
-  std::string m_message; /* client message */
+  std::string m_message;      /* client message */
 
-  uint m_sql_errno;  /* sql error number */
-  std::string m_err_msg; /* sql error message */
+  uint m_sql_errno;       /* sql error number */
+  std::string m_err_msg;  /* sql error message */
   std::string m_sqlstate; /* sql error state */
 
   bool m_killed; /* session killed status */
 };
 
-
-class Sql_service_context_base
-{
-public:
-
+class Sql_service_context_base {
+ public:
   /** The sql service callbacks that will call the below virtual methods*/
   static const st_command_service_cbs sql_service_callbacks;
 
@@ -524,8 +462,7 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  virtual int end_result_metadata(uint server_status,
-                                  uint warn_count) = 0;
+  virtual int end_result_metadata(uint server_status, uint warn_count) = 0;
 
   /**
     Indicates the beginning of a new row in the result set/metadata
@@ -554,7 +491,6 @@ public:
   */
   virtual void abort_row() = 0;
 
-
   /**
     Return client's capabilities (see mysql_com.h, CLIENT_*)
 
@@ -571,7 +507,6 @@ public:
       @retval 0  OK
   */
   virtual int get_null() = 0;
-
 
   /**
     Get TINY/SHORT/LONG value from server
@@ -608,7 +543,7 @@ public:
       @retval 1  Error
       @retval 0  OK
    */
-  virtual int get_decimal(const decimal_t * value) = 0;
+  virtual int get_decimal(const decimal_t *value) = 0;
 
   /**
 
@@ -627,7 +562,7 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  virtual int get_date(const MYSQL_TIME * value) = 0;
+  virtual int get_date(const MYSQL_TIME *value) = 0;
 
   /**
     Get TIME value from server
@@ -639,7 +574,7 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  virtual int get_time(const MYSQL_TIME * value, uint decimals) = 0;
+  virtual int get_time(const MYSQL_TIME *value, uint decimals) = 0;
 
   /**
     Get DATETIME value from server
@@ -651,8 +586,7 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  virtual int get_datetime(const MYSQL_TIME * value,
-                           uint decimals) = 0;
+  virtual int get_datetime(const MYSQL_TIME *value, uint decimals) = 0;
 
   /**
     Get STRING value from server
@@ -665,9 +599,8 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  virtual int get_string(const char * const value,
-                         size_t length, const CHARSET_INFO * const valuecs) = 0;
-
+  virtual int get_string(const char *const value, size_t length,
+                         const CHARSET_INFO *const valuecs) = 0;
 
   /** Getting execution status **/
   /**
@@ -682,8 +615,7 @@ public:
   */
   virtual void handle_ok(uint server_status, uint statement_warn_count,
                          ulonglong affected_rows, ulonglong last_insert_id,
-                         const char * const message) = 0;
-
+                         const char *const message) = 0;
 
   /**
     Command ended with ERROR
@@ -692,147 +624,116 @@ public:
     @param err_msg   Error message
     @param sqlstate  SQL state corresponding to the error code
   */
-  virtual void handle_error(uint sql_errno,
-                            const char * const err_msg,
-                            const char * const sqlstate) = 0;
+  virtual void handle_error(uint sql_errno, const char *const err_msg,
+                            const char *const sqlstate) = 0;
 
   /**
    Session was shutdown while command was running
   */
   virtual void shutdown(int flag) = 0;
 
-private:
+ private:
   static int sql_start_result_metadata(void *ctx, uint num_cols, uint flags,
-                                       const CHARSET_INFO *resultcs)
-  {
-    return ((Sql_service_context_base *) ctx)->start_result_metadata(num_cols,
-                                                                 flags,
-                                                                 resultcs);
+                                       const CHARSET_INFO *resultcs) {
+    return ((Sql_service_context_base *)ctx)
+        ->start_result_metadata(num_cols, flags, resultcs);
   }
 
   static int sql_field_metadata(void *ctx, struct st_send_field *field,
-                                const CHARSET_INFO *charset)
-  {
-    return ((Sql_service_context_base *) ctx)->field_metadata(field,
-                                                          charset);
+                                const CHARSET_INFO *charset) {
+    return ((Sql_service_context_base *)ctx)->field_metadata(field, charset);
   }
 
   static int sql_end_result_metadata(void *ctx, uint server_status,
-                                     uint warn_count)
-  {
-    return ((Sql_service_context_base *) ctx)->end_result_metadata(server_status,
-                                                               warn_count);
+                                     uint warn_count) {
+    return ((Sql_service_context_base *)ctx)
+        ->end_result_metadata(server_status, warn_count);
   }
 
-  static int sql_start_row(void *ctx)
-  {
-    return ((Sql_service_context_base *) ctx)->start_row();
+  static int sql_start_row(void *ctx) {
+    return ((Sql_service_context_base *)ctx)->start_row();
   }
 
-  static int sql_end_row(void *ctx)
-  {
-    return ((Sql_service_context_base *) ctx)->end_row();
+  static int sql_end_row(void *ctx) {
+    return ((Sql_service_context_base *)ctx)->end_row();
   }
 
-  static void sql_abort_row(void *ctx)
-  {
-    return ((Sql_service_context_base *) ctx)->abort_row(); /* purecov: inspected */
+  static void sql_abort_row(void *ctx) {
+    return ((Sql_service_context_base *)ctx)
+        ->abort_row(); /* purecov: inspected */
   }
 
-  static ulong sql_get_client_capabilities(void *ctx)
-  {
-    return ((Sql_service_context_base *) ctx)->get_client_capabilities();
+  static ulong sql_get_client_capabilities(void *ctx) {
+    return ((Sql_service_context_base *)ctx)->get_client_capabilities();
   }
 
-  static int sql_get_null(void *ctx)
-  {
-    return ((Sql_service_context_base *) ctx)->get_null();
+  static int sql_get_null(void *ctx) {
+    return ((Sql_service_context_base *)ctx)->get_null();
   }
 
-  static int sql_get_integer(void * ctx, longlong value)
-  {
-    return ((Sql_service_context_base *) ctx)->get_integer(value);
+  static int sql_get_integer(void *ctx, longlong value) {
+    return ((Sql_service_context_base *)ctx)->get_integer(value);
   }
 
-  static int sql_get_longlong(void * ctx, longlong value, uint is_unsigned)
-  {
-    return ((Sql_service_context_base *) ctx)->get_longlong(value, is_unsigned);
+  static int sql_get_longlong(void *ctx, longlong value, uint is_unsigned) {
+    return ((Sql_service_context_base *)ctx)->get_longlong(value, is_unsigned);
   }
 
-  static int sql_get_decimal(void * ctx, const decimal_t * value)
-  {
-    return ((Sql_service_context_base *) ctx)->get_decimal(value);
+  static int sql_get_decimal(void *ctx, const decimal_t *value) {
+    return ((Sql_service_context_base *)ctx)->get_decimal(value);
   }
 
-  static int sql_get_double(void * ctx, double value, uint32 decimals)
-  {
-    return ((Sql_service_context_base *) ctx)->get_double(value, decimals);
+  static int sql_get_double(void *ctx, double value, uint32 decimals) {
+    return ((Sql_service_context_base *)ctx)->get_double(value, decimals);
   }
 
-  static int sql_get_date(void * ctx, const MYSQL_TIME * value)
-  {
-    return ((Sql_service_context_base *) ctx)->get_date(value);
+  static int sql_get_date(void *ctx, const MYSQL_TIME *value) {
+    return ((Sql_service_context_base *)ctx)->get_date(value);
   }
 
-  static int sql_get_time(void * ctx, const MYSQL_TIME * value, uint decimals)
-  {
-    return ((Sql_service_context_base *) ctx)->get_time(value, decimals);
+  static int sql_get_time(void *ctx, const MYSQL_TIME *value, uint decimals) {
+    return ((Sql_service_context_base *)ctx)->get_time(value, decimals);
   }
 
-  static int sql_get_datetime(void * ctx, const MYSQL_TIME * value,
-                              uint decimals)
-  {
-    return ((Sql_service_context_base *) ctx)->get_datetime(value, decimals);
+  static int sql_get_datetime(void *ctx, const MYSQL_TIME *value,
+                              uint decimals) {
+    return ((Sql_service_context_base *)ctx)->get_datetime(value, decimals);
   }
 
-  static int sql_get_string(void * ctx, const char * const value,
-                            size_t length, const CHARSET_INFO * const valuecs)
-  {
-    return ((Sql_service_context_base *) ctx)->get_string(value, length, valuecs);
+  static int sql_get_string(void *ctx, const char *const value, size_t length,
+                            const CHARSET_INFO *const valuecs) {
+    return ((Sql_service_context_base *)ctx)
+        ->get_string(value, length, valuecs);
   }
 
-  static void sql_handle_ok(void * ctx,
-                            uint server_status, uint statement_warn_count,
-                            ulonglong affected_rows, ulonglong last_insert_id,
-                            const char * const message)
-  {
-    return ((Sql_service_context_base *) ctx)->handle_ok(server_status,
-                                                     statement_warn_count,
-                                                     affected_rows,
-                                                     last_insert_id,
-                                                     message);
+  static void sql_handle_ok(void *ctx, uint server_status,
+                            uint statement_warn_count, ulonglong affected_rows,
+                            ulonglong last_insert_id,
+                            const char *const message) {
+    return ((Sql_service_context_base *)ctx)
+        ->handle_ok(server_status, statement_warn_count, affected_rows,
+                    last_insert_id, message);
   }
 
-
-  static void sql_handle_error(void * ctx, uint sql_errno,
-                               const char * const err_msg,
-                               const char * const sqlstate)
-  {
-    return ((Sql_service_context_base *) ctx)->handle_error(sql_errno,
-                                                        err_msg,
-                                                        sqlstate);
+  static void sql_handle_error(void *ctx, uint sql_errno,
+                               const char *const err_msg,
+                               const char *const sqlstate) {
+    return ((Sql_service_context_base *)ctx)
+        ->handle_error(sql_errno, err_msg, sqlstate);
   }
 
-
-  static void sql_shutdown(void *ctx, int flag)
-  {
-    return ((Sql_service_context_base *) ctx)->shutdown(flag);
+  static void sql_shutdown(void *ctx, int flag) {
+    return ((Sql_service_context_base *)ctx)->shutdown(flag);
   }
 };
 
-
-class Sql_service_context : public Sql_service_context_base
-{
-public:
-  Sql_service_context(wsp::Sql_resultset *rset)
-    :resultset(rset)
-  {
-    if (rset != NULL)
-      resultset->clear();
+class Sql_service_context : public Sql_service_context_base {
+ public:
+  Sql_service_context(wsp::Sql_resultset *rset) : resultset(rset) {
+    if (rset != NULL) resultset->clear();
   }
 
   ~Sql_service_context() {}
-
 
   /** Getting metadata **/
   /**
@@ -859,8 +760,7 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  int field_metadata(struct st_send_field *field,
-                     const CHARSET_INFO *charset);
+  int field_metadata(struct st_send_field *field, const CHARSET_INFO *charset);
 
   /**
     Indicates end of metadata for the result set
@@ -872,8 +772,7 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  int end_result_metadata(uint server_status,
-                          uint warn_count);
+  int end_result_metadata(uint server_status, uint warn_count);
 
   /**
     Indicates the beginning of a new row in the result set/metadata
@@ -954,7 +853,7 @@ public:
       @retval 1  Error
       @retval 0  OK
    */
-  int get_decimal(const decimal_t * value);
+  int get_decimal(const decimal_t *value);
 
   /**
     Receive DOUBLE value from server
@@ -974,7 +873,7 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  int get_date(const MYSQL_TIME * value);
+  int get_date(const MYSQL_TIME *value);
 
   /**
     Get TIME value from server
@@ -986,7 +885,7 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  int get_time(const MYSQL_TIME * value, uint decimals);
+  int get_time(const MYSQL_TIME *value, uint decimals);
 
   /**
     Get DATETIME value from server
@@ -998,8 +897,7 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  int get_datetime(const MYSQL_TIME * value,
-                   uint decimals);
+  int get_datetime(const MYSQL_TIME *value, uint decimals);
 
   /**
     Get STRING value from server
@@ -1012,8 +910,8 @@ public:
       @retval 1  Error
       @retval 0  OK
   */
-  int get_string(const char * const value,
-                 size_t length, const CHARSET_INFO * const valuecs);
+  int get_string(const char *const value, size_t length,
+                 const CHARSET_INFO *const valuecs);
 
   /** Getting execution status **/
   /**
@@ -1028,7 +926,7 @@ public:
   */
   void handle_ok(uint server_status, uint statement_warn_count,
                  ulonglong affected_rows, ulonglong last_insert_id,
-                 const char * const message);
+                 const char *const message);
 
   /**
     Command ended with ERROR
@@ -1037,23 +935,19 @@ public:
     @param err_msg   Error message
     @param sqlstate  SQL state correspongin to the error code
   */
-  void handle_error(uint sql_errno,
-                    const char * const err_msg,
-                    const char * const sqlstate);
+  void handle_error(uint sql_errno, const char *const err_msg,
+                    const char *const sqlstate);
 
   /**
     Session was shutdown while command was running
   */
   void shutdown(int flag);
 
-private:
+ private:
   /* executed command result store */
   wsp::Sql_resultset *resultset;
 };
 
+}  // namespace wsp
 
-
-} // namespace wsp
-
-#endif //WSREP_SERVICE_H
-
+#endif  // WSREP_SERVICE_H
