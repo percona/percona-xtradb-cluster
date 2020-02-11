@@ -6503,6 +6503,28 @@ static int init_server_components() {
   }
 #endif
 
+#ifdef WITH_WSREP
+  /* In the case where no upgrade is required (if we've moved from
+     an 8.0 PS to 8.0 PXC), we will also need to create the
+     wsrep_state.dat.  We do not overwrite any existing wsrep_state.dat
+     file since the database may not have been upgraded. */
+  if (!is_help_or_validate_option() && !opt_initialize &&
+      dd::upgrade::no_server_upgrade_required()) {
+      wsp::WSREPState wsrep_state;
+      wsrep_state.wsrep_schema_version = WSREP_SCHEMA_VERSION;
+      if (!wsrep_state.exists(mysql_real_data_home_ptr, WSREP_STATE_FILENAME)) {
+        if (!wsrep_state.save_to(mysql_real_data_home_ptr, WSREP_STATE_FILENAME)) {
+          WSREP_ERROR("Could not create the wsrep state file : %s",
+                      WSREP_STATE_FILENAME);
+          WSREP_ERROR("Exiting");
+          unireg_abort(1);
+        }
+
+        WSREP_INFO("Created the wsrep_state.dat file (%d)", __LINE__);
+      }
+  }
+#endif /* WITH_WSREP */
+
   if (!is_help_or_validate_option() && !opt_initialize &&
       !dd::upgrade::no_server_upgrade_required()) {
     if (opt_upgrade_mode == UPGRADE_MINIMAL)
@@ -6517,7 +6539,8 @@ static int init_server_components() {
       }
       delete_optimizer_cost_module();
 #ifdef WITH_WSREP
-      /* Create the wsrep state file.
+      /* Create the wsrep state file. This will overwrite any exiting
+         wsrep_state.dat file.  This should be ok since we have run upgrade.
          If user decide to upgrade 5.7 node to 8.0 using offline approach
          then for the first node SST is not invoked and it is auto-upgraded.
          Post successfully upgrade PXC expect wsrep state file to be present. */
@@ -6525,11 +6548,12 @@ static int init_server_components() {
       wsrep_state.wsrep_schema_version = WSREP_SCHEMA_VERSION;
       if (!wsrep_state.save_to(mysql_real_data_home_ptr,
                                WSREP_STATE_FILENAME)) {
-        WSREP_ERROR("Could not create the wsrep state file : %s",
-                    WSREP_STATE_FILENAME);
+        WSREP_ERROR("Could not create the wsrep state file (%d) : %s",
+                    __LINE__, WSREP_STATE_FILENAME);
         WSREP_ERROR("Exiting");
         unireg_abort(1);
       }
+      WSREP_INFO("Created the wsrep_state.dat file (%d)", __LINE__);
 #endif /* WITH_WSREP */
       /*
         When upgrade is finished, we need to initialize the plugins that

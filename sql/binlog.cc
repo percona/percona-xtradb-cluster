@@ -2752,11 +2752,7 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all) {
      */
   } else if (thd->lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT ||
              thd->wsrep_trx().state() == wsrep::transaction::s_aborting ||
-             (thd->lex->sql_command == SQLCOM_ROLLBACK_TO_SAVEPOINT &&
-              thd->wsrep_trx().state() == wsrep::transaction::s_must_abort)) {
-    /* If transaction has save point and while local transaction is trying to
-    rollback savepoint it is killed by high priority transaction ensure rollback
-    is processed. */
+             thd->wsrep_force_savept_rollback) {
 #else
   } else if (thd->lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT) {
 #endif /* WITH_WSREP */

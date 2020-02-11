@@ -984,7 +984,24 @@ bool WSREPState::wsrep_schema_version_equals(const char *server_version) {
          wsrep_revision == server_revision;
 }
 
-bool WSREPState::load_from(const char *dir, const char *filename) {
+bool WSREPState::exists(const char *dir, const char *filename)
+{
+  const int   full_path_len = 1024;
+  char        full_path[full_path_len];
+  MY_STAT     stat_area;
+
+  if (snprintf(full_path, full_path_len,
+               "%s/%s", dir ? dir : "", filename ? filename : "") <= 0)
+  {
+    WSREP_ERROR("WSREPState::load_from() snprintf failed");
+    return false;
+  }
+
+  return (mysql_file_stat(key_file_misc, full_path, &stat_area, MYF(0)) != nullptr);
+}
+
+bool WSREPState::load_from(const char *dir, const char *filename)
+{
   MYSQL_FILE *file;
   int errcode = 0;
   const int full_path_len = 1024;
@@ -1114,23 +1131,6 @@ bool WSREPState::save_to(const char *dir, const char *filename) {
     return false;
   }
   return true;
-}
-
-bool WSREPState::node_needs_upgrading() {
-  wsp::WSREPState wsrep_state;
-
-  /* If we can't load the data file, assume the node is out-of-date (i.e.
-   * from 5.7) */
-  if (!wsrep_state.load_from(mysql_real_data_home_ptr, WSREP_STATE_FILENAME))
-    return true;
-
-  if (!wsrep_state.wsrep_schema_version_equals(WSREP_SCHEMA_VERSION)) {
-    WSREP_WARN("WSREP schema versions  server:%s  datadir:%s",
-               MYSQL_SERVER_VERSION, wsrep_state.wsrep_schema_version.c_str());
-    return true;
-  }
-
-  return false;
 }
 
 }  // namespace wsp

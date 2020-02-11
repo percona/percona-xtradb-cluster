@@ -7817,6 +7817,14 @@ static Sys_var_uint Sys_wsrep_ignore_apply_errors(
     VALID_RANGE(WSREP_IGNORE_ERRORS_NONE, WSREP_IGNORE_ERRORS_MAX), DEFAULT(7),
     BLOCK_SIZE(1));
 
+static Sys_var_uint Sys_wsrep_min_log_verbosity(
+    "wsrep_min_log_verbosity",
+    "Set the minimum logging verbosity "
+    "level of wsrep plugin and Galera",
+    GLOBAL_VAR(wsrep_min_log_verbosity), CMD_LINE(REQUIRED_ARG),
+    VALID_RANGE(1, 3), DEFAULT(3), BLOCK_SIZE(1), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG);
+
 static const char *pxc_strict_modes[] = {"DISABLED", "PERMISSIVE", "ENFORCING",
                                          "MASTER", NullS};
 static Sys_var_enum Sys_pxc_strict_mode(
