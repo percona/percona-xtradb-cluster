@@ -1,0 +1,66 @@
+#
+# Test that ALTER TABLE ... ADD FOREIGN KEY ... REFERENCES ...
+# is not replicated if the user does not have access to the foreign key.
+#
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+--connection node_1
+--echo # connection node_1, root
+CREATE DATABASE db1;
+CREATE USER 'testUser' IDENTIFIED BY 'secret';
+GRANT ALL PRIVILEGES ON db1.* TO 'testUser';
+CREATE USER 'testUser2' IDENTIFIED BY 'secret';
+GRANT ALL PRIVILEGES ON *.* TO 'testUser2';
+
+CREATE TABLE db1.t1 ( id INT PRIMARY KEY AUTO_INCREMENT, m INT) ENGINE=innodb;
+
+CREATE DATABASE db2;
+CREATE TABLE db2.t1 (id INT PRIMARY KEY AUTO_INCREMENT, s INT) ENGINE=innodb;
+
+SHOW CREATE TABLE db1.t1;
+
+# Connect as the user with limited privileges 
+--connect(con_node_2_test_user, localhost, testUser, secret,) 
+--echo # connection node_2, testUser - limited privileges
+
+SHOW CREATE TABLE db1.t1;
+
+--error 1142
+ALTER TABLE db1.t1 ADD FOREIGN KEY (m) REFERENCES db2.t1 (id);
+
+# Ensure that table was not altered by replication
+SHOW CREATE TABLE db1.t1;
+
+
+--connection node_1
+--echo # connection node_1, root
+# Ensure that table was not altered by replication
+SHOW CREATE TABLE db1.t1;
+
+
+# Connect as the user with full privileges
+--connect(con_node_2_test_user_2, localhost, testUser2, secret,) 
+--echo # connection node_2, testUser2 - full privileges
+ALTER TABLE db1.t1 ADD FOREIGN KEY (m) REFERENCES db2.t1 (id);
+
+# Ensure that table was altered by replication
+SHOW CREATE TABLE db1.t1;
+
+
+--connection node_1
+--echo # connection node_1, root
+
+# Ensure that table was altered by replication
+SHOW CREATE TABLE db1.t1;
+
+
+# Cleanup
+--disconnect con_node_2_test_user
+--disconnect con_node_2_test_user_2
+DROP DATABASE db1;
+DROP DATABASE db2;
+DROP USER testUser;
+DROP USER testUser2;
+

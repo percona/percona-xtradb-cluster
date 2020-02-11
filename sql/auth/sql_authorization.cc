@@ -4419,19 +4419,36 @@ bool check_global_access(THD *thd, ulong want_access)
   @retval
    true	  error or access denied. Error is sent to client in this case.
 */
+#ifdef WITH_WSREP
+bool check_fk_parent_table_access(THD *thd,
+                                  const char *child_table_db,
+                                  HA_CREATE_INFO *create_info,
+                                  Alter_info *alter_info,
+                                  bool check_fk_support)
+#else
+
 bool check_fk_parent_table_access(THD *thd,
                                   const char *child_table_db,
                                   HA_CREATE_INFO *create_info,
                                   Alter_info *alter_info)
+#endif
 {
   Key *key;
   List_iterator<Key> key_iterator(alter_info->key_list);
-  handlerton *db_type= create_info->db_type ? create_info->db_type :
-                                             ha_default_handlerton(thd);
 
-  // Return if engine does not support Foreign key Constraint.
-  if (!ha_check_storage_engine_flag(db_type, HTON_SUPPORTS_FOREIGN_KEYS))
-    return false;
+#ifdef WITH_WSREP
+  if (check_fk_support)
+  {
+#endif
+    handlerton *db_type= create_info->db_type ? create_info->db_type :
+                                                ha_default_handlerton(thd);
+
+	  // Return if engine does not support Foreign key Constraint.
+    if (!ha_check_storage_engine_flag(db_type, HTON_SUPPORTS_FOREIGN_KEYS))
+      return false;
+#ifdef WITH_WSREP
+  }
+#endif
 
   while ((key= key_iterator++))
   {
