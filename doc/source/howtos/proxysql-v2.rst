@@ -4,10 +4,10 @@
 The |proxysql-admin| Tool with ProxySQL v2
 ================================================================================
 
-With |proxysql| 2.0.3, the |proxysql-admin| tool now uses the native ProxySQL
-support for |PXC| and does not require custom bash scripts to keep track of PXC
-status. As a result, proxysql_galera_checker and proxysql_node_monitor have been
-removed.
+With |proxysql| 2.0.3, the |proxysql-admin| tool now uses the native |proxysql|
+support for |PXC| and does not require custom bash scripts to keep track of
+|PXC| status. As a result, ``proxysql_galera_checker`` and
+``proxysql_node_monitor`` have been removed.
 
 Summary of Changes in |proxysql-admin| Tool with ProxySQL v2
 ================================================================================
@@ -904,5 +904,5 @@ Simple script to dump ProxySQL config and stats
 
    $ proxysql-status admin admin 127.0.0.1 6032
 
-.. |proxysql| replace:: ProxySQL
-.. |proxysql-admin| replace:: ``proxysql-admin``
+.. include:: ../.res/replace.txt
+.. include:: ../.res/replace.program.txt
