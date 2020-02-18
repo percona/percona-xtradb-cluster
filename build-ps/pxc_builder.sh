@@ -344,8 +344,8 @@ install_deps() {
         if [ x"${DIST}" = xcosmic ]; then
             apt-get -y install libssl1.0-dev libeatmydata1
         fi
-        wget https://repo.percona.com/apt/percona-release_1.0-13.generic_all.deb
-        dpkg -i percona-release_1.0-13.generic_all.deb
+        wget https://repo.percona.com/apt/percona-release_latest.generic_all.deb
+        dpkg -i percona-release_latest.generic_all.deb
         apt-get update
         apt-get -y install --download-only percona-xtrabackup-24
         apt-get -y install --download-only percona-xtrabackup-80
