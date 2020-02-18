@@ -3405,9 +3405,21 @@ int mysql_execute_command(THD *thd, bool first_level) {
     thd->mdl_context.release_transactional_locks();
 
 #ifdef WITH_WSREP
-    /* Clean up the previous transaction on implicit commit */
-    if (wsrep_thd_is_local(thd) && wsrep_after_statement(thd)) {
-      return -1;
+    /*
+     Clean up the previous transaction on implicit commit.
+     If it was not empty transaction, it already has been commited
+     to Galera in trans_commit_implicit().
+     If it was empty transaction (no work sets), trans_commit_implicit()
+     did nothing to Galera, so we need to commit empty transaction.
+    */
+    if (wsrep_thd_is_local(thd)) {
+      if (wsrep_has_changes(thd)) {
+        if (wsrep_after_statement(thd)) {
+          return -1;
+        }
+      } else {
+        wsrep_commit_empty(thd, true);
+      }
     }
 #endif /* WITH_WSREP */
   }
