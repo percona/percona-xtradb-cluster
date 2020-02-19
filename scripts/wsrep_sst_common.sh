@@ -723,7 +723,7 @@ function run_post_processing_steps()
             if compare_versions "$local_version_str" "!=" "$donor_version_str"; then
                 # Check the sys and wsrep schema versions to determine
                 # if mysql_upgrade is needed
-                wsrep_log_info "Opting mysql_upgrade (sst): local version ($local_version_str) != donor version ($donor_version_str)"
+                wsrep_log_info "Opting for mysql_upgrade (sst): local version ($local_version_str) != donor version ($donor_version_str)"
                 run_mysql_upgrade='yes'
             else
                 wsrep_log_info "Skipping mysql_upgrade (sst): local version ($local_version_str) == donor version ($donor_version_str)"
@@ -833,8 +833,8 @@ function run_post_processing_steps()
         wsrep_check_program "${MYSQL_UPGRADE_NAME}"
         if [[ $? -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "Could not locate ${MYSQLD_UPGRADE_NAME} (needed for upgrade)"
-            wsrep_log_error "Please ensure that ${MYSQLD_UPGRADE_NAME} is in the path"
+            wsrep_log_error "Could not locate ${MYSQL_UPGRADE_NAME} (needed for upgrade)"
+            wsrep_log_error "Please ensure that ${MYSQL_UPGRADE_NAME} is in the path"
             wsrep_log_error "Line $LINENO"
             wsrep_log_error "******************* FATAL ERROR ********************** "
             return 2
