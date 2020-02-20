@@ -1,0 +1,26 @@
+#
+# Test proper handling of COMMIT WORK AND CHAIN (PXC-2621)
+#
+
+--source include/galera_cluster.inc
+--source include/wait_wsrep_ready.inc
+
+--connection node_1
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=innodb;
+START TRANSACTION;
+INSERT INTO t1 VALUES(1);
+COMMIT WORK AND CHAIN;
+SELECT * FROM t1;
+INSERT INTO t1 VALUES(2);
+SELECT * FROM t1;
+ROLLBACK WORK AND CHAIN;
+SELECT * FROM t1;
+INSERT INTO t1 VALUES(3);
+COMMIT;
+SELECT* FROM t1;
+
+--connection node_2
+SELECT * FROM t1;
+
+# cleanup
+DROP TABLE t1;

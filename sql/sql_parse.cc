@@ -4872,6 +4872,15 @@ int mysql_execute_command(THD *thd, bool first_level) {
       thd->mdl_context.release_transactional_locks();
       /* Begin transaction with the same isolation level. */
       if (tx_chain) {
+#ifdef WITH_WSREP
+        /* We need to cleanup wsrep state before starting
+           new transaction. If 'regular' commit was issued,
+           it would be done in caller function wsrep_mysql_parse()
+           after returning from here.
+           But now we need to do it in between.
+         */
+        wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
         if (trans_begin(thd)) goto error;
       } else {
         /* Reset the isolation level and access mode if no chaining
@@ -4896,6 +4905,15 @@ int mysql_execute_command(THD *thd, bool first_level) {
       thd->mdl_context.release_transactional_locks();
       /* Begin transaction with the same isolation level. */
       if (tx_chain) {
+#ifdef WITH_WSREP
+        /* We need to cleanup wsrep state before starting
+           new transaction. If 'regular' rollback was issued,
+           it would be done in caller function wsrep_mysql_parse()
+           after returning from here.
+           But now we need to do it in between.
+         */
+        wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
         if (trans_begin(thd)) goto error;
       } else {
         /* Reset the isolation level and access mode if no chaining
