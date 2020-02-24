@@ -10,11 +10,11 @@ including its derivatives that claim full binary compatibility,
 for example: CentOS, Oracle Linux, Amazon Linux AMI, and so on.
 
 .. note:: |PXC| should work on other RPM-based distributions,
-   but it is tested only on RHEL and CentOS versions 6 and 7.
+   but it is tested only on RHEL and CentOS versions 7 and 8.
 
 The packages are available in the official Percona software repository
 and on the `download page
-<http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST/>`_.
+<http://www.percona.com/downloads/Percona-XtraDB-Cluster-80/LATEST/>`_.
 It is recommended to intall |PXC| from the official repository
 using :command:`yum`.
 
@@ -57,17 +57,17 @@ Installing from Percona Repository
 
    .. code-block:: bash
 
-      $ sudo yum install Percona-XtraDB-Cluster-57
+      $ sudo yum install Percona-XtraDB-Cluster-80
 
    .. note:: Alternatively you can install
-      the ``Percona-XtraDB-Cluster-full-57`` meta package,
+      the ``Percona-XtraDB-Cluster-full-80`` meta package,
       which contains the following additional packages:
 
-      * ``Percona-XtraDB-Cluster-devel-57``
-      * ``Percona-XtraDB-Cluster-test-57``
-      * ``Percona-XtraDB-Cluster-debuginfo-57``
+      * ``Percona-XtraDB-Cluster-devel-80``
+      * ``Percona-XtraDB-Cluster-test-80``
+      * ``Percona-XtraDB-Cluster-debuginfo-80``
       * ``Percona-XtraDB-Cluster-galera-3-debuginfo``
-      * ``Percona-XtraDB-Cluster-shared-57``
+      * ``Percona-XtraDB-Cluster-shared-80``
 
 #. Start the |PXC| server:
 

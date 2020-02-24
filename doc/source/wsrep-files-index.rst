@@ -74,6 +74,8 @@
    the re-joining node will get |IST| instead of |SST|. Filename can be changed
    with the :variable:`gcache.name` variable.
 
+.. _galera-grastate-dat:
+   
 * :file:`grastate.dat`
    This file contains the Galera state information.
 
