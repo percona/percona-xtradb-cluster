@@ -91,6 +91,7 @@ SendSIGKILL=no
 # my.cnf contains unknown option
 Restart=on-abort
 RestartSec=5s
+RestartPreventExitStatus=SIGABRT
 
 UMask=007
 
