@@ -260,6 +260,23 @@ check_running()
     fi
 }
 
+check_grastate_dat() {
+  local seqno=-1
+  local uptime=$(awk '{print int($1/60)}' /proc/uptime)
+  if [ $uptime -lt 5 ]; then
+    if [ -f $grastate_loc ]; then
+      seqno=$(grep 'seqno:' $grastate_loc | cut -d: -f2 | tr -d ' ')
+      if [ $seqno -eq -1 ]; then
+        log_warning_msg "Node has been rebooted, $grastate_loc: seqno = $seqno, mysql service has not been started automatically"
+        exit 1
+      fi
+    else
+      log_failure_msg "$grastate_loc is missing after reboot, mysql service has not been started automatically"
+      exit 1
+    fi
+  fi
+}
+
 # Run mysqld with --wsrep-recover and parse recovered position from log.
 # Position will be stored in wsrep_start_position_opt global.
 wsrep_start_position_opt=""
@@ -335,6 +352,7 @@ ret=0
 case $action in
     "galera-recovery") wsrep_recover_position ;;
     "start-pre") check_running; install_db ;;
+    "check-grastate") check_grastate_dat ;;
     "start-post")
       wait_for_pid created  "$pid_path"; ret=$?
       if [[ $ret -eq 1 ]];then
