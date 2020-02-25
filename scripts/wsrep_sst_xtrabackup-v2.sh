@@ -1877,11 +1877,6 @@ then
         FILE_TO_STREAM=$SST_INFO_FILE
         send_data_from_donor_to_joiner "$donor_tmpdir" "${stagemsg}-sst-info"
 
-        # Send the wsrep_state.dat file also
-        wsrep_log_debug "Streaming WSREP state file before SST"
-        FILE_TO_STREAM="wsrep_state.dat"
-        send_data_from_donor_to_joiner "${DATA}" "${stagemsg}-wsrep-state"
-
         # Restore the transport commmand to its original state
         tcmd="$ttcmd"
         if [[ -n "$progress" ]];then
@@ -2055,7 +2050,8 @@ then
         # We also reject the donor if it does not send a version string.
         # (which is true for any version of PXC < 5.7.19)
         #
-        # Truncate the version numbers (we want the major.minor version like "5.6", not "5.6.35-...")
+        # Truncate the version numbers (we want the major.minor.revision version
+        # like "5.6.35", not "5.6.35-...")
         local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
         donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\.[0-9]\+\)')
         donor_version_str=${donor_version_str:-"0.0.0"}
@@ -2108,21 +2104,6 @@ then
             JOINER_SST_DIR=$DATA/sst-xb-tmpdir
         else
             JOINER_SST_DIR=$(mktemp -p "${tmpdirbase}" -dt sst_XXXX)
-        fi
-
-        # Wait to receive the wsrep_state.dat file (this will not be sent with 5.7)
-        # So, only wait for this if the donor version >= 8.0
-        if compare_versions "$donor_version_str" ">=" "8.0.0"; then
-
-            recv_data_from_donor_to_joiner $JOINER_SST_DIR "${stagemsg}-wsrep-state" $stimeout -2
-
-            if [[ ! -r "${JOINER_SST_DIR}/wsrep_state.dat" ]]; then
-                wsrep_log_error "******************* FATAL ERROR ********************** "
-                wsrep_log_error "Did not receive expected file from donor: 'wsrep_state.dat'"
-                wsrep_log_error "Line $LINENO"
-                wsrep_log_error "****************************************************** "
-                exit 32
-            fi
         fi
 
         # server-id is already part of backup-my.cnf so avoid appending it.
@@ -2398,10 +2379,6 @@ then
             wsrep_log_debug "Keyring move successful"
         fi
 
-        if [[ -r ${STATDIR}/wsrep_state.dat ]]; then
-            mv "${STATDIR}/wsrep_state.dat" "${TDATA}"
-        fi
-
         wsrep_log_debug "Move successful, removing ${DATA}"
         rm -rf "$DATA"
         DATA=${TDATA}
@@ -2424,11 +2401,6 @@ then
     #  Run this AFTER the move to ensure that all of the data files have been
     #  placed correctly (especially for files that live outside of the datadir).
     #-----------------------------------------------------------------------
-
-    if [[ -r "${DATA}/wsrep_state.dat" ]]; then
-        read_variables_from_wsrep_state "${DATA}/wsrep_state.dat"
-        [[ $? -ne 0 ]] && exit 2
-    fi
 
     wsrep_log_info "Running post-processing..........."
     set +e

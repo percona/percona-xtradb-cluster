@@ -31,7 +31,6 @@ extern wsrep_uuid_t local_uuid;
 extern wsrep_seqno_t local_seqno;
 
 std::string wsrep_sst_prepare();
-ssize_t wsrep_sst_upgrade();
 wsrep_cb_status wsrep_sst_donate_cb(void *app_ctx, void *recv_ctx,
                                     const wsrep_buf_t *msg,
                                     const wsrep_gtid_t *state_id,
