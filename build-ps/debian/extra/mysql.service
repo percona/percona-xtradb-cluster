@@ -60,6 +60,9 @@ EnvironmentFile=-/etc/default/mysql
 # Needed to create system tables etc.
 ExecStartPre=/usr/bin/mysql-systemd start-pre
 
+# Check grastate.dat file existence and seqno value
+ExecStartPre=/usr/bin/mysql-systemd check-grastate
+
 # Perform automatic wsrep recovery. When server is started without wsrep,
 # mysql-systemd galera_recovery simply returns an empty string.
 # It is always safe to unset _WSREP_START_POSITION environment variable.
