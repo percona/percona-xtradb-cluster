@@ -9884,6 +9884,23 @@ void innobase_get_multi_value(const TABLE *mysql_table, ulint f_idx,
   ut_ad(succ);
 }
 
+#ifdef WITH_WSREP
+/*
+  Check if replication should be done. It should be if:
+  a. wsrep is enabled
+  b. exec mode is local
+     (it is workload executor node and not replicator node)
+  c. No consistency check enforced.
+  d. Ensure that bin-logging is enabled.
+     Either mysql bin-logging or emulated bin logging.
+ */
+static bool wsrep_do_replication(THD *thd) {
+  return wsrep_on(thd) && wsrep_thd_is_local(thd) &&
+         !wsrep_consistency_check(thd) &&
+         thd_binlog_format(thd) == BINLOG_FORMAT_ROW;
+}
+#endif /* WITH_WSREP */
+
 /** Stores a row in an InnoDB database, to the table specified in this
  handle.
  @return error code */
@@ -10152,13 +10169,6 @@ report_error:
   d. No consistency check enforced.
   e. Ensure that bin-logging is enabled.
      Either mysql bin-logging or emulated bin logging.
-  f. If db_type = PARTITION and InnoDB parts are created then MySQL flow
-     will disable bin-logging before inserting data to indivdual parts.
-     This is to avoid double bin-logging. Generic level bin-logging is
-     done at ha_partition level. This causes LDI on partition table
-     to fail as thd_binlog_format() will then return != ROW.
-     In order to take care of this situation we ORed that condition
-     with db_type
   TODO: We allow replication even if binlog-format = STATEMENT.
   This is needed by pt-table-checksum. Now it is not a good idea
   to open this hook for pt-table-checksum but it exist like this for
@@ -10166,11 +10176,8 @@ report_error:
   With that there comes another existing dependency.
   Why not allow LDI operating with binlog-format = STATEMENT.
   There is no reason documented so will leave it as is for now. */
-  if (!error_result && wsrep_thd_is_local(m_user_thd) && wsrep_on(m_user_thd) &&
-      (thd_sql_command(m_user_thd) != SQLCOM_CREATE_TABLE) &&
-      !wsrep_consistency_check(m_user_thd) &&
-      (thd_binlog_format(m_user_thd) == BINLOG_FORMAT_ROW ||
-       table->file->ht->db_type == DB_TYPE_PARTITION_DB)) {
+  if (!error_result && (thd_sql_command(m_user_thd) != SQLCOM_CREATE_TABLE) &&
+      wsrep_do_replication(m_user_thd)) {
     if (wsrep_append_keys(m_user_thd, WSREP_SERVICE_KEY_EXCLUSIVE, record,
                           NULL)) {
       DBUG_PRINT("wsrep", ("row key failed"));
@@ -10986,22 +10993,12 @@ func_exit:
   d. No consistency check enforced.
   e. Ensure that bin-logging is enabled.
      Either mysql bin-logging or emulated bin logging.
-  f. If db_type = PARTITION and InnoDB parts are created then MySQL flow
-     will disable bin-logging before inserting data to indivdual parts.
-     This is to avoid double bin-logging. Generic level bin-logging is
-     done at ha_partition level. This causes LDI on partition table
-     to fail as thd_binlog_format() will then return != ROW.
-     In order to take care of this situation we ORed that condition
-     with db_type
   TODO: We allow replication even if binlog-format = STATEMENT.
   This is needed by pt-table-checksum. Now it is not a good idea
   to open this hook for pt-table-checksum but it exist like this for
   while now so to maintain compatibility we continue to provide it.
   With that there comes another existing dependency. */
-  if (!err && wsrep_thd_is_local(m_user_thd) && wsrep_on(m_user_thd) &&
-      !wsrep_consistency_check(m_user_thd) &&
-      (thd_binlog_format(m_user_thd) == BINLOG_FORMAT_ROW ||
-       table->file->ht->db_type == DB_TYPE_PARTITION_DB)) {
+  if (!err && wsrep_do_replication(m_user_thd)) {
     DBUG_PRINT("wsrep", ("update row key"));
     if (wsrep_append_keys(m_user_thd,
                           wsrep_protocol_version >= 4
@@ -11087,22 +11084,12 @@ int ha_innobase::delete_row(
   d. No consistency check enforced.
   e. Ensure that bin-logging is enabled.
      Either mysql bin-logging or emulated bin logging.
-  f. If db_type = PARTITION and InnoDB parts are created then MySQL flow
-     will disable bin-logging before inserting data to indivdual parts.
-     This is to avoid double bin-logging. Generic level bin-logging is
-     done at ha_partition level. This causes LDI on partition table
-     to fail as thd_binlog_format() will then return != ROW.
-     In order to take care of this situation we ORed that condition
-     with db_type
   TODO: We allow replication even if binlog-format = STATEMENT.
   This is needed by pt-table-checksum. Now it is not a god idea
   to open this hook for pt-table-checksum but it exist like this for
   while now so to maintain compatibility we continue to provide it.
   With that there comes another existing dependency. */
-  if (error == DB_SUCCESS && wsrep_thd_is_local(m_user_thd) &&
-      wsrep_on(m_user_thd) && !wsrep_consistency_check(m_user_thd) &&
-      (thd_binlog_format(m_user_thd) == BINLOG_FORMAT_ROW ||
-       table->file->ht->db_type == DB_TYPE_PARTITION_DB)) {
+  if (error == DB_SUCCESS && wsrep_do_replication(m_user_thd)) {
     if (wsrep_append_keys(m_user_thd, WSREP_SERVICE_KEY_EXCLUSIVE, record,
                           NULL)) {
       DBUG_PRINT("wsrep", ("delete fail"));
@@ -12320,7 +12307,7 @@ extern dberr_t wsrep_append_foreign_key(
   int cache_key_len;
   ut_a(trx);
 
-  if (!wsrep_on(trx->mysql_thd) || !wsrep_thd_is_local(trx->mysql_thd)) {
+  if (!wsrep_do_replication(thd)) {
     return DB_SUCCESS;
   }
 
