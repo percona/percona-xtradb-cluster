@@ -17,7 +17,7 @@ usr/bin/pxc_extra
 usr/bin/wsrep_sst_common
 usr/bin/wsrep_sst_xtrabackup-v2
 # usr/bin/wsrep_sst_rsync
-usr/bin/wsrep_sst_upgrade
+#usr/bin/wsrep_sst_upgrade
 usr/sbin/mysqld
 usr/bin/mysql-systemd
 # configuration files
