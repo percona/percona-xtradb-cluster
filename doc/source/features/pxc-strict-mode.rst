@@ -177,28 +177,10 @@ Depending on the selected mode, the following happens:
 Binary log format
 -----------------
 
-|PXC| supports only the default row-based binary logging format.
-Setting the |binlog_format|_ variable to anything but ``ROW`` at startup
-is not allowed, because this changes the global scope,
-which must be set to ROW.
-Validation is performed only at runtime and against session scope.
-
-Depending on the selected mode, the following happens:
-
-``DISABLED``
-
- At runtime, you can set ``binlog_format`` to any value.
-
-``PERMISSIVE``
-
- At runtime, it is permitted to change ``binlog_format``
- to any value, but if you set it to anything other than ``ROW``,
- a warning is logged.
-
-``ENFORCING`` or ``MASTER``
-
- At runtime, any attempt to change ``binlog_format``
- to anything other than ``ROW`` fails and an error is logged.
+|PXC| supports only the default row-based binary logging format.  In
+|version|, setting the |binlog_format|_ variable to anything but
+``ROW`` at startup or runtime is not allowed regardless of the value of the
+:variable:`pxc_strict_mode` variable.
 
 .. |binlog_format| replace:: ``binlog_format``
 .. _binlog_format: http://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_binlog_format
