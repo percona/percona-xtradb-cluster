@@ -1329,7 +1329,9 @@ bool Sql_cmd_alter_tablespace_rename::execute(THD *thd) {
 
   // Lock both tablespace names in one go
   if (lock_tablespace_names(thd, m_tablespace_name, m_new_name)) {
+#ifdef WITH_WSREP
     mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+#endif /* WITH_WSREP */
     return true;
   }
 

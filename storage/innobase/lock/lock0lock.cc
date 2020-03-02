@@ -2717,10 +2717,12 @@ static void lock_grant_or_update_wait_for_edge(lock_t *lock) {
     /* Grant the lock */
     lock_grant(lock);
   } else {
+#ifdef WITH_WSREP
     WSREP_DEBUG(
         "Failed to grant lock with trx (%lu) due to blocking lock held by trx "
         "(%lu)",
         lock->trx->id, blocking_lock->trx->id);
+#endif /* WITH_WSREP */
     ut_ad(lock->trx != blocking_lock->trx);
     lock_update_wait_for_edge(lock, blocking_lock);
   }
