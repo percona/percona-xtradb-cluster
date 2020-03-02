@@ -357,7 +357,7 @@ Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
 %if 0%{?compatlib}
 Requires:             percona-xtradb-cluster-shared-compat = %{version}-%{release}
 %endif
-Requires:             socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:             socat iproute perl-DBI perl-DBD-MySQL
 Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -853,7 +853,6 @@ ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 %endif
 
 install -d $RBR%{_bindir}
-#ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
 %if %{WITH_TCMALLOC}
 install -m 644 "%{malloc_lib_source}" \
@@ -1452,11 +1451,9 @@ fi
 #%attr(755, root, root) %{_bindir}/resolveip
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
-#%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
 #%attr(755, root, root) %{_bindir}/wsrep_sst_upgrade
 %attr(755, root, root) %{_bindir}/ps_mysqld_helper
 # Explicit %attr() mode not applicaple to symlink
-#%{_bindir}/wsrep_sst_rsync_wan
 %attr(755, root, root) %{_bindir}/lz4_decompress
 %attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
 
