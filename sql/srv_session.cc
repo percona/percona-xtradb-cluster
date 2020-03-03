@@ -75,6 +75,10 @@
 #include "sql/system_variables.h"
 #include "thr_mutex.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_trans_observer.h" /* wsrep_open() */
+#endif  /* WITH_WSREP */
+
 struct decimal_t;
 
 /**
@@ -841,6 +845,16 @@ bool Srv_session::open() {
     return true;
   }
 
+#ifdef WITH_WSREP
+  if (thd.wsrep_cs().state() != wsrep::client_state::s_none) {
+    thd.wsrep_cs().cleanup();
+  }
+  mysql_mutex_lock(&thd.LOCK_wsrep_thd);
+  thd.wsrep_client_thread = true;
+  mysql_mutex_unlock(&thd.LOCK_wsrep_thd);
+  wsrep_open(&thd);
+#endif  /* WITH_WSREP */
+
   return false;
 }
 
@@ -992,6 +1006,13 @@ bool Srv_session::close() {
 
   if (backup.attach_error) return true;
 
+#ifdef WITH_WSREP
+  wsrep_close(&thd);
+  mysql_mutex_lock(&thd.LOCK_wsrep_thd);
+  thd.wsrep_client_thread = false;
+  mysql_mutex_unlock(&thd.LOCK_wsrep_thd);
+#endif /* WITH_WSREP */
+
   state = SRV_SESSION_CLOSED;
 
   server_session_list.remove(&thd);
@@ -1095,6 +1116,10 @@ int Srv_session::execute_command(enum enum_server_command command,
 
   mysql_audit_release(&thd);
 
+#ifdef WITH_WSREP
+  wsrep_before_command(&thd);
+#endif /* WITH_WSREP */
+
   /*
     The server does it for COM_QUERY in mysql_parse() but not for
     COM_INIT_DB, for example
@@ -1106,6 +1131,13 @@ int Srv_session::execute_command(enum enum_server_command command,
       MYSQL_START_STATEMENT(&thd.m_statement_state, stmt_info_new_packet.m_key,
                             thd.db().str, thd.db().length, thd.charset(), NULL);
   int ret = dispatch_command(&thd, data, command);
+
+#ifdef WITH_WSREP
+  if (thd.wsrep_cs().state() == wsrep::client_state::s_exec) {
+    wsrep_after_command_before_result(&thd);
+  }
+  wsrep_after_command_after_result(&thd);
+#endif /* WITH_WSREP */
 
   thd.pop_protocol();
   DBUG_ASSERT(thd.get_protocol() == &protocol_error);

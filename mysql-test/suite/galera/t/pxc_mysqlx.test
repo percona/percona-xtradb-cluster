@@ -1,0 +1,281 @@
+# pxc_mysqlx
+#
+# Simple tests of using the mysqlx plugin with PXC
+#
+--source include/galera_cluster.inc
+--source include/force_restart.inc
+
+--source include/have_mysqlx_plugin.inc
+--source include/xplugin_create_user.inc
+
+# Setup the tables for the test
+# (sql interface) - test basic CRUD scenarios
+# (native interface) - test basic CRUD scenarios
+
+## TEST STARTS HERE
+
+# Setup the test database and test simple CRUD operations
+# and see if they replicate
+--echo # Testing CREATE TABLE DDL and INSERT DML (SQL)
+--connection node_1
+--echo # node 1
+
+--write_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+-->sql
+ DROP DATABASE IF EXISTS dbtest;
+ CREATE DATABASE dbtest;
+ USE dbtest;
+
+ CREATE TABLE t1 (
+  id INT PRIMARY KEY,
+  f2 TEXT);
+
+ INSERT INTO t1 VALUES (1, "foo");
+ INSERT INTO t1 VALUES (2, "bar");
+-->endsql
+EOF
+
+--exec $MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/pxc_mysqlx_script.tmp 2>&1
+--remove_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+
+--connection node_1
+--echo # node 1
+SELECT * FROM dbtest.t1;
+
+--connection node_2
+--echo # node 2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbtest' AND TABLE_NAME = 't1'
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 2 FROM dbtest.t1
+--source include/wait_condition.inc
+
+SELECT * FROM dbtest.t1;
+
+
+--echo # Testing DELETE DML (SQL)
+--connection node_1
+--write_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+-->sql
+ DELETE FROM dbtest.t1 WHERE id = 1;
+-->endsql
+EOF
+
+--exec $MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/pxc_mysqlx_script.tmp 2>&1
+--remove_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+
+--connection node_1
+--echo # node 1
+SELECT * FROM dbtest.t1;
+
+--connection node_2
+--echo # node 2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbtest.t1
+--source include/wait_condition.inc
+
+SELECT * FROM dbtest.t1;
+
+
+--echo # Testing UPDATE DML (SQL)
+--connection node_1
+--write_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+-->sql
+ UPDATE dbtest.t1 SET f2="baz" WHERE id = 2;
+ INSERT INTO dbtest.t1 VALUES (3, "foobar");
+-->endsql
+EOF
+
+--exec $MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/pxc_mysqlx_script.tmp 2>&1
+--remove_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+
+--connection node_1
+--echo # node 1
+SELECT * FROM dbtest.t1;
+
+--connection node_2
+--echo # node 2
+--let $wait_condition = SELECT COUNT(*) = 2 FROM dbtest.t1
+--source include/wait_condition.inc
+
+SELECT * FROM dbtest.t1;
+
+
+--echo # Clearing table for native tests
+--connection node_1
+--echo # node 1
+DELETE FROM dbtest.t1;
+
+--echo # Testing INSERT DML (native)
+--write_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+Mysqlx.Crud.Insert {
+  collection {
+                name: "t1"
+                schema: "dbtest"
+             }
+  data_model: TABLE
+        projection {
+        name: "id"
+        }
+        projection {
+        name: "f2"
+        }
+  row {
+    field {
+    type: LITERAL
+    literal {
+      type: V_SINT
+      v_signed_int: 1
+    }}
+    field {
+    type: LITERAL
+    literal {
+      type: V_STRING
+      v_string {
+        value: "foo2"
+      }
+    }}
+  }
+}
+-->recvresult
+EOF
+
+--exec $MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/pxc_mysqlx_script.tmp 2>&1
+--remove_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+
+--connection node_1
+--echo # node 1
+SELECT * FROM dbtest.t1;
+
+--connection node_2
+--echo # node 2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbtest.t1
+--source include/wait_condition.inc
+
+SELECT * FROM dbtest.t1;
+
+
+--echo # Testing DELETE DML (native)
+--write_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+Mysqlx.Crud.Delete {
+  collection {
+    name: "t1"
+    schema: "dbtest"
+  }
+  data_model: TABLE
+  criteria {
+    type: OPERATOR
+    operator {
+      name: "=="
+      param {
+        type: IDENT
+        identifier {
+          name: "id"
+        }
+      }
+      param {
+        type: LITERAL
+        literal {
+          type: V_SINT
+          v_signed_int: 1
+        }
+      }
+    }
+  }
+}
+#-- Mysqlx.Sql.StmtExecuteOk
+-->recvresult
+EOF
+
+--exec $MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/pxc_mysqlx_script.tmp 2>&1
+--remove_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+
+--connection node_1
+--echo # node 1
+SELECT * FROM dbtest.t1;
+
+--connection node_2
+--echo # node 2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM dbtest.t1
+--source include/wait_condition.inc
+
+SELECT * FROM dbtest.t1;
+
+
+--echo # Testing UPDATE DML (native)
+--connection node_1
+--echo # node 1
+INSERT INTO dbtest.t1 VALUES(1, "foo");
+SELECT * FROM dbtest.t1;
+
+--connection node_2
+--echo # node 2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbtest.t1
+--source include/wait_condition.inc
+SELECT * FROM dbtest.t1;
+
+--write_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+Mysqlx.Crud.Update {
+  collection {
+    name: "t1"
+    schema: "dbtest"
+  }
+  data_model: TABLE
+  criteria {
+    type: OPERATOR
+    operator {
+      name: "=="
+      param {
+        type: IDENT
+        identifier {
+          name: "id"
+        }
+      }
+      param {
+        type: LITERAL
+        literal {
+             type: V_SINT
+             v_signed_int: 1
+        }
+      }
+    }
+  }
+  operation {
+    source {
+      name: "f2"
+    }
+    operation: SET
+    value {
+      type: LITERAL
+      literal {
+        type: V_STRING
+        v_string {
+          value: "bar2"
+        }
+      }
+    }
+  }
+}
+#-- Mysqlx.Sql.StmtExecuteOk
+-->recvresult
+EOF
+
+--exec $MYSQLXTEST -u x_root --password='' --file=$MYSQL_TMP_DIR/pxc_mysqlx_script.tmp 2>&1
+--remove_file $MYSQL_TMP_DIR/pxc_mysqlx_script.tmp
+
+--connection node_1
+--echo # node 1
+INSERT INTO dbtest.t1 VALUES (2, "baz2");
+SELECT * FROM dbtest.t1;
+
+--connection node_2
+--echo # node 2
+--let $wait_condition = SELECT COUNT(*) = 2 FROM dbtest.t1
+--source include/wait_condition.inc
+
+SELECT * FROM dbtest.t1;
+
+
+# Cleanup
+--connection node_1
+DROP DATABASE dbtest;
+--source include/xplugin_drop_user.inc
