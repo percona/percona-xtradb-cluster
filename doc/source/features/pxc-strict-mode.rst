@@ -8,6 +8,11 @@ PXC Strict Mode is designed to avoid the use of
 experimental and unsupported features in |PXC|.
 It performs a number of validations at startup and during runtime.
 
+.. important:: 
+
+   Make sure that the group replication plugin is not active for the strict mode
+   to work correctly.
+
 Depending on the actual mode you select,
 upon encountering a failed validation,
 the server will either throw an error
