@@ -609,7 +609,7 @@ static void *sst_joiner_thread(void *a) {
     thd->variables.transaction_isolation = ISO_READ_COMMITTED;
 
     wsrep_sst_complete(thd, -err);
-
+    WSREP_SYSTEM("SST completed");
     delete thd;
     my_thread_end();
   }

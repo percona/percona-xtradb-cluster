@@ -275,6 +275,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
   if (wsrep_debug) WSREP_LOG(INFORMATION_LEVEL, fmt, ##__VA_ARGS__)
 #define WSREP_INFO(fmt, ...) WSREP_LOG(INFORMATION_LEVEL, fmt, ##__VA_ARGS__)
 #define WSREP_WARN(fmt, ...) WSREP_LOG(WARNING_LEVEL, fmt, ##__VA_ARGS__)
+#define WSREP_SYSTEM(fmt, ...) WSREP_LOG(SYSTEM_LEVEL, fmt, ##__VA_ARGS__)
 
 #define WSREP_ERROR(fmt, ...)                                         \
   do {                                                                \

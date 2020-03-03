@@ -35,7 +35,6 @@ WSREP_LOG_DEBUG=""
 # The NAMEs don't change, however the PATHs may be different (due to packaging)
 readonly MYSQLD_NAME=mysqld
 readonly MYSQLADMIN_NAME=mysqladmin
-readonly MYSQL_UPGRADE_NAME=mysql_upgrade
 readonly MYSQL_CLIENT_NAME=mysql
 
 declare MYSQL_UPGRADE_TMPDIR=""
@@ -526,7 +525,6 @@ EOF
 # Globals
 #   MYSQLD_NAME
 #   MYSQLADMIN_NAME
-#   MYSQL_UPGRADE_NAME
 #   MYSQL_CLIENT_NAME
 #   WSREP_SST_OPT_PARENT
 #   WSREP_SST_OPT_CONF
@@ -690,17 +688,6 @@ function run_post_processing_steps()
     wsrep_log_debug "--$("$mysqld_path" --version | cut -d' ' -f2-)"
 
     # Verify any other needed programs
-    if [[ $run_mysql_upgrade != 'no' ]]; then
-        wsrep_check_program "${MYSQL_UPGRADE_NAME}"
-        if [[ $? -ne 0 ]]; then
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "Could not locate ${MYSQL_UPGRADE_NAME} (needed for upgrade)"
-            wsrep_log_error "Please ensure that ${MYSQL_UPGRADE_NAME} is in the path"
-            wsrep_log_error "Line $LINENO"
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            return 2
-        fi
-    fi
     wsrep_check_program "${MYSQLADMIN_NAME}"
     if [[ $? -ne 0 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
