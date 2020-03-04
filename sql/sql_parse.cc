@@ -2489,63 +2489,47 @@ dispatch_end:
     WSREP_LOG_THD(thd, "leave");
   }
 
-  do_end_of_statement = false;
+  do_end_of_statement = true;
   if (WSREP(thd)) {
     /* wsrep BF abort in query exec phase */
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     do_end_of_statement =
-        thd->wsrep_trx().state() != wsrep::transaction::s_replaying &&
-        !thd->killed;
+        !(thd->wsrep_trx().state() != wsrep::transaction::s_replaying &&
+          !thd->killed);
 
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  } else
-    do_end_of_statement = true;
+  }
 
-  if (do_end_of_statement) {
-    DBUG_ASSERT((thd->open_tables == NULL ||
-                 (thd->locked_tables_mode == LTM_LOCK_TABLES)));
-
-    /* Update user statistics only if at least one timer was initialized */
-    if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0)) {
-      userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
-                            &thd->cpu_time);
-      /* Updates THD stats and the global user stats. */
-      thd->update_stats(true);
-      update_global_user_stats(thd, true, my_getsystime());
-    }
-
-    /* Finalize server status flags after executing a command. */
-    thd->update_slow_query_status();
-    if (thd->killed) thd->send_kill_message();
-    thd->send_statement_status();
-  } else {
 #endif /* WITH_WSREP */
-  done:
-    DBUG_ASSERT(thd->open_tables == NULL ||
-                (thd->locked_tables_mode == LTM_LOCK_TABLES));
 
-    /* Update user statistics only if at least one timer was initialized */
-    if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0)) {
-      userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
-                            &thd->cpu_time);
-      /* Updates THD stats and the global user stats. */
-      thd->update_stats(true);
-      update_global_user_stats(thd, true, my_getsystime());
-    }
+done:
+  DBUG_ASSERT(thd->open_tables == NULL ||
+              (thd->locked_tables_mode == LTM_LOCK_TABLES));
 
-    /* Finalize server status flags after executing a command. */
-    thd->update_slow_query_status();
-    if (thd->killed) thd->send_kill_message();
-    thd->send_statement_status();
+  /* Update user statistics only if at least one timer was initialized */
+  if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0)) {
+    userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
+                          &thd->cpu_time);
+    /* Updates THD stats and the global user stats. */
+    thd->update_stats(true);
+    update_global_user_stats(thd, true, my_getsystime());
+  }
 
-    /* After sending response, switch to clone protocol */
-    if (clone_cmd != nullptr) {
-      DBUG_ASSERT(command == COM_CLONE);
-      error = clone_cmd->execute_server(thd);
-    }
+  /* Finalize server status flags after executing a command. */
+  thd->update_slow_query_status();
+  if (thd->killed) thd->send_kill_message();
+  thd->send_statement_status();
 
+  /* After sending response, switch to clone protocol */
+  if (clone_cmd != nullptr) {
+    DBUG_ASSERT(command == COM_CLONE);
+    error = clone_cmd->execute_server(thd);
+  }
+
+#ifdef WITH_WSREP
+  if (do_end_of_statement) {
+#endif /* WITH_WSREP */
     thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
-
 #ifdef WITH_WSREP
   }
 #endif /* WITH_WSREP */
