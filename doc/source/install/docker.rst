@@ -7,20 +7,24 @@ Running |PXC| in a Docker Container
 Docker images of |PXC| are hosted publicly on Docker Hub at
 https://hub.docker.com/r/percona/percona-xtradb-cluster/.
 
-For more information about using Docker, see the `Docker Docs`_.
+For more information about using Docker, see the `Docker Docs`_. Make
+sure that you are using the latest version of Docker.  The ones
+provided via ``apt`` and ``yum`` may be outdated and cause errors.
 
 .. _`Docker Docs`: https://docs.docker.com/
 
-.. note:: Make sure that you are using the latest version of Docker.
-   The ones provided via ``apt`` and ``yum``
-   may be outdated and cause errors.
+.. note::
 
-.. note:: By default, Docker will pull the image from Docker Hub
-   if it is not available locally.
+   By default, Docker pulls the image from Docker Hub if it is not
+   available locally.
+
+   The image only contains the most essential binaries for |PXC| to
+   run. This means that some utilities included into a |PS| or |MySQL|
+   installation might be missing from the |PXC| Docker image.
 
 The following procedure describes how to set up a simple 3-node cluster
 for evaluation and testing purposes,
-with all nodes running |PXC| 5.7 in separate containers on one host:
+with all nodes running |PXC| 8.0 in separate containers on one host:
 
 1. Create a Docker network::
 
@@ -33,7 +37,7 @@ with all nodes running |PXC| 5.7 in separate containers on one host:
       -e CLUSTER_NAME=cluster1 \
       --name=node1 \
       --net=pxc-network \
-      percona/percona-xtradb-cluster:5.7
+      percona/percona-xtradb-cluster:8.0
 
 #. Join the second node::
 
@@ -43,7 +47,7 @@ with all nodes running |PXC| 5.7 in separate containers on one host:
       -e CLUSTER_JOIN=node1 \
       --name=node2 \
       --net=pxc-network \
-      percona/percona-xtradb-cluster:5.7
+      percona/percona-xtradb-cluster:8.0
 
 #. Join the third node::
 
@@ -53,7 +57,7 @@ with all nodes running |PXC| 5.7 in separate containers on one host:
       -e CLUSTER_JOIN=node1 \
       --name=node3 \
       --net=pxc-network \
-      percona/percona-xtradb-cluster:5.7
+      percona/percona-xtradb-cluster:8.0
 
 To ensure that the cluster is running:
 
