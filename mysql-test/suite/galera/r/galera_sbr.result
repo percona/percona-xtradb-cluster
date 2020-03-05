@@ -1,3 +1,7 @@
+SET PERSIST binlog_format = 'STATEMENT';
+ERROR 42000: Variable 'binlog_format' can't be set to the value of 'STATEMENT'
+SET PERSIST binlog_format = 'MIXED';
+ERROR 42000: Variable 'binlog_format' can't be set to the value of 'MIXED'
 SET GLOBAL binlog_format = 'STATEMENT';
 ERROR 42000: Variable 'binlog_format' can't be set to the value of 'STATEMENT'
 SET SESSION binlog_format = 'STATEMENT';
@@ -12,4 +16,6 @@ COUNT(*) = 2
 1
 DROP TABLE t1;
 SET GLOBAL binlog_format = 'ROW';
+SET PERSIST binlog_format = 'ROW';
+RESET PERSIST binlog_format;
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED");

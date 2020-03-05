@@ -9,6 +9,11 @@
 --connection node_1
 # Not allowed in PXC
 --error ER_WRONG_VALUE_FOR_VAR
+SET PERSIST binlog_format = 'STATEMENT';
+--error ER_WRONG_VALUE_FOR_VAR
+SET PERSIST binlog_format = 'MIXED';
+
+--error ER_WRONG_VALUE_FOR_VAR
 SET GLOBAL binlog_format = 'STATEMENT';
 --disable_warnings
 --error ER_WRONG_VALUE_FOR_VAR
@@ -32,5 +37,7 @@ DROP TABLE t1;
 
 --connection node_1
 SET GLOBAL binlog_format = 'ROW';
+SET PERSIST binlog_format = 'ROW';
 
+RESET PERSIST binlog_format;
 call mtr.add_suppression("Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED");

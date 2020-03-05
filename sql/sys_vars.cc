@@ -1228,7 +1228,8 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var) {
        var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED);
 
   if (WSREP(thd) && stmt_or_mixed &&
-      (var->type == OPT_GLOBAL || var->type == OPT_SESSION)) {
+      (var->type == OPT_GLOBAL || var->type == OPT_SESSION ||
+       var->type == OPT_PERSIST)) {
     /* Setting binlog format to MIXED/STATEMENT is not allowed. */
     WSREP_ERROR(
         "Percona-XtraDB-Cluster prohibits setting"
