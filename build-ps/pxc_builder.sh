@@ -310,9 +310,6 @@ install_deps() {
 --slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake3 \
 --family cmake
         fi
-        if [ "x$RHEL" = "x6" ]; then
-            yum -y install Percona-Server-shared-56
-        fi
         yum -y install yum-utils
     else
         apt-get -y install dirmngr || true
@@ -341,9 +338,6 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        if [ x"${DIST}" = xcosmic ]; then
-            apt-get -y install libssl1.0-dev libeatmydata1
-        fi
         wget https://repo.percona.com/apt/percona-release_latest.generic_all.deb
         dpkg -i percona-release_latest.generic_all.deb
         apt-get update
@@ -710,11 +704,7 @@ build_deb(){
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
     export MYSQL_BUILD_CXXFLAGS="$CXXFLAGS"
 
-    if [ x"${DEBIAN_VERSION}" = xbionic ]; then
-        sed -i "s:iproute:iproute2:g" debian/control
-    fi
-    if [ x"${DEBIAN_VERSION}" = xcosmic ]; then
-        sed -i "s:libssl-dev:libssl1.0-dev:" debian/control
+    if [[ "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" ]]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
