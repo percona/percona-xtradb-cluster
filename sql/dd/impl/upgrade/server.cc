@@ -470,6 +470,65 @@ static void create_upgrade_file() {
 
 }  // namespace
 
+#ifdef WITH_WSREP
+
+bool pxc_fix_mysql_tables(THD *thd) {
+  const LEX_CSTRING section_start { STRING_WITH_LEN("#! PXC_SECTION::START") };
+  const LEX_CSTRING section_end { STRING_WITH_LEN("#! PXC_SECTION::END") };
+
+  const char **query_ptr;
+  bool in_pxc_section = false;
+
+  if (ignore_error_and_execute(thd, "USE mysql")) {
+    WSREP_ERROR("Could not run PXC upgrade. Could not change database to 'mysql'");
+    return true;
+  }
+
+  for (query_ptr = &mysql_fix_privilege_tables[0]; *query_ptr != NULL;
+       query_ptr++) {
+
+    if (!strncmp(*query_ptr, section_start.str, section_start.length)) {
+      in_pxc_section = true;
+    }
+    else if (!strncmp(*query_ptr, section_end.str, section_end.length)) {
+      in_pxc_section = false;
+    }
+
+    if (in_pxc_section) {
+      if (ignore_error_and_execute(thd, *query_ptr)) return true;
+    }
+  }
+  return false;
+}
+
+bool upgrade_pxc_only(THD *thd) {
+  Disable_autocommit_guard autocommit_guard(thd);
+  Bootstrap_error_handler bootstrap_error_handler;
+
+  Server_option_guard<bool> acl_guard(&opt_noacl, true);
+  Server_option_guard<bool> general_log_guard(&opt_general_log, false);
+  Server_option_guard<bool> slow_log_guard(&opt_slow_log, false);
+  Server_option_guard<bool> bin_log_guard(&thd->variables.sql_log_bin, false);
+
+  log_sink_buffer_check_timeout();
+
+  bootstrap_error_handler.set_log_error(false);
+
+  bool err = pxc_fix_mysql_tables(thd);
+
+  bootstrap_error_handler.set_log_error(true);
+
+  if (!err) {
+    WSREP_SYSTEM("PXC upgrade completed successfully");
+  }
+
+  log_sink_buffer_check_timeout();
+
+  return dd::end_transaction(thd, err);
+}
+
+#endif  /* WITH_WSREP */
+
 /*
   This function runs checks on the database before running the upgrade to make
   sure that the database is ready to be upgraded to a newer version. New checks
