@@ -162,7 +162,7 @@ get_sources(){
     export MYSQL_RELEASE="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 
     PRODUCT=Percona-XtraDB-Cluster-80
-    PRODUCT_FULL=Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
+    PRODUCT_FULL=Percona-XtraDB-Cluster-${MYSQL_VERSION}
 
     echo "WSREP_VERSION=${WSREP_VERSION}" > ${WORKDIR}/pxc-80.properties
     echo "WSREP_REV=${WSREP_REV}" >> ${WORKDIR}/pxc-80.properties
@@ -288,7 +288,7 @@ install_deps() {
             percona-release enable tools release
             yum -y install epel-release
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc zstd zstd-devel
-            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata jemalloc-devel
+            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel
             yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static
             yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
             until yum -y install centos-release-scl; do
@@ -419,8 +419,8 @@ build_srpm(){
     tar -xzf ${TARFILE}
     rm -rf ${TARFILE}
     PXCDIR=$(ls | grep 'Percona-XtraDB-Cluster*' | sort | tail -n1)
-    mv ${PXCDIR} Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
-    tar -zcf Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}.tar.gz Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
+    mv ${PXCDIR} Percona-XtraDB-Cluster-${MYSQL_VERSION}
+    tar -zcf Percona-XtraDB-Cluster-${MYSQL_VERSION}.tar.gz Percona-XtraDB-Cluster-${MYSQL_VERSION}
     rm -rf ${PXCDIR}
     cd ${WORKDIR} || exit
     #
@@ -594,17 +594,17 @@ build_source_deb(){
     VERSION=$MYSQL_VERSION
     SHORTVER=$(echo ${VERSION} | awk -F '.' '{print $1"."$2}')
     RELEASE=$MYSQL_RELEASE
-    rm -fr ${HNAME}-${VERSION}-${WSREP_VERSION}
+    rm -fr ${HNAME}-${VERSION}
 
     #
-    NEWTAR=${NAME}_${VERSION}-${WSREP_VERSION}.orig.tar.gz
+    NEWTAR=${NAME}_${VERSION}.orig.tar.gz
     mv ${TARFILE} ${NEWTAR}
 
     DEBIAN_VERSION="$(lsb_release -sc)"
 
     #
     tar xzf ${NEWTAR}
-    cd ${HNAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION} || exit
+    cd ${HNAME}-${VERSION}-${MYSQL_RELEASE} || exit
     cp -ap build-ps/debian/ .
     sed -i "s:@@MYSQL_VERSION@@:${VERSION}:g" debian/changelog
     sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" debian/changelog
@@ -614,7 +614,7 @@ build_source_deb(){
     sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" debian/rules
 
 
-    dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}-$WSREP_VERSION"
+    dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}"
     dpkg-buildpackage -S
     #
     rm -fr ${HNAME}-${VERSION}-${RELEASE}
@@ -669,7 +669,7 @@ build_deb(){
     export CXXFLAGS=" $COMMON_FLAGS -Wno-virtual-move-assign  ${CXXFLAGS:-}"
 
     DSC=$(basename $(find . -name '*.dsc' | sort | tail -n 1))
-    DIRNAME=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $1"-"$2"-"$3"-"$4"-"$5}' | sed -e s:.dsc::)
+    DIRNAME=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $1"-"$2"-"$3"-"$4}' | sed -e s:.dsc::)
     rm -rf $DIRNAME
 
     #
@@ -709,7 +709,7 @@ build_deb(){
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
     sudo chmod 777 debian/rules
-    dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
+    dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
@@ -758,12 +758,12 @@ build_tarball(){
     VERSION=$MYSQL_VERSION
     RELEASE=$WSREP_VERSION
 
-    export PXC_DIRNAME=${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION}
+    export PXC_DIRNAME=${NAME}-${VERSION}-${MYSQL_RELEASE}
 
     tar zxf $TARFILE
     rm -f $TARFILE
     #
-    cd ${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION} || exit
+    cd ${NAME}-${VERSION}-${MYSQL_RELEASE} || exit
 
     BUILD_NUMBER=$(date "+%Y%m%d-%H%M%S")
     mkdir -p $BUILD_NUMBER

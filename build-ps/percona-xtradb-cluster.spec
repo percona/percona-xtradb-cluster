@@ -103,9 +103,9 @@ Prefix: %{_sysconfdir}
 
 %define release_tag     %{nil}
 %if %{undefined dist}
-    %define release         %{release_tag}%{wsrep_version}.%{rpm_version}.%{distribution}
+    %define release         %{release_tag}%{rpm_version}.%{distribution}
 %else
-    %define release         %{release_tag}%{wsrep_version}.%{rpm_version}.%{dist}
+    %define release         %{release_tag}%{rpm_version}.%{dist}
 %endif
 
 #
@@ -144,7 +144,7 @@ Prefix: %{_sysconfdir}
 %if %{undefined src_base}
   %define src_base Percona-XtraDB-Cluster
 %endif
-%define src_dir %{src_base}-%{mysql_version}-%{wsrep_version}
+%define src_dir %{src_base}-%{mysql_version}
 
 %if %{undefined feature_set}
   %define feature_set community
@@ -157,7 +157,7 @@ Prefix: %{_sysconfdir}
     %define compilation_comment_release     Percona XtraDB Cluster (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
 
-%define server_suffix -80
+#%define server_suffix -80
 
 %if 0%{?rhel} > 6
     %define distro_req           chkconfig nmap
@@ -684,7 +684,7 @@ mkdir debug
            -DWITH_ZLIB=system \
            -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DMYSQL_SERVER_SUFFIX="" \
            %{?mecab_option} \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
@@ -724,7 +724,7 @@ mkdir release
            -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DMYSQL_SERVER_SUFFIX="" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags}
