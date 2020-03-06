@@ -5638,8 +5638,6 @@ finish:
 #ifdef WITH_WSREP
 
   thd->wsrep_consistency_check = NO_CONSISTENCY_CHECK;
-  /* If DDL has failed then avoid SE checkpoint. */
-  thd->wsrep_skip_SE_checkpoint = (res || thd->is_error());
   WSREP_TO_ISOLATION_END;
 
   /*

@@ -2073,10 +2073,7 @@ static void wsrep_TOI_end(THD *thd) {
   thd_proc_info(thd, thd->wsrep_info);
 
   if (wsrep_thd_is_local_toi(thd)) {
-    /* Skip update of SE checkpoint if the TOI/DDL failed. */
-    if (!thd->wsrep_skip_SE_checkpoint) {
-      wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
-    }
+    wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
 
     int ret = client_state.leave_toi_local(wsrep::mutable_buffer());
     if (!ret) {
