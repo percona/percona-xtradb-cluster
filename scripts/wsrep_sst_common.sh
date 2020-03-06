@@ -668,6 +668,16 @@ function run_post_processing_steps()
         # We don't have readlink, so look for mysqld in the path
         mysqld_path=$(which ${MYSQLD_NAME})
     fi
+    if [[ $mysqld_path == *"memcheck"* ]]; then
+      wsrep_log_debug "Detected valgrind, adjusting mysqld path accordingly"
+      while read -r line
+      do
+        if [[ ${line::1} != "-" ]]; then
+          mysqld_path=$line
+          wsrep_log_debug "Adjusted mysqld to $line"
+        fi
+      done < <(cat /proc/${WSREP_SST_OPT_PARENT}/cmdline | strings -1)
+    fi
     if [[ -z $mysqld_path ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Could not locate ${MYSQLD_NAME} (needed for post-processing)"
