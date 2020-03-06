@@ -275,7 +275,7 @@ else
     REVISION=""
 fi
 COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION"
-COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
+COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
 
 #-------------------------------------------------------------------------------
 #
