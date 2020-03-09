@@ -17,6 +17,10 @@
 
 set -e
 
+if [ -d /run/systemd/system ] && [ "$1" = remove ]; then
+        deb-systemd-invoke stop 'mysql@bootstrap' >/dev/null || true
+fi
+
 #DEBHELPER#
 
 set +e
