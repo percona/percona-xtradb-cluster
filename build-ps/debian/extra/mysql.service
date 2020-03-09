@@ -87,9 +87,6 @@ ExecReload=/usr/bin/mysql-systemd reload
 
 KillSignal=SIGTERM
 
-# Don't want to see an automated SIGKILL ever
-SendSIGKILL=no
-
 # Restart crashed server only, on-failure would also restart, for example, when
 # my.cnf contains unknown option
 Restart=on-abort
