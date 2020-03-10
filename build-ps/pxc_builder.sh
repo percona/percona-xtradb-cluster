@@ -554,7 +554,7 @@ build_rpm(){
 
     cd ${WORKDIR}  || exit
     source /opt/rh/devtoolset-7/enable
-    source ${WORKDIR}/pxc-80.properties
+    source ${WORKDIR}/srpm/pxc-80.properties
     #
     if [ ${ARCH} = x86_64 ]; then
         rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
