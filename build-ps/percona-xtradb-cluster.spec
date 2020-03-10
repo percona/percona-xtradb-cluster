@@ -616,6 +616,9 @@ yumdownloader percona-xtrabackup-24
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
+mv lib64 lib
+￼mv lib/xtrabackup/* lib/
+￼rm -rf lib/xtrabackup
 rm -rf usr
 rm -f *.rpm
 popd
