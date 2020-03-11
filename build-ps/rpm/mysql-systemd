@@ -1,4 +1,4 @@
-#! /bin/bash -ue
+#!/bin/bash -ue
 #
 # Scripts to run by PXC systemd service
 # 

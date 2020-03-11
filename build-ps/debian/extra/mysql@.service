@@ -89,7 +89,7 @@ ExecStartPre=/usr/bin/mysql-systemd start-pre
 # It is always safe to unset _WSREP_START_POSITION environment variable.
 
 ExecStartPre=/bin/sh -c "systemctl unset-environment _WSREP_START_POSITION"
-ExecStartPre=/bin/sh -c "VAR=`/usr/bin/mysql-systemd galera-recovery`; [ $? -eq 0 ] && systemctl set-environment _WSREP_START_POSITION=$VAR || exit 1"
+ExecStartPre=/bin/sh -c "VAR=`bash /usr/bin/mysql-systemd galera-recovery`; [ $? -eq 0 ] && systemctl set-environment _WSREP_START_POSITION=$VAR || exit 1"
 
 # Start main service
 ExecStart=/usr/sbin/mysqld $EXTRA_ARGS $_WSREP_START_POSITION
