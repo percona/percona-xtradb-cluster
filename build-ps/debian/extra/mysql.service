@@ -21,7 +21,10 @@ Alias=mysqld.service
 ##
 
 Type=notify
-#TimeoutStartSec=300
+
+# Disable service start timeout for proper SST completion
+TimeoutStartSec=0
+
 # Setting this to true can break replication and the Type=notify settings
 # See also bind-address mysqld option.
 PrivateNetwork=false
