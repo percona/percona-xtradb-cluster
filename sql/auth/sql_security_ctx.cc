@@ -43,6 +43,9 @@
 #include "sql/auth/sql_auth_cache.h"
 #include "sql/auth/sql_authorization.h"
 #include "sql/current_thd.h"
+#ifdef WITH_WSREP
+#include "sql/debug_sync.h"
+#endif /* WITH_WSREP */
 #include "sql/mysqld.h"
 #include "sql/sql_class.h"
 #include "sql/table.h"
@@ -634,6 +637,16 @@ std::pair<bool, bool> Security_context::has_global_grant(const char *priv,
     User_to_dynamic_privileges_map::iterator it, it_end;
     std::tie(it, it_end) = get_dynamic_privileges_map()->equal_range(key);
     it = std::find(it, it_end, privilege);
+
+#ifdef WITH_WSREP
+    DBUG_EXECUTE_IF("has_global_grant_hold_lock", {
+      const char act[] =
+          "now signal has_global_grant.got_lock wait_for"
+          "has_global_grant.release_lock";
+      DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+    });
+#endif /* WITH_WSREP */
+
     if (it != it_end) {
       return std::make_pair(true, it->second.second);
     }
