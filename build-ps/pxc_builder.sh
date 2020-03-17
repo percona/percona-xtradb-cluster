@@ -342,7 +342,7 @@ install_deps() {
         dpkg -i percona-release_latest.generic_all.deb
         apt-get update
         apt-get -y install --download-only percona-xtrabackup-24
-        apt-get -y install --download-only percona-xtrabackup-80
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.9-1.${DIST}
     fi
     return;
 }
@@ -789,7 +789,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80
+        yumdownloader percona-xtrabackup-80-8.0.9
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
