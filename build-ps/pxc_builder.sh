@@ -340,6 +340,7 @@ install_deps() {
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         wget https://repo.percona.com/apt/percona-release_latest.generic_all.deb
         dpkg -i percona-release_latest.generic_all.deb
+        percona-release enable tools release
         apt-get update
         apt-get -y install --download-only percona-xtrabackup-24
         apt-get -y install --download-only percona-xtrabackup-80=8.0.9-1.${DIST}
