@@ -375,6 +375,61 @@ Possible values for this variable are:
 .. |binlog_format| replace:: ``binlog_format``
 .. _binlog_format: https://dev.mysql.com/doc/refman/5.7/en/binary-log-setting.html
 
+.. variable:: wsrep_min_log_verbosity
+
+   :cli: ``--wsrep-min-log-verbosity``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: 3
+
+This variable defines the *minimum* logging verbosity of wsrep/Galera and acts
+in conjunction with the ``log_error_verbosity`` variable. The
+:variable:`wsrep_min_log_verbosity` has the same values as
+``log_error_verbosity``.
+
+The actual log verbosity of wsrep/Galera can be greater than the value of
+:variable:`wsrep_min_log_verbosity` if ``log_error_verbosity`` is greater than
+:variable:`wsrep_min_log_verbosity`.
+
+A few examples:
+
+.. list-table::
+   :header-rows: 1
+
+   * - log_error_verbosity
+     - wsrep_min_log_verbosity
+     - |MySQL| Logs Verbosity
+     - wsrep Logs Verbosity
+   * - 2
+     - 3
+     - system error, warning
+     - system error, warning, info
+   * - 1
+     - 3
+     - system error
+     - system error, warning, info
+   * - 1
+     - 2
+     - system error
+     - system error, warning
+   * - 3
+     - 1
+     - system error, warning, info
+     - system error, warning, info
+
+Note the case where ``log_error_verbosity=3`` and
+``wsrep_min_log_verbosity=1``. The actual log verbosity of wsrep/Galera is *3*
+(system error, warning, info) because ``log_error_verbosity`` is greater.
+       
+.. seealso::
+
+   |MySQL| Documentation: log_error_verbosity
+      https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_log_error_verbosity
+   |galera-cluster| Documentation: Database Server Logs
+      https://galeracluster.com/library/documentation/log.html
+
+
 .. variable:: wsrep_load_data_splitting
 
    :cli: ``--wsrep-load-data-splitting``
