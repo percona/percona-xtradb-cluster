@@ -485,7 +485,7 @@ enum_return_status Gtid_state::generate_automatic_gtid(
 
     if (WSREP(thd) && !seqno_undefined && !thd->wsrep_skip_wsrep_GTID)
       automatic_gtid.sidno = wsrep_sidno;
-    else
+    else if (automatic_gtid.sidno == 0)
       automatic_gtid.sidno = get_server_sidno();
 #else
     if (automatic_gtid.sidno == 0) automatic_gtid.sidno = get_server_sidno();
