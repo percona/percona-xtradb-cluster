@@ -12509,8 +12509,7 @@ int ha_innobase::wsrep_append_keys(
           table_share->table_name.str, wsrep_thd_query(thd));
 #endif /* WSREP_DEBUG_PRINT */
 
-  if (table_share && table_share->tmp_table != NO_TMP_TABLE &&
-      thd_sql_command(thd) != SQLCOM_CREATE_TABLE) {
+  if (table_share && table_share->tmp_table != NO_TMP_TABLE) {
     WSREP_DEBUG(
         "Skip appending keys to write-set for"
         " temporary-tables DML (THD: %u tmp: %d SQL: %s)",

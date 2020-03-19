@@ -340,9 +340,10 @@ install_deps() {
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         wget https://repo.percona.com/apt/percona-release_latest.generic_all.deb
         dpkg -i percona-release_latest.generic_all.deb
+        percona-release enable tools release
         apt-get update
         apt-get -y install --download-only percona-xtrabackup-24
-        apt-get -y install --download-only percona-xtrabackup-80
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.9-1.${DIST}
     fi
     return;
 }
@@ -554,11 +555,12 @@ build_rpm(){
 
     cd ${WORKDIR}  || exit
     source /opt/rh/devtoolset-7/enable
+    source ${CURDIR}/srpm/pxc-80.properties
     #
     if [ ${ARCH} = x86_64 ]; then
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $RPM_RELEASE" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     else
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $RPM_RELEASE" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     fi
     return_code=$?
     if [ $return_code != 0 ]; then
@@ -779,16 +781,22 @@ build_tarball(){
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib* ./
+        mv lib64 lib
+        mv lib/xtrabackup/* lib/ || true
+        rm -rf lib/xtrabackup
         rm -rf usr
         rm -f *.rpm
         popd
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80
+        yumdownloader percona-xtrabackup-80-8.0.9
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
-        mv usr/lib* ./
+        mv usr/lib64 ./
+        mv lib64 lib
+        mv lib/xtrabackup/* lib/
+        rm -rf lib/xtrabackup
         rm -rf usr
         rm -f *.rpm
         popd

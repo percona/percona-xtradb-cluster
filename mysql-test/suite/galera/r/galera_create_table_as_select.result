@@ -84,3 +84,12 @@ SELECT * FROM t1;
 ERROR 42S02: Table 'test.t1' doesn't exist
 CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query");
 DROP TABLE t1, t2;
+SET big_tables=ON;
+CREATE TABLE t1 (id INT, a INT, b INT, PRIMARY KEY pkid(id));
+INSERT INTO t1 VALUES (1, 2, 1);
+INSERT INTO t1 VALUES (2, 2, 1);
+CREATE TEMPORARY TABLE t2 AS SELECT a, count(*) c FROM t1 GROUP BY a;
+SHOW TABLES;
+Tables_in_test
+t1
+DROP TABLE t1, t2;

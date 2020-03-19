@@ -161,3 +161,24 @@ CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query");
 
 --connection node_1
 DROP TABLE t1, t2;
+
+#
+# This scenario creates intermediate temporary table to be created
+# as the result of SELECT ... FROM .. GROUP BY
+# SET big_tables=ON causes all temporary tables to be created as InnoDB tables.
+# As we are creating temporary table we are not in TOI mode. However we expect that
+# creation of immediate InnoDB temporary table is still handled correctly 
+# (not attempted to be replicated).
+#  
+
+SET big_tables=ON;
+CREATE TABLE t1 (id INT, a INT, b INT, PRIMARY KEY pkid(id));
+INSERT INTO t1 VALUES (1, 2, 1);
+INSERT INTO t1 VALUES (2, 2, 1);
+CREATE TEMPORARY TABLE t2 AS SELECT a, count(*) c FROM t1 GROUP BY a;
+
+--connection node_2
+SHOW TABLES;
+
+--connection node_1
+DROP TABLE t1, t2;
