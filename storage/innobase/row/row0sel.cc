@@ -4410,7 +4410,6 @@ static row_to_range_relation_t row_compare_row_to_range(
           row_to_range_relation.row_can_be_in_range = false;
           if (prebuilt->m_stop_tuple_found) {
             ut_ad(stop_len == index_len);
-            ut_ad(direction != 0);
             row_to_range_relation.gap_can_intersect_range = false;
             return (row_to_range_relation);
           }
