@@ -43,7 +43,7 @@ Features of |PXC| include:
 * **Automatic configuration of SSL encryption**
 
   |PXC| includes the ``pxc-encrypt-cluster-traffic`` variable
-  that enables automatic configuration of SSL encrytion.
+  that enables automatic configuration of SSL encryption.
 
 * **Optimized Performance**
 
