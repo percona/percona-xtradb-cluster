@@ -13,7 +13,6 @@
    with this program; if not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. */
 
-
 #ifndef WSREP_SCHEMA_H
 #define WSREP_SCHEMA_H
 
@@ -33,12 +32,10 @@ struct TABLE_LIST;
 
 /** Name of the table in `wsrep_schema_str` used for storing streaming
 replication data. In an InnoDB full format, e.g. "database/tablename". */
-extern const char* wsrep_sr_table_name_full;
+extern const char *wsrep_sr_table_name_full;
 
-class Wsrep_schema
-{
+class Wsrep_schema {
  public:
-
   Wsrep_schema();
   ~Wsrep_schema();
 
@@ -51,12 +48,12 @@ class Wsrep_schema
   /*
     Store wsrep view info into wsrep schema.
   */
-  int store_view(THD*, const Wsrep_view& view);
+  int store_view(THD *, const Wsrep_view &view);
 
   /*
     Restore view info from stable storage.
   */
-  Wsrep_view restore_view(THD* thd, const Wsrep_id& own_id) const;
+  Wsrep_view restore_view(THD *thd, const Wsrep_id &own_id) const;
 
   /**
     Append transaction fragment to fragment storage.
@@ -72,12 +69,9 @@ class Wsrep_schema
 
     @return Zero in case of success, non-zero on failure.
   */
-  int append_fragment(THD* thd,
-                      const wsrep::id& server_id,
-                      wsrep::transaction_id transaction_id,
-                      wsrep::seqno seqno,
-                      int flags,
-                      const wsrep::const_buffer& data);
+  int append_fragment(THD *thd, const wsrep::id &server_id,
+                      wsrep::transaction_id transaction_id, wsrep::seqno seqno,
+                      int flags, const wsrep::const_buffer &data);
   /**
      Update existing fragment meta data. The fragment must have been
      inserted before using append_fragment().
@@ -87,8 +81,7 @@ class Wsrep_schema
 
      @return Zero in case of success, non-zero on failure.
    */
-  int update_fragment_meta(THD* thd,
-                           const wsrep::ws_meta& ws_meta);
+  int update_fragment_meta(THD *thd, const wsrep::ws_meta &ws_meta);
 
   /**
      Remove fragments from storage. This method must be called
@@ -100,10 +93,9 @@ class Wsrep_schema
      @param transaction_id Identifier of the current transaction
      @param fragments Vector of fragment seqnos to be removed
   */
-  int remove_fragments(THD*                             thd,
-                       const wsrep::id&                 server_id,
-                       wsrep::transaction_id            transaction_id,
-                       const std::vector<wsrep::seqno>& fragments);
+  int remove_fragments(THD *thd, const wsrep::id &server_id,
+                       wsrep::transaction_id transaction_id,
+                       const std::vector<wsrep::seqno> &fragments);
 
   /**
      Replay a transaction from stored fragments. The caller must have
@@ -115,10 +107,9 @@ class Wsrep_schema
 
      @return Zero on success, non-zero on failure.
   */
-  int replay_transaction(THD* thd,
-                         Relay_log_info* rli,
-                         const wsrep::ws_meta& ws_meta,
-                         const std::vector<wsrep::seqno>& fragments);
+  int replay_transaction(THD *thd, Relay_log_info *rli,
+                         const wsrep::ws_meta &ws_meta,
+                         const std::vector<wsrep::seqno> &fragments);
 
   /**
      Recover streaming transactions from SR table.
@@ -129,14 +120,14 @@ class Wsrep_schema
 
      @return Zero on success, non-zero on failure.
   */
-  int recover_sr_transactions(THD* orig_thd);
+  int recover_sr_transactions(THD *orig_thd);
 
  private:
   /* Non-copyable */
-  Wsrep_schema(const Wsrep_schema&);
-  Wsrep_schema& operator=(const Wsrep_schema&);
+  Wsrep_schema(const Wsrep_schema &);
+  Wsrep_schema &operator=(const Wsrep_schema &);
 };
 
-extern Wsrep_schema* wsrep_schema;
+extern Wsrep_schema *wsrep_schema;
 
 #endif /* !WSREP_SCHEMA_H */

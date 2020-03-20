@@ -43,3 +43,26 @@ SELECT COUNT(*) = 1 FROM t2;
 
 DROP TABLE t1;
 DROP TABLE t2;
+
+#-------------------------------------------------------------------------------
+#
+# Use-case: Stimulate a case where-in mysqldump invokes LOCK TABLE FOR BACKUP
+#           and start transaction but rely on connection closure for cleanup.
+#
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--echo #node-1a
+use mysql;
+start transaction;
+lock tables for backup;
+show create table wsrep_cluster;
+
+--connection node_1
+--connection node_1
+--echo #node-1
+#
+--disconnect node_1a
+#
+use mysql;
+select count(*) from wsrep_cluster;

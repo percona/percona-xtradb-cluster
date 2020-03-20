@@ -413,8 +413,8 @@ Check if the transaction is being referenced. */
 
 UNIV_INLINE
 #ifdef WITH_WSREP
-const trx_t *trx_arbitrate(const trx_t *requestor,
-                           const trx_t *holder, bool sync = false);
+const trx_t *trx_arbitrate(const trx_t *requestor, const trx_t *holder,
+                           bool sync = false);
 #else
 const trx_t *trx_arbitrate(const trx_t *requestor, const trx_t *holder);
 #endif /* WITH_WSREP */
@@ -725,7 +725,7 @@ struct trx_lock_t {
 #ifdef WITH_WSREP
   bool was_chosen_as_wsrep_victim; /*!< high priority wsrep thread has
                                    marked this trx to abort */
-#endif /* WITH_WSREP */
+#endif                             /* WITH_WSREP */
 };
 
 /** Type used to store the list of tables that are modified by a given

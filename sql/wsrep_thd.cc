@@ -13,24 +13,23 @@
    with this program; if not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. */
 
-
 #include "mysql/components/services/log_builtins.h"
 
-#include "wsrep_thd.h"
 #include "log_event.h"
+#include "mysql/plugin.h"
 #include "mysqld.h"  // start_wsrep_THD();
-#include "sql/item_func.h"
 #include "rpl_rli.h"
+#include "sql/item_func.h"
+#include "sql/log.h"
 #include "sql_base.h"  // close_thread_tables()
 #include "sql_parse.h"
 #include "transaction.h"
-#include "mysql/plugin.h"
-#include "sql/log.h"
-#include "wsrep_trans_observer.h"
 #include "wsrep_high_priority_service.h"
 #include "wsrep_storage_service.h"
+#include "wsrep_thd.h"
+#include "wsrep_trans_observer.h"
 
-static Wsrep_thd_queue* wsrep_rollback_queue= 0;
+static Wsrep_thd_queue *wsrep_rollback_queue = 0;
 static std::atomic<long long> atomic_wsrep_bf_aborts_counter(0);
 
 int wsrep_show_bf_aborts(THD *, SHOW_VAR *var, char *) {
@@ -168,7 +167,7 @@ static void wsrep_rollback_streaming_aborted_by_toi(THD *thd) {
        the victim only when all the resources have been
       released */
     thd->wsrep_cs().client_service().bf_rollback();
-   wsrep_reset_threadvars(thd);
+    wsrep_reset_threadvars(thd);
     /* Assign saved event_scheduler.data back before letting
        client to continue. */
     thd->event_scheduler.data = saved_esd;
@@ -282,16 +281,11 @@ static void wsrep_rollback_process(THD *rollbacker,
     /* Rollback methods below may free thd pointer. Do not try
        to access it after method returns. */
     if (thd->wsrep_trx().is_streaming() &&
-        thd->wsrep_trx().bf_aborted_in_total_order())
-    {
+        thd->wsrep_trx().bf_aborted_in_total_order()) {
       wsrep_rollback_streaming_aborted_by_toi(thd);
-    }
-    else if (wsrep_thd_is_applying(thd))
-    {
+    } else if (wsrep_thd_is_applying(thd)) {
       wsrep_rollback_high_priority(thd);
-    }
-    else
-    {
+    } else {
       wsrep_rollback_local(thd);
     }
     wsrep_store_threadvars(rollbacker);
@@ -310,7 +304,6 @@ static void wsrep_rollback_process(THD *rollbacker,
 
 void wsrep_create_rollbacker() {
   if (wsrep_cluster_address && wsrep_cluster_address[0] != 0) {
-
     /* create rollbacker */
     Wsrep_thd_args *args = new Wsrep_thd_args(wsrep_rollback_process, 0);
     if (create_wsrep_THD(key_THREAD_wsrep_rollbacker, args))
@@ -343,7 +336,7 @@ int wsrep_abort_thd(const THD *bf_thd, THD *victim_thd, bool signal) {
                 (bf_thd) ? (long long)bf_thd->real_id : 0,
                 (long long)victim_thd->real_id);
     mysql_mutex_unlock(&victim_thd->LOCK_wsrep_thd);
-    ha_wsrep_abort_transaction(const_cast<THD*>(bf_thd), victim_thd, signal);
+    ha_wsrep_abort_transaction(const_cast<THD *>(bf_thd), victim_thd, signal);
     mysql_mutex_lock(&victim_thd->LOCK_wsrep_thd);
   } else {
     WSREP_DEBUG(
@@ -451,13 +444,12 @@ void wsrep_assign_from_threadvars(THD *) {
 #endif
 }
 
-Wsrep_threadvars wsrep_save_threadvars()
-{
+Wsrep_threadvars wsrep_save_threadvars() {
 #if 0
     return Wsrep_threadvars{
         current_thd, (st_my_thread_var *)pthread_getspecific(THR_KEY_mysys)};
 #endif
-    return Wsrep_threadvars{current_thd, 0};
+  return Wsrep_threadvars{current_thd, 0};
 }
 
 void wsrep_restore_threadvars(const Wsrep_threadvars &) {
@@ -486,4 +478,3 @@ void wsrep_reset_threadvars(THD *thd) {
 #endif
   thd->restore_globals();
 }
-

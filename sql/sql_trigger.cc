@@ -69,8 +69,8 @@
 #include "thr_lock.h"
 
 #ifdef WITH_WSREP
-#include "sql_parse.h"                  // create_default_definer
-#endif /* WITH_WSREP */
+#include "sql_parse.h"  // create_default_definer
+#endif                  /* WITH_WSREP */
 
 namespace dd {
 class Schema;
@@ -730,7 +730,7 @@ int wsrep_create_trigger_query(THD *thd, uchar **buf, size_t *buf_len) {
   append_definer(thd, &stmt_query, definer_user, definer_host);
 
   LEX_STRING stmt_definition;
-  stmt_definition.str = const_cast<char*>(thd->lex->stmt_definition_begin);
+  stmt_definition.str = const_cast<char *>(thd->lex->stmt_definition_begin);
   stmt_definition.length =
       thd->lex->stmt_definition_end - thd->lex->stmt_definition_begin;
   trim_whitespace(thd->charset(), &stmt_definition);
@@ -741,4 +741,3 @@ int wsrep_create_trigger_query(THD *thd, uchar **buf, size_t *buf_len) {
                              buf_len);
 }
 #endif /* WITH_WSREP */
-

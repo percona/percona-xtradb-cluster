@@ -2216,7 +2216,6 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success) {
         */
         WSREP_DEBUG("Skipping after_command hook for killed SP");
       } else {
-
         const bool must_replay = wsrep_must_replay(thd);
 
         (void)wsrep_after_statement(thd);

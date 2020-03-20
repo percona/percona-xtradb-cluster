@@ -19,3 +19,22 @@ COUNT(*) = 1
 1
 DROP TABLE t1;
 DROP TABLE t2;
+#node-1a
+use mysql;
+start transaction;
+lock tables for backup;
+show create table wsrep_cluster;
+Table	Create Table
+wsrep_cluster	CREATE TABLE `wsrep_cluster` (
+  `cluster_uuid` char(36) NOT NULL,
+  `view_id` bigint(20) NOT NULL,
+  `view_seqno` bigint(20) NOT NULL,
+  `protocol_version` int(11) NOT NULL,
+  `capabilities` int(11) NOT NULL,
+  PRIMARY KEY (`cluster_uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+#node-1
+use mysql;
+select count(*) from wsrep_cluster;
+count(*)
+1

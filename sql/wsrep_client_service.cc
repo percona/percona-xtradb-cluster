@@ -14,6 +14,8 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 #include "wsrep_client_service.h"
+#include "debug_sync.h"
+#include "item_func.h"
 #include "mysql/components/services/log_builtins.h"
 #include "wsrep_applier.h" /* wsrep_apply_events() */
 #include "wsrep_binlog.h"  /* wsrep_dump_rbr_buf() */
@@ -22,8 +24,6 @@
 #include "wsrep_thd.h"
 #include "wsrep_trans_observer.h"
 #include "wsrep_xid.h"
-#include "item_func.h"
-#include "debug_sync.h"
 
 #include "log.h"         /* stmt_has_updated_trans_table() */
 #include "rpl_filter.h"  /* binlog_filter */
@@ -53,13 +53,9 @@ Wsrep_client_service::Wsrep_client_service(THD *thd,
                                            Wsrep_client_state &client_state)
     : wsrep::client_service(), m_thd(thd), m_client_state(client_state) {}
 
-void Wsrep_client_service::store_globals() {
-  wsrep_store_threadvars(m_thd);
-}
+void Wsrep_client_service::store_globals() { wsrep_store_threadvars(m_thd); }
 
-void Wsrep_client_service::reset_globals() {
-  wsrep_reset_threadvars(m_thd);
-}
+void Wsrep_client_service::reset_globals() { wsrep_reset_threadvars(m_thd); }
 
 bool Wsrep_client_service::interrupted(
     wsrep::unique_lock<wsrep::mutex> &lock WSREP_UNUSED) const {
@@ -118,11 +114,11 @@ void Wsrep_client_service::cleanup_transaction() {
   m_thd->wsrep_affected_rows = 0;
 
   m_thd->wsrep_skip_wsrep_GTID = false;
-  m_thd->wsrep_skip_SE_checkpoint = false;
   m_thd->run_wsrep_commit_hooks = false;
   m_thd->run_wsrep_ordered_commit = false;
   m_thd->wsrep_enforce_group_commit = false;
   m_thd->wsrep_post_insert_error = false;
+  m_thd->wsrep_stmt_transaction_rolled_back = false;
   m_thd->wsrep_force_savept_rollback = false;
 
   if (m_thd->wsrep_non_replicating_atomic_ddl) {
@@ -157,7 +153,7 @@ int Wsrep_client_service::prepare_fragment_for_replication(
 
   int ret = 0;
   size_t total_length = 0;
-  unsigned char* read_pos = NULL;
+  unsigned char *read_pos = NULL;
   my_off_t read_len = 0;
 
   if (cache->begin(&read_pos, &read_len, thd->wsrep_sr().bytes_certified())) {
@@ -322,6 +318,9 @@ int Wsrep_client_service::bf_rollback() {
   if (m_thd->locked_tables_mode && m_thd->lock) {
     m_thd->locked_tables_list.unlock_locked_tables(m_thd);
     m_thd->variables.option_bits &= ~OPTION_TABLE_LOCK;
+  }
+  if (m_thd->backup_tables_lock.is_acquired()) {
+    m_thd->backup_tables_lock.release(m_thd);
   }
   if (m_thd->global_read_lock.is_acquired()) {
     m_thd->global_read_lock.unlock_global_read_lock(m_thd);

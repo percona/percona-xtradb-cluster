@@ -180,8 +180,8 @@
 #ifdef WITH_WSREP
 #include "wsrep_binlog.h"
 #include "wsrep_mysqld.h"
-#include "wsrep_thd.h"
 #include "wsrep_sst.h"
+#include "wsrep_thd.h"
 #include "wsrep_trans_observer.h"
 
 static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
@@ -1223,8 +1223,8 @@ static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables) {
     /* PXC-2557 : skip if NULL, otherwise lex_string_set will crash */
     if (!table->db || !table->table_name) continue;
 
-    lex_cstring_set(&db, const_cast<char*> (table->db));
-    lex_cstring_set(&tn, const_cast<char*> (table->table_name));
+    lex_cstring_set(&db, const_cast<char *>(table->db));
+    lex_cstring_set(&tn, const_cast<char *>(table->table_name));
     c = get_table_category(db, tn);
     if (c != TABLE_CATEGORY_INFORMATION && c != TABLE_CATEGORY_PERFORMANCE) {
       return false;
@@ -1620,7 +1620,6 @@ static void check_secondary_engine_statement(THD *thd,
                                              Parser_state *parser_state,
                                              const char *query_string,
                                              size_t query_length) {
-
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     /* While running in cluster mode disable the check for now */
@@ -2490,37 +2489,19 @@ dispatch_end:
     WSREP_LOG_THD(thd, "leave");
   }
 
-  do_end_of_statement = false;
+  do_end_of_statement = true;
   if (WSREP(thd)) {
     /* wsrep BF abort in query exec phase */
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     do_end_of_statement =
-        thd->wsrep_trx().state() != wsrep::transaction::s_replaying &&
-        !thd->killed;
+        !(thd->wsrep_trx().state() != wsrep::transaction::s_replaying &&
+          !thd->killed);
 
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  } else
-    do_end_of_statement = true;
+  }
 
-  if (do_end_of_statement) {
-    DBUG_ASSERT((thd->open_tables == NULL ||
-                 (thd->locked_tables_mode == LTM_LOCK_TABLES)));
-
-    /* Update user statistics only if at least one timer was initialized */
-    if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0)) {
-      userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
-                            &thd->cpu_time);
-      /* Updates THD stats and the global user stats. */
-      thd->update_stats(true);
-      update_global_user_stats(thd, true, my_getsystime());
-    }
-
-    /* Finalize server status flags after executing a command. */
-    thd->update_slow_query_status();
-    if (thd->killed) thd->send_kill_message();
-    thd->send_statement_status();
-  } else {
 #endif /* WITH_WSREP */
+
 done:
   DBUG_ASSERT(thd->open_tables == NULL ||
               (thd->locked_tables_mode == LTM_LOCK_TABLES));
@@ -2545,8 +2526,10 @@ done:
     error = clone_cmd->execute_server(thd);
   }
 
-  thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
-
+#ifdef WITH_WSREP
+  if (do_end_of_statement) {
+#endif /* WITH_WSREP */
+    thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
 #ifdef WITH_WSREP
   }
 #endif /* WITH_WSREP */
@@ -2640,7 +2623,7 @@ bool shutdown(THD *thd, enum mysql_enum_shutdown_level level) {
     goto error; /* purecov: inspected */
 
 #ifdef WITH_WSREP
-  (void) wsrep_remove_sst_user(false);
+  (void)wsrep_remove_sst_user(false);
 #endif /* WITH_WSREP */
 
   if (level == SHUTDOWN_DEFAULT)
@@ -3388,7 +3371,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
     */
     if (trans_check_state(thd)) return -1;
 
-    /* Commit the normal transaction if one is active. */
+      /* Commit the normal transaction if one is active. */
 #ifdef WITH_WSREP
     if (trans_commit_implicit(thd)) {
       thd->mdl_context.release_transactional_locks();
@@ -3406,9 +3389,21 @@ int mysql_execute_command(THD *thd, bool first_level) {
     thd->mdl_context.release_transactional_locks();
 
 #ifdef WITH_WSREP
-    /* Clean up the previous transaction on implicit commit */
-    if (wsrep_thd_is_local(thd) && wsrep_after_statement(thd)) {
-      return -1;
+    /*
+     Clean up the previous transaction on implicit commit.
+     If it was not empty transaction, it already has been commited
+     to Galera in trans_commit_implicit().
+     If it was empty transaction (no work sets), trans_commit_implicit()
+     did nothing to Galera, so we need to commit empty transaction.
+    */
+    if (wsrep_thd_is_local(thd)) {
+      if (wsrep_has_changes(thd)) {
+        if (wsrep_after_statement(thd)) {
+          return -1;
+        }
+      } else {
+        wsrep_commit_empty(thd, true);
+      }
     }
 #endif /* WITH_WSREP */
   }
@@ -4219,7 +4214,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
     }
 
     case SQLCOM_UNLOCK_TABLES: {
-
 #ifdef WITH_WSREP
       /* UNLOCK Tables is generic statement and not all lock table variants
       are blocked (only one with explict table lock are blocked). */
@@ -4333,7 +4327,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
 
       break;
     case SQLCOM_CREATE_COMPRESSION_DICTIONARY: {
-
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
@@ -4357,7 +4350,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       break;
     }
     case SQLCOM_DROP_COMPRESSION_DICTIONARY: {
-
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
@@ -4876,6 +4868,15 @@ int mysql_execute_command(THD *thd, bool first_level) {
       thd->mdl_context.release_transactional_locks();
       /* Begin transaction with the same isolation level. */
       if (tx_chain) {
+#ifdef WITH_WSREP
+        /* We need to cleanup wsrep state before starting
+           new transaction. If 'regular' commit was issued,
+           it would be done in caller function wsrep_mysql_parse()
+           after returning from here.
+           But now we need to do it in between.
+         */
+        wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
         if (trans_begin(thd)) goto error;
       } else {
         /* Reset the isolation level and access mode if no chaining
@@ -4900,6 +4901,15 @@ int mysql_execute_command(THD *thd, bool first_level) {
       thd->mdl_context.release_transactional_locks();
       /* Begin transaction with the same isolation level. */
       if (tx_chain) {
+#ifdef WITH_WSREP
+        /* We need to cleanup wsrep state before starting
+           new transaction. If 'regular' rollback was issued,
+           it would be done in caller function wsrep_mysql_parse()
+           after returning from here.
+           But now we need to do it in between.
+         */
+        wsrep_after_statement(thd);
+#endif /* WITH_WSREP */
         if (trans_begin(thd)) goto error;
       } else {
         /* Reset the isolation level and access mode if no chaining
@@ -5127,10 +5137,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
         goto error;
 
 #ifdef WITH_WSREP
-      // to isolation is now done as part of sp_drop_routine as it does
-      // additional ACL based check that ensures the fact that if the
-      // definer has SUPER PRIVILIGES then DROP/ATLER should have same too.
-      // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+        // to isolation is now done as part of sp_drop_routine as it does
+        // additional ACL based check that ensures the fact that if the
+        // definer has SUPER PRIVILIGES then DROP/ATLER should have same too.
+        // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
 
       enum_sp_type sp_type = (lex->sql_command == SQLCOM_DROP_PROCEDURE)
@@ -5264,8 +5274,8 @@ int mysql_execute_command(THD *thd, bool first_level) {
         goto error;
 
 #ifdef WITH_WSREP
-      // check is now done as part od drop view post definer SUPER PRIVILIGES check.
-      // WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+        // check is now done as part od drop view post definer SUPER PRIVILIGES
+        // check. WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
 
       /* Conditionally writes to binlog. */
@@ -5612,8 +5622,6 @@ finish:
 #ifdef WITH_WSREP
 
   thd->wsrep_consistency_check = NO_CONSISTENCY_CHECK;
-  /* If DDL has failed then avoid SE checkpoint. */
-  thd->wsrep_skip_SE_checkpoint = (res || thd->is_error());
   WSREP_TO_ISOLATION_END;
 
   /*

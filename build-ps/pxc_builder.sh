@@ -162,7 +162,7 @@ get_sources(){
     export MYSQL_RELEASE="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 
     PRODUCT=Percona-XtraDB-Cluster-80
-    PRODUCT_FULL=Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
+    PRODUCT_FULL=Percona-XtraDB-Cluster-${MYSQL_VERSION}
 
     echo "WSREP_VERSION=${WSREP_VERSION}" > ${WORKDIR}/pxc-80.properties
     echo "WSREP_REV=${WSREP_REV}" >> ${WORKDIR}/pxc-80.properties
@@ -288,7 +288,7 @@ install_deps() {
             percona-release enable tools release
             yum -y install epel-release
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc zstd zstd-devel
-            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata jemalloc-devel
+            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel
             yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static
             yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
             until yum -y install centos-release-scl; do
@@ -309,9 +309,6 @@ install_deps() {
 --slave /usr/local/bin/cpack cpack /usr/bin/cpack3 \
 --slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake3 \
 --family cmake
-        fi
-        if [ "x$RHEL" = "x6" ]; then
-            yum -y install Percona-Server-shared-56
         fi
         yum -y install yum-utils
     else
@@ -341,14 +338,12 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        if [ x"${DIST}" = xcosmic ]; then
-            apt-get -y install libssl1.0-dev libeatmydata1
-        fi
-        wget https://repo.percona.com/apt/percona-release_1.0-13.generic_all.deb
-        dpkg -i percona-release_1.0-13.generic_all.deb
+        wget https://repo.percona.com/apt/percona-release_latest.generic_all.deb
+        dpkg -i percona-release_latest.generic_all.deb
+        percona-release enable tools release
         apt-get update
         apt-get -y install --download-only percona-xtrabackup-24
-        apt-get -y install --download-only percona-xtrabackup-80
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.10-1.${DIST}
     fi
     return;
 }
@@ -425,8 +420,8 @@ build_srpm(){
     tar -xzf ${TARFILE}
     rm -rf ${TARFILE}
     PXCDIR=$(ls | grep 'Percona-XtraDB-Cluster*' | sort | tail -n1)
-    mv ${PXCDIR} Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
-    tar -zcf Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}.tar.gz Percona-XtraDB-Cluster-${MYSQL_VERSION}-${WSREP_VERSION}
+    mv ${PXCDIR} Percona-XtraDB-Cluster-${MYSQL_VERSION}
+    tar -zcf Percona-XtraDB-Cluster-${MYSQL_VERSION}.tar.gz Percona-XtraDB-Cluster-${MYSQL_VERSION}
     rm -rf ${PXCDIR}
     cd ${WORKDIR} || exit
     #
@@ -560,11 +555,12 @@ build_rpm(){
 
     cd ${WORKDIR}  || exit
     source /opt/rh/devtoolset-7/enable
+    source ${CURDIR}/srpm/pxc-80.properties
     #
     if [ ${ARCH} = x86_64 ]; then
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     else
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     fi
     return_code=$?
     if [ $return_code != 0 ]; then
@@ -600,17 +596,17 @@ build_source_deb(){
     VERSION=$MYSQL_VERSION
     SHORTVER=$(echo ${VERSION} | awk -F '.' '{print $1"."$2}')
     RELEASE=$MYSQL_RELEASE
-    rm -fr ${HNAME}-${VERSION}-${WSREP_VERSION}
+    rm -fr ${HNAME}-${VERSION}
 
     #
-    NEWTAR=${NAME}_${VERSION}-${WSREP_VERSION}.orig.tar.gz
+    NEWTAR=${NAME}_${VERSION}.orig.tar.gz
     mv ${TARFILE} ${NEWTAR}
 
     DEBIAN_VERSION="$(lsb_release -sc)"
 
     #
     tar xzf ${NEWTAR}
-    cd ${HNAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION} || exit
+    cd ${HNAME}-${VERSION}-${MYSQL_RELEASE} || exit
     cp -ap build-ps/debian/ .
     sed -i "s:@@MYSQL_VERSION@@:${VERSION}:g" debian/changelog
     sed -i "s:@@PERCONA_VERSION@@:${RELEASE}:g" debian/changelog
@@ -620,7 +616,7 @@ build_source_deb(){
     sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" debian/rules
 
 
-    dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}-$WSREP_VERSION"
+    dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}"
     dpkg-buildpackage -S
     #
     rm -fr ${HNAME}-${VERSION}-${RELEASE}
@@ -675,7 +671,7 @@ build_deb(){
     export CXXFLAGS=" $COMMON_FLAGS -Wno-virtual-move-assign  ${CXXFLAGS:-}"
 
     DSC=$(basename $(find . -name '*.dsc' | sort | tail -n 1))
-    DIRNAME=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $1"-"$2"-"$3"-"$4"-"$5}' | sed -e s:.dsc::)
+    DIRNAME=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $1"-"$2"-"$3"-"$4}' | sed -e s:.dsc::)
     rm -rf $DIRNAME
 
     #
@@ -710,16 +706,12 @@ build_deb(){
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
     export MYSQL_BUILD_CXXFLAGS="$CXXFLAGS"
 
-    if [ x"${DEBIAN_VERSION}" = xbionic ]; then
-        sed -i "s:iproute:iproute2:g" debian/control
-    fi
-    if [ x"${DEBIAN_VERSION}" = xcosmic ]; then
-        sed -i "s:libssl-dev:libssl1.0-dev:" debian/control
+    if [[ "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" ]]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
     sudo chmod 777 debian/rules
-    dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$WSREP_VERSION-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
+    dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
@@ -760,20 +752,7 @@ build_tarball(){
     ARCH=$(uname -m 2>/dev/null||true)
     JVERSION=${JEMALLOC_VERSION:-4.0.0}
 
-    if [ -f /etc/redhat-release ]; then
-        RHEL=$(rpm --eval %rhel 2>/dev/null||true)
-        if [ ${RHEL} = 7 ]; then
-            SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//'| awk -F':' '{print $2}')
-            export SSL_VER=".ssl${SSL_VER_TMP}"
-        else
-            SSL_VER_TMP=$(yum list installed|grep -i openssl|head -n1|awk '{print $2}'|awk -F "-" '{print $1}'|sed 's/\.//g'|sed 's/[a-z]$//')
-            export SSL_VER=".ssl${SSL_VER_TMP}"
-        fi
-    else
-        SSL_VER_TMP=$(dpkg -l|grep -i libssl|grep -v "libssl\-"|head -n1|awk '{print $2}'|awk -F ":" '{print $1}'|sed 's/libssl/ssl/g'|sed 's/\.//g')
-        export SSL_VER=".${SSL_VER_TMP}"
-    fi
-    export DIST_NAME=".${OS_NAME}"
+    export SSL_VER=".${OS_NAME}"
     ROOT_FS=$(pwd)
 
     TARFILE=$(basename $(find . -iname 'Percona-XtraDB-Cluster*.tar.gz' | grep -v 'galera' | sort | tail -n1))
@@ -781,12 +760,12 @@ build_tarball(){
     VERSION=$MYSQL_VERSION
     RELEASE=$WSREP_VERSION
 
-    export PXC_DIRNAME=${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION}
+    export PXC_DIRNAME=${NAME}-${VERSION}-${MYSQL_RELEASE}
 
     tar zxf $TARFILE
     rm -f $TARFILE
     #
-    cd ${NAME}-${VERSION}-${MYSQL_RELEASE}-${WSREP_VERSION} || exit
+    cd ${NAME}-${VERSION}-${MYSQL_RELEASE} || exit
 
     BUILD_NUMBER=$(date "+%Y%m%d-%H%M%S")
     mkdir -p $BUILD_NUMBER
@@ -802,16 +781,22 @@ build_tarball(){
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib* ./
+        mv lib64 lib
+        mv lib/xtrabackup/* lib/ || true
+        rm -rf lib/xtrabackup
         rm -rf usr
         rm -f *.rpm
         popd
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80
+        yumdownloader percona-xtrabackup-80-8.0.10
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
-        mv usr/lib* ./
+        mv usr/lib64 ./
+        mv lib64 lib
+        mv lib/xtrabackup/* lib/
+        rm -rf lib/xtrabackup
         rm -rf usr
         rm -f *.rpm
         popd

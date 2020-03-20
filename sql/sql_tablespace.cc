@@ -1484,7 +1484,6 @@ bool Sql_cmd_create_undo_tablespace::execute(THD *thd) {
     return true;
 #endif /* WITH_WSREP */
 
-
   handlerton *hton = nullptr;
   if (get_stmt_hton(thd, m_options->engine_name, m_undo_tablespace_name.str,
                     "CREATE UNDO TABLESPACE", &hton)) {

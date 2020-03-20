@@ -18,11 +18,11 @@
 
 #include "my_dbug.h"
 #include "service_wsrep.h"
+#include "sql/binlog.h"
 #include "wsrep_applier.h" /* wsrep_apply_error */
 #include "wsrep_binlog.h"  /* register/deregister group commit */
 #include "wsrep_thd.h"
 #include "wsrep_xid.h"
-#include "sql/binlog.h"
 
 class THD;
 
@@ -171,7 +171,7 @@ static inline bool wsrep_run_commit_hook(THD *thd, bool all) {
   /* Is MST commit or autocommit? */
   bool ret = wsrep_is_active(thd) && wsrep_is_real(thd, all);
   /* Do not commit if we are aborting */
-  ret= ret && (thd->wsrep_trx().state() != wsrep::transaction::s_aborting);
+  ret = ret && (thd->wsrep_trx().state() != wsrep::transaction::s_aborting);
 
   /* Action below will log an empty group of GTID.
   This is done when the real action fails to generate any meaningful result on
@@ -327,7 +327,6 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
  */
 static inline int wsrep_ordered_commit(THD *thd, bool all,
                                        const wsrep_apply_error &) {
-
   /* Interim Commit Optimization can be used only if log_slave_updates is
   ON that ensures all slave thread (including pxc replication threads)
   binlogs the events there-by following group commit protocol.
@@ -429,6 +428,10 @@ static inline int wsrep_before_rollback(THD *thd, bool all) {
 static inline int wsrep_after_rollback(THD *thd, bool all) {
   DBUG_ENTER("wsrep_after_rollback");
   // WSREP_DEBUG("wsrep_after_rollback %u", thd->thread_id());
+  if (!wsrep_is_real(thd, all)) {
+    WSREP_DEBUG("wsrep_after_rollback stmt transaction rolled back");
+    thd->wsrep_stmt_transaction_rolled_back = true;
+  }
   DBUG_RETURN(
       (wsrep_is_real(thd, all) && wsrep_is_active(thd) &&
        thd->wsrep_cs().transaction().state() != wsrep::transaction::s_aborted)
@@ -544,6 +547,7 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
        seems to be committing empty. Figure out why and try to fix
        elsewhere. */
     DBUG_ASSERT(!wsrep_has_changes(thd) ||
+                thd->wsrep_stmt_transaction_rolled_back ||
                 (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
                  !thd->is_current_stmt_binlog_format_row()) ||
                 thd->wsrep_post_insert_error);

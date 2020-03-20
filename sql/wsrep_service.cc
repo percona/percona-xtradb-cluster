@@ -14,33 +14,26 @@
    along with this program; if not, write to the Free Software Foundation,
    51 Franklin Street, Suite 500, Boston, MA 02110-1335 USA */
 
+#include "wsrep_service.h"
 #include "debug_sync.h"
 #include "wsrep_priv.h"
-#include "wsrep_service.h"
-
 
 namespace wsp {
 
-Field_value::Field_value()
-: is_unsigned(false), has_ptr(false)
-{}
+Field_value::Field_value() : is_unsigned(false), has_ptr(false) {}
 
-Field_value::Field_value(const Field_value& other):
-    value(other.value),
-    v_string_length(other.v_string_length),
-    is_unsigned(other.is_unsigned),
-    has_ptr(other.has_ptr)
-{
-  if (other.has_ptr)
-  {
+Field_value::Field_value(const Field_value &other)
+    : value(other.value),
+      v_string_length(other.v_string_length),
+      is_unsigned(other.is_unsigned),
+      has_ptr(other.has_ptr) {
+  if (other.has_ptr) {
     copy_string(other.value.v_string, other.v_string_length);
   }
 }
 
-Field_value& Field_value::operator = (const Field_value& other)
-{
-  if (&other != this)
-  {
+Field_value &Field_value::operator=(const Field_value &other) {
+  if (&other != this) {
     this->~Field_value();
 
     value = other.value;
@@ -48,8 +41,7 @@ Field_value& Field_value::operator = (const Field_value& other)
     is_unsigned = other.is_unsigned;
     has_ptr = other.has_ptr;
 
-    if (other.has_ptr)
-    {
+    if (other.has_ptr) {
       copy_string(other.value.v_string, other.v_string_length);
     }
   }
@@ -57,73 +49,57 @@ Field_value& Field_value::operator = (const Field_value& other)
   return *this;
 }
 
-Field_value::Field_value(const longlong &num, bool unsign)
-{
+Field_value::Field_value(const longlong &num, bool unsign) {
   value.v_long = num;
   is_unsigned = unsign;
   has_ptr = false;
 }
 
-Field_value::Field_value(const double num)
-{
+Field_value::Field_value(const double num) {
   value.v_double = num;
   has_ptr = false;
 }
 
-Field_value::Field_value(const decimal_t &decimal)
-{
+Field_value::Field_value(const decimal_t &decimal) {
   value.v_decimal = decimal;
   has_ptr = false;
 }
 
-
-Field_value::Field_value(const MYSQL_TIME &time)
-{
+Field_value::Field_value(const MYSQL_TIME &time) {
   value.v_time = time;
   has_ptr = false;
 }
 
-void Field_value::copy_string(const char *str, size_t length)
-{
-  value.v_string = (char*)malloc(length + 1);
-  if (value.v_string)
-  {
+void Field_value::copy_string(const char *str, size_t length) {
+  value.v_string = (char *)malloc(length + 1);
+  if (value.v_string) {
     value.v_string[length] = '\0';
     memcpy(value.v_string, str, length);
     v_string_length = length;
     has_ptr = true;
-  }
-  else
-  {
+  } else {
     WSREP_ERROR("Error copying from empty string "); /* purecov: inspected */
   }
 }
 
-Field_value::Field_value(const char *str, size_t length)
-{
+Field_value::Field_value(const char *str, size_t length) {
   copy_string(str, length);
 }
 
-
-Field_value::~Field_value()
-{
-  if (has_ptr && value.v_string)
-  {
+Field_value::~Field_value() {
+  if (has_ptr && value.v_string) {
     free(value.v_string);
   }
 }
 
 /** resultset class **/
 
-void Sql_resultset::clear()
-{
-  while(!result_value.empty())
-  {
-    std::vector<Field_value*> fld_val= result_value.back();
+void Sql_resultset::clear() {
+  while (!result_value.empty()) {
+    std::vector<Field_value *> fld_val = result_value.back();
     result_value.pop_back();
-    while(!fld_val.empty())
-    {
-      Field_value *fld= fld_val.back();
+    while (!fld_val.empty()) {
+      Field_value *fld = fld_val.back();
       fld_val.pop_back();
       delete fld;
     }
@@ -131,36 +107,29 @@ void Sql_resultset::clear()
   result_value.clear();
   result_meta.clear();
 
-  current_row= 0;
-  num_cols= 0;
-  num_rows= 0;
-  num_metarow= 0;
-  m_resultcs= NULL;
-  m_server_status= 0;
-  m_warn_count= 0;
-  m_affected_rows= 0;
-  m_last_insert_id= 0;
-  m_sql_errno= 0;
-  m_killed= false;
+  current_row = 0;
+  num_cols = 0;
+  num_rows = 0;
+  num_metarow = 0;
+  m_resultcs = NULL;
+  m_server_status = 0;
+  m_warn_count = 0;
+  m_affected_rows = 0;
+  m_last_insert_id = 0;
+  m_sql_errno = 0;
+  m_killed = false;
 }
 
-
-void Sql_resultset::new_row()
-{
-  result_value.push_back(std::vector< Field_value* >());
+void Sql_resultset::new_row() {
+  result_value.push_back(std::vector<Field_value *>());
 }
 
-
-void Sql_resultset::new_field(Field_value *val)
-{
+void Sql_resultset::new_field(Field_value *val) {
   result_value[num_rows].push_back(val);
 }
 
-
-bool Sql_resultset::next()
-{
-  if (current_row < (int)num_rows - 1)
-  {
+bool Sql_resultset::next() {
+  if (current_row < (int)num_rows - 1) {
     current_row++;
     return true;
   }
@@ -168,38 +137,34 @@ bool Sql_resultset::next()
   return false;
 }
 
-
 const st_command_service_cbs Sql_service_context_base::sql_service_callbacks = {
-  &Sql_service_context_base::sql_start_result_metadata,
-  &Sql_service_context_base::sql_field_metadata,
-  &Sql_service_context_base::sql_end_result_metadata,
-  &Sql_service_context_base::sql_start_row,
-  &Sql_service_context_base::sql_end_row,
-  &Sql_service_context_base::sql_abort_row,
-  &Sql_service_context_base::sql_get_client_capabilities,
-  &Sql_service_context_base::sql_get_null,
-  &Sql_service_context_base::sql_get_integer,
-  &Sql_service_context_base::sql_get_longlong,
-  &Sql_service_context_base::sql_get_decimal,
-  &Sql_service_context_base::sql_get_double,
-  &Sql_service_context_base::sql_get_date,
-  &Sql_service_context_base::sql_get_time,
-  &Sql_service_context_base::sql_get_datetime,
-  &Sql_service_context_base::sql_get_string,
-  &Sql_service_context_base::sql_handle_ok,
-  &Sql_service_context_base::sql_handle_error,
-  &Sql_service_context_base::sql_shutdown,
+    &Sql_service_context_base::sql_start_result_metadata,
+    &Sql_service_context_base::sql_field_metadata,
+    &Sql_service_context_base::sql_end_result_metadata,
+    &Sql_service_context_base::sql_start_row,
+    &Sql_service_context_base::sql_end_row,
+    &Sql_service_context_base::sql_abort_row,
+    &Sql_service_context_base::sql_get_client_capabilities,
+    &Sql_service_context_base::sql_get_null,
+    &Sql_service_context_base::sql_get_integer,
+    &Sql_service_context_base::sql_get_longlong,
+    &Sql_service_context_base::sql_get_decimal,
+    &Sql_service_context_base::sql_get_double,
+    &Sql_service_context_base::sql_get_date,
+    &Sql_service_context_base::sql_get_time,
+    &Sql_service_context_base::sql_get_datetime,
+    &Sql_service_context_base::sql_get_string,
+    &Sql_service_context_base::sql_handle_ok,
+    &Sql_service_context_base::sql_handle_error,
+    &Sql_service_context_base::sql_shutdown,
 };
 
-
-
-int Sql_service_context::start_result_metadata(uint ncols, uint flags MY_ATTRIBUTE((unused)),
-                                           const CHARSET_INFO *resultcs)
-{
+int Sql_service_context::start_result_metadata(
+    uint ncols, uint flags MY_ATTRIBUTE((unused)),
+    const CHARSET_INFO *resultcs) {
   DBUG_ENTER("Sql_service_context::start_result_metadata");
-  DBUG_PRINT("info",("resultcs->name: %s", resultcs->name));
-  if (resultset)
-  {
+  DBUG_PRINT("info", ("resultcs->name: %s", resultcs->name));
+  if (resultset) {
     resultset->set_cols(ncols);
     resultset->set_charset(resultcs);
   }
@@ -207,150 +172,120 @@ int Sql_service_context::start_result_metadata(uint ncols, uint flags MY_ATTRIBU
 }
 
 int Sql_service_context::field_metadata(struct st_send_field *field,
-                                    const CHARSET_INFO *charset MY_ATTRIBUTE((unused)))
-{
+                                        const CHARSET_INFO *charset
+                                            MY_ATTRIBUTE((unused))) {
   DBUG_ENTER("Sql_service_context::field_metadata");
-  DBUG_PRINT("info",("field->flags: %d", (int)field->flags));
-  DBUG_PRINT("info",("field->type: %d", (int)field->type));
+  DBUG_PRINT("info", ("field->flags: %d", (int)field->flags));
+  DBUG_PRINT("info", ("field->type: %d", (int)field->type));
 
-  if (resultset)
-  {
-    Field_type ftype = {
-                        field->db_name, field->table_name,
+  if (resultset) {
+    Field_type ftype = {field->db_name,        field->table_name,
                         field->org_table_name, field->col_name,
-                        field->org_col_name, field->length,
-                        field->charsetnr, field->flags,
-                        field->decimals, field->type
-                      };
+                        field->org_col_name,   field->length,
+                        field->charsetnr,      field->flags,
+                        field->decimals,       field->type};
     resultset->set_metadata(ftype);
   }
   DBUG_RETURN(0);
 }
 
-int Sql_service_context::end_result_metadata(uint server_status MY_ATTRIBUTE((unused)),
-                                         uint warn_count MY_ATTRIBUTE((unused)))
-{
+int Sql_service_context::end_result_metadata(
+    uint server_status MY_ATTRIBUTE((unused)),
+    uint warn_count MY_ATTRIBUTE((unused))) {
   DBUG_ENTER("Sql_service_context::end_result_metadata");
   DBUG_RETURN(0);
 }
 
-int Sql_service_context::start_row()
-{
+int Sql_service_context::start_row() {
   DBUG_ENTER("Sql_service_context::start_row");
-  if (resultset)
-    resultset->new_row();
+  if (resultset) resultset->new_row();
   DBUG_RETURN(0);
 }
 
-int Sql_service_context::end_row()
-{
+int Sql_service_context::end_row() {
   DBUG_ENTER("Sql_service_context::end_row");
-  if (resultset)
-    resultset->increment_rows();
+  if (resultset) resultset->increment_rows();
   DBUG_RETURN(0);
 }
 
-void Sql_service_context::abort_row()
-{
+void Sql_service_context::abort_row() {
   DBUG_ENTER("Sql_service_context::abort_row");
   DBUG_VOID_RETURN;
 }
 
-ulong Sql_service_context::get_client_capabilities()
-{
+ulong Sql_service_context::get_client_capabilities() {
   DBUG_ENTER("Sql_service_context::get_client_capabilities");
   DBUG_RETURN(0);
 }
 
-int Sql_service_context::get_null()
-{
+int Sql_service_context::get_null() {
   DBUG_ENTER("Sql_service_context::get_null");
-  if (resultset)
-    resultset->new_field(NULL);
+  if (resultset) resultset->new_field(NULL);
   DBUG_RETURN(0);
 }
 
-int Sql_service_context::get_integer(longlong value)
-{
+int Sql_service_context::get_integer(longlong value) {
   DBUG_ENTER("Sql_service_context::get_integer");
-  if (resultset)
-    resultset->new_field(new Field_value(value));
+  if (resultset) resultset->new_field(new Field_value(value));
   DBUG_RETURN(0);
 }
 
-int Sql_service_context::get_longlong(longlong value,
-                                  uint is_unsigned)
-{
+int Sql_service_context::get_longlong(longlong value, uint is_unsigned) {
   DBUG_ENTER("Sql_service_context::get_longlong");
-  if (resultset)
-    resultset->new_field(new Field_value(value, is_unsigned));
+  if (resultset) resultset->new_field(new Field_value(value, is_unsigned));
   DBUG_RETURN(0);
 }
 
-int Sql_service_context::get_decimal(const decimal_t * value)
-{
+int Sql_service_context::get_decimal(const decimal_t *value) {
   DBUG_ENTER("Sql_service_context::get_decimal");
-  if (resultset)
-    resultset->new_field(new Field_value(*value));
+  if (resultset) resultset->new_field(new Field_value(*value));
   DBUG_RETURN(0);
 }
 
 int Sql_service_context::get_double(double value,
-                                uint32 decimals MY_ATTRIBUTE((unused)))
-{
+                                    uint32 decimals MY_ATTRIBUTE((unused))) {
   DBUG_ENTER("Sql_service_context::get_double");
-  if (resultset)
-    resultset->new_field(new Field_value(value));
+  if (resultset) resultset->new_field(new Field_value(value));
   DBUG_RETURN(0);
 }
 
-int Sql_service_context::get_date(const MYSQL_TIME * value)
-{
+int Sql_service_context::get_date(const MYSQL_TIME *value) {
   DBUG_ENTER("Sql_service_context::get_date");
-  if (resultset)
-    resultset->new_field(new Field_value(*value));
+  if (resultset) resultset->new_field(new Field_value(*value));
   DBUG_RETURN(0);
 }
 
-int Sql_service_context::get_time(const MYSQL_TIME * value,
-                              uint decimals MY_ATTRIBUTE((unused)))
-{
+int Sql_service_context::get_time(const MYSQL_TIME *value,
+                                  uint decimals MY_ATTRIBUTE((unused))) {
   DBUG_ENTER("Sql_service_context::get_time");
-  if (resultset)
-    resultset->new_field(new Field_value(*value));
+  if (resultset) resultset->new_field(new Field_value(*value));
   DBUG_RETURN(0);
 }
 
-int Sql_service_context::get_datetime(const MYSQL_TIME * value,
-                                  uint decimals MY_ATTRIBUTE((unused)))
-{
+int Sql_service_context::get_datetime(const MYSQL_TIME *value,
+                                      uint decimals MY_ATTRIBUTE((unused))) {
   DBUG_ENTER("Sql_service_context::get_datetime");
-  if (resultset)
-    resultset->new_field(new Field_value(*value));
+  if (resultset) resultset->new_field(new Field_value(*value));
   DBUG_RETURN(0);
 }
 
-
-int Sql_service_context::get_string(const char * const value,
-                                size_t length,
-                                const CHARSET_INFO * const valuecs MY_ATTRIBUTE((unused)))
-{
+int Sql_service_context::get_string(const char *const value, size_t length,
+                                    const CHARSET_INFO *const valuecs
+                                        MY_ATTRIBUTE((unused))) {
   DBUG_ENTER("Sql_service_context::get_string");
-  DBUG_PRINT("info",("value: %s", value));
-  if (resultset)
-    resultset->new_field(new Field_value(value, length));
+  DBUG_PRINT("info", ("value: %s", value));
+  if (resultset) resultset->new_field(new Field_value(value, length));
   DBUG_RETURN(0);
 }
 
-void Sql_service_context::handle_ok(uint server_status, uint statement_warn_count,
-                                ulonglong affected_rows,
-                                ulonglong last_insert_id,
-                                const char * const message)
-{
+void Sql_service_context::handle_ok(uint server_status,
+                                    uint statement_warn_count,
+                                    ulonglong affected_rows,
+                                    ulonglong last_insert_id,
+                                    const char *const message) {
   DBUG_ENTER("Sql_service_context::handle_ok");
 
-  if (resultset)
-  {
+  if (resultset) {
     resultset->set_server_status(server_status);
     resultset->set_warn_count(statement_warn_count);
     resultset->set_affected_rows(affected_rows);
@@ -361,16 +296,14 @@ void Sql_service_context::handle_ok(uint server_status, uint statement_warn_coun
 }
 
 void Sql_service_context::handle_error(uint sql_errno,
-                                   const char * const err_msg,
-                                   const char * const sqlstate)
-{
+                                       const char *const err_msg,
+                                       const char *const sqlstate) {
   DBUG_ENTER("Sql_service_context::handle_error");
-  DBUG_PRINT("info",("sql_errno: %d", (int)sql_errno));
-  DBUG_PRINT("info",("err_msg: %s", err_msg));
-  DBUG_PRINT("info",("sqlstate: %s", sqlstate));
+  DBUG_PRINT("info", ("sql_errno: %d", (int)sql_errno));
+  DBUG_PRINT("info", ("err_msg: %s", err_msg));
+  DBUG_PRINT("info", ("sqlstate: %s", sqlstate));
 
-  if (resultset)
-  {
+  if (resultset) {
     resultset->set_rows(0);
     resultset->set_sql_errno(sql_errno);
     resultset->set_err_msg(err_msg ? err_msg : "");
@@ -379,15 +312,10 @@ void Sql_service_context::handle_error(uint sql_errno,
   DBUG_VOID_RETURN;
 }
 
-
-void Sql_service_context::shutdown(int flag MY_ATTRIBUTE((unused)))
-{
+void Sql_service_context::shutdown(int flag MY_ATTRIBUTE((unused))) {
   DBUG_ENTER("Sql_service_context::shutdown");
-  if (resultset)
-    resultset->set_killed();
+  if (resultset) resultset->set_killed();
   DBUG_VOID_RETURN;
 }
 
-
-} // namespace wsp
-
+}  // namespace wsp

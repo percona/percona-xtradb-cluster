@@ -13,159 +13,149 @@
    with this program; if not, write to the Free Software Foundation, Inc.,
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. */
 
-#include "sql/sql_lex.h"
 #include "field.h"
-#include "table.h"
 #include "key.h"
+#include "my_sys.h"
+#include "mysql/components/services/log_builtins.h"
+#include "sql/sql_lex.h"
 #include "sql_base.h"
 #include "sql_parse.h"
 #include "sql_update.h"
+#include "table.h"
 #include "transaction.h"
-#include "mysql/components/services/log_builtins.h"
-#include "my_sys.h"
 
 #include "service_wsrep.h"
-#include "wsrep_schema.h"
 #include "wsrep_applier.h"
-#include "wsrep_xid.h"
 #include "wsrep_binlog.h"
 #include "wsrep_high_priority_service.h"
+#include "wsrep_schema.h"
 #include "wsrep_storage_service.h"
 #include "wsrep_thd.h"
+#include "wsrep_xid.h"
 
-#include <string>
 #include <sstream>
+#include <string>
 
-#define WSREP_SCHEMA          "mysql"
+#define WSREP_SCHEMA "mysql"
 #define WSREP_STREAMING_TABLE "wsrep_streaming_log"
-#define WSREP_CLUSTER_TABLE   "wsrep_cluster"
-#define WSREP_MEMBERS_TABLE   "wsrep_cluster_members"
+#define WSREP_CLUSTER_TABLE "wsrep_cluster"
+#define WSREP_MEMBERS_TABLE "wsrep_cluster_members"
 
-const char* wsrep_sr_table_name_full= WSREP_SCHEMA "/" WSREP_STREAMING_TABLE;
+const char *wsrep_sr_table_name_full = WSREP_SCHEMA "/" WSREP_STREAMING_TABLE;
 
-static const std::string wsrep_schema_str= WSREP_SCHEMA;
-static const std::string sr_table_str= WSREP_STREAMING_TABLE;
-static const std::string cluster_table_str= WSREP_CLUSTER_TABLE;
-static const std::string members_table_str= WSREP_MEMBERS_TABLE;
+static const std::string wsrep_schema_str = WSREP_SCHEMA;
+static const std::string sr_table_str = WSREP_STREAMING_TABLE;
+static const std::string cluster_table_str = WSREP_CLUSTER_TABLE;
+static const std::string members_table_str = WSREP_MEMBERS_TABLE;
 
-static const std::string create_cluster_table_str=
-  "CREATE TABLE IF NOT EXISTS " + wsrep_schema_str + "." + cluster_table_str +
-  "("
-  "cluster_uuid CHAR(36) PRIMARY KEY,"
-  "view_id BIGINT NOT NULL,"
-  "view_seqno BIGINT NOT NULL,"
-  "protocol_version INT NOT NULL,"
-  "capabilities INT NOT NULL"
-  ") ENGINE=InnoDB";
+static const std::string create_cluster_table_str =
+    "CREATE TABLE IF NOT EXISTS " + wsrep_schema_str + "." + cluster_table_str +
+    "("
+    "cluster_uuid CHAR(36) PRIMARY KEY,"
+    "view_id BIGINT NOT NULL,"
+    "view_seqno BIGINT NOT NULL,"
+    "protocol_version INT NOT NULL,"
+    "capabilities INT NOT NULL"
+    ") ENGINE=InnoDB";
 
-static const std::string create_members_table_str=
-  "CREATE TABLE IF NOT EXISTS " + wsrep_schema_str + "." + members_table_str +
-  "("
-  "node_uuid CHAR(36) PRIMARY KEY,"
-  "cluster_uuid CHAR(36) NOT NULL,"
-  "node_name CHAR(32) NOT NULL,"
-  "node_incoming_address VARCHAR(256) NOT NULL"
-  ") ENGINE=InnoDB";
+static const std::string create_members_table_str =
+    "CREATE TABLE IF NOT EXISTS " + wsrep_schema_str + "." + members_table_str +
+    "("
+    "node_uuid CHAR(36) PRIMARY KEY,"
+    "cluster_uuid CHAR(36) NOT NULL,"
+    "node_name CHAR(32) NOT NULL,"
+    "node_incoming_address VARCHAR(256) NOT NULL"
+    ") ENGINE=InnoDB";
 
 #ifdef WSREP_SCHEMA_MEMBERS_HISTORY
-static const std::string cluster_member_history_table_str= "wsrep_cluster_member_history";
-static const std::string create_members_history_table_str=
-  "CREATE TABLE IF NOT EXISTS " + wsrep_schema_str + "." + cluster_member_history_table_str +
-  "("
-  "node_uuid CHAR(36) PRIMARY KEY,"
-  "cluster_uuid CHAR(36) NOT NULL,"
-  "last_view_id BIGINT NOT NULL,"
-  "last_view_seqno BIGINT NOT NULL,"
-  "node_name CHAR(32) NOT NULL,"
-  "node_incoming_address VARCHAR(256) NOT NULL"
-  ") ENGINE=InnoDB";
+static const std::string cluster_member_history_table_str =
+    "wsrep_cluster_member_history";
+static const std::string create_members_history_table_str =
+    "CREATE TABLE IF NOT EXISTS " + wsrep_schema_str + "." +
+    cluster_member_history_table_str +
+    "("
+    "node_uuid CHAR(36) PRIMARY KEY,"
+    "cluster_uuid CHAR(36) NOT NULL,"
+    "last_view_id BIGINT NOT NULL,"
+    "last_view_seqno BIGINT NOT NULL,"
+    "node_name CHAR(32) NOT NULL,"
+    "node_incoming_address VARCHAR(256) NOT NULL"
+    ") ENGINE=InnoDB";
 #endif /* WSREP_SCHEMA_MEMBERS_HISTORY */
 
-static const std::string create_frag_table_str=
-  "CREATE TABLE IF NOT EXISTS " + wsrep_schema_str + "." + sr_table_str +
-  "("
-  "node_uuid CHAR(36), "
-  "trx_id BIGINT, "
-  "seqno BIGINT, "
-  "flags INT NOT NULL, "
-  "frag LONGBLOB NOT NULL, "
-  "PRIMARY KEY (node_uuid, trx_id, seqno)"
-  ") ENGINE=InnoDB";
+static const std::string create_frag_table_str =
+    "CREATE TABLE IF NOT EXISTS " + wsrep_schema_str + "." + sr_table_str +
+    "("
+    "node_uuid CHAR(36), "
+    "trx_id BIGINT, "
+    "seqno BIGINT, "
+    "flags INT NOT NULL, "
+    "frag LONGBLOB NOT NULL, "
+    "PRIMARY KEY (node_uuid, trx_id, seqno)"
+    ") ENGINE=InnoDB";
 
-static const std::string delete_from_cluster_table=
-  "DELETE FROM " + wsrep_schema_str + "." + cluster_table_str;
+static const std::string delete_from_cluster_table =
+    "DELETE FROM " + wsrep_schema_str + "." + cluster_table_str;
 
-static const std::string delete_from_members_table=
-  "DELETE FROM " + wsrep_schema_str + "." + members_table_str;
+static const std::string delete_from_members_table =
+    "DELETE FROM " + wsrep_schema_str + "." + members_table_str;
 
-namespace Wsrep_schema_impl
-{
+namespace Wsrep_schema_impl {
 
-class binlog_off
-{
-public:
-  binlog_off(THD* thd)
-    : m_thd(thd)
-    , m_option_bits(thd->variables.option_bits)
-    , m_sql_log_bin(thd->variables.sql_log_bin)
-  {
-    thd->variables.option_bits&= ~OPTION_BIN_LOG;
-    thd->variables.sql_log_bin= 0;
+class binlog_off {
+ public:
+  binlog_off(THD *thd)
+      : m_thd(thd),
+        m_option_bits(thd->variables.option_bits),
+        m_sql_log_bin(thd->variables.sql_log_bin) {
+    thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    thd->variables.sql_log_bin = 0;
   }
-  ~binlog_off()
-  {
-    m_thd->variables.option_bits= m_option_bits;
-    m_thd->variables.sql_log_bin= m_sql_log_bin;
+  ~binlog_off() {
+    m_thd->variables.option_bits = m_option_bits;
+    m_thd->variables.sql_log_bin = m_sql_log_bin;
   }
-private:
-  THD* m_thd;
+
+ private:
+  THD *m_thd;
   ulonglong m_option_bits;
   bool m_sql_log_bin;
 };
 
-class wsrep_off
-{
-public:
-  wsrep_off(THD* thd)
-    : m_thd(thd)
-    , m_wsrep_on(thd->variables.wsrep_on)
-  {
-    thd->variables.wsrep_on= 0;
+class wsrep_off {
+ public:
+  wsrep_off(THD *thd) : m_thd(thd), m_wsrep_on(thd->variables.wsrep_on) {
+    thd->variables.wsrep_on = 0;
   }
-  ~wsrep_off()
-  {
-    m_thd->variables.wsrep_on= m_wsrep_on;
-  }
-private:
-  THD* m_thd;
+  ~wsrep_off() { m_thd->variables.wsrep_on = m_wsrep_on; }
+
+ private:
+  THD *m_thd;
   bool m_wsrep_on;
 };
 
-class thd_context_switch
-{
-public:
+class thd_context_switch {
+ public:
   thd_context_switch(THD *orig_thd, THD *cur_thd)
-    : m_orig_thd(orig_thd)
-    , m_cur_thd(cur_thd)
-  {
+      : m_orig_thd(orig_thd), m_cur_thd(cur_thd) {
     wsrep_reset_threadvars(m_orig_thd);
     wsrep_store_threadvars(m_cur_thd);
   }
-  ~thd_context_switch()
-  {
+  ~thd_context_switch() {
     wsrep_reset_threadvars(m_cur_thd);
     wsrep_store_threadvars(m_orig_thd);
   }
-private:
+
+ private:
   THD *m_orig_thd;
   THD *m_cur_thd;
 };
 
-static int execute_SQL(THD* thd, const char* sql, uint length) {
+static int execute_SQL(THD *thd, const char *sql, uint length) {
   DBUG_ENTER("Wsrep_schema::execute_SQL()");
-  int err= 0;
+  int err = 0;
 
-  PSI_statement_locker *parent_locker= thd->m_statement_psi;
+  PSI_statement_locker *parent_locker = thd->m_statement_psi;
   Parser_state parser_state;
 
   WSREP_DEBUG("SQL: %d %s thd: %u", length, sql, thd->thread_id());
@@ -174,7 +164,7 @@ static int execute_SQL(THD* thd, const char* sql, uint length) {
     thd->reset_for_next_command();
     lex_start(thd);
 
-    thd->m_statement_psi= NULL;
+    thd->m_statement_psi = NULL;
 
     thd->set_query(sql, length);
     thd->set_query_id(next_query_id());
@@ -184,17 +174,15 @@ static int execute_SQL(THD* thd, const char* sql, uint length) {
     if (thd->is_error()) {
       WSREP_WARN("Wsrep_schema::execute_sql() failed, %d %s\nSQL: %s",
                  thd->get_stmt_da()->mysql_errno(),
-                 thd->get_stmt_da()->message_text(),
-                 sql);
-      err= 1;
+                 thd->get_stmt_da()->message_text(), sql);
+      err = 1;
     }
-    thd->m_statement_psi= parent_locker;
+    thd->m_statement_psi = parent_locker;
     thd->end_statement();
     thd->reset_query();
     close_thread_tables(thd);
     // delete_explain_query(thd->lex);
-  }
-  else {
+  } else {
     WSREP_WARN("SR init failure");
   }
   thd->cleanup_after_query();
@@ -204,29 +192,24 @@ static int execute_SQL(THD* thd, const char* sql, uint length) {
 /*
   Initialize thd for next "statement"
  */
-static void init_stmt(THD* thd) {
-  thd->reset_for_next_command();
-}
+static void init_stmt(THD *thd) { thd->reset_for_next_command(); }
 
-static void finish_stmt(THD* thd) {
+static void finish_stmt(THD *thd) {
   trans_commit_stmt(thd);
   close_thread_tables(thd);
 }
 
-static int open_table(THD* thd,
-               const LEX_CSTRING *schema_name,
-               const LEX_CSTRING *table_name,
-               enum thr_lock_type const lock_type,
-               TABLE** table) {
+static int open_table(THD *thd, const LEX_CSTRING *schema_name,
+                      const LEX_CSTRING *table_name,
+                      enum thr_lock_type const lock_type, TABLE **table) {
   assert(table);
-  *table= NULL;
+  *table = NULL;
 
   DBUG_ENTER("Wsrep_schema::open_table()");
 
-  uint flags= (MYSQL_OPEN_IGNORE_GLOBAL_READ_LOCK |
-               MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY |
-               MYSQL_OPEN_IGNORE_FLUSH |
-               MYSQL_LOCK_IGNORE_TIMEOUT);
+  uint flags =
+      (MYSQL_OPEN_IGNORE_GLOBAL_READ_LOCK | MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY |
+       MYSQL_OPEN_IGNORE_FLUSH | MYSQL_LOCK_IGNORE_TIMEOUT);
 
   TABLE_LIST tables(schema_name->str, schema_name->length, table_name->str,
                     table_name->length, table_name->str, lock_type);
@@ -237,20 +220,20 @@ static int open_table(THD* thd,
     DBUG_RETURN(1);
   }
 
-  *table= tables.table;
+  *table = tables.table;
   (*table)->use_all_columns();
 
   DBUG_RETURN(0);
 }
 
-
-static int open_for_write(THD* thd, const char* table_name, TABLE** table) {
-  LEX_CSTRING schema_str= { wsrep_schema_str.c_str(), wsrep_schema_str.length() };
-  LEX_CSTRING table_str= { table_name, strlen(table_name) };
+static int open_for_write(THD *thd, const char *table_name, TABLE **table) {
+  LEX_CSTRING schema_str = {wsrep_schema_str.c_str(),
+                            wsrep_schema_str.length()};
+  LEX_CSTRING table_str = {table_name, strlen(table_name)};
   if (Wsrep_schema_impl::open_table(thd, &schema_str, &table_str, TL_WRITE,
                                     table)) {
-    WSREP_ERROR("Failed to open table %s.%s for writing",
-                schema_str.str, table_name);
+    WSREP_ERROR("Failed to open table %s.%s for writing", schema_str.str,
+                table_name);
     return 1;
   }
   empty_record(*table);
@@ -259,39 +242,35 @@ static int open_for_write(THD* thd, const char* table_name, TABLE** table) {
   return 0;
 }
 
-static void store(TABLE* table, uint field, const Wsrep_id& id) {
+static void store(TABLE *table, uint field, const Wsrep_id &id) {
   assert(field < table->s->fields);
   std::ostringstream os;
   os << id;
-  table->field[field]->store(os.str().c_str(),
-                             os.str().size(),
+  table->field[field]->store(os.str().c_str(), os.str().size(),
                              &my_charset_bin);
 }
 
-
 template <typename INTTYPE>
-static void store(TABLE* table, uint field, const INTTYPE val) {
+static void store(TABLE *table, uint field, const INTTYPE val) {
   assert(field < table->s->fields);
   table->field[field]->store(val);
 }
 
 template <typename CHARTYPE>
-static void store(TABLE* table, uint field, const CHARTYPE* str, size_t str_len) {
+static void store(TABLE *table, uint field, const CHARTYPE *str,
+                  size_t str_len) {
   assert(field < table->s->fields);
-  table->field[field]->store((const char*)str,
-                             str_len,
-                             &my_charset_bin);
+  table->field[field]->store((const char *)str, str_len, &my_charset_bin);
 }
 
-static void store(TABLE* table, uint field, const std::string& str)
-{
+static void store(TABLE *table, uint field, const std::string &str) {
   store(table, field, str.c_str(), str.size());
 }
 
-static int update_or_insert(TABLE* table) {
+static int update_or_insert(TABLE *table) {
   DBUG_ENTER("Wsrep_schema::update_or_insert()");
-  int ret= 0;
-  char* key;
+  int ret = 0;
+  char *key;
   int error;
 
   /*
@@ -299,8 +278,8 @@ static int update_or_insert(TABLE* table) {
   */
   if (table->s->primary_key >= MAX_KEY ||
       !table->s->keys_in_use.is_set(table->s->primary_key)) {
-    WSREP_ERROR("No primary key for %s.%s",
-                table->s->db.str, table->s->table_name.str);
+    WSREP_ERROR("No primary key for %s.%s", table->s->db.str,
+                table->s->table_name.str);
     DBUG_RETURN(1);
   }
 
@@ -314,37 +293,30 @@ static int update_or_insert(TABLE* table) {
     DBUG_RETURN(1);
   }
 
-  key_copy((uchar*) key, table->record[0],
+  key_copy((uchar *)key, table->record[0],
            table->key_info + table->s->primary_key, 0);
 
-  if ((error= table->file->ha_index_read_idx_map(table->record[1],
-                                                 table->s->primary_key,
-                                                 (uchar*) key,
-                                                 HA_WHOLE_KEY,
-                                                 HA_READ_KEY_EXACT))) {
+  if ((error = table->file->ha_index_read_idx_map(
+           table->record[1], table->s->primary_key, (uchar *)key, HA_WHOLE_KEY,
+           HA_READ_KEY_EXACT))) {
     /*
       Row not found, insert a new one.
     */
-    if ((error= table->file->ha_write_row(table->record[0]))) {
-      WSREP_ERROR("Error writing into %s.%s: %d",
-                  table->s->db.str,
-                  table->s->table_name.str,
-                  error);
-      ret= 1;
+    if ((error = table->file->ha_write_row(table->record[0]))) {
+      WSREP_ERROR("Error writing into %s.%s: %d", table->s->db.str,
+                  table->s->table_name.str, error);
+      ret = 1;
     }
-  }
-  else if (!records_are_comparable(table) || compare_records(table)) {
+  } else if (!records_are_comparable(table) || compare_records(table)) {
     /*
       Record has changed
     */
-    if ((error= table->file->ha_update_row(table->record[1],
-                                           table->record[0])) &&
+    if ((error =
+             table->file->ha_update_row(table->record[1], table->record[0])) &&
         error != HA_ERR_RECORD_IS_THE_SAME) {
-      WSREP_ERROR("Error updating record in %s.%s: %d",
-                  table->s->db.str,
-                  table->s->table_name.str,
-                  error);
-      ret= 1;
+      WSREP_ERROR("Error updating record in %s.%s: %d", table->s->db.str,
+                  table->s->table_name.str, error);
+      ret = 1;
     }
   }
 
@@ -353,9 +325,9 @@ static int update_or_insert(TABLE* table) {
   DBUG_RETURN(ret);
 }
 
-static int insert(TABLE* table) {
+static int insert(TABLE *table) {
   DBUG_ENTER("Wsrep_schema::insert()");
-  int ret= 0;
+  int ret = 0;
   int error;
 
   /*
@@ -363,49 +335,45 @@ static int insert(TABLE* table) {
   */
   if (table->s->primary_key >= MAX_KEY ||
       !table->s->keys_in_use.is_set(table->s->primary_key)) {
-    WSREP_ERROR("No primary key for %s.%s",
-                table->s->db.str, table->s->table_name.str);
+    WSREP_ERROR("No primary key for %s.%s", table->s->db.str,
+                table->s->table_name.str);
     DBUG_RETURN(1);
   }
 
-  if ((error= table->file->ha_write_row(table->record[0]))) {
-    WSREP_ERROR("Error writing into %s.%s: %d",
-                table->s->db.str,
-                table->s->table_name.str,
-                error);
-    ret= 1;
+  if ((error = table->file->ha_write_row(table->record[0]))) {
+    WSREP_ERROR("Error writing into %s.%s: %d", table->s->db.str,
+                table->s->table_name.str, error);
+    ret = 1;
   }
 
   DBUG_RETURN(ret);
 }
 
-static int delete_row(TABLE* table) {
+static int delete_row(TABLE *table) {
   int error;
-  int retry= 3;
+  int retry = 3;
 
   do {
-    error= table->file->ha_delete_row(table->record[0]);
+    error = table->file->ha_delete_row(table->record[0]);
     retry--;
   } while (error && retry);
 
   if (error) {
-    WSREP_ERROR("Error deleting row from %s.%s: %d",
-                table->s->db.str,
-                table->s->table_name.str,
-                error);
+    WSREP_ERROR("Error deleting row from %s.%s: %d", table->s->db.str,
+                table->s->table_name.str, error);
     return 1;
   }
   return 0;
 }
 
-static int open_for_read(THD* thd, const char* table_name, TABLE** table) {
-
-  LEX_CSTRING schema_str= { wsrep_schema_str.c_str(), wsrep_schema_str.length() };
-  LEX_CSTRING table_str= { table_name, strlen(table_name) };
+static int open_for_read(THD *thd, const char *table_name, TABLE **table) {
+  LEX_CSTRING schema_str = {wsrep_schema_str.c_str(),
+                            wsrep_schema_str.length()};
+  LEX_CSTRING table_str = {table_name, strlen(table_name)};
   if (Wsrep_schema_impl::open_table(thd, &schema_str, &table_str, TL_READ,
                                     table)) {
-    WSREP_ERROR("Failed to open table %s.%s for reading",
-                schema_str.str, table_name);
+    WSREP_ERROR("Failed to open table %s.%s for reading", schema_str.str,
+                table_name);
     return 1;
   }
   empty_record(*table);
@@ -419,9 +387,9 @@ static int open_for_read(THD* thd, const char* table_name, TABLE** table) {
 
   @return 0 in case of success, 1 in case of error.
  */
-static int init_for_scan(TABLE* table) {
+static int init_for_scan(TABLE *table) {
   int error;
-  if ((error= table->file->ha_rnd_init(true))) {
+  if ((error = table->file->ha_rnd_init(true))) {
     WSREP_ERROR("Failed to init table for scan: %d", error);
     return 1;
   }
@@ -432,9 +400,9 @@ static int init_for_scan(TABLE* table) {
 
   @return 0 in case of success, error code in case of error
  */
-static int next_record(TABLE* table) {
+static int next_record(TABLE *table) {
   int error;
-  if ((error= table->file->ha_rnd_next(table->record[0])) &&
+  if ((error = table->file->ha_rnd_next(table->record[0])) &&
       error != HA_ERR_END_OF_FILE) {
     WSREP_ERROR("Failed to read next record: %d", error);
   }
@@ -446,38 +414,35 @@ static int next_record(TABLE* table) {
 
   @return 0 in case of success, 1 in case of error.
  */
-static int end_scan(TABLE* table) {
+static int end_scan(TABLE *table) {
   int error;
-  if ((error= table->file->ha_rnd_end())) {
+  if ((error = table->file->ha_rnd_end())) {
     WSREP_ERROR("Failed to end scan: %d", error);
     return 1;
   }
   return 0;
 }
 
-static int scan(TABLE* table, uint field, wsrep::id& id)
-{
+static int scan(TABLE *table, uint field, wsrep::id &id) {
   assert(field < table->s->fields);
   String uuid_str;
   (void)table->field[field]->val_str(&uuid_str);
-  id= wsrep::id(std::string(uuid_str.c_ptr(), uuid_str.length()));
+  id = wsrep::id(std::string(uuid_str.c_ptr(), uuid_str.length()));
   return 0;
 }
 
 template <typename INTTYPE>
-static int scan(TABLE* table, uint field, INTTYPE& val)
-{
+static int scan(TABLE *table, uint field, INTTYPE &val) {
   assert(field < table->s->fields);
-  val= table->field[field]->val_int();
+  val = table->field[field]->val_int();
   return 0;
 }
 
-static int scan(TABLE* table, uint field, char* strbuf, uint strbuf_len)
-{
+static int scan(TABLE *table, uint field, char *strbuf, uint strbuf_len) {
   String str;
   (void)table->field[field]->val_str(&str);
-  strncpy(strbuf, str.c_ptr(), std::min(str.length(), (size_t) strbuf_len));
-  strbuf[strbuf_len - 1]= '\0';
+  strncpy(strbuf, str.c_ptr(), std::min(str.length(), (size_t)strbuf_len));
+  strbuf[strbuf_len - 1] = '\0';
   return 0;
 }
 
@@ -485,13 +450,16 @@ static int scan(TABLE* table, uint field, char* strbuf, uint strbuf_len)
   Scan member
   TODO: filter members by cluster UUID
  */
-static int scan_member(TABLE* table,
-                       const Wsrep_id& cluster_uuid __attribute__ ((unused)),
-                       std::vector<Wsrep_view::member>& members)
-{
+static int scan_member(TABLE *table,
+                       const Wsrep_id &cluster_uuid __attribute__((unused)),
+                       std::vector<Wsrep_view::member> &members) {
   Wsrep_id member_id;
-  char member_name[128]= { 0, };
-  char member_incoming[128]= { 0, };
+  char member_name[128] = {
+      0,
+  };
+  char member_incoming[128] = {
+      0,
+  };
 
   if (scan(table, 0, member_id) ||
       scan(table, 2, member_name, sizeof(member_name)) ||
@@ -504,11 +472,9 @@ static int scan_member(TABLE* table,
   }
 
   try {
-    members.push_back(Wsrep_view::member(member_id,
-                                         member_name,
-                                         member_incoming));
-  }
-  catch (...) {
+    members.push_back(
+        Wsrep_view::member(member_id, member_name, member_incoming));
+  } catch (...) {
     WSREP_ERROR("Caught exception while scanning members table");
     return 1;
   }
@@ -520,27 +486,28 @@ static int scan_member(TABLE* table,
 
   @return 0 in case of success, error code in case of error.
  */
-static int init_for_index_scan(TABLE* table, const uchar* key,
+static int init_for_index_scan(TABLE *table, const uchar *key,
                                key_part_map map) {
   int error;
-  if ((error= table->file->ha_index_init(table->s->primary_key, true))) {
+  if ((error = table->file->ha_index_init(table->s->primary_key, true))) {
     WSREP_ERROR("Failed to init table for index scan: %d", error);
     return error;
   }
 
-  error= table->file->ha_index_read_map(table->record[0],
-                                        key, map, HA_READ_KEY_EXACT);
-  switch(error) {
-  case 0:
-  case HA_ERR_END_OF_FILE:
-  case HA_ERR_KEY_NOT_FOUND:
-  case HA_ERR_GENERIC:
-    break;
-  case -1:
-    WSREP_DEBUG("init_for_index_scan interrupted");
-    break;
-  default:
-    WSREP_ERROR("init_for_index_scan failed to read first record, error %d", error);
+  error = table->file->ha_index_read_map(table->record[0], key, map,
+                                         HA_READ_KEY_EXACT);
+  switch (error) {
+    case 0:
+    case HA_ERR_END_OF_FILE:
+    case HA_ERR_KEY_NOT_FOUND:
+    case HA_ERR_GENERIC:
+      break;
+    case -1:
+      WSREP_DEBUG("init_for_index_scan interrupted");
+      break;
+    default:
+      WSREP_ERROR("init_for_index_scan failed to read first record, error %d",
+                  error);
   }
   return error;
 }
@@ -550,66 +517,59 @@ static int init_for_index_scan(TABLE* table, const uchar* key,
 
   @return 0 in case of success, 1 in case of error.
  */
-static int end_index_scan(TABLE* table) {
+static int end_index_scan(TABLE *table) {
   int error;
-  if ((error= table->file->ha_index_end())) {
+  if ((error = table->file->ha_index_end())) {
     WSREP_ERROR("Failed to end scan: %d", error);
     return 1;
   }
   return 0;
 }
 
-static void make_key(TABLE* table, uchar* key, key_part_map* map, int parts) {
-  uint prefix_length= 0;
-  KEY_PART_INFO* key_part= table->key_info->key_part;
-  for (int i=0; i < parts; i++)
-    prefix_length += key_part[i].store_length;
-  *map= make_prev_keypart_map(parts);
+static void make_key(TABLE *table, uchar *key, key_part_map *map, int parts) {
+  uint prefix_length = 0;
+  KEY_PART_INFO *key_part = table->key_info->key_part;
+  for (int i = 0; i < parts; i++) prefix_length += key_part[i].store_length;
+  *map = make_prev_keypart_map(parts);
   key_copy(key, table->record[0], table->key_info, prefix_length);
 }
 } /* namespace Wsrep_schema_impl */
 
+Wsrep_schema::Wsrep_schema() {}
 
-Wsrep_schema::Wsrep_schema()
-{
-}
+Wsrep_schema::~Wsrep_schema() {}
 
-Wsrep_schema::~Wsrep_schema()
-{ }
-
-static void wsrep_init_thd_for_schema(THD *thd)
-{
+static void wsrep_init_thd_for_schema(THD *thd) {
   thd->security_context()->skip_grants();
-  thd->system_thread= SYSTEM_THREAD_BACKGROUND;
+  thd->system_thread = SYSTEM_THREAD_BACKGROUND;
 
-  thd->real_id=pthread_self(); // Keep purify happy
+  thd->real_id = pthread_self();  // Keep purify happy
 
   thd->set_time();
 
   /* */
-  thd->variables.wsrep_on    = 0;
+  thd->variables.wsrep_on = 0;
   /* No binlogging */
   thd->variables.sql_log_bin = 0;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
   /* No general log */
   thd->variables.option_bits |= OPTION_LOG_OFF;
   /* Read committed isolation to avoid gap locking */
-  thd->variables.transaction_isolation= ISO_READ_COMMITTED;
+  thd->variables.transaction_isolation = ISO_READ_COMMITTED;
   wsrep_assign_from_threadvars(thd);
   wsrep_store_threadvars(thd);
 }
 
-int Wsrep_schema::init()
-{
+int Wsrep_schema::init() {
   DBUG_ENTER("Wsrep_schema::init()");
   int ret;
-  THD* thd= new THD;
+  THD *thd = new THD;
   thd->set_new_thread_id();
   if (!thd) {
     WSREP_ERROR("Unable to get thd");
     DBUG_RETURN(1);
   }
-  thd->thread_stack= (char*)&thd;
+  thd->thread_stack = (char *)&thd;
   wsrep_init_thd_for_schema(thd);
 
   if (Wsrep_schema_impl::execute_SQL(thd, create_cluster_table_str.c_str(),
@@ -621,29 +581,26 @@ int Wsrep_schema::init()
                                      create_members_history_table_str.c_str(),
                                      create_members_history_table_str.size()) ||
 #endif /* WSREP_SCHEMA_MEMBERS_HISTORY */
-      Wsrep_schema_impl::execute_SQL(thd,
-                                     create_frag_table_str.c_str(),
+      Wsrep_schema_impl::execute_SQL(thd, create_frag_table_str.c_str(),
                                      create_frag_table_str.size())) {
-    ret= 1;
-  }
-  else {
-    ret= 0;
+    ret = 1;
+  } else {
+    ret = 0;
   }
 
   delete thd;
   DBUG_RETURN(ret);
 }
 
-int Wsrep_schema::store_view(THD* thd, const Wsrep_view& view)
-{
+int Wsrep_schema::store_view(THD *thd, const Wsrep_view &view) {
   DBUG_ENTER("Wsrep_schema::store_view()");
   assert(view.status() == Wsrep_view::primary);
-  int ret= 1;
+  int ret = 1;
   int error;
-  TABLE* cluster_table= 0;
-  TABLE* members_table= 0;
+  TABLE *cluster_table = 0;
+  TABLE *members_table = 0;
 #ifdef WSREP_SCHEMA_MEMBERS_HISTORY
-  TABLE* members_history_table= 0;
+  TABLE *members_history_table = 0;
 #endif /* WSREP_SCHEMA_MEMBERS_HISTORY */
 
   Wsrep_schema_impl::wsrep_off wsrep_off(thd);
@@ -652,11 +609,9 @@ int Wsrep_schema::store_view(THD* thd, const Wsrep_view& view)
   /*
     Clean up cluster table and members table.
   */
-  if (Wsrep_schema_impl::execute_SQL(thd,
-                                     delete_from_cluster_table.c_str(),
+  if (Wsrep_schema_impl::execute_SQL(thd, delete_from_cluster_table.c_str(),
                                      delete_from_cluster_table.size()) ||
-      Wsrep_schema_impl::execute_SQL(thd,
-                                     delete_from_members_table.c_str(),
+      Wsrep_schema_impl::execute_SQL(thd, delete_from_members_table.c_str(),
                                      delete_from_members_table.size())) {
     goto out;
   }
@@ -665,8 +620,8 @@ int Wsrep_schema::store_view(THD* thd, const Wsrep_view& view)
     Store cluster view info
   */
   Wsrep_schema_impl::init_stmt(thd);
-  if (Wsrep_schema_impl::open_for_write(thd, cluster_table_str.c_str(), &cluster_table))
-  {
+  if (Wsrep_schema_impl::open_for_write(thd, cluster_table_str.c_str(),
+                                        &cluster_table)) {
     goto out;
   }
 
@@ -676,8 +631,7 @@ int Wsrep_schema::store_view(THD* thd, const Wsrep_view& view)
   Wsrep_schema_impl::store(cluster_table, 3, view.protocol_version());
   Wsrep_schema_impl::store(cluster_table, 4, view.capabilities());
 
-  if ((error= Wsrep_schema_impl::update_or_insert(cluster_table)))
-  {
+  if ((error = Wsrep_schema_impl::update_or_insert(cluster_table))) {
     WSREP_ERROR("failed to write to cluster table: %d", error);
     goto out;
   }
@@ -689,20 +643,17 @@ int Wsrep_schema::store_view(THD* thd, const Wsrep_view& view)
   */
   Wsrep_schema_impl::init_stmt(thd);
   if (Wsrep_schema_impl::open_for_write(thd, members_table_str.c_str(),
-                                        &members_table))
-  {
+                                        &members_table)) {
     WSREP_ERROR("failed to open wsrep.members table");
     goto out;
   }
 
-  for (size_t i= 0; i < view.members().size(); ++i)
-  {
+  for (size_t i = 0; i < view.members().size(); ++i) {
     Wsrep_schema_impl::store(members_table, 0, view.members()[i].id());
     Wsrep_schema_impl::store(members_table, 1, view.state_id().id());
     Wsrep_schema_impl::store(members_table, 2, view.members()[i].name());
     Wsrep_schema_impl::store(members_table, 3, view.members()[i].incoming());
-    if ((error= Wsrep_schema_impl::update_or_insert(members_table)))
-    {
+    if ((error = Wsrep_schema_impl::update_or_insert(members_table))) {
       WSREP_ERROR("failed to write wsrep.members table: %d", error);
       goto out;
     }
@@ -720,7 +671,7 @@ int Wsrep_schema::store_view(THD* thd, const Wsrep_view& view)
     goto out;
   }
 
-  for (size_t i= 0; i < view.members().size(); ++i) {
+  for (size_t i = 0; i < view.members().size(); ++i) {
     Wsrep_schema_impl::store(members_history_table, 0, view.members()[i].id());
     Wsrep_schema_impl::store(members_history_table, 1, view.state_id().id());
     Wsrep_schema_impl::store(members_history_table, 2, view.view_seqno());
@@ -729,42 +680,43 @@ int Wsrep_schema::store_view(THD* thd, const Wsrep_view& view)
                              view.members()[i].name());
     Wsrep_schema_impl::store(members_history_table, 5,
                              view.members()[i].incoming());
-    if ((error= Wsrep_schema_impl::update_or_insert(members_history_table))) {
-      WSREP_ERROR("failed to write wsrep_cluster_member_history table: %d", error);
+    if ((error = Wsrep_schema_impl::update_or_insert(members_history_table))) {
+      WSREP_ERROR("failed to write wsrep_cluster_member_history table: %d",
+                  error);
       goto out;
     }
   }
   Wsrep_schema_impl::finish_stmt(thd);
 #endif /* WSREP_SCHEMA_MEMBERS_HISTORY */
-  ret= 0;
- out:
+  ret = 0;
+out:
 
   DBUG_RETURN(ret);
 }
 
-Wsrep_view Wsrep_schema::restore_view(THD* thd, const Wsrep_id& own_id) const {
+Wsrep_view Wsrep_schema::restore_view(THD *thd, const Wsrep_id &own_id) const {
   DBUG_ENTER("Wsrep_schema::restore_view()");
 
-  int ret= 1;
+  int ret = 1;
   int error;
 
-  TABLE* cluster_table= 0;
-  bool end_cluster_scan= false;
-  TABLE* members_table= 0;
-  bool end_members_scan= false;
+  TABLE *cluster_table = 0;
+  bool end_cluster_scan = false;
+  TABLE *members_table = 0;
+  bool end_members_scan = false;
 
   /* variables below need to be initialized in case cluster table is empty */
   Wsrep_id cluster_uuid;
-  wsrep_seqno_t view_id= -1;
-  wsrep_seqno_t view_seqno= -1;
-  int my_idx= -1;
-  int proto_ver= 0;
-  wsrep_cap_t capabilities= 0;
+  wsrep_seqno_t view_id = -1;
+  wsrep_seqno_t view_seqno = -1;
+  int my_idx = -1;
+  int proto_ver = 0;
+  wsrep_cap_t capabilities = 0;
   std::vector<Wsrep_view::member> members;
 
   // we don't want causal waits for reading non-replicated private data
-  int const wsrep_sync_wait_saved= thd->variables.wsrep_sync_wait;
-  thd->variables.wsrep_sync_wait= 0;
+  int const wsrep_sync_wait_saved = thd->variables.wsrep_sync_wait;
+  thd->variables.wsrep_sync_wait = 0;
 
   if (trans_begin(thd, MYSQL_START_TRANS_OPT_READ_ONLY)) {
     WSREP_ERROR("wsrep_schema::restore_view(): Failed to start transaction");
@@ -775,19 +727,20 @@ Wsrep_view Wsrep_schema::restore_view(THD* thd, const Wsrep_id& own_id) const {
     Read cluster info from cluster table
    */
   Wsrep_schema_impl::init_stmt(thd);
-  if (Wsrep_schema_impl::open_for_read(thd, cluster_table_str.c_str(), &cluster_table) ||
+  if (Wsrep_schema_impl::open_for_read(thd, cluster_table_str.c_str(),
+                                       &cluster_table) ||
       Wsrep_schema_impl::init_for_scan(cluster_table)) {
     goto out;
   }
 
-  if (((error= Wsrep_schema_impl::next_record(cluster_table)) != 0 ||
+  if (((error = Wsrep_schema_impl::next_record(cluster_table)) != 0 ||
        Wsrep_schema_impl::scan(cluster_table, 0, cluster_uuid) ||
        Wsrep_schema_impl::scan(cluster_table, 1, view_id) ||
        Wsrep_schema_impl::scan(cluster_table, 2, view_seqno) ||
        Wsrep_schema_impl::scan(cluster_table, 3, proto_ver) ||
        Wsrep_schema_impl::scan(cluster_table, 4, capabilities)) &&
       error != HA_ERR_END_OF_FILE) {
-    end_cluster_scan= true;
+    end_cluster_scan = true;
     goto out;
   }
 
@@ -800,46 +753,44 @@ Wsrep_view Wsrep_schema::restore_view(THD* thd, const Wsrep_id& own_id) const {
     Read members from members table
   */
   Wsrep_schema_impl::init_stmt(thd);
-  if (Wsrep_schema_impl::open_for_read(thd, members_table_str.c_str(), &members_table) ||
+  if (Wsrep_schema_impl::open_for_read(thd, members_table_str.c_str(),
+                                       &members_table) ||
       Wsrep_schema_impl::init_for_scan(members_table)) {
     goto out;
   }
-  end_members_scan= true;
+  end_members_scan = true;
 
   while (true) {
-    if ((error= Wsrep_schema_impl::next_record(members_table)) == 0) {
-      if (Wsrep_schema_impl::scan_member(members_table,
-                                         cluster_uuid,
+    if ((error = Wsrep_schema_impl::next_record(members_table)) == 0) {
+      if (Wsrep_schema_impl::scan_member(members_table, cluster_uuid,
                                          members)) {
         goto out;
       }
-    }
-    else if (error == HA_ERR_END_OF_FILE) {
+    } else if (error == HA_ERR_END_OF_FILE) {
       break;
-    }
-    else {
+    } else {
       goto out;
     }
   }
 
-  end_members_scan= false;
+  end_members_scan = false;
   if (Wsrep_schema_impl::end_scan(members_table)) {
     goto out;
   }
   Wsrep_schema_impl::finish_stmt(thd);
 
   if (own_id.is_undefined() == false) {
-    for (uint i= 0; i < members.size(); ++i) {
+    for (uint i = 0; i < members.size(); ++i) {
       if (members[i].id() == own_id) {
-        my_idx= i;
+        my_idx = i;
         break;
       }
     }
   }
 
   (void)trans_commit(thd);
-  ret= 0; /* Success*/
- out:
+  ret = 0; /* Success*/
+out:
 
   if (end_cluster_scan) Wsrep_schema_impl::end_scan(cluster_table);
   if (end_members_scan) Wsrep_schema_impl::end_scan(members_table);
@@ -852,18 +803,12 @@ Wsrep_view Wsrep_schema::restore_view(THD* thd, const Wsrep_id& own_id) const {
   }
   thd->mdl_context.release_transactional_locks();
 
-  thd->variables.wsrep_sync_wait= wsrep_sync_wait_saved;
+  thd->variables.wsrep_sync_wait = wsrep_sync_wait_saved;
 
   if (0 == ret) {
-    Wsrep_view ret_view(
-      wsrep::gtid(cluster_uuid, Wsrep_seqno(view_seqno)),
-      Wsrep_seqno(view_id),
-      wsrep::view::primary,
-      capabilities,
-      my_idx,
-      proto_ver,
-      members
-    );
+    Wsrep_view ret_view(wsrep::gtid(cluster_uuid, Wsrep_seqno(view_seqno)),
+                        Wsrep_seqno(view_id), wsrep::view::primary,
+                        capabilities, my_idx, proto_ver, members);
 
     if (wsrep_debug) {
       std::ostringstream os;
@@ -871,35 +816,28 @@ Wsrep_view Wsrep_schema::restore_view(THD* thd, const Wsrep_id& own_id) const {
       WSREP_INFO("%s", os.str().c_str());
     }
     DBUG_RETURN(ret_view);
-  }
-  else
-  {
+  } else {
     WSREP_ERROR("wsrep_schema::restore_view() failed.");
     Wsrep_view ret_view;
     DBUG_RETURN(ret_view);
   }
 }
 
-int Wsrep_schema::append_fragment(THD* thd,
-                                  const wsrep::id& server_id,
+int Wsrep_schema::append_fragment(THD *thd, const wsrep::id &server_id,
                                   wsrep::transaction_id transaction_id,
-                                  wsrep::seqno seqno,
-                                  int flags,
-                                  const wsrep::const_buffer& data)
-{
+                                  wsrep::seqno seqno, int flags,
+                                  const wsrep::const_buffer &data) {
   DBUG_ENTER("Wsrep_schema::append_fragment");
   std::ostringstream os;
   os << server_id;
-  WSREP_DEBUG("Append fragment(%u) %s, %llu",
-              thd->thread_id(),
-              os.str().c_str(),
-              transaction_id.get());
+  WSREP_DEBUG("Append fragment(%u) %s, %llu", thd->thread_id(),
+              os.str().c_str(), transaction_id.get());
   Wsrep_schema_impl::binlog_off binlog_off(thd);
   Wsrep_schema_impl::init_stmt(thd);
 
-  TABLE* frag_table= 0;
-  if (Wsrep_schema_impl::open_for_write(thd, sr_table_str.c_str(), &frag_table))
-  {
+  TABLE *frag_table = 0;
+  if (Wsrep_schema_impl::open_for_write(thd, sr_table_str.c_str(),
+                                        &frag_table)) {
     trans_rollback_stmt(thd);
     DBUG_RETURN(1);
   }
@@ -911,7 +849,7 @@ int Wsrep_schema::append_fragment(THD* thd,
   Wsrep_schema_impl::store(frag_table, 4, data.data(), data.size());
 
   int error;
-  if ((error= Wsrep_schema_impl::insert(frag_table))) {
+  if ((error = Wsrep_schema_impl::insert(frag_table))) {
     WSREP_ERROR("Failed to write to frag table: %d", error);
     trans_rollback_stmt(thd);
     DBUG_RETURN(1);
@@ -920,28 +858,25 @@ int Wsrep_schema::append_fragment(THD* thd,
   DBUG_RETURN(0);
 }
 
-int Wsrep_schema::update_fragment_meta(THD* thd,
-                                       const wsrep::ws_meta& ws_meta)
-{
+int Wsrep_schema::update_fragment_meta(THD *thd,
+                                       const wsrep::ws_meta &ws_meta) {
   DBUG_ENTER("Wsrep_schema::update_fragment_meta");
   std::ostringstream os;
   os << ws_meta.server_id();
-  WSREP_DEBUG("update_frag_seqno(%u) %s, %llu, seqno %lld",
-              thd->thread_id(),
-              os.str().c_str(),
-              ws_meta.transaction_id().get(),
+  WSREP_DEBUG("update_frag_seqno(%u) %s, %llu, seqno %lld", thd->thread_id(),
+              os.str().c_str(), ws_meta.transaction_id().get(),
               ws_meta.seqno().get());
   DBUG_ASSERT(ws_meta.seqno().is_undefined() == false);
 
   Wsrep_schema_impl::binlog_off binlog_off(thd);
   int error;
   uchar key[MAX_KEY_LENGTH];
-  key_part_map key_map= 0;
-  TABLE* frag_table= 0;
+  key_part_map key_map = 0;
+  TABLE *frag_table = 0;
 
   Wsrep_schema_impl::init_stmt(thd);
-  if (Wsrep_schema_impl::open_for_write(thd, sr_table_str.c_str(), &frag_table))
-  {
+  if (Wsrep_schema_impl::open_for_write(thd, sr_table_str.c_str(),
+                                        &frag_table)) {
     DBUG_RETURN(1);
   }
 
@@ -951,15 +886,11 @@ int Wsrep_schema::update_fragment_meta(THD* thd,
   Wsrep_schema_impl::store(frag_table, 2, -1);
   Wsrep_schema_impl::make_key(frag_table, key, &key_map, 3);
 
-  if ((error= Wsrep_schema_impl::init_for_index_scan(frag_table,
-                                                     key, key_map)))
-  {
-    if (error == HA_ERR_END_OF_FILE || error == HA_ERR_KEY_NOT_FOUND)
-    {
-      WSREP_WARN("Record not found in %s.%s: %d",
-                 frag_table->s->db.str,
-                 frag_table->s->table_name.str,
-                 error);
+  if ((error =
+           Wsrep_schema_impl::init_for_index_scan(frag_table, key, key_map))) {
+    if (error == HA_ERR_END_OF_FILE || error == HA_ERR_KEY_NOT_FOUND) {
+      WSREP_WARN("Record not found in %s.%s: %d", frag_table->s->db.str,
+                 frag_table->s->table_name.str, error);
     }
     Wsrep_schema_impl::finish_stmt(thd);
     DBUG_RETURN(1);
@@ -970,35 +901,29 @@ int Wsrep_schema::update_fragment_meta(THD* thd,
 
   /* Store seqno in frag_table->record[0] and update the row */
   Wsrep_schema_impl::store(frag_table, 2, ws_meta.seqno().get());
-  if ((error= frag_table->file->ha_update_row(frag_table->record[1],
-                                              frag_table->record[0]))) {
-    WSREP_ERROR("Error updating record in %s.%s: %d",
-                frag_table->s->db.str,
-                frag_table->s->table_name.str,
-                error);
+  if ((error = frag_table->file->ha_update_row(frag_table->record[1],
+                                               frag_table->record[0]))) {
+    WSREP_ERROR("Error updating record in %s.%s: %d", frag_table->s->db.str,
+                frag_table->s->table_name.str, error);
     Wsrep_schema_impl::finish_stmt(thd);
     DBUG_RETURN(1);
   }
 
-  int ret= Wsrep_schema_impl::end_index_scan(frag_table);
+  int ret = Wsrep_schema_impl::end_index_scan(frag_table);
   Wsrep_schema_impl::finish_stmt(thd);
   DBUG_RETURN(ret);
 }
 
-static int remove_fragment(THD*                  thd,
-                           TABLE*                frag_table,
-                           const wsrep::id&      server_id,
+static int remove_fragment(THD *thd, TABLE *frag_table,
+                           const wsrep::id &server_id,
                            wsrep::transaction_id transaction_id,
-                           wsrep::seqno          seqno)
-{
-  WSREP_DEBUG("remove_fragment(%u) trx %llu, seqno %lld",
-              thd->thread_id(),
-              transaction_id.get(),
-              seqno.get());
-  int ret= 0;
+                           wsrep::seqno seqno) {
+  WSREP_DEBUG("remove_fragment(%u) trx %llu, seqno %lld", thd->thread_id(),
+              transaction_id.get(), seqno.get());
+  int ret = 0;
   int error;
   uchar key[MAX_KEY_LENGTH];
-  key_part_map key_map= 0;
+  key_part_map key_map = 0;
 
   DBUG_ASSERT(server_id.is_undefined() == false);
   DBUG_ASSERT(transaction_id.is_undefined() == false);
@@ -1013,50 +938,39 @@ static int remove_fragment(THD*                  thd,
   Wsrep_schema_impl::store(frag_table, 2, seqno.get());
   Wsrep_schema_impl::make_key(frag_table, key, &key_map, 3);
 
-  if ((error= Wsrep_schema_impl::init_for_index_scan(frag_table,
-                                                     key,
-                                                     key_map)))
-  {
-    if (error == HA_ERR_END_OF_FILE || error == HA_ERR_KEY_NOT_FOUND)
-    {
+  if ((error =
+           Wsrep_schema_impl::init_for_index_scan(frag_table, key, key_map))) {
+    if (error == HA_ERR_END_OF_FILE || error == HA_ERR_KEY_NOT_FOUND) {
       WSREP_DEBUG("Record not found in %s.%s:trx %llu, seqno %lld, error %d",
-                 frag_table->s->db.str,
-                 frag_table->s->table_name.str,
-                 transaction_id.get(),
-                 seqno.get(),
-                 error);
+                  frag_table->s->db.str, frag_table->s->table_name.str,
+                  transaction_id.get(), seqno.get(), error);
     }
-    ret= error;
-  }
-  else if (Wsrep_schema_impl::delete_row(frag_table))
-  {
-    ret= 1;
+    ret = error;
+  } else if (Wsrep_schema_impl::delete_row(frag_table)) {
+    ret = 1;
   }
 
   Wsrep_schema_impl::end_index_scan(frag_table);
   return ret;
 }
 
-int Wsrep_schema::remove_fragments(THD* thd,
-                                   const wsrep::id& server_id,
+int Wsrep_schema::remove_fragments(THD *thd, const wsrep::id &server_id,
                                    wsrep::transaction_id transaction_id,
-                                   const std::vector<wsrep::seqno>& fragments)
-{
+                                   const std::vector<wsrep::seqno> &fragments) {
   DBUG_ENTER("Wsrep_schema::remove_fragments");
-  int ret= 0;
+  int ret = 0;
 
   WSREP_DEBUG("Removing %zu fragments", fragments.size());
-  Wsrep_schema_impl::wsrep_off  wsrep_off(thd);
+  Wsrep_schema_impl::wsrep_off wsrep_off(thd);
   Wsrep_schema_impl::binlog_off binlog_off(thd);
 
   /*
     Open SR table for write.
     Adopted from Rpl_info_table_access::open_table()
   */
-  uint flags= (MYSQL_OPEN_IGNORE_GLOBAL_READ_LOCK |
-               MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY |
-               MYSQL_OPEN_IGNORE_FLUSH |
-               MYSQL_LOCK_IGNORE_TIMEOUT);
+  uint flags =
+      (MYSQL_OPEN_IGNORE_GLOBAL_READ_LOCK | MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY |
+       MYSQL_OPEN_IGNORE_FLUSH | MYSQL_LOCK_IGNORE_TIMEOUT);
   Query_tables_list query_tables_list_backup;
   Open_tables_backup open_tables_backup;
   thd->lex->reset_n_backup_query_tables_list(&query_tables_list_backup);
@@ -1066,23 +980,15 @@ int Wsrep_schema::remove_fragments(THD* thd,
                     sr_table_str.c_str(), sr_table_str.length(),
                     sr_table_str.c_str(), TL_WRITE);
 
-  if (!open_n_lock_single_table(thd, &tables, TL_WRITE, flags))
-  {
+  if (!open_n_lock_single_table(thd, &tables, TL_WRITE, flags)) {
     WSREP_DEBUG("Failed to open SR table for access");
-    ret= 1;
-  }
-  else
-  {
+    ret = 1;
+  } else {
     tables.table->use_all_columns();
-    for (std::vector<wsrep::seqno>::const_iterator i= fragments.begin();
-         i != fragments.end(); ++i)
-    {
-      if (remove_fragment(thd,
-                          tables.table,
-                          server_id,
-                          transaction_id, *i))
-      {
-        ret= 1;
+    for (std::vector<wsrep::seqno>::const_iterator i = fragments.begin();
+         i != fragments.end(); ++i) {
+      if (remove_fragment(thd, tables.table, server_id, transaction_id, *i)) {
+        ret = 1;
         break;
       }
     }
@@ -1092,8 +998,7 @@ int Wsrep_schema::remove_fragments(THD* thd,
   thd->lex->restore_backup_query_tables_list(&query_tables_list_backup);
 
   if (thd->wsrep_cs().mode() == wsrep::client_state::m_local &&
-      !thd->in_multi_stmt_transaction_mode())
-  {
+      !thd->in_multi_stmt_transaction_mode()) {
     /*
       The ugly part: Locally executing autocommit statement is
       committing and it has removed a fragment from stable storage.
@@ -1104,45 +1009,39 @@ int Wsrep_schema::remove_fragments(THD* thd,
       Doing nothing at this point seems to work ok, this block is
       intentionally no-op and for documentation purposes only.
     */
-  }
-  else
-  {
+  } else {
     Wsrep_schema_impl::finish_stmt(thd);
   }
 
   DBUG_RETURN(ret);
 }
 
-int Wsrep_schema::replay_transaction(THD* orig_thd,
-                                     Relay_log_info* rli,
-                                     const wsrep::ws_meta& ws_meta,
-                                     const std::vector<wsrep::seqno>& fragments)
-{
+int Wsrep_schema::replay_transaction(
+    THD *orig_thd, Relay_log_info *rli, const wsrep::ws_meta &ws_meta,
+    const std::vector<wsrep::seqno> &fragments) {
   DBUG_ENTER("Wsrep_schema::replay_transaction");
   DBUG_ASSERT(!fragments.empty());
 
   THD thd;
   thd.set_new_thread_id();
-  thd.thread_stack= (orig_thd ? orig_thd->thread_stack :
-                     (char*) &thd);
+  thd.thread_stack = (orig_thd ? orig_thd->thread_stack : (char *)&thd);
   wsrep_assign_from_threadvars(&thd);
 
-  Wsrep_schema_impl::wsrep_off  wsrep_off(&thd);
+  Wsrep_schema_impl::wsrep_off wsrep_off(&thd);
   Wsrep_schema_impl::binlog_off binlog_off(&thd);
   Wsrep_schema_impl::thd_context_switch thd_context_switch(orig_thd, &thd);
 
-  int ret= 1;
+  int ret = 1;
   int error;
-  TABLE* frag_table= 0;
+  TABLE *frag_table = 0;
   uchar key[MAX_KEY_LENGTH];
-  key_part_map key_map= 0;
+  key_part_map key_map = 0;
 
-  for (std::vector<wsrep::seqno>::const_iterator i= fragments.begin();
-       i != fragments.end(); ++i)
-  {
+  for (std::vector<wsrep::seqno>::const_iterator i = fragments.begin();
+       i != fragments.end(); ++i) {
     Wsrep_schema_impl::init_stmt(&thd);
-    if ((error= Wsrep_schema_impl::open_for_read(&thd, sr_table_str.c_str(), &frag_table)))
-    {
+    if ((error = Wsrep_schema_impl::open_for_read(&thd, sr_table_str.c_str(),
+                                                  &frag_table))) {
       WSREP_WARN("Could not open SR table for read: %d", error);
       Wsrep_schema_impl::finish_stmt(&thd);
       DBUG_RETURN(1);
@@ -1153,34 +1052,30 @@ int Wsrep_schema::replay_transaction(THD* orig_thd,
     Wsrep_schema_impl::store(frag_table, 2, i->get());
     Wsrep_schema_impl::make_key(frag_table, key, &key_map, 3);
 
-    int error= Wsrep_schema_impl::init_for_index_scan(frag_table,
-                                                      key,
-                                                      key_map);
-    if (error)
-    {
+    int error =
+        Wsrep_schema_impl::init_for_index_scan(frag_table, key, key_map);
+    if (error) {
       WSREP_WARN("Failed to init streaming log table for index scan: %d",
                  error);
       Wsrep_schema_impl::end_index_scan(frag_table);
-      ret= 1;
+      ret = 1;
       break;
     }
 
     int flags;
     Wsrep_schema_impl::scan(frag_table, 3, flags);
     WSREP_DEBUG("replay_fragment(%llu): seqno: %lld flags: %x",
-                ws_meta.transaction_id().get(),
-                i->get(),
-                flags);
+                ws_meta.transaction_id().get(), i->get(), flags);
     String buf;
     frag_table->field[4]->val_str(&buf);
 
     {
       Wsrep_schema_impl::thd_context_switch thd_context_switch(&thd, orig_thd);
 
-      ret= wsrep_apply_events(orig_thd, rli, buf.c_ptr_quick(), buf.length());
-      if (ret)
-      {
-        WSREP_WARN("Wsrep_schema::replay_transaction: failed to apply fragments");
+      ret = wsrep_apply_events(orig_thd, rli, buf.c_ptr_quick(), buf.length());
+      if (ret) {
+        WSREP_WARN(
+            "Wsrep_schema::replay_transaction: failed to apply fragments");
         break;
       }
     }
@@ -1190,32 +1085,26 @@ int Wsrep_schema::replay_transaction(THD* orig_thd,
 
     Wsrep_schema_impl::init_stmt(&thd);
 
-    if ((error= Wsrep_schema_impl::open_for_write(&thd,
-                                                  sr_table_str.c_str(),
-                                                  &frag_table)))
-    {
+    if ((error = Wsrep_schema_impl::open_for_write(&thd, sr_table_str.c_str(),
+                                                   &frag_table))) {
       WSREP_WARN("Could not open SR table for write: %d", error);
       Wsrep_schema_impl::finish_stmt(&thd);
       DBUG_RETURN(1);
     }
-    error= Wsrep_schema_impl::init_for_index_scan(frag_table,
-                                                  key,
-                                                  key_map);
-    if (error)
-    {
+    error = Wsrep_schema_impl::init_for_index_scan(frag_table, key, key_map);
+    if (error) {
       WSREP_WARN("Failed to init streaming log table for index scan: %d",
                  error);
       Wsrep_schema_impl::end_index_scan(frag_table);
-      ret= 1;
+      ret = 1;
       break;
     }
 
-    error= Wsrep_schema_impl::delete_row(frag_table);
-    if (error)
-    {
+    error = Wsrep_schema_impl::delete_row(frag_table);
+    if (error) {
       WSREP_WARN("Could not delete row from streaming log table: %d", error);
       Wsrep_schema_impl::end_index_scan(frag_table);
-      ret= 1;
+      ret = 1;
       break;
     }
     Wsrep_schema_impl::end_index_scan(frag_table);
@@ -1225,51 +1114,44 @@ int Wsrep_schema::replay_transaction(THD* orig_thd,
   DBUG_RETURN(ret);
 }
 
-int Wsrep_schema::recover_sr_transactions(THD *orig_thd)
-{
+int Wsrep_schema::recover_sr_transactions(THD *orig_thd) {
   DBUG_ENTER("Wsrep_schema::recover_sr_transactions");
   THD storage_thd(false, true);
   storage_thd.set_new_thread_id();
-  storage_thd.thread_stack= (orig_thd ? orig_thd->thread_stack :
-                             (char*) &storage_thd);
+  storage_thd.thread_stack =
+      (orig_thd ? orig_thd->thread_stack : (char *)&storage_thd);
   wsrep_assign_from_threadvars(&storage_thd);
 
-  TABLE* frag_table= 0;
-  TABLE* cluster_table= 0;
+  TABLE *frag_table = 0;
+  TABLE *cluster_table = 0;
   Wsrep_storage_service storage_service(&storage_thd);
   Wsrep_schema_impl::binlog_off binlog_off(&storage_thd);
   Wsrep_schema_impl::wsrep_off wsrep_off(&storage_thd);
   Wsrep_schema_impl::thd_context_switch thd_context_switch(orig_thd,
                                                            &storage_thd);
-  Wsrep_server_state& server_state(Wsrep_server_state::instance());
+  Wsrep_server_state &server_state(Wsrep_server_state::instance());
 
-  int ret= 1;
+  int ret = 1;
   int error;
   wsrep::id cluster_id;
 
   Wsrep_schema_impl::init_stmt(&storage_thd);
-  storage_thd.wsrep_skip_locking= false;
-  if (Wsrep_schema_impl::open_for_read(&storage_thd,
-                                       cluster_table_str.c_str(),
+  storage_thd.wsrep_skip_locking = false;
+  if (Wsrep_schema_impl::open_for_read(&storage_thd, cluster_table_str.c_str(),
                                        &cluster_table) ||
-      Wsrep_schema_impl::init_for_scan(cluster_table))
-  {
+      Wsrep_schema_impl::init_for_scan(cluster_table)) {
     Wsrep_schema_impl::finish_stmt(&storage_thd);
     DBUG_RETURN(1);
   }
 
-  if ((error= Wsrep_schema_impl::next_record(cluster_table)))
-  {
+  if ((error = Wsrep_schema_impl::next_record(cluster_table))) {
     Wsrep_schema_impl::end_scan(cluster_table);
     Wsrep_schema_impl::finish_stmt(&storage_thd);
     trans_commit(&storage_thd);
-    if (error == HA_ERR_END_OF_FILE)
-    {
+    if (error == HA_ERR_END_OF_FILE) {
       WSREP_INFO("Cluster table is empty, not recovering transactions");
       DBUG_RETURN(0);
-    }
-    else
-    {
+    } else {
       WSREP_ERROR("Failed to read cluster table: %d", error);
       DBUG_RETURN(1);
     }
@@ -1283,24 +1165,22 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd)
   os << cluster_id;
   WSREP_INFO("Recovered cluster id %s", os.str().c_str());
 
-  storage_thd.wsrep_skip_locking= true;
+  storage_thd.wsrep_skip_locking = true;
   Wsrep_schema_impl::init_stmt(&storage_thd);
 
   /*
     Open the table for reading and writing so that fragments without
     valid seqno can be deleted.
   */
-  if (Wsrep_schema_impl::open_for_write(&storage_thd, sr_table_str.c_str(), &frag_table) ||
-      Wsrep_schema_impl::init_for_scan(frag_table))
-  {
+  if (Wsrep_schema_impl::open_for_write(&storage_thd, sr_table_str.c_str(),
+                                        &frag_table) ||
+      Wsrep_schema_impl::init_for_scan(frag_table)) {
     WSREP_ERROR("Failed to open SR table for write");
     goto out;
   }
 
-  while (true)
-  {
-    if ((error= Wsrep_schema_impl::next_record(frag_table)) == 0)
-    {
+  while (true) {
+    if ((error = Wsrep_schema_impl::next_record(frag_table)) == 0) {
       wsrep::id server_id;
       Wsrep_schema_impl::scan(frag_table, 0, server_id);
       wsrep::client_id client_id;
@@ -1314,8 +1194,7 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd)
       /* This is possible if the server crashes between inserting the
          fragment into table and updating the fragment seqno after
          certification. */
-      if (seqno.is_undefined())
-      {
+      if (seqno.is_undefined()) {
         Wsrep_schema_impl::delete_row(frag_table);
         continue;
       }
@@ -1328,16 +1207,12 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd)
       (void)frag_table->field[4]->val_str(&data_str);
       wsrep::const_buffer data(data_str.c_ptr_quick(), data_str.length());
       wsrep::ws_meta ws_meta(gtid,
-                             wsrep::stid(server_id,
-                                         transaction_id,
-                                         client_id),
-                             wsrep::seqno::undefined(),
-                             flags);
+                             wsrep::stid(server_id, transaction_id, client_id),
+                             wsrep::seqno::undefined(), flags);
 
-      wsrep::high_priority_service* applier;
-      if (!(applier= server_state.find_streaming_applier(server_id,
-                                                         transaction_id)))
-      {
+      wsrep::high_priority_service *applier;
+      if (!(applier = server_state.find_streaming_applier(server_id,
+                                                          transaction_id))) {
         DBUG_ASSERT(wsrep::starts_transaction(flags));
         applier = wsrep_create_streaming_applier(&storage_thd, "recovery");
         server_state.start_streaming_applier(server_id, transaction_id,
@@ -1350,14 +1225,10 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd)
       applier->apply_write_set(ws_meta, data, unused);
       applier->after_apply();
       storage_service.store_globals();
-    }
-    else if (error == HA_ERR_END_OF_FILE)
-    {
-      ret= 0;
+    } else if (error == HA_ERR_END_OF_FILE) {
+      ret = 0;
       break;
-    }
-    else
-    {
+    } else {
       WSREP_ERROR("SR table scan returned error %d", error);
       break;
     }

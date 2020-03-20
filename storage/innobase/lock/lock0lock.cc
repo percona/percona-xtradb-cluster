@@ -466,8 +466,8 @@ ulint lock_rec_get_insert_intention(const lock_t *lock) /*!< in: record lock */
 UNIV_INLINE
 bool lock_rec_has_to_wait(
 #ifdef WITH_WSREP
-    ibool for_locking,    /*!< is caller locking or releasing */
-#endif /* WITH_WSREP */
+    ibool for_locking,   /*!< is caller locking or releasing */
+#endif                   /* WITH_WSREP */
     const trx_t *trx,    /*!< in: trx of new lock */
     ulint type_mode,     /*!< in: precise mode of the new lock
                        to set: LOCK_S or LOCK_X, possibly
@@ -1047,8 +1047,8 @@ ulint lock_number_of_tables_locked(const trx_t *trx) {
 /*============== RECORD LOCK CREATION AND QUEUE MANAGEMENT =============*/
 
 #ifdef WITH_WSREP
-static void wsrep_print_wait_locks(lock_t *
-                                   c_lock) /* conflicting lock to print */
+static void wsrep_print_wait_locks(
+    lock_t *c_lock) /* conflicting lock to print */
 {
   if (wsrep_debug && c_lock->trx->lock.wait_lock != c_lock) {
     ib::info() << "WSREP: c_lock != wait lock";
@@ -1439,7 +1439,7 @@ static void lock_create_wait_for_edge(trx_t *waiter, trx_t *blocker);
 @param[in] prdt			Predicate lock (optional)
 @return a new lock instance */
 #ifdef WITH_WSREP
-lock_t *RecLock::create(lock_t* const c_lock, trx_t *trx, bool add_to_hash,
+lock_t *RecLock::create(lock_t *const c_lock, trx_t *trx, bool add_to_hash,
                         const lock_prdt_t *prdt) {
 #else
 lock_t *RecLock::create(trx_t *trx, bool add_to_hash, const lock_prdt_t *prdt) {
@@ -1558,7 +1558,7 @@ lock_t *RecLock::create(trx_t *trx, bool add_to_hash, const lock_prdt_t *prdt) {
   } else {
 #endif /* WITH_WSREP */
 
-  lock_add(lock, add_to_hash);
+    lock_add(lock, add_to_hash);
 
 #ifdef WITH_WSREP
   }
@@ -1669,7 +1669,7 @@ queue is itself waiting roll it back, also do a deadlock check and resolve.
         as a victim, and we got the lock immediately: no need to
         wait then */
 #ifdef WITH_WSREP
-dberr_t RecLock::add_to_waitq(lock_t* const wait_for, const lock_prdt_t *prdt) {
+dberr_t RecLock::add_to_waitq(lock_t *const wait_for, const lock_prdt_t *prdt) {
 #else
 dberr_t RecLock::add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt) {
 #endif /* WITH_WSREP */
@@ -3857,11 +3857,11 @@ struct TableLockGetNode {
  @return own: new lock object */
 UNIV_INLINE
 #ifdef WITH_WSREP
-lock_t *lock_table_create(lock_t* c_lock, dict_table_t *table,
+lock_t *lock_table_create(lock_t *c_lock, dict_table_t *table,
 #else
 lock_t *lock_table_create(dict_table_t *table, /*!< in/out: database table
                                                in dictionary cache */
-#endif /* WITH_WSREP */
+#endif                                     /* WITH_WSREP */
                           ulint type_mode, /*!< in: lock mode possibly ORed with
                                          LOCK_WAIT */
                           trx_t *trx)      /*!< in: trx */
@@ -4094,8 +4094,8 @@ void lock_table_remove_low(lock_t *lock) /*!< in/out: table lock */
  @return DB_LOCK_WAIT or DB_DEADLOCK */
 static dberr_t lock_table_enqueue_waiting(
 #ifdef WITH_WSREP
-    lock_t * c_lock,      /* conflicting lock */
-#endif /* WITH_WSREP */
+    lock_t *c_lock,      /* conflicting lock */
+#endif                   /* WITH_WSREP */
     ulint mode,          /*!< in: lock mode this transaction is
                          requesting */
     dict_table_t *table, /*!< in/out: table */

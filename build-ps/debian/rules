@@ -174,7 +174,11 @@ override_dh_auto_install:
 	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
 	mkdir -p $(TMP)/usr/bin/pxc_extra/
 	(cp -r pxb-2.4 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/xtrabackup)
 	(cp -r pxb-8.0 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/xtrabackup)
 
 
 	# add PXC configuration file my.cnf to mysql-common package
@@ -192,6 +196,10 @@ override_dh_auto_install:
 	install -m 0755 debian/extra/mysql-systemd $(TMP)/usr/bin/
 	install -m 0644 debian/extra/mysql.service $(TMP)/lib/systemd/system/
 	install -m 0644 debian/extra/mysql@.service $(TMP)/lib/systemd/system/
+
+	install -m 0755 $(TMP)/garb/files/garb-systemd $(TMP)/usr/bin/
+	install -m 0644 $(TMP)/garb/files/garb.service $(TMP)/lib/systemd/system/garbd.service
+	sed -i 's/sysconfig\/garb/default\/garbd/' $(TMP)/lib/systemd/system/garbd.service
 
 	mkdir -p $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
 	cp -rp $(TMP)/usr/lib/mysql-test/* $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
@@ -220,6 +228,7 @@ override_dh_auto_install:
         # Add helper functions for maintainer scripts
 	install -m 0644 debian/extra/mysql-helpers debian/tmp/usr/share/mysql/
 
+	install -m 0644 $(TMP)/garb/files/garb.cnf $(TMP)/etc/default/garbd
 
 	# install source tarball for source package
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
@@ -230,8 +239,8 @@ override_dh_strip:
 
 override_dh_installinit:
 	@echo "RULES.$@"
-	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_enable --name=mysql; fi
-	dh_installinit --name=mysql -- defaults 19 21
-	dh_installinit --name=garbd -- defaults 19 21
+	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_enable --name=mysql; dh_systemd_enable --name=garbd; fi
+	# dh_installinit --name=mysql -- defaults 19 21
+	# dh_installinit --name=garbd -- defaults 19 21
 	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_start --restart-after-upgrade; fi
 	touch $@

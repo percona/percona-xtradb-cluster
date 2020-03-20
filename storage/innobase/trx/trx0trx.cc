@@ -1597,7 +1597,6 @@ static bool trx_write_serialisation_history(
     DBUG_SUICIDE();
   });
 
-
   /* Update latest MySQL wsrep XID in trx sys header.
   If given transaction is marked for replay then avoid updating
   the xid while the trx is being rolled back.
@@ -1605,8 +1604,7 @@ static bool trx_write_serialisation_history(
     skip updating wsrep co-ordinates.
   - Also, if half-cooked transaction is begin rolled back
     skip updating wsrep co-ordinates. */
-  if (wsrep_is_wsrep_xid(trx->xid) &&
-      trx->mysql_thd &&
+  if (wsrep_is_wsrep_xid(trx->xid) && trx->mysql_thd &&
       wsrep_safe_to_persist_xid(trx->mysql_thd)) {
     trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
   } else if (trx->wsrep_recover_xid &&
@@ -2697,10 +2695,10 @@ void trx_print_latched(
  and the trx must have some locks to make sure that it does not escape
  without locking lock_sys->mutex. */
 void wsrep_trx_print_locking(
-    FILE *f,                /*!< in: output stream */
-    const trx_t *trx,       /*!< in: transaction */
-    ulint max_query_len)    /*!< in: max query length to print,
-                            or 0 to use the default max length */
+    FILE *f,             /*!< in: output stream */
+    const trx_t *trx,    /*!< in: transaction */
+    ulint max_query_len) /*!< in: max query length to print,
+                         or 0 to use the default max length */
 {
   ibool newline;
   const char *op_info;

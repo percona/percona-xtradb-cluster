@@ -451,10 +451,8 @@ void lock_wait_suspend_thread(que_thr_t *thr) /*!< in: query thread associated
 
 #ifdef WITH_WSREP
   if (lock_wait_timeout < 100000000 && wait_time > (double)lock_wait_timeout) {
-
     if (!wsrep_on(trx->mysql_thd) ||
         (!wsrep_is_BF_lock_timeout(trx) && trx->error_state != DB_DEADLOCK)) {
-
       trx->error_state = DB_LOCK_WAIT_TIMEOUT;
       if (srv_print_lock_wait_timeout_info)
         print_lock_wait_timeout(*trx, blocking, blocking_count);

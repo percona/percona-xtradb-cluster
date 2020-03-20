@@ -95,12 +95,11 @@
 #include "thr_mutex.h"
 
 #ifdef WITH_WSREP
+#include "sql/log.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
-#include "sql/log.h"
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
-
 
 using std::max;
 using std::min;
@@ -461,7 +460,6 @@ THD::THD(bool enable_plugins)
       wsrep_gtid_event_buf(NULL),
       wsrep_gtid_event_buf_len(0),
       wsrep_skip_wsrep_GTID(false),
-      wsrep_skip_SE_checkpoint(false),
       wsrep_skip_wsrep_hton(false),
       wsrep_intermediate_commit(false),
       wsrep_non_replicating_atomic_ddl(false),
@@ -470,6 +468,7 @@ THD::THD(bool enable_plugins)
       run_wsrep_ordered_commit(false),
       wsrep_enforce_group_commit(false),
       wsrep_post_insert_error(false),
+      wsrep_stmt_transaction_rolled_back(false),
       wsrep_force_savept_rollback(false),
 
       /* wsrep-lib */
@@ -481,7 +480,7 @@ THD::THD(bool enable_plugins)
           this, m_wsrep_mutex, m_wsrep_cond, Wsrep_server_state::instance(),
           m_wsrep_client_service, wsrep::client_id(m_thread_id)),
       wsrep_applier_service(NULL),
-      // wsrep_wfc()
+// wsrep_wfc()
 #endif /* WITH_WSREP */
       m_parser_state(NULL),
       work_part_info(NULL),
@@ -594,7 +593,7 @@ THD::THD(bool enable_plugins)
   lock_info.mysql_thd = this;
   lock_info.in_lock_tables = false;
   wsrep_info[sizeof(wsrep_info) - 1] = '\0'; /* make sure it is 0-terminated */
-#endif /* WITH_WSREP */
+#endif                                       /* WITH_WSREP */
 
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -919,7 +918,6 @@ void THD::init(void) {
   m_wsrep_next_trx_id = WSREP_UNDEFINED_TRX_ID;
 
   wsrep_skip_wsrep_GTID = false;
-  wsrep_skip_SE_checkpoint = false;
   wsrep_skip_wsrep_hton = false;
   wsrep_intermediate_commit = false;
   wsrep_non_replicating_atomic_ddl = false;
@@ -927,6 +925,7 @@ void THD::init(void) {
   run_wsrep_ordered_commit = false;
   wsrep_enforce_group_commit = false;
   wsrep_post_insert_error = false;
+  wsrep_stmt_transaction_rolled_back = false;
   wsrep_force_savept_rollback = false;
 #endif /* WITH_WSREP */
 
@@ -1226,8 +1225,7 @@ void THD::release_resources() {
       delete wsrep_rli->current_mts_submode;
     wsrep_rli->current_mts_submode = 0;
 
-    if (wsrep_rli->deferred_events != NULL)
-      delete wsrep_rli->deferred_events;
+    if (wsrep_rli->deferred_events != NULL) delete wsrep_rli->deferred_events;
     wsrep_rli->deferred_events = 0;
 
     delete wsrep_rli;
@@ -3025,8 +3023,7 @@ void THD::send_statement_status() {
     sanity check, don't send end statement while replaying
   */
   DBUG_ASSERT(wsrep_trx().state() != wsrep::transaction::s_replaying);
-  if (WSREP(this) &&
-      wsrep_trx().state() == wsrep::transaction::s_replaying) {
+  if (WSREP(this) && wsrep_trx().state() == wsrep::transaction::s_replaying) {
     WSREP_ERROR("attempting net_end_statement while replaying");
     return;
   }

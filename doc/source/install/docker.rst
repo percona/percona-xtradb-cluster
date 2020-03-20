@@ -7,16 +7,20 @@ Running |PXC| in a Docker Container
 Docker images of |PXC| are hosted publicly on Docker Hub at
 https://hub.docker.com/r/percona/percona-xtradb-cluster/.
 
-For more information about using Docker, see the `Docker Docs`_.
+For more information about using Docker, see the `Docker Docs`_. Make
+sure that you are using the latest version of Docker.  The ones
+provided via ``apt`` and ``yum`` may be outdated and cause errors.
 
 .. _`Docker Docs`: https://docs.docker.com/
 
-.. note:: Make sure that you are using the latest version of Docker.
-   The ones provided via ``apt`` and ``yum``
-   may be outdated and cause errors.
+.. note::
 
-.. note:: By default, Docker will pull the image from Docker Hub
-   if it is not available locally.
+   By default, Docker pulls the image from Docker Hub if it is not
+   available locally.
+
+   The image only contains the most essential binaries for |PXC| to
+   run. This means that some utilities included into a |PS| or |MySQL|
+   installation might be missing from the |PXC| Docker image.
 
 The following procedure describes how to set up a simple 3-node cluster
 for evaluation and testing purposes,

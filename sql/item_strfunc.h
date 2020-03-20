@@ -1671,21 +1671,21 @@ class Item_func_wsrep_last_seen_gtid : public Item_str_func {
   String *val_str(String *) override;
   bool itemize(Parse_context *pc, Item **res) override;
   bool resolve_type(THD *) override {
-    set_data_type_string((uint32) WSREP_GTID_STR_LEN);
+    set_data_type_string((uint32)WSREP_GTID_STR_LEN);
     maybe_null = true;
     return false;
   }
   const char *func_name() const { return "wsrep_last_seen_gtid"; }
 };
 
-class Item_func_wsrep_sync_wait_upto : public Item_bool_func {
+class Item_func_wsrep_sync_wait_upto_gtid : public Item_bool_func {
   typedef Item_bool_func super;
   String value;
 
  public:
-  Item_func_wsrep_sync_wait_upto(const POS &pos, Item *a)
+  Item_func_wsrep_sync_wait_upto_gtid(const POS &pos, Item *a)
       : Item_bool_func(pos, a) {}
-  Item_func_wsrep_sync_wait_upto(const POS &pos, Item *a, Item *b)
+  Item_func_wsrep_sync_wait_upto_gtid(const POS &pos, Item *a, Item *b)
       : Item_bool_func(pos, a, b) {}
 
   longlong val_int() override;

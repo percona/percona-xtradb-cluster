@@ -170,7 +170,8 @@ extern "C" void handle_fatal_signal(int sig) {
   }
   my_safe_printf_stderr(
       "%s",
-      "You may download the Percona XtraDB Cluster operations manual by visiting\n"
+      "You may download the Percona XtraDB Cluster operations manual by "
+      "visiting\n"
       "http://www.percona.com/software/percona-xtradb-cluster/. You may find "
       "information\n"
       "in the manual which will help you identify the cause of the crash.\n");

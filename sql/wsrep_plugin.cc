@@ -14,26 +14,23 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
 #include "mysql/components/services/log_builtins.h"
-#include "wsrep_trans_observer.h"
 #include "wsrep_mysqld.h"
+#include "wsrep_trans_observer.h"
 
 #include <mysql/plugin.h>
 
-static int wsrep_plugin_init(void *p __attribute__((unused)))
-{
+static int wsrep_plugin_init(void *p __attribute__((unused))) {
   WSREP_DEBUG("wsrep_plugin_init()");
   return 0;
 }
 
-static int wsrep_plugin_deinit(void *p __attribute__((unused)))
-{
+static int wsrep_plugin_deinit(void *p __attribute__((unused))) {
   WSREP_DEBUG("wsrep_plugin_deinit()");
   return 0;
 }
 
 struct st_mysql_storage_engine wsrep_storage_engine = {
-    MYSQL_HANDLERTON_INTERFACE_VERSION
-};
+    MYSQL_HANDLERTON_INTERFACE_VERSION};
 
 mysql_declare_plugin(wsrep){
     MYSQL_STORAGE_ENGINE_PLUGIN,
@@ -43,8 +40,8 @@ mysql_declare_plugin(wsrep){
     "A pseudo storage engine to represent transactions in multi-master "
     "synchornous replication",
     PLUGIN_LICENSE_GPL,
-    wsrep_plugin_init, /* Plugin Init */
-    NULL,            /* Plugin Check uninstall */
+    wsrep_plugin_init,   /* Plugin Init */
+    NULL,                /* Plugin Check uninstall */
     wsrep_plugin_deinit, /* Plugin Deinit */
     0x0100 /* 1.0 */,
     NULL, /* status variables                */
@@ -52,4 +49,3 @@ mysql_declare_plugin(wsrep){
     NULL, /* config options                  */
     0,    /* flags                           */
 } mysql_declare_plugin_end;
-
