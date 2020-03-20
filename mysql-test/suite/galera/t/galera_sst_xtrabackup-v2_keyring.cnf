@@ -6,8 +6,8 @@ wsrep_debug=1
 
 [sst]
 encrypt=3
-tkey=@ENV.MYSQL_TEST_DIR/std_data/galera-key.pem
-tcert=@ENV.MYSQL_TEST_DIR/std_data/galera-cert.pem
+tkey=@ENV.MYSQL_TEST_DIR/std_data/server-key.pem
+tcert=@ENV.MYSQL_TEST_DIR/std_data/server-cert.pem
 ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
 
 [mysqld.1]
