@@ -3,6 +3,8 @@ SELECT user FROM mysql.user ORDER BY user;
 user
 kristofer
 mysql.infoschema
+mysql.pxc.internal.session
+mysql.pxc.sst.role
 mysql.session
 mysql.sys
 root

@@ -6,6 +6,8 @@ SELECT user, plugin FROM mysql.user ORDER BY user;
 user	plugin
 kristofer	sha256_password
 mysql.infoschema	caching_sha2_password
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 mysql.session	caching_sha2_password
 mysql.sys	caching_sha2_password
 root	caching_sha2_password

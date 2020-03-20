@@ -238,6 +238,7 @@ general_log_new
 slave_relay_log_info
 slow_log
 slow_log_new
+wsrep_streaming_log
 drop table slow_log_new, general_log_new;
 use test;
 drop procedure if exists proc25422_truncate_slow;

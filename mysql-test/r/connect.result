@@ -35,6 +35,9 @@ time_zone_name
 time_zone_transition
 time_zone_transition_type
 user
+wsrep_cluster
+wsrep_cluster_members
+wsrep_streaming_log
 show tables;
 Tables_in_test
 connect(localhost,root,z,test2,MASTER_PORT,MASTER_SOCKET);
@@ -80,6 +83,9 @@ time_zone_name
 time_zone_transition
 time_zone_transition_type
 user
+wsrep_cluster
+wsrep_cluster_members
+wsrep_streaming_log
 show tables;
 Tables_in_test
 connect(localhost,test,,test2,MASTER_PORT,MASTER_SOCKET);

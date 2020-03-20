@@ -6,6 +6,9 @@ general_log_XXX.sdi
 slow_log.CSM
 slow_log.CSV
 slow_log_XXX.sdi
+wsrep_cluster.ibd
+wsrep_cluster_members.ibd
+wsrep_streaming_log.ibd
 SET debug='+d,skip_dd_table_access_check';
 SELECT tables1.name, mysql.tablespaces.name INTO OUTFILE '<OUTFILE1>' FROM
 (SELECT * FROM mysql.tables WHERE schema_id IN
@@ -79,6 +82,9 @@ triggers	mysql
 user	mysql
 view_routine_usage	mysql
 view_table_usage	mysql
+wsrep_cluster	\N
+wsrep_cluster_members	\N
+wsrep_streaming_log	\N
 SELECT name INTO OUTFILE '<OUTFILE2>' FROM mysql.tables WHERE
 tablespace_id IN (SELECT id FROM mysql.tablespaces WHERE name='mysql') AND
 name NOT IN ('ndb_binlog_index')
@@ -192,6 +198,9 @@ general_log_XXX.sdi
 slow_log.CSM
 slow_log.CSV
 slow_log_XXX.sdi
+wsrep_cluster.ibd
+wsrep_cluster_members.ibd
+wsrep_streaming_log.ibd
 SET debug='+d,skip_dd_table_access_check';
 SELECT tables1.name, mysql.tablespaces.name INTO OUTFILE '<OUTFILE3>' FROM
 (SELECT * FROM mysql.tables WHERE schema_id IN

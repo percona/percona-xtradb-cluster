@@ -29,6 +29,8 @@ role	%	<default_plugin>	Account is locked
 role1	%	<default_plugin>	Account is locked
 role2	%	<default_plugin>	Account is locked
 text string	%	<default_plugin>	Account is locked
+mysql.pxc.internal.session	localhost	<default_plugin>	Account is locked
+mysql.pxc.sst.role	localhost	<default_plugin>	Account is locked
 # Creating roles which already exist should not cause an error to be raised
 # WL988.I-1
 CREATE ROLE IF NOT EXISTS role1, role2;
@@ -199,7 +201,7 @@ REVOKE engineering, role1 FROM root@localhost;
 # only count nodes and edges as the sorting order is depending on platform
 SELECT ExtractValue(ROLES_GRAPHML(),'count(//node)') as num_nodes;
 num_nodes
-23
+25
 SELECT ExtractValue(ROLES_GRAPHML(),'count(//edge)') as num_edges;
 num_edges
 7
@@ -235,7 +237,7 @@ ERROR HY000: Operation DROP ROLE failed for 'role'@'%'
 # only count nodes and edges as the sorting order is depending on platform
 SELECT ExtractValue(ROLES_GRAPHML(),'count(//node)') as num_nodes;
 num_nodes
-20
+22
 SELECT ExtractValue(ROLES_GRAPHML(),'count(//edge)') as num_edges;
 num_edges
 6
@@ -349,7 +351,7 @@ GRANT consultants TO sally WITH ADMIN OPTION;
 # only count nodes and edges as the sorting order is depending on platform
 SELECT ExtractValue(ROLES_GRAPHML(),'count(//node)') as num_nodes;
 num_nodes
-20
+22
 SELECT ExtractValue(ROLES_GRAPHML(),'count(//edge)') as num_edges;
 num_edges
 7
@@ -433,7 +435,7 @@ DROP ROLE joe@localhost;
 # only count nodes and edges as the sorting order is depending on platform
 SELECT ExtractValue(ROLES_GRAPHML(),'count(//node)') as num_nodes;
 num_nodes
-4
+6
 SELECT ExtractValue(ROLES_GRAPHML(),'count(//edge)') as num_edges;
 num_edges
 0
@@ -660,6 +662,8 @@ schema_designer	%
 security_admin	%
 user_admin	%
 joe_schema_designer	localhost
+mysql.pxc.internal.session	localhost
+mysql.pxc.sst.role	localhost
 DROP ROLE maintenance_admin;
 DROP ROLE user_admin;
 DROP ROLE security_admin;
@@ -993,7 +997,7 @@ ExtractValue(ROLES_GRAPHML(),'//node[text()="`mysql.session`@`localhost`"]')
 
 SELECT ExtractValue(ROLES_GRAPHML(),'count(//node)') as num_nodes;
 num_nodes
-7
+9
 SELECT ExtractValue(ROLES_GRAPHML(),'count(//edge)') as num_edges;
 num_edges
 2
@@ -1121,6 +1125,8 @@ a	a
 b	local
 a	localhost
 mysql.infoschema	localhost
+mysql.pxc.internal.session	localhost
+mysql.pxc.sst.role	localhost
 mysql.session	localhost
 mysql.sys	localhost
 root	localhost

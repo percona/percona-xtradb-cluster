@@ -1043,6 +1043,16 @@ The following options may be given as the first argument:
  networks. If the network doesn't contain mask, it is
  considered to be a single host. "*" represents all
  networks and must the only directive on the line.
+ --pxc-encrypt-cluster-traffic 
+ PXC cluster traffic SSL auto-configuration
+ (Defaults to on; use --skip-pxc-encrypt-cluster-traffic to disable.)
+ --pxc-maint-mode[=name] 
+ ProxySQL assisted PXC maintenance mode
+ --pxc-maint-transition-period=# 
+ Period before the shutdown signal is delivered
+ --pxc-strict-mode[=name] 
+ PXC strict mode help control behavior of experimental
+ features
  --query-alloc-block-size=# 
  Allocation block size for query parsing and execution
  --query-prealloc-size=# 
@@ -1477,6 +1487,108 @@ The following options may be given as the first argument:
  inversion optimization for moving window frames also for
  floating values.
  (Defaults to on; use --skip-windowing-use-high-precision to disable.)
+ --wsrep-OSU-method[=name] 
+ Method for Online Schema Upgrade
+ --wsrep-RSU-commit-timeout[=#] 
+ Wait for wsrep_RSU_commit_timeout (in micro-seconds) to
+ allow active connection to complete COMMIT action before
+ starting RSU
+ --wsrep-SR-store=name 
+ Storage for streaming replication fragments
+ --wsrep-auto-increment-control 
+ To automatically control the assignment of autoincrement
+ variables
+ (Defaults to on; use --skip-wsrep-auto-increment-control to disable.)
+ --wsrep-causal-reads 
+ (DEPRECATED) setting this variable is equivalent to
+ setting wsrep_sync_wait READ flag
+ --wsrep-certification-rules=name 
+ Certification rules to use in the cluster. Possible
+ values are: "strict": stricter rules that could result in
+ more certification failures. "optimized": relaxed rules
+ that allow more concurrency and cause less certification
+ failures.
+ --wsrep-certify-nonPK 
+ Certify tables with no primary key
+ (Defaults to on; use --skip-wsrep-certify-nonPK to disable.)
+ --wsrep-cluster-address=name 
+ Address to initially connect to cluster
+ --wsrep-cluster-name=name 
+ Name for the cluster
+ --wsrep-data-home-dir=name 
+ home directory for wsrep provider
+ --wsrep-dbug-option=name 
+ DBUG options to provider library
+ --wsrep-debug=name  WSREP debug level logging
+ --wsrep-desync      To desynchronize the node from the cluster
+ --wsrep-dirty-reads Allow reads from a node is not in primary component
+ --wsrep-ignore-apply-errors=# 
+ Ignore replication errors
+ --wsrep-load-data-splitting 
+ To commit LOAD DATA transaction after every 10K rows
+ inserted (deprecated)
+ --wsrep-log-conflicts 
+ To log multi-master conflicts
+ --wsrep-max-ws-rows=# 
+ Max number of rows in write set
+ --wsrep-max-ws-size=# 
+ Max write set size (bytes)
+ --wsrep-min-log-verbosity=# 
+ Set the minimum logging verbosity level of wsrep plugin
+ and Galera
+ --wsrep-node-address=name 
+ Node address
+ --wsrep-node-incoming-address=name 
+ Client connection address
+ --wsrep-node-name=name 
+ Node name
+ --wsrep-notify-cmd=name 
+ --wsrep-on          To enable wsrep replication 
+ (Defaults to on; use --skip-wsrep-on to disable.)
+ --wsrep-provider=name 
+ Path to replication provider library
+ --wsrep-provider-options=name 
+ provider specific options
+ --wsrep-recover     Recover database state after crash and exit
+ --wsrep-reject-queries[=name] 
+ Variable to set to reject queries
+ --wsrep-replicate-myisam 
+ To enable myisam replication
+ --wsrep-restart-slave 
+ Should MySQL slave be restarted automatically, when node
+ joins back to cluster
+ --wsrep-retry-autocommit=# 
+ Max number of times to retry a failed autocommit
+ statement
+ --wsrep-slave-FK-checks 
+ Should slave thread do foreign key constraint checks
+ (Defaults to on; use --skip-wsrep-slave-FK-checks to disable.)
+ --wsrep-slave-UK-checks 
+ Should slave thread do secondary index uniqueness chesks
+ --wsrep-slave-threads=# 
+ Number of slave appliers to launch
+ --wsrep-sst-donor=name 
+ preferred donor node for the SST
+ --wsrep-sst-donor-rejects-queries 
+ Reject client queries when donating state snapshot
+ transfer
+ --wsrep-sst-method=name 
+ State snapshot transfer method
+ --wsrep-sst-receive-address=name 
+ Address where node is waiting for SST contact
+ --wsrep-start-position=name 
+ global transaction position to start from 
+ --wsrep-sync-wait[=#] 
+ Ensure "synchronous" read view before executing an
+ operation of the type specified by bitmask: 1 -
+ READ(includes SELECT, SHOW and BEGIN/START TRANSACTION);
+ 2 - UPDATE and DELETE; 4 - INSERT and REPLACE
+ --wsrep-trx-fragment-size=# 
+ Size of transaction fragments for streaming replication
+ (measured in units of 'wsrep_trx_fragment_unit')
+ --wsrep-trx-fragment-unit=name 
+ Unit for streaming replication transaction fragments'
+ size: bytes, rows, statements
 
 Variables (--variable-name=value)
 abort-slave-event-count 0
@@ -1762,6 +1874,10 @@ print-identified-with-as-hex FALSE
 profiling-history-size 15
 protocol-compression-algorithms zlib,zstd,uncompressed
 proxy-protocol-networks 
+pxc-encrypt-cluster-traffic TRUE
+pxc-maint-mode DISABLED
+pxc-maint-transition-period 10
+pxc-strict-mode DISABLED
 query-alloc-block-size 8192
 query-prealloc-size 8192
 range-alloc-block-size 4096
@@ -1867,6 +1983,48 @@ validate-user-plugins TRUE
 verbose TRUE
 wait-timeout 28800
 windowing-use-high-precision TRUE
+wsrep-OSU-method TOI
+wsrep-RSU-commit-timeout 5000
+wsrep-SR-store table
+wsrep-auto-increment-control TRUE
+wsrep-causal-reads FALSE
+wsrep-certification-rules strict
+wsrep-certify-nonPK TRUE
+wsrep-cluster-address 
+wsrep-cluster-name my_wsrep_cluster
+wsrep-data-home-dir MYSQLTEST_VARDIR/tmp/temp/data/
+wsrep-dbug-option 
+wsrep-debug NONE
+wsrep-desync FALSE
+wsrep-dirty-reads FALSE
+wsrep-ignore-apply-errors 7
+wsrep-load-data-splitting FALSE
+wsrep-log-conflicts FALSE
+wsrep-max-ws-rows 0
+wsrep-max-ws-size 2147483647
+wsrep-min-log-verbosity 3
+wsrep-node-address 
+wsrep-node-incoming-address AUTO
+wsrep-notify-cmd 
+wsrep-on FALSE
+wsrep-provider none
+wsrep-provider-options 
+wsrep-recover FALSE
+wsrep-reject-queries NONE
+wsrep-replicate-myisam FALSE
+wsrep-restart-slave FALSE
+wsrep-retry-autocommit 1
+wsrep-slave-FK-checks TRUE
+wsrep-slave-UK-checks FALSE
+wsrep-slave-threads 1
+wsrep-sst-donor 
+wsrep-sst-donor-rejects-queries FALSE
+wsrep-sst-method xtrabackup-v2
+wsrep-sst-receive-address AUTO
+wsrep-start-position 00000000-0000-0000-0000-000000000000:-1
+wsrep-sync-wait 0
+wsrep-trx-fragment-size 0
+wsrep-trx-fragment-unit bytes
 
 To see what values a running MySQL server is using, type
 'mysqladmin variables' instead of 'mysqld --verbose --help'.
