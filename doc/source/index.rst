@@ -33,7 +33,7 @@ for a growing environment.
        |PXC| nodes using ProxySQL.
    * - Automatic configuration of SSL encryption
      - |PXC| includes the ``pxc-encrypt-cluster-traffic`` variable
-       that enables automatic configuration of SSL encrytion
+       that enables automatic configuration of SSL encryption
    * - Optimized Performance
      - |PXC| performance is optimized to scale with a growing production
        workload
