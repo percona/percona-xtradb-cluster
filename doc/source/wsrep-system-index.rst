@@ -9,12 +9,11 @@ related to write-set replication.
 
 .. variable:: pxc_encrypt_cluster_traffic
 
-   :version 5.7.16: Variable introduced
    :cli: ``--pxc-encrypt-cluster-traffic``
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: ``OFF``
+   :default: ``ON``
 
 Enables automatic configuration of SSL encryption.
 When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
@@ -29,7 +28,6 @@ For more information, see :ref:`ssl-auto-conf`.
 
 .. variable:: pxc_maint_mode
 
-   :version 5.7.16: Variable introduced
    :cli: ``--pxc-maint-mode``
    :conf: Yes
    :scope: Global
@@ -53,7 +51,6 @@ For more information, see :ref:`pxc-maint-mode`.
 
 .. variable:: pxc_maint_transition_period
 
-   :version 5.7.16: Variable introduced
    :cli: ``--pxc-maint-transition-period``
    :conf: Yes
    :scope: Global
@@ -70,7 +67,6 @@ For more information, see :ref:`pxc-maint-mode`.
 
 .. variable:: pxc_strict_mode
 
-   :version 5.7: Variable introduced
    :cli: ``--pxc-strict-mode``
    :conf: Yes
    :scope: Global
@@ -146,7 +142,6 @@ It can be disabled in master-slave clusters.
 
 .. variable:: wsrep_causal_reads
 
-   :version 5.6.20-25.7: Variable deprecated
    :cli: ``--wsrep-causal-reads``
    :conf: Yes
    :scope: Global, Session
@@ -223,7 +218,6 @@ Specifies the name of the cluster and should be identical on all nodes.
 
 .. variable:: wsrep_convert_lock_to_trx
 
-   :version 5.7.23-31.31: Variable deprecated
    :cli: ``--wsrep-convert-lock-to-trx``
    :conf: Yes
    :scope: Global
@@ -339,7 +333,6 @@ if you enable ``wsrep_dirty_reads``.
 
 .. variable:: wsrep_drupal_282555_workaround
 
-   :version 5.7.24-31.33: Variable deprecated
    :cli: ``--wsrep-drupal-282555-workaround``
    :conf: Yes
    :scope: Global
@@ -354,7 +347,6 @@ when inserting the ``DEFAULT`` value into an ``AUTO_INCREMENT`` column.
 
 .. variable:: wsrep_forced_binlog_format
 
-   :version 5.7.22-29.26: Variable deprecated
    :cli: ``--wsrep-forced-binlog-format``
    :conf: Yes
    :scope: Global
@@ -373,7 +365,7 @@ Possible values for this variable are:
     and use whatever is set by the |binlog_format| variable (default)
 
 .. |binlog_format| replace:: ``binlog_format``
-.. _binlog_format: https://dev.mysql.com/doc/refman/5.7/en/binary-log-setting.html
+.. _binlog_format: https://dev.mysql.com/doc/refman/8.0/en/binary-log-setting.html
 
 .. variable:: wsrep_load_data_splitting
 
@@ -574,7 +566,7 @@ The following methods are available:
   .. important::
 
      Under the ``TOI`` method, when DDL operations are performed,
-     |abbr-mdl| is ignored. If |abr-mdl| is important, use the ``RSU``
+     |abbr-mdl| is ignored. If |abbr-mdl| is important, use the ``RSU``
      method.
 
 * ``RSU``: When the *Rolling Schema Upgrade* method is selected,
@@ -600,29 +592,6 @@ The following methods are available:
    Setting the variable with ``SET GLOBAL wsrep_OSU_method``
    will change the variable globally
    but it won't have effect on the current session.
-
-.. variable:: wsrep_preordered
-
-   :version 5.7.24-31.33: Variable deprecated
-   :cli: ``--wsrep-preordered``
-   :conf: Yes
-   :scope: Global
-   :dyn: Yes
-   :default: ``OFF``
-
-Defines whether the node should use transparent handling
-of preordered replication events (like replication from traditional master).
-By default, this is disabled.
-
-If you enable this variable, such events will be applied locally first
-before being replicated to other nodes in the cluster.
-This could increase the rate at which they can be processed,
-which would be otherwise limited by the latency
-between the nodes in the cluster.
-
-Preordered events should not interfere with events that originate on the local
-node. Therefore, you should not run local update queries on a table that is
-also being updated through asynchronous replication.
 
 .. variable:: wsrep_provider
 
@@ -726,7 +695,7 @@ the whole DDL statement is not put under TOI.
     (it will get MyISAM tables from donor)
   * Difference in configuration of ``pxc-cluster`` node
     on `enforce_storage_engine
-    <https://www.percona.com/doc/percona-server/5.7/management/enforce_engine.html>`_
+    <https://www.percona.com/doc/percona-server/8.0/management/enforce_engine.html>`_
     front may result in picking up different engine for the same table
     on different nodes
   * ``CREATE TABLE AS SELECT`` (CTAS) statements use TOI
@@ -958,7 +927,6 @@ the cluster can be set up without the state transfer.
 
 .. variable:: wsrep_sync_wait
 
-   :version 5.6.20-25.7: Variable introduced
    :cli: ``--wsrep-sync-wait``
    :conf: Yes
    :scope: Session

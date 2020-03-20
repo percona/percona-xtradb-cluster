@@ -11,7 +11,7 @@ For the purposes of this tutorial, assume the following:
 
 * The local IP address is ``192.168.2.21``.
 * |PXC| is extracted from binary tarball into
-  :file:`/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64`
+  :file:`/usr/local/Percona-XtraDB-Cluster-8.0.x86_64`
 
 To set up the cluster:
 
@@ -25,12 +25,12 @@ To set up the cluster:
         port = 4000
         socket=/tmp/mysql.4000.sock
         datadir=/data/bench/d1
-        basedir=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64
+        basedir=/usr/local/Percona-XtraDB-Cluster-8.0.x86_64
         user=mysql
         log_error=error.log
         binlog_format=ROW
         wsrep_cluster_address='gcomm://192.168.2.21:5030,192.168.2.21:6030'
-        wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64/lib/libgalera_smm.so
+        wsrep_provider=/usr/local/Percona-XtraDB-Cluster-8.0.x86_64/lib/libgalera_smm.so
         wsrep_sst_receive_address=192.168.2.21:4020
         wsrep_node_incoming_address=192.168.2.21
         wsrep_slave_threads=2
@@ -48,12 +48,12 @@ To set up the cluster:
         port = 5000
         socket=/tmp/mysql.5000.sock
         datadir=/data/bench/d2
-        basedir=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64
+        basedir=/usr/local/Percona-XtraDB-Cluster-8.0.x86_64
         user=mysql
         log_error=error.log
         binlog_format=ROW
         wsrep_cluster_address='gcomm://192.168.2.21:4030,192.168.2.21:6030'
-        wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64/lib/libgalera_smm.so
+        wsrep_provider=/usr/local/Percona-XtraDB-Cluster-8.0.x86_64/lib/libgalera_smm.so
         wsrep_sst_receive_address=192.168.2.21:5020
         wsrep_node_incoming_address=192.168.2.21
         wsrep_slave_threads=2
@@ -71,12 +71,12 @@ To set up the cluster:
         port = 6000
         socket=/tmp/mysql.6000.sock
         datadir=/data/bench/d3
-        basedir=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64
+        basedir=/usr/local/Percona-XtraDB-Cluster-8.0.x86_64
         user=mysql
         log_error=error.log
         binlog_format=ROW
         wsrep_cluster_address='gcomm://192.168.2.21:4030,192.168.2.21:5030'
-        wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64/lib/libgalera_smm.so
+        wsrep_provider=/usr/local/Percona-XtraDB-Cluster-8.0.x86_64/lib/libgalera_smm.so
         wsrep_sst_receive_address=192.168.2.21:6020
         wsrep_node_incoming_address=192.168.2.21
         wsrep_slave_threads=2

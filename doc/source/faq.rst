@@ -210,9 +210,7 @@ Try to disable SELinux with the following command:
 What does "nc: invalid option -- 'd'" in the sst.err log file mean?
 ===================================================================
 
-This is Debian/Ubuntu specific error.
-|PXC| uses ``netcat-openbsd`` package.
-This dependency has been fixed in recent releases.
-Future releases of |PXC| will be compatible with any ``netcat``
-(see bug :bug:`959970`).
+This error is specific to Debian and Ubuntu.  |PXC| uses ``netcat-openbsd``
+package. This dependency has been fixed.  Future releases of |PXC| will be
+compatible with any ``netcat`` (see bug :jirabug:`PXC-941`).
 

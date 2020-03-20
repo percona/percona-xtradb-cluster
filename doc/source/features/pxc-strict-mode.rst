@@ -183,7 +183,7 @@ Binary log format
 :variable:`pxc_strict_mode` variable.
 
 .. |binlog_format| replace:: ``binlog_format``
-.. _binlog_format: http://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_binlog_format
+.. _binlog_format: http://dev.mysql.com/doc/refman/8.0/en/replication-options-binary-log.html#sysvar_binlog_format
 
 Tables without primary keys
 ---------------------------
@@ -251,7 +251,7 @@ Depending on the selected mode, the following happens:
  and an error is logged.
 
 .. |log_output| replace:: ``log_output``
-.. _log_output: http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_log_output
+.. _log_output: http://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_log_output
 
 .. _explicit-table-locking:
 
@@ -320,7 +320,7 @@ the following happens:
    cannot be set dynamically.
 
 .. |innodb_autoinc_lock_mode| replace:: ``innodb_autoinc_lock_mode``
-.. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
+.. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
 
 Combining schema and data changes in a single statement
 -------------------------------------------------------

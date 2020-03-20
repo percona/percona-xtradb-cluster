@@ -11,7 +11,6 @@ It is recommended to install |PXC| from official Percona software repositories
 using the corresponding package manager for your system:
 
 * :ref:`Debian or Ubuntu <apt>`
-
 * :ref:`Red Hat or CentOS <yum>`
 
 Installation Alternatives

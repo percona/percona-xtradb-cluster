@@ -476,7 +476,6 @@ the slave queue drops below :variable:`gcs.fc_factor` *
 
 .. variable:: gcs.fc_limit
 
-   :version: :rn:`5.7.17-29.20`: Default value changed from ``16`` to ``100`` 
    :cli: Yes
    :conf: Yes
    :scope: Global
