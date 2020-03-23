@@ -2380,8 +2380,9 @@ static void unireg_abort(int exit_code) {
   if (!daemon_launcher_quiet && exit_code) LogErr(ERROR_LEVEL, ER_ABORTING);
 
 #ifdef WITH_WSREP
-  if (WSREP_ON && Wsrep_server_state::instance().state() !=
-                      wsrep::server_state::s_disconnected) {
+  if (WSREP_ON && Wsrep_server_state::initialized() &&
+      Wsrep_server_state::instance().state() !=
+          wsrep::server_state::s_disconnected) {
     WSREP_DEBUG("Initiating abort (unireg_abort)");
 
     wsrep_unireg_abort = true;
@@ -6513,12 +6514,12 @@ static int init_server_components() {
     if (bootstrap::run_bootstrap_thread(nullptr, nullptr,
                                         &dd::upgrade::upgrade_pxc_only,
                                         SYSTEM_THREAD_SERVER_UPGRADE)) {
-        LogErr(ERROR_LEVEL, ER_SERVER_UPGRADE_FAILED);
-        unireg_abort(1);
+      LogErr(ERROR_LEVEL, ER_SERVER_UPGRADE_FAILED);
+      unireg_abort(1);
     }
     delete_optimizer_cost_module();
   }
-#endif  /* WITH_WSREP */
+#endif /* WITH_WSREP */
 
   if (!is_help_or_validate_option() && !opt_initialize &&
       !dd::upgrade::no_server_upgrade_required()) {
