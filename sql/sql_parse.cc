@@ -2082,7 +2082,9 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       check_secondary_engine_statement(thd, &parser_state, orig_query.str,
                                        orig_query.length);
 
+#ifdef WITH_WSREP
       thd->set_secondary_engine_optimization(saved_secondary_engine);
+#endif /* WITH_WSREP */
 
       DBUG_EXECUTE_IF("parser_stmt_to_error_log", {
         LogErr(INFORMATION_LEVEL, ER_PARSER_TRACE, thd->query().str);
@@ -2187,7 +2189,9 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
         check_secondary_engine_statement(thd, &parser_state,
                                          beginning_of_next_stmt, length);
 
+#ifdef WITH_WSREP
         thd->set_secondary_engine_optimization(saved_secondary_engine);
+#endif /* WITH_WSREP */
       }
 
       /* Need to set error to true for graceful shutdown */

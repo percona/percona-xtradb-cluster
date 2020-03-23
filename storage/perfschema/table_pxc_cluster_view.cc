@@ -18,13 +18,15 @@
   Table PXC_VIEW (implementation).
 */
 
+#ifdef WITH_WSREP
+
 #include "storage/perfschema/table_pxc_cluster_view.h"
 #include "storage/perfschema/pfs_instr.h"
 #include "storage/perfschema/pfs_instr_class.h"
 
-#include "sql/table.h"
 #include "sql/field.h"
 #include "sql/plugin_table.h"
+#include "sql/table.h"
 
 #include "sql/wsrep_mysqld.h"
 #include "sql/wsrep_server_state.h"
@@ -161,3 +163,4 @@ int table_pxc_cluster_view ::read_row_values(TABLE *table, unsigned char *buf,
   return 0;
 }
 
+#endif /* WITH_WSREP */
