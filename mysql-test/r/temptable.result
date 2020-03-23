@@ -36,6 +36,9 @@ def	mysql	PRIMARY	mysql	time_zone_name	PRIMARY KEY	YES
 def	mysql	PRIMARY	mysql	time_zone_transition	PRIMARY KEY	YES
 def	mysql	PRIMARY	mysql	time_zone_transition_type	PRIMARY KEY	YES
 def	mysql	PRIMARY	mysql	user	PRIMARY KEY	YES
+def	mysql	PRIMARY	mysql	wsrep_cluster	PRIMARY KEY	YES
+def	mysql	PRIMARY	mysql	wsrep_cluster_members	PRIMARY KEY	YES
+def	mysql	PRIMARY	mysql	wsrep_streaming_log	PRIMARY KEY	YES
 def	mysql	name	mysql	help_category	UNIQUE	YES
 def	mysql	name	mysql	help_keyword	UNIQUE	YES
 def	mysql	name	mysql	help_topic	UNIQUE	YES

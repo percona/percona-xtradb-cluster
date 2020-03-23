@@ -1,34 +1,46 @@
 CREATE DATABASE test_user_db;
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 ========== test 1.1 ======================================================
 CREATE USER plug IDENTIFIED WITH test_plugin_server;
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 DROP USER plug;
 CREATE USER plug IDENTIFIED WITH test_plugin_server BY '123';
 GRANT ALL PRIVILEGES ON test_user_db.* TO plug;
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 REVOKE ALL PRIVILEGES ON test_user_db.* FROM plug;
 DROP USER plug;
 CREATE USER plug IDENTIFIED WITH 'test_plugin_server';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 DROP USER plug;
 CREATE USER plug IDENTIFIED WITH test_plugin_server BY '123';
 GRANT ALL PRIVILEGES ON test_user_db.* TO plug;
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 REVOKE ALL PRIVILEGES ON test_user_db.* FROM plug;
 DROP USER plug;
 CREATE USER plug IDENTIFIED WITH test_plugin_server AS '';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 DROP USER plug;
 CREATE USER plug IDENTIFIED WITH 'test_plugin_server' AS ;
@@ -66,48 +78,66 @@ CREATE USER plug IDENTIFIED WITH 'test_plugin_server' AS 'plug_dest';
 ========== test 1.1.1.6/1.1.2.5 ============================
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 CREATE USER plug_dest IDENTIFIED BY 'plug_dest_passwd';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 plug_dest	caching_sha2_password
 DROP USER plug, plug_dest;
 CREATE USER plug IDENTIFIED WITH 'test_plugin_server' AS 'plug_dest';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 DROP USER plug;
 CREATE USER plug_dest IDENTIFIED BY 'plug_dest_passwd';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug_dest	caching_sha2_password
 DROP USER plug_dest;
 CREATE USER plug IDENTIFIED WITH test_plugin_server AS 'plug_dest';
 GRANT ALL PRIVILEGES ON test_user_db.* TO plug;
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 DROP USER plug;
 CREATE USER plug_dest IDENTIFIED BY 'plug_dest_passwd';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug_dest	caching_sha2_password
 DROP USER plug_dest;
 CREATE USER plug IDENTIFIED WITH 'test_plugin_server' AS 'plug_dest';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 DROP USER plug;
 CREATE USER plug IDENTIFIED WITH 'test_plugin_server' AS 'plug_dest';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 DROP USER plug;
 CREATE USER plug IDENTIFIED WITH 'test_plugin_server' AS 'plug_dest';
 CREATE USER plug_dest IDENTIFIED WITH 'test_plugin_server' AS 'plug_dest';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 plug_dest	test_plugin_server
 DROP USER plug,plug_dest;
@@ -118,11 +148,15 @@ Warning	3719	'utf8' is currently an alias for the character set UTF8MB3, but wil
 CREATE USER plüg IDENTIFIED WITH 'test_plugin_server' AS 'plüg_dest';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plüg	test_plugin_server
 DROP USER plüg;
 CREATE USER plüg_dest IDENTIFIED BY 'plug_dest_passwd';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plüg_dest	caching_sha2_password
 DROP USER plüg_dest;
 SET NAMES ascii;
@@ -132,6 +166,8 @@ Warning	1300	Cannot convert string 'pl\xC3\xBCg' from ascii to utf8
 Warning	1300	Cannot convert string 'pl\xC3\xBCg_...' from ascii to utf8
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 pl??g	test_plugin_server
 DROP USER 'plüg';
 Warnings:
@@ -141,6 +177,8 @@ Warnings:
 Warning	1300	Cannot convert string 'pl\xC3\xBCg_...' from ascii to utf8
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 pl??g_dest	caching_sha2_password
 DROP USER 'plüg_dest';
 Warnings:
@@ -152,11 +190,15 @@ ERROR HY000: Plugin 'test_plügin_server' is not loaded
 CREATE USER 'plug' IDENTIFIED WITH 'test_plugin_server' AS 'plüg_dest';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 DROP USER 'plug';
 CREATE USER 'plüg_dest' IDENTIFIED BY 'plug_dest_passwd';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plüg_dest	caching_sha2_password
 DROP USER 'plüg_dest';
 SET NAMES utf8;
@@ -167,21 +209,29 @@ ERROR HY000: Plugin 'test_pluggggin_server' is not loaded
 CREATE USER 'plüg' IDENTIFIED WITH 'test_plugin_server' AS 'plüg_dest';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plüg	test_plugin_server
 DROP USER 'plüg';
 CREATE USER 'plüg_dest' IDENTIFIED BY 'plug_dest_passwd';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plüg_dest	caching_sha2_password
 DROP USER 'plüg_dest';
 CREATE USER plüg IDENTIFIED WITH test_plugin_server AS 'plüg_dest';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plüg	test_plugin_server
 DROP USER plüg;
 CREATE USER plüg_dest IDENTIFIED BY 'plug_dest_passwd';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plüg_dest	caching_sha2_password
 DROP USER plüg_dest;
 ========== test 1.1.1.2/1.1.2.2=============================
@@ -197,12 +247,16 @@ ERROR HY000: Plugin 'hh's_test_plugin_server' is not loaded
 CREATE USER plug IDENTIFIED WITH 'test_plugin_server' AS 'hh''s_plug_dest';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug	test_plugin_server
 DROP USER plug;
 CREATE USER 'hh''s_plug_dest' IDENTIFIED BY 'plug_dest_passwd';
 SELECT user,plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema');
 user	plugin
 hh's_plug_dest	caching_sha2_password
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 DROP USER 'hh''s_plug_dest';
 ========== test 1.1.1.4 ====================================
 CREATE USER plug IDENTIFIED WITH hh''s_test_plugin_server AS 'plug_dest';

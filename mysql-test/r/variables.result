@@ -2039,5 +2039,6 @@ SET SESSION timestamp = @@session.timestamp;
 SET SESSION transaction_allow_batching = @@session.transaction_allow_batching;
 SET SESSION use_secondary_engine = @@session.use_secondary_engine;
 SET SESSION warning_count = @@session.warning_count;
+SET SESSION wsrep_on = @@session.wsrep_on;
 SET @@sql_big_selects=@sql_big_selects_save;
 DROP TABLE all_vars;
