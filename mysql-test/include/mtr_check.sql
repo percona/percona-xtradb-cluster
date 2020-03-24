@@ -180,6 +180,14 @@ BEGIN
   -- Show open connections/transactions in wsrep provider
   SHOW STATUS LIKE 'wsrep_open%';
 
+-- drop the sst user, as it's a PXC internal
+-- check testcase runs on a separate session, 
+-- but is affected by the testcase's autocommit setting
+SET autocommit = 1; 
+SET SESSION sql_log_bin = OFF;
+DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;
+SET SESSION sql_log_bin = ON;
+
   -- Checksum system tables to make sure they have been properly
   -- restored after test.
   -- skip mysql.proc however, as created timestamps may have been updated by

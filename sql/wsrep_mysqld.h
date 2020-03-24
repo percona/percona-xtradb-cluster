@@ -181,6 +181,7 @@ void wsrep_update_cluster_state_uuid(const char *str);
 void wsrep_filter_new_cluster(int *argc, char *argv[]);
 
 int wsrep_init();
+bool wsrep_init_schema(THD *thd);
 void wsrep_deinit();
 void wsrep_recover();
 bool wsrep_before_SE();  // initialize wsrep before storage
@@ -226,9 +227,8 @@ extern void wsrep_shutdown_replication();
 extern bool wsrep_must_sync_wait(THD *thd,
                                  uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
 extern bool wsrep_sync_wait(THD *thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
-extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(THD *thd,
-                                                              wsrep_gtid_t *upto,
-                                                              int timeout);
+extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(
+    THD *thd, wsrep_gtid_t *upto, int timeout);
 extern void wsrep_last_committed_id(wsrep_gtid_t *gtid);
 extern int wsrep_check_opts(int argc, char *const *argv);
 extern void wsrep_prepend_PATH(const char *path);

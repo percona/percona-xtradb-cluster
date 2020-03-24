@@ -155,5 +155,17 @@ Preparing deadlock scenario for mysql.user
 ROLLBACK;
 ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 ROLLBACK;
+Preparing deadlock scenario for mysql.wsrep_cluster
+ROLLBACK;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ROLLBACK;
+Preparing deadlock scenario for mysql.wsrep_cluster_members
+ROLLBACK;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ROLLBACK;
+Preparing deadlock scenario for mysql.wsrep_streaming_log
+ROLLBACK;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ROLLBACK;
 DROP TABLE t1;
 SET @@global.innodb_lock_wait_timeout = @innodb_lock_wait_timeout_saved;
