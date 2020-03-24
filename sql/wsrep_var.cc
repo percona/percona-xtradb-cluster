@@ -24,6 +24,8 @@
 #include "sql_class.h"
 #include "sql_plugin.h"
 
+#include "rpl_group_replication.h"
+
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
 #include "wsrep_xid.h"
@@ -930,12 +932,15 @@ bool pxc_strict_mode_check(sys_var *, THD *thd, set_var *var) {
         (thd->tx_isolation == ISO_SERIALIZABLE ||
          global_system_variables.transaction_isolation == ISO_SERIALIZABLE);
 
+    const bool gr_running = is_group_replication_running();
+
     /* replicate_myisam = off
        row_binlog_format = true (row)
        safe_log_output = true (none/file)
-       serializable = false */
+       serializable = false
+       gr_running = false */
     block = !(!replicate_myisam && row_binlog_format && safe_log_output &&
-              !serializable);
+              !serializable && !gr_running);
 
     if (replicate_myisam)
       WSREP_ERROR(
@@ -953,14 +958,20 @@ bool pxc_strict_mode_check(sys_var *, THD *thd, set_var *var) {
           "Can't change pxc_strict_mode while isolation level is"
           " SERIALIZABLE");
 
+    if (gr_running)
+      WSREP_ERROR(
+          "Can't change pxc_strict_mode when group replication "
+          " is running");
+
     if (block) {
       char message[1024];
-      sprintf(message, "Can't change pxc_strict_mode to %s as%s%s%s%s",
+      sprintf(message, "Can't change pxc_strict_mode to %s as%s%s%s%s%s",
               pxc_strict_mode_to_string(var->save_result.ulonglong_value),
               (replicate_myisam ? " wsrep_replicate_myisam is ON" : ""),
               (!row_binlog_format ? " binlog_format != ROW" : ""),
               (!safe_log_output ? " log_output != NONE/FILE" : ""),
-              (serializable ? " isolation level is SERIALIZABLE" : ""));
+              (serializable ? " isolation level is SERIALIZABLE" : ""),
+              (gr_running ? " group replication is running" : ""));
       my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     }
   }
