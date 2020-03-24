@@ -1514,9 +1514,8 @@ static bool pxc_strict_mode_admin_check(THD *thd, TABLE_LIST *tables) {
 
       if (table_ref == nullptr ||
           table_ref->hidden() == dd::Abstract_table::HT_HIDDEN_SE) {
-        my_error(ER_NO_SUCH_TABLE, MYF(0), schema_name, table_name);
         thd->mdl_context.release_lock(mdl_request.ticket);
-        return true;
+        continue;
       }
 
       handlerton *hton = nullptr;
