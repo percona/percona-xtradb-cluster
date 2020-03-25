@@ -860,6 +860,7 @@ extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode)
 extern "C" void wsrep_thd_set_query_state(
 	THD *thd, enum wsrep_query_state state)
 {
+  if (!WSREP(thd)) return;
   /* async slave thread should never flag IDLE state, as it may
      give rollbacker thread chance to interfere and rollback async slave
      transaction.

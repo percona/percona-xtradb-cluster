@@ -4050,7 +4050,7 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
                         && rli->curr_group_seen_begin)
 		    DBUG_SET("+d,stop_when_mts_in_group"););
 #ifdef WITH_WSREP
-    if (exec_res)
+    if (WSREP_ON && exec_res)
     {
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       switch(thd->wsrep_conflict_state) {
@@ -4644,10 +4644,10 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
     }
 
 #ifdef WITH_WSREP
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    if (thd->wsrep_conflict_state == NO_CONFLICT)
+    if (WSREP_ON) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    if (!WSREP_ON || thd->wsrep_conflict_state == NO_CONFLICT)
     {
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      if (WSREP_ON) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
     if (slave_trans_retries)
     {
@@ -4733,7 +4733,7 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
       }
     }
 #ifdef WITH_WSREP
-    } else mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    } else if (WSREP_ON) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
 
     if (exec_res)
