@@ -64,6 +64,7 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+#include "wsrep_thd.h"
 #endif
 #ifdef HAVE_REPLICATION
 
@@ -4049,13 +4050,39 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
                         && rli->curr_group_seen_begin)
 		    DBUG_SET("+d,stop_when_mts_in_group"););
 #ifdef WITH_WSREP
-    if (exec_res && thd->wsrep_conflict_state != NO_CONFLICT)
+    if (exec_res)
     {
-      WSREP_DEBUG("SQL apply failed, res %d conflict state: %d",
-                 exec_res, thd->wsrep_conflict_state);
-      rli->abort_slave = 1;
-      rli->report(ERROR_LEVEL, ER_UNKNOWN_COM_ERROR,
-                  "Node has dropped from cluster");
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      switch(thd->wsrep_conflict_state) {
+        case NO_CONFLICT:  break;
+        case MUST_REPLAY:
+        /* this transaction will be replayed,
+           so not raising slave error here */
+        WSREP_DEBUG("SQL apply failed for MUST_REPLAY, res %d", exec_res);
+	wsrep_replay_transaction(thd);
+        switch (thd->wsrep_conflict_state) {
+        case NO_CONFLICT:
+          exec_res = 0; /* replaying succeeded, and slave may continue */
+          break;
+        case ABORTED:
+          WSREP_WARN("aborted result of slave transaction replaying: %lu, %d",
+                     thd->thread_id, thd->wsrep_conflict_state);
+	  break; /* replaying has failed, trx is rolled back */
+        default:
+          WSREP_WARN("unexpected result of slave transaction replaying: %lu, %d",
+                     thd->thread_id, thd->wsrep_conflict_state);
+        }
+
+        break;
+      default:
+          WSREP_DEBUG("SQL apply failed, res %d conflict state: %d",
+                      exec_res, thd->wsrep_conflict_state);
+          rli->abort_slave= 1;
+          rli->report(ERROR_LEVEL, ER_UNKNOWN_COM_ERROR,
+                      "Node has dropped from cluster");
+          break;
+      }
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     }
 #endif
 
