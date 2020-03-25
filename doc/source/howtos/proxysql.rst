@@ -210,7 +210,7 @@ The following example shows how to add a monitoring user on Node 2:
 
 .. code-block:: text
 
-  mysql@pxc2> CREATE USER 'proxysql'@'%' IDENTIFIED BY 'ProxySQLPa55';
+  mysql@pxc2> CREATE USER 'proxysql'@'%' IDENTIFIED WITH mysql_native_password by '$3Kr$t';
   mysql@pxc2> GRANT USAGE ON *.* TO 'proxysql'@'%';
 
 The following example shows how to configure this user on the ProxySQL node:
