@@ -441,9 +441,9 @@ build_srpm(){
     if [ -n ${SRCRPM} ]; then
         if test "x${SCONS_ARGS}" == "x"
         then
-            rpmbuild -bs --define "_topdir ${WORKDIR}/rpmbuild" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "dist generic" rpmbuild/SPECS/percona-xtradb-cluster.spec
+            rpmbuild -bs --define "_topdir ${WORKDIR}/rpmbuild" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "dist generic" rpmbuild/SPECS/percona-xtradb-cluster.spec
         else
-            rpmbuild -bs --define "_topdir ${WORKDIR}/rpmbuild" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "dist generic" --define "scons_args ${SCONS_ARGS}" rpmbuild/SPECS/percona-xtradb-cluster.spec
+            rpmbuild -bs --define "_topdir ${WORKDIR}/rpmbuild" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "dist generic" --define "scons_args ${SCONS_ARGS}" rpmbuild/SPECS/percona-xtradb-cluster.spec
         fi
     fi
     #
@@ -546,12 +546,13 @@ build_rpm(){
 
     cd ${WORKDIR}  || exit
     source /opt/rh/devtoolset-7/enable
+    source ${WORKDIR}/pxc-80.properties
     source ${CURDIR}/srpm/pxc-80.properties
     #
     if [ ${ARCH} = x86_64 ]; then
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     else
-        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
+        rpmbuild --define "_topdir ${WORKDIR}/rpmbuild" --define "dist el${RHEL}" --define "rpm_version $MYSQL_RELEASE.$RPM_RELEASE" --define "galera_revision ${GALERA_REVNO}" --define "with_tokudb 0" --define "with_rocksdb 0" --define "with_mecab ${MECAB_INSTALL_DIR}/usr" --rebuild rpmbuild/SRPMS/${SRCRPM}
     fi
     return_code=$?
     if [ $return_code != 0 ]; then
@@ -590,7 +591,7 @@ build_source_deb(){
     rm -fr ${HNAME}-${VERSION}
 
     #
-    NEWTAR=${NAME}_${VERSION}.orig.tar.gz
+    NEWTAR=${NAME}_${VERSION}-${RELEASE}.orig.tar.gz
     mv ${TARFILE} ${NEWTAR}
 
     DEBIAN_VERSION="$(lsb_release -sc)"
@@ -607,7 +608,7 @@ build_source_deb(){
     sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" debian/rules
 
 
-    dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}"
+    dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}"
     dpkg-buildpackage -S
     #
     rm -fr ${HNAME}-${VERSION}-${RELEASE}
@@ -662,7 +663,7 @@ build_deb(){
     export CXXFLAGS=" $COMMON_FLAGS -Wno-virtual-move-assign  ${CXXFLAGS:-}"
 
     DSC=$(basename $(find . -name '*.dsc' | sort | tail -n 1))
-    DIRNAME=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $1"-"$2"-"$3"-"$4}' | sed -e s:.dsc::)
+    DIRNAME=$(echo ${DSC} | sed -e 's:_:-:g' | awk -F'-' '{print $1"-"$2"-"$3"-"$4"-"$5}' | sed -e s:.dsc::)
     rm -rf $DIRNAME
 
     #
@@ -702,7 +703,7 @@ build_deb(){
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
     sudo chmod 777 debian/rules
-    dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
+    dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
     #
