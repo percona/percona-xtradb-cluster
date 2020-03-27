@@ -514,4 +514,19 @@ enum wsrep::streaming_context::fragment_unit wsrep_fragment_unit(ulong unit);
 constexpr char WSREP_CHANNEL_NAME[] = "wsrep";
 bool wsrep_is_wsrep_channel_name(const char *channel_name);
 
+/* Simple RAII helper */
+class wsrep_scope_guard {
+ public:
+  wsrep_scope_guard(std::function<void()> scope_enter,
+                    std::function<void()> scope_leave)
+      : _scope_leave(scope_leave) {
+    scope_enter();
+  }
+
+  ~wsrep_scope_guard() { _scope_leave(); }
+
+ private:
+  std::function<void()> _scope_leave;
+};
+
 #endif /* WSREP_MYSQLD_H */

@@ -1494,40 +1494,42 @@ static bool pxc_strict_mode_admin_check(THD *thd, TABLE_LIST *tables) {
 
     bool block = false;
 
-    // Acquire lock on the table as it is needed to get the instance from DD
-    MDL_request mdl_request;
-    MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db, table->table_name,
-                     MDL_SHARED, MDL_EXPLICIT);
-    thd->mdl_context.acquire_lock(&mdl_request,
-                                  thd->variables.lock_wait_timeout);
-
+    // mdl_lock scope begin
     {
+      // Acquire lock on the table as it is needed to get the instance from DD
+      MDL_request mdl_request;
+      MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db,
+                       table->table_name, MDL_SHARED, MDL_EXPLICIT);
+      wsrep_scope_guard mdl_lock(
+          [thd, &mdl_request]() {
+            thd->mdl_context.acquire_lock(&mdl_request,
+                                          thd->variables.lock_wait_timeout);
+          },
+          [thd, &mdl_request]() {
+            thd->mdl_context.release_lock(mdl_request.ticket);
+          });
+
       const char *schema_name = table->db;
       const char *table_name = table->table_name;
       dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
       const dd::Table *table_ref = NULL;
 
       if (thd->dd_client()->acquire(schema_name, table_name, &table_ref)) {
-        thd->mdl_context.release_lock(mdl_request.ticket);
         return true;
       }
 
       if (table_ref == nullptr ||
           table_ref->hidden() == dd::Abstract_table::HT_HIDDEN_SE) {
-        thd->mdl_context.release_lock(mdl_request.ticket);
         continue;
       }
 
       handlerton *hton = nullptr;
       if (dd::table_storage_engine(thd, table_ref, &hton)) {
-        thd->mdl_context.release_lock(mdl_request.ticket);
         return true;
       }
 
       db_type = hton->db_type;
-    }
-
-    thd->mdl_context.release_lock(mdl_request.ticket);
+    }  // mdl_lock scope end
 
     bool is_system_db =
         (table && ((strcmp(table->db, "mysql") == 0) ||
