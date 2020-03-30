@@ -110,7 +110,7 @@ The following is an example of the HAProxy configuration file in this case::
 
       mysql> CREATE USER 'haproxy_user'@'%' IDENTIFIED WITH mysql_native_password by '$3Kr$t';
 
-      .. seealso::
+   .. seealso::
 
-	 |MySQL| Documentation: CREATE USER statement
-	    https://dev.mysql.com/doc/refman/8.0/en/create-user.html
+      |MySQL| Documentation: CREATE USER statement
+         https://dev.mysql.com/doc/refman/8.0/en/create-user.html

@@ -57,6 +57,15 @@ Before you start the upgrade, move your custom settings from
 Ubuntu) or from :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf` (on Red Hat
 and CentOS) to the new location accordingly.
 
+.. rubric:: ``caching_sha2_password`` Is the Default Authentication Plugin
+
+In |PXC| |version|, the default authentication plugin is
+``caching_sha2_password``. The ProxySQL option
+:ref:`pxc.proxysql.v2.admin-tool.syncusers` will not work if the |PXC| user is
+created using ``caching_sha2_password``. Use the ``mysql_native_password``
+authentication plugin in these cases.
+
+
 .. contents::
    :local:
 
