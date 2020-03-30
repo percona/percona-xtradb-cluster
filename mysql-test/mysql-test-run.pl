@@ -3801,9 +3801,16 @@ sub check_wsrep_support() {
     } else {
       # WSREP_PROVIDER env not defined. Lets try to locate the wsrep provider
       # library.
+
+      my $dirname = dirname(abs_path($0));
+      $dirname = "$dirname/..";
+      if (defined $ENV{MTR_BINDIR}) {
+        $dirname = "$ENV{'MTR_BINDIR'}",
+      }
       my $file_wsrep_provider=
         mtr_file_exists("/usr/lib/galera/libgalera_smm.so",
-                        "/usr/lib64/galera/libgalera_smm.so");
+                        "/usr/lib64/galera/libgalera_smm.so",
+                        "$dirname/lib/libgalera_smm.so");
 
       if ($file_wsrep_provider ne "") {
         # wsrep provider library found !
