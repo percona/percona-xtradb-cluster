@@ -2380,7 +2380,7 @@ static void unireg_abort(int exit_code) {
   if (!daemon_launcher_quiet && exit_code) LogErr(ERROR_LEVEL, ER_ABORTING);
 
 #ifdef WITH_WSREP
-  if (WSREP_ON && Wsrep_server_state::initialized() &&
+  if (WSREP_ON && Wsrep_server_state::has_instance() &&
       Wsrep_server_state::instance().state() !=
           wsrep::server_state::s_disconnected) {
     WSREP_DEBUG("Initiating abort (unireg_abort)");
