@@ -36,6 +36,8 @@ class Wsrep_server_state : public wsrep::server_state {
   static void destroy();
   static Wsrep_server_state &instance() { return *m_instance; }
 
+  static bool initialized() noexcept { return m_instance != nullptr; }
+
   static wsrep::provider &get_provider() { return instance().provider(); }
 
   static bool has_capability(int capability) {
