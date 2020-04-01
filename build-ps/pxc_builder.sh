@@ -54,6 +54,7 @@ parse_arguments() {
             --install_deps=*) INSTALL="$val" ;;
             --rpm_release=*) RPM_RELEASE="$val" ;;
             --deb_release=*) DEB_RELEASE="$val" ;;
+            --no_clone=*) NO_CLONE="$val" ;;
             --help) usage ;;      
             *)
               if test -n "$pick_args"
@@ -112,35 +113,39 @@ get_sources(){
         echo "Sources will not be downloaded"
         return 0
     fi
+    if [ ${NO_CLONE} = 0 ]; then
+        git clone "$REPO"
+        retval=$?
+        if [ $retval != 0 ]
+        then
+            echo "There were some issues during repo cloning from github. Please retry one more time"
+            exit 1
+        fi
 
-    git clone "$REPO"
-    retval=$?
-    if [ $retval != 0 ]
-    then
-        echo "There were some issues during repo cloning from github. Please retry one more time"
-        exit 1
-    fi
-
-    cd percona-xtradb-cluster || exit
-    if [ ! -z "$BRANCH" ]
-    then
-        git reset --hard
-        git clean -xdf
-        git checkout "$BRANCH"
-    fi
-    rm -rf wsrep-lib || true
-    rm -rf percona-xtradb-cluster-galera || true
-    git submodule deinit -f . || true
-    git submodule init
-    git submodule update
-
-    for dir in 'wsrep-lib' 'percona-xtradb-cluster-galera'; do
-        cd $dir || exit
+        cd percona-xtradb-cluster || exit
+        if [ ! -z "$BRANCH" ]
+        then
+            git reset --hard
+            git clean -xdf
+            git checkout "$BRANCH"
+        fi
+        rm -rf wsrep-lib || true
+        rm -rf percona-xtradb-cluster-galera || true
         git submodule deinit -f . || true
         git submodule init
         git submodule update
-        cd ../ || exit
-    done
+
+        for dir in 'wsrep-lib' 'percona-xtradb-cluster-galera'; do
+            cd $dir || exit
+            git submodule deinit -f . || true
+            git submodule init
+            git submodule update
+            cd ../ || exit
+        done
+    else
+        cd percona-xtradb-cluster || exit
+    fi
+
     WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep-lib/wsrep-API/v26/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep-lib.cmake" | cut -d '"' -f2)"
     WSREP_REV="$(test -r WSREP-REVISION && cat WSREP-REVISION)"
     REVISION=$(git rev-parse --short HEAD)
@@ -845,6 +850,7 @@ SDEB=0
 RPM=0
 DEB=0
 SOURCE=0
+NO_CLONE=0
 TARBALL=0
 OS_NAME=
 ARCH=
