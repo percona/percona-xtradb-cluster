@@ -326,6 +326,18 @@ SELECT @@admin_address, @@admin_port;
 
 --enable_result_log
 
+--echo # Test case 18
+--echo # Check that server shuts down gracefully if --create-admin-listener-thread=ON
+--echo # is specified, but without --admin-address parameter
+--echo # Starting up server with --create-admin-listener-thread=ON
+--let $restart_parameters=restart: --create-admin-listener-thread=ON
+--let $wait_for_tcpsocket_status = no_wait
+--source include/start_mysqld.inc
+
+--connection default
+--echo # Stop DB server
+--source include/shutdown_mysqld.inc
+
 --echo #
 --echo # Starting mysqld in the regular mode...
 --echo #

@@ -26,6 +26,7 @@
 #include "rpl_msr.h"  // channel_map
 #include "rpl_slave.h"
 #include "sql/sql_lex.h"
+#include "sql/auth/auth_common.h"
 #include "sql_base.h"  // TEMP_PREFIX
 #include "sql_class.h"
 #include "sql_parse.h"
@@ -1127,6 +1128,12 @@ int wsrep_remove_sst_user(bool initialize_thread) {
   int err = 0;
   MYSQL_SESSION session = NULL;
 
+  // Skip the attempt to  mysql.pxc.sst.user in case the server was started with
+  // --skip-grant-tables option. It would fail enyway with error.
+  // This will prevent writing out error to error log.
+  if (skip_grant_tables()) {
+      return ECANCELED;
+  }
   // This array is filled with pairs of entries
   // The first entry is the actual query to be run
   // The second entry is the string to be displayed if the query fails
