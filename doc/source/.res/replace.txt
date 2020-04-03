@@ -6,6 +6,7 @@
 .. |myrocks| replace:: MyRocks
 .. |ps-last| replace:: Percona Server for MySQL 8.0
 .. |xtradb.product| replace:: Percona XtraDB
+.. |mysql| replace:: MySQL
 .. |ps| replace:: Percona Server for MySQL
 .. |percona-server| replace:: Percona Server for MySQL
 

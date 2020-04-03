@@ -8,11 +8,6 @@ PXC Strict Mode is designed to avoid the use of
 experimental and unsupported features in |PXC|.
 It performs a number of validations at startup and during runtime.
 
-.. important:: 
-
-   Make sure that the group replication plugin is not active for the strict mode
-   to work correctly.
-
 Depending on the actual mode you select,
 upon encountering a failed validation,
 the server will either throw an error
@@ -75,7 +70,7 @@ or the ``--pxc-strict-mode`` option during ``mysqld`` startup.
 .. _validations:
 
 Validations
-===========
+================================================================================
 
 PXC Strict Mode validations are designed to ensure optimal operation
 for common cluster setups that do not require experimental features
@@ -90,6 +85,51 @@ This section describes the purpose and consequences of each validation.
 
 .. contents::
    :local:
+
+.. _pxc-strict-mode-validation-group-replication:
+
+Group replication
+--------------------------------------------------------------------------------
+
+.. TODO:
+
+   Provide steps for migrating from group replication
+
+   describing why (e.g. it is a completely different
+   clustering product, and we only support migration from/to, not
+   actively running them together), and how (disabled - allowed,
+   permission - warnings, enforcing/master - can't be turned on)
+
+*Group replication* is a feature of |mysql| that `provides distributed state
+machine replication with strong coordination between servers
+<https://dev.mysql.com/doc/refman/8.0/en/group-replication.html>`_. It is
+implemented as a plugin which, if activated, may conflict with |pxc|. Group
+replication cannot be activated to run alongside |pxc|. However, you can migrate
+to |pxc| from the environment that uses group replication.
+
+For the strict mode to work correctly, make sure that the group replication
+plugin is *not active*. In fact, if :variable:`pxc_strict_mode` is set to
+`ENFORCING` or `MASTER`, the server will stop with an error:
+
+.. admonition:: Error message with :variable:`pxc_strict_mode` set to `ENFORCING` or `MASTER`
+
+   .. code-block:: text
+
+      Group replication cannot be used with |pxc| in strict mode.
+
+If :variable:`pxc_strict_mode` is set to ``DISABLED`` you can use group
+replication at your own risk. Setting :variable:`pxc_strict_mode` to
+``PERMISSIVE`` will result in a warning.
+
+.. admonition:: Warning message with :variable:`pxc_strict_mode` set to `PERMISSIVE`
+
+   .. code-block:: text
+
+      Using group replication with |pxc| is only supported for migration. Please
+      make sure that group replication is turned off once all data is migrated to
+      |pxc|.
+
+   
 
 .. _storage-engine:
 
