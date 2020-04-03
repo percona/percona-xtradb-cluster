@@ -5,9 +5,10 @@ wsrep_sst_method=xtrabackup-v2
 wsrep_debug=1
 
 [sst]
-encrypt=3
-tkey=@ENV.MYSQL_TEST_DIR/std_data/server-key.pem
-tcert=@ENV.MYSQL_TEST_DIR/std_data/server-cert.pem
+encrypt=4
+ssl-key=@ENV.MYSQL_TEST_DIR/std_data/server-key.pem
+ssl-cert=@ENV.MYSQL_TEST_DIR/std_data/server-cert.pem
+ssl-ca=@ENV.MYSQL_TEST_DIR/std_data/cacert.pem
 ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
 
 [mysqld.1]

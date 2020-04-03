@@ -11,16 +11,10 @@ close-files
 # compression requires qpress from the Percona repositories
 # compress
 # compress-threads=2
-#encryption=AES256
-#encrypt-key=4FA92C5873672E20FB163A0BCB2BB4A4
 galera-info
 history=backup
 parallel=1
 
 [SST]
-encrypt=1
-encrypt-algo=AES256
-encrypt-key=4FA92C5873672E20FB163A0BCB2BB4A4
-
 # PXC-2602 : test the options processing
 xbstream-opts="--parallel=1"
