@@ -81,19 +81,18 @@ Enabling :variable:`pxc-encrypt-cluster-traffic`
 ------------------------------------------------
 
 |PXC| includes the :variable:`pxc-encrypt-cluster-traffic` variable that
-enables automatic configuration of SSL encryption there-by encrypting
+enables automatic configuration of SSL encryption thereby encrypting
 :term:`SST`, :term:`IST`, and replication traffic.
 
 This variable is not dynamic and so cannot be changed on runtime. To
 enable automatic configuration of SSL encryption, set
 ``pxc-encrypt-cluster-traffic=ON`` in the the ``[mysqld]`` section of the
-:file:`my.cnf` file, and restart the cluster (by default it is disabled
-there-by using non-secured channel for replication).
+:file:`my.cnf` file, and restart the cluster.
 
 .. note::
 
-   Setting ``pxc-encrypt-cluster-traffic=ON`` has effect of applying
-   the following settings in :file:`my.cnf` configuration file:
+   Setting ``pxc-encrypt-cluster-traffic=ON`` has the effect of applying
+   the following settings in the :file:`my.cnf` configuration file:
 
    .. code-block:: text
 
@@ -110,16 +109,16 @@ there-by using non-secured channel for replication).
    are affected (``socket.ssl_key``, ``socket,ssl_cert``, and
    ``socket.ssl_ca``), the rest is not modified.
 
-Automatic configuration of the SSL encryption needs key and certificate files.
+The automatic configuration of the SSL encryption needs key and certificate files.
 |MySQL| generates default key and certificate
 files and places them in data directory. These auto-generated files are
-suitable for automatic SSL configuration, but you should use the same key and
-certificate files on all nodes. Also you can override auto-generated files with
-manually created ones, as covered by the :ref:`generate-keys-certs` section.
+suitable for automatic SSL configuration, but *you should use the same key and
+certificate files on all nodes*. Also you can override auto-generated files with
+manually created ones, as covered in :ref:`generate-keys-certs`.
 
-Necessary key and certificate files are first searched at the ``ssl-ca``,
+The necessary key and certificate files are first searched at the ``ssl-ca``,
 ``ssl-cert``, and ``ssl-key`` options under ``[mysqld]``. If these options are
-not set, it then looks in the data directory for :file:`ca.pem`,
+not set, the data directory is searched for :file:`ca.pem`,
 :file:`server-cert.pem`, and :file:`server-key.pem` files.
 
 .. note:: The ``[sst]`` section is not searched.
@@ -150,9 +149,9 @@ There are three aspects of |PXC| operation, where you can enable encryption:
   This refers to :term:`SST` traffic during full data copy
   from one cluster node (donor) to the joining node (joiner).
 
-* `Encrypting Replication Traffic <encrypt-replication_>`__
+* :ref:`Encrypting Replication Traffic <encrypt-replication>`
 
-* `Encrypting IST Traffic <encrypt-replication_>`__
+* :ref:`Encrypting IST Traffic <encrypt-replication>`
 
   This refers to all internal |PXC| communication,
   such as, write-set replication, :term:`IST`, and various service messages.
@@ -269,7 +268,7 @@ Generating Keys and Certificates Manually
 =========================================
 
 As mentioned above, |MySQL| generates default key and certificate
-files and places them in data directory. If user wants to override these
+files and places them in the data directory. If you want to override these
 certificates, the following new sets of files can be generated:
 
 * *Certificate Authority (CA) key and certificate*
@@ -283,7 +282,7 @@ These files should be generated using `OpenSSL <https://www.openssl.org/>`_.
 
 .. note:: The ``Common Name`` value
    used for the server and client keys and certificates
-   must differ from that value used for the CA certificate.
+   must differ from the value used for the CA certificate.
 
 .. _generate-ca-key-cert:
 

@@ -20,11 +20,10 @@ When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
 
 Possible values:
 
-* ``OFF``, ``0``, ``false``: Disabled (default)
+* ``OFF``, ``0``, ``false``: Disabled
+* ``ON``, ``1``, ``true``: Enabled (default)
 
-* ``ON``, ``1``, ``true``: Enabled
-
-For more information, see :ref:`ssl-auto-conf`.
+For more information, see :ref:`enabling_encrypt-cluster-traffic`.
 
 .. variable:: pxc_maint_mode
 

@@ -11,3 +11,4 @@
 .. |percona-release| replace:: :program:`percona-release`
 .. |rpm.e.nodeps| replace:: :bash:`rpm -e --nodeps`
 .. |rpm.e| replace:: :bash:`rpm -e`
+.. |xtrabackup| replace:: :program:`xtrabackup`
