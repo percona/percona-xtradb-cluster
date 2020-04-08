@@ -1802,7 +1802,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     WSREP_DEBUG("assigned new next trx id: %" PRIu64, thd->wsrep_next_trx_id());
   }
 
-  bool do_end_of_statement;
+  bool do_end_of_statement = true;
 #endif /* WITH_WSREP */
 
   if (!(server_command_flags[command] & CF_SKIP_QUESTIONS))
@@ -2493,7 +2493,6 @@ dispatch_end:
     WSREP_LOG_THD(thd, "leave");
   }
 
-  do_end_of_statement = true;
   if (WSREP(thd)) {
     /* wsrep BF abort in query exec phase */
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
