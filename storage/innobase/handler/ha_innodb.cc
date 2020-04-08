@@ -3019,34 +3019,9 @@ trx_t *check_trx_exists(THD *thd) /*!< in: user thread handle */
     so we unset the disable flag. */
     ut_ad(trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE);
 
-#ifdef WITH_WSREP
-    /* With 5.7 InnoDB introduce a mechanism for force rollback. If a conflict
-    is detected then high priority transaction can cause low priority
-    transaction to force rollback. Rollback action is executed as part of
-    high priority transaction thread, hogging it till it is done.
-    Galera uses different logic. It has a dedicated rollback thread that does
-    this on request. Also, not each transaction is rollback by rollback thread.
-    For example: if statement is in advance mode with query_state = QUERY_EXEC
-    then rollback is done as part of do_command/dispatch_command flow.
-    For PXC we will disable InnoDB logic and opt for original Galera logic. */
-    if (!wsrep_on(thd)) {
-      trx->in_innodb &= TRX_FORCE_ROLLBACK_MASK;
-    }
-#else
     trx->in_innodb &= TRX_FORCE_ROLLBACK_MASK;
-#endif /* WITH_WSREP */
 
   } else {
-#ifdef WITH_WSREP
-    /* Check comment above.
-    Why we need to re-set DISABLE for every call ?
-    - trx_init() resets the complete mask masking DISABLE bit
-    too without caring what was the original state of this bit. */
-    if (wsrep_on(thd)) {
-      trx->in_innodb |= TRX_FORCE_ROLLBACK_DISABLE;
-    }
-#endif /* WITH_WSREP */
-
     ut_a(trx->magic_n == TRX_MAGIC_N);
 
     innobase_trx_init(thd, trx);
@@ -24083,116 +24058,6 @@ void wsrep_abort_slave_trx(wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno) {
       (long long)bf_seqno, (long long)victim_seqno);
   abort();
 }
-
-#if 0
-/*
-  This function is needed only for canceling thread, which are inside replicator
-  processing commit, when high priority transaction aborts the victim
- */
-int wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx) {
-  DBUG_ENTER("wsrep_signal_replicator");
-  THD *bf_thd = (THD *)bf_trx->mysql_thd;
-  THD *thd = (THD *)victim_trx->mysql_thd;
-  int64_t bf_seqno = (bf_thd) ? wsrep_thd_trx_seqno(bf_thd) : 0;
-
-  if (!thd) {
-    DBUG_PRINT("wsrep", ("no thd for conflicting lock"));
-    WSREP_WARN("no THD for trx: %llu", (long long)victim_trx->id);
-    DBUG_RETURN(1);
-  }
-  if (!bf_thd) {
-    DBUG_PRINT("wsrep", ("no BF thd for conflicting lock"));
-    WSREP_WARN("no BF THD for trx: %llu", (bf_trx) ? (long long)bf_trx->id : 0);
-    DBUG_RETURN(1);
-  }
-
-  WSREP_LOG_CONFLICT(bf_thd, thd, true);
-
-  WSREP_DEBUG(
-      "BF thread %u (with write-set: %lld)"
-      " aborting Victim thread %u with transaction (%llu)",
-      wsrep_thd_thread_id(bf_thd), (long long)bf_seqno,
-      wsrep_thd_thread_id(thd), (long long)victim_trx->id);
-
-  WSREP_DEBUG("Aborting query: %s",
-              (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
-
-  wsrep_thd_LOCK(thd);
-  DBUG_EXECUTE_IF("sync.wsrep_after_BF_victim_lock", {
-    const char act[] =
-        "now "
-        "wait_for signal.wsrep_after_BF_victim_lock";
-    DBUG_ASSERT(!debug_sync_set_action(bf_thd, STRING_WITH_LEN(act)));
-  };);
-
-  if (wsrep_thd_query_state(thd) == QUERY_EXITING) {
-    WSREP_DEBUG("Killing Transaction (%llu) in QUERY_EXITING state",
-                (long long)victim_trx->id);
-    wsrep_thd_UNLOCK(thd);
-    DBUG_RETURN(0);
-  }
-
-  switch (wsrep_thd_conflict_state(thd)) {
-    case NO_CONFLICT:
-      wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
-      break;
-    case MUST_ABORT:
-      WSREP_DEBUG("Victim Transaction (%llu) in MUST_ABORT state",
-                  (long long)victim_trx->id);
-      break;
-    case ABORTED:
-    case ABORTING:  // fall through
-    default:
-      WSREP_DEBUG("Victim Transaction's (%llu) conflict-state: %s",
-                  (long long)victim_trx->id,
-                  wsrep_get_conflict_state(wsrep_thd_conflict_state(thd)));
-      wsrep_thd_UNLOCK(thd);
-      DBUG_RETURN(0);
-      break;
-  }
-
-  switch (wsrep_thd_query_state(thd)) {
-    case QUERY_COMMITTING:
-      enum wsrep_status rcode;
-
-      WSREP_DEBUG(
-          "Killing Transaction (%llu) in QUERY_COMMITTING"
-          " state",
-          (long long)victim_trx->id);
-
-      if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
-        wsrep_abort_slave_trx(bf_seqno, wsrep_thd_trx_seqno(thd));
-      } else {
-        rcode = wsrep->abort_pre_commit(wsrep, bf_seqno,
-                                        (wsrep_trx_id_t)wsrep_thd_trx_id(thd));
-        switch (rcode) {
-          case WSREP_WARNING:
-            WSREP_DEBUG("cancel commit warning: %llu",
-                        (long long)victim_trx->id);
-            wsrep_thd_UNLOCK(thd);
-            DBUG_RETURN(1);
-            break;
-          case WSREP_OK:
-            break;
-          default:
-            WSREP_ERROR("cancel commit bad exit: %d %llu", rcode,
-                        (long long)victim_trx->id);
-            /* unable to interrupt, must abort */
-            /* note: kill_mysql() will block, if we cannot.
-             * kill the lock holder first.
-             */
-            abort();
-            break;
-        }
-      }
-      break;
-    default:
-      break;
-  }
-  wsrep_thd_UNLOCK(thd);
-  DBUG_RETURN(0);
-}
-#endif /* 0 */
 
 int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
                                 const trx_t *const bf_trx, trx_t *victim_trx,
