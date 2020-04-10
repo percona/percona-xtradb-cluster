@@ -247,18 +247,14 @@ MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
 PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
 PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 
-# Note: WSREP_INTERFACE_VERSION act as compatibility check between wsrep-plugin
-# and galera plugin so we include it as part of our component.
-WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/src/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
-
 if [[ $COPYGALERA -eq 0 ]];then
     GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
 fi
 TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
-PRODUCT_NAME="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
-PRODUCT_FULL_NAME="$PRODUCT_NAME-$RELEASE_TAG$WSREP_VERSION${BUILD_COMMENT:-}.$TAG.$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
+PRODUCT_NAME="Percona-XtraDB-Cluster-$PS_VERSION-$PERCONA_SERVER_EXTENSION"
+PRODUCT_FULL_NAME="$PRODUCT_NAME-$RELEASE_TAG$PXC_VERSION_EXTRA${BUILD_COMMENT:-}.$TAG.$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
 
 #
 # This corresponds to GIT revision when the build/package is created.
@@ -271,7 +267,7 @@ then
 else
     REVISION=""
 fi
-COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
+COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$RELEASE_TAG$PXC_VERSION_EXTRA"
 COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
 
 #-------------------------------------------------------------------------------
@@ -353,8 +349,8 @@ fi
     else
         mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
              "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
-        mv $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
-        mv $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
+        cp $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
+        cp $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
     fi
     ) || exit 1
 
@@ -379,7 +375,7 @@ fi
             $SSL_OPT \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
-            -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
+            -DMYSQL_SERVER_SUFFIX="-$PXC_VERSION_EXTRA" \
             -DWITH_INNODB_DISALLOW_WRITES=ON \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
@@ -408,7 +404,7 @@ fi
             $SSL_OPT \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
-            -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
+            -DMYSQL_SERVER_SUFFIX="-$PXC_VERSION_EXTRA" \
             -DWITH_INNODB_DISALLOW_WRITES=ON \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
