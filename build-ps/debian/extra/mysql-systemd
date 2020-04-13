@@ -210,7 +210,8 @@ fi
 grastate_loc="${datadir}/grastate.dat"
 
 if [[ -z "${pid_path:-}" ]];then
-  pid_path=$datadir/`hostname`.pid
+  hostname=$(hostname)
+  pid_path=$datadir/${hostname%.*}.pid
 else
   case "$pid_path" in
     /* ) ;;
