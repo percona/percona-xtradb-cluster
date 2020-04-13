@@ -805,7 +805,7 @@ function run_post_processing_steps()
 
     # Generate a new random password to be used by the JOINER
     local sst_user="mysql.pxc.sst.user"
-    local sst_password=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    local sst_password="aA!9$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)"
 
     local -i timeout_threshold
     timeout_threshold=300
