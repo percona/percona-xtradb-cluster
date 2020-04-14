@@ -18,9 +18,9 @@ Binaries are available from the `downloads section
 * Galera/Codership WSREP API Release 5.7.28
 * Galera Replication library 3.28
 
-|PXC| |release| requires `Percona XtraBackup 2.4.17 <https://www.percona.com/doc/percona-xtrabackup/2.4/release-notes/2.4/2.4.17.html>`_.
+|PXC| |release| requires `Percona XtraBackup 2.4.20 <https://www.percona.com/doc/percona-xtrabackup/2.4/release-notes/2.4/2.4.20.html>`_.
 
 This release fixes security vulnerability *CVE-2020-10997*
 
 .. |release| replace:: 5.7.28-31.41.2
-.. |date| replace:: April 13, 2020
+.. |date| replace:: April 14, 2020
