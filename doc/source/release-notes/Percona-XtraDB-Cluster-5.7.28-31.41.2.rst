@@ -1,11 +1,13 @@
-.. rn:: 5.7.28-31.41
+.. rn:: 5.7.28-31.41.2
 
 ================================================================================
 |PXC| |release|
 ================================================================================
 
-Percona is happy to announce the release of Percona XtraDB Cluster |release| on
-|date|.  Binaries are available from the `downloads section
+:Date: |date|
+:Installation: :ref:`install`
+
+Binaries are available from the `downloads section
 <http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/>`_ or from our
 :ref:`software repositories <install>`.
 
@@ -18,13 +20,7 @@ Percona is happy to announce the release of Percona XtraDB Cluster |release| on
 
 |PXC| |release| requires `Percona XtraBackup 2.4.17 <https://www.percona.com/doc/percona-xtrabackup/2.4/release-notes/2.4/2.4.17.html>`_.
 
-Bugs Fixed
-================================================================================
+This release fixes security vulnerability *CVE-2020-10997*
 
-- :jirabug:`PXC-2729`: A cluster node could hang when trying to access a table which was being updated by another node.
-- :jirabug:`PXC-2704`: After a row was updated with a variable-length unique key, the entire cluster could crash.
-
-Other bugs fixed: :jirabug:`PXC-2670`
-
-.. |release| replace:: 5.7.28-31.41
-.. |date| replace:: December 16, 2019
+.. |release| replace:: 5.7.28-31.41.2
+.. |date| replace:: April 13, 2020
