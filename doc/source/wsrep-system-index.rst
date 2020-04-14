@@ -20,9 +20,9 @@ When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
 
 Possible values:
 
-* ``OFF``, ``0``, ``false``: Disabled (default)
+* ``OFF``, ``0``, ``false``: Disabled
 
-* ``ON``, ``1``, ``true``: Enabled
+* ``ON``, ``1``, ``true``: Enabled (default)
 
 For more information, see :ref:`ssl-auto-conf`.
 
@@ -413,7 +413,7 @@ A few examples:
 Note the case where ``log_error_verbosity=3`` and
 ``wsrep_min_log_verbosity=1``. The actual log verbosity of wsrep/Galera is *3*
 (system error, warning, info) because ``log_error_verbosity`` is greater.
-       
+
 .. seealso::
 
    |MySQL| Documentation: log_error_verbosity
