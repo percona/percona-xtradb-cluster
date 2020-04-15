@@ -524,14 +524,6 @@ int vio_shutdown(Vio *vio, int how) {
 
   int r = vio_cancel(vio, how);
 
-#ifdef WITH_WSREP
-  /* with thread pool enabled socket shutdown immediately followed by close
-  fail to deliver the said notification to the pooling worker thread.
-  sleep help ensure that shutdown signal is delivered before the socket is
-  closed. */
-  sleep(1);
-#endif /* WITH_WSREP */
-
   if (!vio->inactive) {
 #ifdef USE_PPOLL_IN_VIO
     if (vio->thread_id != 0 && vio->poll_shutdown_flag.test_and_set()) {

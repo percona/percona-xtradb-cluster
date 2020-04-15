@@ -2038,6 +2038,25 @@ class Call_close_conn : public Do_THD_Impl {
 
 #ifdef WITH_WSREP
 /**
+  This class implements callback function used by
+  wsrep_close_client_connections() to set KILL_CONNECTION
+  flag on all client thds and awake the thread.
+*/
+class Set_wsrep_kill_client_conn : public Do_THD_Impl {
+ public:
+  Set_wsrep_kill_client_conn() {}
+
+  virtual void operator()(THD *killing_thd) {
+    if (killing_thd->get_protocol()->connection_alive() &&
+       (WSREP(killing_thd) || wsrep_thd_is_local(killing_thd)) &&
+       killing_thd != current_thd) {
+      mysql_mutex_lock(&killing_thd->LOCK_thd_data);
+      killing_thd->awake(THD::KILL_CONNECTION);
+      mysql_mutex_unlock(&killing_thd->LOCK_thd_data);
+    }
+  }
+};
+/**
   This class implements callback function used by close_connections()
   to set KILL_CONNECTION flag on all thds in thd list.
   If m_kill_dump_thread_flag is not set it kills all other threads
@@ -9390,19 +9409,23 @@ int wsrep_wait_committing_connections_close(int wait_time) {
 
 void wsrep_close_client_connections(bool, bool server_shutdown) {
   Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
-  /*
-    First signal all threads that it's time to die
-    This will give the threads some time to gracefully abort their
-    statements and inform their clients that the server is about to die.
-  */
 
+  /*
+   * wsrep_close_client_connections can be used when there is a cluster
+   * reconfiguration or when we set wsrep_reject_queries=ALL_KILL
+   * on those cases if we are using thread pooling,
+   * we cannot close the connections abruptly otherwise the thread pool workers
+   * won't get signaled and will hang forever when we shutdown the server.
+   * Sending a kill signal and awaking the thread.
+   */
   sql_print_information("Giving %d client threads a chance to die gracefully",
                         static_cast<int>(thd_manager->get_thd_count()));
+  Set_wsrep_kill_client_conn set_wsrep_kill_client_conn;
+  thd_manager->do_for_all_thd(&set_wsrep_kill_client_conn);
+  if (thd_manager->get_thd_count() > 0) sleep(2); // Give threads time to die
 
   Call_wsrep_close_client_conn call_wsrep_close_client_conn(server_shutdown);
   thd_manager->do_for_all_thd(&call_wsrep_close_client_conn);
-
-  if (thd_manager->get_thd_count() > 0) sleep(2);  // Give threads time to die
 }
 
 void wsrep_close_applier(THD *thd) {
