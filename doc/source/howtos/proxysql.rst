@@ -622,7 +622,7 @@ wait for ProxySQL to divert traffic from this node,
 and then initiate the shutdown or perform maintenance tasks.
 |PXC| includes a special *maintenance mode* for nodes
 that enables you to take a node down without adjusting ProxySQL manually.
-The mode is controlled using the :variable:`pxc_maint_mode` variable,
+This mode is controlled using the :variable:`pxc_maint_mode` variable,
 which is monitored by ProxySQL and can be set to one of the following values:
 
 * ``DISABLED``: This is the default state
@@ -635,12 +635,13 @@ which is monitored by ProxySQL and can be set to one of the following values:
   changing hardware parts, relocating the server, etc.
 
   When you initiate node shutdown, |PXC| does not send the signal immediately.
-  Intead, it changes the state to ``pxc_maint_mode=SHUTDOWN``
-  and waits for a predefined period (10 seconds by default).
-  When ProxySQL detects that the mode is set to ``SHUTDOWN``,
-  it changes the status of this node to ``OFFLINE_SOFT``,
-  which stops creation of new connections for the node.
-  After the transition period,
+  Instead, it changes the state to ``pxc_maint_mode=SHUTDOWN``
+  and waits for a predefined period,
+  which is determined by the value of the :variable:`pxc_maint_transition_period`).
+  After detecting that the maintenance mode is set to ``SHUTDOWN``,
+  |proxysql| changes the status of this node to ``OFFLINE_SOFT``,
+  which stops creating new connections for the node.
+  After the transition period ends,
   any long-running transactions that are still active are aborted.
 
 * ``MAINTENANCE``: You can change to this state
@@ -654,7 +655,7 @@ which is monitored by ProxySQL and can be set to one of the following values:
   To do this, manually set ``pxc_maint_mode=MAINTENANCE``.
   Control is not returned to the user for a predefined period
   (10 seconds by default).
-  When ProxySQL detects that the mode is set to ``MAINTENANCE``,
+  When |proxysql| detects that the mode is set to ``MAINTENANCE``,
   it stops routing traffic to the node.
   Once control is returned, you can perform maintenance activity.
 
@@ -662,21 +663,6 @@ which is monitored by ProxySQL and can be set to one of the following values:
 
   After you finish maintenance, set the mode back to ``DISABLED``.
   When ProxySQL detects this, it starts routing traffic to the node again.
-
-You can increase the transition period
-using the :variable:`pxc_maint_transition_period` variable
-to accomodate for long-running transactions.
-If the period is long enough for all transactions to finish,
-there should hardly be any disruption in cluster workload.
-
-During the transition period,
-the node continues to receive existing write-set replication traffic,
-ProxySQL avoids openning new connections and starting transactions,
-but the user can still open conenctions to monitor status.
-
-.. note:: If you increase the transition period,
-   the packaging script may determine it as a server stall.
-
 
 .. |proxysql| replace:: ProxySQL
 .. |proxysql-admin| replace:: ``proxysql-admin``

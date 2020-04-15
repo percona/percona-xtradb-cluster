@@ -96,4 +96,21 @@ i
 1
 SET GLOBAL wsrep_debug = 0;
 drop table t;
+use test;
+create table t (i int, c1 char(10), c2 char(10), c12 char(20) as (CONCAT(c1, c2)), b blob);
+insert into t (i, c1, c2, b) values (1, 'newyork', 'us', repeat('a', 1000));
+insert into t (i, c1, c2, b) values (2, 'zagreb', 'croatia', repeat('b', 1000));
+insert into t (i, c1, c2, b) values (3, 'pune', 'india', repeat('c', 1000));
+select c12 from t;
+c12
+newyorkus
+zagrebcroatia
+puneindia
+update t set c1 = "mysql";
+select c12 from t;
+c12
+mysqlus
+mysqlcroatia
+mysqlindia
+drop table t;
 set @@wsrep_replicate_myisam = 0;;
