@@ -1196,6 +1196,14 @@ static void *sst_donor_thread(void *a) {
 #ifdef HAVE_PSI_INTERFACE
     wsrep_pfs_delete_thread();
 #endif /* HAVE_PSI_INTERFACE */
+
+    /* Inform server about SST script startup and release TO isolation */
+    mysql_mutex_lock(&arg->LOCK_wsrep_sst_thread);
+    arg->err = -err;
+    mysql_cond_signal(&arg->COND_wsrep_sst_thread);
+    mysql_mutex_unlock(
+        &arg->LOCK_wsrep_sst_thread);  //! @note arg is unusable after that.
+
     return NULL;
   }
 
