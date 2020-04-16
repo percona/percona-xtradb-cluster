@@ -25,8 +25,8 @@
 #include "mysqld.h"
 #include "rpl_msr.h"  // channel_map
 #include "rpl_slave.h"
-#include "sql/sql_lex.h"
 #include "sql/auth/auth_common.h"
+#include "sql/sql_lex.h"
 #include "sql_base.h"  // TEMP_PREFIX
 #include "sql_class.h"
 #include "sql_parse.h"
@@ -529,8 +529,7 @@ static void *sst_joiner_thread(void *a) {
     mysql_cond_signal(&arg->COND_wsrep_sst_thread);
     mysql_mutex_unlock(&arg->LOCK_wsrep_sst_thread);
 
-    if (err)
-    {
+    if (err) {
       // The process has exited, so the logger thread should
       // also have exited
       if (logger_thd) pthread_join(logger_thd, NULL);
@@ -946,6 +945,9 @@ const std::string get_allowed_pwd_chars() { return g_allowed_pwd_chars; }
 static void generate_password(std::string *password, int size) {
   std::stringstream ss;
   bool srnd;
+  constexpr const char *prefix = "yx9!A-";
+  ss << prefix;
+  size -= strlen(prefix);
   while (size > 0) {
     int ch = ((int)(my_rnd_ssl(&srnd) * 100)) % get_allowed_pwd_chars().size();
     ss << get_allowed_pwd_chars()[ch];
@@ -1132,7 +1134,7 @@ int wsrep_remove_sst_user(bool initialize_thread) {
   // --skip-grant-tables option. It would fail enyway with error.
   // This will prevent writing out error to error log.
   if (skip_grant_tables()) {
-      return ECANCELED;
+    return ECANCELED;
   }
   // This array is filled with pairs of entries
   // The first entry is the actual query to be run
