@@ -34,7 +34,7 @@ if(WITH_PXB_DEV)
   #Note: requires a different boost version than pxc8.0
   ExternalProject_Add(pxb24
     GIT_REPOSITORY https://github.com/percona/percona-xtrabackup.git
-    GIT_TAG percona-xtrabackup-2.4.18
+    GIT_TAG percona-xtrabackup-2.4.20
     GIT_SHALLOW 1
     UPDATE_COMMAND ""
     INSTALL_DIR "${CMAKE_BINARY_DIR}/scripts/pxc_extra/pxb-2.4/"
@@ -50,7 +50,7 @@ if(WITH_PXB_DEV)
 
   ExternalProject_Add(pxb80
     GIT_REPOSITORY https://github.com/percona/percona-xtrabackup.git
-    GIT_TAG percona-xtrabackup-8.0.10
+    GIT_TAG percona-xtrabackup-8.0.11
     GIT_SHALLOW 1
     UPDATE_COMMAND ""
     INSTALL_DIR "${CMAKE_BINARY_DIR}/scripts/pxc_extra/pxb-8.0/"
