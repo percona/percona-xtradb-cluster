@@ -3,7 +3,10 @@
 # server has been restored or timeout occurs
 --disable_result_log
 --disable_query_log
-let $counter= 500;
+# Wsrep change: The native $counter initial value was 500, but this
+# may not be enough for all tests which restart a node which joins
+# back with SST.
+let $counter= 1000;
 let $mysql_errno= 9999;
 while ($mysql_errno)
 {
