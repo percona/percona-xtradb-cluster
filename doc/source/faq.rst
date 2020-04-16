@@ -54,7 +54,11 @@ First set up the ``clustercheck`` user:
 
 .. code-block:: mysql
 
-   GRANT USAGE ON *.* TO 'clustercheck'@'localhost' IDENTIFIED BY PASSWORD '*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19';
+   mysql> CREATE USER 'clustercheck'@'localhost' IDENTIFIED BY PASSWORD
+   '*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19';
+   Query OK, 0 rows affected (0.00 sec)
+
+   mysql> GRANT PROCESS ON *.* TO 'clustercheck'@'localhost';
 
 .. **
 
