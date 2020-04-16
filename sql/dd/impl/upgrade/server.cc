@@ -473,24 +473,23 @@ static void create_upgrade_file() {
 #ifdef WITH_WSREP
 
 bool pxc_fix_mysql_tables(THD *thd) {
-  const LEX_CSTRING section_start { STRING_WITH_LEN("#! PXC_SECTION::START") };
-  const LEX_CSTRING section_end { STRING_WITH_LEN("#! PXC_SECTION::END") };
+  const LEX_CSTRING section_start{STRING_WITH_LEN("#! PXC_SECTION::START")};
+  const LEX_CSTRING section_end{STRING_WITH_LEN("#! PXC_SECTION::END")};
 
   const char **query_ptr;
   bool in_pxc_section = false;
 
   if (ignore_error_and_execute(thd, "USE mysql")) {
-    WSREP_ERROR("Could not run PXC upgrade. Could not change database to 'mysql'");
+    WSREP_ERROR(
+        "Could not run PXC upgrade. Could not change database to 'mysql'");
     return true;
   }
 
   for (query_ptr = &mysql_fix_privilege_tables[0]; *query_ptr != NULL;
        query_ptr++) {
-
     if (!strncmp(*query_ptr, section_start.str, section_start.length)) {
       in_pxc_section = true;
-    }
-    else if (!strncmp(*query_ptr, section_end.str, section_end.length)) {
+    } else if (!strncmp(*query_ptr, section_end.str, section_end.length)) {
       in_pxc_section = false;
     }
 
@@ -502,6 +501,17 @@ bool pxc_fix_mysql_tables(THD *thd) {
 }
 
 bool upgrade_pxc_only(THD *thd) {
+  /*
+     PXC upgrade requires modifications to some InnoDB tables.
+     When the server is started without innodb, or without a read-write innodb,
+     missing this user is a non-issue, since we won't participate in SST anyway.
+     */
+  handlerton *ddse = ha_resolve_by_legacy_type(thd, DB_TYPE_INNODB);
+  if (ddse->is_dict_readonly && ddse->is_dict_readonly()) {
+    LogErr(WARNING_LEVEL, ER_DD_NO_WRITES_NO_REPOPULATION, "InnoDB", " ");
+    return false;
+  }
+
   Disable_autocommit_guard autocommit_guard(thd);
   Bootstrap_error_handler bootstrap_error_handler;
 
@@ -514,7 +524,7 @@ bool upgrade_pxc_only(THD *thd) {
 
   bootstrap_error_handler.set_log_error(false);
 
-  bool err = pxc_fix_mysql_tables(thd);
+  const bool err = pxc_fix_mysql_tables(thd);
 
   bootstrap_error_handler.set_log_error(true);
 
@@ -527,7 +537,7 @@ bool upgrade_pxc_only(THD *thd) {
   return dd::end_transaction(thd, err);
 }
 
-#endif  /* WITH_WSREP */
+#endif /* WITH_WSREP */
 
 /*
   This function runs checks on the database before running the upgrade to make

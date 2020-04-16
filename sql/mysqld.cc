@@ -6523,23 +6523,6 @@ static int init_server_components() {
   }
 #endif
 
-#ifdef WITH_WSREP
-  // PXC-2997: run the PXC portion of the upgrade SQL
-  // This ensures that the mysql.pxc.internal.session user will
-  // always exist.
-  if (!is_help_or_validate_option() && !opt_initialize &&
-      dd::upgrade::no_server_upgrade_required()) {
-    init_optimizer_cost_module(true);
-    if (bootstrap::run_bootstrap_thread(nullptr, nullptr,
-                                        &dd::upgrade::upgrade_pxc_only,
-                                        SYSTEM_THREAD_SERVER_UPGRADE)) {
-      LogErr(ERROR_LEVEL, ER_SERVER_UPGRADE_FAILED);
-      unireg_abort(1);
-    }
-    delete_optimizer_cost_module();
-  }
-#endif /* WITH_WSREP */
-
   if (!is_help_or_validate_option() && !opt_initialize &&
       !dd::upgrade::no_server_upgrade_required()) {
     if (opt_upgrade_mode == UPGRADE_MINIMAL)

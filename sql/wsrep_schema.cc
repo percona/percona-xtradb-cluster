@@ -184,6 +184,7 @@ static int execute_SQL(THD *thd, const char *sql, uint length) {
     // delete_explain_query(thd->lex);
   } else {
     WSREP_WARN("SR init failure");
+    err = 1;
   }
   thd->cleanup_after_query();
   DBUG_RETURN(err);
@@ -539,38 +540,8 @@ Wsrep_schema::Wsrep_schema() {}
 
 Wsrep_schema::~Wsrep_schema() {}
 
-static void wsrep_init_thd_for_schema(THD *thd) {
-  thd->security_context()->skip_grants();
-  thd->system_thread = SYSTEM_THREAD_BACKGROUND;
-
-  thd->real_id = pthread_self();  // Keep purify happy
-
-  thd->set_time();
-
-  /* */
-  thd->variables.wsrep_on = 0;
-  /* No binlogging */
-  thd->variables.sql_log_bin = 0;
-  thd->variables.option_bits &= ~OPTION_BIN_LOG;
-  /* No general log */
-  thd->variables.option_bits |= OPTION_LOG_OFF;
-  /* Read committed isolation to avoid gap locking */
-  thd->variables.transaction_isolation = ISO_READ_COMMITTED;
-  wsrep_assign_from_threadvars(thd);
-  wsrep_store_threadvars(thd);
-}
-
-int Wsrep_schema::init() {
+bool Wsrep_schema::init(THD *thd) {
   DBUG_ENTER("Wsrep_schema::init()");
-  int ret;
-  THD *thd = new THD;
-  thd->set_new_thread_id();
-  if (!thd) {
-    WSREP_ERROR("Unable to get thd");
-    DBUG_RETURN(1);
-  }
-  thd->thread_stack = (char *)&thd;
-  wsrep_init_thd_for_schema(thd);
 
   if (Wsrep_schema_impl::execute_SQL(thd, create_cluster_table_str.c_str(),
                                      create_cluster_table_str.size()) ||
@@ -583,13 +554,10 @@ int Wsrep_schema::init() {
 #endif /* WSREP_SCHEMA_MEMBERS_HISTORY */
       Wsrep_schema_impl::execute_SQL(thd, create_frag_table_str.c_str(),
                                      create_frag_table_str.size())) {
-    ret = 1;
-  } else {
-    ret = 0;
+    DBUG_RETURN(true);
   }
 
-  delete thd;
-  DBUG_RETURN(ret);
+  DBUG_RETURN(false);
 }
 
 int Wsrep_schema::store_view(THD *thd, const Wsrep_view &view) {

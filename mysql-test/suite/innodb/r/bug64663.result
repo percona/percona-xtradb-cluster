@@ -7,7 +7,6 @@ ERROR HY000: Lost connection to MySQL server during query
 SELECT NAME, FLAG FROM INFORMATION_SCHEMA.INNODB_TABLES ORDER BY NAME;
 NAME	FLAG
 mtr/global_suppressions	33
-mtr/test_suppressions	33
 mysql/columns_priv	161
 mysql/component	161
 mysql/compression_dictionary	161
@@ -39,4 +38,7 @@ mysql/time_zone_name	161
 mysql/time_zone_transition	161
 mysql/time_zone_transition_type	161
 mysql/user	161
+mysql/wsrep_cluster	33
+mysql/wsrep_cluster_members	33
+mysql/wsrep_streaming_log	33
 sys/sys_config	33
