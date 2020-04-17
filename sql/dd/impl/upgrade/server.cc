@@ -512,6 +512,12 @@ bool upgrade_pxc_only(THD *thd) {
     return false;
   }
 
+  if (opt_initialize || !dd::upgrade::no_server_upgrade_required()) {
+    // These SQL statements assume an initialized/upgraded server, will fail
+    // wit older versions. Not an issue, skip them.
+    return false;
+  }
+
   Disable_autocommit_guard autocommit_guard(thd);
   Bootstrap_error_handler bootstrap_error_handler;
 
