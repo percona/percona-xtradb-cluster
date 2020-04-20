@@ -73,25 +73,8 @@ Introduction
    :maxdepth: 1
    :glob:
 
-<<<<<<< HEAD
    intro
    limitation
-||||||| merged common ancestors
-   performance/aio_page_requests
-   performance/query_cache_enhance
-   performance/innodb_numa_support
-   performance/threadpool
-   performance/xtradb_performance_improvements_for_io-bound_highly-concurrent_workloads
-   performance/prefix_index_queries_optimization
-=======
-   performance/aio_page_requests
-   performance/query_cache_enhance
-   performance/query_limit_records
-   performance/innodb_numa_support
-   performance/threadpool
-   performance/xtradb_performance_improvements_for_io-bound_highly-concurrent_workloads
-   performance/prefix_index_queries_optimization
->>>>>>> 5b69b2af23e5ecc7f17b2c9098ddc32ed9962f52
 
 Getting Started
 ===============

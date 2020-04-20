@@ -152,19 +152,6 @@ BuildRequires:  systemd-rpm-macros
 BuildRequires:  cyrus-sasl-devel
 BuildRequires:  openldap2-devel
 BuildRequires:  pam-devel
-<<<<<<< HEAD
-||||||| merged common ancestors
-||||||||| merged common ancestors
-=========
-%if 0%{?commercial}
-BuildRequires:  openldap2-client
-%endif
->>>>>>>>> Temporary merge branch 2
-=======
-%if 0%{?commercial}
-BuildRequires:  openldap2-client
-%endif
->>>>>>> wsrep_5.7.29-25.21
 BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 %if 0%{?rhel} > 6

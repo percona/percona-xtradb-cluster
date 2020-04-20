@@ -48,15 +48,8 @@
 
 #include <list>
 #include <string>
-<<<<<<< HEAD
 #include "my_rnd.h"
 #include <sstream>
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-<<<<<<<<< Temporary merge branch 1
-=======
-#include <sstream>
->>>>>>> wsrep_5.7.29-25.21
 
 #ifdef WITH_WSREP
 #include "wsrep_xid.h"
@@ -10959,7 +10952,6 @@ err1:
   return 1;
 }
 
-<<<<<<< HEAD
 /*
   Copy out the non-directory part of binlog position filename for the
   `binlog_snapshot_file' status variable, same way as it is done for
@@ -11036,24 +11028,6 @@ void MYSQL_BIN_LOG::xunlock(void)
   mysql_mutex_unlock(&LOCK_log);
 }
 
-
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-<<<<<<<<< Temporary merge branch 1
-bool THD::is_binlog_cache_empty(bool is_transactional)
-||||||||| 9c3a49ec84b
-Group_cache *THD::get_group_cache(bool is_transactional)
-=========
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-bool THD::is_binlog_cache_empty(bool is_transactional)
-||||||||||| 472b73ec0d7
-Group_cache *THD::get_group_cache(bool is_transactional)
-===========
-=========
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> wsrep_5.7.29-25.21
 void MYSQL_BIN_LOG::report_missing_purged_gtids(const Gtid_set* slave_executed_gtid_set,
                                          const char** errmsg)
 {
