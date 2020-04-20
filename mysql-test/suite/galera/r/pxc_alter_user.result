@@ -1,0 +1,48 @@
+call mtr.add_suppression("Operation ALTER USER failed for 'User3'@'localhost'");
+call mtr.add_suppression("Operation ALTER USER failed for 'User3'@'localhost'");
+# connection node_1, root
+CREATE USER User1@localhost IDENTIFIED BY 'old_pass';
+CREATE USER User2@localhost IDENTIFIED BY 'old_pass';
+CREATE TABLE test(a INT PRIMARY KEY);
+DROP TABLE test;
+# connection node_2, User1
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass';
+ERROR HY000: Do not specify the current password while changing it for other users.
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass', User2@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass';
+ERROR HY000: Do not specify the current password while changing it for other users.
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass', User2@localhost IDENTIFIED BY 'new_pass';
+ERROR HY000: Do not specify the current password while changing it for other users.
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass', User2@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass';
+ERROR HY000: Do not specify the current password while changing it for other users.
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass', User3@localhost IDENTIFIED BY 'new_pass';
+ERROR HY000: Do not specify the current password while changing it for other users.
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass', User3@localhost IDENTIFIED BY 'new_pass';
+ERROR HY000: Operation ALTER USER failed for 'User3'@'localhost'
+CREATE TABLE test(a INT PRIMARY KEY);
+DROP TABLE test;
+# connection node_2, User1
+# connection node_2, User2
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass', User2@localhost IDENTIFIED BY 'new_pass';
+CREATE TABLE test(a INT PRIMARY KEY);
+DROP TABLE test;
+# connection node_2, User1
+ALTER USER User1@localhost IDENTIFIED BY 'absolutely_new_pass' REPLACE 'new_pass';
+# connection node_2, User2
+# connection node_1, root
+CREATE TABLE test(a int primary key);
+DROP TABLE test;
+# connection node_1, User1
+# connection node_1, root
+GRANT ALL PRIVILEGES ON *.* TO 'User1'@'localhost';
+# connection node_1, SuperUser1
+ALTER USER 'User1'@'localhost' IDENTIFIED BY 'root_pass' REPLACE 'absolutely_new_pass' PASSWORD REQUIRE CURRENT;
+CREATE TABLE test(a int primary key);
+DROP TABLE test;
+# connection node_2, SuperUser1
+# connection node_1, SuperUser1
+ALTER USER 'User1'@'localhost' IDENTIFIED BY '' REPLACE 'root_pass';
+CREATE TABLE test(a int primary key);
+DROP TABLE test;
+# connection node_2, SuperUser1
+DROP USER User1@localhost;
+DROP USER User2@localhost;
