@@ -4239,36 +4239,7 @@ static int init_ssl()
         " Disabling FIPS.");
     FIPS_mode_set(0);
   }
-<<<<<<< HEAD
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-#endif /* HAVE_YASSL */
-#if !defined(HAVE_YASSL) && (OPENSSL_VERSION_NUMBER < 0x10100000L)
-||||||||||| 895e70b7b8f
-#ifndef HAVE_YASSL
-===========
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
->>>>>>>>>>> Temporary merge branch 2
-||||||||||| merged common ancestors
-#endif /* HAVE_YASSL */
-#if !defined(HAVE_YASSL) && (OPENSSL_VERSION_NUMBER < 0x10100000L)
-||||||||||||| 895e70b7b8f
-#ifndef HAVE_YASSL
-=============
->>>>>>>>>>>>> Temporary merge branch 2
-===========
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
->>>>>>>>>>> Temporary merge branch 2
-=========
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
->>>>>>>>> Temporary merge branch 2
-=======
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
->>>>>>> Percona-Server-5.7.29-32
   CRYPTO_malloc_init();
 #else /* OPENSSL_VERSION_NUMBER < 0x10100000L */
   OPENSSL_malloc_init();
