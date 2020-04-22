@@ -2,4 +2,9 @@ MYSQL_VERSION_MAJOR=5
 MYSQL_VERSION_MINOR=7
 MYSQL_VERSION_PATCH=29
 MYSQL_VERSION_EXTRA=-32
+<<<<<<< HEAD
 PXC_VERSION_EXTRA=57
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> Percona-Server-5.7.29-32

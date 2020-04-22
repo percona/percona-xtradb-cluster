@@ -7819,7 +7819,12 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query)
 #else
     if (((thd->security_context()->check_access(SUPER_ACL)) && !is_utility_connection) ||
         thd->security_context()->user_matches(tmp->security_context()))
+<<<<<<< HEAD
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> Percona-Server-5.7.29-32
     {
       /* process the kill only if thread is not already undergoing any kill
          connection.

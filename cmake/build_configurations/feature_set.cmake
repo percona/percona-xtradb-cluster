@@ -58,3 +58,10 @@ IF(NOT WITH_ZLIB)
   SET(WITH_ZLIB system CACHE STRING "")
 ENDIF()
 SET(WITH_CURL system CACHE STRING "")
+<<<<<<< HEAD
+||||||| merged common ancestors
+
+>>>>>>>>> Temporary merge branch 2
+=======
+
+>>>>>>> Percona-Server-5.7.29-32
