@@ -552,6 +552,7 @@ static PSI_mutex_info all_innodb_mutexes[] = {
 	PSI_KEY(row_drop_list_mutex),
 	PSI_KEY(master_key_id_mutex),
 	PSI_KEY(scrub_stat_mutex),
+	PSI_KEY(analyze_index_mutex),
 };
 # endif /* UNIV_PFS_MUTEX */
 
@@ -7312,11 +7313,7 @@ ha_innobase::open(
 
 	innobase_copy_frm_flags_from_table_share(ib_table, table->s);
 
-	if (ib_table->is_readable()) {
-		dict_stats_init(ib_table);
-	} else {
-		ib_table->stat_initialized = 1;
-	}
+	dict_stats_init(ib_table);
 
 	MONITOR_INC(MONITOR_TABLE_OPEN);
 
@@ -9173,6 +9170,8 @@ ha_innobase::innobase_lock_autoinc(void)
 
 			/* Acquire the AUTOINC mutex. */
 			dict_table_autoinc_lock(ib_table);
+
+			DEBUG_SYNC_C("innobase_lock_autoinc");
 
 			/* We need to check that another transaction isn't
 			already holding the AUTOINC lock on the table. */

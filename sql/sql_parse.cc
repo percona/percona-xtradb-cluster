@@ -7807,12 +7807,23 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query)
       slayage if both are string-equal.
     */
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
     if (((thd->security_context()->check_access(SUPER_ACL)) ||
          thd->security_context()->user_matches(tmp->security_context())) &&
         !wsrep_thd_is_BF((void *)tmp, true))
 #else
     if ((thd->security_context()->check_access(SUPER_ACL)) ||
+||||||| merged common ancestors
+    if ((thd->security_context()->check_access(SUPER_ACL)) ||
+=======
+    const bool is_utility_connection =
+        acl_is_utility_user(tmp->m_security_ctx->user().str,
+                            tmp->m_security_ctx->host().str,
+                            tmp->m_security_ctx->ip().str);
+
+    if (((thd->security_context()->check_access(SUPER_ACL)) && !is_utility_connection) ||
+>>>>>>> 5b69b2af23e5ecc7f17b2c9098ddc32ed9962f52
         thd->security_context()->user_matches(tmp->security_context()))
 #endif /* WITH_WSREP */
     {
