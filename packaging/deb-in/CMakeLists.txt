@@ -65,7 +65,33 @@ IF (DEB_PRODUCT STREQUAL "commercial")
   SET (DEB_NOTPRODUCTNAME "${DEB_BASE_PRODUCT}community")
   SET (DEB_LICENSENAME "Advanced")
   SET (DEB_INSTALL_LICENSEFILE "LICENSE.mysql")
+<<<<<<< HEAD
   SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+commercial.1")
+||||||| merged common ancestors
+  SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+commercial.1")
+||||||||| merged common ancestors
+<<<<<<<<<<< Temporary merge branch 1
+  SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+commercial-1")
+||||||||||| 472b73ec0d7
+  SET (DEB_INSTALL_LICENSEFILE "LICENSE.mysql")
+  SET (DEB_SERVERVERSION "${VERSION}+commercial-1")
+  SET (DEB_PLUGIN_SETPERMISSION "")
+  SET (DEB_MAN_SETPERMISSION "")
+===========
+  SET (DEB_SERVERVERSION "${VERSION}+commercial-1")
+  SET (DEB_PLUGIN_SETPERMISSION "")
+  SET (DEB_MAN_SETPERMISSION "")
+>>>>>>>>>>> Temporary merge branch 2
+=========
+  SET (DEB_CMAKE_EXTRAS "${DEB_CMAKE_EXTRAS} -DWITH_LDAP=${WITH_LDAP}")
+  SET (DEB_CMAKE_EXTRAS "${DEB_CMAKE_EXTRAS} -DWITH_SASL=${WITH_SASL}")
+  SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+commercial-1")
+>>>>>>>>> Temporary merge branch 2
+=======
+  SET (DEB_CMAKE_EXTRAS "${DEB_CMAKE_EXTRAS} -DWITH_LDAP=${WITH_LDAP}")
+  SET (DEB_CMAKE_EXTRAS "${DEB_CMAKE_EXTRAS} -DWITH_SASL=${WITH_SASL}")
+  SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+commercial-1")
+>>>>>>> wsrep_5.7.29-25.21
   # List of plugins that are only in commercial packages
   # Plugins that are in both community and commercial should NOT be added here
   SET (DEB_INCLUDE_BINARIES_EXTRA
@@ -124,8 +150,29 @@ ELSE()
   SET (DEB_PRODUCTNAMEC "${DEB_BASE_PRODUCTC}Community")
   SET (DEB_NOTPRODUCTNAME "${DEB_BASE_PRODUCT}commercial")
   SET (DEB_LICENSENAME "GPL")
+<<<<<<< HEAD
   SET (DEB_INSTALL_LICENSEFILE "COPYING")
   SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+1")
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+  SET (DEB_INSTALL_LICENSEFILE "COPYING")
+  SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+1")
+||||||||| merged common ancestors
+<<<<<<<<<<< Temporary merge branch 1
+  SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}-1")
+||||||||||| 472b73ec0d7
+  SET (DEB_INSTALL_LICENSEFILE "COPYING")
+  SET (DEB_SERVERVERSION "${VERSION}-1")
+===========
+  SET (DEB_SERVERVERSION "${VERSION}-1")
+>>>>>>>>>>> Temporary merge branch 2
+=========
+  SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}-1")
+>>>>>>>>> Temporary merge branch 2
+=======
+  SET (DEB_INSTALL_LICENSEFILE "COPYING")
+  SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}-1")
+>>>>>>> wsrep_5.7.29-25.21
   SET (DEB_REMOVEPATTERN "com.in")
 ENDIF()
 SET (DEB_INSTALL_LICENSEFILE "LICENSE")

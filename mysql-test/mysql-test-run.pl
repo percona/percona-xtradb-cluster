@@ -7352,9 +7352,73 @@ sub valgrind_arguments {
       mtr_add_arg($args, "--$tool_name-out-file=$opt_vardir/log/".
                          "$report_prefix"."_$tool_name.out.%%p");
     }
+<<<<<<< HEAD
     # Support statically-linked malloc libraries and
     # dynamically-linked jemalloc
     mtr_add_arg($args, "--soname-synonyms=somalloc=NONE,somalloc=*jemalloc*");
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+||||||||| 9c3a49ec84b
+    mtr_add_arg($args, "--tool=callgrind");
+    mtr_add_arg($args, "--base=$opt_vardir/log");
+  }
+  else
+  {
+    mtr_add_arg($args, "--tool=memcheck"); # From >= 2.1.2 needs this option
+    mtr_add_arg($args, "--leak-check=yes");
+    mtr_add_arg($args, "--num-callers=16");
+    mtr_add_arg($args, "--suppressions=%s/valgrind.supp", $glob_mysql_test_dir)
+      if -f "$glob_mysql_test_dir/valgrind.supp";
+=========
+    # Get the value of the last specified --tool=<> argument to valgrind
+    my ($tool_name)= $tool_list[-1] =~ /(memcheck|callgrind|massif)$/;
+    if ($tool_name=~ /memcheck/)
+    {
+      mtr_add_arg($args, "--leak-check=yes") ;
+    }
+    else
+    {
+      $$exe=~ /.*[\/](.*)$/;
+      my $report_prefix= defined $report_prefix ? $report_prefix : $1;
+      mtr_add_arg($args, "--$tool_name-out-file=$opt_vardir/log/".
+                         "$report_prefix"."_$tool_name.out.%%p");
+    }
+>>>>>>>>> Temporary merge branch 2
+||||||||| merged common ancestors
+||||||||||| 472b73ec0d7
+  if ( $opt_callgrind)
+  {
+    mtr_add_arg($args, "--tool=callgrind");
+    mtr_add_arg($args, "--base=$opt_vardir/log");
+  }
+  else
+  {
+    mtr_add_arg($args, "--tool=memcheck"); # From >= 2.1.2 needs this option
+    mtr_add_arg($args, "--leak-check=yes");
+    mtr_add_arg($args, "--num-callers=16");
+    mtr_add_arg($args, "--suppressions=%s/valgrind.supp", $glob_mysql_test_dir)
+      if -f "$glob_mysql_test_dir/valgrind.supp";
+===========
+  if (my @tool_list= grep(/^--tool=(memcheck|callgrind|massif)/, @valgrind_args))
+  {
+    # Get the value of the last specified --tool=<> argument to valgrind
+    my ($tool_name)= $tool_list[-1] =~ /(memcheck|callgrind|massif)$/;
+    if ($tool_name=~ /memcheck/)
+    {
+      mtr_add_arg($args, "--leak-check=yes") ;
+    }
+    else
+    {
+      $$exe=~ /.*[\/](.*)$/;
+      my $report_prefix= defined $report_prefix ? $report_prefix : $1;
+      mtr_add_arg($args, "--$tool_name-out-file=$opt_vardir/log/".
+                         "$report_prefix"."_$tool_name.out.%%p");
+    }
+>>>>>>>>>>> Temporary merge branch 2
+=========
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> wsrep_5.7.29-25.21
   }
 
   # Add valgrind options, can be overriden by user
