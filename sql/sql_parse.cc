@@ -8909,12 +8909,17 @@ uint kill_one_thread(THD *thd, ulong id, bool only_kill_query)
       slayage if both are string-equal.
     */
 
+    const bool is_utility_connection =
+        acl_is_utility_user(tmp->security_ctx->priv_user,
+                            tmp->security_ctx->get_host()->ptr(),
+                            tmp->security_ctx->get_ip()->ptr());
+
 #ifdef WITH_WSREP
-    if (((thd->security_ctx->master_access & SUPER_ACL) ||
+    if ((((thd->security_ctx->master_access & SUPER_ACL) && !is_utility_connection) ||
         thd->security_ctx->user_matches(tmp->security_ctx)) &&
         !wsrep_thd_is_BF((void *)tmp, true))
 #else
-    if ((thd->security_ctx->master_access & SUPER_ACL) ||
+    if (((thd->security_ctx->master_access & SUPER_ACL) && !is_utility_connection) ||
         thd->security_ctx->user_matches(tmp->security_ctx))
 #endif /* WITH_WSREP */
     {
