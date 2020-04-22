@@ -1,0 +1,133 @@
+#
+# Test that ALTER USER ... IDENTIFIED BY ... REPLACE ...
+# is replicated in the proper way.
+#
+
+--source include/galera_cluster.inc
+--source include/wait_wsrep_ready.inc
+--source include/count_sessions.inc
+
+--connection node_1
+call mtr.add_suppression("Operation ALTER USER failed for 'User3'@'localhost'");
+--connection node_2
+call mtr.add_suppression("Operation ALTER USER failed for 'User3'@'localhost'");
+
+--connection node_1
+--echo # connection node_1, root
+CREATE USER User1@localhost IDENTIFIED BY 'old_pass';
+CREATE USER User2@localhost IDENTIFIED BY 'old_pass';
+
+# Ensure that CREATE USER... TOI transactions have been replicated. 
+# It my happen that we connect to Node 2 so quickly that TOI transactions from Node 1 haven't replicate yet.
+# Just execute yet another TOI from Node 1. It will be executed only if previous TOI finishes.
+CREATE TABLE test(a INT PRIMARY KEY);
+DROP TABLE test;
+
+--connect(con_node_2_User1, localhost, User1, old_pass,,$NODE_MYPORT_2) 
+--echo # connection node_2, User1
+--disconnect con_node_2_User1
+
+# 'REPLACE' clause allowed only for current user.
+--connection node_1
+--error ER_CURRENT_PASSWORD_NOT_REQUIRED
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass'; 
+
+--error ER_CURRENT_PASSWORD_NOT_REQUIRED
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass', User2@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass'; 
+
+--error ER_CURRENT_PASSWORD_NOT_REQUIRED
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass', User2@localhost IDENTIFIED BY 'new_pass';
+
+--error ER_CURRENT_PASSWORD_NOT_REQUIRED
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass', User2@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass'; 
+ 
+--error ER_CURRENT_PASSWORD_NOT_REQUIRED
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass' REPLACE 'old_pass', User3@localhost IDENTIFIED BY 'new_pass'; 
+
+# In this case we don't have 'REPLACE' clause, but User3 does not exist
+--error ER_CANNOT_USER
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass', User3@localhost IDENTIFIED BY 'new_pass'; 
+
+# TOI workaround again
+CREATE TABLE test(a INT PRIMARY KEY);
+DROP TABLE test;
+
+
+# Ensure that none of above statements were replicated
+
+--connect(con_node_2_User1, localhost, User1, old_pass,,$NODE_MYPORT_2) 
+--echo # connection node_2, User1
+--disconnect con_node_2_User1
+
+--connect(con_node_2_User2, localhost, User2, old_pass,,$NODE_MYPORT_2) 
+--echo # connection node_2, User2
+--disconnect con_node_2_User2
+
+# Now check that we are still able to change other users' passwords.
+--connection node_1
+ALTER USER User1@localhost IDENTIFIED BY 'new_pass', User2@localhost IDENTIFIED BY 'new_pass'; 
+
+# TOI workaround again
+CREATE TABLE test(a INT PRIMARY KEY);
+DROP TABLE test;
+
+# Ensure that above statement was replicated. 
+# Also test that 'REPLACE' clause works for current user
+--connect(con_node_2_User1, localhost, User1, new_pass,,$NODE_MYPORT_2) 
+--echo # connection node_2, User1
+ALTER USER User1@localhost IDENTIFIED BY 'absolutely_new_pass' REPLACE 'new_pass'; 
+--disconnect con_node_2_User1
+
+--connect(con_node_2_User2, localhost, User2, new_pass,,$NODE_MYPORT_2) 
+--echo # connection node_2, User2
+--disconnect con_node_2_User2
+
+# Check that password change has been replicated
+--connection node_1
+--echo # connection node_1, root
+# TOI workaround again
+CREATE TABLE test(a int primary key);
+DROP TABLE test;
+
+--connect(con_node_1_User1, localhost, User1, absolutely_new_pass,,$NODE_MYPORT_1) 
+--echo # connection node_1, User1
+--disconnect con_node_1_User1
+
+#
+# Super user's password change. We will use User1 here to avoid mtr framework complains about mysql.user table
+# when consistency check is performed after the test.
+#
+--connection node_1
+--echo # connection node_1, root
+GRANT ALL PRIVILEGES ON *.* TO 'User1'@'localhost';
+
+--connect(con_node_1_SuperUser1, localhost, User1, absolutely_new_pass,,$NODE_MYPORT_1) 
+--echo # connection node_1, SuperUser1
+ALTER USER 'User1'@'localhost' IDENTIFIED BY 'root_pass' REPLACE 'absolutely_new_pass' PASSWORD REQUIRE CURRENT;
+
+# TOI workaround again
+CREATE TABLE test(a int primary key);
+DROP TABLE test;
+
+--connect(con_node_2_SuperUser1, localhost, User1, root_pass,,$NODE_MYPORT_2) 
+--echo # connection node_2, SuperUser1
+--disconnect con_node_2_SuperUser1
+
+--connection con_node_1_SuperUser1
+--echo # connection node_1, SuperUser1
+ALTER USER 'User1'@'localhost' IDENTIFIED BY '' REPLACE 'root_pass';
+
+# TOI workaround again
+CREATE TABLE test(a int primary key);
+DROP TABLE test;
+--disconnect con_node_1_SuperUser1
+
+--connect(con_node_2_SuperUser1, localhost, User1,,,$NODE_MYPORT_2) 
+--echo # connection node_2, SuperUser1
+--disconnect con_node_2_SuperUser1
+
+--connection node_1
+DROP USER User1@localhost;
+DROP USER User2@localhost;
+--source include/wait_until_count_sessions.inc
+

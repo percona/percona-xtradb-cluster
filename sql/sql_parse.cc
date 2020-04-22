@@ -5432,6 +5432,32 @@ int mysql_execute_command(THD *thd, bool first_level) {
         }
         if (!(user = get_current_user(thd, tmp_user))) goto error;
 
+#ifdef WITH_WSREP
+        /* When ALTER USER ... IDENTIFIED BY ... REPLACE ...  is executed
+           we need to know the current user to be able to determine REPLACE
+           clause validity (REPLACE allowed only for the current user's password
+           change). However ALTER USER is replicated as TOI, so before local
+           validation/changes. On the slave side, executing thread is wsrep applier
+           thread and we have no chance to determine if it is OK or not.
+           Here we do pre-validation for above condition on master size.
+           Other checks that are not dependent on current user context will be made
+           after replication, on slave node */
+        if (WSREP(thd) && thd->system_thread == NON_SYSTEM_THREAD) {
+          Security_context *sctx = thd->security_context();
+          DBUG_ASSERT(sctx);
+          DBUG_ASSERT(sctx->user().str);
+          if (user->uses_replace_clause) {
+            // If trying to set password for other user
+            if (strcmp(sctx->user().str, user->user.str) ||
+                my_strcasecmp(system_charset_info, sctx->priv_host().str,
+                              user->host.str)) {
+              my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
+              goto error;
+            }
+          }
+        }
+#endif /* WITH_WSREP */
+
         /* copy password expire attributes to individual lex user */
         user->alter_status = thd->lex->alter_password;
 
