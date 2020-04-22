@@ -74,6 +74,31 @@ with other nodes.
 This variable is used to specify if the details of the certification failures
 should be logged.
 
+.. variable:: cert.optimistic_pa
+
+Enabled
+   Allows the full range of parallelization as determined by the certification
+   algorithm.
+
+Disabled
+   Limits the parallel applying window so that it does not exceed the parallel
+   applying window seen on the master. In this case, the action starts applying
+   no sooner than all actions on the master are committed.
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: YES
+   
+   .. seealso::
+
+      |galera-cluster| Documentation:
+         - `Parameter: cert.optimistic_pa
+	   <https://galeracluster.com/library/documentation/galera-parameters.html#cert-optimistic-pa>`_
+	 - `Setting parallel slave threads
+	   <https://galeracluster.com/library/kb/parallel-slave-threads.html>`_
+
 .. variable:: debug
 
    :cli: Yes
@@ -936,3 +961,5 @@ This variable is used to specify if the SSL compression is to be used.
    :default: AES128-SHA
 
 This variable is used to specify what cypher will be used for encryption.
+
+.. include:: ./res/replace.txt
