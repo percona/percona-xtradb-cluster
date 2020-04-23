@@ -57,7 +57,13 @@ The following limitations apply to |PXC|:
 * The minimal recommended size of cluster is 3 nodes.  The 3rd node can be an
   arbitrator.
 
-* InnoDB fake changes feature is not supported.
+* InnoDB fake changes feature is not supported. This feature has been removed
+  from |Percona Server| |release|
+
+  .. seealso::
+
+     Features removed from |Percona Server| |release|:
+        https://www.percona.com/doc/percona-server/5.7/changed_in_57.html#features-removed-from-percona-server-5-7-that-were-available-in-percona-server-5-6
 
 * ``enforce_storage_engine=InnoDB`` is not compatible with
   ``wsrep_replicate_myisam=OFF`` (default).
