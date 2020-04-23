@@ -122,6 +122,12 @@ ulong pxc_strict_mode = PXC_STRICT_MODE_ENFORCING;
 can stop diverting queries to this node. */
 ulong pxc_maint_mode = PXC_MAINT_MODE_DISABLED;
 
+/* wsrep-pxc-maint-mode controls whenever maintenance mode has been set by
+ * Wsrep_server_service::log_view.
+ * This blocks users from changing pxc_maint_mode
+ */
+bool wsrep_pxc_maint_mode_forced = false;
+
 /* sleep for this period before delivering shutdown signal. */
 ulong pxc_maint_transition_period = 30;
 

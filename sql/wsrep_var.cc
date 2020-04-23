@@ -1003,6 +1003,18 @@ bool pxc_maint_mode_check(sys_var *, THD *, set_var *var) {
     my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     return true;
   }
+  /* pxc-maint-mode cannot be changed if operating with multiple major versions
+   * and pxc_strict_mode set to ENFORCING or MASTER.
+   * check Wsrep_server_service::log_view() */
+  if (wsrep_pxc_maint_mode_forced &&
+      pxc_strict_mode >= PXC_STRICT_MODE_ENFORCING) {
+    const char *msg =
+        "pxc_maint_mode cannot be changed while using of multiple major "
+        "versions";
+    WSREP_ERROR("%s", msg);
+    my_message(ER_UNKNOWN_ERROR, msg, MYF(0));
+    return true;
+  }
 
   /* Following transitions are allowed.
   DISABLED -> MAINTENANCE

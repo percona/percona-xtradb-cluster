@@ -186,6 +186,33 @@ void Wsrep_server_service::log_view(
     global_system_variables.auto_increment_increment = view.members().size();
   }
   wsrep_protocol_version = view.protocol_version();
+  bool not_shutdown = (pxc_maint_mode != PXC_MAINT_MODE_SHUTDOWN);
+  bool multi_version_cluster = wsrep_protocol_version < 4;
+  if (not_shutdown &&
+      ((multi_version_cluster &&
+        (pxc_strict_mode > PXC_STRICT_MODE_PERMISSIVE)) ||
+       DBUG_EVALUATE_IF("simulate_wsrep_multiple_major_versions", true,
+                        false))) {
+    std::ostringstream os;
+    os << "Detected Protocol version: " << wsrep_protocol_version
+       << " Changing pxc_maint_mode to "
+          "MAINTENANCE.";
+    WSREP_INFO("%s", os.str().c_str());
+    pxc_maint_mode = PXC_MAINT_MODE_MAINTENANCE;
+    wsrep_pxc_maint_mode_forced = true;
+  } else {
+    /* if pxc_maint_mode was previously set by wsrep, we should reset */
+    if (wsrep_pxc_maint_mode_forced &&
+        pxc_maint_mode != PXC_MAINT_MODE_SHUTDOWN) {
+      std::ostringstream os;
+      os << "Detected Protocol version: " << wsrep_protocol_version
+         << " Changing pxc_maint_mode to "
+            "DISABLED.";
+      WSREP_INFO("%s", os.str().c_str());
+      pxc_maint_mode = PXC_MAINT_MODE_DISABLED;
+      wsrep_pxc_maint_mode_forced = false;
+    }
+  }
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
   /* Update wsrep status variables */
