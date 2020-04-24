@@ -1258,6 +1258,19 @@ bool set_and_validate_user_attributes(
     inbuflen = (unsigned)Str->auth.length;
     std::string gen_password;
     if (Str->has_password_generator) {
+#ifdef WITH_WSREP
+      if (WSREP(thd)) {
+        const char *msg =
+            "Percona XtraDB Cluster doesn't allow use of"
+            " RANDOM PASSWORD for CREATE/ALTER USER operation"
+            " while operating in cluster mode";
+        WSREP_ERROR("%s", msg);
+        my_message(ER_UNKNOWN_ERROR, msg, MYF(0));
+        plugin_unlock(0, plugin);
+        what_to_set.m_what = NONE_ATTR;
+        return true;
+      }
+#endif /* WITH_WSREP */
       thd->m_disable_password_validation = true;
       generate_random_password(&gen_password,
                                thd->variables.generated_random_password_length);

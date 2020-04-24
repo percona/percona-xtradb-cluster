@@ -44,5 +44,11 @@ ALTER USER 'User1'@'localhost' IDENTIFIED BY '' REPLACE 'root_pass';
 CREATE TABLE test(a int primary key);
 DROP TABLE test;
 # connection node_2, SuperUser1
+call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of RANDOM PASSWORD for CREATE/ALTER USER operation while operating in cluster mode");
+call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of RANDOM PASSWORD for CREATE/ALTER USER operation while operating in cluster mode");
+ALTER USER 'User2'@'localhost' IDENTIFIED BY RANDOM PASSWORD;
+ERROR HY000: Percona XtraDB Cluster doesn't allow use of RANDOM PASSWORD for CREATE/ALTER USER operation while operating in cluster mode
+CREATE USER 'User3'@'localhost' IDENTIFIED BY RANDOM PASSWORD;
+ERROR HY000: Percona XtraDB Cluster doesn't allow use of RANDOM PASSWORD for CREATE/ALTER USER operation while operating in cluster mode
 DROP USER User1@localhost;
 DROP USER User2@localhost;
