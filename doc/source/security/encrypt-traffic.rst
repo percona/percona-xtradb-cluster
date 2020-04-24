@@ -13,7 +13,7 @@ There are two kinds of traffic in |PXC|:
    replication, and various service messages.
 
 |PXC| supports encryption for all types of traffic. Replication traffic
-encryption can be configured either in automatic or in manual mode.
+encryption can be configured either automatically or manually.
 
 .. contents::
    :local:
@@ -80,35 +80,40 @@ SSL Automatic Configuration
 Enabling :variable:`pxc-encrypt-cluster-traffic`
 ------------------------------------------------
 
-|PXC| includes the :variable:`pxc-encrypt-cluster-traffic` variable that
-enables automatic configuration of SSL encryption there-by encrypting
+|PXC| includes the |pxc-encrypt-cluster-traffic| variable that
+enables automatic configuration of SSL encryption thereby encrypting
 :term:`SST`, :term:`IST`, and replication traffic.
 
-This variable is not dynamic and so cannot be changed on runtime. To
-enable automatic configuration of SSL encryption, set
-``pxc-encrypt-cluster-traffic=ON`` in the the ``[mysqld]`` section of the
-:file:`my.cnf` file, and restart the cluster (by default it is disabled
-there-by using non-secured channel for replication).
+By default, |pxc-encrypt-cluster-traffic| is enabled thereby using a secured
+channel for replication. This variable is not dynamic and so cannot be changed
+at runtime.
 
-.. note::
+Enabled, |pxc-encrypt-cluster-traffic| has the effect of applying the following
+settings: |opt.encrypt|, |opt.ssl-key|, |opt.ssl_ca|, |opt.ssl-cert|.
 
-   Setting ``pxc-encrypt-cluster-traffic=ON`` has effect of applying
-   the following settings in :file:`my.cnf` configuration file:
+.. code-block:: text
 
-   .. code-block:: text
+   [mysqld]
+   wsrep_provider_options=”socket.ssl_key=server-key.pem;socket.ssl_cert=server-cert.pem;socket.ssl_ca=ca.pem”
 
-      [mysqld]
-      wsrep_provider_options=”socket.ssl_key=server-key.pem;socket.ssl_cert=server-cert.pem;socket.ssl_ca=ca.pem”
+   [sst]
+   encrypt=4
+   ssl-key=server-key.pem
+   ssl-ca=ca.pem
+   ssl-cert=server-cert.pem
 
-      [sst]
-      encrypt=4
-      ssl-key=server-key.pem
-      ssl-ca=ca.pem
-      ssl-cert=server-cert.pem
+For :variable:`wsrep_provider_options`, only the mentioned options
+are affected (``socket.ssl_key``, ``socket,ssl_cert``, and
+``socket.ssl_ca``), the rest is not modified.
 
-   For :variable:`wsrep_provider_options`, only the mentioned options
-   are affected (``socket.ssl_key``, ``socket,ssl_cert``, and
-   ``socket.ssl_ca``), the rest is not modified.
+
+.. admonitition:: Disabling the value of |pxc-encrypt-cluster-traffic|
+
+   The default value of |pxc-encrypt-cluster-traffic| helps improve the security
+   of your system. If you must disable |pxc-encrypt-cluster-traffic|, you need
+   to update `[mysqld]` section of your configuration file:
+   ``pxc-encrypt-cluster-traffic=ON``. Then, restart the cluster
+
 
 Automatic configuration of the SSL encryption needs key and certificate files.
 |MySQL| generates default key and certificate

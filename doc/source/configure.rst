@@ -4,6 +4,32 @@
 Configuring Nodes for Write-Set Replication
 ===========================================
 
+.. By default
+.. 
+.. server will look the certs in default data directory location and
+   on node2 the SSL certs are different(due to auto generated certs).
+.. 
+.. To start the cluster SSL certs should be same on all nodes.
+.. We need to add this note and provide SSL encryption page link here (edited) 
+.. 
+.. Automatic configuration of the SSL encryption needs key and
+   certificate files. MySQL generates default key and certificate
+   files and places them in data directory. These auto-generated files
+   are suitable for automatic SSL configuration, but you should use
+   the same key and certificate files on all nodes. Also you can
+   override auto-generated files with manually created ones, as
+   covered by the Generating Keys and Certificates Manually section.
+.. 
+.. https://www.percona.com/doc/percona-xtradb-cluster/8.0/security/encrypt-traffic.html#ssl-automatic-configuration
+.. This variable is not dynamic and so cannot be changed on
+   runtime. To enable automatic configuration of SSL encryption, set
+   pxc-encrypt-cluster-traffic=ON in the the [mysqld] section of the
+   my.cnf file, and restart the cluster (by default it is disabled
+   there-by using non-secured channel for replication).
+.. 
+.. For 8.0 we need to change this text because pxc-encrypt-cluster-traffic is enabled by default.
+
+
 After installing |PXC| on a node,
 configure it with information about the cluster.
 
@@ -26,7 +52,7 @@ Configuration examples assume there are three |PXC| nodes:
 +--------+-----------+---------------+
 
 If you are running Debian or Ubuntu,
-add the following configuration variables to :file:`/etc/mysql/my.cnf`
+add the following configuration variables to |file.mysqld-cnf|
 on the first node::
 
  wsrep_provider=/usr/lib/galera4/libgalera_smm.so
@@ -161,3 +187,4 @@ After you configure all your nodes, initialize |PXC| by bootstrapping
 the first node according to the procedure described in
 :ref:`bootstrap`.
 
+.. include:: .res/replace.file.txt
