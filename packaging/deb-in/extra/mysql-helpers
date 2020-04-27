@@ -118,29 +118,12 @@ run_init_sql() {
 
 # Verify that everything the server needs to run is set up
 verify_ready() {
-<<<<<<< HEAD
 
 		MYSQLDATA=$(get_mysql_option mysqld datadir "/var/lib/mysql")
 		MYSQLFILES=$(get_mysql_option mysqld secure-file-priv "/var/lib/mysql-files")
 		MYSQLKEYRING=$(dirname $(get_mysql_option mysqld keyring-file-data "/var/lib/mysql-keyring/keyring"))
 		MYSQLLOG=$(dirname $(get_mysql_option mysqld log-error "/var/log/mysql/error.log"))
 		MYSQLRUN=/var/run/mysqld
-||||||| merged common ancestors
-		# For multi-instance support with the mysql@ service
-		INSTANCE="mysqld${1}"
-		MYSQLDATA=$(get_mysql_option ${INSTANCE} datadir "/var/lib/mysql")
-		MYSQLFILES=$(get_mysql_option ${INSTANCE} secure-file-priv "/var/lib/mysql-files")
-		MYSQLKEYRING=$(dirname $(get_mysql_option ${INSTANCE} keyring-file-data "/var/lib/mysql-keyring/keyring"))
-		MYSQLLOG=$(dirname $(get_mysql_option ${INSTANCE} log-error "/var/log/mysql/error.log"))
-		MYSQLRUN=/var/run/mysqld
-=======
-		# For multi-instance support with the mysql@ service
-		INSTANCE="mysqld${1}"
-		MYSQLDATA=$(get_mysql_option ${INSTANCE} datadir "/var/lib/mysql")
-		MYSQLFILES=$(get_mysql_option ${INSTANCE} secure-file-priv "/var/lib/mysql-files")
-		MYSQLKEYRING=$(dirname $(get_mysql_option ${INSTANCE} keyring-file-data "/var/lib/mysql-keyring/keyring"))
-		MYSQLLOG=$(dirname $(get_mysql_option ${INSTANCE} log-error "/var/log/mysql/error.log"))
->>>>>>> Percona-Server-8.0.19-10
 
 		if ! getent group mysql >/dev/null; then
 			addgroup --system mysql >/dev/null
@@ -194,6 +177,10 @@ verify_ready() {
 		if [ ${ERROR_FLAG} = 1 ]; then
 			echo "Errors found. Aborting."
 			exit 1
+		fi
+
+		if [ ! -d ${MYSQLRUN} -a ! -L ${MYSQLRUN} ]; then
+			install -d -m0755 -omysql -gmysql ${MYSQLRUN}
 		fi
 }
 

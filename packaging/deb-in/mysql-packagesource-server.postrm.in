@@ -83,6 +83,7 @@ case "$1" in
 	MYSQLFILES=/var/lib/mysql-files
 	MYSQLKEYRING=/var/lib/mysql-keyring
 	MYSQLLOG=/var/log/mysql
+	MYSQLRUN=/var/run/mysqld
 
 	server_stop
 
@@ -91,6 +92,10 @@ case "$1" in
 	db_get mysql-@DEB_PRODUCTNAME@-server/remove-data-dir && RMDATADIR=${RET}
 	if [ "${RMDATADIR}" = "true" ];
 	then
+		if [ -d ${MYSQLRUN} ] || [ -L ${MYSQLRUN} ];
+		then
+			rm -rf ${MYSQLRUN}
+		fi
 
 		if [ -d ${MYSQLLOG} ] || [ -L ${MYSQLLOG} ];
 		then
@@ -137,6 +142,10 @@ case "$1" in
 	then
 		invoke-rc.d mysql start || exit $?
 	else
+	        if [ -d ${MYSQLRUN} ] || [ -L ${MYSQLRUN} ];
+		then
+			rm -rf ${MYSQLRUN}
+		fi
 
 		if [ -d ${MYSQLLOG} ] || [ -L ${MYSQLLOG} ];
 		then

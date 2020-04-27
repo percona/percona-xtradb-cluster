@@ -340,7 +340,6 @@ Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Percona XtraDB Cluster source
  This package includes the source code to Percona XtraDB Cluster as configured before building.
 
-<<<<<<< HEAD
 Package: percona-xtradb-cluster-garbd
 Architecture: any
 Provides: garbd-3, garbd3
@@ -358,10 +357,3 @@ Replaces: percona-galera-arbitrator-3-dbg
 Depends: percona-xtradb-cluster-garbd (= ${binary:Version}), ${misc:Depends}
 Description: Debugging package for Percona XtraDB Cluster Garbd.
 
-||||||| merged common ancestors
-Package: percona-mysql-router-dev
-Architecture: any
-Description: Percona MySQL Router development files
-Depends: ${shlibs:Depends}, ${misc:Depends}
-=======
->>>>>>> Percona-Server-8.0.19-10
