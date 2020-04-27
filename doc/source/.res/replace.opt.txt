@@ -21,3 +21,7 @@
 .. |opt.pxc-encrypt-cluster-traffic| replace:: :variable:`pxc-encrypt-cluster-traffic`
 .. |opt.encrypt| replace:: :variable:`encrypt`
 .. |opt.ssl-key| replace:: :variable:`ssl_key`
+.. |opt.node-address| replace:: :variable:`wsrep_node_address`
+.. |wsrep-node-address| replace:: :variable:`wsrep_node_address`
+.. |wsrep-node-name| replace:: :variable:`wsrep_node_name`
+.. |opt.node-name| replace:: :variable:`wsrep_node_name`

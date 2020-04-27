@@ -4,7 +4,7 @@
 Security Basics
 ================================================================================
 
-By default, |PXC| does not provide any protection for stored data.  There are
+By default, |PXC| does not provide any protection for stored data. There are
 several considerations to take into account for securing |PXC|:
 
 * :ref:`secure-network`

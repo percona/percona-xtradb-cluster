@@ -27,6 +27,13 @@ Encrypting Client-Server Communication
 |PXC| uses the underlying MySQL encryption mechanism
 to secure communication between client applications and cluster nodes.
 
+|MySQL| generates default key and certificate files and places them in the data
+directory. You can override auto-generated files with manually created ones, as
+described in the section :ref:`generate-keys-certs`.
+
+The auto-generated files are suitable for automatic SSL configuration, but you
+should use the same key and certificate files on all nodes.
+
 Specify the following settings in the :file:`my.cnf` configuration file
 for each node:
 
@@ -42,50 +49,51 @@ for each node:
    ssl-cert=/etc/mysql/certs/client-cert.pem
    ssl-key=/etc/mysql/certs/client-key.pem
 
-After restart the node will use these files to encrypt communication with
-clients. MySQL clients require only the second part of the configuration
-to communicate with cluster nodes.
-
-|MySQL| generates default key and certificate
-files and places them in data directory. You can either use them or generate
-new certificates. For generation of new certificate please refer to
-:ref:`generate-keys-certs` section.
+After it is restarted, the node uses these files to encrypt communication with
+clients. |MySQL| clients require only the second part of the configuration to
+communicate with cluster nodes.
 
 .. _encrypt-replication-traffic:
 
 Encrypting Replication Traffic
 ==============================
 
-Replication traffic refers to the inter-node traffic which includes
-:term:`SST` traffic, :term:`IST` traffic, and replication traffic.
+*Replication traffic* refers to the inter-node traffic which includes
+the :term:`SST` traffic, :term:`IST` traffic, and replication traffic.
 
-Traffic of each type is transferred via different channel, and so it is
-important to configure secure channels for all 3 variants to completely
-secure the replication traffic.
+The traffic of each type is transferred via a different channel, and so it
+is important to configure secure channels for all 3 variants to
+completely secure the replication traffic.
 
-|PXC| supports a single configuration option which helps to
-secure complete replication traffic, and is often referred as Automatic
-Configuration. User can also ignore this and configure security of
-each channel by specifying independent parameters.
-
-Section below will help, covering this aspect.
+|PXC| supports a single configuration option which helps to secure the complete
+replication traffic, and is often referred to as :ref:`ssl-auto-conf`. You can
+also configure the security of each channel by specifying independent
+parameters.
 
 .. _ssl-auto-conf:
 
 SSL Automatic Configuration
 ===========================
 
+The automatic configuration of the SSL encryption needs a key and certificate
+files. MySQL generates a default key and certificate files and places them in
+the data directory.
+
+.. important::
+
+   It is important that your cluster use the same SSL certificates on all nodes.
+ 
 .. _enabling_encrypt-cluster-traffic:
 
 Enabling :variable:`pxc-encrypt-cluster-traffic`
 ------------------------------------------------
 
 |PXC| includes the |pxc-encrypt-cluster-traffic| variable that
-enables automatic configuration of SSL encryption thereby encrypting
+enables the configuration of the SSL encryption thereby encrypting
 :term:`SST`, :term:`IST`, and replication traffic.
 
 By default, |pxc-encrypt-cluster-traffic| is enabled thereby using a secured
-channel for replication. This variable is not dynamic and so cannot be changed
+channel for replication. This variable is not dynamic and so it cannot be changed
 at runtime.
 
 Enabled, |pxc-encrypt-cluster-traffic| has the effect of applying the following
@@ -106,14 +114,19 @@ For :variable:`wsrep_provider_options`, only the mentioned options
 are affected (``socket.ssl_key``, ``socket,ssl_cert``, and
 ``socket.ssl_ca``), the rest is not modified.
 
-
-.. admonitition:: Disabling the value of |pxc-encrypt-cluster-traffic|
+.. important:: Disabling |pxc-encrypt-cluster-traffic|
 
    The default value of |pxc-encrypt-cluster-traffic| helps improve the security
-   of your system. If you must disable |pxc-encrypt-cluster-traffic|, you need
-   to update `[mysqld]` section of your configuration file:
-   ``pxc-encrypt-cluster-traffic=ON``. Then, restart the cluster
+   of your system.
 
+   When |pxc-encrypt-cluster-traffic| is not enabled, anyone with the
+   access to your network can connect to any |pxc| node either as a
+   client or as another node joining the cluster. This potentially
+   lets them query your data or get a complete copy of it.
+
+   If you must disable |pxc-encrypt-cluster-traffic|, you need
+   to stop the cluster and update `[mysqld]` section of  the configuration file:
+   ``pxc-encrypt-cluster-traffic=OFF`` of each node. Then, restart the cluster.
 
 Automatic configuration of the SSL encryption needs key and certificate files.
 |MySQL| generates default key and certificate
@@ -156,7 +169,6 @@ There are three aspects of |PXC| operation, where you can enable encryption:
   from one cluster node (donor) to the joining node (joiner).
 
 * `Encrypting Replication Traffic <encrypt-replication_>`__
-
 * `Encrypting IST Traffic <encrypt-replication_>`__
 
   This refers to all internal |PXC| communication,
