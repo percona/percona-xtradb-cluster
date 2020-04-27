@@ -178,9 +178,16 @@ enum options_client {
   OPT_DROP_COMPRESSION_DICTIONARY,
   OPT_ORDER_BY_PRIMARY_DESC,
   OPT_TLS_CIPHERSUITES,
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+=======
+  OPT_MYSQL_BINARY_AS_HEX,
+  OPT_START_SQL_FILE,
+  OPT_FINISH_SQL_FILE,
+>>>>>>> Percona-Server-8.0.19-10
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };

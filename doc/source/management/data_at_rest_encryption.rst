@@ -4,6 +4,7 @@
 Data at Rest Encryption
 =======================
 
+<<<<<<< HEAD
 .. contents::
    :local:
 
@@ -351,6 +352,914 @@ keyring data file location is not the default location.
 Other non-keyring options may be required as well. One way to specify these
 options is by using ``--defaults-file`` to name an option file that contains
 the required options.
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+This variable works in combination with the :variable:`innodb_encrypt_tables`
+variable set to ``ONLINE_TO_KEYRING``. This variable configures the number of
+threads for background encryption. For the online encryption to work, this
+variable must contain a value greater than **zero**.
+
+.. variable:: innodb_online_encryption_rotate_key_age
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-online-encryption-rotate-key-age``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Numeric
+   :default: 1
+
+By using this variable, you can re-encrypt the table encrypted using
+KEYRING. The value of this variable determines how frequently the encrypted
+tables should be encrypted again. If it is set to **1**, the encrypted table is
+re-encrypted on each key rotation. If it is set to **2**, the table is encrypted
+on every other key rotation.
+      
+.. variable:: innodb_encrypt_online_alter_logs
+
+   :version 5.7.21-21: Implemented
+   :cli: ``--innodb-encrypt-online-alter-logs``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Boolean
+   :default: OFF
+
+This variable simultaneously turns on the encryption of files used by InnoDB for
+full text search using parallel sorting, building indexes using merge sort, and
+online DDL logs created by InnoDB for online DDL.
+
+.. _data-at-rest-encryption.undo-tablespace:
+
+InnoDB Undo Tablespace Encryption
+================================================================================
+
+:Availability: This feature is **Experimental** quality
+
+The encryption of InnoDB Undo tablespaces is only available when using
+separate undo tablespaces. Otherwise, the InnoDB undo log is part of
+the InnoDB system tablespace.
+
+.. seealso::
+
+   More information about how the encryption of the system tablespace
+      :ref:`data-at-rest-encryption.innodb-system-tablespace`
+
+System variables
+--------------------------------------------------------------------------------
+
+.. variable:: innodb_undo_log_encrypt
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-undo-log-encrypt``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Boolean
+   :default: ``Off``
+
+Enables the encryption of InnoDB Undo tablespaces. You can enable encryption and
+disable encryption while the server is running. 
+
+.. note:: 
+
+    If you enable undo log encryption, the server writes encryption information
+    into the header. That information stays in the header during the life of the
+    undo log. If you restart the server, the server will try to load the
+    encryption key from the keyring during startup. If the keyring is not available, the server
+    cannot start.
+
+Binary log encryption
+================================================================================
+
+A new option, implemented since |Percona Server| :rn:`5.7.20-19`, is
+encryption of binary and relay logs, triggered by the
+:variable:`encrypt_binlog` variable.
+
+Besides turning :variable:`encrypt_binlog` ``ON``, this feature requires both
+`master_verify_checksum
+<https://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_master_verify_checksum>`_
+and `binlog_checksum
+<https://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_binlog_checksum>`_
+variables to be turned ``ON``.
+
+While replicating, master sends the stream of decrypted binary log events to a
+slave (SSL connections can be set up to encrypt them in transport). That said,
+masters and slaves use separate keyring storages and are free to use differing
+keyring plugins.
+
+Dumping of encrypted binary logs involves decryption, and can be done using
+``mysqlbinlog`` with ``--read-from-remote-server`` option.
+
+.. note::
+
+   Taking into account that ``--read-from-remote-server`` option  is only
+   relevant to binary logs, encrypted relay logs can not be dumped/decrypted
+   in this way.
+
+.. rubric:: Upgrading from |Percona Server| |changed-version| to any higher version
+
+The key format in the :ref:`keyring vault plugin
+<keyring_vault_plugin>` was changed for binlog encryption in |Percona
+Server| |changed-version| release. When you are upgrading from
+|Percona Server| 5.7.20-19 to a higher version in the |Percona Server|
+5.7 series or to a version prior to 8.0.15-5 in the |Percona Server|
+8.0 series, the binary log encryption will work after you complete the
+following steps:
+
+1. Upgrade to a version higher than |Percona Server| |changed-version|
+#. Start the server without enabling the binary log encryption: :bash:`--encrypt_binlog=OFF`
+#. Enforce the key rotation: :mysql:`SELECT rotate_system_key("percona_binlog")`
+#. Restart the server enabling the binary log encryption: :bash:`--encrypt_binlog=ON`
+
+.. seealso::
+
+   |Percona Server| Documentation: Important changes in |Percona Server| 8.0.15-5
+      - `Binary log encryption to use the upstream implementation
+	<https://www.percona.com/doc/percona-server/LATEST/management/data_at_rest_encryption.html#binary-log-encryption>`_
+
+.. |changed-version| replace:: 5.7.20-19
+
+System Variables
+----------------
+
+.. variable:: encrypt_binlog
+
+   :version 5.7.20-19: Implemented
+   :cli: ``--encrypt-binlog``
+   :dyn: No
+   :scope: Global
+   :vartype: Boolean
+   :default: ``OFF``
+
+The variable turns on binary and relay logs encryption.
+
+.. _ps.data-at-rest-encryption.redo-log:
+
+Redo Log Encryption
+================================================================================
+
+:Availability: This feature is **Experimental** quality
+
+InnoDB redo log encryption is enabled by setting the variable
+:variable:`innodb_redo_log_encrypt`. This variable has three values:
+``MASTER_KEY``, ``KEYRING_KEY`` and ``OFF`` (set by default).
+
+``MASTER_KEY`` uses the InnoDB master key to encrypt with unique keys for each
+log file in the redo log header.
+
+``KEYRING_KEY`` uses the ``percona_redo`` versioned key from the keyring. When
+:variable:`innodb_redo_log_encrypt` is set to ``KEYRING_KEY``, each new redo log
+file is encrypted with the latest ``percona_redo`` key from the keyring.
+
+System variables
+--------------------------------------------------------------------------------
+
+.. variable:: innodb_redo_log_encrypt
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-redo-log-encrypt``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Text
+   :default: ``OFF``
+
+Enables the encryption of the redo log.
+
+.. .. variable:: innodb_key_rotation_interval
+.. 	      
+..    :version 5.7.23-24: Implemented
+..    :cli: ``--innodb-key-rotation_interval``
+..    :dyn: Yes
+..    :scope: Global
+..    :vartype: Text
+..    :default: ``0``
+.. 
+.. This variable stores the time (in seconds) that should pass between key
+.. rotations. It is only used if :variable:`innodb_redo_log_encrypt` is set to
+.. ``KEYRING_KEY``.
+.. 	     
+
+.. _data-at-rest-encryption.variable.innodb-scrub-log:
+
+.. variable:: innodb_scrub_log
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-scrub-log``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Boolean
+   :default: ``OFF``
+
+Specifies if data scrubbing should be automatically applied to the redo log.
+
+
+.. variable:: innodb_scrub_log_speed
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-scrub-log-speed``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Text
+   :default: 
+ 
+Specifies the velocity of data scrubbing (writing dummy redo log records) in bytes per second.
+
+Implemented in version 5.7.27-30, the key rotation is redesigned to allow ``SELECT rotate_system_key("percona_redo)``. The currently used key version is available in the :variable:`innodb_redo_key_version` status. The feature is **Experimental**.
+
+
+Temporary file encryption
+=========================
+
+A new feature, implemented since |Percona Server| :rn:`5.7.22-22`, is the
+encryption of temporary files, triggered by the :variable:`encrypt-tmp-files`
+option.
+
+Temporary files are currently used in |Percona Server| for the following
+purposes:
+
+This feature is considered **Experimental** quality.
+
+* filesort (for example, ``SELECT`` statements with ``SQL_BIG_RESULT`` hints),
+
+* binary log transactional caches,
+
+* Group Replication caches.
+
+For each temporary file, an encryption key is generated locally, only kept
+in memory for the lifetime of the temporary file, and discarded afterwards.
+
+System Variables
+----------------
+
+.. variable:: encrypt-tmp-files
+
+   :version 5.7.22-22: Implemented
+   :cli: ``--encrypt-tmp-files``
+   :dyn: No
+   :scope: Global
+   :vartype: Boolean
+   :default: ``OFF``
+
+The option turns on encryption of temporary files created by |Percona Server|.
+
+.. _data-at-rest-encryption.key-rotation:
+
+Key Rotation
+================================================================================
+
+The keyring management is enabled for each tablespace separately when you set
+the encryption in the ``ENCRYPTION`` clause, to `KEYRING` in the supported SQL
+statement:
+
+- CREATE TABLE .. ENCRYPTION='KEYRING`
+- ALTER TABLE ... ENCRYPTION='KEYRING'
+- CREATE TABLESPACE tablespace_name … ENCRYPTION=’KEYRING’
+
+.. note::
+
+   Running ``ALTER TABLE .. ENCRYPTION=’Y’`` on the tablespace created with
+   ``ENCRYPTION=’KEYRING’`` converts the table back to the existing MySQL
+   scheme.
+
+.. _keyring_vault_plugin:
+
+Keyring Vault plugin
+====================
+
+In |Percona Server| :rn:`5.7.20-18` a ``keyring_vault`` plugin has been
+implemented that can be used to store the encryption keys inside the
+`Hashicorp Vault server <https://www.vaultproject.io>`_.
+
+.. important::
+
+   ``keyring_vault`` plugin only works with kv secrets engine version 1.
+
+   .. seealso::
+
+      HashiCorp Documentation: More information about ``kv`` secrets engine
+         https://www.vaultproject.io/docs/secrets/kv/kv-v1.html
+
+Installation
+------------
+
+The safest way to load the plugin is to do it on the server startup by
+using `--early-plugin-load option
+<https://dev.mysql.com/doc/refman/5.7/en/server-options.html#option_mysqld_early-plugin-load>`_
+option:
+
+.. code-block:: bash
+
+   $ mysqld --early-plugin-load="keyring_vault=keyring_vault.so" \
+   --loose-keyring_vault_config="/home/mysql/keyring_vault.conf"
+
+It should be loaded this way to be able to facilitate recovery for encrypted
+tables.
+
+.. warning::
+
+   If server should be started with several plugins loaded early,
+   ``--early-plugin-load`` should contain their list separated by
+   semicolons. Also it's a good practice to put this list in double quotes so
+   that semicolons do not create problems when executed in a script.
+
+Apart from installing the plugin you also need to set the
+:variable:`keyring_vault_config` variable. This variable should point to the
+keyring_vault configuration file, whose contents are discussed below.
+
+This plugin supports the SQL interface for keyring key management described in
+`General-Purpose Keyring Key-Management Functions
+<https://dev.mysql.com/doc/refman/5.7/en/keyring-udfs-general-purpose.html>`_
+manual.
+
+To enable the functions you'll need to install the ``keyring_udf`` plugin:
+
+.. code-block:: mysql
+
+   mysql> INSTALL PLUGIN keyring_udf SONAME 'keyring_udf.so';
+
+Usage
+-----
+
+On plugin initialization ``keyring_vault`` connects to the Vault server using
+credentials stored in the credentials file. Location of this file is specified
+in by :variable:`keyring_vault_config`. On successful initialization it
+retrieves keys signatures and stores them inside an in-memory hash map.
+
+Configuration file should contain the following information:
+
+* ``vault_url`` - the address of the server where Vault is running. It can be a
+  named address, like one in the following example, or just an IP address. The
+  important part is that it should begin with ``https://``.
+
+* ``secret_mount_point`` - the name of the mount point where ``keyring_vault``
+  will store keys.
+
+* ``token`` - a token generated by the Vault server, which ``keyring_vault``
+  will further use when connecting to the Vault. At minimum, this token should
+  be allowed to store new keys in a secret mount point (when ``keyring_vault``
+  is used only for transparent data encryption, and not for ``keyring_udf``
+  plugin). If ``keyring_udf`` plugin is combined with ``keyring_vault``, this
+  token should be also allowed to remove keys from the Vault (for the
+  ``keyring_key_remove`` operation supported by the ``keyring_udf`` plugin).
+
+* ``vault_ca [optional]`` - this variable needs to be specified only when the
+  Vault's CA certificate is not trusted by the machine that is going to connect
+  to the Vault server. In this case this variable should point to CA
+  certificate that was used to sign Vault's certificates.
+
+.. warning::
+   
+   Each ``secret_mount_point`` should be used by only one server - otherwise
+   mixing encryption keys from different servers may lead to undefined
+   behavior.
+  
+An example of the configuration file looks like this: ::
+
+  vault_url = https://vault.public.com:8202
+  secret_mount_point = secret
+  token = 58a20c08-8001-fd5f-5192-7498a48eaf20
+  vault_ca = /data/keyring_vault_confs/vault_ca.crt
+
+When a key is fetched from a ``keyring`` for the first time the
+``keyring_vault`` communicates with the Vault server, and retrieves the key
+type and data. Next it queries the Vault server for the key type and data and
+caches it locally.
+
+Key deletion will permanently delete key from the in-memory hash map and the
+Vault server.
+
+.. note::
+
+  |Percona XtraBackup| currently doesn't support backup of tables encrypted
+  with :ref:`keyring_vault_plugin`.
+
+System Variables
+----------------
+
+.. variable:: keyring_vault_config
+
+   :version 5.7.20-18: Implemented
+   :cli: ``--keyring-vault-config``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Text
+   :default:
+
+This variable is used to define the location of the
+:ref:`keyring_vault_plugin` configuration file.
+
+.. variable:: keyring_vault_timeout
+
+   :version 5.7.21-20: Implemented
+   :cli: ``--keyring-vault-timeout``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Numeric
+   :default: ``15``
+
+This variable allows to set the duration in seconds for the Vault server
+connection timeout. Default value is ``15``. Allowed range is from ``1``
+second to ``86400`` seconds (24 hours). The timeout can be also completely
+disabled to wait infinite amount of time by setting this variable to ``0``.
+
+.. _data-at-rest-encryption.data-scrubbing:
+
+Data Scrubbing
+================================================================================
+
+While data encryption ensures that the existing data are not stored in plain
+form, the data scrubbing literally removes the data once the user decides they
+should be deleted. Compare this behavior with how the ``DELETE`` statement works
+which only marks the affected data as *deleted* - the space claimed by this data
+is overwritten with new data later.
+
+Once enabled, data scrubbing works automatically on each tablespace
+separately. To enable data scrubbing, you need to set the following variables:
+
+- :variable:`innodb-background-scrub-data-uncompressed`
+- :variable:`innodb-background-scrub-data-compressed`
+
+Uncompressed tables can also be scrubbed immediately, independently of key
+rotation or background threads. This can be enabled by setting the variable
+:variable:`innodb-immediate-scrub-data-uncompressed`. This option is not supported for
+compressed tables.
+
+Note that data scrubbing is made effective by setting the
+:variable:`innodb_online_encryption_threads` variable to a value greater than
+**zero**.
+
+System Variables
+--------------------------------------------------------------------------------
+
+.. variable:: innodb_background_scrub_data_compressed
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-background-scrub-data-compressed``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Boolean
+   :default: ``OFF``
+
+.. variable:: innodb_background_scrub_data_uncompressed
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-background-scrub-data-uncompressed``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Boolean
+   :default: ``OFF``
+||||||||| merged common ancestors
+This variable works in combination with the :variable:`innodb_encrypt_tables`
+variable set to ``ONLINE_TO_KEYRING``. This variable configures the number of
+threads for background encryption. For the online encryption to work, this
+variable must contain a value greater than **zero**.
+
+.. variable:: innodb_online_encryption_rotate_key_age
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-online-encryption-rotate-key-age``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Numeric
+   :default: 1
+
+By using this variable, you can re-encrypt the table encrypted using
+KEYRING. The value of this variable determines how frequently the encrypted
+tables should be encrypted again. If it is set to **1**, the encrypted table is
+re-encrypted on each key rotation. If it is set to **2**, the table is encrypted
+on every other key rotation.
+      
+.. variable:: innodb_encrypt_online_alter_logs
+
+   :version 5.7.21-21: Implemented
+   :cli: ``--innodb-encrypt-online-alter-logs``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Boolean
+   :default: OFF
+
+This variable simultaneously turns on the encryption of files used by InnoDB for
+full text search using parallel sorting, building indexes using merge sort, and
+online DDL logs created by InnoDB for online DDL.
+
+.. _data-at-rest-encryption.undo-tablespace:
+
+InnoDB Undo Tablespace Encryption
+================================================================================
+
+:Availability: This feature is **Experimental** quality
+
+The encryption of InnoDB Undo tablespaces is only available when using
+separate undo tablespaces. Otherwise, the InnoDB undo log is part of
+the InnoDB system tablespace.
+
+.. seealso::
+
+   More information about how the encryption of the system tablespace
+      :ref:`data-at-rest-encryption.innodb-system-tablespace`
+
+System variables
+--------------------------------------------------------------------------------
+
+.. variable:: innodb_undo_log_encrypt
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-undo-log-encrypt``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Boolean
+   :default: ``Off``
+
+Enables the encryption of InnoDB Undo tablespaces
+
+Binary log encryption
+================================================================================
+
+A new option, implemented since |Percona Server| :rn:`5.7.20-19`, is
+encryption of binary and relay logs, triggered by the
+:variable:`encrypt_binlog` variable.
+
+Besides turning :variable:`encrypt_binlog` ``ON``, this feature requires both
+`master_verify_checksum
+<https://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_master_verify_checksum>`_
+and `binlog_checksum
+<https://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_binlog_checksum>`_
+variables to be turned ``ON``.
+
+While replicating, master sends the stream of decrypted binary log events to a
+slave (SSL connections can be set up to encrypt them in transport). That said,
+masters and slaves use separate keyring storages and are free to use differing
+keyring plugins.
+
+Dumping of encrypted binary logs involves decryption, and can be done using
+``mysqlbinlog`` with ``--read-from-remote-server`` option.
+
+.. note::
+
+   Taking into account that ``--read-from-remote-server`` option  is only
+   relevant to binary logs, encrypted relay logs can not be dumped/decrypted
+   in this way.
+
+.. rubric:: Upgrading from |Percona Server| |changed-version| to any higher version
+
+The key format in the :ref:`keyring vault plugin
+<keyring_vault_plugin>` was changed for binlog encryption in |Percona
+Server| |changed-version| release. When you are upgrading from
+|Percona Server| 5.7.20-19 to a higher version in the |Percona Server|
+5.7 series or to a version prior to 8.0.15-5 in the |Percona Server|
+8.0 series, the binary log encryption will work after you complete the
+following steps:
+
+1. Upgrade to a version higher than |Percona Server| |changed-version|
+#. Start the server without enabling the binary log encryption: :bash:`--encrypt_binlog=OFF`
+#. Enforce the key rotation: :mysql:`SELECT rotate_system_key("percona_binlog")`
+#. Restart the server enabling the binary log encryption: :bash:`--encrypt_binlog=ON`
+
+.. seealso::
+
+   |Percona Server| Documentation: Important changes in |Percona Server| 8.0.15-5
+      - `Binary log encryption to use the upstream implementation
+	<https://www.percona.com/doc/percona-server/LATEST/management/data_at_rest_encryption.html#binary-log-encryption>`_
+
+.. |changed-version| replace:: 5.7.20-19
+
+System Variables
+----------------
+
+.. variable:: encrypt_binlog
+
+   :version 5.7.20-19: Implemented
+   :cli: ``--encrypt-binlog``
+   :dyn: No
+   :scope: Global
+   :vartype: Boolean
+   :default: ``OFF``
+
+The variable turns on binary and relay logs encryption.
+
+.. _ps.data-at-rest-encryption.redo-log:
+
+Redo Log Encryption
+================================================================================
+
+:Availability: This feature is **Experimental** quality
+
+InnoDB redo log encryption is enabled by setting the variable
+:variable:`innodb_redo_log_encrypt`. This variable has three values:
+``MASTER_KEY``, ``KEYRING_KEY`` and ``OFF`` (set by default).
+
+``MASTER_KEY`` uses the InnoDB master key to encrypt with unique keys for each
+log file in the redo log header.
+
+``KEYRING_KEY`` uses the ``percona_redo`` versioned key from the keyring. When
+:variable:`innodb_redo_log_encrypt` is set to ``KEYRING_KEY``, each new redo log
+file is encrypted with the latest ``percona_redo`` key from the keyring.
+
+System variables
+--------------------------------------------------------------------------------
+
+.. variable:: innodb_redo_log_encrypt
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-redo-log-encrypt``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Text
+   :default: ``OFF``
+
+Enables the encryption of the redo log.
+
+.. .. variable:: innodb_key_rotation_interval
+.. 	      
+..    :version 5.7.23-24: Implemented
+..    :cli: ``--innodb-key-rotation_interval``
+..    :dyn: Yes
+..    :scope: Global
+..    :vartype: Text
+..    :default: ``0``
+.. 
+.. This variable stores the time (in seconds) that should pass between key
+.. rotations. It is only used if :variable:`innodb_redo_log_encrypt` is set to
+.. ``KEYRING_KEY``.
+.. 	     
+
+.. _data-at-rest-encryption.variable.innodb-scrub-log:
+
+.. variable:: innodb_scrub_log
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-scrub-log``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Boolean
+   :default: ``OFF``
+
+Specifies if data scrubbing should be automatically applied to the redo log.
+
+
+.. variable:: innodb_scrub_log_speed
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-scrub-log-speed``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Text
+   :default: 
+ 
+Specifies the velocity of data scrubbing (writing dummy redo log records) in bytes per second.
+
+Implemented in version 5.7.27-30, the key rotation is redesigned to allow ``SELECT rotate_system_key("percona_redo)``. The currently used key version is available in the :variable:`innodb_redo_key_version` status. The feature is **Experimental**.
+
+
+Temporary file encryption
+=========================
+
+A new feature, implemented since |Percona Server| :rn:`5.7.22-22`, is the
+encryption of temporary files, triggered by the :variable:`encrypt-tmp-files`
+option.
+
+Temporary files are currently used in |Percona Server| for the following
+purposes:
+
+This feature is considered **Experimental** quality.
+
+* filesort (for example, ``SELECT`` statements with ``SQL_BIG_RESULT`` hints),
+
+* binary log transactional caches,
+
+* Group Replication caches.
+
+For each temporary file, an encryption key is generated locally, only kept
+in memory for the lifetime of the temporary file, and discarded afterwards.
+
+System Variables
+----------------
+
+.. variable:: encrypt-tmp-files
+
+   :version 5.7.22-22: Implemented
+   :cli: ``--encrypt-tmp-files``
+   :dyn: No
+   :scope: Global
+   :vartype: Boolean
+   :default: ``OFF``
+
+The option turns on encryption of temporary files created by |Percona Server|.
+
+.. _data-at-rest-encryption.key-rotation:
+
+Key Rotation
+================================================================================
+
+The keyring management is enabled for each tablespace separately when you set
+the encryption in the ``ENCRYPTION`` clause, to `KEYRING` in the supported SQL
+statement:
+
+- CREATE TABLE .. ENCRYPTION='KEYRING`
+- ALTER TABLE ... ENCRYPTION='KEYRING'
+- CREATE TABLESPACE tablespace_name … ENCRYPTION=’KEYRING’
+
+.. note::
+
+   Running ``ALTER TABLE .. ENCRYPTION=’Y’`` on the tablespace created with
+   ``ENCRYPTION=’KEYRING’`` converts the table back to the existing MySQL
+   scheme.
+
+.. _keyring_vault_plugin:
+
+Keyring Vault plugin
+====================
+
+In |Percona Server| :rn:`5.7.20-18` a ``keyring_vault`` plugin has been
+implemented that can be used to store the encryption keys inside the
+`Hashicorp Vault server <https://www.vaultproject.io>`_.
+
+.. important::
+
+   ``keyring_vault`` plugin only works with kv secrets engine version 1.
+
+   .. seealso::
+
+      HashiCorp Documentation: More information about ``kv`` secrets engine
+         https://www.vaultproject.io/docs/secrets/kv/kv-v1.html
+
+Installation
+------------
+
+The safest way to load the plugin is to do it on the server startup by
+using `--early-plugin-load option
+<https://dev.mysql.com/doc/refman/5.7/en/server-options.html#option_mysqld_early-plugin-load>`_
+option:
+
+.. code-block:: bash
+
+   $ mysqld --early-plugin-load="keyring_vault=keyring_vault.so" \
+   --loose-keyring_vault_config="/home/mysql/keyring_vault.conf"
+
+It should be loaded this way to be able to facilitate recovery for encrypted
+tables.
+
+.. warning::
+
+   If server should be started with several plugins loaded early,
+   ``--early-plugin-load`` should contain their list separated by
+   semicolons. Also it's a good practice to put this list in double quotes so
+   that semicolons do not create problems when executed in a script.
+
+Apart from installing the plugin you also need to set the
+:variable:`keyring_vault_config` variable. This variable should point to the
+keyring_vault configuration file, whose contents are discussed below.
+
+This plugin supports the SQL interface for keyring key management described in
+`General-Purpose Keyring Key-Management Functions
+<https://dev.mysql.com/doc/refman/5.7/en/keyring-udfs-general-purpose.html>`_
+manual.
+
+To enable the functions you'll need to install the ``keyring_udf`` plugin:
+
+.. code-block:: mysql
+
+   mysql> INSTALL PLUGIN keyring_udf SONAME 'keyring_udf.so';
+
+Usage
+-----
+
+On plugin initialization ``keyring_vault`` connects to the Vault server using
+credentials stored in the credentials file. Location of this file is specified
+in by :variable:`keyring_vault_config`. On successful initialization it
+retrieves keys signatures and stores them inside an in-memory hash map.
+
+Configuration file should contain the following information:
+
+* ``vault_url`` - the address of the server where Vault is running. It can be a
+  named address, like one in the following example, or just an IP address. The
+  important part is that it should begin with ``https://``.
+
+* ``secret_mount_point`` - the name of the mount point where ``keyring_vault``
+  will store keys.
+
+* ``token`` - a token generated by the Vault server, which ``keyring_vault``
+  will further use when connecting to the Vault. At minimum, this token should
+  be allowed to store new keys in a secret mount point (when ``keyring_vault``
+  is used only for transparent data encryption, and not for ``keyring_udf``
+  plugin). If ``keyring_udf`` plugin is combined with ``keyring_vault``, this
+  token should be also allowed to remove keys from the Vault (for the
+  ``keyring_key_remove`` operation supported by the ``keyring_udf`` plugin).
+
+* ``vault_ca [optional]`` - this variable needs to be specified only when the
+  Vault's CA certificate is not trusted by the machine that is going to connect
+  to the Vault server. In this case this variable should point to CA
+  certificate that was used to sign Vault's certificates.
+
+.. warning::
+   
+   Each ``secret_mount_point`` should be used by only one server - otherwise
+   mixing encryption keys from different servers may lead to undefined
+   behavior.
+  
+An example of the configuration file looks like this: ::
+
+  vault_url = https://vault.public.com:8202
+  secret_mount_point = secret
+  token = 58a20c08-8001-fd5f-5192-7498a48eaf20
+  vault_ca = /data/keyring_vault_confs/vault_ca.crt
+
+When a key is fetched from a ``keyring`` for the first time the
+``keyring_vault`` communicates with the Vault server, and retrieves the key
+type and data. Next it queries the Vault server for the key type and data and
+caches it locally.
+
+Key deletion will permanently delete key from the in-memory hash map and the
+Vault server.
+
+.. note::
+
+  |Percona XtraBackup| currently doesn't support backup of tables encrypted
+  with :ref:`keyring_vault_plugin`.
+
+System Variables
+----------------
+
+.. variable:: keyring_vault_config
+
+   :version 5.7.20-18: Implemented
+   :cli: ``--keyring-vault-config``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Text
+   :default:
+
+This variable is used to define the location of the
+:ref:`keyring_vault_plugin` configuration file.
+
+.. variable:: keyring_vault_timeout
+
+   :version 5.7.21-20: Implemented
+   :cli: ``--keyring-vault-timeout``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Numeric
+   :default: ``15``
+
+This variable allows to set the duration in seconds for the Vault server
+connection timeout. Default value is ``15``. Allowed range is from ``1``
+second to ``86400`` seconds (24 hours). The timeout can be also completely
+disabled to wait infinite amount of time by setting this variable to ``0``.
+
+.. _data-at-rest-encryption.data-scrubbing:
+
+Data Scrubbing
+================================================================================
+
+While data encryption ensures that the existing data are not stored in plain
+form, the data scrubbing literally removes the data once the user decides they
+should be deleted. Compare this behavior with how the ``DELETE`` statement works
+which only marks the affected data as *deleted* - the space claimed by this data
+is overwritten with new data later.
+
+Once enabled, data scrubbing works automatically on each tablespace
+separately. To enable data scrubbing, you need to set the following variables:
+
+- :variable:`innodb-background-scrub-data-uncompressed`
+- :variable:`innodb-background-scrub-data-compressed`
+
+Uncompressed tables can also be scrubbed immediately, independently of key
+rotation or background threads. This can be enabled by setting the variable
+:variable:`innodb-immediate-scrub-data-uncompressed`. This option is not supported for
+compressed tables.
+
+Note that data scrubbing is made effective by setting the
+:variable:`innodb_online_encryption_threads` variable to a value greater than
+**zero**.
+
+System Variables
+--------------------------------------------------------------------------------
+
+.. variable:: innodb_background_scrub_data_compressed
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-background-scrub-data-compressed``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Boolean
+   :default: ``OFF``
+
+.. variable:: innodb_background_scrub_data_uncompressed
+
+   :version 5.7.23-24: Implemented
+   :cli: ``--innodb-background-scrub-data-uncompressed``
+   :dyn: Yes
+   :scope: Global
+   :vartype: Boolean
+   :default: ``OFF``
+=========
+==============================================================================
+Data at Rest Encryption
+==============================================================================
+>>>>>>>>> Temporary merge branch 2
+=======
+==============================================================================
+Data at Rest Encryption
+==============================================================================
+>>>>>>> Percona-Server-8.0.19-10
 
 .. code-block:: text
 

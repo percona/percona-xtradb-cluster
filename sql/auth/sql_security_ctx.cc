@@ -476,10 +476,9 @@ ulong Security_context::db_acl(LEX_CSTRING db, bool use_pattern_scan) const {
   DBUG_TRACE;
   if (m_acl_map == 0 || db.length == 0) return 0;
 
-  Db_access_map::iterator it;
   std::string key(db.str, db.length);
-  it = m_acl_map->db_acls()->find(key);
-  if (it == m_acl_map->db_acls()->end()) {
+  Db_access_map::iterator found_acl_it = m_acl_map->db_acls()->find(key);
+  if (found_acl_it == m_acl_map->db_acls()->end()) {
     if (use_pattern_scan) {
       Db_access_map::iterator it = m_acl_map->db_wild_acls()->begin();
       ulong access = 0;
@@ -507,7 +506,7 @@ ulong Security_context::db_acl(LEX_CSTRING db, bool use_pattern_scan) const {
     }
   } else {
     DBUG_PRINT("info", ("Found exact match for db %s", key.c_str()));
-    return filter_access(it->second, key);
+    return filter_access(found_acl_it->second, key);
   }
 }
 
@@ -1272,7 +1271,7 @@ bool Security_context::has_column_access(ulong priv, TABLE const *table,
 
     if (table_hash_search(this->host().str, this->ip().str, db.str,
                           this->priv_user().str, table_name.str,
-                          0) == nullptr) {
+                          false) == nullptr) {
       // If there is no specific info about the table specific privileges, it
       // means that there are no column privileges configured for the table
       // columns. So, we let the general table access above to prevail.

@@ -44,6 +44,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "my_dbug.h"
 #include "my_io.h"
 #include "os/file.h"
+#include "template_utils.h"
 #include "univ.i"
 
 #ifndef _WIN32
@@ -274,9 +275,17 @@ static const char ENCRYPTION_KEY_MAGIC_V2[] = "lCB";
 information version. */
 static const char ENCRYPTION_KEY_MAGIC_V3[] = "lCC";
 
-static const char ENCRYPTION_KEY_MAGIC_RK[] = "lRK";
+/** Encryption magic bytes before 8.0.19, it's for checking KEYRING
+redo log information version. */
+static const char ENCRYPTION_KEY_MAGIC_RK_V1[] = "lRK";
+
+/** Encryption magic bytes for 8.0.19+, it's for checking KEYRING
+redo log information version. */
+static const char ENCRYPTION_KEY_MAGIC_RK_V2[] = "RKB";
 
 static const char ENCRYPTION_KEY_MAGIC_PS_V1[] = "PSA";
+
+static const char ENCRYPTION_KEY_MAGIC_PS_V2[] = "PSB";
 
 /** Encryption master key prifix */
 static const char ENCRYPTION_MASTER_KEY_PRIFIX[] = "INNODBKey";
@@ -331,6 +340,11 @@ static const uint ENCRYPTION_PROGRESS_INFO_SIZE = sizeof(uint);
 
 class IORequest;
 
+enum class Encryption_rotation : std::uint8_t {
+  NO_ROTATION,
+  MASTER_KEY_TO_KEYRING
+};
+
 /** Encryption algorithm. */
 struct Encryption {
   /** Algorithm types supported */
@@ -344,8 +358,6 @@ struct Encryption {
 
     KEYRING = 2
   };
-
-  enum Encryption_rotation { NO_ROTATION, MASTER_KEY_TO_KEYRING };
 
   /** Encryption information format version */
   enum Version {
@@ -367,27 +379,28 @@ struct Encryption {
         m_klen(0),
         m_key_allocated(false),
         m_iv(nullptr),
-        m_tablespace_iv(nullptr),
         m_tablespace_key(nullptr),
         m_key_version(0),
         m_key_id(0),
         m_checksum(0),
-        m_encryption_rotation(NO_ROTATION) {}
+        m_encryption_rotation(Encryption_rotation::NO_ROTATION) {
+    m_key_id_uuid[0] = '\0';
+  }
 
   /** Specific constructor
   @param[in]	type		Algorithm type */
   explicit Encryption(Type type)
       : m_type(type),
-        m_key(NULL),
+        m_key(nullptr),
         m_klen(0),
         m_key_allocated(false),
-        m_iv(NULL),
-        m_tablespace_iv(NULL),
-        m_tablespace_key(NULL),
+        m_iv(nullptr),
+        m_tablespace_key(nullptr),
         m_key_version(0),
         m_key_id(0),
         m_checksum(0),
-        m_encryption_rotation(NO_ROTATION) {
+        m_encryption_rotation(Encryption_rotation::NO_ROTATION) {
+    m_key_id_uuid[0] = '\0';
 #ifdef UNIV_DEBUG
     switch (m_type) {
       case NONE:
@@ -414,12 +427,15 @@ struct Encryption {
     std::swap(m_klen, other.m_klen);
     std::swap(m_key_allocated, other.m_key_allocated);
     std::swap(m_iv, other.m_iv);
-    std::swap(m_tablespace_iv, other.m_tablespace_iv);
     std::swap(m_tablespace_key, other.m_tablespace_key);
     std::swap(m_key_version, other.m_key_version);
     std::swap(m_key_id, other.m_key_id);
     std::swap(m_checksum, other.m_checksum);
     std::swap(m_encryption_rotation, other.m_encryption_rotation);
+    char tmp[ENCRYPTION_SERVER_UUID_LEN + 1];
+    memcpy(tmp, m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN + 1);
+    memcpy(m_key_id_uuid, other.m_key_id_uuid, ENCRYPTION_SERVER_UUID_LEN + 1);
+    memcpy(other.m_key_id_uuid, tmp, ENCRYPTION_SERVER_UUID_LEN + 1);
   }
 
   ~Encryption();
@@ -467,12 +483,17 @@ struct Encryption {
   static bool is_none(const char *algorithm) MY_ATTRIBUTE((warn_unused_result));
 
   /** Check if the NO algorithm was explicitly specified.
+  @param[in]      explicit_encryption was ENCRYPTION clause
+                  specified explicitly
   @param[in]      algorithm       Encryption algorithm to check
   @return true if no algorithm explicitly requested */
   static bool none_explicitly_specified(
-      ulong create_info_used_fields,
+      bool explicit_encryption,
       const char *algorithm) noexcept MY_ATTRIBUTE((warn_unused_result));
 
+  /** Check if the string is "y" or "Y".
+  @param[in]      algorithm       Encryption algorithm to check
+  @return true if no algorithm requested */
   static bool is_master_key_encryption(const char *algorithm)
       MY_ATTRIBUTE((warn_unused_result));
 
@@ -484,7 +505,7 @@ struct Encryption {
 
   static bool is_online_encryption_on() MY_ATTRIBUTE((warn_unused_result));
 
-  static bool should_be_keyring_encrypted(ulong create_info_used_fields,
+  static bool should_be_keyring_encrypted(bool explicit_encryption,
                                           const char *algorithm)
       MY_ATTRIBUTE((warn_unused_result));
 
@@ -494,31 +515,35 @@ struct Encryption {
 
   /** Create tablespace key
   @param[in,out]	tablespace_key	tablespace key - null if failure
-  @param[in]		key_id		tablespace key id */
-  static void create_tablespace_key(byte **tablespace_key, uint key_id);
+  @param[in]		key_id		tablespace key id
+  @param[in]  uuid tablespace key uuid */
+  static void create_tablespace_key(byte **tablespace_key, uint key_id,
+                                    const char *uuid);
 
   /** Create new master key for key rotation.
   @param[in,out]	master_key	master key */
   static void create_master_key(byte **master_key);
 
   static bool tablespace_key_exists_or_create_new_one_if_does_not_exist(
-      uint key_id);
+      uint key_id, const char *uuid);
 
-  static bool tablespace_key_exists(uint key_id);
+  static bool tablespace_key_exists(uint key_id, const char *uuid);
 
   static bool is_encrypted_and_compressed(const byte *page);
 
-  static uint encryption_get_latest_version(uint key_id);
+  static uint encryption_get_latest_version(uint key_id, const char *uuid);
 
   // TODO:Robert: Te dwa są potrzebne.
-  static void get_latest_tablespace_key(uint key_id,
+  static void get_latest_tablespace_key(uint key_id, const char *uuid,
                                         uint *tablespace_key_version,
                                         byte **tablespace_key);
 
-  static void get_latest_tablespace_key_or_create_new_one(
-      uint key_id, uint *tablespace_key_version, byte **tablespace_key);
+  static void get_latest_key_or_create(uint tablespace_key_id, const char *uuid,
+                                       uint *tablespace_key_version,
+                                       byte **tablespace_key);
 
-  static bool get_tablespace_key(uint key_id, uint tablespace_key_version,
+  static bool get_tablespace_key(uint key_id, const char *uuid,
+                                 uint tablespace_key_version,
                                  byte **tablespace_key, size_t *key_len);
 
   /** Create tablespace key
@@ -539,6 +564,10 @@ struct Encryption {
   @param[in,out]	master_key	master key */
   static void get_master_key(ulint *master_key_id, byte **master_key);
 
+  /** Checks if keyring is installed and it is operational.
+   *  This is done by trying to fetch/create
+   *  dummy percona_keyring_test key
+  @return true if success */
   static bool is_keyring_alive();
 
   static bool can_page_be_keyring_encrypted(ulint page_type);
@@ -658,14 +687,11 @@ struct Encryption {
   /** Encrypt initial vector */
   byte *m_iv;
 
-  // We decide as the last step in decrypt (after reading the page)
-  // when re_encryption_type is MK_TO_RK whether page is
-  // encrypted with MK or RK => thus we do not know which tablespace_iv we are
-  // going to use RK or MK
-  byte *m_tablespace_iv;
-
   byte *m_tablespace_key;
 
+  char m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN + 1];  // uuid that is part of
+                                                       // the full key id of a
+                                                       // percona system key
   uint m_key_version;
 
   uint m_key_id;
@@ -688,9 +714,10 @@ struct Encryption {
   static void get_latest_system_key(const char *system_key_name, byte **key,
                                     uint *key_version, size_t *key_length);
 
-  static void fill_key_name(char *key_name, uint key_id);
+  static void fill_key_name(char *key_name, uint key_id, const char *uuid);
 
-  static void fill_key_name(char *key_name, uint key_id, uint key_version);
+  static void fill_key_name(char *key_name, uint key_id, const char *uuid,
+                            uint key_version);
 };
 
 /** Types for AIO operations @{ */
@@ -922,18 +949,22 @@ class IORequest {
   @param[in] key_len	length of the encryption key
   @param[in] iv		The encryption iv to use */
   void encryption_key(byte *key, ulint key_len, bool key_allocated, byte *iv,
-                      uint key_version, uint key_id, byte *tablespace_iv,
-                      byte *tablespace_key) {
+                      uint key_version, uint key_id, byte *tablespace_key,
+                      const char *uuid) {
     m_encryption.set_key(key, key_len, key_allocated);
     m_encryption.m_iv = iv;
     m_encryption.m_key_version = key_version;
     m_encryption.m_key_id = key_id;
-    m_encryption.m_tablespace_iv = tablespace_iv;
     m_encryption.m_tablespace_key = tablespace_key;
+    if (uuid == nullptr) {
+      m_encryption.m_key_id_uuid[0] = '\0';
+    } else {
+      memcpy(m_encryption.m_key_id_uuid, uuid, ENCRYPTION_SERVER_UUID_LEN);
+      m_encryption.m_key_id_uuid[ENCRYPTION_SERVER_UUID_LEN] = '\0';
+    }
   }
 
-  void encryption_rotation(
-      Encryption::Encryption_rotation encryption_rotation) {
+  void encryption_rotation(Encryption_rotation encryption_rotation) {
     m_encryption.m_encryption_rotation = encryption_rotation;
   }
 
@@ -960,13 +991,12 @@ class IORequest {
 
   /** Clear all encryption related flags */
   void clear_encrypted() {
-    m_encryption.set_key(NULL, 0, false);
-    m_encryption.m_iv = NULL;
+    m_encryption.set_key(nullptr, 0, false);
+    m_encryption.m_iv = nullptr;
     m_encryption.m_type = Encryption::NONE;
-    m_encryption.m_encryption_rotation = Encryption::NO_ROTATION;
-    m_encryption.m_tablespace_iv = NULL;
+    m_encryption.m_encryption_rotation = Encryption_rotation::NO_ROTATION;
     m_encryption.m_key_id = 0;
-    m_encryption.m_tablespace_key = NULL;
+    m_encryption.m_tablespace_key = nullptr;
   }
 
   void mark_page_zip_compressed() { m_is_page_zip_compressed = true; }
@@ -1310,10 +1340,16 @@ are used to register file deletion operations*/
     }                                                                 \
   } while (0)
 
-#define register_pfs_file_rename_begin(state, locker, key, op, name, src_file, \
-                                       src_line)                               \
-  register_pfs_file_open_begin(state, locker, key, op, name, src_file,         \
-                               static_cast<uint>(src_line))
+#define register_pfs_file_rename_begin(state, locker, key, op, from, to,    \
+                                       src_file, src_line)                  \
+  do {                                                                      \
+    locker = PSI_FILE_CALL(get_thread_file_name_locker)(state, key.m_value, \
+                                                        op, from, &locker); \
+    if (locker != nullptr) {                                                \
+      PSI_FILE_CALL(start_file_rename_wait)                                 \
+      (locker, (size_t)0, from, to, src_file, static_cast<uint>(src_line)); \
+    }                                                                       \
+  } while (0)
 
 #define register_pfs_file_rename_end(locker, from, to, result)       \
   do {                                                               \
@@ -1400,14 +1436,16 @@ The wrapper functions have the prefix of "innodb_". */
   pfs_os_aio_func(type, mode, name, file, buf, offset, n, read_only, message1, \
                   message2, space_id, trx, should_buffer, __FILE__, __LINE__)
 
-#define os_file_read_pfs(type, file_name, file, buf, offset, n) \
-  pfs_os_file_read_func(type, file_name, file, buf, offset, n, nullptr, __FILE__, __LINE__)
+#define os_file_read_pfs(type, file_name, file, buf, offset, n)         \
+  pfs_os_file_read_func(type, file_name, file, buf, offset, n, nullptr, \
+                        __FILE__, __LINE__)
 
 #define os_file_read_trx_pfs(file, buf, offset, n, trx) \
   pfs_os_file_read_func(file, buf, offset, n, trx, __FILE__, __LINE__)
 
-#define os_file_read_first_page_pfs(type, file_name, file, buf, n, exit) \
-  pfs_os_file_read_first_page_func(type, file_name, file, buf, n, __FILE__, __LINE__, exit)
+#define os_file_read_first_page_pfs(type, file_name, file, buf, n, exit)    \
+  pfs_os_file_read_first_page_func(type, file_name, file, buf, n, __FILE__, \
+                                   __LINE__, exit)
 
 #define os_file_copy_pfs(src, src_offset, dest, dest_offset, size)          \
   pfs_os_file_copy_func(src, src_offset, dest, dest_offset, size, __FILE__, \
@@ -1554,9 +1592,10 @@ os_file_read() which requests a synchronous read operation.
 @param[in]	src_line	line where the func invoked
 @return DB_SUCCESS if request was successful */
 UNIV_INLINE
-dberr_t pfs_os_file_read_func(IORequest &type, const char *file_name, pfs_os_file_t file, void *buf,
-                              os_offset_t offset, ulint n, trx_t *trx,
-                              const char *src_file, uint src_line);
+dberr_t pfs_os_file_read_func(IORequest &type, const char *file_name,
+                              pfs_os_file_t file, void *buf, os_offset_t offset,
+                              ulint n, trx_t *trx, const char *src_file,
+                              uint src_line);
 
 /** NOTE! Please use the corresponding macro os_file_read_first_page(),
 not directly this function!
@@ -1573,8 +1612,8 @@ of page 0 of IBD file
 @param[in]	exit_on_err	if true then exit on error
 @return DB_SUCCESS if request was successful */
 UNIV_INLINE
-dberr_t pfs_os_file_read_first_page_func(IORequest &type, const char* file_name, pfs_os_file_t file,
-                                         void *buf, ulint n,
+dberr_t pfs_os_file_read_first_page_func(IORequest &type, const char *file_name,
+                                         pfs_os_file_t file, void *buf, ulint n,
                                          const char *src_file, uint src_line,
                                          bool exit_on_err);
 
@@ -2017,8 +2056,9 @@ Requests a synchronous read operation.
 @param[in]	offset		file offset where to read
 @param[in]	n		number of bytes to read
 @return DB_SUCCESS if request was successful */
-dberr_t os_file_read_func(IORequest &type, const char* file_name, os_file_t file, void *buf,
-                          os_offset_t offset, ulint n, trx_t *trx)
+dberr_t os_file_read_func(IORequest &type, const char *file_name,
+                          os_file_t file, void *buf, os_offset_t offset,
+                          ulint n, trx_t *trx)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** NOTE! Use the corresponding macro os_file_read_first_page(),
@@ -2031,8 +2071,9 @@ Requests a synchronous read operation of page 0 of IBD file
 @param[in]	n		number of bytes to read
 @param[in]	exit_on_err	if true then exit on error
 @return DB_SUCCESS if request was successful */
-dberr_t os_file_read_first_page_func(IORequest &type, const char* file_name, os_file_t file, void *buf,
-                                     ulint n, bool exit_on_err)
+dberr_t os_file_read_first_page_func(IORequest &type, const char *file_name,
+                                     os_file_t file, void *buf, ulint n,
+                                     bool exit_on_err)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** copy data from one file to another file. Data is read/written

@@ -322,6 +322,7 @@ fi
 #
 
 (
+<<<<<<< HEAD
     cd "$SOURCEDIR"
 
     # Build/Copy galera as configured
@@ -466,6 +467,60 @@ fi
        echo "Packaging the test files"
        cp -R $SOURCEDIR/percona-xtradb-cluster-tests $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/
     ) || exit 1
+||||||| merged common ancestors
+    rm -rf "$WORKDIR_ABS/bld"
+    mkdir "$WORKDIR_ABS/bld"
+    cd "$WORKDIR_ABS/bld"
+
+    cmake $SOURCEDIR ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
+        $DEBUG_EXTRA \
+        -DFEATURE_SET=community \
+        -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
+        -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
+        -DCOMPILATION_COMMENT="$COMMENT" \
+        -DWITH_PAM=ON \
+        -DWITH_ROCKSDB=ON \
+        -DWITH_INNODB_MEMCACHED=ON \
+        -DWITH_ZLIB=system \
+        -DWITH_NUMA=ON \
+        -DDOWNLOAD_BOOST=1 \
+        -DFORCE_INSOURCE_BUILD=1 \
+        -DWITH_LIBEVENT=bundled \
+        -DWITH_ZSTD=bundled \
+        -DWITH_BOOST="$WORKDIR_ABS/libboost" \
+        $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+
+    make $MAKE_JFLAG $QUIET
+    make DESTDIR="$INSTALLDIR" install
+=======
+    rm -rf "$WORKDIR_ABS/bld"
+    mkdir "$WORKDIR_ABS/bld"
+    cd "$WORKDIR_ABS/bld"
+
+    cmake $SOURCEDIR ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
+        $DEBUG_EXTRA \
+        -DFEATURE_SET=community \
+        -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
+        -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
+        -DCOMPILATION_COMMENT="$COMMENT" \
+        -DWITH_PAM=ON \
+        -DWITH_ROCKSDB=ON \
+        -DWITH_INNODB_MEMCACHED=ON \
+        -DWITH_ZLIB=system \
+        -DWITH_NUMA=ON \
+        -DWITH_LDAP=ON \
+        -DDOWNLOAD_BOOST=1 \
+        -DFORCE_INSOURCE_BUILD=1 \
+        -DWITH_LIBEVENT=bundled \
+        -DWITH_ZSTD=bundled \
+        -DWITH_BOOST="$WORKDIR_ABS/libboost" \
+        $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+
+    make $MAKE_JFLAG $QUIET
+    make DESTDIR="$INSTALLDIR" install
+>>>>>>> Percona-Server-8.0.19-10
 
     # Build jemalloc
     if test "x$WITH_JEMALLOC" != x

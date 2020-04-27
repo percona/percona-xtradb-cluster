@@ -94,7 +94,14 @@ ifeq ($(SKIP_DEBUG_BINARY),)
                 -DWITH_EDITLINE=bundled \
                 -DWITH_LIBEVENT=bundled \
                 -DWITH_NUMA=ON \
+<<<<<<< HEAD
 		-DWITH_EXTRA_CHARSETS=all ..
+||||||| merged common ancestors
+		-DWITH_EXTRA_CHARSETS=all $(TOKUDB_OPTS_DEBUG) ..
+=======
+                -DWITH_LDAP=ON \
+		-DWITH_EXTRA_CHARSETS=all $(TOKUDB_OPTS_DEBUG) ..
+>>>>>>> Percona-Server-8.0.19-10
 endif
 
 	( test -d $(builddir) || mkdir $(builddir) ) && cd $(builddir) && \
@@ -141,9 +148,16 @@ endif
                 -DWITH_EDITLINE=bundled \
                 -DWITH_LIBEVENT=bundled \
                 -DWITH_NUMA=ON \
+<<<<<<< HEAD
 		-DWITH_EXTRA_CHARSETS=all ..
 
 	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)
+||||||| merged common ancestors
+		-DWITH_EXTRA_CHARSETS=all $(TOKUDB_OPTS_RELEASE) ..
+=======
+                -DWITH_LDAP=ON \
+		-DWITH_EXTRA_CHARSETS=all $(TOKUDB_OPTS_RELEASE) ..
+>>>>>>> Percona-Server-8.0.19-10
 
 	touch $@
 

@@ -118,7 +118,13 @@ SELECT @@session.default_table_encryption = false;
 SET GLOBAL default_table_encryption=false;
 SELECT @@global.default_table_encryption = false;
 
+<<<<<<< HEAD
 --Error ER_WRONG_VALUE_FOR_VAR
+||||||| merged common ancestors
+=======
+SELECT @@session.default_table_encryption;
+--error ER_WRONG_VALUE_FOR_VAR
+>>>>>>> Percona-Server-8.0.19-10
 SET SESSION default_table_encryption=KEYRING_ON;
 SELECT @@session.default_table_encryption;
 
@@ -136,7 +142,12 @@ SELECT @@global.default_table_encryption;
 SET PERSIST default_table_encryption=ON;
 SELECT @@global.default_table_encryption;
 
+<<<<<<< HEAD
 --Error ER_WRONG_VALUE_FOR_VAR
+||||||| merged common ancestors
+=======
+--error ER_WRONG_VALUE_FOR_VAR
+>>>>>>> Percona-Server-8.0.19-10
 SET PERSIST default_table_encryption=KEYRING_ON;
 SELECT @@global.default_table_encryption;
 
@@ -175,7 +186,12 @@ SELECT @@session.default_table_encryption;
 SET GLOBAL default_table_encryption=OFF;
 SELECT @@global.default_table_encryption;
 
+<<<<<<< HEAD
 --Error ER_WRONG_VALUE_FOR_VAR
+||||||| merged common ancestors
+=======
+--error ER_WRONG_VALUE_FOR_VAR
+>>>>>>> Percona-Server-8.0.19-10
 SET PERSIST default_table_encryption=KEYRING_ON;
 SELECT @@global.default_table_encryption;
 

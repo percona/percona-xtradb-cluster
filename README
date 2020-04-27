@@ -1,5 +1,13 @@
+<<<<<<< HEAD
 Percona XtraDB Cluster 8.0
 --------------------------
+||||||| merged common ancestors
+Percona Server 8.0
+------------------
+=======
+Percona Server 8.0
+Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+>>>>>>> Percona-Server-8.0.19-10
 
 Percona XtraDB Cluster is based on Percona Server and Codership wsrep API
 using galera replication library that provides Multimaster Cluster based

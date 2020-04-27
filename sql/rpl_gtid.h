@@ -44,7 +44,8 @@ class THD;
   Report an error from code that can be linked into either the server
   or mysqlbinlog.  There is no common error reporting mechanism, so we
   have to duplicate the error message (write it out in the source file
-  for mysqlbinlog, write it in share/errmsg-utf8.txt for the server).
+  for mysqlbinlog, write it in share/messages_to_clients.txt for the
+  server).
 
   @param MYSQLBINLOG_ERROR arguments to mysqlbinlog's 'error'
   function, including the function call parentheses
@@ -3181,6 +3182,9 @@ class Gtid_state {
   */
   int warn_or_err_on_modify_gtid_table(THD *thd, TABLE_LIST *table);
 #endif
+
+  /* Allows to extract snapshot GTID_EXECUTED */
+  void get_snapshot_gtid_executed(std::string &snapshot_gtid_executed);
 
  private:
   /**

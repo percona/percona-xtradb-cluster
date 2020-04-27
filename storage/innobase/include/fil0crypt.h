@@ -162,18 +162,17 @@ struct fil_space_crypt_t {
   /** Constructor. Does not initialize the members!
   The object is expected to be placed in a buffer that
   has been zero-initialized. */
-  fil_space_crypt_t(uint new_type, uint new_min_key_version, uint new_key_id,
+  fil_space_crypt_t(uint new_min_key_version, uint new_key_id, const char *uuid,
                     fil_encryption_t new_encryption,
                     Crypt_key_operation key_operation,
-                    Encryption::Encryption_rotation encryption_rotation =
-                        Encryption::NO_ROTATION);
+                    Encryption_rotation encryption_rotation =
+                        Encryption_rotation::NO_ROTATION);
 
   /** Destructor */
   ~fil_space_crypt_t() {
     mutex_free(&mutex);
     mutex_free(&start_rotate_mutex);
-    if (tablespace_key != NULL) ut_free(tablespace_key);
-    if (tablespace_iv != NULL) ut_free(tablespace_iv);
+    if (tablespace_key != nullptr) ut_free(tablespace_key);
 
     for (std::list<byte *>::iterator iter = fetched_keys.begin();
          iter != fetched_keys.end(); iter++) {
@@ -220,7 +219,7 @@ struct fil_space_crypt_t {
   @param[in,out]	mtr	mini-transaction */
   void write_page0(const fil_space_t *space, byte *page0, mtr_t *mtr,
                    uint a_min_key_version, uint a_type,
-                   Encryption::Encryption_rotation current_encryption_rotation);
+                   Encryption_rotation current_encryption_rotation);
 
   void set_tablespace_key(const uchar *tablespace_key) {
     if (tablespace_key == NULL) {
@@ -233,24 +232,13 @@ struct fil_space_crypt_t {
     }
   }
 
-  void set_tablespace_iv(const uchar *tablespace_iv) {
-    if (tablespace_iv == NULL) {
-      if (this->tablespace_iv != NULL) ut_free(this->tablespace_iv);
-      this->tablespace_iv = NULL;
-    } else {
-      if (this->tablespace_iv == NULL)
-        this->tablespace_iv = (byte *)ut_malloc_nokey(ENCRYPTION_KEY_LEN);
-      memcpy(this->tablespace_iv, tablespace_iv, ENCRYPTION_KEY_LEN);
-    }
-  }
+  void set_iv(const uchar *iv) { memcpy(this->iv, iv, CRYPT_SCHEME_1_IV_LEN); }
 
   bool load_needed_keys_into_local_cache();
   uchar *get_min_key_version_key();
   uchar *get_key_currently_used_for_encryption();
 
-  uint min_key_version;  // min key version for this space
-  ulint page0_offset;  // byte offset on page 0 for crypt data //TODO:Robert: po
-                       // co to ?
+  uint min_key_version;         // min key version for this space
   fil_encryption_t encryption;  // Encryption setup
 
   // key being used for encryption
@@ -275,15 +263,17 @@ struct fil_space_crypt_t {
 
   fil_space_rotate_state_t rotate_state;
 
-  Encryption::Encryption_rotation encryption_rotation;
+  Encryption_rotation encryption_rotation;
 
   uchar *tablespace_key;  // TODO:Make it private ?
-  // In Oracle's tablespace encryption is ENCRYPTION_KEY_LEN long,
-  // which is incorrect value - it should be always 128 bits,
-  // nevertheless we need ENCRYPTION_KEY_LEN tablespace_iv
-  // to be able to store this IV.
-  uchar *tablespace_iv;
 
+  // In Oracle's tablespace encryption iv is ENCRYPTION_KEY_LEN long,
+  // which is incorrect value - it should be always 128 bits.
+  // In case of MK to KEYRING re-encryption we re-use MK iv for
+  // Keyring encryption. Since only 128 bits is really used
+  // by AES we only store the needed 128 bits of this iv.
+  // During re-encryption we use this iv to decrypt MK encrypted
+  // pages and encrypt pages with KEYRING.
   unsigned char iv[CRYPT_SCHEME_1_IV_LEN];
 
   uint encrypting_with_key_version;
@@ -292,6 +282,13 @@ struct fil_space_crypt_t {
   unsigned int type;
 
   std::list<byte *> fetched_keys;  // TODO: temp for test
+
+  // Internally we have two versions of crypt_data written to page 0.
+  // One starting with magic PSA and the second one starting with PSB.
+  // Here we store which magic we read : 1 - PSA, 2 - PSB.
+  size_t private_version{2};
+
+  char uuid[ENCRYPTION_SERVER_UUID_LEN + 1];
 };
 
 /** Status info about encryption */
@@ -335,8 +332,6 @@ struct redo_log_key final {
   ulint read_count;
   ulint write_count;
   bool present;
-
-  bool persisted() const noexcept { return version != 0; }
 };
 
 /** Handles the fetching/generation/storing/etc of keyring redo log keys.
@@ -358,22 +353,39 @@ class redo_log_keys final {
   MY_NODISCARD
   redo_log_key *load_latest_key(THD *thd, bool generate);
   MY_NODISCARD
-  redo_log_key *load_key_version(THD *thd, uint version);
+  redo_log_key *load_key_version(THD *thd, const char *uuid, uint version);
 
   MY_NODISCARD
   redo_log_key *generate_and_store_new_key(THD *thd);
 
-  /** These two methods are used during bootstrap encryption, when wo do not yet
-  have an uuid */
+  /** Fetch if exists default percona_redo key, in case it does not
+  exist - generate it in keyring. Should be used when server_uuid is not
+  yet available
+  @param[in] thd - connection thread
+  @return percona_redo default key */
   MY_NODISCARD
-  redo_log_key *generate_new_key_without_storing();
-
-  MY_NODISCARD
-  bool store_used_keys() noexcept;
+  redo_log_key *fetch_or_generate_default_key(THD *thd);
 
   void unload_old_keys() noexcept;
 
  private:
+  /**
+  Get KEYRING encryption redo key name
+  @param[in] - uuid key's UUID
+  @param[in] - key_version key's version
+  @return KEYRING encryption redo key name */
+  std::string get_key_name(const char *uuid, uint key_version);
+  /**
+  Get KEYRING encryption redo key name
+  @param[in] uuid - key's UUID
+  @return KEYRING encryption redo key name */
+  std::string get_key_name(const char *uuid);
+  /**
+  Get KEYRING encryption redo key name
+  @param[in,out]  oss - output string stream
+  @param[in] uuid - key's UUID */
+  void get_key_name(std::ostringstream &oss, const char *uuid);
+
   using key_map = std::map<ulint, redo_log_key>;
   key_map m_keys;
 };
@@ -406,7 +418,7 @@ Create a fil_space_crypt_t object
 @param[in]	key_id		Encryption key id
 @return crypt object */
 fil_space_crypt_t *fil_space_create_crypt_data(
-    fil_encryption_t encrypt_mode, uint key_id,
+    fil_encryption_t encrypt_mode, uint key_id, const char *uuid,
     Crypt_key_operation key_operation =
         Crypt_key_operation::FETCH_OR_GENERATE_KEY)
     MY_ATTRIBUTE((warn_unused_result));
@@ -434,15 +446,24 @@ Free a crypt data object
 @param[in,out] crypt_data	crypt data to be freed */
 void fil_space_destroy_crypt_data(fil_space_crypt_t **crypt_data);
 
-/******************************************************************
-Parse a MLOG_FILE_WRITE_CRYPT_DATA log entry
-@param[in]	ptr		Log entry start
-@param[in]	end_ptr		Log entry end
-@param[in]	block		buffer block
-@param[out]	err		DB_SUCCESS or DB_IO_DECRYPT_FAIL
+/** Parse a MLOG_FILE_WRITE_CRYPT_DATA log entry
+@param[in]  space_id  id of space that this log entry refers to
+@param[in]  ptr  Log entry start
+@param[in]  end_ptr  Log entry end
+@param[in]  len  Log entry length
 @return position on log buffer */
-byte *fil_parse_write_crypt_data(byte *ptr, const byte *end_ptr,
-                                 const buf_block_t *block, ulint len)
+byte *fil_parse_write_crypt_data_v1(space_id_t space_id, byte *ptr,
+                                    const byte *end_ptr, ulint len)
+    MY_ATTRIBUTE((warn_unused_result));
+
+/** Parse a MLOG_FILE_WRITE_CRYPT_DATA log entry
+@param[in]  space_id  id of space that this log entry refers to
+@param[in]  ptr  Log entry start
+@param[in]  end_ptr  Log entry end
+@param[in]  len  Log entry length
+@return position on log buffer */
+byte *fil_parse_write_crypt_data_v2(space_id_t space_id, byte *ptr,
+                                    const byte *end_ptr, ulint len)
     MY_ATTRIBUTE((warn_unused_result));
 
 /**
@@ -551,7 +572,26 @@ return 0 if data found */
 void fil_space_get_scrub_status(const fil_space_t *space,
                                 fil_space_scrub_status_t *status);
 
-//#include "fil0crypt.ic"
+/**
+Checks if tablespace is encrypted with KEYRING encryption v1
+
+@param[in] space Tablespace
+return true - fully or partially encrypted with keyring
+              encryption v1
+       false - is not encrypted, fully or partially with
+              keyring encryption v1 */
+bool is_space_keyring_v1_encrypted(fil_space_t *space);
+
+/**
+Checks if tablespace is encrypted with KEYRING encryption v1
+
+@param[in] space_id Tablespace's id
+return true - fully or partially encrypted with keyring
+              encryption v1
+       false - is not encrypted, fully or partially with
+              keyring encryption v1 */
+bool is_space_keyring_v1_encrypted(space_id_t space_id);
+
 #endif /* !UNIV_INNOCHECKSUM */
 
 #endif /* fil0crypt_h */

@@ -912,7 +912,7 @@ static void fill_dd_index_elements_from_key_parts(
     // Set index order
     //
 
-    if (file->index_flags(idx_obj->ordinal_position() - 1, key_part_no, 0) &
+    if (file->index_flags(idx_obj->ordinal_position() - 1, key_part_no, false) &
         HA_READ_ORDER)
       idx_elem->set_order(key_part->key_part_flag & HA_REVERSE_SORT
                               ? dd::Index_element::ORDER_DESC
@@ -1728,7 +1728,7 @@ static bool fill_dd_partition_from_create_info(
           partition_element *sub_elem;
           uint sub_part_num = 0;
           while ((sub_elem = sub_it++)) {
-            dd::Partition *sub_obj = part_obj->add_sub_partition();
+            dd::Partition *sub_obj = part_obj->add_subpartition();
 
             sub_obj->set_engine(tab_obj->engine());
             if (sub_elem->part_comment)
@@ -2116,6 +2116,22 @@ static bool fill_dd_table_from_create_info(
     table_options->set("encrypt_type", encrypt_type);
   }
 
+  // assign explicit encryption. explict_encryption can come from ENCRYPTION
+  // clause usage (used_fields) or from DD (create_info->explicit_encryption -
+  // this means table originally was created with explicit_encryption
+  // (ENCRYPTION clause was used with CREATE)).
+  if ((create_info->used_fields & HA_CREATE_USED_ENCRYPT) ||
+      create_info->explicit_encryption) {
+    // clear explicit encryption if SE does not support encryption
+    if (!(hton->flags & HTON_SUPPORTS_TABLE_ENCRYPTION)) {
+      table_options->set("explicit_encryption", false);
+    } else {
+      table_options->set("explicit_encryption", true);
+    }
+  } else {
+    table_options->set("explicit_encryption", false);
+  }
+
   if (create_info->was_encryption_key_id_set) {
     table_options->set("encryption_key_id", create_info->encryption_key_id);
   }
@@ -2490,7 +2506,7 @@ bool rename_foreign_keys(THD *thd MY_ATTRIBUTE((unused)),
       // Copy <fk_name_suffix><number> (e.g. "_ibfk_nnnn") from the old name.
       new_name.append(fk->name().substr(old_table_name_norm_len));
       if (check_string_char_length(to_lex_cstring(new_name.c_str()), "",
-                                   NAME_CHAR_LEN, system_charset_info, 1)) {
+                                   NAME_CHAR_LEN, system_charset_info, true)) {
         my_error(ER_TOO_LONG_IDENT, MYF(0), new_name.c_str());
         return true;
       }
