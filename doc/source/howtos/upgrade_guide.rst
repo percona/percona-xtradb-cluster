@@ -14,20 +14,48 @@ The following documents contain details about relevant changes in the 8.0 series
 of MySQL and |percona-server|. Make sure you deal with any incompatible features
 and variables mentioned in these documents when upgrading to |PXC| 8.0.
 
-* `Changed in Percona Server 8.0 <https://www.percona.com/doc/percona-server/8.0/changed_in_version.html>`_
-* `Upgrading MySQL <http://dev.mysql.com/doc/refman/8.0/en/upgrading.html>`_
-* `Upgrading from MySQL 5.7 to 8.0 <https://dev.mysql.com/doc/refman/8.0/en/upgrading-from-previous-series.html>`_
+* `Changed in Percona Server for MySQL 8.0
+  <https://www.percona.com/doc/percona-server/8.0/changed_in_version.html>`_
+* `Upgrading MySQL
+  <http://dev.mysql.com/doc/refman/8.0/en/upgrading.html>`_
+* `Upgrading from MySQL 5.7 to 8.0
+  <https://dev.mysql.com/doc/refman/8.0/en/upgrading-from-previous-series.html>`_
+
+.. contents:: In this section
+   :depth: 1
+   :local:
+   :backlinks: entry
+
+.. _upgrade-guide-changed:
 
 Important changes in |pxc| |version|
 ================================================================================
 
-.. rubric:: Traffic encryption enabled by default
+.. contents::
+   :local:
+
+.. _upgrade-guide-changed-traffic-encryption:
+
+Traffic encryption is enabled by default
+--------------------------------------------------------------------------------
 
 The :variable:`pxc_encrypt_cluster_traffic` variable, which enables traffic
-encryption, is set to ``ON`` by default in |pxc| |version|. For more
-information, see :ref:`encrypt-traffic`.
+encryption, is set to ``ON`` by default in |pxc| |version|. 
 
-.. rubric:: Rolling upgrades to |version| from versions older than 5.7 are not supported
+Unless you configure a node accordingly (each node in your cluster must use the
+same SSL certificates) or try to join a cluster running |pxc| 5.7 which
+unencrypted cluster traffic, the node will not be able to join resulting in an
+error.
+
+.. code-block:: text
+
+   ... [ERROR] ... [Galera] handshake with remote endpoint ... 
+   This error is often caused by SSL issues. ...
+
+.. seealso:: sections :ref:`encrypt-traffic`, :ref:`configure`
+
+Rolling upgrades to |version| from versions older than 5.7 are not supported
+--------------------------------------------------------------------------------
 
 Therefore, if you are running |PXC| version 5.6, shut down all
 nodes, then remove and re-create the cluster from scratch. Alternatively,
@@ -35,29 +63,59 @@ you can perform a `rolling upgrade from PXC 5.6 to 5.7
 <https://www.percona.com/doc/percona-xtradb-cluster/5.7/howtos/upgrade_guide.html>`_.
 and then follow the current procedure to upgrade from 5.7 to 8.0.
 
-.. rubric:: *Not* recommended to mix |pxc| 5.7 nodes with |pxc| 8.0 nodes
+Not recommended to mix |pxc| 5.7 nodes with |pxc| 8.0 nodes
+--------------------------------------------------------------------------------
 
-If downtime is acceptable, shut down the cluster and upgrade all nodes to |pxc|
-8.0. It is important that you make backups before attempting an upgrade.
+If downtime is acceptable
+   Shut down the cluster and upgrade all nodes to |pxc|
+   8.0. It is important that you make backups before attempting an upgrade.
 
-If downtime is not possible, the rolling upgrade is supported but ensure the
-traffic is controlled during the upgrade and writes are directed only to 5.7
-nodes until all nodes are upgraded to 8.0.
+If downtime is not possible
+   The rolling upgrade is supported but ensure the
+   traffic is controlled during the upgrade and writes are directed only to 5.7
+   nodes until all nodes are upgraded to 8.0.
 
-.. rubric:: The configuration file layout has changed in |pxc| |version|
+.. _upgrade-guide-changed-strict-mode:
+
+|strict-mode| is enabled by default
+--------------------------------------------------------------------------------
+
+|PXC| in |version| runs with |strict-mode| enabled by default. This will deny
+any unsupported operations and may halt the server if :ref:`a strict mode
+validation fails <validations>`. It is recommended to first start the node with
+the :variable:`pxc_strict_mode` variable set to ``PERMISSIVE`` in the |MySQL|
+configuration file (on Debian and Ubuntu |file.debian-conf|; on CentOS and Red
+Hat |file.centos-conf|).
+
+After you check the log for any experimental or unsupported features and fix any
+encountered incompatibilities, you can set the variable back to ``ENFORCING`` at
+run time:
+
+.. code-block:: mysql
+
+   mysql> SET pxc_strict_mode=ENFORCING;
+
+Also, switching back to ``ENFORCING`` may be done by restarting the node with
+the updated configuration file (on Debian and Ubuntu |file.debian-conf|; on
+CentOS and Red Hat |file.centos-conf|).
+
+
+The configuration file layout has changed in |pxc| |version|
+--------------------------------------------------------------------------------
 
 All configuration settings are stored in the default |MySQL| configuration file:
-:file:`my.cnf`:
 
-* Path on Debian and Ubuntu: :file:`/etc/mysql/my.cnf`
-* Path on Red Hat and CentOS: :file:`/etc/my.cnf`
+* Path on Debian and Ubuntu: |file.debian-conf|
+* Path on Red Hat and CentOS: |file.centos-conf|
 
 Before you start the upgrade, move your custom settings from
 :file:`/etc/mysql/percona-xtradb-cluster.conf.d/wsrep.cnf` (on Debian and
 Ubuntu) or from :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf` (on Red Hat
 and CentOS) to the new location accordingly.
 
-.. rubric:: ``caching_sha2_password`` Is the Default Authentication Plugin
+
+``caching_sha2_password`` is the default authentication plugin
+--------------------------------------------------------------------------------
 
 In |PXC| |version|, the default authentication plugin is
 ``caching_sha2_password``. The ProxySQL option
@@ -66,38 +124,12 @@ created using ``caching_sha2_password``. Use the ``mysql_native_password``
 authentication plugin in these cases.
 
 
-.. contents::
-   :local:
+|mysql-upgrade| is part of :term:`SST`
+--------------------------------------------------------------------------------
 
-.. _upgrading.auto:
+|mysql-upgrade| is now run automatically as part of :term:`SST`. You do not have
+to run it manually when upgrading your system from an older version.
 
-Auto-upgrade
-================================================================================
-
-|pxc| |version| introduces auto-upgrade facility that can detect when the
-upgrade is needed and then run the upgrade if necessary. To make auto-upgrade
-possible |pxc| maintains the :file:`wsrep_state.dat` state file that contains
-the data-directory compatible server version.
-
-.. code-block:: text
-
-   # *wsrep_state.dat* WSREP state file (created on initialization)
-   version=1.0
-   wsrep_schema_version=8.0.16
-
-The |wsrep_state_dat| file represents that the data directory is compatible
-with |pxc| 8.0.16. If this directory is attached to |pxc| 8.0.18 binaries, then
-the 8.0.18 binaries detect automatically that the data directory is not
-compatible and should be upgraded.
-
-Versions of |pxc| prior to the 8.0 release do not have the |wsrep_state_dat|
-file. If this file is not detected, the version of the data directory is less
-8.0 and |pxc| should be upgraded.
-
-The auto-upgrade is available for upgrading from version 5.7 to 8.0 both for the
-rolling upgrade (without downtime) and the offline upgrade (with downtime).
-
-.. As part of rolling upgrade, you need to accommodate the pxc-cluster-encrypt-traffic difference.
 
 Rolling Upgrade of a 3-Node |pxc| from 5.7 to 8.0
 ================================================================================
@@ -136,103 +168,51 @@ To upgrade the cluster, follow these steps for each node:
         $ sudo apt-get remove percona-xtrabackup* percona-xtradb-cluster*
         $ sudo apt-get install percona-xtradb-cluster
 
-#. In case of Debian or Ubuntu, the ``mysql`` service starts automatically after
-   the installation. Stop the service:
-
-   .. code-block:: bash
-
-      $ sudo service mysql stop
-
 #. Back up :file:`grastate.dat`, so that you can restore it
    if it is corrupted or zeroed out due to network issue.
 
-#. Start the node outside the cluster (in standalone mode)
-   by setting the :variable:`wsrep_provider` variable to ``none``.
-   For example:
+#. Now, start the cluster node with 8.0 packages installed, |pxc| will upgrade
+   the data directory as needed - either as part of the startup process or a
+   state transfer (IST/SST).
 
-   .. code-block:: bash
-
-      $ sudo mysqld --skip-grant-tables --user=mysql --wsrep-provider='none'
-
-   .. note::
-
-      To prevent any users from accessing this node while performing
-      work on it, you may add `--skip-networking
-      <https://dev.mysql.com/doc/refman/8.0/en/server-options.html#option_mysqld_skip-networking>`_
-      to the startup options and use a local socket to connect, or
-      alternatively you may want to divert any incoming traffic from
-      your application to other operational nodes.
-
-#. When the upgrade is done, stop the ``mysqld`` process.
-   You can either run ``sudo kill`` on the ``mysqld`` process ID,
-   or ``sudo mysqladmin shutdown`` with the MySQL root user credentials.
-
-   .. note:: On CentOS, the :file:`my.cnf` configuration file
-      is renamed to :file:`my.cnf.rpmsave`.
-      Make sure to rename it back
-      before joining the upgraded node back to the cluster.
-
-#. Now you can join the upgraded node back to the cluster.
-
-   In most cases, starting the ``mysql`` service
-   should run the node with your previous configuration::
+   In most cases, starting the ``mysql`` service should run the node with your
+   previous configuration. For more information, see :ref:`add-node`.
 
    .. code-block:: bash
 
       $ sudo service mysql start
 
-   For more information, see :ref:`add-node`.
+   .. note::
 
-   .. note:: As of version |version|,
-      |PXC| runs with :ref:`pxc-strict-mode` enabled by default.
-      This will deny any unsupported operations and may halt the server
-      upon encountering a failed validation.
+      On CentOS, the |file.centos-conf| configuration file is renamed to
+      :file:`my.cnf.rpmsave`.  Make sure to rename it back before
+      joining the upgraded node back to the cluster.
 
-      If you are not sure, it is recommended to first start the node
-      with the :variable:`pxc_strict_mode` variable set to ``PERMISSIVE``
-      in the in the |MySQL| configuration file, :file:`my.cnf`.
+   |strict-mode| is enabled by default, which may result in denying any
+   unsupported operations and may halt the server. For more information, see
+   :ref:`upgrade-guide-changed-strict-mode`.
 
-      After you check the log for any experimental or unsupported features
-      and fix any encountered incompatibilities,
-      you can set the variable back to ``ENFORCING`` at run time::
-
-       mysql> SET pxc_strict_mode=ENFORCING;
-
-      Also switch back to ``ENFORCING`` may be done by restarting the node
-      with updated :file:`my.cnf`.
-
+   |opt.encrypt-cluster-traffic| is enabled by default. You need to configure
+   each node accordingly and avoid joining a cluster with unencrypted cluster
+   traffic: all nodes in your cluster must have traffic encryption enabled. For
+   more information, see :ref:`upgrade-guide-changed-traffic-encryption`.
+      
 #. Repeat this procedure for the next node in the cluster
    until you upgrade all nodes.
-
-It is important that on rejoining, the node should synchronize using
-:term:`IST`. For this, it is best not to leave the cluster node being
-upgraded offline for an extended period. More on this below.
-
-When performing any upgrade (major or minor), :term:`SST` could
-be initiated by the joiner node after the upgrade if the server
-was offline for some time. After :term:`SST` completes, the data
-directory structure needs to be upgraded (using mysql_upgrade)
-once more time to ensure compatibility with the newer version
-of binaries.
-
-.. note::
-
-   In case of :term:`SST` synchronization, the error log contains
-   statements like
-
-   .. code-block:: text
-
-      Check if state gap can be serviced using IST
-      ... State gap can't be serviced using IST. Switching to SST
-      
-   instead of "Receiving IST: ..." lines appropriate to :term:`IST`
-   synchronization.
 
 Major Upgrade Scenarios
 ================================================================================
 
 Upgrading |pxc| from 5.7 to 8.0 may have slightly different strategies depending
 on the configuration and workload on your |pxc| cluster.
+
+Note that the new default value of |opt.encrypt-cluster-traffic| (set to *ON*
+versus *OFF* in |pxc| 5.7) requires additional care. You cannot join a 5.7 node
+to a |pxc| 8.0 cluster unless the node has traffic encryption enabled as the
+cluster may not have some nodes with traffic encryption enabled and some nodes
+with traffic encryption disabled.
+
+.. seealso:: :ref:`upgrade-guide-changed-traffic-encryption`
 
 .. contents::
    :local:
@@ -326,13 +306,12 @@ The upgrade prosess is similar to that described in
 cluster state keeps changing while each node is taken down and upgraded,
 :term:`IST` or :term:`SST` is triggered when rejoining the node that you
 upgrading. In |version|, |pxc| clears the configuration of each slave node (via
-RESET SLAVE).
+`RESET SLAVE ALL <https://dev.mysql.com/doc/refman/8.0/en/reset-slave.html>`_).
 
 .. important::
 
    It is important that the joining node have enough slave threads to catch up
    IST write-sets and cluster write-sets.
-
 
 Scenario: Adding 8.0 node to a 5.7 cluster
 --------------------------------------------------------------------------------
@@ -367,7 +346,6 @@ First, upgrade |pxc| from 5.6 to the latest version of |pxc| 5.7. Then proceed
 with the upgrade using the procedure described in
 :ref:`upgrading-rolling-no-active-read-only-parallel-workload`.
 
-
 Minor upgrade
 ================================================================================
 
@@ -387,102 +365,34 @@ To upgrade the cluster, follow these steps for each node:
 #. Back up :file:`grastate.dat`, so that you can restore it
    if it is corrupted or zeroed out due to network issue.
 
-#. Start the node outside the cluster (in standalone mode)
-   by setting the :variable:`wsrep_provider` variable to ``none``.
-   For example:
+#. Now, start the cluster node with 8.0 packages installed, |pxc| will upgrade
+   the data directory as needed - either as part of the startup process or a
+   state transfer (IST/SST).
 
-   .. code-block:: bash
-
-      sudo mysqld --skip-grant-tables --user=mysql --wsrep-provider='none'
-
-   .. note::
-
-      To prevent any users from accessing this node while performing
-      work on it, you may add `--skip-networking <https://dev.mysql.com/doc/refman/8.0/en/server-options.html#option_mysqld_skip-networking>`_
-      to the startup options and use a local socket to connect, or
-      alternatively you may want to divert any incoming traffic from your
-      application to other operational nodes.
-
-#. When the upgrade is done, stop the ``mysqld`` process.
-   You can either run ``sudo kill`` on the ``mysqld`` process ID,
-   or ``sudo mysqladmin shutdown`` with the MySQL root user credentials.
-
-   .. note:: On CentOS, the :file:`my.cnf` configuration file
-      is renamed to :file:`my.cnf.rpmsave`.
-      Make sure to rename it back
-      before joining the upgraded node back to the cluster.
-
-#. Now you can join the upgraded node back to the cluster.
-
-   In most cases, starting the ``mysql`` service
-   should run the node with your previous configuration::
+   In most cases, starting the ``mysql`` service should run the node with your
+   previous configuration. For more information, see :ref:`add-node`.
 
     $ sudo service mysql start
 
-   For more information, see :ref:`add-node`.
+   .. note::
 
-   .. note:: 
+      On CentOS, the |file.centos-conf| configuration file is renamed to
+      :file:`my.cnf.rpmsave`.  Make sure to rename it back before
+      joining the upgraded node back to the cluster.
 
-      |PXC| runs with :ref:`pxc-strict-mode` enabled by default.
-      This will deny any unsupported operations and may halt the server
-      upon encountering a failed validation.
+   |strict-mode| is enabled by default, which may result in denying any
+   unsupported operations and may halt the server. For more information, see
+   :ref:`upgrade-guide-changed-strict-mode`.
 
-      If you are not sure, it is recommended to first start the node
-      with the :variable:`pxc_strict_mode` variable set to ``PERMISSIVE``
-      in the in the |MySQL| configuration file, :file:`my.cnf`.
-
-      After you check the log for any experimental or unsupported features
-      and fix any encountered incompatibilities,
-      you can set the variable back to ``ENFORCING`` at run time::
-
-       mysql> SET pxc_strict_mode=ENFORCING;
-
-      Also switch back to ``ENFORCING`` may be done by restarting the node
-      with updated :file:`my.cnf`.
-
+   |opt.encrypt-cluster-traffic| is enabled by default. You need to configure
+   each node accordingly and avoid joining a cluster with unencrypted cluster
+   traffic. For more information, see
+   :ref:`upgrade-guide-changed-traffic-encryption`.
+   
 #. Repeat this procedure for the next node in the cluster
    until you upgrade all nodes.
 
-Dealing with IST/SST synchronization while upgrading
-----------------------------------------------------
-
-It is important that on rejoining, the node should synchronize using
-:term:`IST`. For this, it is best not to leave the cluster node being
-upgraded offline for an extended period. More on this below.
-
-When performing any upgrade (major or minor), :term:`SST` could
-be initiated by the joiner node after the upgrade if the server
-was offline for some time. After :term:`SST` completes, the data
-directory structure needs to be upgraded (using mysql_upgrade)
-once more time to ensure compatibility with the newer version
-of binaries.
-
-.. note::
-
-   In case of :term:`SST` synchronization, the error log contains
-   statements like "Check if state gap can be serviced using IST
-   ... State gap can't be serviced using IST. Switching to SST"
-   instead of "Receiving IST: ..." lines appropriate to :term:`IST`
-   synchronization.
-
-The following additional steps should be made to upgrade the data
-directory structure after :term:`SST` (after the normal major or
-minor upgrade steps):
-
-1. Shutdown the node that rejoined the cluster using :term:`SST`:
-
-   .. code-block:: bash
-
-      $ sudo service mysql stop
-
-#. Restart the node in standalone mode by setting the
-   :variable:`wsrep_provider` variable to ``none``, e.g.:
-
-   .. code-block:: bash
-
-      sudo mysqld --skip-grant-tables --user=mysql --wsrep-provider='none'
-
-#. Restart the node in cluster mode (e.g by executing ``sudo service mysql
-   start`` and make sure the cluster joins back using :term:`IST`.
-
 .. include:: ../.res/replace.txt
+.. include:: ../.res/replace.opt.txt
+.. include:: ../.res/replace.ref.txt
+.. include:: ../.res/replace.program.txt

@@ -16,3 +16,6 @@
 .. |opt.rocksdb-update-cf-options| replace:: :variable:`rocksdb_update_cf_options`
 .. |opt.update-cf-options|         replace:: :variable:`rocksdb_update_cf_options`
 .. |opt.ucfo|                      replace:: :variable:`rocksdb_update_cf_options`
+
+.. |opt.encrypt-cluster-traffic| replace:: :variable:`pxc-encrypt-cluster-traffic`
+

@@ -27,4 +27,5 @@
 .. |version.previous| replace:: 5.7
 
 .. |data-at-rest| replace:: *data at rest*
-.. |wsrep_state_dat| replace:: :file:`wsrep_state.dat`
+
+

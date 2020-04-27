@@ -1,0 +1,2 @@
+
+.. |strict-mode| replace:: :ref:`pxc-strict-mode`
