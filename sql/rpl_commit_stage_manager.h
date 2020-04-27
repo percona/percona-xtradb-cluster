@@ -57,7 +57,11 @@ class Commit_stage_manager {
       @retval true The queue was empty before this operation.
       @retval false The queue was non-empty before this operation.
     */
+#ifdef WITH_WSREP
+    bool append(THD *first, bool interim_commit);
+#else
     bool append(THD *first);
+#endif
 
     /**
       Fetch the entire queue for a stage. It is a wrapper over

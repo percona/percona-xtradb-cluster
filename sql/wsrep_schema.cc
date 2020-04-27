@@ -1020,9 +1020,9 @@ int Wsrep_schema::replay_transaction(
     Wsrep_schema_impl::store(frag_table, 2, i->get());
     Wsrep_schema_impl::make_key(frag_table, key, &key_map, 3);
 
-    int error =
+    const int error2 =
         Wsrep_schema_impl::init_for_index_scan(frag_table, key, key_map);
-    if (error) {
+    if (error2) {
       WSREP_WARN("Failed to init streaming log table for index scan: %d",
                  error);
       Wsrep_schema_impl::end_index_scan(frag_table);
@@ -1038,7 +1038,7 @@ int Wsrep_schema::replay_transaction(
     frag_table->field[4]->val_str(&buf);
 
     {
-      Wsrep_schema_impl::thd_context_switch thd_context_switch(&thd, orig_thd);
+      Wsrep_schema_impl::thd_context_switch thd_context_switch2(&thd, orig_thd);
 
       ret = wsrep_apply_events(orig_thd, rli, buf.c_ptr_quick(), buf.length());
       if (ret) {

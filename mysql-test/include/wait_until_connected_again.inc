@@ -6,20 +6,15 @@
 #
 # $explicit_default_counter - can be set before calling the script,
 #                             reset only at the end of the test, overrides $wait_counter
-<<<<<<< HEAD
+#
+# $add_wait_counter - can be set before calling the script,
+#                     additional time count to wait during valgrind run.
 
 #
 # We require two consequtive connection successes in order to
 # work around a race condition on Galera startup where the server
 # can temporarily accept queries before starting to reject them again
 #
-||||||| merged common ancestors
-
-=======
-#
-# $add_wait_counter - can be set before calling the script,
-#                     additional time count to wait during valgrind run.
->>>>>>> Percona-Server-8.0.19-10
 
 --disable_result_log
 --disable_query_log

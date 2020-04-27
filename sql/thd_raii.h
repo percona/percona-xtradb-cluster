@@ -158,7 +158,6 @@ class Implicit_substatement_state_guard {
 
 class Disable_binlog_guard {
  public:
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* wsrep is turned off along with binlog as part of mysql-wsrep/issues/329
   meant for tracking and handling leaking galera open transaction.
@@ -170,7 +169,7 @@ class Disable_binlog_guard {
   For now disabling it in 8.x but if in future this fix is re-enabled
   then ensure that PXC-2639 (9721695) is backported too. Will keep
   all infrastructure ready for easy fix in future. */
-  Disable_binlog_guard(THD *thd, bool turn_off_wsrep = false)
+  explicit Disable_binlog_guard(THD *thd, bool turn_off_wsrep = false)
       : m_thd(thd),
         m_wsrep_on(thd->variables.wsrep_on),
         m_binlog_disabled(thd->variables.option_bits & OPTION_BIN_LOG) {
@@ -180,12 +179,7 @@ class Disable_binlog_guard {
     }
   }
 #else
-  Disable_binlog_guard(THD *thd)
-||||||| merged common ancestors
-  Disable_binlog_guard(THD *thd)
-=======
   explicit Disable_binlog_guard(THD *thd)
->>>>>>> Percona-Server-8.0.19-10
       : m_thd(thd),
         m_binlog_disabled(thd->variables.option_bits & OPTION_BIN_LOG) {
     thd->variables.option_bits &= ~OPTION_BIN_LOG;

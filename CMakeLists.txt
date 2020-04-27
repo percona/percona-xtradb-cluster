@@ -1510,14 +1510,9 @@ IF(NOT INSTALL_LAYOUT MATCHES "RPM")
     ${CMAKE_BINARY_DIR}/Docs/INFO_BIN
     DESTINATION ${INSTALL_DOCDIR} COMPONENT Info
     )
-<<<<<<< HEAD
   INSTALL(FILES
     Docs/README-wsrep
     DESTINATION ${INSTALL_DOCREADMEDIR} COMPONENT Readme)
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> Percona-Server-8.0.19-10
 
   # MYSQL_DOCS_LOCATON is used in "make dist",
   # points to the documentation directory

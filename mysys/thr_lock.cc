@@ -811,18 +811,12 @@ enum enum_thr_lock_result thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
     wait_queue = &lock->write_wait;
   }
   /* Can't get lock yet;  Wait for it */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (wsrep_on(data->owner->mysql_thd) && wsrep_lock_inserted) {
     return (wait_for_lock(wait_queue, data, owner, true, lock_wait_timeout));
   }
 #endif /* WITH_WSREP */
-  result = wait_for_lock(wait_queue, data, owner, 0, lock_wait_timeout);
-||||||| merged common ancestors
-  result = wait_for_lock(wait_queue, data, owner, 0, lock_wait_timeout);
-=======
   result = wait_for_lock(wait_queue, data, owner, false, lock_wait_timeout);
->>>>>>> Percona-Server-8.0.19-10
   MYSQL_END_TABLE_LOCK_WAIT(locker);
   return result;
 end:

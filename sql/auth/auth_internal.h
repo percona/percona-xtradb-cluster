@@ -40,8 +40,8 @@
 #include "violite.h" /* SSL_type */
 
 #ifdef WITH_WSREP
-#include "sql/sql_parse.h"  // to expose WSREP_MYSQL_DB
-#endif                      /* WITH_WSREP */
+#include "sql/wsrep_mysqld.h"  // to expose WSREP_MYSQL_DB
+#endif                         /* WITH_WSREP */
 
 class ACL_USER;
 class ACL_PROXY_USER;

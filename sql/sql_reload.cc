@@ -222,21 +222,15 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
         UNLOCK TABLES
       */
       tmp_write_to_binlog = 0;
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
       if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
-        return 1;  // Killed
+        return true;  // Killed
 #else
-      if (thd->global_read_lock.lock_global_read_lock(thd)) return 1;  // Killed
-#endif /* WITH_WSREP */
-
-||||||| merged common ancestors
-      if (thd->global_read_lock.lock_global_read_lock(thd)) return 1;  // Killed
-=======
       if (thd->global_read_lock.lock_global_read_lock(thd))
         return true;  // Killed
->>>>>>> Percona-Server-8.0.19-10
+#endif /* WITH_WSREP */
+
       if (close_cached_tables(thd, tables,
                               ((options & REFRESH_FAST) ? false : true),
                               thd->variables.lock_wait_timeout)) {
@@ -256,15 +250,9 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
         if (own_lock) thd->global_read_lock.unlock_global_read_lock(thd);
 #else
         thd->global_read_lock.unlock_global_read_lock(thd);
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
 
-        return 1;
-||||||| merged common ancestors
-        return 1;
-=======
         return true;
->>>>>>> Percona-Server-8.0.19-10
       }
 
 #ifdef WITH_WSREP

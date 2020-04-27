@@ -27,19 +27,29 @@
 #include "sql/rpl_commit_stage_manager.h"
 #include "sql/rpl_rli_pdb.h"  // Slave_worker                    // Slave_worker
 #include "sql/rpl_slave_commit_order_manager.h"  // Commit_order_manager
+#include "sql/wsrep_applier.h"
+#include "sql/wsrep_trans_observer.h"
 
 class Slave_worker;
 class Commit_order_manager;
 
 #define YESNO(X) ((X) ? "yes" : "no")
 
+#ifdef WITH_WSREP
+bool Commit_stage_manager::Mutex_queue::append(THD *first,
+                                               bool interim_commit) {
+#else
 bool Commit_stage_manager::Mutex_queue::append(THD *first) {
+#endif /* WITH_WSREP */
   DBUG_TRACE;
   DBUG_PRINT("enter", ("first: 0x%llx", (ulonglong)first));
   DBUG_PRINT("info",
              ("m_first: 0x%llx, &m_first: 0x%llx, m_last: 0x%llx",
               (ulonglong)m_first, (ulonglong)&m_first, (ulonglong)m_last));
   int32 count = 1;
+#ifdef WITH_WSREP
+  THD *thd_to_append = first;
+#endif /* WITH_WSREP */
   bool empty = (m_first == nullptr);
 
   *m_last = first;
@@ -64,6 +74,55 @@ bool Commit_stage_manager::Mutex_queue::append(THD *first) {
               (ulonglong)m_first, (ulonglong)&m_first, (ulonglong)m_last));
   DBUG_ASSERT(m_first || m_last == &m_first);
   DBUG_PRINT("return", ("empty: %s", YESNO(empty)));
+#ifdef WITH_WSREP
+  /* What is interim_commit ?
+  - Galera/PXC enforces ordering based on replication order (order in which
+    transaction write-sets are replicated to group channel).
+  - This is enforced using CommitMonitor.
+  - CommitMonitor is grabbed during transaction prepare stage and released
+    once transaction is committed. This enforces that transaction are committed
+    in order of their global_seqno_.
+  - Interim commit optimization help us to release commit monitor before
+    real-commit happens. This is possible only when MySQL enforces
+    binlog-order-commits. With binlog-order-commits MySQL ensures that
+    the transaction goes through FLUSH->SYNC->COMMIT stages only in
+    said order and so adding the transaction thread to FLUSH STAGE
+    ensures commit ordering will be enforced there-by allowing us to
+    release commit ordering monitor earlier.
+  - This optimization is not enabled if MySQL has disabled binlog-order-commits.
+    (In this case we rely on PXC ordering).
+
+  Append to FLUSH QUEUE and interim commit should be an atomic action for reason
+  mentioned below.
+
+  Group Commit has leader and follower concept.
+  Follower add themselves to the queue and leader is responsible for completing
+  action on behalf of follower.
+  Say a use-case where-in follower is appended to queue but not yet
+  interim_committed and leader get the slot to execute the action.
+
+  It is quite possible that leader may end-up running post_commit action
+  even before follower execute interim_commit. This could be allowed but what if
+  leader is schedule to run post_commit and in meantime follower execute the
+  interim_commit where-in it will create a redundant action execution.
+  (This is redundant action is error in normal flow and not feasible to allow
+   exception in such case).
+
+  In order to rule out this race we ensure that FLUSH QUEUE addition and interim
+  commit are executed as atomic action. */
+  if (WSREP(thd_to_append) && interim_commit &&
+      thd_to_append->run_wsrep_ordered_commit) {
+    wsrep_ordered_commit(thd_to_append, true, wsrep_apply_error());
+
+    DBUG_EXECUTE_IF("sync.wsrep_ordered_commit", {
+      const char act[] =
+          "now "
+          "SIGNAL sync.wsrep_ordered_commit_reached "
+          "WAIT_FOR signal.wsrep_ordered_commit_continue";
+      DBUG_ASSERT(!debug_sync_set_action(thd_to_append, STRING_WITH_LEN(act)));
+    };);
+  }
+#endif /* WITH_WSREP */
   return empty;
 }
 
@@ -152,7 +211,11 @@ bool Commit_stage_manager::enroll_for(StageID stage, THD *thd,
              ("Enqueue 0x%llx to queue for stage %d", (ulonglong)thd, stage));
 
   lock_queue(stage);
+#ifdef WITH_WSREP
+  bool leader = m_queue[stage].append(thd, (stage == BINLOG_FLUSH_STAGE));
+#else
   bool leader = m_queue[stage].append(thd);
+#endif /* WITH_WSREP */
 
   /*
    if its FLUSH stage queue (BINLOG_FLUSH_STAGE or COMMIT_ORDER_FLUSH_STAGE)

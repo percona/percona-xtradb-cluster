@@ -270,7 +270,11 @@ INSERT INTO global_suppressions VALUES
  */
  ("The SSL library function CRYPTO_set_mem_functions failed"),
 
-<<<<<<< HEAD
+ /*
+   binlog-less slave (WL#7846)
+ */
+ ("The transaction owned GTID is already in the gtid_executed table"),
+
  /*
    Galera suppressions
  */
@@ -342,14 +346,6 @@ INSERT INTO global_suppressions VALUES
 -- PXC enabled log_verbosity=3 for mtr run so PXC needs it.
  ("Failed to set O_DIRECT "),
 
-||||||| merged common ancestors
-=======
- /*
-   binlog-less slave (WL#7846)
- */
- ("The transaction owned GTID is already in the gtid_executed table"),
-
->>>>>>> Percona-Server-8.0.19-10
  ("THE_LAST_SUPPRESSION");
 
 

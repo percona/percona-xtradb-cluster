@@ -39,48 +39,6 @@ ELSE()
   SET (PIDOF "pgrep -d' ' -f")
 ENDIF()
 
-<<<<<<< HEAD
-FOREACH(script
-    mysql.server
-    mysqld_multi.server
-    mysql-log-rotate
-    )
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${script}.sh
-    ${CMAKE_CURRENT_BINARY_DIR}/${script} @ONLY )
-
-  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${script}
-    DESTINATION ${INSTALL_SUPPORTFILESDIR} COMPONENT Server_Scripts
-    PERMISSIONS
-    OWNER_READ OWNER_WRITE OWNER_EXECUTE
-    GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-    )
-ENDFOREACH()
-
-  #CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/wsrep_notify.sh 
-  #               ${CMAKE_CURRENT_BINARY_DIR}/wsrep_notify @ONLY)
-  #INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/wsrep_notify
-  #  DESTINATION ${inst_location} COMPONENT SupportFiles
-  #  PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ 
-  #  GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-  #CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/wsrep.cnf.sh 
-  #               ${CMAKE_CURRENT_BINARY_DIR}/wsrep.cnf @ONLY)
-||||||| merged common ancestors
-FOREACH(script
-    mysql.server
-    mysqld_multi.server
-    mysql-log-rotate
-    )
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${script}.sh
-    ${CMAKE_CURRENT_BINARY_DIR}/${script} @ONLY )
-
-  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${script}
-    DESTINATION ${INSTALL_SUPPORTFILESDIR} COMPONENT Server_Scripts
-    PERMISSIONS
-    OWNER_READ OWNER_WRITE OWNER_EXECUTE
-    GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-    )
-ENDFOREACH()
-=======
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/mysql.server.sh
   ${CMAKE_CURRENT_BINARY_DIR}/mysql.server @ONLY)
 
@@ -104,4 +62,3 @@ INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/mysql-log-rotate
   OWNER_READ OWNER_WRITE
   GROUP_READ WORLD_READ
   )
->>>>>>> Percona-Server-8.0.19-10

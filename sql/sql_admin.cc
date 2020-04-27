@@ -2258,14 +2258,8 @@ bool Sql_cmd_show_grants::execute(THD *thd) {
       const List_of_auth_id_refs *active_list =
           thd->security_context()->get_active_roles();
       return mysql_show_grants(thd, &current_user, *active_list,
-<<<<<<< HEAD
-                               show_mandatory_roles, effective_grants);
-||||||| merged common ancestors
-                                    show_mandatory_roles, effective_grants);
-=======
                                show_mandatory_roles, have_using_clause,
                                effective_grants);
->>>>>>> Percona-Server-8.0.19-10
     }
   } else if (strcmp(thd->security_context()->priv_user().str,
                     for_user->user.str) != 0) {
@@ -2288,16 +2282,8 @@ bool Sql_cmd_show_grants::execute(THD *thd) {
 
   LEX_USER *tmp_user = const_cast<LEX_USER *>(for_user);
   tmp_user = get_current_user(thd, tmp_user);
-<<<<<<< HEAD
-  return mysql_show_grants(thd, tmp_user, authid_list, show_mandatory_roles,
-                           effective_grants);
-||||||| merged common ancestors
-  return mysql_show_grants(thd, tmp_user, authid_list,
-                                show_mandatory_roles, effective_grants);
-=======
   return mysql_show_grants(thd, tmp_user, authid_list, show_mandatory_roles,
                            have_using_clause, effective_grants);
->>>>>>> Percona-Server-8.0.19-10
 }
 
 bool Sql_cmd_show::execute(THD *thd) {

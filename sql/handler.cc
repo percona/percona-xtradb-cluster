@@ -1643,14 +1643,8 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
   }
 #else
   THD_STAGE_INFO(thd, stage_waiting_for_handler_commit);
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
 
-  bool need_clear_owned_gtid = false;
-||||||| merged common ancestors
-  bool need_clear_owned_gtid = false;
-=======
->>>>>>> Percona-Server-8.0.19-10
   bool run_slave_post_commit = false;
   bool need_clear_owned_gtid = false;
   /*
@@ -2562,8 +2556,6 @@ int ha_prepare_low(THD *thd, bool all) {
   SAVEPOINT is *not* transaction-initiating SQL-statement
 */
 int ha_savepoint(THD *thd, SAVEPOINT *sv) {
-
-
 #if 0
 /* commenting it out for now.
    it was not present in 5.7. there is no reason explained why
@@ -3763,9 +3755,9 @@ bool handler::is_using_full_key(key_part_map keypart_map,
          (keypart_map == ((key_part_map(1) << actual_key_parts) - 1));
 }
 
-bool handler::is_using_full_unique_key(uint index, key_part_map keypart_map,
-                                       enum ha_rkey_function find_flag) const
-    noexcept {
+bool handler::is_using_full_unique_key(
+    uint index, key_part_map keypart_map,
+    enum ha_rkey_function find_flag) const noexcept {
   return (
       is_using_full_key(keypart_map, table->key_info[index].actual_key_parts) &&
       find_flag == HA_READ_KEY_EXACT &&
@@ -8825,9 +8817,8 @@ static void copy_blob_data(const TABLE *table, const MY_BITMAP *const fields,
   }
 }
 
-bool handler::is_using_prohibited_gap_locks(TABLE *table,
-                                            bool using_full_primary_key) const
-    noexcept {
+bool handler::is_using_prohibited_gap_locks(
+    TABLE *table, bool using_full_primary_key) const noexcept {
   const THD *thd = table->in_use;
   const thr_lock_type lock_type = table->reginfo.lock_type;
 

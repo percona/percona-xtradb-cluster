@@ -4941,14 +4941,8 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
         rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER,
                     ER_THD(thd, ER_ERROR_ON_MASTER), expected_error,
                     thd->query().str);
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-        thd->is_slave_error = 1;
-||||||| merged common ancestors
-        thd->is_slave_error = 1;
-=======
         thd->is_slave_error = true;
->>>>>>> Percona-Server-8.0.19-10
       }
       goto end;
     }
@@ -5039,14 +5033,8 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
                  : query_arg));
 #else
             actual_error, print_slave_db_safe(db), query_arg);
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-        thd->is_slave_error = 1;
-||||||| merged common ancestors
-        thd->is_slave_error = 1;
-=======
         thd->is_slave_error = true;
->>>>>>> Percona-Server-8.0.19-10
       } else {
         rli->report(INFORMATION_LEVEL, actual_error,
                     "The actual error and expected error on slave are"
@@ -5104,8 +5092,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
                     print_slave_db_safe(thd->db().str), query_arg);
 #endif /* WITH_WSREP */
       }
-<<<<<<< HEAD
-      thd->is_slave_error = 1;
+      thd->is_slave_error = true;
 
 #ifdef WITH_WSREP
       /* If DDL evaluate if user has configured to ignore certain errors. */
@@ -5115,11 +5102,6 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
         thd->wsrep_has_ignored_error = true;
       }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-      thd->is_slave_error = 1;
-=======
-      thd->is_slave_error = true;
->>>>>>> Percona-Server-8.0.19-10
     }
 
     /*

@@ -313,13 +313,6 @@ MACRO (MYSQL_CHECK_SSL)
       ENDIF()
       MESSAGE(STATUS "SSL_LIBRARIES = ${SSL_LIBRARIES}")
       INCLUDE_DIRECTORIES(SYSTEM ${OPENSSL_INCLUDE_DIR})
-<<<<<<< HEAD
-      SET(SSL_INTERNAL_INCLUDE_DIRS "")
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-      SET(SSL_INTERNAL_INCLUDE_DIRS "")
-=======
->>>>>>> Percona-Server-8.0.19-10
       INCLUDE(CMakePushCheckState)
       cmake_push_check_state()
       SET(CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIR})

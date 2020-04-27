@@ -105,7 +105,6 @@
 #include "template_utils.h"
 #include "thr_mutex.h"
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "sql/log.h"
 #include "wsrep_mysqld.h"
@@ -113,11 +112,8 @@
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
 class Parse_tree_root;
 
->>>>>>> Percona-Server-8.0.19-10
 using std::max;
 using std::min;
 using std::unique_ptr;

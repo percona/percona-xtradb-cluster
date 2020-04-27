@@ -3008,7 +3008,6 @@ class THD : public MDL_context_owner,
     rollback. */
   bool wsrep_force_savept_rollback;
 
-
   /*
     Transaction id:
     * m_next_wsrep_trx_id is assigned on the first query after

@@ -4386,19 +4386,12 @@ int mysql_execute_command(THD *thd, bool first_level) {
           (check_and_convert_db_name(&lex->name, false) !=
            Ident_name_check::OK))
         break;
-<<<<<<< HEAD
-      if (check_access(thd, CREATE_ACL, lex->name.str, NULL, NULL, 1, 0)) break;
+      if (check_access(thd, CREATE_ACL, lex->name.str, NULL, NULL, true, false))
+        break;
 
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
 #endif /* WITH_WSREP */
-
-||||||| merged common ancestors
-      if (check_access(thd, CREATE_ACL, lex->name.str, NULL, NULL, 1, 0)) break;
-=======
-      if (check_access(thd, CREATE_ACL, lex->name.str, NULL, NULL, true, false))
-        break;
->>>>>>> Percona-Server-8.0.19-10
       /*
         As mysql_create_db() may modify HA_CREATE_INFO structure passed to
         it, we need to use a copy of LEX::create_info to make execution
@@ -4413,38 +4406,22 @@ int mysql_execute_command(THD *thd, bool first_level) {
     case SQLCOM_DROP_DB: {
       if (check_and_convert_db_name(&lex->name, false) != Ident_name_check::OK)
         break;
-<<<<<<< HEAD
-      if (check_access(thd, DROP_ACL, lex->name.str, NULL, NULL, 1, 0)) break;
-
+      if (check_access(thd, DROP_ACL, lex->name.str, NULL, NULL, true, false))
+        break;
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
 #endif /* WITH_WSREP */
-
-||||||| merged common ancestors
-      if (check_access(thd, DROP_ACL, lex->name.str, NULL, NULL, 1, 0)) break;
-=======
-      if (check_access(thd, DROP_ACL, lex->name.str, NULL, NULL, true, false))
-        break;
->>>>>>> Percona-Server-8.0.19-10
       res = mysql_rm_db(thd, to_lex_cstring(lex->name), lex->drop_if_exists);
       break;
     }
     case SQLCOM_ALTER_DB: {
       if (check_and_convert_db_name(&lex->name, false) != Ident_name_check::OK)
         break;
-<<<<<<< HEAD
-      if (check_access(thd, ALTER_ACL, lex->name.str, NULL, NULL, 1, 0)) break;
-
+      if (check_access(thd, ALTER_ACL, lex->name.str, NULL, NULL, true, false))
+        break;
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
 #endif /* WITH_WSREP */
-
-||||||| merged common ancestors
-      if (check_access(thd, ALTER_ACL, lex->name.str, NULL, NULL, 1, 0)) break;
-=======
-      if (check_access(thd, ALTER_ACL, lex->name.str, NULL, NULL, true, false))
-        break;
->>>>>>> Percona-Server-8.0.19-10
       /*
         As mysql_alter_db() may modify HA_CREATE_INFO structure passed to
         it, we need to use a copy of LEX::create_info to make execution
@@ -4531,19 +4508,11 @@ int mysql_execute_command(THD *thd, bool first_level) {
     }
     case SQLCOM_CREATE_FUNCTION:  // UDF function
     {
-<<<<<<< HEAD
-      if (check_access(thd, INSERT_ACL, "mysql", NULL, NULL, 1, 0)) break;
-
+      if (check_access(thd, INSERT_ACL, "mysql", NULL, NULL, true, false))
+        break;
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
-
-||||||| merged common ancestors
-      if (check_access(thd, INSERT_ACL, "mysql", NULL, NULL, 1, 0)) break;
-=======
-      if (check_access(thd, INSERT_ACL, "mysql", NULL, NULL, true, false))
-        break;
->>>>>>> Percona-Server-8.0.19-10
       if (!(res = mysql_create_function(thd, &lex->udf))) my_ok(thd);
       break;
     }
@@ -5486,19 +5455,19 @@ int mysql_execute_command(THD *thd, bool first_level) {
            we need to know the current user to be able to determine REPLACE
            clause validity (REPLACE allowed only for the current user's password
            change). However ALTER USER is replicated as TOI, so before local
-           validation/changes. On the slave side, executing thread is wsrep applier
-           thread and we have no chance to determine if it is OK or not.
+           validation/changes. On the slave side, executing thread is wsrep
+           applier thread and we have no chance to determine if it is OK or not.
            Here we do pre-validation for above condition on master size.
-           Other checks that are not dependent on current user context will be made
-           after replication, on slave node */
+           Other checks that are not dependent on current user context will be
+           made made after replication, on slave node */
         if (WSREP(thd) && thd->system_thread == NON_SYSTEM_THREAD) {
-          Security_context *sctx = thd->security_context();
-          DBUG_ASSERT(sctx);
-          DBUG_ASSERT(sctx->user().str);
+          Security_context *sctx2 = thd->security_context();
+          DBUG_ASSERT(sctx2);
+          DBUG_ASSERT(sctx2->user().str);
           if (user->uses_replace_clause) {
             // If trying to set password for other user
-            if (strcmp(sctx->user().str, user->user.str) ||
-                my_strcasecmp(system_charset_info, sctx->priv_host().str,
+            if (strcmp(sctx2->user().str, user->user.str) ||
+                my_strcasecmp(system_charset_info, sctx2->priv_host().str,
                               user->host.str)) {
               my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
               goto error;
@@ -7537,27 +7506,19 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query) {
       slayage if both are string-equal.
     */
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-    if ((sctx->check_access(SUPER_ACL) ||
-         sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN")).first ||
-         sctx->user_matches(tmp->security_context())) &&
-        !wsrep_thd_is_BF(tmp, true) && !tmp->wsrep_applier) {
-#else
-    if (sctx->check_access(SUPER_ACL) ||
-        sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN")).first ||
-||||||| merged common ancestors
-    if (sctx->check_access(SUPER_ACL) ||
-        sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN")).first ||
-=======
     const bool is_utility_connection = acl_is_utility_user(
         tmp->m_security_ctx->user().str, tmp->m_security_ctx->host().str,
         tmp->m_security_ctx->ip().str);
-
+#ifdef WITH_WSREP
+    if ((((sctx->check_access(SUPER_ACL) ||
+           sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN")).first) &&
+          !is_utility_connection) ||
+         sctx->user_matches(tmp->security_context())) &&
+        !wsrep_thd_is_BF(tmp, true) && !tmp->wsrep_applier) {
+#else
     if (((sctx->check_access(SUPER_ACL) ||
           sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN")).first) &&
          !is_utility_connection) ||
->>>>>>> Percona-Server-8.0.19-10
         sctx->user_matches(tmp->security_context())) {
 #endif /* WITH_WSREP */
       /*
@@ -7685,7 +7646,7 @@ static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
         thd->wsrep_retry_counter = 0;  //  reset
       }
     } else {
-      set_if_smaller(thd->wsrep_retry_counter, 0);  // reset; eventually ok
+      thd->wsrep_retry_counter = 0;
     }
   } while (retry_autocommit);
 

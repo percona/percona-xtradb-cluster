@@ -457,7 +457,6 @@ bool Rpl_filter::db_ok(const char *db, bool need_increase_counter) {
   if (do_db.is_empty() && ignore_db.is_empty())
     return true;  // Ok to replicate if the user puts no constraints
 
-<<<<<<< HEAD
     /*
       Previous behaviour "if the user has specified restrictions on which
       databases to replicate and db was not selected, do not replicate" has
@@ -467,29 +466,10 @@ bool Rpl_filter::db_ok(const char *db, bool need_increase_counter) {
     */
 #ifdef WITH_WSREP
   // TODO: check the need for strlen(db) == 0
-  if (!db || strlen(db) == 0) return 1;
+  if (!db || strlen(db) == 0) return true;
 #else
-  if (!db) return 1;
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  /*
-    Previous behaviour "if the user has specified restrictions on which
-    databases to replicate and db was not selected, do not replicate" has
-    been replaced with "do replicate".
-    Since the filtering criteria is not equal to "NULL" the statement should
-    be logged into binlog.
-  */
-  if (!db) return 1;
-=======
-  /*
-    Previous behaviour "if the user has specified restrictions on which
-    databases to replicate and db was not selected, do not replicate" has
-    been replaced with "do replicate".
-    Since the filtering criteria is not equal to "NULL" the statement should
-    be logged into binlog.
-  */
   if (!db) return true;
->>>>>>> Percona-Server-8.0.19-10
+#endif /* WITH_WSREP */
 
   if (!do_db.is_empty())  // if the do's are not empty
   {

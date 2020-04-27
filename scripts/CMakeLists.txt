@@ -403,67 +403,6 @@ ELSE()
     SET(WSREP_BINARIES wsrep_sst_common wsrep_sst_xtrabackup-v2 clustercheck pyclustercheck)
   ENDIF()
 
-<<<<<<< HEAD
-  # Configure this one, for testing, but do not install it.
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/mysql_config.pl.in
-    ${CMAKE_CURRENT_BINARY_DIR}/mysql_config.pl ESCAPE_QUOTES @ONLY)
-  # On Unix, most of the files end up in the bin directory
-  SET(mysql_config_COMPONENT Development)
-
-  IF(WITH_SYSTEMD)
-    SET(BIN_SCRIPTS
-      mysql_config
-      mysqldumpslow
-      ps_mysqld_helper
-      ps-admin
-      ${WSREP_BINARIES}
-      )
-  ELSE()
-    SET(BIN_SCRIPTS
-      mysql_config
-      mysqldumpslow
-      mysqld_multi
-      mysqld_safe
-      ps_mysqld_helper
-      ps-admin
-      ${WSREP_BINARIES}
-      )
-  ENDIF()
-  IF(WITH_WSREP)
-    SET(BIN_SCRIPTS
-      ${BIN_SCRIPTS}
-      wsrep_sst_common
-      wsrep_sst_xtrabackup-v2
-    )
-  ENDIF()
-
-||||||| merged common ancestors
-  # Configure this one, for testing, but do not install it.
-  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/mysql_config.pl.in
-    ${CMAKE_CURRENT_BINARY_DIR}/mysql_config.pl ESCAPE_QUOTES @ONLY)
-  # On Unix, most of the files end up in the bin directory
-  SET(mysql_config_COMPONENT Development)
-
-  IF(WITH_SYSTEMD)
-    SET(BIN_SCRIPTS
-      mysql_config
-      mysqldumpslow
-      ps_mysqld_helper
-      ps-admin
-      )
-  ELSE()
-    SET(BIN_SCRIPTS
-      mysql_config
-      mysqldumpslow
-      mysqld_multi
-      mysqld_safe
-      ps_mysqld_helper
-      ps-admin
-      )
-  ENDIF()
-
-=======
->>>>>>> Percona-Server-8.0.19-10
   SET(PKGCONFIG_FILE ${LIBMYSQL_OS_OUTPUT_NAME}.pc)
   STRING(REGEX REPLACE "/mysql$" "" PKGCONFIG_DIR "${INSTALL_LIBDIR}")
   SET(PKGCONFIG_DIR "${PKGCONFIG_DIR}/pkgconfig")
@@ -496,6 +435,7 @@ ELSE()
       mysqld_safe
       ps_mysqld_helper
       ps-admin
+      ${WSREP_BINARIES}
       )
   ELSE()
     SET(BIN_SCRIPTS
@@ -505,12 +445,24 @@ ELSE()
       mysqld_safe
       ps_mysqld_helper
       ps-admin
+      ${WSREP_BINARIES}
       )
+  ENDIF()
+  IF(WITH_WSREP)
+    SET(BIN_SCRIPTS
+      ${BIN_SCRIPTS}
+      wsrep_sst_common
+      wsrep_sst_xtrabackup-v2
+    )
   ENDIF()
 
   FOREACH(file ${BIN_SCRIPTS})
     IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${file}.sh)
       CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${file}.sh
+        ${CMAKE_CURRENT_BINARY_DIR}/${file} ESCAPE_QUOTES @ONLY
+        )
+    ELSEIF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${file})
+      CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${file}
         ${CMAKE_CURRENT_BINARY_DIR}/${file} ESCAPE_QUOTES @ONLY
         )
     ELSEIF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${file}.pl.in)

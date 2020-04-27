@@ -291,17 +291,11 @@ class SslAcceptorContext {
       current_crlpath_;
 
   /** singleton lock */
-<<<<<<< HEAD
-  static SslAcceptorContextLockType *lock;
+  static SslAcceptorContextLockType *s_lock;
 
 #ifdef WITH_WSREP
   static bool wsrep_context_initialized;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  static SslAcceptorContextLockType *lock;
-=======
-  static SslAcceptorContextLockType *s_lock;
->>>>>>> Percona-Server-8.0.19-10
 };
 
 #endif  // SSL_ACCEPTOR_CONTEXT_INCLUDED

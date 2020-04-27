@@ -1161,7 +1161,6 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
     If we didn't succeed lock_global_read_lock(), or if we already suceeded
     make_global_read_lock_block_commit(), do nothing.
   */
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
   if (WSREP(thd) && m_mdl_blocks_commits_lock) {
@@ -1172,12 +1171,7 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
   }
 #endif /* WITH_WSREP */
 
-  if (m_state != GRL_ACQUIRED) return 0;
-||||||| merged common ancestors
-  if (m_state != GRL_ACQUIRED) return 0;
-=======
   if (m_state != GRL_ACQUIRED) return false;
->>>>>>> Percona-Server-8.0.19-10
 
 #ifdef WITH_WSREP
   /* Take an explict lock that is not wsrep-preemptable. */

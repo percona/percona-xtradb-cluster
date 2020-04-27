@@ -72,18 +72,13 @@ namespace upgrade {
 bool upgrade_system_schemas(THD *thd);
 
 bool no_server_upgrade_required();
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 bool upgrade_pxc_only(THD *thd);
-#endif  /* WITH_WSREP */
-
-||||||| merged common ancestors
-=======
+#endif /* WITH_WSREP */
 
 bool I_S_upgrade_required();
 
->>>>>>> Percona-Server-8.0.19-10
 }  // namespace upgrade
 
 }  // namespace dd

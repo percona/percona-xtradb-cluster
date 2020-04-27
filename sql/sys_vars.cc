@@ -7481,7 +7481,6 @@ static Sys_var_charptr Sys_protocol_compression_algorithms(
     DEFAULT(const_cast<char *>(PROTOCOL_COMPRESSION_DEFAULT_VALUE)),
     NO_MUTEX_GUARD, NOT_IN_BINLOG,
     ON_CHECK(check_set_protocol_compression_algorithms), ON_UPDATE(0));
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 
@@ -7859,8 +7858,6 @@ static Sys_var_bool Sys_pxc_encrypt_cluster_traffic(
     DEFAULT(true), NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
 
 static bool check_set_require_row_format(sys_var *, THD *thd, set_var *var) {
   /*
@@ -7899,4 +7896,3 @@ static Sys_var_bool Sys_var_require_row_format(
     "and DDLs with the exception of temporary table creation/deletion.",
     SESSION_ONLY(require_row_format), NO_CMD_LINE, DEFAULT(false),
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_set_require_row_format));
->>>>>>> Percona-Server-8.0.19-10

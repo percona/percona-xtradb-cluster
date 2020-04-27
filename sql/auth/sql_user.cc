@@ -84,6 +84,7 @@
 #include "violite.h"
 /* key_restore */
 
+#include <openssl/rand.h>  // RAND_bytes
 #include "prealloced_array.h"
 #include "sql/auth/auth_internal.h"
 #include "sql/auth/sql_auth_cache.h"
@@ -94,7 +95,6 @@
 #include "sql/log.h"
 #include "sql/mysqld.h"
 #include "sql/sql_rewrite.h"
-#include <openssl/rand.h>  // RAND_bytes
 
 #ifdef WITH_WSREP
 #include "sql/wsrep_trans_observer.h"
@@ -110,7 +110,6 @@
   @param comma   If true, append a ',' before the the user.
  */
 void log_user(THD *thd, String *str, LEX_USER *user, bool comma = true) {
-
 #ifdef WITH_WSREP
   /*
     PXC doesn't allow user functions viz. USER/CURRENT_USER
@@ -770,7 +769,6 @@ static bool validate_password_require_current(THD *thd, LEX_USER *Str,
       int is_error = 0;
       Security_context *sctx = thd->security_context();
       DBUG_ASSERT(sctx);
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       // System threads do not have user and have
       // m_is_skip_grants_user set.
@@ -781,24 +779,9 @@ static bool validate_password_require_current(THD *thd, LEX_USER *Str,
             my_strcasecmp(system_charset_info, sctx->priv_host().str,
                           Str->host.str)) {
           my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
-          return (1);
+          return (true);
         }
 #ifdef WITH_WSREP
-||||||| merged common ancestors
-      // If trying to set password for other user
-      if (strcmp(sctx->user().str, Str->user.str) ||
-          my_strcasecmp(system_charset_info, sctx->priv_host().str,
-                        Str->host.str)) {
-        my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
-        return (1);
-=======
-      // If trying to set password for other user
-      if (strcmp(sctx->user().str, Str->user.str) ||
-          my_strcasecmp(system_charset_info, sctx->priv_host().str,
-                        Str->host.str)) {
-        my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
-        return (true);
->>>>>>> Percona-Server-8.0.19-10
       }
 #endif /* WITH_WSREP */
 
@@ -1568,11 +1551,12 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
       return true;
     }
 
-  /* trying to change the password of the utility user? */
-  if (acl_is_utility_user(acl_user->user, acl_user->host.get_host(), nullptr)) {
-    my_error(ER_PASSWORD_NO_MATCH, MYF(0));
-    return true;
-  }
+    /* trying to change the password of the utility user? */
+    if (acl_is_utility_user(acl_user->user, acl_user->host.get_host(),
+                            nullptr)) {
+      my_error(ER_PASSWORD_NO_MATCH, MYF(0));
+      return true;
+    }
 
     DBUG_ASSERT(acl_user->plugin.length != 0);
     is_role = acl_user->is_role;
@@ -1951,10 +1935,10 @@ static int handle_grant_data(THD *thd, TABLE_LIST *tables, bool drop,
   if (acl_utility_user.user) {
     if (user_from && acl_is_utility_user(user_from->user.str,
                                          user_from->host.str, nullptr)) {
-	    return -1;
+      return -1;
     } else if (user_to && acl_is_utility_user(user_to->user.str,
                                               user_to->host.str, nullptr)) {
-	    return -1;
+      return -1;
     }
   }
 
@@ -2193,12 +2177,12 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
     }
 
     while ((tmp_user_name = user_list++)) {
-    if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
-                            nullptr)) {
-      log_user(thd, &wrong_users, tmp_user_name, wrong_users.length() > 0);
-      result = true;
-      continue;
-    }
+      if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
+                              nullptr)) {
+        log_user(thd, &wrong_users, tmp_user_name, wrong_users.length() > 0);
+        result = true;
+        continue;
+      }
       bool history_check_done = false;
       /*
         Ignore the current user as it already exists.
@@ -2432,13 +2416,11 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
 
     get_mandatory_roles(&mandatory_roles);
     while ((user = user_list++) != 0) {
-
-    if (acl_is_utility_user(user->user.str, user->host.str,
-                            nullptr)) {
-      log_user(thd, &wrong_users, user, wrong_users.length() > 0);
-      result = true;
-      continue;
-    }
+      if (acl_is_utility_user(user->user.str, user->host.str, nullptr)) {
+        log_user(thd, &wrong_users, user, wrong_users.length() > 0);
+        result = true;
+        continue;
+      }
 
       if (std::find_if(mandatory_roles.begin(), mandatory_roles.end(),
                        [&](Role_id &id) -> bool {
@@ -2772,7 +2754,6 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
       return true;
     }
 
-
     if (check_system_user_privilege(thd, list)) {
       commit_and_close_mysql_tables(thd);
       return true;
@@ -2788,12 +2769,12 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
       TABLE *history_tbl = nullptr;
       bool dummy_row_existed = false;
 
-    if (acl_is_utility_user(tmp_user_from->user.str, tmp_user_from->host.str,
-                            nullptr)) {
-      log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0);
+      if (acl_is_utility_user(tmp_user_from->user.str, tmp_user_from->host.str,
+                              nullptr)) {
+        log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0);
         result = 1;
         continue;
-    }
+      }
 
       /* add the defaults where needed */
       if (!(user_from = get_current_user(thd, tmp_user_from))) {

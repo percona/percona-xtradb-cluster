@@ -34,7 +34,6 @@ use My::Find;
 use My::Platform;
 
 # Rules to run first of all
-<<<<<<< HEAD
 
 sub add_opt_values {
   my ($self, $config)= @_;
@@ -48,13 +47,8 @@ sub add_opt_values {
 my @pre_rules=
 (
   \&add_opt_values,
+  \&pre_check_no_hosts_in_cluster_config
 );
-#my @pre_rules = ();
-||||||| merged common ancestors
-my @pre_rules = ();
-=======
-my @pre_rules = (\&pre_check_no_hosts_in_cluster_config);
->>>>>>> Percona-Server-8.0.19-10
 
 sub get_basedir {
   my ($self, $group) = @_;

@@ -446,7 +446,6 @@ struct System_variables {
     @sa Sys_var_generated_random_password_length
   */
   uint32_t generated_random_password_length;
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
   bool wsrep_on;
@@ -485,14 +484,11 @@ struct System_variables {
     WSREP_BINLOG_DISABLED
   } wsrep_saved_binlog_state;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
 
   /**
     @sa Sys_var_require_row_format
   */
   bool require_row_format;
->>>>>>> Percona-Server-8.0.19-10
 };
 
 /**

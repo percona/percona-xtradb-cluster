@@ -878,7 +878,6 @@ uint get_global_default_encryption_key_id_value() {
   return THDVAR(NULL, default_encryption_key_id);
 }
 
-<<<<<<< HEAD
 static MYSQL_THDVAR_UINT(records_in_range, PLUGIN_VAR_RQCMDARG,
                          "Used to override the result of records_in_range(). "
                          "Set to a positive number to override",
@@ -891,163 +890,6 @@ static MYSQL_THDVAR_UINT(force_index_records_in_range, PLUGIN_VAR_RQCMDARG,
                          NULL, NULL, 0,
                          /* min */ 0, /* max */ INT_MAX, 0);
 
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-static MYSQL_THDVAR_UINT(records_in_range, PLUGIN_VAR_RQCMDARG,
-                         "Used to override the result of records_in_range(). "
-                         "Set to a positive number to override",
-                         NULL, NULL, 0,
-                         /* min */ 0, /* max */ INT_MAX, 0);
-
-static MYSQL_THDVAR_UINT(force_index_records_in_range, PLUGIN_VAR_RQCMDARG,
-                         "Used to override the result of records_in_range() "
-                         "when FORCE INDEX is used.",
-                         NULL, NULL, 0,
-                         /* min */ 0, /* max */ INT_MAX, 0);
-
-uint innodb_force_index_records_in_range(THD* thd) {
-	return THDVAR(thd, force_index_records_in_range);
-}
-
-uint innodb_records_in_range(THD* thd) {
-	return THDVAR(thd, records_in_range);
-}
-
-/** Set up InnoDB API callback function array */
-ib_cb_t innodb_api_cb[] = {
-	(ib_cb_t) ib_cursor_open_table,
-	(ib_cb_t) ib_cursor_read_row,
-	(ib_cb_t) ib_cursor_insert_row,
-	(ib_cb_t) ib_cursor_delete_row,
-	(ib_cb_t) ib_cursor_update_row,
-	(ib_cb_t) ib_cursor_moveto,
-	(ib_cb_t) ib_cursor_first,
-	(ib_cb_t) ib_cursor_next,
-	(ib_cb_t) ib_cursor_set_match_mode,
-	(ib_cb_t) ib_sec_search_tuple_create,
-	(ib_cb_t) ib_clust_read_tuple_create,
-	(ib_cb_t) ib_tuple_delete,
-	(ib_cb_t) ib_tuple_read_u8,
-	(ib_cb_t) ib_tuple_read_u16,
-	(ib_cb_t) ib_tuple_read_u32,
-	(ib_cb_t) ib_tuple_read_u64,
-	(ib_cb_t) ib_tuple_read_i8,
-	(ib_cb_t) ib_tuple_read_i16,
-	(ib_cb_t) ib_tuple_read_i32,
-	(ib_cb_t) ib_tuple_read_i64,
-	(ib_cb_t) ib_tuple_get_n_cols,
-	(ib_cb_t) ib_col_set_value,
-	(ib_cb_t) ib_col_get_value,
-	(ib_cb_t) ib_col_get_meta,
-	(ib_cb_t) ib_trx_begin,
-	(ib_cb_t) ib_trx_commit,
-	(ib_cb_t) ib_trx_rollback,
-	(ib_cb_t) ib_trx_start,
-	(ib_cb_t) ib_trx_release,
-	(ib_cb_t) ib_cursor_lock,
-	(ib_cb_t) ib_cursor_close,
-	(ib_cb_t) ib_cursor_new_trx,
-	(ib_cb_t) ib_cursor_reset,
-	(ib_cb_t) ib_col_get_name,
-	(ib_cb_t) ib_table_truncate,
-	(ib_cb_t) ib_cursor_open_index_using_name,
-	(ib_cb_t) ib_cfg_get_cfg,
-	(ib_cb_t) ib_cursor_set_memcached_sync,
-	(ib_cb_t) ib_cursor_set_cluster_access,
-	(ib_cb_t) ib_cursor_commit_trx,
-	(ib_cb_t) ib_cfg_trx_level,
-	(ib_cb_t) ib_tuple_get_n_user_cols,
-	(ib_cb_t) ib_cursor_set_lock_mode,
-	(ib_cb_t) ib_get_idx_field_name,
-	(ib_cb_t) ib_trx_get_start_time,
-	(ib_cb_t) ib_cfg_bk_commit_interval,
-	(ib_cb_t) ib_ut_strerr,
-	(ib_cb_t) ib_cursor_stmt_begin,
-	(ib_cb_t) ib_trx_read_only,
-	(ib_cb_t) ib_is_virtual_table
-};
-||||||||| merged common ancestors
-/** Set up InnoDB API callback function array */
-ib_cb_t innodb_api_cb[] = {
-	(ib_cb_t) ib_cursor_open_table,
-	(ib_cb_t) ib_cursor_read_row,
-	(ib_cb_t) ib_cursor_insert_row,
-	(ib_cb_t) ib_cursor_delete_row,
-	(ib_cb_t) ib_cursor_update_row,
-	(ib_cb_t) ib_cursor_moveto,
-	(ib_cb_t) ib_cursor_first,
-	(ib_cb_t) ib_cursor_next,
-	(ib_cb_t) ib_cursor_set_match_mode,
-	(ib_cb_t) ib_sec_search_tuple_create,
-	(ib_cb_t) ib_clust_read_tuple_create,
-	(ib_cb_t) ib_tuple_delete,
-	(ib_cb_t) ib_tuple_read_u8,
-	(ib_cb_t) ib_tuple_read_u16,
-	(ib_cb_t) ib_tuple_read_u32,
-	(ib_cb_t) ib_tuple_read_u64,
-	(ib_cb_t) ib_tuple_read_i8,
-	(ib_cb_t) ib_tuple_read_i16,
-	(ib_cb_t) ib_tuple_read_i32,
-	(ib_cb_t) ib_tuple_read_i64,
-	(ib_cb_t) ib_tuple_get_n_cols,
-	(ib_cb_t) ib_col_set_value,
-	(ib_cb_t) ib_col_get_value,
-	(ib_cb_t) ib_col_get_meta,
-	(ib_cb_t) ib_trx_begin,
-	(ib_cb_t) ib_trx_commit,
-	(ib_cb_t) ib_trx_rollback,
-	(ib_cb_t) ib_trx_start,
-	(ib_cb_t) ib_trx_release,
-	(ib_cb_t) ib_cursor_lock,
-	(ib_cb_t) ib_cursor_close,
-	(ib_cb_t) ib_cursor_new_trx,
-	(ib_cb_t) ib_cursor_reset,
-	(ib_cb_t) ib_col_get_name,
-	(ib_cb_t) ib_table_truncate,
-	(ib_cb_t) ib_cursor_open_index_using_name,
-	(ib_cb_t) ib_cfg_get_cfg,
-	(ib_cb_t) ib_cursor_set_memcached_sync,
-	(ib_cb_t) ib_cursor_set_cluster_access,
-	(ib_cb_t) ib_cursor_commit_trx,
-	(ib_cb_t) ib_cfg_trx_level,
-	(ib_cb_t) ib_tuple_get_n_user_cols,
-	(ib_cb_t) ib_cursor_set_lock_mode,
-	(ib_cb_t) ib_get_idx_field_name,
-	(ib_cb_t) ib_trx_get_start_time,
-	(ib_cb_t) ib_cfg_bk_commit_interval,
-	(ib_cb_t) ib_ut_strerr,
-	(ib_cb_t) ib_cursor_stmt_begin,
-	(ib_cb_t) ib_trx_read_only,
-	(ib_cb_t) ib_is_virtual_table
-};
-=========
-static MYSQL_THDVAR_UINT(records_in_range, PLUGIN_VAR_RQCMDARG,
-                         "Used to override the result of records_in_range(). "
-                         "Set to a positive number to override",
-                         NULL, NULL, 0,
-                         /* min */ 0, /* max */ INT_MAX, 0);
->>>>>>>>> Temporary merge branch 2
-
-static MYSQL_THDVAR_UINT(force_index_records_in_range, PLUGIN_VAR_RQCMDARG,
-                         "Used to override the result of records_in_range() "
-                         "when FORCE INDEX is used.",
-                         NULL, NULL, 0,
-                         /* min */ 0, /* max */ INT_MAX, 0);
-
-=======
-static MYSQL_THDVAR_UINT(records_in_range, PLUGIN_VAR_RQCMDARG,
-                         "Used to override the result of records_in_range(). "
-                         "Set to a positive number to override",
-                         NULL, NULL, 0,
-                         /* min */ 0, /* max */ INT_MAX, 0);
-
-static MYSQL_THDVAR_UINT(force_index_records_in_range, PLUGIN_VAR_RQCMDARG,
-                         "Used to override the result of records_in_range() "
-                         "when FORCE INDEX is used.",
-                         NULL, NULL, 0,
-                         /* min */ 0, /* max */ INT_MAX, 0);
-
->>>>>>> Percona-Server-8.0.19-10
 uint innodb_force_index_records_in_range(THD *thd) {
   return THDVAR(thd, force_index_records_in_range);
 }
@@ -12746,11 +12588,14 @@ int ha_innobase::wsrep_append_keys(
                    key_info->name);
       }
 
+      const bool referenced_by_fk =
+          dict_table_is_referenced_by_foreign_key(m_prebuilt->table);
+
       /* !hasPK == table with no PK,
          must append all non-unique keys */
       if ((!hasPK && wsrep_certify_nonPK) || key_info->flags & HA_NOSAME ||
           ((tab && wsrep_is_FK_index(tab, idx)) ||
-           (!tab && referenced_by_foreign_key()))) {
+           (!tab && referenced_by_fk))) {
         ibool is_null0;
         uint len0 = wsrep_store_key_val_for_row(thd, table, i, key0,
                                                 WSREP_MAX_SUPPORTED_KEY_LENGTH,
