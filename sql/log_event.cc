@@ -4942,8 +4942,8 @@ compare_errors:
                      "no error"),
 #ifdef WITH_WSREP
                     actual_error, print_slave_db_safe(db),
-                    (!opt_general_log_raw) && thd->rewritten_query.length()
-                    ? thd->rewritten_query.c_ptr_safe() : query_arg);
+                    (!opt_general_log_raw) && thd->rewritten_query().length()
+                    ? thd->rewritten_query().ptr() : query_arg);
 #else
                     actual_error, print_slave_db_safe(db), query_arg);
 #endif /* WITH_WSREP */
@@ -5006,8 +5006,8 @@ compare_errors:
                      "unexpected success or fatal error"),
 #ifdef WITH_WSREP
                     print_slave_db_safe(db),
-                      (!opt_general_log_raw) && thd->rewritten_query.length()
-                      ? thd->rewritten_query.c_ptr_safe() : query_arg);
+                    (!opt_general_log_raw) && thd->rewritten_query().length()
+                    ? thd->rewritten_query().ptr() : query_arg);
 #else
                     print_slave_db_safe(thd->db().str), query_arg);
 #endif /* WITH_WSREP */

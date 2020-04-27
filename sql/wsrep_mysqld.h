@@ -269,9 +269,9 @@ void WSREP_LOG(void (*fun)(const char* fmt, ...), const char* fmt, ...);
     if (victim_thd) WSREP_LOG_CONFLICT_THD(victim_thd, "Victim thread");       \
   }
 
-#define WSREP_QUERY(thd)                                \
-  ((!opt_general_log_raw) && thd->rewritten_query.length()      \
-   ? thd->rewritten_query.c_ptr_safe() : thd->query().str)
+#define WSREP_QUERY(thd)                                        \
+  ((!opt_general_log_raw) && thd->rewritten_query().length()    \
+   ? thd->rewritten_query().ptr() : thd->query().str)
 
 extern my_bool wsrep_ready_get();
 extern void wsrep_ready_wait();
