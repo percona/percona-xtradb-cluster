@@ -104,7 +104,7 @@ and only in primary state (skip messages while in state exchange). ::
 
 .. note:: This is an amazing way to solve the problem
    of the id coordination in multi-master systems.
-   Otherwise a node will have to first get an id from central system
+   Otherwise, a node will have to first get an id from central system
    or through a separate agreed protocol,
    and then use it for the packet, thereby doubling the round-trip time.
 
@@ -183,8 +183,9 @@ to reflect reference transaction.
   Using the same case as explained above, Node 1 certification
   also rejects the packet from Node 1.
 
-This suggests that the node doesn't need to wait for certification to complete,
-but just needs to ensure that the packet is written to the channel.
+This action suggests that the node does not need to wait for certification to
+complete,
+but needs to ensure that the packet is written to the channel.
 The applier transaction will always win
 and the local conflicting transaction will be rolled back.
 

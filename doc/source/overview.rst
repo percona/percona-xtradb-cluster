@@ -20,7 +20,7 @@ as a common choice for trying out and testing:
 +--------+-----------+---------------+
 
 .. note:: Avoid creating a cluster with two or any even number of nodes,
-   because this can lead to *split brain*.
+   because this can lead to a *split brain*.
    For more information, see :ref:`failover`.
 
 The following procedure provides an overview

@@ -9,7 +9,7 @@ integrates |PS|_ and |PXB|_ with the Galera_ library to enable synchronous
 multi-master replication.
 
 A *cluster* consists of *nodes*, where each node contains the same set of data
-synchronized accross nodes.  The recommended configuration is to have at least 3
+synchronized across nodes.  The recommended configuration is to have at least 3
 nodes, but you can have 2 nodes as well.  Each node is a regular MySQL Server
 instance (for example, Percona Server).  You can convert an existing MySQL
 Server instance to a node and run the cluster using this node as a base.  You
@@ -25,7 +25,7 @@ instance.
   All data is available locally, no need for remote access.
 
 * No central management.
-  You can loose any node at any point of time,
+  You can lose any node at any point of time,
   and the cluster will continue to function without any data loss.
 
 * Good solution for scaling a read workload.
@@ -52,4 +52,3 @@ It uses the Galera_ library,
 which is an implementation of the write set replication (wsrep) API
 developed by `Codership Oy <http://www.galeracluster.com/>`_.
 The default and recommended data transfer method is via |PXB|_.
-

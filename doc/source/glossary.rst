@@ -36,9 +36,9 @@
      The Isolation requirement means that no transaction can interfere
      with another.
   
-   InnoDB A
+   InnoDB 
 
-     :term:`Storage Engine` for MySQL and derivatives
+     A :term:`Storage Engine` for MySQL and derivatives
      (:term:`Percona Server`, :term:`MariaDB`) originally written by
      Innobase Oy, since acquired by Oracle. It provides :term:`ACID`
      compliant storage engine with :term:`foreign key` support. InnoDB
@@ -50,20 +50,15 @@
      system that we use to help ensure the continued quality of the
      software we produce. It helps us achieve the aims of:
   
-      * no failed tests in trunk on any platform,
+      * no failed tests in the trunk on any platform,
       * aid developers in ensuring merge requests build and test on all platforms,
       * no known performance regressions (without a damn good explanation).
-  
-   LSN
-
-     Log Serial Number. A term used in relation to the :term:`InnoDB` or
-     :term:`XtraDB` storage engines.
   
    MariaDB
 
      A fork of :term:`MySQL` that is maintained primarily by Monty
-     Program AB. It aims to add features, fix bugs while maintaining 100%
-     backwards compatibility with MySQL.
+     Program AB. MariaDB 
+     aims to add features, fix bugs while maintaining compatibility with MySQL.
   
    MyISAM
 
@@ -118,8 +113,8 @@
   
    LSN
 
-      Each InnoDB page (usually 16kb in size) contains a log sequence number, or
-      LSN. The LSN is the system version number for the entire database. Each
+      Each InnoDB page (usually 16kb in size) contains a log sequence number. 
+      The LSN is the system version number for the entire database. Each
       page's LSN shows how recently it was changed.
   
    InnoDB
@@ -148,7 +143,7 @@
       and HTTP-based applications. It is particularly suited for web sites
       crawling under very high loads while needing persistence or Layer7
       processing. Supporting tens of thousands of connections is clearly
-      realistic with todays hardware. Its mode of operation makes its
+      realistic with today's hardware. Its mode of operation makes its
       integration into existing architectures very easy and riskless, while
       still offering the possibility not to expose fragile web servers to the
       net.
@@ -168,13 +163,13 @@
       purpose.  :program:`xtrabackup` does not require :command:`READ
       LOCK` for the entire syncing process - only for syncing the
       |MySQL| system tables and writing the information about the
-      binlog, galera and slave information (same as the regular
+      binlog, Galera and slave information (same as the regular
       |Percona XtraBackup| backup). The SST method is configured with
       the :variable:`wsrep_sst_method` variable.
   
    UUID
 
-      Universally Unique IDentifier which uniquely identifies the state and the
+      Universally Unique Identifier which uniquely identifies the state and the
       sequence of changes node undergoes. 128-bit UUID is a classic DCE UUID
       Version 1 (based on current time and MAC address). Although in theory this
       UUID could be generated based on the real MAC-address, in the Galera it is
@@ -275,7 +270,7 @@
   
    node
 
-      A cluster node -- a single mysql instance that is in the cluster.
+      A cluster node -- a single MySQL instance that is in the cluster.
   
    primary cluster
 

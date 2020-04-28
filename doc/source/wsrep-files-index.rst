@@ -7,15 +7,17 @@
 * :file:`GRA_*.log`
    These files contain binlog events in ROW format representing the failed
    transaction. That means that the slave thread was not able to apply one of
-   the transactions. For each of those file, a corresponding warning or error
-   message is present in the mysql error log file. Those error can also be
+   the transactions. For each of those files, a corresponding warning or error
+   message is present in the mysql error log file. Those errors can also be
    false positives like a bad ``DDL`` statement (dropping  a table that doesn't
-   exists for example) and therefore nothing to worry about. However it's
-   always recommended to check these log to understand what's is happening.
+   exists for example) and, therefore, nothing to worry about. However it's
+   always recommended to check these logs.
 
-   To be able to analyze these files binlog header needs to be added to the log
+   To be able to analyze these files the binlog header needs to be added to the
+log
    file. To create the ``GRA_HEADER`` file you need an instance running with
-   :variable:`binlog_checksum` set to ``NONE`` and extract first 120 bytes from
+   :variable:`binlog_checksum` set to ``NONE`` and to extract the first 120
+bytes from
    the binlog file:
 
    .. code-block:: bash
@@ -80,7 +82,7 @@
    This file is used as a main writeset store. It's implemented as a permanent
    ring-buffer file that is preallocated on disk when the node is initialized.
    File size can be controlled with the variable :variable:`gcache.size`. If
-   this value is bigger, more writesets are cached and chances are better that
+   this value is larger, more writesets are cached and chances are better that
    the re-joining node will get |IST| instead of |SST|. Filename can be changed
    with the :variable:`gcache.name` variable.
 
@@ -89,7 +91,7 @@
 
   * ``version`` - grastate version
   * ``uuid`` - a unique identifier for the state and the sequence of changes it
-    undergoes.For more information on how UUID is generated see :term:`UUID`.
+    undergoes. For more information on how UUID is generated see :term:`UUID`.
   * ``seqno`` - Ordinal Sequence Number, a 64-bit signed integer used to denote
     the position of the change in the sequence. ``seqno`` is ``0`` when no
     writesets have been generated or applied on that node, i.e., not
@@ -107,7 +109,7 @@
 
   Examples of this file look like this:
 
-  In case server node has this state when not running it means that that node
+  In case the server node has this state when not running, the node
   crashed during the transaction processing. ::
 
     # GALERA saved state
@@ -116,8 +118,8 @@
     seqno:   -1
     cert_index:
 
-  In case server node has this state when not running it means that the node
-  was gracefully shut down. ::
+  In case the server node has this state when not running, the node was
+  gracefully shut down. ::
 
     # GALERA saved state
     version: 2.1
@@ -125,7 +127,7 @@
     seqno:   5192193423942
     cert_index:
 
-  In case server node has this state when not running it means that the node
+  In case the server node has this state when not running, the node
   crashed during the DDL. ::
 
     # GALERA saved state
@@ -136,13 +138,14 @@
 
 * :file:`gvwstate.dat`
   This file is used for Primary Component recovery feature. This file is
-  created once primary component is formed or changed, so you can get the
-  latest primary component this node was in. And this file is deleted when the
+  created once the primary component is formed or changed, so you can get the
+  latest primary component this node was in. This file is deleted when the
   node is shutdown gracefully.
 
-  First part contains the node :term:`UUID` information. Second part contains
-  the view information. View information is written between ``#vwbeg`` and
-  ``#vwend``. View information consists of:
+  The first part contains the node :term:`UUID` information. The second part
+contains
+  the view information. The view information is written between ``#vwbeg`` and
+  ``#vwend``. The view information consists of the following:
 
  - view_id: [view_type] [view_uuid] [view_seq]. - ``view_type`` is always ``3``
    which means primary view. ``view_uuid`` and ``view_seq`` identifies a unique

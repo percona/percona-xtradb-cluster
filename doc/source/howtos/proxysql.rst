@@ -513,7 +513,7 @@ which is monitored by ProxySQL and can be set to one of the following values:
   changing hardware parts, relocating the server, etc.
 
   When you initiate node shutdown, |PXC| does not send the signal immediately.
-  Intead, it changes the state to ``pxc_maint_mode=SHUTDOWN``
+  Instead, it changes the state to ``pxc_maint_mode=SHUTDOWN``
   and waits for a predefined period (10 seconds by default).
   When ProxySQL detects that the mode is set to ``SHUTDOWN``,
   it changes the status of this node to ``OFFLINE_SOFT``,
@@ -522,7 +522,7 @@ which is monitored by ProxySQL and can be set to one of the following values:
   any long-running transactions that are still active are aborted.
 
 * ``MAINTENANCE``: You can change to this state
-  if you need to perform maintenace on a node without shutting it down.
+  if you need to perform maintenance on a node without shutting it down.
 
   You may need to isolate the node for some time,
   so that it does not receive traffic from ProxySQL
@@ -543,18 +543,17 @@ which is monitored by ProxySQL and can be set to one of the following values:
 
 You can increase the transition period
 using the :variable:`pxc_maint_transition_period` variable
-to accomodate for long-running transactions.
+to accommodate for long-running transactions.
 If the period is long enough for all transactions to finish,
 there should hardly be any disruption in cluster workload.
 
 During the transition period,
 the node continues to receive existing write-set replication traffic,
-ProxySQL avoids openning new connections and starting transactions,
-but the user can still open conenctions to monitor status.
+ProxySQL avoids opening new connections and starting transactions,
+but the user can still open connections to monitor status.
 
 .. note:: If you increase the transition period,
    the packaging script may determine it as a server stall.
-
 
 .. |proxysql| replace:: ProxySQL
 .. |proxysql-admin| replace:: ``proxysql-admin``

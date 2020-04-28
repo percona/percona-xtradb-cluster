@@ -20,7 +20,9 @@ the `encrypt traffic documentation <https://www.percona.com/doc/percona-xtradb-c
 therefore supposed to be safe. Below sections are about securing the
 data-at-rest only. 
 
-|PXC| |version| supports all |data-at-rest| encryption features available from |percona-server| 8.0.
+|PXC| |version| supports all Genrerally Available (GA) |data-at-rest|
+encryption features
+available from |percona-server| 8.0.
 
 .. seealso::
 
@@ -78,8 +80,8 @@ successfully loaded.
 
 .. note:: PXC recommends same configuration on all the nodes of the cluster,
    and that also means all the nodes of the cluster should have keyring
-   configured. Mismatch in keyring configuration will not allow JOINER node to
-   join the cluster.
+   configured. A mismatch in keyring configuration will not allow a JOINER
+   node to join the cluster.
 
 If the user has bootstrapped node with keyring enabled, then upcoming nodes of the
 cluster will inherit the keyring (encrypted key) from the DONOR node
@@ -157,7 +159,8 @@ Also ``keyring_vault_n1.conf`` file contents should be :
 
 Detailed description of these options can be found in the `upstream documentation <https://www.percona.com/doc/percona-server/8.0/management/data_at_rest_encryption.html#keyring-vault-plugin>`_.
 
-Vault-server is an external server so make sure PXC node is able to reach to the said
+Vault-server is an external server so make sure the PXC node is able to reach to
+the said
 server.
 
 .. note:: |PXC| recommends to use same keyring_plugin on all the nodes of the
@@ -191,7 +194,7 @@ consequences are the same, and the corresponding error looks like following:
    ... [ERROR] Plugin keyring_vault reported: 'Could not retrieve list of keys from Vault. ...
 
 In case of accessible vault-server with the wrong mount point, there is no
-error during server boot, but sitll node refuses to start:
+error during server boot, but still node refuses to start:
 
 .. code-block:: text
 
@@ -208,8 +211,8 @@ With |xtrabackup| introducing transition-key logic it is now possible to
 mix-match keyring plugins. For example, user has node-1 configured to use
 ``keyring_file`` plugin and node-2 configured to use ``keyring_vault``.
 
-.. note:: Percona recommends same configuration for all the nodes of the
-   cluster. Mix-match (in keyring plugins) is recommended only during
+.. note:: Percona recommends the same configuration for all nodes of the
+   cluster. A mix-match (in keyring plugins) is recommended only during
    transition from one keying to other.
 
 Upgrade and compatibility issues
@@ -226,8 +229,8 @@ Temporary file encryption
 Percona Server supports the encryption of temporary file storage
 enabled using ``encrypt-tmp-files``. This storage or files are local to the
 node and has no direct effect on |PXC| replication. |PXC| recommends enabling
-it on all the nodes of the cluster, though that is not mandatory. Parameter to
-enable this option is same as in Percona Server:
+it on all the nodes of the cluster, though that is not mandatory. The
+parameter to enable this option is same as in Percona Server:
 
 .. code-block:: text
 
@@ -337,7 +340,7 @@ Migration server options
 * ``--keyring-migration-port``: For TCP/IP connections, the port number to
   connect to on the running server.
 
-* ``--keyring-migration-socket``: For Unix socket file or Windows named pipe
+* ``--keyring-migration-socket``: For a Unix socket file or a Windows named pipe
   connections, the socket file or named pipe to connect to on the running
   server. 
 

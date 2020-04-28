@@ -22,7 +22,7 @@ Unsupported queries:
 
    Lock functions, such as ``GET_LOCK()``, ``RELEASE_LOCK()``, and so on
 
-Query log cannot be directed to table.
+Query log cannot be directed to the table.
 
    If you enable query logging, you must forward the log to a file:
 
@@ -37,13 +37,13 @@ Query log cannot be directed to table.
   :variable:`wsrep_max_ws_rows` and :variable:`wsrep_max_ws_size` variables.
   ``LOAD DATA INFILE`` processing will commit every 10 000 rows.
   So large transactions due to ``LOAD DATA``
-  will be split to series of small transactions.
+  will be split to a series of small transactions.
 
 * Due to cluster-level optimistic concurrency control,
   transaction issuing ``COMMIT`` may still be aborted at that stage.
   There can be two transactions writing to the same rows
   and committing in separate |PXC| nodes,
-  and only one of the them can successfully commit.
+  and only one of them can successfully commit.
   The failing one will be aborted.
   For cluster-level aborts, |PXC| gives back deadlock error code: ::
 
@@ -56,7 +56,7 @@ Query log cannot be directed to table.
   for stable high performance, then it should be supported by corresponding
   hardware.
 
-* The minimal recommended size of cluster is 3 nodes.  The 3rd node can be an
+* The minimal recommended size of a cluster is 3 nodes.  The 3rd node can be an
   arbitrator.
 
 * InnoDB fake changes feature is not supported.
@@ -73,6 +73,6 @@ Query log cannot be directed to table.
   tables without a primary key.
 
   .. seealso::
+     `Galera Limitations <https://mariadb.com/kb/en/mariadb-galera-cluster-known-limitations/>`_
 
-     Galera Documentation: Tables without Primary Keys
-        http://galeracluster.com/documentation-webpages/limitations.html#tables-without-primary-keys
+        

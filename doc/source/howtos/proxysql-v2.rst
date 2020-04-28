@@ -25,7 +25,7 @@ Added Features
   reads. The default value is 100
 - New operation ``--update-cluster`` to update the cluster membership by adding
   server nodes as found. (Note that nodes are added but not removed).  The
-  ``--writer-hg`` option may be used to specify which galera hostgroup to
+  ``--writer-hg`` option may be used to specify which Galera hostgroup to
   update. The ``--remove-all-servers`` option instructs to remove all servers
   from the mysql_servers table before updating the cluster.
 - Hostgroups can be specified on the command-line: ``--writer-hg``,
@@ -66,7 +66,7 @@ Changed Features
 
 - The commands ``--syncusers``, ``--sync-multi-cluster-users``, ``--adduser``,
   and ``--disable`` can use the ``--writer-hg`` option.
-- The command ``--disable`` removes all users associated with the galera cluster
+- The command ``--disable`` removes all users associated with the Galera cluster
   hostgroups. Previously, this command only removed the users with the
   **CLUSTER_APP_USERNAME**.
 - The command ``--disable`` accepts the ``--writer-hg`` option to disable the
@@ -672,7 +672,7 @@ nodes are not removed from the cluster by default.
 If used with ``--remove-all-servers``, then the server list for this configuration
 will be removed before running the update cluster function.
 
-A specific galera cluster can be updated by using the ``--writer-hg`` option
+A specific Galera cluster can be updated by using the ``--writer-hg`` option
 with ``--update-cluster``.  Otherwise the cluster specified in the config file
 will be updated.
 
@@ -712,7 +712,7 @@ the server list and is ONLINE.  This should only be used if the mode is _singlew
 --is-enabled
 --------------------------------------------------------------------------------
 
-This option will check if a galera cluster (specified by the writer hostgroup,
+This option will check if a Galera cluster (specified by the writer hostgroup,
 either from ``--writer-hg`` or from the config file) has any active entries
 in the ``mysql_galera_hostgroups`` table in ProxySQL.
 

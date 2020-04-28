@@ -48,7 +48,7 @@ to communicate with cluster nodes.
 
 |MySQL| generates default key and certificate
 files and places them in data directory. You can either use them or generate
-new certificates. For generation of new certificate please refer to
+new certificates. For the generation of new certificate please refer to
 :ref:`generate-keys-certs` section.
 
 .. _encrypt-replication-traffic:
@@ -87,7 +87,7 @@ enables automatic configuration of SSL encryption there-by encrypting
 This variable is not dynamic and so cannot be changed on runtime. To
 enable automatic configuration of SSL encryption, set
 ``pxc-encrypt-cluster-traffic=ON`` in the the ``[mysqld]`` section of the
-:file:`my.cnf` file, and restart the cluster (by default it is disabled
+:file:`my.cnf` file, and restart the cluster (by default, it is disabled
 there-by using non-secured channel for replication).
 
 .. note::
@@ -141,7 +141,7 @@ files shoud be specified in the |PXC| configuration. If you do not have the
 necessary files, see :ref:`generate-keys-certs`.
 
 .. note:: Encryption settings are not dynamic.
-   To enable it on a running cluster, you need to restart the entire cluster.
+   To enable it on a running cluster, you must restart the entire cluster.
 
 There are three aspects of |PXC| operation, where you can enable encryption:
 
@@ -361,7 +361,8 @@ If the verification is successful, you should see the following output::
 
 Sometimes, an SSL configuration may fail if the certificate and the CA files contain the same :abbr:`CN (SSL Certificate Common Name)`.
 
-To check if this is the case run ``openssl`` command as follows and verify that the **CN** field differs for the *Subject* and *Issuer* lines.
+To check if this is the case, run ``openssl`` command as follows and verify
+that the **CN** field differs for the *Subject* and *Issuer* lines.
 
 .. code-block:: bash
 

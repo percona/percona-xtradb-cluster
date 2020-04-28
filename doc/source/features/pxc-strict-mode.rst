@@ -4,44 +4,44 @@
 PXC Strict Mode
 ===============
 
-PXC Strict Mode is designed to avoid the use of
+Enabling ``pxc_strict_mode`` avoids the use of
 experimental and unsupported features in |PXC|.
-It performs a number of validations at startup and during runtime.
+It performs several validations at startup and during runtime.
 
 Depending on the actual mode you select,
 upon encountering a failed validation,
 the server will either throw an error
-(halting startup or denying the operation),
+(halting startup or denying the operation)
 or log a warning and continue running as normal.
 The following modes are available:
 
 * ``DISABLED``: Do not perform strict mode validations
   and run as normal.
 
-* ``PERMISSIVE``: If a vaidation fails, log a warning and continue running
+* ``PERMISSIVE``: If validation fails, log a warning and continue running
   as normal.
 
-* ``ENFORCING``: If a validation fails during startup,
+* ``ENFORCING``: If validation fails during startup,
   halt the server and throw an error.
   If a validation fails during runtime,
-  deny the operation and throw an error.
+  deny the operation, and throw an error.
 
 * ``MASTER``: The same as ``ENFORCING`` except that the validation of
   :ref:`explicit table locking <explicit-table-locking>` is not performed.
   This mode can be used with clusters
   in which write operations are isolated to a single node.
 
-By default, PXC Strict Mode is set to ``ENFORCING``,
+By default, ``pxc_strict_mode`` is set to ``ENFORCING``,
 except if the node is acting as a standalone server
-or the node is bootstrapping, then PXC Strict Mode defaults to ``DISABLED``.
+or the node is bootstrapping, then the variable is set to ``DISABLED``.
 
-It is recommended to keep PXC Strict Mode set to ``ENFORCING``,
-because in this case whenever |PXC| encounters an experimental feature
+It is recommended to keep ``pxc_strict_mode`` set to ``ENFORCING``,
+because in this case, whenever |PXC| encounters an experimental feature
 or an unsupported operation, the server will deny it.
-This will force you to re-evaluate your |PXC| configuration
+This setting forces you to re-evaluate your |PXC| configuration
 without risking the consistency of your data.
 
-If you are planning to set PXC Strict Mode to anything else than ``ENFORCING``,
+If you are planning to set the variable to anything else than ``ENFORCING``,
 you should be aware of the limitations and effects
 that this may have on data integrity.
 For more information, see :ref:`validations`.
@@ -55,7 +55,7 @@ or the ``--pxc-strict-mode`` option during ``mysqld`` startup.
    It is better to start the server with the necessary mode
    (the default ``ENFORCING`` is highly recommended).
    However, you can dynamically change it during runtime.
-   For example, to set PXC Strict Mode to ``PERMISSIVE``,
+   For example, to set the variable to ``PERMISSIVE``,
    run the following command::
 
       mysql> SET GLOBAL pxc_strict_mode=PERMISSIVE;
@@ -79,7 +79,7 @@ and do not rely on operations not supported by |PXC|.
 .. warning:: If an unsupported operation is performed on a node
    with ``pxc_strict_mode`` set to ``DISABLED`` or ``PERMISSIVE``,
    it will not be validated on nodes where it is replicated to,
-   even if the destination node has ``pxc_strict_mode`` set to ``ENFORCING``.
+   even if the destination node has the variable set to ``ENFORCING``.
 
 This section describes the purpose and consequences of each validation.
 
@@ -115,7 +115,7 @@ Depending on the selected mode, the following happens:
 
 ``PERMISSIVE``
 
- At startup, no validation is perfromed.
+ At startup, no validation is performed.
 
  At runtime, all operations are permitted,
  but a warning is logged when an undesirable operation
@@ -126,7 +126,7 @@ Depending on the selected mode, the following happens:
  At startup, no validation is performed.
 
  At runtime, any undesirable operation performed on an unsupported table
- is denied and an error is logged.
+ is denied, and an error is logged.
 
 .. note:: Unsupported tables can be converted to use a supported storage engine.
 
@@ -155,7 +155,7 @@ Depending on the selected mode, the following happens:
 ``PERMISSIVE``
 
  At startup, if :variable:`wsrep_replicate_myisam` is set to ``ON``,
- a warning is logged and startup continues.
+ a warning is logged, and startup continues.
 
  At runtime, it is permitted to change :variable:`wsrep_replicate_myisam`
  to any value, but if you set it to ``ON``, a warning is logged.
@@ -166,7 +166,7 @@ Depending on the selected mode, the following happens:
  an error is logged and startup is aborted.
 
  At runtime, any attempt to change :variable:`wsrep_replicate_myisam`
- to ``ON`` fails and an error is logged.
+ to ``ON`` fails, and an error is logged.
 
 .. note:: The :variable:`wsrep_replicate_myisam` variable controls
    *replication* for MyISAM tables,
@@ -191,7 +191,7 @@ Tables without primary keys
 |PXC| cannot properly propagate certain write operations
 to tables that do not have primary keys defined.
 Undesirable operations include data manipulation statements
-that perform writing to table (especially ``DELETE``).
+that perform writing to the table (especially ``DELETE``).
 
 Depending on the selected mode, the following happens:
 
@@ -203,7 +203,7 @@ Depending on the selected mode, the following happens:
 
 ``PERMISSIVE``
 
- At startup, no validation is perfromed.
+ At startup, no validation is performed.
 
  At runtime, all operations are permitted,
  but a warning is logged when an undesirable operation
@@ -215,7 +215,7 @@ Depending on the selected mode, the following happens:
 
  At runtime, any undesirable operation
  performed on a table without an explicit primary key
- is denied and an error is logged.
+ is denied, and an error is logged.
 
 Log output
 ----------
@@ -236,7 +236,7 @@ Depending on the selected mode, the following happens:
 ``PERMISSIVE``
 
  At startup, if ``log_output`` is set only to ``TABLE``,
- a warning is logged and startup continues.
+ a warning is logged, and startup continues.
 
  At runtime, it is permitted to change ``log_output``
  to any value, but if you set it only to ``TABLE``,
@@ -245,9 +245,9 @@ Depending on the selected mode, the following happens:
 ``ENFORCING`` or ``MASTER``
 
  At startup, if ``log_output`` is set only to ``TABLE``,
- an error is logged and startup is aborted.
+ an error is logged, and startup is aborted.
 
- At runtime, any attempt to change ``log_output`` only to ``TABLE`` fails
+ At runtime, any attempt to change ``log_output`` only to ``TABLE`` fails,
  and an error is logged.
 
 .. |log_output| replace:: ``log_output``
@@ -258,7 +258,7 @@ Depending on the selected mode, the following happens:
 Explicit table locking
 ----------------------
 
-|PXC| has only experimental support for explicit table locking operations,
+|PXC| has only experimental support for explicit table locking operations.
 The following undesirable operations lead to explicit table locking
 and are covered by this validation:
 
@@ -286,7 +286,7 @@ Depending on the selected mode, the following happens:
 
  At startup, no validation is performed.
 
- At runtime, any undesirable operation is denied and an error is logged.
+ At runtime, any undesirable operation is denied, and an error is logged.
 
 Auto-increment lock mode
 ------------------------
@@ -308,12 +308,12 @@ the following happens:
 ``PERMISSIVE``
 
  At startup, if ``innodb_autoinc_lock_mode`` is not set to ``2``,
- a warning is logged and startup continues.
+ a warning is logged, and startup continues.
 
 ``ENFORCING`` or ``MASTER``
 
  At startup, if ``innodb_autoinc_lock_mode`` is not set to ``2``,
- an error is logged and startup is aborted.
+ an error is logged, and startup is aborted.
 
 .. note:: This validation is not performed during runtime,
    because the ``innodb_autoinc_lock_mode`` variable
@@ -325,15 +325,15 @@ the following happens:
 Combining schema and data changes in a single statement
 -------------------------------------------------------
 
-With strict mode set to ``ENFORCING``, |PXC| does not support :abbr:`CTAS
+With the variable ``pxc_strict_mode`` set to ``ENFORCING``, |PXC| does not support :abbr:`CTAS
 (CREATE TABLE ... AS SELECT)` statements, because they combine both schema and
 data changes. Note that tables in the SELECT clause should be present on all
 replication nodes.
 
-With strict mode set to ``PERMISSIVE`` or ``DISABLED``, |ctas| statements are
+With the variable set to ``PERMISSIVE`` or ``DISABLED``, |ctas| statements are
 replicated using the :abbr:`TOI (Total Order Isolation)` method to ensure
 consistency. In |PXC| 5.7, |ctas| statements were replicated using DML
-write-sets when strict mode was set to ``PERMISSIVE`` or ``DISABLED``.
+write-sets when the variable was set to ``PERMISSIVE`` or ``DISABLED``.
 
 .. important::
    
@@ -359,7 +359,7 @@ Depending on the strict mode selected, the following happens:
      - At startup, no validation is performed. At runtime, all operations are
        permitted.
    * - PERMISSIVE
-     - At startup, no validation is perfromed. At runtime, all operations are
+     - At startup, no validation is performed. At runtime, all operations are
        permitted, but a warning is logged when a |ctas| operation is performed.
    * - ENFORCING
      - At startup, no validation is performed. At runtime, any CTAS operation is
@@ -367,8 +367,8 @@ Depending on the strict mode selected, the following happens:
 
 .. important::
 
-   Although |ctas| operations for temporary tables are permitted even in
-   ``STRICT`` mode, temporary tables should not be used as *source* tables in
+   Although |ctas| operations for temporary tables are permitted,
+   temporary tables should not be used as *source* tables in
    |ctas| operations due to the fact that temporary tables are not present on
    all nodes.
 
@@ -396,7 +396,7 @@ the following happens:
 
 ``PERMISSIVE``
 
- At startup, no validation is perfromed.
+ At startup, no validation is performed.
 
  At runtime, all operations are permitted,
  but a warning is logged when you discard or import a tablespace.

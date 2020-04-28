@@ -231,7 +231,7 @@ be sent).
 
 Average length of the send queue since the last status query. When cluster
 experiences network throughput issues or replication throttling, this value
-will be significantly bigger than ``0``.
+will be significantly larger than ``0``.
 
 .. variable:: wsrep_local_state
 

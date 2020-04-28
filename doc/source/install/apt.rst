@@ -85,9 +85,9 @@ Installing from Repository
 
       $ sudo service mysql stop
 
-   .. note:: All Debian-based distributions start services
+   .. note:: All Debian-based distributions start the services
       as soon as the corresponding package is installed.
-      Before starting a |PXC| node, it needs to be properly configured.
+      Before starting a |PXC| node, it must be properly configured.
       For more information, see :ref:`configure`.
 
 Next Steps

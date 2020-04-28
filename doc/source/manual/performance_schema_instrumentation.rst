@@ -39,7 +39,7 @@ Some of the most important are:
   Mutexes, condition variables, and threads related to this are part of
   ``PERFORMANCE_SCHEMA``.
 
-* Galera internally uses monitor mechanism to enforce ordering of
+* Galera internally uses a monitor mechanism to enforce the ordering of
   events. These monitor control events apply and are mainly responsible for
   the wait between different action. All such monitor mutexes and condition
   variables are covered as part of this implementation.

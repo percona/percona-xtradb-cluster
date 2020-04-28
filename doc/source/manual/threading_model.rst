@@ -25,7 +25,7 @@ which means at least one wsrep applier thread exists to process the request.
 Applier threads wait for an event, and once it gets the event,
 it applies it using normal slave apply routine path,
 and relays the log info apply path with wsrep-customization.
-These threads are similar to slave worker threads (but not exactly the same).
+These threads are similar to slave worker threads but are not exactly the same.
 
 Coordination is achieved using *Apply and Commit Monitor*.
 A transaction passes through two important states: ``APPLY`` and ``COMMIT``.

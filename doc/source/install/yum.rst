@@ -77,7 +77,7 @@ Installing from Percona Repository
 
       $ sudo service mysql start
 
-#. Copy the automatically generated temporary password
+#. Copy the automatically- generated, temporary password
    for the superuser account:
 
    .. code-block:: bash

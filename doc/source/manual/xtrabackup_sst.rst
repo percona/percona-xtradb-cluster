@@ -6,10 +6,11 @@ Percona XtraBackup SST Configuration
 
 Percona XtraBackup SST works in two stages:
 
-1. First it identifies the type of data transfer
+1. Identifies the type of data transfer
   based on the presence of :file:`xtrabackup_ist` file on the joiner node.
 
-#. Then it starts data transfer. In case of |SST|, it empties the data directory except for some files
+#. Starts data transfer. In case of |SST|, it empties the data
+directory except for some files
    (:file:`galera.cache`, :file:`sst_in_progress`, :file:`grastate.dat`)
    and then proceeds with SST.
 
@@ -41,7 +42,7 @@ under ``[sst]``.
 Used to specify the Percona XtraBackup streaming format.
 The recommended value is ``streamfmt=xbstream``.
 Certain features are not available with ``tar``, for instance:
-encryption, compression, parallel streaming, streaming incremental backups.
+encryption, compression, parallel streaming, and streaming incremental backups.
 For more information about the ``xbstream`` format, see `The xbstream Binary
 <https://www.percona.com/doc/percona-xtrabackup/2.4/xbstream/xbstream.html>`_.
 
@@ -87,8 +88,8 @@ for ``socat`` encryption based on OpenSSL.
    For testing you can also download certificates from
    `launchpad <https://bazaar.launchpad.net/~percona-core/percona-xtradb-cluster/5.5/files/head:/tests/certs/>`_.
 
-.. note:: Irrespective of what is shown in the example,
-   you can use the same .crt and .pem files on all nodes and it will work,
+.. note:: You can use the same .crt and .pem files on all nodes and it will
+work,
    since there is no server-client paradigm here,
    but rather a cluster with homogeneous nodes.
 
@@ -352,7 +353,7 @@ and should be specified under the ``[sst]`` group.
 XtraBackup SST Dependencies
 ---------------------------
 
-Each suppored version of |PXC| is tested against a specific version of |PXB|:
+Each supported version of |PXC| is tested against a specific version of |PXB|:
 
 * |PXC| 5.6 requires |PXB| 2.3
 * |PXC| 5.7 requires |PXB| 2.4

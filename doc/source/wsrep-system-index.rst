@@ -178,7 +178,7 @@ STRICT
 
 OPTIMIZED
    Two INSERTs that happen at about the same time on two different nodes in a
-   child table, that insert different (non conflicting rows), but both rows
+   child table, that insert different (non-conflicting rows), but both rows
    point to the same row in the parent table **will not result** in the
    certification failure.
 
@@ -508,7 +508,7 @@ The maximum allowed value is ``1048576``.
    :default: ``2147483647`` (2 GB)
 
 Defines the maximum write-set size (in bytes).
-Anything bigger than the specified value will be rejected.
+Anything larger than the specified value will be rejected.
 
 You can set it to any value between ``1024`` and the default ``2147483647``.
 
@@ -797,9 +797,9 @@ the whole DDL statement is not put under TOI.
 
 Defines whether replication slave should be restarted
 when the node joins back to the cluster.
-Enabling this can be useful because asynchronous replication slave thread
+Enabling this can be useful because the asynchronous replication slave thread
 is stopped when the node tries to apply the next replication event
-while the node is in non-primary state.
+while the node is in a non-primary state.
 
 .. variable:: wsrep_retry_autocommit
 
@@ -833,7 +833,7 @@ autocommit transactions won't be retried.
 Specifies the timeout in microseconds to allow active connection to complete
 COMMIT action before starting RSU.
 
-While running RSU it is expected that user has isolated the node and there is
+While running RSU, it is expected that user has isolated the node and there is
 no active traffic executing on the node. RSU has a check to ensure this, and
 waits for any active connection in ``COMMIT`` state before starting RSU.
 

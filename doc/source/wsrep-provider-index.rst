@@ -117,10 +117,10 @@ When this variable is set to ``yes``, it will enable debugging.
    :dyn: Yes
    :default: 0
 
-Number of entries allowed on delayed list until auto eviction takes place.
-Setting value to ``0`` disables auto eviction protocol on the node, though node
+Number of entries allowed on delayed list until auto-eviction takes place.
+Setting value to ``0`` disables auto-eviction protocol on the node, though node
 response times will still be monitored. EVS protocol version
-(:variable:`evs.version`) ``1`` is required to enable auto eviction.
+(:variable:`evs.version`) ``1`` is required to enable auto-eviction.
 
 .. variable:: evs.causal_keepalive_period
 
@@ -130,7 +130,7 @@ response times will still be monitored. EVS protocol version
    :dyn: No
    :default: value of :variable:`evs.keepalive_period`
 
-This variable is used for development purposes and shouldn't be used by regular
+This variable is used for development purposes and should not be used by regular
 users.
 
 .. variable:: evs.debug_log_mask
@@ -262,7 +262,7 @@ up (total rounds will be :variable:`evs.max_install_timeouts` + 2).
 
 This variable defines the maximum number of data packets in replication at a
 time. For WAN setups, the variable can be set to a considerably higher value
-than default (for example,512). The value must not be less than
+than default (for example, 512). The value must not be less than
 :variable:`evs.user_send_window`.
 
 .. variable:: evs.stats_report_period
@@ -284,7 +284,8 @@ This variable defines the control period of EVS statistics reporting.
    :default: PT5S
 
 This variable defines the inactivity period after which the node is
-"suspected" to be dead. If all remaining nodes agree on that, the node will be
+"suspected" to be dead. If all of the remaining nodes agree on that, the node
+will be
 dropped out of cluster even before :variable:`evs.inactive_timeout` is reached.
 
 .. variable:: evs.use_aggregate
@@ -431,7 +432,7 @@ cleanup is called on excess overflow pages to delete them.
 
 This variable was used to define how much RAM is available for the system.
 
-.. warning:: This variable has been deprecated and shouldn't be used as it
+.. warning:: This variable has been deprecated and should not be used as it
   could cause a node to crash.
 
 .. variable:: gcache.name
@@ -546,7 +547,7 @@ fragmented.
    :default: 0.25
 
 This variable specifies how much the replication can be throttled during the
-state transfer in order to avoid running out of memory. Value can be set to
+state transfer in order to avoid running out of memory. The value can be set to
 ``0.0`` if stopping replication is acceptable in order to finish state
 transfer.
 
@@ -795,7 +796,7 @@ component.
    :dyn: Yes
    :default: 1
 
-This variable specifies the node weight that's going to be used for Weighted
+This variable specifies the node weight to be used for Weighted
 Quorum calculations.
 
 .. variable::  protonet.backend
@@ -874,7 +875,7 @@ values are available:
    :default: 2147483647
 
 This variable is used to specify the maximum size of a write-set in bytes. This
-is limited to 2 gygabytes.
+is limited to 2 gigabytes.
 
 .. variable::  repl.proto_max
 

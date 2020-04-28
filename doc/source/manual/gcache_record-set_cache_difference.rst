@@ -29,7 +29,7 @@ then the storage is switched from Heap to Page
 All these limits are non-configurable,
 but having a memory-page size greater than 4MB per transaction
 can cause things to stall due to memory pressure,
-so this limit is reasonable. This is another
+so this limit is reasonable,  another
 limitation to address when Galera supports large transaction.
 
 The same long-running transaction will also generate binlog data

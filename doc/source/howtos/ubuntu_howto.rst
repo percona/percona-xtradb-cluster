@@ -261,7 +261,7 @@ Step 4. Configuring the third node
 Testing replication
 ===================
 
-To test replication, lets create a new database on the second node,
+To test the replication, let's create a new database on the second node,
 create a table for that database on the third node,
 and add some records to the table on the first node.
 

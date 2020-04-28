@@ -199,7 +199,7 @@ with application servers.
    .. note::
 
       ProxySQL uses the concept of *hostgroups* to group cluster nodes.
-      This enables you to balance the load in a cluster by
+      This concept enables you to balance the load in a cluster by
       routing different types of traffic to different groups.
       There are many ways you can configure hostgroups
       (for example master and slaves, read and write load, etc.)
@@ -412,9 +412,9 @@ This example shows how to do it with ``sysbench`` from the EPEL repository.
 
 If you are using |HAProxy| for |MySQL| you can break the privilege system’s
 host part, because |MySQL| will think that the connections are always coming
-from the load balancer. You can work this around using T-Proxy patches and some
+from the load balancer. You can work around this issue by using T-Proxy patches
+and some
 `iptables` magic for the backwards connections. However in the setup described
 in this how-to this is not an issue, since each application server has it's own
 |HAProxy| instance, each application server connects to 127.0.0.1, so MySQL
-will see that connections are coming from the application servers. Just like in
-the normal case.
+will see that connections are coming from the application servers.

@@ -6,10 +6,10 @@ Multi-Master Replication
 
 Multi-master replication means that you can write to any node
 and be sure that the write will be consistent for all nodes in the cluster.
-This is different from regular MySQL replication,
+This type of replication is different from regular MySQL replication,
 where you have to apply writes to master to ensure that it will be synced.
 
-With multi-master replication any write is either committed on all nodes
+With multi-master replication, any write is either committed on all nodes
 or not committed at all.
 The following diagram shows how it works for two nodes,
 but the same logic is applied with any number of nodes in the cluster:
@@ -37,12 +37,12 @@ Response time of ``COMMIT`` includes the following:
 There are two important consequences of this architecture:
 
 * Several appliers can be used in parallel.
-  This enables truely parallel replication.
+  This ability enables parallel replication.
   A slave can have many parallel threads configured
   using the :option:`wsrep_slave_threads` variable.
 
-* There might be a small period of time when a slave is out of sync.
-  This happens because the master may apply events faster than the slave.
+* There might be a small period when a slave is out of sync.
+  This out of sync happens because the master may apply events faster than the slave.
   And if you do read from the slave,
   you may read the data that has not changed yet.
   You can see that from the diagram.
@@ -50,20 +50,20 @@ There are two important consequences of this architecture:
   However, this behavior can be changed
   by setting the :option:`wsrep_causal_reads=ON` variable.
   In this case, the read on the slave will wait until the event is applied
-  (this will obviously increase the response time of the read).
+  (this setting will increase the response time of the read).
   The gap between the slave and the master is the reason
-  why this replication is called *virtually synchronous replication*,
+  why this replication is called *virtually synchronous replication*
   and not *real synchronous replication*.
 
 The described behavior of ``COMMIT`` also has another serious implication.
 If you run write transactions to two different nodes,
-the cluster will use an `optimistic locking model
+the cluster uses an `optimistic locking model
 <http://en.wikipedia.org/wiki/Optimistic_concurrency_control>`_.
-This means a transaction will not check on possible locking conflicts
+This model means a transaction will not check on possible locking conflicts
 during the individual queries, but rather on the ``COMMIT`` stage,
 and you may get ``ERROR`` response on ``COMMIT``.
 
-This is mentioned because it is one of the incompatibilities
+This information is mentioned because it is one of the incompatibilities
 with regular |InnoDB| that you might experience.
 With InnoDB, ``DEADLOCK`` and ``LOCK TIMEOUT`` errors usually happen
 in response to a particular query, but not on ``COMMIT``.

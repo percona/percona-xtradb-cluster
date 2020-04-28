@@ -46,7 +46,7 @@ proceed to add the next node.
 .. note::
 
    If the state of the node is ``Joiner``, it means that SST hasn't finished.
-   Do not add new nodes until all others are in ``Synced`` state.
+   Do not add new nodes until all others are in a ``Synced`` state.
 
 Starting the Third Node
 =======================
@@ -87,7 +87,7 @@ Next Steps
 
 When you add all nodes to the cluster, you can :ref:`verify replication
 <verify>` by running queries and manipulating data on nodes to see if these
-changes are synchronized accross the cluster.
+changes are synchronized across the cluster.
 
 .. |wsrep_sst_method| replace:: :variable:`wsrep_sst_method`
 .. |wsrep_cluster_address| replace:: :variable:`wsrep_cluster_address`

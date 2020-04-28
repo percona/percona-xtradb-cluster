@@ -269,7 +269,8 @@ cluster:
    size.  Also, during the upgrade, the cluster will operate with an even number
    of nodes - the cluster may run into the split-brain problem.
 
-This upgrade flow auto-detects the presence of the 5.7 data directory and trigger
+This upgrade flow auto-detects the presence of the 5.7 data directory and
+triggers
 the upgrade as part of the node bootup process. The data directory is upgraded
 to be compatible with |pxc| |version|. Then the node joins the cluster and
 enters synced state. The 3-node cluster is restored with 2 nodes running |pxc|

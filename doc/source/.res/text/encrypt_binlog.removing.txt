@@ -1,4 +1,4 @@
-Starting from release :rn:`8.0.15-5`, |Percona Server| uses the upstream
+Starting from the release :rn:`8.0.15-5`, |Percona Server| uses the upstream
 implementation of binary log encryption. The variable |encrypt-binlog| is
 removed and the related command line option |opt.encrypt-binlog| is not
 supported. It is important that you remove the |encrypt-binlog| variable from
