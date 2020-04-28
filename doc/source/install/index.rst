@@ -25,6 +25,19 @@ If you want to build |PXC| from source, see :ref:`compile`.
 
 If you want to run |PXC| using Docker, see :ref:`pxc.docker-container.running`.
 
+.. _pxc-install-version-numbering-conventions:
+
+Product version numbering
+================================================================================
+
+The version number in |pxc| releases contains the following components:
+
+- The version of |PS| that the given |pxc| release is based on
+- The sequence number which represents the |pxc| built.
+
+For example, version number *8.0.18-9.3* means that this is the third |pxc|
+build based on |PS| 8.0.18-9.
+
 .. toctree::
    :hidden:
 
