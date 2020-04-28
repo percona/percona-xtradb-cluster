@@ -27,7 +27,7 @@ f1	f2
 5	node2
 10	node1
 INSERT INTO t1 VALUES(15, 'node1');
-ERROR 23000: Duplicate entry '15' for key 'PRIMARY'
+ERROR 23000: Duplicate entry '15' for key 't1.PRIMARY'
 COMMIT;
 SELECT * FROM t1;
 f1	f2

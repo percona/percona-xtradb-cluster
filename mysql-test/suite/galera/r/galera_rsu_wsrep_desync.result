@@ -22,8 +22,8 @@ SET DEBUG_SYNC= 'now SIGNAL continue';
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `f1` int(11) DEFAULT NULL,
-  `f2` int(11) DEFAULT NULL
+  `f1` int DEFAULT NULL,
+  `f2` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 Variable_name	Value
 wsrep_desync_count	0
@@ -85,8 +85,8 @@ SET DEBUG_SYNC= 'now SIGNAL continue';
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `f1` int(11) DEFAULT NULL,
-  `f2` int(11) DEFAULT NULL
+  `f1` int DEFAULT NULL,
+  `f2` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 Variable_name	Value
 wsrep_desync_count	1

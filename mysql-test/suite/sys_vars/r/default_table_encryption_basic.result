@@ -113,12 +113,7 @@ SELECT @@session.default_table_encryption;
 @@session.default_table_encryption
 OFF
 SET SESSION default_table_encryption=KEYRING_ON;
-<<<<<<< HEAD
-ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-||||||| merged common ancestors
-=======
 ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'KEYRING_ON'
->>>>>>> Percona-Server-8.0.19-10
 SELECT @@session.default_table_encryption;
 @@session.default_table_encryption
 OFF
@@ -141,12 +136,7 @@ SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 ON
 SET PERSIST default_table_encryption=KEYRING_ON;
-<<<<<<< HEAD
-ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-||||||| merged common ancestors
-=======
 ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'KEYRING_ON'
->>>>>>> Percona-Server-8.0.19-10
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 ON
@@ -191,12 +181,7 @@ SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 OFF
 SET PERSIST default_table_encryption=KEYRING_ON;
-<<<<<<< HEAD
-ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-||||||| merged common ancestors
-=======
 ERROR 42000: Variable 'default_table_encryption' can't be set to the value of 'KEYRING_ON'
->>>>>>> Percona-Server-8.0.19-10
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 OFF

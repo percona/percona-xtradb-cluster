@@ -10,7 +10,7 @@ i
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ENCRYPTION='y'
 create schema work2;
@@ -30,7 +30,7 @@ i
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ENCRYPTION='y'
 select schema_name, default_encryption from information_schema.schemata where schema_name like 'work%';
@@ -71,7 +71,7 @@ id	text
 show create table e1;
 Table	Create Table
 e1	CREATE TABLE `e1` (
-  `id` int(11) NOT NULL,
+  `id` int NOT NULL,
   `text` varchar(10) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ENCRYPTION='Y'
@@ -108,7 +108,7 @@ id	text
 show create table e1;
 Table	Create Table
 e1	CREATE TABLE `e1` (
-  `id` int(11) NOT NULL,
+  `id` int NOT NULL,
   `text` varchar(10) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ENCRYPTION='Y'

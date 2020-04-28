@@ -34,7 +34,7 @@ mysqld-bin.000001	357	Write_rows	1	397	table_id: ### flags: STMT_END_F
 mysqld-bin.000001	397	Xid	1	428	COMMIT /* xid=### */
 TRUNCATE TABLE t1;
 RESET MASTER;
-ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
+ERROR 23000: Duplicate entry '1' for key 't1.PRIMARY'
 wsrep_last_applied_correct
 1
 SELECT COUNT(*) = 0 FROM t1;

@@ -1,6 +1,11 @@
 --source include/galera_cluster.inc
 --source include/big_test.inc
 
+--connection node_1
+--disable_query_log
+call mtr.add_suppression("Ignoring error 'Duplicate entry '111110' for key 't1.PRIMARY");
+--enable_query_log
+
 #
 # Test the operation of DDLs that fail partway through
 #
