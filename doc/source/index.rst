@@ -149,6 +149,7 @@ How-tos
    :glob:
 
    howtos/upgrade_guide
+   howtos/crash-recovery
    howtos/centos_howto
    howtos/ubuntu_howto
    howtos/garbd_howto
