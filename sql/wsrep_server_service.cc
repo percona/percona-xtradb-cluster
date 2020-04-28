@@ -184,8 +184,8 @@ void Wsrep_server_service::log_view(
   if (wsrep_auto_increment_control && view.own_index() >= 0) {
     global_system_variables.auto_increment_offset = view.own_index() + 1;
     global_system_variables.auto_increment_increment = view.members().size();
-    wsrep_protocol_version = view.protocol_version();
   }
+  wsrep_protocol_version = view.protocol_version();
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
   /* Update wsrep status variables */
