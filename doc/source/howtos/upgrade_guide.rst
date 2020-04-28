@@ -148,13 +148,6 @@ To upgrade the cluster, follow these steps for each node:
         $ sudo apt-get remove percona-xtrabackup* percona-xtradb-cluster*
         $ sudo apt-get install percona-xtradb-cluster
 
-#. In case of Debian or Ubuntu, the ``mysql`` service starts automatically after
-   the installation. Stop the service:
-
-   .. code-block:: bash
-
-      $ sudo service mysql stop
-
 #. Back up :file:`grastate.dat`, so that you can restore it
    if it is corrupted or zeroed out due to network issue.
 
@@ -184,10 +177,10 @@ To upgrade the cluster, follow these steps for each node:
       Make sure to rename it back
       before joining the upgraded node back to the cluster.
 
-#. Now you can join the upgraded node back to the cluster.
+#. Now start  the cluster node to upgrade the data directory.
 
    In most cases, starting the ``mysql`` service
-   should run the node with your previous configuration::
+   should run the node with your previous configuration:
 
    .. code-block:: bash
 
