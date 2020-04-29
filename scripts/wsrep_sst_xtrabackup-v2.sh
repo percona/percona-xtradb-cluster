@@ -1284,7 +1284,8 @@ send_data_from_donor_to_joiner()
 }
 
 # Returns the version string in a standardized format
-# Input "1.2.3" => echoes "010203"
+# Input
+#   "1.2.3" => echoes "010203"
 # Wrongly formatted values => echoes "000000"
 normalize_version()
 {
@@ -1292,9 +1293,9 @@ normalize_version()
     local minor=0
     local patch=0
 
-    # Only parses purely numeric version numbers, 1.2.3 
+    # Only parses purely numeric version numbers, 1.2.3
     # Everything after the first three values are ignored
-    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([\.0-9])*$ ]]; then
+    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([^ ])* ]]; then
         major=${BASH_REMATCH[1]}
         minor=${BASH_REMATCH[2]}
         patch=${BASH_REMATCH[3]}
@@ -1424,8 +1425,10 @@ fi
 #
 # 2.4.17  PXB added Data-At-Rest Encryption support found in PS/PXC 5.7.28
 #
+# 2.4.20  Transition-key fixes
+#
 
-XB_REQUIRED_VERSION="2.4.17"
+XB_REQUIRED_VERSION="2.4.20"
 
 XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
 if [[ -z $XB_VERSION ]]; then
@@ -1617,7 +1620,7 @@ then
     # append transition_key only if keyring is being used.
     if [[ $keyring_plugin -eq 1 ]]; then
         echo "transition-key=$transition_key" >> "$sst_info_file_path"
-        encrypt_backup_options="--transition-key=\$transition_key"
+        encrypt_backup_options="--transition-key=$transition_key"
     fi
 
     #
@@ -1814,9 +1817,18 @@ then
         DONOR_MYSQL_VERSION=$(parse_sst_info "$sst_file_info_path" sst mysql-version "")
 
         transition_key=$(parse_sst_info "$sst_file_info_path" sst transition-key "")
+
         if [[ -n $transition_key ]]; then
-            encrypt_prepare_options="--transition-key=\$transition_key"
-            encrypt_move_options="--transition-key=\$transition_key --generate-new-master-key"
+
+            # Use the broken key if the donor version is < 5.7.29 and is not 5.7.28-31-57.2
+            # In other words, 5.7.28-31-57.2 and above will use the key that was sent
+            if ! check_for_version "$DONOR_MYSQL_VERSION" "5.7.29" &&
+               [[ $DONOR_MYSQL_VERSION != "5.7.28-31-57.2" ]]; then
+                transition_key="\$transition_key"
+            fi
+
+            encrypt_prepare_options="--transition-key=$transition_key"
+            encrypt_move_options="--transition-key=$transition_key --generate-new-master-key"
         fi
     elif [[ -r "${STATDIR}/${XB_GTID_INFO_FILE}" ]]; then
         #

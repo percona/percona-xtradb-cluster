@@ -2170,7 +2170,9 @@ os_file_get_parent_dir(
 	}
 
 	if (last_slash - path < 0) {
-		return(NULL);
+		/* Sanity check, it prevents gcc from trying to handle this case which
+		 * results in warnings for some optimized builds */
+		return (NULL);
 	}
 
 	/* Non-trivial directory component */
