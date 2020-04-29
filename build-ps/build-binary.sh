@@ -261,7 +261,7 @@ TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
 PRODUCT_NAME="Percona-XtraDB-Cluster_$MYSQL_VERSION$PERCONA_SERVER_EXTENSION"
-PRODUCT_FULL_NAME="${PRODUCT_NAME}-${WSREP_VERSION}_${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
+PRODUCT_FULL_NAME="${PRODUCT_NAME}_${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
 
 #
 # This corresponds to GIT revision when the build/package is created.
@@ -274,8 +274,8 @@ then
 else
     REVISION=""
 fi
-COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
-COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
+COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION"
+COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
 
 #-------------------------------------------------------------------------------
 #
@@ -418,7 +418,7 @@ fi
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_BOOST="$TARGETDIR/libboost" \
-            -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
+            -DMYSQL_SERVER_SUFFIX="" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
             -DWITH_DEBUG=ON \
@@ -452,7 +452,7 @@ fi
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_BOOST="$TARGETDIR/libboost" \
-            -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
+            -DMYSQL_SERVER_SUFFIX="" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
@@ -495,8 +495,10 @@ fi
         fi
         # Remove the .tar.gz extension
         pxb_basename=${pxb_tar%.tar*}
-        # Remove the libXXX (such as libgcrypt)
-        pxb_basename=${pxb_basename%.lib*}
+        # Pull the name (up-to-the x86_64 part
+        if [[ $pxb_basename =~ x86_64 ]]; then
+            pxb_basename="${pxb_basename%x86_64*}x86_64"
+        fi
         pxb_dir="pxb-2.4"
 
         mkdir -p pxc_extra
@@ -524,8 +526,10 @@ fi
         fi
         # Remove the .tar.gz extension
         pxb_basename=${pxb_tar%.tar*}
-        # Remove the libXXX (such as libgcrypt) extension
-        pxb_basename=${pxb_basename%.lib*}
+        # Pull the name (up-to-the x86_64 part
+        if [[ $pxb_basename =~ x86_64 ]]; then
+            pxb_basename="${pxb_basename%x86_64*}x86_64"
+        fi
         pxb_dir="pxb-8.0"
 
         mkdir -p pxc_extra

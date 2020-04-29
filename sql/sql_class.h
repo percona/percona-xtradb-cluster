@@ -2868,11 +2868,6 @@ class THD : public MDL_context_owner,
   bool wsrep_skip_wsrep_GTID;
 
   /**
-    DDL statement can fail in which case SE checkpoint shouldn't get updated.
-  */
-  bool wsrep_skip_SE_checkpoint;
-
-  /**
     Skip registering wsrep_hton handler for a DDL statement that got skipped
     from TOI replication probably due to sql_log_bin=0.
     Given the mode for the statement is not set to TOI, flow will try to execute

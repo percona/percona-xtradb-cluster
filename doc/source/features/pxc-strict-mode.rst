@@ -177,31 +177,13 @@ Depending on the selected mode, the following happens:
 Binary log format
 -----------------
 
-|PXC| supports only the default row-based binary logging format.
-Setting the |binlog_format|_ variable to anything but ``ROW`` at startup
-is not allowed, because this changes the global scope,
-which must be set to ROW.
-Validation is performed only at runtime and against session scope.
-
-Depending on the selected mode, the following happens:
-
-``DISABLED``
-
- At runtime, you can set ``binlog_format`` to any value.
-
-``PERMISSIVE``
-
- At runtime, it is permitted to change ``binlog_format``
- to any value, but if you set it to anything other than ``ROW``,
- a warning is logged.
-
-``ENFORCING`` or ``MASTER``
-
- At runtime, any attempt to change ``binlog_format``
- to anything other than ``ROW`` fails and an error is logged.
+|PXC| supports only the default row-based binary logging format.  In
+|version|, setting the |binlog_format|_ variable to anything but
+``ROW`` at startup or runtime is not allowed regardless of the value of the
+:variable:`pxc_strict_mode` variable.
 
 .. |binlog_format| replace:: ``binlog_format``
-.. _binlog_format: http://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_binlog_format
+.. _binlog_format: http://dev.mysql.com/doc/refman/8.0/en/replication-options-binary-log.html#sysvar_binlog_format
 
 Tables without primary keys
 ---------------------------
@@ -269,7 +251,7 @@ Depending on the selected mode, the following happens:
  and an error is logged.
 
 .. |log_output| replace:: ``log_output``
-.. _log_output: http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_log_output
+.. _log_output: http://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_log_output
 
 .. _explicit-table-locking:
 
@@ -338,7 +320,7 @@ the following happens:
    cannot be set dynamically.
 
 .. |innodb_autoinc_lock_mode| replace:: ``innodb_autoinc_lock_mode``
-.. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
+.. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
 
 Combining schema and data changes in a single statement
 -------------------------------------------------------

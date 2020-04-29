@@ -114,7 +114,6 @@ void Wsrep_client_service::cleanup_transaction() {
   m_thd->wsrep_affected_rows = 0;
 
   m_thd->wsrep_skip_wsrep_GTID = false;
-  m_thd->wsrep_skip_SE_checkpoint = false;
   m_thd->run_wsrep_commit_hooks = false;
   m_thd->run_wsrep_ordered_commit = false;
   m_thd->wsrep_enforce_group_commit = false;

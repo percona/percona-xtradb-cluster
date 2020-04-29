@@ -245,12 +245,12 @@ case "${1:-''}" in
 	$SELF start 
 	;;
 
-  'restart-bootstrap')
+  'bootstrap-restart')
 	set +e; $SELF stop; set -e
 	$SELF bootstrap-pxc 
 	;;
 
-  'reload'|'force-reload'|'reload-bootstrap')
+  'reload'|'force-reload'|'bootstrap-reload')
   	log_daemon_msg "Reloading MySQL (Percona XtraDB Cluster)" "mysqld"
         mysqld_pid=$(cat $pid_file 2>/dev/null)
 
@@ -270,7 +270,7 @@ case "${1:-''}" in
         fi
 	;;
 
-  'status'|'status-bootstrap')
+  'status'|'bootstrap-status')
 	if mysqld_status check_alive nowarn; then
 	  log_action_msg "Percona XtraDB Cluster up and running"
 	else
@@ -331,7 +331,7 @@ case "${1:-''}" in
 	fi
 	;;
   *)
-	echo "Usage: $SELF start|stop|restart|restart-bootstrap|reload|force-reload|status|bootstrap-pxc"
+	echo "Usage: $SELF start|stop|bootstrap-stop|restart|bootstrap-restart|reload|bootstrap-reload|force-reload|status|bootstrap-status|bootstrap-pxc"
 	exit 1
 	;;
 esac

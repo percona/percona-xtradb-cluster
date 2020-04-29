@@ -1096,15 +1096,16 @@ void Global_read_lock::unlock_global_read_lock(THD *thd) {
 
     /* If node not part of the cluster avoid running the resume/pause action */
     if (server_state.state() != Wsrep_server_state::s_disconnected) {
-      if (server_state.state() == Wsrep_server_state::s_donor ||
-          (wsrep_on(thd) &&
-           server_state.state() != Wsrep_server_state::s_synced)) {
+      /*
+       Resume wsrep server even if current thread has disabled replication.
+       We allow other nodes to replicate data to this server.
+       */
+      if (server_state.state() != Wsrep_server_state::s_synced) {
         /* TODO: maybe redundant here?: */
         wsrep_locked_seqno = WSREP_SEQNO_UNDEFINED;
         server_state.resume();
         pause_provider(false);
-      } else if (wsrep_on(thd) &&
-                 server_state.state() == Wsrep_server_state::s_synced) {
+      } else {
         server_state.resume_and_resync();
         pause_provider(false);
       }
@@ -1178,15 +1179,15 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
   /* If node has left the cluster no point in pausing and resuming it. */
   if (server_state.state() != Wsrep_server_state::s_disconnected) {
     wsrep::seqno paused_seqno;
-    if (server_state.state() == Wsrep_server_state::s_donor ||
-        (wsrep_on(thd) &&
-         server_state.state() != Wsrep_server_state::s_synced)) {
+
+    /*
+     Pause wsrep server even if current thread has disabled replication.
+     We don't want another nodes to replicate data to this server.
+     */
+    if (server_state.state() != Wsrep_server_state::s_synced) {
       paused_seqno = server_state.pause();
-    } else if (wsrep_on(thd) &&
-               server_state.state() == Wsrep_server_state::s_synced) {
-      paused_seqno = server_state.desync_and_pause();
     } else {
-      return false;
+      paused_seqno = server_state.desync_and_pause();
     }
     WSREP_INFO("Server paused at: %lld", paused_seqno.get());
     if (paused_seqno.get() >= 0) {

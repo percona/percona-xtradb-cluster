@@ -25,6 +25,7 @@
 #include "mysqld.h"
 #include "rpl_msr.h"  // channel_map
 #include "rpl_slave.h"
+#include "sql/auth/auth_common.h"
 #include "sql/sql_lex.h"
 #include "sql_base.h"  // TEMP_PREFIX
 #include "sql_class.h"
@@ -453,7 +454,6 @@ static void *sst_joiner_thread(void *a) {
     const size_t magic_len = sizeof(magic) - 1;
     const int out_len = 512;
     char out[out_len];
-    int ret;
 
     WSREP_INFO("Initiating SST/IST transfer on JOINER side (%s)", arg->cmd);
 
@@ -471,13 +471,7 @@ static void *sst_joiner_thread(void *a) {
     err = start_sst_logger_thread(&logger_arg, &logger_thd);
 
     if (!err && !proc.error()) {
-      err = 0;
-      ret = fprintf(proc.write_pipe(), "wsrep_schema_version=%s\n",
-                    WSREP_SCHEMA_VERSION);
-      if (ret <= 0) {
-        WSREP_ERROR("sst_joiner_thread(): fprintf() failed: %d", ret);
-        err = (ret < 0 ? ret : -EMSGSIZE);
-      }
+      // Write out to the stdin pipe any parameters (if needed)
 
       // Close the pipe, so that the other side gets an EOF
       proc.close_write_pipe();
@@ -535,8 +529,7 @@ static void *sst_joiner_thread(void *a) {
     mysql_cond_signal(&arg->COND_wsrep_sst_thread);
     mysql_mutex_unlock(&arg->LOCK_wsrep_sst_thread);
 
-    if (err)
-    {
+    if (err) {
       // The process has exited, so the logger thread should
       // also have exited
       if (logger_thd) pthread_join(logger_thd, NULL);
@@ -616,7 +609,7 @@ static void *sst_joiner_thread(void *a) {
     thd->variables.transaction_isolation = ISO_READ_COMMITTED;
 
     wsrep_sst_complete(thd, -err);
-
+    WSREP_SYSTEM("SST completed");
     delete thd;
     my_thread_end();
   }
@@ -787,237 +780,6 @@ std::string wsrep_sst_prepare() {
   return ret;
 }
 
-static void *sst_upgrade_thread(void *a) {
-  sst_thread_arg *arg = (sst_thread_arg *)a;
-  int err = 1;
-
-#ifdef HAVE_PSI_INTERFACE
-  wsrep_pfs_register_thread(key_THREAD_wsrep_sst_upgrade);
-#endif /* HAVE_PSI_INTERFACE */
-
-  {
-    THD *thd;
-    const char magic[] = "ready";
-    const size_t magic_len = sizeof(magic) - 1;
-    const int out_len = 512;
-    char out[out_len];
-
-    WSREP_INFO("Initiating mysql upgrade on JOINER side (%s)", arg->cmd);
-
-    // Launch the SST script and save pointer to its process:
-    if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
-    wsp::process proc(arg->cmd, "rw", arg->env);
-    sst_process = &proc;
-    mysql_mutex_unlock(&LOCK_wsrep_sst);
-
-    pthread_t logger_thd = 0;
-    sst_logger_thread_arg logger_arg(proc.err_pipe());
-    proc.clear_err_pipe();
-
-    err = start_sst_logger_thread(&logger_arg, &logger_thd);
-
-    if (!err && !proc.error()) {
-      int ret;
-      err = 0;
-      ret = fprintf(proc.write_pipe(), "wsrep_schema_version=%s\n",
-                    WSREP_SCHEMA_VERSION);
-      if (ret <= 0) {
-        WSREP_ERROR("sst_upgrade_thread(): fprintf() failed: %d", ret);
-        err = (ret < 0 ? ret : -EMSGSIZE);
-      }
-
-      // Close the pipe, so that the other side gets an EOF
-      proc.close_write_pipe();
-    }
-
-    if (!err && proc.pipe() && !proc.error()) {
-      // We wait for "ready" to be written out. This means that the script
-      // has completed the upgrade and we can return and let the rest of
-      // the system continue.
-      const char *tmp = my_fgets(out, out_len, proc.pipe());
-
-      if (!tmp || strlen(tmp) < magic_len ||
-          strncasecmp(tmp, magic, magic_len)) {
-        err = EINVAL;
-        if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
-        // Print error message if SST is not cancelled:
-        if (!sst_cancelled) {
-          // Null-pointer is not valid argument for %s formatting (even
-          // though it is supported by many compilers):
-          WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '%s'",
-                      magic, arg->cmd, tmp ? tmp : "(null)");
-        }
-        // Clear the pointer to SST process:
-        sst_process = NULL;
-        mysql_mutex_unlock(&LOCK_wsrep_sst);
-        proc.wait();
-        if (proc.error()) err = proc.error();
-      } else {
-        // Clear the pointer to SST process:
-        if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
-        sst_process = NULL;
-        mysql_mutex_unlock(&LOCK_wsrep_sst);
-        err = 0;
-      }
-    } else {
-      // Clear the pointer to SST process:
-      if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
-      sst_process = NULL;
-      mysql_mutex_unlock(&LOCK_wsrep_sst);
-      err = proc.error();
-      WSREP_ERROR("Failed to execute: %s : %d (%s)", arg->cmd, err,
-                  strerror(err));
-    }
-
-    // signal sst_prepare thread with ret code,
-    // it will go on sending SST request
-    mysql_mutex_lock(&arg->LOCK_wsrep_sst_thread);
-    arg->err = -err;
-    mysql_cond_signal(&arg->COND_wsrep_sst_thread);
-    mysql_mutex_unlock(&arg->LOCK_wsrep_sst_thread);
-
-    if (err)
-      return NULL; /* lp:808417 - return immediately, don't signal
-                    * initializer thread to ensure single thread of
-                    * shutdown. */
-
-    proc.wait();
-
-    // The process has exited, so the logger thread should
-    // also have exited
-    if (logger_thd) pthread_join(logger_thd, NULL);
-
-    if (proc.error()) {
-      err = proc.error();
-      char errbuf[MYSYS_STRERROR_SIZE];
-      WSREP_ERROR("Upgrade script aborted with error %d (%s)", err,
-                  my_strerror(errbuf, sizeof(errbuf), err));
-    }
-
-    // Tell initializer thread that SST is complete
-    if (my_thread_init()) {
-      WSREP_ERROR(
-          "my_thread_init() failed, can't signal end of SST. "
-          "Aborting.");
-      unireg_abort(1);
-    }
-
-    thd = new THD;
-    thd->set_new_thread_id();
-
-    if (!thd) {
-      WSREP_ERROR(
-          "Failed to allocate THD to restore view from local state, "
-          "can't signal end of SST. Aborting.");
-      unireg_abort(1);
-    }
-
-    thd->thread_stack = (char *)&thd;
-    thd->security_context()->skip_grants();
-    thd->system_thread = SYSTEM_THREAD_BACKGROUND;
-    thd->real_id = pthread_self();
-    thd->store_globals();
-
-    /* */
-    thd->variables.wsrep_on = 0;
-    /* No binlogging */
-    thd->variables.sql_log_bin = 0;
-    thd->variables.option_bits &= ~OPTION_BIN_LOG;
-    /* No general log */
-    thd->variables.option_bits |= OPTION_LOG_OFF;
-    /* Read committed isolation to avoid gap locking */
-    thd->variables.transaction_isolation = ISO_READ_COMMITTED;
-
-    // Tell initializer thread that SST is complete
-    wsrep_sst_complete(thd, err);
-  }
-
-#ifdef HAVE_PSI_INTERFACE
-  wsrep_pfs_delete_thread();
-#endif /* HAVE_PSI_INTERFACE */
-
-  return NULL;
-}
-
-static ssize_t sst_prepare_upgrade() {
-  int const cmd_len = 4096;
-  wsp::string cmd_str(cmd_len);
-
-  if (!cmd_str()) {
-    WSREP_ERROR(
-        "sst_prepare_upgrade(): could not allocate cmd buffer of %d bytes",
-        cmd_len);
-    return -ENOMEM;
-  }
-
-  const char *binlog_opt = "";
-  char *binlog_opt_val = NULL;
-
-  int ret;
-  if ((ret = generate_binlog_opt_val(&binlog_opt_val))) {
-    WSREP_ERROR("sst_prepare_upgrade(): generate_binlog_opt_val() failed: %d",
-                ret);
-    return ret;
-  }
-  if (strlen(binlog_opt_val)) binlog_opt = WSREP_SST_OPT_BINLOG;
-
-  ret = snprintf(cmd_str(), cmd_len,
-                 "wsrep_sst_upgrade " WSREP_SST_OPT_DATA
-                 " '%s' " WSREP_SST_OPT_BASEDIR " '%s' " WSREP_SST_OPT_PLUGINDIR
-                 " '%s' " WSREP_SST_OPT_CONF " '%s' " WSREP_SST_OPT_CONF_SUFFIX
-                 " '%s' " WSREP_SST_OPT_PARENT " '%d' " WSREP_SST_OPT_VERSION
-                 " '%s' "
-                 " %s '%s' ",
-                 mysql_real_data_home, mysql_home_ptr ? mysql_home_ptr : "",
-                 opt_plugin_dir_ptr ? opt_plugin_dir_ptr : "",
-                 wsrep_defaults_file, wsrep_defaults_group_suffix,
-                 (int)getpid(), MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
-                 binlog_opt, binlog_opt_val);
-  my_free(binlog_opt_val);
-
-  if (ret < 0 || ret >= cmd_len) {
-    WSREP_ERROR("sst_prepare_upgrade(): snprintf() failed: %d", ret);
-    return (ret < 0 ? ret : -EMSGSIZE);
-  }
-
-  wsp::env env(NULL);
-  if (env.error()) {
-    WSREP_ERROR("sst_prepare_upgrade(): env. var ctor failed: %d",
-                -env.error());
-    return -env.error();
-  }
-
-  pthread_t tmp;
-  sst_thread_arg arg(cmd_str(), env());
-  mysql_mutex_lock(&arg.LOCK_wsrep_sst_thread);
-  ret = pthread_create(&tmp, NULL, sst_upgrade_thread, &arg);
-  if (ret) {
-    WSREP_ERROR("sst_prepare_upgrade(): pthread_create() failed: %d (%s)", ret,
-                strerror(ret));
-    return -ret;
-  }
-  mysql_cond_wait(&arg.COND_wsrep_sst_thread, &arg.LOCK_wsrep_sst_thread);
-
-  if (arg.err) {
-    assert(arg.err < 0);
-    ret = arg.err;
-  }
-
-  pthread_detach(tmp);
-
-  return ret;
-}
-
-ssize_t wsrep_sst_upgrade() {
-  ssize_t addr_len = sst_prepare_upgrade();
-  if (addr_len < 0) {
-    WSREP_ERROR("Failed to run upgrade. Unrecoverable.");
-    unireg_abort(1);
-  }
-
-  return addr_len;
-}
-
 #if 0
 // helper method for donors
 static int sst_run_shell(const char *cmd_str, char **env, int max_tries) {
@@ -1183,6 +945,9 @@ const std::string get_allowed_pwd_chars() { return g_allowed_pwd_chars; }
 static void generate_password(std::string *password, int size) {
   std::stringstream ss;
   bool srnd;
+  constexpr const char *prefix = "yx9!A-";
+  ss << prefix;
+  size -= strlen(prefix);
   while (size > 0) {
     int ch = ((int)(my_rnd_ssl(&srnd) * 100)) % get_allowed_pwd_chars().size();
     ss << get_allowed_pwd_chars()[ch];
@@ -1255,7 +1020,8 @@ static MYSQL_SESSION setup_server_session(bool initialize_thread) {
 }
 
 static uint server_session_execute(MYSQL_SESSION session, std::string query,
-                                   const char *safe_query) {
+                                   const char *safe_query,
+                                   bool ignore_error = false) {
   COM_DATA cmd;
   wsp::Sql_resultset rset;
   cmd.com_query.query = query.c_str();
@@ -1271,7 +1037,7 @@ static uint server_session_execute(MYSQL_SESSION session, std::string query,
   delete ctx;
 
   err = rset.sql_errno();
-  if (err) {
+  if (err && !ignore_error) {
     // an error occurred, retrieve the status/message
     if (safe_query) {
       WSREP_ERROR("Command execution failed (%d) : %s", err, safe_query);
@@ -1298,8 +1064,8 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
     nullptr,
     "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;",
     nullptr,
-    "CREATE USER 'mysql.pxc.sst.user'@localhost IDENTIFIED WITH "
-    "'mysql_native_password' BY '%s' ACCOUNT LOCK;",
+    "CREATE USER 'mysql.pxc.sst.user'@localhost "
+    " IDENTIFIED BY '%s' ACCOUNT LOCK;",
     "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
   /*
     This is the code that uses the mysql.pxc.sst.role
@@ -1322,6 +1088,8 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
     "'mysql.pxc.sst.user'@localhost;",
     nullptr,
     "GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.user'@localhost;",
+    nullptr,
+    "GRANT CREATE USER ON *.* to 'mysql.pxc.sst.user'@localhost;",
     nullptr,
     "GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.user'@localhost;",
     nullptr,
@@ -1348,7 +1116,8 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
       err = (ret < 0 ? ret : -EMSGSIZE);
       break;
     }
-    err = server_session_execute(session, auth_buf, cmds[index + 1]);
+    // Ignore errors: also ignored in the boostrap code
+    err = server_session_execute(session, auth_buf, cmds[index + 1], true);
   }
 
   // Overwrite query (clear out any sensitive data)
@@ -1363,11 +1132,19 @@ int wsrep_remove_sst_user(bool initialize_thread) {
   int err = 0;
   MYSQL_SESSION session = NULL;
 
+  // Skip the attempt to  mysql.pxc.sst.user in case the server was started with
+  // --skip-grant-tables option. It would fail enyway with error.
+  // This will prevent writing out error to error log.
+  if (skip_grant_tables()) {
+    return ECANCELED;
+  }
   // This array is filled with pairs of entries
   // The first entry is the actual query to be run
   // The second entry is the string to be displayed if the query fails
   //  (this can be NULL, in which case the actual query will be used)
   const char *cmds[] = {"SET SESSION sql_log_bin = OFF;",
+                        nullptr,
+                        "SET SESSION lock_wait_timeout = 1;",
                         nullptr,
                         "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;",
                         nullptr,
@@ -1382,7 +1159,8 @@ int wsrep_remove_sst_user(bool initialize_thread) {
   }
 
   for (int index = 0; !err && cmds[index]; index += 2) {
-    err = server_session_execute(session, cmds[index], cmds[index + 1]);
+    // Ignore errors, as those are also ignored during user creation
+    err = server_session_execute(session, cmds[index], cmds[index + 1], true);
   }
 
   cleanup_server_session(session, initialize_thread);
@@ -1423,6 +1201,14 @@ static void *sst_donor_thread(void *a) {
 #ifdef HAVE_PSI_INTERFACE
     wsrep_pfs_delete_thread();
 #endif /* HAVE_PSI_INTERFACE */
+
+    /* Inform server about SST script startup and release TO isolation */
+    mysql_mutex_lock(&arg->LOCK_wsrep_sst_thread);
+    arg->err = -err;
+    mysql_cond_signal(&arg->COND_wsrep_sst_thread);
+    mysql_mutex_unlock(
+        &arg->LOCK_wsrep_sst_thread);  //! @note arg is unusable after that.
+
     return NULL;
   }
 
@@ -1440,9 +1226,8 @@ static void *sst_donor_thread(void *a) {
     int ret;
     ret = fprintf(proc.write_pipe(),
                   "sst_user=mysql.pxc.sst.user\n"
-                  "sst_password=%s\n"
-                  "wsrep_schema_version=%s\n",
-                  password.c_str(), WSREP_SCHEMA_VERSION);
+                  "sst_password=%s\n",
+                  password.c_str());
     if (ret < 0) {
       WSREP_ERROR("sst_donor_thread(): fprintf() failed: %d", ret);
       err = (ret < 0 ? ret : -EMSGSIZE);
@@ -1656,44 +1441,3 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
 
   return (ret >= 0 ? WSREP_CB_SUCCESS : WSREP_CB_FAILURE);
 }
-
-#if 0
-void wsrep_SE_init_grab() {
-  if (mysql_mutex_lock(&LOCK_wsrep_sst_init)) abort();
-}
-
-void wsrep_SE_init_wait(THD *thd) {
-  while (SE_initialized == false && thd->killed == THD::NOT_KILLED) {
-    mysql_mutex_lock(&thd->LOCK_thd_data);
-    thd->current_cond = &COND_wsrep_sst_init;
-    thd->current_mutex = &LOCK_wsrep_sst_init;
-    mysql_mutex_unlock(&thd->LOCK_thd_data);
-
-    mysql_cond_wait(&COND_wsrep_sst_init, &LOCK_wsrep_sst_init);
-
-    if (thd->killed != THD::NOT_KILLED) {
-      WSREP_DEBUG("SE init waiting canceled");
-      break;
-    }
-    mysql_mutex_lock(&thd->LOCK_thd_data);
-    thd->current_cond = NULL;
-    thd->current_mutex = NULL;
-    mysql_mutex_unlock(&thd->LOCK_thd_data);
-  }
-  mysql_mutex_unlock(&LOCK_wsrep_sst_init);
-
-  mysql_mutex_lock(&thd->LOCK_thd_data);
-  thd->current_cond = NULL;
-  thd->current_mutex = NULL;
-  mysql_mutex_unlock(&thd->LOCK_thd_data);
-}
-
-void wsrep_SE_init_done() {
-  mysql_cond_signal(&COND_wsrep_sst_init);
-  mysql_mutex_unlock(&LOCK_wsrep_sst_init);
-}
-
-void wsrep_SE_initialized() { SE_initialized = true; }
-
-bool wsrep_is_SE_initialized() { return SE_initialized; }
-#endif

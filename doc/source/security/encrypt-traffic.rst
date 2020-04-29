@@ -28,23 +28,25 @@ Encrypting Client-Server Communication
 to secure communication between client applications and cluster nodes.
 
 Specify the following settings in the :file:`my.cnf` configuration file
-for each node::
+for each node:
 
- [mysqld]
- ssl-ca=/etc/mysql/certs/ca.pem
- ssl-cert=/etc/mysql/certs/server-cert.pem
- ssl-key=/etc/mysql/certs/server-key.pem
+.. code-block:: guess
 
- [client]
- ssl-ca=/etc/mysql/certs/ca.pem
- ssl-cert=/etc/mysql/certs/client-cert.pem
- ssl-key=/etc/mysql/certs/client-key.pem
+   [mysqld]
+   ssl-ca=/etc/mysql/certs/ca.pem
+   ssl-cert=/etc/mysql/certs/server-cert.pem
+   ssl-key=/etc/mysql/certs/server-key.pem
+  
+   [client]
+   ssl-ca=/etc/mysql/certs/ca.pem
+   ssl-cert=/etc/mysql/certs/client-cert.pem
+   ssl-key=/etc/mysql/certs/client-key.pem
 
 After restart the node will use these files to encrypt communication with
 clients. MySQL clients require only the second part of the configuration
 to communicate with cluster nodes.
 
-Starting from the version 5.7, |MySQL| generates default key and certificate
+|MySQL| generates default key and certificate
 files and places them in data directory. You can either use them or generate
 new certificates. For generation of new certificate please refer to
 :ref:`generate-keys-certs` section.
@@ -61,7 +63,7 @@ Traffic of each type is transferred via different channel, and so it is
 important to configure secure channels for all 3 variants to completely
 secure the replication traffic.
 
-Starting from 5.7, PXC supports a single configuration option which helps to
+|PXC| supports a single configuration option which helps to
 secure complete replication traffic, and is often referred as Automatic
 Configuration. User can also ignore this and configure security of
 each channel by specifying independent parameters.
@@ -88,24 +90,28 @@ enable automatic configuration of SSL encryption, set
 :file:`my.cnf` file, and restart the cluster (by default it is disabled
 there-by using non-secured channel for replication).
 
-.. note:: Setting ``pxc-encrypt-cluster-traffic=ON`` has effect of applying
-          the following settings in :file:`my.cnf` configuration file::
+.. note::
 
-           [mysqld]
-           wsrep_provider_options=”socket.ssl_key=server-key.pem;socket.ssl_cert=server-cert.pem;socket.ssl_ca=ca.pem”
+   Setting ``pxc-encrypt-cluster-traffic=ON`` has effect of applying
+   the following settings in :file:`my.cnf` configuration file:
 
-           [sst]
-           encrypt=4
-           ssl-key=server-key.pem
-           ssl-ca=ca.pem
-           ssl-cert=server-cert.pem
+   .. code-block:: text
 
-          For :variable:`wsrep_provider_options`, only the mentioned options
-          are affected (``socket.ssl_key``, ``socket,ssl_cert``, and
-          ``socket.ssl_ca``), the rest is not modified.
+      [mysqld]
+      wsrep_provider_options=”socket.ssl_key=server-key.pem;socket.ssl_cert=server-cert.pem;socket.ssl_ca=ca.pem”
+
+      [sst]
+      encrypt=4
+      ssl-key=server-key.pem
+      ssl-ca=ca.pem
+      ssl-cert=server-cert.pem
+
+   For :variable:`wsrep_provider_options`, only the mentioned options
+   are affected (``socket.ssl_key``, ``socket,ssl_cert``, and
+   ``socket.ssl_ca``), the rest is not modified.
 
 Automatic configuration of the SSL encryption needs key and certificate files.
-Starting from the version 5.7, |MySQL| generates default key and certificate
+|MySQL| generates default key and certificate
 files and places them in data directory. These auto-generated files are
 suitable for automatic SSL configuration, but you should use the same key and
 certificate files on all nodes. Also you can override auto-generated files with
@@ -175,23 +181,20 @@ For more information, see :ref:`state_snapshot_transfer`.
           The cluster will not work if keyring configuration across nodes is
           different.
 
-The default SST method is ``xtrabackup-v2`` which uses |Percona XtraBackup|.
+The only available SST method is ``xtrabackup-v2`` which uses |Percona XtraBackup|.
 
 .. _xtrabackup:
 
 xtrabackup
 **********
 
-This is the default SST method (the :variable:`wsrep_sst_method` is set
+This is the only available SST method (the :variable:`wsrep_sst_method` is always set
 to ``xtrabackup-v2``), which uses |PXB|_ to perform non-blocking transfer
 of files. For more information, see :ref:`xtrabackup_sst`.
 
 Encryption mode for this method is selected using the :option:`encrypt` option:
 
 * ``encrypt=0`` is the default value, meaning that encryption is disabled.
-
-* ``encrypt=1``, ``encrypt=2``, and ``encrypt=3`` have been deprecated.
-
 * ``encrypt=4`` enables encryption based on key and certificate files
   generated with OpenSSL.
   For more information, see :ref:`generate-keys-certs`.
@@ -366,17 +369,17 @@ To check if this is the case run ``openssl`` command as follows and verify that 
 
 .. admonition:: Incorrect values
 
-.. code-block:: text
+   .. code-block:: text
 
-   Certificate:
-   Data:
-   Version: 1 (0x0)
-   Serial Number: 1 (0x1)
-   Signature Algorithm: sha256WithRSAEncryption
-   Issuer: CN=www.percona.com, O=Database Performance., C=US
-   ...
-   Subject: CN=www.percona.com, O=Database Performance., C=AU
-   ...
+      Certificate:
+      Data:
+      Version: 1 (0x0)
+      Serial Number: 1 (0x1)
+      Signature Algorithm: sha256WithRSAEncryption
+      Issuer: CN=www.percona.com, O=Database Performance., C=US
+      ...
+      Subject: CN=www.percona.com, O=Database Performance., C=AU
+      ...
 
 To obtain a more compact output run ``openssl`` specifying `-subject` and `-issuer` parameters:
 
@@ -386,10 +389,10 @@ To obtain a more compact output run ``openssl`` specifying `-subject` and `-issu
 
 .. admonition:: Output
 
-.. code-block:: text
+   .. code-block:: text
 
-   subject= /CN=www.percona.com/O=Database Performance./C=AU
-   issuer= /CN=www.percona.com/O=Database Performance./C=US
+      subject= /CN=www.percona.com/O=Database Performance./C=AU
+      issuer= /CN=www.percona.com/O=Database Performance./C=US
 
 Deploying Keys and Certificates
 -------------------------------

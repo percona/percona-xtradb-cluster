@@ -18,20 +18,14 @@ if ($galera_wsrep_start_position == '') {
 if ($suppress_print_params == '') {
   # We use --exec echo instead of simple "--echo" because
   # replace_result works on --exec
-  --replace_regex /--wsrep-start-position=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9]*/--wsrep-start-position=<WSREP_START_POSITION>/ /127\.0\.0\.1:[0-9]{1,5}/127.0.0.1:<PORT>/ /socket\.ssl_ca=\/[-_\/[:alnum:]\.]*/socket.ssl_ca=<SSL_CA>/ /socket\.ssl_cert=\/[-_\/[:alnum:]\.]*/socket.ssl_cert=<SSL_CERT>/ /socket\.ssl_key=\/[-_\/[:alnum:]\.]*/socket.ssl_key=<SSL_KEY>/ /base_port=[0-9]{5}/base_port=<PORT>/
-  --exec echo "# $restart_parameters"
+  if (!$restart_hide_args) {
+    --replace_regex /--wsrep-start-position=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9]*/--wsrep-start-position=<WSREP_START_POSITION>/ /127\.0\.0\.1:[0-9]{1,5}/127.0.0.1:<PORT>/ /socket\.ssl_ca=\/[-_\/[:alnum:]\.]*/socket.ssl_ca=<SSL_CA>/ /socket\.ssl_cert=\/[-_\/[:alnum:]\.]*/socket.ssl_cert=<SSL_CERT>/ /socket\.ssl_key=\/[-_\/[:alnum:]\.]*/socket.ssl_key=<SSL_KEY>/ /base_port=[0-9]{5}/base_port=<PORT>/
+    --exec echo "# $restart_parameters"
+  }
+  if ($restart_hide_args) {
+    --echo # restart:<hidden args>
+  }
 }
-# We use --exec echo instead of simple "--echo" because
-# replace_result works on --exec
-#if (!$restart_hide_args)
-#{
-#  --exec echo "# $restart_parameters"
-#}
-#if ($restart_hide_args)
-#{
-#  --echo # restart:<hidden args>
-#  let $restart_hide_args=;
-#}
 
 # Include this script only after using shutdown_mysqld.inc
 # or kill_mysqld.inc or expect_crash.inc

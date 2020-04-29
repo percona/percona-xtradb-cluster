@@ -101,8 +101,8 @@ Package: percona-xtradb-cluster-common
 Section: database
 Architecture: any
 Pre-depends: debconf (>= 0.2.17), debsums, ${misc:Pre-Depends}
-Provides: mysql-common
-Replaces: mysql-common
+Provides: mysql-common, mariadb-common
+Replaces: mysql-common, mariadb-common
 Multi-Arch: foreign
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Percona XtraDB Cluster database common files (e.g. /etc/mysql/my.cnf)
@@ -186,10 +186,10 @@ Architecture: any
 Suggests: tinyca, netcat-openbsd, pv 
 Pre-Depends: percona-xtradb-cluster-common (= ${binary:Version}),
              adduser,
+             libdbd-mysql-perl,
              debconf (>= 0.2.17)
 Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          libdbi-perl,
-         libdbd-mysql-perl,
          perl (>= 5.6),
          ${shlibs:Depends},
          ${misc:Depends},
@@ -197,8 +197,6 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          passwd,
          lsb-base (>= 3.0-10),
          socat,
-        lsof,
-         rsync,
          qpress,
          iproute
 Provides: mysql-server,
@@ -289,8 +287,6 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          passwd,
          lsb-base (>= 3.0-10),
          socat,
-         lsof,
-         rsync,
          qpress,
          iproute
 Provides: mysql-server-debug

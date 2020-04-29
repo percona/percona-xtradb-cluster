@@ -7,8 +7,8 @@ Installing |PXC| on Debian or Ubuntu
 Percona provides :file:`.deb` packages for 64-bit versions
 of the following distributions:
 
-* Debian 9 ("stretch")
-* Debian 10 ("buster")
+* Debian 9 (stretch)
+* Debian 10 (buster)
 * Ubuntu 16.04 LTS (Xenial Xerus)
 * Ubuntu 18.04 LTS (Bionic Beaver)
 * Ubuntu 20.04 LTS (Bionic Beaver)
@@ -75,7 +75,8 @@ Installing from Repository
       * ``percona-xtradb-cluster-garbd-3.x-dbg``
       * ``libmysqlclient18``
 
-   During installation, you will be prompted to provide a password
+
+   During the installation, you are requested to provide a password
    for the ``root`` user on the database node.
 
 #. Stop the ``mysql`` service:

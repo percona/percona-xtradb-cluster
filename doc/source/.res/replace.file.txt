@@ -2,3 +2,5 @@
 .. |etc.my-cnf| replace:: :file:`/etc/my.cnf`
 .. |etc.my-cnf-backup| replace:: :file:`etc/my.cnf_backup-20181201-1802`
 .. |etc/my.cnf| replace:: :file:`/etc/my.cnf`
+.. |pxc-build| replace:: :file:`pxc-build`
+.. |tarball| replace:: :file:`Percona-XtraDB-Cluster-8.0.x86_64.tar.gz`

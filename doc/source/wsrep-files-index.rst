@@ -29,7 +29,7 @@
       /*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;
       DELIMITER /*!*/;
       # at 4
-      #160809  16:04:05 server id 3  end_log_pos 123     Start: binlog v 4, server v 5.7.12-5rc1-log created 160809 16:04:05 at startup
+      #160809  16:04:05 server id 3  end_log_pos 123     Start: binlog v 4, server v 8.0-log created 160809 16:04:05 at startup
       # Warning: this binlog is either in use or was not closed properly.
       ROLLBACK/*!*/;
       BINLOG '
@@ -63,6 +63,16 @@
      160805  9:33:37 8:52:21 [Warning] WSREP: RBR event 1 Query apply warning: 1, 3
 
    In this example ``DROP TABLE`` statement was executed on a table that doesn't exist.
+
+
+* :file:`gcache.page`
+
+  See :variable:`gcache.page_size`  
+
+  .. seealso::
+
+     |percona| Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
+        https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/
 
 .. _galera.cache: galera_cache
 

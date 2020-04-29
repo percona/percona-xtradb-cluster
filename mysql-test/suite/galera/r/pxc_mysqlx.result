@@ -1,0 +1,235 @@
+# Testing CREATE TABLE DDL and INSERT DML (SQL)
+# node 1
+RUN DROP DATABASE IF EXISTS dbtest
+
+0 rows affected
+RUN CREATE DATABASE dbtest
+
+1 rows affected
+RUN USE dbtest
+
+0 rows affected
+RUN CREATE TABLE t1 (
+  id INT PRIMARY KEY,
+  f2 TEXT)
+
+0 rows affected
+RUN INSERT INTO t1 VALUES (1, "foo")
+
+1 rows affected
+RUN INSERT INTO t1 VALUES (2, "bar")
+
+1 rows affected
+Mysqlx.Ok {
+  msg: "bye!"
+}
+ok
+# node 1
+SELECT * FROM dbtest.t1;
+id	f2
+1	foo
+2	bar
+# node 2
+SELECT * FROM dbtest.t1;
+id	f2
+1	foo
+2	bar
+# Testing DELETE DML (SQL)
+RUN DELETE FROM dbtest.t1 WHERE id = 1
+
+1 rows affected
+Mysqlx.Ok {
+  msg: "bye!"
+}
+ok
+# node 1
+SELECT * FROM dbtest.t1;
+id	f2
+2	bar
+# node 2
+SELECT * FROM dbtest.t1;
+id	f2
+2	bar
+# Testing UPDATE DML (SQL)
+RUN UPDATE dbtest.t1 SET f2="baz" WHERE id = 2
+
+1 rows affected
+Rows matched: 1  Changed: 1  Warnings: 0
+RUN INSERT INTO dbtest.t1 VALUES (3, "foobar")
+
+1 rows affected
+Mysqlx.Ok {
+  msg: "bye!"
+}
+ok
+# node 1
+SELECT * FROM dbtest.t1;
+id	f2
+2	baz
+3	foobar
+# node 2
+SELECT * FROM dbtest.t1;
+id	f2
+2	baz
+3	foobar
+# Clearing table for native tests
+# node 1
+DELETE FROM dbtest.t1;
+# Testing INSERT DML (native)
+send Mysqlx.Crud.Insert {
+  collection {
+    name: "t1"
+    schema: "dbtest"
+  }
+  data_model: TABLE
+  projection {
+    name: "id"
+  }
+  projection {
+    name: "f2"
+  }
+  row {
+    field {
+      type: LITERAL
+      literal {
+        type: V_SINT
+        v_signed_int: 1
+      }
+    }
+    field {
+      type: LITERAL
+      literal {
+        type: V_STRING
+        v_string {
+          value: "foo2"
+        }
+      }
+    }
+  }
+}
+
+
+1 rows affected
+Mysqlx.Ok {
+  msg: "bye!"
+}
+ok
+# node 1
+SELECT * FROM dbtest.t1;
+id	f2
+1	foo2
+# node 2
+SELECT * FROM dbtest.t1;
+id	f2
+1	foo2
+# Testing DELETE DML (native)
+send Mysqlx.Crud.Delete {
+  collection {
+    name: "t1"
+    schema: "dbtest"
+  }
+  data_model: TABLE
+  criteria {
+    type: OPERATOR
+    operator {
+      name: "=="
+      param {
+        type: IDENT
+        identifier {
+          name: "id"
+        }
+      }
+      param {
+        type: LITERAL
+        literal {
+          type: V_SINT
+          v_signed_int: 1
+        }
+      }
+    }
+  }
+}
+
+
+1 rows affected
+Mysqlx.Ok {
+  msg: "bye!"
+}
+ok
+# node 1
+SELECT * FROM dbtest.t1;
+id	f2
+# node 2
+SELECT * FROM dbtest.t1;
+id	f2
+# Testing UPDATE DML (native)
+# node 1
+INSERT INTO dbtest.t1 VALUES(1, "foo");
+SELECT * FROM dbtest.t1;
+id	f2
+1	foo
+# node 2
+SELECT * FROM dbtest.t1;
+id	f2
+1	foo
+send Mysqlx.Crud.Update {
+  collection {
+    name: "t1"
+    schema: "dbtest"
+  }
+  data_model: TABLE
+  criteria {
+    type: OPERATOR
+    operator {
+      name: "=="
+      param {
+        type: IDENT
+        identifier {
+          name: "id"
+        }
+      }
+      param {
+        type: LITERAL
+        literal {
+          type: V_SINT
+          v_signed_int: 1
+        }
+      }
+    }
+  }
+  operation {
+    source {
+      name: "f2"
+    }
+    operation: SET
+    value {
+      type: LITERAL
+      literal {
+        type: V_STRING
+        v_string {
+          value: "bar2"
+        }
+      }
+    }
+  }
+}
+
+
+1 rows affected
+Rows matched: 1  Changed: 1  Warnings: 0
+Mysqlx.Ok {
+  msg: "bye!"
+}
+ok
+# node 1
+INSERT INTO dbtest.t1 VALUES (2, "baz2");
+SELECT * FROM dbtest.t1;
+id	f2
+1	bar2
+2	baz2
+# node 2
+SELECT * FROM dbtest.t1;
+id	f2
+1	bar2
+2	baz2
+DROP DATABASE dbtest;

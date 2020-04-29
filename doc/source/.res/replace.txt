@@ -7,6 +7,7 @@
 .. |ps-last| replace:: Percona Server for MySQL 8.0
 .. |xtradb.product| replace:: Percona XtraDB
 .. |ps| replace:: Percona Server for MySQL
+.. |percona-server| replace:: Percona Server for MySQL
 
 .. Platforms and rel. products
 
@@ -18,8 +19,12 @@
 .. |docker| replace:: Docker
 .. |centos| replace:: CentOS
 .. |rhel| replace:: RHEL
+.. |galera-cluster| replace:: Galera Cluster
 
 .. |version.next| replace:: 9.0
 .. |changed-version| replace:: 8.0.15-5
 .. |version.prev| replace:: 5.7
 .. |version.previous| replace:: 5.7
+
+.. |data-at-rest| replace:: *data at rest*
+.. |wsrep_state_dat| replace:: :file:`wsrep_state.dat`

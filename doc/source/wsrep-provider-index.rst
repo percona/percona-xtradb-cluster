@@ -74,6 +74,31 @@ with other nodes.
 This variable is used to specify if the details of the certification failures
 should be logged.
 
+.. variable:: cert.optimistic_pa
+
+Enabled
+   Allows the full range of parallelization as determined by the certification
+   algorithm.
+
+Disabled
+   Limits the parallel applying window so that it does not exceed the parallel
+   applying window seen on the master. In this case, the action starts applying
+   no sooner than all actions on the master are committed.
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: YES
+   
+   .. seealso::
+
+      |galera-cluster| Documentation:
+         - `Parameter: cert.optimistic_pa
+	   <https://galeracluster.com/library/documentation/galera-parameters.html#cert-optimistic-pa>`_
+	 - `Setting parallel slave threads
+	   <https://galeracluster.com/library/kb/parallel-slave-threads.html>`_
+
 .. variable:: debug
 
    :cli: Yes
@@ -341,7 +366,7 @@ allows restarting the node to rejoin by using :term:`IST`.
    Percona Database Performance Blog:
       - `All You Need to Know About GCache (Galera-Cache) <https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/>`_
       - `Want IST Not SST for Node Rejoins? We Have a Solution! <https://www.percona.com/blog/2018/02/13/no-sst-node-rejoins/>`_
-   
+
 The :variable:`gcache.freeze_purge_at_seqno` variable takes three values:
 
 -1 (default)
@@ -354,7 +379,7 @@ A valid seqno in gcache
    The freeze purge of write-sets is no less than the smallest seqno currently
    in gcache. Using this value results in freezing the gcache-purge instantly.
    Use this value if selecting a valid seqno in gcache is difficult.
-   
+
 .. variable:: gcache.keep_pages_count
 
    :cli: Yes
@@ -427,8 +452,16 @@ This variable can be used to specify the name of the Galera cache file.
    :dyn: No
    :default: 128M
 
-This variable can be used to specify the size of the page files in the page
-storage.
+Size of the page files in page storage. The limit on overall page storage is the
+size of the disk. Pages are prefixed by gcache.page.
+
+.. seealso::
+
+   |galera-cluster| Documentation: gcache.page_size
+      https://galeracluster.com/library/documentation/galera-parameters.html#gcache-page-size
+   |percona| Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
+      https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/
+
 
 .. variable:: gcache.size
 
@@ -468,7 +501,6 @@ the slave queue drops below :variable:`gcs.fc_factor` *
 
 .. variable:: gcs.fc_limit
 
-   :version: :rn:`5.7.17-29.20`: Default value changed from ``16`` to ``100`` 
    :cli: Yes
    :conf: Yes
    :scope: Global
@@ -850,7 +882,7 @@ is limited to 2 gygabytes.
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: 7
+   :default: 10
 
 This variable is used to specify the highest communication protocol version to
 accept in the cluster. Used only for debugging.
@@ -929,3 +961,5 @@ This variable is used to specify if the SSL compression is to be used.
    :default: AES128-SHA
 
 This variable is used to specify what cypher will be used for encryption.
+
+.. include:: ./res/replace.txt

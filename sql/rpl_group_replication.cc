@@ -49,6 +49,8 @@
 #include "sql/ssl_acceptor_context.h"
 #include "sql/system_variables.h"  // System_variables
 
+#include "sql/wsrep_mysqld.h"
+
 class THD;
 
 extern ulong opt_mi_repository_id;
@@ -95,7 +97,32 @@ LEX_CSTRING group_replication_plugin_name_str = {
 /*
   Group Replication plugin handler function accessors.
 */
-int group_replication_init() { return initialize_channel_service_interface(); }
+int group_replication_init() {
+#ifdef WITH_WSREP
+  if (pxc_strict_mode >= PXC_STRICT_MODE_ENFORCING) {
+    constexpr const char *error_msg =
+        "Group replication cannot be used with Percona XtraDB Cluster in "
+        "strict mode.";
+    WSREP_ERROR(error_msg);
+    if (current_thd) {
+      my_error(ER_PXC_GR_INIT, MYF(0), error_msg);
+    }
+    return 1;
+  } else {
+    constexpr const char *error_msg =
+        "Using group replication with Percona XtraDB Cluster is only supported "
+        "for migration. Please make sure that group replication is turned off "
+        "once all data is migrated to Percona XtraDB Cluster.";
+    WSREP_WARN(error_msg);
+    if (current_thd) {
+      push_warning_printf(current_thd, Sql_condition::SL_WARNING,
+                          ER_PXC_GR_INIT, ER_THD(current_thd, ER_PXC_GR_INIT),
+                          error_msg);
+    }
+  }
+#endif
+  return initialize_channel_service_interface();
+}
 
 bool is_group_replication_plugin_loaded() {
   bool result = false;

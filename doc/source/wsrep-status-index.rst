@@ -139,8 +139,6 @@ Number of ``FC_PAUSE`` events sent since the last status query.
 
 .. variable:: wsrep_flow_control_status
 
-   :Version: Introduced in 5.7.17-29.20
-
 This variable shows whether a node has flow control enabled for normal traffic.
 It does not indicate the status of flow control during SST.
 
@@ -161,8 +159,6 @@ Shows the comma-separated list of incoming node addresses in the cluster.
 
 .. variable:: wsrep_ist_receive_status
 
-   :Version: Introduced in 5.7.17-29.20
-
 Displays the progress of IST for joiner node.
 If IST is not running, the value is blank.
 If IST is running, the value is the percentage of transfer completed.
@@ -180,8 +176,6 @@ The sequence number of the current transaction in IST.
 The sequence number of the first transaction in IST.
 
 .. variable:: wsrep_last_applied
-
-   :Version: Introduced in :rn:`5.7.20-29.24`
 
 Sequence number of the last applied transaction.
 

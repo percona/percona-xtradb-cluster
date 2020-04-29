@@ -21,7 +21,10 @@ Alias=mysqld.service
 ##
 
 Type=notify
-#TimeoutStartSec=300
+
+# Disable service start timeout for proper SST completion
+TimeoutStartSec=0
+
 # Setting this to true can break replication and the Type=notify settings
 # See also bind-address mysqld option.
 PrivateNetwork=false
@@ -65,7 +68,7 @@ ExecStartPre=/usr/bin/mysql-systemd start-pre
 # It is always safe to unset _WSREP_START_POSITION environment variable.
 
 ExecStartPre=/bin/sh -c "systemctl unset-environment _WSREP_START_POSITION"
-ExecStartPre=/bin/sh -c "VAR=`/usr/bin/mysql-systemd galera-recovery`; [ $? -eq 0 ] && systemctl set-environment _WSREP_START_POSITION=$VAR || exit 1"
+ExecStartPre=/bin/sh -c "VAR=`bash /usr/bin/mysql-systemd galera-recovery`; [ $? -eq 0 ] && systemctl set-environment _WSREP_START_POSITION=$VAR || exit 1"
 
 # Start main service
 ExecStart=/usr/sbin/mysqld $_WSREP_START_POSITION
@@ -84,13 +87,11 @@ ExecReload=/usr/bin/mysql-systemd reload
 
 KillSignal=SIGTERM
 
-# Don't want to see an automated SIGKILL ever
-SendSIGKILL=no
-
 # Restart crashed server only, on-failure would also restart, for example, when
 # my.cnf contains unknown option
 Restart=on-abort
 RestartSec=5s
+RestartPreventExitStatus=SIGABRT
 
 UMask=007
 

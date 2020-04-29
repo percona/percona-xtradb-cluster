@@ -181,6 +181,7 @@ void wsrep_update_cluster_state_uuid(const char *str);
 void wsrep_filter_new_cluster(int *argc, char *argv[]);
 
 int wsrep_init();
+bool wsrep_init_schema(THD *thd);
 void wsrep_deinit();
 void wsrep_recover();
 bool wsrep_before_SE();  // initialize wsrep before storage
@@ -226,9 +227,8 @@ extern void wsrep_shutdown_replication();
 extern bool wsrep_must_sync_wait(THD *thd,
                                  uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
 extern bool wsrep_sync_wait(THD *thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
-extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(THD *thd,
-                                                              wsrep_gtid_t *upto,
-                                                              int timeout);
+extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(
+    THD *thd, wsrep_gtid_t *upto, int timeout);
 extern void wsrep_last_committed_id(wsrep_gtid_t *gtid);
 extern int wsrep_check_opts(int argc, char *const *argv);
 extern void wsrep_prepend_PATH(const char *path);
@@ -275,6 +275,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
   if (wsrep_debug) WSREP_LOG(INFORMATION_LEVEL, fmt, ##__VA_ARGS__)
 #define WSREP_INFO(fmt, ...) WSREP_LOG(INFORMATION_LEVEL, fmt, ##__VA_ARGS__)
 #define WSREP_WARN(fmt, ...) WSREP_LOG(WARNING_LEVEL, fmt, ##__VA_ARGS__)
+#define WSREP_SYSTEM(fmt, ...) WSREP_LOG(SYSTEM_LEVEL, fmt, ##__VA_ARGS__)
 
 #define WSREP_ERROR(fmt, ...)                                         \
   do {                                                                \
@@ -405,7 +406,6 @@ extern PSI_cond_key key_COND_wsrep_sst_thread;
 
 extern PSI_thread_key key_THREAD_wsrep_sst_joiner;
 extern PSI_thread_key key_THREAD_wsrep_sst_donor;
-extern PSI_thread_key key_THREAD_wsrep_sst_upgrade;
 extern PSI_thread_key key_THREAD_wsrep_sst_logger;
 extern PSI_thread_key key_THREAD_wsrep_applier;
 extern PSI_thread_key key_THREAD_wsrep_rollbacker;
@@ -514,24 +514,19 @@ enum wsrep::streaming_context::fragment_unit wsrep_fragment_unit(ulong unit);
 constexpr char WSREP_CHANNEL_NAME[] = "wsrep";
 bool wsrep_is_wsrep_channel_name(const char *channel_name);
 
-/* In 8.0, a WSREP state file was added to keep track of information
-   about WSREP that could be accessed by other processes (e.g. SST)
+/* Simple RAII helper */
+class wsrep_scope_guard {
+ public:
+  wsrep_scope_guard(std::function<void()> scope_enter,
+                    std::function<void()> scope_leave)
+      : _scope_leave(scope_leave) {
+    scope_enter();
+  }
 
-   This file is named 'wsrep_state.dat'
- */
+  ~wsrep_scope_guard() { _scope_leave(); }
 
-/* Name of the file that holds metadata about the WSREP state.
- */
-constexpr char WSREP_STATE_FILENAME[] = "wsrep_state.dat";
-
-/* Version number for the state file format
- */
-constexpr char WSREP_STATE_FILE_VERSION_NAME[] = "version";
-constexpr char WSREP_STATE_FILE_VERSION[] = "1.0";
-
-/* This identifies the PXC version of the datadir/schema.
- */
-constexpr char WSREP_SCHEMA_VERSION_NAME[] = "wsrep_schema_version";
-constexpr char WSREP_SCHEMA_VERSION[] = MYSQL_SERVER_VERSION;
+ private:
+  std::function<void()> _scope_leave;
+};
 
 #endif /* WSREP_MYSQLD_H */

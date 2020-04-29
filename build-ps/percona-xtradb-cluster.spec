@@ -103,9 +103,9 @@ Prefix: %{_sysconfdir}
 
 %define release_tag     %{nil}
 %if %{undefined dist}
-    %define release         %{release_tag}%{wsrep_version}.%{rpm_version}.%{distribution}
+    %define release         %{release_tag}%{rpm_version}.%{distribution}
 %else
-    %define release         %{release_tag}%{wsrep_version}.%{rpm_version}.%{dist}
+    %define release         %{release_tag}%{rpm_version}.%{dist}
 %endif
 
 #
@@ -144,7 +144,7 @@ Prefix: %{_sysconfdir}
 %if %{undefined src_base}
   %define src_base Percona-XtraDB-Cluster
 %endif
-%define src_dir %{src_base}-%{mysql_version}-%{wsrep_version}
+%define src_dir %{src_base}-%{mysql_version}
 
 %if %{undefined feature_set}
   %define feature_set community
@@ -157,7 +157,7 @@ Prefix: %{_sysconfdir}
     %define compilation_comment_release     Percona XtraDB Cluster (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
 
-%define server_suffix -80
+#%define server_suffix -80
 
 %if 0%{?rhel} > 6
     %define distro_req           chkconfig nmap
@@ -357,7 +357,7 @@ Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
 %if 0%{?compatlib}
 Requires:             percona-xtradb-cluster-shared-compat = %{version}-%{release}
 %endif
-Requires:             socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:             socat iproute perl-DBI perl-DBD-MySQL
 Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -612,10 +612,13 @@ mkdir pxc_extra
 pushd pxc_extra
 mkdir pxb-2.4
 pushd pxb-2.4
-yumdownloader percona-xtrabackup-24
+yumdownloader percona-xtrabackup-24-2.4.20
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
+mv lib64 lib
+mv lib/xtrabackup/* lib/ || true
+rm -rf lib/xtrabackup
 rm -rf usr
 rm -f *.rpm
 popd
@@ -623,12 +626,16 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80
+yumdownloader percona-xtrabackup-80-8.0.11
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
-mv usr/lib* ./
+mv usr/lib64 ./
+mv lib64 lib
+mv lib/xtrabackup/* lib/
+rm -rf lib/xtrabackup
 rm -rf usr
 rm -f *.rpm
+
 popd
 popd
 
@@ -680,7 +687,7 @@ mkdir debug
            -DWITH_ZLIB=system \
            -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DMYSQL_SERVER_SUFFIX="" \
            %{?mecab_option} \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
@@ -720,7 +727,7 @@ mkdir release
            -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DMYSQL_SERVER_SUFFIX="" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags}
@@ -849,7 +856,6 @@ ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 %endif
 
 install -d $RBR%{_bindir}
-#ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
 %if %{WITH_TCMALLOC}
 install -m 644 "%{malloc_lib_source}" \
@@ -1448,11 +1454,9 @@ fi
 #%attr(755, root, root) %{_bindir}/resolveip
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
-#%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
-%attr(755, root, root) %{_bindir}/wsrep_sst_upgrade
+#%attr(755, root, root) %{_bindir}/wsrep_sst_upgrade
 %attr(755, root, root) %{_bindir}/ps_mysqld_helper
 # Explicit %attr() mode not applicaple to symlink
-#%{_bindir}/wsrep_sst_rsync_wan
 %attr(755, root, root) %{_bindir}/lz4_decompress
 %attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
 
@@ -1628,7 +1632,8 @@ done
 
 %if 0%{?systemd}
 if [ $1 -eq 0 ];then
-    %systemd_postun
+    echo "Postinstall actions for mysql.service"
+    %systemd_postun mysql.service
 else
     serv=$(/usr/bin/systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
     numint=0

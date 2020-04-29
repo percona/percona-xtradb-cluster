@@ -629,17 +629,30 @@ void wsrep_init_sidno(const wsrep::id &uuid) {
   global_sid_lock->unlock();
 }
 
-void wsrep_init_schema() {
+bool wsrep_init_schema(THD *thd) {
   DBUG_ASSERT(!wsrep_schema);
+
+  /*
+   PXC upgrade requires modifications to some InnoDB tables.
+   When the server is started without innodb, or without a read-write innodb,
+   missing this user is a non-issue, since we won't participate in SST anyway.
+   */
+  handlerton *ddse = ha_resolve_by_legacy_type(thd, DB_TYPE_INNODB);
+  if (ddse->is_dict_readonly && ddse->is_dict_readonly()) {
+    LogErr(WARNING_LEVEL, ER_DD_NO_WRITES_NO_REPOPULATION, "InnoDB", " ");
+    return false;
+  }
 
   WSREP_INFO("wsrep_init_schema_and_SR %p", wsrep_schema);
   if (!wsrep_schema) {
     wsrep_schema = new Wsrep_schema();
-    if (wsrep_schema->init()) {
+    if (wsrep_schema->init(thd)) {
       WSREP_ERROR("Failed to init wsrep schema");
-      unireg_abort(1);
+      return true;
     }
   }
+
+  return false;
 }
 
 void wsrep_deinit_schema() {
@@ -975,7 +988,6 @@ int wsrep_init_server() {
 
 void wsrep_init_globals() {
   wsrep_init_sidno(Wsrep_server_state::instance().connected_gtid().id());
-  wsrep_init_schema();
   if (WSREP_ON) {
     Wsrep_server_state::instance().initialized();
   }
@@ -2073,10 +2085,7 @@ static void wsrep_TOI_end(THD *thd) {
   thd_proc_info(thd, thd->wsrep_info);
 
   if (wsrep_thd_is_local_toi(thd)) {
-    /* Skip update of SE checkpoint if the TOI/DDL failed. */
-    if (!thd->wsrep_skip_SE_checkpoint) {
-      wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
-    }
+    wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
 
     int ret = client_state.leave_toi_local(wsrep::mutable_buffer());
     if (!ret) {

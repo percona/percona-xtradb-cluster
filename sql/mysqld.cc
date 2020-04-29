@@ -2038,6 +2038,25 @@ class Call_close_conn : public Do_THD_Impl {
 
 #ifdef WITH_WSREP
 /**
+  This class implements callback function used by
+  wsrep_close_client_connections() to set KILL_CONNECTION
+  flag on all client thds and awake the thread.
+*/
+class Set_wsrep_kill_client_conn : public Do_THD_Impl {
+ public:
+  Set_wsrep_kill_client_conn() {}
+
+  virtual void operator()(THD *killing_thd) {
+    if (killing_thd->get_protocol()->connection_alive() &&
+       (WSREP(killing_thd) || wsrep_thd_is_local(killing_thd)) &&
+       killing_thd != current_thd) {
+      mysql_mutex_lock(&killing_thd->LOCK_thd_data);
+      killing_thd->awake(THD::KILL_CONNECTION);
+      mysql_mutex_unlock(&killing_thd->LOCK_thd_data);
+    }
+  }
+};
+/**
   This class implements callback function used by close_connections()
   to set KILL_CONNECTION flag on all thds in thd list.
   If m_kill_dump_thread_flag is not set it kills all other threads
@@ -2380,8 +2399,9 @@ static void unireg_abort(int exit_code) {
   if (!daemon_launcher_quiet && exit_code) LogErr(ERROR_LEVEL, ER_ABORTING);
 
 #ifdef WITH_WSREP
-  if (WSREP_ON && Wsrep_server_state::instance().state() !=
-                      wsrep::server_state::s_disconnected) {
+  if (WSREP_ON && Wsrep_server_state::has_instance() &&
+      Wsrep_server_state::instance().state() !=
+          wsrep::server_state::s_disconnected) {
     WSREP_DEBUG("Initiating abort (unireg_abort)");
 
     wsrep_unireg_abort = true;
@@ -6503,28 +6523,6 @@ static int init_server_components() {
   }
 #endif
 
-#ifdef WITH_WSREP
-  /* In the case where no upgrade is required (if we've moved from
-     an 8.0 PS to 8.0 PXC), we will also need to create the
-     wsrep_state.dat.  We do not overwrite any existing wsrep_state.dat
-     file since the database may not have been upgraded. */
-  if (!is_help_or_validate_option() && !opt_initialize &&
-      dd::upgrade::no_server_upgrade_required()) {
-      wsp::WSREPState wsrep_state;
-      wsrep_state.wsrep_schema_version = WSREP_SCHEMA_VERSION;
-      if (!wsrep_state.exists(mysql_real_data_home_ptr, WSREP_STATE_FILENAME)) {
-        if (!wsrep_state.save_to(mysql_real_data_home_ptr, WSREP_STATE_FILENAME)) {
-          WSREP_ERROR("Could not create the wsrep state file : %s",
-                      WSREP_STATE_FILENAME);
-          WSREP_ERROR("Exiting");
-          unireg_abort(1);
-        }
-
-        WSREP_INFO("Created the wsrep_state.dat file (%d)", __LINE__);
-      }
-  }
-#endif /* WITH_WSREP */
-
   if (!is_help_or_validate_option() && !opt_initialize &&
       !dd::upgrade::no_server_upgrade_required()) {
     if (opt_upgrade_mode == UPGRADE_MINIMAL)
@@ -6538,23 +6536,6 @@ static int init_server_components() {
         unireg_abort(1);
       }
       delete_optimizer_cost_module();
-#ifdef WITH_WSREP
-      /* Create the wsrep state file. This will overwrite any exiting
-         wsrep_state.dat file.  This should be ok since we have run upgrade.
-         If user decide to upgrade 5.7 node to 8.0 using offline approach
-         then for the first node SST is not invoked and it is auto-upgraded.
-         Post successfully upgrade PXC expect wsrep state file to be present. */
-      wsp::WSREPState wsrep_state;
-      wsrep_state.wsrep_schema_version = WSREP_SCHEMA_VERSION;
-      if (!wsrep_state.save_to(mysql_real_data_home_ptr,
-                               WSREP_STATE_FILENAME)) {
-        WSREP_ERROR("Could not create the wsrep state file (%d) : %s",
-                    __LINE__, WSREP_STATE_FILENAME);
-        WSREP_ERROR("Exiting");
-        unireg_abort(1);
-      }
-      WSREP_INFO("Created the wsrep_state.dat file (%d)", __LINE__);
-#endif /* WITH_WSREP */
       /*
         When upgrade is finished, we need to initialize the plugins that
         had their initialization delayed due to dependencies on the
@@ -7992,18 +7973,7 @@ int mysqld_main(int argc, char **argv)
   flush_error_log_messages();
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
-  if (opt_initialize) {
-    /* Create the wsrep state file. This path will be used when seed-db is
-       created using 8.x binaries */
-    wsp::WSREPState wsrep_state;
-    wsrep_state.wsrep_schema_version = WSREP_SCHEMA_VERSION;
-    if (!wsrep_state.save_to(mysql_real_data_home_ptr, WSREP_STATE_FILENAME)) {
-      WSREP_ERROR("Could not create the wsrep state file : %s",
-                  WSREP_STATE_FILENAME);
-      WSREP_ERROR("Exiting");
-      unireg_abort(MYSQLD_ABORT_EXIT);
-    }
-  } else {
+  if (!opt_initialize) {
     wsrep_init_globals();
     if (!wsrep_before_SE()) {
       wsrep_init_startup(false);
@@ -9422,19 +9392,23 @@ int wsrep_wait_committing_connections_close(int wait_time) {
 
 void wsrep_close_client_connections(bool, bool server_shutdown) {
   Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
-  /*
-    First signal all threads that it's time to die
-    This will give the threads some time to gracefully abort their
-    statements and inform their clients that the server is about to die.
-  */
 
+  /*
+   * wsrep_close_client_connections can be used when there is a cluster
+   * reconfiguration or when we set wsrep_reject_queries=ALL_KILL
+   * on those cases if we are using thread pooling,
+   * we cannot close the connections abruptly otherwise the thread pool workers
+   * won't get signaled and will hang forever when we shutdown the server.
+   * Sending a kill signal and awaking the thread.
+   */
   sql_print_information("Giving %d client threads a chance to die gracefully",
                         static_cast<int>(thd_manager->get_thd_count()));
+  Set_wsrep_kill_client_conn set_wsrep_kill_client_conn;
+  thd_manager->do_for_all_thd(&set_wsrep_kill_client_conn);
+  if (thd_manager->get_thd_count() > 0) sleep(2); // Give threads time to die
 
   Call_wsrep_close_client_conn call_wsrep_close_client_conn(server_shutdown);
   thd_manager->do_for_all_thd(&call_wsrep_close_client_conn);
-
-  if (thd_manager->get_thd_count() > 0) sleep(2);  // Give threads time to die
 }
 
 void wsrep_close_applier(THD *thd) {
@@ -12306,7 +12280,6 @@ PSI_thread_key key_thread_handle_con_admin_sockets;
 #ifdef WITH_WSREP
 PSI_thread_key key_THREAD_wsrep_sst_joiner;
 PSI_thread_key key_THREAD_wsrep_sst_donor;
-PSI_thread_key key_THREAD_wsrep_sst_upgrade;
 PSI_thread_key key_THREAD_wsrep_sst_logger;
 
 PSI_thread_key key_THREAD_wsrep_applier;
@@ -12334,7 +12307,6 @@ static PSI_thread_info all_server_threads[]=
 #ifdef WITH_WSREP
   { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_sst_upgrade, "THREAD_wsrep_sst_upgrade", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_sst_logger, "THREAD_wsrep_sst_logger", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},

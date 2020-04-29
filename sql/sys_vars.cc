@@ -1228,7 +1228,8 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var) {
        var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED);
 
   if (WSREP(thd) && stmt_or_mixed &&
-      (var->type == OPT_GLOBAL || var->type == OPT_SESSION)) {
+      (var->type == OPT_GLOBAL || var->type == OPT_SESSION ||
+       var->type == OPT_PERSIST)) {
     /* Setting binlog format to MIXED/STATEMENT is not allowed. */
     WSREP_ERROR(
         "Percona-XtraDB-Cluster prohibits setting"
@@ -1654,7 +1655,7 @@ static Sys_var_bool Sys_binlog_order_commits(
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(binlog_order_commits_check),
     ON_UPDATE(0));
 #else
-    GLOBAL_VAR(opt_binlog_order_commits), CMD_LINE(OPT_ARG), DEFAULT(TRUE));
+    GLOBAL_VAR(opt_binlog_order_commits), CMD_LINE(OPT_ARG), DEFAULT(true));
 #endif /* WITH_WSREP */
 
 static Sys_var_ulong Sys_bulk_insert_buff_size(

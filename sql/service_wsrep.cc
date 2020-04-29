@@ -141,10 +141,8 @@ extern "C" bool wsrep_thd_bf_abort(const THD *bf_thd, THD *victim_thd,
                                    bool signal) {
   /* Note: do not store/reset globals before wsrep_bf_abort() call
      to avoid losing BF thd context. */
-  if (WSREP(victim_thd) && !victim_thd->wsrep_trx().active()) {
-    WSREP_DEBUG("BF abort for non active transaction");
-    wsrep_start_transaction(victim_thd, victim_thd->wsrep_next_trx_id());
-  }
+
+  /* Transaction will be started inside wsrep_bf_abort if not started yet */
   bool ret = wsrep_bf_abort(bf_thd, victim_thd);
 
 #if 0

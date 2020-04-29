@@ -10,12 +10,13 @@ SET SESSION DEBUG='-d,innodb_fail_to_update_tablespace_dict';
 Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
 innodb_system	System	DEFAULT	0	Any	ibdata1
 mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
-mtr/test_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
 === information_schema.files ===
 Space_Name	File_Type	Engine	Status	Tablespace_Name	Path
 innodb_system	TABLESPACE	InnoDB	NORMAL	innodb_system	MYSQLD_DATADIR/ibdata1
 mtr/global_suppressions	TABLESPACE	InnoDB	NORMAL	mtr/global_suppressions	MYSQLD_DATADIR/mtr/global_suppressions.ibd
-mtr/test_suppressions	TABLESPACE	InnoDB	NORMAL	mtr/test_suppressions	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+mysql/wsrep_cluster	TABLESPACE	InnoDB	NORMAL	mysql/wsrep_cluster	MYSQLD_DATADIR/mysql/wsrep_cluster.ibd
+mysql/wsrep_cluster_members	TABLESPACE	InnoDB	NORMAL	mysql/wsrep_cluster_members	MYSQLD_DATADIR/mysql/wsrep_cluster_members.ibd
+mysql/wsrep_streaming_log	TABLESPACE	InnoDB	NORMAL	mysql/wsrep_streaming_log	MYSQLD_DATADIR/mysql/wsrep_streaming_log.ibd
 # MYSQLD_DATADIR/
 mysql.ibd
 DROP TABLESPACE s_def;
@@ -34,14 +35,12 @@ INSERT INTO t3 VALUES ( 31);
 === information_schema.innodb_tables  and innodb_tablespaces ===
 Table Name	Tablespace	Table Flags	Columns	Row Format	Zip Size	Space Type
 mtr/global_suppressions	mtr/global_suppressions	33	4	Dynamic	0	Single
-mtr/test_suppressions	mtr/test_suppressions	33	4	Dynamic	0	Single
 test/t1	s1	161	4	Dynamic	0	General
 ALTER TABLE t2 TABLESPACE=s1;
 ALTER TABLE t3 TABLESPACE=s1;
 === information_schema.innodb_tables  and innodb_tablespaces ===
 Table Name	Tablespace	Table Flags	Columns	Row Format	Zip Size	Space Type
 mtr/global_suppressions	mtr/global_suppressions	33	4	Dynamic	0	Single
-mtr/test_suppressions	mtr/test_suppressions	33	4	Dynamic	0	Single
 test/t1	s1	161	4	Dynamic	0	General
 # MYSQLD_DATADIR/
 mysql.ibd
@@ -85,7 +84,6 @@ INSERT INTO t4 VALUES (42);
 === information_schema.innodb_tables  and innodb_tablespaces ===
 Table Name	Tablespace	Table Flags	Columns	Row Format	Zip Size	Space Type
 mtr/global_suppressions	mtr/global_suppressions	33	4	Dynamic	0	Single
-mtr/test_suppressions	mtr/test_suppressions	33	4	Dynamic	0	Single
 test/t1	s1	161	4	Dynamic	0	General
 test/t2	s1	161	4	Dynamic	0	General
 test/t3	innodb_system	161	4	Dynamic	0	System
@@ -94,7 +92,6 @@ test/t4	test/t4	33	4	Dynamic	0	Single
 === information_schema.innodb_tables  and innodb_tablespaces ===
 Table Name	Tablespace	Table Flags	Columns	Row Format	Zip Size	Space Type
 mtr/global_suppressions	mtr/global_suppressions	33	4	Dynamic	0	Single
-mtr/test_suppressions	mtr/test_suppressions	33	4	Dynamic	0	Single
 test/t1	s1	161	4	Dynamic	0	General
 test/t2	s1	161	4	Dynamic	0	General
 test/t3	innodb_system	161	4	Dynamic	0	System
@@ -143,7 +140,6 @@ RENAME TABLE t4 TO tr4;
 === information_schema.innodb_tables  and innodb_tablespaces ===
 Table Name	Tablespace	Table Flags	Columns	Row Format	Zip Size	Space Type
 mtr/global_suppressions	mtr/global_suppressions	33	4	Dynamic	0	Single
-mtr/test_suppressions	mtr/test_suppressions	33	4	Dynamic	0	Single
 test/tr1	s1	161	4	Dynamic	0	General
 test/tr2	s1	161	4	Dynamic	0	General
 test/tr3	innodb_system	161	4	Dynamic	0	System
@@ -152,7 +148,6 @@ test/tr4	test/tr4	33	4	Dynamic	0	Single
 === information_schema.innodb_tables  and innodb_tablespaces ===
 Table Name	Tablespace	Table Flags	Columns	Row Format	Zip Size	Space Type
 mtr/global_suppressions	mtr/global_suppressions	33	4	Dynamic	0	Single
-mtr/test_suppressions	mtr/test_suppressions	33	4	Dynamic	0	Single
 test/tr1	s1	161	4	Dynamic	0	General
 test/tr2	s1	161	4	Dynamic	0	General
 test/tr3	innodb_system	161	4	Dynamic	0	System

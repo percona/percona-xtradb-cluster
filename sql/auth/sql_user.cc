@@ -759,13 +759,21 @@ static bool validate_password_require_current(THD *thd, LEX_USER *Str,
       int is_error = 0;
       Security_context *sctx = thd->security_context();
       DBUG_ASSERT(sctx);
-      // If trying to set password for other user
-      if (strcmp(sctx->user().str, Str->user.str) ||
-          my_strcasecmp(system_charset_info, sctx->priv_host().str,
-                        Str->host.str)) {
-        my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
-        return (1);
+#ifdef WITH_WSREP
+      // System threads do not have user and have
+      // m_is_skip_grants_user set.
+      if (thd->system_thread == NON_SYSTEM_THREAD) {
+#endif /* WITH_WSREP */
+        // If trying to set password for other user
+        if (strcmp(sctx->user().str, Str->user.str) ||
+            my_strcasecmp(system_charset_info, sctx->priv_host().str,
+                          Str->host.str)) {
+          my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
+          return (1);
+        }
+#ifdef WITH_WSREP
       }
+#endif /* WITH_WSREP */
 
       /*
         Handle the validation of empty current password first as some of
@@ -1250,6 +1258,19 @@ bool set_and_validate_user_attributes(
     inbuflen = (unsigned)Str->auth.length;
     std::string gen_password;
     if (Str->has_password_generator) {
+#ifdef WITH_WSREP
+      if (WSREP(thd)) {
+        const char *msg =
+            "Percona XtraDB Cluster doesn't allow use of"
+            " RANDOM PASSWORD for CREATE/ALTER USER operation"
+            " while operating in cluster mode";
+        WSREP_ERROR("%s", msg);
+        my_message(ER_UNKNOWN_ERROR, msg, MYF(0));
+        plugin_unlock(0, plugin);
+        what_to_set.m_what = NONE_ATTR;
+        return true;
+      }
+#endif /* WITH_WSREP */
       thd->m_disable_password_validation = true;
       generate_random_password(&gen_password,
                                thd->variables.generated_random_password_length);

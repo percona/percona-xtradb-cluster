@@ -1802,7 +1802,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     WSREP_DEBUG("assigned new next trx id: %" PRIu64, thd->wsrep_next_trx_id());
   }
 
-  bool do_end_of_statement;
+  bool do_end_of_statement = true;
 #endif /* WITH_WSREP */
 
   if (!(server_command_flags[command] & CF_SKIP_QUESTIONS))
@@ -2082,7 +2082,9 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       check_secondary_engine_statement(thd, &parser_state, orig_query.str,
                                        orig_query.length);
 
+#ifdef WITH_WSREP
       thd->set_secondary_engine_optimization(saved_secondary_engine);
+#endif /* WITH_WSREP */
 
       DBUG_EXECUTE_IF("parser_stmt_to_error_log", {
         LogErr(INFORMATION_LEVEL, ER_PARSER_TRACE, thd->query().str);
@@ -2187,7 +2189,9 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
         check_secondary_engine_statement(thd, &parser_state,
                                          beginning_of_next_stmt, length);
 
+#ifdef WITH_WSREP
         thd->set_secondary_engine_optimization(saved_secondary_engine);
+#endif /* WITH_WSREP */
       }
 
       /* Need to set error to true for graceful shutdown */
@@ -2489,63 +2493,46 @@ dispatch_end:
     WSREP_LOG_THD(thd, "leave");
   }
 
-  do_end_of_statement = false;
   if (WSREP(thd)) {
     /* wsrep BF abort in query exec phase */
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     do_end_of_statement =
-        thd->wsrep_trx().state() != wsrep::transaction::s_replaying &&
-        !thd->killed;
+        !(thd->wsrep_trx().state() != wsrep::transaction::s_replaying &&
+          !thd->killed);
 
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  } else
-    do_end_of_statement = true;
+  }
 
-  if (do_end_of_statement) {
-    DBUG_ASSERT((thd->open_tables == NULL ||
-                 (thd->locked_tables_mode == LTM_LOCK_TABLES)));
-
-    /* Update user statistics only if at least one timer was initialized */
-    if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0)) {
-      userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
-                            &thd->cpu_time);
-      /* Updates THD stats and the global user stats. */
-      thd->update_stats(true);
-      update_global_user_stats(thd, true, my_getsystime());
-    }
-
-    /* Finalize server status flags after executing a command. */
-    thd->update_slow_query_status();
-    if (thd->killed) thd->send_kill_message();
-    thd->send_statement_status();
-  } else {
 #endif /* WITH_WSREP */
-  done:
-    DBUG_ASSERT(thd->open_tables == NULL ||
-                (thd->locked_tables_mode == LTM_LOCK_TABLES));
 
-    /* Update user statistics only if at least one timer was initialized */
-    if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0)) {
-      userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
-                            &thd->cpu_time);
-      /* Updates THD stats and the global user stats. */
-      thd->update_stats(true);
-      update_global_user_stats(thd, true, my_getsystime());
-    }
+done:
+  DBUG_ASSERT(thd->open_tables == NULL ||
+              (thd->locked_tables_mode == LTM_LOCK_TABLES));
 
-    /* Finalize server status flags after executing a command. */
-    thd->update_slow_query_status();
-    if (thd->killed) thd->send_kill_message();
-    thd->send_statement_status();
+  /* Update user statistics only if at least one timer was initialized */
+  if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0)) {
+    userstat_finish_timer(start_busy_usecs, start_cpu_nsecs, &thd->busy_time,
+                          &thd->cpu_time);
+    /* Updates THD stats and the global user stats. */
+    thd->update_stats(true);
+    update_global_user_stats(thd, true, my_getsystime());
+  }
 
-    /* After sending response, switch to clone protocol */
-    if (clone_cmd != nullptr) {
-      DBUG_ASSERT(command == COM_CLONE);
-      error = clone_cmd->execute_server(thd);
-    }
+  /* Finalize server status flags after executing a command. */
+  thd->update_slow_query_status();
+  if (thd->killed) thd->send_kill_message();
+  thd->send_statement_status();
 
+  /* After sending response, switch to clone protocol */
+  if (clone_cmd != nullptr) {
+    DBUG_ASSERT(command == COM_CLONE);
+    error = clone_cmd->execute_server(thd);
+  }
+
+#ifdef WITH_WSREP
+  if (do_end_of_statement) {
+#endif /* WITH_WSREP */
     thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
-
 #ifdef WITH_WSREP
   }
 #endif /* WITH_WSREP */
@@ -2637,10 +2624,6 @@ bool shutdown(THD *thd, enum mysql_enum_shutdown_level level) {
 
   if (check_global_access(thd, SHUTDOWN_ACL))
     goto error; /* purecov: inspected */
-
-#ifdef WITH_WSREP
-  (void)wsrep_remove_sst_user(false);
-#endif /* WITH_WSREP */
 
   if (level == SHUTDOWN_DEFAULT)
     level = SHUTDOWN_WAIT_ALL_BUFFERS;  // soon default will be configurable
@@ -5449,6 +5432,32 @@ int mysql_execute_command(THD *thd, bool first_level) {
         }
         if (!(user = get_current_user(thd, tmp_user))) goto error;
 
+#ifdef WITH_WSREP
+        /* When ALTER USER ... IDENTIFIED BY ... REPLACE ...  is executed
+           we need to know the current user to be able to determine REPLACE
+           clause validity (REPLACE allowed only for the current user's password
+           change). However ALTER USER is replicated as TOI, so before local
+           validation/changes. On the slave side, executing thread is wsrep applier
+           thread and we have no chance to determine if it is OK or not.
+           Here we do pre-validation for above condition on master size.
+           Other checks that are not dependent on current user context will be made
+           after replication, on slave node */
+        if (WSREP(thd) && thd->system_thread == NON_SYSTEM_THREAD) {
+          Security_context *sctx = thd->security_context();
+          DBUG_ASSERT(sctx);
+          DBUG_ASSERT(sctx->user().str);
+          if (user->uses_replace_clause) {
+            // If trying to set password for other user
+            if (strcmp(sctx->user().str, user->user.str) ||
+                my_strcasecmp(system_charset_info, sctx->priv_host().str,
+                              user->host.str)) {
+              my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
+              goto error;
+            }
+          }
+        }
+#endif /* WITH_WSREP */
+
         /* copy password expire attributes to individual lex user */
         user->alter_status = thd->lex->alter_password;
 
@@ -5638,8 +5647,6 @@ finish:
 #ifdef WITH_WSREP
 
   thd->wsrep_consistency_check = NO_CONSISTENCY_CHECK;
-  /* If DDL has failed then avoid SE checkpoint. */
-  thd->wsrep_skip_SE_checkpoint = (res || thd->is_error());
   WSREP_TO_ISOLATION_END;
 
   /*
