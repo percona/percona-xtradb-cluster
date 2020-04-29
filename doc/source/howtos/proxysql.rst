@@ -27,7 +27,7 @@ status.
 
 .. important::
 
-   In version |version|, |PXC| does work with ProxySQL v1.   
+   In version |version|, |PXC| does not support ProxySQL v1.   
 
 Manual Configuration
 ====================
@@ -58,10 +58,10 @@ that already have the ``mysql`` client installed (Node 1, Node 2, Node 3)
 or install the client on Node 4 and connect locally.
 For this tutorial, install |PXC| on Node 4:
 
-.. admonition:: Changes in the installation procedure
+.. admonitiion:: Changes in the installation procedure
 
    In |PXC| |version|, ProxySQL is not installed automatically as a dependency
-   of the ``percona-xtradb-cluster-client`` package. You should install the
+   of the ``percona-xtradb-cluster-client-8.0`` package. You should install the
    ``proxysql`` package separately.
 
 * On Debian or Ubuntu:
@@ -75,7 +75,7 @@ For this tutorial, install |PXC| on Node 4:
 
   .. code-block:: bash
 
-     [root@proxysql ~]# yum install percona-xtradb-cluster-client
+     [root@proxysql ~]# yum install Percona-XtraDB-Cluster-client-80
      [root@proxysql ~]# yum install proxysql2
 
 .. TODO: Verify package names
@@ -88,6 +88,8 @@ use the credentials, host name and port specified in the `global variables
 
 The following example shows how to connect to the ProxySQL admin interface
 with default credentials:
+
+|author| Update the output
 
 .. code-block:: bash
 
@@ -302,6 +304,8 @@ Load the user into runtime space and save these changes to disk
   mysql@proxysql> SAVE MYSQL USERS TO DISK;
 
 To confirm that the user has been set up correctly, you can try to log in:
+
+|author| [TODO] Update the output
 
 .. code-block:: bash
 
