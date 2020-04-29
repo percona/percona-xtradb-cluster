@@ -13,6 +13,17 @@ using the corresponding package manager for your system:
 * :ref:`Debian or Ubuntu <apt>`
 * :ref:`Red Hat or CentOS <yum>`
 
+.. important::
+
+   After installing |PXC| the ``mysql`` service is *stopped* but *enabled* so
+   that it may start the next time the system is restarted. The service starts
+   if the the grastate.dat file exists and the value of ``seqno`` is not **-1**.
+
+   .. seealso::
+
+      More information about Galera state information in :ref:`wsrep_file_index`
+         :ref:`grastat.dat <galera-grastate-dat>`_
+
 Installation Alternatives
 =========================
 
