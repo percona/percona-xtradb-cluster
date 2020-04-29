@@ -310,6 +310,7 @@ BuildRequires:  systemd
 %endif
 Conflicts: Percona-XtraDB-Cluster-galera-2 Percona-XtraDB-Cluster-galera-3
 Obsoletes: galera-57
+Obsoletes: Percona-XtraDB-Cluster-57
 
 # Think about what you use here since the first step is to
 # run a rm -rf
@@ -369,6 +370,7 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
+Obsoletes:      Percona-XtraDB-Cluster-server-57
 Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
 
 %description -n percona-xtradb-cluster-server
@@ -393,6 +395,7 @@ package "percona-xtradb-cluster-client" as well!
 Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
 Provides:       mysql-client MySQL-client MySQL Percona-XtraDB-Cluster-client mysql
+Obsoletes:      Percona-XtraDB-Cluster-client-57
 Conflicts:      Percona-SQL-client-50 Percona-Server-client-51 Percona-Server-client-55 Percona-XtraDB-Cluster-client-55
 Requires:       perl-DBI
 
@@ -419,6 +422,7 @@ Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
 Provides:       mysql-test
 Requires:       perl(Socket), perl(Time::HiRes), perl(Data::Dumper), perl(Test::More), perl(Env)
+Obsoletes:      Percona-XtraDB-Cluster-test-57
 Conflicts:      Percona-SQL-test-50 Percona-Server-test-51 Percona-Server-test-55 Percona-XtraDB-Cluster-test-55
 AutoReqProv:    no
 
@@ -443,6 +447,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
 Provides:       mysql-devel
+Obsoletes:      Percona-XtraDB-Cluster-devel-57
 %if "%rhel" == "6"
 Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-devel-55 Percona-XtraDB-Cluster-devel-55 /usr/bin/mysql_config
 %else
@@ -472,7 +477,7 @@ Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:      Percona-Server-shared-56
-Conflicts:      Percona-Server-shared-57
+Obsoletes:      Percona-Server-shared-57
 %if "%rhel" > "6"
 #Provides:       mariadb-libs >= 5.5.37
 Obsoletes:      mariadb-libs >= 5.5.37
@@ -504,11 +509,11 @@ Provides:       MySQL-shared-compat%{?_isa} = %{version}-%{release}
 Provides:       libmysqlclient.so.18()(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_16)(64bit)
 Provides:       libmysqlclient.so.18(libmysqlclient_18)(64bit)
-Obsoletes:      mariadb-libs Percona-XtraDB-Cluster-shared-compat-57
+Obsoletes:      mariadb-libs
+Obsoletes:      Percona-XtraDB-Cluster-shared-compat-57
+Obsoletes:      Percona-XtraDB-Cluster-shared-57
 Conflicts:      Percona-XtraDB-Cluster-shared-55
 Conflicts:      Percona-XtraDB-Cluster-shared-56
-Conflicts:      Percona-XtraDB-Cluster-shared-57
-Conflicts:      Percona-XtraDB-Cluster-shared-compat-57
 %endif
 
 %description -n percona-xtradb-cluster-shared-compat
