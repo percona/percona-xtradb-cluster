@@ -25,31 +25,29 @@ using :command:`apt`.
 Prerequisites
 =============
 
-.. note:: You need to have root access on the node
-   where you will be installing |PXC|
-   (either logged in as a user with root privileges
-   or be able to run commands with :command:`sudo`).
+- You need to have root access on the node where you will be installing |PXC|
+  (either logged in as a user with root privileges or be able to run commands
+  with :command:`sudo`).
 
-.. note:: Make sure that the following ports are not blocked by firewall
-   or used by other software. |PXC| requires them for communication.
+- Make sure that the following ports are not blocked by firewall
+  or used by other software. |PXC| requires them for communication.
 
    * 3306
    * 4444
    * 4567
    * 4568
 
-.. note:: If you previously had MySQL installed on the server,
-   there might be an `AppArmor <https://help.ubuntu.com/community/AppArmor>`_
-   profile which will prevent |PXC| nodes from communicating with each other.
-   The best solution is to remove the ``apparmor`` package entirely:
+- If you previously had MySQL installed on the server, there might be an
+  `AppArmor <https://help.ubuntu.com/community/AppArmor>`_ profile which will
+  prevent |PXC| nodes from communicating with each other.  The best solution is
+  to remove the ``apparmor`` package entirely:
 
    .. code-block:: bash
 
       $ sudo apt-get remove apparmor
 
-   If you need to have AppArmor enabled due to security policies
-   or for other reasons,
-   it is possible to disable or extend the MySQL profile.
+  If you need to have AppArmor enabled due to security policies or for other
+  reasons, it is possible to disable or extend the MySQL profile.
 
 Installing from Repository
 ==========================
@@ -78,17 +76,6 @@ Installing from Repository
 
    During the installation, you are requested to provide a password
    for the ``root`` user on the database node.
-
-#. Stop the ``mysql`` service:
-
-   .. code-block:: bash
-
-      $ sudo service mysql stop
-
-   .. note:: 
-
-      Before starting a |PXC| node, it needs to be properly configured.
-      For more information, see :ref:`configure`.
 
 Next Steps
 ==========
