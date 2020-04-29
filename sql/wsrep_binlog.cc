@@ -15,17 +15,17 @@
 
 #include "wsrep_binlog.h"
 #include "log_event.h"
+#include "mysql/components/services/log_builtins.h"
 #include "mysql/plugin.h"
 #include "wsrep_priv.h"
-#include "mysql/components/services/log_builtins.h"
 
-#include "service_wsrep.h"
-#include "log.h"
-#include "wsrep_applier.h"
-#include "transaction.h"
 #include "binlog.h"
-#include "log_event.h"	// Log_event_writer
+#include "log.h"
+#include "log_event.h"  // Log_event_writer
 #include "mysql/psi/mysql_file.h"
+#include "service_wsrep.h"
+#include "transaction.h"
+#include "wsrep_applier.h"
 
 /*
   Write the contents of a cache to a memory buffer.
@@ -44,10 +44,9 @@
  */
 int wsrep_write_cache_buf(IO_CACHE_binlog_cache_storage *cache, uchar **buf,
                           size_t *buf_len) {
-
   my_off_t const saved_pos(cache->position());
 
-  unsigned char* read_pos = NULL;
+  unsigned char *read_pos = NULL;
   my_off_t read_len = 0;
 
   if (cache->begin(&read_pos, &read_len)) {
@@ -250,8 +249,8 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
   File file;
   IO_CACHE cache;
   assert(0);
-  // TODO: need to find way to persist event (Format_description_log_event to cache)
-  // Log_event_writer writer(&cache, 0);
+  // TODO: need to find way to persist event (Format_description_log_event to
+  // cache) Log_event_writer writer(&cache, 0);
   Format_description_log_event *ev = 0;
 
   longlong thd_trx_seqno = (long long)wsrep_thd_trx_seqno(thd);
@@ -302,8 +301,7 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
                             : (new Format_description_log_event());
 
   // if (writer.write(ev) || my_b_write(&cache, (uchar *)rbr_buf, buf_len) ||
-  if (my_b_write(&cache,
-                 static_cast<uchar *>(const_cast<void *>(rbr_buf)),
+  if (my_b_write(&cache, static_cast<uchar *>(const_cast<void *>(rbr_buf)),
                  buf_len) ||
       flush_io_cache(&cache)) {
     WSREP_ERROR("Failed to write to '%s'.", filename);
@@ -426,11 +424,14 @@ void wsrep_wait_for_turn_in_group_commit(THD *thd) {
 
   while (true) {
     if (thd == wsrep_group_commit_queue.front()) {
-      WSREP_DEBUG("Thread with id (%d) granted turn to proceed", thd->thread_id());
+      WSREP_DEBUG("Thread with id (%d) granted turn to proceed",
+                  thd->thread_id());
       break;
     } else {
-      WSREP_DEBUG("Thread with id (%d) waiting for its turns in wsrep group"
-                  " commit queue", thd->thread_id());
+      WSREP_DEBUG(
+          "Thread with id (%d) waiting for its turns in wsrep group"
+          " commit queue",
+          thd->thread_id());
       mysql_cond_wait(&COND_wsrep_group_commit, &LOCK_wsrep_group_commit);
     }
   }
@@ -462,8 +463,10 @@ void wsrep_unregister_from_group_commit(THD *thd) {
 
   thd->wsrep_enforce_group_commit = false;
   wsrep_group_commit_queue.pop();
-  WSREP_DEBUG("Un-Registering thread with id (%d) from wsrep group commit"
-              " queue", thd->thread_id());
+  WSREP_DEBUG(
+      "Un-Registering thread with id (%d) from wsrep group commit"
+      " queue",
+      thd->thread_id());
   mysql_mutex_unlock(&LOCK_wsrep_group_commit);
   mysql_cond_broadcast(&COND_wsrep_group_commit);
   DBUG_VOID_RETURN;

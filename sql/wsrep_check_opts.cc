@@ -15,9 +15,9 @@
 
 #include "sql_class.h"
 
-#include "wsrep_mysqld.h"
 #include "mysql/components/services/log_builtins.h"
 #include "sql/log.h"
+#include "wsrep_mysqld.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -297,4 +297,3 @@ static int check_opts(int const argc, const char *const argv[],
 int wsrep_check_opts(int const argc, char *const *const argv) {
   return check_opts(argc, argv, opts);
 }
-

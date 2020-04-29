@@ -891,8 +891,8 @@ static Sys_var_ulong Sys_auto_increment_increment(
     "Auto-increment columns are incremented by this",
     HINT_UPDATEABLE SESSION_VAR(auto_increment_increment), CMD_LINE(OPT_ARG),
 #ifdef WITH_WSREP
-    VALID_RANGE(1, 65535), DEFAULT(1), BLOCK_SIZE(1), NO_MUTEX_GUARD,
-    IN_BINLOG, NULL, ON_UPDATE(update_auto_increment_increment));
+    VALID_RANGE(1, 65535), DEFAULT(1), BLOCK_SIZE(1), NO_MUTEX_GUARD, IN_BINLOG,
+    NULL, ON_UPDATE(update_auto_increment_increment));
 #else
     VALID_RANGE(1, 65535), DEFAULT(1), BLOCK_SIZE(1), NO_MUTEX_GUARD,
     IN_BINLOG);
@@ -904,8 +904,8 @@ static Sys_var_ulong Sys_auto_increment_offset(
     "auto-increment-increment != 1",
     HINT_UPDATEABLE SESSION_VAR(auto_increment_offset), CMD_LINE(OPT_ARG),
 #ifdef WITH_WSREP
-    VALID_RANGE(1, 65535), DEFAULT(1), BLOCK_SIZE(1), NO_MUTEX_GUARD,
-    IN_BINLOG, NULL, ON_UPDATE(update_auto_increment_offset));
+    VALID_RANGE(1, 65535), DEFAULT(1), BLOCK_SIZE(1), NO_MUTEX_GUARD, IN_BINLOG,
+    NULL, ON_UPDATE(update_auto_increment_offset));
 #else
     VALID_RANGE(1, 65535), DEFAULT(1), BLOCK_SIZE(1), NO_MUTEX_GUARD,
     IN_BINLOG);
@@ -1228,8 +1228,8 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var) {
        var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED);
 
   if (WSREP(thd) && stmt_or_mixed &&
-      (var->type == OPT_GLOBAL || var->type == OPT_SESSION))
-  {
+      (var->type == OPT_GLOBAL || var->type == OPT_SESSION ||
+       var->type == OPT_PERSIST)) {
     /* Setting binlog format to MIXED/STATEMENT is not allowed. */
     WSREP_ERROR(
         "Percona-XtraDB-Cluster prohibits setting"
@@ -1655,7 +1655,7 @@ static Sys_var_bool Sys_binlog_order_commits(
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(binlog_order_commits_check),
     ON_UPDATE(0));
 #else
-    GLOBAL_VAR(opt_binlog_order_commits), CMD_LINE(OPT_ARG), DEFAULT(TRUE));
+    GLOBAL_VAR(opt_binlog_order_commits), CMD_LINE(OPT_ARG), DEFAULT(true));
 #endif /* WITH_WSREP */
 
 static Sys_var_ulong Sys_bulk_insert_buff_size(
@@ -3420,7 +3420,7 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type) {
   bool result = true;
 #ifdef WITH_WSREP
   bool own_lock = false;
-#endif /* WITH_WSREP */
+#endif                             /* WITH_WSREP */
   bool new_read_only = read_only;  // make a copy before releasing a mutex
   DBUG_TRACE;
 
@@ -3500,7 +3500,7 @@ static bool fix_super_read_only(sys_var *, THD *thd, enum_var_type type) {
   DBUG_TRACE;
 
 #ifdef WITH_WSREP
-  bool own_lock= false;
+  bool own_lock = false;
 #endif /* WITH_WSREP */
 
   /* return if no changes: */
@@ -7350,6 +7350,16 @@ static bool check_set_default_table_encryption_access(
   // the value is unchanged.
   longlong previous_val = thd->variables.default_table_encryption;
   longlong val = (longlong)var->save_result.ulonglong_value;
+
+#ifdef WITH_WSREP
+  if (val > 1) {
+    my_message(ER_WRONG_VALUE_FOR_VAR,
+               "Keyring encryption is not supported in Percona XtraDB Cluster.",
+               MYF(0));
+    return true;
+  }
+#endif
+
   if ((!var->is_global_persist() && val == previous_val) ||
       thd->security_context()->check_access(SUPER_ACL) ||
       (thd->security_context()
@@ -7500,9 +7510,8 @@ static Sys_var_charptr Sys_wsrep_data_home_dir(
 static Sys_var_charptr Sys_wsrep_cluster_name(
     "wsrep_cluster_name", "Name for the cluster",
     READ_ONLY GLOBAL_VAR(wsrep_cluster_name), CMD_LINE(REQUIRED_ARG),
-    IN_FS_CHARSET, DEFAULT(WSREP_CLUSTER_NAME), NO_MUTEX_GUARD,
-    NOT_IN_BINLOG, ON_CHECK(wsrep_cluster_name_check),
-    ON_UPDATE(wsrep_cluster_name_update));
+    IN_FS_CHARSET, DEFAULT(WSREP_CLUSTER_NAME), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+    ON_CHECK(wsrep_cluster_name_check), ON_UPDATE(wsrep_cluster_name_update));
 
 static Sys_var_charptr Sys_wsrep_cluster_address(
     "wsrep_cluster_address", "Address to initially connect to cluster",
@@ -7743,10 +7752,9 @@ static Sys_var_bool Sys_wsrep_replicate_myisam(
     ON_UPDATE(0));
 
 static Sys_var_bool Sys_wsrep_log_conflicts("wsrep_log_conflicts",
-                                              "To log multi-master conflicts",
-                                              GLOBAL_VAR(wsrep_log_conflicts),
-                                              CMD_LINE(OPT_ARG),
-                                              DEFAULT(false));
+                                            "To log multi-master conflicts",
+                                            GLOBAL_VAR(wsrep_log_conflicts),
+                                            CMD_LINE(OPT_ARG), DEFAULT(false));
 
 static Sys_var_bool Sys_wsrep_load_data_splitting(
     "wsrep_load_data_splitting",
@@ -7756,11 +7764,11 @@ static Sys_var_bool Sys_wsrep_load_data_splitting(
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0),
     DEPRECATED_VAR(""));
 
-static Sys_var_bool Sys_wsrep_slave_FK_checks(
-    "wsrep_slave_FK_checks",
-    "Should slave thread do "
-    "foreign key constraint checks",
-    GLOBAL_VAR(wsrep_slave_FK_checks), CMD_LINE(OPT_ARG), DEFAULT(true));
+static Sys_var_bool Sys_wsrep_slave_FK_checks("wsrep_slave_FK_checks",
+                                              "Should slave thread do "
+                                              "foreign key constraint checks",
+                                              GLOBAL_VAR(wsrep_slave_FK_checks),
+                                              CMD_LINE(OPT_ARG), DEFAULT(true));
 
 static Sys_var_bool Sys_wsrep_slave_UK_checks(
     "wsrep_slave_UK_checks",

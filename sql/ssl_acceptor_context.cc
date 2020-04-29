@@ -453,7 +453,6 @@ int SslAcceptorContext::show_ssl_get_ssl_crlpath(THD *, SHOW_VAR *var,
 
 #ifdef WITH_WSREP
 bool SslAcceptorContext::wsrep_ssl_artifacts_check(bool bootstrapping_node) {
-
   if (!WSREP_ON) {
     /* No-op if node is running in non-cluster mode. */
     return false;
@@ -481,12 +480,12 @@ bool SslAcceptorContext::wsrep_ssl_artifacts_check(bool bootstrapping_node) {
       case SSL_ARTIFACTS_VIA_OPTIONS:
         WSREP_INFO(
             "New joining cluster node configured to use specified SSL "
-            "artificats");
+            "artifacts");
         break;
       case SSL_ARTIFACT_TRACES_FOUND:
       case SSL_ARTIFACTS_NOT_FOUND:
         WSREP_ERROR(
-            "New joining cluster node didn't found %sneeded SSL artifacts",
+            "New joining cluster node didn't find %sneeded SSL artifacts",
             (auto_detection_status == SSL_ARTIFACT_TRACES_FOUND) ? "all " : "");
         return true;
         break;

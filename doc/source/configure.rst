@@ -26,10 +26,10 @@ Configuration examples assume there are three |PXC| nodes:
 +--------+-----------+---------------+
 
 If you are running Debian or Ubuntu,
-add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
+add the following configuration variables to :file:`/etc/mysql/my.cnf`
 on the first node::
 
- wsrep_provider=/usr/lib/libgalera_smm.so
+ wsrep_provider=/usr/lib/galera4/libgalera_smm.so
 
  wsrep_cluster_name=pxc-cluster
  wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
@@ -45,11 +45,11 @@ on the first node::
  default_storage_engine=InnoDB
  innodb_autoinc_lock_mode=2
 
-If you are running Red Hat or CentOS,
-add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
-on the first node::
+If you are running Red Hat or CentOS, your configuration file on the
+first node (:file:`/etc/my.cnf`) should set the following
+configuration variables to::
 
- wsrep_provider=/usr/lib64/galera3/libgalera_smm.so
+ wsrep_provider=/usr/lib64/galera4/libgalera_smm.so
 
  wsrep_cluster_name=pxc-cluster
  wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
@@ -83,13 +83,10 @@ Configuration Reference
 
 :variable:`wsrep_provider`
 
-  Specify the path to the Galera library.
+  Specify the path to the Galera library. The location depends on the distribution:
 
-  .. note:: The location depends on the distribution:
-
-     * Debian or Ubuntu: :file:`/usr/lib/libgalera_smm.so`
-
-     * Red Hat or CentOS: :file:`/usr/lib64/galera3/libgalera_smm.so`
+  * Debian and Ubuntu: :file:`/usr/lib/galera4/libgalera_smm.so`
+  * Red Hat and CentOS: :file:`/usr/lib64/galera4/libgalera_smm.so`
 
 :variable:`wsrep_cluster_name`
 
@@ -122,7 +119,7 @@ Configuration Reference
 :variable:`wsrep_sst_method`
 
   By default, |PXC| uses |PXB|_ for :term:`State Snapshot Transfer <SST>`.
-  Setting ``wsrep_sst_method=xtrabackup-v2`` is highly recommended.
+  ``xtrabackup-v2`` is the only supported option for this variable.
   This method requires a user for SST to be set up on the initial node.
 
 :variable:`pxc_strict_mode`
@@ -145,7 +142,7 @@ Configuration Reference
   Set this variable to ``default_storage_engine=InnoDB``.
 
 .. |default_storage_engine| replace:: ``default_storage_engine``
-.. _default_storage_engine: http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_default_storage_engine
+.. _default_storage_engine: http://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_default_storage_engine
 
 |innodb_autoinc_lock_mode|_
 
@@ -155,7 +152,7 @@ Configuration Reference
   Set this variable to ``innodb_autoinc_lock_mode=2``.
 
 .. |innodb_autoinc_lock_mode| replace:: ``innodb_autoinc_lock_mode``
-.. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
+.. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
 
 Next Steps
 ==========

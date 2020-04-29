@@ -155,9 +155,9 @@
 #include "thr_lock.h"
 
 #ifdef WITH_WSREP
+#include "service_wsrep.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_xid.h"
-#include "service_wsrep.h"
 #endif /* WITH_WSREP */
 
 #define window_size Log_throttle::LOG_THROTTLE_WINDOW_SIZE
@@ -3806,7 +3806,6 @@ Query_log_event::Query_log_event(THD *thd_arg, const char *query_arg,
                       : Log_event::EVENT_STMT_CACHE,
           Log_event::EVENT_NORMAL_LOGGING, header(), footer()),
       data_buf(nullptr) {
-
 #ifdef WITH_WSREP
   /*
     If Query_log_event will contain non trans keyword (not BEGIN, COMMIT,
@@ -9554,7 +9553,6 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli) {
       DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(action)));
     };);
     if (open_and_lock_tables(thd, rli->tables_to_lock, 0)) {
-
 #ifdef WITH_WSREP
       if (WSREP(thd)) {
         WSREP_WARN(

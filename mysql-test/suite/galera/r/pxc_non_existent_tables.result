@@ -1,0 +1,30 @@
+ANALYZE TABLE nonexestint1;
+Table	Op	Msg_type	Msg_text
+test.nonexestint1	analyze	Error	Table 'test.nonexestint1' doesn't exist
+test.nonexestint1	analyze	status	Operation failed
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE VIEW v AS SELECT * FROM t1;
+ANALYZE TABLE nonexestint2;
+Table	Op	Msg_type	Msg_text
+test.nonexestint2	analyze	Error	Table 'test.nonexestint2' doesn't exist
+test.nonexestint2	analyze	status	Operation failed
+OPTIMIZE TABLE nonexstent1;
+Table	Op	Msg_type	Msg_text
+test.nonexstent1	optimize	Error	Table 'test.nonexstent1' doesn't exist
+test.nonexstent1	optimize	status	Operation failed
+INSERT INTO t1 VALUES (1);
+ANALYZE TABLE t1, nonexistent3;
+Table	Op	Msg_type	Msg_text
+test.t1	analyze	status	OK
+test.nonexistent3	analyze	Error	Table 'test.nonexistent3' doesn't exist
+test.nonexistent3	analyze	status	Operation failed
+ANALYZE TABLE v;
+Table	Op	Msg_type	Msg_text
+test.v	analyze	Error	'test.v' is not BASE TABLE
+test.v	analyze	status	Operation failed
+CHECK TABLE t1, v;
+Table	Op	Msg_type	Msg_text
+test.t1	check	status	OK
+test.v	check	status	OK
+DROP VIEW v;
+DROP TABLE t1;

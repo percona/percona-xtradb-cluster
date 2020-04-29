@@ -1,0 +1,47 @@
+#
+# Test group replication error messages with pxc strict mode
+#
+
+--source include/galera_cluster.inc
+
+--connection node_2
+
+--disable_query_log
+call mtr.add_suppression("Plugin group_replication reported");
+call mtr.add_suppression("Group replication cannot be used with Percona XtraDB Cluster in strict mode.");
+call mtr.add_suppression("Plugin 'group_replication' init function returned error.");
+call mtr.add_suppression("Using group replication with Percona XtraDB Cluster is only supported for migration");
+--enable_query_log
+
+--connection node_1
+
+--disable_query_log
+call mtr.add_suppression("Plugin group_replication reported");
+call mtr.add_suppression("Group replication cannot be used with Percona XtraDB Cluster in strict mode.");
+call mtr.add_suppression("Plugin 'group_replication' init function returned error.");
+call mtr.add_suppression("Using group replication with Percona XtraDB Cluster is only supported for migration");
+--enable_query_log
+
+# Default
+SET GLOBAL pxc_strict_mode = 0;
+
+INSTALL PLUGIN group_replication SONAME 'group_replication.so';
+UNINSTALL PLUGIN group_replication;
+
+SET GLOBAL pxc_strict_mode = 2;
+--connection node_2
+SET GLOBAL pxc_strict_mode = 2;
+
+--connection node_1
+
+--error ER_PXC_GR_INIT
+INSTALL PLUGIN group_replication SONAME 'group_replication.so';
+# Create a dummy table, which ensures that the following statements won't be executed until this is replicated
+# This is to prevent node_2 relaxing strict mode before it executes the install plugin
+CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT);
+
+SET GLOBAL pxc_strict_mode = 0;
+--connection node_2
+SET GLOBAL pxc_strict_mode = 0;
+--connection node_1
+DROP TABLE t1;

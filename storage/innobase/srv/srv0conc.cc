@@ -301,4 +301,3 @@ void wsrep_srv_conc_cancel_wait(trx_t *trx) {
   WSREP_DEBUG("WSREP: conc slot cancel, no atomics\n");
 }
 #endif /* WITH_WSREP */
-

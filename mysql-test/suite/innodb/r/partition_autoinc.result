@@ -51,7 +51,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -89,7 +88,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -193,7 +191,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -226,7 +223,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -259,7 +255,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -275,7 +270,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p1.ibd
 ./test/t1#p#p3.ibd
@@ -318,7 +312,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p1.ibd
 ./test/tr.ibd
@@ -369,7 +362,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -402,7 +394,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -474,7 +465,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -517,7 +507,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -592,7 +581,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p01.ibd
 ./test/t1#p#p02.ibd
@@ -647,7 +635,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p01.ibd
 ./test/t1#p#p02.ibd
@@ -709,7 +696,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p01.ibd
 ./test/t1#p#p02.ibd
@@ -805,7 +791,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -852,7 +837,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0.ibd
 ./test/t1#p#p1.ibd
@@ -963,7 +947,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0#sp#sp00.ibd
 ./test/t1#p#p0#sp#sp01.ibd
@@ -1034,7 +1017,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0#sp#sp00.ibd
 ./test/t1#p#p0#sp#sp01.ibd
@@ -1104,7 +1086,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p0#sp#sp00.ibd
 ./test/t1#p#p0#sp#sp01.ibd
@@ -1151,7 +1132,6 @@ AND df.path NOT LIKE '._mysql_%'
 ORDER BY t.name;
 LOWER(path)
 ./mtr/global_suppressions.ibd
-./mtr/test_suppressions.ibd
 ./sys/sys_config.ibd
 ./test/t1#p#p1#sp#sp10.ibd
 ./test/t1#p#p1#sp#sp11.ibd

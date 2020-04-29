@@ -97,9 +97,9 @@
 #include "violite.h"
 
 #ifdef WITH_WSREP
-#include "sql/dd/types/table.h"                // dd::Table
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
-#endif /* WITH_WSREP */
+#include "sql/dd/types/table.h"              // dd::Table
+#endif                                       /* WITH_WSREP */
 
 bool Column_name_comparator::operator()(const String *lhs,
                                         const String *rhs) const {
@@ -1489,48 +1489,47 @@ static bool pxc_strict_mode_admin_check(THD *thd, TABLE_LIST *tables) {
   enum legacy_db_type db_type;
 
   for (TABLE_LIST *table = tables; table; table = table->next_local) {
-
     /* Skip check for temporary table */
-    if (is_temporary_table(table))
-      continue;
+    if (is_temporary_table(table)) continue;
 
     bool block = false;
 
-    // Acquire lock on the table as it is needed to get the instance from DD
-    MDL_request mdl_request;
-    MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db, table->table_name,
-                     MDL_SHARED, MDL_EXPLICIT);
-    thd->mdl_context.acquire_lock(&mdl_request,
-                                  thd->variables.lock_wait_timeout);
-
+    // mdl_lock scope begin
     {
+      // Acquire lock on the table as it is needed to get the instance from DD
+      MDL_request mdl_request;
+      MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db,
+                       table->table_name, MDL_SHARED, MDL_EXPLICIT);
+      wsrep_scope_guard mdl_lock(
+          [thd, &mdl_request]() {
+            thd->mdl_context.acquire_lock(&mdl_request,
+                                          thd->variables.lock_wait_timeout);
+          },
+          [thd, &mdl_request]() {
+            thd->mdl_context.release_lock(mdl_request.ticket);
+          });
+
       const char *schema_name = table->db;
       const char *table_name = table->table_name;
       dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
       const dd::Table *table_ref = NULL;
 
       if (thd->dd_client()->acquire(schema_name, table_name, &table_ref)) {
-        thd->mdl_context.release_lock(mdl_request.ticket);
         return true;
       }
 
       if (table_ref == nullptr ||
           table_ref->hidden() == dd::Abstract_table::HT_HIDDEN_SE) {
-        my_error(ER_NO_SUCH_TABLE, MYF(0), schema_name, table_name);
-        thd->mdl_context.release_lock(mdl_request.ticket);
-        return true;
+        continue;
       }
 
       handlerton *hton = nullptr;
       if (dd::table_storage_engine(thd, table_ref, &hton)) {
-        thd->mdl_context.release_lock(mdl_request.ticket);
         return true;
       }
 
       db_type = hton->db_type;
-    }
-
-    thd->mdl_context.release_lock(mdl_request.ticket);
+    }  // mdl_lock scope end
 
     bool is_system_db =
         (table && ((strcmp(table->db, "mysql") == 0) ||
@@ -2211,7 +2210,7 @@ bool Sql_cmd_show_grants::execute(THD *thd) {
       const List_of_auth_id_refs *active_list =
           thd->security_context()->get_active_roles();
       return mysql_show_grants(thd, &current_user, *active_list,
-                                    show_mandatory_roles, effective_grants);
+                               show_mandatory_roles, effective_grants);
     }
   } else if (strcmp(thd->security_context()->priv_user().str,
                     for_user->user.str) != 0) {
@@ -2235,8 +2234,8 @@ bool Sql_cmd_show_grants::execute(THD *thd) {
 
   LEX_USER *tmp_user = const_cast<LEX_USER *>(for_user);
   tmp_user = get_current_user(thd, tmp_user);
-  return mysql_show_grants(thd, tmp_user, authid_list,
-                                show_mandatory_roles, effective_grants);
+  return mysql_show_grants(thd, tmp_user, authid_list, show_mandatory_roles,
+                           effective_grants);
 }
 
 bool Sql_cmd_show::execute(THD *thd) {

@@ -751,13 +751,13 @@ constexpr ulint REC_MAX_DATA_SIZE = 16384;
 
 #ifdef WITH_WSREP
 dberr_t wsrep_rec_get_foreign_key(
-	byte 		*buf,     /* out: extracted key */
-	ulint 		*buf_len, /* in/out: length of buf */
-	const rec_t*	rec,	  /* in: physical record */
-	dict_index_t*	index_for,  /* in: index for foreign table */
-	dict_index_t*	index_ref,  /* in: index for referenced table */
-	ibool		new_protocol); /* in: protocol > 1 */
-#endif /* WITH_WSREP */
+    byte *buf,               /* out: extracted key */
+    ulint *buf_len,          /* in/out: length of buf */
+    const rec_t *rec,        /* in: physical record */
+    dict_index_t *index_for, /* in: index for foreign table */
+    dict_index_t *index_ref, /* in: index for referenced table */
+    ibool new_protocol);     /* in: protocol > 1 */
+#endif                       /* WITH_WSREP */
 
 #include "rem0rec.ic"
 

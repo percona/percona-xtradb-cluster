@@ -40,7 +40,7 @@
 
 #ifdef WITH_WSREP
 #include "sql/sql_parse.h"  // to expose WSREP_MYSQL_DB
-#endif /* WITH_WSREP */
+#endif                      /* WITH_WSREP */
 
 class ACL_USER;
 class ACL_PROXY_USER;

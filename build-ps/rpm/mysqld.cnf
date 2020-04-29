@@ -9,7 +9,6 @@ datadir=/var/lib/mysql
 socket=/var/lib/mysql/mysql.sock
 log-error=/var/log/mysqld.log
 pid-file=/var/run/mysqld/mysqld.pid
-log_error_verbosity=3
 
 # Binary log expiration period is 604800 seconds, which equals 7 days
 binlog_expire_logs_seconds=604800

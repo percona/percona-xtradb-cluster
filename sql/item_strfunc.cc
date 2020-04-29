@@ -5089,7 +5089,7 @@ bool Item_func_wsrep_last_seen_gtid::itemize(Parse_context *pc, Item **res) {
   return false;
 }
 
-longlong Item_func_wsrep_sync_wait_upto::val_int() {
+longlong Item_func_wsrep_sync_wait_upto_gtid::val_int() {
   int timeout = -1;
   String *gtid_str = args[0]->val_str(&value);
   if (gtid_str == NULL) {
@@ -5114,7 +5114,7 @@ longlong Item_func_wsrep_sync_wait_upto::val_int() {
   }
 
   enum wsrep::provider::status status =
-      wsrep_sync_wait_upto(current_thd, &gtid, timeout);
+      wsrep_sync_wait_upto_gtid(current_thd, &gtid, timeout);
 
   if (status) {
     int err;
@@ -5131,7 +5131,8 @@ longlong Item_func_wsrep_sync_wait_upto::val_int() {
   return 1LL;
 }
 
-bool Item_func_wsrep_sync_wait_upto::itemize(Parse_context *pc, Item **res) {
+bool Item_func_wsrep_sync_wait_upto_gtid::itemize(Parse_context *pc,
+                                                  Item **res) {
   if (skip_itemize(res)) return false;
   if (super::itemize(pc, res)) return true;
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);

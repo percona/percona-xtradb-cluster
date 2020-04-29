@@ -370,6 +370,23 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
   thd->set_slow_log_for_admin_command();
 
 #ifdef WITH_WSREP
+  /* Check if foreign keys are accessible.
+  1. Transaction is replicated first, then is done locally.
+  2. Replicated node applies write sets in context
+  of root user.
+  Above two conditions may cause that even if we have no access to FKs,
+  transactions will replicate with success, but fail locally.
+
+  Here we check only for FK access, not if the engine supports FKs.
+  That's enough, because right now we need only to know if transaction
+  should be rolled back because of lack of access and not replicated,
+  or we can replicate it and let replicated node do the rest of the job. */
+  if (alter_info.flags & Alter_info::ADD_FOREIGN_KEY) {
+    if (check_fk_parent_table_access(thd, &create_info, &alter_info, false)) {
+      return true;
+    }
+  }
+
   /* PXC doesn't recommend/allow ALTER operation on table created using
   non-transactional storage engine (like MyISAM, HEAP/MEMORY, etc....)
   except ALTER operation to change storage engine to transactional storage
@@ -384,41 +401,43 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
 
     TABLE_LIST* table = first_table;
 
-    // Acquire lock on the table as it is needed to get the instance from DD
-    MDL_request mdl_request;
-    MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db, table->table_name,
-                     MDL_SHARED, MDL_EXPLICIT);
-    thd->mdl_context.acquire_lock(&mdl_request,
-                                  thd->variables.lock_wait_timeout);
-
+    // mdl_lock scope begin
     {
+      // Acquire lock on the table as it is needed to get the instance from DD
+      MDL_request mdl_request;
+      MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db,
+                       table->table_name, MDL_SHARED, MDL_EXPLICIT);
+      wsrep_scope_guard mdl_lock(
+          [thd, &mdl_request]() {
+            thd->mdl_context.acquire_lock(&mdl_request,
+                                          thd->variables.lock_wait_timeout);
+          },
+          [thd, &mdl_request]() {
+            thd->mdl_context.release_lock(mdl_request.ticket);
+          });
+
       const char *schema_name = table->db;
       const char *table_name = table->table_name;
       dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
       const dd::Table *table_ref = NULL;
 
       if (thd->dd_client()->acquire(schema_name, table_name, &table_ref)) {
-        thd->mdl_context.release_lock(mdl_request.ticket);
         return true;
       }
 
       if (table_ref == nullptr ||
           table_ref->hidden() == dd::Abstract_table::HT_HIDDEN_SE) {
         my_error(ER_NO_SUCH_TABLE, MYF(0), schema_name, table_name);
-        thd->mdl_context.release_lock(mdl_request.ticket);
         return true;
       }
 
       handlerton *hton = nullptr;
       if (dd::table_storage_engine(thd, table_ref, &hton)) {
-        thd->mdl_context.release_lock(mdl_request.ticket);
         return true;
       }
 
       existing_db_type = hton->db_type;
-    }
-
-    thd->mdl_context.release_lock(mdl_request.ticket);
+    }  // mdl_lock scope end
 
     bool is_system_db =
         (first_table && ((strcmp(first_table->db, "mysql") == 0) ||

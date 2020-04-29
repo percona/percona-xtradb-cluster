@@ -1157,8 +1157,19 @@ PREPARE stmt FROM @cmd;
 EXECUTE stmt;
 DROP PREPARE stmt;
 
+#! PXC_SECTION::START
 #
-# SQL commands to create the PXC internal session user and role that is used by the SST process
+# All the commands between PXC_SECTION::START and PXC_SECTION::END will be
+# run whenever PXC starts up.  This is to ensure that the PXC internal session
+# user always exists (this user is also created on upgrade, but in certain
+# upgrade scenarios, such as upgrading from a PS 8.0 node, it will not
+# run the upgrade code).
+#
+# Note: The PXC_SECTION markers must come after an SQL statement.  Due to the
+# way the code is generated, do not place any comments before the markers.
+#
+# SQL commands to create the PXC internal session user and role that is used
+# by the SST process
 #
 # mysql.pxc.internal.session
 #   See the comments in mysql_system_tables.sql
@@ -1214,8 +1225,10 @@ INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mys
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role','N','N','N','N','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
 
+#! PXC_SECTION::END
 # flush privileges at this stage can cause problem with upgrade from 57 -> 80
 # FLUSH PRIVILEGES;
+#--------------------------------
 
 # Move all system tables with InnoDB storage engine to mysql tablespace.
 SET @cmd="ALTER TABLE mysql.db TABLESPACE = mysql";

@@ -112,7 +112,7 @@ class SslAcceptorContext {
 
 #ifdef WITH_WSREP
   static bool wsrep_ssl_artifacts_check(bool bootstrapping_node);
-  static void populate_wsrep_ssl_options(char* buff, unsigned int sz);
+  static void populate_wsrep_ssl_options(char *buff, unsigned int sz);
   static bool is_wsrep_context_initialized() {
     return wsrep_context_initialized;
   }
@@ -291,7 +291,6 @@ class SslAcceptorContext {
 
   /** singleton lock */
   static SslAcceptorContextLockType *lock;
-
 
 #ifdef WITH_WSREP
   static bool wsrep_context_initialized;

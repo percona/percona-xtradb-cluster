@@ -7,21 +7,18 @@ Installing |PXC| on Debian or Ubuntu
 Percona provides :file:`.deb` packages for 64-bit versions
 of the following distributions:
 
-* Debian 7 ("wheezy")
-* Debian 8 ("jessie")
-* Ubuntu 12.04 LTS (Precise Pangolin)
-* Ubuntu 14.04 LTS (Trusty Tahr)
+* Debian 9 (stretch)
+* Debian 10 (buster)
 * Ubuntu 16.04 LTS (Xenial Xerus)
-* Ubuntu 17.04 (Zesty Zapus)
-* Ubuntu 17.10 (Artful Aardvark)
 * Ubuntu 18.04 LTS (Bionic Beaver)
+* Ubuntu 20.04 LTS (Bionic Beaver)
 
 .. note:: |PXC| should work on other DEB-based distributions,
    but it is tested only on platforms listed above.
 
 The packages are available in the official Percona software repository
 and on the `download page
-<http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST/>`_.
+<http://www.percona.com/downloads/Percona-XtraDB-Cluster-80/LATEST/>`_.
 It is recommended to install |PXC| from the official repository
 using :command:`apt`.
 
@@ -65,20 +62,21 @@ Installing from Repository
 
    .. code-block:: bash
 
-      $ sudo apt-get install percona-xtradb-cluster-57
+      $ sudo apt-get install percona-xtradb-cluster-80
 
    .. note:: Alternatively, you can install
-      the ``percona-xtradb-cluster-full-57`` meta package,
+      the ``percona-xtradb-cluster-full-80`` meta package,
       which contains the following additional packages:
 
-      * ``percona-xtradb-cluster-test-5.7``
-      * ``percona-xtradb-cluster-5.7-dbg``
+      * ``percona-xtradb-cluster-test-8.0``
+      * ``percona-xtradb-cluster-8.0-dbg``
       * ``percona-xtradb-cluster-garbd-3.x``
       * ``percona-xtradb-cluster-galera-3.x-dbg``
       * ``percona-xtradb-cluster-garbd-3.x-dbg``
       * ``libmysqlclient18``
 
-   During installation, you will be prompted to provide a password
+
+   During the installation, you are requested to provide a password
    for the ``root`` user on the database node.
 
 #. Stop the ``mysql`` service:
@@ -87,8 +85,8 @@ Installing from Repository
 
       $ sudo service mysql stop
 
-   .. note:: All Debian-based distributions start services
-      as soon as the corresponding package is installed.
+   .. note:: 
+
       Before starting a |PXC| node, it needs to be properly configured.
       For more information, see :ref:`configure`.
 

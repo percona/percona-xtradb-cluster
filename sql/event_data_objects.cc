@@ -1028,6 +1028,12 @@ bool Event_job_data::execute(THD *thd, bool drop) {
   // connection with new command. Run wsrep_open to initialize the open-state
   wsrep_open(thd);
   wsrep_before_command(thd);
+
+  // Setup valid query_id (and wsrep_next_trx_id).
+  // It will be used to setup transaction in case it
+  // needs to be BF aborted in set_system_user_flag(),
+  // before actual event execution is started.
+  thd->set_query_id(next_query_id());
 #endif /* WITH_WSREP */
 
   /*
@@ -1078,6 +1084,11 @@ bool Event_job_data::execute(THD *thd, bool drop) {
     goto end;
   }
 
+#ifdef WITH_WSREP
+  if (wsrep_is_bf_aborted(thd)) {
+    goto end;
+  }
+#endif
   if (construct_sp_sql(thd, &sp_sql)) goto end;
 
   /*
@@ -1222,7 +1233,12 @@ end:
   }
 
 #ifdef WITH_WSREP
-  wsrep_after_command_ignore_result(thd);
+  // Transaction might have been aborted at the stage
+  // when set_system_user_flag() is called.
+  // wsrep_after_command_ignore_result() asserts when there was
+  // any error, so ignore the error explicitly.
+  wsrep_after_command_before_result(thd);
+  wsrep_after_command_after_result(thd);
   wsrep_close(thd);
 #endif /* WITH_WSREP */
 

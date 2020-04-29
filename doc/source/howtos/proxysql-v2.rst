@@ -243,7 +243,8 @@ To view the usage information, run ``proxysql-admin`` without any options:
    --quick-demo                       Setup a quick demo with no authentication
    --syncusers                        Sync user accounts currently configured in MySQL to ProxySQL
                                       May be used with --enable.
-                                      (deletes ProxySQL users not in MySQL)
+                                      (deletes ProxySQL users not in MySQL).
+				      See :ref:`pxc.proxysql.v2.admin-tool.syncusers` for more information
    --sync-multi-cluster-users         Sync user accounts currently configured in MySQL to ProxySQL
                                       May be used with --enable.
                                       (doesn't delete ProxySQL users not in MySQL)
@@ -491,9 +492,28 @@ database for you
 --syncusers
 --------------------------------------------------------------------------------
 
-This option will sync user accounts currently configured in Percona XtraDB Cluster
-with the ProxySQL database except password-less users and admin users.
-It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL database.
+This option synchronizes user accounts currently configured in |PXC| with the
+ProxySQL database except password-less users and admin users.
+
+.. important::
+
+   This option does not work if the |PXC| user is created using the
+   ``caching_sha2_password`` plugin (used by default in |PXC| |version|). Create
+   a mysql user using the ``mysql_native_password`` authentication plugin.
+
+   .. code-block:: guess
+
+      mysql> CREATE USER 'proxysql'@'%' IDENTIFIED WITH mysql_native_password by '$3Kr$t';
+
+   .. seealso::
+
+      |MySQL| Documentation: CREATE USER statement
+         https://dev.mysql.com/doc/refman/8.0/en/create-user.html
+
+
+It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL
+database.
+
 
 .. code-block:: bash
 
@@ -514,15 +534,17 @@ It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL d
 
 .. admonition:: Output
 
-   +---------------+
-   | username      |
-   +---------------+
-   | monitor       |
-   | one           |
-   | proxysql_user |
-   | two           |
-   +---------------+
-   4 rows in set (0.00 sec)
+   .. code-block:: guess
+
+      +---------------+
+      | username      |
+      +---------------+
+      | monitor       |
+      | one           |
+      | proxysql_user |
+      | two           |
+      +---------------+
+      4 rows in set (0.00 sec)
 
 .. rubric:: From PXC
 
@@ -532,15 +554,17 @@ It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL d
 
 .. admonition:: Output
 
-   +---------------+-------+
-   | user          | host  |
-   +---------------+-------+
-   | monitor       | 192.% |
-   | proxysql_user | 192.% |
-   | two           | %     |
-   | one           | %     |
-   +---------------+-------+
-   4 rows in set (0.00 sec)
+   .. code-block:: guess
+
+      +---------------+-------+
+      | user          | host  |
+      +---------------+-------+
+      | monitor       | 192.% |
+      | proxysql_user | 192.% |
+      | two           | %     |
+      | one           | %     |
+      +---------------+-------+
+      4 rows in set (0.00 sec)
 
 .. _pxc.proxysql.v2.admin-tool.sync-multi-cluster-users:
 

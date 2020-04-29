@@ -764,8 +764,14 @@ bool acl_is_utility_user(const char *user, const char *host, const char *ip);
 bool lock_tables_precheck(THD *thd, TABLE_LIST *tables);
 bool create_table_precheck(THD *thd, TABLE_LIST *tables,
                            TABLE_LIST *create_table);
+#ifdef WITH_WSREP
+bool check_fk_parent_table_access(THD *thd, HA_CREATE_INFO *create_info,
+                                  Alter_info *alter_info,
+                                  bool check_fk_support = true);
+#else
 bool check_fk_parent_table_access(THD *thd, HA_CREATE_INFO *create_info,
                                   Alter_info *alter_info);
+#endif
 bool check_readonly(THD *thd, bool err_if_readonly);
 void err_readonly(THD *thd);
 

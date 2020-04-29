@@ -18,11 +18,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include "my_dir.h"
+#include "mysql/components/services/log_builtins.h"
 #include "mysqld.h"
 #include "set_var.h"
 #include "sql_class.h"
 #include "sql_plugin.h"
-#include "mysql/components/services/log_builtins.h"
+
+#include "rpl_group_replication.h"
 
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
@@ -277,8 +279,8 @@ static bool refresh_provider_options() {
   try {
     std::string opts = Wsrep_server_state::instance().provider().options();
     wsrep_provider_options_init(opts.c_str());
-    get_provider_option_value(wsrep_provider_options,
-                              "repl.max_ws_size", &wsrep_max_ws_size);
+    get_provider_option_value(wsrep_provider_options, "repl.max_ws_size",
+                              &wsrep_max_ws_size);
     return false;
   } catch (...) {
     WSREP_ERROR("Failed to get provider options");
@@ -398,7 +400,6 @@ bool wsrep_provider_update(sys_var *, THD *thd, enum_var_type) {
   mysql_mutex_lock(&LOCK_global_system_variables);
   mysql_mutex_lock(&LOCK_wsrep_cluster_config);
 
-
   return rcode;
 }
 
@@ -412,14 +413,13 @@ void wsrep_provider_init(const char *value) {
     return;
   }
 
-  if (wsrep_provider) my_free(const_cast<char*>(wsrep_provider));
+  if (wsrep_provider) my_free(const_cast<char *>(wsrep_provider));
   wsrep_provider = my_strdup(key_memory_wsrep, value, MYF(0));
 }
 
 bool wsrep_provider_options_check(sys_var *, THD *, set_var *) { return 0; }
 
 bool wsrep_provider_options_update(sys_var *, THD *, enum_var_type) {
-
   if (!wsrep_provider_options) {
     WSREP_ERROR("Invalid value for wsrep_provider_options");
     my_message(ER_WRONG_ARGUMENTS, "Invalid value for wsrep_provider_options",
@@ -430,8 +430,7 @@ bool wsrep_provider_options_update(sys_var *, THD *, enum_var_type) {
   enum wsrep::provider::status ret =
       Wsrep_server_state::instance().provider().options(wsrep_provider_options);
 
-  if (ret)
-  {
+  if (ret) {
     WSREP_ERROR("Set options returned %d", ret);
     refresh_provider_options();
     return true;
@@ -441,7 +440,7 @@ bool wsrep_provider_options_update(sys_var *, THD *, enum_var_type) {
 
 void wsrep_provider_options_init(const char *value) {
   if (wsrep_provider_options && wsrep_provider_options != value)
-    my_free(const_cast<char*>(wsrep_provider_options));
+    my_free(const_cast<char *>(wsrep_provider_options));
   wsrep_provider_options =
       (value) ? my_strdup(key_memory_wsrep, value, MYF(0)) : NULL;
 }
@@ -552,7 +551,7 @@ void wsrep_cluster_address_init(const char *value) {
               (wsrep_cluster_address) ? wsrep_cluster_address : "null",
               (value) ? value : "null");
 
-  if (wsrep_cluster_address) my_free(const_cast<char*>(wsrep_cluster_address));
+  if (wsrep_cluster_address) my_free(const_cast<char *>(wsrep_cluster_address));
   wsrep_cluster_address =
       my_strdup(PSI_NOT_INSTRUMENTED, (value) ? value : "", MYF(0));
 }
@@ -572,9 +571,7 @@ bool wsrep_cluster_name_check(sys_var *, THD *, set_var *var) {
   return false;
 }
 
-bool wsrep_cluster_name_update(sys_var *, THD *, enum_var_type) {
-  return 0;
-}
+bool wsrep_cluster_name_update(sys_var *, THD *, enum_var_type) { return 0; }
 
 /* Function checks if the new value for node_name is valid.
 @return false if no error encountered with check else return true. */
@@ -620,7 +617,7 @@ bool wsrep_node_address_update(sys_var *, THD *, enum_var_type) { return 0; }
 
 void wsrep_node_address_init(const char *value) {
   if (wsrep_node_address && strcmp(wsrep_node_address, value))
-    my_free(const_cast<char*>(wsrep_node_address));
+    my_free(const_cast<char *>(wsrep_node_address));
 
   wsrep_node_address =
       (value) ? my_strdup(key_memory_wsrep, value, MYF(0)) : NULL;
@@ -676,21 +673,21 @@ bool wsrep_desync_check(sys_var *, THD *thd, set_var *var) {
     my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     return true;
   }
-  int ret= 1;
+  int ret = 1;
   if (new_wsrep_desync) {
-    ret= Wsrep_server_state::instance().provider().desync();
+    ret = Wsrep_server_state::instance().provider().desync();
     if (ret) {
-      WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
-                  thd->db().str, WSREP_QUERY(thd));
-      my_error (ER_CANNOT_USER, MYF(0), "'desync'", thd->query());
+      WSREP_WARN("SET desync failed %d for schema: %s, query: %s", ret,
+                 thd->db().str, WSREP_QUERY(thd));
+      my_error(ER_CANNOT_USER, MYF(0), "'desync'", thd->query());
       return true;
     }
   } else {
-    ret= Wsrep_server_state::instance().provider().resync();
+    ret = Wsrep_server_state::instance().provider().resync();
     if (ret != WSREP_OK) {
-      WSREP_WARN ("SET resync failed %d for schema: %s, query: %s", ret,
-                  thd->db().str, WSREP_QUERY(thd));
-      my_error (ER_CANNOT_USER, MYF(0), "'resync'", thd->query());
+      WSREP_WARN("SET resync failed %d for schema: %s, query: %s", ret,
+                 thd->db().str, WSREP_QUERY(thd));
+      my_error(ER_CANNOT_USER, MYF(0), "'resync'", thd->query());
       return true;
     }
   }
@@ -713,7 +710,6 @@ bool wsrep_max_ws_size_update(sys_var *, THD *, enum_var_type) {
 }
 
 bool wsrep_trx_fragment_size_check(sys_var *, THD *thd, set_var *var) {
-
   if (!WSREP(thd)) {
     push_warning(thd, Sql_condition::SL_WARNING, ER_WRONG_VALUE_FOR_VAR,
                  "Cannot set 'wsrep_trx_fragment_size' to a value other than "
@@ -742,11 +738,10 @@ bool wsrep_trx_fragment_size_check(sys_var *, THD *thd, set_var *var) {
     return true;
   }
 
-  if (wsrep_protocol_version < 4  && new_trx_fragment_size > 0) {
-    push_warning (thd, Sql_condition::SL_WARNING,
-                  ER_WRONG_VALUE_FOR_VAR,
-                  "Cannot set 'wsrep_trx_fragment_size' to a value other than "
-                  "0 because cluster is not yet operating in Galera 4 mode.");
+  if (wsrep_protocol_version < 4 && new_trx_fragment_size > 0) {
+    push_warning(thd, Sql_condition::SL_WARNING, ER_WRONG_VALUE_FOR_VAR,
+                 "Cannot set 'wsrep_trx_fragment_size' to a value other than "
+                 "0 because cluster is not yet operating in Galera 4 mode.");
     return true;
   }
 
@@ -814,15 +809,14 @@ static void export_wsrep_status_to_mysql(THD *thd) {
 
   thd->wsrep_status_vars = Wsrep_server_state::instance().status();
 
-  wsrep_status_len= thd->wsrep_status_vars.size();
+  wsrep_status_len = thd->wsrep_status_vars.size();
 
   if (mysql_status_len < wsrep_status_len) wsrep_status_len = mysql_status_len;
 
   for (i = 0; i < wsrep_status_len; i++) {
-    mysql_status_vars[i].name =
-        thd->wsrep_status_vars[i].name().c_str();
+    mysql_status_vars[i].name = thd->wsrep_status_vars[i].name().c_str();
     mysql_status_vars[i].value =
-        const_cast<char*>(thd->wsrep_status_vars[i].value().c_str());
+        const_cast<char *>(thd->wsrep_status_vars[i].value().c_str());
     mysql_status_vars[i].type = SHOW_CHAR;
     mysql_status_vars[i].scope = SHOW_SCOPE_ALL;
   }
@@ -839,9 +833,7 @@ int wsrep_show_status(THD *thd, SHOW_VAR *var, char *) {
   return 0;
 }
 
-void wsrep_free_status(THD *thd) {
-  thd->wsrep_status_vars.clear();
-}
+void wsrep_free_status(THD *thd) { thd->wsrep_status_vars.clear(); }
 
 bool wsrep_replicate_myisam_check(sys_var *, THD *thd, set_var *var) {
   /* Trying to set wsrep_replicate_myisam to off. */
@@ -940,12 +932,15 @@ bool pxc_strict_mode_check(sys_var *, THD *thd, set_var *var) {
         (thd->tx_isolation == ISO_SERIALIZABLE ||
          global_system_variables.transaction_isolation == ISO_SERIALIZABLE);
 
+    const bool gr_running = is_group_replication_running();
+
     /* replicate_myisam = off
        row_binlog_format = true (row)
        safe_log_output = true (none/file)
-       serializable = false */
+       serializable = false
+       gr_running = false */
     block = !(!replicate_myisam && row_binlog_format && safe_log_output &&
-              !serializable);
+              !serializable && !gr_running);
 
     if (replicate_myisam)
       WSREP_ERROR(
@@ -963,14 +958,20 @@ bool pxc_strict_mode_check(sys_var *, THD *thd, set_var *var) {
           "Can't change pxc_strict_mode while isolation level is"
           " SERIALIZABLE");
 
+    if (gr_running)
+      WSREP_ERROR(
+          "Can't change pxc_strict_mode when group replication "
+          " is running");
+
     if (block) {
       char message[1024];
-      sprintf(message, "Can't change pxc_strict_mode to %s as%s%s%s%s",
+      sprintf(message, "Can't change pxc_strict_mode to %s as%s%s%s%s%s",
               pxc_strict_mode_to_string(var->save_result.ulonglong_value),
               (replicate_myisam ? " wsrep_replicate_myisam is ON" : ""),
               (!row_binlog_format ? " binlog_format != ROW" : ""),
               (!safe_log_output ? " log_output != NONE/FILE" : ""),
-              (serializable ? " isolation level is SERIALIZABLE" : ""));
+              (serializable ? " isolation level is SERIALIZABLE" : ""),
+              (gr_running ? " group replication is running" : ""));
       my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     }
   }

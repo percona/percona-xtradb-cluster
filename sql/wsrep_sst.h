@@ -23,8 +23,8 @@
 #include "wsrep_api.h"
 
 #include <my_config.h>
-#include "wsrep/gtid.hpp"
 #include <string>
+#include "wsrep/gtid.hpp"
 
 /* system variables */
 extern const char *wsrep_sst_method;
@@ -32,20 +32,8 @@ extern const char *wsrep_sst_receive_address;
 extern const char *wsrep_sst_donor;
 extern bool wsrep_sst_donor_rejects_queries;
 
-/*! Synchronizes applier thread start with init thread */
-extern void wsrep_sst_grab();
-/*! Init thread waits for SST completion */
-extern bool wsrep_sst_wait();
-/*! Signals wsrep that initialization is complete, writesets can be applied */
-extern void wsrep_sst_continue();
 /*! Cancel the SST script if it is running */
 extern void wsrep_sst_cancel(bool call_wsrep_cb);
-
-extern void wsrep_SE_init_grab();         /*! grab init critical section */
-extern void wsrep_SE_init_wait(THD *thd); /*! wait for SE init to complete */
-extern void wsrep_SE_init_done();         /*! signal that SE init is complte */
-extern void wsrep_SE_initialized();       /*! mark SE initialization complete */
-extern bool wsrep_is_SE_initialized();
 
 /**
    Return a string containing the state transfer request string.

@@ -187,6 +187,13 @@ SELECT @@admin_address, @@admin_port;
 disconnect admin_tcp_con_ipv6;
 connection default;
 # Stop DB server
+# Test case 18
+# Check that server shuts down gracefully if --create-admin-listener-thread=ON
+# is specified, but without --admin-address parameter
+# Starting up server with --create-admin-listener-thread=ON
+# restart: --create-admin-listener-thread=ON
+connection default;
+# Stop DB server
 #
 # Starting mysqld in the regular mode...
 #

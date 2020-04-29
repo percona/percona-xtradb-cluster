@@ -9,27 +9,25 @@ related to write-set replication.
 
 .. variable:: pxc_encrypt_cluster_traffic
 
-   :version 5.7.16: Variable introduced
    :cli: ``--pxc-encrypt-cluster-traffic``
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: ``OFF``
+   :default: ``ON``
 
 Enables automatic configuration of SSL encryption.
 When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
 
 Possible values:
 
-* ``OFF``, ``0``, ``false``: Disabled (default)
+* ``OFF``, ``0``, ``false``: Disabled
 
-* ``ON``, ``1``, ``true``: Enabled
+* ``ON``, ``1``, ``true``: Enabled (default)
 
 For more information, see :ref:`ssl-auto-conf`.
 
 .. variable:: pxc_maint_mode
 
-   :version 5.7.16: Variable introduced
    :cli: ``--pxc-maint-mode``
    :conf: Yes
    :scope: Global
@@ -53,7 +51,6 @@ For more information, see :ref:`pxc-maint-mode`.
 
 .. variable:: pxc_maint_transition_period
 
-   :version 5.7.16: Variable introduced
    :cli: ``--pxc-maint-transition-period``
    :conf: Yes
    :scope: Global
@@ -70,7 +67,6 @@ For more information, see :ref:`pxc-maint-mode`.
 
 .. variable:: pxc_strict_mode
 
-   :version 5.7: Variable introduced
    :cli: ``--pxc-strict-mode``
    :conf: Yes
    :scope: Global
@@ -146,7 +142,6 @@ It can be disabled in master-slave clusters.
 
 .. variable:: wsrep_causal_reads
 
-   :version 5.6.20-25.7: Variable deprecated
    :cli: ``--wsrep-causal-reads``
    :conf: Yes
    :scope: Global, Session
@@ -161,6 +156,36 @@ Enabling this variable will result in larger latencies.
 
 .. note:: This variable was deprecated because enabling it
    is the equivalent of setting :variable:`wsrep_sync_wait` to ``1``.
+
+.. variable:: wsrep_certification_rules
+
+   :cli: ``--wsrep-certification-rules``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :values: STRICT, OPTIMIZED
+   :default: STRICT
+
+
+This variable controls how certification is done in the cluster, in particular
+this affects how foreign keys are handled.
+
+STRICT
+   Two INSERTs that happen at about the same time on two different nodes in a
+   child table, that insert different (non conflicting rows), but both rows
+   point to the same row in the parent table **may result** in the certification
+   failure.
+
+OPTIMIZED
+   Two INSERTs that happen at about the same time on two different nodes in a
+   child table, that insert different (non conflicting rows), but both rows
+   point to the same row in the parent table **will not result** in the
+   certification failure.
+
+.. seealso::
+
+   |galera-cluster| Documentation: |MySQL| wsrep options
+      https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-certification-rules
 
 .. variable:: wsrep_certify_nonPK
 
@@ -223,7 +248,6 @@ Specifies the name of the cluster and should be identical on all nodes.
 
 .. variable:: wsrep_convert_lock_to_trx
 
-   :version 5.7.23-31.31: Variable deprecated
    :cli: ``--wsrep-convert-lock-to-trx``
    :conf: Yes
    :scope: Global
@@ -339,7 +363,6 @@ if you enable ``wsrep_dirty_reads``.
 
 .. variable:: wsrep_drupal_282555_workaround
 
-   :version 5.7.24-31.33: Variable deprecated
    :cli: ``--wsrep-drupal-282555-workaround``
    :conf: Yes
    :scope: Global
@@ -354,7 +377,6 @@ when inserting the ``DEFAULT`` value into an ``AUTO_INCREMENT`` column.
 
 .. variable:: wsrep_forced_binlog_format
 
-   :version 5.7.22-29.26: Variable deprecated
    :cli: ``--wsrep-forced-binlog-format``
    :conf: Yes
    :scope: Global
@@ -373,7 +395,62 @@ Possible values for this variable are:
     and use whatever is set by the |binlog_format| variable (default)
 
 .. |binlog_format| replace:: ``binlog_format``
-.. _binlog_format: https://dev.mysql.com/doc/refman/5.7/en/binary-log-setting.html
+.. _binlog_format: https://dev.mysql.com/doc/refman/8.0/en/binary-log-setting.html
+
+.. variable:: wsrep_min_log_verbosity
+
+   :cli: ``--wsrep-min-log-verbosity``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: 3
+
+This variable defines the *minimum* logging verbosity of wsrep/Galera and acts
+in conjunction with the ``log_error_verbosity`` variable. The
+:variable:`wsrep_min_log_verbosity` has the same values as
+``log_error_verbosity``.
+
+The actual log verbosity of wsrep/Galera can be greater than the value of
+:variable:`wsrep_min_log_verbosity` if ``log_error_verbosity`` is greater than
+:variable:`wsrep_min_log_verbosity`.
+
+A few examples:
+
+.. list-table::
+   :header-rows: 1
+
+   * - log_error_verbosity
+     - wsrep_min_log_verbosity
+     - |MySQL| Logs Verbosity
+     - wsrep Logs Verbosity
+   * - 2
+     - 3
+     - system error, warning
+     - system error, warning, info
+   * - 1
+     - 3
+     - system error
+     - system error, warning, info
+   * - 1
+     - 2
+     - system error
+     - system error, warning
+   * - 3
+     - 1
+     - system error, warning, info
+     - system error, warning, info
+
+Note the case where ``log_error_verbosity=3`` and
+``wsrep_min_log_verbosity=1``. The actual log verbosity of wsrep/Galera is *3*
+(system error, warning, info) because ``log_error_verbosity`` is greater.
+
+.. seealso::
+
+   |MySQL| Documentation: log_error_verbosity
+      https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_log_error_verbosity
+   |galera-cluster| Documentation: Database Server Logs
+      https://galeracluster.com/library/documentation/log.html
+
 
 .. variable:: wsrep_load_data_splitting
 
@@ -574,7 +651,7 @@ The following methods are available:
   .. important::
 
      Under the ``TOI`` method, when DDL operations are performed,
-     |abbr-mdl| is ignored. If |abr-mdl| is important, use the ``RSU``
+     |abbr-mdl| is ignored. If |abbr-mdl| is important, use the ``RSU``
      method.
 
 * ``RSU``: When the *Rolling Schema Upgrade* method is selected,
@@ -600,29 +677,6 @@ The following methods are available:
    Setting the variable with ``SET GLOBAL wsrep_OSU_method``
    will change the variable globally
    but it won't have effect on the current session.
-
-.. variable:: wsrep_preordered
-
-   :version 5.7.24-31.33: Variable deprecated
-   :cli: ``--wsrep-preordered``
-   :conf: Yes
-   :scope: Global
-   :dyn: Yes
-   :default: ``OFF``
-
-Defines whether the node should use transparent handling
-of preordered replication events (like replication from traditional master).
-By default, this is disabled.
-
-If you enable this variable, such events will be applied locally first
-before being replicated to other nodes in the cluster.
-This could increase the rate at which they can be processed,
-which would be otherwise limited by the latency
-between the nodes in the cluster.
-
-Preordered events should not interfere with events that originate on the local
-node. Therefore, you should not run local update queries on a table that is
-also being updated through asynchronous replication.
 
 .. variable:: wsrep_provider
 
@@ -726,7 +780,7 @@ the whole DDL statement is not put under TOI.
     (it will get MyISAM tables from donor)
   * Difference in configuration of ``pxc-cluster`` node
     on `enforce_storage_engine
-    <https://www.percona.com/doc/percona-server/5.7/management/enforce_engine.html>`_
+    <https://www.percona.com/doc/percona-server/8.0/management/enforce_engine.html>`_
     front may result in picking up different engine for the same table
     on different nodes
   * ``CREATE TABLE AS SELECT`` (CTAS) statements use TOI
@@ -958,7 +1012,6 @@ the cluster can be set up without the state transfer.
 
 .. variable:: wsrep_sync_wait
 
-   :version 5.6.20-25.7: Variable introduced
    :cli: ``--wsrep-sync-wait``
    :conf: Yes
    :scope: Session
@@ -998,3 +1051,4 @@ is determined by bitmask:
    of setting the deprecated :variable:`wsrep_causal_reads` to ``ON``.
 
 .. |abbr-mdl| replace:: :abbr:`MDL (Metadata Locking)`
+.. include:: .res/replace.txt
