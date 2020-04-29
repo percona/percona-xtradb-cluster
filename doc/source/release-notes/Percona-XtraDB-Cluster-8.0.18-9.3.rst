@@ -15,6 +15,7 @@ Improvements
 * :jirabug:`PXC-2331`: Modified the SST process to run mysql_upgrade
 * :jirabug:`PXC-2991`: Enhanced Strict Mode Processing to handle Group Replication Plugin
 * :jirabug:`PXC-2985`: Enabled Service for Automated Startup on Reboot with valid grastate.dat
+* :jirabug:`PXC-2980`: Modified Documentation to include AutoStart Up Process after Installation
 * :jirabug:`PXC-2722`: Enabled Support for Percona XtraBackup (PXB) 8.0.8 in Percona XtraDB Cluster (PXC) 8.0
 * :jirabug:`PXC-2602`: Added Ability to Configure xbstream options with wsrep_sst_xtrabackup-v2
 * :jirabug:`PXC-2455`: Implemented the use of Percona XtraBackup (PXB) 8.0.5 in Percona XtraDB Cluster (PXC) 8.0
@@ -22,9 +23,8 @@ Improvements
 * :jirabug:`PXC-2197`: Modified SST Documentation to Include Package Dependencies for Percona XtraBackup (PXB)
 * :jirabug:`PXC-2194`: Improvements to the PXC upgrade guide
 * :jirabug:`PXC-2191`: Revised Documentation on innodb_deadlock to Clarify Cluster Level Deadlock Processing
-* :jirabug:`PXC-2980`: Modified Documentation to include AutoStart Up Process after Installation
-* :jirabug:`PXC-2189`: Modified Reference Architecture for Percona XtraDB Cluster (PXC) to include ProxySQL
 * :jirabug:`PXC-3017`: Remove these SST encryption methods. encrypt=1, encrypt=2, and encrypt=3
+* :jirabug:`PXC-2189`: Modified Reference Architecture for Percona XtraDB Cluster (PXC) to include ProxySQL
 
 
 
@@ -42,8 +42,8 @@ Bugs Fixed
 * :jirabug:`PXC-2912`: Modified netcat Configuration to Include -N Flag on Donor
 * :jirabug:`PXC-2476`: Modified process to determine and process IST or SST and with keyring_file processing
 * :jirabug:`PXC-2204`: Modified Shutdown using systemd after Bootstrap to provide additional messaging
-* :jirabug:`PXC-2969`: Modified pxc_maint_transition_period Documentation to Include Criteria for Use
 * :jirabug:`PXB-2142`: Transition key was written to backup / stream
+* :jirabug:`PXC-2969`: Modified pxc_maint_transition_period Documentation to Include Criteria for Use
 
 
 
