@@ -7,6 +7,7 @@
 .. |ps-last| replace:: Percona Server for MySQL 8.0
 .. |xtradb.product| replace:: Percona XtraDB
 .. |ps| replace:: Percona Server for MySQL
+.. |proxysql| replace:: ProxySQL
 .. |percona-server| replace:: Percona Server for MySQL
 
 .. Platforms and rel. products

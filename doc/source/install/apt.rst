@@ -11,6 +11,7 @@ of the following distributions:
 * Debian 10 (buster)
 * Ubuntu 16.04 LTS (Xenial Xerus)
 * Ubuntu 18.04 LTS (Bionic Beaver)
+* Ubuntu 20.04 LTS (Bionic Beaver)
 
 .. note:: |PXC| should work on other DEB-based distributions,
    but it is tested only on platforms listed above.
@@ -59,20 +60,19 @@ Installing from Repository
 
    .. code-block:: bash
 
-      $ sudo apt-get install percona-xtradb-cluster
+      $ sudo apt-get install percona-xtradb-cluster-80
 
    .. note:: Alternatively, you can install
-      the ``percona-xtradb-cluster-full`` meta package,
+      the ``percona-xtradb-cluster-full-80`` meta package,
       which contains the following additional packages:
 
-      * ``percona-xtradb-cluster-client``
-      * ``percona-xtradb-cluster-common``
-      * ``percona-xtradb-cluster-debug``
-      * ``percona-xtradb-cluster-server``
-      * ``percona-xtradb-cluster-server-debug``
-      * ``percona-xtradb-cluster-server-test``
-      * ``percona-xtradb-cluster-garbd``
-      * ``percona-xtradb-cluster-garbd-debug``
+      * ``percona-xtradb-cluster-test-8.0``
+      * ``percona-xtradb-cluster-8.0-dbg``
+      * ``percona-xtradb-cluster-garbd-3.x``
+      * ``percona-xtradb-cluster-galera-3.x-dbg``
+      * ``percona-xtradb-cluster-garbd-3.x-dbg``
+      * ``libmysqlclient18``
+
 
    During the installation, you are requested to provide a password
    for the ``root`` user on the database node.
