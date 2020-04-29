@@ -22,7 +22,7 @@ using the corresponding package manager for your system:
    .. seealso::
 
       More information about Galera state information in :ref:`wsrep_file_index`
-         :ref:`grastat.dat <galera-grastate-dat>`_
+         :ref:`grastat.dat <galera-grastate-dat>`
 
 Installation Alternatives
 =========================

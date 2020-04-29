@@ -44,15 +44,15 @@ Rolling upgrades to |version| from versions older than 5.7 are not supported
    
    .. important:: 
 
-   If writes are directed to a |pxc| 8.0 node in a cluster that has |pxc| 5.7,
-   the cluster will be broken down. In this case, the system reports an error message
-   similar to the following:
+      If writes are directed to a |pxc| 8.0 node in a cluster that has |pxc| 5.7,
+      the cluster will be broken down. In this case, the system reports an error message
+      similar to the following:
 
-   .. code-block:: text
+      .. code-block:: text
 
-      [ERROR] Slave SQL: Error 'Character set '#255' is not a compiled character set and
-      is not specified in the '/usr/share/percona-xtradb-cluster/charsets/Index.xml' file' on
-      query. Default database: DATABASE_NAME. Query: QUERY, Error_code: 22
+	 [ERROR] Slave SQL: Error 'Character set '#255' is not a compiled character set and
+	 is not specified in the '/usr/share/percona-xtradb-cluster/charsets/Index.xml' file' on
+	 query. Default database: DATABASE_NAME. Query: QUERY, Error_code: 22
 
 The configuration file layout has changed in |pxc| |version|
    All configuration settings are stored in the default |MySQL| configuration
