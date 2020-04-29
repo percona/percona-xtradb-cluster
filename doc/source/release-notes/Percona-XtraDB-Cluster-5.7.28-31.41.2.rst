@@ -1,26 +1,35 @@
-.. rn:: 5.7.28-31.41.2
+.. _PXC-5.7.28-31.41.2:
 
 ================================================================================
-|PXC| |release|
+*Percona XtraDB Cluster* 5.7.28-31.41.2
 ================================================================================
 
-:Date: |date|
-:Installation: :ref:`install`
+:Date: April 14, 2020
+:Installation: `Installing Percona XtraDB Cluster <https://www.percona.com/doc/percona-xtradb-cluster/5.7/install/index.html>`_
 
-Binaries are available from the `downloads section
-<http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/>`_ or from our
-:ref:`software repositories <install>`.
+Percona XtraDB Cluster 5.7.28-31.41.2 requires `Percona XtraBackup 2.4.20
+<https://www.percona.com/doc/percona-xtrabackup/2.4/release-notes/2.4/2.4.20.html>`_.
 
-|PXC| |release| is now the current release, based on the following:
+This release fixes security vulnerability `CVE-2020-10996 <This release fixes security vulnerability >`_
 
-* `Percona Server for MySQL 5.7.28-31
-  <https://www.percona.com/doc/percona-server/5.7/release-notes/Percona-Server-5.7.28-31.html>`_
-* Galera/Codership WSREP API Release 5.7.28
-* Galera Replication library 3.28
+.. seealso::
 
-|PXC| |release| requires `Percona XtraBackup 2.4.20 <https://www.percona.com/doc/percona-xtrabackup/2.4/release-notes/2.4/2.4.20.html>`_.
+   Percona Database Performance Blog
+      `This release fixes security vulnerability
+      <https://www.percona.com/blog/2020/04/16/cve-2020-10997-percona-xtrabackup-information-disclosure-of-command-line-arguments/>`_
 
-This release fixes security vulnerability *CVE-2020-10997*
+Bugs Fixed
+================================================================================
 
-.. |release| replace:: 5.7.28-31.41.2
-.. |date| replace:: April 14, 2020
+* :jirabug:`PXC-3117`: Transition key was hardcoded
+
+  .. important::
+
+     SST with an encrypted table will fail if sent to a downlevel node:
+
+     - will work: 5.7.28  to 5.7.28.2
+     - will not work: 5.7.28.2 to 5.7.28
+    
+* :jirabug:`PXB-2142`: Transition key was written to backup / stream
+
+
