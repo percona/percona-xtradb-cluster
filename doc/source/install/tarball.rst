@@ -27,7 +27,7 @@ Be sure to check your system and make sure that the packages are installed that 
 
 .. rubric:: For Debian or Ubuntu:
 
-.. code-block::
+.. code-block:: bash
 
    $ sudo apt-get install -y \
    socat libdbd-mysql-perl \
