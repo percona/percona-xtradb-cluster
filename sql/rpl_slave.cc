@@ -4059,7 +4059,7 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
         /* this transaction will be replayed,
            so not raising slave error here */
         WSREP_DEBUG("SQL apply failed for MUST_REPLAY, res %d", exec_res);
-	wsrep_replay_transaction(thd);
+        wsrep_replay_transaction(thd);
         switch (thd->wsrep_conflict_state) {
         case NO_CONFLICT:
           exec_res = 0; /* replaying succeeded, and slave may continue */
@@ -4067,7 +4067,7 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
         case ABORTED:
           WSREP_WARN("aborted result of slave transaction replaying: %lu, %d",
                      thd->thread_id, thd->wsrep_conflict_state);
-	  break; /* replaying has failed, trx is rolled back */
+          break; /* replaying has failed, trx is rolled back */
         default:
           WSREP_WARN("unexpected result of slave transaction replaying: %lu, %d",
                      thd->thread_id, thd->wsrep_conflict_state);
