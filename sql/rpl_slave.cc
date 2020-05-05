@@ -4913,11 +4913,11 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
           break;
         case ABORTED:
           WSREP_WARN("aborted result of slave transaction replaying: %lu, %d",
-                     thd->thread_id, thd->wsrep_conflict_state);
+                     thd->thread_id(), thd->wsrep_conflict_state);
           break; /* replaying has failed, trx is rolled back */
         default:
           WSREP_WARN("unexpected result of slave transaction replaying: %lu, %d",
-                     thd->thread_id, thd->wsrep_conflict_state);
+                     thd->thread_id(), thd->wsrep_conflict_state);
         }
 
         break;
