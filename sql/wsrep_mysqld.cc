@@ -1127,10 +1127,17 @@ void wsrep_init_startup(bool sst_first) {
     With mysqldump SST (!sst_first) wait until the server reaches
     joiner state and proceed to accepting connections.
   */
-  if (sst_first) {
-    server_state.wait_until_state(Wsrep_server_state::s_initializing);
-  } else {
-    server_state.wait_until_state(Wsrep_server_state::s_joiner);
+  try {
+    if (sst_first) {
+      server_state.wait_until_state(Wsrep_server_state::s_initializing);
+    } else {
+      server_state.wait_until_state(Wsrep_server_state::s_joiner);
+    }
+  } catch (const wsrep::runtime_error &e) {
+    // While waiting for 'initializing' or 'joiner' state we got 'disconnecting'
+    // state. It means that something went wrong during wsrep provider
+    // initialization and we cannot recover anyway.
+    unireg_abort(MYSQLD_ABORT_EXIT);
   }
 }
 
