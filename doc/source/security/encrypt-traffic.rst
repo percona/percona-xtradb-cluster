@@ -42,12 +42,12 @@ for each node:
    ssl-cert=/etc/mysql/certs/client-cert.pem
    ssl-key=/etc/mysql/certs/client-key.pem
 
-After restart the node will use these files to encrypt communication with
+After it is restarted, the node uses these files to encrypt communication with
 clients. MySQL clients require only the second part of the configuration
 to communicate with cluster nodes.
 
-|MySQL| generates default key and certificate
-files and places them in data directory. You can either use them or generate
+|MySQL| generates the default key and certificate
+files and places them in the data directory. You can either use them or generate
 new certificates. For generation of new certificate please refer to
 :ref:`generate-keys-certs` section.
 

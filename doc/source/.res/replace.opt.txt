@@ -16,3 +16,6 @@
 .. |opt.rocksdb-update-cf-options| replace:: :variable:`rocksdb_update_cf_options`
 .. |opt.update-cf-options|         replace:: :variable:`rocksdb_update_cf_options`
 .. |opt.ucfo|                      replace:: :variable:`rocksdb_update_cf_options`
+
+.. |wsrep-sst-auth| replace:: :variable:`wsrep_sst_auth`
+.. |opt.wsrep-sst-auth| replace:: :variable:`wsrep_sst_auth`

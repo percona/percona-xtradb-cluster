@@ -124,9 +124,9 @@
   
    InnoDB
 
-       Storage engine which provides ACID-compliant transactions and foreign key
-       support, among others improvements over :term:`MyISAM`. It is the default
-       engine for |MySQL| as of the 5.5 series.
+      Storage engine which provides ACID-compliant transactions and foreign key
+      support, among others improvements over :term:`MyISAM`. It is the default
+      engine for |MySQL| as of the 5.5 series.
   
    MyISAM
 
@@ -279,13 +279,13 @@
   
    primary cluster
 
-      A cluster with :term:`quorum`. A non-primary cluster will not allow any
+      A cluster with :term:`quorum`. A non-primary cluster will not allow any
       operations and will give ``Unknown command`` errors on any clients
       attempting to read or write from the database.
   
    quorum
 
-      A majority (> 50%) of nodes. In the event of a network partition, only the
+      A majority (> 50%) of nodes. In the event of a network partition, only the
       cluster partition that retains a quorum (if any) will remain Primary by
       default.
   
@@ -299,3 +299,29 @@
 
       For each table, the server will create a file with the :file:`.frm`
       extension containing the table definition (for all storage engines).
+
+   mysql.pxc.internal.session
+
+      This user is used by the SST process to run the SQL commands needed for
+      :term:`SST`, such as creating the |pxc-sst-user| and assigning it the role
+      |pxc-sst-role|).
+
+      .. admonition:: Difference from previous major version |prev-major-version|
+
+	 The |wsrep-sst-auth| variable is no longer needed and has been removed.
+
+   mysql.pxc.sst.role
+
+      This role has all the privileges needed to run xtrabackup to create a
+      backup on the donor node.
+
+   mysql.pxc.sst.user
+
+      This user (set up on the donor node) is assigned the |pxc-sst-role| and
+      runs the |xtrabackup| to make backups. The password for this is randomly
+      generated for each SST. The password is generated automatically for each
+      :term:`SST`.
+
+.. include:: .res/replace.txt
+.. include:: .res/replace.program.txt
+.. include:: .res/replace.opt.txt

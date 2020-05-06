@@ -111,8 +111,6 @@ file. If this file is not detected, the version of the data directory is less
 The auto-upgrade is available for upgrading from version 5.7 to 8.0 both for the
 rolling upgrade (without downtime) and the offline upgrade (with downtime).
 
-.. As part of rolling upgrade, you need to accommodate the pxc-cluster-encrypt-traffic difference.
-
 Rolling Upgrade of a 3-Node |pxc| from 5.7 to 8.0
 ================================================================================
 
