@@ -48,6 +48,7 @@
 */
 
 #include <sys/types.h>
+#include <my_sys.h> // PSI_memory_key
 #include <my_dir.h>
 
 #ifdef __cplusplus

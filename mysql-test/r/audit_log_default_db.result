@@ -18,6 +18,7 @@ GRANT ALL PRIVILEGES ON ąžąžąžą.* TO 'user2'@'%';
 UNINSTALL PLUGIN audit_log;
 Warnings:
 Warning	1620	Plugin is busy and will be uninstalled on shutdown
+set names utf8;
 INSTALL PLUGIN audit_log SONAME 'audit_log.so';
 connect(localhost,user2,111,db1,MASTER_MYPORT,MASTER_MYSOCK);
 ERROR 42000: Access denied for user 'user2'@'%' to database 'db1'
@@ -53,11 +54,8 @@ set global audit_log_flush= ON;
 "Query","<ID>","<DATETIME>","install_plugin","<CONN_ID>",0,"INSTALL PLUGIN audit_log SONAME 'audit_log.so'","root[root] @ localhost []","localhost","","",""
 "Quit","<ID>","<DATETIME>","<CONN_ID>",0,"root","root","","","localhost","","test"
 "Connect","<ID>","<DATETIME>","<CONN_ID>",1044,"user2","user2","","","localhost","",""
-"Quit","<ID>","<DATETIME>","<CONN_ID>",0,"user2","user2","","","localhost","",""
 "Connect","<ID>","<DATETIME>","<CONN_ID>",1045,"user2","user2","","","localhost","",""
-"Quit","<ID>","<DATETIME>","<CONN_ID>",0,"user2","user2","","","localhost","",""
 "Connect","<ID>","<DATETIME>","<CONN_ID>",1045,"user3","","","","localhost","",""
-"Quit","<ID>","<DATETIME>","<CONN_ID>",0,"user3","","","","localhost","",""
 "Connect","<ID>","<DATETIME>","<CONN_ID>",0,"user2","user2","","","localhost","","db2"
 "Query","<ID>","<DATETIME>","set_option","<CONN_ID>",0,"set names utf8","user2[user2] @ localhost []","localhost","","","db2"
 "Query","<ID>","<DATETIME>","select","<CONN_ID>",0,"SELECT * FROM t","user2[user2] @ localhost []","localhost","","","db2"
@@ -74,8 +72,8 @@ set global audit_log_flush= ON;
 "Connect","<ID>","<DATETIME>","<CONN_ID>",0,"user1","user1","","","localhost","","test"
 "Query","<ID>","<DATETIME>","select","<CONN_ID>",0,"select @@version_comment limit 1","user1[user1] @ localhost []","localhost","","","test"
 "Query","<ID>","<DATETIME>","select","<CONN_ID>",0,"SELECT DATABASE()","user1[user1] @ localhost []","localhost","","","test"
-"Init DB","<ID>","<DATETIME>","error","<CONN_ID>",0,"","user1[user1] @ localhost []","localhost","","","db1"
-"Query","<ID>","<DATETIME>","select","<CONN_ID>",0,"SELECT * FROM t","user1[user1] @ localhost []","localhost","","","db1"
+"Init DB","<ID>","<DATETIME>","error","<CONN_ID>",0,"","user1[user1] @ localhost []","localhost","","","test"
+"Query","<ID>","<DATETIME>","select","<CONN_ID>",0,"SELECT * FROM t","user1[user1] @ localhost []","localhost","","","test"
 "Quit","<ID>","<DATETIME>","<CONN_ID>",0,"user1","user1","","","localhost","","db1"
 ===================================================================
 DROP DATABASE db1;

@@ -35,7 +35,7 @@ eval INSERT INTO t VALUES ('$very_long_text');
 
 SET NAMES utf8mb4;
 
-INSERT INTO t VALUES ('𦉘𦟌𦧲');
+INSERT IGNORE INTO t VALUES ('𦉘𦟌𦧲');
 CREATE DATABASE 𦉘𦟌𦧲;
 
 SHOW DATABASES;

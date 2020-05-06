@@ -15,8 +15,8 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA */
 
 #include "buffer.h"
+#include "audit_log.h"
 
-#include <my_pthread.h>
 #include <my_sys.h>
 #include "audit_log.h"
 #include <my_atomic.h>
@@ -67,7 +67,7 @@ void audit_log_flush(audit_log_buffer_t *log)
       mysql_mutex_unlock(&log->mutex);
       return;
     }
-    set_timespec(abstime, 1);
+    set_timespec(&abstime, 1);
     mysql_cond_timedwait(&log->written_cond, &log->mutex, &abstime);
   }
 
@@ -119,8 +119,9 @@ void *audit_log_flush_worker(void *arg)
 audit_log_buffer_t *audit_log_buffer_init(size_t size, int drop_if_full,
                                  audit_log_write_func write_func, void *data)
 {
-  audit_log_buffer_t *log= (audit_log_buffer_t*) 
-                                 calloc(sizeof(audit_log_buffer_t) + size, 1);
+  audit_log_buffer_t *log= (audit_log_buffer_t*)
+    my_malloc(key_memory_audit_log_buffer,
+              sizeof(audit_log_buffer_t) + size, MY_ZEROFILL);
 
 #ifdef HAVE_PSI_INTERFACE
   mysql_mutex_register(AUDIT_LOG_PSI_CATEGORY,
@@ -139,8 +140,8 @@ audit_log_buffer_t *audit_log_buffer_init(size_t size, int drop_if_full,
     log->state= LOG_RECORD_COMPLETE;
 
     mysql_mutex_init(key_log_mutex, &log->mutex, MY_MUTEX_INIT_FAST);
-    mysql_cond_init(key_log_flushed_cond, &log->flushed_cond, NULL);
-    mysql_cond_init(key_log_written_cond, &log->written_cond, NULL);
+    mysql_cond_init(key_log_flushed_cond, &log->flushed_cond);
+    mysql_cond_init(key_log_written_cond, &log->written_cond);
     pthread_create(&log->flush_worker_thread, NULL,
                             audit_log_flush_worker, log);
 
@@ -159,7 +160,7 @@ void audit_log_buffer_shutdown(audit_log_buffer_t *log)
   mysql_cond_destroy(&log->written_cond);
   mysql_mutex_destroy(&log->mutex);
 
-  free(log);
+  my_free(log);
 }
 
 
@@ -190,7 +191,7 @@ int audit_log_buffer_write(audit_log_buffer_t *log, const char *buf, size_t len)
       log->write_func(log->write_func_data, buf, len, LOG_RECORD_COMPLETE);
       audit_log_buffer_resume(log);
     }
-    my_atomic_add64(&audit_log_buffer_size_overflow, (int64)1);
+    my_atomic_add64(&audit_log_buffer_size_overflow, 1);
     return(0);
   }
 

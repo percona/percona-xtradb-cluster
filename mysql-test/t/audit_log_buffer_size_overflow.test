@@ -3,7 +3,7 @@
 
 # Test it with default audit_log_strategy
 --source include/shutdown_mysqld.inc
---let $start_mysqld_params = $AUDIT_LOG_OPT $AUDIT_LOG_LOAD --audit_log_buffer_size=4096
+--let $start_mysqld_params = --audit_log_buffer_size=4096
 --source include/start_mysqld.inc
 --source include/wait_until_connected_again.inc
 
@@ -18,7 +18,7 @@ SHOW GLOBAL STATUS LIKE 'Audit_log_buffer_size_overflow';
 
 # Test it with audit_log_strategy = PERFORMANCE
 --source include/shutdown_mysqld.inc
---let $start_mysqld_params = $AUDIT_LOG_OPT $AUDIT_LOG_LOAD --audit_log_buffer_size=4096 --audit_log_strategy=PERFORMANCE
+--let $start_mysqld_params = --audit_log_buffer_size=4096 --audit_log_strategy=PERFORMANCE
 --source include/start_mysqld.inc
 --source include/wait_until_connected_again.inc
 
