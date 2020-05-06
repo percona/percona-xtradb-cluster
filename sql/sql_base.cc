@@ -326,10 +326,15 @@ uint get_table_def_key(const TABLE_LIST *table_list, const char **key)
   */
   DBUG_ASSERT(!strcmp(table_list->get_db_name(),
                       table_list->mdl_request.key.db_name()) &&
+#ifdef WITH_WSREP
               (!strcmp(table_list->get_table_name(),
                       table_list->mdl_request.key.name()) ||
                !strcmp(table_list->get_table_alias(),
                        table_list->mdl_request.key.name())));
+#else
+              !strcmp(table_list->get_table_name(),
+                      table_list->mdl_request.key.name()));
+#endif
 
   *key= (const char*)table_list->mdl_request.key.ptr() + 1;
   return table_list->mdl_request.key.length() - 1;
@@ -4440,8 +4445,11 @@ thr_lock_type read_lock_type_for_table(THD *thd,
     it is safe to use a weaker lock.
   */
   ulong binlog_format= thd->variables.binlog_format;
-  if ((log_on == FALSE) || (WSREP_BINLOG_FORMAT(binlog_format) == BINLOG_FORMAT_ROW) ||
-      (table_list->table->s->table_category == TABLE_CATEGORY_LOG) ||
+  if (log_on == FALSE || 
+      (WSREP_BINLOG_FORMAT(binlog_format) == BINLOG_FORMAT_ROW))
+    return TL_READ;
+
+  if ((table_list->table->s->table_category == TABLE_CATEGORY_LOG) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_RPL_INFO) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_PERFORMANCE))
     return TL_READ;

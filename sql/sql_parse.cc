@@ -1483,10 +1483,8 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   /* To avoid cross initialization in case of pxc/wsrep due to following jump */
   double start_busy_usecs = 0.0;
   double start_cpu_nsecs = 0.0;
-#endif /* WITH_WSREP */
 
   if (unlikely(opt_userstat))
-#ifdef WITH_WSREP
   if (WSREP(thd)) {
     if (!thd->in_multi_stmt_transaction_mode())
     {
@@ -3360,13 +3358,15 @@ mysql_execute_command(THD *thd)
 
     /* Commit the normal transaction if one is active. */
     if (trans_commit_implicit(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("implicit commit failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif /* WITH_WSREP */
     /* Release metadata locks acquired in this transaction. */
     thd->mdl_context.release_transactional_locks();
   }
@@ -4163,9 +4163,7 @@ end_with_restore_list:
 
     WSREP_TO_ISOLATION_BEGIN(0, 0, first_table)
     if (mysql_rename_tables(thd, first_table, 0))
-    {
       goto error;
-    }
     break;
   }
 #ifndef EMBEDDED_LIBRARY
@@ -4757,8 +4755,10 @@ end_with_restore_list:
   }
 
   case SQLCOM_UNLOCK_TABLES:
+#ifdef WITH_WSREP
   {
     bool table_lock= false;
+#endif
     /*
       It is critical for mysqldump --single-transaction --master-data that
       UNLOCK TABLES does not implicitely commit a connection which has only
@@ -4767,7 +4767,9 @@ end_with_restore_list:
     */
     if (thd->variables.option_bits & OPTION_TABLE_LOCK)
     {
+#ifdef WITH_WSREP
       table_lock= true;
+#endif
       DBUG_ASSERT(!thd->backup_tables_lock.is_acquired());
       /*
         Can we commit safely? If not, return to avoid releasing
@@ -4816,7 +4818,9 @@ end_with_restore_list:
       goto error;
     my_ok(thd);
     break;
+#ifdef WITH_WSREP
   }
+#endif
   case SQLCOM_UNLOCK_BINLOG:
     if (thd->backup_binlog_lock.is_acquired())
       thd->backup_binlog_lock.release(thd);
@@ -5265,6 +5269,7 @@ end_with_restore_list:
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
+#ifdef WITH_WSREP
       /*
         Note:
         We don't check for multiple non-idempotent invocations
@@ -5274,7 +5279,6 @@ end_with_restore_list:
         hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
-#ifdef WITH_WSREP
       if (WSREP(thd) &&
           !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
@@ -5308,6 +5312,7 @@ end_with_restore_list:
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
+#ifdef WITH_WSREP
       /*
         Note:
         We don't check for multiple non-idempotent invocations
@@ -5317,7 +5322,6 @@ end_with_restore_list:
         hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
-#ifdef WITH_WSREP
       if (WSREP(thd) &&
           !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
@@ -5442,13 +5446,15 @@ end_with_restore_list:
 #endif
   case SQLCOM_BEGIN:
     if (trans_begin(thd, lex->start_transaction_opt))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("BEGIN failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif
     my_ok(thd);
     break;
   case SQLCOM_COMMIT:
@@ -5462,13 +5468,15 @@ end_with_restore_list:
                       (thd->variables.completion_type == 2 &&
                        lex->tx_release != TVL_NO));
     if (trans_commit(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("COMMIT failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif /* WITH_WSREP */
     thd->mdl_context.release_transactional_locks();
     /* Begin transaction with the same isolation level. */
     if (tx_chain)
@@ -5512,13 +5520,15 @@ end_with_restore_list:
                       (thd->variables.completion_type == 2 &&
                        lex->tx_release != TVL_NO));
     if (trans_rollback(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("rollback failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif /* WITH_WSREP */
     thd->mdl_context.release_transactional_locks();
     /* Begin transaction with the same isolation level. */
     if (tx_chain)
@@ -6099,13 +6109,15 @@ create_sp_error:
     break;
   case SQLCOM_XA_COMMIT:
     if (trans_xa_commit(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("XA commit failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif
     thd->mdl_context.release_transactional_locks();
     /*
       We've just done a commit, reset transaction
@@ -6117,13 +6129,15 @@ create_sp_error:
     break;
   case SQLCOM_XA_ROLLBACK:
     if (trans_xa_rollback(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("XA rollback failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif
     thd->mdl_context.release_transactional_locks();
     /*
       We've just done a rollback, reset transaction

@@ -2948,7 +2948,7 @@ bool change_password(THD *thd, const char *host, const char *user,
   Acl_table_intact table_intact;
   /* Buffer should be extended when password length is extended. */
   char buff[2048];
-  ulong query_length=0;
+  ulong query_length;
   bool save_binlog_row_based;
   uchar user_key[MAX_KEY_LENGTH];
   char *plugin_temp= NULL;
@@ -10984,12 +10984,14 @@ static bool parse_com_change_user_packet(MPVIO_EXT *mpvio, uint packet_length)
     if (mpvio->charset_adapter->init_client_charset(uint2korr(ptr)))
       DBUG_RETURN(1);
   }
+#ifdef WITH_WSREP
   else
   {
     sql_print_warning("Client failed to provide its character set. "
                       "'%s' will be used as client character set.",
                       mpvio->charset_adapter->charset()->csname);
   }
+#endif
 
   /* Convert database and user names to utf8 */
   db_len= copy_and_convert(db_buff, sizeof(db_buff) - 1, system_charset_info,

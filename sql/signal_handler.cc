@@ -73,11 +73,11 @@ extern "C" sig_handler handle_fatal_signal(int sig)
 
   segfaulted = 1;
 
+#ifdef WITH_WSREP
 /*
   The wsrep subsystem has their its own actions
   which need be performed before exiting:
 */
-#ifdef WITH_WSREP
   wsrep_handle_fatal_signal(sig);
 #endif
 
