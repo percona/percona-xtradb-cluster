@@ -66,12 +66,15 @@ Installing from Percona Repository
       the ``Percona-XtraDB-Cluster-full-80`` meta package,
       which contains the following additional packages:
 
-      * ``Percona-XtraDB-Cluster-devel-80``
-      * ``Percona-XtraDB-Cluster-test-80``
-      * ``Percona-XtraDB-Cluster-debuginfo-80``
-      * ``Percona-XtraDB-Cluster-galera-3-debuginfo``
-      * ``Percona-XtraDB-Cluster-shared-80``
-
+      * ``percona-xtraDB-cluster-shared``
+      * ``percona-xtraDB-cluster-shared-compat``
+      * ``percona-xtradb-cluster-client``
+      * ``percona-xtradb-cluster-debuginfo``
+      * ``percona-xtradb-cluster-devel``
+      * ``percona-xtradb-cluster-garbd``
+      * ``percona-xtradb-cluster-server``
+      * ``percona-xtradb-cluster-test``
+      
 #. Start the |PXC| server:
 
    .. code-block:: bash
