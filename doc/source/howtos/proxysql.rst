@@ -27,7 +27,7 @@ status.
 
 .. important::
 
-   In version |version|, |PXC| does work with ProxySQL v1.   
+   In version |version|, |PXC| does not support ProxySQL v1.   
 
 Manual Configuration
 ====================
@@ -61,7 +61,7 @@ For this tutorial, install |PXC| on Node 4:
 .. admonition:: Changes in the installation procedure
 
    In |PXC| |version|, ProxySQL is not installed automatically as a dependency
-   of the ``percona-xtradb-cluster-client`` package. You should install the
+   of the ``percona-xtradb-cluster-client-8.0`` package. You should install the
    ``proxysql`` package separately.
 
 * On Debian or Ubuntu:
@@ -75,7 +75,7 @@ For this tutorial, install |PXC| on Node 4:
 
   .. code-block:: bash
 
-     [root@proxysql ~]# yum install percona-xtradb-cluster-client
+     [root@proxysql ~]# yum install Percona-XtraDB-Cluster-client-80
      [root@proxysql ~]# yum install proxysql2
 
 .. TODO: Verify package names

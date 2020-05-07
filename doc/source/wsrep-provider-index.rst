@@ -895,12 +895,18 @@ accept in the cluster. Used only for debugging.
    :dyn: No
    :default: 2
 
-This variable is used to choose the checksum algorithm for network packets. The
-following values are available:
+This variable is used to choose the checksum algorithm for network packets.
+The ``CRC32-C`` option is optimized and may be hardware accelerated on Intel CPUs. The following values are available:
 
  * ``0`` - disable checksum
- * ``1`` - plain ``CRC32`` (used in Galera 2.x)
- * ``2`` - hardware accelerated ``CRC32-C``
+ * ``1`` - ``CRC32``
+ * ``2`` - ``CRC32-C``
+ 
+ The following is an example of the variable use:
+ 
+ .. code-block:: bash
+ 
+     wsrep_provider_options="socket.checksum=2"
 
 .. variable::  socket.ssl
 
@@ -962,4 +968,5 @@ This variable is used to specify if the SSL compression is to be used.
 
 This variable is used to specify what cypher will be used for encryption.
 
-.. include:: ./res/replace.txt
+.. include:: .res/replace.txt
+

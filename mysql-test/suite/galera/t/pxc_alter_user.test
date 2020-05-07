@@ -126,7 +126,21 @@ DROP TABLE test;
 --echo # connection node_2, SuperUser1
 --disconnect con_node_2_SuperUser1
 
+
+#
+# CREATE/ALTER USER ... IDENTIFIED BY RANDOM PASSWORD is not allowed in PXC
+#
+--connection node_2
+call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of RANDOM PASSWORD for CREATE/ALTER USER operation while operating in cluster mode");
 --connection node_1
+call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of RANDOM PASSWORD for CREATE/ALTER USER operation while operating in cluster mode");
+--error ER_UNKNOWN_ERROR
+ALTER USER 'User2'@'localhost' IDENTIFIED BY RANDOM PASSWORD;
+--error ER_UNKNOWN_ERROR
+CREATE USER 'User3'@'localhost' IDENTIFIED BY RANDOM PASSWORD;
+
+
+# cleanup
 DROP USER User1@localhost;
 DROP USER User2@localhost;
 --source include/wait_until_count_sessions.inc
