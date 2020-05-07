@@ -1796,7 +1796,7 @@ done
 
 %if 0%{?systemd}
 if [ $1 -eq 0 ];then
-    %systemd_postun
+    /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
 else
     serv=$(/usr/bin/systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
     numint=0
@@ -1819,7 +1819,7 @@ else
             else
                 echo "Not bootstrapping with $(( numint-1 )) nodes already in cluster PC"
                 echo "Restarting with mysql.service in its stead"
-                %systemd_postun
+                /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
                 /usr/bin/systemctl stop mysql@bootstrap.service
                 /usr/bin/systemctl start mysql.service
             fi
