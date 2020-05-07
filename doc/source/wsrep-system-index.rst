@@ -20,8 +20,8 @@ When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
 
 Possible values:
 
-* ``OFF``, ``0``, ``false``: Disabled
 * ``ON``, ``1``, ``true``: Enabled (default)
+* ``OFF``, ``0``, ``false``: Disabled
 
 For more information, see :ref:`ssl-auto-conf`.
 
