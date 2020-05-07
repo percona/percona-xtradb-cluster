@@ -34,8 +34,8 @@ In this section, we will demonstrate how to configure a three node cluster:
       wsrep_cluster_name=pxc-cluster
       wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
-   *If you use Red Hat or CentOS*, edit |file.my-conf|. Note that on these systems you set
-    the wsrep_provider option to a different value:
+   *If you use Red Hat or CentOS*, edit |file.my-cnf|. Note that on these systems you set
+   the wsrep_provider option to a different value:
 
     .. code-block:: text
 
