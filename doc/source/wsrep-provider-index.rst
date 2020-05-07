@@ -74,6 +74,31 @@ with other nodes.
 This variable is used to specify if the details of the certification failures
 should be logged.
 
+.. variable:: cert.optimistic_pa
+
+Enabled
+   Allows the full range of parallelization as determined by the certification
+   algorithm.
+
+Disabled
+   Limits the parallel applying window so that it does not exceed the parallel
+   applying window seen on the master. In this case, the action starts applying
+   no sooner than all actions on the master are committed.
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: YES
+   
+   .. seealso::
+
+      |galera-cluster| Documentation:
+         - `Parameter: cert.optimistic_pa
+	   <https://galeracluster.com/library/documentation/galera-parameters.html#cert-optimistic-pa>`_
+	 - `Setting parallel slave threads
+	   <https://galeracluster.com/library/kb/parallel-slave-threads.html>`_
+
 .. variable:: debug
 
    :cli: Yes
@@ -341,7 +366,7 @@ allows restarting the node to rejoin by using :term:`IST`.
    Percona Database Performance Blog:
       - `All You Need to Know About GCache (Galera-Cache) <https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/>`_
       - `Want IST Not SST for Node Rejoins? We Have a Solution! <https://www.percona.com/blog/2018/02/13/no-sst-node-rejoins/>`_
-   
+
 The :variable:`gcache.freeze_purge_at_seqno` variable takes three values:
 
 -1 (default)
@@ -354,7 +379,7 @@ A valid seqno in gcache
    The freeze purge of write-sets is no less than the smallest seqno currently
    in gcache. Using this value results in freezing the gcache-purge instantly.
    Use this value if selecting a valid seqno in gcache is difficult.
-   
+
 .. variable:: gcache.keep_pages_count
 
    :cli: Yes
@@ -857,7 +882,7 @@ is limited to 2 gygabytes.
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: 7
+   :default: 10
 
 This variable is used to specify the highest communication protocol version to
 accept in the cluster. Used only for debugging.
@@ -870,12 +895,18 @@ accept in the cluster. Used only for debugging.
    :dyn: No
    :default: 2
 
-This variable is used to choose the checksum algorithm for network packets. The
-following values are available:
+This variable is used to choose the checksum algorithm for network packets.
+The ``CRC32-C`` option is optimized and may be hardware accelerated on Intel CPUs. The following values are available:
 
  * ``0`` - disable checksum
- * ``1`` - plain ``CRC32`` (used in Galera 2.x)
- * ``2`` - hardware accelerated ``CRC32-C``
+ * ``1`` - ``CRC32``
+ * ``2`` - ``CRC32-C``
+ 
+ The following is an example of the variable use:
+ 
+ .. code-block:: bash
+ 
+     wsrep_provider_options="socket.checksum=2"
 
 .. variable::  socket.ssl
 
@@ -936,3 +967,6 @@ This variable is used to specify if the SSL compression is to be used.
    :default: AES128-SHA
 
 This variable is used to specify what cypher will be used for encryption.
+
+.. include:: .res/replace.txt
+

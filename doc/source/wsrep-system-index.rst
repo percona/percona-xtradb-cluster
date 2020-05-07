@@ -23,7 +23,7 @@ Possible values:
 * ``OFF``, ``0``, ``false``: Disabled
 * ``ON``, ``1``, ``true``: Enabled (default)
 
-For more information, see :ref:`enabling_encrypt-cluster-traffic`.
+For more information, see :ref:`ssl-auto-conf`.
 
 .. variable:: pxc_maint_mode
 
@@ -155,6 +155,36 @@ Enabling this variable will result in larger latencies.
 
 .. note:: This variable was deprecated because enabling it
    is the equivalent of setting :variable:`wsrep_sync_wait` to ``1``.
+
+.. variable:: wsrep_certification_rules
+
+   :cli: ``--wsrep-certification-rules``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :values: STRICT, OPTIMIZED
+   :default: STRICT
+
+
+This variable controls how certification is done in the cluster, in particular
+this affects how foreign keys are handled.
+
+STRICT
+   Two INSERTs that happen at about the same time on two different nodes in a
+   child table, that insert different (non conflicting rows), but both rows
+   point to the same row in the parent table **may result** in the certification
+   failure.
+
+OPTIMIZED
+   Two INSERTs that happen at about the same time on two different nodes in a
+   child table, that insert different (non conflicting rows), but both rows
+   point to the same row in the parent table **will not result** in the
+   certification failure.
+
+.. seealso::
+
+   |galera-cluster| Documentation: |MySQL| wsrep options
+      https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-certification-rules
 
 .. variable:: wsrep_certify_nonPK
 
@@ -412,7 +442,7 @@ A few examples:
 Note the case where ``log_error_verbosity=3`` and
 ``wsrep_min_log_verbosity=1``. The actual log verbosity of wsrep/Galera is *3*
 (system error, warning, info) because ``log_error_verbosity`` is greater.
-       
+
 .. seealso::
 
    |MySQL| Documentation: log_error_verbosity
@@ -1020,3 +1050,4 @@ is determined by bitmask:
    of setting the deprecated :variable:`wsrep_causal_reads` to ``ON``.
 
 .. |abbr-mdl| replace:: :abbr:`MDL (Metadata Locking)`
+.. include:: .res/replace.txt

@@ -21,50 +21,68 @@ and variables mentioned in these documents when upgrading to |PXC| 8.0.
 Important changes in |pxc| |version|
 ================================================================================
 
-.. rubric:: Traffic encryption enabled by default
+Traffic encryption enabled by default
+   The :variable:`pxc_encrypt_cluster_traffic` variable, which enables traffic
+   encryption, is set to ``ON`` by default in |pxc| |version|. For more
+   information, see :ref:`encrypt-traffic`.
 
-The :variable:`pxc_encrypt_cluster_traffic` variable, which enables traffic
-encryption, is set to ``ON`` by default in |pxc| |version|. For more
-information, see :ref:`encrypt-traffic`.
+Rolling upgrades to |version| from versions older than 5.7 are not supported
+   Therefore, if you are running |PXC| version 5.6, shut down all nodes, then
+   remove and re-create the cluster from scratch. Alternatively, you can perform
+   a `rolling upgrade from PXC 5.6 to 5.7
+   <https://www.percona.com/doc/percona-xtradb-cluster/5.7/howtos/upgrade_guide.html>`_.
+   and then follow the current procedure to upgrade from 5.7 to 8.0.
 
-.. rubric:: Rolling upgrades to |version| from versions older than 5.7 are not supported
+*Not* recommended to mix |pxc| 5.7 nodes with |pxc| 8.0 nodes
+   If downtime is acceptable, shut down the cluster and upgrade all nodes to
+   |pxc| 8.0. It is important that you make backups before attempting an
+   upgrade.
 
-Therefore, if you are running |PXC| version 5.6, shut down all
-nodes, then remove and re-create the cluster from scratch. Alternatively,
-you can perform a `rolling upgrade from PXC 5.6 to 5.7
-<https://www.percona.com/doc/percona-xtradb-cluster/5.7/howtos/upgrade_guide.html>`_.
-and then follow the current procedure to upgrade from 5.7 to 8.0.
+   If downtime is not possible, the rolling upgrade is supported but ensure the
+   traffic is controlled during the upgrade and writes are directed only to 5.7
+   nodes until all nodes are upgraded to 8.0.
+   
+   .. important:: 
 
-.. rubric:: *Not* recommended to mix |pxc| 5.7 nodes with |pxc| 8.0 nodes
+      If writes are directed to a |pxc| 8.0 node in a cluster that has |pxc| 5.7,
+      the cluster will be broken down. In this case, the system reports an error message
+      similar to the following:
 
-If downtime is acceptable, shut down the cluster and upgrade all nodes to |pxc|
-8.0. It is important that you make backups before attempting an upgrade.
+      .. code-block:: text
 
-If downtime is not possible, the rolling upgrade is supported but ensure the
-traffic is controlled during the upgrade and writes are directed only to 5.7
-nodes until all nodes are upgraded to 8.0.
+	 [ERROR] Slave SQL: Error 'Character set '#255' is not a compiled character set and
+	 is not specified in the '/usr/share/percona-xtradb-cluster/charsets/Index.xml' file' on
+	 query. Default database: DATABASE_NAME. Query: QUERY, Error_code: 22
 
-.. rubric:: The configuration file layout has changed in |pxc| |version|
+The configuration file layout has changed in |pxc| |version|
+   All configuration settings are stored in the default |MySQL| configuration
+   file:
 
-All configuration settings are stored in the default |MySQL| configuration file:
-:file:`my.cnf`:
+   * Path on Debian and Ubuntu: :file:`/etc/mysql/mysql.conf.d/mysqld.cnf`. This
+     file contains the new settings and it is referenced from the main
+     configuration file :file:`/etc/mysql/my.cnf`.
+   * Path on Red Hat and CentOS: :file:`/etc/my.cnf`
 
-* Path on Debian and Ubuntu: :file:`/etc/mysql/my.cnf`
-* Path on Red Hat and CentOS: :file:`/etc/my.cnf`
+   .. important::
 
-Before you start the upgrade, move your custom settings from
-:file:`/etc/mysql/percona-xtradb-cluster.conf.d/wsrep.cnf` (on Debian and
-Ubuntu) or from :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf` (on Red Hat
-and CentOS) to the new location accordingly.
+      Before you start the upgrade, move your custom settings from
+      :file:`/etc/mysql/percona-xtradb-cluster.conf.d/wsrep.cnf` (on Debian and
+      Ubuntu) or from :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf` (on Red Hat
+      and CentOS) to the new location accordingly.
 
-.. rubric:: ``caching_sha2_password`` Is the Default Authentication Plugin
+      After the upgrade completes, edit :file:`/etc/mysql/mysql.conf.d/mysqld.cnf` or
+      :file:`/etc/my.cnf` so that it includes the correct settings. Then restart the server. 
 
-In |PXC| |version|, the default authentication plugin is
-``caching_sha2_password``. The ProxySQL option
-:ref:`pxc.proxysql.v2.admin-tool.syncusers` will not work if the |PXC| user is
-created using ``caching_sha2_password``. Use the ``mysql_native_password``
-authentication plugin in these cases.
+``caching_sha2_password`` Is the Default Authentication Plugin
+   In |PXC| |version|, the default authentication plugin is
+   ``caching_sha2_password``. The ProxySQL option
+   :ref:`pxc.proxysql.v2.admin-tool.syncusers` will not work if the |PXC| user
+   is created using ``caching_sha2_password``. Use the ``mysql_native_password``
+   authentication plugin in these cases.
+   
+.. warning::
 
+   Be sure you are running on the latest 5.7 version before you upgrade to 8.0.
 
 .. contents::
    :local:
@@ -136,13 +154,6 @@ To upgrade the cluster, follow these steps for each node:
         $ sudo apt-get remove percona-xtrabackup* percona-xtradb-cluster*
         $ sudo apt-get install percona-xtradb-cluster
 
-#. In case of Debian or Ubuntu, the ``mysql`` service starts automatically after
-   the installation. Stop the service:
-
-   .. code-block:: bash
-
-      $ sudo service mysql stop
-
 #. Back up :file:`grastate.dat`, so that you can restore it
    if it is corrupted or zeroed out due to network issue.
 
@@ -172,10 +183,10 @@ To upgrade the cluster, follow these steps for each node:
       Make sure to rename it back
       before joining the upgraded node back to the cluster.
 
-#. Now you can join the upgraded node back to the cluster.
+#. Now start  the cluster node to upgrade the data directory.
 
    In most cases, starting the ``mysql`` service
-   should run the node with your previous configuration::
+   should run the node with your previous configuration:
 
    .. code-block:: bash
 

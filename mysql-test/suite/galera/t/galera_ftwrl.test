@@ -36,3 +36,68 @@ SHOW TABLES;
 SELECT COUNT(*) = 1 FROM t1;
 
 DROP TABLE t1;
+
+
+# 
+# Test the scenario when the session on node_1 disables replication and acquires global read lock.
+# Another session on node_2 modifies the table. As the lock is not acquired on node_2 changes are applied
+# and replicated to the cluster.
+# Session on node_1 should still see unmodified table.
+# Then node_1 session enables replication. Should still see not modified table.
+# When node_1 session releases global read lock, rows replicated from node_2 should be visible on node_1
+#
+# The point here is that even if session has disabled replication and acquires global read lock, the replication
+# to this node not take place.
+#
+
+--connection node_1
+--let $wsrep_provider_options_orig = `SELECT @@wsrep_provider_options;`
+
+SET GLOBAL wsrep_provider_options = "repl.causal_read_timeout=PT1S";
+
+CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (0);
+
+SET SESSION wsrep_on=OFF;
+FLUSH TABLES WITH READ LOCK;
+SELECT * FROM t1;
+
+--connection node_2
+INSERT INTO t1 VALUES (1);
+SELECT * FROM t1;
+
+--connection node_1
+# node 1 should still have only one row
+SELECT * FROM t1;
+SET SESSION wsrep_on=ON;
+
+--connection node_2
+INSERT INTO t1 VALUES (2);
+SELECT * FROM t1;
+
+--connection node_1
+
+# As causal reads are enabled by default in MTR and we have read lock on node_1, changes will never be replicated
+--error ER_LOCK_WAIT_TIMEOUT
+SELECT * FROM t1;
+
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = "$wsrep_provider_options_orig";
+--enable_query_log
+
+# Disable causality checks
+SET SESSION wsrep_causal_reads = OFF;
+SET SESSION wsrep_sync_wait = 0;
+
+# node_1 is still no synced, but we can select. 1 row expeccted.
+SELECT * FROM t1;
+
+# reenable causality checks
+SET SESSION wsrep_sync_wait = 15;
+
+UNLOCK TABLES;
+
+# now we expect 3 rows
+SELECT * FROM t1;
+
+DROP TABLE t1;

@@ -1459,7 +1459,12 @@ fi
 # 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
 #         my.cnf.
 #
-XB_2x_REQUIRED_VERSION="2.4.18"
+# 2.4.17  PXB added Data-At-Rest Encryption support found in PS/PXC 5.7.28
+#
+# 2.4.20  Transition-key fixes
+#
+
+XB_2x_REQUIRED_VERSION="2.4.20"
 
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1482,7 +1487,10 @@ fi
 
 # Verify our PXB 8.0 version
 #
-XB_8x_REQUIRED_VERSION="8.0.9"
+# 8.0.11  Transition-key fixes
+#
+
+XB_8x_REQUIRED_VERSION="8.0.11"
 
 if [[ ! -x $XTRABACKUP_80_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1677,7 +1685,7 @@ then
     # append transition_key only if keyring is being used.
     if [[ $keyring_plugin -eq 1 ]]; then
         echo "transition-key=$transition_key" >> "$sst_info_file_path"
-        encrypt_backup_options="--transition-key=\$transition_key"
+        encrypt_backup_options="--transition-key=$transition_key"
     fi
 
     #
@@ -1846,9 +1854,18 @@ then
         DONOR_MYSQL_VERSION=$(parse_sst_info "$sst_file_info_path" sst mysql-version "")
 
         transition_key=$(parse_sst_info "$sst_file_info_path" sst transition-key "")
+
         if [[ -n $transition_key ]]; then
-            encrypt_prepare_options="--transition-key=\$transition_key"
-            encrypt_move_options="--transition-key=\$transition_key --generate-new-master-key"
+
+            # Use the broken key if the donor version is < 5.7.29 and is not 5.7.28-31-57.2
+            # In other words, 5.7.28-31-57.2 and above will use the key that was sent
+            if compare_versions "$DONOR_MYSQL_VERSION" "<" "5.7.29" &&
+               [[ $DONOR_MYSQL_VERSION != "5.7.28-31-57.2" ]]; then
+                transition_key="\$transition_key"
+            fi
+
+            encrypt_prepare_options="--transition-key=$transition_key"
+            encrypt_move_options="--transition-key=$transition_key --generate-new-master-key"
         fi
 
     elif [[ -r "${STATDIR}/${XB_GTID_INFO_FILE}" ]]; then

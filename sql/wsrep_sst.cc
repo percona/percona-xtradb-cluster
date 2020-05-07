@@ -25,8 +25,8 @@
 #include "mysqld.h"
 #include "rpl_msr.h"  // channel_map
 #include "rpl_slave.h"
-#include "sql/sql_lex.h"
 #include "sql/auth/auth_common.h"
+#include "sql/sql_lex.h"
 #include "sql_base.h"  // TEMP_PREFIX
 #include "sql_class.h"
 #include "sql_parse.h"
@@ -476,10 +476,8 @@ static void *sst_joiner_thread(void *a) {
       // Close the pipe, so that the other side gets an EOF
       proc.close_write_pipe();
     }
-
     if (!err && proc.pipe() && !proc.error()) {
       const char *tmp = my_fgets(out, out_len, proc.pipe());
-
       if (!tmp || strlen(tmp) < (magic_len + 2) ||
           strncasecmp(tmp, magic, magic_len)) {
         if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
@@ -529,8 +527,7 @@ static void *sst_joiner_thread(void *a) {
     mysql_cond_signal(&arg->COND_wsrep_sst_thread);
     mysql_mutex_unlock(&arg->LOCK_wsrep_sst_thread);
 
-    if (err)
-    {
+    if (err) {
       // The process has exited, so the logger thread should
       // also have exited
       if (logger_thd) pthread_join(logger_thd, NULL);
@@ -759,7 +756,7 @@ std::string wsrep_sst_prepare() {
   if (addr_len < 0) {
     WSREP_ERROR("Failed to prepare for '%s' SST. Unrecoverable.",
                 wsrep_sst_method);
-    unireg_abort(1);
+    throw wsrep::runtime_error("Failed to prepare for SST. Unrecoverable");
   }
 
   std::string ret;
@@ -946,6 +943,9 @@ const std::string get_allowed_pwd_chars() { return g_allowed_pwd_chars; }
 static void generate_password(std::string *password, int size) {
   std::stringstream ss;
   bool srnd;
+  constexpr const char *prefix = "yx9!A-";
+  ss << prefix;
+  size -= strlen(prefix);
   while (size > 0) {
     int ch = ((int)(my_rnd_ssl(&srnd) * 100)) % get_allowed_pwd_chars().size();
     ss << get_allowed_pwd_chars()[ch];
@@ -1018,7 +1018,8 @@ static MYSQL_SESSION setup_server_session(bool initialize_thread) {
 }
 
 static uint server_session_execute(MYSQL_SESSION session, std::string query,
-                                   const char *safe_query) {
+                                   const char *safe_query,
+                                   bool ignore_error = false) {
   COM_DATA cmd;
   wsp::Sql_resultset rset;
   cmd.com_query.query = query.c_str();
@@ -1034,7 +1035,7 @@ static uint server_session_execute(MYSQL_SESSION session, std::string query,
   delete ctx;
 
   err = rset.sql_errno();
-  if (err) {
+  if (err && !ignore_error) {
     // an error occurred, retrieve the status/message
     if (safe_query) {
       WSREP_ERROR("Command execution failed (%d) : %s", err, safe_query);
@@ -1113,7 +1114,8 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
       err = (ret < 0 ? ret : -EMSGSIZE);
       break;
     }
-    err = server_session_execute(session, auth_buf, cmds[index + 1]);
+    // Ignore errors: also ignored in the boostrap code
+    err = server_session_execute(session, auth_buf, cmds[index + 1], true);
   }
 
   // Overwrite query (clear out any sensitive data)
@@ -1132,13 +1134,15 @@ int wsrep_remove_sst_user(bool initialize_thread) {
   // --skip-grant-tables option. It would fail enyway with error.
   // This will prevent writing out error to error log.
   if (skip_grant_tables()) {
-      return ECANCELED;
+    return ECANCELED;
   }
   // This array is filled with pairs of entries
   // The first entry is the actual query to be run
   // The second entry is the string to be displayed if the query fails
   //  (this can be NULL, in which case the actual query will be used)
   const char *cmds[] = {"SET SESSION sql_log_bin = OFF;",
+                        nullptr,
+                        "SET SESSION lock_wait_timeout = 1;",
                         nullptr,
                         "DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;",
                         nullptr,
@@ -1153,7 +1157,8 @@ int wsrep_remove_sst_user(bool initialize_thread) {
   }
 
   for (int index = 0; !err && cmds[index]; index += 2) {
-    err = server_session_execute(session, cmds[index], cmds[index + 1]);
+    // Ignore errors, as those are also ignored during user creation
+    err = server_session_execute(session, cmds[index], cmds[index + 1], true);
   }
 
   cleanup_server_session(session, initialize_thread);
@@ -1194,6 +1199,14 @@ static void *sst_donor_thread(void *a) {
 #ifdef HAVE_PSI_INTERFACE
     wsrep_pfs_delete_thread();
 #endif /* HAVE_PSI_INTERFACE */
+
+    /* Inform server about SST script startup and release TO isolation */
+    mysql_mutex_lock(&arg->LOCK_wsrep_sst_thread);
+    arg->err = -err;
+    mysql_cond_signal(&arg->COND_wsrep_sst_thread);
+    mysql_mutex_unlock(
+        &arg->LOCK_wsrep_sst_thread);  //! @note arg is unusable after that.
+
     return NULL;
   }
 

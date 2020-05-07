@@ -495,8 +495,10 @@ fi
         fi
         # Remove the .tar.gz extension
         pxb_basename=${pxb_tar%.tar*}
-        # Remove the libXXX (such as libgcrypt)
-        pxb_basename=${pxb_basename%.lib*}
+        # Pull the name (up-to-the x86_64 part
+        if [[ $pxb_basename =~ x86_64 ]]; then
+            pxb_basename="${pxb_basename%x86_64*}x86_64"
+        fi
         pxb_dir="pxb-2.4"
 
         mkdir -p pxc_extra
@@ -524,8 +526,10 @@ fi
         fi
         # Remove the .tar.gz extension
         pxb_basename=${pxb_tar%.tar*}
-        # Remove the libXXX (such as libgcrypt) extension
-        pxb_basename=${pxb_basename%.lib*}
+        # Pull the name (up-to-the x86_64 part
+        if [[ $pxb_basename =~ x86_64 ]]; then
+            pxb_basename="${pxb_basename%x86_64*}x86_64"
+        fi
         pxb_dir="pxb-8.0"
 
         mkdir -p pxc_extra

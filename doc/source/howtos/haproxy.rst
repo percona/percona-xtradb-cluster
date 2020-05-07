@@ -114,3 +114,4 @@ The following is an example of the HAProxy configuration file in this case::
 
       |MySQL| Documentation: CREATE USER statement
          https://dev.mysql.com/doc/refman/8.0/en/create-user.html
+

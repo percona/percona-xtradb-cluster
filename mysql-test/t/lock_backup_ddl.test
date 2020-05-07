@@ -16,6 +16,7 @@ SET autocommit= 0;
 --connection default
 LOCK INSTANCE FOR BACKUP;
 
+
 --connection con1
 --error ER_LOCK_WAIT_TIMEOUT
 CREATE DATABASE testdb;
@@ -145,6 +146,7 @@ DROP SERVER s;
 --disconnect con1
 
 LOCK INSTANCE FOR BACKUP;
+DROP USER IF EXISTS 'mysql.pxc.sst.user'@'localhost';
 
 --echo # Restart server
 --source include/restart_mysqld.inc

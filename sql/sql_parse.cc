@@ -1605,6 +1605,54 @@ static bool pxc_strict_mode_lock_check(THD *thd) {
 
   return block;
 }
+/*
+ * This function should be called to determine if cluster still has nodes
+ * with lower versions of wsrep_protocol_version (eg.: version 3).
+ * Writing on a new node can crash nodes with lower version 8.0->5.7
+ */
+static bool block_write_while_in_rolling_upgrade(THD *thd) {
+  /* Ignore check while server is not ready or for background wsrep applier too
+   * (like slave thread) */
+  if (!wsrep_node_is_synced() || (WSREP(thd) && thd->wsrep_applier))
+    return false;
+
+  bool block = false;
+  LEX *lex = thd->lex;
+  if (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) {
+    bool multi_version_cluster = wsrep_protocol_version < 4;
+    if (multi_version_cluster ||
+        DBUG_EVALUATE_IF("simulate_wsrep_multiple_major_versions", true,
+                         false)) {
+      const char *msg;
+      switch (pxc_strict_mode) {
+        case PXC_STRICT_MODE_DISABLED:
+          /* Do nothing */
+          break;
+        case PXC_STRICT_MODE_PERMISSIVE:
+          msg =
+              "Percona-XtraDB-Cluster doesn't recommend use of multiple major"
+              " versions while accepting write workload"
+              " with pxc_strict_mode = PERMISSIVE";
+          WSREP_WARN("%s", msg);
+          push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                              "%s", msg);
+          break;
+        case PXC_STRICT_MODE_MASTER:
+        case PXC_STRICT_MODE_ENFORCING:
+        default:
+          block = true;
+          msg =
+              "Percona-XtraDB-Cluster prohibits use of multiple major versions"
+              " while accepting write workload with pxc_strict_mode = "
+              "ENFORCING or MASTER";
+          WSREP_ERROR("%s", msg);
+          my_message(ER_UNKNOWN_ERROR, msg, MYF(0));
+          break;
+      }
+    }
+  }
+  return block;
+}
 #endif /* WITH_WSREP */
 
 /**
@@ -1802,7 +1850,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     WSREP_DEBUG("assigned new next trx id: %" PRIu64, thd->wsrep_next_trx_id());
   }
 
-  bool do_end_of_statement;
+  bool do_end_of_statement = true;
 #endif /* WITH_WSREP */
 
   if (!(server_command_flags[command] & CF_SKIP_QUESTIONS))
@@ -2493,7 +2541,6 @@ dispatch_end:
     WSREP_LOG_THD(thd, "leave");
   }
 
-  do_end_of_statement = true;
   if (WSREP(thd)) {
     /* wsrep BF abort in query exec phase */
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -2625,10 +2672,6 @@ bool shutdown(THD *thd, enum mysql_enum_shutdown_level level) {
 
   if (check_global_access(thd, SHUTDOWN_ACL))
     goto error; /* purecov: inspected */
-
-#ifdef WITH_WSREP
-  (void)wsrep_remove_sst_user(false);
-#endif /* WITH_WSREP */
 
   if (level == SHUTDOWN_DEFAULT)
     level = SHUTDOWN_WAIT_ALL_BUFFERS;  // soon default will be configurable
@@ -3334,6 +3377,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
         !wsrep_is_show_query(lex->sql_command)) {
       my_message(ER_UNKNOWN_COM_ERROR,
                  "WSREP has not yet prepared node for application use", MYF(0));
+      return -1;
+    }
+    if (block_write_while_in_rolling_upgrade(thd)) {
       return -1;
     }
   }
@@ -5436,6 +5482,32 @@ int mysql_execute_command(THD *thd, bool first_level) {
           tmp_user->user.length = strlen(sctx->user().str);
         }
         if (!(user = get_current_user(thd, tmp_user))) goto error;
+
+#ifdef WITH_WSREP
+        /* When ALTER USER ... IDENTIFIED BY ... REPLACE ...  is executed
+           we need to know the current user to be able to determine REPLACE
+           clause validity (REPLACE allowed only for the current user's password
+           change). However ALTER USER is replicated as TOI, so before local
+           validation/changes. On the slave side, executing thread is wsrep applier
+           thread and we have no chance to determine if it is OK or not.
+           Here we do pre-validation for above condition on master size.
+           Other checks that are not dependent on current user context will be made
+           after replication, on slave node */
+        if (WSREP(thd) && thd->system_thread == NON_SYSTEM_THREAD) {
+          Security_context *sctx = thd->security_context();
+          DBUG_ASSERT(sctx);
+          DBUG_ASSERT(sctx->user().str);
+          if (user->uses_replace_clause) {
+            // If trying to set password for other user
+            if (strcmp(sctx->user().str, user->user.str) ||
+                my_strcasecmp(system_charset_info, sctx->priv_host().str,
+                              user->host.str)) {
+              my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
+              goto error;
+            }
+          }
+        }
+#endif /* WITH_WSREP */
 
         /* copy password expire attributes to individual lex user */
         user->alter_status = thd->lex->alter_password;

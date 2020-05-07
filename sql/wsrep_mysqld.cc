@@ -122,6 +122,12 @@ ulong pxc_strict_mode = PXC_STRICT_MODE_ENFORCING;
 can stop diverting queries to this node. */
 ulong pxc_maint_mode = PXC_MAINT_MODE_DISABLED;
 
+/* wsrep-pxc-maint-mode controls whenever maintenance mode has been set by
+ * Wsrep_server_service::log_view.
+ * This blocks users from changing pxc_maint_mode
+ */
+bool wsrep_pxc_maint_mode_forced = false;
+
 /* sleep for this period before delivering shutdown signal. */
 ulong pxc_maint_transition_period = 30;
 
@@ -629,17 +635,30 @@ void wsrep_init_sidno(const wsrep::id &uuid) {
   global_sid_lock->unlock();
 }
 
-void wsrep_init_schema() {
+bool wsrep_init_schema(THD *thd) {
   DBUG_ASSERT(!wsrep_schema);
+
+  /*
+   PXC upgrade requires modifications to some InnoDB tables.
+   When the server is started without innodb, or without a read-write innodb,
+   missing this user is a non-issue, since we won't participate in SST anyway.
+   */
+  handlerton *ddse = ha_resolve_by_legacy_type(thd, DB_TYPE_INNODB);
+  if (ddse->is_dict_readonly && ddse->is_dict_readonly()) {
+    LogErr(WARNING_LEVEL, ER_DD_NO_WRITES_NO_REPOPULATION, "InnoDB", " ");
+    return false;
+  }
 
   WSREP_INFO("wsrep_init_schema_and_SR %p", wsrep_schema);
   if (!wsrep_schema) {
     wsrep_schema = new Wsrep_schema();
-    if (wsrep_schema->init()) {
+    if (wsrep_schema->init(thd)) {
       WSREP_ERROR("Failed to init wsrep schema");
-      unireg_abort(1);
+      return true;
     }
   }
+
+  return false;
 }
 
 void wsrep_deinit_schema() {
@@ -975,7 +994,6 @@ int wsrep_init_server() {
 
 void wsrep_init_globals() {
   wsrep_init_sidno(Wsrep_server_state::instance().connected_gtid().id());
-  wsrep_init_schema();
   if (WSREP_ON) {
     Wsrep_server_state::instance().initialized();
   }
@@ -1115,10 +1133,17 @@ void wsrep_init_startup(bool sst_first) {
     With mysqldump SST (!sst_first) wait until the server reaches
     joiner state and proceed to accepting connections.
   */
-  if (sst_first) {
-    server_state.wait_until_state(Wsrep_server_state::s_initializing);
-  } else {
-    server_state.wait_until_state(Wsrep_server_state::s_joiner);
+  try {
+    if (sst_first) {
+      server_state.wait_until_state(Wsrep_server_state::s_initializing);
+    } else {
+      server_state.wait_until_state(Wsrep_server_state::s_joiner);
+    }
+  } catch (const wsrep::runtime_error &e) {
+    // While waiting for 'initializing' or 'joiner' state we got 'disconnecting'
+    // state. It means that something went wrong during wsrep provider
+    // initialization and we cannot recover anyway.
+    unireg_abort(MYSQLD_ABORT_EXIT);
   }
 }
 

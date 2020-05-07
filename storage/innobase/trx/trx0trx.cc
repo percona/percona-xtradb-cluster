@@ -64,9 +64,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ut0pool.h"
 #include "ut0vec.h"
 
+#include "debug_sync.h"
 #include "my_dbug.h"
 #include "mysql/plugin.h"
 #include "sql/clone_handler.h"
+#include "sql/wsrep_mysqld.h"
 
 #ifdef WITH_WSREP
 #include <wsrep_mysqld.h>
@@ -3400,14 +3402,67 @@ void trx_set_rw_mode(trx_t *trx) /*!< in/out: transaction that is RW */
   mutex_exit(&trx_sys->mutex);
 }
 
+/*
+  This function is needed only for canceling thread, which are inside replicator
+  processing commit, when high priority transaction aborts the victim
+ */
+int wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx) {
+  DBUG_ENTER("wsrep_signal_replicator");
+  THD *bf_thd = (THD *)bf_trx->mysql_thd;
+  THD *thd = (THD *)victim_trx->mysql_thd;
+  int64_t bf_seqno = (bf_thd) ? wsrep_thd_trx_seqno(bf_thd) : 0;
+
+  if (!thd) {
+    DBUG_PRINT("wsrep", ("no thd for conflicting lock"));
+    WSREP_WARN("no THD for trx: %llu", (long long)victim_trx->id);
+    DBUG_RETURN(1);
+  }
+  if (!bf_thd) {
+    DBUG_PRINT("wsrep", ("no BF thd for conflicting lock"));
+    WSREP_WARN("no BF THD for trx: %llu", (bf_trx) ? (long long)bf_trx->id : 0);
+    DBUG_RETURN(1);
+  }
+
+  WSREP_LOG_CONFLICT(bf_thd, thd, true);
+
+  WSREP_DEBUG(
+      "BF thread %u (with write-set: %lld)"
+      " aborting Victim thread %u with transaction (%llu)",
+      wsrep_thd_thread_id(bf_thd), (long long)bf_seqno,
+      wsrep_thd_thread_id(thd), (long long)victim_trx->id);
+
+  WSREP_DEBUG("Aborting query: %s",
+              (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
+
+  wsrep_thd_LOCK(thd);
+  victim_trx->lock.was_chosen_as_wsrep_victim = true;
+  wsrep_thd_UNLOCK(thd);
+
+  if (wsrep_thd_bf_abort(bf_thd, thd, true)) {
+    if (victim_trx->lock.wait_lock) {
+      WSREP_DEBUG("victim has wait flag: %lu", thd_get_thread_id(thd));
+      lock_t *wait_lock = victim_trx->lock.wait_lock;
+
+      if (wait_lock) {
+        WSREP_DEBUG("canceling wait lock");
+        victim_trx->lock.was_chosen_as_deadlock_victim = true;
+        lock_cancel_waiting_and_release(wait_lock, false);
+      }
+    }
+  }
+
+  DBUG_RETURN(0);
+}
+
 void trx_kill_blocking(trx_t *trx) {
+  DBUG_ENTER("trx_kill_blocking");
   if (!trx_is_high_priority(trx)) {
-    return;
+    DBUG_VOID_RETURN;
   }
   hit_list_t hit_list;
   lock_make_trx_hit_list(trx, hit_list);
   if (hit_list.empty()) {
-    return;
+    DBUG_VOID_RETURN;
   }
 
   DEBUG_SYNC_C("trx_kill_blocking_enter");
@@ -3553,9 +3608,7 @@ void trx_kill_blocking(trx_t *trx) {
     */
     trx_id_t save_id = victim_trx->id;
     victim_trx->id = victim_id;
-    // TODO: G-4
-    assert(0);
-    // wsrep_signal_replicator(victim_trx, trx);
+    wsrep_signal_replicator(victim_trx, trx);
     victim_trx->id = save_id;
 #endif /* WITH_WSREP */
 
@@ -3573,6 +3626,8 @@ void trx_kill_blocking(trx_t *trx) {
   if (had_dict_lock) {
     row_mysql_freeze_data_dictionary(trx);
   }
+
+  DBUG_VOID_RETURN;
 }
 
 /* To get current session thread default THD */
