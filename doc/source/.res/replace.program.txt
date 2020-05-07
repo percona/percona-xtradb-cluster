@@ -9,7 +9,11 @@
 .. |service.mysql.restart| replace:: `service mysql restart`
 .. |service.mysql.stop| replace:: `service mysql stop`
 .. |percona-release| replace:: :program:`percona-release`
+.. |rpm.e.nodeps| replace:: :bash:`rpm -e --nodeps`
+.. |rpm.e| replace:: :bash:`rpm -e`
+.. |xtrabackup| replace:: :program:`xtrabackup`
 .. |proxysql-admin| replace:: :program:`proxysql-admin`
 .. |rpm.e.nodeps| replace:: `rpm -e --nodeps`
 .. |rpm.e| replace:: `rpm -e`
+
 

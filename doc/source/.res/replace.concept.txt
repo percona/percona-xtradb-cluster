@@ -9,3 +9,5 @@
 .. |sql.create-table| replace:: :mysql:`CREATE TABLE`
 .. |sql.alter-table| replace:: :mysql:`ALTER TABLE`
 .. |sql.upgrade-partitioning| replace:: :mysql:`UPGRADE PARTITIONING`
+
+.. |pxb-encryption| replace:: XtraBackup-based Encryption
