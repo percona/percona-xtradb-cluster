@@ -49,19 +49,15 @@ To make sure that the cluster has been initialized, run the following:
    40 rows in set (0.01 sec)
 
 The previous output shows that the cluster size is 1 node,
-it is the primary component, the node is in ``Synced`` state,
+it is the primary component, the node is in the ``Synced`` state,
 it is fully connected and ready for write-set replication.
 
-.. admonition:: New feature
+.. include:: .res/text/admonition-automatic-user.txt
 
-   Unlike previous versions, |pxc| |version| does not require that a user with
-   special permissions be created manually. In this version, |PXC| automatically
-   sets up a user account with a randomly generated password.
+.. seealso::
 
-   .. seealso::
-
-      |percona| Blog Post: |PXB| |version| New Feature: wsrep_sst_auth removal
-         https://www.percona.com/blog/2019/10/03/percona-xtradb-cluster-8-0-new-feature-wsrep_sst_auth-removal/
+   |percona| Blog Post: |PXB| |version| New Feature: wsrep_sst_auth removal
+      https://www.percona.com/blog/2019/10/03/percona-xtradb-cluster-8-0-new-feature-wsrep_sst_auth-removal/
 
 Next Steps
 ==========
@@ -69,3 +65,6 @@ Next Steps
 After initializing the cluster, you can :ref:`add other nodes <add-node>`.
 
 .. |wsrep_cluster_address| replace:: :variable:`wsrep_cluster_address`
+
+.. include:: .res/replace.opt.txt
+.. include:: .res/replace.txt

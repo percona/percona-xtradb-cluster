@@ -1,0 +1,7 @@
+
+.. admonition:: Different from previous version
+
+   The variable |wsrep-sst-auth| has been removed. |pxc| |version|
+   automatically creates the system user |mysql-pxc-sst-root|. During
+   :term:`SST`, the user |pxc-sst-user| and the role |pxc-sst-role|
+   are created on the donor node.

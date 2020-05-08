@@ -30,3 +30,16 @@
 
 .. |data-at-rest| replace:: *data at rest*
 .. |wsrep_state_dat| replace:: :file:`wsrep_state.dat`
+
+.. |pxc-sst-root| replace:: `mysql.pxc.internal.session`
+.. |mysql-pxc-sst-root| replace:: :term:`mysql.pxc.internal.session`
+.. |term.mysql-pxc-sst-root| replace:: :term:`mysql.pxc.internal.session`
+
+.. |pxc-sst-user| replace:: `mysql.pxc.sst.user`
+
+.. |mysql-pxc-sst-role| replace:: `mysql.pxc.sst.role`
+.. |prev-major-version| replace:: 5.7
+
+.. |term.mysql-pxc-sst-role| replace:: :term:`mysql.pxc.sst.role`
+.. |pxc-sst-role| replace:: :term:`mysql.pxc.sst.role`
+
