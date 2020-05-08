@@ -16,15 +16,15 @@ Percona is happy to announce the release of Percona XtraDB Cluster |release| on
 * Galera/Codership WSREP API Release 5.7.28
 * Galera Replication library 3.28
 
-|PXC| |release| requires `PXB 2.4.17 <https://www.percona.com/doc/percona-xtrabackup/2.4/release-notes/2.4/2.4.17.html>`_.
+|PXC| |release| requires `Percona XtraBackup 2.4.17 <https://www.percona.com/doc/percona-xtrabackup/2.4/release-notes/2.4/2.4.17.html>`_.
 
 Bugs Fixed
 ================================================================================
 
-- :pxcbug:`2729`: A cluster node could hang when trying to access a table which was being updated by another node.
-- :pxcbug:`2704`: After a row was updated with a variable-length unique key, the entire cluster could crash.
+- :jirabug:`PXC-2729`: A cluster node could hang when trying to access a table which was being updated by another node.
+- :jirabug:`PXC-2704`: After a row was updated with a variable-length unique key, the entire cluster could crash.
 
-Other bugs fixed: :pxcbug:`2670`
+Other bugs fixed: :jirabug:`PXC-2670`
 
 .. |release| replace:: 5.7.28-31.41
 .. |date| replace:: December 16, 2019

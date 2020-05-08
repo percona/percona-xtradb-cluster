@@ -61,7 +61,7 @@ For more information, see :ref:`pxc-maint-mode`.
    :default: ``10`` (ten seconds)
 
 Defines the transition period
-when you change :variable:`pxc_maint_mode` to ``SHUTDOWN`` or ``MAINTENANCE``.
+when you change :variable:`pxc_maint_mode` to ``SHUTDOWN``.
 By default, the period is set to 10 seconds,
 which should be enough for most transactions to finish.
 You can increase the value to accommodate for longer-running transactions.

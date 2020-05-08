@@ -1,0 +1,66 @@
+# connection node_1, root
+CREATE DATABASE db1;
+CREATE USER 'testUser' IDENTIFIED BY 'secret';
+GRANT ALL PRIVILEGES ON db1.* TO 'testUser';
+CREATE USER 'testUser2' IDENTIFIED BY 'secret';
+GRANT ALL PRIVILEGES ON *.* TO 'testUser2';
+CREATE TABLE db1.t1 ( id INT PRIMARY KEY AUTO_INCREMENT, m INT) ENGINE=innodb;
+CREATE DATABASE db2;
+CREATE TABLE db2.t1 (id INT PRIMARY KEY AUTO_INCREMENT, s INT) ENGINE=innodb;
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `m` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+# connection node_2, testUser - limited privileges
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `m` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+ALTER TABLE db1.t1 ADD FOREIGN KEY (m) REFERENCES db2.t1 (id);
+ERROR 42000: REFERENCES command denied to user 'testUser'@'localhost' for table 'db2.t1'
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `m` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+# connection node_1, root
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `m` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+# connection node_2, testUser2 - full privileges
+ALTER TABLE db1.t1 ADD FOREIGN KEY (m) REFERENCES db2.t1 (id);
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `m` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `m` (`m`),
+  CONSTRAINT `t1_ibfk_1` FOREIGN KEY (`m`) REFERENCES `db2`.`t1` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+# connection node_1, root
+SHOW CREATE TABLE db1.t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `m` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `m` (`m`),
+  CONSTRAINT `t1_ibfk_1` FOREIGN KEY (`m`) REFERENCES `db2`.`t1` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+DROP DATABASE db1;
+DROP DATABASE db2;
+DROP USER testUser;
+DROP USER testUser2;
