@@ -44,6 +44,9 @@ for a growing environment.
 
 .. seealso::
 
+   Overview of changes in the most recent |pxc| release
+      :ref:`upgrade-guide-changed`
+
    |MySQL| Community Edition
       https://www.mysql.com/products/community/
    |percona-server|
@@ -51,10 +54,6 @@ for a growing environment.
    How We Made Percona XtraDB Cluster Scale
        https://www.percona.com/blog/2017/04/19/how-we-made-percona-xtradb-cluster-scale
       
-..   Performance improvements in Percona XtraDB Cluster 5.7.17-29.20
-..   https://www.percona.com/blog/2017/04/19/performance-improvements-percona-xtradb-cluster-5-7-17
-
-
 Data compatibility
    You can use data created by any MySQL variant.
 Application compatibility

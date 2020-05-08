@@ -969,4 +969,3 @@ This variable is used to specify if the SSL compression is to be used.
 This variable is used to specify what cypher will be used for encryption.
 
 .. include:: .res/replace.txt
-

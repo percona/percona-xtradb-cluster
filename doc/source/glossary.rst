@@ -163,15 +163,22 @@
 
       State Snapshot Transfer is the full copy of data from one node
       to another.  It's used when a new node joins the cluster, it has
-      to transfer data from an existing node. |Percona XtraDB
+      to transfer data from an existing node.
+
+      |Percona XtraDB
       Cluster|: uses the :program:`xtrabackup` program for this
       purpose.  :program:`xtrabackup` does not require :command:`READ
       LOCK` for the entire syncing process - only for syncing the
       |MySQL| system tables and writing the information about the
       binlog, galera and slave information (same as the regular
-      |Percona XtraBackup| backup). The SST method is configured with
-      the :variable:`wsrep_sst_method` variable.
+      |Percona XtraBackup| backup).
+
+      The SST method is configured with the :variable:`wsrep_sst_method` variable.
   
+      In |pxc| |version|, the |mysql-upgrade| command is now run
+      automatically as part of :term:`SST`. You do not have to run it
+      manually when upgrading your system from an older version.
+
    UUID
 
       Universally Unique IDentifier which uniquely identifies the state and the
