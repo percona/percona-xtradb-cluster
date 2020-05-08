@@ -16,6 +16,18 @@
 .. |opt.rocksdb-update-cf-options| replace:: :variable:`rocksdb_update_cf_options`
 .. |opt.update-cf-options|         replace:: :variable:`rocksdb_update_cf_options`
 .. |opt.ucfo|                      replace:: :variable:`rocksdb_update_cf_options`
-
 .. |opt.encrypt-cluster-traffic| replace:: :variable:`pxc-encrypt-cluster-traffic`
-
+.. |wsrep-sst-auth| replace:: :variable:`wsrep_sst_auth`
+.. |opt.wsrep-sst-auth| replace:: :variable:`wsrep_sst_auth`
+.. |pxc-encrypt-cluster-traffic| replace:: :variable:`pxc-encrypt-cluster-traffic`
+.. |opt.pxc-encrypt-cluster-traffic| replace:: :variable:`pxc-encrypt-cluster-traffic`
+.. |opt.encrypt| replace:: :variable:`encrypt`
+.. |opt.ssl-key| replace:: :variable:`ssl_key`
+.. |opt.node-address| replace:: :variable:`wsrep_node_address`
+.. |wsrep-node-address| replace:: :variable:`wsrep_node_address`
+.. |wsrep-node-name| replace:: :variable:`wsrep_node_name`
+.. |opt.node-name| replace:: :variable:`wsrep_node_name`
+.. |opt.wsrep_max_ws_rows| replace:: :variable:`wsrep_max_ws_rows`
+.. |max_ws_rows| replace:: :variable:`wsrep_max_ws_rows`
+.. |opt.wsrep_max_ws_size| replace:: :variable:`wsrep_max_ws_size`
+.. |max_ws_size| replace:: :variable:`wsrep_max_ws_size`

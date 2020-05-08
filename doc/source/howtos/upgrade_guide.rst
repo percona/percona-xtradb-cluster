@@ -123,13 +123,13 @@ In |PXC| |version|, the default authentication plugin is
 created using ``caching_sha2_password``. Use the ``mysql_native_password``
 authentication plugin in these cases.
 
+Be sure you are running on the latest 5.7 version before you upgrade to 8.0.
 
 |mysql-upgrade| is part of :term:`SST`
 --------------------------------------------------------------------------------
 
 |mysql-upgrade| is now run automatically as part of :term:`SST`. You do not have
 to run it manually when upgrading your system from an older version.
-
 
 Rolling Upgrade of a 3-Node |pxc| from 5.7 to 8.0
 ================================================================================

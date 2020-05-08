@@ -149,6 +149,7 @@ enum enum_pxc_maint_modes {
   PXC_MAINT_MODE_MAINTENANCE,
 };
 extern ulong pxc_maint_mode;
+extern bool wsrep_pxc_maint_mode_forced;
 extern ulong pxc_maint_transition_period;
 extern bool pxc_encrypt_cluster_traffic;
 

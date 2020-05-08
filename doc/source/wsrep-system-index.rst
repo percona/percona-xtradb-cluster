@@ -20,9 +20,8 @@ When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
 
 Possible values:
 
-* ``OFF``, ``0``, ``false``: Disabled
-
 * ``ON``, ``1``, ``true``: Enabled (default)
+* ``OFF``, ``0``, ``false``: Disabled
 
 For more information, see :ref:`ssl-auto-conf`.
 
@@ -292,17 +291,40 @@ Defines ``DBUG`` options to pass to the wsrep provider.
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: ``OFF``
+   :default: ``NONE``
 
-Enables additional debugging output for the database server error log.
-By default, it is disabled.
-This variable can be used when trying to diagnose problems
-or when submitting a bug.
+Enables debug level logging for the database server and `wsrep-lib
+<https://github.com/codership/wsrep-lib>`_ - an integration library for WSREP
+API with additional convenience for transaction processing.  By default,
+:variable:`--wsrep-debug` is disabled.
+
+This variable can be used when trying to diagnose problems or when submitting a
+bug.
 
 You can set ``wsrep_debug`` in the following :file:`my.cnf` groups:
 
 * Under ``[mysqld]`` it enables debug logging for ``mysqld`` and the SST script
 * Under ``[sst]`` it enables debug logging for the SST script only
+
+This variable may be set to one of the following values:
+
+NONE
+   No debug-level messages.
+
+SERVER
+
+   ``wsrep-lib`` general debug-level messages and detailed debug-level messages
+   from the *server_state* part are printed out.  Galera debug-level logs are
+   printed out.
+
+TRANSACTION
+   Same as SERVER + wsrep-lib *transaction* part
+
+STREAMING
+   Same as TRANSACTION + wsrep-lib *streaming* part
+
+CLIENT
+   Same as STREAMING + wsrep-lib *client_service* part
 
 .. note:: Do not enable debugging in production environments,
    because it logs authentication info (that is, passwords).

@@ -2413,7 +2413,12 @@ static void unireg_abort(int exit_code) {
      * wsrep threads here, we can only diconnect from service */
     wsrep_close_client_connections(false, true);
     wsrep_close_threads(NULL);
-    Wsrep_server_state::instance().disconnect();
+
+    auto state = Wsrep_server_state::instance().state();
+    if (state != wsrep::server_state::s_disconnected &&
+        state != wsrep::server_state::s_disconnecting) {
+      Wsrep_server_state::instance().disconnect();
+    }
 
     THD *thd = current_thd;
     if (thd) {

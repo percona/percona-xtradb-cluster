@@ -76,9 +76,6 @@ dependencies:
    libboost-all-dev libasio-dev libaio-dev libncurses5-dev libreadline-dev \
    libpam-dev socat libcurl-dev
    
-   .. libcurl-dev (not found on debian; used libcurl4-gnutls-dev
-   .. zlib-dev is missing here. on debian worked with zlib1g-dev
-
 * For Red Hat Enterprise Linux or CentOS:
 
 .. code-block:: bash

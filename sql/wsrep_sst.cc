@@ -476,10 +476,8 @@ static void *sst_joiner_thread(void *a) {
       // Close the pipe, so that the other side gets an EOF
       proc.close_write_pipe();
     }
-
     if (!err && proc.pipe() && !proc.error()) {
       const char *tmp = my_fgets(out, out_len, proc.pipe());
-
       if (!tmp || strlen(tmp) < (magic_len + 2) ||
           strncasecmp(tmp, magic, magic_len)) {
         if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
@@ -758,7 +756,7 @@ std::string wsrep_sst_prepare() {
   if (addr_len < 0) {
     WSREP_ERROR("Failed to prepare for '%s' SST. Unrecoverable.",
                 wsrep_sst_method);
-    unireg_abort(1);
+    throw wsrep::runtime_error("Failed to prepare for SST. Unrecoverable");
   }
 
   std::string ret;
