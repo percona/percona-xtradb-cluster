@@ -17,7 +17,7 @@ Improvements
 * :jirabug:`PXC-2985`: Enabled Service for Automated Startup on Reboot with valid grastate.dat
 * :jirabug:`PXC-2980`: Modified Documentation to include AutoStart Up Process after Installation
 * :jirabug:`PXC-2722`: Enabled Support for Percona XtraBackup (PXB) 8.0.8 in Percona XtraDB Cluster (PXC) 8.0
-* :jirabug:`PXC-2602`: Added Ability to Configure xbstream options with wsrep_sst_xtrabackup-v2
+* :jirabug:`PXC-2602`: Added Ability to Configure xbstream options with wsrep_sst_xtrabackup
 * :jirabug:`PXC-2455`: Implemented the use of Percona XtraBackup (PXB) 8.0.5 in Percona XtraDB Cluster (PXC) 8.0
 * :jirabug:`PXC-2259`: Updated wsrep-files-index.htrml to include new files created by Percona XtraDB Cluster (PXC)
 * :jirabug:`PXC-2197`: Modified SST Documentation to Include Package Dependencies for Percona XtraBackup (PXB)

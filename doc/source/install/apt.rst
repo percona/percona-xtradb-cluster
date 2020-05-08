@@ -66,12 +66,19 @@ Installing from Repository
       the ``percona-xtradb-cluster-full-80`` meta package,
       which contains the following additional packages:
 
-      * ``percona-xtradb-cluster-test-8.0``
-      * ``percona-xtradb-cluster-8.0-dbg``
-      * ``percona-xtradb-cluster-garbd-3.x``
-      * ``percona-xtradb-cluster-galera-3.x-dbg``
-      * ``percona-xtradb-cluster-garbd-3.x-dbg``
-      * ``libmysqlclient18``
+      * ``libperconaserverclient21-dev``
+      * ``libperconaserverclient21``
+      * ``percona-xtradb-cluster-client``
+      * ``percona-xtradb-cluster-common``
+      * ``percona-xtradb-cluster-dbg`
+      * ``percona-xtradb-cluster-full``
+      * ``percona-xtradb-cluster-garbd-debug``
+      * ``percona-xtradb-cluster-garbd``
+      * ``percona-xtradb-cluster-server-debug``
+      * ``percona-xtradb-cluster-server``
+      * ``percona-xtradb-cluster-source``
+      * ``percona-xtradb-cluster-test``
+      * ``percona-xtradb-cluster``
 
 
    During the installation, you are requested to provide a password

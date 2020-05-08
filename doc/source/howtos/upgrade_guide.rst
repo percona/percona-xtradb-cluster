@@ -79,6 +79,10 @@ The configuration file layout has changed in |pxc| |version|
    :ref:`pxc.proxysql.v2.admin-tool.syncusers` will not work if the |PXC| user
    is created using ``caching_sha2_password``. Use the ``mysql_native_password``
    authentication plugin in these cases.
+   
+.. warning::
+
+   Be sure you are running on the latest 5.7 version before you upgrade to 8.0.
 
 .. contents::
    :local:

@@ -1605,6 +1605,54 @@ static bool pxc_strict_mode_lock_check(THD *thd) {
 
   return block;
 }
+/*
+ * This function should be called to determine if cluster still has nodes
+ * with lower versions of wsrep_protocol_version (eg.: version 3).
+ * Writing on a new node can crash nodes with lower version 8.0->5.7
+ */
+static bool block_write_while_in_rolling_upgrade(THD *thd) {
+  /* Ignore check while server is not ready or for background wsrep applier too
+   * (like slave thread) */
+  if (!wsrep_node_is_synced() || (WSREP(thd) && thd->wsrep_applier))
+    return false;
+
+  bool block = false;
+  LEX *lex = thd->lex;
+  if (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) {
+    bool multi_version_cluster = wsrep_protocol_version < 4;
+    if (multi_version_cluster ||
+        DBUG_EVALUATE_IF("simulate_wsrep_multiple_major_versions", true,
+                         false)) {
+      const char *msg;
+      switch (pxc_strict_mode) {
+        case PXC_STRICT_MODE_DISABLED:
+          /* Do nothing */
+          break;
+        case PXC_STRICT_MODE_PERMISSIVE:
+          msg =
+              "Percona-XtraDB-Cluster doesn't recommend use of multiple major"
+              " versions while accepting write workload"
+              " with pxc_strict_mode = PERMISSIVE";
+          WSREP_WARN("%s", msg);
+          push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                              "%s", msg);
+          break;
+        case PXC_STRICT_MODE_MASTER:
+        case PXC_STRICT_MODE_ENFORCING:
+        default:
+          block = true;
+          msg =
+              "Percona-XtraDB-Cluster prohibits use of multiple major versions"
+              " while accepting write workload with pxc_strict_mode = "
+              "ENFORCING or MASTER";
+          WSREP_ERROR("%s", msg);
+          my_message(ER_UNKNOWN_ERROR, msg, MYF(0));
+          break;
+      }
+    }
+  }
+  return block;
+}
 #endif /* WITH_WSREP */
 
 /**
@@ -3329,6 +3377,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
         !wsrep_is_show_query(lex->sql_command)) {
       my_message(ER_UNKNOWN_COM_ERROR,
                  "WSREP has not yet prepared node for application use", MYF(0));
+      return -1;
+    }
+    if (block_write_while_in_rolling_upgrade(thd)) {
       return -1;
     }
   }
