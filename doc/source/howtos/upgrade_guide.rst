@@ -24,14 +24,13 @@ and variables mentioned in these documents when upgrading to |PXC| 8.0.
 .. contents:: In this section
    :depth: 1
    :local:
-   :backlinks: entry
 
 .. _upgrade-guide-changed:
 
 Important changes in |pxc| |version|
 ================================================================================
 
-.. contents::
+.. contents:: 
    :local:
 
 .. _upgrade-guide-changed-traffic-encryption:
@@ -210,9 +209,8 @@ Note that the new default value of |opt.encrypt-cluster-traffic| (set to *ON*
 versus *OFF* in |pxc| 5.7) requires additional care. You cannot join a 5.7 node
 to a |pxc| 8.0 cluster unless the node has traffic encryption enabled as the
 cluster may not have some nodes with traffic encryption enabled and some nodes
-with traffic encryption disabled.
-
-.. seealso:: :ref:`upgrade-guide-changed-traffic-encryption`
+with traffic encryption disabled. For more information, see
+:ref:`upgrade-guide-changed-traffic-encryption`.
 
 .. contents::
    :local:
@@ -395,4 +393,5 @@ To upgrade the cluster, follow these steps for each node:
 .. include:: ../.res/replace.txt
 .. include:: ../.res/replace.opt.txt
 .. include:: ../.res/replace.ref.txt
+.. include:: ../.res/replace.file.txt
 .. include:: ../.res/replace.program.txt
