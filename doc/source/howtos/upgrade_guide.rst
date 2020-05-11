@@ -4,11 +4,11 @@
 Upgrading Percona XtraDB Cluster
 ================================
 
-This guide describes the procedure for upgrading |PXC| without downtime
-(*rolling upgrade*) to the |PXC| 8.0.
+.. This guide describes the procedure for upgrading |PXC| without downtime
+   (*rolling upgrade*) to the |PXC| 8.0.
 
-A "rolling upgrade" means there is no need to take down the complete
-cluster during the upgrade.
+.. A "rolling upgrade" means there is no need to take down the complete
+   cluster during the upgrade.
 
 The following documents contain details about relevant changes in the 8.0 series
 of MySQL and |percona-server|. Make sure you deal with any incompatible features
@@ -53,23 +53,25 @@ error.
 
 .. seealso:: sections :ref:`encrypt-traffic`, :ref:`configure`
 
-Rolling upgrades to |version| from versions older than 5.7 are not supported
---------------------------------------------------------------------------------
+.. Rolling upgrades to |version| from versions older than 5.7 are not supported
+   --------------------------------------------------------------------------------
 
-Therefore, if you are running |PXC| version 5.6, shut down all
-nodes, then remove and re-create the cluster from scratch. Alternatively,
-you can perform a `rolling upgrade from PXC 5.6 to 5.7
-<https://www.percona.com/doc/percona-xtradb-cluster/5.7/howtos/upgrade_guide.html>`_.
-and then follow the current procedure to upgrade from 5.7 to 8.0.
+   Therefore, if you are running |PXC| version 5.6, shut down all
+   nodes, then remove and re-create the cluster from scratch. Alternatively,
+   you can perform a `rolling upgrade from PXC 5.6 to 5.7 <https://www.percona.com/doc/percona-xtradb-cluster/5.7/howtos/upgrade_guide.html>`_.
+   and then follow the current procedure to upgrade from 5.7 to 8.0.
 
 Not recommended to mix |pxc| 5.7 nodes with |pxc| 8.0 nodes
 --------------------------------------------------------------------------------
 
-If downtime is acceptable
+Shut down the cluster and upgrade each node to |pxc| 8.0. It is
+important that you make backups before attempting an upgrade.
+
+.. If downtime is acceptable
    Shut down the cluster and upgrade all nodes to |pxc|
    8.0. It is important that you make backups before attempting an upgrade.
 
-If downtime is not possible
+.. If downtime is not possible
    The rolling upgrade is supported but ensure the
    traffic is controlled during the upgrade and writes are directed only to 5.7
    nodes until all nodes are upgraded to 8.0.
@@ -130,74 +132,69 @@ Be sure you are running on the latest 5.7 version before you upgrade to 8.0.
 |mysql-upgrade| is now run automatically as part of :term:`SST`. You do not have
 to run it manually when upgrading your system from an older version.
 
-Rolling Upgrade of a 3-Node |pxc| from 5.7 to 8.0
-================================================================================
+.. Rolling Upgrade of a 3-Node |pxc| from 5.7 to 8.0
+   ================================================================================
 
-The major upgrade involves upgrading the |pxc| from the previous major version
-5.7 to the new major version 8.0.
+   The major upgrade involves upgrading the |pxc| from the previous major version
+   5.7 to the new major version 8.0.
 
-To upgrade the cluster, follow these steps for each node:
+   To upgrade the cluster, follow these steps for each node:
 
-1. Make sure that all nodes are synchronized.
+   #. Make sure that all nodes are synchronized.
 
-#. Stop the ``mysql`` service:
+   #. Stop the ``mysql`` service:
 
-   .. code-block:: bash
+..   .. code-block: bash
 
       $ sudo service mysql stop
 
-#. Remove existing |PXC| and Percona XtraBackup packages, then install
-   |PXC| version 8.0 packages.  For more information, see
-   :ref:`install`.
+.. #. Remove existing |PXC| and Percona XtraBackup packages, then install |PXC| version 8.0 packages.  For more information, see :ref:`install`.
 
    For example, if you have Percona software repositories configured,
    you might use the following commands:
 
-   * On CentOS or RHEL:
+..   * On CentOS or RHEL:
 
-     .. code-block:: bash
+     .. code-block: bash
 
         $ sudo yum remove percona-xtrabackup* Percona-XtraDB-Cluster*
         $ sudo yum install percona-xtradb-cluster
 
-   * On Debian or Ubuntu:
+..   * On Debian or Ubuntu:
 
-     .. code-block:: bash
+     .. code-block: bash
 
         $ sudo apt-get remove percona-xtrabackup* percona-xtradb-cluster*
         $ sudo apt-get install percona-xtradb-cluster
 
-#. Back up :file:`grastate.dat`, so that you can restore it
+.. #. Back up :file:`grastate.dat`, so that you can restore it
    if it is corrupted or zeroed out due to network issue.
 
-#. Now, start the cluster node with 8.0 packages installed, |pxc| will upgrade
+.. #. Now, start the cluster node with 8.0 packages installed, |pxc| will upgrade
    the data directory as needed - either as part of the startup process or a
    state transfer (IST/SST).
 
    In most cases, starting the ``mysql`` service should run the node with your
    previous configuration. For more information, see :ref:`add-node`.
 
-   .. code-block:: bash
+   .. code-block: bash
 
       $ sudo service mysql start
 
-   .. note::
+   .. note:
 
       On CentOS, the |file.centos-conf| configuration file is renamed to
       :file:`my.cnf.rpmsave`.  Make sure to rename it back before
       joining the upgraded node back to the cluster.
 
-   |strict-mode| is enabled by default, which may result in denying any
-   unsupported operations and may halt the server. For more information, see
-   :ref:`upgrade-guide-changed-strict-mode`.
+   |strict-mode| is enabled by default, which may result in denying any unsupported operations and may halt the server. For more information, see    :ref:`upgrade-guide-changed-strict-mode`.
 
    |opt.encrypt-cluster-traffic| is enabled by default. You need to configure
    each node accordingly and avoid joining a cluster with unencrypted cluster
    traffic: all nodes in your cluster must have traffic encryption enabled. For
    more information, see :ref:`upgrade-guide-changed-traffic-encryption`.
       
-#. Repeat this procedure for the next node in the cluster
-   until you upgrade all nodes.
+.. #. Repeat this procedure for the next node in the cluster until you upgrade all nodes.
 
 Major Upgrade Scenarios
 ================================================================================
@@ -296,46 +293,46 @@ data directory.
 
    It is not recommended to restart the last node without upgrading it.
 
-Scenario: Upgrading with active parallel read-write workload
---------------------------------------------------------------------------------
+.. Scenario: Upgrading with active parallel read-write workload
+   --------------------------------------------------------------------------------
 
-The upgrade prosess is similar to that described in
-:ref:`upgrading-rolling-no-active-read-only-parallel-workload`: since the
-cluster state keeps changing while each node is taken down and upgraded,
-:term:`IST` or :term:`SST` is triggered when rejoining the node that you
-upgrading. In |version|, |pxc| clears the configuration of each slave node (via
-`RESET SLAVE ALL <https://dev.mysql.com/doc/refman/8.0/en/reset-slave.html>`_).
+.. The upgrade prosess is similar to that described in
+   :ref:`upgrading-rolling-no-active-read-only-parallel-workload`: since
+   the cluster state keeps changing while each node is taken down and
+   upgraded, :term:`IST` or :term:`SST` is triggered when rejoining the
+   node that you upgrading. In |version|, |pxc| clears the configuration
+   of each slave node (via `RESET SLAVE ALL <https://dev.mysql.com/doc/refman/8.0/en/reset-slave.html>`_).
 
-.. important::
+.. important:
 
    It is important that the joining node have enough slave threads to catch up
    IST write-sets and cluster write-sets.
 
-Scenario: Adding 8.0 node to a 5.7 cluster
---------------------------------------------------------------------------------
+.. Scenario: Adding 8.0 node to a 5.7 cluster
+   --------------------------------------------------------------------------------
 
-Instead of upgrading a node in a 5.7 cluster to |pxc| 8.0, you are booting a
-fresh 8.0 node and try joining it as an additional node.
+   Instead of upgrading a node in a 5.7 cluster to |pxc| 8.0, you are booting a
+   fresh 8.0 node and try joining it as an additional node.
 
-Suppose the 5.7 cluster is already active and has processed write-sets. The new
-8.0 node joins the cluster and gets a dump of the cluster through :term:`SST`
-and remains part of the cluster.
+   Suppose the 5.7 cluster is already active and has processed write-sets. The new
+   8.0 node joins the cluster and gets a dump of the cluster through :term:`SST`
+   and remains part of the cluster.
 
-Since the underline protocol version negotiated in both cases is based on Galera 3,
-the 8.0 node will fail to service galera 4 features. As soon as all 5.7
-nodes leave the cluster, the 8.0 nodes re-negotiates using protocol version 4
-and gets a proper local index and other properties assigned.
+   Since the underline protocol version negotiated in both cases is based on Galera 3,
+   the 8.0 node will fail to service galera 4 features. As soon as all 5.7
+   nodes leave the cluster, the 8.0 nodes re-negotiates using protocol version 4
+   and gets a proper local index and other properties assigned.
 
-.. warning::
+   .. warning:
 
-   Joining a 5.7 node to a |pxc| |version| cluster is not supported.
+      Joining a 5.7 node to a |pxc| |version| cluster is not supported.
 
-Scenario: Upgrading a node which is an async replication slave
---------------------------------------------------------------------------------
+.. Scenario: Upgrading a node which is an async replication slave
+   --------------------------------------------------------------------------------
 
-In this case you need to configure the master-slave replication. Make one of the
-PXC nodes as an async slave. Upgrade the |pxc| async slave node and check the
-replication status.
+   In this case, you need to configure the master-slave replication. Make one of the
+   PXC nodes as an async slave. Upgrade the |pxc| async slave node and check the
+   replication status.
 
 Scenario: Upgrading from |pxc| 5.6 to |pxc| 8.0
 --------------------------------------------------------------------------------
@@ -370,7 +367,9 @@ To upgrade the cluster, follow these steps for each node:
    In most cases, starting the ``mysql`` service should run the node with your
    previous configuration. For more information, see :ref:`add-node`.
 
-    $ sudo service mysql start
+   .. code-block:: bash
+
+      $ sudo service mysql start
 
    .. note::
 

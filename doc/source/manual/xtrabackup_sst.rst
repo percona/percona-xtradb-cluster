@@ -7,7 +7,7 @@ Percona XtraBackup SST Configuration
 Percona XtraBackup SST works in two stages:
 
 1. First it identifies the type of data transfer
-  based on the presence of :file:`xtrabackup_ist` file on the joiner node.
+   based on the presence of :file:`xtrabackup_ist` file on the joiner node.
 
 #. Then it starts data transfer. In case of |SST|, it empties the data directory except for some files
    (:file:`galera.cache`, :file:`sst_in_progress`, :file:`grastate.dat`)

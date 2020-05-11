@@ -37,7 +37,7 @@ tablespace encrypted by specifying the appropriate option.
 File-per-tablespace and General tablespace encryption are table/tablespace
 specific features and are enabled on object level through DDL:
 
-.. code-block:: guess
+.. code-block:: sql
 
    CREATE TABLE t1 (c1 INT, PRIMARY KEY pk(c1)) ENCRYPTION=’Y’;
    CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
@@ -53,7 +53,7 @@ Configuring PXC to use keyring_file plugin
 ==========================================
 
 keyring_file
-------------
+--------------------------------------------------------------------------------
 
 The following subsection covers some of the important semantics of
 ``keyring_file`` plugin needed to use it in scope of data-at-rest encryption.
@@ -62,7 +62,7 @@ The following subsection covers some of the important semantics of
 file is specified by ``keyring_file_data`` parameter configured during startup.
 
 Configuration
-*************
+--------------------------------------------------------------------------------
 
 |PXC| inherits upstream (Percona Server) behavior to configure ``keyring_file``
 plugin. Following options are to be set in the configuration file:
@@ -86,13 +86,13 @@ cluster will inherit the keyring (encrypted key) from the DONOR node
 or generate it.
 
 Usage
-*****
+--------------------------------------------------------------------------------
 
 |xtrabackup| re-encrypts the data using a transition-key and the JOINER node
 re-encrypts it using a new generated master-key.
 
 The keyring is generated on the JOINER node. SST is done using the
-``xtrabackup-v2` method. The keyring is sent over explicitly before
+``xtrabackup-v2`` method. The keyring is sent over explicitly before
 the real data backup/streaming starts.
 
 |PXC| doesn't allow to combine nodes with encryption and nodes without 
@@ -118,11 +118,12 @@ not replicated on cluster.
 The JOINER node generates its own keyring. 
 
 Compatibility
-*************
+--------------------------------------------------------------------------------
 
 Keyring (or, more generally, the |PXC| SST process) is backward compatible, as
 in higher version JOINER can join from lower version DONOR, but not vice-versa.
-More details are covered below, in `Upgrade and compatibility issues`_ section.
+More details are covered below, in
+:ref:`data-at-rest-encryption-upgrade-compatibility-issues` section.
 
 Configuring PXC to use keyring_vault plugin
 ===========================================
@@ -134,7 +135,7 @@ The ``keyring_vault`` plugin allows storing the master-key in vault-server
 (vs. local file as in case of ``keyring_file``).
 
 Configuration
-*************
+--------------------------------------------------------------------------------
 
 Configuration options are same as `upstream
 <https://www.percona.com/doc/percona-server/8.0/management/data_at_rest_encryption.html#keyring-vault-plugin>`_. The
@@ -211,6 +212,8 @@ mix-match keyring plugins. For example, user has node-1 configured to use
 .. note:: Percona recommends same configuration for all the nodes of the
    cluster. Mix-match (in keyring plugins) is recommended only during
    transition from one keying to other.
+
+.. _data-at-rest-encryption-upgrade-compatibility-issues:
 
 Upgrade and compatibility issues
 --------------------------------

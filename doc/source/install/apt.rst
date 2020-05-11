@@ -70,7 +70,7 @@ Installing from Repository
       * ``libperconaserverclient21``
       * ``percona-xtradb-cluster-client``
       * ``percona-xtradb-cluster-common``
-      * ``percona-xtradb-cluster-dbg`
+      * ``percona-xtradb-cluster-dbg``
       * ``percona-xtradb-cluster-full``
       * ``percona-xtradb-cluster-garbd-debug``
       * ``percona-xtradb-cluster-garbd``
