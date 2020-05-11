@@ -10,14 +10,35 @@ for manual installation.
 You can download the appropriate tarball package from
 https://www.percona.com/downloads/Percona-XtraDB-Cluster-80
 
-There are multiple tarballs in the **Linux - Generic** section
-depending on the *OpenSSL* library available in your distribution:
+The **Linux - Generic** section has tarballs for each supported platform. The
+code name of the platform is part of the file name. For example, files ending in
+*buster.tar.gz* are built for |debian| buster, files ending in *el8.tar.gz* are
+built for CentOS 8:
 
-* ``ssl100``: for Debian prior to 9 and Ubuntu prior to 14.04 versions
-* ``ssl101``: for CentOS 7 and 8
-* ``ssl102``: for Debian 9 or 10 and Ubuntu versions starting from 14.04
+.. admonition:: Examples of tarball names for |pxc| 8.0.18-9.3
 
-For example, you can use ``curl`` as follows:
+   .. list-table::
+      :header-rows: 1
+
+      * - Platform
+	- Tarball
+      *	- CentOS 7
+	- Percona-XtraDB-Cluster_8.0.18-9.3_Linux.x86_64.el7.tar.gz
+      * - CentOS 8
+	- Percona-XtraDB-Cluster_8.0.18-9.3_Linux.x86_64.el8.tar.gz
+      * - Debian 10 (Buster)
+	- Percona-XtraDB-Cluster_8.0.18-9.3_Linux.x86_64.buster.tar.gz
+      * - Debian 9 (Stretch)
+	- Percona-XtraDB-Cluster_8.0.18-9.3_Linux.x86_64.stretch.tar.gz
+      * - Ubuntu 16.4 (Xenial Xerus: xenial)
+	- Percona-XtraDB-Cluster_8.0.18-9.3_Linux.x86_64.xenial.tar.gz
+      * - Ubuntu 18.04 (Bionic Beaver: bionic)
+	- Percona-XtraDB-Cluster_8.0.18-9.3_Linux.x86_64.bionic.tar.gz
+      * - Ubuntu 20.04 (Focal Fossa: focal)
+	- Percona-XtraDB-Cluster_8.0.18-9.3_Linux.x86_64.focal.tar.gz
+
+
+To download a tarball, you can use ``curl`` as follows:
 
 .. code-block:: bash
 
@@ -32,7 +53,7 @@ Be sure to check your system and make sure that the packages are installed that 
    $ sudo apt-get install -y \
    socat libdbd-mysql-perl \
    libaio1 libc6 libcurl3 libev4 libgcc1 libgcrypt20 \
-   libgpg-error0 libssl1.1 libstdc++6 zlib1g libatomic1
+   libgpg-error0 libssl-dev libstdc++6 zlib1g libatomic1 libnuma libinfo
 
 .. rubric:: For Red Hat Enterprise Linux or CentOS:
 

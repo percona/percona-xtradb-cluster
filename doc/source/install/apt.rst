@@ -11,7 +11,7 @@ of the following distributions:
 * Debian 10 (buster)
 * Ubuntu 16.04 LTS (Xenial Xerus)
 * Ubuntu 18.04 LTS (Bionic Beaver)
-* Ubuntu 20.04 LTS (Bionic Beaver)
+* Ubuntu 20.04 LTS (Focal Fossa)
 
 .. note:: |PXC| should work on other DEB-based distributions,
    but it is tested only on platforms listed above.
