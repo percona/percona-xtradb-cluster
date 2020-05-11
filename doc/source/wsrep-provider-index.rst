@@ -89,7 +89,7 @@ Disabled
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: YES
+   :default: NO
    
    .. seealso::
 
