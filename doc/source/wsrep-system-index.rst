@@ -574,7 +574,7 @@ The following methods are available:
   .. important::
 
      Under the ``TOI`` method, when DDL operations are performed,
-     |abbr-mdl| is ignored. If |abr-mdl| is important, use the ``RSU``
+     |abbr-mdl| is ignored. If |abbr-mdl| is important, use the ``RSU``
      method.
 
 * ``RSU``: When the *Rolling Schema Upgrade* method is selected,

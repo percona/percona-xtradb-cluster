@@ -447,17 +447,17 @@ To check if this is the case run ``openssl`` command as follows and verify that 
 
 .. admonition:: Incorrect values
 
-.. code-block:: text
+   .. code-block:: text
 
-   Certificate:
-   Data:
-   Version: 1 (0x0)
-   Serial Number: 1 (0x1)
-   Signature Algorithm: sha256WithRSAEncryption
-   Issuer: CN=www.percona.com, O=Database Performance., C=US
-   ...
-   Subject: CN=www.percona.com, O=Database Performance., C=AU
-   ...
+      Certificate:
+      Data:
+      Version: 1 (0x0)
+      Serial Number: 1 (0x1)
+      Signature Algorithm: sha256WithRSAEncryption
+      Issuer: CN=www.percona.com, O=Database Performance., C=US
+      ...
+      Subject: CN=www.percona.com, O=Database Performance., C=AU
+      ...
 
 To obtain a more compact output run ``openssl`` specifying `-subject` and `-issuer` parameters:
 
@@ -467,10 +467,10 @@ To obtain a more compact output run ``openssl`` specifying `-subject` and `-issu
 
 .. admonition:: Output
 
-.. code-block:: text
+   .. code-block:: text
 
-   subject= /CN=www.percona.com/O=Database Performance./C=AU
-   issuer= /CN=www.percona.com/O=Database Performance./C=US
+      subject= /CN=www.percona.com/O=Database Performance./C=AU
+      issuer= /CN=www.percona.com/O=Database Performance./C=US
 
 Deploying Keys and Certificates
 -------------------------------
