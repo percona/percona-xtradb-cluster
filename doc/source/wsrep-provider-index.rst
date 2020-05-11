@@ -432,7 +432,7 @@ size of the disk. Pages are prefixed by gcache.page.
 
 .. seealso::
 
-   |galera-cluster| Documentation: gcache.page_size
+   |galera| Documentation: gcache.page_size
       https://galeracluster.com/library/documentation/galera-parameters.html#gcache-page-size
    |percona| Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
       https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/
@@ -937,3 +937,5 @@ This variable is used to specify if the SSL compression is to be used.
    :default: AES128-SHA
 
 This variable is used to specify what cypher will be used for encryption.
+
+.. include:: .res/replace.txt
