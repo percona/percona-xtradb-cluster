@@ -20,6 +20,7 @@ Usage: $0 [OPTIONS]
         --repo              Repo for build
         --rpm_release       RPM version( default = 1)
         --deb_release       DEB version( default = 1)
+        --bin_release       BIN version( default = 1)
         --help) usage ;;
 Example $0 --builddir=/tmp/PXC80 --get_sources=1 --build_src_rpm=1 --build_rpm=1
 EOF
@@ -54,6 +55,7 @@ parse_arguments() {
             --install_deps=*) INSTALL="$val" ;;
             --rpm_release=*) RPM_RELEASE="$val" ;;
             --deb_release=*) DEB_RELEASE="$val" ;;
+            --bin_release=*) BIN_RELEASE="$val" ;;
             --no_clone=*) NO_CLONE="$val" ;;
             --help) usage ;;      
             *)
@@ -833,7 +835,7 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
         sed -i 's:cmake ../../:/usr/bin/cmake3 ../../:g' ./build-ps/build-binary.sh
     fi
-    bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t 1.1 $BUILD_ROOT
+    bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
     mkdir -p ${WORKDIR}/tarball
     mkdir -p ${CURDIR}/tarball
     cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/tarball
@@ -860,6 +862,7 @@ OS=
 INSTALL=0
 RPM_RELEASE=1
 DEB_RELEASE=1
+BIN_RELEASE=1
 REVISION=0
 BRANCH="8.0"
 MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
