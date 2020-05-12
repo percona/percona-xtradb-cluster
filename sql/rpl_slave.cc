@@ -4854,6 +4854,7 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
   if (ev) {
 #ifdef WITH_WSREP
     if (wsrep_before_statement(thd)) {
+      mysql_mutex_unlock(&rli->data_lock);
       WSREP_INFO("Wsrep before statement error");
       return 1;
     }
@@ -4943,13 +4944,17 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
         will not try to get the rli->data_lock again.
       */
 #ifdef WITH_WSREP
+      {
         wsrep_after_statement(thd);
 #endif /* WITH_WSREP */
-      /*
-        In the case of an error, coord_handle_partial_binlogged_transaction
-        will not try to get the rli->data_lock again.
-      */
-      return 1;
+        /*
+          In the case of an error, coord_handle_partial_binlogged_transaction
+          will not try to get the rli->data_lock again.
+        */
+        return 1;
+#ifdef WITH_WSREP
+      }
+#endif /* WITH_WSREP */
     }
 
     /* ptr_ev can change to NULL indicating MTS coorinator passed to a Worker */
@@ -6691,6 +6696,9 @@ err:
    Coordinator finalizes with its MTS running status to reset few objects.
 */
 static void slave_stop_workers(Relay_log_info *rli, bool *mts_inited) {
+#ifdef WITH_WSREP
+  DBUG_TRACE;
+#endif /* WITH_WSREP */
   THD *thd = rli->info_thd;
 
   if (!*mts_inited)
