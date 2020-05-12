@@ -85,7 +85,7 @@ perform the full :term:`SST` to join the cluster initialized from the less
 advanced one. As a result, some transactions will be lost). To bootstrap the
 first node, invoke the startup script like this:
 
-.. code-block::
+.. code-block:: bash
 
    $ systemctl start mysql@bootstrap.service
     
@@ -211,7 +211,7 @@ best bootstrap candidate. In its :file:`grastate.dat` file, set the
 
    Galera Documentation
       `Introducing the "Safe-To-Bootstrap" feature in Galera Cluster
-      <https://galeracluster.com/2016/11/introducing-the-safe-to-bootstrap-feature-in-galera-cluster/`_
+      <https://galeracluster.com/2016/11/introducing-the-safe-to-bootstrap-feature-in-galera-cluster/>`_
 
 -----      
 
@@ -256,7 +256,7 @@ re-connect.
 
 If you want to restore the service even
 before the network link is restored, you can make one of the groups primary
-again using the same command as described in :ref:`.. _pxc-crash-recovery-scenario-5`
+again using the same command as described in :ref:`pxc-crash-recovery-scenario-5`
 
 .. code-block:: guess
 
@@ -284,3 +284,4 @@ soon as the network link is restored.
    This article is based on the blog post *Galera replication - how to recover a PXC cluster by *Przemysław Malkowski*:
       https://www.percona.com/blog/2014/09/01/galera-replication-how-to-recover-a-pxc-cluster/
 
+.. include:: ../.res/replace.txt

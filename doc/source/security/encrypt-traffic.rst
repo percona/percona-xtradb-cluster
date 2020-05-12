@@ -102,7 +102,7 @@ channel for replication. This variable is not dynamic and so it cannot be change
 at runtime.
 
 Enabled, |pxc-encrypt-cluster-traffic| has the effect of applying the following
-settings: |opt.encrypt|, |opt.ssl-key|, |opt.ssl_ca|, |opt.ssl-cert|.
+settings: |opt.encrypt|, |opt.ssl-key|, |opt.ssl-ca|, |opt.ssl-cert|.
 
 Setting ``pxc-encrypt-cluster-traffic=ON`` has the effect of applying
    the following settings in the :file:`my.cnf` configuration file:
@@ -487,3 +487,5 @@ used for securing replication traffic when there are two nodes in the cluster.
    as in the previous step.
 
 #. You can remove the old certificate files.
+
+.. include:: ../.res/replace.opt.txt 

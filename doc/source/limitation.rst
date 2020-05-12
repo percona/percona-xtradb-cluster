@@ -24,7 +24,7 @@ Query log cannot be directed to table.
    Use ``general_log`` and ``general_log_file`` to choose query logging
    and the log file name.
 
-Maximum allowed transaction size is defined by the |max_ws_rows| and |max_ws_size| variables.
+Maximum allowed transaction size is defined by the |max-ws-rows| and |max-ws-size| variables.
    ``LOAD DATA INFILE`` processing will commit every 10 000 rows.  So large
    transactions due to ``LOAD DATA`` will be split to series of small
    transactions.
@@ -63,3 +63,5 @@ All tables must have a primary key.
 
      Galera Documentation: Tables without Primary Keys
         http://galeracluster.com/documentation-webpages/limitations.html#tables-without-primary-keys
+
+.. include:: .res/replace.opt.txt
