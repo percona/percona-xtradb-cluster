@@ -1,4 +1,4 @@
-#!/bin/bash -ue
+#!/usr/bin/env bash
 
 # Copyright (C) 2010-2014 Codership Oy
 #
@@ -17,6 +17,8 @@
 # MA  02110-1301  USA.
 
 # This is a reference script for rsync-based state snapshot tansfer
+
+set -o nounset -o errexit
 
 RSYNC_PID=
 RSYNC_CONF=
@@ -57,15 +59,25 @@ check_pid_and_port()
     local rsync_pid=$2
     local rsync_port=$3
 
-    if ! which lsof > /dev/null; then
-        wsrep_log_error "lsof tool not found in PATH! Make sure you have it installed."
-        exit 2 # ENOENT
-    fi
+    case $OS in
+    FreeBSD)
+        local port_info="$(sockstat -46lp ${rsync_port} 2>/dev/null | \
+            grep ":${rsync_port}")"
+        local is_rsync="$(echo $port_info | \
+            grep -E '[[:space:]]+(rsync|stunnel)[[:space:]]+'"$rsync_pid" 2>/dev/null)"
+        ;;
+    *)
+        if ! which lsof > /dev/null; then
+            wsrep_log_error "lsof tool not found in PATH! Make sure you have it installed."
+            exit 2 # ENOENT
+        fi
 
-    local port_info=$(lsof -i :$rsync_port -Pn 2>/dev/null | \
-        grep "(LISTEN)")
-    local is_rsync=$(echo $port_info | \
-        grep -w '^rsync[[:space:]]\+'"$rsync_pid" 2>/dev/null)
+        local port_info="$(lsof -i :$rsync_port -Pn 2>/dev/null | \
+            grep "(LISTEN)")"
+        local is_rsync="$(echo $port_info | \
+            grep -E '^(rsync|stunnel)[[:space:]]+'"$rsync_pid" 2>/dev/null)"
+        ;;
+    esac
 
     if [ -n "$port_info" -a -z "$is_rsync" ]; then
         wsrep_log_error "rsync daemon port '$rsync_port' has been taken"
@@ -242,7 +254,6 @@ then
 
 elif [ "$WSREP_SST_OPT_ROLE" = "joiner" ]
 then
-    wsrep_check_programs lsof
 
     touch $SST_PROGRESS_FILE
     MYSQLD_PID=$WSREP_SST_OPT_PARENT
