@@ -110,6 +110,9 @@ static bool thread_attach(THD *thd) {
   /* Wait until possible background rollback has finished before
      attaching the thd. */
   wsrep_wait_rollback_complete_and_acquire_ownership(thd);
+
+  DEBUG_SYNC(thd, "thread_attach_after_acquire_ownership");
+
 #endif /* WITH_WSREP */
 #ifndef DBUG_OFF
   set_my_thread_var_id(thd->thread_id());
