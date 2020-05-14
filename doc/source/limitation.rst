@@ -10,7 +10,7 @@ The following limitations apply to |PXC|:
   Any writes to tables of other types, including system (``mysql.*``) tables,
   are not replicated.
   However, ``DDL`` statements are replicated in statement level,
-  and changes to ``mysql.*`` tables will get replicated that way.
+  and changes to ``mysql.*`` tables will be replicated that way.
   So you can safely issue ``CREATE USER...``,
   but issuing ``INSERT INTO mysql.user...`` will not be replicated.
   You can enable experimental |MyISAM| replication support
@@ -23,7 +23,13 @@ The following limitations apply to |PXC|:
 
   * Lock functions, such as ``GET_LOCK()``, ``RELEASE_LOCK()``, and so on
 
-* Query log cannot be directed to table.
+  .. seealso::
+
+     |MySQL| Documentation:
+        - `LOCK TABLES and UNLOCK TABLES statements <https://dev.mysql.com/doc/refman/8.0/en/lock-tables.html>`_
+	- `Locking functions <https://dev.mysql.com/doc/refman/5.7/en/locking-functions.html>`_
+	  
+* Query log cannot be directed to a table.
   If you enable query logging, you must forward the log to a file: ::
 
     log_output = FILE
@@ -33,12 +39,12 @@ The following limitations apply to |PXC|:
 
 * Maximum allowed transaction size is defined by the
   :variable:`wsrep_max_ws_rows` and :variable:`wsrep_max_ws_size` variables.
-  ``LOAD DATA INFILE`` processing will commit every 10 000 rows.
+  ``LOAD DATA INFILE`` processing will commit every 10,000 rows.
   So large transactions due to ``LOAD DATA``
   will be split to series of small transactions.
 
-* Due to cluster-level optimistic concurrency control,
-  transaction issuing ``COMMIT`` may still be aborted at that stage.
+* Due to cluster-level optimistic concurrency control, a
+  transaction issuing a ``COMMIT`` may still be aborted at that stage.
   There can be two transactions writing to the same rows
   and committing in separate |PXC| nodes,
   and only one of the them can successfully commit.
@@ -47,7 +53,8 @@ The following limitations apply to |PXC|:
 
    (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK)).
 
-* XA transactions are not supported due to possible rollback on commit.
+* `XA transactions <https://dev.mysql.com/doc/refman/5.7/en/xa.html>`_ are not
+  supported due to possible rollback on commit.
 
 * The write throughput of the whole cluster is limited by the weakest node.  If
   one node becomes slow, the whole cluster slows down.  If you have requirements
@@ -55,9 +62,9 @@ The following limitations apply to |PXC|:
   hardware.
 
 * The minimal recommended size of cluster is 3 nodes.  The 3rd node can be an
-  arbitrator.
+  `arbitrator <https://galeracluster.com/library/documentation/arbitrator.html>`.
 
-* InnoDB fake changes feature is not supported. This feature has been removed
+* `InnoDB fake changes feature <https://www.percona.com/doc/percona-server/5.5/management/innodb_fake_changes.html>`_ is not supported. This feature has been removed
   from |Percona Server| |release|
 
   .. seealso::
@@ -67,6 +74,8 @@ The following limitations apply to |PXC|:
 
 * ``enforce_storage_engine=InnoDB`` is not compatible with
   ``wsrep_replicate_myisam=OFF`` (default).
+
+  .. seealso:: `Percona Server for MySQL documentation: enforcing storage engine <https://www.percona.com/doc/percona-server/5.7/management/enforce_engine.html>`_
 
 * When running |PXC| in cluster mode,
   avoid ``ALTER TABLE ... IMPORT/EXPORT`` workloads.
