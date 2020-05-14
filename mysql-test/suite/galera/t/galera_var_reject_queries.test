@@ -42,4 +42,10 @@ SET GLOBAL wsrep_reject_queries = NONE;
 
 SELECT COUNT(*) = 1 FROM t1;
 
+# PXC-3165 - Allow COM_FIELD_LIST to be executed when WSREP is not ready
+--connection node_2
+SET GLOBAL wsrep_reject_queries = ALL;
+--exec $MYSQL_SHOW -P $NODE_MYPORT_1 test t1;
+SET GLOBAL wsrep_reject_queries = NONE;
+
 DROP TABLE t1;
