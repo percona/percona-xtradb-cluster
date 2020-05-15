@@ -751,9 +751,9 @@ Rejecting queries can be useful during upgrades,
 when you want to keep the node up and apply write-sets
 without accepting queries.
 
-When a query is rejected, the following error is returned::
+When a query is rejected, the following error appears:
 
- Error 1047: Unknown command
+   ERROR 1047 (08S01): WSREP has not yet prepared node for application use
 
 The following values are available:
 
@@ -768,6 +768,8 @@ The following values are available:
 .. note:: This variable doesn't affect Galera replication in any way,
    only the applications that connect to the database are affected.
    If you want to desync a node, use :variable:`wsrep_desync`.
+
+When a query is rejected, an error is returned.
 
 .. variable:: wsrep_replicate_myisam
 
