@@ -62,7 +62,7 @@ sub mtr_report_stats_junit {
 
     $testinfo->{$suite}{tot_tests}++;
     $testinfo->{$suite}{tot_failed}++  if $tinfo->{failures};
-    $testinfo->{$suite}{tot_skipped}++ if $tinfo->{skip};
+    $testinfo->{$suite}{tot_skipped}++ if $tinfo->{result} eq 'MTR_RES_SKIPPED';
     $testinfo->{$suite}{tot_passed}++  if $tinfo->{result} eq 'MTR_RES_PASSED';
     push (@{$testinfo->{$suite}{tests}}, $tinfo);
   }
@@ -80,17 +80,17 @@ sub mtr_report_stats_junit {
 
       my $testcase = gen_testcase ($name, $tinfo->{name}, $testtime);
       if ($tinfo->{failures}) {
-	my $content = $tinfo->{logfile};
-	$content .= "\n" . $tinfo->{comment} if $tinfo->{comment};
-	my $failure = gen_failure ($tinfo->{result}, "Test failed", $content);
-	push @{$testcase->{failure}}, $failure;
+        my $content = $tinfo->{logfile};
+        $content .= "\n" . $tinfo->{comment} if $tinfo->{comment};
+        my $failure = gen_failure ($tinfo->{result}, "Test failed", $content);
+        push @{$testcase->{failure}}, $failure;
       }
 
       if ($tinfo->{skip}) {
-	my $message = $tinfo->{comment} ? $tinfo->{comment} : 'unknown reason';
+        my $message = $tinfo->{comment} ? $tinfo->{comment} : 'unknown reason';
         # Failures and skips have the same structure
-	my $skipped = gen_failure ($tinfo->{result}, $message, $message);
-	push @{$testcase->{skipped}}, $skipped;
+        my $skipped = gen_failure ($tinfo->{result}, $message, $message);
+        push @{$testcase->{skipped}}, $skipped;
       }
       push @testcases, $testcase;
     }
@@ -153,9 +153,9 @@ sub gen_testsuite {
     hostname     => $hostname,
     errors       => 0,
     failures     => $failures,
-    skip         => $skip,
+    skipped      => $skip,
     tests        => $tests,
-    'time'       => $time,
+    'time'       => sprintf("%.3f", $time),
     testcase     => [],
     timestamp    => strftime ("%Y-%m-%dT%H:%M:%S", localtime),
     'system-out' => [],
@@ -179,7 +179,7 @@ sub gen_testcase {
 
   return {
     name    => $name,
-    class   => $class,
+    classname   => $class,
     'time'  => $time,
     failure => [],
     skipped => [],
@@ -197,6 +197,17 @@ sub gen_testcase {
 # <failure></failure> XML block.  It can also be used to generate a JUnit
 # <skipped></skipped> XML block which uses the same fields.
 #
+
+sub quotexml {
+    my $line = shift;
+    $line =~ s/&/&amp;/g;
+    $line =~ s/</&lt;/g;
+    $line =~ s/>/&gt;/g;
+    $line =~ s/\"/&quot;/g;
+    return $line;
+}
+   
+
 sub gen_failure {
   my $type    = shift;
   my $message = shift;
@@ -208,7 +219,7 @@ sub gen_failure {
 
   return {
     type    => $type,
-    message => $message,
-    content => sprintf ("<![CDATA[%s]]>", $content),
+    message => quotexml($message),
+    content => sprintf ("<![CDATA[%s]]>", quotexml($content)),
   };
 }
