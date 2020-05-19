@@ -60,10 +60,10 @@ Installing from Percona Repository
    .. code-block:: bash
 
 
-      $ sudo yum install Percona-XtraDB-Cluster-80
+      $ sudo yum install percona-xtradb-cluster
 
    .. note:: Alternatively you can install
-      the ``Percona-XtraDB-Cluster-full-80`` meta package,
+      the ``percona-xtradb-cluster-full`` meta package,
       which contains the following additional packages:
 
       * ``percona-xtraDB-cluster-shared``
