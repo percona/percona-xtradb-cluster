@@ -60,10 +60,10 @@ Installing from Repository
 
    .. code-block:: bash
 
-      $ sudo apt-get install percona-xtradb-cluster-80
+      $ sudo apt-get install percona-xtradb-cluster
 
    .. note:: Alternatively, you can install
-      the ``percona-xtradb-cluster-full-80`` meta package,
+      the ``percona-xtradb-cluster-full`` meta package,
       which contains the following additional packages:
 
       * ``libperconaserverclient21-dev``
