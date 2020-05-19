@@ -372,6 +372,7 @@ void init_update_queries(void)
   server_command_flags[COM_TIME]         |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_INIT_DB]      |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_END]          |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_FIELD_LIST]   |= CF_SKIP_WSREP_CHECK;
  
   /*
     COM_QUERY and COM_SET_OPTION are allowed to pass the early COM_xxx filter,
