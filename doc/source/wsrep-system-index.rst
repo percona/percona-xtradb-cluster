@@ -165,7 +165,6 @@ Enabling this variable will result in larger latencies.
    :values: STRICT, OPTIMIZED
    :default: STRICT
 
-
 This variable controls how certification is done in the cluster, in particular
 this affects how foreign keys are handled.
 
