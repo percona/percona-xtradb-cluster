@@ -1099,7 +1099,13 @@ fi
   sleep 5
 fi
 
-echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
+if [ ! -d %{_datadir}/mysql ]; then
+    pushd %{_datadir}
+    ln -s percona-xtradb-cluster mysql
+    popd
+fi
+
+echo "Percona XtraDB Cluster is distributed with several useful UDF (User Defined Function) from Percona Toolkit."
 echo "Run the following commands to create these functions:"
 echo "mysql -e \"CREATE FUNCTION fnv1a_64 RETURNS INTEGER SONAME 'libfnv1a_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION fnv_64 RETURNS INTEGER SONAME 'libfnv_udf.so'\""
@@ -1133,6 +1139,10 @@ mv -f  $STATUS_FILE ${STATUS_FILE}-LAST  # for "triggerpostun"
 #  http://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/RPM_Guide/ch09s04s05.html
  
 if [ $1 = 0 ] ; then
+  if [ -L %{_datadir}/mysql ]; then
+      rm %{_datadir}/mysql
+  fi
+
 %if 0%{?systemd}
     serv=$(/usr/bin/systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
     if [[ -n ${serv:-} ]] && /usr/bin/systemctl is-active $serv;then
