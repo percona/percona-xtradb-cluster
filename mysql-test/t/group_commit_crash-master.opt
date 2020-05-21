@@ -1,1 +1,1 @@
---skip-stack-trace --skip-core-file
+--skip-stack-trace --skip-core-file --binlog-format=STATEMENT

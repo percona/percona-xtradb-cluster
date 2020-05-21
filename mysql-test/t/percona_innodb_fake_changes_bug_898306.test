@@ -1,6 +1,10 @@
 # Test case for Bug #898306: innodb_fake_changes doesn't handle duplicate keys on REPLACE
 # https://bugs.launchpad.net/percona-server/+bug/898306
 # Test ensures that REPLACE statement behaviour respects innodb_fake_changes feature
+
+# https://www.percona.com/doc/percona-xtradb-cluster/5.6/limitation.html
+--skip InnoDB Fake Changes not supported for PXC
+
 --source include/have_innodb.inc
 
 --disable_warnings

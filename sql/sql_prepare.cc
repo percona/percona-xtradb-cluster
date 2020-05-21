@@ -4148,27 +4148,6 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
       thd->protocol->send_out_parameters(&this->lex->param_list);
   }
 
-#ifdef WITH_WSREP
-  /*
-    Log COM_STMT_EXECUTE to the general log. Note, that in case of SQL
-    prepared statements this causes two records to be output:
-
-    Query       EXECUTE <statement name>
-    Execute     <statement SQL text>
-
-    This is considered user-friendly, since in the
-    second log entry we output values of parameter markers.
-
-    Rewriting/password obfuscation:
-
-    - Any passwords in the "Execute" line should be substituted with
-      their hashes, or a notice.
-
-  */
-  if (error == 0)
-    log_execute_line(thd);
-#endif
-
 error:
   flags&= ~ (uint) IS_IN_USE;
   return error;
