@@ -484,12 +484,13 @@ diff -rup old/storage/ndb/test/run-test/CMakeLists.txt new/storage/ndb/test/run-
 +++ new/storage/ndb/test/run-test/CMakeLists.txt	2016-03-09 11:41:15.167325622 +0100
 @@ -41,7 +41,7 @@
  ADD_EXECUTABLE(atrt main.cpp setup.cpp files.cpp db.cpp command.cpp)
-<<<<<<< HEAD
--TARGET_LINK_LIBRARIES(atrt ndbNDBT ndbclient_static perconaserverclient)
-+TARGET_LINK_LIBRARIES(atrt ndbNDBT ndbclient_static mysqlclient)
- 
- FILE(GLOB testcase_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*-tests.txt")
- ADD_TEST(NAME check_testcase_files
+ IF(WIN32)
+   # All clients will need auth_win_client
+-  TARGET_LINK_LIBRARIES(atrt ndbNDBT ndbclient_static perconaserverclient)
++  TARGET_LINK_LIBRARIES(atrt ndbNDBT ndbclient_static mysqlclient)
+ ELSE()
+   # Linking with mysqlclient may fail on macOS, so link individual libs instead.
+   TARGET_LINK_LIBRARIES(atrt ndbNDBT ndbclient_static
 diff -rup old/support-files/MySQL-shared-compat.spec.sh new/support-files/MySQL-shared-compat.spec.sh
 --- old/support-files/MySQL-shared-compat.spec.sh	2016-03-09 09:25:27.000000000 +0100
 +++ new/support-files/MySQL-shared-compat.spec.sh	2016-03-09 11:41:15.167325622 +0100
@@ -502,21 +503,6 @@ diff -rup old/support-files/MySQL-shared-compat.spec.sh new/support-files/MySQL-
  
  # The spec file changelog only includes changes made to the spec file
  # itself - note that they must be ordered by date (important when
-||||||| merged common ancestors
--TARGET_LINK_LIBRARIES(atrt ndbNDBT ndbclient_static perconaserverclient)
-+TARGET_LINK_LIBRARIES(atrt ndbNDBT ndbclient_static mysqlclient)
- 
- FILE(GLOB testcase_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*-tests.txt")
- ADD_TEST(NAME check_testcase_files
-=======
- IF(WIN32)
-   # All clients will need auth_win_client
--  TARGET_LINK_LIBRARIES(atrt ndbNDBT ndbclient_static perconaserverclient)
-+  TARGET_LINK_LIBRARIES(atrt ndbNDBT ndbclient_static mysqlclien)
- ELSE()
-   # Linking with mysqlclient may fail on macOS, so link individual libs instead.
-   TARGET_LINK_LIBRARIES(atrt ndbNDBT ndbclient_static
->>>>>>> 6517692a9e88a94b45fb16dba89482b88df908f8
 diff -rup old/testclients/CMakeLists.txt new/testclients/CMakeLists.txt
 --- old/testclients/CMakeLists.txt	2016-03-09 09:25:27.000000000 +0100
 +++ new/testclients/CMakeLists.txt	2016-03-09 11:41:15.167325622 +0100
