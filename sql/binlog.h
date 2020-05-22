@@ -689,15 +689,9 @@ private:
   int ordered_commit(THD *thd, bool all);
 #else
   int ordered_commit(THD *thd);
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-  void handle_binlog_flush_or_sync_error(THD *thd, bool need_lock_log);
-||||||| merged common ancestors
-  void handle_binlog_flush_or_sync_error(THD *thd, bool need_lock_log);
-=======
   void handle_binlog_flush_or_sync_error(THD *thd, bool need_lock_log,
                                          const char *message);
->>>>>>> 41ef86408b0b3fdaef4c02aac3d329f1ed83be3e
 public:
   int open_binlog(const char *opt_name);
   void close();

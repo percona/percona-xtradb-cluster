@@ -13551,7 +13551,6 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, const char *query_arg,
 
 #endif /* !defined(MYSQL_CLIENT) */
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 
 IO_CACHE * wsrep_get_trans_log(THD * thd, bool transaction)
@@ -13629,12 +13628,7 @@ int wsrep_thd_binlog_rollback(THD* thd, bool all)
 }
 #endif /* WITH_WSREP */
 
-static int show_binlog_vars(THD *thd, SHOW_VAR *var, char *buff)
-||||||| merged common ancestors
-static int show_binlog_vars(THD *thd, SHOW_VAR *var, char *buff)
-=======
 static const binlog_cache_mngr *get_cache_mngr(THD *thd)
->>>>>>> 41ef86408b0b3fdaef4c02aac3d329f1ed83be3e
 {
   const binlog_cache_mngr *cache_mngr
     = (thd && opt_bin_log)

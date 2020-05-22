@@ -5030,10 +5030,11 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
       else
       {
 #ifdef WITH_WSREP
+        String rewritten_query = thd->rewritten_query();
         rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER, ER(ER_ERROR_ON_MASTER),
                     expected_error,
-                    (!opt_general_log_raw) && thd->rewritten_query.length()
-                      ? thd->rewritten_query.c_ptr_safe() : thd->query().str);
+                    (!opt_general_log_raw) && thd->rewritten_query().length()
+                      ? rewritten_query.c_ptr_safe() : thd->query().str);
 #else
         rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER, ER(ER_ERROR_ON_MASTER),
                     expected_error, thd->query().str);
@@ -5114,8 +5115,8 @@ compare_errors:
                      "no error"),
 #ifdef WITH_WSREP
                     actual_error, print_slave_db_safe(db),
-                    (!opt_general_log_raw) && thd->rewritten_query.length()
-                    ? thd->rewritten_query.c_ptr_safe() : query_arg);
+                    (!opt_general_log_raw) && thd->rewritten_query().length()
+                    ? wsrep_thd_rewritten_query(thd).c_ptr_safe() : query_arg);
 #else
                     actual_error, print_slave_db_safe(db), query_arg);
 #endif /* WITH_WSREP */
@@ -5178,8 +5179,8 @@ compare_errors:
                      "unexpected success or fatal error"),
 #ifdef WITH_WSREP
                     print_slave_db_safe(db),
-                      (!opt_general_log_raw) && thd->rewritten_query.length()
-                      ? thd->rewritten_query.c_ptr_safe() : query_arg);
+                      (!opt_general_log_raw) && thd->rewritten_query().length()
+                      ? wsrep_thd_rewritten_query(thd).c_ptr_safe() : query_arg);
 #else
                     print_slave_db_safe(thd->db().str), query_arg);
 #endif /* WITH_WSREP */
@@ -5256,16 +5257,6 @@ end:
   thd->m_digest= NULL;
 
   /*
-<<<<<<< HEAD
-    Prevent rewritten query from getting "stuck" in SHOW PROCESSLIST,
-    and performance_schema.threads.
-  */
-  thd->rewritten_query.mem_free();
-  thd->reset_query_for_display();
-
-  /*
-||||||| merged common ancestors
-=======
     Prevent rewritten query from getting "stuck" in SHOW PROCESSLIST,
     and performance_schema.threads.
   */
@@ -5273,7 +5264,6 @@ end:
   thd->reset_query_for_display();
 
   /*
->>>>>>> 41ef86408b0b3fdaef4c02aac3d329f1ed83be3e
     As a disk space optimization, future masters will not log an event for
     LAST_INSERT_ID() if that function returned 0 (and thus they will be able
     to replace the THD::stmt_depends_on_first_successful_insert_id_in_prev_stmt

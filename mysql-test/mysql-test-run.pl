@@ -6101,7 +6101,6 @@ sub mysqld_arguments ($$$) {
     {
         $found_no_console= 1;
     }
-<<<<<<< HEAD
 #    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
 #    {
 #      ; # Dont add --binlog-format when running without binlog
@@ -6116,16 +6115,7 @@ sub mysqld_arguments ($$$) {
         ; # Dont add --binlog-format when running without binlog
       }
     }
-    elsif ($arg eq "--loose-skip-log-bin" and
-||||||| merged common ancestors
-    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
-    {
-      ; # Dont add --binlog-format when running without binlog
-    }
-    elsif ($arg eq "--loose-skip-log-bin" and
-=======
     elsif ($arg =~ /--loose[-_]skip[-_]log[-_]bin/ and
->>>>>>> 41ef86408b0b3fdaef4c02aac3d329f1ed83be3e
            $mysqld->option("log-slave-updates"))
     {
       ; # Dont add --skip-log-bin when mysqld have --log-slave-updates in config

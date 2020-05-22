@@ -218,22 +218,8 @@ override_dh_strip:
 
 override_dh_installinit:
 	@echo "RULES.$@"
-<<<<<<< HEAD
-	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_enable --name=mysql; fi
-||||||| merged common ancestors
 	dh_systemd_enable --name=mysql
-=======
-	dh_systemd_enable --name=mysql
-	dh_systemd_enable --no-enable --name=mysql@
->>>>>>> 41ef86408b0b3fdaef4c02aac3d329f1ed83be3e
 	dh_installinit --name=mysql -- defaults 19 21
-<<<<<<< HEAD
 	dh_installinit --name=garbd -- defaults 19 21
-	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_start --restart-after-upgrade; fi
-||||||| merged common ancestors
 	dh_systemd_start --restart-after-upgrade
-=======
-	dh_installinit --name=mysql@
-	dh_systemd_start --restart-after-upgrade
->>>>>>> 41ef86408b0b3fdaef4c02aac3d329f1ed83be3e
 	touch $@

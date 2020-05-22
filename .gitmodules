@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 [submodule "percona-xtradb-cluster-galera"]
 	path = percona-xtradb-cluster-galera
 	url = https://github.com/percona/galera
@@ -7,36 +6,3 @@
 	path = wsrep/src
 	url = https://github.com/percona/wsrep-API.git
 	branch = percona-3.x-5.7-v31
-||||||| merged common ancestors
-[submodule "PerconaFT"]
-	path = storage/tokudb/PerconaFT
-	url = https://github.com/percona/PerconaFT.git
-[submodule "Percona-TokuBackup"]
-	path = plugin/tokudb-backup-plugin/Percona-TokuBackup
-	url = https://github.com/percona/Percona-TokuBackup.git
-[submodule "storage/rocksdb/rocksdb"]
-	path = storage/rocksdb/rocksdb
-	url = https://github.com/facebook/rocksdb.git
-[submodule "storage/rocksdb/third_party/lz4"]
-	path = storage/rocksdb/third_party/lz4
-	url = https://github.com/lz4/lz4
-[submodule "storage/rocksdb/third_party/zstd"]
-	path = storage/rocksdb/third_party/zstd
-	url = https://github.com/facebook/zstd
-=======
-[submodule "PerconaFT"]
-	path = storage/tokudb/PerconaFT
-	url = https://github.com/percona/PerconaFT.git
-[submodule "Percona-TokuBackup"]
-	path = plugin/tokudb-backup-plugin/Percona-TokuBackup
-	url = https://github.com/percona/Percona-TokuBackup.git
-[submodule "storage/rocksdb/rocksdb"]
-	path = storage/rocksdb/rocksdb
-	url = https://github.com/percona/rocksdb.git
-[submodule "storage/rocksdb/third_party/lz4"]
-	path = storage/rocksdb/third_party/lz4
-	url = https://github.com/lz4/lz4
-[submodule "storage/rocksdb/third_party/zstd"]
-	path = storage/rocksdb/third_party/zstd
-	url = https://github.com/facebook/zstd
->>>>>>> 41ef86408b0b3fdaef4c02aac3d329f1ed83be3e

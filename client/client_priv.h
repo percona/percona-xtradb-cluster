@@ -120,15 +120,11 @@ enum options_client
   OPT_ENABLE_COMPRESSED_COLUMNS_WITH_DICTIONARIES,
   OPT_DROP_COMPRESSION_DICTIONARY,
   OPT_ORDER_BY_PRIMARY_DESC,
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
   OPT_START_SQL_FILE,
   OPT_FINISH_SQL_FILE,
->>>>>>> 41ef86408b0b3fdaef4c02aac3d329f1ed83be3e
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };
