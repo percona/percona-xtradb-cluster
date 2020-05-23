@@ -1,3 +1,10 @@
+SET GLOBAL wsrep_on = OFF;
+RESET MASTER;
+SET GLOBAL wsrep_on = ON;
+SET GLOBAL wsrep_on = OFF;
+RESET MASTER;
+SET GLOBAL wsrep_on = ON;
+RESET MASTER;
 START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
@@ -5,36 +12,36 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES(1);
 uuids_do_not_match
 1
-SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 123;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000002	123	Previous_gtids	1	154	
-mysqld-bin.000002	154	Gtid	1	219	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
-mysqld-bin.000002	219	Query	1	347	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB
-mysqld-bin.000002	347	Gtid	1	412	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
-mysqld-bin.000002	412	Query	1	489	BEGIN
-mysqld-bin.000002	489	Table_map	1	534	table_id: # (test.t1)
-mysqld-bin.000002	534	Write_rows	1	574	table_id: # flags: STMT_END_F
-mysqld-bin.000002	574	Xid	1	605	COMMIT /* xid=# */
+mysqld-bin.000001	123	Previous_gtids	1	154	
+mysqld-bin.000001	154	Gtid	1	219	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000001	219	Query	1	347	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB
+mysqld-bin.000001	347	Gtid	1	412	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000001	412	Query	1	489	BEGIN
+mysqld-bin.000001	489	Table_map	1	534	table_id: # (test.t1)
+mysqld-bin.000001	534	Write_rows	1	574	table_id: # flags: STMT_END_F
+mysqld-bin.000001	574	Xid	1	605	COMMIT /* xid=# */
 INSERT INTO t1 VALUES(2);
 uuids_do_not_match
 1
 uuids_match
 1
-SHOW BINLOG EVENTS IN 'mysqld-bin.000003' FROM 123;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000003	123	Previous_gtids	2	154	
-mysqld-bin.000003	154	Gtid	1	219	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
-mysqld-bin.000003	219	Query	1	347	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB
-mysqld-bin.000003	347	Gtid	1	412	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
-mysqld-bin.000003	412	Query	1	480	BEGIN
-mysqld-bin.000003	480	Table_map	1	525	table_id: # (test.t1)
-mysqld-bin.000003	525	Write_rows	1	565	table_id: # flags: STMT_END_F
-mysqld-bin.000003	565	Xid	1	596	COMMIT /* xid=# */
-mysqld-bin.000003	596	Gtid	2	661	SET @@SESSION.GTID_NEXT= '<effective_uuid>:3'
-mysqld-bin.000003	661	Query	2	738	BEGIN
-mysqld-bin.000003	738	Table_map	2	783	table_id: # (test.t1)
-mysqld-bin.000003	783	Write_rows	2	823	table_id: # flags: STMT_END_F
-mysqld-bin.000003	823	Xid	2	854	COMMIT /* xid=# */
+mysqld-bin.000001	123	Previous_gtids	2	154	
+mysqld-bin.000001	154	Gtid	1	219	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000001	219	Query	1	347	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB
+mysqld-bin.000001	347	Gtid	1	412	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000001	412	Query	1	480	BEGIN
+mysqld-bin.000001	480	Table_map	1	525	table_id: # (test.t1)
+mysqld-bin.000001	525	Write_rows	1	565	table_id: # flags: STMT_END_F
+mysqld-bin.000001	565	Xid	1	596	COMMIT /* xid=# */
+mysqld-bin.000001	596	Gtid	2	661	SET @@SESSION.GTID_NEXT= '<effective_uuid>:3'
+mysqld-bin.000001	661	Query	2	738	BEGIN
+mysqld-bin.000001	738	Table_map	2	783	table_id: # (test.t1)
+mysqld-bin.000001	783	Write_rows	2	823	table_id: # flags: STMT_END_F
+mysqld-bin.000001	823	Xid	2	854	COMMIT /* xid=# */
 uuids_do_not_match
 1
 uuids_match
