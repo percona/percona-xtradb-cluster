@@ -2899,13 +2899,12 @@ int TC_LOG_MMAP::open(const char *opt_name)
     mysql_mutex_init(key_PAGE_lock, &pg->lock, MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_PAGE_cond, &pg->cond, 0);
     pg->ptr= pg->start=(my_xid *)(data + i*tc_log_page_size);
-#ifdef WITH_WSREP
-    if (!WSREP_ON) 
-#endif /* WITH_WSREP */
-    pg->end=(my_xid *)(pg->start + tc_log_page_size);
     pg->size=pg->free=tc_log_page_size/sizeof(my_xid);
 #ifdef WITH_WSREP
-    if (WSREP_ON) pg->end=pg->start + pg->size;
+    if (!WSREP_ON) 
+      pg->end=(my_xid *)(pg->start + tc_log_page_size);
+    else
+      pg->end=pg->start + pg->size;
 #else
     pg->end=pg->start + pg->size;
 #endif /* WITH_WSREP */

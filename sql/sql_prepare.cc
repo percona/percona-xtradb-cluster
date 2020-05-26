@@ -3462,7 +3462,6 @@ bool Prepared_statement::prepare(const char *packet, uint packet_len)
   error= parse_sql(thd, & parser_state, NULL) ||
     thd->is_error() ||
     init_param_array(this);
-  thd->m_statement_psi= parent_locker;
 
   lex->set_trg_event_type_for_tables();
 
@@ -4149,6 +4148,7 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
       thd->protocol->send_out_parameters(&this->lex->param_list);
   }
 
+#ifdef WITH_WSREP
   /*
     Log COM_STMT_EXECUTE to the general log. Note, that in case of SQL
     prepared statements this causes two records to be output:
@@ -4167,6 +4167,7 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
   */
   if (error == 0)
     log_execute_line(thd);
+#endif
 
 error:
   flags&= ~ (uint) IS_IN_USE;

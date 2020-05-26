@@ -829,9 +829,11 @@ static bool fix_binlog_format_after_update(sys_var *self, THD *thd,
 static Sys_var_test_flag Sys_core_file(
        "core_file", "write a core-file on crashes", TEST_CORE_ON_SIGNAL);
 
+#ifdef WITH_WSREP
 /*
   Bug#1243228 Changed from BINLOG_FORMAT_STMT to BINLOG_FORMAT_ROW here.
 */
+#endif
 static Sys_var_enum Sys_binlog_format(
        "binlog_format", "What form of binary logging the master will "
        "use: either ROW for row-based binary logging, STATEMENT "
@@ -2539,7 +2541,9 @@ static bool check_read_only(sys_var *self, THD *thd, set_var *var)
 static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 {
   bool result= true;
+#ifdef WITH_WSREP
   bool own_lock= false;
+#endif
 
   if (read_only == FALSE && super_read_only == TRUE)
   {
@@ -2592,7 +2596,11 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
   read_only= opt_readonly;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
+#ifdef WITH_WSREP
   if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
+  if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif
     goto end_with_mutex_unlock;
 
   if ((result= thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -2605,10 +2613,14 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 
  end_with_read_lock:
   /* Release the lock */
+#ifdef WITH_WSREP
   if (own_lock)
   {
+#endif
     thd->global_read_lock.unlock_global_read_lock(thd);
+#ifdef WITH_WSREP
   }
+#endif
  end_with_mutex_unlock:
   mysql_mutex_lock(&LOCK_global_system_variables);
  end:
@@ -3736,8 +3748,8 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
     if (trans_commit_stmt(thd) || trans_commit(thd))
     {
       thd->variables.option_bits&= ~OPTION_AUTOCOMMIT;
-      thd->mdl_context.release_transactional_locks();
 #ifdef WITH_WSREP
+      thd->mdl_context.release_transactional_locks();
       WSREP_DEBUG("autocommit, MDL TRX lock released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       return true;
@@ -5734,7 +5746,9 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
   DBUG_ENTER("fix_gtid_deployment_step");
   bool new_gtid_deployment_step= gtid_deployment_step;
   bool result= true;
+#ifdef WITH_WSREP
   bool own_lock= false;
+#endif
 
   if (gtid_deployment_step == opt_gtid_deployment_step)
   {
@@ -5747,7 +5761,11 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
   gtid_deployment_step= opt_gtid_deployment_step;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
+#ifdef WITH_WSREP
   if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
+  if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif
     goto end_with_mutex_unlock;
 
   if ((result= thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -5769,10 +5787,14 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
 
  end_with_read_lock:
   /* Release the lock */
+#ifdef WITH_WSREP
   if (own_lock)
   {
+#endif
     thd->global_read_lock.unlock_global_read_lock(thd);
+#ifdef WITH_WSREP
   }
+#endif
  end_with_mutex_unlock:
   mysql_mutex_lock(&LOCK_global_system_variables);
  end:

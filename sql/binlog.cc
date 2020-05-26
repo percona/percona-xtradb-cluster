@@ -1488,7 +1488,7 @@ static int binlog_start_consistent_snapshot(handlerton *hton, THD *thd)
   int err= 0;
   DBUG_ENTER("binlog_start_consistent_snapshot");
 
-#ifdef WSREP
+#ifdef WITH_WSREP
   if (wsrep_emulate_bin_log)
     DBUG_RETURN(0);
 #endif
@@ -1517,7 +1517,7 @@ static int binlog_clone_consistent_snapshot(handlerton *hton, THD *thd,
 
   DBUG_ENTER("binlog_start_consistent_snapshot");
 
-#ifdef WSREP
+#ifdef WITH_WSREP
   if (wsrep_emulate_bin_log)
     DBUG_RETURN(0);
 #endif
@@ -8130,8 +8130,7 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
   init_alloc_root(&mem_root, TC_LOG_PAGE_SIZE, TC_LOG_PAGE_SIZE);
 
   while ((ev= Log_event::read_log_event(log, 0, fdle, TRUE))
-         && ev->is_valid()
-      )
+         && ev->is_valid())
   {
     if (ev->get_type_code() == QUERY_EVENT &&
         !strcmp(((Query_log_event*)ev)->query, "BEGIN"))

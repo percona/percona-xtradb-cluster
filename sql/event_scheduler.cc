@@ -30,7 +30,9 @@
 #include "sql_connect.h"         // init_new_connection_handler_thread
 #include "sql_acl.h"             // SUPER_ACL
 #include "global_threads.h"
+#ifdef WITH_WSREP
 #include "debug_sync.h"
+#endif
 
 /**
   @addtogroup Event_Scheduler
@@ -369,9 +371,9 @@ Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event)
                           job_data.definer.str,
                           job_data.dbname.str, job_data.name.str);
 
+#ifdef WITH_WSREP
   DEBUG_SYNC(thd, "event_worker_thread_end");
 
-#ifdef WITH_WSREP
   if (WSREP(thd))
   {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);

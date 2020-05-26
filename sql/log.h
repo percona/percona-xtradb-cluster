@@ -606,10 +606,12 @@ enum enum_binlog_row_image {
 };
 
 enum enum_binlog_format {
+#ifdef WITH_WSREP
   /*
     statement-based except for cases where only row-based can work (UUID()
     etc):
   */
+#endif /* WITH_WSREP */
   BINLOG_FORMAT_MIXED= 0, ///< statement if safe, otherwise row - autodetected
   BINLOG_FORMAT_STMT=  1, ///< statement-based
   BINLOG_FORMAT_ROW=   2, ///< row-based

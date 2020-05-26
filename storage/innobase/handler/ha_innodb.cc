@@ -829,6 +829,14 @@ static MYSQL_THDVAR_ULONG(flush_log_at_trx_commit, PLUGIN_VAR_OPCMDARG,
   " or 2 (write at commit, flush once per second).",
   NULL, NULL, 1, 0, 2, 0);
 
+#ifndef WITH_WSREP
+static MYSQL_THDVAR_BOOL(fake_changes, PLUGIN_VAR_OPCMDARG,
+  "In the transaction after enabled, UPDATE, INSERT and DELETE only move the cursor to the records "
+  "and do nothing other operations (no changes, no ibuf, no undo, no transaction log) in the transaction. "
+  "This is to cause replication prefetch IO. ATTENTION: the transaction started after enabled is affected.",
+  NULL, NULL, FALSE);
+#endif
+
 static MYSQL_THDVAR_STR(tmpdir,
   PLUGIN_VAR_OPCMDARG|PLUGIN_VAR_MEMALLOC,
   "Directory for temporary non-tablespace files.",
@@ -1580,9 +1588,9 @@ innodb_page_size_validate(
 /*======================*/
 	ulong	page_size)		/*!< in: Page Size to evaluate */
 {
+#ifdef WITH_WSREP
 	DBUG_ENTER("innodb_page_size_validate");
 
-#ifdef WITH_WSREP
 	/* With a 4K page_size, Galera triggers an assert upon restart.
 	 * Until that gets resolved, require using the default page size (16K).
 	*/
@@ -1591,6 +1599,7 @@ innodb_page_size_validate(
 	}
 #else
 	ulong		n;
+	DBUG_ENTER("innodb_page_size_validate");
 
 	for (n = UNIV_PAGE_SIZE_SHIFT_MIN;
 	     n <= UNIV_PAGE_SIZE_SHIFT_MAX;
@@ -1811,6 +1820,22 @@ thd_innodb_tmpdir(
 
 	return(tmp_dir);
 }
+
+#ifndef WITH_WSREP
+/******************************************************************//**
+Check the status of fake changes mode (innodb_fake_changes)
+@return	true	if fake change mode is enabled. */
+UNIV_INTERN
+ibool
+thd_fake_changes(
+/*=============*/
+	THD*	thd)	/*!< in: thread handle, or NULL to query
+			the global innodb_supports_xa */
+{
+	return(THDVAR((THD*) thd, fake_changes));
+}
+#endif
+
 /******************************************************************//**
 Returns the lock wait timeout for the current connection.
 @return	the lock wait timeout, in seconds */
@@ -2651,6 +2676,18 @@ innobase_trx_init(
 
 	trx->check_unique_secondary = !thd_test_options(
 		thd, OPTION_RELAXED_UNIQUE_CHECKS);
+
+#ifndef WITH_WSREP
+	/* Transaction on start caches the fake_changes state and uses it for
+	complete transaction lifetime.
+	There are some APIs that doesn't need an active transaction object
+	but transaction object are just use as a cache object/data carrier.
+	Before using transaction object for such APIs refresh the state of
+	fake_changes. */
+	if (trx->state == TRX_STATE_NOT_STARTED) {
+		trx->fake_changes = thd_fake_changes(thd);
+	}
+#endif
 
 #ifdef EXTENDED_SLOWLOG
 	if (thd_log_slow_verbosity(thd) & (1ULL << SLOG_V_INNODB)) {
@@ -3567,7 +3604,6 @@ innobase_init(
 
 	innobase_hton->create_zip_dict = innobase_create_zip_dict;
 	innobase_hton->drop_zip_dict = innobase_drop_zip_dict;
-	innobase_hton->is_reserved_db_name= innobase_check_reserved_file_name;
 
 	ut_a(DATA_MYSQL_TRUE_VARCHAR == (ulint)MYSQL_TYPE_VARCHAR);
 
@@ -4271,6 +4307,12 @@ innobase_create_zip_dict(
 	if (UNIV_UNLIKELY(high_level_read_only)) {
 		DBUG_RETURN(HA_CREATE_ZIP_DICT_READ_ONLY);
 	}
+
+#ifndef WITH_WSREP
+	if (UNIV_UNLIKELY(THDVAR(NULL, fake_changes))) {
+		DBUG_RETURN(HA_CREATE_ZIP_DICT_FAKE_CHANGES);
+	}
+#endif
 	
 	if (UNIV_UNLIKELY(*name_len > ZIP_DICT_MAX_NAME_LENGTH)) {
 		*name_len = ZIP_DICT_MAX_NAME_LENGTH;
@@ -4323,6 +4365,12 @@ innobase_drop_zip_dict(
 	if (UNIV_UNLIKELY(high_level_read_only)) {
 		DBUG_RETURN(HA_DROP_ZIP_DICT_READ_ONLY);
 	}
+
+#ifndef WITH_WSREP
+	if (UNIV_UNLIKELY(THDVAR(NULL, fake_changes))) {
+		DBUG_RETURN(HA_DROP_ZIP_DICT_FAKE_CHANGES);
+	}
+#endif
 
 	switch (dict_drop_zip_dict(name, *name_len)) {
 		case DB_SUCCESS:
@@ -5096,7 +5144,9 @@ innobase_kill_connection(
         handlerton*	hton,	/*!< in:  innobase handlerton */
 	THD*	thd)	/*!< in: handle to the MySQL thread being killed */
 {
+#ifdef WITH_WSREP
         ut_ad(!lock_mutex_own());
+#endif
 	trx_t*	trx;
 
 	DBUG_ENTER("innobase_kill_connection");
@@ -8241,7 +8291,9 @@ ha_innobase::write_row(
 
 	DBUG_ENTER("ha_innobase::write_row");
 
+#ifdef WITH_WSREP
 	DEBUG_SYNC(user_thd, "ha_innobase_write_row");
+#endif
 
 	if (high_level_read_only) {
 		ib_senderrf(ha_thd(), IB_LOG_LEVEL_WARN, ER_READ_ONLY_MODE);
@@ -8429,10 +8481,12 @@ no_commit:
 		build_template(true);
 	}
 
+#ifdef WITH_WSREP
 	/* debug sync point has a special significance given the location
 	where-in auto-inc value is generated but row insert action is not yet
 	started. */
 	DEBUG_SYNC(user_thd, "pxc_autoinc_val_generated");
+#endif
 
 	innobase_srv_conc_enter_innodb(prebuilt->trx);
 
@@ -8654,10 +8708,6 @@ report_error:
 	}
 wsrep_error:
 #endif
-
-	if (error_result == HA_FTS_INVALID_DOCID) {
-		my_error(HA_FTS_INVALID_DOCID, MYF(0));
-	}
 
 	if (error_result == HA_FTS_INVALID_DOCID) {
 		my_error(HA_FTS_INVALID_DOCID, MYF(0));
@@ -9055,7 +9105,9 @@ ha_innobase::update_row(
 
 	DBUG_ENTER("ha_innobase::update_row");
 
+#ifdef WITH_WSREP
 	DEBUG_SYNC(user_thd, "ha_innobase_update_row");
+#endif
 
 	ut_a(prebuilt->trx == trx);
 
@@ -15012,38 +15064,11 @@ ha_innobase::external_lock(
 		    && lock_type == F_WRLCK)
 		|| thd_sql_command(thd) == SQLCOM_CREATE_INDEX
 		|| thd_sql_command(thd) == SQLCOM_DROP_INDEX
-		|| thd_sql_command(thd) == SQLCOM_DELETE)) {
-
-		if (thd_sql_command(thd) == SQLCOM_CREATE_TABLE)
-		{
-			ib_senderrf(thd, IB_LOG_LEVEL_WARN,
-				    ER_INNODB_READ_ONLY);
-			DBUG_RETURN(HA_ERR_INNODB_READ_ONLY);
-		} else {
-			ib_senderrf(thd, IB_LOG_LEVEL_WARN,
-				    ER_READ_ONLY_MODE);
-			DBUG_RETURN(HA_ERR_TABLE_READONLY);
-		}
-
-	}
-
-	/* Check for UPDATEs in read-only mode. */
-	if (srv_read_only_mode
-	    && (thd_sql_command(thd) == SQLCOM_UPDATE
-		|| thd_sql_command(thd) == SQLCOM_INSERT
-		|| thd_sql_command(thd) == SQLCOM_REPLACE
-		|| thd_sql_command(thd) == SQLCOM_DROP_TABLE
-		|| thd_sql_command(thd) == SQLCOM_ALTER_TABLE
-		|| thd_sql_command(thd) == SQLCOM_OPTIMIZE
-		|| (thd_sql_command(thd) == SQLCOM_CREATE_TABLE
-		    && lock_type == F_WRLCK)
-		|| thd_sql_command(thd) == SQLCOM_CREATE_INDEX
-		|| thd_sql_command(thd) == SQLCOM_DROP_INDEX
-		|| thd_sql_command(thd) == SQLCOM_DELETE
-		|| thd_sql_command(thd) ==
-			SQLCOM_CREATE_COMPRESSION_DICTIONARY
-		|| thd_sql_command(thd) ==
-			SQLCOM_DROP_COMPRESSION_DICTIONARY)) {
+ 		|| thd_sql_command(thd) == SQLCOM_DELETE
+ 		|| thd_sql_command(thd) ==
+ 			SQLCOM_CREATE_COMPRESSION_DICTIONARY
+ 		|| thd_sql_command(thd) ==
+ 			SQLCOM_DROP_COMPRESSION_DICTIONARY)) {
 
 		if (thd_sql_command(thd) == SQLCOM_CREATE_TABLE)
 		{
@@ -16161,12 +16186,12 @@ ha_innobase::get_auto_increment(
 
 		current = *first_value > col_max_value ? autoinc : *first_value;
 
+#ifdef WITH_WSREP
 		/* If the increment step of the auto increment column
 		decreases then it is not affecting the immediate
 		next value in the series. */
 		if (prebuilt->autoinc_increment > increment) {
 
-#ifdef WITH_WSREP
 			WSREP_DEBUG("Refresh change in auto-inc configuration"
 				    " from (off: %llu -> %llu)"
 				    " and (inc: %llu -> %llu)."
@@ -16180,8 +16205,6 @@ ha_innobase::get_auto_increment(
 				    current, autoinc);
 			if (!wsrep_on(ha_thd()))
 			{
-#endif /* WITH_WSREP */
-
 			/* MySQL flow will construct last_inserted_id but PXC
 			can't do so because any values in that range are
 			potentially unsafe as they were reserved for other node
@@ -16193,14 +16216,13 @@ ha_innobase::get_auto_increment(
 
 			current = innobase_next_autoinc(
 				current, 1, increment, 1, col_max_value);
-#ifdef WITH_WSREP
 			}
-#endif /* WITH_WSREP */
 
 			dict_table_autoinc_initialize(prebuilt->table, current);
 
 			*first_value = current;
 		}
+#endif /* WITH_WSREP */
 
 		/* Compute the last value in the interval */
 		next_value = innobase_next_autoinc(
@@ -16676,7 +16698,9 @@ innobase_commit_by_xid(
 	DBUG_ASSERT(hton == innodb_hton_ptr);
 
 	trx = trx_get_trx_by_xid(xid);
+#ifdef WITH_WSREP
 	trx->wsrep_recover_xid = xid;
+#endif
 
 	if (trx) {
 		innobase_commit_low(trx);
@@ -20476,6 +20500,15 @@ static	MYSQL_SYSVAR_ENUM(corrupt_table_action, srv_pass_corrupt_table,
   "except for the deletion.",
   NULL, NULL, 0, &corrupt_table_action_typelib);
 
+#ifndef WITH_WSREP
+static MYSQL_SYSVAR_BOOL(locking_fake_changes, srv_fake_changes_locks,
+  PLUGIN_VAR_NOCMDARG,
+  "###EXPERIMENTAL### if enabled, transactions will get S row locks instead "
+  "of X locks for fake changes.  If disabled, fake change transactions will "
+  "not take any locks at all.",
+  NULL, NULL, TRUE);
+#endif
+
 static MYSQL_SYSVAR_UINT(compressed_columns_zip_level,
   srv_compressed_columns_zip_level,
   PLUGIN_VAR_RQCMDARG,
@@ -20688,6 +20721,10 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(saved_page_number_debug),
 #endif /* UNIV_DEBUG */
   MYSQL_SYSVAR(corrupt_table_action),
+#ifndef WITH_WSREP
+  MYSQL_SYSVAR(fake_changes),
+  MYSQL_SYSVAR(locking_fake_changes),
+#endif
   MYSQL_SYSVAR(tmpdir),
   MYSQL_SYSVAR(compressed_columns_zip_level),
   MYSQL_SYSVAR(compressed_columns_threshold),

@@ -1268,7 +1268,6 @@ buf_page_hash_get_locked(
 	if (!bpage || buf_pool_watch_is_sentinel(buf_pool, bpage)) {
 		if (!watch) {
 		bpage = NULL;
-		goto unlock_and_exit;
 	}
 		goto unlock_and_exit;
 	}
