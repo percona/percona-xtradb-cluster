@@ -29,7 +29,7 @@ i
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 #node-2
@@ -41,19 +41,19 @@ i
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 show create table foo2_t1;
 Table	Create Table
 foo2_t1	CREATE TABLE `foo2_t1` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 show create table foo3_t1;
 Table	Create Table
 foo3_t1	CREATE TABLE `foo3_t1` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 select name, encryption from information_schema.innodb_tablespaces where name like '%foo%';
@@ -67,7 +67,7 @@ insert into t2 values (10), (20), (30);
 show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 drop table t1, t2;
@@ -90,7 +90,7 @@ i
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 CREATE TABLESPACE foo2 ADD DATAFILE 'foo2.ibd';
@@ -113,7 +113,7 @@ i
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
@@ -127,7 +127,7 @@ foo3	Y
 show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 drop table t1, t2;
@@ -146,7 +146,7 @@ i
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 CREATE TABLESPACE foo2 ADD DATAFILE 'foo2.ibd';
@@ -167,7 +167,7 @@ i
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 create table t2 (i int, primary key pk(i)) tablespace foo encryption='y';
@@ -181,7 +181,7 @@ foo3	Y
 show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) /*!50100 TABLESPACE `foo` */ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci /*!80016 ENCRYPTION='y' */
 drop table t1, t2;

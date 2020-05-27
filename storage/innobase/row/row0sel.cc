@@ -4450,7 +4450,7 @@ It also has optimization such as pre-caching the rows, using AHI, etc.
 @return DB_SUCCESS or error code */
 dberr_t row_search_mvcc(byte *buf, page_cur_mode_t mode,
                         row_prebuilt_t *prebuilt, ulint match_mode,
-                        ulint direction) {
+                        const ulint direction) {
   DBUG_TRACE;
 
   dict_index_t *index = prebuilt->index;

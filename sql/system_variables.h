@@ -100,9 +100,8 @@ enum use_secondary_engine {
 enum enum_default_table_encryption {
   DEFAULT_TABLE_ENC_OFF = 0,
   DEFAULT_TABLE_ENC_ON = 1,
-  DEFAULT_TABLE_ENC_KEYRING_ON = 2,
-  DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING = 3,
-  DEFAULT_TABLE_ENC_ONLINE_FROM_KEYRING_TO_UNENCRYPTED = 4
+  DEFAULT_TABLE_ENC_ONLINE_TO_KEYRING = 2,
+  DEFAULT_TABLE_ENC_ONLINE_FROM_KEYRING_TO_UNENCRYPTED = 3
 };
 
 /* Bits for different SQL modes modes (including ANSI mode) */
@@ -485,6 +484,11 @@ struct System_variables {
     WSREP_BINLOG_DISABLED
   } wsrep_saved_binlog_state;
 #endif /* WITH_WSREP */
+
+  /**
+    @sa Sys_var_require_row_format
+  */
+  bool require_row_format;
 };
 
 /**

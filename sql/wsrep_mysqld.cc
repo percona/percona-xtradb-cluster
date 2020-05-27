@@ -21,6 +21,7 @@
 #include "sql/sql_alter.h"
 #include "sql/sql_lex.h"
 #include "sql/ssl_acceptor_context.h"
+#include "sql/thd_raii.h"
 #include "sql_base.h"
 #include "sql_class.h"
 #include "sql_parse.h"
@@ -1501,9 +1502,10 @@ static bool wsrep_prepare_keys_for_isolation(THD *, const char *db,
     if (!wsrep_prepare_key_for_isolation(db, table, ka)) goto err;
   }
 
-  for (const TABLE_LIST *table = table_list; table;
-       table = table->next_global) {
-    if (!wsrep_prepare_key_for_isolation(table->db, table->table_name, ka))
+  for (const TABLE_LIST *table_it = table_list; table_it;
+       table_it = table_it->next_global) {
+    if (!wsrep_prepare_key_for_isolation(table_it->db, table_it->table_name,
+                                         ka))
       goto err;
   }
 
@@ -1611,10 +1613,11 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
   if (db || table) {
     ret.push_back(wsrep_prepare_key_for_toi(db, table, wsrep::key::exclusive));
   }
-  for (const TABLE_LIST *table = table_list; table;
-       table = table->next_global) {
-    ret.push_back(wsrep_prepare_key_for_toi(
-        table->get_db_name(), table->get_table_name(), wsrep::key::exclusive));
+  for (const TABLE_LIST *table_it = table_list; table_it;
+       table_it = table_it->next_global) {
+    ret.push_back(wsrep_prepare_key_for_toi(table_it->get_db_name(),
+                                            table_it->get_table_name(),
+                                            wsrep::key::exclusive));
   }
   if (alter_info && (alter_info->flags & Alter_info::ADD_FOREIGN_KEY)) {
     wsrep::key_array fk(wsrep_prepare_keys_for_alter_add_fk(
@@ -1872,9 +1875,9 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
       }
 
       if (table_list && first_table) {
-        for (TABLE_LIST *table = first_table; table;
-             table = table->next_global) {
-          if (!find_temporary_table(thd, table->db, table->table_name)) {
+        for (TABLE_LIST *table_it = first_table; table_it;
+             table_it = table_it->next_global) {
+          if (!find_temporary_table(thd, table_it->db, table_it->table_name)) {
             return true;
           }
         }

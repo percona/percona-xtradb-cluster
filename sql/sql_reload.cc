@@ -85,7 +85,7 @@
 
 bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
                            int *write_to_binlog) {
-  bool result = 0;
+  bool result = false;
   select_errors = 0; /* Write if more errors */
   int tmp_write_to_binlog = *write_to_binlog = 1;
 
@@ -107,7 +107,7 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
       bool reload_servers_failed = servers_reload(thd);
       notify_flush_event(thd);
       if (reload_acl_failed || reload_servers_failed) {
-        result = 1;
+        result = true;
         /*
           When an error is returned, my_message may have not been called and
           the client will hang waiting for a response.
@@ -139,18 +139,20 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
   }
 
   if (options & REFRESH_ERROR_LOG) {
-    if (reopen_error_log()) result = 1;
+    if (reopen_error_log()) result = true;
   }
 
-  if ((options & REFRESH_SLOW_LOG) && opt_slow_log)
-    if (query_logger.reopen_log_file(QUERY_LOG_SLOW)) result = 1;
+  if ((options & REFRESH_SLOW_LOG) && opt_slow_log &&
+      (log_output_options & LOG_FILE))
+    if (query_logger.reopen_log_file(QUERY_LOG_SLOW)) result = true;
 
-  if ((options & REFRESH_GENERAL_LOG) && opt_general_log)
-    if (query_logger.reopen_log_file(QUERY_LOG_GENERAL)) result = 1;
+  if ((options & REFRESH_GENERAL_LOG) && opt_general_log &&
+      (log_output_options & LOG_FILE))
+    if (query_logger.reopen_log_file(QUERY_LOG_GENERAL)) result = true;
 
   if (options & REFRESH_ENGINE_LOG) {
     if (ha_flush_logs()) {
-      result = 1;
+      result = true;
     }
   }
   if ((options & REFRESH_BINARY_LOG) || (options & REFRESH_RELAY_LOG)) {
@@ -213,7 +215,7 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
       */
       if (thd->locked_tables_mode) {
         my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
-        return 1;
+        return true;
       }
       /*
         Writing to the binlog could cause deadlocks, as we don't log
@@ -223,9 +225,10 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
 
 #ifdef WITH_WSREP
       if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
-        return 1;  // Killed
+        return true;  // Killed
 #else
-      if (thd->global_read_lock.lock_global_read_lock(thd)) return 1;  // Killed
+      if (thd->global_read_lock.lock_global_read_lock(thd))
+        return true;  // Killed
 #endif /* WITH_WSREP */
 
       if (close_cached_tables(thd, tables,
@@ -235,7 +238,7 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
           NOTE: my_error() has been already called by reopen_tables() within
           close_cached_tables().
         */
-        result = 1;
+        result = true;
       }
 
       if (thd->global_read_lock.make_global_read_lock_block_commit(
@@ -249,7 +252,7 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
         thd->global_read_lock.unlock_global_read_lock(thd);
 #endif /* WITH_WSREP */
 
-        return 1;
+        return true;
       }
 
 #ifdef WITH_WSREP
@@ -273,7 +276,7 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
         if (tables) {
           for (TABLE_LIST *t = tables; t; t = t->next_local)
             if (!find_table_for_mdl_upgrade(thd, t->db, t->table_name, false))
-              return 1;
+              return true;
         } else {
           /*
             It is not safe to upgrade the metadata lock without GLOBAL IX lock.
@@ -293,7 +296,7 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
             if (!tab->mdl_ticket->is_upgradable_or_exclusive()) {
               my_error(ER_TABLE_NOT_LOCKED_FOR_WRITE, MYF(0),
                        tab->s->table_name.str);
-              return 1;
+              return true;
             }
           }
         }
@@ -357,7 +360,7 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
           NOTE: my_error() has been already called by reopen_tables() within
           close_cached_tables().
         */
-        result = 1;
+        result = true;
       }
     }
   }
@@ -381,7 +384,7 @@ cleanup:
     */
     if (reset_master(thd, options & REFRESH_READ_LOCK)) {
       /* NOTE: my_error() has been already called by reset_master(). */
-      result = 1;
+      result = true;
     }
   }
   if (options & REFRESH_OPTIMIZER_COSTS) reload_optimizer_cost_constants();
@@ -389,11 +392,11 @@ cleanup:
     tmp_write_to_binlog = 0;
     if (reset_slave_cmd(thd)) {
       /*NOTE: my_error() has been already called by reset_slave() */
-      result = 1;
+      result = true;
     }
   }
   if (options & REFRESH_USER_RESOURCES)
-    reset_mqh(thd, nullptr, 0); /* purecov: inspected */
+    reset_mqh(thd, nullptr, false); /* purecov: inspected */
   if (options & REFRESH_TABLE_STATS) {
     mysql_mutex_lock(&LOCK_global_table_stats);
     free_global_table_stats();

@@ -238,9 +238,9 @@ void Wsrep_server_service::log_view(
       }
 
       if (wsrep_debug) {
-        std::ostringstream os;
-        os << "Storing cluster view:\n" << view;
-        WSREP_INFO("%s", os.str().c_str());
+        std::ostringstream os2;
+        os2 << "Storing cluster view:\n" << view;
+        WSREP_INFO("%s", os2.str().c_str());
         DBUG_ASSERT(prev_view.state_id().id() != view.state_id().id() ||
                     view.state_id().seqno().get() >=
                         prev_view.state_id().seqno().get());

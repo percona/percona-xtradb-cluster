@@ -6,7 +6,7 @@ INSERT INTO t1 VALUES (1);
 COMMIT;
 INSERT IGNORE INTO t1 VALUES(1);
 Warnings:
-Warning	1062	Duplicate entry '1' for key 'PRIMARY'
+Warning	1062	Duplicate entry '1' for key 't1.PRIMARY'
 CREATE TABLE t1(A INT) ENCRYPTION="Y" ENGINE=MEMORY;
 ERROR 42000: The storage engine for the table doesn't support ENCRYPTION
 DROP TABLE t1;

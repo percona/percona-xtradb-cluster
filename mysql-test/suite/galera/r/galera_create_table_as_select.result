@@ -73,7 +73,7 @@ COUNT(*) = 5
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `f1` int(11) DEFAULT NULL
+  `f1` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 UNLOCK TABLES;
 DROP TABLE t1, t2;

@@ -5,7 +5,7 @@ INSERT INTO t1 VALUES (1, 'a'), (2, 'a'), (3, 'a');
 INSERT INTO t2 VALUES (3, 'b');
 SET SESSION wsrep_trx_fragment_size = 1;
 INSERT INTO t2 SELECT * FROM t1;
-ERROR 23000: Duplicate entry '3' for key 'PRIMARY'
+ERROR 23000: Duplicate entry '3' for key 't2.PRIMARY'
 last_committed_diff
 3
 #node-2

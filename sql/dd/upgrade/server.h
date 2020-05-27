@@ -75,7 +75,9 @@ bool no_server_upgrade_required();
 
 #ifdef WITH_WSREP
 bool upgrade_pxc_only(THD *thd);
-#endif  /* WITH_WSREP */
+#endif /* WITH_WSREP */
+
+bool I_S_upgrade_required();
 
 }  // namespace upgrade
 

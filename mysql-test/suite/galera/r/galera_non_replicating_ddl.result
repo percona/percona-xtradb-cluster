@@ -22,7 +22,7 @@ Timeout in wait_condition.inc for SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.CO
 show create table t;
 Table	Create Table
 t	CREATE TABLE `t` (
-  `i` int(11) NOT NULL,
+  `i` int NOT NULL,
   PRIMARY KEY (`i`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 select * from t;

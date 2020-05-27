@@ -10,16 +10,16 @@ CREATE TABLE db2.t1 (id INT PRIMARY KEY AUTO_INCREMENT, s INT) ENGINE=innodb;
 SHOW CREATE TABLE db1.t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `m` int(11) DEFAULT NULL,
+  `id` int NOT NULL AUTO_INCREMENT,
+  `m` int DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 # connection node_2, testUser - limited privileges
 SHOW CREATE TABLE db1.t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `m` int(11) DEFAULT NULL,
+  `id` int NOT NULL AUTO_INCREMENT,
+  `m` int DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 ALTER TABLE db1.t1 ADD FOREIGN KEY (m) REFERENCES db2.t1 (id);
@@ -27,16 +27,16 @@ ERROR 42000: REFERENCES command denied to user 'testUser'@'localhost' for table 
 SHOW CREATE TABLE db1.t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `m` int(11) DEFAULT NULL,
+  `id` int NOT NULL AUTO_INCREMENT,
+  `m` int DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 # connection node_1, root
 SHOW CREATE TABLE db1.t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `m` int(11) DEFAULT NULL,
+  `id` int NOT NULL AUTO_INCREMENT,
+  `m` int DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 # connection node_2, testUser2 - full privileges
@@ -44,8 +44,8 @@ ALTER TABLE db1.t1 ADD FOREIGN KEY (m) REFERENCES db2.t1 (id);
 SHOW CREATE TABLE db1.t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `m` int(11) DEFAULT NULL,
+  `id` int NOT NULL AUTO_INCREMENT,
+  `m` int DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `m` (`m`),
   CONSTRAINT `t1_ibfk_1` FOREIGN KEY (`m`) REFERENCES `db2`.`t1` (`id`)
@@ -54,8 +54,8 @@ t1	CREATE TABLE `t1` (
 SHOW CREATE TABLE db1.t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `m` int(11) DEFAULT NULL,
+  `id` int NOT NULL AUTO_INCREMENT,
+  `m` int DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `m` (`m`),
   CONSTRAINT `t1_ibfk_1` FOREIGN KEY (`m`) REFERENCES `db2`.`t1` (`id`)
