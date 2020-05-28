@@ -690,7 +690,8 @@ private:
 #else
   int ordered_commit(THD *thd);
 #endif /* WITH_WSREP */
-  void handle_binlog_flush_or_sync_error(THD *thd, bool need_lock_log);
+  void handle_binlog_flush_or_sync_error(THD *thd, bool need_lock_log,
+                                         const char *message);
 public:
   int open_binlog(const char *opt_name);
   void close();
