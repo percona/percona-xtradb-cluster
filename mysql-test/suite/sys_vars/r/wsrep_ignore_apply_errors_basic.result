@@ -1,10 +1,10 @@
 select @@wsrep_ignore_apply_errors;
 @@wsrep_ignore_apply_errors
-7
+0
 set global wsrep_ignore_apply_errors=default;
 select @@wsrep_ignore_apply_errors;
 @@wsrep_ignore_apply_errors
-7
+0
 set global wsrep_ignore_apply_errors=0;
 select @@wsrep_ignore_apply_errors;
 @@wsrep_ignore_apply_errors

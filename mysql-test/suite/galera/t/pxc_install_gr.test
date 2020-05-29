@@ -11,6 +11,7 @@ call mtr.add_suppression("Plugin group_replication reported");
 call mtr.add_suppression("Group replication cannot be used with Percona XtraDB Cluster in strict mode.");
 call mtr.add_suppression("Plugin 'group_replication' init function returned error.");
 call mtr.add_suppression("Using group replication with Percona XtraDB Cluster is only supported for migration");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
 --enable_query_log
 
 --connection node_1

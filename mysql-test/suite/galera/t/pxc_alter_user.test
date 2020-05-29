@@ -9,8 +9,10 @@
 
 --connection node_1
 call mtr.add_suppression("Operation ALTER USER failed for 'User3'@'localhost'");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
 --connection node_2
 call mtr.add_suppression("Operation ALTER USER failed for 'User3'@'localhost'");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
 
 --connection node_1
 --echo # connection node_1, root
