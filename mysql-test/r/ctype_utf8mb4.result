@@ -2158,8 +2158,8 @@ insert into t1 values (0xF2808080);
 insert into t1 values (0xF2BFBFBF);
 select hex(utf8mb4) from t1;
 hex(utf8mb4)
-F2808080
 F2BFBFBF
+F2808080
 delete from t1;
 Testing [F4][80..8F][80..BF][80..BF]
 insert into t1 values (0xF4808080);
@@ -2169,9 +2169,9 @@ Warnings:
 Warning	1366	Incorrect string value: '\xF4\x90\x80\x80' for column 'utf8mb4' at row 1
 select hex(utf8mb4) from t1;
 hex(utf8mb4)
-F4808080
-F48F8080
 
+F48F8080
+F4808080
 drop table t1;
 #
 # Check strnxfrm() with odd length

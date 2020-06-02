@@ -5481,7 +5481,7 @@ sub mysqld_arguments ($$$) {
 #    {
 #      ; # Dont add --binlog-format when running without binlog
 #    }
-    elsif ($arg eq "--loose-skip-log-bin")
+    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
     {
       if (grep { /--wsrep-provider=/ } @$extra_opts) {
         # As an exception, allow --binlog-format if MTR is run with
@@ -5495,6 +5495,11 @@ sub mysqld_arguments ($$$) {
            $mysqld->option("log-slave-updates"))
     {
       ; # Dont add --skip-log-bin when mysqld have --log-slave-updates in config
+    }
+    elsif ($arg eq "--loose-skip-log-bin" and
+	       (grep { /--wsrep-provider=/ } @$extra_opts))
+    {
+      ; # Dont add --skip-log-bin when wsrep provider loaded
     }
     elsif ($arg eq "")
     {
@@ -5854,6 +5859,15 @@ sub get_extra_opts {
   my $opts=
     $mysqld->option("#!use-slave-opt") ?
       $tinfo->{slave_opt} : $tinfo->{master_opt};
+
+  # For Galera and sys_vars tests skip --loose-skip-log-bin
+  my @galera_test = grep(/^galera\./, $tinfo->{name});
+  my @sys_vars_test = grep(/^sys_vars\./, $tinfo->{name});
+  if(@galera_test > 0 or @sys_vars_test > 0 )
+  {
+    my $skip_item = "--loose-skip-log-bin";
+    @$opts = grep { $_ ne $skip_item } @$opts;
+  }
 
   # Expand environment variables
   foreach my $opt ( @$opts )

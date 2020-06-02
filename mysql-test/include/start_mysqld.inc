@@ -10,6 +10,8 @@ if ($restart_parameters != "restart")
   # file from 5.7) and Percona Server 5.7, where upstream has
   # $restart_parameters too and echoes them unconditionally.
   # This is to avoid unnecassary re-records of upstream test cases.
+  
+  # Disable for PXC. Galera tests pass ip/ports that may vary
   #--echo # $restart_parameters
 }
 
