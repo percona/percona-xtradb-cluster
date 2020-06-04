@@ -1,5 +1,7 @@
 call mtr.add_suppression("Operation DROP USER failed");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
 call mtr.add_suppression("Operation DROP USER failed");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
 CREATE TABLE t1(a INT AUTO_INCREMENT, b INT, PRIMARY KEY pka(a));
 SET DEBUG_SYNC = 'now WAIT_FOR has_global_grant.got_lock'; ;
 SET @@global.debug = '+d,has_global_grant_hold_lock';

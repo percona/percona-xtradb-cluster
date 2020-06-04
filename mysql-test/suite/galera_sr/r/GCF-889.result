@@ -18,6 +18,6 @@ COUNT(*) = 1
 1
 CALL mtr.add_suppression("Could not execute Delete_rows event on table");
 CALL mtr.add_suppression("Can't find record in 't1'");
-SET GLOBAL wsrep_ignore_apply_errors = 7;
+SET GLOBAL wsrep_ignore_apply_errors = 0;
 #node-1
 DROP TABLE t1;

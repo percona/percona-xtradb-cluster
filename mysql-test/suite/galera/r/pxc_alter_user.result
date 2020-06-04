@@ -1,5 +1,7 @@
 call mtr.add_suppression("Operation ALTER USER failed for 'User3'@'localhost'");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
 call mtr.add_suppression("Operation ALTER USER failed for 'User3'@'localhost'");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
 # connection node_1, root
 CREATE USER User1@localhost IDENTIFIED BY 'old_pass';
 CREATE USER User2@localhost IDENTIFIED BY 'old_pass';

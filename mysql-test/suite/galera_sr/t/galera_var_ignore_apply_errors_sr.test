@@ -37,6 +37,6 @@ SELECT COUNT(*) = 1 FROM t1;
 SET SESSION wsrep_trx_fragment_size = 0;
 DROP TABLE t1;
 
-SET GLOBAL wsrep_ignore_apply_errors = 7;
+SET GLOBAL wsrep_ignore_apply_errors = 0;
 CALL mtr.add_suppression("Slave SQL: Could not execute Delete_rows event");
 CALL mtr.add_suppression("Can't find record in 't1'");

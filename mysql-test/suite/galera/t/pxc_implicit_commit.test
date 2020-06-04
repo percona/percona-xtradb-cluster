@@ -8,6 +8,7 @@
 
 --connection node_2
 call mtr.add_suppression(".*The storage engine for the table doesn't support ENCRYPTION.*");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
 
 --connection node_1
 call mtr.add_suppression(".*The storage engine for the table doesn't support ENCRYPTION.*");

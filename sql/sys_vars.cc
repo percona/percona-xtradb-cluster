@@ -7818,8 +7818,8 @@ static Sys_var_bool Sys_wsrep_dirty_reads(
 static Sys_var_uint Sys_wsrep_ignore_apply_errors(
     "wsrep_ignore_apply_errors", "Ignore replication errors",
     GLOBAL_VAR(wsrep_ignore_apply_errors), CMD_LINE(REQUIRED_ARG),
-    VALID_RANGE(WSREP_IGNORE_ERRORS_NONE, WSREP_IGNORE_ERRORS_MAX), DEFAULT(7),
-    BLOCK_SIZE(1));
+    VALID_RANGE(WSREP_IGNORE_ERRORS_NONE, WSREP_IGNORE_ERRORS_MAX),
+    DEFAULT(WSREP_IGNORE_ERRORS_NONE), BLOCK_SIZE(1));
 
 static Sys_var_uint Sys_wsrep_min_log_verbosity(
     "wsrep_min_log_verbosity",

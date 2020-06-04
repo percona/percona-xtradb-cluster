@@ -1,4 +1,5 @@
 call mtr.add_suppression(".*The storage engine for the table doesn't support ENCRYPTION.*");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
 call mtr.add_suppression(".*The storage engine for the table doesn't support ENCRYPTION.*");
 SET @@session.autocommit=0;
 CREATE TABLE t1(id INT, PRIMARY KEY(id));
