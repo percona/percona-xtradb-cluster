@@ -1010,10 +1010,12 @@ wait_for_listen()
                 fi
 
                 # Also check IPv6
-                if grep -E "\s(${sockets})\s" /proc/$pid/net/tcp6 |
-                        awk "{print \$${ip_index}}" |
-                        grep -q "^00*:${port_in_hex}$"; then
-                    break 2
+                if [[ -r /proc/$pid/net/tcp6 ]]; then
+                    if grep -E "\s(${sockets})\s" /proc/$pid/net/tcp6 |
+                            awk "{print \$${ip_index}}" |
+                            grep -q "^00*:${port_in_hex}$"; then
+                        break 2
+                    fi
                 fi
             fi
         done
