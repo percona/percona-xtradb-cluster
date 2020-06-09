@@ -361,9 +361,7 @@ protected:
   { 
     assert(end_pos >= buff);
     assert(buff_size >= ulong(end_pos - buff));
-    return static_cast<ulong>(
-      std::max<long>(buff_size - (end_pos - buff) - aux_buff_size, 0L)
-    );
+    return ulong(buff_size - (end_pos - buff) - aux_buff_size);
   }
 
   /* Shall skip record from the join buffer if its match flag is on */
@@ -836,9 +834,7 @@ protected:
     assert(last_key_entry >= end_pos);
     assert(buff_size >= aux_buff_size);
     assert(ulong(last_key_entry - end_pos) >= aux_buff_size);
-    return static_cast<ulong>(
-      std::max<long>(last_key_entry - end_pos - aux_buff_size, 0L)
-    );
+    return ulong(last_key_entry - end_pos - aux_buff_size);
   }
 
   /* 

@@ -521,10 +521,15 @@ size_t get_table_def_key(const TABLE_LIST *table_list, const char **key)
   */
   assert(!strcmp(table_list->get_db_name(),
                  table_list->mdl_request.key.db_name()) &&
+#ifdef WITH_WSREP
          (!strcmp(table_list->get_table_name(),
                   table_list->mdl_request.key.name()) ||
           !strcmp(table_list->get_table_alias(),
                   table_list->mdl_request.key.name())));
+#else
+         !strcmp(table_list->get_table_name(),
+                 table_list->mdl_request.key.name()));
+#endif /* WITH_WSREP */
 
   *key= (const char*)table_list->mdl_request.key.ptr() + 1;
   return table_list->mdl_request.key.length() - 1;
@@ -4972,9 +4977,17 @@ thr_lock_type read_lock_type_for_table(THD *thd,
     When we do not write to binlog or when we use row based replication,
     it is safe to use a weaker lock.
   */
+#ifdef WITH_WSREP
   ulong binlog_format= thd->variables.binlog_format;
-  if ((log_on == FALSE) || (WSREP_BINLOG_FORMAT(binlog_format) == BINLOG_FORMAT_ROW) ||
-      (table_list->table->s->table_category == TABLE_CATEGORY_LOG) ||
+  if (log_on == false ||
+      (WSREP_BINLOG_FORMAT(binlog_format) == BINLOG_FORMAT_ROW))
+#else
+  if (log_on == false ||
+      thd->variables.binlog_format == BINLOG_FORMAT_ROW)
+#endif /* WITH_WSREP */
+    return TL_READ;
+
+  if ((table_list->table->s->table_category == TABLE_CATEGORY_LOG) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_RPL_INFO) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_GTID) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_PERFORMANCE))

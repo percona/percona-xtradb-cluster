@@ -2072,13 +2072,15 @@ static int binlog_clone_consistent_snapshot(handlerton *hton, THD *thd,
   char log_file_name[FN_REFLEN];
   my_off_t pos;
 
+#ifdef WITH_WSREP
   DBUG_ENTER("binlog_clone_consistent_snapshot");
 
-#ifdef WITH_WSREP
   /* If operating in emulation binlog mode avoid binlog snapshot as
      binlog is not open. */
   if (wsrep_emulate_bin_log)
     DBUG_RETURN(0);
+#else
+  DBUG_ENTER("binlog_start_consistent_snapshot");
 #endif /* WITH_WSREP */
 
   from_cache_mngr= opt_bin_log ?
@@ -9709,7 +9711,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
           }
         }
       });
-#endif /* HAVE_REPLICATION */
+#endif
 
 #ifndef WITH_WSREP
 
@@ -10769,11 +10771,13 @@ commit_stage:
    */
   if (DBUG_EVALUATE_IF("force_rotate", 1, 0) ||
       (do_rotate && thd->commit_error == THD::CE_NONE &&
-       !is_rotating_caused_by_incident
 #ifdef WITH_WSREP
+       !is_rotating_caused_by_incident
        && !thd->wsrep_split_trx
-#endif /* WITH_WSREP */
       ))
+#else
+       !is_rotating_caused_by_incident))
+#endif /* WITH_WSREP */
   {
     /*
       Do not force the rotate as several consecutive groups may
@@ -12002,7 +12006,11 @@ int THD::decide_logging_format(TABLE_LIST *tables, bool use_cached_table_flags)
     }
 #endif
 
+#ifdef WITH_WSREP
     if (WSREP_BINLOG_FORMAT(variables.binlog_format) != BINLOG_FORMAT_ROW && tables)
+#else
+    if (variables.binlog_format != BINLOG_FORMAT_ROW && tables)
+#endif /* WITH_WSREP */
     {
       /*
         DML statements that modify a table with an auto_increment column based on
@@ -12256,8 +12264,13 @@ int THD::decide_logging_format(TABLE_LIST *tables, bool use_cached_table_flags)
         */
         my_error((error= ER_BINLOG_ROW_INJECTION_AND_STMT_ENGINE), MYF(0));
       }
+#ifdef WITH_WSREP
       else if (WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW &&
                sqlcom_can_generate_row_events(this->lex->sql_command))
+#else
+      else if (variables.binlog_format == BINLOG_FORMAT_ROW &&
+               sqlcom_can_generate_row_events(this->lex->sql_command))
+#endif /* WITH_WSREP */
       {
         /*
           2. Error: Cannot modify table that uses a storage engine
@@ -12299,7 +12312,11 @@ int THD::decide_logging_format(TABLE_LIST *tables, bool use_cached_table_flags)
     else
     {
       /* binlog_format = STATEMENT */
+#ifdef WITH_WSREP
       if (WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT)
+#else
+      if (variables.binlog_format == BINLOG_FORMAT_STMT)
+#endif /* WITH_WSREP */
        {
         if (lex->is_stmt_row_injection())
         {

@@ -604,12 +604,11 @@ Check if the transaction is being referenced. */
 
 UNIV_INLINE
 const trx_t*
-trx_arbitrate(const trx_t*	requestor,
-	      const trx_t*	holder
-#ifdef WITH_WSREP
-	      ,my_bool		sync = FALSE 
+#ifndef WITH_WSREP
+trx_arbitrate(const trx_t* requestor, const trx_t*	holder);
+#else
+trx_arbitrate(const trx_t* requestor, const trx_t*	holder, my_bool sync = FALSE);
 #endif /* WITH_WSREP */
-	     );
 
 /**
 @param[in] trx		Transaction to check

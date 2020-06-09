@@ -1138,11 +1138,17 @@ volatile int32 Global_read_lock::m_active_requests;
   @retval True   Failure, thread was killed.
 */
 
+#ifdef WITH_WSREP
 bool Global_read_lock::lock_global_read_lock(THD *thd, bool *own_lock)
+#else
+bool Global_read_lock::lock_global_read_lock(THD *thd)
+#endif /* WITH_WSREP */
 {
   DBUG_ENTER("lock_global_read_lock");
 
+#ifdef WITH_WSREP
   *own_lock= FALSE;
+#endif /* WITH_WSREP */
 
   if (!m_state)
   {
@@ -1177,7 +1183,9 @@ bool Global_read_lock::lock_global_read_lock(THD *thd, bool *own_lock)
     m_mdl_global_shared_lock= mdl_request.ticket;
     m_state= GRL_ACQUIRED;
 
+#ifdef WITH_WSREP
     *own_lock= TRUE;
+#endif /* WITH_WSREP */
   }
   /*
     We DON'T set global_read_lock_blocks_commit now, it will be set after
