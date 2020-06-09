@@ -1425,6 +1425,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.server.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_tzinfo_to_sql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/perror.1*
+%doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
 #%doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
 #%doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
 %doc %attr(644, root, man) %{_mandir}/man8/mysqld.8*
@@ -1437,6 +1438,7 @@ fi
 %attr(755, root, root) %{_bindir}/pyclustercheck
 %attr(755, root, root) %{_bindir}/innochecksum
 %attr(755, root, root) %{_bindir}/ibd2sdi
+%attr(755, root, root) %{_bindir}/comp_err
 %attr(755, root, root) %{_bindir}/my_print_defaults
 %attr(755, root, root) %{_bindir}/myisam_ftdump
 %attr(755, root, root) %{_bindir}/myisamchk
@@ -1545,7 +1547,6 @@ fi
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-devel
 %defattr(-, root, root, 0755)
-%doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config.1*
 %attr(755, root, root) %{_bindir}/mysql_config
 %dir %attr(755, root, root) %{_includedir}/mysql
