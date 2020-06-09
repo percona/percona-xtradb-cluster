@@ -3304,14 +3304,16 @@ mysql_execute_command(THD *thd, bool first_level)
 
     /* Commit the normal transaction if one is active. */
     if (trans_commit_implicit(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("Transaction implicit commit failed"
                   " MDL released: %u", thd->thread_id());
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif /* WITH_WSREP */
     /* Release metadata locks acquired in this transaction. */
     thd->mdl_context.release_transactional_locks();
   }
@@ -4580,8 +4582,8 @@ end_with_restore_list:
   }
 
   case SQLCOM_UNLOCK_TABLES:
-  {
 #ifdef WITH_WSREP
+  {
     /* UNLOCK Tables is generic statement and not all lock table variants
     are blocked (only one with explict table lock are blocked). */
     bool table_lock= (thd->variables.option_bits & OPTION_TABLE_LOCK);
@@ -4639,7 +4641,9 @@ end_with_restore_list:
       goto error;
     my_ok(thd);
     break;
+#ifdef WITH_WSREP
   }
+#endif /* WITH_WSREP */
 
   case SQLCOM_UNLOCK_BINLOG:
     if (thd->backup_binlog_lock.is_acquired())
@@ -5135,6 +5139,7 @@ end_with_restore_list:
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
+#ifdef WITH_WSREP
       /*
         Note:
         We don't check for multiple non-idempotent invocations
@@ -5144,7 +5149,6 @@ end_with_restore_list:
         hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
-#ifdef WITH_WSREP
       if (WSREP(thd) &&
           !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
@@ -5182,6 +5186,7 @@ end_with_restore_list:
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
+#ifdef WITH_WSREP
       /*
         Note:
         We don't check for multiple non-idempotent invocations
@@ -5191,7 +5196,6 @@ end_with_restore_list:
         hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
-#ifdef WITH_WSREP
       if (WSREP(thd) &&
           !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
@@ -5333,13 +5337,15 @@ end_with_restore_list:
 #endif
   case SQLCOM_BEGIN:
     if (trans_begin(thd, lex->start_transaction_opt))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("BEGIN failed, MDL released: %u", thd->thread_id());
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif /* WITH_WSREP */
     my_ok(thd);
     break;
   case SQLCOM_COMMIT:
@@ -5353,13 +5359,15 @@ end_with_restore_list:
                       (thd->variables.completion_type == 2 &&
                        lex->tx_release != TVL_NO));
     if (trans_commit(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("COMMIT command failed, MDL released: %u", thd->thread_id());
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif /* WITH_WSREP */
     thd->mdl_context.release_transactional_locks();
     /* Begin transaction with the same isolation level. */
     if (tx_chain)
@@ -5402,13 +5410,15 @@ end_with_restore_list:
                       (thd->variables.completion_type == 2 &&
                        lex->tx_release != TVL_NO));
     if (trans_rollback(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("ROLLBACK failed, MDL released: %u", thd->thread_id());
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif /* WITH_WSREP */
     thd->mdl_context.release_transactional_locks();
     /* Begin transaction with the same isolation level. */
     if (tx_chain)
@@ -6004,8 +6014,8 @@ end_with_restore_list:
   case SQLCOM_UNINSTALL_PLUGIN:
   case SQLCOM_SHUTDOWN:
   case SQLCOM_ALTER_INSTANCE:
-  {
 #ifdef WITH_WSREP
+  {
     if (lex->sql_command == SQLCOM_XA_START    ||
         lex->sql_command == SQLCOM_XA_END      ||
         lex->sql_command == SQLCOM_XA_PREPARE  ||
@@ -6025,7 +6035,9 @@ end_with_restore_list:
     DBUG_ASSERT(lex->m_sql_cmd != NULL);
     res= lex->m_sql_cmd->execute(thd);
     break;
+#ifdef WITH_WSREP
   }
+#endif /* WITH_WSREP */
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
   case SQLCOM_ALTER_USER:

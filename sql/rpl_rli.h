@@ -878,12 +878,14 @@ public:
   void cleanup_after_session()
   {
     if (deferred_events)
+#ifdef WITH_WSREP
     {
+#endif /* WITH_WSREP */
       delete deferred_events;
 #ifdef WITH_WSREP
       deferred_events= NULL;
-#endif /* WITH_WSREP */
     }
+#endif /* WITH_WSREP */
   };
    
   /**

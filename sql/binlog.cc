@@ -2071,13 +2071,15 @@ static int binlog_clone_consistent_snapshot(handlerton *hton, THD *thd,
   char log_file_name[FN_REFLEN];
   my_off_t pos;
 
+#ifdef WITH_WSREP
   DBUG_ENTER("binlog_clone_consistent_snapshot");
 
-#ifdef WITH_WSREP
   /* If operating in emulation binlog mode avoid binlog snapshot as
      binlog is not open. */
   if (wsrep_emulate_bin_log)
     DBUG_RETURN(0);
+#else
+  DBUG_ENTER("binlog_start_consistent_snapshot");
 #endif /* WITH_WSREP */
 
   from_cache_mngr= opt_bin_log ?
@@ -9706,7 +9708,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
           }
         }
       });
-#endif /* HAVE_REPLICATION */
+#endif
 
       if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT,
                                                      timeout))
@@ -10753,11 +10755,13 @@ commit_stage:
    */
   if (DBUG_EVALUATE_IF("force_rotate", 1, 0) ||
       (do_rotate && thd->commit_error == THD::CE_NONE &&
-       !is_rotating_caused_by_incident
 #ifdef WITH_WSREP
+       !is_rotating_caused_by_incident
        && !thd->wsrep_split_trx
-#endif /* WITH_WSREP */
       ))
+#else
+       !is_rotating_caused_by_incident))
+#endif /* WITH_WSREP */
   {
     /*
       Do not force the rotate as several consecutive groups may
@@ -10871,8 +10875,7 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
                   &mem_root, memory_page_size, memory_page_size);
 
   while ((ev= Log_event::read_log_event(log, 0, fdle, TRUE))
-         && ev->is_valid()
-      )
+         && ev->is_valid())
   {
     if (ev->get_type_code() == binary_log::QUERY_EVENT &&
         !strcmp(((Query_log_event*)ev)->query, "BEGIN"))

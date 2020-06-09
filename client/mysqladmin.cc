@@ -1047,8 +1047,12 @@ static int execute_commands(MYSQL *mysql,int argc, char **argv)
     }
     case ADMIN_PASSWORD:
     {
+#ifdef WITH_WSREP
       const int buff_len=128;
       char buff[buff_len];
+#else
+      char buff[128];
+#endif /* WITH_WSREP */
       time_t start_time;
       char *typed_password= NULL, *verified= NULL, *tmp= NULL;
       bool log_off= true, err= false;

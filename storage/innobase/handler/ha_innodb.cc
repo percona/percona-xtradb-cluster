@@ -131,9 +131,9 @@ enum_tx_isolation thd_get_trx_isolation(const THD* thd);
 #include "sync0sync.h"
 #include "xtradb_i_s.h"
 
+#ifdef WITH_WSREP
 /* for ha_innopart, Native InnoDB Partitioning. */
 #include "ha_innopart.h"
-#ifdef WITH_WSREP
 #include "../storage/innobase/include/ut0byte.h"
 #include "wsrep_api.h"
 #include <wsrep_mysqld.h>
@@ -1845,6 +1845,10 @@ ulong
 innodb_page_size_validate(
 	ulong	page_size)
 {
+#ifndef WITH_WSREP
+	ulong		n;
+#endif
+
 	DBUG_ENTER("innodb_page_size_validate");
 
 #ifdef WITH_WSREP
@@ -1855,7 +1859,6 @@ innodb_page_size_validate(
 		DBUG_RETURN(UNIV_PAGE_SIZE_SHIFT_ORIG);
 	}
 #else
-	ulong		n;
 
 	for (n = UNIV_PAGE_SIZE_SHIFT_MIN;
 	     n <= UNIV_PAGE_SIZE_SHIFT_MAX;
@@ -1925,11 +1928,6 @@ thd_trx_arbitrate(THD* requestor, THD* holder)
 	THD*	victim = thd_tx_arbitrate(requestor, holder);
 
 	ut_a(victim == NULL || victim == requestor || victim == holder);
-#if 0
-#ifdef WITH_WSREP
-        return (NULL);
-#endif /* WITH_WSREP */
-#endif /* 0 */
 	return(victim);
 }
 
@@ -3474,7 +3472,9 @@ ha_innobase::ha_innobase(
 	m_prebuilt(),
 	m_prebuilt_ptr(&m_prebuilt),
 	m_user_thd(),
+#ifdef WITH_WSREP
 	m_share(),
+#endif /* WITH_WSREP */
 	m_int_table_flags(HA_REC_NOT_IN_SEQ
 			  | HA_NULL_IN_KEY
 			  | HA_CAN_INDEX_BLOBS
@@ -7177,7 +7177,9 @@ ha_innobase::open(
 	normalize_table_name(norm_name, name);
 
 	m_user_thd = NULL;
+#ifdef WITH_WSREP
 	ut_ad(m_share == NULL);
+#endif /* WITH_WSREP */
 
 	if (!(m_share = get_share(name))) {
 
@@ -7187,7 +7189,9 @@ ha_innobase::open(
 	if (UNIV_UNLIKELY(m_share->ib_table && m_share->ib_table->is_corrupt &&
 			  srv_pass_corrupt_table <= 1)) {
 		free_share(m_share);
-		m_share = NULL;
+#ifdef WITH_WSREP
+    m_share = NULL;
+#endif /* WITH_WSREP */
 
 		DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
 	}
@@ -7252,7 +7256,9 @@ ha_innobase::open(
 			  srv_pass_corrupt_table <= 1)) {
 
 		free_share(m_share);
+#ifdef WITH_WSREP
 		m_share = NULL;
+#endif /* WITH_WSREP */
 		DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
 	}
 
@@ -7307,7 +7313,9 @@ ha_innobase::open(
 			" file for the table exists. " << TROUBLESHOOTING_MSG;
 
 		free_share(m_share);
+#ifdef WITH_WSREP
 		m_share = NULL;
+#endif /* WITH_WSREP */
 		set_my_errno(ENOENT);
 
 		DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
@@ -7362,7 +7370,9 @@ ha_innobase::open(
         
 	if (!thd_tablespace_op(thd) && no_tablespace) {
 		free_share(m_share);
+#ifdef WITH_WSREP
 		m_share = NULL;
+#endif /* WITH_WSREP */
 		set_my_errno(ENOENT);
 		int ret_err = HA_ERR_TABLESPACE_MISSING;
 
@@ -7787,7 +7797,9 @@ ha_innobase::close()
 	}
 
 	free_share(m_share);
+#ifdef WITH_WSREP
 	m_share = NULL;
+#endif /* WITH_WSREP */
 
 	MONITOR_INC(MONITOR_TABLE_CLOSE);
 
@@ -9273,7 +9285,9 @@ ha_innobase::write_row(
 #endif
 
 	DBUG_ENTER("ha_innobase::write_row");
+#ifdef WITH_WSREP
 	DEBUG_SYNC(m_user_thd, "ha_innobase_write_row");
+#endif
 
 	if (dict_table_is_intrinsic(m_prebuilt->table)) {
 		DBUG_RETURN(intrinsic_table_write_row(record));
@@ -9499,10 +9513,12 @@ no_commit:
 		build_template(true);
 	}
 
+#ifdef WITH_WSREP
 	/* debug sync point has a special significance given the location
 	where-in auto-inc value is generated but row insert action is not yet
 	started. */
 	DEBUG_SYNC(m_user_thd, "pxc_autoinc_val_generated");
+#endif /* WITH_WSREP */
 
 	innobase_srv_conc_enter_innodb(m_prebuilt);
 
@@ -10325,7 +10341,9 @@ ha_innobase::update_row(
 	trx_t*		trx = thd_to_trx(m_user_thd);
 
 	DBUG_ENTER("ha_innobase::update_row");
+#ifdef WITH_WSREP
 	DEBUG_SYNC(m_user_thd, "ha_innobase_update_row");
+#endif /* WITH_WSREP */
 
 	ut_a(m_prebuilt->trx == trx);
 
@@ -19484,7 +19502,11 @@ get_share(
 /*======*/
 	const char*	table_name)
 {
+#ifdef WITH_WSREP
 	INNOBASE_SHARE*	share = NULL;
+#else
+	INNOBASE_SHARE*	share;
+#endif /* WITH_WSREP */
 
 	mysql_mutex_lock(&innobase_share_mutex);
 
@@ -19957,12 +19979,12 @@ ha_innobase::get_auto_increment(
 
 		current = *first_value > col_max_value ? autoinc : *first_value;
 
+#ifdef WITH_WSREP
 		/* If the increment step of the auto increment column
 		decreases then it is not affecting the immediate
 		next value in the series. */
 		if (m_prebuilt->autoinc_increment > increment) {
 
-#ifdef WITH_WSREP
 			WSREP_DEBUG("Refresh change in auto-inc configuration"
 				    " from (off: %llu -> %llu)"
 				    " and (inc: %llu -> %llu)."
@@ -19976,7 +19998,6 @@ ha_innobase::get_auto_increment(
 				    current, autoinc);
 			if (!wsrep_on(ha_thd()))
 			{
-#endif /* WITH_WSREP */
 
 			/* MySQL flow will construct last_inserted_id but PXC
 			can't do so because any values in that range are
@@ -19989,15 +20010,14 @@ ha_innobase::get_auto_increment(
 
 			current = innobase_next_autoinc(
 				current, 1, increment, 1, col_max_value);
-#ifdef WITH_WSREP
 			}
-#endif /* WITH_WSREP */
 
 			dict_table_autoinc_initialize(
 				m_prebuilt->table, current);
 
 			*first_value = current;
 		}
+#endif /* WITH_WSREP */
 
 		/* Compute the last value in the interval */
 		next_value = innobase_next_autoinc(

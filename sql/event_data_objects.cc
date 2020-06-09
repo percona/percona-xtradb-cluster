@@ -40,7 +40,9 @@
 
 #include "mysql/psi/mysql_sp.h"
 
+#ifdef WITH_WSREP
 #include "wsrep_thd.h"
+#endif
 
 /**
   @addtogroup Event_Scheduler

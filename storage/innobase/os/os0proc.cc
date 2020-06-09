@@ -205,7 +205,7 @@ skip:
 			&os_total_large_mem_allocated, size);
 		UNIV_MEM_ALLOC(ptr, size);
 	}
-#endif /* _WIN32 */
+#endif
 
 #if defined(WITH_WSREP) && defined(UNIV_LINUX)
 	/* Do not make the pages from this block available to the child after a

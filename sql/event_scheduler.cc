@@ -31,7 +31,9 @@
 #include "mysqld_thd_manager.h"      // Global_THD_manager
 #include "sql_error.h"               // Sql_condition
 #include "sql_class.h"               // THD
+#ifdef WITH_WSREP
 #include "debug_sync.h"
+#endif /* WITH_WSREP */
 
 /**
   @addtogroup Event_Scheduler
@@ -381,9 +383,9 @@ Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event)
                           job_data.definer.str,
                           job_data.dbname.str, job_data.name.str);
 
+#ifdef WITH_WSREP
   DEBUG_SYNC(thd, "event_worker_thread_end");
 
-#ifdef WITH_WSREP
   if (WSREP(thd))
   {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);

@@ -3687,8 +3687,10 @@ os_file_create_simple_func(
 	*success = false;
 
 	int		create_flag;
+#ifdef WITH_INNODB_DISALLOW_WRITES
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
 		WAIT_ALLOW_WRITES();
+#endif
 
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));
@@ -4023,8 +4025,10 @@ os_file_create_func(
 	bool		on_error_silent;
 	pfs_os_file_t	file;
 
+#ifdef WITH_INNODB_DISALLOW_WRITES
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
 		WAIT_ALLOW_WRITES();
+#endif
 
 	*success = false;
 
@@ -4201,8 +4205,10 @@ os_file_create_simple_no_error_handling_func(
 	pfs_os_file_t	file;
 	int		create_flag;
 
+#ifdef WITH_INNODB_DISALLOW_WRITES
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
 		WAIT_ALLOW_WRITES();
+#endif
 
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));

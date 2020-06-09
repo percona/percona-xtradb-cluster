@@ -2722,7 +2722,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
                         wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
             can_grant = true;
       }
-#ifdef WITH_WSREP_TODO
+#ifdef WSREP_TODO
       /* victim unobstrusive lock holder is hard to find.
          Skipping here to allow high priority thread to continue,
          it will have earlier seqno and victims will die at certification stage
@@ -2740,7 +2740,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
                      );
         }
       }
-#endif /* WITH_WSREP_TODO */
+#endif /* WSREP_TODO */
       else if (WSREP(requestor_ctx->wsrep_get_thd()))
       {
         WSREP_DEBUG("Granting MDL to applier/TOI action processor over unobstrusive locks");

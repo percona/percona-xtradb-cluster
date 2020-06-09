@@ -353,13 +353,15 @@ extern "C" void *handle_connection(void *arg)
 #endif /* WITH_WSREP */
 
     delete thd;
+#ifdef WITH_WSREP
     thd= NULL;
+#endif /* WITH_WSREP */
 
     if (abort_loop) // Server is shutting down so end the pthread.
       break;
 
-    channel_info= NULL;
 #ifdef WITH_WSREP
+    channel_info= NULL;
     if (wsrep_applier_thread)
       break;
 #endif /* WITH_WSREP */

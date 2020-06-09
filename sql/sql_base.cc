@@ -524,10 +524,15 @@ size_t get_table_def_key(const TABLE_LIST *table_list, const char **key)
   */
   DBUG_ASSERT(!strcmp(table_list->get_db_name(),
                       table_list->mdl_request.key.db_name()) &&
+#ifdef WITH_WSREP
               (!strcmp(table_list->get_table_name(),
                       table_list->mdl_request.key.name()) ||
                !strcmp(table_list->get_table_alias(),
                        table_list->mdl_request.key.name())));
+#else
+              !strcmp(table_list->get_table_name(),
+                      table_list->mdl_request.key.name()));
+#endif /* WITH_WSREP */
 
   *key= (const char*)table_list->mdl_request.key.ptr() + 1;
   return table_list->mdl_request.key.length() - 1;

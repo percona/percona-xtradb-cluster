@@ -4812,9 +4812,9 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       opt_bin_logname=my_strdup(key_memory_opt_bin_logname,
                                 buf, MYF(0));
     }
-  }
 
 #ifdef WITH_WSREP /* WSREP BEFORE SE */
+  }
     /*
       Wsrep initialization must happen at this point, because:
       - opt_bin_logname must be known when starting replication
@@ -4921,8 +4921,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     }
   }
 #else
-  if (opt_bin_log)
-  {
     /*
       Skip opening the index file if we start with --help. This is necessary
       to avoid creating the file in an otherwise empty datadir, which will
@@ -4999,12 +4997,12 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     sql_print_warning("ignore-builtin-innodb is ignored "
                       "and will be removed in future releases.");
 
-#ifndef WITH_WSREP
+#ifdef WITH_WSREP
   /* Leave the original location if wsrep is not involved otherwise
   we do this before initializing WSREP as wsrep needs access to
   gtid_mode which and for accessing gtid_mode gtid_sid_locks has to be
   initialized which is done by this function. */
-
+#else
   if (gtid_server_init())
   {
     sql_print_error("Failed to initialize GTID structures.");
@@ -5433,9 +5431,9 @@ extern "C" void *handle_shutdown(void *arg)
     my_thread_end();
     my_thread_exit(0);
   }
+#ifdef WITH_WSREP
 #if 0
 // TODO not sure why need to re-init on shutdown.
-#ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_ready,
                    &LOCK_wsrep_ready, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_ready, &COND_wsrep_ready);
@@ -10636,9 +10634,8 @@ static PSI_thread_info all_server_threads[]=
   { &key_thread_one_connection, "one_connection", 0},
   { &key_thread_signal_hand, "signal_handler", PSI_FLAG_GLOBAL},
   { &key_thread_compress_gtid_table, "compress_gtid_table", PSI_FLAG_GLOBAL},
-  { &key_thread_parser_service, "parser_service", PSI_FLAG_GLOBAL}
+  { &key_thread_parser_service, "parser_service", PSI_FLAG_GLOBAL},
 #ifdef WITH_WSREP
-  ,
   { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", 0},
   { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", 0},
   { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", 0},

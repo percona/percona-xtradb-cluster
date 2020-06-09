@@ -1460,13 +1460,15 @@ void trans_register_ha(THD *thd, bool all, handlerton *ht_arg,
 */
 #ifdef HAVE_PSI_TRANSACTION_INTERFACE
   if (thd->m_transaction_psi == NULL &&
-      ht_arg->db_type != DB_TYPE_BINLOG
 #ifdef WITH_WSREP
+      ht_arg->db_type != DB_TYPE_BINLOG
       /* Do not register transactions for WSREP engine registration should be
       done by the base transactional storage engine (InnoDB). */
       && ht_arg->db_type != DB_TYPE_WSREP
-#endif /* WITH_WSREP */
      )
+#else
+      ht_arg->db_type != DB_TYPE_BINLOG)
+#endif /* WITH_WSREP */
   {
     const XID *xid= trn_ctx->xid_state()->get_xid();
     my_bool autocommit= !thd->in_multi_stmt_transaction_mode();
@@ -1510,7 +1512,9 @@ int ha_prepare(THD *thd)
 
     while (ha_info)
     {
+#ifdef WITH_WSREP
       int err;
+#endif /* WITH_WSREP */
       handlerton *ht= ha_info->ht();
       DBUG_ASSERT(!thd->status_var_aggregated);
       thd->status_var.ha_prepare_count++;
@@ -1520,7 +1524,11 @@ int ha_prepare(THD *thd)
           ha_rollback_trans(thd, true);
           DBUG_RETURN(1);
         });
+#ifdef WITH_WSREP
         if ((err= ht->prepare(ht, thd, true)))
+#else
+        if (ht->prepare(ht, thd, true))
+#endif /* WITH_WSREP */
         {
 #ifdef WITH_WSREP
           if (WSREP(thd) && ht->db_type == DB_TYPE_WSREP)
@@ -1970,8 +1978,8 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit)
   Ha_trx_info *ha_info= trn_ctx->ha_trx_info(trx_scope), *ha_info_next;
 
   DBUG_ENTER("ha_commit_low");
-#if 0
 #ifdef WITH_WSREP
+#if 0
   if (WSREP(thd))
   {
     snprintf (thd->wsrep_info, sizeof(thd->wsrep_info),
@@ -1979,8 +1987,8 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit)
               (long long)wsrep_thd_trx_seqno(thd));
     thd_proc_info(thd, thd->wsrep_info);
   }
-#endif /* WITH_WSREP */
 #endif
+#endif /* WITH_WSREP */
 
   if (ha_info)
   {

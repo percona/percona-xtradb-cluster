@@ -2557,8 +2557,12 @@ void var_query_set(VAR *var, const char *query, const char** query_end)
   do_eval(&ds_query, query, end, FALSE);
 
   if (mysql_real_query(mysql, ds_query.str,
+#ifdef WITH_WSREP
                        static_cast<ulong>(ds_query.length))
       || !(res= mysql_store_result(mysql)))
+#else
+                       static_cast<ulong>(ds_query.length)))
+#endif
   {
     handle_error (curr_command, mysql_errno(mysql), mysql_error(mysql),
                   mysql_sqlstate(mysql), &ds_res);
@@ -2568,6 +2572,11 @@ void var_query_set(VAR *var, const char *query, const char** query_end)
     DBUG_VOID_RETURN;
   }
   
+#ifndef WITH_WSREP
+  if (!(res= mysql_store_result(mysql)))
+    die("Query '%s' didn't return a result set", ds_query.str);
+#endif
+
   dynstr_free(&ds_query);
 
   if ((row= mysql_fetch_row(res)) && row[0])

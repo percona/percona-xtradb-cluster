@@ -64,7 +64,9 @@ using std::vector;
 #include <memory>
 #include "mysql/thread_type.h"
 
+#ifdef WITH_WSREP
 #include "log.h"
+#endif /* WITH_WSREP */
 #include "violite.h"                       /* SSL_handle */
 
 #include "query_strip_comments.h"
@@ -1594,7 +1596,11 @@ public:
       m_mdl_blocks_commits_lock(NULL)
   {}
 
+#ifdef WITH_WSREP
   bool lock_global_read_lock(THD *thd, bool *own_lock);
+#else
+  bool lock_global_read_lock(THD *thd);
+#endif /* WITH_WSREP */
   void unlock_global_read_lock(THD *thd);
 
   /**
@@ -5086,11 +5092,11 @@ public:
     Assign a new value to thd->query_id.
     Protected with the LOCK_thd_data mutex.
   */
-  void set_query_id(query_id_t new_query_id
 #ifdef WITH_WSREP
-                  , bool update_wsrep_id= true
+  void set_query_id(query_id_t new_query_id, bool update_wsrep_id= true)
+#else
+  void set_query_id(query_id_t new_query_id)
 #endif /* WITH_WSREP */
-  )
   {
     mysql_mutex_lock(&LOCK_thd_data);
     query_id= new_query_id;
