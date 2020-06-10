@@ -418,6 +418,64 @@ Possible values for this variable are:
 .. |binlog_format| replace:: ``binlog_format``
 .. _binlog_format: https://dev.mysql.com/doc/refman/8.0/en/binary-log-setting.html
 
+.. variable:: wsrep_ignore_apply_errors
+
+    :cli: ``--wsrep-ignore-apply-errors``
+    :conf: Yes
+    :scope: Global
+    :dyn: Yes
+    :default: 0
+    
+Defines the rules of wsrep applier behavior on errors. You can change the settings by editing the ``my.cnf`` file under ``[mysqld]`` or at runtime.
+
+.. note::
+
+    In |PXC| version 8.0.19-10, the default value has changed from ``7`` to ``0``. If you have been working with an earlier version of the PXC 8.0 series, you may see different behavior when upgrading to this version or later.
+
+The variable has the following options:
+
+.. list-table::
+    :widths: 25 30
+    :header-rows: 1
+    
+    * - Value
+      - Description
+    * - WSREP_IGNORE_ERRORS_NONE
+      - All replication errors are treated as errors and will shutdown the node (default behavior)
+    * - WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL
+      - DROP DATABASE, DROP TABLE, DROP INDEX, ALTER TABLE are converted to a warning if they result in ER_DB_DROP_EXISTS, ER_BAD_TABLE_ERROR OR ER_CANT_DROP_FIELD_OR_KEY errors
+    * - WSREP_IGNORE_ERRORS_ON_RECONCILING_DML
+      - DELETE events are treated as warnings if they failed because the deleted row was not found (ER_KEY_NOT_FOUND)
+    * - WSREP_IGNORE_ERRORS_ON_DDL
+      - All DDL errors will be treated as a warning
+    * - WSREP_IGNORE_ERRORS_MAX
+      - Infers WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL, WSREP_IGNORE_ERRORS_ON_RECONCILING_DML and WSREP_IGNORE_ERRORS_ON_DDL
+
+Setting the variable between ``0`` and ``7`` has the following behavior:
+
+..  list-table::
+    :widths: 25 30
+    :header-rows: 1
+    
+    * - Setting
+      - Behavior
+    * - 0
+      - WSREP_IGNORE_ERRORS_NONE
+    * - 1
+      - WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL
+    * - 2
+      - WSREP_IGNORE_ERRORS_ON_RECONCILING_DML
+    * - 3
+      - WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL, WSREP_IGNORE_ERRORS_ON_RECONCILING_DML
+    * - 4
+      - WSREP_IGNORE_ERRORS_ON_DDL
+    * - 5
+      - WSREP_IGNORE_ERRORS_ON_DDL, WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL
+    * - 6
+      - WSREP_IGNORE_ERRORS_ON_DDL, WSREP_IGNORE_ERRORS_ON_RECONCILING_DML
+    * - 7
+      - WSREP_IGNORE_ERRORS_ON_DDL, WSREP_IGNORE_ERRORS_ON_RECONCILING_DML, WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL
+    
 .. variable:: wsrep_min_log_verbosity
 
    :cli: ``--wsrep-min-log-verbosity``
