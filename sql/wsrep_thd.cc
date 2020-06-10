@@ -15,6 +15,7 @@
 
 #include "mysql/components/services/log_builtins.h"
 
+#include "debug_sync.h"
 #include "log_event.h"
 #include "mysql/plugin.h"
 #include "mysqld.h"  // start_wsrep_THD();
@@ -350,7 +351,16 @@ int wsrep_abort_thd(const THD *bf_thd, THD *victim_thd, bool signal) {
 bool wsrep_bf_abort(const THD *bf_thd, THD *victim_thd) {
   WSREP_LOG_THD(const_cast<THD *>(bf_thd), "BF aborter before");
   WSREP_LOG_THD(victim_thd, "victim before");
-  wsrep::seqno bf_seqno(bf_thd->wsrep_trx().ws_meta().seqno());
+
+  DBUG_EXECUTE_IF("sync.wsrep_bf_abort",
+                  {
+                    const char act[]=
+                      "now "
+                      "SIGNAL sync.wsrep_bf_abort_reached "
+                      "WAIT_FOR signal.wsrep_bf_abort";
+                    DBUG_ASSERT(!debug_sync_set_action(const_cast<THD*>(bf_thd),
+                                                       STRING_WITH_LEN(act)));
+                  };);
 
   if (WSREP(victim_thd) && !victim_thd->wsrep_trx().active()) {
     WSREP_DEBUG("wsrep_bf_abort, BF abort for non active transaction");
@@ -358,6 +368,7 @@ bool wsrep_bf_abort(const THD *bf_thd, THD *victim_thd) {
   }
 
   bool ret;
+  wsrep::seqno bf_seqno = bf_thd->wsrep_trx().ws_meta().seqno();
   if (wsrep_thd_is_toi(bf_thd)) {
     ret = victim_thd->wsrep_cs().total_order_bf_abort(bf_seqno);
   } else {
@@ -366,6 +377,18 @@ bool wsrep_bf_abort(const THD *bf_thd, THD *victim_thd) {
   if (ret) {
     atomic_wsrep_bf_aborts_counter++;
   }
+
+  DBUG_EXECUTE_IF("sync.wsrep_bf_abort_failed",
+                  {
+                    if (!ret)
+                    {
+                      const char act[]=
+                        "now SIGNAL sync.wsrep_bf_abort_failed_reached";
+                      DBUG_ASSERT(!debug_sync_set_action(const_cast<THD*>(bf_thd),
+                                                         STRING_WITH_LEN(act)));
+                    }
+                  };);
+
   return ret;
 }
 

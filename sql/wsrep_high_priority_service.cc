@@ -340,6 +340,16 @@ int Wsrep_high_priority_service::commit(const wsrep::ws_handle &ws_handle,
 int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
                                           const wsrep::ws_meta &ws_meta) {
   DBUG_ENTER("Wsrep_high_priority_service::rollback");
+  DBUG_EXECUTE_IF("sync.wsrep_rollback_cb",
+                  {
+                    const char act[]=
+                      "now "
+                      "SIGNAL sync.wsrep_rollback_cb_reached "
+                      "WAIT_FOR signal.wsrep_rollback_cb";
+                    DBUG_ASSERT(!debug_sync_set_action(m_thd,
+                                                       STRING_WITH_LEN(act)));
+                  };);
+
   m_thd->wsrep_cs().prepare_for_ordering(ws_handle, ws_meta, false);
 
   THD_STAGE_INFO(m_thd, stage_wsrep_rolling_back);
@@ -406,6 +416,16 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   /* DDL are atomic so flow (in wsrep_apply_events) will assign XID.
   Avoid over-writting of this XID by MySQL XID */
   thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(true);
+
+  DBUG_EXECUTE_IF("sync.wsrep_apply_toi_cb",
+                  {
+                    const char act[]=
+                      "now "
+                      "SIGNAL sync.wsrep_apply_toi_cb_reached "
+                      "WAIT_FOR signal.wsrep_apply_toi_cb";
+                    DBUG_ASSERT(!debug_sync_set_action(thd,
+                                                       STRING_WITH_LEN(act)));
+                  };);
 
   int ret = wsrep_apply_events(thd, m_rli, data.data(), data.size());
   if (ret != 0 || thd->wsrep_has_ignored_error) {

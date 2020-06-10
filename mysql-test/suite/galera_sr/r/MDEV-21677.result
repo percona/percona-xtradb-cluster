@@ -1,0 +1,28 @@
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) Engine=InnoDB;
+INSERT INTO t1 VALUES (1), (2), (3);
+SET SESSION wsrep_trx_fragment_size = 1;
+START TRANSACTION;
+INSERT INTO t1 VALUES (4);
+SELECT COUNT(*) FROM t1;
+COUNT(*)
+3
+SET GLOBAL DEBUG = "d,sync.wsrep_apply_toi_cb";
+SET GLOBAL DEBUG = "d,sync.wsrep_bf_abort";
+TRUNCATE TABLE t1;
+SET DEBUG_SYNC = "now WAIT_FOR sync.wsrep_bf_abort_reached";
+SET DEBUG_SYNC = "now WAIT_FOR sync.wsrep_apply_toi_cb_reached";
+SET GLOBAL DEBUG = "d,sync.wsrep_rollback_cb";
+INSERT INTO t1 VALUES (5);
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait = DEFAULT;
+SET GLOBAL DEBUG = "";
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_toi_cb";
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SET DEBUG_SYNC = "now WAIT_FOR sync.wsrep_rollback_cb_reached";
+SET GLOBAL DEBUG = "d,sync.wsrep_bf_abort_failed";
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_bf_abort WAIT_FOR sync.wsrep_bf_abort_failed_reached";
+SET GLOBAL DEBUG = "";
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_rollback_cb";
+SET DEBUG_SYNC = "RESET";
+SET DEBUG_SYNC = "RESET";
+DROP TABLE t1;
