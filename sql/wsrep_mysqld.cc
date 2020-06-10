@@ -1349,11 +1349,11 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
     return true;
 
   case SQLCOM_CREATE_TRIGGER:
+  case SQLCOM_DROP_TRIGGER:
 
-    DBUG_ASSERT(!table_list);
-    DBUG_ASSERT(first_table);
+    DBUG_ASSERT(table_list);
 
-    if (find_temporary_table(thd, first_table))
+    if (find_temporary_table(thd, table_list))
     {
       return false;
     }
