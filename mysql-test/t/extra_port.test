@@ -157,14 +157,18 @@ DROP USER nonprivuser@localhost;
 --disconnect extracon2
 
 --connection extracon
+# Error is returned by PXC in case of sleep interruption (PXC-2684)
+--error ER_QUERY_INTERRUPTED
 --reap
 --disconnect extracon
 
 --connection con3
+--error ER_QUERY_INTERRUPTED
 --reap
 --disconnect con3
 
 --connection con2
+--error ER_QUERY_INTERRUPTED
 --reap
 --disconnect con2
 

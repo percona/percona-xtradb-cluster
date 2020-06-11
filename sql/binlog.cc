@@ -9680,8 +9680,6 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
 
       DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
 
-#ifndef WITH_WSREP
-
 #ifdef HAVE_REPLICATION
       DBUG_EXECUTE_IF("delay_slave_worker_0", {
         if (has_commit_order_manager(thd))
@@ -9707,6 +9705,8 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
         }
       });
 #endif /* HAVE_REPLICATION */
+
+#ifndef WITH_WSREP
 
       if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT,
                                                      timeout))

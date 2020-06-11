@@ -108,6 +108,10 @@ perl;
       {
         $in_server_stage_list= 1;
       }
+      elsif (/PSI_stage_info\s*\*\s*wsrep_server_stages\s*\[/)
+      {
+        $in_server_stage_list= 1;
+      }
       elsif (/\};/) {
         $in_server_stage_list= 0;
       }
