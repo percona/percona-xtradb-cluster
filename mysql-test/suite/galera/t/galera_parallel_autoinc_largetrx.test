@@ -37,6 +37,8 @@ SET GLOBAL wsrep_slave_threads = 4;
 
 --connection node_2
 --reap
+--let $wait_condition = SELECT COUNT(*) = 30000 FROM t1;
+--source include/wait_condition.inc
 SELECT COUNT(*) = 30000 FROM t1;
 SELECT COUNT(DISTINCT f1) = 30000 FROM t1;
 SELECT COUNT(*) = 5 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
