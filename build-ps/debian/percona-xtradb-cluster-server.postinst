@@ -157,4 +157,17 @@ if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-decon
 fi
 # End automatically added section
 
+if [ "$1" = "configure" ] || [ "$1" = "upgrade" ]; then
+        systemctl daemon-reload
+
+        state_file=/var/lib/mysql/service.state
+        if [ -f $state_file ]; then
+                service_state=$(cat $state_file)
+                if [ "x$service_state" = "xactive" ]; then
+                        systemctl start mysql.service
+                fi
+                rm -rf $state_file
+        fi
+fi
+
 exit 0
