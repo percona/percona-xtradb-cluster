@@ -163,7 +163,7 @@ if [ "$1" = "configure" ] || [ "$1" = "upgrade" ]; then
         state_file=/var/lib/mysql/service.state
         if [ -f $state_file ]; then
                 service_state=$(cat $state_file)
-                if [ "x$service_state" = "xactive" ]; then
+                if [ "$service_state" = 0 ]; then
                         systemctl start mysql.service
                 fi
                 rm -rf $state_file
