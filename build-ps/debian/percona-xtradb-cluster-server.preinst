@@ -6,10 +6,16 @@ get_pcount () {
 }
 
 server_stop () {
-        if ! pgrep -x mysqld > /dev/null; then return; fi
+        if ! pgrep -x mysqld > /dev/null; then
+                set +e
+                systemctl is-active mysql.service > /var/lib/mysql/service.state
+                set -e
+                return;
+        fi
 
         set +e
-        systemctl stop mysql
+        systemctl is-active mysql.service > /var/lib/mysql/service.state
+        systemctl stop mysql.service
         errno=$?
         set -e
 
