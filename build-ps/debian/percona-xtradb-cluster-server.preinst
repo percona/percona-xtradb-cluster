@@ -7,15 +7,14 @@ get_pcount () {
 
 server_stop () {
         if ! pgrep -x mysqld > /dev/null; then
-                set +e
-                systemctl is-active mysql.service > /var/lib/mysql/service.state
-                set -e
+                echo 1 > /var/lib/mysql/service.state
                 return;
         fi
 
         set +e
-        systemctl is-active mysql.service > /var/lib/mysql/service.state
-        systemctl stop mysql.service
+        systemctl is-active mysql@bootstrap.service mysql.service --quiet && EC=$?
+        echo $EC > /var/lib/mysql/service.state
+        systemctl stop mysql@bootstrap.service mysql.service
         errno=$?
         set -e
 
