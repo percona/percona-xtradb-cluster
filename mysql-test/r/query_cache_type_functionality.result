@@ -184,7 +184,7 @@ variable_value
 0 Expected
 select variable_value from information_schema.global_status where variable_name ='Qcache_not_cached';
 variable_value
-27
+25
 25 Expected
 select 1 from tab1 limit 1;
 1
@@ -204,7 +204,7 @@ variable_value
 0 Expected
 select variable_value from information_schema.global_status where variable_name ='Qcache_not_cached';
 variable_value
-32
+30
 30 Expected
 select 1 from tab1 limit 2;
 1
@@ -225,7 +225,7 @@ variable_value
 0 Expected
 select variable_value from information_schema.global_status where variable_name ='Qcache_not_cached';
 variable_value
-37
+35
 35 Expected
 # Restart server with query_cache_type ON
 select 1 from tab1 limit 1;
@@ -246,7 +246,7 @@ variable_value
 1 Expected
 select variable_value from information_schema.global_status where variable_name ='Qcache_not_cached';
 variable_value
-10
+8
 8 Expected
 select 1 from tab1 limit 2;
 1
@@ -267,7 +267,7 @@ variable_value
 2 Expected
 select variable_value from information_schema.global_status where variable_name ='Qcache_not_cached';
 variable_value
-14
+12
 12 Expected
 select 1 from tab1 limit 1;
 1
@@ -287,12 +287,12 @@ variable_value
 2 Expected
 select variable_value from information_schema.global_status where variable_name ='Qcache_not_cached';
 variable_value
-18
+16
 16 Expected
 # opening another client session
 select variable_value from information_schema.global_status where variable_name ='Qcache_not_cached';
 variable_value
-19
+17
 17 Expected
 #cleanup
 DROP TABLE IF EXISTS tab1;
