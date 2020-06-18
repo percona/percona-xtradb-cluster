@@ -25,6 +25,7 @@ wsrep_node_incoming_address=127.0.0.1:@mysqld.1.port
 innodb_autoinc_lock_mode=2
 
 innodb_flush_log_at_trx_commit=2
+wsrep_node_name=node1
 
 [mysqld.2]
 log-bin=mysqld-bin
