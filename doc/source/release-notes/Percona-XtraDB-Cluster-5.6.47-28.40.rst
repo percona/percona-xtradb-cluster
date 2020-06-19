@@ -10,14 +10,17 @@
 Improvements
 ================================================================================
 
-* :jirabug:`PXC-2197`: Modified SST Documentation to Include Package Dependencies for Percona XtraBackup (PXB)
-* :jirabug:`PXC-2602`: Added Ability to Configure xbstream options with wsrep_sst_xtrabackup
+* :jirabug:`PXC-2197`: Modified the SST Documentation to Include Package Dependencies for Percona XtraBackup (PXB).
+* :jirabug:`PXC-2602`: Added the ability to configure xbstream options with wsrep_sst_xtrabackup.
 
 
 
 Bugs Fixed
 ================================================================================
 
-* :jirabug:`PXC-2684`: Modified Error Handling to Prevent Deadlock when Stored Procedure Aborted
-* :jirabug:`PXC-2904`: Ensured the PXC yum package installed the required xtrabackup version.
-* :jirabug:`PXC-2912`: Modified netcat Configuration to Include -N Flag on Donor
+* :jirabug:`PXC-2954`: DDL to add FK on one node fails but completes on other nodes causing inconsistency
+* :jirabug:`PXC-2904`: Ensured the "Percona-XtraDB-Cluster-57" yum package installed the required xtrabackup version.
+* :jirabug:`PXC-2684`: Modified error handling to prevent deadlock when stored procedure was aborted.
+* :jirabug:`PXC-2912`: Modified the netcat Configuration to Include the -N option, which is required by more recent versions of netcat. The option allows the shutdown of the network socket after the input EOF.
+
+
