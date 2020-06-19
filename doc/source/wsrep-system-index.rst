@@ -526,16 +526,16 @@ This can be used for alerting or to reconfigure load balancers.
 
 .. variable:: wsrep_on
 
-   :version 5.6.27-25.13: Variable available only in session scope
    :cli: No
    :conf: No
    :scope: Session
    :dyn: Yes
    :default: ``ON``
 
-Defines whether updates from the current session should be replicated.
-If disabled, it does not cause the node to leave the cluster
-and the node continues to communicate with other nodes.
+Defines if current session transaction changes for a node are replicated to the cluster.
+
+If set to ``OFF`` for a session, no transaction changes are replicated in that session. The setting does not cause the node to leave the cluster, and the node communicates with other nodes.
+
 
 .. variable:: wsrep_OSU_method
 
