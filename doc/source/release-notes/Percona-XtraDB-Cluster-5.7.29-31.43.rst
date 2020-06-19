@@ -20,6 +20,7 @@ Improvements
 Bugs Fixed
 ================================================================================
 
+* :jirabug:`PXC-2954`: DDL to add FK on one node fails but completes on other nodes causing inconsistency
 * :jirabug:`PXC-2705`: Executing parallel LOAD DATA queries against the same table and same source data and the number of rows is greater then 10k, the cluster consistency was broken.
 * :jirabug:`PXC-2683`: An issue may occur if a user set innodb_locks_unsafe_for_binlog=1. The variable is deprecated. The processing for the variable was removed.
 * :jirabug:`PXC-3202`: In CentOS 8, the POSTUN scriptlet in an rpm package would expand into an "empty string" and caused an error.
@@ -28,7 +29,9 @@ Bugs Fixed
 * :jirabug:`PXC-2969`: Modified the "Load balancing with Proxy-SQL" documentation to include the Criteria for Use.
 * :jirabug:`PXC-2904`: Ensured the "Percona-XtraDB-Cluster-57" yum package installed the required xtrabackup version.
 * :jirabug:`PXC-2958`: Modified the User Documentation to include wsrep_certification_rules and the cert.optimistic_pa option.
-* :jirabug:`PXC-2974`: Modified Percona XtraDB Cluster (PXC) Dockerfile to Integrate the Galera WSREP recovery process.
-* :jirabug:`PS-6979`: If CREATE USER remains in the processlist, other users may see it. Modified the processing to call clean up functions as part of event. (Upstream :mysqlbug:`99200`)
 * :jirabug:`PXC-2912`: Modified the netcat Configuration to Include the -N option, which is required by more recent versions of netcat. The option allows the shutdown of the network socket after the input EOF.
+* :jirabug:`PXC-2974`: Modified Percona XtraDB Cluster (PXC) Dockerfile to Integrate the Galera WSREP recovery process.
+* :jirabug:`PS-6979`: Modify the processing to call clean up functions to remove CREATE USER statement from the processlist after the statement has completed (Upstream :mysqlbug:`99200`)
+* :jirabug:`PXC-2684`: Modified error handling to prevent deadlock when stored procedure was aborted.
+
 
