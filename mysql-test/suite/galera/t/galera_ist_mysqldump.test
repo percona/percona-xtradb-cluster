@@ -16,3 +16,7 @@
 --source suite/galera/include/galera_st_kill_slave_ddl.inc
 
 --source suite/galera/include/galera_sst_restore.inc
+
+# this is needed because somehow wsrep_sst_receive_address gets corrupted
+# on repeat run.
+--source include/force_restart.inc

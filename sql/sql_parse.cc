@@ -1032,7 +1032,7 @@ bool do_command(THD *thd)
   if (WSREP(thd))
   {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_IDLE;
+    wsrep_thd_set_query_state(thd, QUERY_IDLE);
     if (thd->wsrep_conflict_state==MUST_ABORT)
     {
       wsrep_client_rollback(thd);
@@ -1118,7 +1118,7 @@ bool do_command(THD *thd)
       thd->store_globals();
     }
 
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
 #endif /* WITH_WSREP */
@@ -1492,7 +1492,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     }
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       thd->wsrep_conflict_state= NO_CONFLICT;
@@ -1766,7 +1766,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     }
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       thd->wsrep_conflict_state= NO_CONFLICT;

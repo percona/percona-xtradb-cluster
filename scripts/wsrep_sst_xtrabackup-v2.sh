@@ -1,4 +1,4 @@
-#!/bin/bash -ue
+#!/usr/bin/env bash
 # Copyright (C) 2013 Percona Inc
 #
 # This program is free software; you can redistribute it and/or modify
@@ -18,10 +18,11 @@
 # Documentation: http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html 
 # Make sure to read that before proceeding!
 
-
-
+set -o nounset -o errexit
 
 . $(dirname $0)/wsrep_sst_common
+
+OS=$(uname)
 
 ealgo=""
 ekey=""
@@ -482,7 +483,11 @@ read_cnf()
     ncsockopt=$(parse_cnf sst ncsockopt "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
-    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+     if [ "$OS" = "FreeBSD" ] ; then
+        cpat=$(parse_cnf sst cpat '.*\.pem$|.*init\.ok$|.*galera\.cache$|.*sst_in_progress$|.*\.sst$|.*gvwstate\.dat$|.*grastate\.dat$|.*\.err$|.*\.log$|.*RPM_UPGRADE_MARKER$|.*RPM_UPGRADE_HISTORY$')
+    else
+        cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+    fi
     ealgo=$(parse_cnf xtrabackup encrypt "")
     ekey=$(parse_cnf xtrabackup encrypt-key "")
     ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
@@ -597,7 +602,9 @@ get_stream()
 get_proc()
 {
     set +e
-    nproc=$(grep -c processor /proc/cpuinfo)
+    nproc=1
+    [ "$OS" = "Linux" ] && nproc=$(grep -c processor /proc/cpuinfo)
+    [ "$OS" = "Darwin" -o "$OS" = "FreeBSD" ] && nproc=$(sysctl -n hw.ncpu)
     [[ -z $nproc || $nproc -eq 0 ]] && nproc=1
     set -e
 }
@@ -1390,10 +1397,21 @@ then
 
 
         wsrep_log_info "Cleaning the existing datadir and innodb-data/log directories"
+<<<<<<< HEAD
         find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
 
         # Clean the binlog dir (if it's explicitly specified)
         # By default it'll be in the datadir
+||||||| merged common ancestors
+        find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
+
+=======
+        if [ "$OS" = "FreeBSD" ] ; then
+            find -E $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1 -prune -regex $cpat -o -exec rm -rfv {} 1>&2 \+
+        else
+            find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1 -prune -regex $cpat -o -exec rm -rfv {} 1>&2 \+
+        fi
+>>>>>>> wsrep_5.6.48-25.30
         tempdir=$(parse_cnf mysqld log-bin "")
         if  [[ -n "$tempdir" ]]; then
             binlog_dir=$(dirname "$tempdir")

@@ -8,6 +8,12 @@
 # rather than Galera's own implementation
 #
 
+--connection node_2
+RESET MASTER;
+
+--connection node_1
+RESET MASTER;
+
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 
@@ -33,7 +39,13 @@ FLUSH LOGS;
 # Use pos 120 in order to skip the header that contains the MySQL version number.
 # Otherwise, version number changes will cause the test to break
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
+<<<<<<< HEAD
 SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 120;
+||||||| merged common ancestors
+SHOW BINLOG EVENTS IN '0.000002' FROM 120;
+=======
+SHOW BINLOG EVENTS IN '0.000001' FROM 120;
+>>>>>>> wsrep_5.6.48-25.30
 
 --connection node_2
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';
@@ -43,6 +55,3 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
 
 DROP TABLE t1;
 DROP TABLE t2;
-
---connection node_1
-RESET MASTER;
