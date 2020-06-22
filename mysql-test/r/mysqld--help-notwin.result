@@ -1601,7 +1601,6 @@ wsrep-certify-nonPK TRUE
 wsrep-cluster-address 
 wsrep-cluster-name my_wsrep_cluster
 wsrep-convert-LOCK-to-trx FALSE
-wsrep-data-home-dir MYSQLTEST_VARDIR/install.db/
 wsrep-dbug-option 
 wsrep-debug FALSE
 wsrep-desync FALSE

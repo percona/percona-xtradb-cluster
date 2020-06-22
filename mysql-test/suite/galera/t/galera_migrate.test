@@ -129,36 +129,16 @@ GRANT ALL PRIVILEGES ON *.* TO 'sst';
 
 --enable_query_log
 
-<<<<<<< HEAD
 --sleep 60
-||||||| merged common ancestors
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
---source include/wait_condition.inc
-=======
---let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
---source include/wait_condition.inc
->>>>>>> wsrep_5.6.48-25.30
 
-<<<<<<< HEAD
 --connection node_3
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-||||||| merged common ancestors
---let $wait_condition = SELECT COUNT(*) = 6 FROM t1;
-=======
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
->>>>>>> wsrep_5.6.48-25.30
 --source include/wait_condition.inc
 
-<<<<<<< HEAD
 --connect node_4a, 127.0.0.1, root, , test, $NODE_MYPORT_4
 --connection node_4a
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
-||||||| merged common ancestors
---let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
-=======
---let $wait_condition = SELECT COUNT(*) = 6 FROM t1;
->>>>>>> wsrep_5.6.48-25.30
 --source include/wait_condition.inc
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
@@ -226,9 +206,10 @@ DROP TABLE t1;
 --connection node_2
 DROP TABLE t1;
 
---connection node_4
+--connection node_4a
 SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_method = 'rsync';
+SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;
@@ -244,13 +225,7 @@ DROP USER sst;
 --source include/wait_condition.inc
 
 SET GLOBAL wsrep_provider = 'none';
-<<<<<<< HEAD
-SET GLOBAL wsrep_sst_method = 'xtrabackup-v2';
-||||||| merged common ancestors
-SET GLOBAL wsrep_sst_method = 'rsync';
-=======
 SET GLOBAL wsrep_sst_auth = '';
->>>>>>> wsrep_5.6.48-25.30
 SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;
 DROP USER sst;

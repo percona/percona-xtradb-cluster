@@ -67,18 +67,13 @@ DROP TABLE t1;
 DROP TABLE t1;
 SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_method = 'rsync';
+SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;
 DROP USER sst;
 SET GLOBAL wsrep_provider = 'none';
-<<<<<<< HEAD
-SET GLOBAL wsrep_sst_method = 'xtrabackup-v2';
-||||||| merged common ancestors
-SET GLOBAL wsrep_sst_method = 'rsync';
-=======
 SET GLOBAL wsrep_sst_auth = '';
->>>>>>> wsrep_5.6.48-25.30
 SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;
 DROP USER sst;

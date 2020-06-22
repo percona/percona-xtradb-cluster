@@ -1397,21 +1397,13 @@ then
 
 
         wsrep_log_info "Cleaning the existing datadir and innodb-data/log directories"
-<<<<<<< HEAD
-        find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
-
         # Clean the binlog dir (if it's explicitly specified)
         # By default it'll be in the datadir
-||||||| merged common ancestors
-        find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
-
-=======
         if [ "$OS" = "FreeBSD" ] ; then
             find -E $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1 -prune -regex $cpat -o -exec rm -rfv {} 1>&2 \+
         else
             find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1 -prune -regex $cpat -o -exec rm -rfv {} 1>&2 \+
         fi
->>>>>>> wsrep_5.6.48-25.30
         tempdir=$(parse_cnf mysqld log-bin "")
         if  [[ -n "$tempdir" ]]; then
             binlog_dir=$(dirname "$tempdir")

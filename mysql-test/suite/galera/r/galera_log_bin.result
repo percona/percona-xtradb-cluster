@@ -13,50 +13,8 @@ COUNT(*) = 2
 1
 ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 FLUSH LOGS;
-<<<<<<< HEAD
 SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 120;
-||||||| merged common ancestors
-SHOW BINLOG EVENTS IN '0.000002' FROM 120;
-=======
-SHOW BINLOG EVENTS IN '0.000001' FROM 120;
->>>>>>> wsrep_5.6.48-25.30
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-<<<<<<< HEAD
-||||||| merged common ancestors
-0.000002	120	Query	1	244	use `test`; CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB
-0.000002	244	Query	1	321	BEGIN
-0.000002	321	Table_map	1	366	table_id: # (test.t1)
-0.000002	366	Write_rows	1	406	table_id: # flags: STMT_END_F
-0.000002	406	Xid	1	437	COMMIT /* xid=# */
-0.000002	437	Query	1	549	use `test`; CREATE TABLE t2 (id INT) ENGINE=InnoDB
-0.000002	549	Query	1	626	BEGIN
-0.000002	626	Table_map	1	671	table_id: # (test.t2)
-0.000002	671	Write_rows	1	711	table_id: # flags: STMT_END_F
-0.000002	711	Xid	1	742	COMMIT /* xid=# */
-0.000002	742	Query	1	819	BEGIN
-0.000002	819	Table_map	1	864	table_id: # (test.t2)
-0.000002	864	Write_rows	1	904	table_id: # flags: STMT_END_F
-0.000002	904	Xid	1	935	COMMIT /* xid=# */
-0.000002	935	Query	1	1045	use `test`; ALTER TABLE t1 ADD COLUMN f2 INTEGER
-0.000002	1045	Rotate	1	1084	0.000003;pos=4
-=======
-0.000001	120	Query	1	244	use `test`; CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB
-0.000001	244	Query	1	321	BEGIN
-0.000001	321	Table_map	1	366	table_id: # (test.t1)
-0.000001	366	Write_rows	1	406	table_id: # flags: STMT_END_F
-0.000001	406	Xid	1	437	COMMIT /* xid=# */
-0.000001	437	Query	1	549	use `test`; CREATE TABLE t2 (id INT) ENGINE=InnoDB
-0.000001	549	Query	1	626	BEGIN
-0.000001	626	Table_map	1	671	table_id: # (test.t2)
-0.000001	671	Write_rows	1	711	table_id: # flags: STMT_END_F
-0.000001	711	Xid	1	742	COMMIT /* xid=# */
-0.000001	742	Query	1	819	BEGIN
-0.000001	819	Table_map	1	864	table_id: # (test.t2)
-0.000001	864	Write_rows	1	904	table_id: # flags: STMT_END_F
-0.000001	904	Xid	1	935	COMMIT /* xid=# */
-0.000001	935	Query	1	1045	use `test`; ALTER TABLE t1 ADD COLUMN f2 INTEGER
-0.000001	1045	Rotate	1	1084	0.000002;pos=4
->>>>>>> wsrep_5.6.48-25.30
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';
 COUNT(*) = 2
 1

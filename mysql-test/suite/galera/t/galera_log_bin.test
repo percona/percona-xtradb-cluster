@@ -39,13 +39,7 @@ FLUSH LOGS;
 # Use pos 120 in order to skip the header that contains the MySQL version number.
 # Otherwise, version number changes will cause the test to break
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-<<<<<<< HEAD
 SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 120;
-||||||| merged common ancestors
-SHOW BINLOG EVENTS IN '0.000002' FROM 120;
-=======
-SHOW BINLOG EVENTS IN '0.000001' FROM 120;
->>>>>>> wsrep_5.6.48-25.30
 
 --connection node_2
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';

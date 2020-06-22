@@ -1,9 +1,9 @@
-SET GLOBAL wsrep_on = OFF;
+SET SESSION wsrep_on = OFF;
 RESET MASTER;
-SET GLOBAL wsrep_on = ON;
-SET GLOBAL wsrep_on = OFF;
+SET SESSION wsrep_on = ON;
+SET SESSION wsrep_on = OFF;
 RESET MASTER;
-SET GLOBAL wsrep_on = ON;
+SET SESSION wsrep_on = ON;
 RESET MASTER;
 START SLAVE USER='root';
 Warnings:
