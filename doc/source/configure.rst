@@ -131,7 +131,7 @@ Configuration Reference
 :variable:`wsrep_sst_auth`
 
   Specify authentication credentials for :term:`SST`
-  as ``<sst_user>:<sst_pass>``.
+  as ``<sstuser>:<sst_pass>``.
   You must create this user when :ref:`bootstrap`
   and provide necessary privileges for it:
 

@@ -249,7 +249,7 @@ in a running cluster:
 
    .. code-block:: guess
 
-      mysql> CREATE USER 'sst_user'$'%' IDENTIFIED BY PASSWORD 'sst_password';
+      mysql> CREATE USER 'sstuser'$'%' IDENTIFIED BY PASSWORD 'sst_password';
 
    .. note:: This user must have the same name and password on all nodes
       where you want to use ``mysqldump`` for SST.
@@ -258,19 +258,19 @@ in a running cluster:
 
    .. code-block:: guess
 
-      mysql> GRANT USAGE ON *.* TO 'sst_user' REQUIRE SSL;
+      mysql> GRANT USAGE ON *.* TO 'sstuser' REQUIRE SSL;
 
 #. To make sure that the SST user replicated across the cluster,
    run the following query on another node:
 
    .. code-block:: guess
 
-      mysql> SELECT User, Host, ssl_type FROM mysql.user WHERE User='sst_user';
+      mysql> SELECT User, Host, ssl_type FROM mysql.user WHERE User='sstuser';
 
       +----------+------+----------+
       | User     | Host | ssl_type |
       +----------+------+----------+
-      | sst_user | %    | Any      |
+      | sstuser | %    | Any      |
       +----------+------+----------+
 
    .. note:: If the :variable:`wsrep_OSU_method` is set to ROI,
@@ -296,7 +296,7 @@ in a running cluster:
    in the :variable:`wsrep_sst_auth` variable on each node::
 
     [mysqld]
-    wsrep_sst_auth = sst_user:sst_password
+    wsrep_sst_auth = sstuser:sst_password
 
 #. Restart the cluster with the new configuration.
 
