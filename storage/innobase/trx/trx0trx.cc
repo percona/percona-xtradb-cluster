@@ -70,10 +70,6 @@ Created 3/26/1996 Heikki Tuuri
 #endif /* WITH_WSREP */
 static const ulint MAX_DETAILED_ERROR_LEN = 256;
 
-#ifdef WITH_WSREP
-#include <wsrep_mysqld.h>
-#endif /* WITH_WSREP */
-
 /** Set of table_id */
 typedef std::set<
 	table_id_t,
@@ -3585,8 +3581,9 @@ Kill all transactions that are blocking this transaction from acquiring locks.
 void
 trx_kill_blocking(trx_t* trx)
 {
+	DBUG_ENTER("trx_kill_blocking");
 	if (trx->hit_list.empty()) {
-		return;
+		DBUG_VOID_RETURN;
 	}
 
 	DEBUG_SYNC_C("trx_kill_blocking_enter");
@@ -3746,5 +3743,5 @@ trx_kill_blocking(trx_t* trx)
 
 		row_mysql_freeze_data_dictionary(trx);
 	}
-
+	DBUG_VOID_RETURN;
 }
