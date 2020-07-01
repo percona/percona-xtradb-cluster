@@ -25,8 +25,15 @@ DROP USER u1;
 --let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.user WHERE USER = 'u1';
 --source include/wait_condition.inc
 
+<<<<<<< HEAD
 --connection node_1
+||||||| merged common ancestors
+=======
+--let $assert_only_after = CURRENT_TEST
+
+>>>>>>> wsrep_5.7.30-25.22
 # Check that the plaintext password does not appear in the logs
+<<<<<<< HEAD
 
 --let $assert_text = plaintext_password
 --let $assert_select = plaintext_password
@@ -41,9 +48,24 @@ DROP USER u1;
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
+||||||| merged common ancestors
+--exec grep --count plaintext_password $MYSQLTEST_VARDIR/log/mysqld.1.err || true
+--exec grep --count plaintext_password $MYSQLTEST_VARDIR/log/mysqld.2.err || true
+=======
+--let $assert_select = plaintext_password
+--let $assert_count = 0
+--let $assert_text = Plaintext password count is 0
+
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--source include/assert_grep.inc
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--source include/assert_grep.inc
+>>>>>>> wsrep_5.7.30-25.22
 
 # Check that the obfuscated password appears in the logs
+--let $assert_select = 9CAB2BAE176801E82ABA9E55CCCDDBF388E0301D
 
+<<<<<<< HEAD
 # Five times for the first node, in the various wsrep_debug messages
 --let $assert_text = 'mysql_native_password' AS '<secret>'
 --let $assert_select = 'mysql_native_password' AS '<secret>'
@@ -51,14 +73,37 @@ DROP USER u1;
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
+||||||| merged common ancestors
+# Four times for the first node, in the various wsrep_debug messages
+--exec grep --count 9CAB2BAE176801E82ABA9E55CCCDDBF388E0301D $MYSQLTEST_VARDIR/log/mysqld.1.err
+=======
+# Four times for the first node, in the various wsrep_debug messages
+--let $assert_count = 4
+--let $assert_text = Obfuscated password count is 4 on the master node
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--source include/assert_grep.inc
+>>>>>>> wsrep_5.7.30-25.22
 
 # Once for the second node, in the 'Slave SQL' error
+<<<<<<< HEAD
 --let $assert_text = 'mysql_native_password' AS '<secret>'
 --let $assert_select = 'mysql_native_password' AS '<secret>'
 --let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
+||||||| merged common ancestors
+--exec grep --count 9CAB2BAE176801E82ABA9E55CCCDDBF388E0301D $MYSQLTEST_VARDIR/log/mysqld.2.err
+
+DROP USER u1;
+=======
+--let $assert_count = 1
+--let $assert_text = Obfuscated password count is 1 on the slave node
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--source include/assert_grep.inc
+
+DROP USER u1;
+>>>>>>> wsrep_5.7.30-25.22
 
 --disable_query_log
 --eval SET GLOBAL wsrep_debug = $wsrep_debug_orig

@@ -1,5 +1,11 @@
+<<<<<<< HEAD
 #!/bin/bash -ue
 
+||||||| merged common ancestors
+#!/bin/bash -ue
+=======
+#!/usr/bin/env bash
+>>>>>>> wsrep_5.7.30-25.22
 # Copyright (C) 2013 Percona Inc
 #
 # This program is free software; you can redistribute it and/or modify
@@ -19,20 +25,35 @@
 # Documentation: http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html
 # Make sure to read that before proceeding!
 
+<<<<<<< HEAD
 
 #-------------------------------------------------------------------------------
 #
 # Step-1: Parse and read input params arguments. These are mainly
 # related to role/username/password/etc...
 #
+||||||| merged common ancestors
+
+
+
+=======
+set -o nounset -o errexit
+
+>>>>>>> wsrep_5.7.30-25.22
 . $(dirname $0)/wsrep_sst_common
 
+<<<<<<< HEAD
 #-------------------------------------------------------------------------------
 #
 # Step-2: Setup default global variable that we plan to use during processing.
 #
 
 # encryption specific variables.
+||||||| merged common ancestors
+=======
+OS=$(uname)
+
+>>>>>>> wsrep_5.7.30-25.22
 ealgo=""
 ekey=""
 ekeyfile=""
@@ -586,6 +607,22 @@ read_cnf()
     ncsockopt=$(parse_cnf sst ncsockopt "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
+<<<<<<< HEAD
+||||||| merged common ancestors
+    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+    ealgo=$(parse_cnf xtrabackup encrypt "")
+    ekey=$(parse_cnf xtrabackup encrypt-key "")
+    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
+=======
+     if [ "$OS" = "FreeBSD" ] ; then
+        cpat=$(parse_cnf sst cpat '.*\.pem$|.*init\.ok$|.*galera\.cache$|.*sst_in_progress$|.*\.sst$|.*gvwstate\.dat$|.*grastate\.dat$|.*\.err$|.*\.log$|.*RPM_UPGRADE_MARKER$|.*RPM_UPGRADE_HISTORY$')
+    else
+        cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+    fi
+    ealgo=$(parse_cnf xtrabackup encrypt "")
+    ekey=$(parse_cnf xtrabackup encrypt-key "")
+    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
+>>>>>>> wsrep_5.7.30-25.22
     scomp=$(parse_cnf sst compressor "")
     sdecomp=$(parse_cnf sst decompressor "")
 
@@ -829,7 +866,9 @@ get_stream()
 get_proc()
 {
     set +e
-    nproc=$(grep -c processor /proc/cpuinfo)
+    nproc=1
+    [ "$OS" = "Linux" ] && nproc=$(grep -c processor /proc/cpuinfo)
+    [ "$OS" = "Darwin" -o "$OS" = "FreeBSD" ] && nproc=$(sysctl -n hw.ncpu)
     [[ -z $nproc || $nproc -eq 0 ]] && nproc=1
     set -e
 }
@@ -1942,6 +1981,7 @@ then
             exit 32
         fi
 
+<<<<<<< HEAD
         if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
         then
             wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1967,6 +2007,36 @@ then
             if [[ -d ${DATA}/.sst ]]; then
                 wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer. Removing"
                 rm -rf ${DATA}/.sst
+||||||| merged common ancestors
+        wsrep_log_info "Cleaning the existing datadir and innodb-data/log directories"
+        find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
+
+        tempdir=$(parse_cnf mysqld log-bin "")
+        if [[ -n ${tempdir:-} ]];then
+            binlog_dir=$(dirname $tempdir)
+            binlog_file=$(basename $tempdir)
+            if [[ -n ${binlog_dir:-} && $binlog_dir != '.' && $binlog_dir != $DATA ]];then
+                pattern="$binlog_dir/$binlog_file\.[0-9]+$"
+                wsrep_log_info "Cleaning the binlog directory $binlog_dir as well"
+                find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+ || true
+                rm $binlog_dir/*.index || true
+=======
+        wsrep_log_info "Cleaning the existing datadir and innodb-data/log directories"
+        if [ "$OS" = "FreeBSD" ] ; then
+            find -E $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1 -prune -regex $cpat -o -exec rm -rfv {} 1>&2 \+
+        else
+            find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1 -prune -regex $cpat -o -exec rm -rfv {} 1>&2 \+
+        fi
+        tempdir=$(parse_cnf mysqld log-bin "")
+        if [[ -n ${tempdir:-} ]];then
+            binlog_dir=$(dirname $tempdir)
+            binlog_file=$(basename $tempdir)
+            if [[ -n ${binlog_dir:-} && $binlog_dir != '.' && $binlog_dir != $DATA ]];then
+                pattern="$binlog_dir/$binlog_file\.[0-9]+$"
+                wsrep_log_info "Cleaning the binlog directory $binlog_dir as well"
+                find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+ || true
+                rm $binlog_dir/*.index || true
+>>>>>>> wsrep_5.7.30-25.22
             fi
             mkdir -p ${DATA}/.sst
             JOINER_SST_DIR=$DATA/.sst

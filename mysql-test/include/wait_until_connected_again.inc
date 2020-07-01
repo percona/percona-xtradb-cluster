@@ -10,7 +10,16 @@
 
 --disable_result_log
 --disable_query_log
+<<<<<<< HEAD
 let $counter= 5000;
+||||||| merged common ancestors
+let $counter= 500;
+=======
+# Wsrep change: The native $counter initial value was 500, but this
+# may not be enough for all tests which restart a node which joins
+# back with SST.
+let $counter= 1000;
+>>>>>>> wsrep_5.7.30-25.22
 if ($VALGRIND_TEST) {
   let $counter= 30000;
 }

@@ -2,6 +2,18 @@ SET GLOBAL wsrep_debug = ON;
 CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 ERROR HY000: Operation CREATE USER failed for 'u1'@'%'
+<<<<<<< HEAD
+||||||| merged common ancestors
+0
+0
+4
+1
+=======
+include/assert_grep.inc [Plaintext password count is 0]
+include/assert_grep.inc [Plaintext password count is 0]
+include/assert_grep.inc [Obfuscated password count is 4 on the master node]
+include/assert_grep.inc [Obfuscated password count is 1 on the slave node]
+>>>>>>> wsrep_5.7.30-25.22
 DROP USER u1;
 include/assert_grep.inc [plaintext_password]
 include/assert_grep.inc [plaintext_password]

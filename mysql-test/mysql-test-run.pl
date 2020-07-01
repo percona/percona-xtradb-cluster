@@ -6102,6 +6102,7 @@ sub mysqld_arguments ($$$) {
     {
         $found_no_console= 1;
     }
+<<<<<<< HEAD
 #    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
 #    {
 #      ; # Dont add --binlog-format when running without binlog
@@ -6117,6 +6118,28 @@ sub mysqld_arguments ($$$) {
 #        ; # Dont add --binlog-format when running without binlog
 #      }
 #    }
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
+    {
+      if (grep { /--wsrep-provider=/ } @$extra_opts) {
+        # As an exception, allow --binlog-format if MTR is run with
+        # wsrep provider loaded.
+        mtr_add_arg($args, "%s", $arg);
+      } else {
+        ; # Dont add --binlog-format when running without binlog
+      }
+    }
+    elsif ($arg eq "--loose-skip-log-bin" and
+||||||||| merged common ancestors
+    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
+    {
+      ; # Dont add --binlog-format when running without binlog
+    }
+    elsif ($arg eq "--loose-skip-log-bin" and
+=========
+=======
+>>>>>>> wsrep_5.7.30-25.22
     elsif ($arg =~ /--loose[-_]skip[-_]log[-_]bin/ and
            $mysqld->option("log-slave-updates"))
     {

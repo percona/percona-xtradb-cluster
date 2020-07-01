@@ -5115,8 +5115,16 @@ compare_errors:
                      "no error"),
 #ifdef WITH_WSREP
                     actual_error, print_slave_db_safe(db),
+<<<<<<< HEAD
                     (!opt_general_log_raw) && thd->rewritten_query().length()
                     ? wsrep_thd_rewritten_query(thd).c_ptr_safe() : query_arg);
+||||||| merged common ancestors
+                    (!opt_general_log_raw) && thd->rewritten_query.length()
+                    ? thd->rewritten_query.c_ptr_safe() : query_arg);
+=======
+                    (!opt_general_log_raw) && thd->rewritten_query().length()
+                    ? thd->rewritten_query().ptr() : query_arg);
+>>>>>>> wsrep_5.7.30-25.22
 #else
                     actual_error, print_slave_db_safe(db), query_arg);
 #endif /* WITH_WSREP */
@@ -5179,8 +5187,16 @@ compare_errors:
                      "unexpected success or fatal error"),
 #ifdef WITH_WSREP
                     print_slave_db_safe(db),
+<<<<<<< HEAD
                       (!opt_general_log_raw) && thd->rewritten_query().length()
                       ? wsrep_thd_rewritten_query(thd).c_ptr_safe() : query_arg);
+||||||| merged common ancestors
+                      (!opt_general_log_raw) && thd->rewritten_query.length()
+                      ? thd->rewritten_query.c_ptr_safe() : query_arg);
+=======
+                    (!opt_general_log_raw) && thd->rewritten_query().length()
+                    ? thd->rewritten_query().ptr() : query_arg);
+>>>>>>> wsrep_5.7.30-25.22
 #else
                     print_slave_db_safe(thd->db().str), query_arg);
 #endif /* WITH_WSREP */
@@ -7704,6 +7720,10 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli)
   mysql_mutex_lock(&rli_ptr->data_lock);
   if (error)
   {
+#ifdef WITH_WSREP
+    /* if slave transaction has to be replayed, do not report error message */
+    if ((!WSREP(thd) || thd->wsrep_conflict_state != MUST_REPLAY))
+#endif /* WITH_WSREP */
     rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
                 "Error in Xid_log_event: Commit could not be completed, '%s'",
                 thd->get_stmt_da()->message_text());

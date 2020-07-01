@@ -1583,6 +1583,9 @@ void close_connection(THD *thd, uint sql_errno,
   if (MYSQL_CONNECTION_DONE_ENABLED())
   {
     sleep(0); /* Workaround to avoid tailcall optimisation */
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    wsrep_thd_set_query_state(thd, QUERY_EXITING);
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
 
   if (generate_event)

@@ -70,15 +70,21 @@ VARIABLE_VALUE
 DROP TABLE t1;
 DROP TABLE t1;
 SET GLOBAL wsrep_provider = 'none';
-SET GLOBAL wsrep_sst_auth = '';
-SET GLOBAL wsrep_provider_options = '';
-DROP TABLE t1;
-DROP USER sst;
-SET GLOBAL wsrep_provider = 'none';
-SET GLOBAL wsrep_sst_method = default;
+SET GLOBAL wsrep_sst_method = 'rsync';
 SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
+DROP TABLE t1;
+DROP USER sst;
+SET GLOBAL wsrep_provider = 'none';
+<<<<<<< HEAD
+SET GLOBAL wsrep_sst_method = default;
+||||||| merged common ancestors
+SET GLOBAL wsrep_sst_method = 'rsync';
+=======
+>>>>>>> wsrep_5.7.30-25.22
+SET GLOBAL wsrep_sst_auth = '';
+SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;
 DROP USER sst;
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");

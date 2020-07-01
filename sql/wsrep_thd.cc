@@ -109,7 +109,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   shadow->server_status = thd->server_status;
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
   shadow->vio           = thd->active_vio;
-
+  shadow->rli_slave     = thd->rli_slave;
   // Disable general logging on applier threads
   thd->variables.option_bits |= OPTION_LOG_OFF;
   // Enable binlogging if opt_log_slave_updates is set
@@ -130,7 +130,6 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   if (!thd->wsrep_rli)
   {
     thd->wsrep_rli = wsrep_relay_log_init("wsrep_relay");
-    assert(!thd->rli_slave);
     thd->rli_slave = thd->wsrep_rli;
     thd->wsrep_rli->info_thd= thd;
     thd->init_for_queries(thd->wsrep_rli);
@@ -161,17 +160,22 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db);
   thd->user_time              = shadow->user_time;
-
   assert(thd->rli_slave == thd->wsrep_rli);
-  thd->rli_slave = NULL;
+  thd->rli_slave              = shadow->rli_slave;
 
   delete thd->wsrep_rli->current_mts_submode;
   thd->wsrep_rli->current_mts_submode = 0;
   delete thd->wsrep_rli;
   thd->wsrep_rli = 0;
+<<<<<<< HEAD
 #ifdef GALERA
   thd->slave_thread = FALSE;
 #endif /* GALERA */
+||||||| merged common ancestors
+  thd->slave_thread = FALSE;
+=======
+  thd->slave_thread = (thd->rli_slave) ? TRUE : FALSE;
+>>>>>>> wsrep_5.7.30-25.22
   thd->set_row_count_func(shadow->row_count_func);
 }
 

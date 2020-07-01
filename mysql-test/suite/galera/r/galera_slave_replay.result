@@ -1,0 +1,74 @@
+RESET MASTER;
+RESET SLAVE ALL;
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1)) engine=innodb;
+INSERT INTO t1 VALUES (1, 'a');
+INSERT INTO t1 VALUES (3, 'a');
+set binlog_format=STATEMENT;
+SET AUTOCOMMIT=ON;
+START TRANSACTION;
+SELECT * FROM t1  FOR UPDATE;
+f1	f2
+1	a
+3	a
+UPDATE t1 SET f2 = 'c' WHERE f1 > 1;
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
+SET GLOBAL debug = "d,sync.wsrep_apply_cb";
+INSERT INTO test.t1 VALUES (2, 'b');
+COMMIT;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL debug = "";
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'a';
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
+COUNT(*) = 1
+1
+SELECT * FROM t1;
+f1	f2
+1	a
+3	c
+set session wsrep_sync_wait=15;
+set session wsrep_sync_wait=0;
+wsrep_local_replays
+1
+SELECT *  FROM t1;
+f1	f2
+1	a
+2	b
+3	c
+SET DEBUG_SYNC = "RESET";
+#
+# test phase with real abort
+#
+set binlog_format=ROW;
+insert into t1 values (4, 'd');
+SET AUTOCOMMIT=ON;
+START TRANSACTION;
+UPDATE t1 SET f2 = 'd' WHERE f1 = 3;
+SET GLOBAL debug = "d,sync.wsrep_apply_cb";
+UPDATE test.t1 SET f2 = 'e' WHERE f1 = 3;
+SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_apply_cb_reached";
+COMMIT;
+SET GLOBAL debug = "";
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
+set session wsrep_sync_wait=15;
+SELECT COUNT(*) = 1 FROM test.t1 WHERE f2 = 'e';
+COUNT(*) = 1
+1
+set session wsrep_sync_wait=0;
+STOP SLAVE;
+RESET SLAVE ALL;
+DROP TABLE t1;
+CALL mtr.add_suppression("Node has dropped from cluster");
+CALL mtr.add_suppression("Error in Xid_log_event: Commit could not be complete");
+DROP TABLE t1;
+RESET MASTER;
