@@ -33,15 +33,9 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
-<<<<<<< HEAD
+#include "wsrep_thd.h"
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-#endif
-=======
-#include "wsrep_thd.h"
-#endif
->>>>>>> wsrep_5.7.30-25.22
 #ifdef HAVE_REPLICATION
 #include "rpl_slave.h"
 
@@ -4948,23 +4942,6 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
 
     exec_res= ev->apply_event(rli);
 #ifdef WITH_WSREP
-<<<<<<< HEAD
-    if (exec_res && thd->wsrep_conflict_state != NO_CONFLICT)
-    {
-      WSREP_DEBUG("Apply Event failed (Reason: %d, Conflict-State: %s)",
-                 exec_res, wsrep_get_conflict_state(thd->wsrep_conflict_state));
-      rli->abort_slave = 1;
-      rli->report(ERROR_LEVEL, ER_UNKNOWN_COM_ERROR,
-                  "Node has dropped from cluster");
-||||||| merged common ancestors
-    if (exec_res && thd->wsrep_conflict_state != NO_CONFLICT)
-    {
-      WSREP_DEBUG("SQL apply failed, res %d conflict state: %d",
-                 exec_res, thd->wsrep_conflict_state);
-      rli->abort_slave = 1;
-      rli->report(ERROR_LEVEL, ER_UNKNOWN_COM_ERROR,
-                  "Node has dropped from cluster");
-=======
     if (WSREP_ON && exec_res)
     {
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -4998,7 +4975,6 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
           break;
       }
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
->>>>>>> wsrep_5.7.30-25.22
     }
 #endif /* WITH_WSREP */
 

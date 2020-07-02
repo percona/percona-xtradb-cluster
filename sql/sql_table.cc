@@ -6072,12 +6072,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table, TABLE_LIST* src_table,
          enable the create to succeed
        */
       TABLE_LIST tbl;
-<<<<<<< HEAD
       memset(static_cast<void*>(&tbl), 0, sizeof(tbl));
-||||||| merged common ancestors
-      memset(&tbl, 0, sizeof(tbl));
-=======
->>>>>>> wsrep_5.7.30-25.22
       tbl.db= src_table->db;
       tbl.table_name= tbl.alias= src_table->table_name;
       tbl.table= tmp_table;

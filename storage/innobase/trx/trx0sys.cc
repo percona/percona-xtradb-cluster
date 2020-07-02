@@ -437,16 +437,10 @@ trx_sys_read_wsrep_checkpoint(XID* xid)
 
 	sys_header = trx_sysf_get(&mtr);
 
-<<<<<<< HEAD
-	if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
-		+ TRX_SYS_WSREP_XID_MAGIC_N_FLD))
-		!= TRX_SYS_WSREP_XID_MAGIC_N) {
-||||||| merged common ancestors
         if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
                                       + TRX_SYS_WSREP_XID_MAGIC_N_FLD))
             != TRX_SYS_WSREP_XID_MAGIC_N) {
-                memset(xid, 0, sizeof(*xid));
-                xid->set_format_id(-1);
+				xid->reset();
                 trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
                 mtr_commit(&mtr);
                 return;
@@ -467,106 +461,6 @@ trx_sys_read_wsrep_checkpoint(XID* xid)
         xid->set_data(
                       sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_DATA, 
                       XIDDATASIZE);
-
-	mtr_commit(&mtr);
-}
-
-#endif /* WITH_WSREP */
-
-/*****************************************************************//**
-Stores the MySQL binlog offset info in the trx system header if
-the magic number shows it valid, and print the info to stderr */
-void
-trx_sys_print_mysql_binlog_offset(void)
-/*===================================*/
-{
-	trx_sysf_t*	sys_header;
-	mtr_t		mtr;
-	ulint		trx_sys_mysql_bin_log_pos_high;
-	ulint		trx_sys_mysql_bin_log_pos_low;
-
-	mtr_start(&mtr);
-
-	sys_header = trx_sysf_get(&mtr);
-
-	if (mach_read_from_4(sys_header + TRX_SYS_MYSQL_LOG_INFO
-			     + TRX_SYS_MYSQL_LOG_MAGIC_N_FLD)
-	    != TRX_SYS_MYSQL_LOG_MAGIC_N) {
-=======
-        if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
-                                      + TRX_SYS_WSREP_XID_MAGIC_N_FLD))
-            != TRX_SYS_WSREP_XID_MAGIC_N) {
-		xid->reset();
-                trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
-                mtr_commit(&mtr);
-                return;
-        }
-
-        xid->set_format_id((long)mach_read_from_4(
-                sys_header
-                + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_FORMAT));
-        xid->set_gtrid_length((long)mach_read_from_4(
-                sys_header
-                + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_GTRID_LEN));
-        xid->set_bqual_length((long)mach_read_from_4(
-                sys_header
-                + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_BQUAL_LEN));
-        //ut_memcpy(xid->data,
-        //          sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_DATA,
-        //          XIDDATASIZE);
-        xid->set_data(
-                      sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_DATA, 
-                      XIDDATASIZE);
-
-	mtr_commit(&mtr);
-}
-
-#endif /* WITH_WSREP */
-
-/*****************************************************************//**
-Stores the MySQL binlog offset info in the trx system header if
-the magic number shows it valid, and print the info to stderr */
-void
-trx_sys_print_mysql_binlog_offset(void)
-/*===================================*/
-{
-	trx_sysf_t*	sys_header;
-	mtr_t		mtr;
-	ulint		trx_sys_mysql_bin_log_pos_high;
-	ulint		trx_sys_mysql_bin_log_pos_low;
-
-	mtr_start(&mtr);
-
-	sys_header = trx_sysf_get(&mtr);
-
-	if (mach_read_from_4(sys_header + TRX_SYS_MYSQL_LOG_INFO
-			     + TRX_SYS_MYSQL_LOG_MAGIC_N_FLD)
-	    != TRX_SYS_MYSQL_LOG_MAGIC_N) {
->>>>>>> wsrep_5.7.30-25.22
-
-		memset(static_cast<void*>(xid), 0, sizeof(*xid));
-		xid->set_format_id(-1);
-		trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
-		mtr_commit(&mtr);
-		return;
-
-	}
-
-	/* Make sure we first load it to int32_t so the sign bit is preserved.*/
-	int32_t format_id = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
-					     + TRX_SYS_WSREP_XID_FORMAT);
-	xid->set_format_id(format_id);
-
-	xid->set_gtrid_length(mach_read_from_4(sys_header
-				+ TRX_SYS_WSREP_XID_INFO
-				+ TRX_SYS_WSREP_XID_GTRID_LEN));
-
-	xid->set_bqual_length(mach_read_from_4(sys_header
-				+ TRX_SYS_WSREP_XID_INFO
-				+ TRX_SYS_WSREP_XID_BQUAL_LEN));
-
-	xid->set_data(sys_header + TRX_SYS_WSREP_XID_INFO
-			+ TRX_SYS_WSREP_XID_DATA, XIDDATASIZE);
 
 	mtr_commit(&mtr);
 }

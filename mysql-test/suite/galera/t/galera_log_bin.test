@@ -49,11 +49,6 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
 
 DROP TABLE t1;
 DROP TABLE t2;
-<<<<<<< HEAD
 
 --connection node_1
 RESET MASTER;
-||||||| merged common ancestors
-
-=======
->>>>>>> wsrep_5.7.30-25.22

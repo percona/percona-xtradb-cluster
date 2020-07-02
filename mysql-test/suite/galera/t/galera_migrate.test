@@ -140,16 +140,11 @@ GRANT ALL PRIVILEGES ON *.* TO 'sst';
 
 --connect node_4a, 127.0.0.1, root, , test, $NODE_MYPORT_4
 --connection node_4a
-<<<<<<< HEAD
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_ready';
 --source include/wait_condition.inc
 --let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
-||||||| merged common ancestors
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
-=======
---let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
->>>>>>> wsrep_5.7.30-25.22
 --source include/wait_condition.inc
 
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
@@ -234,12 +229,6 @@ DROP USER sst;
 --source include/wait_condition.inc
 
 SET GLOBAL wsrep_provider = 'none';
-<<<<<<< HEAD
-SET GLOBAL wsrep_sst_method = default;
-||||||| merged common ancestors
-SET GLOBAL wsrep_sst_method = 'rsync';
-=======
->>>>>>> wsrep_5.7.30-25.22
 SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;

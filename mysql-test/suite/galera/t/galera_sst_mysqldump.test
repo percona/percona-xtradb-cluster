@@ -17,7 +17,6 @@
 --source suite/galera/include/galera_st_kill_slave_ddl.inc
 
 --source suite/galera/include/galera_sst_restore.inc
-<<<<<<< HEAD
 
 --connection node_1
 # Starting 5.7 if server is started with skip-grant-table then current_user
@@ -41,10 +40,7 @@ CALL mtr.add_suppression("WSREP: Try 1/3: 'wsrep_sst_mysqldump.*");
 CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
 CALL mtr.add_suppression("InnoDB: Cannot open.*");
 CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
-||||||| merged common ancestors
-=======
 
 # this is needed because somehow wsrep_sst_receive_address gets corrupted
 # on repeat run.
 --source include/force_restart.inc
->>>>>>> wsrep_5.7.30-25.22

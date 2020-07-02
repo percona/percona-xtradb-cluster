@@ -140,14 +140,6 @@ void wsrep_get_SE_checkpoint(wsrep_uuid_t& uuid, wsrep_seqno_t& seqno)
   seqno= WSREP_SEQNO_UNDEFINED;
 
   XID xid;
-<<<<<<< HEAD
-  memset(static_cast<void*>(&xid), 0, sizeof(xid));
-  xid.set_format_id(-1);
-||||||| merged common ancestors
-  memset(&xid, 0, sizeof(xid));
-  xid.set_format_id(-1);
-=======
->>>>>>> wsrep_5.7.30-25.22
 
   wsrep_get_SE_checkpoint(xid);
 

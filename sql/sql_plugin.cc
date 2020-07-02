@@ -3637,33 +3637,6 @@ void plugin_thdvar_safe_update(THD *thd, st_mysql_sys_var *var, char **dest, con
   }
 }
 
-/**
-  Set value for a thread local variable.
-
-  @param[in]     thd   Thread context.
-  @param[in]     var   Plugin variable.
-  @param[in,out] dest  Destination memory pointer.
-  @param[in]     value New value.
-
-  Note: new value should be '\0'-terminated for string variables.
-
-  Used in plugin.h:THDVAR_SET(thd, name, value) macro.
-*/
-
-void plugin_thdvar_safe_update(THD *thd, st_mysql_sys_var *var, char **dest, const char *value)
-{
-  DBUG_ASSERT(current_thd == NULL || thd == current_thd);
-
-  if (var->flags & PLUGIN_VAR_THDLOCAL)
-  {
-    if ((var->flags & PLUGIN_VAR_TYPEMASK) == PLUGIN_VAR_STR &&
-        var->flags & PLUGIN_VAR_MEMALLOC)
-      plugin_var_memalloc_session_update(thd, var, dest, value);
-    else
-      var->update(thd, var, dest, value);
-  }
-}
-
 
 /**
   Free all elements allocated by plugin_var_memalloc_session_update().
