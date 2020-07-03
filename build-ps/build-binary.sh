@@ -565,6 +565,11 @@ fi
     cd "$TARGETDIR/usr/local/"
 
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
+
+    rm -rf $PRODUCT_FULL_NAME/mysql-test 2> /dev/null
+    rm -rf $PRODUCT_FULL_NAME/percona-xtradb-cluster-tests 2> /dev/null
+    find $PRODUCT_FULL_NAME -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
+    $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME
 ) || exit 1
 
 if [[ $KEEP_BUILD -eq 0 ]]
