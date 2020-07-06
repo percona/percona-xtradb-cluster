@@ -239,15 +239,18 @@ get_sources(){
 
 get_system(){
     if [ -f /etc/redhat-release ]; then
+        GLIBC_VER_TMP="$(rpm glibc -qa --qf %{VERSION})"
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         OS_NAME="el$RHEL"
         OS="rpm"
     else
+        GLIBC_VER_TMP="$(dpkg-query -W -f='${Version}' libc6 | awk -F'-' '{print $1}')"
         ARCH=$(uname -m)
         OS_NAME="$(lsb_release -sc)"
         OS="deb"
     fi
+    export GLIBC_VER=".glibc${GLIBC_VER_TMP}"
     return
 }
 
@@ -267,6 +270,8 @@ install_deps() {
     if [ "x$OS" = "xrpm" ]; then
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
+        yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
+        percona-release enable tools testing
         add_percona_yum_repo
         if [ "x${RHEL}" = "x8" ]; then
             yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++
@@ -278,10 +283,6 @@ install_deps() {
             wget https://rpmfind.net/linux/fedora/linux/releases/29/Everything/x86_64/os/Packages/r/rpcgen-1.4-1.fc29.x86_64.rpm
             yum -y install rpcgen-1.4-1.fc29.x86_64.rpm
         else
-            yum -y install https://repo.percona.com/yum/percona-release-latest.noarch.rpm || true
-            percona-release enable original release
-            percona-release enable tools release
-            percona-release enable tools testing
             yum -y install epel-release
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc zstd zstd-devel
             yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel
@@ -306,12 +307,14 @@ install_deps() {
 --slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake3 \
 --family cmake
         fi
-        yum -y install yum-utils
+        yum -y install yum-utils patchelf
     else
         apt-get -y install dirmngr || true
         apt-get update
         apt-get -y install dirmngr || true
         apt-get -y install lsb-release wget
+        wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
+        percona-release enable tools testing
         export DEBIAN_FRONTEND="noninteractive"
         export DIST="$(lsb_release -sc)"
             until sudo apt-get update; do
@@ -326,6 +329,7 @@ install_deps() {
         apt-get -y install curl bison cmake perl libssl-dev gcc g++ libaio-dev libldap2-dev libwrap0-dev gdb unzip gawk
         apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-gnutls-dev
         apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libeatmydata libc6-dbg valgrind libjson-perl libsasl2-dev
+        apt-get -y install patchelf
         if [ x"${DIST}" = xfocal ]; then
             apt-get -y install python3-mysqldb
         else
@@ -337,11 +341,6 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        wget https://repo.percona.com/apt/percona-release_latest.generic_all.deb
-        dpkg -i percona-release_latest.generic_all.deb
-        percona-release enable tools release
-        percona-release enable tools testing
-        apt-get update
         apt-get -y install --download-only percona-xtrabackup-24=2.4.20-1.${DIST}
         apt-get -y install --download-only percona-xtrabackup-80=8.0.11-1.${DIST}
     fi
@@ -753,7 +752,6 @@ build_tarball(){
     ARCH=$(uname -m 2>/dev/null||true)
     JVERSION=${JEMALLOC_VERSION:-4.0.0}
 
-    export SSL_VER=".${OS_NAME}"
     ROOT_FS=$(pwd)
 
     TARFILE=$(basename $(find . -iname 'Percona-XtraDB-Cluster*.tar.gz' | grep -v 'galera' | sort | tail -n1))
