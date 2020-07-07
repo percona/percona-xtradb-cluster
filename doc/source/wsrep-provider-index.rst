@@ -476,6 +476,37 @@ the :file:`galera.cache` file which is used as source for |IST|. The bigger the
 value of this variable, the better are chances that the re-joining node will
 get IST instead of |SST|.
 
+.. variable:: gcomm.thread_prio
+
+Using this option, you can raise the priority of the gcomm thread to a higher
+level than it normally uses. 
+
+The format for this option is: <policy>:<priority>. The priority value is an
+integer. The policy value supports the following options:
+
+other
+   Default time-sharing scheduling in Linux. The threads can run
+   until blocked by an I/O request or preempted by higher priorities or
+   superior scheduling designations.
+
+fifo
+   First-in First-out (FIFO) scheduling. These threads always immediately
+   preempt any currently running other, batch or idle threads. They can run
+   until they are either blocked by an I/O request or preempted by a FIFO thread
+   of a higher priority.
+
+rr
+   Round-robin scheduling. These threads always preempt any currently running
+   other, batch or idle threads. The scheduler allows these threads to run for a
+   fixed period of a time. If the thread is still running when this time period is
+   exceeded, they are stopped and moved to the end of the list, allowing another
+   round-robin thread of the same priority to run in their place. They can
+   otherwise continue to run until they are blocked by an I/O request or are
+   preempted by threads of a higher priority.
+
+.. seealso:: `Full definition in Galera Cluster documentation: gcomm.thread_prio
+	     <https://galeracluster.com/library/documentation/galera-parameters.html#gcomm-thread-prio>`_
+
 .. variable:: gcs.fc_debug
 
    :cli: Yes
