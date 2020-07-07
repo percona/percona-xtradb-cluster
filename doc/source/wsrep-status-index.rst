@@ -194,14 +194,18 @@ Total time spent in a paused state measured in nanoseconds.
 
 .. variable:: wsrep_flow_control_recv
 
-Number of ``FC_PAUSE`` events received since the last status query.
+Number of ``FC_PAUSE`` events received since the last status query. Unlike most
+status variables, the counter for this one does not reset every time you run the
+query.
 
 .. seealso:: `Galera status variable: wsrep_flow_control_recv
              <https://galeracluster.com/library/documentation/galera-status-variables.html#wsrep-flow-control-recv>`_
 
 .. variable:: wsrep_flow_control_sent
 
-Number of ``FC_PAUSE`` events sent since the last status query.
+Number of ``FC_PAUSE`` events sent since the last status query. Unlike most
+status variables, the counter for this one does not reset every time you run the
+query.
 
 .. seealso:: `Galera status variable: wsrep_flow_control_sent
              <https://galeracluster.com/library/documentation/galera-status-variables.html#wsrep-flow-control-sent>`_
