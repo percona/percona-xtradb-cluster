@@ -462,7 +462,15 @@ Total size of other bits replicated.
 
 Total number of writesets sent to other nodes.
 
+.. seealso:: `Galera status variable: wsrep_replicated
+             <https://galeracluster.com/library/documentation/galera-status-variables.html#wsrep-replicated>`_
+
 .. variable:: wsrep_replicated_bytes
 
-Total size (in bytes) of writesets sent to other nodes.
+Total size of replicated writesets. To compute the actual size of bytes sent
+over network to cluster peers, multiply the value of this variable by the number
+of cluster peers in the given :variable:`network segment <gmcast.segment>`.
+
+.. seealso:: `Galera status variable: wsrep_replicated_bytes
+             <https://galeracluster.com/library/documentation/galera-status-variables.html#wsrep-replicated-bytes>`_
 
