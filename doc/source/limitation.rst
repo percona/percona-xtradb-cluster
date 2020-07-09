@@ -64,4 +64,21 @@ All tables must have a primary key.
      Galera Documentation: Tables without Primary Keys
         http://galeracluster.com/documentation-webpages/limitations.html#tables-without-primary-keys
 
+Avoid reusing the names of persistent tables for temporary tables
+   Although MySQL does allow having temporary tables named the same as
+   persistent tables, this approach is not recommended.
+
+   Galera Cluster blocks the replication of those persistent tables
+   the names of which match the names of temporary tables.
+
+   With wsrep_debug set to *1*, the error log may contain the following message:
+
+   .. code-block:: text
+
+      ... [Note] WSREP: TO BEGIN: -1, 0 : create table t (i int) engine=innodb
+      ... [Note] WSREP: TO isolation skipped for: 1, sql: create table t (i int) engine=innodb.Only temporary tables affected.
+
+   .. seealso:: `MySQL Documentation: Problems with temporary tables
+		<https://dev.mysql.com/doc/refman/8.0/en/temporary-table-problems.html>`_
+
 .. include:: .res/replace.opt.txt
