@@ -20424,6 +20424,14 @@ innobase_rollback_by_xid(
 	if (trx != NULL) {
 		TrxInInnoDB	trx_in_innodb(trx);
 
+#ifdef WITH_WSREP
+		/* If a wsrep transaction is being rolled back during
+		   the recovery, we must clear the xid in order to avoid
+		   writing serialisation history for rolled back transaction. */
+		if (trx->xid && wsrep_is_wsrep_xid(trx->xid)) {
+			trx->xid->reset();
+		}
+#endif /* WITH_WSREP */
 		int	ret = innobase_rollback_trx(trx);
 
 		trx_deregister_from_2pc(trx);

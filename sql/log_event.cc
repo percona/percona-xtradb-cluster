@@ -7704,6 +7704,10 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli)
   mysql_mutex_lock(&rli_ptr->data_lock);
   if (error)
   {
+#ifdef WITH_WSREP
+    /* if slave transaction has to be replayed, do not report error message */
+    if ((!WSREP(thd) || thd->wsrep_conflict_state != MUST_REPLAY))
+#endif /* WITH_WSREP */
     rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
                 "Error in Xid_log_event: Commit could not be completed, '%s'",
                 thd->get_stmt_da()->message_text());

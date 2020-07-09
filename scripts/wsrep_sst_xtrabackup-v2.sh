@@ -33,6 +33,7 @@
 #
 
 # encryption specific variables.
+OS=$(uname)
 ealgo=""
 ekey=""
 ekeyfile=""
@@ -829,7 +830,9 @@ get_stream()
 get_proc()
 {
     set +e
-    nproc=$(grep -c processor /proc/cpuinfo)
+    nproc=1
+    [ "$OS" = "Linux" ] && nproc=$(grep -c processor /proc/cpuinfo)
+    [ "$OS" = "Darwin" -o "$OS" = "FreeBSD" ] && nproc=$(sysctl -n hw.ncpu)
     [[ -z $nproc || $nproc -eq 0 ]] && nproc=1
     set -e
 }

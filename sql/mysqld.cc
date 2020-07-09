@@ -5897,6 +5897,15 @@ int mysqld_main(int argc, char **argv)
   Service.SetSlowStarting(slow_start_timeout);
 #endif
 
+#ifdef WITH_WSREP
+  /*
+    Make sure that SSL library gets initialized before WSREP provider
+    is loaded. This is to ensure that possible server side initialization
+    does not have any side effects while the provider is already running
+    with open SSL sessions.
+  */
+  ssl_start();
+#endif /* */
   if (init_server_components())
     unireg_abort(MYSQLD_ABORT_EXIT);
 

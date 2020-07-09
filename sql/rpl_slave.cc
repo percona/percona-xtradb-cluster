@@ -33,6 +33,7 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+#include "wsrep_thd.h"
 #endif /* WITH_WSREP */
 
 #ifdef HAVE_REPLICATION
@@ -4941,13 +4942,39 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
 
     exec_res= ev->apply_event(rli);
 #ifdef WITH_WSREP
-    if (exec_res && thd->wsrep_conflict_state != NO_CONFLICT)
+    if (WSREP_ON && exec_res)
     {
-      WSREP_DEBUG("Apply Event failed (Reason: %d, Conflict-State: %s)",
-                 exec_res, wsrep_get_conflict_state(thd->wsrep_conflict_state));
-      rli->abort_slave = 1;
-      rli->report(ERROR_LEVEL, ER_UNKNOWN_COM_ERROR,
-                  "Node has dropped from cluster");
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      switch(thd->wsrep_conflict_state) {
+        case NO_CONFLICT:  break;
+        case MUST_REPLAY:
+        /* this transaction will be replayed,
+           so not raising slave error here */
+        WSREP_DEBUG("SQL apply failed for MUST_REPLAY, res %d", exec_res);
+        wsrep_replay_transaction(thd);
+        switch (thd->wsrep_conflict_state) {
+        case NO_CONFLICT:
+          exec_res = 0; /* replaying succeeded, and slave may continue */
+          break;
+        case ABORTED:
+          WSREP_WARN("aborted result of slave transaction replaying: %lu, %d",
+                     thd->thread_id(), thd->wsrep_conflict_state);
+          break; /* replaying has failed, trx is rolled back */
+        default:
+          WSREP_WARN("unexpected result of slave transaction replaying: %lu, %d",
+                     thd->thread_id(), thd->wsrep_conflict_state);
+        }
+
+        break;
+      default:
+          WSREP_DEBUG("SQL apply failed, res %d conflict state: %d",
+                      exec_res, thd->wsrep_conflict_state);
+          rli->abort_slave= 1;
+          rli->report(ERROR_LEVEL, ER_UNKNOWN_COM_ERROR,
+                      "Node has dropped from cluster");
+          break;
+      }
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     }
 #endif /* WITH_WSREP */
 
@@ -5553,10 +5580,10 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
     }
 
 #ifdef WITH_WSREP
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    if (thd->wsrep_conflict_state == NO_CONFLICT)
+    if (WSREP_ON) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    if (!WSREP_ON || thd->wsrep_conflict_state == NO_CONFLICT)
     {
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      if (WSREP_ON) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
     if (slave_trans_retries)
     {
@@ -5645,7 +5672,7 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
       }
     }
 #ifdef WITH_WSREP
-    } else mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    } else if (WSREP_ON) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
 
     if (exec_res)
@@ -7700,6 +7727,7 @@ wsrep_restart_point:
 
 #ifdef WITH_WSREP
   thd->wsrep_exec_mode= LOCAL_STATE;
+  wsrep_thd_set_query_state(thd, QUERY_EXEC);
   /* synchronize with wsrep replication */
   if (WSREP_ON)
   {

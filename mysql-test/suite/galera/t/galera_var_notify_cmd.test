@@ -1,15 +1,33 @@
 #
-# Test wsrep_notify_cmd. We use a version of the support-files/wsrep_notify.sh script that writes
-# notifications into a table.
+# Test wsrep_notify_cmd. We use a version of the support-files/wsrep_notify.sh
+# script that writes notifications into a table.
+#
+# Restart node_2 to ensure identical conditions on test repeat.
 #
 
 --source include/have_innodb.inc
 --source include/galera_cluster.inc
 --source include/force_restart.inc
 
---connection node_1
-SELECT COUNT(DISTINCT uuid) = 2 FROM mtr_wsrep_notify.membership;
-SELECT MAX(size) = 2 FROM mtr_wsrep_notify.status;
-SELECT COUNT(DISTINCT idx) = 2 FROM mtr_wsrep_notify.status;
+--connection node_2
+--source include/restart_mysqld.inc
+--source include/wait_until_connected_again.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
+--source include/wait_condition.inc
 
+--connection node_1
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'mtr_wsrep_notify' AND TABLE_NAME = 'membership';
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'mtr_wsrep_notify' AND TABLE_NAME = 'status';
+--source include/wait_condition.inc
+
+SELECT COUNT(DISTINCT uuid) AS expect_2 FROM mtr_wsrep_notify.membership;
+SELECT MAX(size) AS expect_2 FROM mtr_wsrep_notify.status;
+SELECT COUNT(*) AS expect_1 FROM mtr_wsrep_notify.status;
+
+# Notification schema is private to the node, don't replicate
+SET wsrep_on = OFF;
 DROP SCHEMA mtr_wsrep_notify;

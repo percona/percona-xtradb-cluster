@@ -278,14 +278,10 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 #define WSREP_EMULATE_BINLOG(thd) \
   (WSREP(thd) && wsrep_emulate_bin_log)
 
-// MySQL logging functions don't seem to understand long long length modifer.
-// This is a workaround. It also prefixes all messages with "WSREP"
-#define WSREP_LOG(fun, ...)                                       \
-    {                                                             \
-        char msg[4096] = {'\0'};                                  \
-        snprintf(msg, sizeof(msg) - 1, ## __VA_ARGS__);           \
-        fun("WSREP: %s", msg);                                    \
-    }
+/* A wrapper function for MySQL log functions. The call will prefix
+   the log message with WSREP and forwards the result buffer to
+   MySQL log function specified in fun. */
+void WSREP_LOG(void (*fun)(const char* fmt, ...), const char* fmt, ...);
 
 #define WSREP_DEBUG(...)                                                \
     if (wsrep_debug)     WSREP_LOG(sql_print_information, ##__VA_ARGS__)

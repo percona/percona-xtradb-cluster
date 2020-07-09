@@ -63,6 +63,7 @@
 
 %{!?with_systemd:                %global systemd 0}
 %{?el7:                          %global systemd 1}
+%{?el8:                          %global systemd 1}
 %{!?with_debuginfo:              %global nodebuginfo 1}
 %global product_suffix wsrep
 %{!?feature_set:                 %global feature_set community}
@@ -383,7 +384,7 @@ MySQL database server, and MySQL embedded server.
 %package        test-%{series}
 Summary:        Test suite for the MySQL database server
 Group:          Applications/Databases
-Requires:       %{name}-server%{?_isa} >= %{min}
+Requires:       %{name}-server-%{series}%{?_isa} >= %{min}
 Requires:       perl(Carp)
 Requires:       perl(Config)
 Requires:       perl(Cwd)
@@ -655,7 +656,9 @@ Requires:       mysql-commercial-libs-compat%{?_isa} >= %{min}
 Requires:       mysql-wsrep-client-%{series}%{?_isa} = %{version}-%{release}
 Requires:       mysql-wsrep-libs-%{series}%{?_isa} = %{version}-%{release}
 Requires:       mysql-wsrep-server-%{series}%{?_isa} = %{version}-%{release}
+%if 0%{?compatlib}
 Requires:       mysql-wsrep-libs-compat-%{series}%{?_isa} = %{version}-%{release}
+%endif
 %endif
 
 %description    %{series}
@@ -1157,6 +1160,7 @@ fi
 
 %dir %{_libdir}/mysql/plugin
 %attr(755, root, root) %{_libdir}/mysql/plugin/adt_null.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/audit_log.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth_pam.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth_socket.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_sasl_client.so
@@ -1180,6 +1184,7 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/plugin/version_token.so
 %dir %{_libdir}/mysql/plugin/debug
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/adt_null.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/audit_log.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_pam.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_socket.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_ldap_sasl_client.so

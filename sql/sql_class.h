@@ -81,6 +81,7 @@ struct wsrep_thd_shadow {
   LEX_CSTRING          db;
   struct timeval       user_time;
   longlong             row_count_func;
+  Relay_log_info       * rli_slave;
 };
 #endif /* WITH_WSREP */
 
