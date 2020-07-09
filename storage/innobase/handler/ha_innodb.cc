@@ -8716,6 +8716,10 @@ wsrep_error:
 func_exit:
 	innobase_active_small();
 
+#ifdef WITH_WSREP
+	DEBUG_SYNC(user_thd, "ha_innobase_end_of_write_row");
+#endif /* WITH_WSREP */
+
 	if (UNIV_UNLIKELY(share->ib_table->is_corrupt)) {
 		DBUG_RETURN(HA_ERR_CRASHED);
 	}
@@ -9208,6 +9212,12 @@ ha_innobase::update_row(
 	innobase_srv_conc_exit_innodb(trx);
 
 func_exit:
+#ifdef WITH_WSREP
+	if (trx_is_interrupted(trx)) {
+		error = DB_INTERRUPTED;
+	}
+#endif /* WITH_WSREP */
+
 	int err = convert_error_code_to_mysql(error,
 					    prebuilt->table->flags, user_thd);
 
@@ -9367,6 +9377,12 @@ wsrep_error:
 			  && share->ib_table->is_corrupt)) {
 		DBUG_RETURN(HA_ERR_CRASHED);
 	}
+
+#ifdef WITH_WSREP
+	if (trx_is_interrupted(trx)) {
+		error = DB_INTERRUPTED;
+	}
+#endif /* WITH_WSREP */
 
 	DBUG_RETURN(convert_error_code_to_mysql(
 			    error, prebuilt->table->flags, user_thd));

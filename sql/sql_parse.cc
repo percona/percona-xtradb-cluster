@@ -6310,17 +6310,30 @@ finish:
 
   if (! thd->in_sub_stmt)
   {
-    /* report error issued during command execution */
-    if (thd->killed_errno())
-      thd->send_kill_message();
-    if (thd->is_error() || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
-      trans_rollback_stmt(thd);
 #ifdef WITH_WSREP
-    else if (thd->sp_runtime_ctx &&
-             (thd->wsrep_conflict_state == MUST_ABORT ||
-              thd->wsrep_conflict_state == CERT_FAILURE ||
-              thd->wsrep_conflict_state == ABORTED))
+
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+
+    const int killed_errno(thd->killed_errno());
+    const bool is_error(thd->is_error());
+    const THD::killed_state killed(thd->killed);
+    const bool has_sp_runtime_ctx(thd->sp_runtime_ctx != NULL);
+    const wsrep_conflict_state conflict_state(wsrep_thd_conflict_state(thd));
+
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+    /* report error issued during command execution */
+    if (killed_errno)
+      thd->send_kill_message();
+    if (is_error || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
+      trans_rollback_stmt(thd);
+    else if (has_sp_runtime_ctx &&
+             (conflict_state == MUST_ABORT ||
+              conflict_state == CERT_FAILURE ||
+              conflict_state == ABORTED))
     {
+      trans_rollback_stmt(thd);
+
       /*
         The error was cleared, but THD was aborted by wsrep and
         wsrep_conflict_state is still set accordingly. This
@@ -6328,12 +6341,51 @@ finish:
         that declares a handler that catches ER_LOCK_DEADLOCK error.
         In which case the error may have been cleared in method
         sp_rcontext::handle_sql_condition().
+
+        PXC-3243
+        If BF-aborted, do not clear the conflict-state/killed variables.
+        Let the error propagate upward (if this was called from an SP),
+        to ensure that the locks are cleared.
       */
-      trans_rollback_stmt(thd);
-      thd->wsrep_conflict_state= NO_CONFLICT;
-      thd->killed= THD::NOT_KILLED;
+      if (conflict_state != MUST_ABORT)
+      {
+        thd->wsrep_conflict_state= NO_CONFLICT;
+        thd->killed= THD::NOT_KILLED;
+      }
     }
-#endif /* WITH_WSREP */
+    else
+    {
+      /* If commit fails, we should be able to reset the OK status. */
+      thd->get_stmt_da()->set_overwrite_status(true);
+      trans_commit_stmt(thd);
+      thd->get_stmt_da()->set_overwrite_status(false);
+    }
+    if (killed == THD::KILL_QUERY ||
+        killed == THD::KILL_TIMEOUT ||
+        killed == THD::KILL_BAD_DATA)
+    {
+      /*
+        PXC-3243
+        To handle the error in an SP, the thd->killed must be propagated
+        back up to the SP call so that the trans_rollback_stmt()
+        can be invoked for the SP call.
+
+        So leaving thd->killed unchanged will ensure that sp_head::execute
+        will set the err_status to true.
+       */
+      if (!has_sp_runtime_ctx || conflict_state != MUST_ABORT)
+      {
+        thd->killed= THD::NOT_KILLED;
+        thd->mysys_var->abort= 0;
+        thd->reset_query_for_display();
+      }
+    }
+#else
+    /* report error issued during command execution */
+    if (thd->killed_errno())
+      thd->send_kill_message();
+    if (thd->is_error() || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
+      trans_rollback_stmt(thd);
     else
     {
       /* If commit fails, we should be able to reset the OK status. */
@@ -6349,6 +6401,7 @@ finish:
       thd->mysys_var->abort= 0;
       thd->reset_query_for_display();
     }
+#endif /* WITH_WSREP */
   }
 
   lex->unit.cleanup();
