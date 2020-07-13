@@ -323,6 +323,7 @@ our $opt_user = "root";
 
 our $opt_sanitize= 0;
 our $opt_valgrind= 0;
+my $shutdown_report    = 0;
 my $opt_valgrind_mysqld= 0;
 my $opt_valgrind_clients= 0;
 my $opt_valgrind_mysqltest= 0;
@@ -470,6 +471,10 @@ sub main {
     $opt_parallel= 1;
   }
 
+  # Shutdown report is one extra test created to report
+  # any failures or crashes during shutdown.
+  $num_tests_for_report = $num_tests_for_report + 1;
+
   # When either --valgrind or --sanitize option is enabled, a dummy
   # test is created.
   if ($opt_valgrind_mysqld or $opt_sanitize) {
@@ -603,6 +608,26 @@ sub main {
   mark_time_used('init');
 
   push @$completed, run_ctest() if $opt_ctest;
+
+  # Create minimalistic "test" for the reporting failures at shutdown
+  my $tinfo = My::Test->new(
+    name      => 'shutdown_report',
+    shortname => 'shutdown_report',
+    );
+
+  # Set dummy worker id to align report with normal tests
+  $tinfo->{worker} = 0 if $opt_parallel > 1;
+  if ($shutdown_report) {
+    $tinfo->{result} = 'MTR_RES_FAILED';
+    $tinfo->{comment} = "Mysqld reported failures at shutdown, see above";
+    $tinfo->{failures} = 1;
+  } else {
+    $tinfo->{result} = 'MTR_RES_PASSED';
+  }
+  mtr_report_test($tinfo);
+  report_option('prev_report_length', 0);
+  push @$completed, $tinfo;
+
 
   if ($opt_valgrind_mysqld or $opt_sanitize) {
     # Create minimalistic "test" for the reporting
@@ -859,8 +884,10 @@ sub run_test_server ($$$) {
           # server logs. This will cause the master to flag the pseudo test
           # valgrind_report as failed.
 	  $valgrind_reports= 1;
-	}
-	else {
+	} elsif ($line eq 'SRV_CRASH') {
+          # Mysqld detected crash during shutdown
+          $shutdown_report = 1;
+	} else {
 	  mtr_error("Unknown response: '$line' from client");
 	}
 
@@ -1040,7 +1067,12 @@ sub run_worker ($) {
     }
     elsif ($line eq 'BYE'){
       mtr_report("Server said BYE");
-      stop_all_servers($opt_shutdown_timeout);
+      my $ret = stop_all_servers($opt_shutdown_timeout);
+      if (defined $ret and $ret != 0) {
+        shutdown_exit_reports();
+        $shutdown_report = 1;
+      }
+      print $server "SRV_CRASH\n" if $shutdown_report;
       mark_time_used('restart');
       my $valgrind_reports= 0;
       if ($opt_valgrind_mysqld or $opt_sanitize) {
@@ -1064,6 +1096,60 @@ sub run_worker ($) {
   exit(1);
 }
 
+# Search server logs for any crashes during mysqld shutdown
+sub shutdown_exit_reports() {
+  my $found_report  = 0;
+  my $clean_shutdown = 0;
+
+  foreach my $log_file (keys %mysqld_logs) {
+    my @culprits = ();
+    my $crash_rep     = "";
+
+    my $LOGF = IO::File->new($log_file) or
+      mtr_error("Could not open file '$log_file' for reading: $!");
+
+    while (my $line = <$LOGF>) {
+      if ($line =~ /^CURRENT_TEST: (.+)$/) {
+        my $testname = $1;
+        # If we have a report, report it if needed and start new list of tests
+        if ($found_report or $clean_shutdown) {
+          # Make ready to collect new report
+          @culprits     = ();
+          $found_report = 0;
+          $clean_shutdown = 0;
+          $crash_rep = "";
+        }
+        push(@culprits, $testname);
+        next;
+      }
+
+      # Clean shutdown
+      $clean_shutdown = 1 if $line =~ /.*Shutdown completed.*/;
+
+      # Mysqld crash at shutdown
+      $found_report = 1 if ($line =~ /.*Assertion.*/ or $line =~ /.*mysqld got signal.*/
+                            or $line =~ /.*mysqld got exception.*/);
+
+      if ($found_report) {
+        $crash_rep .= $line;
+      }
+    }
+
+    if ($found_report) {
+        mtr_print("Shutdown report from $log_file after tests:\n", @culprits);
+        mtr_print_line();
+        print("$crash_rep\n");
+    } else {
+      # Print last 100 lines of log file since shutdown failed
+      # for some reason.
+      mtr_print("Shutdown report from $log_file after tests:\n", @culprits);
+      mtr_print_line();
+      my $reason = mtr_lastlinesfromfile($log_file, 100) . "\n";
+      print("$reason");
+    }
+    $LOGF = undef;
+  }
+}
 
 sub ignore_option {
   my ($opt, $value)= @_;
@@ -4924,7 +5010,11 @@ sub run_testcase ($) {
           my $check_res;
           if ( restart_forced_by_test('force_restart') )
           {
-            stop_all_servers($opt_shutdown_timeout);
+            my $ret = stop_all_servers($opt_shutdown_timeout);
+            if ($ret != 0) {
+              shutdown_exit_reports();
+              $shutdown_report = 1;
+            }
           }
           elsif ( $opt_check_testcases and
             $check_res= check_testcase($tinfo, "after"))
@@ -5000,6 +5090,15 @@ sub run_testcase ($) {
           }
           mtr_appendfile_to_file($path_current_testlog, $path_testlog);
           unlink($path_current_testlog);
+        }
+
+        # Remove testcase .log file produce in var/log/ to save space since
+        # relevant part of logfile has already been appended to master log
+        {
+          my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
+          if (-e $log_file_name && ($tinfo->{'result'} ne 'MTR_RES_FAILED')) {
+            unlink($log_file_name);
+          }
         }
 
         return ($res == 62) ? 0 : $res;
@@ -5786,7 +5885,8 @@ sub report_failure_and_restart ($) {
     # In these cases we may want valgrind report from normal termination
     $tinfo->{'dont_kill_server'}= 1;
   }
-  # Shotdown properly if not to be killed (for valgrind)
+
+  # Shutdown properly if not to be killed (for valgrind)
   stop_all_servers($tinfo->{'dont_kill_server'} ? $opt_shutdown_timeout : 0);
 
   $tinfo->{'result'}= 'MTR_RES_FAILED';
@@ -6107,8 +6207,8 @@ sub mysqld_start ($$) {
 
   my $output= $mysqld->value('#log-error');
 
-  # Remember this log file for valgrind error report search
-  $mysqld_logs{$output}= 1 if $opt_valgrind or $opt_sanitize;
+  # Remember this log file for valgrind/shutdown error report search
+  $mysqld_logs{$output} = 1;
 
   # Remember data dir for gmon.out files if using gprof
   $gprof_dirs{$mysqld->value('datadir')}= 1 if $opt_gprof;
@@ -6156,7 +6256,7 @@ sub stop_all_servers () {
   mtr_verbose("Stopping all servers...");
 
   # Kill all started servers
-  My::SafeProcess::shutdown($shutdown_timeout,
+  my $ret = My::SafeProcess::shutdown($shutdown_timeout,
 			    started(all_servers()));
 
   # Remove pidfiles
@@ -6167,8 +6267,8 @@ sub stop_all_servers () {
   }
 
   # Mark servers as stopped
-  map($_->{proc}= undef, all_servers());
-
+  map($_->{proc} = undef, all_servers());
+  return $ret;
 }
 
 
@@ -6421,17 +6521,18 @@ sub stop_servers($$) {
   my ($tinfo, @servers)= @_;
 
   # Remember if we restarted for this test case (count restarts)
-  $tinfo->{'restarted'}= 1;
+  $tinfo->{'restarted'} = 1;
+  my $ret;
 
   if ( join('|', @servers) eq join('|', all_servers()) )
   {
     # All servers are going down, use some kind of order to
     # avoid too many warnings in the log files
 
-   mtr_report("Restarting all servers");
+    mtr_report("Restarting all servers");
 
-    #  mysqld processes
-    My::SafeProcess::shutdown( $opt_shutdown_timeout, started(mysqlds()) );
+    # mysqld processes
+    $ret = My::SafeProcess::shutdown($opt_shutdown_timeout, started(mysqlds()));
 
     # cluster processes
     My::SafeProcess::shutdown( $opt_shutdown_timeout,
@@ -6441,9 +6542,14 @@ sub stop_servers($$) {
   {
     mtr_report("Restarting ", started(@servers));
 
-     # Stop only some servers
-    My::SafeProcess::shutdown( $opt_shutdown_timeout,
+    # Stop only some servers
+    my $ret = My::SafeProcess::shutdown( $opt_shutdown_timeout,
 			       started(@servers) );
+  }
+
+  if ($ret) {
+    shutdown_exit_reports();
+    $shutdown_report = 1;
   }
 
   foreach my $server (@servers)
