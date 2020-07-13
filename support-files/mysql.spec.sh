@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2020, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -191,6 +191,9 @@ BuildRequires: gperf procps time
 %else
 %define WITH_TCMALLOC 0
 %endif
+# Hack to work around bug in RHEL5 __os_install_post macro, wrong inverted
+# test for __debug_package
+%define __strip         /bin/true
 
 ##############################################################################
 # Settings for the "compatibility libs", the version depends on the target platform
@@ -1392,10 +1395,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %dir %{_libdir}/mysql/plugin/debug
 %attr(755, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
 
-%if %{WITH_TCMALLOC}
-%attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
-%endif
-
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 # %%attr(755, root, root) %%{_datadir}/mysql/  ## Contained in "plugins.files", see "%%install" code
@@ -1787,8 +1786,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 * Mon Nov 16 2009 Joerg Bruehe <joerg.bruehe@sun.com>
 
-- Fix some problems with the directives around "tcmalloc" (experimental),
-  remove erroneous traces of the InnoDB plugin (that is 5.1 only).
+- remove erroneous traces of the InnoDB plugin (that is 5.1 only).
 
 * Tue Oct 06 2009 Magnus Blaudd <mvensson@mysql.com>
 
