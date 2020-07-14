@@ -30,6 +30,7 @@
 #include <cstdlib>
 #include "log_event.h"
 #include <rpl_slave.h>
+#include "debug_sync.h"
 
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
@@ -1565,6 +1566,7 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
     switch (thd->variables.wsrep_OSU_method) {
     case WSREP_OSU_TOI:
       ret= wsrep_TOI_begin(thd, db_, table_, table_list, alter_info);
+      DEBUG_SYNC(thd, "wsrep_after_toi_begin");
       break;
     case WSREP_OSU_RSU:
       ret= wsrep_RSU_begin(thd, db_, table_);
