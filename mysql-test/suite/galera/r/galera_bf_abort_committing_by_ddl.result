@@ -1,0 +1,207 @@
+# ANALYZE TABLE
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+START TRANSACTION;
+INSERT INTO t2 VALUES (1, 1);
+UPDATE IGNORE t1 SET f2 = 2 WHERE f1 = 2;
+SET DEBUG_SYNC = "wsrep_before_certification SIGNAL wbc_reached WAIT_FOR wbc_continue";
+COMMIT;
+SET DEBUG_SYNC = "now WAIT_FOR wbc_reached";
+SET DEBUG_SYNC = "wsrep_after_toi_begin SIGNAL watb_reached WAIT_FOR watb_continue";
+ANALYZE TABLE t1;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR watb_reached";
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL wbc_continue";
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL watb_continue";
+Table	Op	Msg_type	Msg_text
+test.t1	analyze	status	OK
+SET DEBUG_SYNC = "RESET";
+DROP TABLE t2;
+wsrep_local_replays
+1
+DROP TABLE t1;
+# OPTIMIZE TABLE
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+START TRANSACTION;
+INSERT INTO t2 VALUES (1, 1);
+UPDATE IGNORE t1 SET f2 = 2 WHERE f1 = 2;
+SET DEBUG_SYNC = "wsrep_before_certification SIGNAL wbc_reached WAIT_FOR wbc_continue";
+COMMIT;
+SET DEBUG_SYNC = "now WAIT_FOR wbc_reached";
+SET DEBUG_SYNC = "wsrep_after_toi_begin SIGNAL watb_reached WAIT_FOR watb_continue";
+OPTIMIZE TABLE t1;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR watb_reached";
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL wbc_continue";
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL watb_continue";
+Table	Op	Msg_type	Msg_text
+test.t1	optimize	note	Table does not support optimize, doing recreate + analyze instead
+test.t1	optimize	status	OK
+SET DEBUG_SYNC = "RESET";
+DROP TABLE t2;
+wsrep_local_replays
+1
+DROP TABLE t1;
+# REPAIR TABLE
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+START TRANSACTION;
+INSERT INTO t2 VALUES (1, 1);
+UPDATE IGNORE t1 SET f2 = 2 WHERE f1 = 2;
+SET DEBUG_SYNC = "wsrep_before_certification SIGNAL wbc_reached WAIT_FOR wbc_continue";
+COMMIT;
+SET DEBUG_SYNC = "now WAIT_FOR wbc_reached";
+SET DEBUG_SYNC = "wsrep_after_toi_begin SIGNAL watb_reached WAIT_FOR watb_continue";
+REPAIR TABLE t1;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR watb_reached";
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL wbc_continue";
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL watb_continue";
+Table	Op	Msg_type	Msg_text
+test.t1	repair	note	The storage engine for the table doesn't support repair
+SET DEBUG_SYNC = "RESET";
+DROP TABLE t2;
+wsrep_local_replays
+1
+DROP TABLE t1;
+# CREATE TABLE
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+START TRANSACTION;
+INSERT INTO t2 VALUES (1, 1);
+UPDATE IGNORE t1 SET f2 = 2 WHERE f1 = 2;
+SET DEBUG_SYNC = "wsrep_before_certification SIGNAL wbc_reached WAIT_FOR wbc_continue";
+COMMIT;
+SET DEBUG_SYNC = "now WAIT_FOR wbc_reached";
+SET DEBUG_SYNC = "wsrep_after_toi_begin SIGNAL watb_reached WAIT_FOR watb_continue";
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR watb_reached";
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL wbc_continue";
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL watb_continue";
+SET DEBUG_SYNC = "RESET";
+DROP TABLE t2;
+wsrep_local_replays
+1
+DROP TABLE t1;
+# DROP TABLE
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+START TRANSACTION;
+INSERT INTO t2 VALUES (1, 1);
+UPDATE IGNORE t1 SET f2 = 2 WHERE f1 = 2;
+SET DEBUG_SYNC = "wsrep_before_certification SIGNAL wbc_reached WAIT_FOR wbc_continue";
+COMMIT;
+SET DEBUG_SYNC = "now WAIT_FOR wbc_reached";
+SET DEBUG_SYNC = "wsrep_after_toi_begin SIGNAL watb_reached WAIT_FOR watb_continue";
+DROP TABLE t1;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR watb_reached";
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL wbc_continue";
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL watb_continue";
+SET DEBUG_SYNC = "RESET";
+DROP TABLE t2;
+wsrep_local_replays
+1
+# ALTER TABLE
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+START TRANSACTION;
+INSERT INTO t2 VALUES (1, 1);
+UPDATE IGNORE t1 SET f2 = 2 WHERE f1 = 2;
+SET DEBUG_SYNC = "wsrep_before_certification SIGNAL wbc_reached WAIT_FOR wbc_continue";
+COMMIT;
+SET DEBUG_SYNC = "now WAIT_FOR wbc_reached";
+SET DEBUG_SYNC = "wsrep_after_toi_begin SIGNAL watb_reached WAIT_FOR watb_continue";
+ALTER TABLE t1 ADD COLUMN f3 INT;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR watb_reached";
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL wbc_continue";
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL watb_continue";
+SET DEBUG_SYNC = "RESET";
+DROP TABLE t2;
+wsrep_local_replays
+1
+DROP TABLE t1;
+# RENAME TABLE
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+START TRANSACTION;
+INSERT INTO t2 VALUES (1, 1);
+UPDATE IGNORE t1 SET f2 = 2 WHERE f1 = 2;
+SET DEBUG_SYNC = "wsrep_before_certification SIGNAL wbc_reached WAIT_FOR wbc_continue";
+COMMIT;
+SET DEBUG_SYNC = "now WAIT_FOR wbc_reached";
+SET DEBUG_SYNC = "wsrep_after_toi_begin SIGNAL watb_reached WAIT_FOR watb_continue";
+RENAME TABLE t1 TO t3;;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR watb_reached";
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL wbc_continue";
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL watb_continue";
+SET DEBUG_SYNC = "RESET";
+DROP TABLE t2;
+wsrep_local_replays
+1
+DROP TABLE t3;
+# TRUNCATE TABLE
+CREATE TABLE t1 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INT PRIMARY KEY, f2 INT) ENGINE=InnoDB;
+START TRANSACTION;
+INSERT INTO t2 VALUES (1, 1);
+UPDATE IGNORE t1 SET f2 = 2 WHERE f1 = 2;
+SET DEBUG_SYNC = "wsrep_before_certification SIGNAL wbc_reached WAIT_FOR wbc_continue";
+COMMIT;
+SET DEBUG_SYNC = "now WAIT_FOR wbc_reached";
+SET DEBUG_SYNC = "wsrep_after_toi_begin SIGNAL watb_reached WAIT_FOR watb_continue";
+TRUNCATE TABLE t1;;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR watb_reached";
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL wbc_continue";
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET DEBUG_SYNC = "now SIGNAL watb_continue";
+SET DEBUG_SYNC = "RESET";
+DROP TABLE t2;
+wsrep_local_replays
+1
+DROP TABLE t1;
+CALL mtr.add_suppression("Slave SQL: Error 'Table 't1' already exists' on query.");
