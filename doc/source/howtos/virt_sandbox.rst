@@ -6,7 +6,7 @@ Setting up PXC reference architecture with ProxySQL
 
 This manual describes how to set up |PXC| in a virtualized test sandbox.
 
-The procedure assumes Amazon EC2 micro instances running CentOS 6.
+The procedure assumes Amazon EC2 micro instances running CentOS 7.
 However, it should apply to any virtualization technology
 (for example, VirtualBox) with any Linux distribution.
 
@@ -80,11 +80,11 @@ with application servers.
    then copying it to the new node.
    After a successful |SST|, you should see the following in the error log::
 
-      120619 13:20:17 [Note] WSREP: State transfer required:
+      ... [Note] WSREP: State transfer required:
            Group state: 77c9da88-b965-11e1-0800-ea53b7b12451:97
            Local state: 00000000-0000-0000-0000-000000000000:-1
-      120619 13:20:17 [Note] WSREP: New cluster view: global state: 77c9da88-b965-11e1-0800-ea53b7b12451:97, view# 18: Primary, number of nodes: 3, my index: 0, protocol version 2
-      120619 13:20:17 [Warning] WSREP: Gap in state sequence. Need state transfer.
+      ... [Note] WSREP: New cluster view: global state: 77c9da88-b965-11e1-0800-ea53b7b12451:97, view# 18: Primary, number of nodes: 3, my index: 0, protocol version 2
+      ... [Warning] WSREP: Gap in state sequence. Need state transfer.
       ...
       
    For debugging information about the |SST|,
@@ -245,9 +245,9 @@ with application servers.
 
  .. code-block:: text
 
-  mysql> UPDATE global_variables SET variable_value='proxysql'
+    mysql> UPDATE global_variables SET variable_value='proxysql'
          WHERE variable_name='mysql-monitor_username';
-  mysql> UPDATE global_variables SET variable_value='ProxySQLPa55'
+    mysql> UPDATE global_variables SET variable_value='ProxySQLPa55'
          WHERE variable_name='mysql-monitor_password';
 
   To load this configuration at runtime, issue a ``LOAD`` command.  To save
@@ -380,13 +380,18 @@ This example shows how to do it with ``sysbench`` from the EPEL repository.
 
    .. code-block:: bash
 
-      sysbench --test=oltp --db-driver=mysql --mysql-engine-trx=yes --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3307 --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 prepare
+      sysbench --test=oltp --db-driver=mysql --mysql-engine-trx=yes \
+      --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3307 \
+      --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 prepare
 
 3. Run the benchmark on port 3307:
 
    .. code-block:: bash
 
-      sysbench --test=oltp --db-driver=mysql --mysql-engine-trx=yes --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3307 --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 --num-threads=8 run
+      sysbench --test=oltp --db-driver=mysql --mysql-engine-trx=yes \
+      --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3307 \
+      --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 \
+      --num-threads=8 run
 
    You should see the following in HAProxy statistics for ``pxc-back``:
 
@@ -401,7 +406,10 @@ This example shows how to do it with ``sysbench`` from the EPEL repository.
 
    .. code-block:: bash
 
-      sysbench --test=oltp --db-driver=mysql --mysql-engine-trx=yes --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3306 --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 --num-threads=8 run
+      sysbench --test=oltp --db-driver=mysql --mysql-engine-trx=yes \
+      --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3306 \
+      --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 \
+      --num-threads=8 run
 
    You should see the following in HAProxy statistics for ``pxc-onenode-back``:
 
