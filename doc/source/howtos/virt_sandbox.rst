@@ -6,17 +6,15 @@ Setting up PXC reference architecture with ProxySQL
 
 This manual describes how to set up |PXC| in a virtualized test sandbox.
 
-The procedure assumes Amazon EC2 micro instances running CentOS 7.
-However, it should apply to any virtualization technology
-(for example, VirtualBox) with any Linux distribution.
+The procedure assumes Amazon EC2 micro instances running CentOS 7.  However, it
+should apply to any virtualization technology (for example, VirtualBox) with any
+Linux distribution.
 
-This manual requires three virtual machines for |PXC| nodes,
-and one for the ProxySQL, which redirects requests to the nodes.
-Running ProxySQL on an application server,
-instead of having it as a dedicated entity,
-removes the unnecessary extra network roundtrip,
-because the load balancing layer in |PXC| scales well
-with application servers.
+This manual requires three virtual machines for |PXC| nodes, and one for the
+ProxySQL, which redirects requests to the nodes.  Running ProxySQL on an
+application server, instead of having it as a dedicated entity, removes the
+unnecessary extra network roundtrip, because the load balancing layer in |PXC|
+scales well with application servers.
 
 1. Install |PXC| on the three cluster nodes, as described in :ref:`yum`.
 
@@ -75,11 +73,13 @@ with application servers.
 
 #. Start the second and third nodes.
 
-   When a new node joins the cluster,
-   |SST| is performed by taking a backup using XtraBackup,
-   then copying it to the new node.
-   After a successful |SST|, you should see the following in the error log::
+   When a new node joins the cluster, |SST| is performed by taking a backup
+   using XtraBackup, then copying it to the new node.  After a successful |SST|,
+   you should see the following in the error log:
 
+   .. code-block:: text
+
+      ...
       ... [Note] WSREP: State transfer required:
            Group state: 77c9da88-b965-11e1-0800-ea53b7b12451:97
            Local state: 00000000-0000-0000-0000-000000000000:-1
@@ -87,8 +87,8 @@ with application servers.
       ... [Warning] WSREP: Gap in state sequence. Need state transfer.
       ...
       
-   For debugging information about the |SST|,
-   you can check the :file:`sst.err` file and the error log.
+   For debugging information about the |SST|, you can check the :file:`sst.err`
+   file and the error log.
 
    After |SST| finishes, you can check the cluster size as follows:
 
@@ -175,8 +175,7 @@ with application servers.
       +--------------------------------------+
       12 rows in set (0.00 sec)
 
-   For more information about admin databases and tables,
-   see `Admin Tables
+   For more information about admin databases and tables, see `Admin Tables
    <https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md>`_
 
    .. note::
@@ -226,7 +225,7 @@ To see the nodes:
    +--------------+---------------+------+--------+     +---------+
    3 rows in set (0.00 sec)
 
- .. rubric:: Creating ProxySQL Monitoring User
+.. rubric:: Creating ProxySQL Monitoring User
 
 To enable monitoring of |PXC| nodes in ProxySQL, create a user with ``USAGE``
 privilege on any node in the cluster and configure the user in ProxySQL.
@@ -355,7 +354,7 @@ of the |PXC| nodes:
 Testing the cluster with sysbench
 =================================
 
-After you set up |PXC| in a sand box, you can test it using
+After you set up |PXC| in a sandbox, you can test it using
 `sysbench <https://launchpad.net/sysbench/>`_.
 This example shows how to do it with ``sysbench`` from the EPEL repository.
 
@@ -380,7 +379,7 @@ This example shows how to do it with ``sysbench`` from the EPEL repository.
       --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3307 \
       --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 prepare
 
-3. Run the benchmark on port 3307:
+#. Run the benchmark on port 3307:
 
    .. code-block:: bash
 
@@ -389,16 +388,7 @@ This example shows how to do it with ``sysbench`` from the EPEL repository.
       --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 \
       --num-threads=8 run
 
-   You should see the following in HAProxy statistics for ``pxc-back``:
-
-   .. image:: ../_static/pxc_haproxy_lb_leastconn.png
-
-   Note the ``Cur`` column under ``Session``:
-
-   * ``c1`` has 2 threads connected
-   * ``c2`` and ``c3`` have 3 threads connected
-
-4. Run the same benchmark on port 3306:
+#. Run the same benchmark on port 3306:
 
    .. code-block:: bash
 
@@ -406,19 +396,3 @@ This example shows how to do it with ``sysbench`` from the EPEL repository.
       --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3306 \
       --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 \
       --num-threads=8 run
-
-   You should see the following in HAProxy statistics for ``pxc-onenode-back``:
-
-   .. image:: ../_static/pxc_haproxy_lb_active_backup.png
-
-   All 8 threads are connected to the ``c1`` server.
-   ``c2`` and ``c3`` are acting as backup nodes.
-
-If you are using |HAProxy| for |MySQL| you can break the privilege system’s
-host part, because |MySQL| will think that the connections are always coming
-from the load balancer. You can work this around using T-Proxy patches and some
-`iptables` magic for the backwards connections. However in the setup described
-in this how-to this is not an issue, since each application server has it's own
-|HAProxy| instance, each application server connects to 127.0.0.1, so MySQL
-will see that connections are coming from the application servers. Just like in
-the normal case.
