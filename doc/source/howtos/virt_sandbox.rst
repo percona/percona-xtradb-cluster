@@ -191,170 +191,166 @@ with application servers.
       That is done by design to allow you to test the changes
       before pushing to production (RUNTIME), or save them to disk.
 
-   .. rubric:: Adding cluster nodes to ProxySQL
+.. rubric:: Adding cluster nodes to ProxySQL
 
-   To configure the backend |PXC| nodes in ProxySQL, insert corresponding
-   records into the ``mysql_servers`` table.
+To configure the backend |PXC| nodes in ProxySQL, insert corresponding
+records into the ``mysql_servers`` table.
 
-   .. note::
+ProxySQL uses the concept of *hostgroups* to group cluster nodes.  This enables
+you to balance the load in a cluster by routing different types of traffic to
+different groups.  There are many ways you can configure hostgroups (for example
+master and slaves, read and write load, etc.)  and a every node can be a member
+of multiple hostgroups.
 
-      ProxySQL uses the concept of *hostgroups* to group cluster nodes.
-      This enables you to balance the load in a cluster by
-      routing different types of traffic to different groups.
-      There are many ways you can configure hostgroups
-      (for example master and slaves, read and write load, etc.)
-      and a every node can be a member of multiple hostgroups.
+This example adds three |PXC| nodes to the default hostgroup (``0``), which
+receives both write and read traffic:
 
-   This example adds three |PXC| nodes to the default hostgroup (``0``),
-   which receives both write and read traffic:
+.. code-block:: text
 
-   .. code-block:: text
+   mysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.61',3306);
+   mysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.62',3306);
+   mysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.63',3306);
 
-      mysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.61',3306);
-      mysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.62',3306);
-      mysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.63',3306);
+To see the nodes:
 
-   To see the nodes:
+.. code-block:: text
 
-   .. code-block:: text
+   mysql> SELECT * FROM mysql_servers;
 
-      mysql> SELECT * FROM mysql_servers;
-
-      +--------------+---------------+------+--------+     +---------+
-      | hostgroup_id | hostname      | port | status | ... | comment |
-      +--------------+---------------+------+--------+     +---------+
-      | 0            | 192.168.70.61 | 3306 | ONLINE |     |         | 
-      | 0            | 192.168.70.62 | 3306 | ONLINE |     |         | 
-      | 0            | 192.168.70.63 | 3306 | ONLINE |     |         | 
-      +--------------+---------------+------+--------+     +---------+
-      3 rows in set (0.00 sec)
+   +--------------+---------------+------+--------+     +---------+
+   | hostgroup_id | hostname      | port | status | ... | comment |
+   +--------------+---------------+------+--------+     +---------+
+   | 0            | 192.168.70.61 | 3306 | ONLINE |     |         | 
+   | 0            | 192.168.70.62 | 3306 | ONLINE |     |         | 
+   | 0            | 192.168.70.63 | 3306 | ONLINE |     |         | 
+   +--------------+---------------+------+--------+     +---------+
+   3 rows in set (0.00 sec)
 
  .. rubric:: Creating ProxySQL Monitoring User
 
- To enable monitoring of |PXC| nodes in ProxySQL, create a user with ``USAGE``
- privilege on any node in the cluster and configure the user in ProxySQL.
+To enable monitoring of |PXC| nodes in ProxySQL, create a user with ``USAGE``
+privilege on any node in the cluster and configure the user in ProxySQL.
 
- The following example shows how to add a monitoring user on Node 2:
+The following example shows how to add a monitoring user on Node 2:
 
  .. code-block:: text
 
     mysql> CREATE USER 'proxysql'@'%' IDENTIFIED BY 'ProxySQLPa55';
     mysql> GRANT USAGE ON *.* TO 'proxysql'@'%';
 
- The following example shows how to configure this user on the ProxySQL node:
+The following example shows how to configure this user on the ProxySQL node:
 
- .. code-block:: text
+.. code-block:: text
 
-    mysql> UPDATE global_variables SET variable_value='proxysql'
+   mysql> UPDATE global_variables SET variable_value='proxysql'
          WHERE variable_name='mysql-monitor_username';
-    mysql> UPDATE global_variables SET variable_value='ProxySQLPa55'
+   mysql> UPDATE global_variables SET variable_value='ProxySQLPa55'
          WHERE variable_name='mysql-monitor_password';
 
-  To load this configuration at runtime, issue a ``LOAD`` command.  To save
-  these changes to disk (ensuring that they persist after ProxySQL shuts down),
-  issue a ``SAVE`` command.
+To load this configuration at runtime, issue a ``LOAD`` command.  To save these
+changes to disk (ensuring that they persist after ProxySQL shuts down), issue a
+``SAVE`` command.
 
-  .. code-block:: text
+.. code-block:: text
 
-     mysql> LOAD MYSQL VARIABLES TO RUNTIME;
-     mysql> SAVE MYSQL VARIABLES TO DISK;
+   mysql> LOAD MYSQL VARIABLES TO RUNTIME;
+   mysql> SAVE MYSQL VARIABLES TO DISK;
 
-  To ensure that monitoring is enabled, check the monitoring logs:
+To ensure that monitoring is enabled, check the monitoring logs:
 
-  .. code-block:: text
+.. code-block:: text
 
-     mysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start_us DESC LIMIT 6;
-     +---------------+------+------------------+----------------------+---------------+
-     | hostname      | port | time_start_us    | connect_success_time | connect_error |
-     +---------------+------+------------------+----------------------+---------------+
-     | 192.168.70.61 | 3306 | 1469635762434625 | 1695                 | NULL          |
-     | 192.168.70.62 | 3306 | 1469635762434625 | 1779                 | NULL          |
-     | 192.168.70.63 | 3306 | 1469635762434625 | 1627                 | NULL          |
-     | 192.168.70.61 | 3306 | 1469635642434517 | 1557                 | NULL          |
-     | 192.168.70.62 | 3306 | 1469635642434517 | 2737                 | NULL          |
-     | 192.168.70.63 | 3306 | 1469635642434517 | 1447                 | NULL          |
-     +---------------+------+------------------+----------------------+---------------+
-     6 rows in set (0.00 sec)
+   mysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start_us DESC LIMIT 6;
+   +---------------+------+------------------+----------------------+---------------+
+   | hostname      | port | time_start_us    | connect_success_time | connect_error |
+   +---------------+------+------------------+----------------------+---------------+
+   | 192.168.70.61 | 3306 | 1469635762434625 | 1695                 | NULL          |
+   | 192.168.70.62 | 3306 | 1469635762434625 | 1779                 | NULL          |
+   | 192.168.70.63 | 3306 | 1469635762434625 | 1627                 | NULL          |
+   | 192.168.70.61 | 3306 | 1469635642434517 | 1557                 | NULL          |
+   | 192.168.70.62 | 3306 | 1469635642434517 | 2737                 | NULL          |
+   | 192.168.70.63 | 3306 | 1469635642434517 | 1447                 | NULL          |
+   +---------------+------+------------------+----------------------+---------------+
+   6 rows in set (0.00 sec)
 
-  .. code-block:: text
+.. code-block:: text
 
-     mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start_us DESC LIMIT 6;
-     +---------------+------+------------------+-------------------+------------+
-     | hostname      | port | time_start_us    | ping_success_time | ping_error |
-     +---------------+------+------------------+-------------------+------------+
-     | 192.168.70.61 | 3306 | 1469635762416190 | 948               | NULL       |
-     | 192.168.70.62 | 3306 | 1469635762416190 | 803               | NULL       |
-     | 192.168.70.63 | 3306 | 1469635762416190 | 711               | NULL       |
-     | 192.168.70.61 | 3306 | 1469635702416062 | 783               | NULL       |
-     | 192.168.70.62 | 3306 | 1469635702416062 | 631               | NULL       |
-     | 192.168.70.63 | 3306 | 1469635702416062 | 542               | NULL       |
-     +---------------+------+------------------+-------------------+------------+
-     6 rows in set (0.00 sec)
+   mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start_us DESC LIMIT 6;
+   +---------------+------+------------------+-------------------+------------+
+   | hostname      | port | time_start_us    | ping_success_time | ping_error |
+   +---------------+------+------------------+-------------------+------------+
+   | 192.168.70.61 | 3306 | 1469635762416190 | 948               | NULL       |
+   | 192.168.70.62 | 3306 | 1469635762416190 | 803               | NULL       |
+   | 192.168.70.63 | 3306 | 1469635762416190 | 711               | NULL       |
+   | 192.168.70.61 | 3306 | 1469635702416062 | 783               | NULL       |
+   | 192.168.70.62 | 3306 | 1469635702416062 | 631               | NULL       |
+   | 192.168.70.63 | 3306 | 1469635702416062 | 542               | NULL       |
+   +---------------+------+------------------+-------------------+------------+
+   6 rows in set (0.00 sec)
 
-  The previous examples show that ProxySQL is able to connect and ping the nodes
-  you added.
+The previous examples show that ProxySQL is able to connect and ping the nodes
+you added.
 
-  To enable monitoring of these nodes, load them at runtime:
+To enable monitoring of these nodes, load them at runtime:
 
-  .. code-block:: text
+.. code-block:: text
 
-     mysql> LOAD MYSQL SERVERS TO RUNTIME;
+   mysql> LOAD MYSQL SERVERS TO RUNTIME;
 
-  .. _proxysql-client-user:
+.. _proxysql-client-user:
 
-  .. rubric:: Creating ProxySQL Client User
+.. rubric:: Creating ProxySQL Client User
 
-  ProxySQL must have users that can access backend nodes
-  to manage connections.
+ProxySQL must have users that can access backend nodes to manage connections.
 
-  To add a user, insert credentials into ``mysql_users`` table:
+To add a user, insert credentials into ``mysql_users`` table:
 
-  .. code-block:: text
+.. code-block:: text
 
-     mysql> INSERT INTO mysql_users (username,password) VALUES ('sbuser','sbpass');
-     Query OK, 1 row affected (0.00 sec)
+   mysql> INSERT INTO mysql_users (username,password) VALUES ('sbuser','sbpass');
+   Query OK, 1 row affected (0.00 sec)
 
-  .. note::
+.. note::
 
-     ProxySQL currently doesn't encrypt passwords.
+   ProxySQL currently doesn't encrypt passwords.
 
-  Load the user into runtime space and save these changes to disk
-  (ensuring that they persist after ProxySQL shuts down):
+Load the user into runtime space and save these changes to disk (ensuring that
+they persist after ProxySQL shuts down):
 
-  .. code-block:: text
+.. code-block:: text
 
-     mysql> LOAD MYSQL USERS TO RUNTIME;
-     mysql> SAVE MYSQL USERS TO DISK;
+   mysql> LOAD MYSQL USERS TO RUNTIME;
+   mysql> SAVE MYSQL USERS TO DISK;
 
-  To confirm that the user has been set up correctly, you can try to log in:
+To confirm that the user has been set up correctly, you can try to log in:
 
-  .. code-block:: bash
+.. code-block:: bash
 
-     root@proxysql:~# mysql -u sbuser -psbpass -h 127.0.0.1 -P 6033
+   root@proxysql:~# mysql -u sbuser -psbpass -h 127.0.0.1 -P 6033
 
-     Welcome to the MySQL monitor.  Commands end with ; or \g.
-     Your MySQL connection id is 1491
-     Server version: 5.5.30 (ProxySQL)
+   Welcome to the MySQL monitor.  Commands end with ; or \g.
+   Your MySQL connection id is 1491
+   Server version: 5.5.30 (ProxySQL)
 
-     Copyright (c) 2009-2020 Percona LLC and/or its affiliates
-     Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2009-2020 Percona LLC and/or its affiliates
+   Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
-     Oracle is a registered trademark of Oracle Corporation and/or its
-     affiliates. Other names may be trademarks of their respective
-     owners.
+   Oracle is a registered trademark of Oracle Corporation and/or its
+   affiliates. Other names may be trademarks of their respective
+   owners.
 
-     Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+   Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-  To provide read/write access to the cluster for ProxySQL,
-  add this user on one of the |PXC| nodes:
+To provide read/write access to the cluster for ProxySQL, add this user on one
+of the |PXC| nodes:
 
-  .. code-block:: text
+.. code-block:: text
 
-     mysql> CREATE USER 'sbuser'@'192.168.70.64' IDENTIFIED BY 'sbpass';
-     Query OK, 0 rows affected (0.01 sec)
+   mysql> CREATE USER 'sbuser'@'192.168.70.64' IDENTIFIED BY 'sbpass';
+   Query OK, 0 rows affected (0.01 sec)
 
-     mysql> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.64';
-     Query OK, 0 rows affected (0.00 sec)
+   mysql> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.64';
+   Query OK, 0 rows affected (0.00 sec)
 
 Testing the cluster with sysbench
 =================================
