@@ -450,12 +450,7 @@ fi
 
 # Patch needed libraries
 (
-    cd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME"
-    if [ ! -d lib/private ]; then
-        mkdir -p lib/private
-    fi
-
-    LIBLIST="libcrypto.so libssl.so libreadline.so libtinfo.so libsasl2.so libcurl.so libldap liblber libssh libgssapi_krb5.so libkrb5.so libkrb5support.so libk5crypto.so libgssapi.so libcrypt.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libssl3.so libncurses.so"
+    LIBLIST="libcrypto.so libssl.so libreadline.so libtinfo.so libsasl2.so libcurl.so libldap liblber libssh libgssapi_krb5.so libkrb5.so libkrb5support.so libk5crypto.so libgssapi.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libssl3.so libncurses.so"
     DIRLIST="bin lib lib/private lib/mysql/plugin"
 
     LIBPATH=""
@@ -505,40 +500,51 @@ fi
                     echo "Replacing lib $(basename $(readlink -f $libpath_sorted)) for $elf"
                     patchelf --replace-needed $LDD $(basename $(readlink -f $libpath_sorted)) $elf
                 fi
-                # Add if present in LDD to NEEDED
-                if [[ ! -z $LDD ]] && [[ -z "$(readelf -d $elf | grep $(basename $libpath_sorted | awk -F'.' '{print $1}'))" ]]; then
-                    patchelf --add-needed $(basename $(readlink -f $libpath_sorted)) $elf
-                fi
             done
         done
     }
 
-    # Gather libs
-    for DIR in $DIRLIST; do
-        gather_libs $DIR
-    done
-    
-    # Set proper runpath
-    set_runpath bin '$ORIGIN/../lib/private/'
-    set_runpath lib '$ORIGIN/private/'
-    set_runpath lib/mysql/plugin '$ORIGIN/../../private/'
-    set_runpath lib/private '$ORIGIN'
+    function link {
+        if [ ! -d lib/private ]; then
+            mkdir -p lib/private
+        fi
+        # Gather libs
+        for DIR in $DIRLIST; do
+            gather_libs $DIR
+        done
+        
+        # Set proper runpath
+        set_runpath bin '$ORIGIN/../lib/private/'
+        set_runpath lib '$ORIGIN/private/'
+        set_runpath lib/mysql/plugin '$ORIGIN/../../private/'
+        set_runpath lib/private '$ORIGIN'
 
-    # Replace libs
-    for DIR in $DIRLIST; do
-        replace_libs $DIR
-    done
+        # Replace libs
+        for DIR in $DIRLIST; do
+            replace_libs $DIR
+        done
+    }
+
+    mkdir "$TARGETDIR/usr/local/minimal"
+    cp -r "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME"
+
+    # NORMAL TARBALL
+    cd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME"
+    link
+
+    # MIN TARBALL
+    cd "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME"
+    rm -rf mysql-test 2> /dev/null
+    rm -rf percona-xtradb-cluster-tests 2> /dev/null
+    find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
+    link
 )
 
 # Package the archive
 (
     cd "$TARGETDIR/usr/local/"
-
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
-
-    rm -rf $PRODUCT_FULL_NAME/mysql-test 2> /dev/null
-    rm -rf $PRODUCT_FULL_NAME/percona-xtradb-cluster-tests 2> /dev/null
-    find $PRODUCT_FULL_NAME -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
+    cd "$TARGETDIR/usr/local/minimal/"
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME
 ) || exit 1
 
