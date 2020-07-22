@@ -1,0 +1,128 @@
+# ==== Purpose ====
+#
+# This test verifies that joiner node aborts when donor node is killed while
+# SST is in progress.
+#
+# ==== Implementation ====
+#
+# 1. Create a two node cluster.
+# 2. Shutdown node2 and remove the grastate.dat file.
+# 3. Execute some transactions on node1 so that node2 forces an SST when it
+#    joins next time.
+# 4. Add a debug point on node1 to stop after reading xid from InnoDB.
+# 5. Start node2 in background and wait till node1 reads the wsrep_xid from
+#    InnoDB.
+# 6. Kill node1 and wait till SST failure is handled and node2 is shutdown.
+# 7. Restart node1 and node2
+# 8. Verify that the reason for the shutdown is logged in the error log.
+# 9. Cleanup
+#
+# ==== References ====
+#
+# PXC-3159: Killing the Donor or Connection lost during SST Process Leaves
+#           Joiner Hanging
+
+
+--source include/big_test.inc
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
+
+--echo #
+--echo # 1. Create a two node cluster.
+--source include/galera_cluster.inc
+
+--echo #
+--echo # 2. Shutdown node2 and remove the grastate.dat file.
+--connection node_2
+--echo [connection node_2]
+--source include/shutdown_mysqld.inc
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+# Wait until the cluster size is updated on node1.
+--connection node_1
+--echo [connection node_1]
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--echo #
+--echo # 3. Execute some transactions on node1 so that node2 forces an SST when it
+--echo #    joins next time.
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(1);
+INSERT INTO t1 VALUES(2);
+INSERT INTO t1 VALUES(3);
+INSERT INTO t1 VALUES(4);
+
+--echo #
+--echo # 4. Add a debug point on node1 to stop after reading xid from InnoDB.
+--let $debug_point= stop_after_reading_xid
+--source include/add_debug_point.inc
+
+--echo #
+--echo # 5. Start node2 in background and wait till node1 reads the wsrep_xid from
+--echo #    InnoDB.
+
+--let $PID_FILE= $MYSQLTEST_VARDIR/tmp/node2.pid
+--let $ERROR_LOG_FILE= $MYSQLTEST_VARDIR/tmp/node2.err
+
+--let $command = $MYSQLD
+--let $command_opt =  --defaults-group-suffix=.2 --defaults-file=$MYSQLTEST_VARDIR/my.cnf --log-error=$ERROR_LOG_FILE
+--let $pid_file = $PID_FILE
+--source include/start_proc_in_background.inc
+
+--connection node_1
+--echo [connection node_1]
+SET SESSION wsrep_sync_wait=0;
+SET DEBUG_SYNC='now wait_for read_xid';
+
+--echo #
+--echo # 6. Kill node1 and wait till SST failure is handled and node2 is shutdown.
+--source include/kill_galera.inc
+--source include/wait_proc_to_finish.inc
+
+--echo #
+--echo # 7. Restart node1 and node2
+
+# node1 has wsrep_cluster_address=gcomm:// in my.cnf, and since is not the last
+# server to shutdown, it will have safe_to_bootstrap set to 0 in the
+# grastate.dat file and makes the bootstrap to fail.
+#
+# Remove the grastate.dat files to restart the cluster.
+--remove_file $MYSQLTEST_VARDIR/mysqld.1/data/grastate.dat
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+--connection node_1
+--echo [connection node_1]
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+
+--connection node_2
+--echo [connection node_2]
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc
+
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--echo #
+--echo # 8. Verify that the reason for the shutdown is logged in the error log.
+--let $assert_select= State transfer request failed unrecoverably.* Most likely it is due to inability to communicate with the cluster primary component. Restart required.
+--let $assert_text= Appropriate message has been written to the error log explaining the reason for the shutdown.
+--let $assert_count= 1
+--let $assert_file= $ERROR_LOG_FILE
+--source include/assert_grep.inc
+
+# Suppress the warnings
+CALL mtr.add_suppression("Found a stale sst_in_progress file");
+
+--echo #
+--echo # 9. Cleanup
+--remove_file $PID_FILE
+--remove_file $ERROR_LOG_FILE
+
+--connection node_1
+--echo [connection node_1]
+DROP TABLE t1;
