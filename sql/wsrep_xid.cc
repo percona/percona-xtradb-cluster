@@ -17,6 +17,7 @@
 //! @file some utility functions and classes not directly related to replication
 
 #include "wsrep_xid.h"
+#include "debug_sync.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/plugin.h"  // MYSQL_STORAGE_ENGINE_PLUGIN
 #include "service_wsrep.h"
@@ -135,6 +136,10 @@ static bool get_SE_checkpoint(THD *, plugin_ref plugin, void *arg) {
     wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
     WSREP_DEBUG("Read WSREPXid (InnoDB): %s:%lld", uuid_str,
                 (long long)wsrep_xid_seqno(xid));
+    DBUG_EXECUTE_IF("stop_after_reading_xid", {
+      const char action[] = "now SIGNAL read_xid WAIT_FOR go_ahead";
+      DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(action)));
+    };);
   }
 
   return false;
