@@ -658,7 +658,7 @@ fi
         done
     }
 
-    mkdir "$TARGETDIR/usr/local/minimal"
+    mkdir -p "$TARGETDIR/usr/local/minimal"
     cp -r "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
 
     # NORMAL TARBALL
