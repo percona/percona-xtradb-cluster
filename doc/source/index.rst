@@ -15,13 +15,13 @@ Features of |PXC| include:
   Data is written to all nodes simultaneously,
   or not written at all if it fails even on a single node.
 
-* **Multi-master replication**
+* **Multi-source replication**
 
   Any node can trigger a data update.
 
 * **True parallel replication**
 
-  Multiple threads on slave performing replication on row level.
+  Multiple threads on replica performing replication on row level.
 
 * **Automatic node provisioning**
 

@@ -51,7 +51,7 @@
      another (SST applies :command:`FLUSH TABLES WITH READ LOCK` command).
      Xtrabackup SST does not require :command:`READ LOCK` for the entire
      syncing process, only for syncing the |MySQL| system tables and writing
-     the information about the binlog, galera and slave information (same as
+     the information about the binlog, galera and replica information (same as
      the regular |Percona XtraBackup| backup). State snapshot transfer method
      can be configured with the :variable:`wsrep_sst_method` variable.
 
