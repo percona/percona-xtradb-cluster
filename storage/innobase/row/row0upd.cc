@@ -359,9 +359,8 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
     NOT break the constraint. */
 
     if (foreign->foreign_index == index &&
-        (node->is_delete ||
-         row_upd_changes_first_fields_binary(entry, index, node->update,
-                                             foreign->n_fields))) {
+        row_upd_changes_first_fields_binary(entry, index, node->update,
+                                            foreign->n_fields)) {
       if (foreign->referenced_table == NULL) {
         MDL_ticket *mdl;
 
@@ -2518,6 +2517,15 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
             case DB_NO_REFERENCED_ROW:
               err = DB_SUCCESS;
               break;
+            /* We can expect DB_LOCK_WAIT when the transaction that blocked
+            our lock was rolled back or committed while we were waiting
+            for the lock. In such cases, we can retry the operation.
+
+            See row_mysql_handle_errors() and
+            row_update_for_mysql_using_upd_graph()
+            for more details.*/
+            case DB_LOCK_WAIT:
+              break;
             case DB_DEADLOCK:
               if (wsrep_get_debug()) {
                 ib::warn() << "WSREP: sec index FK check fail for deadlock"
@@ -2526,7 +2534,6 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
               }
               break;
             case DB_LOCK_WAIT_TIMEOUT:
-            case DB_LOCK_WAIT:
               err = DB_LOCK_WAIT_TIMEOUT;
               break;
             default:

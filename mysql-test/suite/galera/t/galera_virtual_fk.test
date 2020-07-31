@@ -1,0 +1,6 @@
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--source suite/innodb/t/virtual_fk.test
+
+--source include/wait_until_count_sessions.inc
