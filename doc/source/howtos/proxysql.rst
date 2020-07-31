@@ -16,10 +16,7 @@ configuration can be done at runtime using queries similar to SQL statements in
 the ProxySQL admin interface.  These include runtime parameters, server
 grouping, and traffic-related settings.
 
-.. note::
-
-   For more information about ProxySQL, see `ProxySQL documentation
-   <https://github.com/sysown/proxysql/tree/master/doc>`_.
+.. seealso:: `More information about ProxySQL <https://github.com/sysown/proxysql/tree/master/doc>`_.
 
 :ref:`ProxySQL v2 <pxc.proxysql.v2>` natively supports |PXC|. With this version,
 |proxysql-admin| tool does not require any custom scripts to keep track of |PXC|
@@ -32,25 +29,24 @@ status.
 Manual Configuration
 ====================
 
-This tutorial describes how to configure ProxySQL with three |PXC| nodes.
+This section describes how to configure ProxySQL with three |PXC| nodes.
 
 +--------+-----------+---------------+
 | Node   | Host Name | IP address    |
 +========+===========+===============+
-| Node 1 | pxc1      | 192.168.70.61 |
+| Node 1 | pxc1      | 192.168.70.71 |
 +--------+-----------+---------------+
-| Node 2 | pxc2      | 192.168.70.62 |
+| Node 2 | pxc2      | 192.168.70.72 |
 +--------+-----------+---------------+
-| Node 3 | pxc3      | 192.168.70.63 |
+| Node 3 | pxc3      | 192.168.70.73 |
 +--------+-----------+---------------+
-| Node 4 | proxysql  | 192.168.70.64 |
+| Node 4 | proxysql  | 192.168.70.74 |
 +--------+-----------+---------------+
 
-ProxySQL can be configured either using the :file:`/etc/proxysql.cnf` file
-or through the admin interface.
-Using the admin interface is preferable,
-because it allows you to change the configuration dynamically
-(without having to restart the proxy).
+ProxySQL can be configured either using the :file:`/etc/proxysql.cnf` file or
+through the admin interface.  Using the admin interface is preferable, because
+it allows you to change the configuration dynamically without having to restart
+the proxy.
 
 To connect to the ProxySQL admin interface, you need a ``mysql`` client.
 You can either connect to the admin interface from |PXC| nodes
@@ -77,8 +73,6 @@ For this tutorial, install |PXC| on Node 4:
 
      [root@proxysql ~]# yum install Percona-XtraDB-Cluster-client-80
      [root@proxysql ~]# yum install proxysql2
-
-.. TODO: Verify package names
 
 To connect to the admin interface,
 use the credentials, host name and port specified in the `global variables
@@ -153,9 +147,7 @@ see `Admin Tables
   ProxySQL has 3 areas where the configuration can reside:
 
   * MEMORY (your current working place)
-
   * RUNTIME (the production settings)
-
   * DISK (durable configuration, saved inside an SQLITE database)
 
   When you change a parameter, you change it in MEMORY area.
@@ -180,9 +172,9 @@ which receives both write and read traffic:
 
 .. code-block:: text
 
-   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.61',3306);
-   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.62',3306);
-   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.63',3306);
+   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.71',3306);
+   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.72',3306);
+   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.73',3306);
 
 To see the nodes:
 
@@ -193,9 +185,9 @@ To see the nodes:
   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
   | hostgroup_id | hostname      | port | status | weight | compression | max_connections | max_replication_lag | use_ssl | max_latency_ms | comment |
   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
-  | 0            | 192.168.70.62 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
-  | 0            | 192.168.70.63 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+  | 0            | 192.168.70.71 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+  | 0            | 192.168.70.72 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+  | 0            | 192.168.70.73 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
   3 rows in set (0.00 sec)
 
@@ -241,12 +233,12 @@ check the monitoring logs:
   +---------------+------+------------------+----------------------+---------------+
   | hostname      | port | time_start_us    | connect_success_time | connect_error |
   +---------------+------+------------------+----------------------+---------------+
-  | 192.168.70.61 | 3306 | 1469635762434625 | 1695                 | NULL          |
-  | 192.168.70.62 | 3306 | 1469635762434625 | 1779                 | NULL          |
-  | 192.168.70.63 | 3306 | 1469635762434625 | 1627                 | NULL          |
-  | 192.168.70.61 | 3306 | 1469635642434517 | 1557                 | NULL          |
-  | 192.168.70.62 | 3306 | 1469635642434517 | 2737                 | NULL          |
-  | 192.168.70.63 | 3306 | 1469635642434517 | 1447                 | NULL          |
+  | 192.168.70.71 | 3306 | 1469635762434625 | 1695                 | NULL          |
+  | 192.168.70.72 | 3306 | 1469635762434625 | 1779                 | NULL          |
+  | 192.168.70.73 | 3306 | 1469635762434625 | 1627                 | NULL          |
+  | 192.168.70.71 | 3306 | 1469635642434517 | 1557                 | NULL          |
+  | 192.168.70.72 | 3306 | 1469635642434517 | 2737                 | NULL          |
+  | 192.168.70.73 | 3306 | 1469635642434517 | 1447                 | NULL          |
   +---------------+------+------------------+----------------------+---------------+
   6 rows in set (0.00 sec)
 
@@ -256,12 +248,12 @@ check the monitoring logs:
   +---------------+------+------------------+-------------------+------------+
   | hostname      | port | time_start_us    | ping_success_time | ping_error |
   +---------------+------+------------------+-------------------+------------+
-  | 192.168.70.61 | 3306 | 1469635762416190 | 948               | NULL       |
-  | 192.168.70.62 | 3306 | 1469635762416190 | 803               | NULL       |
-  | 192.168.70.63 | 3306 | 1469635762416190 | 711               | NULL       |
-  | 192.168.70.61 | 3306 | 1469635702416062 | 783               | NULL       |
-  | 192.168.70.62 | 3306 | 1469635702416062 | 631               | NULL       |
-  | 192.168.70.63 | 3306 | 1469635702416062 | 542               | NULL       |
+  | 192.168.70.71 | 3306 | 1469635762416190 | 948               | NULL       |
+  | 192.168.70.72 | 3306 | 1469635762416190 | 803               | NULL       |
+  | 192.168.70.73 | 3306 | 1469635762416190 | 711               | NULL       |
+  | 192.168.70.71 | 3306 | 1469635702416062 | 783               | NULL       |
+  | 192.168.70.72 | 3306 | 1469635702416062 | 631               | NULL       |
+  | 192.168.70.73 | 3306 | 1469635702416062 | 542               | NULL       |
   +---------------+------+------------------+-------------------+------------+
   6 rows in set (0.00 sec)
 
@@ -325,10 +317,10 @@ add this user on one of the |PXC| nodes:
 
 .. code-block:: text
 
-  mysql@pxc3> CREATE USER 'sbuser'@'192.168.70.64' IDENTIFIED BY 'sbpass';
+  mysql@pxc3> CREATE USER 'sbuser'@'192.168.70.74' IDENTIFIED BY 'sbpass';
   Query OK, 0 rows affected (0.01 sec)
 
-  mysql@pxc3> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.64';
+  mysql@pxc3> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.74';
   Query OK, 0 rows affected (0.00 sec)
 
 Testing Cluster with sysbench
@@ -427,7 +419,9 @@ For example, to see the number of commands that run on the cluster:
    +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
    45 rows in set (0.00 sec)
 
-Automatic Fail-over
+.. _proxysql.automatic-failover:
+
+Automatic failover
 -------------------
 
 ProxySQL will automatically detect if a node is not available
@@ -441,9 +435,9 @@ You can check the status of all available nodes by running:
    +--------------+---------------+------+--------+
    | hostgroup_id | hostname      | port | status |
    +--------------+---------------+------+--------+
-   | 0            | 192.168.70.61 | 3306 | ONLINE |
-   | 0            | 192.168.70.62 | 3306 | ONLINE |
-   | 0            | 192.168.70.63 | 3306 | ONLINE |
+   | 0            | 192.168.70.71 | 3306 | ONLINE |
+   | 0            | 192.168.70.72 | 3306 | ONLINE |
+   | 0            | 192.168.70.73 | 3306 | ONLINE |
    +--------------+---------------+------+--------+
    3 rows in set (0.00 sec)
 
@@ -462,9 +456,9 @@ ProxySQL will detect that the node is down and update its status to
    +--------------+---------------+------+--------------+
    | hostgroup_id | hostname      | port | status       |
    +--------------+---------------+------+--------------+
-   | 0            | 192.168.70.61 | 3306 | ONLINE       |
-   | 0            | 192.168.70.62 | 3306 | ONLINE       |
-   | 0            | 192.168.70.63 | 3306 | OFFLINE_SOFT |
+   | 0            | 192.168.70.71 | 3306 | ONLINE       |
+   | 0            | 192.168.70.72 | 3306 | ONLINE       |
+   | 0            | 192.168.70.73 | 3306 | OFFLINE_SOFT |
    +--------------+---------------+------+--------------+
    3 rows in set (0.00 sec)
 
@@ -483,9 +477,9 @@ The script will detect the change and mark the node as
    +--------------+---------------+------+--------+
    | hostgroup_id | hostname      | port | status |
    +--------------+---------------+------+--------+
-   | 0            | 192.168.70.61 | 3306 | ONLINE |
-   | 0            | 192.168.70.62 | 3306 | ONLINE |
-   | 0            | 192.168.70.63 | 3306 | ONLINE |
+   | 0            | 192.168.70.71 | 3306 | ONLINE |
+   | 0            | 192.168.70.72 | 3306 | ONLINE |
+   | 0            | 192.168.70.73 | 3306 | ONLINE |
    +--------------+---------------+------+--------+
    3 rows in set (0.00 sec)
 
@@ -554,6 +548,14 @@ but the user can still open conenctions to monitor status.
 
 .. note:: If you increase the transition period,
    the packaging script may determine it as a server stall.
+
+-----
+
+.. admonition:: Related sections
+
+   - :ref:`testing-env-proxysql.setting-up`
+
+   
 
 
 .. |proxysql| replace:: ProxySQL
