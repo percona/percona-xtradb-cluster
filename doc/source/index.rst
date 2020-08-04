@@ -14,7 +14,7 @@ Features of |PXC| include:
    Data is written to all nodes simultaneously,
    or not written at all if it fails even on a single node.
 
-:term:`Multi-master replication`
+:term:`Multi-source replication`
    Any node can trigger a data update.
 
 :term:`True parallel replication <Database replication>`
@@ -29,6 +29,7 @@ Data consistency
 
 :ref:`pxc-strict-mode`
    Avoids the use of experimental and unsupported features.
+
 
 Configuration script for ProxySQL
   |Percona| provides a ProxySQL package with the ``proxysql-admin``

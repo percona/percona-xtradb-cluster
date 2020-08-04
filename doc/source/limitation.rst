@@ -19,7 +19,7 @@ The following limitations apply to |PXC|:
 * Unsupported queries:
 
   * ``LOCK TABLES`` and ``UNLOCK TABLES`` is not supported
-    in multi-master setups
+    in multi-source setups
 
   * Lock functions, such as ``GET_LOCK()``, ``RELEASE_LOCK()``, and so on
 
