@@ -1,5 +1,6 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
+--source suite/galera/include/galera_have_debug_sync.inc
 
 --connection node_2
 --let $wsrep_provider_orig = `SELECT @@wsrep_provider`

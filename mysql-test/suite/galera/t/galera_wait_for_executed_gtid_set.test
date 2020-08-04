@@ -5,6 +5,7 @@
 --source include/have_log_bin.inc
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
+--source suite/galera/include/galera_have_debug_sync.inc
 
 --connection node_1
 CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
