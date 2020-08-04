@@ -58,6 +58,7 @@
 #ifdef HAVE_REPLICATION
 #include "rpl_rli_pdb.h"                     // Slave_worker
 #include "rpl_slave_commit_order_manager.h"
+#include "rpl_master.h"                      // unregister_slave
 #endif
 
 #ifdef WITH_WSREP
@@ -848,6 +849,19 @@ extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode)
 extern "C" void wsrep_thd_set_query_state(
 	THD *thd, enum wsrep_query_state state)
 {
+  if (!WSREP(thd)) return;
+  /* async slave thread should never flag IDLE state, as it may
+     give rollbacker thread chance to interfere and rollback async slave
+     transaction.
+     in fact, async slave thread is never idle as it reads complete
+     transactions from relay log and applies them, as a whole.
+     BF abort happens voluntarily by async slave thread.
+  */
+  if (thd->slave_thread && state == QUERY_IDLE) {
+    WSREP_DEBUG("Skipping IDLE state change for slave SQL");
+    return;
+  }
+
   thd->wsrep_query_state= state;
 }
 extern "C" void wsrep_thd_set_conflict_state(
@@ -1951,7 +1965,7 @@ void THD::init(void)
 #ifdef WITH_WSREP
   wsrep_exec_mode= wsrep_applier ? REPL_RECV :  LOCAL_STATE;
   wsrep_conflict_state= NO_CONFLICT;
-  wsrep_query_state= QUERY_IDLE;
+  wsrep_thd_set_query_state(this, QUERY_IDLE);
   wsrep_last_query_id= 0;
   wsrep_trx_meta.gtid= WSREP_GTID_UNDEFINED;
   wsrep_trx_meta.depends_on= WSREP_SEQNO_UNDEFINED;
@@ -2440,6 +2454,12 @@ THD::~THD()
   }
   if (rli_slave)
     rli_slave->cleanup_after_session();
+  /*
+    As slaves can be added in one mysql command like COM_REGISTER_SLAVE
+    but then need to be removed on error scenarios, we call this method
+    here.
+  */
+  unregister_slave(this, true, true);
 #endif
 
   free_root(&main_mem_root, MYF(0));
@@ -5080,6 +5100,38 @@ void THD::set_query(const LEX_CSTRING& query_arg)
   DBUG_ASSERT(this == current_thd);
   mysql_mutex_lock(&LOCK_thd_query);
   m_query_string= query_arg;
+  mysql_mutex_unlock(&LOCK_thd_query);
+}
+
+
+/**
+  Set the rewritten query (with passwords obfuscated etc.) on the THD.
+  Wraps this in the LOCK_thd_query mutex to protect against race conditions
+  with SHOW PROCESSLIST inspecting that string.
+
+  This uses swap() and therefore "steals" the argument from the caller;
+  the caller MUST take care not to try to use its own string after calling
+  this function! This is an optimization for mysql_rewrite_query() so we
+  don't copy its temporary string (which may get very long, up to
+  @@max_allowed_packet).
+
+  Using this outside of mysql_rewrite_query() is almost certainly wrong;
+  please check with the runtime team!
+
+  @param query_arg  The rewritten query to use for slow/bin/general logging.
+                    The value will be released in the caller and MUST NOT
+                    be used there after calling this function.
+*/
+void THD::swap_rewritten_query(String& query_arg)
+{
+  DBUG_ASSERT(this == current_thd);
+
+  mysql_mutex_lock(&LOCK_thd_query);
+  m_rewritten_query.mem_free();
+  m_rewritten_query.swap(query_arg);
+  // The rewritten query should always be a valid C string, just in case.
+  DBUG_EVALUATE_IF("simulate_out_of_memory",
+                    (void) NULL, (void) m_rewritten_query.c_ptr_safe());
   mysql_mutex_unlock(&LOCK_thd_query);
 }
 

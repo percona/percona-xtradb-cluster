@@ -1,3 +1,7 @@
+# innodb_redo_log_encrypt is read only for PXC, 
+# so no way to proceed with this test
+--skip innodb_redo_log_encrypt is read-only for PXC
+
 # Test tries restart after redo log encryption is enabled
 # - Error   :restart without keyring plugin
 # - Pass    :restart without keyring plugin and --innodb_force_recovery=6

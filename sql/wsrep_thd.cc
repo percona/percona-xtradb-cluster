@@ -109,7 +109,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   shadow->server_status = thd->server_status;
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
   shadow->vio           = thd->active_vio;
-
+  shadow->rli_slave     = thd->rli_slave;
   // Disable general logging on applier threads
   thd->variables.option_bits |= OPTION_LOG_OFF;
   // Enable binlogging if opt_log_slave_updates is set
@@ -130,7 +130,6 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   if (!thd->wsrep_rli)
   {
     thd->wsrep_rli = wsrep_relay_log_init("wsrep_relay");
-    assert(!thd->rli_slave);
     thd->rli_slave = thd->wsrep_rli;
     thd->wsrep_rli->info_thd= thd;
     thd->init_for_queries(thd->wsrep_rli);
@@ -161,17 +160,14 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db);
   thd->user_time              = shadow->user_time;
-
   assert(thd->rli_slave == thd->wsrep_rli);
-  thd->rli_slave = NULL;
+  thd->rli_slave              = shadow->rli_slave;
 
   delete thd->wsrep_rli->current_mts_submode;
   thd->wsrep_rli->current_mts_submode = 0;
   delete thd->wsrep_rli;
   thd->wsrep_rli = 0;
-#ifdef GALERA
-  thd->slave_thread = FALSE;
-#endif /* GALERA */
+  thd->slave_thread = (thd->rli_slave) ? TRUE : FALSE;
   thd->set_row_count_func(shadow->row_count_func);
 }
 
@@ -807,6 +803,17 @@ bool wsrep_safe_to_persist_xid(THD* thd)
 {
   /* Rollback of transaction too also invoke persist of XID.
   Avoid persisting XID in this use-case. */
+  
+  /* This method is the part of performance improvement
+  (introduce in commi c01c75da8ec67197e5b2f86edbdd9541df717faa)
+  Before upstream wsrep_5.7.30-25.22 merge we never got here in case of 
+  recovery, because xid was unconditionally reset in trx_get_trx_by_xid_low()
+  and then we skipped this call in trx_write_serialisation_history()
+  Togheter with wsrep_5.7.30-25.22 merge we have conditional xid reset in trx_get_trx_by_xid_low()
+  and as it is WSREP xid, we are not resetting it, so we get here. However, we do not have
+  thd context. In this case skip the optimization. */
+  if (!thd) return true;
+
   bool safe_to_persist_xid= false;
   if (thd->wsrep_conflict_state == NO_CONFLICT      ||
       thd->wsrep_conflict_state == REPLAYING        ||

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # -*- cperl -*-
 
-# Copyright (c) 2004, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2004, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -199,12 +199,13 @@ my $DEFAULT_SUITES= "main,sys_vars,binlog,binlog_encryption,rpl_encryption,encry
   ."innodb_fts,innodb_zip,innodb_undo,innodb_stress,perfschema,funcs_1,"
   ."funcs_2,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,"
   ."test_service_sql_api,jp,stress,engines/iuds,engines/funcs,"
-  ."group_replication,x,galera,"
+  ."group_replication,x,"
   ."query_response_time,audit_log,json,connection_control,"
   ."tokudb.add_index,tokudb.alter_table,tokudb,tokudb.bugs,tokudb.parts,"
   ."tokudb.rpl,tokudb.perfschema,"
-  ."rocksdb,rocksdb.rpl,rocksdb.sys_vars,"
-  ."keyring_vault,audit_null,percona-pam-for-mysql";
+  ."rocksdb,rocksdb_rpl,rocksdb_sys_vars,"
+  ."keyring_vault,audit_null,percona-pam-for-mysql,"
+  ."galera,galera_3nodes";
 my $opt_suites;
 
 our $opt_verbose= 0;  # Verbose output, enable with --verbose
@@ -319,7 +320,7 @@ my $opt_skip_core;
 
 our $opt_check_testcases= 1;
 my $opt_mark_progress;
-our $opt_test_progress= 0;
+our $opt_test_progress= 1;
 my $opt_max_connections;
 our $opt_report_times= 0;
 
@@ -562,7 +563,7 @@ sub main {
 
   if ($group_replication)
   {
-    $ports_per_thread= $ports_per_thread + 10;
+    $ports_per_thread= $ports_per_thread + 40;
   }
 
   if ($xplugin)
@@ -1292,7 +1293,7 @@ sub command_line_setup {
              'valgrind-options=s'       => sub {
 	       my ($opt, $value)= @_;
 	       # Deprecated option unless it's what we know pushbuild uses
-	       if ($value eq "--gen-suppressions=all --show-reachable=yes") {
+	       if (option_equals($value,"--gen-suppressions=all --show-reachable=yes")) {
 		 push(@valgrind_args, $_) for (split(' ', $value));
 		 return;
 	       }
@@ -1548,13 +1549,13 @@ sub command_line_setup {
   # --------------------------------------------------------------------------
   foreach my $arg ( @opt_extra_mysqld_opt )
   {
-    if ( $arg =~ /default-storage-engine=(\S+)/ )
+    if ( $arg =~ /default[-_]storage[-_]engine=(\S+)/ )
     {
       # Save this for collect phase
       collect_option('default-storage-engine', $1);
       mtr_report("Using default engine '$1'")
     }
-    if ( $arg =~ /default-tmp-storage-engine=(\S+)/ )
+    if ( $arg =~ /default[-_]tmp-storage[-_]engine=(\S+)/ )
     {
       # Save this for collect phase
       collect_option('default-tmp-storage-engine', $1);
@@ -2505,7 +2506,7 @@ sub mysqlxtest_arguments(){
    return mtr_args2str($exe, @$args);
  }
 
-sub mysqlpump_arguments ($) {
+sub mysql_pump_arguments ($) {
   my($group_suffix) = @_;
   my $exe= mtr_exe_exists(vs_config_dirs('client/dump','mysqlpump'),
                           "$basedir/client/mysqlpump",
@@ -2520,6 +2521,20 @@ sub mysqlpump_arguments ($) {
   mtr_add_arg($args, "--defaults-file=%s", $path_config_file);
   mtr_add_arg($args, "--defaults-group-suffix=%s", $group_suffix);
   client_debug_arg($args, "mysqlpump-$group_suffix");
+  return mtr_args2str($exe, @$args);
+}
+
+sub mysqlpump_arguments () {
+  my $exe= mtr_exe_exists(vs_config_dirs('client/dump','mysqlpump'),
+                          "$basedir/client/mysqlpump",
+                          "$path_client_bindir/mysqlpump");
+
+  my $args;
+  mtr_init_args(\$args);
+  if ( $opt_valgrind_clients )
+  {
+    valgrind_client_arguments($args, \$exe);
+  }
   return mtr_args2str($exe, @$args);
 }
 #
@@ -2810,7 +2825,8 @@ sub environment_setup {
   $ENV{'MYSQL_IMPORT'}=                client_arguments("mysqlimport");
   $ENV{'MYSQL_SHOW'}=                  client_arguments("mysqlshow");
   $ENV{'MYSQL_CONFIG_EDITOR'}=         client_arguments_no_grp_suffix("mysql_config_editor");
-  $ENV{'MYSQL_PUMP'}=                  mysqlpump_arguments(".1");
+  $ENV{'MYSQL_PUMP'}=                  mysql_pump_arguments(".1");
+  $ENV{'MYSQLPUMP'}=                   mysqlpump_arguments();
 
   if (!IS_WINDOWS)
   {
@@ -5997,7 +6013,7 @@ sub mysqld_arguments ($$$) {
   my $mysqld=            shift;
   my $extra_opts=        shift;
 
-  my @defaults = grep(/^--defaults-file=/, @$extra_opts);
+  my @defaults = grep(/^--defaults[-_]file=/, @$extra_opts);
   if (@defaults > 0) {
     mtr_add_arg($args, pop(@defaults))
   }
@@ -6034,9 +6050,6 @@ sub mysqld_arguments ($$$) {
     mtr_add_arg($args, "--log-output=file");
   }
 
-  # Check if "extra_opt" contains skip-log-bin
-  my $skip_binlog= grep(/^(--|--loose-)skip-log-bin/, @$extra_opts);
-
   # Indicate to mysqld it will be debugged in debugger
   if ( $glob_debugger )
   {
@@ -6054,6 +6067,7 @@ sub mysqld_arguments ($$$) {
   my $found_skip_core= 0;
   my $found_no_console= 0;
   my $found_log_error= 0;
+
 
   # On windows, do not add console if log-error found in .cnf file
   open (CONFIG_FILE, " < $path_config_file") or
@@ -6073,6 +6087,7 @@ sub mysqld_arguments ($$$) {
     # Skip --defaults-file option since it's handled above.
     next if $arg =~ /^--defaults-file/;
 
+
     if ($arg =~ /^--log[-_]error/)
     {
       $found_log_error= 1;
@@ -6087,24 +6102,15 @@ sub mysqld_arguments ($$$) {
     {
         $found_no_console= 1;
     }
-#    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
-#    {
-#      ; # Dont add --binlog-format when running without binlog
-#    }
-    elsif ($arg eq "--loose-skip-log-bin")
-    {
-      if (grep { /--wsrep-provider=/ } @$extra_opts) {
-        # As an exception, allow --binlog-format if MTR is run with
-        # wsrep provider loaded.
-        mtr_add_arg($args, "%s", $arg);
-      } else {
-        ; # Dont add --binlog-format when running without binlog
-      }
-    }
-    elsif ($arg eq "--loose-skip-log-bin" and
+    elsif ($arg =~ /--loose[-_]skip[-_]log[-_]bin/ and
            $mysqld->option("log-slave-updates"))
     {
       ; # Dont add --skip-log-bin when mysqld have --log-slave-updates in config
+    }
+    elsif ($arg =~ /--loose[-_]skip[-_]log[-_]bin/ and
+	       (grep { /--wsrep-provider=/ } @$extra_opts))
+    {
+      ; # Dont add --skip-log-bin when wsrep provider loaded
     }
     elsif ($arg eq "")
     {
@@ -6530,6 +6536,15 @@ sub get_extra_opts {
     $mysqld->option("#!use-slave-opt") ?
       $tinfo->{slave_opt} : $tinfo->{master_opt};
 
+  # For Galera and sys_vars tests skip --loose-skip-log-bin
+  my @galera_test = grep(/^galera\./, $tinfo->{name});
+  my @sys_vars_test = grep(/^sys_vars\./, $tinfo->{name});
+  if(@galera_test > 0 or @sys_vars_test > 0 )
+  {
+    my $skip_item = "--loose-skip-log-bin";
+    @$opts = grep { $_ ne $skip_item } @$opts;
+  }
+
   # Expand environment variables
   foreach my $opt ( @$opts )
   {
@@ -6628,7 +6643,14 @@ sub start_servers($) {
     }
     else
     {
-      my $xcom_port= $baseport + 9 + $server_id;
+      # For PXC's MTR
+      #
+      # Port X   - Connection handling
+      # Port X+1 - Galera
+      # Port X+2 - IST
+      # Port X+3 - SST
+      # Port X+4 - Group Replication
+      my $xcom_port= $baseport + 5 * $server_id;
       $ENV{$xcom_server}= $xcom_port;
     }
 

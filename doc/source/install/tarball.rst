@@ -19,6 +19,10 @@ depending on the *OpenSSL* library available in your distribution:
 
 * ``ssl102``: for Debian 9 and Ubuntu versions starting from 14.04
 
+.. note::
+
+    In CentOS version 7.04 and later, the *OpenSSL* library is ``ssl102``. 
+
 For example, you can use ``curl`` as follows::
 
   curl -O https://www.percona.com/downloads/Percona-XtraDB-Cluster-57/Percona-XtraDB-Cluster-5.7.14-26.17/binary/tarball/Percona-XtraDB-Cluster-5.7.14-rel8-26.17.1.Linux.x86_64.ssl101.tar.gz

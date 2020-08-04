@@ -4,14 +4,14 @@
 Adding Nodes to Cluster
 =======================
 
-New nodes that are :ref:`properly configured <configure>`
+New :term:`nodes <Node>` that are :ref:`properly configured <configure>`
 are provisioned automatically.
-When you start a node with the address of at least one other running node
+When you start a node with the address of at least one other running :term:`node`
 in the :variable:`wsrep_cluster_address` variable,
 it automatically joins the cluster and synchronizes with it.
 
 .. note:: Any existing data and configuration will be overwritten
-   to match the data and configuration of the DONOR node.
+   to match the data and configuration of the :term:`DONOR node`.
    Do not join several nodes at the same time
    to avoid overhead due to large amounts of traffic when a new node joins.
 
@@ -23,7 +23,7 @@ This requires the following:
 
   For more information, see :ref:`configure`.
 
-* Create a user for SST on the initial node.
+* Create a user for SST on the initial :term:`node`.
 
   For more information, see :ref:`bootstrap`.
 

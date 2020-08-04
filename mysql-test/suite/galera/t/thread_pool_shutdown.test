@@ -1,0 +1,16 @@
+#
+# PXC-3154 Thread pooling hangs on shutdown
+#
+--source include/galera_cluster.inc
+--source include/force_restart.inc
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+--echo #node-2a
+SELECT 1;
+
+--connection node_2
+--echo #node-2
+SET GLOBAL wsrep_reject_queries=ALL_KILL;
+SET GLOBAL wsrep_reject_queries=NONE;
+--source include/restart_mysqld.inc

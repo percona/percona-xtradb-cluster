@@ -1,8 +1,10 @@
+
 ==========
  Glossary
 ==========
 
 .. glossary::
+   
 
    LSN
      Each InnoDB page (usually 16kb in size) contains a log sequence number, or
@@ -129,6 +131,26 @@
      Normal replication path for cluster members. Can be encrypted (not by
      default) and unicast or multicast (unicast by default). Runs on tcp port
      4567 by default.
+
+   Database replication
+
+      See `Database replication in Galera Cluster documentation
+      <https://galeracluster.com/library/documentation/tech-desc-introduction.html>`_
+
+   Slave database server
+
+      See `Database replication in Galera Cluster documentation
+      <https://galeracluster.com/library/documentation/tech-desc-introduction.html>`_
+
+   Multi-master replication
+
+      See `Multi-master replication in Galera Cluster documentation
+      <https://galeracluster.com/library/documentation/tech-desc-introduction.html>`_
+
+   Node
+
+      See `Database replication in Galera Cluster documentation
+      <https://galeracluster.com/library/documentation/tech-desc-introduction.html>`_
 
    datadir
     The directory in which the database server stores its databases. Most Linux

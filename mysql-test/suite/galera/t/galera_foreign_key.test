@@ -1,0 +1,149 @@
+#
+# See suite/innodb/t/foreign_key.test
+#
+
+--source include/have_innodb.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--echo #
+--echo # Bug #19027905 ASSERT RET.SECOND DICT_CREATE_FOREIGN_CONSTRAINTS_LOW
+--echo # DICT_CREATE_FOREIGN_CONSTR
+--echo #
+
+create table t1 (f1 int primary key) engine=InnoDB;
+--error ER_CANNOT_ADD_FOREIGN
+create table t2 (f1 int primary key,
+constraint c1 foreign key (f1) references t1(f1),
+constraint c1 foreign key (f1) references t1(f1)) engine=InnoDB; 
+create table t2 (f1 int primary key,
+   constraint c1 foreign key (f1) references t1(f1)) engine=innodb;
+
+--replace_regex /#sql-[0-9a-f_]*'/#sql-temporary'/
+--error ER_DUP_KEY
+alter table t2 add constraint c1 foreign key (f1) references t1(f1); 
+
+set foreign_key_checks = 0;
+--error ER_FK_DUP_NAME
+alter table t2 add constraint c1 foreign key (f1) references t1(f1); 
+
+drop table t2, t1;
+
+--echo #
+--echo # Bug #20031243 CREATE TABLE FAILS TO CHECK IF FOREIGN KEY COLUMN
+--echo # NULL/NOT NULL MISMATCH
+--echo #
+
+set foreign_key_checks = 1;
+show variables like 'foreign_key_checks';
+
+CREATE TABLE t1
+(a INT NOT NULL,
+ b INT NOT NULL,
+ INDEX idx(a)) ENGINE=InnoDB;
+
+CREATE TABLE t2
+(a INT KEY,
+ b INT,
+ INDEX ind(b),
+ FOREIGN KEY (b) REFERENCES t1(a) ON DELETE CASCADE ON UPDATE CASCADE)
+ ENGINE=InnoDB;
+
+show create table t1;
+show create table t2;
+
+INSERT INTO t1 VALUES (1, 80);
+INSERT INTO t1 VALUES (2, 81);
+INSERT INTO t1 VALUES (3, 82);
+INSERT INTO t1 VALUES (4, 83);
+INSERT INTO t1 VALUES (5, 84);
+
+INSERT INTO t2 VALUES (51, 1);
+INSERT INTO t2 VALUES (52, 2);
+INSERT INTO t2 VALUES (53, 3);
+INSERT INTO t2 VALUES (54, 4);
+INSERT INTO t2 VALUES (55, 5);
+
+SELECT a, b FROM t1 ORDER BY a;
+SELECT a, b FROM t2 ORDER BY a;
+
+--error ER_NO_REFERENCED_ROW_2
+INSERT INTO t2 VALUES (56, 6);
+
+ALTER TABLE t1 CHANGE a id INT;
+
+SELECT id, b FROM t1 ORDER BY id;
+SELECT a, b FROM t2 ORDER BY a;
+
+--echo # Operations on child table
+--error ER_NO_REFERENCED_ROW_2
+INSERT INTO t2 VALUES (56, 6);
+--error ER_NO_REFERENCED_ROW_2
+UPDATE t2 SET b = 99 WHERE a = 51;
+DELETE FROM t2 WHERE a = 53;
+SELECT id, b FROM t1 ORDER BY id;
+SELECT a, b FROM t2 ORDER BY a;
+
+--echo # Operations on parent table
+DELETE FROM t1 WHERE id = 1;
+UPDATE t1 SET id = 50 WHERE id = 5;
+SELECT id, b FROM t1 ORDER BY id;
+SELECT a, b FROM t2 ORDER BY a;
+
+DROP TABLE t2, t1;
+
+--echo #
+--echo # bug#25126722 FOREIGN KEY CONSTRAINT NAME IS NULL AFTER RESTART
+--echo # base bug#24818604 [GR]
+--echo #
+
+CREATE TABLE t1 (c1 INT PRIMARY KEY);
+CREATE TABLE t2 (c1 INT PRIMARY KEY, FOREIGN KEY (c1) REFERENCES t1(c1));
+
+INSERT INTO t1 VALUES (1);
+INSERT INTO t2 VALUES (1);
+
+SELECT unique_constraint_name FROM information_schema.referential_constraints
+WHERE table_name = 't2';
+
+# node1 has wsrep_cluster_address=gcomm:// in my.cnf, and since is not the last
+# server in the cluster to shutdown, it will have safe_to_bootstrap set to 0 in
+# the grastate.dat file and makes the bootstrap to fail. So, remove the
+# grastate.dat files to restart both the servers.
+--remove_file $MYSQLTEST_VARDIR/mysqld.1/data/grastate.dat
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+--connection node_1
+--echo [connection node_1]
+--source include/restart_mysqld.inc
+--source include/wait_until_connected_again.inc
+
+--connection node_2
+--echo [connection node_2]
+--source include/restart_mysqld.inc
+--source include/wait_until_connected_again.inc
+
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--connection node_1
+SELECT unique_constraint_name FROM information_schema.referential_constraints
+WHERE table_name = 't2';
+
+SELECT * FROM t1;
+
+SELECT unique_constraint_name FROM information_schema.referential_constraints
+WHERE table_name = 't2';
+
+# Test suppressions
+--connection node_2
+CALL mtr.add_suppression("Cannot add foreign key constraint");
+CALL mtr.add_suppression("Can't write; duplicate key in table");
+CALL mtr.add_suppression("Duplicate foreign key constraint name");
+
+DROP TABLE t2;
+DROP TABLE t1;
+
+--connection node_1
+--source include/wait_until_count_sessions.inc

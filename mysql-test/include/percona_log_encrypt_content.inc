@@ -1,3 +1,7 @@
+# innodb_redo_log_encrypt is read only for PXC, 
+# so no way to proceed with this test
+--skip innodb_redo_log_encrypt is read-only for PXC
+
 # InnoDB transparent tablespace data encryption
 # This test case will verify that no unencrypted data is in the logs
 

@@ -64,6 +64,16 @@
 
    In this example ``DROP TABLE`` statement was executed on a table that doesn't exist.
 
+
+* :file:`gcache.page`
+
+  See :variable:`gcache.page_size`  
+
+  .. seealso::
+
+     |percona| Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
+        https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/
+
 .. _galera.cache: galera_cache
 
 * :file:`galera.cache`

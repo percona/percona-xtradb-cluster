@@ -372,6 +372,7 @@ void init_update_queries(void)
   server_command_flags[COM_TIME]         |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_INIT_DB]      |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_END]          |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_FIELD_LIST]   |= CF_SKIP_WSREP_CHECK;
  
   /*
     COM_QUERY and COM_SET_OPTION are allowed to pass the early COM_xxx filter,
@@ -1000,7 +1001,7 @@ bool do_command(THD *thd)
   if (WSREP(thd))
   {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_IDLE;
+    wsrep_thd_set_query_state(thd, QUERY_IDLE);
     if (thd->wsrep_conflict_state==MUST_ABORT)
     {
       wsrep_client_rollback(thd);
@@ -1092,7 +1093,7 @@ bool do_command(THD *thd)
       thd->store_globals();
     }
 
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
 #endif /* WITH_WSREP */
@@ -1507,7 +1508,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       thd->wsrep_conflict_state= NO_CONFLICT;
@@ -1620,7 +1621,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
   }
   thd->set_query_id(next_query_id());
-  thd->rewritten_query.mem_free();
+  thd->reset_rewritten_query();
   thd_manager->inc_thread_running();
 
   if (!(server_command_flags[command] & CF_SKIP_QUESTIONS))
@@ -1827,7 +1828,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       thd->wsrep_conflict_state= NO_CONFLICT;
@@ -2406,7 +2407,7 @@ done:
   thd->m_digest= NULL;
 
   /* Prevent rewritten query from getting "stuck" in SHOW PROCESSLIST. */
-  thd->rewritten_query.mem_free();
+  thd->reset_rewritten_query();
 
   thd_manager->dec_thread_running();
   free_root(thd->mem_root,MYF(MY_KEEP_PREALLOC));
@@ -6787,29 +6788,29 @@ void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat)
     if (!err)
     {
       /*
-        Rewrite the query for logging and for the Performance Schema statement
-        tables. Raw logging happened earlier.
-      
+        Rewrite the query for logging and for the Performance Schema
+        statement tables. (Raw logging happened earlier.)
+
         Query-cache only handles SELECT, which we don't rewrite, so it's no
         concern of ours.
 
         Sub-routines of mysql_rewrite_query() should try to only rewrite when
         necessary (e.g. not do password obfuscation when query contains no
         password).
-      
-        If rewriting does not happen here, thd->rewritten_query is still empty
-        from being reset in alloc_query().
+
+        If rewriting does not happen here, thd->m_rewritten_query is still
+        empty from being reset in alloc_query().
       */
-      // bool general= !(opt_general_log_raw || thd->slave_thread);
 
-      mysql_rewrite_query(thd);
+      if (thd->rewritten_query().length() == 0)
+        mysql_rewrite_query(thd);
 
-      if (thd->rewritten_query.length())
+      if (thd->rewritten_query().length())
       {
         lex->safe_to_cache_query= false; // see comments below
 
-        thd->set_query_for_display(thd->rewritten_query.c_ptr_safe(),
-                                   thd->rewritten_query.length());
+        thd->set_query_for_display(thd->rewritten_query().ptr(),
+                                   thd->rewritten_query().length());
       } else if (thd->slave_thread) {
         /*
           In the slave, we add the information to pfs.events_statements_history,
@@ -6824,16 +6825,16 @@ void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat)
 
       if (!(opt_general_log_raw || thd->slave_thread))
       {
-        if (thd->rewritten_query.length())
+        if (thd->rewritten_query().length())
           query_logger.general_log_write(thd, COM_QUERY,
-                                         thd->rewritten_query.c_ptr_safe(),
-                                         thd->rewritten_query.length());
+                                         thd->rewritten_query().ptr(),
+                                         thd->rewritten_query().length());
         else
         {
           size_t qlen= found_semicolon
             ? (found_semicolon - thd->query().str)
             : thd->query().length;
-          
+
           query_logger.general_log_write(thd, COM_QUERY,
                                          thd->query().str, qlen);
         }
@@ -7807,12 +7808,17 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query)
       slayage if both are string-equal.
     */
 
+    const bool is_utility_connection =
+        acl_is_utility_user(tmp->m_security_ctx->user().str,
+                            tmp->m_security_ctx->host().str,
+                            tmp->m_security_ctx->ip().str);
+
 #ifdef WITH_WSREP
-    if (((thd->security_context()->check_access(SUPER_ACL)) ||
+    if ((((thd->security_context()->check_access(SUPER_ACL)) && !is_utility_connection) ||
          thd->security_context()->user_matches(tmp->security_context())) &&
         !wsrep_thd_is_BF((void *)tmp, true))
 #else
-    if ((thd->security_context()->check_access(SUPER_ACL)) ||
+    if (((thd->security_context()->check_access(SUPER_ACL)) && !is_utility_connection) ||
         thd->security_context()->user_matches(tmp->security_context()))
 #endif /* WITH_WSREP */
     {

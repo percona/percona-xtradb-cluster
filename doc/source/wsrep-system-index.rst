@@ -61,7 +61,7 @@ For more information, see :ref:`pxc-maint-mode`.
    :default: ``10`` (ten seconds)
 
 Defines the transition period
-when you change :variable:`pxc_maint_mode` to ``SHUTDOWN`` or ``MAINTENANCE``.
+when you change :variable:`pxc_maint_mode` to ``SHUTDOWN``.
 By default, the period is set to 10 seconds,
 which should be enough for most transactions to finish.
 You can increase the value to accommodate for longer-running transactions.
@@ -526,16 +526,16 @@ This can be used for alerting or to reconfigure load balancers.
 
 .. variable:: wsrep_on
 
-   :version 5.6.27-25.13: Variable available only in session scope
    :cli: No
    :conf: No
    :scope: Session
    :dyn: Yes
    :default: ``ON``
 
-Defines whether updates from the current session should be replicated.
-If disabled, it does not cause the node to leave the cluster
-and the node continues to communicate with other nodes.
+Defines if current session transaction changes for a node are replicated to the cluster.
+
+If set to ``OFF`` for a session, no transaction changes are replicated in that session. The setting does not cause the node to leave the cluster, and the node communicates with other nodes.
+
 
 .. variable:: wsrep_OSU_method
 
@@ -574,7 +574,7 @@ The following methods are available:
   .. important::
 
      Under the ``TOI`` method, when DDL operations are performed,
-     |abbr-mdl| is ignored. If |abr-mdl| is important, use the ``RSU``
+     |abbr-mdl| is ignored. If |abbr-mdl| is important, use the ``RSU``
      method.
 
 * ``RSU``: When the *Rolling Schema Upgrade* method is selected,

@@ -19,4 +19,12 @@ SET GLOBAL wsrep_reject_queries = NONE;
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1
+SET GLOBAL wsrep_reject_queries = ALL;
+Database: test  Table: t1
++-------+---------+-----------+------+-----+---------+-------+---------------------------------+---------+
+| Field | Type    | Collation | Null | Key | Default | Extra | Privileges                      | Comment |
++-------+---------+-----------+------+-----+---------+-------+---------------------------------+---------+
+| f1    | int(11) |           | YES  |     |         |       | select,insert,update,references |         |
++-------+---------+-----------+------+-----+---------+-------+---------------------------------+---------+
+SET GLOBAL wsrep_reject_queries = NONE;
 DROP TABLE t1;
