@@ -336,6 +336,7 @@ INSERT INTO global_suppressions VALUES
  ("pxc_strict_mode can be changed only if node is cluster-node"),
  ("Toggling wsrep_on to OFF will affect sql_log_bin"),
  ("Toggling wsrep_on to ON will affect sql_log_bin"),
+ ("InnoDB High Priority being used"),
 
  /* MySQL supression needed by Galera */
  ("Slave I/O.*: Get master clock failed with error:.*"),
