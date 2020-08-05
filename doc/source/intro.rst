@@ -6,7 +6,7 @@ About Percona XtraDB Cluster
 
 |PXC|_ is a fully open-source high-availability solution for MySQL.  It
 integrates |PS|_ and |PXB|_ with the Galera_ library to enable synchronous
-multi-master replication.
+multi-source replication.
 
 A *cluster* consists of *nodes*, where each node contains the same set of data
 synchronized accross nodes.  The recommended configuration is to have at least 3

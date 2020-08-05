@@ -260,7 +260,7 @@ Sequence number of the last committed transaction.
 
 .. variable:: wsrep_local_bf_aborts
 
-Number of local transactions that were aborted by slave transactions while
+Number of local transactions that were aborted by replica transactions while
 being executed.
 
 .. seealso:: `Galera status variable: wsrep_local_bf_aborts

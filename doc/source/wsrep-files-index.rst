@@ -6,7 +6,7 @@
 
 * :file:`GRA_*.log`
    These files contain binlog events in ROW format representing the failed
-   transaction. That means that the slave thread was not able to apply one of
+   transaction. That means that the replica thread was not able to apply one of
    the transactions. For each of those file, a corresponding warning or error
    message is present in the mysql error log file. Those error can also be
    false positives like a bad ``DDL`` statement (dropping  a table that doesn't

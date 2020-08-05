@@ -76,7 +76,7 @@ Changed Features
 Removed Features
 --------------------------------------------------------------------------------
 
-- Asynchronous slave reader support has been removed: the ``--include-slaves``
+- Asynchronous replica reader support has been removed: the ``--include-slaves``
   option is not supported.
 - A list of nodes in the priority order is not supported in |proxysql| v2. Only
   a single node is supported at this time.

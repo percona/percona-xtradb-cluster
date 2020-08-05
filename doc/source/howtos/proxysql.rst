@@ -164,7 +164,7 @@ insert corresponding records into the ``mysql_servers`` table.
    This enables you to balance the load in a cluster by
    routing different types of traffic to different groups.
    There are many ways you can configure hostgroups
-   (for example master and slaves, read and write load, etc.)
+   (for example source and replicas, read and write load, etc.)
    and a every node can be a member of multiple hostgroups.
 
 This example adds three |PXC| nodes to the default hostgroup (``0``),

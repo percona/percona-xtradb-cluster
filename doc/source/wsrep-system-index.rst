@@ -137,7 +137,7 @@ It is enabled by default.
 
 Automatic adjustment may not be desirable depending on application's use
 and assumptions of auto-increments.
-It can be disabled in master-slave clusters.
+It can be disabled in source-replica clusters.
 
 .. seealso:: `MySQL wsrep option: wsrep_auto_increment_control
              <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-auto-increment-control>`_
@@ -150,9 +150,9 @@ It can be disabled in master-slave clusters.
    :dyn: Yes
    :default: ``OFF``
 
-In some cases, the master may apply events faster than a slave,
-which can cause master and slave to become out of sync for a brief moment.
-When this variable is set to ``ON``, the slave will wait
+In some cases, the source may apply events faster than a replica,
+which can cause source and replica to become out of sync for a brief moment.
+When this variable is set to ``ON``, the replica will wait
 until that event is applied before doing any other queries.
 Enabling this variable will result in larger latencies.
 
@@ -271,7 +271,7 @@ Defines whether locking sessions should be converted into transactions.
 By default, this is disabled.
 
 Enabling this variable can help older applications to work
-in a multi-master setup by converting ``LOCK/UNLOCK TABLES`` statements
+in a multi-source setup by converting ``LOCK/UNLOCK TABLES`` statements
 into ``BEGIN/COMMIT`` statements.
 It is not the same as support for locking sessions,
 but it does prevent the database from ending up
@@ -952,9 +952,9 @@ the whole DDL statement is not put under TOI.
    :dyn: Yes
    :default: ``OFF``
 
-Defines whether replication slave should be restarted
+Defines whether replication replica should be restarted
 when the node joins back to the cluster.
-Enabling this can be useful because asynchronous replication slave thread
+Enabling this can be useful because asynchronous replication replica thread
 is stopped when the node tries to apply the next replication event
 while the node is in non-primary state.
 
@@ -1050,7 +1050,7 @@ You may want to increase it as suggested
 `in Codership documentation for flow control
 <http://galeracluster.com/documentation-webpages/nodestates.html#flow-control>`_:
 when the node is in ``JOINED`` state,
-increasing the number of slave threads can speed up the catchup to ``SYNCED``.
+increasing the number of replica threads can speed up the catchup to ``SYNCED``.
 
 You can also estimate the optimal value for this from
 :variable:`wsrep_cert_deps_distance` as suggested `on this page
@@ -1157,7 +1157,7 @@ Available values are:
 
 .. note::
 
-   ``xtrabackup-v2`` provides support for clusters with GTIDs and async slaves.
+   ``xtrabackup-v2`` provides support for clusters with GTIDs and async replicas.
 
 .. seealso:: `MySQL wsrep option: wsrep_sst_method
              <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-sst-method>`_
