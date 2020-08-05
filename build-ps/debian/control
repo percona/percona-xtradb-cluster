@@ -157,20 +157,14 @@ Depends: percona-xtradb-cluster-client-5.6 (>= ${source:Version}),
          ${misc:Depends},
          psmisc,
          passwd,
-<<<<<<< HEAD
          lsb-base (>= 3.0-10),
+         openssl
          percona-xtradb-cluster-galera-3 (= @@GALERA_VERSION@@),
          percona-xtrabackup (>= @@XB_VERSION@@),
          socat,
          lsof,
          rsync,
          iproute
-||||||| 66735bc03f8
-         lsb-base (>= 3.0-10)
-=======
-         lsb-base (>= 3.0-10),
-         openssl
->>>>>>> 9d4976d
 Provides: mysql-server,
           virtual-mysql-server,
           virtual-mysql-server-core
@@ -229,6 +223,7 @@ Depends: percona-xtradb-cluster-client-5.6 (>= ${source:Version}),
          psmisc,
          passwd,
          lsb-base (>= 3.0-10),
+         openssl
          percona-xtradb-cluster-galera-3 (= @@GALERA_VERSION@@),
          percona-xtrabackup (>= @@XB_VERSION@@),
          socat,

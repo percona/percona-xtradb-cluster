@@ -216,12 +216,8 @@ IF(WITH_DEFAULT_FEATURE_SET)
 ENDIF()
 
 # Add macros
-<<<<<<< HEAD
 INCLUDE(wsrep)
-||||||| 66735bc03f8
-=======
 INCLUDE(compile_flags)
->>>>>>> 9d4976d
 INCLUDE(character_sets)
 INCLUDE(cpu_info)
 INCLUDE(zlib)

@@ -64,16 +64,10 @@
 #include <io.h>
 #endif
 #include "table_cache.h" // Table_cache_manager, Table_cache
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
-
-||||||| 66735bc03f8
-
-=======
 #include "global_threads.h" // LOCK_thread_count
->>>>>>> 9d4976d
 
 bool
 No_such_table_error_handler::handle_condition(THD *,
