@@ -417,7 +417,7 @@ fi
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_BOOST="$TARGETDIR/libboost" \
-            -DMYSQL_SERVER_SUFFIX="" \
+            -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
             -DWITH_DEBUG=ON \
@@ -451,7 +451,7 @@ fi
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_BOOST="$TARGETDIR/libboost" \
-            -DMYSQL_SERVER_SUFFIX="" \
+            -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY

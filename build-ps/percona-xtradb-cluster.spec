@@ -101,6 +101,10 @@ Prefix: %{_sysconfdir}
 %define rpm_version     1
 %endif
 
+%if %{undefined rel}
+%define rel     1
+%endif
+
 %define release_tag     %{nil}
 %if %{undefined dist}
     %define release         %{release_tag}%{rpm_version}.%{distribution}
@@ -687,7 +691,7 @@ mkdir debug
            -DWITH_ZLIB=system \
            -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
-           -DMYSQL_SERVER_SUFFIX="" \
+           -DMYSQL_SERVER_SUFFIX=".%{rel}" \
            %{?mecab_option} \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
@@ -727,7 +731,7 @@ mkdir release
            -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
-           -DMYSQL_SERVER_SUFFIX="" \
+           -DMYSQL_SERVER_SUFFIX=".%{rel}" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags}
