@@ -18,10 +18,10 @@ for a growing environment.
    * - Synchronous replication**
      - Data is written to all nodes simultaneously, or not written at all in
        case of a failure even on a single node
-   * - Multi-master replication
+   * - Multi-source replication
      - Any node can trigger a data update.
    * - True parallel replication
-     - Multiple threads on slave performing replication on row level
+     - Multiple threads on replica performing replication on row level
    * - Automatic node provisioning
      - You simply add a node and it automatically syncs.
    * - Data consistency
@@ -90,7 +90,7 @@ Features
    :maxdepth: 1
 
    features/highavailability
-   features/multimaster-replication
+   features/multisource-replication
    features/pxc-strict-mode
 
 PXC Security

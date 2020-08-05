@@ -301,11 +301,11 @@ data directory.
    the cluster state keeps changing while each node is taken down and
    upgraded, :term:`IST` or :term:`SST` is triggered when rejoining the
    node that you upgrading. In |version|, |pxc| clears the configuration
-   of each slave node (via `RESET SLAVE ALL <https://dev.mysql.com/doc/refman/8.0/en/reset-slave.html>`_).
+   of each replica node (via `RESET SLAVE ALL <https://dev.mysql.com/doc/refman/8.0/en/reset-slave.html>`_).
 
 .. important:
 
-   It is important that the joining node have enough slave threads to catch up
+   It is important that the joining node have enough replica threads to catch up
    IST write-sets and cluster write-sets.
 
 .. Scenario: Adding 8.0 node to a 5.7 cluster
@@ -327,11 +327,11 @@ data directory.
 
       Joining a 5.7 node to a |pxc| |version| cluster is not supported.
 
-.. Scenario: Upgrading a node which is an async replication slave
+.. Scenario: Upgrading a node which is an async replication replica
    --------------------------------------------------------------------------------
 
-   In this case, you need to configure the master-slave replication. Make one of the
-   PXC nodes as an async slave. Upgrade the |pxc| async slave node and check the
+   In this case, you need to configure the source-replica replication. Make one of the
+   PXC nodes as an async replica. Upgrade the |pxc| async replica node and check the
    replication status.
 
 Scenario: Upgrading from |pxc| 5.6 to |pxc| 8.0

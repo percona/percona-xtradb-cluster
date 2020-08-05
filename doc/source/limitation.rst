@@ -10,7 +10,7 @@ Replication works only with |InnoDB| storage engine.
    Any writes to tables of other types are not replicated.
 
 Unsupported queries:
-   ``LOCK TABLES`` and ``UNLOCK TABLES`` is not supported in multi-master setups
+   ``LOCK TABLES`` and ``UNLOCK TABLES`` is not supported in multi-source setups
 
    Lock functions, such as ``GET_LOCK()``, ``RELEASE_LOCK()``, and so on
 

@@ -170,7 +170,7 @@
       purpose.  :program:`xtrabackup` does not require :command:`READ
       LOCK` for the entire syncing process - only for syncing the
       |MySQL| system tables and writing the information about the
-      binlog, galera and slave information (same as the regular
+      binlog, galera and replica information (same as the regular
       |Percona XtraBackup| backup).
 
       The SST method is configured with the :variable:`wsrep_sst_method` variable.
