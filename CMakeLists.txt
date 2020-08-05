@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2020, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -216,7 +216,12 @@ IF(WITH_DEFAULT_FEATURE_SET)
 ENDIF()
 
 # Add macros
+<<<<<<< HEAD
 INCLUDE(wsrep)
+||||||| 66735bc03f8
+=======
+INCLUDE(compile_flags)
+>>>>>>> 9d4976d
 INCLUDE(character_sets)
 INCLUDE(cpu_info)
 INCLUDE(zlib)
@@ -560,6 +565,12 @@ ENDIF()
 IF(CMAKE_COMPILER_IS_GNUCXX AND NOT GXX_VERSION VERSION_LESS 8)
   STRING_APPEND(CMAKE_CXX_FLAGS_DEBUG          " -Wno-class-memaccess")
   STRING_APPEND(CMAKE_CXX_FLAGS_RELWITHDEBINFO " -Wno-class-memaccess")
+ENDIF()
+
+# Disable -Werror=deprecated-copy for gcc >= 9)
+IF(CMAKE_COMPILER_IS_GNUCXX AND NOT GXX_VERSION VERSION_LESS 9)
+  STRING_APPEND(CMAKE_CXX_FLAGS_DEBUG          " -Wno-deprecated-copy")
+  STRING_APPEND(CMAKE_CXX_FLAGS_RELWITHDEBINFO " -Wno-deprecated-copy")
 ENDIF()
 
 IF(NOT WITHOUT_SERVER)
