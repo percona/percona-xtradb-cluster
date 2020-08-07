@@ -247,7 +247,7 @@ fi
 
 source "$SOURCEDIR/VERSION"
 MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
-PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/./')"
+PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 
 # Note: WSREP_INTERFACE_VERSION act as compatibility check between wsrep-plugin
@@ -296,7 +296,6 @@ if [[ $ENABLE_ASAN -eq 1 ]]; then
         fi
     fi
 fi
-
 COMMON_FLAGS="-DPERCONA_INNODB_VERSION=$PERCONA_SERVER_EXTENSION"
 export CFLAGS=" $COMMON_FLAGS -static-libgcc $MACHINE_SPECS_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $MACHINE_SPECS_CFLAGS ${CXXFLAGS:-}"
@@ -418,7 +417,7 @@ fi
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_BOOST="$TARGETDIR/libboost" \
-            -DMYSQL_SERVER_SUFFIX="" \
+            -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
             -DWITH_DEBUG=ON \
@@ -452,7 +451,7 @@ fi
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_BOOST="$TARGETDIR/libboost" \
-            -DMYSQL_SERVER_SUFFIX="" \
+            -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY

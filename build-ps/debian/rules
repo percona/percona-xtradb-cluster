@@ -13,6 +13,7 @@ PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
 wsrep_version="@@WSREP_VERSION@@"
 percona_server_version="@@PERCONA_VERSION@@"
 revision="@@REVISION@@"
+rel="@@DEB_RELEASE@@"
 compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
 compilation_comment_release="Percona XtraDB Cluster (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
 server_suffix=""
@@ -72,7 +73,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DCOMPILATION_COMMENT=$(compilation_comment_debug) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DWITHOUT_TOKUDB=ON \
-		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
+		-DMYSQL_SERVER_SUFFIX=".$(rel)" \
 		-DWITH_WSREP=ON \
 		-DINSTALL_LAYOUT=DEB \
 		-DWITH_INNODB_MEMCACHED=ON \
@@ -119,7 +120,7 @@ endif
 		-DCOMPILATION_COMMENT=$(compilation_comment_release) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DWITHOUT_TOKUDB=ON \
-		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
+		-DMYSQL_SERVER_SUFFIX=".$(rel)" \
 		-DWITH_WSREP=ON \
 		-DINSTALL_LAYOUT=DEB \
 		-DWITH_INNODB_MEMCACHED=ON \
