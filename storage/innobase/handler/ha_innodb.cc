@@ -1928,7 +1928,8 @@ ulint thd_start_time_in_secs(THD *thd) /*!< in: thread handle, or NULL */
 
 /** Enter InnoDB engine after checking the max number of user threads
 allowed, else the thread is put into sleep.
-@param[in,out]	prebuilt	row prebuilt handler */
+@param[in,out]	prebuilt	row prebuilt handler
+@return InnoDB error code. */
 static inline dberr_t innobase_srv_conc_enter_innodb(row_prebuilt_t *prebuilt) {
   /* We rely on server to do external_lock(F_UNLCK) to reset the
   srv_conc.n_active counter. */

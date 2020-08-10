@@ -905,14 +905,6 @@ wsrep_kill_victim(const trx_t * const trx, trx_t *victim_trx) {
         wsrep_trx_print_locking(stderr, victim_trx, 3000);
         ib::info() << "*** WAITING FOR THIS LOCK TO BE GRANTED:";
 
-#ifdef OUT
-        if (lock_get_type(victim_trx->lock) == LOCK_REC) {
-          lock_rec_print(stderr, victim_trx->lock);
-        } else {
-          lock_table_print(stderr, victim_trx->lock);
-        }
-#endif
-
         ib::info() << " SQL1: " << wsrep_thd_query(trx->mysql_thd);
         ib::info() << " SQL2: " << wsrep_thd_query(victim_trx->mysql_thd);
       }
@@ -3840,15 +3832,6 @@ const lock_t *lock_table_other_has_incompatible(
        lock = UT_LIST_GET_PREV(tab_lock.locks, lock)) {
     if (lock->trx != trx && !lock_mode_compatible(lock_get_mode(lock), mode) &&
         (wait || !lock_get_wait(lock))) {
-#ifdef WITH_WSREP_OUT
-      if (wsrep_on(trx->mysql_thd)) {
-        if (wsrep_debug) ib::info() << "WSREP: table lock abort";
-        trx_mutex_enter(lock->trx);
-        wsrep_kill_victim((trx_t *)trx, (lock_t *)lock);
-        trx_mutex_exit(lock->trx);
-      }
-#endif /* WITH_WSREP */
-
       return (lock);
     }
   }
@@ -5436,7 +5419,6 @@ static void rec_queue_validate_latched(const buf_block_t *block,
                                impl_trx)) {
           ib::info() << "WSREP impl BF lock conflict";
         }
-        //ut_a(lock_get_wait(other_lock));
         ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
                                impl_trx));
 #endif /* WITH_WSREP */
@@ -6550,18 +6532,6 @@ void lock_trx_release_locks(trx_t *trx) /*!< in/out: transaction */
   DEBUG_SYNC_C("before_lock_trx_release_locks");
 
   trx_mutex_enter(trx);
-
-#ifdef WITH_WSREP_OUT
-  /* If the trx releasing locks is local streaming transaction and it is rolling
-  back, call wsrep_handle_SR_rollback() to ensure that the rollback fragment
-  gets replicated before any of the locks is released. */
-  if (wsrep_on(trx->mysql_thd) &&
-      wsrep_thd_is_local(trx->mysql_thd) &&
-      wsrep_thd_is_SR(trx->mysql_thd) &&
-      trx->lock.que_state == TRX_QUE_ROLLING_BACK) {
-    wsrep_handle_SR_rollback(NULL, trx->mysql_thd);
-  }
-#endif /* WITH_WSREP */
 
   check_trx_state(trx);
   ut_ad(trx_state_eq(trx, TRX_STATE_COMMITTED_IN_MEMORY));

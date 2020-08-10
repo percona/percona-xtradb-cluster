@@ -117,8 +117,9 @@ sub fix_port {
 
 sub fix_admin_port {
   my ($self, $config, $group_name, $group) = @_;
-  my $hostname = $group->value('#host');
-  return $self->{HOSTS}->{$hostname}++;
+  #my $hostname = $group->value('#host');
+  #return $self->{HOSTS}->{$hostname}++;
+  return $self->{PORT}++;
 }
 
 sub fix_x_port {

@@ -325,8 +325,7 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
 
   Return zero on succes, non-zero on failure.
  */
-static inline int wsrep_ordered_commit(THD *thd, bool all,
-                                       const wsrep_apply_error &) {
+static inline int wsrep_ordered_commit(THD *thd, bool all) {
   /* Interim Commit Optimization can be used only if log_slave_updates is
   ON that ensures all slave thread (including pxc replication threads)
   binlogs the events there-by following group commit protocol.

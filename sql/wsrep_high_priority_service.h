@@ -49,7 +49,7 @@ class Wsrep_high_priority_service : public wsrep::high_priority_service,
   void switch_execution_context(wsrep::high_priority_service &);
   int log_dummy_write_set(const wsrep::ws_handle &, const wsrep::ws_meta &,
                           wsrep::mutable_buffer &);
-  void adopt_apply_error(wsrep::mutable_buffer &) {}
+  void adopt_apply_error(wsrep::mutable_buffer &);
 
   virtual bool check_exit_status() const = 0;
   void debug_crash(const char *);

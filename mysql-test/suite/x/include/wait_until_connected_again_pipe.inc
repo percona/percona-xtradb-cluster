@@ -15,7 +15,7 @@ while ($mysql_errno)
   # while being shutdown, thus 1040 is an "allowed" error
   # See BUG#36228
   --error 0,1040,1053,2002,2003,2006,2013,1045,ER_SECURE_TRANSPORT_REQUIRED,2017,2016
-  show session status;
+  show session statUS;
   if ($mysql_errno == 1045){
     let mysql_errno=0;
   }

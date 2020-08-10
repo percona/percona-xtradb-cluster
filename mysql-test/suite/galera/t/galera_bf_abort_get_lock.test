@@ -66,9 +66,22 @@ insert into t1 values ('a');
 disconnect con_node_1a;
 
 --connection node_2
-call mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query.*");
-call mtr.add_suppression("Ignoring error 'Unknown table 'test.t1'' on query.*");
-call mtr.add_suppression("Query apply failed.*");
+call mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query");
+call mtr.add_suppression("Ignoring error 'Unknown table 'test.t1'' on query");
+call mtr.add_suppression("Query apply failed");
+call mtr.add_suppression("Inconsistency detected");
 
 --connection node_1
+call mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query");
+call mtr.add_suppression("Ignoring error 'Unknown table 'test.t1'' on query");
+call mtr.add_suppression("Query apply failed");
+call mtr.add_suppression("Inconsistency detected");
 drop table t1;
+
+# Rejoin node #2
+--connection node_2
+--source include/kill_galera.inc
+--sleep 1
+--echo Starting mysqld
+--source include/start_mysqld.inc
+

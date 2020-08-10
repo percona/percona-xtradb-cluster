@@ -1,0 +1,12 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.1]
+wsrep-ignore-apply-errors=0
+wsrep_sync_wait=0
+wsrep_causal_reads=0
+
+[mysqld.2]
+wsrep-ignore-apply-errors=0
+wsrep_sync_wait=0
+wsrep_causal_reads=0
+

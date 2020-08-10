@@ -1,0 +1,12 @@
+--source include/galera_cluster.inc
+
+--connection node_2
+call mtr.add_suppression("The used table type doesn't support BLOB/TEXT columns");
+call mtr.add_suppression("Query apply failed");
+
+--connection node_1
+call mtr.add_suppression("The used table type doesn't support BLOB/TEXT columns");
+
+--error ER_TABLE_CANT_HANDLE_BLOB
+CREATE TABLE t1 (a BLOB NOT NULL, id BIGINT NOT NULL, PRIMARY KEY(id)) ENGINE=MEMORY;
+

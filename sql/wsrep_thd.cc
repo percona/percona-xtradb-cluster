@@ -351,9 +351,7 @@ bool wsrep_bf_abort(const THD *bf_thd, THD *victim_thd) {
   DBUG_TRACE;
   WSREP_LOG_THD(const_cast<THD *>(bf_thd), "BF aborter before");
 
-  //wsrep_lock_thd_query(victim_thd, true);
   WSREP_LOG_THD(victim_thd, "victim before");
-  //wsrep_lock_thd_query(victim_thd, false);
 
   wsrep::seqno bf_seqno(bf_thd->wsrep_trx().ws_meta().seqno());
 

@@ -1,0 +1,27 @@
+!include ../galera_4nodes.cnf
+
+[mysqld]
+wsrep-ignore-apply-errors=0
+
+[ENV]
+galera_cluster_size=4
+
+# Increase the SST timeout due to mysql_upgrade
+# This is needed here since we are staring up 4 nodes and there
+# are 3 SSTs running at the same time
+[sst]
+sst-initial-timeout=300
+
+
+[mysqld.1]
+wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.1.#galera_port;gmcast.peer_timeout=PT8S;evs.suspect_timeout=PT10S;evs.inactive_timeout=PT30S;evs.install_timeout=PT25S;gmcast.segment=1'
+
+[mysqld.2]
+wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.2.#galera_port;gmcast.peer_timeout=PT8S;evs.suspect_timeout=PT10S;evs.inactive_timeout=PT30S;evs.install_timeout=PT25S;gmcast.segment=1'
+
+[mysqld.3]
+wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.3.#galera_port;gmcast.peer_timeout=PT8S;evs.suspect_timeout=PT10S;evs.inactive_timeout=PT30S;evs.install_timeout=PT25S;gmcast.segment=2'
+
+[mysqld.4]
+wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.4.#galera_port;gmcast.peer_timeout=PT8S;evs.suspect_timeout=PT10S;evs.inactive_timeout=PT30S;evs.install_timeout=PT25S;gmcast.segment=2'
+

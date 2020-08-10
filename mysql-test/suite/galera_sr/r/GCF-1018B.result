@@ -7,4 +7,6 @@ SET SESSION innodb_lock_wait_timeout = 1000;
 SET SESSION wsrep_sync_wait = 0;
 SET SESSION wsrep_trx_fragment_size = 64;
 SET SESSION innodb_lock_wait_timeout = 1000;
+CALL mtr.add_suppression("Error deleting row from mysql.wsrep_streaming_log:");
+CALL mtr.add_suppression("Failed to init table for index scan:");
 DROP TABLE t1;

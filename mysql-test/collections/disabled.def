@@ -221,10 +221,6 @@ galera.galera_sst_rsync : BUG#0 rsync feature removed
 galera.galera_ist_rsync : BUG#0 rsync feature removed
 galera.galera_truncate : BUG#0 result depends on which node indexing
 
-galera.high_prio_trx_1 : BUG#0 Failing after 8.0.21 merge
-galera.high_prio_trx_2 : BUG#0 Failing after 8.0.21 merge
-galera.high_prio_trx_3 : BUG#0 Failing after 8.0.21 merge
-galera.galera_high_prio_trx_fk : BUG#0 Failing after 8.0.21 merge
 
 # galera-3nodes
 galera_3nodes.galera_ipv6_rsync : BUG#0 Needs rsync so disabled
@@ -241,6 +237,15 @@ galera_3nodes_sr.GCF-810C : BUG#0 Test sub-file missing
 #binlog
 binlog.binlog_index : BUG#0 codership/mysql-wsrep##71
 binlog.binlog_xa_prepared_disconnect : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
+
+# Galera 4.5 / 8.0.21 related
+galera.galera_mysqlpump : BUG#0 Wasn't working properly even before inconsistency voting 
+galera.high_prio_trx_1 : BUG#0 Failing after 8.0.21 merge. Also fails in codership sources
+galera.high_prio_trx_2 : BUG#0 Failing after 8.0.21 merge. Also fails in codership sources
+galera.high_prio_trx_3 : BUG#0 Failing after 8.0.21 merge. Also fails in codership sources
+galera.galera_high_prio_trx_fk : BUG#0 Failing after 8.0.21 merge. Also fails in codership sources
+galera.galera-index-online-fk : BUG#0 fk_40 triggers inconsistency voting, as it uses a debug_sync on node1
+galera.MW-284 : BUG#0000 test is incompatible with native mysql8.0 server slave behavior (upstream)
 
 #--------------------------------------------------
 # Codership disabled tests end here

@@ -45,4 +45,7 @@ while ($count)
 }
 --enable_query_log
 
+CALL mtr.add_suppression("Error deleting row from mysql.wsrep_streaming_log:");
+CALL mtr.add_suppression("Failed to init table for index scan:");
+
 DROP TABLE t1;

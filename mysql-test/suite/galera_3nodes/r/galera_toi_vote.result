@@ -1,0 +1,19 @@
+SET SESSION wsrep_on=OFF;
+DROP SCHEMA test;
+CREATE SCHEMA test;
+ERROR HY000: Can't create database 'test'; database exists
+SET SESSION wsrep_sync_wait=0;
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 2 FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+SET SESSION wsrep_sync_wait=0;
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 2 FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+SET SESSION wsrep_sync_wait=0;
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'Disconnected' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+Killing server ...
+# restart
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready'
+CALL mtr.add_suppression("is inconsistent with group. Leaving");
+CALL mtr.add_suppression("Can't create database");
+CALL mtr.add_suppression("Query apply failed: 1");

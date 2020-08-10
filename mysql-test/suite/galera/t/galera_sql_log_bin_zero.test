@@ -38,15 +38,18 @@ call mtr.add_suppression("Query apply failed.*");
 SELECT COUNT(*) = 1 FROM t1;
 SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 1;
 SHOW TABLES;
+
 --error ER_CANNOT_USER
-DROP USER 'demo'@'localhost';
+SHOW CREATE USER 'demo'@'localhost';
 
 --connection node_1
 DROP TABLE t1;
+SET SESSION sql_log_bin = 0;
 DROP TABLE t2;
 DROP TABLE t3;
 DROP COMPRESSION_DICTIONARY numbers;
-
+DROP USER 'demo'@'localhost';
+SET SESSION sql_log_bin = 1;
 
 #-------------------------------------------------------------------------------
 #

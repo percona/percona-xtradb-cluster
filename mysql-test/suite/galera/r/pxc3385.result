@@ -1,0 +1,5 @@
+call mtr.add_suppression("The used table type doesn't support BLOB/TEXT columns");
+call mtr.add_suppression("Query apply failed");
+call mtr.add_suppression("The used table type doesn't support BLOB/TEXT columns");
+CREATE TABLE t1 (a BLOB NOT NULL, id BIGINT NOT NULL, PRIMARY KEY(id)) ENGINE=MEMORY;
+ERROR 42000: The used table type doesn't support BLOB/TEXT columns

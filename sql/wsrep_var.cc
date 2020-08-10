@@ -29,6 +29,7 @@
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
 #include "wsrep_xid.h"
+#include "wsrep_trans_observer.h"
 
 #define WSREP_START_POSITION_ZERO "00000000-0000-0000-0000-000000000000:-1"
 #define WSREP_CLUSTER_NAME "my_wsrep_cluster"
@@ -64,7 +65,9 @@ int wsrep_init_vars() {
 Toggling of the value inside function or transaction is not allowed
 @return false if no error encountered with check else return true. */
 bool wsrep_on_check(sys_var *, THD *thd, set_var *var) {
-  if (var->type == OPT_GLOBAL) return true;
+  bool new_wsrep_on = (bool)var->save_result.ulonglong_value;
+
+  //if (!thd->security_context()->check_access(SUPER_ACL)) return true;
 
   /* If in a stored function/trigger, it's too late to change wsrep_on. */
   if (thd->in_sub_stmt) {
@@ -82,6 +85,27 @@ bool wsrep_on_check(sys_var *, THD *thd, set_var *var) {
     my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
              var->save_result.ulonglong_value ? "ON" : "OFF");
     return true;
+  }
+
+  if (var->type == OPT_GLOBAL) {
+    /*
+      The global value is about to change. We close all client connections
+      to make sure that there will be no connections working with wrong
+      wsrep_on setting. This THD thd->variables.wsrep_on will be adjusted
+      in wsrep_on_update().
+    */
+    if (global_system_variables.wsrep_on && !new_wsrep_on) {
+      wsrep_commit_empty(thd, true);
+      wsrep_after_statement(thd);
+      wsrep_after_command_ignore_result(thd);
+      wsrep_close(thd);
+      //wsrep_cleanup(thd);
+      wsrep_close_client_connections(true, true);
+    } else if (!global_system_variables.wsrep_on && new_wsrep_on) {
+      wsrep_close_client_connections(true, true);
+      /* Wsrep session is opened in wsrep_on_update() after the
+         global value has been changed. */
+    }
   }
 
   return false;
@@ -770,29 +794,6 @@ bool wsrep_trx_fragment_unit_update(sys_var *, THD *thd, enum_var_type) {
         size_t(thd->variables.wsrep_trx_fragment_size));
   }
   return false;
-}
-
-/*
- * Status variables stuff below
- */
-static inline void wsrep_assign_to_mysql(SHOW_VAR *mysql,
-                                         wsrep_stats_var *wsrep) {
-  mysql->scope = SHOW_SCOPE_ALL;
-  mysql->name = wsrep->name;
-  switch (wsrep->type) {
-    case WSREP_VAR_INT64:
-      mysql->value = (char *)&wsrep->value._int64;
-      mysql->type = SHOW_LONGLONG;
-      break;
-    case WSREP_VAR_STRING:
-      mysql->value = (char *)&wsrep->value._string;
-      mysql->type = SHOW_CHAR_PTR;
-      break;
-    case WSREP_VAR_DOUBLE:
-      mysql->value = (char *)&wsrep->value._double;
-      mysql->type = SHOW_DOUBLE;
-      break;
-  }
 }
 
 static SHOW_VAR mysql_status_vars[512 + 1];

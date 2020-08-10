@@ -40,6 +40,22 @@ bool binlog_cache_is_reset = false;
 IO_CACHE_binlog_cache_storage::IO_CACHE_binlog_cache_storage() {}
 IO_CACHE_binlog_cache_storage::~IO_CACHE_binlog_cache_storage() { close(); }
 
+bool IO_CACHE_binlog_cache_storage::open(File file,
+                                         my_off_t max_cache_size) {
+  DBUG_TRACE;
+  /* Set the max cache size for IO_CACHE */
+  m_io_cache.end_of_file = max_cache_size;
+  if (init_io_cache(&m_io_cache, file, 0, WRITE_CACHE, 0, 0,
+                    MYF(MY_WME | MY_NABP))) {
+    return true;
+  }
+
+  if (rpl_encryption.is_enabled()) enable_encryption();
+
+  m_max_cache_size = max_cache_size;
+  return false;
+}
+
 bool IO_CACHE_binlog_cache_storage::open(const char *dir, const char *prefix,
                                          my_off_t cache_size,
                                          my_off_t max_cache_size) {
@@ -262,6 +278,13 @@ bool IO_CACHE_binlog_cache_storage::setup_ciphers_password() {
 
   if (m_io_cache.m_encryptor->open(password_str, 0)) return true;
   if (m_io_cache.m_decryptor->open(password_str, 0)) return true;
+  return false;
+}
+
+bool Binlog_cache_storage::open(File file, my_off_t max_cache_size) {
+  if (m_file.open(file, max_cache_size))
+    return true;
+  m_pipeline_head = &m_file;
   return false;
 }
 

@@ -1,1 +1,4 @@
 !include ../galera_2nodes_as_master.cnf
+
+[mysqld]
+wsrep_debug=1

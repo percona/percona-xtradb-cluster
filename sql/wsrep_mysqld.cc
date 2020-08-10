@@ -1044,7 +1044,6 @@ int wsrep_init() {
     }
 
     char ssl_opts[4096];
-    // TODO
     server_main_callback.populate_wsrep_ssl_options(ssl_opts, sizeof(ssl_opts));
     snprintf(buffer, sizeof(buffer), "%s%s%s",
              provider_options ? provider_options : "",
@@ -1317,10 +1316,15 @@ bool wsrep_start_replication() {
 bool wsrep_must_sync_wait(THD *thd, uint mask) {
   bool ret;
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  ret = (thd->variables.wsrep_sync_wait & mask) && thd->wsrep_client_thread &&
-        thd->variables.wsrep_on && !thd->in_active_multi_stmt_transaction() &&
-        thd->wsrep_trx().state() != wsrep::transaction::s_replaying &&
-        thd->wsrep_cs().sync_wait_gtid().is_undefined();
+  ret = (thd->variables.wsrep_sync_wait & mask) && 
+    thd->wsrep_client_thread &&
+    WSREP_ON && thd->variables.wsrep_on &&
+    !(thd->variables.wsrep_dirty_reads &&
+      !is_update_query(thd->lex->sql_command)) &&
+    !thd->in_active_multi_stmt_transaction() &&
+    thd->wsrep_trx().state() !=  
+    wsrep::transaction::s_replaying &&
+    thd->wsrep_cs().sync_wait_gtid().is_undefined();
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   return ret;
 }
@@ -1356,7 +1360,7 @@ bool wsrep_sync_wait(THD *thd, uint mask) {
           break;
         default:
           msg = "Synchronous wait failed.";
-          err = ER_LOCK_WAIT_TIMEOUT;  // NOTE: the above msg won't be displayed
+          err = ER_LOCK_WAIT_TIMEOUT;  // HERE! NOTE: the above msg won't be displayed
                                        //       with ER_LOCK_WAIT_TIMEOUT
       }
       my_error(err, MYF(0), msg);
@@ -1940,13 +1944,16 @@ static void wsrep_TOI_begin_failed(THD *thd,
       goto fail;
     }
     wsrep::client_state &cs(thd->wsrep_cs());
-    int const ret = cs.leave_toi_local(wsrep::mutable_buffer());
+    std::string const err(wsrep::to_c_string(cs.current_error()));
+    wsrep::mutable_buffer err_buf;
+    err_buf.push_back(err);
+    int const ret = cs.leave_toi_local(err_buf);
     if (ret) {
       WSREP_ERROR(
           "Leaving critical section for failed TOI failed: thd: %lld, "
           "schema: %s, SQL: %s, rcode: %d wsrep_error: %s",
           (long long)thd->real_id, thd->db().str, thd->query().str, ret,
-          wsrep::to_c_string(cs.current_error()));
+          err.c_str());
       goto fail;
     }
   }
@@ -2107,8 +2114,13 @@ static void wsrep_TOI_end(THD *thd) {
 
   if (wsrep_thd_is_local_toi(thd)) {
     wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
+    wsrep::mutable_buffer err;
+    if (thd->is_error() && !wsrep_must_ignore_error(thd))
+    {
+        wsrep_store_error(thd, err);
+    }
+    int const ret= client_state.leave_toi_local(err);
 
-    int ret = client_state.leave_toi_local(wsrep::mutable_buffer());
     if (!ret) {
       WSREP_DEBUG("TO END: %lld", client_state.toi_meta().seqno().get());
       /* Reset XID on completion of DDL transactions */
@@ -2453,7 +2465,7 @@ int wsrep_must_ignore_error(THD *thd) {
   const uint flags = sql_command_flags[thd->lex->sql_command];
 
   DBUG_ASSERT(error);
-  DBUG_ASSERT(wsrep_thd_is_toi(thd) || wsrep_thd_is_applying(thd));
+  DBUG_ASSERT(wsrep_thd_is_toi(thd));
 
   if ((wsrep_ignore_apply_errors & WSREP_IGNORE_ERRORS_ON_DDL))
     goto ignore_error;

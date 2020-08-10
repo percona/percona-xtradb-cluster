@@ -3445,6 +3445,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
         !wsrep_tables_accessible_when_detached(all_tables) &&
         lex->sql_command != SQLCOM_SET_OPTION &&
         lex->sql_command != SQLCOM_SHUTDOWN &&
+        !(lex->sql_command == SQLCOM_SELECT && !all_tables)                &&
         !wsrep_is_show_query(lex->sql_command)) {
       my_message(ER_UNKNOWN_COM_ERROR,
                  "WSREP has not yet prepared node for application use", MYF(0));

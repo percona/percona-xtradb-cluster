@@ -7,6 +7,10 @@
 --source include/galera_cluster.inc
 
 --disable_query_log
+--connection node_1
+call mtr.add_suppression("Failed to initialize TLS for channel");
+call mtr.add_suppression("Failed to set up SSL because");
+--connection node_2
 call mtr.add_suppression("Failed to initialize TLS for channel");
 call mtr.add_suppression("Failed to set up SSL because");
 --enable_query_log

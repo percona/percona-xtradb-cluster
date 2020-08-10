@@ -6,35 +6,45 @@
 
 --connection node_2
 --exec rm -rf $MYSQLTEST_VARDIR/mysqld.2/data/GRA_*.log
+let $restore_wsrep_ignore_apply_errors = `SELECT @@GLOBAL.wsrep_ignore_apply_errors`;
+SET GLOBAL wsrep_ignore_apply_errors=0;
 
 # Create applier failure
-
 SET SESSION wsrep_on=OFF;
 CREATE TABLE t1 (f1 INTEGER);
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER);
 
+# node 2 should detect an error and leave the cluster
+--let $members = 1
+--source include/wsrep_wait_membership.inc
+
 --connection node_2
+--let $members = 0
+--source include/wsrep_wait_membership.inc
 SELECT COUNT(*) = 0 FROM t1;
 
 # Compose a valid binlog from a header file and the GRA file
 
 --let $gra_binlog_file = $MYSQLTEST_VARDIR/tmp/gra.log
 --exec rm -rf $gra_binlog_file 
-
 --exec cp std_data/binlog-header.log $gra_binlog_file
 --exec cat $MYSQLTEST_VARDIR/mysqld.2/data/GRA_*.log >> $gra_binlog_file
 
 # Make sure the binlog thus produced is readable and contains the failure
---replace_regex /SET TIMESTAMP=[0-9]+/SET TIMESTAMP=<TIMESTAMP>/ /#[0-9]+ +[0-9]+:[0-9]+:[0-9]+/<ISO TIMESTAMP>/ /pseudo_thread_id=[0-9]+/pseudo_thread_id=<PSEUDO_THREAD_ID>/ /thread_id=[0-9]+/thread_id=<THREAD_ID>/
---exec $MYSQL_BINLOG $gra_binlog_file
+--replace_regex /SET TIMESTAMP=[0-9]+/SET TIMESTAMP=<TIMESTAMP>/ /#[0-9]+ +[0-9]+:[0-9]+:[0-9]+/<ISO TIMESTAMP>/ /pseudo_thread_id=[0-9]+/pseudo_thread_id=<PSEUDO_THREAD_ID>/ /thread_id=[0-9]+/thread_id=<THREAD_ID>/ /server v [0-9].[0-9].[0-9]+.* created/server v x.y.z created/  /created [0-9]+ ( )?[0-9]+:[0-9]+:[0-9]+ at startup/created ###### ##:##:## at startup/
+--exec $MYSQL_BINLOG --base64-output=never $gra_binlog_file
+--remove_file $gra_binlog_file
 
-SET SESSION wsrep_on=ON;
+# restart and reconnect node_2
+--source include/kill_galera.inc
+--source include/wait_until_disconnected.inc
+--source include/start_mysqld.inc
 
-CALL mtr.add_suppression("Slave SQL: Error 'Table 't1' already exists' on query");
-call mtr.add_suppression("Ignoring error 'Table 't1' already exists'");
-call mtr.add_suppression("Query apply failed.*");
-
+--eval SET GLOBAL wsrep_ignore_apply_errors = $restore_wsrep_ignore_apply_errors
 DROP TABLE t1;
---exec rm -rf $gra_binlog_file 
+
+CALL mtr.add_suppression("Slave SQL: Error 'Table 't1' already exists' on query. Default database: 'test'.");
+CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on");
+CALL mtr.add_suppression("Event 1 Query apply failed");
