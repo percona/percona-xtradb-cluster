@@ -66,6 +66,7 @@ max_parts.innodb_partition_open_files_limit                 : BUG#27423163 Test 
 
 # perfschema suite test
 perfschema.threads_history      : BUG#27712231
+perfschema.ssl                  : BUG#30910698
 
 # rpl_gtid suite tests
 rpl_gtid.rpl_gtid_delete_memory_table_after_start_server : BUG#24351040
@@ -80,7 +81,6 @@ rpl_nogtid.rpl_binlog_format_errors               : BUG#29776083 EXPLICIT BINLOG
 
 # rpl suite tests
 rpl.rpl_io_thd_wait_for_disk_space_stress : BUG#23581287 Disabled until bug is fixed.
-rpl.rpl_multi_source_corrupt_repository   : Bug#28765425 Disabled until the bug is fixed
 
 # sysschema suite tests
 sysschema.v_wait_classes_global_by_avg_latency : BUG#21550054 Test fails too often.
@@ -93,22 +93,12 @@ rocksdb.covered_unpack_info_format : BUG#0 MYR-180 fb-mysql-5.6.35/922021ce3d8bf
 rocksdb.fast_prefix_index_fetch : BUG#0 MYR-180 fb-mysql-5.6.35/922021ce3d8bfc40152c112f6a59eb71e3d6dd98
 rocksdb.level_read_uncommitted : BUG#0 MyRocks does not yet suppore ISO read uncommitted
 rocksdb.level_serializable : BUG#0 MyRocks does not yet support ISO serializable
-rocksdb.rpl_read_free : BUG#6 MYR-6
 rocksdb.slow_query_log : BUG#26 MYR-26
 # 8.0
 rocksdb.allow_to_start_after_corruption : BUG#4584 PS-4584
-rocksdb.bloomfilter3 : BUG#4618 PS-4618 - Port PS-4070 a.k.a. MYR-63 to 8.0
-rocksdb.skip_validate_tmp_table : BUG#4218 PS-4218
-rocksdb.validate_datadic : BUG#4218 PS-4218
-
-rocksdb.add_index_inplace : BUG#0 inplace alter partitioning has not yet been implemented
-rocksdb.add_index_inplace_crash : BUG#0 inplace alter partitioning has not yet been implemented
 
 # rocksdb_rpl suite tests
 rocksdb_rpl.rpl_rocksdb_snapshot : BUG#0 LOCK BINLOG FOR BACKUP
-
-# rocksdb_sys_vars suite tests
-rocksdb_sys_vars.rocksdb_validate_tables_basic : BUG#0 disabled until validation is figured out
 
 # tokudb suite tests
 tokudb.mvcc-19 : BUG#0 tokutek

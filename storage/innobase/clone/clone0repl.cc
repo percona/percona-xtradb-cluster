@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2018, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2018, 2020, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -313,6 +313,7 @@ int Clone_persist_gtid::write_other_gtids() {
 }
 
 bool Clone_persist_gtid::check_compress() {
+  DBUG_EXECUTE_IF("simulate_force_compress", { return true; });
   /* Check local threshold on number of flush. */
   if (m_compression_counter >= s_compression_threshold) {
     return (true);
@@ -471,7 +472,14 @@ void Clone_persist_gtid::flush_gtids(THD *thd) {
     m_compression_gtid_counter = 0;
     /* Write non-innodb GTIDs before compression. */
     write_other_gtids();
-    err = gtid_table_persistor->compress(thd);
+
+    /* Compress the gtid_executed table if there is an explicit compression
+    request. Otherwise signal the gtid persister thread to perform
+    compression. */
+    if (explicit_request)
+      err = gtid_table_persistor->compress(thd);
+    else
+      gtid_table_persistor->set_compression_and_signal_compressor();
   }
   if (err != 0) {
     ib::error(ER_IB_CLONE_GTID_PERSIST) << "Error persisting GTIDs to table";
@@ -501,23 +509,16 @@ void Clone_persist_gtid::periodic_write() {
   after recovery. */
   m_thread_active.store(true);
 
-  while (!m_close_thread.load()) {
+  for (;;) {
     /* Exit if last phase of shutdown */
     auto is_shutdown = (srv_shutdown_state.load() != SRV_SHUTDOWN_NONE);
 
-    if (is_shutdown) {
+    if (is_shutdown || m_close_thread.load()) {
       /* Stop accepting any more GTID */
       m_active.store(false);
-
-      /* Exit immediately if fast shutdown. */
-      if (srv_fast_shutdown == 2) {
-        break;
-      }
-      /* For slow shutdown, consume all GTIDs so that undo can be purged. */
-      if (m_num_gtid_mem.load() == 0) {
-        break;
-      }
+      break;
     }
+
     if (!flush_immediate()) {
       os_event_wait_time(m_event, s_time_threshold_ms * 1000);
     }
@@ -525,6 +526,16 @@ void Clone_persist_gtid::periodic_write() {
     /* Write accumulated GTIDs to disk table */
     flush_gtids(thd);
   }
+
+  /* For slow shutdown, consume remaining GTIDs so that undo can be purged. */
+  if (m_num_gtid_mem.load() > 0 && srv_fast_shutdown < 2) {
+    flush_gtids(thd);
+    /* All GTIDs should have been flushed at this point. */
+    if (m_num_gtid_mem.load() > 0) {
+      ib::warn(ER_IB_MSG_GTID_FLUSH_AT_SHUTDOWN);
+    }
+  }
+
   m_active.store(false);
   destroy_thd(thd);
   m_thread_active.store(false);

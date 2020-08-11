@@ -36,6 +36,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <algorithm>
+
 #include "decimal.h"
 #include "lex_string.h"
 #include "my_config.h"
@@ -161,6 +163,13 @@ static inline char *my_stpnmov(char *dst, const char *src, size_t n) {
 */
 static inline char *my_stpcpy(char *dst, const char *src) {
 #if defined(HAVE_BUILTIN_STPCPY)
+  /*
+    If __builtin_stpcpy() is available, use it instead of stpcpy(), since GCC in
+    some situations is able to transform __builtin_stpcpy() into more efficient
+    strcpy() or memcpy() calls. It does not perform these transformations for a
+    plain call to stpcpy() when the compiler runs in strict mode. See GCC bug
+    82429.
+  */
   return __builtin_stpcpy(dst, src);
 #elif defined(HAVE_STPCPY)
   return stpcpy(dst, src);
@@ -277,7 +286,7 @@ static constexpr int FLOATING_POINT_BUFFER{311 + DECIMAL_NOT_SPECIFIED};
   MAX_DECPT_FOR_F_FORMAT zeros for cases when |x|<1 and the 'f' format is used).
 */
 #define MY_GCVT_MAX_FIELD_WIDTH \
-  (DBL_DIG + 4 + MY_MAX(5, MAX_DECPT_FOR_F_FORMAT))
+  (DBL_DIG + 4 + std::max(5, MAX_DECPT_FOR_F_FORMAT))
 
 const char *str2int(const char *src, int radix, long lower, long upper,
                     long *val);
@@ -341,8 +350,9 @@ static inline void human_readable_num_bytes(char *buf, int buf_len,
   unsigned int i;
   for (i = 0; dbl_val > 1024 && i < sizeof(size) - 1; i++) dbl_val /= 1024;
   const char mult = size[i];
-  // 18446744073709551615 Yottabytes should be enough for most ...
-  if (dbl_val > ULLONG_MAX)
+  // ULLONG_MAX (18446744073709551615) should be enough for most ...
+  // static_cast<double>(ULLONG_MAX) is equal 18446744073709551616.0
+  if (dbl_val >= static_cast<double>(ULLONG_MAX))
     snprintf(buf, buf_len, "+INF");
   else
     snprintf(buf, buf_len, "%llu%c", (unsigned long long)dbl_val, mult);

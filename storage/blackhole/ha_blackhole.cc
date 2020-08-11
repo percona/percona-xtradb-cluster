@@ -1,4 +1,4 @@
-/* Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2005, 2020, Oracle and/or its affiliates. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -45,12 +45,18 @@ static inline bool is_slave_applier(const THD &thd) {
 
 static inline bool pretend_for_slave(const THD &thd) {
   return is_slave_applier(thd) &&
+<<<<<<< HEAD
 #ifdef WITH_WSREP
          ((thd.rli_slave && thd.rli_slave->rows_query_ev)
           || (thd.query().str == NULL));
 #else
          (thd.rli_slave->rows_query_ev || thd.query().str == NULL);
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+         (thd.rli_slave->rows_query_ev || thd.query().str == NULL);
+=======
+         (thd.rli_slave->rows_query_ev || thd.query().str == nullptr);
+>>>>>>> Percona-Server-8.0.20-11
 }
 
 /* Static declarations for handlerton */
@@ -91,7 +97,7 @@ int ha_blackhole::open(const char *name, int, uint, const dd::Table *) {
 
   if (!(share = get_share(name))) return HA_ERR_OUT_OF_MEM;
 
-  thr_lock_data_init(&share->lock, &lock, NULL);
+  thr_lock_data_init(&share->lock, &lock, nullptr);
   return 0;
 }
 
@@ -395,15 +401,15 @@ mysql_declare_plugin(blackhole){
     MYSQL_STORAGE_ENGINE_PLUGIN,
     &blackhole_storage_engine,
     "BLACKHOLE",
-    "MySQL AB",
+    PLUGIN_AUTHOR_ORACLE,
     "/dev/null storage engine (anything you write to it disappears)",
     PLUGIN_LICENSE_GPL,
     blackhole_init, /* Plugin Init */
-    NULL,           /* Plugin check uninstall */
+    nullptr,        /* Plugin check uninstall */
     blackhole_fini, /* Plugin Deinit */
     0x0100 /* 1.0 */,
-    NULL, /* status variables                */
-    NULL, /* system variables                */
-    NULL, /* config options                  */
-    0,    /* flags                           */
+    nullptr, /* status variables                */
+    nullptr, /* system variables                */
+    nullptr, /* config options                  */
+    0,       /* flags                           */
 } mysql_declare_plugin_end;
