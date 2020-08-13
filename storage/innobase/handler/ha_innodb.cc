@@ -9747,6 +9747,10 @@ wsrep_error:
 func_exit:
 	innobase_active_small();
 
+#ifdef WITH_WSREP
+	DEBUG_SYNC(m_user_thd, "ha_innobase_end_of_write_row");
+#endif /* WITH_WSREP */
+
 	if (UNIV_UNLIKELY(m_share && m_share->ib_table
 			  && m_share->ib_table->is_corrupt)) {
 		DBUG_RETURN(HA_ERR_CRASHED);
@@ -10465,6 +10469,12 @@ func_exit:
 	err = convert_error_code_to_mysql(
 		error, m_prebuilt->table->flags, m_user_thd);
 
+#ifdef WITH_WSREP
+	if (trx_is_interrupted(trx)) {
+		error = DB_INTERRUPTED;
+	}
+#endif /* WITH_WSREP */
+
 	/* If success and no columns were updated. */
 	if (err == 0 && uvect->n_fields == 0) {
 
@@ -10632,6 +10642,12 @@ wsrep_error:
 			  && m_share->ib_table->is_corrupt)) {
 		DBUG_RETURN(HA_ERR_CRASHED);
 	}
+
+#ifdef WITH_WSREP
+	if (trx_is_interrupted(trx)) {
+		error = DB_INTERRUPTED;
+	}
+#endif /* WITH_WSREP */
 
 	DBUG_RETURN(convert_error_code_to_mysql(
 			    error, m_prebuilt->table->flags, m_user_thd));
