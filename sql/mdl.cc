@@ -1540,16 +1540,10 @@ void MDL_request::init_with_source(MDL_key::enum_mdl_namespace mdl_namespace,
   key.mdl_key_init(mdl_namespace, db_arg, name_arg);
   type = mdl_type_arg;
   duration = mdl_duration_arg;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   m_wsrep_non_preemptable = wsrep_non_preemptable;
 #endif /* WITH_WSREP */
-  ticket = NULL;
-||||||| merged common ancestors
-  ticket = NULL;
-=======
   ticket = nullptr;
->>>>>>> Percona-Server-8.0.20-11
   m_src_file = src_file;
   m_src_line = src_line;
 }
@@ -1573,16 +1567,10 @@ void MDL_request::init_by_key_with_source(const MDL_key *key_arg,
   key.mdl_key_init(key_arg);
   type = mdl_type_arg;
   duration = mdl_duration_arg;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   m_wsrep_non_preemptable = false;
 #endif /* WITH_WSREP */
-  ticket = NULL;
-||||||| merged common ancestors
-  ticket = NULL;
-=======
   ticket = nullptr;
->>>>>>> Percona-Server-8.0.20-11
   m_src_file = src_file;
   m_src_line = src_line;
 }
@@ -1613,16 +1601,10 @@ void MDL_request::init_by_part_key_with_source(
                    db_length_arg);
   type = mdl_type_arg;
   duration = mdl_duration_arg;
-<<<<<<< HEAD
-  ticket = NULL;
+  ticket = nullptr;
 #ifdef WITH_WSREP
   m_wsrep_non_preemptable = false;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  ticket = NULL;
-=======
-  ticket = nullptr;
->>>>>>> Percona-Server-8.0.20-11
   m_src_file = src_file;
   m_src_line = src_line;
 }

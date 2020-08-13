@@ -1658,16 +1658,10 @@ parameter (--tmpdir).
 @param[in]	path	location for creating temporary file
 @return temporary file handle, or NULL on error */
 FILE *os_file_create_tmpfile(const char *path) {
-<<<<<<< HEAD
-  FILE *file = NULL;
+  FILE *file = nullptr;
 #ifdef WITH_WSREP
   WAIT_ALLOW_WRITES();
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  FILE *file = NULL;
-=======
-  FILE *file = nullptr;
->>>>>>> Percona-Server-8.0.20-11
   int fd = innobase_mysql_tmpfile(path);
 
   if (fd >= 0) {

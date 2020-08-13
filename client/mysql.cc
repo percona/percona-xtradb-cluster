@@ -3165,14 +3165,8 @@ static int com_help(String *buffer MY_ATTRIBUTE((unused)),
   put_info(
       "\nFor information about Percona products and services, visit:\n"
       "   http://www.percona.com/\n"
-<<<<<<< HEAD
       "Percona XtraDB Cluster manual: "
       "http://www.percona.com/doc/percona-xtradb-cluster/8.0/\n"
-||||||| merged common ancestors
-      "Percona Server manual: http://www.percona.com/doc/percona-server/%d.%d\n"
-=======
-      "Percona Server manual: http://www.percona.com/doc/percona-server/8.0/\n"
->>>>>>> Percona-Server-8.0.20-11
       "For the MySQL Reference Manual: http://dev.mysql.com/\n"
       "To buy Percona support, training, or other products, visit:\n"
       "   https://www.percona.com/\n",

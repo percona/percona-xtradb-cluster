@@ -1116,36 +1116,11 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/include
   )
 
-<<<<<<< HEAD
 IF(WITH_WSREP)
   INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/include)
   INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep-lib/wsrep-API/v26/)
 ENDIF()
 
-IF(DEFINED WITH_LTO_DEFAULT)
-  SET(WITH_LTO_DEFAULT ${WITH_LTO_DEFAULT})
-ELSE()
-  SET(WITH_LTO_DEFAULT OFF)
-ENDIF()
-
-OPTION(WITH_LTO
-  "Enable the link-time optimizer. Currently works for gcc7/gcc8 only."
-  ${WITH_LTO_DEFAULT}
-  )
-||||||| merged common ancestors
-
-IF(DEFINED WITH_LTO_DEFAULT)
-  SET(WITH_LTO_DEFAULT ${WITH_LTO_DEFAULT})
-ELSE()
-  SET(WITH_LTO_DEFAULT OFF)
-ENDIF()
-
-OPTION(WITH_LTO
-  "Enable the link-time optimizer. Currently works for gcc7/gcc8 only."
-  ${WITH_LTO_DEFAULT}
-  )
-=======
->>>>>>> Percona-Server-8.0.20-11
 IF(WITH_LTO)
   IF(APPLE)
     # Requires CMake 3.9+

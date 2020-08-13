@@ -310,9 +310,9 @@ extern wsrep_seqno_t wsrep_locked_seqno;
     if (victim_thd) WSREP_LOG_CONFLICT_THD(victim_thd, "Victim thread");      \
   }
 
-#define WSREP_QUERY(thd)                                   \
-  ((!opt_general_log_raw) && thd->rewritten_query.length() \
-       ? thd->rewritten_query.c_ptr_safe()                 \
+#define WSREP_QUERY(thd)                                           \
+  ((!opt_general_log_raw) && thd->rewritten_query().length()         \
+       ? const_cast<String&>(thd->rewritten_query()).c_ptr_safe()  \
        : thd->query().str)
 
 // Use this for logging output received from the SST scripts

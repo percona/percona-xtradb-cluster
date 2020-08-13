@@ -313,14 +313,10 @@ table_log_status.cc
 table_plugin_table.cc
 table_replication_applier_filters.cc
 table_replication_applier_global_filters.cc
-<<<<<<< HEAD
+table_binary_log_transaction_compression_stats.cc
 # -- WITH_WSREP
 table_pxc_cluster_view.cc
 # -- WITH_WSREP
-||||||| merged common ancestors
-=======
-table_binary_log_transaction_compression_stats.cc
->>>>>>> Percona-Server-8.0.20-11
 )
 
 MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES}

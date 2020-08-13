@@ -45,18 +45,12 @@ static inline bool is_slave_applier(const THD &thd) {
 
 static inline bool pretend_for_slave(const THD &thd) {
   return is_slave_applier(thd) &&
-<<<<<<< HEAD
 #ifdef WITH_WSREP
          ((thd.rli_slave && thd.rli_slave->rows_query_ev)
           || (thd.query().str == NULL));
 #else
-         (thd.rli_slave->rows_query_ev || thd.query().str == NULL);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-         (thd.rli_slave->rows_query_ev || thd.query().str == NULL);
-=======
          (thd.rli_slave->rows_query_ev || thd.query().str == nullptr);
->>>>>>> Percona-Server-8.0.20-11
+#endif /* WITH_WSREP */
 }
 
 /* Static declarations for handlerton */

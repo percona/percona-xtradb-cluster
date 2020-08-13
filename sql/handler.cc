@@ -1357,18 +1357,12 @@ void trans_register_ha(THD *thd, bool all, handlerton *ht_arg,
   transactional storage engine.
 */
 #ifdef HAVE_PSI_TRANSACTION_INTERFACE
-<<<<<<< HEAD
-  if (thd->m_transaction_psi == NULL && ht_arg->db_type != DB_TYPE_BINLOG &&
+  if (thd->m_transaction_psi == nullptr && ht_arg->db_type != DB_TYPE_BINLOG &&
 #ifdef WITH_WSREP
       /* Do not register transactions for WSREP engine, it would be done by the
       base transactional storage engine (InnoDB). */
       ht_arg->db_type != DB_TYPE_WSREP &&
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  if (thd->m_transaction_psi == NULL && ht_arg->db_type != DB_TYPE_BINLOG &&
-=======
-  if (thd->m_transaction_psi == nullptr && ht_arg->db_type != DB_TYPE_BINLOG &&
->>>>>>> Percona-Server-8.0.20-11
       !thd->is_attachable_transaction_active()) {
     const XID *xid = trn_ctx->xid_state()->get_xid();
     bool autocommit = !thd->in_multi_stmt_transaction_mode();
@@ -8551,8 +8545,8 @@ int handler::ha_delete_row(const uchar *buf) {
                       { error = delete_row(buf); })
 
   if (unlikely(error)) return error;
-<<<<<<< HEAD
-  if (unlikely((error = binlog_log_row(table, buf, 0, log_func)))) return error;
+  if (unlikely((error = binlog_log_row(table, buf, nullptr, log_func))))
+    return error;
 
 #ifdef WITH_WSREP
   /* With MySQL-8.0 DDL action would result in altering of InnoDB
@@ -8569,12 +8563,6 @@ int handler::ha_delete_row(const uchar *buf) {
   }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-  if (unlikely((error = binlog_log_row(table, buf, 0, log_func)))) return error;
-=======
-  if (unlikely((error = binlog_log_row(table, buf, nullptr, log_func))))
-    return error;
->>>>>>> Percona-Server-8.0.20-11
   rows_changed++;
   return 0;
 }

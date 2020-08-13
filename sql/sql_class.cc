@@ -445,8 +445,7 @@ THD::THD(bool enable_plugins)
       in_lock_tables(false),
       derived_tables_processing(false),
       parsing_system_view(false),
-<<<<<<< HEAD
-      sp_runtime_ctx(NULL),
+      sp_runtime_ctx(nullptr),
 #ifdef WITH_WSREP
       wsrep_applier(is_applier),
       wsrep_applier_closing(false),
@@ -498,17 +497,9 @@ THD::THD(bool enable_plugins)
       wsrep_applier_service(NULL),
 // wsrep_wfc()
 #endif /* WITH_WSREP */
-      m_parser_state(NULL),
-      work_part_info(NULL),
-||||||| merged common ancestors
-      sp_runtime_ctx(NULL),
-      m_parser_state(NULL),
-      work_part_info(NULL),
-=======
-      sp_runtime_ctx(nullptr),
       m_parser_state(nullptr),
       work_part_info(nullptr),
->>>>>>> Percona-Server-8.0.20-11
+
       // No need to instrument, highly unlikely to have that many plugins.
       audit_class_plugins(PSI_NOT_INSTRUMENTED),
       audit_class_mask(PSI_NOT_INSTRUMENTED),

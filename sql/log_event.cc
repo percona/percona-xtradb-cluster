@@ -4962,8 +4962,8 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
 #ifdef WITH_WSREP
         rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER,
                     ER_THD(thd, ER_ERROR_ON_MASTER), expected_error,
-                    (!opt_general_log_raw) && thd->rewritten_query.length()
-                        ? thd->rewritten_query.c_ptr_safe()
+                    (!opt_general_log_raw) && thd->rewritten_query().length()
+                        ? const_cast<String&>(thd->rewritten_query()).c_ptr_safe()
                         : thd->query().str);
 #else
         rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER,
@@ -5056,8 +5056,8 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
             (actual_error ? thd->get_stmt_da()->message_text() : "no error"),
 #ifdef WITH_WSREP
             actual_error, print_slave_db_safe(db),
-            ((!opt_general_log_raw) && thd->rewritten_query.length()
-                 ? thd->rewritten_query.c_ptr_safe()
+            ((!opt_general_log_raw) && thd->rewritten_query().length()
+                 ? const_cast<String&>(thd->rewritten_query()).c_ptr_safe()
                  : query_arg));
 #else
             actual_error, print_slave_db_safe(db), query_arg);
@@ -5113,8 +5113,8 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
                                   : "unexpected success or fatal error"),
 #ifdef WITH_WSREP
                     print_slave_db_safe(db),
-                    ((!opt_general_log_raw) && thd->rewritten_query.length()
-                         ? thd->rewritten_query.c_ptr_safe()
+                    ((!opt_general_log_raw) && thd->rewritten_query().length()
+                         ? const_cast<String&>(thd->rewritten_query()).c_ptr_safe()
                          : query_arg));
 #else
                     print_slave_db_safe(thd->db().str), query_arg);

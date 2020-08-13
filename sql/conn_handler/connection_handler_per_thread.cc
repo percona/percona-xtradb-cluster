@@ -363,14 +363,8 @@ static void *handle_connection(void *arg) {
     }
 #else
     channel_info = Per_thread_connection_handler::block_until_new_connection();
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-    if (channel_info == NULL) break;
-||||||| merged common ancestors
-    if (channel_info == NULL) break;
-=======
     if (channel_info == nullptr) break;
->>>>>>> Percona-Server-8.0.20-11
     pthread_reused = true;
     if (connection_events_loop_aborted()) {
       // Close the channel and exit as server is undergoing shutdown.

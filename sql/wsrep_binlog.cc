@@ -156,13 +156,17 @@ static int wsrep_write_cache_inc(THD *const thd,
     should be appended to write-set. */
     Gtid_log_event gtid_event(thd, true, 0, 0, false, 0, 0,
                               UNKNOWN_SERVER_VERSION, UNKNOWN_SERVER_VERSION);
-    uchar gtid_buf[Gtid_log_event::MAX_EVENT_LENGTH];
-    uint32 gtid_len = gtid_event.write_to_memory(gtid_buf);
-
-    if (thd->wsrep_cs().append_data(wsrep::const_buffer(gtid_buf, gtid_len)))
+    int error = 0;
+    StringBuffer_ostream<Gtid_log_event::MAX_EVENT_LENGTH> ostream;
+    if ((error = gtid_event.write(&ostream))) {
+      WSREP_ERROR("Failed to write the GTID event");
+      ret = -1;
       goto cleanup;
+    }
 
-    total_length += gtid_len;
+    if (thd->wsrep_cs().append_data(wsrep::const_buffer(ostream.c_ptr(), ostream.length())))
+      goto cleanup;
+    total_length += ostream.length();
   }
 
   if (read_len == 0 && cache->next(&read_pos, &read_len)) {

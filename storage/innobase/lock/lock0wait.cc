@@ -605,19 +605,13 @@ static void lock_wait_check_and_cancel(
     if (trx->lock.wait_lock != nullptr && !trx_is_high_priority(trx)) {
       ut_a(trx->lock.que_state == TRX_QUE_LOCK_WAIT);
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       if (!wsrep_is_BF_lock_timeout(trx)) {
-        lock_cancel_waiting_and_release(trx->lock.wait_lock, true);
+        lock_cancel_waiting_and_release(trx->lock.wait_lock);
       }
 #else
-      lock_cancel_waiting_and_release(trx->lock.wait_lock, false);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-      lock_cancel_waiting_and_release(trx->lock.wait_lock, false);
-=======
       lock_cancel_waiting_and_release(trx->lock.wait_lock);
->>>>>>> Percona-Server-8.0.20-11
+#endif /* WITH_WSREP */
     }
 
     lock_mutex_exit();

@@ -317,21 +317,15 @@ static struct my_option my_long_options[] = {
      &opt_zstd_compress_level, &opt_zstd_compress_level, nullptr, GET_UINT,
      REQUIRED_ARG, 3, 1, 22, nullptr, 0, nullptr},
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     {"use_set_password", OPT_USE_SET_PASSWORD,
      "Use 'SET PASSWORD' instead of 'ALTER USER' to change passwords",
      &opt_use_set_password, &opt_use_set_password, 0, GET_BOOL, NO_ARG, 0, 0, 0,
-     0, 0, 0},
+     nullptr, 0, nullptr},
 #endif /* WITH_WSREP */
 
-    {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}};
-||||||| merged common ancestors
-    {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}};
-=======
     {nullptr, 0, nullptr, nullptr, nullptr, nullptr, GET_NO_ARG, NO_ARG, 0, 0,
      0, nullptr, 0, nullptr}};
->>>>>>> Percona-Server-8.0.20-11
 
 static const char *load_default_groups[] = {"mysqladmin", "client", nullptr};
 

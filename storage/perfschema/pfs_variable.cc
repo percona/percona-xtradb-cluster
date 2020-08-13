@@ -656,19 +656,13 @@ void System_variable::init(THD *target_thd, const SHOW_VAR *show_var,
                                query_scope, show_var_type, nullptr, &m_charset,
                                m_value_str, &m_value_length);
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-  m_value_length = MY_MIN(
+  m_value_length = std::min(
       m_value_length,
-      ((SHOW_VAR_FUNC_BUFF_SIZE > 2048) ? SHOW_VAR_FUNC_BUFF_SIZE : 2048));
+      ((size_t{SHOW_VAR_FUNC_BUFF_SIZE} > 2048) ? size_t{SHOW_VAR_FUNC_BUFF_SIZE} : 2048));
 #else
-  m_value_length = MY_MIN(m_value_length, SHOW_VAR_FUNC_BUFF_SIZE);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  m_value_length = MY_MIN(m_value_length, SHOW_VAR_FUNC_BUFF_SIZE);
-=======
   m_value_length = std::min(m_value_length, size_t{SHOW_VAR_FUNC_BUFF_SIZE});
->>>>>>> Percona-Server-8.0.20-11
+#endif /* WITH_WSREP */
 
   /* Returned value may reference a string other than m_value_str. */
   if (value != m_value_str) {

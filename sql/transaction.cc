@@ -566,14 +566,8 @@ bool trans_commit_stmt(THD *thd, bool ignore_global_read_lock) {
   This could be avoided by using a new THD for sub-commit purpose. */
   /* In autocommit=1 mode the transaction should be marked as complete in P_S */
   DBUG_ASSERT(thd->in_active_multi_stmt_transaction() ||
-<<<<<<< HEAD
-              thd->m_transaction_psi == NULL);
-#endif
-||||||| merged common ancestors
-              thd->m_transaction_psi == NULL);
-=======
               thd->m_transaction_psi == nullptr);
->>>>>>> Percona-Server-8.0.20-11
+#endif
 
   thd->get_transaction()->reset(Transaction_ctx::STMT);
 
@@ -800,17 +794,11 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name) {
   SAVEPOINT *sv = *find_savepoint(thd, name);
   DBUG_TRACE;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   DEBUG_SYNC(thd, "pxc_rollback_to_savepoint");
 #endif /* WITH_WSREP */
 
-  if (sv == NULL) {
-||||||| merged common ancestors
-  if (sv == NULL) {
-=======
   if (sv == nullptr) {
->>>>>>> Percona-Server-8.0.20-11
     my_error(ER_SP_DOES_NOT_EXIST, MYF(0), "SAVEPOINT", name.str);
     return true;
   }

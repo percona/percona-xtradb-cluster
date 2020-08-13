@@ -9641,7 +9641,6 @@ static bool binlog_recover(Binlog_file_reader *binlog_file_reader,
   */
   bool in_transaction = false;
   int memory_page_size = my_getpagesize();
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
   /*
@@ -9710,10 +9709,6 @@ static bool binlog_recover(Binlog_file_reader *binlog_file_reader,
   binlogged */
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-
-=======
->>>>>>> Percona-Server-8.0.20-11
   {
     MEM_ROOT mem_root(key_memory_binlog_recover_exec, memory_page_size);
     mem_root_unordered_set<my_xid> xids(&mem_root);
@@ -9813,7 +9808,6 @@ static bool binlog_recover(Binlog_file_reader *binlog_file_reader,
     res = res || (total_ha_2pc > 1 && ha_recover(&xids));
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP_ON) {
     wsrep::gtid gtid = wsrep_get_SE_checkpoint();
@@ -9822,21 +9816,9 @@ static bool binlog_recover(Binlog_file_reader *binlog_file_reader,
     WSREP_INFO("After binlog recovery (wsrep position: %s)", oss.str().c_str());
   }
 #endif /* WITH_WSREP */
-  return 0;
 
-err1:
-  LogErr(ERROR_LEVEL, ER_BINLOG_CRASH_RECOVERY_FAILED);
-  return 1;
-||||||| merged common ancestors
-  return 0;
-
-err1:
-  LogErr(ERROR_LEVEL, ER_BINLOG_CRASH_RECOVERY_FAILED);
-  return 1;
-=======
   if (res) LogErr(ERROR_LEVEL, ER_BINLOG_CRASH_RECOVERY_FAILED);
   return res;
->>>>>>> Percona-Server-8.0.20-11
 }
 
 /*

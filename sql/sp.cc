@@ -2557,7 +2557,7 @@ int wsrep_create_sp(THD *thd, uchar **buf, size_t *buf_len) {
   log_query.set_charset(system_charset_info);
 
   if (sp->m_type == enum_sp_type::FUNCTION) {
-    sp_returns_type(thd, retstr, sp);
+    sp->returns_type(thd, &retstr);
   }
 
   if (!create_string(thd, &log_query, sp->m_type,

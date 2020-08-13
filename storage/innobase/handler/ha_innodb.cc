@@ -23892,7 +23892,7 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
       if (wait_lock) {
         WSREP_DEBUG("canceling wait lock");
         victim_trx->lock.was_chosen_as_deadlock_victim = TRUE;
-        lock_cancel_waiting_and_release(wait_lock, true);
+        lock_cancel_waiting_and_release(wait_lock);
       }
     }
   }

@@ -675,20 +675,13 @@ static PFS_engine_table_share *all_shares[] = {
     &table_variables_info::m_share,
     &table_persisted_variables::m_share,
     &table_user_defined_functions::m_share,
-<<<<<<< HEAD
+    &table_binary_log_transaction_compression_stats::m_share,
 
 #ifdef WITH_WSREP
     &table_pxc_cluster_view::m_share,
 #endif /* WITH_WSREP */
 
-    NULL};
-||||||| merged common ancestors
-
-    NULL};
-=======
-    &table_binary_log_transaction_compression_stats::m_share,
     nullptr};
->>>>>>> Percona-Server-8.0.20-11
 
 static PSI_mutex_key key_LOCK_pfs_share_list;
 static PSI_mutex_info info_LOCK_pfs_share_list = {

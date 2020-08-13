@@ -602,21 +602,12 @@ bool lock_has_to_wait(const lock_t *lock1, /*!< in: waiting lock */
         return (lock_prdt_has_to_wait(lock1->trx, lock1->type_mode,
                                       lock_get_prdt_from_lock(lock1), lock2));
       } else {
-<<<<<<< HEAD
         return (lock_rec_has_to_wait(
 #ifdef WITH_WSREP
             false,
 #endif /* WITH_WSREP */
             lock1->trx, lock1->type_mode, lock2,
-            lock_rec_get_nth_bit(lock1, PAGE_HEAP_NO_SUPREMUM)));
-||||||| merged common ancestors
-        return (lock_rec_has_to_wait(
-            lock1->trx, lock1->type_mode, lock2,
-            lock_rec_get_nth_bit(lock1, PAGE_HEAP_NO_SUPREMUM)));
-=======
-        return (lock_rec_has_to_wait(lock1->trx, lock1->type_mode, lock2,
-                                     lock1->includes_supremum()));
->>>>>>> Percona-Server-8.0.20-11
+            lock1->includes_supremum()));
       }
     }
 
@@ -1186,46 +1177,12 @@ static void lock_rec_insert_to_waiting(hash_table_t *lock_hash, lock_t *lock,
   ut_ad(lock->is_waiting());
   ut_ad(rec_id.matches(lock));
   ut_ad(lock_mutex_own());
-<<<<<<< HEAD
-
-#ifdef WITH_WSREP
-  /* Disable CATS for galera for now */
-  if (wsrep_on(lock->trx->mysql_thd)) return (true);
-#endif /* WITH_WSREP */
-
-  /* We read n_waiting without holding lock_wait_mutex_enter/exit, so we use
-  atomic read, to avoid torn read. Because `lock_use_fcfs` is just a heuristic
-  which can tolerate a slightly desynchronized (w.r.t. other variables)
-  information called quite often during trx->age updating, we use relaxed
-  memory ordering */
-  return (thd_is_replication_slave_thread(lock->trx->mysql_thd) ||
-          lock_sys->n_waiting.load(std::memory_order_relaxed) <
-              LOCK_CATS_THRESHOLD ||
-          !lock->is_record_lock() || lock->is_predicate());
-}
-
-/** Insert lock record to the head of the queue.
-||||||| merged common ancestors
-  /* We read n_waiting without holding lock_wait_mutex_enter/exit, so we use
-  atomic read, to avoid torn read. Because `lock_use_fcfs` is just a heuristic
-  which can tolerate a slightly desynchronized (w.r.t. other variables)
-  information called quite often during trx->age updating, we use relaxed
-  memory ordering */
-  return (thd_is_replication_slave_thread(lock->trx->mysql_thd) ||
-          lock_sys->n_waiting.load(std::memory_order_relaxed) <
-              LOCK_CATS_THRESHOLD ||
-          !lock->is_record_lock() || lock->is_predicate());
-}
-
-/** Insert lock record to the head of the queue.
-=======
 
   const ulint fold = rec_id.fold();
   HASH_INSERT(lock_t, hash, lock_hash, fold, lock);
 }
 
 /** Insert lock record to the head of the queue where the GRANTED locks reside.
->>>>>>> Percona-Server-8.0.20-11
 @param[in,out]	lock_hash	Hash table containing the locks
 @param[in,out]	lock		Record lock instance to insert
 @param[in]	rec_id	        Record being locked */
@@ -1277,16 +1234,6 @@ void RecLock::lock_add(lock_t *lock) {
 
   if (wait) {
     lock_set_lock_and_trx_wait(lock);
-<<<<<<< HEAD
-  } else {
-    // TODO: do we need to skip this for wsrep thread or it is okay to get
-    // age updated even though FCFS is in use.
-    lock_update_age(lock, lock_rec_find_set_bit(lock));
-||||||| merged common ancestors
-  } else {
-    lock_update_age(lock, lock_rec_find_set_bit(lock));
-=======
->>>>>>> Percona-Server-8.0.20-11
   }
 }
 
@@ -1296,18 +1243,12 @@ static void lock_create_wait_for_edge(trx_t *waiter, trx_t *blocker);
 @param[in,out] trx		Transaction requesting the lock
 @param[in] prdt			Predicate lock (optional)
 @return a new lock instance */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-lock_t *RecLock::create(lock_t *const c_lock, trx_t *trx, bool add_to_hash,
+lock_t *RecLock::create(lock_t *const c_lock, trx_t *trx,
                         const lock_prdt_t *prdt) {
 #else
-lock_t *RecLock::create(trx_t *trx, bool add_to_hash, const lock_prdt_t *prdt) {
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-lock_t *RecLock::create(trx_t *trx, bool add_to_hash, const lock_prdt_t *prdt) {
-=======
 lock_t *RecLock::create(trx_t *trx, const lock_prdt_t *prdt) {
->>>>>>> Percona-Server-8.0.20-11
+#endif /* WITH_WSREP */
   ut_ad(lock_mutex_own());
 
   /* Ensure that another transaction doesn't access the trx
@@ -1344,7 +1285,6 @@ lock_t *RecLock::create(trx_t *trx, const lock_prdt_t *prdt) {
     lock_prdt_set_prdt(lock, prdt);
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 
   /* If the requesting transaction is background applier transaction. */
@@ -1393,7 +1333,7 @@ lock_t *RecLock::create(trx_t *trx, const lock_prdt_t *prdt) {
          lock_grant, which wants to grant trx mutex again
       */
       trx_mutex_exit(trx);
-      lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock, true);
+      lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock);
       trx_mutex_enter(trx);
 
       /* trx might not wait for c_lock, but some other lock
@@ -1419,20 +1359,15 @@ lock_t *RecLock::create(trx_t *trx, const lock_prdt_t *prdt) {
     /* we don't want to add to hash anymore, but need other updates from
      * lock_add */
     ++lock->index->table->n_rec_locks;
-    lock_add(lock, false);
+    lock_add(lock);
   } else {
 #endif /* WITH_WSREP */
 
-    lock_add(lock, add_to_hash);
+    lock_add(lock);
 
 #ifdef WITH_WSREP
   }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  lock_add(lock, add_to_hash);
-=======
-  lock_add(lock);
->>>>>>> Percona-Server-8.0.20-11
 
   return (lock);
 }
@@ -1520,13 +1455,6 @@ void RecLock::set_wait_state(lock_t *lock) {
   ut_a(stopped);
 }
 
-<<<<<<< HEAD
-#ifdef UNIV_DEBUG
-UNIV_INLINE bool lock_current_thread_handles_trx(const trx_t *trx) {
-  return (!trx->mysql_thd || trx->mysql_thd == current_thd);
-}
-#endif
-
 /**
 Enqueue a lock wait for normal transaction. If it is a high priority transaction
 then jump the record lock wait queue and if the transaction at the head of the
@@ -1542,15 +1470,6 @@ queue is itself waiting roll it back, also do a deadlock check and resolve.
 #ifdef WITH_WSREP
 dberr_t RecLock::add_to_waitq(lock_t *const wait_for, const lock_prdt_t *prdt) {
 #else
-||||||| merged common ancestors
-#ifdef UNIV_DEBUG
-UNIV_INLINE bool lock_current_thread_handles_trx(const trx_t *trx) {
-  return (!trx->mysql_thd || trx->mysql_thd == current_thd);
-}
-#endif
-
-=======
->>>>>>> Percona-Server-8.0.20-11
 dberr_t RecLock::add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt) {
 #endif /* WITH_WSREP */
   ut_ad(lock_mutex_own());
@@ -1574,24 +1493,11 @@ dberr_t RecLock::add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt) {
   prepare();
 
   /* Don't queue the lock to hash table, if high priority transaction. */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-  lock_t *lock = create(wait_for, m_trx, !high_priority, prdt);
+  lock_t *lock = create(wait_for, m_trx, prdt);
 #else
-  lock_t *lock = create(m_trx, !high_priority, prdt);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  lock_t *lock = create(m_trx, !high_priority, prdt);
-=======
   lock_t *lock = create(m_trx, prdt);
->>>>>>> Percona-Server-8.0.20-11
-
-<<<<<<< HEAD
-  /* Attempt to jump over the low priority waiting locks. */
-  if (high_priority && jump_queue(lock, wait_for)) {
-    /* Lock is granted */
-    return (DB_SUCCESS_LOCKED_REC);
-  }
+#endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP
   if (wsrep_thd_is_BF(m_trx->mysql_thd, false) && !lock_get_wait(lock)) {
@@ -1601,14 +1507,6 @@ dberr_t RecLock::add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt) {
   }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-  /* Attempt to jump over the low priority waiting locks. */
-  if (high_priority && jump_queue(lock, wait_for)) {
-    /* Lock is granted */
-    return (DB_SUCCESS_LOCKED_REC);
-  }
-=======
->>>>>>> Percona-Server-8.0.20-11
   lock_create_wait_for_edge(m_trx, wait_for->trx);
 
   ut_ad(lock_get_wait(lock));
@@ -1790,17 +1688,11 @@ static void lock_rec_add_to_queue(ulint type_mode, const buf_block_t *block,
   if (!we_own_trx_mutex) {
     trx_mutex_enter(trx);
   }
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-  rec_lock.create(NULL, trx, true);
+  rec_lock.create(NULL, trx);
 #else
-  rec_lock.create(trx, true);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  rec_lock.create(trx, true);
-=======
   rec_lock.create(trx);
->>>>>>> Percona-Server-8.0.20-11
+#endif /* WITH_WSREP */
   if (!we_own_trx_mutex) {
     trx_mutex_exit(trx);
   }
@@ -1857,17 +1749,11 @@ lock_rec_req_status lock_rec_lock_fast(
       RecLock rec_lock(index, block, heap_no, mode);
 
       trx_mutex_enter(trx);
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-      rec_lock.create(NULL, trx, true);
+      rec_lock.create(NULL, trx);
 #else
-      rec_lock.create(trx, true);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-      rec_lock.create(trx, true);
-=======
       rec_lock.create(trx);
->>>>>>> Percona-Server-8.0.20-11
+#endif /* WITH_WSREP */
       trx_mutex_exit(trx);
 
       status = LOCK_REC_SUCCESS_CREATED;
@@ -3765,7 +3651,7 @@ lock_t *lock_table_create(dict_table_t *table, /*!< in/out: database table
       lock_grant, which wants to grant trx mutex again */
       /* caller has trx_mutex, have to release for lock cancel */
       trx_mutex_exit(trx);
-      lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock, true);
+      lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock);
       trx_mutex_enter(trx);
 
       /* trx might not wait for c_lock, but some other lock
@@ -4130,17 +4016,11 @@ dberr_t lock_table(ulint flags, /*!< in: if BTR_NO_LOCKING_FLAG bit is set,
   /* Another trx has a request on the table in an incompatible
   mode: this trx may have to wait */
 
-<<<<<<< HEAD
-  if (wait_for != NULL) {
+  if (wait_for != nullptr) {
 #ifdef WITH_WSREP
     err = lock_table_enqueue_waiting((lock_t *)wait_for, mode | flags, table,
                                      thr);
 #else
-||||||| merged common ancestors
-  if (wait_for != NULL) {
-=======
-  if (wait_for != nullptr) {
->>>>>>> Percona-Server-8.0.20-11
     err = lock_table_enqueue_waiting(mode | flags, table, thr);
 #endif /* WITH_WSREP */
     if (err == DB_LOCK_WAIT) {
@@ -5502,8 +5382,7 @@ static bool lock_rec_queue_validate(
       explicit waiting lock only if the impl_trx has an
       explicit granted lock. */
 
-<<<<<<< HEAD
-      if (other_lock != NULL) {
+      if (other_lock != nullptr) {
 #ifdef WITH_WSREP
         if (!lock_get_wait(other_lock)) {
           ib::info() << "WSREP impl BF lock conflict for my impl lock:\n BF:"
@@ -5530,12 +5409,6 @@ static bool lock_rec_queue_validate(
                                impl_trx)) {
           ib::info() << "WSREP impl BF lock conflict";
         }
-#else
-||||||| merged common ancestors
-      if (other_lock != NULL) {
-=======
-      if (other_lock != nullptr) {
->>>>>>> Percona-Server-8.0.20-11
         ut_a(lock_get_wait(other_lock));
         ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
                                impl_trx));

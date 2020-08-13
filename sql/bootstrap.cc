@@ -354,16 +354,10 @@ bool run_bootstrap_thread(const char *file_name, MYSQL_FILE *file,
 
   THD *thd = new THD;
   thd->system_thread = thread_type;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   thd->variables.wsrep_on = false;
 #endif /* WITH_WSREP */
-  thd->get_protocol_classic()->init_net(NULL);
-||||||| merged common ancestors
-  thd->get_protocol_classic()->init_net(NULL);
-=======
   thd->get_protocol_classic()->init_net(nullptr);
->>>>>>> Percona-Server-8.0.20-11
   // Skip grants and set the system_user flag in THD.
   thd->security_context()->skip_grants();
 

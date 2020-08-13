@@ -2420,30 +2420,12 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
     }
 
     get_mandatory_roles(&mandatory_roles);
-<<<<<<< HEAD
-    while ((user = user_list++) != 0) {
-      if (acl_is_utility_user(user->user.str, user->host.str, nullptr)) {
-        log_user(thd, &wrong_users, user, wrong_users.length() > 0);
-        result = true;
-        continue;
-      }
-||||||| merged common ancestors
-    while ((user = user_list++) != 0) {
-
-    if (acl_is_utility_user(user->user.str, user->host.str,
-                            nullptr)) {
-      log_user(thd, &wrong_users, user, wrong_users.length() > 0);
-      result = true;
-      continue;
-    }
-=======
     while ((user = user_list++) != nullptr) {
       if (acl_is_utility_user(user->user.str, user->host.str, nullptr)) {
         log_user(thd, &wrong_users, user, wrong_users.length() > 0);
         result = true;
         continue;
       }
->>>>>>> Percona-Server-8.0.20-11
 
       if (std::find_if(mandatory_roles.begin(), mandatory_roles.end(),
                        [&](Role_id &id) -> bool {

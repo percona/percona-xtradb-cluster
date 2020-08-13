@@ -3451,7 +3451,7 @@ int wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx) {
       if (wait_lock) {
         WSREP_DEBUG("canceling wait lock");
         victim_trx->lock.was_chosen_as_deadlock_victim = true;
-        lock_cancel_waiting_and_release(wait_lock, false);
+        lock_cancel_waiting_and_release(wait_lock);
       }
     }
   }

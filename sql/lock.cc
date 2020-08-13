@@ -1108,8 +1108,7 @@ void Global_read_lock::unlock_global_read_lock(THD *thd) {
 
   if (m_mdl_blocks_commits_lock) {
     thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
-<<<<<<< HEAD
-    m_mdl_blocks_commits_lock = NULL;
+    m_mdl_blocks_commits_lock = nullptr;
 
 #ifdef WITH_WSREP
     Wsrep_server_state &server_state = Wsrep_server_state::instance();
@@ -1131,11 +1130,6 @@ void Global_read_lock::unlock_global_read_lock(THD *thd) {
       }
     }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-    m_mdl_blocks_commits_lock = NULL;
-=======
-    m_mdl_blocks_commits_lock = nullptr;
->>>>>>> Percona-Server-8.0.20-11
   }
   thd->mdl_context.release_lock(m_mdl_global_shared_lock);
   Global_read_lock::m_atomic_active_requests--;

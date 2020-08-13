@@ -320,7 +320,6 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
   dtuple_t *entry;
   trx_t *trx;
   const rec_t *rec;
-  ulint n_ext;
   dberr_t err;
   bool opened = false;
 
@@ -342,7 +341,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 
   heap = mem_heap_create(500);
 
-  entry = row_rec_to_index_entry(rec, index, offsets, &n_ext, heap);
+  entry = row_rec_to_index_entry(rec, index, offsets, heap);
 
   mtr_commit(mtr);
 

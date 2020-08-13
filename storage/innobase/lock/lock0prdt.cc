@@ -419,17 +419,11 @@ static lock_t *lock_prdt_add_to_queue(
   RecLock rec_lock(index, block, PRDT_HEAPNO, type_mode);
 
   trx_mutex_enter(trx);
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-  auto *created_lock = (rec_lock.create(NULL, trx, true, prdt));
+  auto *created_lock = (rec_lock.create(NULL, trx, prdt));
 #else
-  auto *created_lock = (rec_lock.create(trx, true, prdt));
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  auto *created_lock = (rec_lock.create(trx, true, prdt));
-=======
   auto *created_lock = (rec_lock.create(trx, prdt));
->>>>>>> Percona-Server-8.0.20-11
+#endif /* WITH_WSREP */
   trx_mutex_exit(trx);
 
   return (created_lock);
@@ -739,17 +733,11 @@ dberr_t lock_prdt_lock(buf_block_t *block,  /*!< in/out: buffer block of rec */
     RecLock rec_lock(index, block, PRDT_HEAPNO, prdt_mode);
 
     trx_mutex_enter(trx);
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-    lock = rec_lock.create(NULL, trx, true);
+    lock = rec_lock.create(NULL, trx);
 #else
     lock = rec_lock.create(trx, true);
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-    lock = rec_lock.create(trx, true);
-=======
-    lock = rec_lock.create(trx);
->>>>>>> Percona-Server-8.0.20-11
     trx_mutex_exit(trx);
 
     status = LOCK_REC_SUCCESS_CREATED;
@@ -763,19 +751,13 @@ dberr_t lock_prdt_lock(buf_block_t *block,  /*!< in/out: buffer block of rec */
                                 lock->index->rtr_srs.get())))) {
       lock = lock_prdt_has_lock(mode, type_mode, block, prdt, trx);
 
-<<<<<<< HEAD
-      if (lock == NULL) {
+      if (lock == nullptr) {
 #ifdef WITH_WSREP
         lock_t *wait_for;
 
         wait_for = (lock_t *)lock_prdt_other_has_conflicting(prdt_mode, block,
                                                              prdt, trx);
 #else
-||||||| merged common ancestors
-      if (lock == NULL) {
-=======
-      if (lock == nullptr) {
->>>>>>> Percona-Server-8.0.20-11
         const lock_t *wait_for;
 
         wait_for = lock_prdt_other_has_conflicting(prdt_mode, block, prdt, trx);
@@ -862,17 +844,11 @@ dberr_t lock_place_prdt_page_lock(
     RecLock rec_lock(index, rec_id, mode);
 
     trx_mutex_enter(trx);
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-    rec_lock.create(NULL, trx, true);
+    rec_lock.create(NULL, trx);
 #else
-    rec_lock.create(trx, true);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-    rec_lock.create(trx, true);
-=======
     rec_lock.create(trx);
->>>>>>> Percona-Server-8.0.20-11
+#endif /* WITH_WSREP */
     trx_mutex_exit(trx);
 
 #ifdef PRDT_DIAG

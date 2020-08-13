@@ -7117,20 +7117,10 @@ bool ha_rollback_to_savepoint_can_release_mdl(THD *thd);
 int ha_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_release_savepoint(THD *thd, SAVEPOINT *sv);
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, bool signal);
 #endif /* WITH_WSREP */
 
-/* Build pushed joins in handlers implementing this feature */
-int ha_make_pushed_joins(THD *thd, const AQP::Join_plan *plan);
-
-||||||| merged common ancestors
-/* Build pushed joins in handlers implementing this feature */
-int ha_make_pushed_joins(THD *thd, const AQP::Join_plan *plan);
-
-=======
->>>>>>> Percona-Server-8.0.20-11
 /* these are called by storage engines */
 void trans_register_ha(THD *thd, bool all, handlerton *ht,
                        const ulonglong *trxid);

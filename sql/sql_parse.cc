@@ -1435,9 +1435,8 @@ bool do_command(THD *thd) {
 
 out:
   /* The statement instrumentation must be closed in all cases. */
-<<<<<<< HEAD
-  DBUG_ASSERT(thd->m_digest == NULL);
-  DBUG_ASSERT(thd->m_statement_psi == NULL);
+  DBUG_ASSERT(thd->m_digest == nullptr);
+  DBUG_ASSERT(thd->m_statement_psi == nullptr);
 #ifdef WITH_WSREP
   // TODO: Need to findout significance of bad packet and execution of API
   if (!thd->get_protocol_classic()->bad_packet) {
@@ -1445,13 +1444,6 @@ out:
     wsrep_after_command_after_result(thd);
   }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  DBUG_ASSERT(thd->m_digest == NULL);
-  DBUG_ASSERT(thd->m_statement_psi == NULL);
-=======
-  DBUG_ASSERT(thd->m_digest == nullptr);
-  DBUG_ASSERT(thd->m_statement_psi == nullptr);
->>>>>>> Percona-Server-8.0.20-11
   return return_value;
 }
 
@@ -3568,7 +3560,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
     goto error;
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /*
     Always start a new transaction for a wsrep THD unless the
@@ -3593,15 +3584,12 @@ int mysql_execute_command(THD *thd, bool first_level) {
   }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
   /*
     We do not flag "is DML" (TX_STMT_DML) here as replication expects us to
     test for LOCK TABLE etc. first. To rephrase, we try not to set TX_STMT_DML
     until we have the MDL, and LOCK TABLE could massively delay this.
   */
 
->>>>>>> Percona-Server-8.0.20-11
   switch (lex->sql_command) {
     case SQLCOM_SHOW_STATUS: {
       System_status_var old_status_var = thd->status_var;
@@ -4034,16 +4022,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
       break;
     }
     case SQLCOM_SHOW_CREATE:
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
 #endif /* WITH_WSREP */
-      DBUG_ASSERT(first_table == all_tables && first_table != 0);
-||||||| merged common ancestors
-      DBUG_ASSERT(first_table == all_tables && first_table != 0);
-=======
       DBUG_ASSERT(first_table == all_tables && first_table != nullptr);
->>>>>>> Percona-Server-8.0.20-11
       {
         /*
            Access check:
@@ -4100,16 +4082,10 @@ int mysql_execute_command(THD *thd, bool first_level) {
         break;
       }
     case SQLCOM_CHECKSUM: {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ);
 #endif /* WITH_WSREP */
-      DBUG_ASSERT(first_table == all_tables && first_table != 0);
-||||||| merged common ancestors
-      DBUG_ASSERT(first_table == all_tables && first_table != 0);
-=======
       DBUG_ASSERT(first_table == all_tables && first_table != nullptr);
->>>>>>> Percona-Server-8.0.20-11
       if (check_table_access(thd, SELECT_ACL, all_tables, false, UINT_MAX,
                              false))
         goto error; /* purecov: inspected */
@@ -5756,7 +5732,6 @@ finish:
     thd->mdl_context.release_statement_locks();
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 
   thd->wsrep_consistency_check = NO_CONSISTENCY_CHECK;
@@ -5788,16 +5763,6 @@ finish:
   thd->wsrep_PA_safe = true;
 #endif /* WITH_WSREP */
 
-  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE) {
-    ((Transaction_state_tracker *)thd->session_tracker.get_tracker(
-         TRANSACTION_INFO_TRACKER))
-        ->add_trx_state_from_thd(thd);
-||||||| merged common ancestors
-  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE) {
-    ((Transaction_state_tracker *)thd->session_tracker.get_tracker(
-         TRANSACTION_INFO_TRACKER))
-        ->add_trx_state_from_thd(thd);
-=======
   // If the client wishes to have transaction state reported, we add whatever
   // is set on THD to our set here.
   {
@@ -5808,7 +5773,6 @@ finish:
 
     // We're done. Clear "is DML" flag.
     tst->clear_trx_state(thd, TX_STMT_DML);
->>>>>>> Percona-Server-8.0.20-11
   }
 
 #ifdef HAVE_LSAN_DO_RECOVERABLE_LEAK_CHECK

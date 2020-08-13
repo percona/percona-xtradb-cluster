@@ -703,8 +703,12 @@ bool log_and_commit_acl_ddl(THD *thd, bool transactional_tables,
   result = thd->is_error() || extra_error || thd->transaction_rollback_request;
   /* Write to binlog and textlogs only if there is no error */
   if (!result) {
-<<<<<<< HEAD
-    mysql_rewrite_acl_query(thd, Consumer_type::BINLOG, rewrite_params);
+    String rlb;
+    /*
+      We're requesting a rewrite with instrumentation. This will change
+      the value on the THD and those seen in instrumentation.
+    */
+    mysql_rewrite_acl_query(thd, rlb, Consumer_type::BINLOG, rewrite_params);
 #ifdef WITH_WSREP
     /*
       If operating in cluster mode and binlog is enabled but sql_log_bin = 0
@@ -718,16 +722,6 @@ bool log_and_commit_acl_ddl(THD *thd, bool transactional_tables,
             ? false
             : write_to_binlog;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-    mysql_rewrite_acl_query(thd, Consumer_type::BINLOG, rewrite_params);
-=======
-    String rlb;
-    /*
-      We're requesting a rewrite with instrumentation. This will change
-      the value on the THD and those seen in instrumentation.
-    */
-    mysql_rewrite_acl_query(thd, rlb, Consumer_type::BINLOG, rewrite_params);
->>>>>>> Percona-Server-8.0.20-11
     if (write_to_binlog) {
       LEX_CSTRING query;
       enum_sql_command command;

@@ -875,15 +875,6 @@ bool update_named_pipe_full_access_group(const char *new_group_name);
 extern LEX_STRING opt_mandatory_roles;
 extern bool opt_mandatory_roles_cache;
 extern bool opt_always_activate_granted_roles;
-<<<<<<< HEAD
-
-#ifdef WITH_WSREP
-extern "C" void *start_wsrep_THD(void *);
-void unireg_abort(int exit_code);
-#endif /* WITH_WSREP */
-
-||||||| merged common ancestors
-=======
 
 extern mysql_component_t mysql_component_mysql_server;
 extern mysql_component_t mysql_component_performance_schema;
@@ -894,5 +885,10 @@ extern SERVICE_TYPE_NO_CONST(registry) * srv_registry;
    mysql_server component */
 extern SERVICE_TYPE(dynamic_loader_scheme_file) * scheme_file_srv;
 extern SERVICE_TYPE(dynamic_loader) * dynamic_loader_srv;
->>>>>>> Percona-Server-8.0.20-11
+
+#ifdef WITH_WSREP
+extern "C" void *start_wsrep_THD(void *);
+void unireg_abort(int exit_code);
+#endif /* WITH_WSREP */
+
 #endif /* MYSQLD_INCLUDED */

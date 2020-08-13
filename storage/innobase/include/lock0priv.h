@@ -757,50 +757,24 @@ class RecLock {
                                 we've managed to jump in front of other waiting
                                 transactions and got the lock granted, so there
                                 is no need to wait. */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-  dberr_t add_to_waitq(lock_t *const wait_for, const lock_prdt_t *prdt = NULL);
+  dberr_t add_to_waitq(lock_t *const wait_for, const lock_prdt_t *prdt = nullptr);
 #else
-  dberr_t add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt = NULL);
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  dberr_t add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt = NULL);
-=======
   dberr_t add_to_waitq(const lock_t *wait_for,
                        const lock_prdt_t *prdt = nullptr);
->>>>>>> Percona-Server-8.0.20-11
+#endif /* WITH_WSREP */
 
   /**
   Create a lock for a transaction and initialise it.
   @param[in, out] trx		Transaction requesting the new lock
   @param[in] prdt			Predicate lock (optional)
   @return new lock instance */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-  lock_t *create(lock_t* const c_lock, trx_t *trx, bool add_to_hash,
+  lock_t *create(lock_t* const c_lock, trx_t *trx,
                  const lock_prdt_t *prdt = nullptr);
 #else
-  lock_t *create(trx_t *trx, bool add_to_hash,
-                 const lock_prdt_t *prdt = nullptr);
-#endif /* WITH_WSREP */
-
-  /**
-  Check of the lock is on m_rec_id.
-  @param[in] lock			Lock to compare with
-  @return true if the record lock is on m_rec_id*/
-  bool is_on_row(const lock_t *lock) const;
-||||||| merged common ancestors
-  lock_t *create(trx_t *trx, bool add_to_hash,
-                 const lock_prdt_t *prdt = nullptr);
-
-  /**
-  Check of the lock is on m_rec_id.
-  @param[in] lock			Lock to compare with
-  @return true if the record lock is on m_rec_id*/
-  bool is_on_row(const lock_t *lock) const;
-=======
   lock_t *create(trx_t *trx, const lock_prdt_t *prdt = nullptr);
->>>>>>> Percona-Server-8.0.20-11
+#endif /* WITH_WSREP */
 
   /**
   Create the lock instance

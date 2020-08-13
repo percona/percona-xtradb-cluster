@@ -794,20 +794,11 @@ class Global_read_lock {
 
   Global_read_lock()
       : m_state(GRL_NONE),
-<<<<<<< HEAD
 #ifdef WITH_WSREP
         provider_paused(false),
 #endif /* WITH_WSREP */
-        m_mdl_global_shared_lock(NULL),
-        m_mdl_blocks_commits_lock(NULL) {
-  }
-||||||| merged common ancestors
-        m_mdl_global_shared_lock(NULL),
-        m_mdl_blocks_commits_lock(NULL) {}
-=======
         m_mdl_global_shared_lock(nullptr),
         m_mdl_blocks_commits_lock(nullptr) {}
->>>>>>> Percona-Server-8.0.20-11
 
 #ifdef WITH_WSREP
   bool lock_global_read_lock(THD *thd, bool *own_lock);
@@ -3129,12 +3120,6 @@ class THD : public MDL_context_owner,
   // We don't want to load/unload plugins for unit tests.
   bool m_enable_plugins;
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  explicit THD(bool enable_plugins = true, bool is_applier = false);
-#else
-||||||| merged common ancestors
-=======
   /**
      Used by some transformations that need Item:transform to make a permanent
      transform. Will be voided by WL#6570.
@@ -3158,7 +3143,9 @@ class THD : public MDL_context_owner,
     ~Permanent_transform() { m_thd->m_permanent_transform = m_old_value; }
   };
 
->>>>>>> Percona-Server-8.0.20-11
+#ifdef WITH_WSREP
+  explicit THD(bool enable_plugins = true, bool is_applier = false);
+#else
   explicit THD(bool enable_plugins = true);
 #endif /* WITH_WSREP */
 
