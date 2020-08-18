@@ -419,6 +419,7 @@ fi
             -DWITH_EDITLINE=bundled \
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
+            -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
             -DMYSQL_SERVER_SUFFIX="" \
             -DWITH_WSREP=ON \
@@ -453,6 +454,7 @@ fi
             -DWITH_LIBEVENT=bundled \
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
+            -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
             -DMYSQL_SERVER_SUFFIX="" \
             -DWITH_WSREP=ON \

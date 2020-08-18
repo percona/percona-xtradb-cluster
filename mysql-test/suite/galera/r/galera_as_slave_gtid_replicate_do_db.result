@@ -36,138 +36,138 @@ START TRANSACTION;
 INSERT INTO test1.t1 (f1) VALUES (333);
 INSERT INTO test2.t1 (f1) VALUES (99999);
 COMMIT;
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	124	Previous_gtids	2	155	
-mysqld-bin.000001	155	Gtid	1	239	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
-mysqld-bin.000001	239	Query	1	348	CREATE SCHEMA test1 /* xid=### */
-mysqld-bin.000001	348	Gtid	1	432	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
-mysqld-bin.000001	432	Query	1	508	BEGIN
-mysqld-bin.000001	508	Query	1	585	COMMIT
-mysqld-bin.000001	585	Gtid	1	671	SET @@SESSION.GTID_NEXT= '<effective_uuid>:3'
-mysqld-bin.000001	671	Query	1	840	use `test1`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY,f2 CHAR(5) DEFAULT 'abc') ENGINE=InnoDB /* xid=### */
-mysqld-bin.000001	840	Gtid	1	924	SET @@SESSION.GTID_NEXT= '<effective_uuid>:4'
-mysqld-bin.000001	924	Query	1	1000	BEGIN
-mysqld-bin.000001	1000	Query	1	1077	COMMIT
-mysqld-bin.000001	1077	Gtid	1	1163	SET @@SESSION.GTID_NEXT= '<effective_uuid>:5'
-mysqld-bin.000001	1163	Query	1	1234	BEGIN
-mysqld-bin.000001	1234	Table_map	1	1291	table_id: ### (test1.t1)
-mysqld-bin.000001	1291	Write_rows	1	1335	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	1335	Xid	1	1366	COMMIT /* xid=### */
-mysqld-bin.000001	1366	Gtid	1	1450	SET @@SESSION.GTID_NEXT= '<effective_uuid>:6'
-mysqld-bin.000001	1450	Query	1	1516	BEGIN
-mysqld-bin.000001	1516	Query	1	1583	COMMIT
-mysqld-bin.000001	1583	Gtid	1	1669	SET @@SESSION.GTID_NEXT= '<effective_uuid>:7'
-mysqld-bin.000001	1669	Query	1	1740	BEGIN
-mysqld-bin.000001	1740	Table_map	1	1797	table_id: ### (test1.t1)
-mysqld-bin.000001	1797	Write_rows	1	1841	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	1841	Xid	1	1872	COMMIT /* xid=### */
-mysqld-bin.000001	1872	Gtid	1	1956	SET @@SESSION.GTID_NEXT= '<effective_uuid>:8'
-mysqld-bin.000001	1956	Query	1	2022	BEGIN
-mysqld-bin.000001	2022	Query	1	2089	COMMIT
-mysqld-bin.000001	2089	Gtid	1	2175	SET @@SESSION.GTID_NEXT= '<effective_uuid>:9'
-mysqld-bin.000001	2175	Query	1	2246	BEGIN
-mysqld-bin.000001	2246	Table_map	1	2303	table_id: ### (test1.t1)
-mysqld-bin.000001	2303	Write_rows	1	2347	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	2347	Xid	1	2378	COMMIT /* xid=### */
-mysqld-bin.000001	2378	Gtid	1	2462	SET @@SESSION.GTID_NEXT= '<effective_uuid>:10'
-mysqld-bin.000001	2462	Query	1	2528	BEGIN
-mysqld-bin.000001	2528	Query	1	2595	COMMIT
-mysqld-bin.000001	2595	Gtid	1	2679	SET @@SESSION.GTID_NEXT= '<effective_uuid>:11'
-mysqld-bin.000001	2679	Query	1	2745	BEGIN
-mysqld-bin.000001	2745	Query	1	2812	COMMIT
-mysqld-bin.000001	2812	Gtid	1	2898	SET @@SESSION.GTID_NEXT= '<effective_uuid>:12'
-mysqld-bin.000001	2898	Query	1	2969	BEGIN
-mysqld-bin.000001	2969	Table_map	1	3026	table_id: ### (test1.t1)
-mysqld-bin.000001	3026	Update_rows	1	3116	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	3116	Xid	1	3147	COMMIT /* xid=### */
-mysqld-bin.000001	3147	Gtid	1	3233	SET @@SESSION.GTID_NEXT= '<effective_uuid>:13'
-mysqld-bin.000001	3233	Query	1	3304	BEGIN
-mysqld-bin.000001	3304	Table_map	1	3361	table_id: ### (test1.t1)
-mysqld-bin.000001	3361	Delete_rows	1	3405	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	3405	Xid	1	3436	COMMIT /* xid=### */
-mysqld-bin.000001	3436	Gtid	1	3520	SET @@SESSION.GTID_NEXT= '<effective_uuid>:14'
-mysqld-bin.000001	3520	Query	1	3586	BEGIN
-mysqld-bin.000001	3586	Query	1	3653	COMMIT
-mysqld-bin.000001	3653	Gtid	1	3739	SET @@SESSION.GTID_NEXT= '<effective_uuid>:15'
-mysqld-bin.000001	3739	Query	1	3810	BEGIN
-mysqld-bin.000001	3810	Table_map	1	3867	table_id: ### (test1.t1)
-mysqld-bin.000001	3867	Write_rows	1	3911	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	3911	Table_map	1	3968	table_id: ### (test1.t1)
-mysqld-bin.000001	3968	Write_rows	1	4012	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	4012	Xid	1	4043	COMMIT /* xid=### */
-mysqld-bin.000001	4043	Gtid	1	4129	SET @@SESSION.GTID_NEXT= '<effective_uuid>:16'
-mysqld-bin.000001	4129	Query	1	4200	BEGIN
-mysqld-bin.000001	4200	Table_map	1	4257	table_id: ### (test1.t1)
-mysqld-bin.000001	4257	Write_rows	1	4301	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	4301	Xid	1	4332	COMMIT /* xid=### */
+mysqld-bin.000001	125	Previous_gtids	2	156	
+mysqld-bin.000001	156	Gtid	1	240	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000001	240	Query	1	349	CREATE SCHEMA test1 /* xid=### */
+mysqld-bin.000001	349	Gtid	1	433	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000001	433	Query	1	509	BEGIN
+mysqld-bin.000001	509	Query	1	586	COMMIT
+mysqld-bin.000001	586	Gtid	1	672	SET @@SESSION.GTID_NEXT= '<effective_uuid>:3'
+mysqld-bin.000001	672	Query	1	841	use `test1`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY,f2 CHAR(5) DEFAULT 'abc') ENGINE=InnoDB /* xid=### */
+mysqld-bin.000001	841	Gtid	1	925	SET @@SESSION.GTID_NEXT= '<effective_uuid>:4'
+mysqld-bin.000001	925	Query	1	1001	BEGIN
+mysqld-bin.000001	1001	Query	1	1078	COMMIT
+mysqld-bin.000001	1078	Gtid	1	1164	SET @@SESSION.GTID_NEXT= '<effective_uuid>:5'
+mysqld-bin.000001	1164	Query	1	1235	BEGIN
+mysqld-bin.000001	1235	Table_map	1	1292	table_id: ### (test1.t1)
+mysqld-bin.000001	1292	Write_rows	1	1336	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	1336	Xid	1	1367	COMMIT /* xid=### */
+mysqld-bin.000001	1367	Gtid	1	1451	SET @@SESSION.GTID_NEXT= '<effective_uuid>:6'
+mysqld-bin.000001	1451	Query	1	1517	BEGIN
+mysqld-bin.000001	1517	Query	1	1584	COMMIT
+mysqld-bin.000001	1584	Gtid	1	1670	SET @@SESSION.GTID_NEXT= '<effective_uuid>:7'
+mysqld-bin.000001	1670	Query	1	1741	BEGIN
+mysqld-bin.000001	1741	Table_map	1	1798	table_id: ### (test1.t1)
+mysqld-bin.000001	1798	Write_rows	1	1842	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	1842	Xid	1	1873	COMMIT /* xid=### */
+mysqld-bin.000001	1873	Gtid	1	1957	SET @@SESSION.GTID_NEXT= '<effective_uuid>:8'
+mysqld-bin.000001	1957	Query	1	2023	BEGIN
+mysqld-bin.000001	2023	Query	1	2090	COMMIT
+mysqld-bin.000001	2090	Gtid	1	2176	SET @@SESSION.GTID_NEXT= '<effective_uuid>:9'
+mysqld-bin.000001	2176	Query	1	2247	BEGIN
+mysqld-bin.000001	2247	Table_map	1	2304	table_id: ### (test1.t1)
+mysqld-bin.000001	2304	Write_rows	1	2348	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	2348	Xid	1	2379	COMMIT /* xid=### */
+mysqld-bin.000001	2379	Gtid	1	2463	SET @@SESSION.GTID_NEXT= '<effective_uuid>:10'
+mysqld-bin.000001	2463	Query	1	2529	BEGIN
+mysqld-bin.000001	2529	Query	1	2596	COMMIT
+mysqld-bin.000001	2596	Gtid	1	2680	SET @@SESSION.GTID_NEXT= '<effective_uuid>:11'
+mysqld-bin.000001	2680	Query	1	2746	BEGIN
+mysqld-bin.000001	2746	Query	1	2813	COMMIT
+mysqld-bin.000001	2813	Gtid	1	2899	SET @@SESSION.GTID_NEXT= '<effective_uuid>:12'
+mysqld-bin.000001	2899	Query	1	2970	BEGIN
+mysqld-bin.000001	2970	Table_map	1	3027	table_id: ### (test1.t1)
+mysqld-bin.000001	3027	Update_rows	1	3117	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	3117	Xid	1	3148	COMMIT /* xid=### */
+mysqld-bin.000001	3148	Gtid	1	3234	SET @@SESSION.GTID_NEXT= '<effective_uuid>:13'
+mysqld-bin.000001	3234	Query	1	3305	BEGIN
+mysqld-bin.000001	3305	Table_map	1	3362	table_id: ### (test1.t1)
+mysqld-bin.000001	3362	Delete_rows	1	3406	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	3406	Xid	1	3437	COMMIT /* xid=### */
+mysqld-bin.000001	3437	Gtid	1	3521	SET @@SESSION.GTID_NEXT= '<effective_uuid>:14'
+mysqld-bin.000001	3521	Query	1	3587	BEGIN
+mysqld-bin.000001	3587	Query	1	3654	COMMIT
+mysqld-bin.000001	3654	Gtid	1	3740	SET @@SESSION.GTID_NEXT= '<effective_uuid>:15'
+mysqld-bin.000001	3740	Query	1	3811	BEGIN
+mysqld-bin.000001	3811	Table_map	1	3868	table_id: ### (test1.t1)
+mysqld-bin.000001	3868	Write_rows	1	3912	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	3912	Table_map	1	3969	table_id: ### (test1.t1)
+mysqld-bin.000001	3969	Write_rows	1	4013	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	4013	Xid	1	4044	COMMIT /* xid=### */
+mysqld-bin.000001	4044	Gtid	1	4130	SET @@SESSION.GTID_NEXT= '<effective_uuid>:16'
+mysqld-bin.000001	4130	Query	1	4201	BEGIN
+mysqld-bin.000001	4201	Table_map	1	4258	table_id: ### (test1.t1)
+mysqld-bin.000001	4258	Write_rows	1	4302	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	4302	Xid	1	4333	COMMIT /* xid=### */
 gtid_executed_equal
 1
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	124	Previous_gtids	3	155	
-mysqld-bin.000001	155	Gtid	1	239	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
-mysqld-bin.000001	239	Query	1	348	CREATE SCHEMA test1 /* xid=### */
-mysqld-bin.000001	348	Gtid	1	432	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
-mysqld-bin.000001	432	Query	1	508	BEGIN
-mysqld-bin.000001	508	Query	1	585	COMMIT
-mysqld-bin.000001	585	Gtid	1	671	SET @@SESSION.GTID_NEXT= '<effective_uuid>:3'
-mysqld-bin.000001	671	Query	1	840	use `test1`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY,f2 CHAR(5) DEFAULT 'abc') ENGINE=InnoDB /* xid=### */
-mysqld-bin.000001	840	Gtid	1	924	SET @@SESSION.GTID_NEXT= '<effective_uuid>:4'
-mysqld-bin.000001	924	Query	1	1000	BEGIN
-mysqld-bin.000001	1000	Query	1	1077	COMMIT
-mysqld-bin.000001	1077	Gtid	1	1163	SET @@SESSION.GTID_NEXT= '<effective_uuid>:5'
-mysqld-bin.000001	1163	Query	1	1234	BEGIN
-mysqld-bin.000001	1234	Table_map	1	1291	table_id: ### (test1.t1)
-mysqld-bin.000001	1291	Write_rows	1	1335	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	1335	Xid	1	1366	COMMIT /* xid=### */
-mysqld-bin.000001	1366	Gtid	1	1450	SET @@SESSION.GTID_NEXT= '<effective_uuid>:6'
-mysqld-bin.000001	1450	Query	1	1516	BEGIN
-mysqld-bin.000001	1516	Query	1	1583	COMMIT
-mysqld-bin.000001	1583	Gtid	1	1669	SET @@SESSION.GTID_NEXT= '<effective_uuid>:7'
-mysqld-bin.000001	1669	Query	1	1740	BEGIN
-mysqld-bin.000001	1740	Table_map	1	1797	table_id: ### (test1.t1)
-mysqld-bin.000001	1797	Write_rows	1	1841	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	1841	Xid	1	1872	COMMIT /* xid=### */
-mysqld-bin.000001	1872	Gtid	1	1956	SET @@SESSION.GTID_NEXT= '<effective_uuid>:8'
-mysqld-bin.000001	1956	Query	1	2022	BEGIN
-mysqld-bin.000001	2022	Query	1	2089	COMMIT
-mysqld-bin.000001	2089	Gtid	1	2175	SET @@SESSION.GTID_NEXT= '<effective_uuid>:9'
-mysqld-bin.000001	2175	Query	1	2246	BEGIN
-mysqld-bin.000001	2246	Table_map	1	2303	table_id: ### (test1.t1)
-mysqld-bin.000001	2303	Write_rows	1	2347	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	2347	Xid	1	2378	COMMIT /* xid=### */
-mysqld-bin.000001	2378	Gtid	1	2462	SET @@SESSION.GTID_NEXT= '<effective_uuid>:10'
-mysqld-bin.000001	2462	Query	1	2528	BEGIN
-mysqld-bin.000001	2528	Query	1	2595	COMMIT
-mysqld-bin.000001	2595	Gtid	1	2679	SET @@SESSION.GTID_NEXT= '<effective_uuid>:11'
-mysqld-bin.000001	2679	Query	1	2745	BEGIN
-mysqld-bin.000001	2745	Query	1	2812	COMMIT
-mysqld-bin.000001	2812	Gtid	1	2898	SET @@SESSION.GTID_NEXT= '<effective_uuid>:12'
-mysqld-bin.000001	2898	Query	1	2969	BEGIN
-mysqld-bin.000001	2969	Table_map	1	3026	table_id: ### (test1.t1)
-mysqld-bin.000001	3026	Update_rows	1	3116	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	3116	Xid	1	3147	COMMIT /* xid=### */
-mysqld-bin.000001	3147	Gtid	1	3233	SET @@SESSION.GTID_NEXT= '<effective_uuid>:13'
-mysqld-bin.000001	3233	Query	1	3304	BEGIN
-mysqld-bin.000001	3304	Table_map	1	3361	table_id: ### (test1.t1)
-mysqld-bin.000001	3361	Delete_rows	1	3405	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	3405	Xid	1	3436	COMMIT /* xid=### */
-mysqld-bin.000001	3436	Gtid	1	3520	SET @@SESSION.GTID_NEXT= '<effective_uuid>:14'
-mysqld-bin.000001	3520	Query	1	3586	BEGIN
-mysqld-bin.000001	3586	Query	1	3653	COMMIT
-mysqld-bin.000001	3653	Gtid	1	3739	SET @@SESSION.GTID_NEXT= '<effective_uuid>:15'
-mysqld-bin.000001	3739	Query	1	3810	BEGIN
-mysqld-bin.000001	3810	Table_map	1	3867	table_id: ### (test1.t1)
-mysqld-bin.000001	3867	Write_rows	1	3911	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	3911	Table_map	1	3968	table_id: ### (test1.t1)
-mysqld-bin.000001	3968	Write_rows	1	4012	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	4012	Xid	1	4043	COMMIT /* xid=### */
-mysqld-bin.000001	4043	Gtid	1	4129	SET @@SESSION.GTID_NEXT= '<effective_uuid>:16'
-mysqld-bin.000001	4129	Query	1	4200	BEGIN
-mysqld-bin.000001	4200	Table_map	1	4257	table_id: ### (test1.t1)
-mysqld-bin.000001	4257	Write_rows	1	4301	table_id: ### flags: STMT_END_F
-mysqld-bin.000001	4301	Xid	1	4332	COMMIT /* xid=### */
+mysqld-bin.000001	125	Previous_gtids	3	156	
+mysqld-bin.000001	156	Gtid	1	240	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000001	240	Query	1	349	CREATE SCHEMA test1 /* xid=### */
+mysqld-bin.000001	349	Gtid	1	433	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000001	433	Query	1	509	BEGIN
+mysqld-bin.000001	509	Query	1	586	COMMIT
+mysqld-bin.000001	586	Gtid	1	672	SET @@SESSION.GTID_NEXT= '<effective_uuid>:3'
+mysqld-bin.000001	672	Query	1	841	use `test1`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY,f2 CHAR(5) DEFAULT 'abc') ENGINE=InnoDB /* xid=### */
+mysqld-bin.000001	841	Gtid	1	925	SET @@SESSION.GTID_NEXT= '<effective_uuid>:4'
+mysqld-bin.000001	925	Query	1	1001	BEGIN
+mysqld-bin.000001	1001	Query	1	1078	COMMIT
+mysqld-bin.000001	1078	Gtid	1	1164	SET @@SESSION.GTID_NEXT= '<effective_uuid>:5'
+mysqld-bin.000001	1164	Query	1	1235	BEGIN
+mysqld-bin.000001	1235	Table_map	1	1292	table_id: ### (test1.t1)
+mysqld-bin.000001	1292	Write_rows	1	1336	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	1336	Xid	1	1367	COMMIT /* xid=### */
+mysqld-bin.000001	1367	Gtid	1	1451	SET @@SESSION.GTID_NEXT= '<effective_uuid>:6'
+mysqld-bin.000001	1451	Query	1	1517	BEGIN
+mysqld-bin.000001	1517	Query	1	1584	COMMIT
+mysqld-bin.000001	1584	Gtid	1	1670	SET @@SESSION.GTID_NEXT= '<effective_uuid>:7'
+mysqld-bin.000001	1670	Query	1	1741	BEGIN
+mysqld-bin.000001	1741	Table_map	1	1798	table_id: ### (test1.t1)
+mysqld-bin.000001	1798	Write_rows	1	1842	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	1842	Xid	1	1873	COMMIT /* xid=### */
+mysqld-bin.000001	1873	Gtid	1	1957	SET @@SESSION.GTID_NEXT= '<effective_uuid>:8'
+mysqld-bin.000001	1957	Query	1	2023	BEGIN
+mysqld-bin.000001	2023	Query	1	2090	COMMIT
+mysqld-bin.000001	2090	Gtid	1	2176	SET @@SESSION.GTID_NEXT= '<effective_uuid>:9'
+mysqld-bin.000001	2176	Query	1	2247	BEGIN
+mysqld-bin.000001	2247	Table_map	1	2304	table_id: ### (test1.t1)
+mysqld-bin.000001	2304	Write_rows	1	2348	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	2348	Xid	1	2379	COMMIT /* xid=### */
+mysqld-bin.000001	2379	Gtid	1	2463	SET @@SESSION.GTID_NEXT= '<effective_uuid>:10'
+mysqld-bin.000001	2463	Query	1	2529	BEGIN
+mysqld-bin.000001	2529	Query	1	2596	COMMIT
+mysqld-bin.000001	2596	Gtid	1	2680	SET @@SESSION.GTID_NEXT= '<effective_uuid>:11'
+mysqld-bin.000001	2680	Query	1	2746	BEGIN
+mysqld-bin.000001	2746	Query	1	2813	COMMIT
+mysqld-bin.000001	2813	Gtid	1	2899	SET @@SESSION.GTID_NEXT= '<effective_uuid>:12'
+mysqld-bin.000001	2899	Query	1	2970	BEGIN
+mysqld-bin.000001	2970	Table_map	1	3027	table_id: ### (test1.t1)
+mysqld-bin.000001	3027	Update_rows	1	3117	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	3117	Xid	1	3148	COMMIT /* xid=### */
+mysqld-bin.000001	3148	Gtid	1	3234	SET @@SESSION.GTID_NEXT= '<effective_uuid>:13'
+mysqld-bin.000001	3234	Query	1	3305	BEGIN
+mysqld-bin.000001	3305	Table_map	1	3362	table_id: ### (test1.t1)
+mysqld-bin.000001	3362	Delete_rows	1	3406	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	3406	Xid	1	3437	COMMIT /* xid=### */
+mysqld-bin.000001	3437	Gtid	1	3521	SET @@SESSION.GTID_NEXT= '<effective_uuid>:14'
+mysqld-bin.000001	3521	Query	1	3587	BEGIN
+mysqld-bin.000001	3587	Query	1	3654	COMMIT
+mysqld-bin.000001	3654	Gtid	1	3740	SET @@SESSION.GTID_NEXT= '<effective_uuid>:15'
+mysqld-bin.000001	3740	Query	1	3811	BEGIN
+mysqld-bin.000001	3811	Table_map	1	3868	table_id: ### (test1.t1)
+mysqld-bin.000001	3868	Write_rows	1	3912	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	3912	Table_map	1	3969	table_id: ### (test1.t1)
+mysqld-bin.000001	3969	Write_rows	1	4013	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	4013	Xid	1	4044	COMMIT /* xid=### */
+mysqld-bin.000001	4044	Gtid	1	4130	SET @@SESSION.GTID_NEXT= '<effective_uuid>:16'
+mysqld-bin.000001	4130	Query	1	4201	BEGIN
+mysqld-bin.000001	4201	Table_map	1	4258	table_id: ### (test1.t1)
+mysqld-bin.000001	4258	Write_rows	1	4302	table_id: ### flags: STMT_END_F
+mysqld-bin.000001	4302	Xid	1	4333	COMMIT /* xid=### */
 include/diff_servers.inc [servers=2 3]
 SELECT COUNT(*) = 2 FROM test1.t1 WHERE f1 IN (1,2);
 COUNT(*) = 2

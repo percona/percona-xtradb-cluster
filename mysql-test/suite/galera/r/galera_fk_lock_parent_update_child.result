@@ -1,4 +1,4 @@
-SET GLOBAL innodb_lock_wait_timeout = 5;
+SET GLOBAL innodb_lock_wait_timeout = 2;
 
 # ===========================================================================
 # Case 1: Delete a row from the child table.

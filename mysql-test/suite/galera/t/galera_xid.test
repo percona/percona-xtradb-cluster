@@ -44,7 +44,7 @@ select * from t3;
 #
 #
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
 --connection node_2
 --echo #=============================================
@@ -53,7 +53,7 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 --source include/wait_condition.inc
 #
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 #
 drop table t3;
 

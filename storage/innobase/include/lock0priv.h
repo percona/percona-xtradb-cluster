@@ -769,12 +769,7 @@ class RecLock {
   @param[in, out] trx		Transaction requesting the new lock
   @param[in] prdt			Predicate lock (optional)
   @return new lock instance */
-#ifdef WITH_WSREP
-  lock_t *create(lock_t* const c_lock, trx_t *trx,
-                 const lock_prdt_t *prdt = nullptr);
-#else
   lock_t *create(trx_t *trx, const lock_prdt_t *prdt = nullptr);
-#endif /* WITH_WSREP */
 
   /**
   Create the lock instance
@@ -803,7 +798,7 @@ class RecLock {
 
   /**
   Add the lock to the record lock hash and the transaction's lock list
-  @param[in,out] lock	Newly created record lock to add to the
+  @param[in,out] lock Newly created record lock to add to the
                           rec hash and the transaction lock list */
   void lock_add(lock_t *lock);
 

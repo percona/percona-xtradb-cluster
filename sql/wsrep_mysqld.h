@@ -238,6 +238,9 @@ extern void wsrep_prepend_PATH(const char *path);
 /* Provide a wrapper of the WSREP_ON macro for plugins to use */
 extern "C" bool wsrep_is_wsrep_on(void);
 
+/* return non-const copy of thd->rewritten_query() */
+extern String wsrep_thd_rewritten_query(THD *thd);
+
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
 
@@ -311,8 +314,8 @@ extern wsrep_seqno_t wsrep_locked_seqno;
   }
 
 #define WSREP_QUERY(thd)                                           \
-  ((!opt_general_log_raw) && thd->rewritten_query().length()         \
-       ? const_cast<String&>(thd->rewritten_query()).c_ptr_safe()  \
+  ((!opt_general_log_raw) && thd->rewritten_query().length()       \
+       ? wsrep_thd_rewritten_query(thd).c_ptr_safe()               \
        : thd->query().str)
 
 // Use this for logging output received from the SST scripts

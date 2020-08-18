@@ -21,6 +21,7 @@ SHOW STATUS LIKE 'wsrep_incoming_addresses';
 --let $restart_parameters = "restart:--wsrep_node_incoming_address=4.3.2.1:98765"
 --replace_regex /# restart:.*//
 --source include/restart_mysqld.inc
+--source include/galera_wait_ready.inc
 SHOW STATUS LIKE 'wsrep_incoming_addresses';
 
 # Invalid address. 
@@ -30,6 +31,7 @@ call mtr.add_suppression("Could not parse wsrep_node_incoming_address : 4.3.2.1:
 --let $restart_parameters = "restart:--wsrep_node_incoming_address=4.3.2.1:123456789123456789123456789123456789"
 --replace_regex /# restart:.*//
 --source include/restart_mysqld.inc
+--source include/galera_wait_ready.inc
 SHOW STATUS LIKE 'wsrep_incoming_addresses';
 
 # Ensure that invalid value for wsrep_node_incoming_address was logged
@@ -42,6 +44,7 @@ SHOW STATUS LIKE 'wsrep_incoming_addresses';
 --let $restart_parameters = "restart:--wsrep_node_incoming_address=[2001:db8::1:0:0:1]:98765"
 --replace_regex /# restart:.*//
 --source include/restart_mysqld.inc
+--source include/galera_wait_ready.inc
 SHOW STATUS LIKE 'wsrep_incoming_addresses';
 
 # Invalid address. 
@@ -49,6 +52,7 @@ call mtr.add_suppression("Could not parse wsrep_node_incoming_address : .2001:db
 --let $restart_parameters = "restart:--wsrep_node_incoming_address=[2001:db8::1:0:0:1]:123456789123456789123456789123456789"
 --replace_regex /# restart:.*//
 --source include/restart_mysqld.inc
+--source include/galera_wait_ready.inc
 SHOW STATUS LIKE 'wsrep_incoming_addresses';
 
 # Ensure that invalid value for wsrep_node_incoming_address was logged

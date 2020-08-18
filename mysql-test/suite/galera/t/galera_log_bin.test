@@ -45,7 +45,7 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 124;
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';
 
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
 DROP TABLE t1;
 DROP TABLE t2;

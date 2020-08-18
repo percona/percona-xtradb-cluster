@@ -9495,7 +9495,7 @@ extern "C" void *start_wsrep_THD(void *arg) {
   thd_manager->add_thd(thd);
   thd_added = true;
 
-#ifdef SKIP_INNODB_HP
+#ifndef SKIP_INNODB_HP
   /* set priority */
   thd->thd_tx_priority = 1;
 #endif

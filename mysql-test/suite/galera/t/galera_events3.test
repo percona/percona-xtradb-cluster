@@ -15,6 +15,7 @@ call mtr.add_suppression("Operation DROP USER failed");
 call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
 CREATE TABLE t1(a INT AUTO_INCREMENT, b INT, PRIMARY KEY pka(a));
 --send SET DEBUG_SYNC = 'now WAIT_FOR has_global_grant.got_lock'; 
+--sleep 1
 
 --connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
 --connection node_1a

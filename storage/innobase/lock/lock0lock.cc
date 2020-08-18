@@ -1051,6 +1051,7 @@ ulint lock_number_of_tables_locked(const trx_t *trx) {
 /*============== RECORD LOCK CREATION AND QUEUE MANAGEMENT =============*/
 
 #ifdef WITH_WSREP
+
 static void wsrep_print_wait_locks(
     lock_t *c_lock) /* conflicting lock to print */
 {
@@ -1243,12 +1244,7 @@ static void lock_create_wait_for_edge(trx_t *waiter, trx_t *blocker);
 @param[in,out] trx		Transaction requesting the lock
 @param[in] prdt			Predicate lock (optional)
 @return a new lock instance */
-#ifdef WITH_WSREP
-lock_t *RecLock::create(lock_t *const c_lock, trx_t *trx,
-                        const lock_prdt_t *prdt) {
-#else
 lock_t *RecLock::create(trx_t *trx, const lock_prdt_t *prdt) {
-#endif /* WITH_WSREP */
   ut_ad(lock_mutex_own());
 
   /* Ensure that another transaction doesn't access the trx
@@ -1285,89 +1281,7 @@ lock_t *RecLock::create(trx_t *trx, const lock_prdt_t *prdt) {
     lock_prdt_set_prdt(lock, prdt);
   }
 
-#ifdef WITH_WSREP
-
-  /* If the requesting transaction is background applier transaction. */
-  if (c_lock && wsrep_on(trx->mysql_thd) &&
-      wsrep_thd_is_BF(trx->mysql_thd, false)) {
-    lock_t *hash = (lock_t *)c_lock->hash;
-    lock_t *prev = NULL;
-
-    while (hash && wsrep_thd_is_BF(((lock_t *)hash)->trx->mysql_thd, true) &&
-           wsrep_thd_order_before(((lock_t *)hash)->trx->mysql_thd,
-                                  trx->mysql_thd)) {
-      prev = hash;
-      hash = (lock_t *)hash->hash;
-    }
-
-    lock->hash = hash;
-    if (prev) {
-      prev->hash = lock;
-    } else {
-      c_lock->hash = lock;
-    }
-    /*
-     * delayed conflict resolution '...kill_one_trx' was not called,
-     * if victim was waiting for some other lock
-     */
-    trx_mutex_enter(c_lock->trx);
-    if (c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
-      c_lock->trx->lock.was_chosen_as_deadlock_victim = true;
-
-      if (wsrep_debug) wsrep_print_wait_locks(c_lock);
-
-      trx->lock.que_state = TRX_QUE_LOCK_WAIT;
-      lock_set_lock_and_trx_wait(lock);
-      UT_LIST_ADD_LAST(trx->lock.trx_locks, lock);
-
-      /* Add the edge in the graph to ensure logic to grant lock to applier
-      thread succeed. */
-      lock_create_wait_for_edge(trx, c_lock->trx);
-
-      ut_ad(m_thr != NULL);
-      trx->lock.wait_thr = m_thr;
-      m_thr->state = QUE_THR_LOCK_WAIT;
-
-      /* have to release trx mutex for the duration of
-         victim lock release. This will eventually call
-         lock_grant, which wants to grant trx mutex again
-      */
-      trx_mutex_exit(trx);
-      lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock);
-      trx_mutex_enter(trx);
-
-      /* trx might not wait for c_lock, but some other lock
-         does not matter if wait_lock was released above
-       */
-      if (c_lock->trx->lock.wait_lock == c_lock) {
-        if (wsrep_debug)
-          ib::info() << "victim trx waits for some other lock than c_lock";
-        lock_reset_lock_and_trx_wait(lock);
-        lock->trx->lock.blocking_trx.store(nullptr);
-      }
-      lock->trx->lock.blocking_trx.store(nullptr);
-      trx_mutex_exit(c_lock->trx);
-
-      if (wsrep_debug)
-        ib::info() << "WSREP: c_lock canceled " << c_lock->trx->id;
-
-      ++lock->index->table->n_rec_locks;
-      /* have to bail out here to avoid lock_set_lock... */
-      return (lock);
-    }
-    trx_mutex_exit(c_lock->trx);
-    /* we don't want to add to hash anymore, but need other updates from
-     * lock_add */
-    ++lock->index->table->n_rec_locks;
-    lock_add(lock);
-  } else {
-#endif /* WITH_WSREP */
-
-    lock_add(lock);
-
-#ifdef WITH_WSREP
-  }
-#endif /* WITH_WSREP */
+  lock_add(lock);
 
   return (lock);
 }
@@ -1493,19 +1407,7 @@ dberr_t RecLock::add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt) {
   prepare();
 
   /* Don't queue the lock to hash table, if high priority transaction. */
-#ifdef WITH_WSREP
-  lock_t *lock = create(wait_for, m_trx, prdt);
-#else
   lock_t *lock = create(m_trx, prdt);
-#endif /* WITH_WSREP */
-
-#ifdef WITH_WSREP
-  if (wsrep_thd_is_BF(m_trx->mysql_thd, false) && !lock_get_wait(lock)) {
-    if (wsrep_debug)
-      ib::info() << "BF thread got lock granted early, ID " << lock->trx->id;
-    return DB_SUCCESS_LOCKED_REC;
-  }
-#endif /* WITH_WSREP */
 
   lock_create_wait_for_edge(m_trx, wait_for->trx);
 
@@ -1688,11 +1590,7 @@ static void lock_rec_add_to_queue(ulint type_mode, const buf_block_t *block,
   if (!we_own_trx_mutex) {
     trx_mutex_enter(trx);
   }
-#ifdef WITH_WSREP
-  rec_lock.create(NULL, trx);
-#else
   rec_lock.create(trx);
-#endif /* WITH_WSREP */
   if (!we_own_trx_mutex) {
     trx_mutex_exit(trx);
   }
@@ -1749,11 +1647,7 @@ lock_rec_req_status lock_rec_lock_fast(
       RecLock rec_lock(index, block, heap_no, mode);
 
       trx_mutex_enter(trx);
-#ifdef WITH_WSREP
-      rec_lock.create(NULL, trx);
-#else
       rec_lock.create(trx);
-#endif /* WITH_WSREP */
       trx_mutex_exit(trx);
 
       status = LOCK_REC_SUCCESS_CREATED;

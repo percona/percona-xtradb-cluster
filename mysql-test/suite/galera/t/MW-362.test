@@ -23,5 +23,5 @@ SET SESSION WSREP_ON=ON;
 # The CREATE above is no longer in the binlog
 
 SHOW BINARY LOGS;
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
