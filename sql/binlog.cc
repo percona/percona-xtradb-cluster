@@ -8452,8 +8452,13 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all) {
       gtid_state->update_on_rollback(thd);
       thd_get_cache_mngr(thd)->reset();
       // Reset the thread OK status before changing the outcome.
-      if (thd->get_stmt_da()->is_ok())
+      if (!wsrep_must_replay(thd) && thd->get_stmt_da()->is_ok())
         thd->get_stmt_da()->reset_diagnostics_area();
+      /* If wsrep transaction needs to replay, we didn't reset DA data.
+         It will be used by replayer service. As DA::m_can_overwrite_status
+         is 'true' here (set in mysql_execute_command() before
+         trans_commit_stmt()) the following call to my_error() will allow
+         overwriting the error */
       my_error(ER_TRANSACTION_ROLLBACK_DURING_COMMIT, MYF(0));
       return RESULT_ABORTED;
     }
