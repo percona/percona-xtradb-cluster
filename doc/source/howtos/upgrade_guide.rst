@@ -3,7 +3,7 @@
 ================================
 Upgrading Percona XtraDB Cluster
 ================================
-
+           
 .. This guide describes the procedure for upgrading |PXC| without downtime
    (*rolling upgrade*) to the |PXC| 8.0.
 
@@ -75,6 +75,10 @@ important that you make backups before attempting an upgrade.
    The rolling upgrade is supported but ensure the
    traffic is controlled during the upgrade and writes are directed only to 5.7
    nodes until all nodes are upgraded to 8.0.
+   
+.. note::
+
+    Writing to mixed version nodes is not supported and will cause data corruption. Each node should be taken offline one at a time and upgraded prior to using |Percona XtraCluster| 8.0 in any node of a cluster.
 
 .. _upgrade-guide-changed-strict-mode:
 
@@ -318,10 +322,11 @@ data directory.
    8.0 node joins the cluster and gets a dump of the cluster through :term:`SST`
    and remains part of the cluster.
 
-   Since the underline protocol version negotiated in both cases is based on Galera 3,
+   Since the underlying protocol version negotiated in both cases is based on Galera 3,
    the 8.0 node will fail to service galera 4 features. As soon as all 5.7
    nodes leave the cluster, the 8.0 nodes re-negotiates using protocol version 4
-   and gets a proper local index and other properties assigned.
+   and gets a proper local index and other properties assigned. The last node to leave the cluster before an offline upgrade should be the node used to bootstrap after the upgrades are completed.
+   
 
    .. warning:
 
@@ -388,6 +393,13 @@ To upgrade the cluster, follow these steps for each node:
    
 #. Repeat this procedure for the next node in the cluster
    until you upgrade all nodes.
+   
+Downgrading
+=====================
+
+.. warning::
+
+    **Downgrading from PXC 8.0 to PXC 5.7 is not supported. Prior to upgrading from PXC 5.7 to PXC 8.0, a full backup should be completed.**
 
 .. include:: ../.res/replace.txt
 .. include:: ../.res/replace.opt.txt
