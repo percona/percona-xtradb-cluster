@@ -31,6 +31,8 @@ extern void wsrep_sst_grab();
 extern bool wsrep_sst_wait();
 /*! Signals wsrep that initialization is complete, writesets can be applied */
 extern void wsrep_sst_continue();
+/*! Free SST auth memory allocated strings */
+extern void wsrep_sst_auth_free();
 
 extern void wsrep_SE_init_grab();          /*! grab init critical section */
 extern void wsrep_SE_init_wait(THD* thd);  /*! wait for SE init to complete */

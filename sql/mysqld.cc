@@ -1419,6 +1419,7 @@ extern "C" void unireg_abort(int exit_code)
 
     sleep(1); /* so give some time to exit for those which can */
     WSREP_INFO("Some threads may fail to exit.");
+    wsrep_deinit();
   }
 #endif // WITH_WSREP
   mysql_audit_notify(MYSQL_AUDIT_SERVER_SHUTDOWN_SHUTDOWN,
