@@ -161,6 +161,14 @@ void wsrep_sst_auth_init (const char* value)
     if (value) sst_auth_real_set (value);
 }
 
+void wsrep_sst_auth_free()
+{
+  if (wsrep_sst_auth) { my_free ((void*)wsrep_sst_auth); }
+  if (sst_auth_real) { free (const_cast<char*>(sst_auth_real)); }
+  wsrep_sst_auth= NULL;
+  sst_auth_real= NULL;
+}
+
 bool  wsrep_sst_donor_check (sys_var *self, THD* thd, set_var* var)
 {
   return 0;

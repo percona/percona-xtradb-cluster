@@ -663,6 +663,7 @@ void wsrep_init_startup (bool first)
 
 void wsrep_deinit()
 {
+  wsrep_sst_auth_free();
   wsrep_unload(wsrep);
   wsrep= 0;
   provider_name[0]=    '\0';

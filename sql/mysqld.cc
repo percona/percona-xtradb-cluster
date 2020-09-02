@@ -1891,6 +1891,7 @@ extern "C" void unireg_abort(int exit_code)
     wsrep_close_threads(thd); /* this won't close all threads */
     sleep(1); /* so give some time to exit for those which can */
     WSREP_INFO("Some threads may fail to exit.");
+    wsrep_deinit();
   }
 #endif // WITH_WSREP
 
