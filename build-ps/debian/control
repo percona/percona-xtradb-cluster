@@ -173,7 +173,6 @@ Suggests: tinyca, netcat-openbsd, pv
 Pre-Depends: percona-xtradb-cluster-common-5.7 (= ${binary:Version}),
              adduser,
              debconf (>= 0.2.17)
-<<<<<<< HEAD
 Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
          libdbi-perl,
          libdbd-mysql-perl,
@@ -188,17 +187,8 @@ Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
          lsof,
          rsync,
          qpress,
-         iproute
-||||||| merged common ancestors
-Depends: percona-server-client-5.7 (= ${binary:Version}),
-         ${shlibs:Depends}, ${misc:Depends},
-         psmisc
-=======
-Depends: percona-server-client-5.7 (= ${binary:Version}),
-         ${shlibs:Depends}, ${misc:Depends},
-         psmisc,
+         iproute,
          openssl
->>>>>>> 278fb5d
 Provides: mysql-server,
           virtual-mysql-server, virtual-mysql-server-core,
           mysql-server-5.7, mysql-server-core-5.7

@@ -44,16 +44,7 @@ Automatic configuration of SSL encryption
 Optimized Performance
   |PXC| performance is optimized to scale with a growing production workload.
 
-<<<<<<< HEAD
   For more information, see the following blog posts:
-||||||| merged common ancestors
-   installation
-   upgrading_guide_56_57
-=======
-   installation
-   upgrading_guide_56_57
-   installation/post-installation
->>>>>>> 278fb5d
 
   * `How We Made Percona XtraDB Cluster Scale
     <https://www.percona.com/blog/2017/04/19/how-we-made-percona-xtradb-cluster-scale/>`_
@@ -118,7 +109,6 @@ User\'s Manual
    :maxdepth: 1
    :glob:
 
-<<<<<<< HEAD
    manual/state_snapshot_transfer
    manual/xtrabackup_sst
    manual/restarting_nodes
@@ -129,32 +119,6 @@ User\'s Manual
    manual/gcache_record-set_cache_difference
    manual/performance_schema_instrumentation
    management/data_at_rest_encryption
-||||||| merged common ancestors
-   diagnostics/user_stats
-   diagnostics/slow_extended
-   diagnostics/innodb_show_status
-   diagnostics/show_engines
-   diagnostics/process_list
-   diagnostics/misc_info_schema_tables
-   diagnostics/thread_based_profiling
-   diagnostics/scalability_metrics_plugin
-   diagnostics/response_time_distribution
-   diagnostics/innodb_fragmentation_count
-=======
-   diagnostics/user_stats
-   diagnostics/slow_extended
-   diagnostics/innodb_show_status
-   diagnostics/show_engines
-   diagnostics/process_list
-   diagnostics/misc_info_schema_tables
-   diagnostics/thread_based_profiling
-   diagnostics/scalability_metrics_plugin
-   diagnostics/response_time_distribution
-   diagnostics/innodb_fragmentation_count
-   diagnostics/libcoredumper
-   diagnostics/stacktrace
-
->>>>>>> 278fb5d
 
 Flexibility
 ================================================================================

@@ -5098,7 +5098,6 @@ sub run_testcase ($) {
       {
         my $res= $test->exit_status();
 
-<<<<<<< HEAD
         if ($res == 0 and $opt_warnings and check_warnings($tinfo) )
         {
           # Test case suceeded, but it has produced unexpected
@@ -5107,51 +5106,55 @@ sub run_testcase ($) {
           resfile_output($tinfo->{'warnings'}) if $opt_resfile;
         }
 
-        if ( $res == 0 )
+      if ( $res == 0 )
+      {
+        my $check_res;
+        if ( restart_forced_by_test('force_restart') )
         {
-          my $check_res;
-          if ( restart_forced_by_test('force_restart') )
-          {
+          my $ret = stop_all_servers($opt_shutdown_timeout);
+          if ($ret != 0) {
+            shutdown_exit_reports();
+            $shutdown_report = 1;
+          }
+        }
+        elsif ( $opt_check_testcases and
+          $check_res= check_testcase($tinfo, "after"))
+        {
+          if ($check_res == 1) {
+            # Test case had sideeffects, not fatal error, just continue
             stop_all_servers($opt_shutdown_timeout);
+            mtr_report("Resuming tests...\n");
+            resfile_output($tinfo->{'check'}) if $opt_resfile;
           }
-          elsif ( $opt_check_testcases and
-            $check_res= check_testcase($tinfo, "after"))
-          {
-            if ($check_res == 1) {
-              # Test case had sideeffects, not fatal error, just continue
-              stop_all_servers($opt_shutdown_timeout);
-              mtr_report("Resuming tests...\n");
-              resfile_output($tinfo->{'check'}) if $opt_resfile;
-            }
-            else {
-              # Test case check failed fatally, probably a server crashed
-              report_failure_and_restart($tinfo);
-              return 1;
-            }
+          else {
+            # Test case check failed fatally, probably a server crashed
+            report_failure_and_restart($tinfo);
+            return 1;
           }
-          mtr_report_test_passed($tinfo);
         }
-        elsif ( $res == 62 )
+        mtr_report_test_passed($tinfo);
+      }
+      elsif ( $res == 62 )
+      {
+        # Testcase itself tell us to skip this one
+        $tinfo->{skip_detected_by_test}= 1;
+        # Try to get reason from test log file
+        find_testcase_skipped_reason($tinfo);
+        mtr_report_test_skipped($tinfo);
+        # Restart if skipped due to missing perl, it may have had side effects
+        if ( restart_forced_by_test('force_restart_if_skipped') ||
+          $tinfo->{'comment'} =~ /^perl not found/ )
         {
-          # Testcase itself tell us to skip this one
-          $tinfo->{skip_detected_by_test}= 1;
-          # Try to get reason from test log file
-          find_testcase_skipped_reason($tinfo);
-          mtr_report_test_skipped($tinfo);
-          # Restart if skipped due to missing perl, it may have had side effects
-          if ( restart_forced_by_test('force_restart_if_skipped') ||
-            $tinfo->{'comment'} =~ /^perl not found/ )
-          {
-            stop_all_servers($opt_shutdown_timeout);
-          }
+          stop_all_servers($opt_shutdown_timeout);
         }
-        elsif ( $res == 65 )
-        {
-          # Testprogram killed by signal
-          $tinfo->{comment}=
-            "testprogram crashed(returned code $res)";
-          report_failure_and_restart($tinfo);
-        }
+      }
+      elsif ( $res == 65 )
+      {
+        # Testprogram killed by signal
+        $tinfo->{comment}=
+        "testprogram crashed(returned code $res)";
+        report_failure_and_restart($tinfo);
+      }
         elsif ( $res == 1 )
         {
           # Check if the test tool requests that
@@ -5191,101 +5194,6 @@ sub run_testcase ($) {
         }
 
         return ($res == 62) ? 0 : $res;
-||||||| merged common ancestors
-      if ( $res == 0 )
-      {
-	my $check_res;
-	if ( restart_forced_by_test('force_restart') )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-	elsif ( $opt_check_testcases and
-	     $check_res= check_testcase($tinfo, "after"))
-	{
-	  if ($check_res == 1) {
-	    # Test case had sideeffects, not fatal error, just continue
-	    stop_all_servers($opt_shutdown_timeout);
-	    mtr_report("Resuming tests...\n");
-	    resfile_output($tinfo->{'check'}) if $opt_resfile;
-	  }
-	  else {
-	    # Test case check failed fatally, probably a server crashed
-	    report_failure_and_restart($tinfo);
-	    return 1;
-	  }
-	}
-	mtr_report_test_passed($tinfo);
-      }
-      elsif ( $res == 62 )
-      {
-	# Testcase itself tell us to skip this one
-	$tinfo->{skip_detected_by_test}= 1;
-	# Try to get reason from test log file
-	find_testcase_skipped_reason($tinfo);
-	mtr_report_test_skipped($tinfo);
-	# Restart if skipped due to missing perl, it may have had side effects
-	if ( restart_forced_by_test('force_restart_if_skipped') ||
-             $tinfo->{'comment'} =~ /^perl not found/ )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-      }
-      elsif ( $res == 65 )
-      {
-	# Testprogram killed by signal
-	$tinfo->{comment}=
-	  "testprogram crashed(returned code $res)";
-	report_failure_and_restart($tinfo);
-=======
-      if ( $res == 0 )
-      {
-	my $check_res;
-	if ( restart_forced_by_test('force_restart') )
-	{
-	  my $ret = stop_all_servers($opt_shutdown_timeout);
-          if ($ret != 0) {
-            shutdown_exit_reports();
-            $shutdown_report = 1;
-          }
-	}
-	elsif ( $opt_check_testcases and
-	     $check_res= check_testcase($tinfo, "after"))
-	{
-	  if ($check_res == 1) {
-	    # Test case had sideeffects, not fatal error, just continue
-	    stop_all_servers($opt_shutdown_timeout);
-	    mtr_report("Resuming tests...\n");
-	    resfile_output($tinfo->{'check'}) if $opt_resfile;
-	  }
-	  else {
-	    # Test case check failed fatally, probably a server crashed
-	    report_failure_and_restart($tinfo);
-	    return 1;
-	  }
-	}
-	mtr_report_test_passed($tinfo);
-      }
-      elsif ( $res == 62 )
-      {
-	# Testcase itself tell us to skip this one
-	$tinfo->{skip_detected_by_test}= 1;
-	# Try to get reason from test log file
-	find_testcase_skipped_reason($tinfo);
-	mtr_report_test_skipped($tinfo);
-	# Restart if skipped due to missing perl, it may have had side effects
-	if ( restart_forced_by_test('force_restart_if_skipped') ||
-             $tinfo->{'comment'} =~ /^perl not found/ )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-      }
-      elsif ( $res == 65 )
-      {
-	# Testprogram killed by signal
-	$tinfo->{comment}=
-	  "testprogram crashed(returned code $res)";
-	report_failure_and_restart($tinfo);
->>>>>>> 278fb5d
       }
 
       # ----------------------------------------------------

@@ -411,7 +411,7 @@ parse_arguments() {
       --wsrep[-_]urls=*) wsrep_urls="$val"; ;;
       --wsrep-data-home-dir=*) wsrep_data_home_dir="$val"; ;;
       --flush-caches=*) flush_caches="$val" ;;
-<<<<<<< HEAD
+      --numa-interleave) append_arg_to_args "--innodb-numa-interleave=1" ;;
       --exit-on-recover-fail) resume_on_fail=0 ;;
       --wsrep[-_]provider=*)
         if test -n "$val" && test "$val" != "none"
@@ -421,11 +421,6 @@ parse_arguments() {
         append_arg_to_args "$arg"
         ;;
 
-||||||| merged common ancestors
-
-=======
-      --numa-interleave) append_arg_to_args "--innodb-numa-interleave=1" ;;
->>>>>>> 278fb5d
       --help) usage ;;
 
       *)

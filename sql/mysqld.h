@@ -1138,17 +1138,14 @@ static inline THD *_current_thd(void)
 bool update_named_pipe_full_access_group(const char *new_group_name);
 #endif
 
-<<<<<<< HEAD
+/* coredumper */
+extern bool  opt_libcoredumper;
+extern char *opt_libcoredumper_path;
+bool         validate_libcoredumper_path(char *opt_libcoredumper_path);
+
 #ifdef WITH_WSREP
 extern "C" void *start_wsrep_THD(void*);
 typedef void (*wsrep_thd_processor_fun)(THD *);
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-=======
-/* coredumper */
-extern bool  opt_libcoredumper;
-extern char *opt_libcoredumper_path;
-bool         validate_libcoredumper_path(char *opt_libcoredumper_path);
->>>>>>> 278fb5d
 #endif /* MYSQLD_INCLUDED */

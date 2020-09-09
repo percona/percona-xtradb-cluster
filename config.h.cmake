@@ -471,15 +471,11 @@
 /* For default value of --early_plugin_load */
 #cmakedefine DEFAULT_EARLY_PLUGIN_LOAD @DEFAULT_EARLY_PLUGIN_LOAD@
 
-<<<<<<< HEAD
+/* coredumper library */
+#cmakedefine01 HAVE_LIBCOREDUMPER
+#endif
+
 /*
  * Needed by wsrep
  */
 #define HAVE_GETIFADDRS 1
-
-||||||| merged common ancestors
-=======
-/* coredumper library */
-#cmakedefine01 HAVE_LIBCOREDUMPER
->>>>>>> 278fb5d
-#endif
