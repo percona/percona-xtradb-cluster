@@ -591,6 +591,7 @@ static void wsrep_rollback_process(THD *thd)
                   aborting->thread_id(), (long long)aborting->real_id);
       mysql_mutex_unlock(&aborting->LOCK_wsrep_thd);
 
+      thd->store_globals();
       mysql_mutex_lock(&LOCK_wsrep_rollback);
     }
   }
@@ -603,7 +604,6 @@ static void wsrep_rollback_process(THD *thd)
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 
   sql_print_information("WSREP: rollbacker thread exiting");
-  thd->store_globals();
   DBUG_PRINT("wsrep",("wsrep rollbacker thread exiting"));
   DBUG_VOID_RETURN;
 }
