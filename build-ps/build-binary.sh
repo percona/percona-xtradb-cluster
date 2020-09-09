@@ -555,33 +555,11 @@ fi
 
 # Package the archive
 (
-<<<<<<< HEAD
     cd "$TARGETDIR/usr/local/"
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
     cd "$TARGETDIR/usr/local/minimal/"
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
 ) || exit 1
-||||||| merged common ancestors
-    cd "$INSTALLDIR/usr/local/"
-    #PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
-    find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
-    $TAR --owner=0 --group=0 -czf "$WORKDIR_ABS/$PRODUCT_FULL.tar.gz" $PRODUCT_FULL
-
-    cd "$INSTALLDIR/usr/local/minimal/"
-    find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
-    $TAR --owner=0 --group=0 -czf "$WORKDIR_ABS/$PRODUCT_FULL-minimal.tar.gz" $PRODUCT_FULL-minimal
-)
-=======
-    cd "$INSTALLDIR/usr/local/"
-    #PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
-    find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
-    $TAR --owner=0 --group=0 -czf "$WORKDIR_ABS/$PRODUCT_FULL.tar.gz" $PRODUCT_FULL
-
-    cd "$INSTALLDIR/usr/local/minimal/"
-    find $PRODUCT_FULL-minimal -type f -name 'COPYING.AGPLv3' -delete
-    $TAR --owner=0 --group=0 -czf "$WORKDIR_ABS/$PRODUCT_FULL-minimal.tar.gz" $PRODUCT_FULL-minimal
-)
->>>>>>> Percona-Server-5.7.31-34
 
 if [[ $KEEP_BUILD -eq 0 ]]
 then
