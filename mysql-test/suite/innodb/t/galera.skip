@@ -60,3 +60,7 @@ xa_prepare_lock_release : 1235: This version of MySQL doesn't yet support 'XA wi
 ibuf_not_empty : InnoDB: Failing assertion: !srv_read_only_mode with server restart
 innodb_force_recovery : InnoDB: Failing assertion: !srv_read_only_mode with server restart
 iodku_debug: InnoDB: Failing assertion: ut_ad(trx_is_registered_for_2pc(trx))
+innodb-log-file-size-1 : Process exit code mismatch on SE init failure.
+innodb-log-file-size : Process exit code mismatch on SE init failure.
+innodb_bug70867 : Process exit code mismatch on SE init failure.
+innodb_page_size_func : Process exit code mismatch on SE init failure.

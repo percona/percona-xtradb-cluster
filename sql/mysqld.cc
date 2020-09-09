@@ -1419,6 +1419,8 @@ extern "C" void unireg_abort(int exit_code)
 
     sleep(1); /* so give some time to exit for those which can */
     WSREP_INFO("Some threads may fail to exit.");
+    /* Signal possible SE initialization waiters with error. */
+    wsrep_SE_initialized(WSREP_SE_INIT_RESULT_FAILURE);
     wsrep_deinit();
   }
 #endif // WITH_WSREP
@@ -5470,13 +5472,10 @@ int mysqld_main(int argc, char **argv)
   }
   else
   {
-    wsrep_SE_initialized();
+    wsrep_SE_initialized(WSREP_SE_INIT_RESULT_SUCCESS);
 
     if (wsrep_before_SE())
     {
-      /*! in case of no SST wsrep waits in view handler callback */
-      wsrep_SE_init_grab();
-      wsrep_SE_init_done();
       /*! in case of SST wsrep waits for wsrep->sst_received */
       wsrep_sst_continue();
     }

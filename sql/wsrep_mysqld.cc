@@ -330,11 +330,14 @@ wsrep_view_handler_cb (void*                    app_ctx,
     {
       if (wsrep_before_SE())
       {
-        wsrep_SE_init_grab();
         // Signal mysqld init thread to continue
         wsrep_sst_complete (&cluster_uuid, view->state_id.seqno, false);
         // and wait for SE initialization
-        wsrep_SE_init_wait(thd);
+        if (wsrep_SE_init_wait(thd) == WSREP_SE_INIT_RESULT_FAILURE)
+        {
+            WSREP_ERROR("Storage engine initialization failed.");
+            return WSREP_CB_FAILURE;
+        }
       }
       else
       {
@@ -433,12 +436,13 @@ static void wsrep_synced_cb(void* app_ctx)
 
   if (signal_main)
   {
-      wsrep_SE_init_grab();
-      // Signal mysqld init thread to continue
-      wsrep_sst_complete (&local_uuid, local_seqno, false);
-      // and wait for SE initialization
-      /* we don't have recv_ctx (THD*) here */
-      wsrep_SE_init_wait(current_thd);
+    // Signal mysqld init thread to continue
+    wsrep_sst_complete (&local_uuid, local_seqno, false);
+    // And wait for SE initialization. Return immediately in
+    // case of failure, the server is going to shut down.
+    /* we don't have recv_ctx (THD*) here */
+    if (wsrep_SE_init_wait(current_thd) == WSREP_SE_INIT_RESULT_FAILURE)
+      return;
   }
   if (wsrep_restart_slave_activated)
   {

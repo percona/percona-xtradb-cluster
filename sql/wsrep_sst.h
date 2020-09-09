@@ -34,9 +34,23 @@ extern void wsrep_sst_continue();
 /*! Free SST auth memory allocated strings */
 extern void wsrep_sst_auth_free();
 
-extern void wsrep_SE_init_grab();          /*! grab init critical section */
-extern void wsrep_SE_init_wait(THD* thd);  /*! wait for SE init to complete */
-extern void wsrep_SE_init_done();          /*! signal that SE init is complte */
-extern void wsrep_SE_initialized();        /*! mark SE initialization complete */
+/*!  Result enumeration of the SE initialization. */
+enum Wsrep_SE_init_result {
+    WSREP_SE_INIT_RESULT_NONE,    /*! Initialization not done yet. */
+    WSREP_SE_INIT_RESULT_SUCCESS, /*! Initialization succeeded */
+    WSREP_SE_INIT_RESULT_FAILURE  /*! Initialization failed */
+};
+/*!
+ * Wait for SE init to complete.
+ *
+ * @return WSREP_SE_INIT_RESULT_SUCCESS if SE initialization was successful.
+ * @return WSREP_SE_INIT_RESULT_FAILURE if SE initialization failed or
+ *         an error was encountered before SE initialization took place.
+ */
+extern enum Wsrep_SE_init_result wsrep_SE_init_wait(THD* thd);
+/*!
+ * Mark SE initialization complete with result.
+ */
+extern void wsrep_SE_initialized(enum Wsrep_SE_init_result result);
 
 #endif /* WSREP_SST_H */
