@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2020, Oracle and/or its affiliates.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -94,6 +94,8 @@ IF(NOT DEFINED MANUFACTURER)
   MARK_AS_ADVANCED(MANUFACTURER)
 ENDIF()
 
+#Caching for BUILD TESTING
+SET(BUILD_TESTING OFF CACHE BOOL "")
 
 # MAX_INDEXES - Set the maximum number of indexes per table, default 64U
 IF (NOT MAX_INDEXES)
@@ -275,6 +277,7 @@ INCLUDE(CMakePushCheckState)
 # Add macros
 INCLUDE(wsrep)
 INCLUDE(character_sets)
+INCLUDE(compile_flags)
 INCLUDE(cpu_info)
 INCLUDE(zlib)
 INCLUDE(lz4)
@@ -293,6 +296,7 @@ INCLUDE(install_macros)
 INCLUDE(install_layout)
 INCLUDE(mysql_add_executable)
 INCLUDE(curl)
+INCLUDE(coredumper)
 INCLUDE(prepend_append_cflags_if_supported)
 
 # Handle options
@@ -472,6 +476,8 @@ MARK_AS_ADVANCED(ENABLED_LOCAL_INFILE)
 
 OPTION(OPTIMIZER_TRACE "Support tracing of Optimizer" ON)
 
+OPTION (WITH_COREDUMPER "Enable support for coredumper library" ON)
+
 #
 # Options related to client-side protocol tracing
 #
@@ -597,6 +603,7 @@ INCLUDE(configure.cmake)
 
 # Common defines and includes
 ADD_DEFINITIONS(-DHAVE_CONFIG_H)
+ADD_DEFINITIONS(-DLZ4_DISABLE_DEPRECATE_WARNINGS) # C++14 deprecation warnings in LZ4.
 INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_BINARY_DIR}/include
   ${CMAKE_SOURCE_DIR}/extra/rapidjson/include
@@ -628,6 +635,8 @@ IF(NOT WITHOUT_SERVER)
 ENDIF()
 # Try and set CURL_LIBRARY
 MYSQL_CHECK_CURL()
+# Add coredumper
+MYSQL_CHECK_COREDUMPER()
 
 # Check for SYS_thread_selfid system call
 CHECK_C_SOURCE_COMPILES("

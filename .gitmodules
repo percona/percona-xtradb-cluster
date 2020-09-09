@@ -6,3 +6,6 @@
 	path = wsrep/src
 	url = https://github.com/percona/wsrep-API.git
 	branch = percona-3.x-5.7-v31
+[submodule "extra/coredumper"]
+	path = extra/coredumper
+	url = https://github.com/Percona-Lab/coredumper.git
