@@ -27,6 +27,7 @@ and the application may receive lock error in response to ``COMMIT`` query.
 What if a node crashes and InnoDB recovery rolls back some transactions?
 ========================================================================
 
+<<<<<<< HEAD
 When a node crashes, after restarting,
 it will copy the whole dataset from another node
 (if there were changes to data since the crash).
@@ -215,4 +216,17 @@ This is Debian/Ubuntu specific error.
 This dependency has been fixed in recent releases.
 Future releases of |PXC| will be compatible with any ``netcat``
 (see bug :bug:`959970`).
+||||||| merged common ancestors
+Q: When using the |Percona XtraBackup| to setup a replication slave on Debian based systems I'm getting: "ERROR 1045 (28000): Access denied for user 'debian-sys-maint'@'localhost' (using password: YES)" 
+==========================================================================================================================================================================================================
+=======
+Q: When using the |Percona XtraBackup| to setup a replication replica on Debian based systems I'm getting: "ERROR 1045 (28000): Access denied for user 'debian-sys-maint'@'localhost' (using password: YES)"
+==========================================================================================================================================================================================================
+>>>>>>> Percona-Server-5.7.31-34
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+A: In case you're using init script on Debian based system to start ``mysqld``, be sure that the password for ``debian-sys-maint`` user has been updated and it's the same as that user's password from the server that the backup has been taken from. Password can be seen and updated in :file:`/etc/mysql/debian.cnf`. For more information on how to set up a replication slave using |Percona XtraBackup| see `this how-to <http://www.percona.com/doc/percona-xtrabackup/2.1/howtos/setting_up_replication.html>`_.
+=======
+A: In case you're using init script on Debian based system to start ``mysqld``, be sure that the password for ``debian-sys-maint`` user has been updated and it's the same as that user's password from the server that the backup has been taken from. Password can be seen and updated in :file:`/etc/mysql/debian.cnf`. For more information on how to set up a replication replica using |Percona XtraBackup| see `this how-to <http://www.percona.com/doc/percona-xtrabackup/2.1/howtos/setting_up_replication.html>`_.
+>>>>>>> Percona-Server-5.7.31-34

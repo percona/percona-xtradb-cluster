@@ -85,7 +85,19 @@ Configuration
 
 Configuration options are same as `upstream <https://www.percona.com/doc/percona-server/5.7/management/data_at_rest_encryption.html#keyring-vault-plugin>`_. The ``my.cnf`` configuration file should contain following options:
 
+<<<<<<< HEAD
 .. code-block:: text
+||||||| merged common ancestors
+While replicating, master sends the stream of decrypted binary log events to a
+slave (SSL connections can be set up to encrypt them in transport). That said,
+masters and slaves use separate keyring storages and are free to use differing
+keyring plugins.
+=======
+While replicating, source sends the stream of decrypted binary log events to a
+replica (SSL connections can be set up to encrypt them in transport). That said,
+sources and replicas use separate keyring storages and are free to use differing
+keyring plugins.
+>>>>>>> Percona-Server-5.7.31-34
 
    [mysqld]
    early-plugin-load="keyring_vault=keyring_vault.so"
