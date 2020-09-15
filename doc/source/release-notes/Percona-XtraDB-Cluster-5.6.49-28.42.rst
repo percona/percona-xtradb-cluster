@@ -10,11 +10,11 @@
 Improvements
 ================================================================================
 
-* :jirabug:`2187`: Enhance SST documentation to include warning about use of command line parameters
+* :jirabug:`PXC-2187`: Enhance SST documentation to include warning about use of command line parameters
 
 
 
 Bugs Fixed
 ================================================================================
 
-* :jirabug:`3243`: Modify the BF-abort process to propagate and abort and retry the Stored Procedure instead of the statement
+* :jirabug:`PXC-3243`: Modify the BF-abort process to propagate and abort and retry the Stored Procedure instead of the statement
