@@ -41,17 +41,7 @@ connect (root,localhost,root,,,);
 connection root;
 INSTALL PLUGIN audit_log SONAME 'audit_log.so';
 disconnect root;
-connection default;
---source include/wait_until_count_sessions.inc
 
-connect (test,localhost,user1,111,db2,);
-connection test;
-SELECT * FROM t;
-
-use 	`db1`;
---error ER_DBACCESS_DENIED_ERROR
-change_user user2,111,db1;
-disconnect test;
 connection default;
 --source include/wait_until_count_sessions.inc
 --replace_result $MASTER_MYPORT MASTER_MYPORT $MASTER_MYSOCK MASTER_MYSOCK

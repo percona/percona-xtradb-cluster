@@ -504,7 +504,11 @@ struct st_match_err
 
 struct st_expected_errors
 {
+#ifdef WITH_WSREP
   struct st_match_err err[20];
+#else
+  struct st_match_err err[10];
+#endif
   uint count;
 };
 static struct st_expected_errors saved_expected_errors;
@@ -2451,7 +2455,11 @@ void var_query_set(VAR *var, const char *query, const char** query_end)
   init_dynamic_string(&ds_query, 0, (end - query) + 32, 256);
   do_eval(&ds_query, query, end, FALSE);
 
+#ifdef WITH_WSREP
   if (mysql_real_query(mysql, ds_query.str, ds_query.length) || !(res= mysql_store_result(mysql)))
+#else
+  if (mysql_real_query(mysql, ds_query.str, ds_query.length))
+#endif
   {
     handle_error (curr_command, mysql_errno(mysql), mysql_error(mysql),
                   mysql_sqlstate(mysql), &ds_res);
@@ -2460,6 +2468,10 @@ void var_query_set(VAR *var, const char *query, const char** query_end)
     eval_expr(var, "", 0);
     DBUG_VOID_RETURN;
   }
+#ifndef WITH_WSREP
+   if (!(res= mysql_store_result(mysql)))
+     die("Query '%s' didn't return a result set", ds_query.str);
+#endif
   
   dynstr_free(&ds_query);
 

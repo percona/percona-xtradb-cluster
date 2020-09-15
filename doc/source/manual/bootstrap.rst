@@ -40,6 +40,11 @@ In case cluster that's being bootstrapped has already been set up before, and to
 
 This way values in :file:`my.cnf` would remain unchanged. Next time node is restarted it won't require updating the configuration file. This can be useful in case cluster has been previously set up and for some reason all nodes went down and the cluster needs to be bootstrapped again. 
 
+.. note::
+
+    A service started with ``mysql@bootstrap`` must be stopped using the same name. For example, the ``systemctl stop mysql`` command
+    does not stop an instance started with the ``mysql@bootstrap`` command.
+    
 Other Reading
 =============
 

@@ -45,6 +45,7 @@
 #include "rpl_rli.h"
 #include "rpl_filter.h"
 #include "rpl_record.h"
+#include "rpl_master.h"                       // unregister_slave
 #include "rpl_slave.h"
 #include <my_bitmap.h>
 #include "log_event.h"
@@ -954,6 +955,19 @@ extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode)
 extern "C" void wsrep_thd_set_query_state(
 	THD *thd, enum wsrep_query_state state)
 {
+  if (!WSREP(thd)) return;
+  /* async slave thread should never flag IDLE state, as it may
+     give rollbacker thread chance to interfere and rollback async slave
+     transaction.
+     in fact, async slave thread is never idle as it reads complete
+     transactions from relay log and applies them, as a whole.
+     BF abort happens voluntarily by async slave thread.
+  */
+  if (thd->slave_thread && state == QUERY_IDLE) {
+    WSREP_DEBUG("Skipping IDLE state change for slave SQL");
+    return;
+  }
+
   thd->wsrep_query_state= state;
 }
 extern "C" void wsrep_thd_set_conflict_state(
@@ -1754,7 +1768,7 @@ void THD::init(void)
 #ifdef WITH_WSREP
   wsrep_exec_mode= wsrep_applier ? REPL_RECV :  LOCAL_STATE;
   wsrep_conflict_state= NO_CONFLICT;
-  wsrep_query_state= QUERY_IDLE;
+  wsrep_thd_set_query_state(this, QUERY_IDLE);
   wsrep_last_query_id= 0;
   wsrep_trx_meta.gtid= WSREP_GTID_UNDEFINED;
   wsrep_trx_meta.depends_on= WSREP_SEQNO_UNDEFINED;
@@ -2123,12 +2137,19 @@ THD::~THD()
     DBUG_ASSERT(0);
 #endif
   }
-  
+
   mysql_audit_free_thd(this);
   if (rli_slave)
     rli_slave->cleanup_after_session();
-#endif
 
+  /*
+    As slaves can be added in one mysql command like COM_REGISTER_SLAVE
+    but then need to be removed on error scenarios, we call this method
+    here
+  */
+  unregister_slave(this, true, true);
+
+#endif
   free_root(&main_mem_root, MYF(0));
 
   if (m_token_array != NULL)

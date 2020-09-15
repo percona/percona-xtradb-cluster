@@ -8293,18 +8293,18 @@ a
 insert into t2 partition (p8191) values (65534), (65535);
 select * from t2 partition (p8191);
 a
-65534
 65535
+65534
 update t2 partition (p8191) set a=65533 where a= 65534;
 select * from t2 partition (p8191);
 a
-65533
 65535
+65533
 load data infile 'MYSQL_TMP_DIR/data01' into table t2 partition (p8191) fields terminated by ',';
 select * from t2 partition (p8191);
 a
-65533
-65535
-65532
 65534
+65532
+65535
+65533
 drop table t2;

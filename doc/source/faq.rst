@@ -149,12 +149,14 @@ Does it work with regular MySQL replication?
 
 Yes. On the node you are going to use as master, you should enable ``log-bin`` and ``log-slave-update`` options.
 
-What is the init script (/etc/init.d/mysql) does not start?
-===========================================================
+Why doesn't the init script (/etc/init.d/mysql) start?
+================================================================================
 
-Try to disable SELinux with the following command: ::
+Try to disable SELinux with the following command:
+
+.. code-block:: bash
   
-  echo 0 > /selinux/enforce
+   $ echo 0 > /selinux/enforce
 
 What does "nc: invalid option -- 'd'" in the sst.err log file mean?
 ===================================================================

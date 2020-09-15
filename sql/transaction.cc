@@ -481,15 +481,13 @@ bool trans_commit_stmt(THD *thd)
 #endif /* WITH_WSREP */
     res= ha_commit_trans(thd, FALSE);
     if (! thd->in_active_multi_stmt_transaction())
-#ifdef WITH_WSREP
     {
-#endif /* WITH_WSREP */
       thd->tx_isolation= (enum_tx_isolation) thd->variables.tx_isolation;
       thd->tx_read_only= thd->variables.tx_read_only;
 #ifdef WITH_WSREP
       wsrep_post_commit(thd, FALSE);
-    }
 #endif /* WITH_WSREP */
+    }
   }
   else if (tc_log)
     tc_log->commit(thd, false);
@@ -731,12 +729,14 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name)
 
   thd->transaction.savepoints= sv;
 
+#ifdef WITH_WSREP
   /*
     Release metadata locks that were acquired during this savepoint unit
     unless binlogging is on. Releasing locks with binlogging on can break
     replication as it allows other connections to drop these tables before
     rollback to savepoint is written to the binlog.
   */
+#endif
   if (!res && mdl_can_safely_rollback_to_savepoint)
     thd->mdl_context.rollback_to_savepoint(sv->mdl_savepoint);
 

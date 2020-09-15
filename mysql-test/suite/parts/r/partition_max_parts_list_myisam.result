@@ -8265,18 +8265,18 @@ a
 insert into t2 partition (p8191) values (32766),(32767);
 select * from t2 partition (p8191);
 a
-32766
 32767
+32766
 update t2 partition (p8191) set a=32765 where a= 32766;
 select * from t2 partition (p8191);
 a
-32765
 32767
+32765
 load data infile 'MYSQL_TMP_DIR/data01' into table t2 partition (p8191) fields terminated by ',';
 select * from t2 partition (p8191);
 a
-32765
-32767
-32766
 32764
+32766
+32767
+32765
 drop table t2;

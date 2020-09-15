@@ -327,7 +327,6 @@ our $opt_user = "root";
 our $opt_valgrind= 0;
 my $opt_valgrind_mysqld= 0;
 my $opt_valgrind_mysqltest= 0;
-my @default_valgrind_args= ("--show-reachable=yes");
 my @valgrind_args;
 my $opt_valgrind_path;
 my $valgrind_reports= 0;
@@ -1069,6 +1068,7 @@ sub print_global_resfile {
   resfile_global("gprof", $opt_gprof ? 1 : 0);
   resfile_global("valgrind", $opt_valgrind ? 1 : 0);
   resfile_global("callgrind", $opt_callgrind ? 1 : 0);
+  resfile_global("helgrind", $opt_helgrind ? 1 : 0);
   resfile_global("mem", $opt_mem ? 1 : 0);
   resfile_global("tmpdir", $opt_tmpdir);
   resfile_global("vardir", $opt_vardir);
@@ -1747,6 +1747,16 @@ sub command_line_setup {
     if ($opt_suite_timeout <= 0);
 
   # --------------------------------------------------------------------------
+  # Check trace protocol option
+  # --------------------------------------------------------------------------
+  if ( $opt_trace_protocol )
+  {
+    push(@opt_extra_mysqld_opt, "--optimizer_trace=enabled=on,one_line=off");
+    # Some queries yield big traces:
+    push(@opt_extra_mysqld_opt, "--optimizer-trace-max-mem-size=1000000");
+  }
+
+  # --------------------------------------------------------------------------
   # Check valgrind arguments
   # --------------------------------------------------------------------------
   if ( $opt_valgrind or $opt_valgrind_path or @valgrind_args)
@@ -1773,45 +1783,55 @@ sub command_line_setup {
     $opt_valgrind= 1;
   }
 
+  if ( $opt_helgrind )
+  {
+    mtr_report("Turning on valgrind with helgrind for mysqld(s)");
+    $opt_valgrind= 1;
+    $opt_valgrind_mysqld= 1;
+
+    push(@valgrind_args, "--tool=helgrind");
+  }
+
   if ( $opt_callgrind )
   {
     mtr_report("Turning on valgrind with callgrind for mysqld(s)");
     $opt_valgrind= 1;
     $opt_valgrind_mysqld= 1;
 
-    # Set special valgrind options unless options passed on command line
-    push(@valgrind_args, "--trace-children=yes")
-      unless @valgrind_args;
+    push(@valgrind_args, "--tool=callgrind", "--trace-children=yes");
+
+    # Increase the timeouts when running with callgrind
+    $opt_testcase_timeout*= 10;
+    $opt_suite_timeout*= 6;
+    $opt_start_timeout*= 10;
+    $opt_debug_sync_timeout*= 10;
   }
 
-  if ( $opt_trace_protocol )
+  if ($opt_valgrind)
   {
-    push(@opt_extra_mysqld_opt, "--optimizer_trace=enabled=on,one_line=off");
-    # some queries yield big traces:
-    push(@opt_extra_mysqld_opt, "--optimizer-trace-max-mem-size=1000000");
-  }
+    # Default to --tool=memcheck if no other tool has been explicitly
+    # specified. From >= 2.1.2, this option is needed
+    if (!@valgrind_args or !grep(/^--tool=/, @valgrind_args))
+    {
+      # Set default valgrind options for memcheck, can be overriden by user
+      unshift(@valgrind_args, ("--tool=memcheck", "--num-callers=16",
+                               "--show-reachable=yes"));
+    }
 
-  if ( $opt_helgrind )
-  {
-    mtr_report("Turning on valgrind with helgrind for mysqld(s)");
-    $opt_valgrind= 1;
-    $opt_valgrind_mysqld= 1;
-  }
-
-  if ( $opt_valgrind )
-  {
-    # Set valgrind_options to default unless already defined
-    push(@valgrind_args, @default_valgrind_args)
-      unless @valgrind_args || $opt_helgrind;
+    # Add suppression file if not specified
+    if (!grep(/^--suppressions=/, @valgrind_args))
+    {
+      push(@valgrind_args,"--suppressions=${glob_mysql_test_dir}/valgrind.supp")
+           if -f "$glob_mysql_test_dir/valgrind.supp";
+    }
 
     # Don't add --quiet; you will loose the summary reports.
-
     mtr_report("Running valgrind with options \"",
-	       join(" ", @valgrind_args), "\"");
-    
+               join(" ", @valgrind_args), "\"");
+
     # Turn off check testcases to save time
     mtr_report("Turning off --check-testcases to save time when valgrinding");
-    $opt_check_testcases = 0; 
+    $opt_check_testcases = 0;
   }
 
   if ($opt_debug_common)
@@ -2339,21 +2359,28 @@ sub read_plugin_defs($)
     # listed in def. file but not found.
 
     if ($plugin) {
+      my $plug_dir= dirname($plugin);
       $ENV{$plug_var}= basename($plugin);
-      $ENV{$plug_var.'_DIR'}= dirname($plugin);
-      $ENV{$plug_var.'_OPT'}= "--plugin-dir=".dirname($plugin);
+      $ENV{$plug_var.'_DIR'}= $plug_dir;
+      $ENV{$plug_var.'_OPT'}= "--plugin-dir=".$plug_dir;
       if ($plug_names) {
 	my $lib_name= basename($plugin);
 	my $load_var= "--plugin_load=";
 	my $load_add_var= "--plugin_load_add=";
+	my $load_var_with_path = "--plugin_load=";
+	my $load_add_var_with_path = "--plugin_load_add=";
 	my $semi= '';
 	foreach my $plug_name (split (',', $plug_names)) {
 	  $load_var .= $semi . "$plug_name=$lib_name";
 	  $load_add_var .= $semi . "$plug_name=$lib_name";
+	  $load_var_with_path .= $semi . "$plug_name=$plug_dir/$lib_name";
+	  $load_add_var_with_path .= $semi . "$plug_name=$plug_dir/$lib_name";
 	  $semi= ';';
 	}
 	$ENV{$plug_var.'_LOAD'}= $load_var;
 	$ENV{$plug_var.'_LOAD_ADD'}= $load_add_var;
+	$ENV{$plug_var.'_LOAD_PATH'}= $load_var_with_path;
+	$ENV{$plug_var.'_LOAD_ADD_PATH'}= $load_add_var_with_path;
       }
     } else {
       $ENV{$plug_var}= "";
@@ -2361,6 +2388,8 @@ sub read_plugin_defs($)
       $ENV{$plug_var.'_OPT'}= "";
       $ENV{$plug_var.'_LOAD'}= "" if $plug_names;
       $ENV{$plug_var.'_LOAD_ADD'}= "" if $plug_names;
+      $ENV{$plug_var.'_LOAD_PATH'}= "" if $plug_names;
+      $ENV{$plug_var.'_LOAD_ADD_PATH'}= "" if $plug_names;
     }
   }
   close PLUGDEF;
@@ -3032,6 +3061,7 @@ sub check_ndbcluster_support ($) {
       # which is the default case
       return;
     }
+
     if ($opt_skip_ndbcluster)
     {
       # Compiled with ndbcluster but ndbcluster skipped
@@ -5461,7 +5491,7 @@ sub mysqld_arguments ($$$) {
 #    {
 #      ; # Dont add --binlog-format when running without binlog
 #    }
-    elsif ($arg eq "--loose-skip-log-bin")
+    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
     {
       if (grep { /--wsrep-provider=/ } @$extra_opts) {
         # As an exception, allow --binlog-format if MTR is run with
@@ -5475,6 +5505,11 @@ sub mysqld_arguments ($$$) {
            $mysqld->option("log-slave-updates"))
     {
       ; # Dont add --skip-log-bin when mysqld have --log-slave-updates in config
+    }
+    elsif ($arg eq "--loose-skip-log-bin" and
+	       (grep { /--wsrep-provider=/ } @$extra_opts))
+    {
+      ; # Dont add --skip-log-bin when wsrep provider loaded
     }
     elsif ($arg eq "")
     {
@@ -5525,7 +5560,7 @@ sub mysqld_start ($$) {
 
   if ( $opt_valgrind_mysqld )
   {
-    valgrind_arguments($args, \$exe);
+    valgrind_arguments($args, \$exe, $mysqld->name());
   }
 
   mtr_add_arg($args, "--defaults-group-suffix=%s", $mysqld->after('mysqld'));
@@ -5834,6 +5869,15 @@ sub get_extra_opts {
   my $opts=
     $mysqld->option("#!use-slave-opt") ?
       $tinfo->{slave_opt} : $tinfo->{master_opt};
+
+  # For Galera and sys_vars tests skip --loose-skip-log-bin
+  my @galera_test = grep(/^galera\./, $tinfo->{name});
+  my @sys_vars_test = grep(/^sys_vars\./, $tinfo->{name});
+  if(@galera_test > 0 or @sys_vars_test > 0 )
+  {
+    my $skip_item = "--loose-skip-log-bin";
+    @$opts = grep { $_ ne $skip_item } @$opts;
+  }
 
   # Expand environment variables
   foreach my $opt ( @$opts )
@@ -6594,26 +6638,26 @@ sub strace_server_arguments {
 sub valgrind_arguments {
   my $args= shift;
   my $exe=  shift;
+  my $report_prefix= shift;
 
-  if ( $opt_callgrind)
+  if (my @tool_list= grep(/^--tool=(memcheck|callgrind|helgrind|massif)/, @valgrind_args))
   {
-    mtr_add_arg($args, "--tool=callgrind");
-    mtr_add_arg($args, "--base=$opt_vardir/log");
-  }
-  elsif ( $opt_helgrind )
-  {
-    mtr_add_arg($args, "--tool=helgrind");
-  }
-  else
-  {
-    mtr_add_arg($args, "--tool=memcheck"); # From >= 2.1.2 needs this option
-    mtr_add_arg($args, "--leak-check=yes");
-    mtr_add_arg($args, "--num-callers=16");
-    # Support statically-linked malloc libraries and
-    # dynamically-linked jemalloc
-    mtr_add_arg($args, "--soname-synonyms=somalloc=NONE,somalloc=*jemalloc*");
-    mtr_add_arg($args, "--suppressions=%s/valgrind.supp", $glob_mysql_test_dir)
-      if -f "$glob_mysql_test_dir/valgrind.supp";
+    # Get the value of the last specified --tool=<> argument to valgrind
+    my ($tool_name)= $tool_list[-1] =~ /(memcheck|callgrind|helgrind|massif)$/;
+    if ($tool_name=~ /memcheck/)
+    {
+      mtr_add_arg($args, "--leak-check=yes") ;
+      # Support statically-linked malloc libraries and
+      # dynamically-linked jemalloc
+      mtr_add_arg($args, "--soname-synonyms=somalloc=NONE,somalloc=*jemalloc*");
+    }
+    else
+    {
+      $$exe=~ /.*[\/](.*)$/;
+      my $report_prefix= defined $report_prefix ? $report_prefix : $1;
+      mtr_add_arg($args, "--$tool_name-out-file=$opt_vardir/log/".
+                         "$report_prefix"."_$tool_name.out.%%p");
+    }
   }
 
   # Add valgrind options, can be overriden by user
@@ -6979,6 +7023,7 @@ Options for valgrind
                         can be specified more then once
   valgrind-path=<EXE>   Path to the valgrind executable
   callgrind             Instruct valgrind to use callgrind
+  helgrind              Instruct valgrind to use helgrind
 
 Misc options
   user=USER             User for connecting to mysqld(default: $opt_user)

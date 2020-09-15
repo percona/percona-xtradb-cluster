@@ -19,7 +19,7 @@ set session binlog_format=row;
 show session variables like "binlog_format%";
 Variable_name	Value
 binlog_format	ROW
-set global binlog_format=DEFAULT;
+set global binlog_format=STATEMENT;
 show global variables like "binlog_format%";
 Variable_name	Value
 binlog_format	STATEMENT

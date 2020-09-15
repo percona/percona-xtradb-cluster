@@ -208,11 +208,13 @@ lock_tables_check(THD *thd, TABLE **tables, uint count, uint flags)
     if (!(flags & MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY) && !t->s->tmp_table)
     {
       if (t->reginfo.lock_type >= TL_WRITE_ALLOW_WRITE &&
-          enforce_ro && opt_readonly && !thd->slave_thread
 #ifdef WITH_WSREP
+          enforce_ro && opt_readonly && !thd->slave_thread
           && !thd->wsrep_applier
-#endif /* WITH_WSREP */
          )
+#else
+          enforce_ro && opt_readonly && !thd->slave_thread)
+#endif /* WITH_WSREP */
       {
         my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0),
                  opt_super_readonly ? "--read-only (super)" : "--read-only");
@@ -992,11 +994,17 @@ volatile int32 Global_read_lock::m_active_requests;
   @retval True   Failure, thread was killed.
 */
 
+#ifdef WITH_WSREP
 bool Global_read_lock::lock_global_read_lock(THD *thd, bool *own_lock)
+#else
+bool Global_read_lock::lock_global_read_lock(THD *thd)
+#endif
 {
   DBUG_ENTER("lock_global_read_lock");
 
+#ifdef WITH_WSREP
   *own_lock= FALSE;
+#endif
 
   if (!m_state)
   {
@@ -1029,7 +1037,9 @@ bool Global_read_lock::lock_global_read_lock(THD *thd, bool *own_lock)
     m_mdl_global_shared_lock= mdl_request.ticket;
     m_state= GRL_ACQUIRED;
 
+#ifdef WITH_WSREP
     *own_lock= TRUE;
+#endif
   }
   /*
     We DON'T set global_read_lock_blocks_commit now, it will be set after

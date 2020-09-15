@@ -2,12 +2,12 @@
 .\"     Title: Options Common to NDB Cluster Programs
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 12/20/2018
+.\"      Date: 06/02/2020
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.6
 .\"  Language: English
 .\"
-.TH "OPTIONS COMMON TO NDB CLUSTER PROGRAMS" "1" "12/20/2018" "MySQL 5\&.6" "MySQL Database System"
+.TH "OPTIONS COMMON TO NDB CLUSTER PROGRAMS" "1" "06/02/2020" "MySQL 5\&.6" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -105,7 +105,7 @@ The options in the following table are common to all NDB Cluster executables (ex
 .nr an-no-space-flag 1
 .nr an-break-flag 1
 .br
-.B Table\ \&18.326.\ \&Command\-line options common to all MySQL NDB Cluster programs
+.B Table\ \&18.239.\ \&Command\-line options common to all MySQL NDB Cluster programs
 .TS
 allbox tab(:);
 lB lB lB.
@@ -136,16 +136,16 @@ l l l
 l l l.
 T{
 .PP
---character-sets-dir=dir_name
+\fB \fR\fB--character-sets-dir=dir_name\fR\fB \fR
 T}:T{
 Directory where character sets are installed
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---connect-retries=#
+\fB \fR\fB--connect-retries=#\fR\fB \fR
 T}:T{
 Set the number of times to retry a connection before giving up
 T}:T{
@@ -154,7 +154,7 @@ ADDED: NDB 7.4.9
 T}
 T{
 .PP
---connect-retry-delay=#
+\fB \fR\fB--connect-retry-delay=#\fR\fB \fR
 T}:T{
 Time to wait between attempts to contact a management server, in seconds
 T}:T{
@@ -163,143 +163,142 @@ ADDED: NDB 7.4.9
 T}
 T{
 .PP
---core-file
+\fB \fR\fB--core-file\fR\fB \fR
 T}:T{
 Write core on errors (defaults to TRUE in debug builds)
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---debug=options
+\fB \fR\fB--debug=options\fR\fB \fR
 T}:T{
 Enable output from debug calls. Can be used only for versions compiled
               with debugging enabled
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---defaults-extra-file=filename
+\fB \fR\fB--defaults-extra-file=filename\fR\fB \fR
 T}:T{
 Read this file after global option files are read
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---defaults-file=filename
+\fB \fR\fB--defaults-file=filename\fR\fB \fR
 T}:T{
 Read default options from this file
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---defaults-group-suffix
+\fB \fR\fB--defaults-group-suffix\fR\fB \fR
 T}:T{
 Also read groups with names ending in this suffix
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---help,
+\fB--help\fR,
 .PP
---usage,
+\fB--usage\fR,
 .PP
--?
+\fB \fR\fB-?\fR\fB \fR
 T}:T{
 Display help message and exit
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---login-path=path
+\fB \fR\fB--login-path=path\fR\fB \fR
 T}:T{
 Read this path from the login file
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---ndb-connectstring=connectstring,
+\fB--ndb-connectstring=connectstring\fR,
 .PP
---connect-string=connectstring,
+\fB--connect-string=connectstring\fR,
 .PP
--c
+\fB \fR\fB-c\fR\fB \fR
 T}:T{
 Set connection string for connecting to ndb_mgmd. Syntax:
               [nodeid=<id>;][host=]<hostname>[:<port>].
-              Overrides entries specified in NDB_CONNECTSTRING or
-              my.cnf.
+              Overrides entries specified in NDB_CONNECTSTRING or my.cnf
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---ndb-mgmd-host=host[:port]
+\fB \fR\fB--ndb-mgmd-host=host[:port]\fR\fB \fR
 T}:T{
 Set the host (and port, if desired) for connecting to management server
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---ndb-nodeid=#
+\fB \fR\fB--ndb-nodeid=#\fR\fB \fR
 T}:T{
 Set node id for this node
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---ndb-optimized-node-selection
+\fB \fR\fB--ndb-optimized-node-selection\fR\fB \fR
 T}:T{
 Select nodes for transactions in a more optimal way
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---no-defaults
+\fB \fR\fB--no-defaults\fR\fB \fR
 T}:T{
 Do not read default options from any option file other than login file
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---print-defaults
+\fB \fR\fB--print-defaults\fR\fB \fR
 T}:T{
 Print the program argument list and exit
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 T{
 .PP
---version,
+\fB--version\fR,
 .PP
--V
+\fB \fR\fB-V\fR\fB \fR
 T}:T{
 Output version information and exit
 T}:T{
 .PP
-All MySQL 5.6 based releases
+(Supported in all MySQL 5.6 based releases)
 T}
 .TE
 .sp 1
@@ -330,21 +329,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --character-sets-dir=dir_name
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 Directory name
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 T}
 .TE
@@ -370,39 +369,39 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l
-l l
-l l
-l l.
+lB l
+lB l
+lB l
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --connect-retries=#
 T}
 T{
-\fBIntroduced\fR
+Introduced
 T}:T{
 5.6.28-ndb-7.4.9
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 Numeric
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 12
 T}
 T{
-\fBMinimum Value\fR
+Minimum Value
 T}:T{
 0
 T}
 T{
-\fBMaximum Value\fR
+Maximum Value
 T}:T{
 4294967295
 T}
@@ -448,39 +447,39 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l
-l l
-l l
-l l.
+lB l
+lB l
+lB l
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --connect-retry-delay=#
 T}
 T{
-\fBIntroduced\fR
+Introduced
 T}:T{
 5.6.28-ndb-7.4.9
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 Numeric
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 5
 T}
 T{
-\fBMinimum Value\fR
+Minimum Value
 T}:T{
 0
 T}
 T{
-\fBMaximum Value\fR
+Maximum Value
 T}:T{
 4294967295
 T}
@@ -510,28 +509,28 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --core-file
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 Boolean
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 FALSE
 T}
 .TE
 .sp 1
 Write a core file if the program dies\&. The name and location of the core file are system\-dependent\&. (For NDB Cluster programs nodes running on Linux, the default location is the program\*(Aqs working directory\(emfor a data node, this is the node\*(Aqs
-DataDir\&.) For some systems, there may be restrictions or limitations; for example, it might be necessary to execute
+DataDir\&.) For some systems, there may be restrictions or limitations\&. For example, it might be necessary to execute
 \fBulimit \-c unlimited\fR
 before starting the server\&. Consult your system documentation for detailed information\&.
 .sp
@@ -563,21 +562,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --debug=options
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 String
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 d:t:O,/tmp/ndb_restore.trace
 T}
@@ -606,21 +605,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --defaults-extra-file=filename
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 String
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 [none]
 T}
@@ -629,7 +628,7 @@ T}
 Read this file after global option files are read\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -650,21 +649,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --defaults-file=filename
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 String
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 [none]
 T}
@@ -673,7 +672,7 @@ T}
 Read default options from this file\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -694,21 +693,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --defaults-group-suffix
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 String
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 [none]
 T}
@@ -717,7 +716,7 @@ T}
 Also read groups with names ending in this suffix\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -740,9 +739,9 @@ T}:T{
 Value
 T}
 .T&
-l l.
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 .PP
 --help
@@ -772,21 +771,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --login-path=path
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 String
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 [none]
 T}
@@ -795,7 +794,7 @@ T}
 Read this path from the login file\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -818,11 +817,11 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 .PP
 --ndb-connectstring=connectstring
@@ -830,12 +829,12 @@ T}:T{
 --connect-string=connectstring
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 String
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 localhost:1186
 T}
@@ -875,21 +874,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --ndb-mgmd-host=host[:port]
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 String
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 localhost:1186
 T}
@@ -918,21 +917,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --ndb-nodeid=#
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 Numeric
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 0
 T}
@@ -961,21 +960,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --no-defaults
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 Boolean
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 TRUE
 T}
@@ -984,7 +983,7 @@ T}
 Do not read default options from any option file other than login file\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -1005,21 +1004,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --ndb-optimized-node-selection
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 Boolean
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 TRUE
 T}
@@ -1046,21 +1045,21 @@ T}:T{
 Value
 T}
 .T&
-l l
-l l
-l l.
+lB l
+lB l
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --print-defaults
 T}
 T{
-\fBType\fR
+Type
 T}:T{
 Boolean
 T}
 T{
-\fBDefault Value\fR
+Default Value
 T}:T{
 TRUE
 T}
@@ -1069,7 +1068,7 @@ T}
 Print the program argument list and exit\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -1091,9 +1090,9 @@ T}:T{
 Value
 T}
 .T&
-l l.
+lB l.
 T{
-\fBCommand-Line Format\fR
+Command-Line Format
 T}:T{
 --version
 T}
@@ -1107,7 +1106,7 @@ Section\ \&18.5.5, \(lqPerforming a Rolling Restart of an NDB Cluster\(rq), for 
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 1997, 2020, Oracle and/or its affiliates.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP

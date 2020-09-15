@@ -9007,9 +9007,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9029,10 +9029,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -9075,9 +9075,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH LOCAL    CHECK OPTION - WITH LOCAL    CHECK OPTION
@@ -9088,22 +9088,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9119,9 +9119,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9141,10 +9141,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -9196,22 +9196,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9227,9 +9227,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9249,10 +9249,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -9304,22 +9304,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9335,9 +9335,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9357,10 +9357,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -9404,10 +9404,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -9421,22 +9421,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9452,9 +9452,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9474,10 +9474,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -9520,9 +9520,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH CASCADED CHECK OPTION - WITH LOCAL    CHECK OPTION
@@ -9533,22 +9533,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9564,9 +9564,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9586,10 +9586,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -9641,22 +9641,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9672,9 +9672,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9694,10 +9694,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -9749,22 +9749,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9780,9 +9780,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9802,10 +9802,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -9849,10 +9849,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -9866,22 +9866,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9897,9 +9897,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -9919,10 +9919,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -9965,9 +9965,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH          CHECK OPTION - WITH LOCAL    CHECK OPTION
@@ -9978,22 +9978,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10009,9 +10009,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10031,10 +10031,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -10086,22 +10086,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10117,9 +10117,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10139,10 +10139,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -10194,22 +10194,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10225,9 +10225,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10247,10 +10247,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -10294,10 +10294,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -10311,22 +10311,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10342,9 +10342,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10364,10 +10364,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -10410,9 +10410,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION -         <nothing>          - WITH LOCAL    CHECK OPTION
@@ -10423,22 +10423,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10454,9 +10454,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10476,10 +10476,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -10531,22 +10531,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10562,9 +10562,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10584,10 +10584,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -10639,22 +10639,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10670,9 +10670,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10692,10 +10692,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -10739,10 +10739,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -10759,22 +10759,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10790,9 +10790,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10812,10 +10812,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -10858,9 +10858,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH LOCAL    CHECK OPTION - WITH CASCADED CHECK OPTION
@@ -10871,22 +10871,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10902,9 +10902,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -10924,10 +10924,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -10979,22 +10979,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11010,9 +11010,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11032,10 +11032,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -11087,22 +11087,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11118,9 +11118,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11140,10 +11140,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -11187,10 +11187,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -11204,22 +11204,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11235,9 +11235,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11257,10 +11257,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -11303,9 +11303,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH CASCADED CHECK OPTION - WITH CASCADED CHECK OPTION
@@ -11316,22 +11316,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11347,9 +11347,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11369,10 +11369,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -11424,22 +11424,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11455,9 +11455,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11477,10 +11477,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -11532,22 +11532,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11563,9 +11563,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11585,10 +11585,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -11632,10 +11632,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -11649,22 +11649,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11680,9 +11680,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11702,10 +11702,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -11748,9 +11748,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH          CHECK OPTION - WITH CASCADED CHECK OPTION
@@ -11761,22 +11761,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11792,9 +11792,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11814,10 +11814,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -11869,22 +11869,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11900,9 +11900,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -11922,10 +11922,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -11977,22 +11977,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12008,9 +12008,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12030,10 +12030,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -12077,10 +12077,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -12094,22 +12094,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12125,9 +12125,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12147,10 +12147,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -12193,9 +12193,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION -         <nothing>          - WITH CASCADED CHECK OPTION
@@ -12206,22 +12206,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12237,9 +12237,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12259,10 +12259,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -12314,22 +12314,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12345,9 +12345,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12367,10 +12367,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -12422,22 +12422,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12453,9 +12453,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12475,10 +12475,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -12522,10 +12522,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -12542,22 +12542,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12573,9 +12573,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12595,10 +12595,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -12641,9 +12641,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH LOCAL    CHECK OPTION - WITH          CHECK OPTION
@@ -12654,22 +12654,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12685,9 +12685,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12707,10 +12707,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -12762,22 +12762,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12793,9 +12793,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12815,10 +12815,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -12870,22 +12870,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12901,9 +12901,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -12923,10 +12923,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -12970,10 +12970,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -12987,22 +12987,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13018,9 +13018,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13040,10 +13040,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -13086,9 +13086,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH CASCADED CHECK OPTION - WITH          CHECK OPTION
@@ -13099,22 +13099,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13130,9 +13130,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13152,10 +13152,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -13207,22 +13207,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13238,9 +13238,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13260,10 +13260,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -13315,22 +13315,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13346,9 +13346,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13368,10 +13368,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -13415,10 +13415,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -13432,22 +13432,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13463,9 +13463,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13485,10 +13485,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -13531,9 +13531,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH          CHECK OPTION - WITH          CHECK OPTION
@@ -13544,22 +13544,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13575,9 +13575,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13597,10 +13597,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -13652,22 +13652,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13683,9 +13683,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13705,10 +13705,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -13760,22 +13760,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13791,9 +13791,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13813,10 +13813,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -13860,10 +13860,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -13877,22 +13877,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13908,9 +13908,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -13930,10 +13930,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -13976,9 +13976,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION -         <nothing>          - WITH          CHECK OPTION
@@ -13989,22 +13989,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14020,9 +14020,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14042,10 +14042,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -14097,22 +14097,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14128,9 +14128,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14150,10 +14150,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -14205,22 +14205,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14236,9 +14236,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14258,10 +14258,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -14305,10 +14305,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -14325,22 +14325,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14356,9 +14356,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14378,10 +14378,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -14424,9 +14424,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH LOCAL    CHECK OPTION -         <nothing>         
@@ -14437,22 +14437,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14468,9 +14468,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14490,10 +14490,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -14545,22 +14545,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14576,9 +14576,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14598,10 +14598,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -14653,22 +14653,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14684,9 +14684,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14706,10 +14706,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -14753,10 +14753,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -14770,22 +14770,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14801,9 +14801,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14823,10 +14823,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -14869,9 +14869,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH CASCADED CHECK OPTION -         <nothing>         
@@ -14882,22 +14882,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14913,9 +14913,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -14935,10 +14935,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -14990,22 +14990,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15021,9 +15021,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15043,10 +15043,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -15098,22 +15098,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15129,9 +15129,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15151,10 +15151,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -15198,10 +15198,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -15215,22 +15215,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15246,9 +15246,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15268,10 +15268,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -15314,9 +15314,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION - WITH          CHECK OPTION -         <nothing>         
@@ -15327,22 +15327,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15358,9 +15358,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15380,10 +15380,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -15435,22 +15435,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15466,9 +15466,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15488,10 +15488,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -15543,22 +15543,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15574,9 +15574,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15596,10 +15596,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -15643,10 +15643,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;
@@ -15660,22 +15660,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15691,9 +15691,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15713,10 +15713,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -15759,9 +15759,9 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 8	eight
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 option_variant	WITH CASCADED CHECK OPTION -         <nothing>          -         <nothing>         
@@ -15772,22 +15772,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15803,9 +15803,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15825,10 +15825,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -15880,22 +15880,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15911,9 +15911,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -15933,10 +15933,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -15988,22 +15988,22 @@ INSERT INTO t1 VALUES(7, 'seven');
 INSERT INTO t1 VALUES(8, 'eight');
 SELECT * FROM v1;
 f1	f2
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
 SELECT * FROM v2;
 col1	col2
-7	seven
 8	eight
+7	seven
 SELECT * FROM v3;
 my_col1	my_col2
 8	eight
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -16019,9 +16019,9 @@ DELETE FROM v3 WHERE my_col1 = 8;
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
 7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(16, 'sixteen');
 INSERT INTO t1 VALUES(0, 'zero');
@@ -16041,10 +16041,10 @@ affected rows: 1
 info: Rows matched: 1  Changed: 1  Warnings: 0
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	whatever
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 INSERT INTO t1 VALUES(8, 'eight');
 UPDATE v3 SET my_col1 = 7 WHERE my_col1 = 8;
@@ -16088,10 +16088,10 @@ INSERT INTO v3 VALUES(8, 'eight');
 affected rows: 1
 SELECT * FROM t1;
 f1	f2
-16	sixteen
-0	zero
-7	seven
 8	eight
+7	seven
+0	zero
+16	sixteen
 DELETE FROM t1;
 DROP VIEW v3;
 DROP VIEW v2;

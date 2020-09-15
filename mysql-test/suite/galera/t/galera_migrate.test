@@ -22,7 +22,6 @@
 #
 
 --connect node_1, 127.0.0.1, root, , test, $NODE_MYPORT_1
-
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 
@@ -113,6 +112,8 @@ GRANT ALL PRIVILEGES ON *.* TO 'sst';
 SET GLOBAL wsrep_sst_auth = 'sst:';
 
 --connect node_4, 127.0.0.1, root, , test, $NODE_MYPORT_4
+# enforce SST when running in --repeat mode
+--exec rm -rf $MYSQLTEST_VARDIR/mysqld.4/data/grastate.dat
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
 
 --disable_query_log
@@ -205,21 +206,35 @@ DROP TABLE t1;
 --connection node_2
 DROP TABLE t1;
 
+--connection node_4a
+SET GLOBAL wsrep_provider = 'none';
+SET GLOBAL wsrep_sst_method = 'rsync';
+SET GLOBAL wsrep_sst_auth = '';
+SET GLOBAL wsrep_provider_options = '';
+SET GLOBAL wsrep_sst_receive_address = 'AUTO';
+DROP TABLE t1;
+DROP USER sst;
+
 --connection node_3
+# make sure node_3 is the last one remaining in cluster for potential
+# reuse with --repeat option
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
+--source include/wait_condition.inc
+
 SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;
 DROP USER sst;
 
---connection node_4
-SET GLOBAL wsrep_provider = 'none';
-SET GLOBAL wsrep_sst_method = 'xtrabackup-v2';
-SET GLOBAL wsrep_provider_options = '';
-SET GLOBAL wsrep_sst_receive_address = 'AUTO';
-DROP TABLE t1;
-DROP USER sst;
+CALL mtr.add_suppression("InnoDB: Error: Table \"mysql\"\\.\"innodb_index_stats\" not found");
+CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
+CALL mtr.add_suppression("Host name '[0-9a-zA-Z\.\-]+' could not be resolved.*");
 
+--connection node_4
 CALL mtr.add_suppression("InnoDB: Error: Table \"mysql\"\\.\"innodb_index_stats\" not found");
 CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
 CALL mtr.add_suppression("Host name '[0-9a-zA-Z\.\-]+' could not be resolved.*");

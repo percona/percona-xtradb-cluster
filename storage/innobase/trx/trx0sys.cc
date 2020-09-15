@@ -189,10 +189,11 @@ trx_sys_flush_max_trx_id(void)
 	mtr_t		mtr;
 	trx_sysf_t*	sys_header;
 
-#ifndef WITH_WSREP
+#ifdef WITH_WSREP
 	/* wsrep_fake_trx_id  violates this assert
 	 * Copied from trx_sys_get_new_trx_id
 	 */
+#else
 	ut_ad(mutex_own(&trx_sys->mutex));
 #endif /* WITH_WSREP */
 

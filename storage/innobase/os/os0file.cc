@@ -1256,8 +1256,10 @@ os_file_create_simple_func(
 
 #else /* __WIN__ */
 	int		create_flag;
+#ifdef WITH_INNODB_DISALLOW_WRITES
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
 		WAIT_ALLOW_WRITES();
+#endif
 
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));
@@ -1456,8 +1458,10 @@ os_file_create_simple_no_error_handling_func(
 	int		create_flag;
 	const char*	mode_str	= NULL;
 	ut_a(name);
+#ifdef WITH_INNODB_DISALLOW_WRITES
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
 		WAIT_ALLOW_WRITES();
+#endif
 
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));
@@ -1803,8 +1807,10 @@ os_file_create_func(
 #else /* __WIN__ */
 	int		create_flag;
 	const char*	mode_str	= NULL;
+#ifdef WITH_INNODB_DISALLOW_WRITES
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
 		WAIT_ALLOW_WRITES();
+#endif
 
 	on_error_no_exit = create_mode & OS_FILE_ON_ERROR_NO_EXIT
 		? TRUE : FALSE;

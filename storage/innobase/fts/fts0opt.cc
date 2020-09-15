@@ -2581,7 +2581,9 @@ fts_optimize_add_table(
 		return;
 	}
 
+#ifdef WITH_WSREP
 	ut_ad(table->cached && table->fts != NULL);
+#endif
 
 	/* Make sure table with FTS index cannot be evicted */
 	if (table->can_be_evicted) {
