@@ -681,14 +681,14 @@ mkdir debug
   # Attempt to remove any optimisation flags from the debug build
   CFLAGS=`echo " ${CFLAGS} " | \
             sed -e 's/ -O[0-9]* / /' \
-                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
+                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
                 -e 's/ -unroll2 / /' \
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
                 -e 's/ $//'`
   CXXFLAGS=`echo " ${CXXFLAGS} " | \
               sed -e 's/ -O[0-9]* / /' \
-                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
+                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
                   -e 's/ -unroll2 / /' \
                   -e 's/ -ip / /' \
                   -e 's/^ //' \
@@ -935,6 +935,9 @@ install -m 644 "%{malloc_lib_source}" \
 rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
 rm -f $RBR%{_bindir}/ps_tokudb_admin
 rm -f $RBR%{_bindir}/ps-admin
+rm -rf $RBR/usr/cmake/coredumper-relwithdebinfo.cmake
+rm -rf $RBR/usr/cmake/coredumper.cmake
+
 
 %if 0%{?systemd}
 rm -rf $RBR%{_sysconfdir}/init.d/mysql
@@ -1665,6 +1668,9 @@ fi
 %if 0%{?rhel} > 6
 %config(noreplace) %{_sysconfdir}/my.cnf
 %endif
+#coredumper
+%attr(755, root, root) %{_includedir}/coredumper/coredumper.h
+%attr(755, root, root) /usr/lib/libcoredumper.a
 
 
 # ----------------------------------------------------------------------------
