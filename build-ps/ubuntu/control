@@ -187,7 +187,7 @@ Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
          lsof,
          rsync,
          qpress,
-         iproute
+         iproute,
          openssl
 Provides: mysql-server,
           virtual-mysql-server, virtual-mysql-server-core,
