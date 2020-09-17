@@ -33,10 +33,10 @@ function install_deps {
     if [ -f /etc/redhat-release ]; then 
         yum update -y
         yum install -y epel-release
-        yum install -y wget perl-Time-HiRes perl-DBD-MySQL perl numactl numactl-libs libaio libidn lsof socat libev rsync || true
+        yum install -y wget perl-Time-HiRes perl-DBD-MySQL perl numactl numactl-libs libaio libidn lsof socat libev rsync libcurl-devel || true
     else
         apt-get update
-        apt-get install -y wget perl numactl libaio-dev libidn11 lsof socat libev4 rsync libdbd-mysql-perl || true
+        apt-get install -y wget perl numactl libaio-dev libidn11 lsof socat libev4 rsync libdbd-mysql-perl libcurl4-openssl-dev || true
     fi
     wget -c https://github.com/datacharmer/dbdeployer/releases/download/v1.53.1/dbdeployer-1.53.1.linux.tar.gz -O - | tar -xz
     mv dbdeployer*.linux /usr/bin/dbdeployer
