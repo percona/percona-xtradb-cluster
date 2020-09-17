@@ -75,10 +75,6 @@ Prefix: %{_sysconfdir}
  %define scons_args %{nil}
 %endif
 
-%if %{undefined galera_version}
- %define galera_version 3.31
-%endif
-
 %if %{undefined galera_revision}
  %define galera_revision %{revision}
 %endif
@@ -811,8 +807,8 @@ pushd percona-xtradb-cluster-galera
 #  RPM_OPT_FLAGS=
 %endif
 
-scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
-scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
+scons %{?_smp_mflags}  revno=%{galera_revision} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
+scons %{?_smp_mflags}  revno=%{galera_revision} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
 popd
 
 
