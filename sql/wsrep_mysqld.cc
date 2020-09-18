@@ -74,6 +74,7 @@ my_bool wsrep_restart_slave_activated  = 0; // node has dropped, and slave
                                             // restart will be needed
 my_bool wsrep_slave_UK_checks          = 0; // slave thread does UK checks
 my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
+ulonglong wsrep_mode                   = 0;
 /*
  * End configuration options
  */
@@ -844,6 +845,11 @@ bool wsrep_start_replication()
   }
 
   return true;
+}
+
+bool wsrep_check_mode (uint mask)
+{
+  return wsrep_mode & (1ULL << mask);
 }
 
 bool wsrep_must_sync_wait (THD* thd, uint mask)

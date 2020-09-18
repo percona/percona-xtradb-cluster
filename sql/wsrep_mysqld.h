@@ -105,6 +105,7 @@ extern my_bool     wsrep_restart_slave;
 extern my_bool     wsrep_restart_slave_activated;
 extern my_bool     wsrep_slave_FK_checks;
 extern my_bool     wsrep_slave_UK_checks;
+extern ulonglong   wsrep_mode;
 extern ulong       wsrep_running_threads;
 
 enum enum_wsrep_reject_types {
@@ -127,6 +128,10 @@ enum enum_wsrep_sync_wait {
     WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE = 0x4,
     WSREP_SYNC_WAIT_BEFORE_SHOW = 0x8,
     WSREP_SYNC_WAIT_MAX = 0xF
+};
+
+enum enum_wsrep_mode {
+    WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0
 };
 
 // MySQL status variables
@@ -207,6 +212,7 @@ extern void wsrep_stop_replication(THD *thd);
 extern bool wsrep_start_replication();
 extern bool wsrep_must_sync_wait (THD* thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
 extern bool wsrep_sync_wait (THD* thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
+extern bool wsrep_check_mode(uint mask);
 extern int  wsrep_check_opts (int argc, char* const* argv);
 extern void wsrep_prepend_PATH (const char* path);
 /* some inline functions are defined in wsrep_mysqld_inl.h */

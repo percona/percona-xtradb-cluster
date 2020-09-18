@@ -184,6 +184,11 @@ const LEX_STRING command_name[]={
 */
 bool all_tables_not_ok(THD *thd, TABLE_LIST *tables)
 {
+#ifdef WITH_WSREP
+  if (WSREP(thd) && thd->wsrep_applier && 
+      wsrep_check_mode(WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES))
+    return FALSE;
+#endif
   return rpl_filter->is_on() && tables && !thd->sp_runtime_ctx &&
          !rpl_filter->tables_ok(thd->db().str, tables);
 }
@@ -214,6 +219,11 @@ inline bool check_database_filters(THD *thd, const char* db, enum_sql_command sq
   DBUG_ASSERT(thd->slave_thread);
   if (!db)
     DBUG_RETURN(TRUE);
+#ifdef WITH_WSREP
+  if (WSREP(thd) && thd->wsrep_applier &&
+      wsrep_check_mode(WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES))
+    DBUG_RETURN(TRUE);
+#endif
   switch (sql_cmd)
   {
   case SQLCOM_BEGIN:

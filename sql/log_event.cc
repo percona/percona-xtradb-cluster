@@ -12070,11 +12070,11 @@ check_table_map(Relay_log_info const *rli, RPL_TABLE_LIST *table_list)
   DBUG_ENTER("check_table_map");
   enum_tbl_map_status res= OK_TO_PROCESS;
 
+
+  if ((rli->info_thd->slave_thread /* filtering is for slave only */ &&
 #ifdef WITH_WSREP
-  if ((rli->info_thd->slave_thread /* filtering is for slave only */  ||
-       (WSREP(rli->info_thd) && rli->info_thd->wsrep_applier))        &&
-#else
-  if (rli->info_thd->slave_thread /* filtering is for slave only */ &&
+       !(WSREP(rli->info_thd) && rli->info_thd->wsrep_applier &&
+         wsrep_check_mode(WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES))) &&
 #endif /* WITH_WSREP */
       (!rpl_filter->db_ok(table_list->db) ||
        (rpl_filter->is_on() && !rpl_filter->tables_ok("", table_list))))
