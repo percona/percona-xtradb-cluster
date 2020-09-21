@@ -684,6 +684,7 @@ mkdir debug
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
            -DWITH_WSREP=ON \
+           -DWITH_LDAP=system \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DWITH_EMBEDDED_SERVER=0 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
@@ -723,6 +724,7 @@ mkdir release
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
            -DWITH_WSREP=ON \
+           -DWITH_LDAP=system \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DWITH_EMBEDDED_SERVER=0 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
