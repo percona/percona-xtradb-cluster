@@ -107,6 +107,9 @@ MAGIC_FILE="${DATA}/${INFO_FILE}"
 # from the donor to the joiner
 SST_INFO_FILE="sst_info"
 
+# Used to pass status of pipelined processes executed in background
+PIPESTATUS_FILE="pipestatus"
+
 # Setting the path for ss and ip
 export PATH="/usr/sbin:/sbin:$PATH"
 
@@ -131,6 +134,90 @@ timeit(){
         extcode=$?
     fi
     return $extcode
+}
+
+# Helper function executed in background by interruptable_timeout function.
+# As it is executed in background it will return PIPESTATUS in the file
+# specified in argument.
+timeout_delegate(){
+    local stage=$1
+    shift
+    local status_file=$1
+    shift
+    local cmd="$@"
+    local x1 x2 took piperc
+
+    if [[ $ttime -eq 1 ]];then 
+        x1=$(date +%s)
+        wsrep_log_info "Evaluating $cmd"
+        eval "$cmd; piperc=( "\${PIPESTATUS[@]}" )"
+        x2=$(date +%s)
+        took=$(( x2-x1 ))
+        wsrep_log_info "NOTE: $stage took $took seconds"
+        totime=$(( totime+took ))
+    else 
+        wsrep_log_info "Evaluating $cmd"
+        eval "$cmd; piperc=( "\${PIPESTATUS[@]}" )"
+    fi
+
+    echo ${piperc[@]} > $status_file
+}
+
+# Execute provided command within provided time window.
+# Return:
+# Array consisting of error code of timeout followed by 
+# command PIPESTATUS array.
+# 0 - success
+# 124 - timeout
+interruptable_timeout() {
+    local tmt=$1
+    shift
+    local stage=$1
+    shift
+    local cmd="$@"
+    local result=0
+    local pid piperesult
+
+    # Add 20 seconds for requested timeout to allow graceful shutdown.
+    tmt=$((tmt+20))
+
+    # Start the command in background and monitor if it is alive.
+    # If still alive after timeout, kill it.
+    timeout_delegate "$stage" "${tmpdirbase}/$PIPESTATUS_FILE" "$cmd" &
+    pid=$!
+
+    while kill -0 $pid 2> /dev/null; do
+        if [[ $tmt -eq 20 ]];then
+          # Send SIGTERM to allow graceful shutdown
+          wsrep_log_info "Trying to terminate ($pid) $cmd with SIGTERM"
+          pkill -SIGTERM -P $pid
+          result=124
+        fi 
+
+        if [[ $tmt -eq 10 ]];then
+          # Still alive after SIGTERM? Send SIGKILL.
+          wsrep_log_info "Trying to terminate ($pid) $cmd with SIGKILL"
+          pkill -SIGKILL -P $pid
+          result=124
+        fi 
+        
+        if [[ $tmt -eq 0 ]];then
+          # Still alive after SIGKILL? Give up.
+          wsrep_log_error "Unable to stop command: $cmd"
+          result=124
+          break
+        fi 
+
+        sleep 1
+        tmt=$((tmt-1))
+    done
+    
+    if [[ $result -eq 0 ]];then
+      piperesult=(`cat ${tmpdirbase}/$PIPESTATUS_FILE`)
+    fi
+
+    piperesult=( $result "${piperesult[@]}" )
+    echo ${piperesult[@]}
 }
 
 get_keys()
@@ -848,20 +935,21 @@ recv_joiner()
     pushd ${dir} 1>/dev/null
     set +e
 
-    if [[ $tmt -gt 0 && -x `which timeout` ]];then 
-        if timeout --help | grep -q -- '-k';then 
-            ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
-        else 
-            ltcmd="timeout -s9 $tmt $tcmd"
-        fi
-        timeit "$msg" "$ltcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+    if [[ $tmt -gt 0 ]];then 
+         RC=(`interruptable_timeout $tmt "$msg" "$tcmd | $strmcmd"`)
     else 
         timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     fi
 
     set -e
     popd 1>/dev/null 
-
+    
+    # In case of SIGTERM, RC is not valid
+    if [[ ${#RC[@]} -lt 1 ]];then
+      wsrep_log_error "SST script interrupted"
+      exit 32
+    fi
+    
     if [[ ${RC[0]} -eq 124 ]];then 
         wsrep_log_error "Possible timeout in receving first data from donor in gtid stage"
         exit 32
