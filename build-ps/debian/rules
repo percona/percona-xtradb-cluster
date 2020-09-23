@@ -63,7 +63,6 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DINSTALL_MYSQLSHAREDIR=share/mysql \
 		-DINSTALL_MYSQLTESTDIR=lib/mysql-test \
 		-DINSTALL_PLUGINDIR=lib/mysql/plugin/debug \
-		-DROUTER_INSTALL_PLUGINDIR=lib/mysqlrouter/plugin \
 		-DINSTALL_SBINDIR=sbin \
 		-DINSTALL_SCRIPTDIR=bin \
 		-DINSTALL_SUPPORTFILESDIR=share/mysql \
@@ -110,7 +109,6 @@ endif
 		-DINSTALL_MYSQLSHAREDIR=share/mysql \
 		-DINSTALL_MYSQLTESTDIR=lib/mysql-test \
 		-DINSTALL_PLUGINDIR=lib/mysql/plugin \
-		-DROUTER_INSTALL_PLUGINDIR=lib/mysqlrouter/plugin \
 		-DINSTALL_SBINDIR=sbin \
 		-DINSTALL_SCRIPTDIR=bin \
 		-DINSTALL_SUPPORTFILESDIR=share/mysql \
