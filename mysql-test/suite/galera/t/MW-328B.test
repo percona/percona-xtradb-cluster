@@ -19,7 +19,7 @@ SET SESSION wsrep_retry_autocommit = 0;
 
 while ($count)
 {
-  --error 0,1213
+  --error 0,ER_LOCK_DEADLOCK
   INSERT IGNORE INTO t2 SELECT f2 FROM t1;
 
   --disable_result_log

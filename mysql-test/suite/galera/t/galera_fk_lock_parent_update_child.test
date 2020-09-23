@@ -44,7 +44,7 @@
 --source include/count_sessions.inc
 
 --let $saved_innodb_lock_wait_timeout = `SELECT @@GLOBAL.innodb_lock_wait_timeout`
-SET GLOBAL innodb_lock_wait_timeout = 5;
+SET GLOBAL innodb_lock_wait_timeout = 2;
 
 # ===========================================================================
 # Create helper files for test setup and teardown.

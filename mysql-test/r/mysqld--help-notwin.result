@@ -204,6 +204,12 @@ The following options may be given as the first argument:
  non-transactional engines for the binary log. If you
  often use statements updating a great number of rows, you
  can increase this to get more performance
+ --binlog-transaction-compression 
+ Whether to compress transactions or not. Transactions are
+ compressed using the ZSTD compression algorythm.
+ --binlog-transaction-compression-level-zstd=# 
+ Specifies the transaction compression level for ZSTD
+ transaction compression in the binary log.
  --binlog-transaction-dependency-history-size=# 
  Maximum number of rows to keep in the writeset history.
  --binlog-transaction-dependency-tracking=name 
@@ -670,7 +676,8 @@ The following options may be given as the first argument:
  --max-join-size=#   Joins that are probably going to read more than
  max_join_size records return an error
  --max-length-for-sort-data=# 
- Max number of bytes in sorted records
+ This variable is deprecated and will be removed in a
+ future release.
  --max-points-in-geometry[=#] 
  Maximum number of points in a geometry
  --max-prepared-stmt-count=# 
@@ -1414,6 +1421,9 @@ The following options may be given as the first argument:
  --temptable-use-mmap 
  Use mmap files for temptables
  (Defaults to on; use --skip-temptable-use-mmap to disable.)
+ --tf-sequence-table-max-upper-bound=# 
+ Maximum number of records SEQUENCE_TABLE() table function
+ is allowed to generate.
  --thread-cache-size=# 
  How many threads we should keep in a cache for reuse
  --thread-handling=name 
@@ -1464,6 +1474,10 @@ The following options may be given as the first argument:
  running
  --utility-user=name Specifies a MySQL user that will be added to the internal
  list of users and recognized as the utility user.
+ --utility-user-dynamic-privileges=name 
+ Specifies the dynamic privileges that the utility user
+ will have in a comma delimited list. See the manual for a
+ complete list of privileges.
  --utility-user-password=name 
  Specifies the password required for the utility user.
  --utility-user-privileges=name 
@@ -1625,6 +1639,8 @@ binlog-rows-query-log-events FALSE
 binlog-skip-flush-commands FALSE
 binlog-space-limit 0
 binlog-stmt-cache-size 32768
+binlog-transaction-compression FALSE
+binlog-transaction-compression-level-zstd 3
 binlog-transaction-dependency-history-size 25000
 binlog-transaction-dependency-tracking COMMIT_ORDER
 block-encryption-mode aes-128-ecb
@@ -1960,6 +1976,7 @@ tablespace-definition-cache 256
 tc-heuristic-recover OFF
 temptable-max-ram 1073741824
 temptable-use-mmap TRUE
+tf-sequence-table-max-upper-bound 1048576
 thread-cache-size 9
 thread-handling one-thread-per-connection
 thread-stack 262144
@@ -1975,6 +1992,7 @@ updatable-views-with-limit YES
 upgrade AUTO
 userstat FALSE
 utility-user (No default value)
+utility-user-dynamic-privileges (No default value)
 utility-user-password (No default value)
 utility-user-privileges 
 utility-user-schema-access (No default value)

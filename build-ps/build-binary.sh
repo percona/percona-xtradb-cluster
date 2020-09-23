@@ -16,6 +16,7 @@ set -ue
 #
 # Step-0: Set default configuration.
 #
+TARGET="$(uname -m)"
 
 # check the machine type (x86_64, i686) and accordingly configure
 # the compliation flag.
@@ -274,6 +275,8 @@ then
 else
     REVISION=""
 fi
+PRODUCT_FULL="Percona-XtraDB-Cluster_${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
+PRODUCT_FULL="${PRODUCT_FULL}.${TAG}${BUILD_COMMENT:+_}${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}"
 COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION"
 COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
 
@@ -281,7 +284,6 @@ COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VE
 #
 # Step-4: Set compilation options.
 #
-
 export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
 
@@ -416,6 +418,7 @@ fi
             -DWITH_EDITLINE=bundled \
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
+            -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
             -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
@@ -450,6 +453,7 @@ fi
             -DWITH_LIBEVENT=bundled \
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
+            -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
             -DMYSQL_SERVER_SUFFIX=".$TAG" \
             -DWITH_WSREP=ON \
@@ -686,9 +690,13 @@ fi
 # Package the archive
 (
     cd "$TARGETDIR/usr/local/"
-
+    # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
+    find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
+
     cd "$TARGETDIR/usr/local/minimal/"
+    # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
+    find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
 ) || exit 1
 

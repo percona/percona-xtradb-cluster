@@ -43,6 +43,11 @@ alter table user_session add foreign key (fk1) references user(id);
 INSERT INTO user values (1,0), (2,0), (3,0), (4,0);
 INSERT INTO user_session values (1,1,1);
 
+# Grab the value of these variables so we can restore them later
+--connection node_1
+--let $innodb_status_output_orig = `select @@innodb_status_output`
+--let $innodb_status_output_locks_orig = `select @@innodb_status_output_locks`
+
 #
 # prepare test connections, for:
 #   update of parent row in node1
@@ -139,3 +144,9 @@ set debug_sync = reset;
 
 drop table user_session;
 drop table user;
+
+# These variables are enabled in wsrep_is_BF_lock_timeout()
+# in lock0wait.cc, so turn them OFF here to allow the end-of-testcase
+# checks to succeed.
+--eval set global innodb_status_output = $innodb_status_output_orig
+--eval set global innodb_status_output_locks = $innodb_status_output_locks_orig

@@ -425,7 +425,7 @@ struct MDL_key {
     }
 
     /* No column name stored. */
-    return NULL;
+    return nullptr;
   }
 
   uint col_name_length() const {
@@ -843,7 +843,7 @@ class MDL_request {
                                     const char *src_file, uint src_line);
   /** Set type of lock request. Can be only applied to pending locks. */
   inline void set_type(enum_mdl_type type_arg) {
-    DBUG_ASSERT(ticket == NULL);
+    DBUG_ASSERT(ticket == nullptr);
     type = type_arg;
   }
 
@@ -901,7 +901,7 @@ class MDL_request {
   MDL_request() {}
 
   MDL_request(const MDL_request &rhs)
-      : type(rhs.type), duration(rhs.duration), ticket(NULL), key(rhs.key) {}
+      : type(rhs.type), duration(rhs.duration), ticket(nullptr), key(rhs.key) {}
 
   MDL_request(MDL_request &&) = default;
 
@@ -1112,13 +1112,13 @@ class MDL_ticket : public MDL_wait_for_subgraph {
         m_wsrep_non_preemptable(wsrep_non_preemptable),
 #endif /* WITH_WSREP */
         m_ctx(ctx_arg),
-        m_lock(NULL),
+        m_lock(nullptr),
         m_is_fast_path(false),
         m_hton_notified(false),
-        m_psi(NULL) {
+        m_psi(nullptr) {
   }
 
-  virtual ~MDL_ticket() { DBUG_ASSERT(m_psi == NULL); }
+  virtual ~MDL_ticket() { DBUG_ASSERT(m_psi == nullptr); }
 
 #ifdef WITH_WSREP
   static MDL_ticket *create(MDL_context *ctx_arg, enum_mdl_type type_arg,
@@ -1819,7 +1819,7 @@ class MDL_context {
   /** Remove the wait-for edge from the graph after we're done waiting. */
   void done_waiting_for() {
     mysql_prlock_wrlock(&m_LOCK_waiting_for);
-    m_waiting_for = NULL;
+    m_waiting_for = nullptr;
     mysql_prlock_unlock(&m_LOCK_waiting_for);
   }
   void lock_deadlock_victim() { mysql_prlock_rdlock(&m_LOCK_waiting_for); }

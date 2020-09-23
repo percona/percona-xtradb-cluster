@@ -26,27 +26,31 @@ ROLLBACK;
 
 --connection node_2
 SET SESSION wsrep_sync_wait = 0;
---let $wsrep_provider_options_node_2 = `SELECT VARIABLE_VALUE FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'wsrep_provider_options'`
+--let $wsrep_provider_options_node_2 = `SELECT @@wsrep_provider_options`
 SET GLOBAL wsrep_provider_options = 'repl.causal_read_timeout=PT10M';
 SET SESSION wsrep_sync_wait = 7;
 
 SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
 SELECT COUNT(*) = 0 FROM t1;
 
+--echo "# Resetting wsrep_provider_options on node 2"
 --disable_query_log
---eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_node_2';
+--eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_node_2'
+--enable_query_log
 
 --connection node_1
 SET SESSION wsrep_sync_wait = 0;
---let $wsrep_provider_options_node_1 = `SELECT VARIABLE_VALUE FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'wsrep_provider_options'`
+--let $wsrep_provider_options_node_1 = `SELECT @@wsrep_provider_options`
 SET GLOBAL wsrep_provider_options = 'repl.causal_read_timeout=PT10M';
 SET SESSION wsrep_sync_wait = 7;
 
 SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
 SELECT COUNT(*) = 0 FROM t1;
 
+--echo "# Resetting wsrep_provider_options on node 1"
 --disable_query_log
---eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_node_1';
+--eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_node_1'
+--enable_query_log
 
 DROP TABLE ten;
 DROP TABLE t1;

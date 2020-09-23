@@ -2283,15 +2283,17 @@ void wsrep_to_isolation_end(THD *thd) {
       (long long)wsrep_thd_trx_seqno(req), wsrep_thd_client_mode_str(req),   \
       wsrep_thd_client_state_str(req), wsrep_thd_transaction_state_str(req), \
       req->get_command(), req->lex->sql_command,                             \
-      (req->rewritten_query.length() ? req->rewritten_query.c_ptr_safe()     \
-                                     : req->query().str),                    \
+      (req->rewritten_query().length()                                       \
+                ? wsrep_thd_rewritten_query(req).c_ptr_safe()                \
+                : req->query().str),                                         \
                                                                              \
       gra->thread_id(), (long long)wsrep_thd_trx_seqno(gra),                 \
       wsrep_thd_client_mode_str(gra), wsrep_thd_client_state_str(gra),       \
       wsrep_thd_transaction_state_str(gra), gra->get_command(),              \
       gra->lex->sql_command,                                                 \
-      (gra->rewritten_query.length() ? gra->rewritten_query.c_ptr_safe()     \
-                                     : gra->query().str));
+      (gra->rewritten_query().length()                                       \
+            ? wsrep_thd_rewritten_query(gra).c_ptr_safe()                    \
+            : gra->query().str));
 
 bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
                                MDL_ticket *ticket, const MDL_key *key) {
@@ -2528,4 +2530,18 @@ bool get_wsrep_recovery() { return wsrep_recovery; }
 
 bool wsrep_consistency_check(THD *thd) {
   return thd->wsrep_consistency_check == CONSISTENCY_CHECK_RUNNING;
+}
+
+/*
+ Returns non-const copy of thd->rewritten_query().
+
+ PXC code uses rewritten_query.c_ptr_safe() in several places.
+ As c_ptr_save() is non const method, it requires non const object.
+ Here we return copy of thd->rewritten_query() instead of const-casting
+ thd->rewritten_query() in place.
+ This is to avoid interference of PXC specific part with generic server part.
+ */
+String wsrep_thd_rewritten_query(THD *thd)
+{
+  return thd->rewritten_query();
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -110,12 +110,11 @@ class ACL_internal_table_access {
     to save_priv.
     @param want_access the privileges requested
     @param [in, out] save_priv the privileges granted
-    @return
-      @retval ACL_INTERNAL_ACCESS_GRANTED All the requested privileges
+    @retval ACL_INTERNAL_ACCESS_GRANTED All the requested privileges
       are granted, and saved in save_priv.
-      @retval ACL_INTERNAL_ACCESS_DENIED At least one of the requested
+    @retval ACL_INTERNAL_ACCESS_DENIED At least one of the requested
       privileges was denied.
-      @retval ACL_INTERNAL_ACCESS_CHECK_GRANT No requested privilege
+    @retval ACL_INTERNAL_ACCESS_CHECK_GRANT No requested privilege
       was denied, and grant should be checked for at least one
       privilege. Requested privileges that are granted, if any, are saved
       in save_priv.
@@ -144,12 +143,11 @@ class ACL_internal_schema_access {
     Check access to an internal schema.
     @param want_access the privileges requested
     @param [in, out] save_priv the privileges granted
-    @return
-      @retval ACL_INTERNAL_ACCESS_GRANTED All the requested privileges
+    @retval ACL_INTERNAL_ACCESS_GRANTED All the requested privileges
       are granted, and saved in save_priv.
-      @retval ACL_INTERNAL_ACCESS_DENIED At least one of the requested
+    @retval ACL_INTERNAL_ACCESS_DENIED At least one of the requested
       privileges was denied.
-      @retval ACL_INTERNAL_ACCESS_CHECK_GRANT No requested privilege
+    @retval ACL_INTERNAL_ACCESS_CHECK_GRANT No requested privilege
       was denied, and grant should be checked for at least one
       privilege. Requested privileges that are granted, if any, are saved
       in save_priv.
@@ -763,6 +761,7 @@ int fill_schema_column_privileges(THD *thd, TABLE_LIST *tables, Item *cond);
 const ACL_internal_schema_access *get_cached_schema_access(
     GRANT_INTERNAL_INFO *grant_internal_info, const char *schema_name);
 bool acl_is_utility_user(const char *user, const char *host, const char *ip);
+bool acl_utility_user_has_global_grant(const std::string &privilege);
 
 bool lock_tables_precheck(THD *thd, TABLE_LIST *tables);
 bool create_table_precheck(THD *thd, TABLE_LIST *tables,
@@ -786,8 +785,11 @@ bool check_single_table_access(THD *thd, ulong privilege, TABLE_LIST *tables,
 bool check_routine_access(THD *thd, ulong want_access, const char *db,
                           char *name, bool is_proc, bool no_errors);
 bool check_some_access(THD *thd, ulong want_access, TABLE_LIST *table);
-bool check_some_routine_access(THD *thd, const char *db, const char *name,
-                               bool is_proc);
+bool has_full_view_routine_access(THD *thd, const char *db,
+                                  const char *definer_user,
+                                  const char *definer_host);
+bool has_partial_view_routine_access(THD *thd, const char *db,
+                                     const char *routine_name, bool is_proc);
 bool check_access(THD *thd, ulong want_access, const char *db, ulong *save_priv,
                   GRANT_INTERNAL_INFO *grant_internal_info,
                   bool dont_check_global_grants, bool no_errors);
@@ -834,12 +836,10 @@ typedef enum ssl_artifacts_status {
 } ssl_artifacts_status;
 
 ulong get_global_acl_cache_size();
-#if defined(HAVE_OPENSSL)
 extern bool opt_auto_generate_certs;
 bool do_auto_cert_generation(ssl_artifacts_status auto_detection_status,
                              const char **ssl_ca, const char **ssl_key,
                              const char **ssl_cert);
-#endif /* HAVE_OPENSSL */
 
 #define DEFAULT_SSL_CA_CERT "ca.pem"
 #define DEFAULT_SSL_CA_KEY "ca-key.pem"

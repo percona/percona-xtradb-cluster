@@ -7,7 +7,7 @@ RESET MASTER;
 SET SESSION WSREP_ON=ON;
 SHOW BINARY LOGS;
 Log_name	File_size	Encrypted
-mysqld-bin.000001	155	No
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+mysqld-bin.000001	156	No
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	124	Previous_gtids	1	155	
+mysqld-bin.000001	125	Previous_gtids	1	156	
