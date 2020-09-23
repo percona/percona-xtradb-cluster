@@ -151,6 +151,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
 
   delete thd->wsrep_rli->current_mts_submode;
   thd->wsrep_rli->current_mts_submode = 0;
+  thd->wsrep_rli->cleanup_after_session();
   delete thd->wsrep_rli;
   thd->wsrep_rli = 0;
   thd->slave_thread = (thd->rli_slave) ? TRUE : FALSE;
