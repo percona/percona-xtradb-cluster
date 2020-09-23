@@ -10021,13 +10021,16 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
                   &mem_root, memory_page_size, memory_page_size);
 
   while ((ev= Log_event::read_log_event(log, 0, fdle, TRUE))
-         && ev->is_valid()
-#ifdef WITH_WSREP
-         && (last_xid_seqno == WSREP_SEQNO_UNDEFINED ||
-             last_xid_seqno != cur_xid_seqno)
-#endif
-      )
+         && ev->is_valid())
   {
+#ifdef WITH_WSREP
+    if (last_xid_seqno != WSREP_SEQNO_UNDEFINED &&
+        last_xid_seqno == cur_xid_seqno)
+    {
+      delete ev;
+      continue;
+    }
+#endif
     if (ev->get_type_code() == binary_log::QUERY_EVENT &&
         !strcmp(((Query_log_event*)ev)->query, "BEGIN"))
       in_transaction= TRUE;
