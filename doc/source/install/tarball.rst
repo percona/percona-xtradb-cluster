@@ -10,8 +10,26 @@ for manual installation.
 You can download the appropriate tarball package from
 https://www.percona.com/downloads/Percona-XtraDB-Cluster-80
 
-There are multiple tarballs in the **Linux - Generic** section
-depending on the *OpenSSL* library available in your distribution:
+In |Percona XtraDB Cluster| 8.0.20-11 and later, the multiple binary tarballs available in the **Linux - Generic** section are replaced with the following:
+
+.. tabularcolumns:: |p{5cm}|p{5cm}|p{5cm}|
+
+.. list-table::
+   :header-rows: 1
+
+   * - Name
+     - Type
+     - Description
+   * - Percona-XtraDB-Cluster-8.0.xx-relxx-xx-Linux.x86_64.glibc2.12.tar.gz
+     - Full
+     - Contains binaries, libraries, test files, and debug symbols
+   * - Percona-XtraDB-Cluster-8.0.xx-relxx-xx-Linux.x86_64.glibc2.12-minimal.tar.gz
+     - Minimal
+     - Contains binaries, and libraries but does not include test files, or debug symbols
+
+Both binary tarballs support all distributions.
+
+For installations before |Percona XtraDB Cluster| 8.0.20-11, the **Linux - Generic** section contains multiple tarballs which are based on the *OpenSSL* library available in your distribution:
 
 * ``ssl100``: for Debian prior to 9, and Ubuntu prior to 14.04 versions
 * ``ssl101``: for CentOS 7, and 8
