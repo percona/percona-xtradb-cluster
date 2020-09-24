@@ -436,6 +436,8 @@ fi
             -DFEATURE_SET=community \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
+            -DROUTER_INSTALL_LIBDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/private" \
+            -DROUTER_INSTALL_PLUGINDIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib/mysqlrouter/plugin" \
             -DCOMPILATION_COMMENT="$COMMENT" \
             -DWITH_PAM=ON \
             -DWITHOUT_ROCKSDB=ON \
