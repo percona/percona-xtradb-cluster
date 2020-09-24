@@ -342,7 +342,7 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         apt-get -y install --download-only percona-xtrabackup-24=2.4.20-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.12-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.13-1.${DIST}
     fi
     return;
 }
@@ -790,7 +790,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.12
+        yumdownloader percona-xtrabackup-80-8.0.13
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
