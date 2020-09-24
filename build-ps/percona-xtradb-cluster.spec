@@ -926,9 +926,6 @@ install -d $RBR%{_libdir}/mysql
 #%if 0%{?mecab}
 #    mv $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
 #%endif
-# remove some unwanted router files
-rm -rf %{buildroot}/%{_libdir}/mysql/libmysqlharness.{a,so}
-rm -rf %{buildroot}/%{_libdir}/mysql/libmysqlrouter.so
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
@@ -1706,11 +1703,15 @@ fi
 %else
 %{_sysconfdir}/init.d/mysqlrouter
 %endif
-%{_libdir}/mysql/libmysqlharness.so.*
-%{_libdir}/mysql/libmysqlrouter.so.*
-%{_libdir}/mysql/libmysqlrouter_http.so*
-%dir %{_libdir}/mysql/mysqlrouter
-%{_libdir}/mysql/mysqlrouter/*.so*
+%{_libdir}/mysqlrouter/private/libmysqlharness.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_http.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_backend.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
+%{_libdir}/mysqlrouter/private/libprotobuf-lite.so.*
+%dir %{_libdir}/mysqlrouter
+%dir %{_libdir}/mysqlrouter/private
+%{_libdir}/mysqlrouter/*.so*
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/log/mysqlrouter
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/run/mysqlrouter
 
