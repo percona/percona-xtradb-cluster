@@ -9,7 +9,7 @@ Specific information on the supported platforms, products, and versions is descr
 The packages are available in the official Percona software repository
 and on the `download page
 <http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST/>`_.
-It is recommended to intall |PXC| from the official repository
+It is recommended to install |PXC| from the official repository
 using :command:`yum`.
 
 Prerequisites
