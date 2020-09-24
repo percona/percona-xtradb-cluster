@@ -1,4 +1,3 @@
-
 if (!$restart_parameters)
 {
   let $restart_parameters = restart;
@@ -16,12 +15,16 @@ if ($galera_wsrep_start_position == '') {
    }
 }
 
-
 if ($suppress_print_params == '') {
   # We use --exec echo instead of simple "--echo" because
   # replace_result works on --exec
-  --replace_regex /--wsrep-start-position=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9]*/--wsrep-start-position=<WSREP_START_POSITION>/ /127\.0\.0\.1:[0-9]{1,5}/127.0.0.1:<PORT>/ /socket\.ssl_ca=\/[-_\/[:alnum:]\.]*/socket.ssl_ca=<SSL_CA>/ /socket\.ssl_cert=\/[-_\/[:alnum:]\.]*/socket.ssl_cert=<SSL_CERT>/ /socket\.ssl_key=\/[-_\/[:alnum:]\.]*/socket.ssl_key=<SSL_KEY>/ /base_port=[0-9]{5}/base_port=<PORT>/
-  --exec echo "# $restart_parameters"
+  if (!$restart_hide_args) {
+    --replace_regex /--wsrep-start-position=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9]*/--wsrep-start-position=<WSREP_START_POSITION>/ /127\.0\.0\.1:[0-9]{1,5}/127.0.0.1:<PORT>/ /socket\.ssl_ca=\/[-_\/[:alnum:]\.]*/socket.ssl_ca=<SSL_CA>/ /socket\.ssl_cert=\/[-_\/[:alnum:]\.]*/socket.ssl_cert=<SSL_CERT>/ /socket\.ssl_key=\/[-_\/[:alnum:]\.]*/socket.ssl_key=<SSL_KEY>/ /base_port=[0-9]{5}/base_port=<PORT>/
+    --exec echo "# $restart_parameters"
+  }
+  if ($restart_hide_args) {
+    --echo # restart:<hidden args>
+  }
 }
 
 # Include this script only after using shutdown_mysqld.inc
@@ -36,5 +39,26 @@ if ($suppress_print_params == '') {
 # Call script that will poll the server waiting for it to be back online again
 --source include/wait_until_connected_again.inc
 
+## Script xplugin_wait_for_interfaces.inc
+#
+#  $do_not_wait_for_x_interface -
+#    set for which interfaces the script shouldn't wait
+#    In default the script wait for both socket and tcp
+#    on *NIX OS-es and only for TCP on windows
+#
+## Usage
+#
+# --let $wait_for_tcpsocket_status = valid_value|undefined_value|no_wait
+# --let $wait_for_unixsocket_status = valid_value|undefined_value|no_wait
+# --source include/xplugin_wait_for_interfaces.inc
+#
+
+--let $_xplugin_active= `SELECT plugin_status='ACTIVE' FROM information_schema.plugins WHERE plugin_name LIKE 'mysqlx'`
+if ($_xplugin_active)
+{
+  --source include/xplugin_wait_for_interfaces.inc
+}
+
 # Turn off reconnect again
 --disable_reconnect
+

@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);

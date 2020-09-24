@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # Test ALTER TABLE FORCE, a 5.6.3 feature that simply rebuilds the table

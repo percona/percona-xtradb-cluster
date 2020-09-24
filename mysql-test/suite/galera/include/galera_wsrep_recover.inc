@@ -3,7 +3,7 @@
 
 --perl
 	use strict;
-        my $wsrep_start_position = `grep 'WSREP: Recovered position:' $ENV{MYSQL_TMP_DIR}/galera_wsrep_recover.log | sed 's/.*WSREP\:\ Recovered\ position://' | sed 's/^[ \t]*//'`;
+        my $wsrep_start_position = `grep 'Recovered position:' $ENV{MYSQL_TMP_DIR}/galera_wsrep_recover.log | sed 's/.*Recovered\ position://' | sed 's/^[ \t]*//'`;
         chomp($wsrep_start_position);
 
         die if $wsrep_start_position eq '';

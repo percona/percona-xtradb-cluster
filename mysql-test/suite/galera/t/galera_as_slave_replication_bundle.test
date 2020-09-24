@@ -4,12 +4,12 @@
 # be reported.
 #
 
---source include/have_innodb.inc
 --source include/have_log_bin.inc
+--let $show_rpl_debug_info = 0
 
 # As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
---source include/galera_cluster.inc
+--source include/galera_cluster_master_slave.inc
 
 --connection node_2
 --disable_query_log
@@ -29,12 +29,11 @@ INSERT INTO t1 VALUES(5);
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
---let $wait_condition = SELECT COUNT(*) = 4 FROM t1;
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t1;
 --source include/wait_condition.inc
 
-# With wsrep_mysql_replication_bundle = 2, the last insert is not delivered
-# because there are not enough events remaining to complete an entire bundle
-SELECT COUNT(*) = 4 FROM t1;
+# wsrep_replication_bundle has no effect. it is deprecated.
+SELECT COUNT(*) = 5 FROM t1;
 
 # Bundle is now complete, the last INSERT and the DROP are delivered
 --connection node_1

@@ -1,0 +1,29 @@
+#
+# wsrep_incoming_addresses
+#
+SHOW VARIABLES LIKE 'wsrep_node_incoming_address';
+Variable_name	Value
+wsrep_node_incoming_address	AUTO
+SHOW STATUS LIKE 'wsrep_incoming_addresses';
+Variable_name	Value
+wsrep_incoming_addresses	IP_ADDR:PORT
+
+SHOW STATUS LIKE 'wsrep_incoming_addresses';
+Variable_name	Value
+wsrep_incoming_addresses	4.3.2.1:98765
+call mtr.add_suppression("Could not parse wsrep_node_incoming_address : 4.3.2.1:123456789123456789123456789123456789");
+
+SHOW STATUS LIKE 'wsrep_incoming_addresses';
+Variable_name	Value
+wsrep_incoming_addresses	
+Pattern "Could not parse wsrep_node_incoming_address : 4.3.2.1:123456789123456789123456789123456789" found
+
+SHOW STATUS LIKE 'wsrep_incoming_addresses';
+Variable_name	Value
+wsrep_incoming_addresses	[2001:db8::1:0:0:1]:98765
+call mtr.add_suppression("Could not parse wsrep_node_incoming_address : .2001:db8::1:0:0:1.:123456789123456789123456789123456789");
+
+SHOW STATUS LIKE 'wsrep_incoming_addresses';
+Variable_name	Value
+wsrep_incoming_addresses	
+Pattern "Could not parse wsrep_node_incoming_address : \[2001:db8::1:0:0:1\]:123456789123456789123456789123456789" found

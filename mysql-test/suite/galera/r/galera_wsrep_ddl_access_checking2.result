@@ -23,9 +23,9 @@ use testdb;
 GRANT CREATE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, CREATE ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, CREATE ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -39,9 +39,9 @@ include/assert.inc [Table t2 should exist on node 2]
 REVOKE CREATE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 DROP TABLE t2;
 #
@@ -51,9 +51,9 @@ DROP TABLE t2;
 GRANT INDEX ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, INDEX ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, INDEX ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -67,9 +67,9 @@ include/assert.inc [Index t1_f2 should exist on node 2]
 REVOKE INDEX ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 DROP INDEX index_t1_f2 ON t1;
 #
@@ -79,9 +79,9 @@ DROP INDEX index_t1_f2 ON t1;
 GRANT ALTER ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, ALTER ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, ALTER ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -95,9 +95,9 @@ include/assert.inc [Column f3 on table t1 should exist on node 2]
 REVOKE ALTER ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 ALTER TABLE t1 DROP COLUMN f3;
 #
@@ -107,9 +107,9 @@ ALTER TABLE t1 DROP COLUMN f3;
 GRANT DROP ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, DROP ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, DROP ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -123,9 +123,9 @@ include/assert.inc [Table t1 was truncated on node 2]
 REVOKE DROP ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 INSERT INTO t1(f2) VALUES(1);
 #
@@ -135,9 +135,9 @@ INSERT INTO t1(f2) VALUES(1);
 GRANT DROP ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, DROP ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, DROP ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -151,9 +151,9 @@ include/assert.inc [Table t1 was dropped on node 2]
 REVOKE DROP ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT, f2 CHAR(64));
 INSERT INTO t1(f2) VALUES(1);
@@ -167,9 +167,9 @@ include/assert.inc [Index t1_f2 should exist on node 1]
 GRANT INDEX ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, INDEX ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, INDEX ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -183,9 +183,9 @@ include/assert.inc [Index t1_f2 should not exist on node 2]
 REVOKE INDEX ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_GRANT access test
@@ -194,9 +194,9 @@ FLUSH PRIVILEGES;
 GRANT GRANT OPTION ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%' WITH GRANT OPTION
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%` WITH GRANT OPTION
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -205,20 +205,20 @@ INSERT INTO counter(count) VALUES(7);;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.* TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.* TO `testother`@`%`
 # connection node_2
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.* TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.* TO `testother`@`%`
 # connection node_1
 REVOKE GRANT OPTION ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_DB access test
@@ -229,9 +229,9 @@ include/assert.inc [Database testdbother does not exist on node 1]
 GRANT CREATE ON *.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT CREATE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT CREATE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -245,9 +245,9 @@ include/assert.inc [Database testdbother should exist on node 2]
 REVOKE CREATE ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 DROP DATABASE testdbother;
 #
@@ -259,9 +259,9 @@ CREATE DATABASE testdbother;
 # connection node_1
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 GRANT DROP ON *.* TO 'testme'@'%';
 FLUSH PRIVILEGES;
 # connection node_testme
@@ -276,9 +276,9 @@ include/assert.inc [Database testdbother shoutl not exist on node 2]
 REVOKE DROP ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_ALTER_DB access test
@@ -287,14 +287,14 @@ FLUSH PRIVILEGES;
 GRANT ALTER ON *.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT ALTER ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT ALTER ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 CREATE DATABASE testdbother;
 SHOW CREATE DATABASE testdbother;
 Database	Create Database
-testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET latin1 */
+testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */
 # connection node_testme
 use testdb;
 ALTER DATABASE testdbother CHARACTER SET latin7;
@@ -302,19 +302,19 @@ INSERT INTO counter(count) VALUES(10);;
 # connection node_1
 SHOW CREATE DATABASE testdbother;
 Database	Create Database
-testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET latin7 */
+testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET latin7 */ /*!80016 DEFAULT ENCRYPTION='N' */
 # connection node_2
 SHOW CREATE DATABASE testdbother;
 Database	Create Database
-testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET latin7 */
+testdbother	CREATE DATABASE `testdbother` /*!40100 DEFAULT CHARACTER SET latin7 */ /*!80016 DEFAULT ENCRYPTION='N' */
 # connection node_1
 DROP DATABASE testdbother;
 REVOKE ALTER ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_REPAIR access test
@@ -323,9 +323,9 @@ FLUSH PRIVILEGES;
 GRANT INSERT ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, INSERT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, INSERT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -341,14 +341,18 @@ include/assert_grep.inc [REPAIR TABLE did execute on node 2]
 REVOKE INSERT ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_FUNCTION access test
 #
 # connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE FUNCTION hello2 (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
 # connection node_1
 include/assert.inc [The hello2 function should exist on node 1]
@@ -358,9 +362,10 @@ include/assert.inc [The hello2 function should exist on node 2]
 GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, ALTER ROUTINE ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
+GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `testdb`.`hello2` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -371,12 +376,13 @@ include/assert.inc [The hello2 function should not exist on node 1]
 # connection node_2
 include/assert.inc [The hello2 function should not exist on node 2]
 # connection node_1
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_REVOKE access test
@@ -387,22 +393,22 @@ FLUSH PRIVILEGES;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
 # connection node_2
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
 # connection node_1
 GRANT GRANT OPTION ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%' WITH GRANT OPTION
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%` WITH GRANT OPTION
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -411,20 +417,20 @@ INSERT INTO counter(count) VALUES(13);;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.* TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.* TO `testother`@`%`
 # connection node_2
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.* TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.* TO `testother`@`%`
 # connection node_1
 REVOKE GRANT OPTION ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_OPTIMIZE access test
@@ -433,9 +439,9 @@ FLUSH PRIVILEGES;
 GRANT INSERT ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, INSERT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, INSERT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -452,9 +458,9 @@ include/assert_grep.inc [OPTIMIZE TABLE did execute on node 2]
 REVOKE INSERT ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_ANALYZE access test
@@ -463,9 +469,9 @@ FLUSH PRIVILEGES;
 GRANT INSERT ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, INSERT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, INSERT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -481,9 +487,9 @@ include/assert_grep.inc [ANALYZE TABLE did execute on node 2]
 REVOKE INSERT ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_RENAME_TABLE access test
@@ -492,9 +498,9 @@ FLUSH PRIVILEGES;
 GRANT ALTER,DROP,CREATE,INSERT ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, INSERT, CREATE, DROP, ALTER ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, INSERT, CREATE, DROP, ALTER ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -509,9 +515,9 @@ RENAME TABLE t2 to t1;
 REVOKE ALTER,DROP,CREATE,INSERT ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_USER access test
@@ -520,9 +526,9 @@ FLUSH PRIVILEGES;
 GRANT CREATE USER ON *.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT CREATE USER ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT CREATE USER ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -537,9 +543,9 @@ DROP USER foo;
 REVOKE CREATE USER ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_USER access test
@@ -549,9 +555,9 @@ CREATE USER 'testdbother'@'%' IDENTIFIED BY 'secret2';
 GRANT CREATE USER ON *.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT CREATE USER ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT CREATE USER ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -565,9 +571,9 @@ include/assert.inc [User testdbother does not exist on node 2]
 REVOKE CREATE USER ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_RENAME_USER access test
@@ -576,9 +582,9 @@ FLUSH PRIVILEGES;
 GRANT CREATE USER ON *.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT CREATE USER ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT CREATE USER ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -595,9 +601,9 @@ RENAME USER 'testwho'@'%' TO 'testother'@'%';
 REVOKE CREATE USER ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_REVOKE_ALL access test
@@ -607,15 +613,15 @@ CREATE USER 'foo'@'%' IDENTIFIED BY 'secret';
 GRANT SELECT ON testdb.t1 TO 'foo'@'%';
 SHOW GRANTS FOR 'foo';
 Grants for foo@%
-GRANT USAGE ON *.* TO 'foo'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'foo'@'%'
+GRANT USAGE ON *.* TO `foo`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `foo`@`%`
 FLUSH PRIVILEGES;
 # connection node_1
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 GRANT CREATE USER ON *.* TO 'testme'@'%';
 FLUSH PRIVILEGES;
 # connection node_testme
@@ -625,19 +631,19 @@ INSERT INTO counter(count) VALUES(20);;
 # connection node_1
 SHOW GRANTS FOR 'foo';
 Grants for foo@%
-GRANT USAGE ON *.* TO 'foo'@'%'
+GRANT USAGE ON *.* TO `foo`@`%`
 # connection node_2
 SHOW GRANTS FOR 'foo';
 Grants for foo@%
-GRANT USAGE ON *.* TO 'foo'@'%'
+GRANT USAGE ON *.* TO `foo`@`%`
 # connection node_1
 DROP USER foo;
 REVOKE CREATE USER ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_PROCEDURE access test
@@ -646,9 +652,9 @@ FLUSH PRIVILEGES;
 GRANT CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, EXECUTE, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, EXECUTE, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -665,9 +671,9 @@ DROP PROCEDURE hellop;
 REVOKE CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_SPFUNCTION access test
@@ -676,9 +682,9 @@ FLUSH PRIVILEGES;
 GRANT CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, EXECUTE, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, EXECUTE, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -693,14 +699,18 @@ DROP FUNCTION hello;
 REVOKE CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_PROCEDURE access test
 #
 # connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
 BEGIN
 END;
@@ -712,9 +722,10 @@ include/assert.inc [The hellop procedure should exist on node 2]
 GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, ALTER ROUTINE ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
+GRANT EXECUTE, ALTER ROUTINE ON PROCEDURE `testdb`.`hellop` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -724,17 +735,22 @@ INSERT INTO counter(count) VALUES(23);;
 include/assert.inc [The hellop procedure should not exist on node 1]
 # connection node_2
 include/assert.inc [The hellop procedure should not exist on node 2]
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_ALTER_PROCEDURE access test
 #
 # connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
 BEGIN
 END;
@@ -742,16 +758,17 @@ END;
 include/assert.inc [The hellop procedure should exist on node 1]
 # connection node_2
 include/assert.inc [The hellop procedure should exist on node 2]
-SELECT name, security_type FROM mysql.proc WHERE name = "hellop";
-name	security_type
+SELECT routine_name, security_type FROM information_schema.routines where ROUTINE_NAME = "hellop";
+ROUTINE_NAME	SECURITY_TYPE
 hellop	DEFINER
 # connection node_1
 GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, ALTER ROUTINE ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
+GRANT EXECUTE, ALTER ROUTINE ON PROCEDURE `testdb`.`hellop` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -763,32 +780,38 @@ include/assert.inc [The hellop procedure should use the invoker on node 1]
 include/assert.inc [The hellop procedure should use the invoker on node 2]
 # connection node_1
 DROP PROCEDURE hellop;
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_ALTER_FUNCTION access test
 #
 # connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE FUNCTION hellof (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
 # connection node_1
 include/assert.inc [The hellof function should exist on node 1]
 # connection node_2
 include/assert.inc [The hellof function should exist on node 2]
-SELECT name, security_type FROM mysql.proc WHERE name = "hellof";
-name	security_type
+SELECT routine_name, security_type FROM information_schema.routines where ROUTINE_NAME = "hellof";
+ROUTINE_NAME	SECURITY_TYPE
 hellof	DEFINER
 # connection node_1
 GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, ALTER ROUTINE ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, CREATE ROUTINE, ALTER ROUTINE ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
+GRANT EXECUTE, ALTER ROUTINE ON FUNCTION `testdb`.`hellof` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -800,12 +823,13 @@ include/assert.inc [The hellof function should use the invoker on node 1]
 include/assert.inc [The hellof function should use the invoker on node 2]
 # connection node_1
 DROP FUNCTION hellof;
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_VIEW access test
@@ -814,9 +838,9 @@ FLUSH PRIVILEGES;
 GRANT CREATE VIEW ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, CREATE VIEW ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, CREATE VIEW ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -830,14 +854,18 @@ DROP VIEW testview;
 REVOKE CREATE VIEW ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_VIEW access test
 #
 # connection node_1
+GRANT CREATE VIEW ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE VIEW helloview AS SELECT * FROM t1;
 # connection node_1
 include/assert.inc [The helloview VIEW should exist on node 1]
@@ -847,9 +875,9 @@ include/assert.inc [The helloview VIEW should exist on node 2]
 GRANT DROP ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, DROP ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, DROP, CREATE VIEW ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -860,12 +888,13 @@ include/assert.inc [The helloview VIEW should not exist on node 1]
 # connection node_2
 include/assert.inc [The helloview VIEW should not exist on node 2]
 # connection node_1
+REVOKE CREATE VIEW ON testdb.* FROM 'testme'@'%';
 REVOKE DROP ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_TRIGGER access test
@@ -874,9 +903,9 @@ FLUSH PRIVILEGES;
 GRANT TRIGGER ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, TRIGGER ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, TRIGGER ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -891,9 +920,9 @@ DROP TRIGGER testtrigger;
 REVOKE TRIGGER ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_TRIGGER access test
@@ -908,9 +937,9 @@ include/assert.inc [The hellotrigger TRIGGER should exist on node 2]
 GRANT TRIGGER ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, TRIGGER ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, TRIGGER ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -924,9 +953,9 @@ include/assert.inc [The hellotrigger TRIGGER should not exist on node 2]
 REVOKE TRIGGER ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_INSTALL_PLUGIN access test
@@ -935,9 +964,9 @@ FLUSH PRIVILEGES;
 GRANT INSERT ON *.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT INSERT ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT INSERT ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -952,9 +981,9 @@ UNINSTALL PLUGIN audit_log;
 REVOKE INSERT ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_UNINSTALL_PLUGIN access test
@@ -967,9 +996,9 @@ include/assert.inc [The null_audit PLUGIN should be installed on node 1]
 GRANT DELETE ON *.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT DELETE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT DELETE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -983,9 +1012,9 @@ include/assert.inc [The null_audit PLUGIN should not be installed on node 2]
 REVOKE DELETE ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_CREATE_EVENT access test
@@ -994,9 +1023,9 @@ FLUSH PRIVILEGES;
 GRANT EVENT ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, EVENT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, EVENT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -1013,14 +1042,18 @@ DROP EVENT testevent;
 REVOKE EVENT ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_ALTER_EVENT access test
 #
 # connection node_1
+GRANT EVENT ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+# connection node_testme
+use testdb;
 CREATE EVENT helloevent
 ON SCHEDULE EVERY 1 HOUR
 DO INSERT INTO t1(f2) VALUES(3);
@@ -1032,9 +1065,9 @@ include/assert.inc [The helloevent EVENT should exist on node 2]
 GRANT EVENT ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, EVENT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, EVENT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -1048,9 +1081,9 @@ include/assert.inc [The helloevent EVENT should still exist on node 2]
 REVOKE EVENT ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_DROP_EVENT access test
@@ -1059,9 +1092,9 @@ FLUSH PRIVILEGES;
 GRANT EVENT ON testdb.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT, EVENT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT, EVENT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -1075,9 +1108,9 @@ include/assert.inc [The helloevent EVENT should not exist on node 2]
 REVOKE EVENT ON testdb.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # SQLCOM_ALTER_USER access test
@@ -1088,9 +1121,9 @@ include/assert.inc [User testother should not be expired on node 1]
 GRANT CREATE USER ON *.* TO 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT CREATE USER ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT CREATE USER ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 # connection node_testme
 use testdb;
@@ -1104,9 +1137,9 @@ include/assert.inc [User testother should be expired on node 2]
 REVOKE CREATE USER ON *.* FROM 'testme'@'%';
 SHOW GRANTS FOR 'testme';
 Grants for testme@%
-GRANT USAGE ON *.* TO 'testme'@'%'
-GRANT SELECT ON `testdb`.* TO 'testme'@'%'
-GRANT INSERT ON `testdb`.`counter` TO 'testme'@'%'
+GRANT USAGE ON *.* TO `testme`@`%`
+GRANT SELECT ON `testdb`.* TO `testme`@`%`
+GRANT INSERT ON `testdb`.`counter` TO `testme`@`%`
 FLUSH PRIVILEGES;
 #
 # cleanup

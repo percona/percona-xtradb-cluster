@@ -2,12 +2,12 @@
 .\"     Title: \fBmyisampack\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 12/20/2018
+.\"      Date: 03/06/2020
 .\"    Manual: MySQL Database System
-.\"    Source: MySQL 5.7
+.\"    Source: MySQL 8.0
 .\"  Language: English
 .\"
-.TH "\FBMYISAMPACK\FR" "1" "12/20/2018" "MySQL 5\&.7" "MySQL Database System"
+.TH "\FBMYISAMPACK\FR" "1" "03/06/2020" "MySQL 8\&.0" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -118,7 +118,7 @@ to rebuild its indexes\&.
 .PP
 \fBmyisampack\fR
 supports the following options\&. It also reads option files and supports the options for processing them described at
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .sp
 .RS 4
 .ie n \{\
@@ -160,7 +160,7 @@ Make a backup of each table\*(Aqs data file using the name
 \fB\-\-character\-sets\-dir=\fR\fB\fIdir_name\fR\fR
 .sp
 The directory where character sets are installed\&. See
-Section\ \&10.14, \(lqCharacter Set Configuration\(rq\&.
+Section\ \&10.15, \(lqCharacter Set Configuration\(rq\&.
 .RE
 .sp
 .RS 4
@@ -179,6 +179,11 @@ Write a debugging log\&. A typical
 string is
 d:t:o,\fIfile_name\fR\&. The default is
 d:t:o\&.
+.sp
+This option is available only if MySQL was built using
+\fBWITH_DEBUG\fR\&. MySQL release binaries provided by Oracle are
+\fInot\fR
+built using this option\&.
 .RE
 .sp
 .RS 4
@@ -329,9 +334,8 @@ The following sequence of commands illustrates a typical table compression sessi
 .\}
 .nf
 shell> \fBls \-l station\&.*\fR
-\-rw\-rw\-r\-\-   1 monty    my         994128 Apr 17 19:00 station\&.MYD
-\-rw\-rw\-r\-\-   1 monty    my          53248 Apr 17 19:00 station\&.MYI
-\-rw\-rw\-r\-\-   1 monty    my           5767 Apr 17 19:00 station\&.frm
+\-rw\-rw\-r\-\-   1 jones    my         994128 Apr 17 19:00 station\&.MYD
+\-rw\-rw\-r\-\-   1 jones    my          53248 Apr 17 19:00 station\&.MYI
 shell> \fBmyisamchk \-dvv station\fR
 MyISAM file:     station
 Isam\-version:  2
@@ -422,9 +426,8 @@ Data records: 1192
 \- Fixing index 2
 shell> \fBmysqladmin \-uroot flush\-tables\fR
 shell> \fBls \-l station\&.*\fR
-\-rw\-rw\-r\-\-   1 monty    my         127874 Apr 17 19:00 station\&.MYD
-\-rw\-rw\-r\-\-   1 monty    my          55296 Apr 17 19:04 station\&.MYI
-\-rw\-rw\-r\-\-   1 monty    my           5767 Apr 17 19:00 station\&.frm
+\-rw\-rw\-r\-\-   1 jones    my         127874 Apr 17 19:00 station\&.MYD
+\-rw\-rw\-r\-\-   1 jones    my          55296 Apr 17 19:04 station\&.MYI
 shell> \fBmyisamchk \-dvv station\fR
 MyISAM file:     station
 Isam\-version:  2
@@ -825,7 +828,7 @@ option to
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 1997, 2020, Oracle and/or its affiliates. All rights reserved.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP

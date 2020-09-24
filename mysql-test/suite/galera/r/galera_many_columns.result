@@ -14,7 +14,7 @@ START TRANSACTION;
 UPDATE t1 SET f2 = 'CDE' WHERE f1 = 'XYZ' AND f1017 = 'XYZ';
 COMMIT;
 COMMIT;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 ROLLBACK;
 ROLLBACK;
 START TRANSACTION;

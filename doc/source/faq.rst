@@ -54,7 +54,11 @@ First set up the ``clustercheck`` user:
 
 .. code-block:: mysql
 
-   GRANT USAGE ON *.* TO 'clustercheck'@'localhost' IDENTIFIED BY PASSWORD '*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19';
+   mysql> CREATE USER 'clustercheck'@'localhost' IDENTIFIED BY PASSWORD
+   '*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19';
+   Query OK, 0 rows affected (0.00 sec)
+
+   mysql> GRANT PROCESS ON *.* TO 'clustercheck'@'localhost';
 
 .. **
 
@@ -195,7 +199,7 @@ with other transactions on the corresponding node.
 Does it work with regular MySQL replication?
 ============================================
 
-Yes. On the node you are going to use as master,
+Yes. On the node you are going to use as source,
 you should enable ``log-bin`` and ``log-slave-update`` options.
 
 Why the init script (/etc/init.d/mysql) does not start?
@@ -210,9 +214,7 @@ Try to disable SELinux with the following command:
 What does "nc: invalid option -- 'd'" in the sst.err log file mean?
 ===================================================================
 
-This is Debian/Ubuntu specific error.
-|PXC| uses ``netcat-openbsd`` package.
-This dependency has been fixed in recent releases.
-Future releases of |PXC| will be compatible with any ``netcat``
-(see bug :bug:`959970`).
+This error is specific to Debian and Ubuntu.  |PXC| uses ``netcat-openbsd``
+package. This dependency has been fixed.  Future releases of |PXC| will be
+compatible with any ``netcat`` (see bug :jirabug:`PXC-941`).
 

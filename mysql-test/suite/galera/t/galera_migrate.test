@@ -13,7 +13,6 @@
 #
 
 --source include/big_test.inc
---source include/have_innodb.inc
 --source include/have_log_bin.inc
 --source include/force_restart.inc
 
@@ -87,7 +86,7 @@ INSERT INTO t1 VALUES (5);
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_ready';
 --source include/wait_condition.inc
---let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 --source include/wait_condition.inc
 
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
@@ -103,7 +102,7 @@ SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME 
 INSERT INTO t1 VALUES (6);
 
 #
-# Step #5. Attach a second Galera node using mysqldump SST
+# Step #5. Attach a second Galera node using xtrabackup-v2
 #
 
 --connection node_3
@@ -111,27 +110,17 @@ INSERT INTO t1 VALUES (6);
 # non-empty passwords will not work since there is already an empty 'password=' directive in the [client] section of my.cnf
 CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
-SET GLOBAL wsrep_sst_auth = 'sst:';
 
 --connect node_4, 127.0.0.1, root, , test, $NODE_MYPORT_4
+
 CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
 
---disable_query_log
---eval SET GLOBAL wsrep_sst_method = 'mysqldump';
---eval SET GLOBAL wsrep_sst_auth = 'sst:';
---eval SET GLOBAL wsrep_provider='$WSREP_PROVIDER'
---eval SET GLOBAL wsrep_provider_options='base_port=$NODE_GALERAPORT_4'
---eval SET GLOBAL wsrep_sst_receive_address = '127.0.0.1:$NODE_MYPORT_4';
+--let $restart_parameters = "restart:--wsrep_sst_method='xtrabackup-v2' --wsrep_provider=$WSREP_PROVIDER --wsrep_provider_options='base_port=$NODE_GALERAPORT_4' --wsrep_sst_receive_address='127.0.0.1:$NODE_SSTPORT_4' --wsrep_cluster_address='gcomm://127.0.0.1:$NODE_GALERAPORT_3'"
+--replace_regex /# restart:.*//
+--source include/restart_mysqld.inc
 
-# Changing wsrep_cluster_address will cause the client connection to be shutdown
-# Depending on timing, it may trigger 2013 (CR_SERVER_LOST) on the client side
---error 0,2013
---eval SET GLOBAL wsrep_cluster_address='gcomm://127.0.0.1:$NODE_GALERAPORT_3'
-
---enable_query_log
-
---sleep 60
+--sleep 10
 
 --connection node_3
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
@@ -142,7 +131,7 @@ GRANT ALL PRIVILEGES ON *.* TO 'sst';
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_ready';
 --source include/wait_condition.inc
---let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 --source include/wait_condition.inc
 
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
@@ -210,7 +199,6 @@ DROP TABLE t1;
 
 --connection node_3
 SET GLOBAL wsrep_provider = 'none';
-SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;
 DROP USER sst;
@@ -218,7 +206,6 @@ DROP USER sst;
 --connection node_4a
 SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_method = default;
-SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;
@@ -226,10 +213,17 @@ DROP USER sst;
 
 --connection node_3
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
-CALL mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+CALL mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 
 --connection node_4a
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
 CALL mtr.add_suppression("`innodb_index_stats` not found");
 CALL mtr.add_suppression("`innodb_table_stats` not found");
 CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table");
+
+# since we are copying over directory from node-3 it would also copy over
+# slave param from node-3.
+call mtr.add_suppression("Failed to open the relay log.*");
+call mtr.add_suppression("Could not find target log file.*");
+call mtr.add_suppression("Slave: Failed to initialize the master info structure.*");
+call mtr.add_suppression("Failed to create or recover replication info repositories.*");

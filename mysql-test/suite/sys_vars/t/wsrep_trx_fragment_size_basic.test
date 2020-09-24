@@ -1,0 +1,40 @@
+#
+# Test different setting option for wsrep_trx_fragment_size
+
+# Save initial value
+--let $saved_wsrep_trx_fragment_size = `SELECT @@global.wsrep_trx_fragment_size`
+select @@wsrep_trx_fragment_size;
+
+#
+# try to set default value
+--error ER_WRONG_VALUE_FOR_VAR
+set global wsrep_trx_fragment_size = default;
+select @@wsrep_trx_fragment_size;
+
+#
+# try to different valid values (can't set value to valid as wsrep_on=off)
+--error ER_WRONG_VALUE_FOR_VAR
+set global wsrep_trx_fragment_size=102400;
+select @@wsrep_trx_fragment_size;
+
+#
+# try to different invalid values
+--error ER_WRONG_VALUE_FOR_VAR
+set global wsrep_trx_fragment_size=1000000000000;
+select @@wsrep_trx_fragment_size;
+#
+--error ER_WRONG_VALUE_FOR_VAR
+set global wsrep_trx_fragment_size=-1;
+select @@wsrep_trx_fragment_size;
+
+#
+# try to valid value at session level
+--error ER_WRONG_VALUE_FOR_VAR
+set session wsrep_trx_fragment_size=10000;
+select @@wsrep_trx_fragment_size;
+
+# Clean up
+#--disable_query_log
+#--eval SET GLOBAL wsrep_trx_fragment_size = $saved_wsrep_trx_fragment_size
+#--enable_query_log
+

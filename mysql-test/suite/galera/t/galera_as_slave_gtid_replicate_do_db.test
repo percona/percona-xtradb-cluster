@@ -2,12 +2,11 @@
 # Test Galera as a slave to a MySQL master using GTIDs
 #
 
---source include/have_innodb.inc
 --source include/have_log_bin.inc
 
 # As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
---source include/galera_cluster.inc
+--source include/galera_cluster_master_slave.inc
 
 --connection node_1
 RESET MASTER;
@@ -98,7 +97,7 @@ COMMIT;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
 --connection node_3
 
@@ -108,7 +107,7 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
 #
 # Final consistency checks

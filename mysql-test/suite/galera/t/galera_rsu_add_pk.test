@@ -4,7 +4,6 @@
 
 --source include/big_test.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --connection node_1
 CREATE TABLE ten (f1 INTEGER);

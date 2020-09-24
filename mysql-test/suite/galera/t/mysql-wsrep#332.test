@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/have_debug_sync.inc
 --source suite/galera/include/galera_have_debug_sync.inc
 
@@ -24,6 +23,13 @@ INSERT INTO p VALUES (2, 0);
 INSERT INTO c VALUES (1, 1);
 INSERT INTO c VALUES (2, 2);
 
+# Wait for the CREATE TABLE c to reach node_2 to ensure
+# that the mw_369_child_query will work
+--connection node_2
+--let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "c"
+--source include/wait_condition.inc
+
+--connection node_1
 --let $mw_369_parent_query = UPDATE p SET f1 = f1 + 100
 --let $mw_369_child_query = ALTER TABLE c ADD FOREIGN KEY (p_id) REFERENCES p(f1)
 

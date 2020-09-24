@@ -33,13 +33,13 @@ Installation
 
 .. code-block:: bash
 
-  root@ubuntu:~# apt-get install percona-xtradb-cluster-garbd-5.7
+   root@ubuntu:~# apt-get install percona-xtradb-cluster-garbd
 
 on Debian/Ubuntu distributions, or:
 
 .. code-block:: bash
 
-  [root@centos ~]# yum install Percona-XtraDB-Cluster-garbd-57
+   [root@centos ~]# yum install percona-xtradb-cluster-garbd
 
 on CentOS/RHEL distributions.
 

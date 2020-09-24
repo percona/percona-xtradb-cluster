@@ -7,14 +7,13 @@
 
 --source include/big_test.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 # Force a restart at the end of the test
 --source include/force_restart.inc
 
 SELECT 1;
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
 
 
@@ -25,7 +24,7 @@ SELECT 1;
 
 # Wait until the node is confirmed as being down
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Basic setup, create an encrypted table
@@ -44,7 +43,7 @@ INSERT INTO e1(text) VALUES('bbbbb');
 --echo Restarting node 2 ...
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 select * from e1;
@@ -58,7 +57,7 @@ select * from e1;
 
 --connection node_1
 --echo #node-1
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 INSERT INTO e1(text) VALUES('aaaaa2');
@@ -68,7 +67,7 @@ INSERT INTO e1(text) VALUES('bbbbb2');
 --echo #restarting node-2
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 select * from e1;

@@ -144,7 +144,6 @@
 #
 --source include/have_debug_sync.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/force_restart.inc
 
 CREATE DATABASE testdb;
@@ -621,13 +620,13 @@ CREATE FUNCTION hello2 (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT
 --echo # connection node_1
 --connection node_1
 --let $assert_text = The hello2 function should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello2"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hello2"
 --source include/assert.inc
 
 --echo # connection node_2
 --connection node_2
 --let $assert_text = The hello2 function should exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello2"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hello2"
 --source include/assert.inc
 
 
@@ -645,7 +644,7 @@ DROP FUNCTION hello2;
 --source include/wait_condition.inc
 
 --let $assert_text = The hello2 function should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello2"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hello2"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -654,7 +653,7 @@ DROP FUNCTION hello2;
 --source include/wait_condition.inc
 
 --let $assert_text = The hello2 function should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello2"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hello2"
 --source include/assert.inc
 
 # cleanup
@@ -1022,7 +1021,7 @@ END;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellop procedure should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1031,7 +1030,7 @@ END;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellop function should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 
@@ -1058,7 +1057,7 @@ CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT(
 --source include/wait_condition.inc
 
 --let $assert_text = The hello function should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hello"
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.routines where ROUTINE_NAME="hello"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1067,7 +1066,7 @@ CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT(
 --source include/wait_condition.inc
 
 --let $assert_text = The hello function should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hello"
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.routines where ROUTINE_NAME="hello"
 --source include/assert.inc
 
 
@@ -1091,13 +1090,13 @@ END;
 --echo # connection node_1
 --connection node_1
 --let $assert_text = The hellop procedure should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 --echo # connection node_2
 --connection node_2
 --let $assert_text = The hellop procedure should exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 
@@ -1115,7 +1114,7 @@ DROP PROCEDURE hellop;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellop procedure should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1124,7 +1123,7 @@ DROP PROCEDURE hellop;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellop procedure should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 # cleanup
@@ -1154,16 +1153,16 @@ END;
 --echo # connection node_1
 --connection node_1
 --let $assert_text = The hellop procedure should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 --echo # connection node_2
 --connection node_2
 --let $assert_text = The hellop procedure should exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
-SELECT name, security_type FROM mysql.proc WHERE name = "hellop";
+SELECT routine_name, security_type FROM information_schema.routines where ROUTINE_NAME = "hellop";
 
 --echo # connection node_testme
 --connection node_testme
@@ -1178,9 +1177,9 @@ ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellop procedure should still use the definer on node 1
---let $assert_cond = security_type = "definer" FROM mysql.proc WHERE name = "hellop";
---let $assert_debug = SELECT * FROM mysql.proc WHERE name = "hellop";
+--let $assert_text = The hellop procedure should still use the DEFINER on node 1
+--let $assert_cond = security_type = "DEFINER" FROM information_schema.routines where ROUTINE_NAME = "hellop";
+--let $assert_debug = SELECT * FROM information_schema.routines where ROUTINE_NAME = "hellop";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1188,8 +1187,8 @@ ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellop procedure should still use the definer on node 2
---let $assert_cond = security_type = "definer" FROM mysql.proc WHERE name = "hellop";
+--let $assert_text = The hellop procedure should still use the DEFINER on node 2
+--let $assert_cond = security_type = "DEFINER" FROM information_schema.routines where ROUTINE_NAME = "hellop";
 --source include/assert.inc
 
 # cleanup
@@ -1217,16 +1216,16 @@ CREATE FUNCTION hellof (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT
 --echo # connection node_1
 --connection node_1
 --let $assert_text = The hellof function should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellof"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellof"
 --source include/assert.inc
 
 --echo # connection node_2
 --connection node_2
 --let $assert_text = The hellof function should exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellof"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellof"
 --source include/assert.inc
 
-SELECT name, security_type FROM mysql.proc WHERE name = "hellof";
+SELECT routine_name, security_type FROM information_schema.routines where ROUTINE_NAME = "hellof";
 
 --echo # connection node_testme
 --connection node_testme
@@ -1241,9 +1240,9 @@ ALTER FUNCTION hellof SQL SECURITY INVOKER;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellof function should still use the definer on node 1
---let $assert_cond = security_type = "definer" FROM mysql.proc WHERE name = "hellof";
---let $assert_debug = SELECT * FROM mysql.proc WHERE name = "hellof";
+--let $assert_text = The hellof function should still use the DEFINER on node 1
+--let $assert_cond = security_type = "DEFINER" FROM information_schema.routines where ROUTINE_NAME = "hellof";
+--let $assert_debug = SELECT * FROM information_schema.routines where ROUTINE_NAME = "hellof";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1251,8 +1250,8 @@ ALTER FUNCTION hellof SQL SECURITY INVOKER;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellof function should still use the definer on node 2
---let $assert_cond = security_type = "definer" FROM mysql.proc WHERE name = "hellof";
+--let $assert_text = The hellof function should still use the DEFINER on node 2
+--let $assert_cond = security_type = "DEFINER" FROM information_schema.routines where ROUTINE_NAME = "hellof";
 --source include/assert.inc
 
 # cleanup

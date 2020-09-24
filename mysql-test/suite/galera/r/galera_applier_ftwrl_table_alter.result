@@ -13,10 +13,10 @@ SET SESSION wsrep_sync_wait = 15;
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `f1` int(11) NOT NULL,
-  `f2` int(11) DEFAULT NULL,
+  `f1` int NOT NULL,
+  `f2` int DEFAULT NULL,
   PRIMARY KEY (`f1`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE = 'Waiting for table metadata lock';
 COUNT(*) = 0
 1

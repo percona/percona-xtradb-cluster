@@ -1,0 +1,76 @@
+#
+--source include/galera_cluster.inc
+
+#
+# This test explore and test persistence of variable in PXC environment
+# and effect of it on galera cluster
+#
+
+#-------------------------------------------------------------------------------
+--connection node_1
+--echo #node-1 (some workload)
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (10), (20), (30), (40);
+select * from t;
+#
+select @@global.max_connections;
+SET PERSIST max_connections = 1900;
+select @@global.max_connections;
+#
+select @@global.sort_buffer_size;
+SET PERSIST_ONLY sort_buffer_size = 1000000;
+select @@global.sort_buffer_size;
+#
+set global wsrep_provider_options="pc.ignore_sb=true";
+
+#-------------------------------------------------------------------------------
+--connection node_2
+--echo #node-2 (just to validate it is active and working)
+--let $wait_condition = SELECT COUNT(*) = 4 FROM t
+--source include/wait_condition.inc
+#
+select @@global.sort_buffer_size;
+select @@global.max_connections;
+--echo #node-2 being killed
+--source include/kill_galera.inc
+
+#-------------------------------------------------------------------------------
+--connection node_1
+--echo #node-1 (some operation on node-1)
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+#
+insert into t values (100), (200);
+insert into t values (101), (201);
+insert into t values (102), (202);
+insert into t values (103), (203);
+insert into t values (104), (204);
+select * from t;
+--echo #node-1 (set persist variables)
+SET PERSIST max_connections = 2100;
+select @@global.max_connections;
+SET PERSIST_ONLY sort_buffer_size = 20000000;
+select @@global.sort_buffer_size;
+
+#-------------------------------------------------------------------------------
+--connection node_2
+--echo #node-2 (restarted will cause SST as node-2 was killed)
+--source include/start_mysqld.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+#
+--echo #node-2 (node-2 gets SST from node-1 but the persist settings are not copied over)
+select @@global.sort_buffer_size;
+select @@global.max_connections;
+#
+
+#-------------------------------------------------------------------------------
+--connection node_1
+drop table t;
+RESET PERSIST max_connections;
+RESET PERSIST sort_buffer_size;
+set global max_connections=DEFAULT;
+set global wsrep_provider_options="pc.ignore_sb=false";
+

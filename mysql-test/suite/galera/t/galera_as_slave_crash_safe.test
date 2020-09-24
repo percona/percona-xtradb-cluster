@@ -4,12 +4,11 @@
 # The galera/galera_2node_slave.cnf describes the setup of the nodes
 #
 
---source include/have_innodb.inc
 --source include/have_log_bin.inc
 
 # As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
---source include/galera_cluster.inc
+--source include/galera_cluster_master_slave.inc
 
 --connection node_3
 --echo #node-3 (async slave)

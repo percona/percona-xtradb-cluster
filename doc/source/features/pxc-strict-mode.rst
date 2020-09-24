@@ -4,43 +4,35 @@
 PXC Strict Mode
 ===============
 
-PXC Strict Mode (:variable:`pxc_strict_mode`) is designed to help control
-behavior of cluster when an experimental/unsupported feature is used.  It
-performs a number of validations at startup and during runtime.
+PXC Strict Mode is designed to avoid the use of
+experimental and unsupported features in |PXC|.
+It performs a number of validations at startup and during runtime.
 
-Depending on the actual mode you select, upon encountering a failed validation,
-the server will either throw an error (halting startup or denying the
-operation), or log a warning and continue running as normal.  The following
-modes are available:
+Depending on the actual mode you select,
+upon encountering a failed validation,
+the server will either throw an error
+(halting startup or denying the operation),
+or log a warning and continue running as normal.
+The following modes are available:
 
-* ``DISABLED``: Do not perform strict mode validations and run as normal; no
-  error or warning is logged for use of experimental/unsupported feature.
+* ``DISABLED``: Do not perform strict mode validations
+  and run as normal.
 
-* ``PERMISSIVE``: If a vaidation fails, log a warning and continue running as
-  normal.
+* ``PERMISSIVE``: If a vaidation fails, log a warning and continue running
+  as normal.
 
-* ``ENFORCING``: If a validation fails during startup, halt the server and throw
-  an error.  If a validation fails during runtime, deny the operation and throw
-  an error.
+* ``ENFORCING``: If a validation fails during startup,
+  halt the server and throw an error.
+  If a validation fails during runtime,
+  deny the operation and throw an error.
 
-* ``MASTER``: The same as ``ENFORCING`` except that explicit table locking is
-  allowed: the validation of :ref:`explicit table locking
-  <explicit-table-locking>` is not performed.  This mode can be used with
-  clusters in which write operations are isolated to a single node.
-
-.. important::
-
-   Setting ``pxc_strict_mode`` from `DISABLED` or `PERMISSIVE` to either
-   `ENFORCING` or `MASTER` requires that the following conditions are
-   met:
-
-   - `wsrep_replicate_myisam=OFF`
-   - `binlog_format=ROW`
-   - `log_output=FILE/NONE`
-   - transaction isolation level != SERIALIZABLE
+* ``MASTER``: The same as ``ENFORCING`` except that the validation of
+  :ref:`explicit table locking <explicit-table-locking>` is not performed.
+  This mode can be used with clusters
+  in which write operations are isolated to a single node.
 
 By default, PXC Strict Mode is set to ``ENFORCING``,
-except if the node is acting as a standalone server (wsrep_provider=none)
+except if the node is acting as a standalone server
 or the node is bootstrapping, then PXC Strict Mode defaults to ``DISABLED``.
 
 It is recommended to keep PXC Strict Mode set to ``ENFORCING``,
@@ -54,27 +46,31 @@ you should be aware of the limitations and effects
 that this may have on data integrity.
 For more information, see :ref:`validations`.
 
-To set the mode, use the :variable:`pxc_strict_mode` variable in the
-configuration file or the ``--pxc-strict-mode`` option during ``mysqld``
-startup.
+To set the mode,
+use the :variable:`pxc_strict_mode` variable in the configuration file
+or the ``--pxc-strict-mode`` option during ``mysqld`` startup.
 
-.. important::
+.. note::
 
-   It is better to start the server with the necessary mode (the default
-   ``ENFORCING`` is highly recommended).  However, you can dynamically change it
-   during runtime.  For example, to set PXC Strict Mode to ``PERMISSIVE``, run
-   the following command::
+   It is better to start the server with the necessary mode
+   (the default ``ENFORCING`` is highly recommended).
+   However, you can dynamically change it during runtime.
+   For example, to set PXC Strict Mode to ``PERMISSIVE``,
+   run the following command::
 
       mysql> SET GLOBAL pxc_strict_mode=PERMISSIVE;
 
-   To further ensure data consistency, it is important to have all nodes in the
-   cluster running with the same configuration, including the value of
-   ``pxc_strict_mode`` variable.
+.. note::
+
+   To further ensure data consistency,
+   it is important to have all nodes in the cluster
+   running with the same configuration,
+   including the value of ``pxc_strict_mode`` variable.
 
 .. _validations:
 
 Validations
-===========
+================================================================================
 
 PXC Strict Mode validations are designed to ensure optimal operation
 for common cluster setups that do not require experimental features
@@ -90,194 +86,217 @@ This section describes the purpose and consequences of each validation.
 .. contents::
    :local:
 
+.. _pxc-strict-mode-validation-group-replication:
+
+Group replication
+--------------------------------------------------------------------------------
+
+.. TODO:
+
+   Provide steps for migrating from group replication
+
+   describing why (e.g. it is a completely different
+   clustering product, and we only support migration from/to, not
+   actively running them together), and how (disabled - allowed,
+   permission - warnings, enforcing/master - can't be turned on)
+
+*Group replication* is a feature of |mysql| that `provides distributed state
+machine replication with strong coordination between servers
+<https://dev.mysql.com/doc/refman/8.0/en/group-replication.html>`_. It is
+implemented as a plugin which, if activated, may conflict with |pxc|. Group
+replication cannot be activated to run alongside |pxc|. However, you can migrate
+to |pxc| from the environment that uses group replication.
+
+For the strict mode to work correctly, make sure that the group replication
+plugin is *not active*. In fact, if :variable:`pxc_strict_mode` is set to
+`ENFORCING` or `MASTER`, the server will stop with an error:
+
+.. admonition:: Error message with :variable:`pxc_strict_mode` set to `ENFORCING` or `MASTER`
+
+   .. code-block:: text
+
+      Group replication cannot be used with |pxc| in strict mode.
+
+If :variable:`pxc_strict_mode` is set to ``DISABLED`` you can use group
+replication at your own risk. Setting :variable:`pxc_strict_mode` to
+``PERMISSIVE`` will result in a warning.
+
+.. admonition:: Warning message with :variable:`pxc_strict_mode` set to `PERMISSIVE`
+
+   .. code-block:: text
+
+      Using group replication with |pxc| is only supported for migration. Please
+      make sure that group replication is turned off once all data is migrated to
+      |pxc|.
+
+   
+
 .. _storage-engine:
 
 Storage engine
 --------------
 
-|PXC| supports only transactional storage engine (XtraDB or InnoDB) as PXC needs
-capability of the storage engine to rollback any given transaction. Storage
-engines, such as *MyISAM*, *MEMORY*, *CSV* are not supported.
+|PXC| currently supports replication only for tables
+that use a transactional storage engine (XtraDB or InnoDB).
+To ensure data consistency,
+the following statements should not be allowed for tables
+that use a non-transactional storage engine (MyISAM, MEMORY, CSV, etc.):
 
-* Data manipulation statements that perform writing to table (for example,
-  ``INSERT``, ``UPDATE``, ``DELETE``, etc.)
-* The following administrative statements: ``CHECK``, ``OPTIMIZE``, ``REPAIR``,
-  and ``ANALYZE``
+* Data manipulation statements that perform writing to table
+  (for example, ``INSERT``, ``UPDATE``, ``DELETE``, etc.)
+
+* The following administrative statements:
+  ``CHECK``, ``OPTIMIZE``, ``REPAIR``, and ``ANALYZE``
+
 * ``TRUNCATE TABLE`` and ``ALTER TABLE``
 
-.. list-table::
-   :header-rows: 1
+Depending on the selected mode, the following happens:
 
-   * - Strict Mode
-     - At startup
-     - At runtime
-   * - DISABLED
-     - No validation is performed
-     - Allow write/DML, ALTER, TRUNCATE and ADMIN (check, optimize, repair,
-       analyze) operations on all persistent tables (including one that resides
-       in non-transactional storage engine).
-   * - PERMISSIVE
-     - No validation is perfromed.
-     - All operations are permitted, but a warning is logged when an undesirable
-       operation is performed on an unsupported table.
-   * - ENFORCING or MASTER
-     - No validation is performed.
-     - write/DML, ALTER, TRUNCATE and ADMIN operations on each persistent table
-       that is not implemented using a supported storage engine logs an error.
+``DISABLED``
 
-In order to balance backward compatibility and existing application, |PXC|
-allows table created with a non-transactional storage engine to co-exist but
-DML, ALTER, TRUNCATE and ADMIN (ANALYZE, CHECK, etc....) operations on such
-tables are blocked in ENFORCING mode.
+ At startup, no validation is performed.
 
-ALTERing unsupported table from non-transactional storage engine to a
-transactional storage engine is allowed.
+ At runtime, all operations are permitted.
 
-As operation checks are applicable only to persistent tables, temporary tables
-are not replicated by Galera Cluster so *pxc-strict-mode* enforcement is not
-applicable to temporary table. Same is applicable to performance-schema.  (Check
-is also not applied for system tables located in the `mysql` database.)
+``PERMISSIVE``
+
+ At startup, no validation is perfromed.
+
+ At runtime, all operations are permitted,
+ but a warning is logged when an undesirable operation
+ is performed on an unsupported table.
+
+``ENFORCING`` or ``MASTER``
+
+ At startup, no validation is performed.
+
+ At runtime, any undesirable operation performed on an unsupported table
+ is denied and an error is logged.
+
+.. note:: Unsupported tables can be converted to use a supported storage engine.
 
 MyISAM replication
 ------------------
 
-|PXC| provides experimental support for replication of tables that use the
-MyISAM storage engine.  Due to the non-transactional nature of MyISAM, it is not
-likely to ever be fully supported in |PXC|.
+|PXC| provides experimental support for replication of tables
+that use the MyISAM storage engine.
+Due to the non-transactional nature of MyISAM,
+it is not likely to ever be fully supported in |PXC|.
 
-MyISAM replication is controlled using the :variable:`wsrep_replicate_myisam`
-variable, which is set to ``OFF`` by default.  Due to its unreliability, MyISAM
-replication should not be enabled if you want to ensure data consistency.
+MyISAM replication is controlled
+using the :variable:`wsrep_replicate_myisam` variable,
+which is set to ``OFF`` by default.
+Due to its unreliability, MyISAM replication should not be enabled
+if you want to ensure data consistency.
 
-.. list-table::
-   :header-rows: 1
+Depending on the selected mode, the following happens:
 
-   * - Strict Mode
-     - At startup
-     - At runtime
-   * - DISABLED
-     - No validation is performed.
-     - You can set :variable:`wsrep_replicate_myisam` to any value.
-   * - PERMISSIVE
-     - If :variable:`wsrep_replicate_myisam` is set to ``ON``, a warning is
-       logged and startup continues.
-     - It is permitted to change :variable:`wsrep_replicate_myisam` to any
-       value, but if you set it to ``ON``, a warning is logged.
-   * - ENFORCING or MASTER
-     - If :variable:`wsrep_replicate_myisam` is set to ``ON``, an error is
-       logged and startup is aborted.
-     - Any attempt to change :variable:`wsrep_replicate_myisam` to ``ON`` fails
-       and an error is logged. Setting it to OFF is welcome operation and
-       doesn't result in an error.
+``DISABLED``
 
-.. note::
+ At startup, no validation is performed.
 
-   The :variable:`wsrep_replicate_myisam` variable controls *replication* for
-   MyISAM tables, and this validation only checks whether it is allowed.
-   Undesirable operations for MyISAM tables are restricted using the
-   :ref:`storage-engine` validation.
+ At runtime, you can set :variable:`wsrep_replicate_myisam` to any value.
+
+``PERMISSIVE``
+
+ At startup, if :variable:`wsrep_replicate_myisam` is set to ``ON``,
+ a warning is logged and startup continues.
+
+ At runtime, it is permitted to change :variable:`wsrep_replicate_myisam`
+ to any value, but if you set it to ``ON``, a warning is logged.
+
+``ENFORCING`` or ``MASTER``
+
+ At startup, if :variable:`wsrep_replicate_myisam` is set to ``ON``,
+ an error is logged and startup is aborted.
+
+ At runtime, any attempt to change :variable:`wsrep_replicate_myisam`
+ to ``ON`` fails and an error is logged.
+
+.. note:: The :variable:`wsrep_replicate_myisam` variable controls
+   *replication* for MyISAM tables,
+   and this validation only checks whether it is allowed.
+   Undesirable operations for MyISAM tables
+   are restricted using the :ref:`storage-engine` validation.
 
 Binary log format
 -----------------
 
-|PXC| supports only the default row-based binary logging format.  Setting the
-|binlog_format|_ variable to anything but ``ROW`` at startup is not allowed,
-because this changes the global scope, which must be set to ROW.  Validation is
-performed only at runtime and against session scope.
-
-.. list-table::
-   :header-rows: 1
-
-   * - Strict Mode
-     - At startup
-     - At runtime
-   * - DISABLED
-     - No check is enforced.
-     - You can set ``binlog_format`` to any value.
-   * - PERMISSIVE
-     - No check is enforced.
-     - It is permitted to change ``binlog_format`` to any value, but if you set
-       it to anything other than ``ROW``, a warning is logged.
-   * - ENFORCING or MASTER
-     - No check is enforced.
-     - At runtime, any attempt to change ``binlog_format`` to anything other
-       than ``ROW`` fails and an error is logged. Setting it to ROW is welcome
-       operation and doesn't result in an error.
-
-.. note::
-
-   Setting *binlog_format* at global level to STATEMENT/MIXED is not allowed under
-   any mode and even during startup (startup setting are global setting)
+|PXC| supports only the default row-based binary logging format.  In
+|version|, setting the |binlog_format|_ variable to anything but
+``ROW`` at startup or runtime is not allowed regardless of the value of the
+:variable:`pxc_strict_mode` variable.
 
 .. |binlog_format| replace:: ``binlog_format``
-.. _binlog_format: http://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_binlog_format
+.. _binlog_format: http://dev.mysql.com/doc/refman/8.0/en/replication-options-binary-log.html#sysvar_binlog_format
 
-Tables without the primary key
+Tables without primary keys
 ---------------------------
 
-|PXC| cannot properly propagate certain write operations to tables that do not
-have primary keys defined.  Undesirable operations include data manipulation
-statements that perform writing to table (especially ``DELETE``).
-
-.. note::
-
-   This type of validation is not applicable to temporary tables, system tables
-   (tables located in `mysql` database), and performance-schema.
+|PXC| cannot properly propagate certain write operations
+to tables that do not have primary keys defined.
+Undesirable operations include data manipulation statements
+that perform writing to table (especially ``DELETE``).
 
 Depending on the selected mode, the following happens:
 
-.. list-table::
-   :header-rows: 1
+``DISABLED``
 
-   * - Strict Mode
-     - At startup
-     - At runtime
-   * - DISABLED
-     - No validation is performed.
-     - All operations are permitted.
-   * - PERMISSIVE
-     - No validation is perfromed.
-     - All operations are permitted, but a warning is logged when an undesirable
-       operation is performed on a table without an explicit primary key
-       defined.
-   * - ENFORCING or MASTER
-     - No validation is performed.
-     - Any undesirable operation performed on a table without an
-       explicit primary key is denied and an error is logged.
+ At startup, no validation is performed.
+
+ At runtime, all operations are permitted.
+
+``PERMISSIVE``
+
+ At startup, no validation is perfromed.
+
+ At runtime, all operations are permitted,
+ but a warning is logged when an undesirable operation
+ is performed on a table without an explicit primary key defined.
+
+``ENFORCING`` or ``MASTER``
+
+ At startup, no validation is performed.
+
+ At runtime, any undesirable operation
+ performed on a table without an explicit primary key
+ is denied and an error is logged.
 
 Log output
 ----------
 
-|PXC| does not support tables in the MySQL database as the destination for log
-output.  By default, log entries are written to a file.  This validation checks
-the value of the |log_output|_ variable.
+|PXC| does not support tables in the MySQL database
+as the destination for log output.
+By default, log entries are written to file.
+This validation checks the value of the |log_output|_ variable.
 
 Depending on the selected mode, the following happens:
 
-.. list-table::
-   :header-rows: 1
+``DISABLED``
 
-   * - Strict Mode
-     - At startup
-     - At runtime
-   * - DISABLED
-     - No validation is performed.
-     - You can set ``log_output`` to any value.
-   * - PERMISSIVE
-     - If ``log_output`` is set only to ``TABLE``, a warning is logged and
-       startup continues.
-     - It is permitted to change ``log_output`` to any value, but if you set it
-       only to ``TABLE``, a warning is logged. Setting it to FILE/NONE is
-       welcome operation and doesn't result in a warning.
-   * - ENFORCING or MASTER
-     - If ``log_output`` is set only to ``TABLE``, an error is logged and
-       startup is aborted.
-     - Any attempt to change ``log_output`` only to ``TABLE`` fails and an error
-       is logged. Setting it to FILE/NONE is welcome operation and doesn't
-       result in a warning.
+ At startup, no validation is performed.
+
+ At runtime, you can set ``log_output`` to any value.
+
+``PERMISSIVE``
+
+ At startup, if ``log_output`` is set only to ``TABLE``,
+ a warning is logged and startup continues.
+
+ At runtime, it is permitted to change ``log_output``
+ to any value, but if you set it only to ``TABLE``,
+ a warning is logged.
+
+``ENFORCING`` or ``MASTER``
+
+ At startup, if ``log_output`` is set only to ``TABLE``,
+ an error is logged and startup is aborted.
+
+ At runtime, any attempt to change ``log_output`` only to ``TABLE`` fails
+ and an error is logged.
 
 .. |log_output| replace:: ``log_output``
-.. _log_output: http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_log_output
+.. _log_output: http://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_log_output
 
 .. _explicit-table-locking:
 
@@ -295,22 +314,24 @@ and are covered by this validation:
 
 Depending on the selected mode, the following happens:
 
-.. list-table::
-   :header-rows: 1
+``DISABLED`` or ``MASTER``
 
-   * - Strict Mode
-     - At startup
-     - At runtime
-   * - DISABLED or MASTER
-     - No validation is performed.
-     - All operations are permitted.
-   * - PERMISSIVE
-     - No validation is performed.
-     - All operations are permitted, but a warning is logged when an
-       undesirable operation is performed.
-   * - ENFORCING
-     - No validation is performed.
-     - Any undesirable operation is denied and an error is logged.
+ At startup, no validation is performed.
+
+ At runtime, all operations are permitted.
+
+``PERMISSIVE``
+
+ At startup, no validation is performed.
+
+ At runtime, all operations are permitted,
+ but a warning is logged when an undesirable operation is performed.
+
+``ENFORCING``
+
+ At startup, no validation is performed.
+
+ At runtime, any undesirable operation is denied and an error is logged.
 
 Auto-increment lock mode
 ------------------------
@@ -322,97 +343,119 @@ This validation checks the value of the |innodb_autoinc_lock_mode|_ variable.
 By default, the variable is set to ``1`` (*consecutive* lock mode),
 but it should be set to ``2`` (*interleaved* lock mode).
 
-.. note::
+Depending on the strict mode selected,
+the following happens:
 
-   This validation is not performed during runtime, because the
-   ``innodb_autoinc_lock_mode`` variable cannot be set dynamically.
+``DISABLED``
 
-Depending on the strict mode selected, the following happens:
+ At startup, no validation is performed.
 
-.. list-table::
-   :header-rows: 1
+``PERMISSIVE``
 
-   * - Strict Mode
-     - At startup
-     - At runtime
-   * - DISABLED
-     - no validation is performed.
-     - This option is not dynamic, no validation is required during runtime.
-   * - PERMISSIVE
-     - If ``innodb_autoinc_lock_mode`` is not set to ``2``,
-       a warning is logged and startup continues.
-     - This option is not dynamic, no validation is required during runtime.
-   * - ENFORCING or MASTER
-     - If ``innodb_autoinc_lock_mode`` is not set to ``2``, an error is logged
-       and startup is aborted.
-     - This option is not dynamic, no validation is required during runtime.
-       
+ At startup, if ``innodb_autoinc_lock_mode`` is not set to ``2``,
+ a warning is logged and startup continues.
+
+``ENFORCING`` or ``MASTER``
+
+ At startup, if ``innodb_autoinc_lock_mode`` is not set to ``2``,
+ an error is logged and startup is aborted.
+
+.. note:: This validation is not performed during runtime,
+   because the ``innodb_autoinc_lock_mode`` variable
+   cannot be set dynamically.
+
 .. |innodb_autoinc_lock_mode| replace:: ``innodb_autoinc_lock_mode``
-.. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
+.. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
 
 Combining schema and data changes in a single statement
 -------------------------------------------------------
 
-|PXC| does not support ``CREATE TABLE ... AS SELECT`` (CTAS) statements, because
-they combine both schema and data changes.
+With strict mode set to ``ENFORCING``, |PXC| does not support :abbr:`CTAS
+(CREATE TABLE ... AS SELECT)` statements, because they combine both schema and
+data changes. Note that tables in the SELECT clause should be present on all
+replication nodes.
+
+With strict mode set to ``PERMISSIVE`` or ``DISABLED``, |ctas| statements are
+replicated using the :abbr:`TOI (Total Order Isolation)` method to ensure
+consistency. In |PXC| 5.7, |ctas| statements were replicated using DML
+write-sets when strict mode was set to ``PERMISSIVE`` or ``DISABLED``.
+
+.. important::
+   
+   MyISAM tables are created and loaded even if
+   :variable:`wsrep_replicate_myisam` equals to 1.  |PXC| does not recommend
+   using the |MyISAM| storage engine. The support for |MyISAM| is experimental
+   and may be removed in a future release.
+
+.. seealso::
+
+   |MySQL| Bug System: XID inconsistency on master-slave with CTAS
+      https://bugs.mysql.com/bug.php?id=93948   
 
 Depending on the strict mode selected, the following happens:
 
 .. list-table::
    :header-rows: 1
+   :widths: 25 75
 
-   * - Strict Mode
-     - At startup
-     - At runtime
+   * - Mode
+     - Behavior
    * - DISABLED
-     - No validation is performed.
-     - All operations are permitted.
+     - At startup, no validation is performed. At runtime, all operations are
+       permitted.
    * - PERMISSIVE
-     - No validation is perfromed.
-     - All operations are permitted, but a warning is logged when a CTAS
-       operation is performed.
+     - At startup, no validation is perfromed. At runtime, all operations are
+       permitted, but a warning is logged when a |ctas| operation is performed.
    * - ENFORCING
-     - No validation is performed.
-     - Any CTAS operation is denied and an error is logged.
+     - At startup, no validation is performed. At runtime, any CTAS operation is
+       denied and an error is logged.
 
-.. note::
+.. important::
 
-   CTAS operations for temporary tables are permitted even in strict mode.
+   Although |ctas| operations for temporary tables are permitted even in
+   ``STRICT`` mode, temporary tables should not be used as *source* tables in
+   |ctas| operations due to the fact that temporary tables are not present on
+   all nodes.
+
+   If ``node-1`` has a temporary and a non-temporary table with the same name,
+   |ctas| on ``node-1`` will use temporary and |ctas| on ``node-2`` will use the
+   non-temporary table resulting in a data level inconsistency.
+
+.. worklog: 1h 2/21/2019
 
 Discarding and Importing Tablespaces
 ------------------------------------
 
-``DISCARD TABLESPACE`` and ``IMPORT TABLESPACE`` are not replicated using
-:term:`TOI`.  This can lead to data inconsistency if executed on only one node.
+``DISCARD TABLESPACE`` and ``IMPORT TABLESPACE``
+are not replicated using TOI.
+This can lead to data inconsistency if executed on only one node.
 
-Depending on the strict mode selected, the following happens:
+Depending on the strict mode selected,
+the following happens:
 
-.. list-table::
-   :header-rows: 1
+``DISABLED``
 
-   * - Strict Mode
-     - At startup
-     - At runtime
-   * - DISABLED
-     - No validation is performed
-     - All operations are permitted
-   * - PERMISSIVE
-     - No validation is perfromed.
-     - All operations are permitted, but a warning is logged when you discard or
-       import a tablespace.
-   * - ENFORCING
-     - No validation is performed
-     - Discarding or importing a tablespace is denied and an error is logged.
+ At startup, no validation is performed.
 
-XA transactions
---------------------------------------------------------------------------------
+ At runtime, all operations are permitted.
 
-XA transaction are not supported by PXC/Galera and with new MySQL-5.7 semantics
-using xa statement causes reuse of XID which is being used by Galera causing
-conflicts.  XA statements are completely blocked irrespective of the value of
-:variable:`pxc-strict-mode`.
+``PERMISSIVE``
 
+ At startup, no validation is perfromed.
+
+ At runtime, all operations are permitted,
+ but a warning is logged when you discard or import a tablespace.
+
+``ENFORCING``
+
+ At startup, no validation is performed.
+
+ At runtime, discarding or importing a tablespace is denied
+ and an error is logged.
 
 .. rubric:: References
 
 .. target-notes::
+
+
+.. |ctas| replace:: :abbr:`CTAS (CREATE TABLE ... AS SELECT)`

@@ -22,9 +22,9 @@ DROP DATABASE database1;
 # Node 1
 SET DEBUG_SYNC = "now SIGNAL continue";
 # Node 1a
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 # Node 1b
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 # Node 1
 include/assert.inc [database1 has been deleted on node 1]
 USE database1;

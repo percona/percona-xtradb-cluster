@@ -1,32 +1,23 @@
 .. _bootstrap:
 
-============================
+================================================================================
 Bootstrapping the First Node
-============================
+================================================================================
 
-After you :ref:`configure all PXC nodes <configure>`,
-initialize the cluster by bootstrapping the first node.
-The initial node should be the one that contains all your data,
-which you want to be replicated to other nodes.
+After you :ref:`configure all PXC nodes <configure>`, initialize the cluster by
+bootstrapping the first node.  The initial node must contain all the data that
+you want to be replicated to other nodes.
 
-Bootstrapping implies starting the node without any known cluster addresses.
-If the :variable:`wsrep_cluster_address` variable is empty,
-|PXC| assumes that this is the first node and initializes the cluster.
+Bootstrapping implies starting the first node without any known cluster
+addresses: if the |wsrep_cluster_address| variable is empty, |PXC| assumes that
+this is the first node and initializes the cluster.
 
-Instead of changing the configuration,
-start the first node using the following command:
+Instead of changing the configuration, start the first node using the following
+command:
 
 .. code-block:: bash
 
-   [root@pxc1 ~]# /etc/init.d/mysql bootstrap-pxc
-
-.. note::
-
-   On RHEL or CentOS 7, use the following bootstrap command:
-
-   .. code-block:: bash
-
-      [root@pxc1 ~]# systemctl start mysql@bootstrap.service
+   [root@pxc1 ~]# systemctl start mysql@bootstrap.service
 
 When you start the node using the previous command,
 it runs in bootstrap mode with ``wsrep_cluster_address=gcomm://``.
@@ -58,24 +49,22 @@ To make sure that the cluster has been initialized, run the following:
    40 rows in set (0.01 sec)
 
 The previous output shows that the cluster size is 1 node,
-it is the primary component, the node is in ``Synced`` state,
+it is the primary component, the node is in the ``Synced`` state,
 it is fully connected and ready for write-set replication.
 
-Before :ref:`adding other nodes <add-node>` to your new cluster,
-create a user for :term:`SST` and provide necessary privileges for it.
-The credentials must match those specified when :ref:`configure`.
+.. include:: .res/text/admonition-automatic-user.txt
 
-.. code-block:: sql
+.. seealso::
 
-   mysql@pxc1> CREATE USER 'sstuser'@'localhost' IDENTIFIED BY 'passw0rd';
-   mysql@pxc1> GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO
-     'sstuser'@'localhost';
-   mysql@pxc1> FLUSH PRIVILEGES;
-
-For more information, see `Privileges for Percona XtraBackup
-<https://www.percona.com/doc/percona-xtrabackup/2.4/using_xtrabackup/privileges.html>`_.
+   |percona| Blog Post: |PXB| |version| New Feature: wsrep_sst_auth removal
+      https://www.percona.com/blog/2019/10/03/percona-xtradb-cluster-8-0-new-feature-wsrep_sst_auth-removal/
 
 Next Steps
 ==========
 
 After initializing the cluster, you can :ref:`add other nodes <add-node>`.
+
+.. |wsrep_cluster_address| replace:: :variable:`wsrep_cluster_address`
+
+.. include:: .res/replace.opt.txt
+.. include:: .res/replace.txt

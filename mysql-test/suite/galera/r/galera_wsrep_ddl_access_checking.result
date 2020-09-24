@@ -97,11 +97,11 @@ INSERT INTO counter(count) VALUES(7);;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
 # connection node_2
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
 #
 # SQLCOM_CREATE_DB access test
 #
@@ -132,18 +132,18 @@ include/assert.inc [Database testdb still exists on node 2]
 # connection node_testme
 SHOW CREATE DATABASE testdb;
 Database	Create Database
-testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET latin1 */
+testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */
 ALTER DATABASE testdb CHARACTER SET latin7;
 ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
 INSERT INTO counter(count) VALUES(10);;
 # connection node_1
 SHOW CREATE DATABASE testdb;
 Database	Create Database
-testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET latin1 */
+testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */
 # connection node_2
 SHOW CREATE DATABASE testdb;
 Database	Create Database
-testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET latin1 */
+testdb	CREATE DATABASE `testdb` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */
 #
 # SQLCOM_REPAIR access test
 #
@@ -183,13 +183,13 @@ FLUSH PRIVILEGES;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
 # connection node_2
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
 # connection node_testme
 REVOKE SELECT ON testdb.t1 FROM 'testother'@'%';
 ERROR 42000: GRANT command denied to user 'testme'@'localhost' for table 't1'
@@ -197,13 +197,13 @@ INSERT INTO counter(count) VALUES(13);;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
 # connection node_2
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
 # connection node_1
 REVOKE SELECT ON testdb.t1 FROM 'testother'@'%';
 #
@@ -281,13 +281,13 @@ FLUSH PRIVILEGES;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
 # connection node_2
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
 # connection node_testme
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'testother'@'%';
 ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
@@ -295,13 +295,13 @@ INSERT INTO counter(count) VALUES(20);;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
 # connection node_2
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
-GRANT USAGE ON *.* TO 'testother'@'%'
-GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
+GRANT USAGE ON *.* TO `testother`@`%`
+GRANT SELECT ON `testdb`.`t1` TO `testother`@`%`
 #
 # SQLCOM_CREATE_PROCEDURE access test
 #
@@ -358,17 +358,17 @@ END;
 include/assert.inc [The hellop procedure should exist on node 1]
 # connection node_2
 include/assert.inc [The hellop procedure should exist on node 2]
-SELECT name, security_type FROM mysql.proc WHERE name = "hellop";
-name	security_type
+SELECT routine_name, security_type FROM information_schema.routines where ROUTINE_NAME = "hellop";
+ROUTINE_NAME	SECURITY_TYPE
 hellop	DEFINER
 # connection node_testme
 ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 ERROR 42000: alter routine command denied to user 'testme'@'%' for routine 'testdb.hellop'
 INSERT INTO counter(count) VALUES(24);;
 # connection node_1
-include/assert.inc [The hellop procedure should still use the definer on node 1]
+include/assert.inc [The hellop procedure should still use the DEFINER on node 1]
 # connection node_2
-include/assert.inc [The hellop procedure should still use the definer on node 2]
+include/assert.inc [The hellop procedure should still use the DEFINER on node 2]
 # connection node_1
 DROP PROCEDURE hellop;
 #
@@ -380,17 +380,17 @@ CREATE FUNCTION hellof (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT
 include/assert.inc [The hellof function should exist on node 1]
 # connection node_2
 include/assert.inc [The hellof function should exist on node 2]
-SELECT name, security_type FROM mysql.proc WHERE name = "hellof";
-name	security_type
+SELECT routine_name, security_type FROM information_schema.routines where ROUTINE_NAME = "hellof";
+ROUTINE_NAME	SECURITY_TYPE
 hellof	DEFINER
 # connection node_testme
 ALTER FUNCTION hellof SQL SECURITY INVOKER;
 ERROR 42000: alter routine command denied to user 'testme'@'%' for routine 'testdb.hellof'
 INSERT INTO counter(count) VALUES(25);;
 # connection node_1
-include/assert.inc [The hellof function should still use the definer on node 1]
+include/assert.inc [The hellof function should still use the DEFINER on node 1]
 # connection node_2
-include/assert.inc [The hellof function should still use the definer on node 2]
+include/assert.inc [The hellof function should still use the DEFINER on node 2]
 # connection node_1
 DROP FUNCTION hellof;
 #

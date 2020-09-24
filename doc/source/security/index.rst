@@ -1,11 +1,11 @@
 .. _security:
 
-===============
+================================================================================
 Security Basics
-===============
+================================================================================
 
-By default, |PXC| does not provide any protection for stored data.
-There are several considerations to take into account for securing |PXC|:
+By default, |PXC| does not provide any protection for stored data. There are
+several considerations to take into account for securing |PXC|:
 
 * :ref:`secure-network`
 
@@ -16,14 +16,13 @@ There are several considerations to take into account for securing |PXC|:
 
 * :ref:`encrypt-traffic`
 
-  Unencrypted traffic can potentially be viewed
-  by anyone monitoring your network.
-  You should enable encryption for all nodes in the cluster to prevent this.
+  Unencrypted traffic can potentially be viewed by anyone monitoring your
+  network. In |PXC| |version| traffic encryption is enabled by default.
 
 * Data-at-rest encryption
 
   |PXC| supports `tablespace encryption
-  <https://dev.mysql.com/doc/refman/5.7/en/innodb-tablespace-encryption.html>`_
+  <https://dev.mysql.com/doc/refman/8.0/en/innodb-tablespace-encryption.html>`_
   to provide at-rest encryption for physical tablespace data files.
 
   For more information, see the following blog post:
@@ -33,7 +32,7 @@ There are several considerations to take into account for securing |PXC|:
 .. _security-modules:
 
 Security Modules
-================
+================================================================================
 
 Most modern disributions include special security modules
 that control access to resources for users and applications.
@@ -45,7 +44,7 @@ however, this is not recommended for production environments.
 You should instead create necessary security policies for |PXC|.
 
 SELinux
--------
+--------------------------------------------------------------------------------
 
 `SELinux <https://selinuxproject.org>`_ is usually enabled by default
 in Red Hat Enterprise Linux and derivatives (including CentOS).

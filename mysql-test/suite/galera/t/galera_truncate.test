@@ -2,8 +2,15 @@
 # Test TRUNCATE
 #
 
+# presence of galera_truncate.cnf will restart the node before the test
+# this will ensure node-1 is first to start and node-2 is second
+# ordering their index for auto-increement
+
 --source include/galera_cluster.inc
---source include/have_innodb.inc
+
+--connection node_2
+--echo #node-2 (restarting at start)
+--source include/restart_mysqld.inc
 
 #
 # Simple case
@@ -39,17 +46,33 @@ SELECT COUNT(*) = 0 FROM t2;
 #
 
 --connection node_1
+--echo #node-1
 CREATE TABLE t3 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY) Engine=InnoDB;
 INSERT INTO t3 VALUES (DEFAULT),(DEFAULT),(DEFAULT),(DEFAULT),(DEFAULT);
+select * from t3;
 
 CREATE TABLE t4 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY) Engine=InnoDB AUTO_INCREMENT=1234;
 INSERT INTO t4 VALUES (DEFAULT),(DEFAULT),(DEFAULT),(DEFAULT),(DEFAULT);
+select * from t4;
 
+--echo #node-1 auto-inc values before truncate
+SELECT TABLE_NAME, AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN ('t3', 't4');
+
+--connection node_2
+--echo #node-2 auto-inc values before truncate
+SELECT TABLE_NAME, AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN ('t3', 't4');
+
+--connection node_1
+--echo #node-1
 TRUNCATE TABLE t3;
 TRUNCATE TABLE t4;
 
+--echo #node-1 auto-inc values after truncate
+SELECT TABLE_NAME, AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN ('t3', 't4');
+
 --connection node_2
-SELECT AUTO_INCREMENT = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN ('t3', 't4');
+--echo #node-2 auto-inc values after truncate
+SELECT TABLE_NAME, AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN ('t3', 't4');
 
 DROP TABLE t1;
 DROP TABLE t2;

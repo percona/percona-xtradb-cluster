@@ -1,0 +1,36 @@
+
+#
+# This test exercises multiple scenario that involves testing
+# different DDL + DML statement for innodb and myisam engine
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
+
+
+#-------------------------------------------------------------------------------
+#
+# Test-Scenarios
+#
+# 1. test install of components.
+#
+
+#-------------------------------------------------------------------------------
+#
+# 1. test install of components.
+#
+--connection node_1
+--echo #node-1
+INSTALL COMPONENT "file://component_pfs_example_component_population";
+SELECT * FROM performance_schema.pfs_example_continent;
+
+--connection node_2
+--echo #node-2
+SELECT * FROM performance_schema.pfs_example_continent;
+UNINSTALL COMPONENT "file://component_pfs_example_component_population";
+
+--connection node_1
+--echo #node-1
+--error ER_NO_SUCH_TABLE
+SELECT * FROM performance_schema.pfs_example_continent;

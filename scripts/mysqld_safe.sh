@@ -20,7 +20,6 @@ mysqld_ld_library_path=
 load_jemalloc=1
 load_hotbackup=0
 flush_caches=0
-numa_interleave=
 resume_on_fail=1
 # Change (disable) transparent huge pages (TokuDB requirement)
 thp_setting=
@@ -108,8 +107,6 @@ Usage: $0 [OPTIONS]
   --syslog-tag=TAG           Pass -t "mysqld-TAG" to 'logger'
   --flush-caches             Flush and purge buffers/caches before
                              starting the server
-  --numa-interleave          Run mysqld with its memory interleaved
-                             on all NUMA nodes
 ${thp_usage}
   --mysqld-safe-log-         TYPE must be one of UTC (ISO 8601 UTC),
     timestamps=TYPE          system (ISO 8601 local time), hyphen
@@ -217,6 +214,7 @@ eval_log_error () {
   esac
 
   #echo "Running mysqld: [$cmd]"
+  cmd="env MYSQLD_PARENT_PID=$$ $cmd"
   eval "$cmd"
   ret=$?
   if [ $ret -gt 0 ] && [ $ret -lt 128 ]; then
@@ -230,6 +228,7 @@ shell_quote_string() {
   echo "$1" | sed -e 's,\([^a-zA-Z0-9/_.=-]\),\\\1,g'
 }
 
+# ---- WITH_WSREP
 wsrep_pick_url() {
   [ $# -eq 0 ] && return 0
 
@@ -326,6 +325,7 @@ wsrep_recover_position() {
 
   return $ret
 }
+# ---- WITH_WSREP
 
 parse_arguments() {
   # We only need to pass arguments through to the server if we don't
@@ -820,11 +820,37 @@ then
     err_log_append="$err_log"
     case "$err_log" in
       /* ) ;;
+      ./*|../*)
+          # Preparing absolute path from the relative path value specified for the
+          # --log-error argument.
+          #
+          # Absolute path will be prepared for the value of following form
+          #    ./bar/foo OR
+          #   ../old_bar/foo
+          # for --log-error argument.
+          #
+          # Note: If directory of log file name does not exists or
+          #       if write or execute permissions are missing on directory then
+          #       --log-error is set  $DATADIR/`hostname`.err
+
+          log_dir_name="$(dirname "$err_log")";
+          if [ ! -d "$log_dir_name" ]
+          then
+            log_notice "Directory "$log_dir_name" does not exists.";
+            err_log=$DATADIR/`hostname`.err
+          elif [ ! -x "$log_dir_name" -o ! -w "$log_dir_name" ]
+          then
+            log_notice "Do not have Execute or Write permissions on directory "$log_dir_name".";
+            err_log=$DATADIR/`hostname`.err
+          else
+            err_log=$(cd $log_dir_name && pwd -P)/$(basename "$err_log")
+          fi
+          ;;
       * ) err_log="$DATADIR/$err_log" ;;
     esac
   else
-    err_log=$DATADIR/`@HOSTNAME@`.err
-    err_log_append=`@HOSTNAME@`.err
+    err_log=$DATADIR/`hostname`.err
+    err_log_append=`hostname`.err
   fi
 
   append_arg_to_args "--log-error=$err_log_append"
@@ -934,8 +960,8 @@ fi
 
 if test -z "$pid_file"
 then
-  pid_file="$DATADIR/`@HOSTNAME@`.pid"
-  pid_file_append="`@HOSTNAME@`.pid"
+  pid_file="$DATADIR/`hostname`.pid"
+  pid_file_append="`hostname`.pid"
 else
   pid_file_append="$pid_file"
   case "$pid_file" in
@@ -952,11 +978,6 @@ fi
 if test -n "$mysql_tcp_port"
 then
   append_arg_to_args "--port=$mysql_tcp_port"
-fi
-
-if test -n "$numa_interleave"
-then
-  append_arg_to_args "--innodb-numa-interleave=1"
 fi
 
 if test $niceness -eq 0
@@ -1277,15 +1298,17 @@ do
 
   end_time=`date +%M%S`
 
-  if test ! -f "$pid_file"		# This is removed if normal shutdown
-  then
-    break
-  else                                  # self's mysqld crashed or other's mysqld running
-    PID=`cat "$pid_file"`
-    if @CHECK_PID@
-    then                                # true when above pid belongs to a running mysqld process
-      log_error "A mysqld process with pid=$PID is already running. Aborting!!"
-      exit 1
+  if $dont_restart_mysqld; then
+    if test ! -f "$pid_file"		# This is removed if normal shutdown
+    then
+      break
+    else                                  # self's mysqld crashed or other's mysqld running
+        PID=`cat "$pid_file"`
+        if @CHECK_PID@
+        then                                # true when above pid belongs to a running mysqld process
+          log_error "A mysqld process with pid=$PID is already running. Aborting!!"
+          exit 1
+        fi
     fi
   fi
 

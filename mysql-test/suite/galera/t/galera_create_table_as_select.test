@@ -23,6 +23,13 @@ CREATE TABLE t1 AS SELECT * FROM t2;
 CREATE TABLE t1 AS SELECT 1 FROM DUAL;
 
 --connection node_2
+call mtr.add_suppression("Slave SQL: Error \'Table \'t1\' already exists\' on query");
+call mtr.add_suppression("Slave SQL: Error \'Table \'test.t2\' doesn\'t exist\' on query");
+call mtr.add_suppression("Ignoring error 'Table 't1' already exists'");
+call mtr.add_suppression("Ignoring error 'Table 'test.t2' doesn't exist'");
+call mtr.add_suppression("Query apply failed.*");
+
+--connection node_2
 let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1";
 --source include/wait_condition.inc
 SELECT COUNT(*) = 1 FROM t1;
@@ -53,7 +60,7 @@ SELECT COUNT(*) = 5 FROM t1;
 --connection node_2
 let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1";
 --source include/wait_condition.inc
-SELECT COUNT(*) = 5 FROM t1;
+SELECT COUNT(*) = 0 FROM t1;
 
 --connection node_1
 DROP TABLE t1,t2;
@@ -125,13 +132,14 @@ LOCK TABLE t2 WRITE;
 
 --connection node_2
 SELECT COUNT(*) = 5 FROM t2;
-CREATE TABLE t1 AS SELECT * FROM t2;
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+show create table t1;
 
 --connection node_1a
 UNLOCK TABLES;
 
 --connection node_1
---error ER_TABLE_EXISTS_ERROR,ER_LOCK_DEADLOCK
 --reap
 
 DROP TABLE t1, t2;
@@ -150,6 +158,27 @@ CREATE TEMPORARY TABLE t1 AS SELECT * FROM t2;
 SELECT * FROM t1;
 
 CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query");
+
+--connection node_1
+DROP TABLE t1, t2;
+
+#
+# This scenario creates intermediate temporary table to be created
+# as the result of SELECT ... FROM .. GROUP BY
+# SET big_tables=ON causes all temporary tables to be created as InnoDB tables.
+# As we are creating temporary table we are not in TOI mode. However we expect that
+# creation of immediate InnoDB temporary table is still handled correctly 
+# (not attempted to be replicated).
+#  
+
+SET big_tables=ON;
+CREATE TABLE t1 (id INT, a INT, b INT, PRIMARY KEY pkid(id));
+INSERT INTO t1 VALUES (1, 2, 1);
+INSERT INTO t1 VALUES (2, 2, 1);
+CREATE TEMPORARY TABLE t2 AS SELECT a, count(*) c FROM t1 GROUP BY a;
+
+--connection node_2
+SHOW TABLES;
 
 --connection node_1
 DROP TABLE t1, t2;

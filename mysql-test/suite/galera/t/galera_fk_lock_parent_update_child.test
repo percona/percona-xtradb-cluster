@@ -1,0 +1,276 @@
+# ==== Purpose ====
+#
+# This test verifies that, in a foreign key relationship, update/delete on
+# child table are handled properly when the parent key is locked.
+#
+# ==== Implementation ====
+#
+# 1. Create a two node cluster.
+# 2. Create a parent and a child tables.
+# 3. With few rows being locked on the parent table, test the below scenarios.
+#
+#    3.1: Delete a row from the child table.
+#         Expectation: Delete should be successful.
+#
+#    3.2: Update non-referenced field of the child table.
+#         Expectation: Update should fail with lock wait timeout error.
+#
+#    3.3: Update non-referenced field of the child table and unlock the parent row.
+#         Expectation: Update should be successful.
+#
+#    3.4: Update referenced field of the child table.
+#         Expectation: Update should fail with lock wait timeout error.
+#
+#    3.5: Update referenced field of the child table and unlock the parent row.
+#         Expectation: Update should be successful.
+#
+#    3.6: Delete a row from the child table from node2.
+#         Expectation: Commit on node1 should fail with deadlock error due to BF abort.
+#
+#    3.7: Update non-referenced field in the child table from node2.
+#         Expectation: Commit on node1 should fail with deadlock error due to BF abort.
+#
+#    3.8: Update referenced field in the child table from node2.
+#         Expectation: Commit on node1 should fail with deadlock error due to BF abort.
+#
+# 4. Cleanup
+#
+# ==== References ====
+#
+# PXC-3352: Unexpected ERROR 1205 modifying a child table in a FK relationship
+
+--source include/big_test.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--let $saved_innodb_lock_wait_timeout = `SELECT @@GLOBAL.innodb_lock_wait_timeout`
+SET GLOBAL innodb_lock_wait_timeout = 2;
+
+# ===========================================================================
+# Create helper files for test setup and teardown.
+# ===========================================================================
+
+# Create tables, insert data and and lock parent row.
+--write_file $MYSQLTEST_VARDIR/tmp/fk_test_setup.inc
+    --connection con1
+    CREATE TABLE parent_t (id INT AUTO_INCREMENT PRIMARY KEY )ENGINE = INNODB;
+    CREATE TABLE child_t (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT,
+                          CONSTRAINT `FK_child_parent_id` FOREIGN KEY (`parent_id`)
+                          REFERENCES `parent_t` (`id`)) ENGINE = INNODB;
+
+    INSERT INTO parent_t VALUES (), (), (), (), ();
+    INSERT INTO child_t (parent_id) SELECT id FROM parent_t;
+
+    BEGIN;
+    SELECT * FROM parent_t WHERE id = 1 FOR UPDATE;
+EOF
+
+--write_file $MYSQLTEST_VARDIR/tmp/fk_test_cascade_setup.inc
+    --connection con1
+    CREATE TABLE parent_t (id INT AUTO_INCREMENT PRIMARY KEY )ENGINE = INNODB;
+    CREATE TABLE child_t (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT,
+                          CONSTRAINT `FK_child_parent_id` FOREIGN KEY (`parent_id`)
+                          REFERENCES `parent_t` (`id`) ON UPDATE CASCADE) ENGINE = INNODB;
+
+    INSERT INTO parent_t VALUES (), (), (), (), ();
+    INSERT INTO child_t (parent_id) SELECT id FROM parent_t;
+
+    BEGIN;
+    UPDATE parent_t SET id = id * 10;
+EOF
+
+# Wait till the transaction from node_2 to be replicated.
+--write_file $MYSQLTEST_VARDIR/tmp/fk_test_sync_node1.inc
+    --connection node_1
+    --let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+    --let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
+    --source include/wait_condition_with_debug.inc
+EOF
+
+# Validate the data across nodes and perform cleanup.
+--write_file $MYSQLTEST_VARDIR/tmp/fk_test_validate_and_teardown.inc
+
+    # Validation
+    --let $galera_diff_statement = SELECT * FROM parent_t;
+    --source include/galera_diff.inc
+    --let $galera_diff_statement = SELECT * FROM child_t;
+    --source include/galera_diff.inc
+
+    # Cleanup
+    --connection con1
+    DROP TABLE child_t;
+    DROP TABLE parent_t;
+EOF
+
+# ===========================================================================
+# Test starts from here.
+# ===========================================================================
+
+# Create auxiliary connections on node1.
+--connect(con1, 127.0.0.1, root, , test, $NODE_MYPORT_1)
+--connect(con2, 127.0.0.1, root, , test, $NODE_MYPORT_1)
+
+--echo
+--echo # ===========================================================================
+--echo # Case 1: Delete a row from the child table.
+--echo # Expectation: Delete should be successful.
+--echo # ===========================================================================
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_setup.inc
+--connection con2
+DELETE FROM child_t WHERE parent_id = 1;
+
+--connection con1
+COMMIT;
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_validate_and_teardown.inc
+
+--echo
+--echo # ===========================================================================
+--echo # Case 2: Update non-referenced field of the child table.
+--echo # Expectation: Update should fail with lock wait timeout error.
+--echo # ===========================================================================
+--source $MYSQLTEST_VARDIR/tmp/fk_test_setup.inc
+
+--connection con2
+--error ER_LOCK_WAIT_TIMEOUT
+UPDATE child_t SET id = id - 1;
+
+--connection con1
+COMMIT;
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_validate_and_teardown.inc
+
+--echo
+--echo # ===========================================================================
+--echo # Case 3: Update non-referenced field of the child table and unlock the parent row.
+--echo # Expectation: Update should be successful.
+--echo # ===========================================================================
+--source $MYSQLTEST_VARDIR/tmp/fk_test_setup.inc
+
+--connection con2
+--send UPDATE child_t SET id = id - 1
+
+--connection con1
+--sleep 1
+ROLLBACK;
+
+--connection con2
+--reap
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_validate_and_teardown.inc
+
+--echo
+--echo # ===========================================================================
+--echo # Case 4: Update referenced field of the child table.
+--echo # Expectation: Update should fail with lock wait timeout error.
+--echo # ===========================================================================
+--source $MYSQLTEST_VARDIR/tmp/fk_test_setup.inc
+
+--connection con2
+--error ER_LOCK_WAIT_TIMEOUT
+UPDATE child_t SET parent_id=3 WHERE parent_id=1;
+
+--connection con1
+ROLLBACK;
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_validate_and_teardown.inc
+
+--echo
+--echo # ===========================================================================
+--echo # Case 5: Update referenced field of the child table and unlock the parent row.
+--echo # Expectation: Update should be successful.
+--echo # ===========================================================================
+--source $MYSQLTEST_VARDIR/tmp/fk_test_setup.inc
+
+--connection con2
+--send UPDATE child_t SET parent_id=3 WHERE parent_id=1
+
+--connection con1
+--sleep 1
+ROLLBACK;
+
+# Without the fix for PXC-3352, the below reap will fail with ER_LOCK_WAIT_TIMEOUT
+--connection con2
+--reap
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_validate_and_teardown.inc
+
+--echo
+--echo # ===========================================================================
+--echo # Case 6: Delete a row from the child table from node2.
+--echo # Expectation: Commit on node1 should fail with deadlock error due to BF abort.
+--echo # ===========================================================================
+--source $MYSQLTEST_VARDIR/tmp/fk_test_cascade_setup.inc
+
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_2
+DELETE FROM child_t WHERE parent_id = 1;
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_sync_node1.inc
+
+--connection con1
+--error ER_LOCK_DEADLOCK
+COMMIT;
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_validate_and_teardown.inc
+
+--echo
+--echo # ===========================================================================
+--echo # Case 7: Update non-referenced field in the child table from node2.
+--echo # Expectation: Commit on node1 should fail with deadlock error due to BF abort.
+--echo # ===========================================================================
+--source $MYSQLTEST_VARDIR/tmp/fk_test_cascade_setup.inc
+
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_2
+UPDATE child_t SET id = id - 1;
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_sync_node1.inc
+
+--connection con1
+--error ER_LOCK_DEADLOCK
+COMMIT;
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_validate_and_teardown.inc
+
+--echo
+--echo # ===========================================================================
+--echo # Case 8: Update referenced field in the child table from node2.
+--echo # Expectation: Commit on node1 should fail with deadlock error due to BF abort.
+--echo # ===========================================================================
+--source $MYSQLTEST_VARDIR/tmp/fk_test_cascade_setup.inc
+
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_2
+UPDATE child_t SET parent_id=3 WHERE parent_id=1;
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_sync_node1.inc
+
+--connection con1
+--error ER_LOCK_DEADLOCK
+COMMIT;
+
+--source $MYSQLTEST_VARDIR/tmp/fk_test_validate_and_teardown.inc
+
+--echo
+--echo # ===========================================================================
+--echo # Test Cleanup
+--echo # ===========================================================================
+--remove_file $MYSQLTEST_VARDIR/tmp/fk_test_setup.inc
+--remove_file $MYSQLTEST_VARDIR/tmp/fk_test_cascade_setup.inc
+--remove_file $MYSQLTEST_VARDIR/tmp/fk_test_sync_node1.inc
+--remove_file $MYSQLTEST_VARDIR/tmp/fk_test_validate_and_teardown.inc
+
+--disconnect con1
+--disconnect con2
+
+--connection node_1
+--disable_query_log
+--eval SET GLOBAL innodb_lock_wait_timeout = $saved_innodb_lock_wait_timeout
+--enable_query_log
+
+--source include/wait_until_count_sessions.inc

@@ -15,14 +15,13 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 #pragma once
 
-#include "log.h"
 #include <sstream>
 #include <string>
 
 namespace myrocks {
 
 class Rdb_logger : public rocksdb::Logger {
-public:
+ public:
   explicit Rdb_logger(const rocksdb::InfoLogLevel log_level =
                           rocksdb::InfoLogLevel::ERROR_LEVEL)
       : m_mysql_log_level(log_level) {}
@@ -50,9 +49,9 @@ public:
     }
 
     // log to MySQL
-    std::string f("LibRocksDB:");
-    f.append(format);
-    error_log_print(mysql_log_level, f.c_str(), ap);
+    char buffer[1024];
+    vsnprintf(buffer, sizeof(buffer), format, ap);
+    LogPluginErrMsg(mysql_log_level, 0, "%s", buffer);
   }
 
   void Logv(const char *format, va_list ap) override {
@@ -77,9 +76,9 @@ public:
     m_mysql_log_level = log_level;
   }
 
-private:
+ private:
   std::shared_ptr<rocksdb::Logger> m_logger;
   rocksdb::InfoLogLevel m_mysql_log_level;
 };
 
-} // namespace myrocks
+}  // namespace myrocks

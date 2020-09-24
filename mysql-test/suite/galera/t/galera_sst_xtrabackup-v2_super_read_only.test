@@ -1,0 +1,26 @@
+#
+# This test checks the pxc-encrypt-cluster-traffic option (auto SSL config).
+# Initial SST happens via xtrabackup, so there is not much to do in the body of the test
+#
+
+--source include/big_test.inc
+--source include/galera_cluster.inc
+
+SELECT 1;
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 0;
+--source include/shutdown_mysqld.inc
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+--exec sed -i '/^\[mysqld.2\]/a super_read_only=ON' $MYSQLTEST_VARDIR/my.cnf
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+
+#cleanup
+--connection node_2
+SET GLOBAL super_read_only = OFF;
+SET GLOBAL read_only = OFF;
+--exec sed -i '/^super_read_only=ON/d' $MYSQLTEST_VARDIR/my.cnf

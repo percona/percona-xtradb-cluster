@@ -5,7 +5,7 @@ Configuring Percona XtraDB Cluster on Ubuntu
 ============================================
 
 This tutorial describes how to install and configure three |PXC| nodes
-on Ubuntu 12.04.2 LTS servers, using the packages from Percona repositories.
+on Ubuntu 14 LTS servers, using the packages from Percona repositories.
 
 * Node 1
 
@@ -27,7 +27,7 @@ Prerequisites
 
 The procedure described in this tutorial requires he following:
 
-* All three nodes have Ubuntu 12.04.2 LTS installed.
+* All three nodes have Ubuntu 14 LTS installed.
 * Firewall on all nodes is configured to allow connecting
   to ports 3306, 4444, 4567 and 4568.
 * AppArmor profile for |MySQL| is `disabled <http://www.mysqlperformanceblog.com/2012/12/20/percona-xtradb-cluster-selinux-is-not-always-the-culprit/>`_.
@@ -41,7 +41,7 @@ Install |PXC| on all three nodes as described in :ref:`apt`.
    For this tutorial, set it to ``Passw0rd``.
    After the packages have been installed,
    ``mysqld`` will start automatically.
-   Stop ``mysqld`` on all three nodes using ``/etc/init.d/mysql stop``.
+   Stop ``mysqld`` on all three nodes using ``sudo systemctl stop mysql``.
 
 Step 2. Configuring the first node
 ==================================
@@ -81,12 +81,12 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
     # Cluster name
     wsrep_cluster_name=my_ubuntu_cluster
 
-    # Authentication for SST method
-    wsrep_sst_auth="sstuser:s3cretPass"
 
-#. Start the first node with the following command: ::
+#. Start the first node with the following command:
+   
+   .. code-block:: bash
 
-    [root@pxc1 ~]# /etc/init.d/mysql bootstrap-pxc
+      [root@pxc1 ~]# systemctl start mysql@bootstrap.service
 
    This command will start the first node and bootstrap the cluster.
 
@@ -95,22 +95,22 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
 
    .. code-block:: mysql
 
-     mysql> show status like 'wsrep%';
-     +----------------------------+--------------------------------------+
-     | Variable_name              | Value                                |
-     +----------------------------+--------------------------------------+
-     | wsrep_local_state_uuid     | b598af3e-ace3-11e2-0800-3e90eb9cd5d3 |
-     ...
-     | wsrep_local_state          | 4                                    |
-     | wsrep_local_state_comment  | Synced                               |
-     ...
-     | wsrep_cluster_size         | 1                                    |
-     | wsrep_cluster_status       | Primary                              |
-     | wsrep_connected            | ON                                   |
-     ...
-     | wsrep_ready                | ON                                   |
-     +----------------------------+--------------------------------------+
-     40 rows in set (0.01 sec)
+      mysql> show status like 'wsrep%';
+      +----------------------------+--------------------------------------+
+      | Variable_name              | Value                                |
+      +----------------------------+--------------------------------------+
+      | wsrep_local_state_uuid     | b598af3e-ace3-11e2-0800-3e90eb9cd5d3 |
+      ...
+      | wsrep_local_state          | 4                                    |
+      | wsrep_local_state_comment  | Synced                               |
+      ...
+      | wsrep_cluster_size         | 1                                    |
+      | wsrep_cluster_status       | Primary                              |
+      | wsrep_connected            | ON                                   |
+      ...
+      | wsrep_ready                | ON                                   |
+      +----------------------------+--------------------------------------+
+      75 rows in set (0.00 sec)
 
   This output shows that the cluster has been successfully bootstrapped.
 
@@ -162,12 +162,10 @@ Step 3. Configuring the second node
     # SST method
     wsrep_sst_method=xtrabackup-v2
 
-    #Authentication for SST method
-    wsrep_sst_auth="sstuser:s3cretPass"
 
 #. Start the second node with the following command: ::
 
-    [root@pxc2 ~]# /etc/init.d/mysql start
+    [root@pxc2 ~]# systemctl start mysql
 
 #. After the server has been started,
    it should receive |SST| automatically.
@@ -230,12 +228,9 @@ Step 4. Configuring the third node
     # SST method
     wsrep_sst_method=xtrabackup-v2
 
-    #Authentication for SST method
-    wsrep_sst_auth="sstuser:s3cretPass"
-
 #. Start the third node with the following command: ::
 
-    [root@pxc3 ~]# /etc/init.d/mysql start
+    [root@pxc3 ~]# systemctl start mysql
 
 #. After the server has been started,
    it should receive SST automatically.

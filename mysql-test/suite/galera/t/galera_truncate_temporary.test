@@ -3,7 +3,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 CREATE TEMPORARY TABLE t1 (f1 INTEGER PRIMARY KEY) Engine=InnoDB;
 

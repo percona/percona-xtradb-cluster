@@ -2,12 +2,12 @@
 use performance_schema;
 select count(*) from setup_instruments where name like '%galera%' or name like '%wsrep%';
 count(*)
-81
+92
 #node-2
 use performance_schema;
 select count(*) from setup_instruments where name like '%galera%' or name like '%wsrep%';
 count(*)
-81
+92
 select count(*) = 5 from performance_schema.threads where name like '%galera%' or name like '%wsrep%';
 count(*) = 5
 1
@@ -35,8 +35,5 @@ use test;
 insert into t values (3);
 #node-1
 commit;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
-select count(*) > 0 from performance_schema.events_waits_current where event_name like '%COND_wsrep_rollback%';;
-count(*) > 0
-1
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 drop table t;

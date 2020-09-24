@@ -91,7 +91,7 @@ then
     datadir=@localstatedir@
   fi
   sbindir=@sbindir@
-  libexecdir=@libexecdir@
+  libexecdir=@sbindir@
 else
   bindir="$basedir/bin"
   if test -z "$datadir"
@@ -296,7 +296,7 @@ parse_server_arguments `$print_defaults $extra_args mysqld server mysql_server m
 #
 if test -z "$mysqld_pid_file_path"
 then
-  mysqld_pid_file_path=$datadir/`@HOSTNAME@`.pid
+  mysqld_pid_file_path=$datadir/`hostname`.pid
 else
   case "$mysqld_pid_file_path" in
     /* ) ;;
@@ -412,7 +412,7 @@ case "$mode" in
     fi
     ;;
 
-  'stop')
+  'stop'|'bootstrap-stop')
     # Stop daemon. We use a signal here to avoid having to know the
     # root password.
     echo $echo_n "Shutting down MySQL (Percona XtraDB Cluster)"
@@ -467,7 +467,7 @@ case "$mode" in
     fi
     ;;
 
-  'restart-bootstrap')
+  'bootstrap-restart')
     # Stop the service and regardless of whether it was
     # running or not, start it again.
     if $0 stop  $other_args; then
@@ -481,7 +481,7 @@ case "$mode" in
     fi
     ;;
 
-  'reload'|'force-reload')
+  'reload'|'force-reload'|'bootstrap-reload')
     if test -s "$mysqld_pid_file_path" ; then
       read mysqld_pid <  "$mysqld_pid_file_path"
       kill -HUP $mysqld_pid && log_success_msg "Reloading service MySQL (Percona XtraDB Cluster)"
@@ -491,7 +491,7 @@ case "$mode" in
       exit 1
     fi
     ;;
-  'status')
+  'status'|'bootstrap-status')
       check_running 1
       exit $?
     ;;
@@ -510,7 +510,7 @@ case "$mode" in
     *)
       # usage
       basename=`basename "$0"`
-      echo "Usage: $basename {start|stop|restart|restart-bootstrap|reload|force-reload|status|bootstrap-pxc}  [ MySQL (Percona XtraDB Cluster) options ]"
+      echo "Usage: $basename {start|stop|bootstrap-stop|restart|bootstrap-restart|reload|force-reload|bootstrap-reload|status|bootstrap-status|bootstrap-pxc}  [ MySQL (Percona XtraDB Cluster) options ]"
       exit 1
     ;;
 esac

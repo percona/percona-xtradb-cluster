@@ -3,7 +3,6 @@
 # notifications into a table.
 #
 
---source include/have_innodb.inc
 --source include/galera_cluster.inc
 --source include/force_restart.inc
 

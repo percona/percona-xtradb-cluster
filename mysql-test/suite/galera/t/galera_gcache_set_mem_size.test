@@ -2,7 +2,6 @@
 # 'gcache.mem_size deprecated' warning fix.
 #
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --let LOGF=$MYSQLTEST_VARDIR/log/mysqld.1.err
 --disable_info
 
@@ -18,7 +17,7 @@ perl;
   use strict;
   my $logf= $ENV{'LOGF'} or die "LOGF not set";
   open(FILE, "$logf") or die("Unable to open $logf: $!\n");
-  my $count_warnings=grep(/\[Warning\] WSREP\: gcache\.mem_size parameter is buggy and DEPRECATED\, use it with care\./gi,<FILE>);
+  my $count_warnings=grep(/gcache\.mem_size parameter is buggy and DEPRECATED\, use it with care\./gi,<FILE>);
   print "Deprecation warning count: $count_warnings\n";
   close(FILE);
 EOF
@@ -30,7 +29,7 @@ perl;
   use strict;
   my $logf= $ENV{'LOGF'} or die "LOGF not set";
   open(FILE, "$logf") or die("Unable to open $logf: $!\n");
-  my $count_warnings=grep(/\[Warning\] WSREP\: gcache\.mem_size parameter is buggy and DEPRECATED\, use it with care\./gi,<FILE>);
+  my $count_warnings=grep(/gcache\.mem_size parameter is buggy and DEPRECATED\, use it with care\./gi,<FILE>);
   print "Deprecation warning count: $count_warnings\n";
   close(FILE);
 EOF

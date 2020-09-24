@@ -20,6 +20,8 @@
 --let $successes = 0
 --let $deadlocks = 0
 
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2'
+
 SET SESSION wsrep_retry_autocommit = 0;
 
 --disable_query_log
@@ -28,9 +30,9 @@ while ($count)
 {
   TRUNCATE TABLE t2;
 
-  --error 0,ER_LOCK_DEADLOCK
+  --error 0,ER_LOCK_DEADLOCK,ER_ERROR_DURING_COMMIT
   INSERT IGNORE INTO t2 SELECT f2 FROM t1;
-  if ($mysql_errno != 1213) {
+  if ($mysql_errno == 0) {
     --inc $successes
     if (`SELECT COUNT(*) = 0 FROM t2`) {
       --die No rows arrived in table t2
@@ -70,8 +72,9 @@ UPDATE t1 SET j=2 WHERE i=1;
 COMMIT;
 
 SELECT * FROM t1;
+
 --connection node_2
 SELECT * FROM t1;
---connection node_1
 
+--connection node_1
 DROP TABLE t1;

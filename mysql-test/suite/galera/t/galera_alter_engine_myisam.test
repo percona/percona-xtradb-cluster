@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # Test ALTER ENGINE from MyISAM to InnoDB under wsrep_replicate_myisam

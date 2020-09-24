@@ -3,7 +3,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # CREATE USER
@@ -63,7 +62,7 @@ SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user3';
 --sleep 3
 
 --connection node_1
-SET PASSWORD FOR user3 = PASSWORD('foo');
+SET PASSWORD FOR user3 = 'foo';
 
 --connection node_2
 let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user3' and '$user3_last_changed' < password_last_changed;
@@ -90,7 +89,8 @@ SELECT COUNT(*) = 0 FROM mysql.user WHERE user IN ('user1', 'user2');
 #
 
 --connection node_1
-GRANT ALL ON *.* TO user4 IDENTIFIED BY 'password';
+CREATE USER user4 IDENTIFIED BY 'password';
+GRANT ALL ON *.* TO user4;
 
 --connection node_2
 SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user4';

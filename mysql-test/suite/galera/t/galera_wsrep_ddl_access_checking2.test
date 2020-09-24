@@ -143,7 +143,6 @@
 #
 --source include/have_debug_sync.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/force_restart.inc
 
 CREATE DATABASE testdb;
@@ -812,18 +811,26 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
 CREATE FUNCTION hello2 (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
 
 --echo # connection node_1
 --connection node_1
 --let $assert_text = The hello2 function should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello2"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hello2"
 --source include/assert.inc
 
 --echo # connection node_2
 --connection node_2
 --let $assert_text = The hello2 function should exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello2"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hello2"
 --source include/assert.inc
 
 --echo # connection node_1
@@ -849,7 +856,7 @@ DROP FUNCTION hello2;
 --source include/wait_condition.inc
 
 --let $assert_text = The hello2 function should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hello2"
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.routines where ROUTINE_NAME="hello2"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -858,13 +865,14 @@ DROP FUNCTION hello2;
 --source include/wait_condition.inc
 
 --let $assert_text = The hello2 function should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hello2"
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.routines where ROUTINE_NAME="hello2"
 --source include/assert.inc
 
 # cleanup
 #
 --echo # connection node_1
 --connection node_1
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -1387,7 +1395,7 @@ END;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellop procedure should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1396,7 +1404,7 @@ END;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellop function should exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 --echo # connection node_1
@@ -1441,7 +1449,7 @@ CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT(
 --source include/wait_condition.inc
 
 --let $assert_text = The hello function should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hello"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1450,7 +1458,7 @@ CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT(
 --source include/wait_condition.inc
 
 --let $assert_text = The hello function should exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hello"
 --source include/assert.inc
 
 --echo # connection node_1
@@ -1476,6 +1484,14 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
 BEGIN
 END;
@@ -1483,13 +1499,13 @@ END;
 --echo # connection node_1
 --connection node_1
 --let $assert_text = The hellop procedure should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 --echo # connection node_2
 --connection node_2
 --let $assert_text = The hellop procedure should exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 --echo # connection node_1
@@ -1515,7 +1531,7 @@ DROP PROCEDURE hellop;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellop procedure should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1524,12 +1540,13 @@ DROP PROCEDURE hellop;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellop procedure should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 # cleanup
 #
 --connection node_1
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -1549,6 +1566,14 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(25), INOUT incr_param INT)
 BEGIN
 END;
@@ -1556,16 +1581,16 @@ END;
 --echo # connection node_1
 --connection node_1
 --let $assert_text = The hellop procedure should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
 --echo # connection node_2
 --connection node_2
 --let $assert_text = The hellop procedure should exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellop"
 --source include/assert.inc
 
-SELECT name, security_type FROM mysql.proc WHERE name = "hellop";
+SELECT routine_name, security_type FROM information_schema.routines where ROUTINE_NAME = "hellop";
 
 --echo # connection node_1
 --connection node_1
@@ -1590,8 +1615,8 @@ ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellop procedure should use the invoker on node 1
---let $assert_cond = security_type = "invoker" FROM mysql.proc WHERE name = "hellop";
---let $assert_debug = SELECT * FROM mysql.proc WHERE name = "hellop";
+--let $assert_cond = security_type = "INVOKER" FROM information_schema.routines where ROUTINE_NAME = "hellop";
+--let $assert_debug = SELECT * FROM information_schema.routines where ROUTINE_NAME = "hellop";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1600,7 +1625,7 @@ ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellop procedure should use the invoker on node 2
---let $assert_cond = security_type = "invoker" FROM mysql.proc WHERE name = "hellop";
+--let $assert_cond = security_type = "INVOKER" FROM information_schema.routines where ROUTINE_NAME = "hellop";
 --source include/assert.inc
 
 # cleanup
@@ -1610,6 +1635,7 @@ ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 DROP PROCEDURE hellop;
 
 --connection node_1
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -1629,21 +1655,29 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT CREATE ROUTINE ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
 CREATE FUNCTION hellof (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello again, ',s,'!');
 
 --echo # connection node_1
 --connection node_1
 --let $assert_text = The hellof function should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellof"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellof"
 --source include/assert.inc
 
 --echo # connection node_2
 --connection node_2
 --let $assert_text = The hellof function should exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellof"
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.routines where ROUTINE_NAME="hellof"
 --source include/assert.inc
 
-SELECT name, security_type FROM mysql.proc WHERE name = "hellof";
+SELECT routine_name, security_type FROM information_schema.routines where ROUTINE_NAME = "hellof";
 
 --echo # connection node_1
 --connection node_1
@@ -1668,8 +1702,8 @@ ALTER FUNCTION hellof SQL SECURITY INVOKER;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellof function should use the invoker on node 1
---let $assert_cond = security_type = "invoker" FROM mysql.proc WHERE name = "hellof";
---let $assert_debug = SELECT * FROM mysql.proc WHERE name = "hellof";
+--let $assert_cond = security_type = "INVOKER" FROM information_schema.routines where ROUTINE_NAME = "hellof";
+--let $assert_debug = SELECT * FROM information_schema.routines where ROUTINE_NAME = "hellof";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1678,7 +1712,7 @@ ALTER FUNCTION hellof SQL SECURITY INVOKER;
 --source include/wait_condition.inc
 
 --let $assert_text = The hellof function should use the invoker on node 2
---let $assert_cond = security_type = "invoker" FROM mysql.proc WHERE name = "hellof";
+--let $assert_cond = security_type = "INVOKER" FROM information_schema.routines where ROUTINE_NAME = "hellof";
 --source include/assert.inc
 
 # cleanup
@@ -1688,6 +1722,7 @@ ALTER FUNCTION hellof SQL SECURITY INVOKER;
 DROP FUNCTION hellof;
 
 --connection node_1
+REVOKE CREATE ROUTINE ON testdb.* FROM 'testme'@'%';
 REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -1760,6 +1795,14 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT CREATE VIEW ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
 CREATE VIEW helloview AS SELECT * FROM t1;
 
 --echo # connection node_1
@@ -1818,6 +1861,7 @@ DROP VIEW helloview;
 #
 --echo # connection node_1
 --connection node_1
+REVOKE CREATE VIEW ON testdb.* FROM 'testme'@'%';
 REVOKE DROP ON testdb.* FROM 'testme'@'%';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testme';
@@ -2155,6 +2199,15 @@ FLUSH PRIVILEGES;
 #
 --echo # connection node_1
 --connection node_1
+GRANT EVENT ON testdb.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE EVENT helloevent
   ON SCHEDULE EVERY 1 HOUR
   DO INSERT INTO t1(f2) VALUES(3);
@@ -2194,7 +2247,7 @@ ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 --source include/wait_condition.inc
 
 --let $assert_text = The helloevent EVENT should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value LIKE "%2 3%";
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value LIKE "\'2 3\'";
 --let $assert_debug = SHOW EVENTS;
 --source include/assert.inc
 
@@ -2204,7 +2257,7 @@ ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 --source include/wait_condition.inc
 
 --let $assert_text = The helloevent EVENT should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value LIKE "%2 3%";
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value LIKE "\'2 3\'";
 --source include/assert.inc
 
 # No cleanup

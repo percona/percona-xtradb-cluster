@@ -10,26 +10,32 @@ SET session wsrep_causal_reads=OFF;
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL,
+  `id` int NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.apply_trx.start_of_apply_trx';
 FLUSH TABLES t1 WITH READ LOCK;;
+SET session wsrep_sync_wait=0;
 UNLOCK TABLES;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL,
+  `id` int NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=sync.apply_trx.start_of_apply_trx';
 UNLOCK TABLES;
 SET SESSION wsrep_sync_wait = DEFAULT;
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL,
-  `f2` int(11) DEFAULT NULL,
+  `id` int NOT NULL,
+  `f2` int DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 SELECT * from t1;
 id	f2
 1	NULL

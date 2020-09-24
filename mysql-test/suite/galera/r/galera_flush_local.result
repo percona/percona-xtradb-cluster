@@ -1,4 +1,4 @@
-SET STATEMENT sort_buffer_size=0,myisam_repair_threads=0 FOR OPTIMIZE TABLE t0;
+OPTIMIZE  /*+ SET_VAR(sort_buffer_size = 0) SET_VAR(myisam_repair_threads=0) */ TABLE t0;
 Table	Op	Msg_type	Msg_text
 test.t0	optimize	Warning	Truncated incorrect sort_buffer_size value: '0'
 test.t0	optimize	Warning	Truncated incorrect myisam_repair_threads value: '0'
@@ -14,11 +14,7 @@ INSERT INTO t1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 INSERT INTO x1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 INSERT INTO t2 (f2) SELECT 1 FROM t1 AS a1, t1 AS a2, t1 AS a3, t1 AS a4;
 INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
-FLUSH LOCAL DES_KEY_FILE;
 FLUSH LOCAL HOSTS;
-FLUSH LOCAL QUERY CACHE;
-Warnings:
-Warning	1681	'FLUSH QUERY CACHE' is deprecated and will be removed in a future release.
 FLUSH LOCAL STATUS;
 FLUSH LOCAL PRIVILEGES;
 FLUSH LOCAL USER_RESOURCES;
@@ -90,11 +86,7 @@ INSERT INTO x1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 INSERT INTO t2 (f2) SELECT 1 FROM t1 AS a1, t1 AS a2, t1 AS a3, t1 AS a4;
 INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 set wsrep_on=0;
-FLUSH DES_KEY_FILE;
 FLUSH HOSTS;
-FLUSH QUERY CACHE;
-Warnings:
-Warning	1681	'FLUSH QUERY CACHE' is deprecated and will be removed in a future release.
 FLUSH STATUS;
 FLUSH PRIVILEGES;
 FLUSH USER_RESOURCES;

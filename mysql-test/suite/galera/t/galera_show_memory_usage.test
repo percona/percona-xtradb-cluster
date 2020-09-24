@@ -2,7 +2,6 @@
 # Checking variables that indicate the memory usage.
 #
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #-------------------------------------------------------------------------------
 #

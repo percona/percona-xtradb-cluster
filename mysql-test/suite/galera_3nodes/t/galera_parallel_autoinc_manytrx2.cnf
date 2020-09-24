@@ -1,0 +1,2 @@
+!include suite/galera_3nodes/galera_3nodes.cnf
+!include suite/galera/galera_optimistic_pa.cnf

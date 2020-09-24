@@ -5,16 +5,21 @@
 # are no transactions, so we have to shutdown node 2, do some transactions, and
 # then start it up and force an SST).
 #
+
+if (`SELECT COUNT(*) = 0 FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'GTID_MODE' AND VARIABLE_VALUE = 'ON'`)
+{
+  --skip Test requires GTID_MODE=ON.
+}
+
 --source include/big_test.inc
---source include/have_gtid.inc
+#--source include/have_gtid.inc
 --source include/have_binlog_format_row.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 # Force a restart at the end of the test
 --source include/force_restart.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
 
 #
@@ -40,7 +45,7 @@ SELECT 1;
 
 # Wait until the node is confirmed as being down
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Remove the grastate.dat file to force an SST
@@ -68,7 +73,7 @@ INSERT INTO t1(text) VALUES('bbbbb');
 
 --connection node_1
 --source include/wait_until_connected_again.inc
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 --connection node_2

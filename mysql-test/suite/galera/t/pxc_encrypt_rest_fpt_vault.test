@@ -2,7 +2,6 @@
 #
 #
 --source include/big_test.inc
---source include/have_innodb.inc
 --source include/have_keyring_vault_plugin.inc
 --source include/galera_cluster.inc
 
@@ -54,7 +53,7 @@ drop table t;
 
 --connection node_1
 --echo #node-1
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 #
 CREATE TABLE e1 (
@@ -69,7 +68,7 @@ INSERT INTO e1 VALUES(2, 'bbbbb');
 --echo #node-2 restarted (should get encrypted table through SST)
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 select * from e1;
@@ -85,7 +84,7 @@ drop table e1;
 
 --connection node_1
 --echo #node-1
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 #
 CREATE TABLE e1 (
@@ -100,7 +99,7 @@ INSERT INTO e1 VALUES(2, 'bbbbb');
 --echo #node-2 restarted (should get encrypted table through IST)
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 select * from e1;

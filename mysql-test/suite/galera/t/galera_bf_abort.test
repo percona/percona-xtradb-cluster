@@ -1,5 +1,7 @@
+#
 --source include/galera_cluster.inc
---source include/have_innodb.inc
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
 
 #
 # Test a local transaction being aborted by a slave one
@@ -34,3 +36,85 @@ INSERT INTO t1 VALUES (2, 'node_2');
 --enable_query_log
 
 DROP TABLE t1;
+
+
+#-------------------------------------------------------------------------------
+#
+# Use-case below will execute procedure that uses the table that is being
+# dropped parallelly by another connection on same node (this could be from
+# other node too).
+# It has test 2 aspects:
+# a. bf_abort of local running transaction by high priority local running DDL.
+# b. call procedure is constructed such that it created 2 level dd action
+#    cascade (trx
+#               attachable_trx (accessing table t)
+#                 attachable_trx (accessing tables from mysql)
+#
+--connection node_2
+--echo #node-2 (create needed object and shutdown)
+create table t (i int, primary key pk(i)) engine=innodb;
+create table t2 (i int, primary key pk(i)) engine=innodb;
+insert into t values (1);
+select * from t;
+#
+delimiter |;
+create procedure p1(col1 int)
+begin
+insert into t2 values (col1);
+end|
+delimiter ;|
+--echo #shutdown node-2
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+--echo #node-1 (check if node-2 has left cluster)
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+# restart node-2 this. Now when we execute the call p1 it will cause
+# open and caching of mysql internal tables (routines, etc....) table that will
+# create the said effect of cascading attachable transaction.
+--connection node_2
+--echo #node-2 (restart)
+--let $restart_parameters="restart:"
+--let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+#
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+--connection node_2
+--echo #node-2 (call p1)
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_attach_trx_with_prev_attach_trx SIGNAL entered1 WAIT_FOR continue1";
+--send call p1((select i from t limit 1));
+
+--connect node_2b, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2b
+--echo #node-2b (fire parallel DDL action)
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+--send drop table t;
+
+--connect node_2c, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2c
+--echo #node-2c (signal proc thread to continue)
+--sleep 4
+SET DEBUG_SYNC = 'RESET';
+SET DEBUG_SYNC = "now SIGNAL continue1";
+
+--connection node_2b
+--echo #node-2b (ensuring table got dropped)
+--reap
+--error ER_NO_SUCH_TABLE
+select * from t;
+
+--connection node_2
+--echo #node-2 (cleanup)
+--reap
+drop procedure p1;
+drop table t2;
+
+

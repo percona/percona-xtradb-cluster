@@ -94,7 +94,7 @@ END|
 
 DELIMITER ;|
 
---let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connect node_1_insert_simple, 127.0.0.1, root, , test, $NODE_MYPORT_1
 --connect node_1_insert_multi, 127.0.0.1, root, , test, $NODE_MYPORT_1
@@ -131,12 +131,12 @@ SET SESSION wsrep_sync_wait = 0;
 # Make sure that node_2 is not killed while TOIs are applied.
 # Otherwhise we risk that grastate file is marked unsafe, and
 # as a consequence the node cannot rejoin with IST.
---let $wait_condition = SELECT VARIABLE_VALUE > $wsrep_last_committed_before FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition = SELECT VARIABLE_VALUE > $wsrep_last_committed_before FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
 --source include/wait_condition.inc
 
 --source include/kill_galera.inc
 
---sleep 10
+--sleep 18
 --connection node_1
 --source include/kill_galera.inc
 
@@ -171,18 +171,17 @@ SET SESSION wsrep_sync_wait = 0;
 --connection node_1
 --let $galera_wsrep_recover_server_id=1
 --source suite/galera/include/galera_wsrep_recover.inc
-
 --let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --source include/start_mysqld.inc
+
 --connection node_2
 --let $galera_wsrep_recover_server_id=2
 --source suite/galera/include/galera_wsrep_recover.inc
-
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --source include/start_mysqld.inc
 
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
 
 --let $diff_servers = 1 2

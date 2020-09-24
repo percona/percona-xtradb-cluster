@@ -4,7 +4,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 CREATE DATABASE d1;
 CREATE TABLE d1.t1(f1 INTEGER) ENGINE=InnoDB;

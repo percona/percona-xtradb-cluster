@@ -1,7 +1,6 @@
 #
 # Galera test for upstream fix for lp:1470677
 #
---source include/have_innodb.inc
 --source include/galera_cluster.inc
 
 --connection node_1

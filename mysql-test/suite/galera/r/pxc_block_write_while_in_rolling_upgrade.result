@@ -1,0 +1,30 @@
+#node-2
+CALL mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of multiple major versions while accepting write workload with pxc_strict_mode = PERMISSIVE");
+CALL mtr.add_suppression("pxc_maint_mode cannot be changed while using of multiple major versions");
+CALL mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of multiple major versions while accepting write workload with pxc_strict_mode = ENFORCING");
+SET @global_saved_strict_tmp = @@global.pxc_strict_mode;
+SET GLOBAL pxc_strict_mode = ENFORCING;
+CREATE TABLE tb1 (ID INT PRIMARY KEY);
+INSERT INTO tb1 VALUES (1),(2),(3);
+SET GLOBAL debug="+d,simulate_wsrep_multiple_major_versions";
+SET GLOBAL pxc_maint_mode = DISABLED;
+ERROR HY000: pxc_maint_mode cannot be changed while using of multiple major versions
+include/assert_grep.inc [Assert that the expected entry is in the error log when pxc_strict_mode = ENFORCING]
+INSERT INTO tb1 VALUES (4);
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of multiple major versions while accepting write workload with pxc_strict_mode = ENFORCING or MASTER
+UPDATE tb1 SET ID = 5 WHERE ID = 3;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of multiple major versions while accepting write workload with pxc_strict_mode = ENFORCING or MASTER
+DELETE FROM tb1 WHERE ID = 2;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of multiple major versions while accepting write workload with pxc_strict_mode = ENFORCING or MASTER
+include/assert_grep.inc [Assert that the expected entry is in the error log when pxc_strict_mode = ENFORCING]
+SET GLOBAL pxc_strict_mode = PERMISSIVE;
+INSERT INTO tb1 VALUES (4);
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of multiple major versions while accepting write workload with pxc_strict_mode = PERMISSIVE
+UPDATE tb1 SET ID = 5 WHERE ID = 3;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of multiple major versions while accepting write workload with pxc_strict_mode = PERMISSIVE
+DELETE FROM tb1 WHERE ID = 2;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of multiple major versions while accepting write workload with pxc_strict_mode = PERMISSIVE
+include/assert_grep.inc [Assert that the expected entry is in the error log when pxc_strict_mode = ENFORCING]

@@ -4,16 +4,8 @@
 Configuring Nodes for Write-Set Replication
 ===========================================
 
-After installing |PXC| on a node,
-configure it with information about the cluster.
-
-.. note:: Make sure that the |PXC| server is not running.
-
-   .. code-block:: bash
-
-      $ sudo service mysql stop
-
-Configuration examples assume there are three |PXC| nodes:
+After installing |PXC| on each node, you need to configure the cluster.
+In this section, we will demonstrate how to configure a three node cluster:
 
 +--------+-----------+---------------+
 | Node   | Host      | IP            |
@@ -25,73 +17,106 @@ Configuration examples assume there are three |PXC| nodes:
 | Node 3 | pxc3      | 192.168.70.63 |
 +--------+-----------+---------------+
 
-If you are running Debian or Ubuntu,
-add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
-on the first node::
+1. Stop the |PXC| server. After the installation completes the server is not
+   started. You need this step if you have started the server manually.
 
- wsrep_provider=/usr/lib/libgalera_smm.so
+   .. code-block:: bash
 
- wsrep_cluster_name=pxc-cluster
- wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
+      $ sudo service mysql stop
 
- wsrep_node_name=pxc1
- wsrep_node_address=192.168.70.61
+#. Edit the configuration file of the first node to provide the cluster settings.
 
- wsrep_sst_method=xtrabackup-v2
- wsrep_sst_auth=sstuser:passw0rd
+   *If you use Debian or Ubuntu*, edit |file.mysqld-cnf|:
 
- pxc_strict_mode=ENFORCING
+   .. code-block:: text
 
- binlog_format=ROW
- default_storage_engine=InnoDB
- innodb_autoinc_lock_mode=2
+      wsrep_provider=/usr/lib/galera4/libgalera_smm.so
+      wsrep_cluster_name=pxc-cluster
+      wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
-If you are running Red Hat or CentOS,
-add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
-on the first node::
+   *If you use Red Hat or CentOS*, edit |file.my-cnf|. Note that on these systems you set
+   the wsrep_provider option to a different value:
 
- wsrep_provider=/usr/lib64/galera3/libgalera_smm.so
+    .. code-block:: text
 
- wsrep_cluster_name=pxc-cluster
- wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
+       wsrep_provider=/usr/lib64/galera4/libgalera_smm.so
+       wsrep_cluster_name=pxc-cluster
+       wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
- wsrep_node_name=pxc1
- wsrep_node_address=192.168.70.61
+#. Configure *node 1*. 
 
- wsrep_sst_method=xtrabackup-v2
- wsrep_sst_auth=sstuser:passw0rd
+   .. code-block:: text
 
- pxc_strict_mode=ENFORCING
+      wsrep_node_name=pxc1
+      wsrep_node_address=192.168.70.61
+      pxc_strict_mode=ENFORCING
 
- binlog_format=ROW
- default_storage_engine=InnoDB
- innodb_autoinc_lock_mode=2
+#. Set up *node 2* and *node 3* in the same way: Stop the server and update the configuration file
+   applicable to your system. All settings are the same except for |wsrep-node-name| and |wsrep-node-address|.
 
-Use the same configuration for the second and third nodes,
-except the ``wsrep_node_name`` and ``wsrep_node_address`` variables:
+   For node 2
+     wsrep_node_name=pxc2
+     wsrep_node_address=192.168.70.62
 
-* For the second node::
+   For node 3
+      wsrep_node_name=pxc3
+      wsrep_node_address=192.168.70.63
 
-   wsrep_node_name=pxc2
-   wsrep_node_address=192.168.70.62
+#. Set up the traffic encryption settings. Each node of the cluster must use the same SSL certificates.
 
-* For the third node::
+   .. code-block:: text
 
-   wsrep_node_name=pxc3
-   wsrep_node_address=192.168.70.63
+      [mysqld]
+      wsrep_provider_options=”socket.ssl_key=server-key.pem;socket.ssl_cert=server-cert.pem;socket.ssl_ca=ca.pem”
 
-Configuration Reference
-=======================
+      [sst]
+      encrypt=4
+      ssl-key=server-key.pem
+      ssl-ca=ca.pem
+      ssl-cert=server-cert.pem
+
+.. important::
+
+   In |PXC| |version|, the :ref:`encrypt-replication-traffic` is
+   enabled by default (via the |pxc-encrypt-cluster-traffic|
+   variable).
+
+   The replication traffic encryption cannot be enabled on a running cluster. If
+   it was disabled before the cluster was bootstrapped, the cluster must to
+   stopped. Then set up the encryption, and bootstrap (see :ref:`bootstrap`)
+   again.
+
+   .. seealso::
+
+      More information about the security settings in |PXC|
+         - :ref:`security`
+	 - :ref:`encrypt-traffic`
+	 - :ref:`ssl-auto-conf`
+
+Template of the configuration file
+================================================================================
+
+Here is an example of a full configuration file installed on CentOS to
+|file.my-cnf|.
+
+.. include:: .res/code-block/sql/sample-my-conf.txt
+
+Next Steps: Bootstrap the first node 
+================================================================================
+
+After you configure all your nodes, initialize |PXC| by bootstrapping the first
+node according to the procedure described in :ref:`bootstrap`.
+
+
+Essential configuration variables
+================================================================================
 
 :variable:`wsrep_provider`
 
-  Specify the path to the Galera library.
+  Specify the path to the Galera library. The location depends on the distribution:
 
-  .. note:: The location depends on the distribution:
-
-     * Debian or Ubuntu: :file:`/usr/lib/libgalera_smm.so`
-
-     * Red Hat or CentOS: :file:`/usr/lib64/galera3/libgalera_smm.so`
+  * Debian and Ubuntu: :file:`/usr/lib/galera4/libgalera_smm.so`
+  * Red Hat and CentOS: :file:`/usr/lib64/galera4/libgalera_smm.so`
 
 :variable:`wsrep_cluster_name`
 
@@ -123,27 +148,9 @@ Configuration Reference
 
 :variable:`wsrep_sst_method`
 
-  By default, |PXC| uses |PXB|_ for *State Snapshot Transfer* (:term:`SST`).
-  Setting ``wsrep_sst_method=xtrabackup-v2`` is highly recommended.
+  By default, |PXC| uses |PXB|_ for :term:`State Snapshot Transfer <SST>`.
+  ``xtrabackup-v2`` is the only supported option for this variable.
   This method requires a user for SST to be set up on the initial node.
-  Provide SST user credentials with the :variable:`wsrep_sst_auth` variable.
-
-:variable:`wsrep_sst_auth`
-
-  Specify authentication credentials for :term:`SST`
-  as ``<sst_user>:<sst_pass>``.
-  You must create this user when :ref:`bootstrap`
-  and provide necessary privileges for it:
-
-  .. code-block:: sql
-
-     mysql> CREATE USER 'sstuser'@'localhost' IDENTIFIED BY 'passw0rd';
-     mysql> GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO
-       'sstuser'@'localhost';
-     mysql> FLUSH PRIVILEGES;
-
-  For more information, see `Privileges for Percona XtraBackup
-  <https://www.percona.com/doc/percona-xtrabackup/2.4/using_xtrabackup/privileges.html>`_.
 
 :variable:`pxc_strict_mode`
 
@@ -165,7 +172,7 @@ Configuration Reference
   Set this variable to ``default_storage_engine=InnoDB``.
 
 .. |default_storage_engine| replace:: ``default_storage_engine``
-.. _default_storage_engine: http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_default_storage_engine
+.. _default_storage_engine: http://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_default_storage_engine
 
 |innodb_autoinc_lock_mode|_
 
@@ -175,12 +182,7 @@ Configuration Reference
   Set this variable to ``innodb_autoinc_lock_mode=2``.
 
 .. |innodb_autoinc_lock_mode| replace:: ``innodb_autoinc_lock_mode``
-.. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
+.. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
 
-Next Steps
-==========
-
-After you configure all your nodes,
-initialize |PXC| by bootstrapping the first node
-according to the procedure described in :ref:`bootstrap`.
-
+.. include:: .res/replace.file.txt
+.. include:: .res/replace.opt.txt

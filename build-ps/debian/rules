@@ -7,15 +7,16 @@ export DH_VERBOSE=1
 export CFLAGS=
 export CXXFLAGS=
 
-PACKAGE=percona-xtradb-cluster-5.7
+PACKAGE=percona-xtradb-cluster
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
 
 wsrep_version="@@WSREP_VERSION@@"
 percona_server_version="@@PERCONA_VERSION@@"
 revision="@@REVISION@@"
+rel="@@DEB_RELEASE@@"
 compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
 compilation_comment_release="Percona XtraDB Cluster (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
-server_suffix="-57"
+server_suffix=""
 prefix=/usr
 
 TMP=$(CURDIR)/debian/tmp/
@@ -35,7 +36,7 @@ DEB_UPSTREAM_VERSION ?= $(shell echo $(DEB_NOEPOCH_VERSION) | sed 's/-[^-]*$$//'
 DEB_UPSTREAM_VERSION_MAJOR_MINOR := $(shell echo $(DEB_UPSTREAM_VERSION) | sed -r -n 's/^([0-9]+\.[0-9]+).*/\1/p')
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-5.7.tar.gz
+EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-8.0.tar.gz
 
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -c -s)
@@ -62,28 +63,19 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DINSTALL_MYSQLSHAREDIR=share/mysql \
 		-DINSTALL_MYSQLTESTDIR=lib/mysql-test \
 		-DINSTALL_PLUGINDIR=lib/mysql/plugin/debug \
+		-DROUTER_INSTALL_PLUGINDIR=lib/mysqlrouter/plugin \
 		-DINSTALL_SBINDIR=sbin \
 		-DINSTALL_SCRIPTDIR=bin \
 		-DINSTALL_SUPPORTFILESDIR=share/mysql \
 		-DSYSCONFDIR=/etc/mysql \
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 		-DCMAKE_BUILD_TYPE=Debug \
-		-DWITH_LIBWRAP=ON \
-		-DWITH_ZLIB=system \
-		-DWITH_SSL=system \
-		-DWITH_SCALABILITY_METRICS=ON \
-		-DSYSTEM_TYPE="debian-linux-gnu" \
-		-DWITH_READLINE=system \
-		-DWITHOUT_TOKUDB=ON \
 		-DCOMPILATION_COMMENT=$(compilation_comment_debug) \
-		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
-		-DINSTALL_LAYOUT=RPM \
-		-DWITH_INNODB_DISALLOW_WRITES=ON \
+		-DSYSTEM_TYPE="debian-linux-gnu" \
+		-DWITHOUT_TOKUDB=ON \
+		-DMYSQL_SERVER_SUFFIX=".$(rel)" \
 		-DWITH_WSREP=ON \
-		-DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
-		-DINSTALL_PLUGINDIR=lib/mysql/plugin/debug \
 		-DINSTALL_LAYOUT=DEB \
-		-DWITH_EMBEDDED_SERVER=OFF \
 		-DWITH_INNODB_MEMCACHED=ON \
 		-DWITH_MECAB=system \
 		-DWITH_ARCHIVE_STORAGE_ENGINE=ON \
@@ -91,8 +83,18 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_FEDERATED_STORAGE_ENGINE=ON \
 		-DWITH_PAM=ON \
 		-DWITH_ROCKSDB=0 \
+		-DFORCE_INSOURCE_BUILD=1 \
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
+		-DWITH_SYSTEM_LIBS=ON \
+                -DWITH_PROTOBUF=bundled \
+                -DWITH_RAPIDJSON=bundled \
+                -DWITH_ICU=bundled \
+                -DWITH_ZSTD=bundled \
+                -DWITH_LZ4=bundled \
+                -DWITH_EDITLINE=bundled \
+                -DWITH_LIBEVENT=bundled \
+                -DWITH_NUMA=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 endif
 
@@ -108,29 +110,21 @@ endif
 		-DINSTALL_MYSQLSHAREDIR=share/mysql \
 		-DINSTALL_MYSQLTESTDIR=lib/mysql-test \
 		-DINSTALL_PLUGINDIR=lib/mysql/plugin \
+		-DROUTER_INSTALL_PLUGINDIR=lib/mysqlrouter/plugin \
 		-DINSTALL_SBINDIR=sbin \
 		-DINSTALL_SCRIPTDIR=bin \
 		-DINSTALL_SUPPORTFILESDIR=share/mysql \
 		-DSYSCONFDIR=/etc/mysql \
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		-DWITH_LIBWRAP=ON \
-		-DWITH_ZLIB=system \
-		-DWITH_SSL=system \
-		-DWITH_SCALABILITY_METRICS=ON \
-		-DSYSTEM_TYPE="debian-linux-gnu" \
-		-DWITH_READLINE=system \
-		-DWITHOUT_TOKUDB=ON \
 		-DCOMPILATION_COMMENT=$(compilation_comment_release) \
-		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
-		-DINSTALL_LAYOUT=RPM \
-		-DWITH_INNODB_DISALLOW_WRITES=ON \
+		-DSYSTEM_TYPE="debian-linux-gnu" \
+		-DWITHOUT_TOKUDB=ON \
+		-DMYSQL_SERVER_SUFFIX=".$(rel)" \
 		-DWITH_WSREP=ON \
-		-DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
-		-DINSTALL_PLUGINDIR=lib/mysql/plugin \
 		-DINSTALL_LAYOUT=DEB \
-		-DWITH_EMBEDDED_SERVER=OFF \
 		-DWITH_INNODB_MEMCACHED=ON \
+		-DFORCE_INSOURCE_BUILD=1 \
 		-DWITH_MECAB=system \
 		-DWITH_ARCHIVE_STORAGE_ENGINE=ON \
 		-DWITH_BLACKHOLE_STORAGE_ENGINE=ON \
@@ -139,6 +133,15 @@ endif
 		-DWITH_ROCKSDB=0 \
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
+		-DWITH_SYSTEM_LIBS=ON \
+                -DWITH_PROTOBUF=bundled \
+                -DWITH_RAPIDJSON=bundled \
+                -DWITH_ICU=bundled \
+                -DWITH_ZSTD=bundled \
+                -DWITH_LZ4=bundled \
+                -DWITH_EDITLINE=bundled \
+                -DWITH_LIBEVENT=bundled \
+                -DWITH_NUMA=ON \
 		-DWITH_EXTRA_CHARSETS=all ..
 
 	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)
@@ -150,7 +153,7 @@ override_dh_auto_build:
 
 	[ -f $(EXPORTED_SOURCE_TARBALL) ] || tar -zcf $(EXPORTED_SOURCE_TARBALL) \
 	--exclude=debian . \
-	--transform="s,^\./,percona-xtradb-cluster-5.7/,"
+	--transform="s,^\./,percona-xtradb-cluster-8.0/,"
 
 ifeq ($(SKIP_DEBUG_BINARY),)
 	cd $(builddebug) && $(MAKE) -j$(NCPU)  VERBOSE=1
@@ -170,6 +173,14 @@ override_dh_auto_install:
 	(cd $(galeradir) && cp -r garb $(TMP)/)
 	(cd $(galeradir) && cp libgalera_smm.so $(TMP)/)
 	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
+	mkdir -p $(TMP)/usr/bin/pxc_extra/
+	(cp -r pxb-2.4 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-2.4/lib/xtrabackup)
+	(cp -r pxb-8.0 $(TMP)/usr/bin/pxc_extra/)
+	(mv $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/xtrabackup/* $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/)
+	(rm -rf $(TMP)/usr/bin/pxc_extra/pxb-8.0/lib/xtrabackup)
+
 
 	# add PXC configuration file my.cnf to mysql-common package
 	#install -g root -o root -m 0644 -D debian/extra/my.cnf $(TMP)/etc/mysql/my.cnf
@@ -181,7 +192,15 @@ override_dh_auto_install:
 	mkdir -p $(TMP)/var/lib/mysql-files
 	mkdir -p $(TMP)/var/lib/mysql
 	mkdir -p $(TMP)/var/run/mysql
+	mkdir -p $(TMP)/lib/systemd/system
 	install -m 0755 debian/extra/mysql-systemd-start $(TMP)/usr/share/mysql/
+	install -m 0755 debian/extra/mysql-systemd $(TMP)/usr/bin/
+	install -m 0644 debian/extra/mysql.service $(TMP)/lib/systemd/system/
+	install -m 0644 debian/extra/mysql@.service $(TMP)/lib/systemd/system/
+
+	install -m 0755 $(TMP)/garb/files/garb-systemd $(TMP)/usr/bin/
+	install -m 0644 $(TMP)/garb/files/garb.service $(TMP)/lib/systemd/system/garbd.service
+	sed -i 's/sysconfig\/garb/default\/garbd/' $(TMP)/lib/systemd/system/garbd.service
 
 	mkdir -p $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
 	cp -rp $(TMP)/usr/lib/mysql-test/* $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
@@ -210,16 +229,19 @@ override_dh_auto_install:
         # Add helper functions for maintainer scripts
 	install -m 0644 debian/extra/mysql-helpers debian/tmp/usr/share/mysql/
 
+	install -m 0644 $(TMP)/garb/files/garb.cnf $(TMP)/etc/default/garbd
+
 	# install source tarball for source package
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
 
 override_dh_strip:
-	dh_strip --dbg-package=percona-xtradb-cluster-5.7-dbg 
+	dh_strip --dbg-package=percona-xtradb-cluster-dbg 
+	dh_strip -Xlibprotobuf-lite
 
 override_dh_installinit:
 	@echo "RULES.$@"
-	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_enable --name=mysql; fi
-	dh_installinit --name=mysql -- defaults 19 21
-	dh_installinit --name=garbd -- defaults 19 21
+	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_enable --name=mysql; dh_systemd_enable --name=garbd; fi
+	# dh_installinit --name=mysql -- defaults 19 21
+	# dh_installinit --name=garbd -- defaults 19 21
 	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_start --restart-after-upgrade; fi
 	touch $@

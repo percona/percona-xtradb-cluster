@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # Test wsrep_local_state . We can not reliably produce all possible statuses in MTR, but

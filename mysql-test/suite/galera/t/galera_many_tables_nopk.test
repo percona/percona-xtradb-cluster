@@ -1,6 +1,5 @@
 --source include/big_test.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # This test forces 1K tables without a PK to participate in a single transaction

@@ -2,7 +2,6 @@
 # Test Galera clusters as masters to a MySQL slave
 #
 
---source include/have_innodb.inc
 --source include/have_log_bin.inc
 
 --connect node_1, 127.0.0.1, root, , test, $NODE_MYPORT_1

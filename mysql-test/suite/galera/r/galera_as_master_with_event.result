@@ -19,7 +19,7 @@ Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	E
 create event foo on schedule every 1 minute do insert into mysql.t values (NULL);
 show events;
 Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
-test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	ENABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
+test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	ENABLED	1	utf8mb4	utf8mb4_0900_ai_ci	utf8mb4_0900_ai_ci
 select count(*) from mysql.t;
 count(*)
 NUMBER_OF_ROWS
@@ -29,7 +29,7 @@ select @@server_id;
 2
 show events;
 Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
-test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	SLAVESIDE_DISABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
+test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	SLAVESIDE_DISABLED	1	utf8mb4	utf8mb4_0900_ai_ci	utf8mb4_0900_ai_ci
 #async-slave
 select @@server_id;
 @@server_id
@@ -48,7 +48,7 @@ Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 # restart
 show events;
 Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
-test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	SLAVESIDE_DISABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci
+test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	SLAVESIDE_DISABLED	1	utf8mb4	utf8mb4_0900_ai_ci	utf8mb4_0900_ai_ci
 use mysql;
 drop table t;
 #async-slave

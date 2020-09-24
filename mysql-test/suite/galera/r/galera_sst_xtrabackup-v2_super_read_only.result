@@ -1,0 +1,7 @@
+SELECT 1;
+1
+1
+SET SESSION wsrep_sync_wait = 0;
+# restart
+SET GLOBAL super_read_only = OFF;
+SET GLOBAL read_only = OFF;

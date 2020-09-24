@@ -2,6 +2,7 @@
 
 [mysqld]
 replicate-wild-do-table=db.%
+default-authentication-plugin=mysql_native_password
 
 [mysqld.2]
 replicate-wild-do-table=db1.%

@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/have_debug_sync.inc
 
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
@@ -18,7 +17,7 @@ SELECT * FROM t1;
 
 --connection node_1
 
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Remove the "grastate.dat" file to initiate new SST after restart:
@@ -64,7 +63,7 @@ CREATE TABLE t2 (f1 INTEGER);
 
 # Wait until node 2 is ready:
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Sanity check (node 2 is running now and can perform SQL operators):

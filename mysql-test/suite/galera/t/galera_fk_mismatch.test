@@ -3,7 +3,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 CREATE TABLE parent (
     id1 INT,

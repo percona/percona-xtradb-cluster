@@ -1,3 +1,5 @@
+call mtr.add_suppression("Although a path was specified for the.*");
+call mtr.add_suppression("Although a path was specified for the.*");
 TRUNCATE TABLE mysql.general_log;
 SET SESSION wsrep_osu_method=TOI;
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;

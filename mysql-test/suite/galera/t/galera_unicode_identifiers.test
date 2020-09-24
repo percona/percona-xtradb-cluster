@@ -3,7 +3,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --let $wsrep_sync_wait_orig = (SELECT @@wsrep_sync_wait)
 SET GLOBAL wsrep_sync_wait = 15;

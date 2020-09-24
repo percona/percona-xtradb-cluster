@@ -23,8 +23,8 @@ By default, |PXC| nodes use the following ports:
 * 3306 is used for MySQL client connections
   and :term:`SST` (State Snapshot Transfer) via ``mysqldump``.
 
-* 4444 is used for :term:`SST` via ``rsync``
-  and :ref:`Percona XtraBackup <xtrabackup_sst>`.
+* 4444 is used for :term:`SST` via 
+  :ref:`Percona XtraBackup <xtrabackup_sst>`.
 
 * 4567 is used for write-set replication traffic (over TCP)
   and multicast replication (over TCP and UDP).

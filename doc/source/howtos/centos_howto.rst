@@ -5,7 +5,7 @@ Configuring Percona XtraDB Cluster on CentOS
 ============================================
 
 This tutorial describes how to install and configure three |PXC| nodes
-on CentOS 6.8 servers, using the packages from Percona repositories.
+on CentOS 7 servers, using the packages from Percona repositories.
 
 * Node 1
 
@@ -27,10 +27,12 @@ Prerequisites
 
 The procedure described in this tutorial requires the following:
 
-* All three nodes have CentOS 6.8 installed.
+* All three nodes have CentOS 7 installed.
 * The firewall on all nodes is configured to allow connecting
   to ports 3306, 4444, 4567 and 4568.
 * SELinux on all nodes is disabled.
+
+.. include:: ../.res/text/admonition-automatic-user.txt
 
 Step 1. Installing PXC
 ======================
@@ -52,7 +54,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
       user=mysql
 
       # Path to Galera library
-      wsrep_provider=/usr/lib64/libgalera_smm.so
+      wsrep_provider=/usr/lib64/galera4/libgalera_smm.so
 
       # Cluster connection URL contains the IPs of node#1, node#2 and node#3
       wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
@@ -75,17 +77,11 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
       # Cluster name
       wsrep_cluster_name=my_centos_cluster
 
-      # Authentication for SST method
-      wsrep_sst_auth="sstuser:s3cret"
+#. Start the first node with the following command:
 
-#. Start the first node with the following command::
+   .. code-block:: text
 
-      [root@percona1 ~]# /etc/init.d/mysql bootstrap-pxc
-
-   .. note:: In case you're running CentOS 7,
-      the bootstrap service should be used instead: ::
-
-         [root@percona1 ~]#  systemctl start mysql@bootstrap.service
+      [root@percona1 ~]#  systemctl start mysql@bootstrap.service
 
    The previous command will start the cluster
    with initial :variable:`wsrep_cluster_address` variable
@@ -113,29 +109,28 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
       ...
       | wsrep_ready                | ON                                   |
       +----------------------------+--------------------------------------+
-      40 rows in set (0.01 sec)
+      75 rows in set (0.00 sec)
 
    This output shows that the cluster has been successfully bootstrapped.
 
-.. note:: It is not recommended to leave an empty password
-   for the root account. Password can be changed as follows:
+   Copy the automatically generated temporary password for the superuser account:
 
-   .. code-block:: mysql
+   .. code-block:: bash
 
-      mysql@percona1> UPDATE mysql.user SET password=PASSWORD("Passw0rd") where user='root';
-      mysql@percona1> FLUSH PRIVILEGES;
+      $ sudo grep 'temporary password' /var/log/mysqld.log
 
-To perform :ref:`state_snapshot_transfer` using |XtraBackup|,
-set up a new user with proper `privileges <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_:
+   Use this password to log in as root:
 
-.. code-block:: mysql
+   .. code-block:: bash
 
-   mysql@percona1> CREATE USER 'sstuser'@'localhost' IDENTIFIED BY 's3cret';
-   mysql@percona1> GRANT PROCESS, RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'localhost';
-   mysql@percona1> FLUSH PRIVILEGES;
+      $ mysql -u root -p
 
-.. note:: MySQL root account can also be used for performing SST,
-   but it is more secure to use a different (non-root) user for this.
+   Change the password for the superuser account and log out. For example:
+
+   .. code-block:: guess
+
+      mysql> ALTER USER 'root'@'localhost' IDENTIFIED BY 'r00tP@$$';
+      Query OK, 0 rows affected (0.00 sec)
 
 Step 3. Configuring the second node
 ===================================
@@ -149,7 +144,7 @@ Step 3. Configuring the second node
       user=mysql
 
       # Path to Galera library
-      wsrep_provider=/usr/lib64/libgalera_smm.so
+      wsrep_provider=/usr/lib64/galera4/libgalera_smm.so
 
       # Cluster connection URL contains IPs of node#1, node#2 and node#3
       wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
@@ -172,20 +167,14 @@ Step 3. Configuring the second node
       # SST method
       wsrep_sst_method=xtrabackup-v2
 
-      #Authentication for SST method
-      wsrep_sst_auth="sstuser:s3cret"
-
 #. Start the second node with the following command:
 
 .. code-block:: bash
 
-      [root@percona2 ~]# /etc/init.d/mysql start
+      [root@percona2 ~]# systemctl start mysql
 
 #. After the server has been started,
    it should receive |SST| automatically.
-   This means that the second node won't have empty root password anymore.
-   In order to connect to the cluster and check the status,
-   the root password from the first node should be used.
    Cluster status can be checked on both nodes.
    The following is an example of status from the second node (``percona2``):
 
@@ -222,7 +211,7 @@ Step 4. Configuring the third node
       user=mysql
 
       # Path to Galera library
-      wsrep_provider=/usr/lib64/libgalera_smm.so
+      wsrep_provider=/usr/lib64/galera4/libgalera_smm.so
 
       # Cluster connection URL contains IPs of node#1, node#2 and node#3
       wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
@@ -245,14 +234,11 @@ Step 4. Configuring the third node
       # SST method
       wsrep_sst_method=xtrabackup-v2
 
-      #Authentication for SST method
-      wsrep_sst_auth="sstuser:s3cret"
-
 #. Start the third node with the following command:
 
 .. code-block:: bash
 
-      [root@percona3 ~]# /etc/init.d/mysql start
+      [root@percona3 ~]# systemctl start mysql
 
 #. After the server has been started,
    it should receive SST automatically.
@@ -325,3 +311,6 @@ and add some records to the table on the first node.
 
 This simple procedure should ensure that all nodes in the cluster
 are synchronized and working as intended.
+
+.. include:: ../.res/replace.txt
+.. include:: ../.res/replace.opt.txt

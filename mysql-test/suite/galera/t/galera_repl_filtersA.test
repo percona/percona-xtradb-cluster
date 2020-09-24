@@ -26,8 +26,14 @@
 #
 # db1 and dbx1 can be used for TABLE/DATABASE testing.
 #
+# 8.0 Changes
+# ===========
+# In PXC 5.7, the replication filters would also apply to galera replication,
+# which meant that galera used the global replication
+# In PXC 8.0, this is no longer true.  The galera channel has it's own filters,
+# and no longer uses the global replication filter.
+#
 
---source include/have_innodb.inc
 --source include/have_log_bin.inc
 --source include/force_restart.inc
 
@@ -38,10 +44,10 @@
 # As node #1 is not a Galera node, we connect to node #2 in order to run
 # include/galera_cluster.inc
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
---source include/galera_cluster.inc
+--source include/galera_cluster_master_slave.inc
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 --disable_query_log
@@ -1292,7 +1298,8 @@ INSERT INTO dbx1.t2(id) VALUES(99);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(99);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t2
+--source include/wait_condition.inc
 
 
 #
@@ -1913,7 +1920,8 @@ INSERT INTO dbx1.t1(id) VALUES(99);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t1(id) VALUES(99);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t1
+--source include/wait_condition.inc
 
 
 #
@@ -2349,7 +2357,8 @@ INSERT INTO dbx1.t2(id) VALUES(1);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t2
+--source include/wait_condition.inc
 
 
 #
@@ -2670,7 +2679,8 @@ INSERT INTO dbx1.t2(id) VALUES(1);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t2
+--source include/wait_condition.inc
 
 
 #
@@ -4736,7 +4746,8 @@ INSERT INTO dbx1.t2(id) VALUES(99);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(99);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t2
+--source include/wait_condition.inc
 
 
 #
@@ -5190,7 +5201,8 @@ INSERT INTO dbx1.t2(id) VALUES(99);
 
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(99);
+--let $wait_condition = SELECT COUNT(*) = 1 FROM dbx1.t2
+--source include/wait_condition.inc
 
 
 #
@@ -5505,16 +5517,10 @@ USE db; DELETE FROM db1.t1 WHERE id = 1;
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 because the table's database, dbx1,
-# is not allowed, so the operation will not replicate.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
-# NOTE: The default database does not matter here, only the
-# table's database.
-#
-# NOTE: Unlike statement-based replication, the database filters
-# are checked for row-based replication.
-#
-# SUMMARY: node_2:yes  node_3:no
+# SUMMARY: node_2:yes  node_3:yes
 #
 USE db; INSERT INTO dbx1.t2(id) VALUES(1);
 
@@ -5529,9 +5535,10 @@ USE db; INSERT INTO dbx1.t2(id) VALUES(1);
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Insert not replicated to node_3"
---let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--let $assert_text = "Insert replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
 --source include/assert.inc
+
 
 #
 # Test preparation
@@ -5541,7 +5548,9 @@ USE db; INSERT INTO dbx1.t2(id) VALUES(1);
 --echo #
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
+--let $assert_text = "Nodes 2 and 3 should be the same"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
 
 
 #
@@ -5558,16 +5567,10 @@ INSERT INTO dbx1.t2(id) VALUES(1);
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 because the table's database, dbx1,
-# is not allowed, so the operation will not replicate.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
-# NOTE: The default database does not matter here, only the
-# table's database.
-#
-# NOTE: Unlike statement-based replication, the database filters
-# are checked for row-based replication.
-#
-# SUMMARY: node_2:yes  node_3:no
+# SUMMARY: node_2:yes  node_3:yes
 #
 USE db; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 
@@ -5582,8 +5585,8 @@ USE db; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Update not replicated to node_3"
---let $assert_cond = COUNT(*) = 0 FROM dbx1.t2 WHERE f2 = "abcde"
+--let $assert_text = "Update replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2 WHERE f2 = "abcde"
 --source include/assert.inc
 
 
@@ -5601,16 +5604,10 @@ USE db; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 because the table's database, dbx1,
-# is not allowed, so the operation will not replicate.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
-# NOTE: The default database does not matter here, only the
-# table's database.
-#
-# NOTE: Unlike statement-based replication, the database filters
-# are checked for row-based replication.
-#
-# SUMMARY: node_2:yes  node_3:no
+# SUMMARY: node_2:yes  node_3:yes
 #
 USE db; DELETE FROM dbx1.t2 WHERE id = 1;
 
@@ -5625,8 +5622,8 @@ USE db; DELETE FROM dbx1.t2 WHERE id = 1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Delete not replicated to node_3"
---let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--let $assert_text = "Delete replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
 --source include/assert.inc
 
 --echo #
@@ -5798,16 +5795,10 @@ USE dbx; DELETE FROM db1.t1 WHERE id = 1;
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 because the table's database, dbx1,
-# is not allowed, so the operation will not replicate.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
-# NOTE: The default database does not matter here, only the
-# table's database.
-#
-# NOTE: Unlike statement-based replication, the database filters
-# are checked for row-based replication.
-#
-# SUMMARY: node_2:yes  node_3:no
+# SUMMARY: node_2:yes  node_3:yes
 #
 USE dbx; INSERT INTO dbx1.t2(id) VALUES(1);
 
@@ -5822,8 +5813,8 @@ USE dbx; INSERT INTO dbx1.t2(id) VALUES(1);
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Insert not replicated to node_3"
---let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
+--let $assert_text = "Insert replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
 --source include/assert.inc
 
 #
@@ -5834,7 +5825,9 @@ USE dbx; INSERT INTO dbx1.t2(id) VALUES(1);
 --echo #
 --echo # connection node_3
 --connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
+--let $assert_text = "node_2 and node_3 are the same"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--source include/assert.inc
 
 
 #
@@ -5851,14 +5844,8 @@ INSERT INTO dbx1.t2(id) VALUES(1);
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 because the table's database, dbx1,
-# is not allowed, so the operation will not replicate.
-#
-# NOTE: The default database does not matter here, only the
-# table's database.
-#
-# NOTE: Unlike statement-based replication, the database filters
-# are checked for row-based replication.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
 # SUMMARY: node_2:yes  node_3:no
 #
@@ -5875,8 +5862,8 @@ USE dbx; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Update not replicated to node_3"
---let $assert_cond = COUNT(*) = 0 FROM dbx1.t2 WHERE f2 = "abcde"
+--let $assert_text = "Update replicated to node_3"
+--let $assert_cond = COUNT(*) = 1 FROM dbx1.t2 WHERE f2 = "abcde"
 --source include/assert.inc
 
 
@@ -5894,14 +5881,8 @@ USE dbx; UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 --echo # connection node_2
 --connection node_2
 
-# EXPECTED: This will not replicate to node_3 because the table's database, dbx1,
-# is not allowed, so the operation will not replicate.
-#
-# NOTE: The default database does not matter here, only the
-# table's database.
-#
-# NOTE: Unlike statement-based replication, the database filters
-# are checked for row-based replication.
+# EXPECTED: This will replicate to node 3 because the global replication filter
+# does not affect galera replication.
 #
 # SUMMARY: node_2:yes  node_3:no
 #
@@ -5918,8 +5899,8 @@ USE dbx; DELETE FROM dbx1.t2 WHERE id = 1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM db.counter;
 --source include/wait_condition.inc
 
---let $assert_text = "Delete not replicated to node_3"
---let $assert_cond = COUNT(*) = 1 FROM dbx1.t2
+--let $assert_text = "Delete replicated to node_3"
+--let $assert_cond = COUNT(*) = 0 FROM dbx1.t2
 --source include/assert.inc
 
 --echo #
@@ -6681,11 +6662,71 @@ RESET SLAVE ALL;
 --connection node_1
 RESET MASTER;
 
---connection node_1
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+
+# ==== PXC-2368 test cases ====
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+CHANGE MASTER TO MASTER_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+START SLAVE FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+STOP SLAVE FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+SHOW RELAYLOG EVENTS FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+FLUSH RELAY LOGS FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+SHOW SLAVE STATUS FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+RESET SLAVE FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';
+
+# ==== PXC-2368 test cases end ====
 
 --connection node_2
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+--echo #node-2 (cluster node)
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+CHANGE MASTER TO MASTER_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+START SLAVE FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+STOP SLAVE FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+SHOW RELAYLOG EVENTS FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+FLUSH RELAY LOGS FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+SHOW SLAVE STATUS FOR CHANNEL 'wsrep';
+
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+RESET SLAVE FOR CHANNEL 'wsrep';
+
+#--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
+#CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';
+
+
+--connection node_1
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
+
+--connection node_2
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 
 --connection node_3
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("FLUSH RELAY LOGS cannot be performed on channel 'wsrep'");
+call mtr.add_suppression("Slave channel 'wsrep' does not exist");
+

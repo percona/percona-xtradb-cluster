@@ -13,8 +13,9 @@
 # link though it introduces GTID backlog on failing node.
 #
 
+--source include/have_debug_sync.inc
+
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #------------------------------------------------------------------------------
 #
@@ -36,8 +37,8 @@ insert into t2 values (3), (4), (5);
 #insert into t3 values (100), (101), (102);
 
 # check if tablespace is created
-select name from information_schema.innodb_sys_tablespaces where name='ts1';
-select name from information_schema.innodb_sys_tablespaces where name='ts2';
+select name from information_schema.innodb_tablespaces where name='ts1';
+select name from information_schema.innodb_tablespaces where name='ts2';
 show create table t1;
 show create table t2;
 
@@ -53,7 +54,7 @@ use test;
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 #
-select name from information_schema.innodb_sys_tablespaces where name='ts1';
+select name from information_schema.innodb_tablespaces where name='ts1';
 show create table t1;
 show create table t2;
 select * from t1;
@@ -75,5 +76,124 @@ drop tablespace ts1;
 # ensure drop action is replicated too.
 --connection node_2
 --echo #node-2
---let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLESPACES WHERE NAME = 'ts1';
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'ts1';
 --source include/wait_condition.inc
+
+
+#------------------------------------------------------------------------------
+#
+# trying alter and rename of tablespace
+#
+--connection node_1
+--echo #node-1
+create tablespace ts1 add datafile 'ts1.ibd' engine=innodb;
+create tablespace ts2 add datafile 'ts2.ibd' engine=innodb;
+create table t1 (i int) TABLESPACE ts1 engine=innodb;
+show create table t1;
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+select name, path from information_schema.innodb_tablespaces_brief where name LIKE 'ts%';
+
+--connection node_2
+--echo #node-2
+#
+# rename tablespace
+alter tablespace ts1 rename to ts10;
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+select name, path from information_schema.innodb_tablespaces_brief where name LIKE 'ts%';
+show create table t1;
+#
+drop tablespace ts2;
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+
+--connection node_1
+--echo #node-1
+select name, space_type, state from information_schema.innodb_tablespaces where name LIKE 'ts%';
+select name, path from information_schema.innodb_tablespaces_brief where name LIKE 'ts%';
+drop table t1;
+drop tablespace ts10;
+
+#------------------------------------------------------------------------------
+#
+# MySQL-8.0 introduces create/alter/drop of undo tables
+#
+--connection node_1
+--echo #node-1
+CREATE UNDO TABLESPACE one_undo ADD DATAFILE 'one_undo.ibu';
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+
+--connection node_2
+--echo #node-2
+#
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+
+#
+ALTER UNDO TABLESPACE one_undo SET INACTIVE;
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+# -- truncate of undo tablespace after marking inactive may take some time
+SELECT SLEEP(5);
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+
+#
+DROP UNDO TABLESPACE one_undo;
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+
+
+--connection node_1
+--echo #node-1
+SELECT NAME, SPACE_TYPE, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE SPACE_TYPE = 'Undo' ORDER BY NAME;
+SELECT count(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME = 'one_undo' AND STATE = 'empty';
+
+
+
+#------------------------------------------------------------------------------
+#
+# ALTER OF TABLESPACE should add all sub-objects as part of it write-set
+# signature to properly detect conflict with parallel running DML command.
+#
+--connection node_1
+--echo #node-1 (issue dml that would conflict with parallel ALTER TABLESPACE)
+use test;
+create tablespace tab ADD DATAFILE 'tab.ibd';
+create table t1 (i int, primary key pk(i)) tablespace=tab;
+insert into t1 values (1), (2), (3), (4);
+select * from t1;
+select name from information_schema.innodb_tablespaces where name='tab';
+#
+set session wsrep_retry_autocommit=0;
+--let $galera_sync_point = before_replicate_sync
+--source include/galera_set_sync_point.inc
+--send update t1 set i = i + 10 where i = 2;
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--echo #node-1a (issue ALTER TABLESPACE)
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+#
+--send alter tablespace tab rename to tab_rename;
+
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--echo #node-1b (wait for both to get blocked)
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = select count(*) = 1 from information_schema.processlist where State like "innobase_commit_low%" and Info like "alter tablespace tab rename to tab_rename";
+--source include/wait_condition.inc
+--source include/galera_signal_sync_point.inc
+
+--connection node_1
+--echo #node-1
+--error ER_LOCK_DEADLOCK
+--reap
+select * from t1;
+
+--connection node_1a
+--echo #node-1a
+--reap
+--let $wait_condition = select count(*) = 1 from information_schema.innodb_tablespaces where name='tab_rename';
+--source include/wait_condition.inc
+
+--connection node_1
+--echo #node-1
+drop table t1;
+drop tablespace tab_rename;

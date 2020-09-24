@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # In this test, we send two ALTER TABLE statements that would only work if executed in the right order

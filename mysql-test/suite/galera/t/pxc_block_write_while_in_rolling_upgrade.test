@@ -1,0 +1,80 @@
+#
+# PXC-3182 - disallow write on 8.0 while 5.7 nodes are still on the cluster
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug.inc
+
+--connection node_2
+--echo #node-2
+CALL mtr.add_suppression("Percona-XtraDB-Cluster doesn't recommend use of multiple major versions while accepting write workload with pxc_strict_mode = PERMISSIVE");
+CALL mtr.add_suppression("pxc_maint_mode cannot be changed while using of multiple major versions");
+CALL mtr.add_suppression("Percona-XtraDB-Cluster prohibits use of multiple major versions while accepting write workload with pxc_strict_mode = ENFORCING");
+SET @global_saved_strict_tmp = @@global.pxc_strict_mode;
+SET GLOBAL pxc_strict_mode = ENFORCING;
+CREATE TABLE tb1 (ID INT PRIMARY KEY);
+INSERT INTO tb1 VALUES (1),(2),(3);
+
+# provoke reconfiguration 
+SET GLOBAL debug="+d,simulate_wsrep_multiple_major_versions";
+--disable_query_log
+SET GLOBAL wsrep_cluster_address=@@wsrep_cluster_address;
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment'
+--source include/wait_condition.inc
+SET SESSION wsrep_sync_wait = DEFAULT;
+--enable_query_log
+
+# Test Error trying to change pxc_maint_mode
+--error ER_UNKNOWN_ERROR
+SET GLOBAL pxc_maint_mode = DISABLED;
+--let $assert_text= Assert that the expected entry is in the error log when pxc_strict_mode = ENFORCING
+--let $assert_file=$MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = Synchronized with group, ready for connections
+--let $assert_select= .* \[ERROR\] .* pxc_maint_mode cannot be changed while using of multiple major versions
+--let $assert_count= 1
+--source include/assert_grep.inc
+
+# Test Error while writing data
+--error ER_UNKNOWN_ERROR
+INSERT INTO tb1 VALUES (4);
+--error ER_UNKNOWN_ERROR
+UPDATE tb1 SET ID = 5 WHERE ID = 3;
+--error ER_UNKNOWN_ERROR
+DELETE FROM tb1 WHERE ID = 2;
+
+--let $assert_text= Assert that the expected entry is in the error log when pxc_strict_mode = ENFORCING
+--let $assert_file=$MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = Synchronized with group, ready for connections
+--let $assert_select= .* \[ERROR\] .* Percona-XtraDB-Cluster prohibits use of multiple major versions while accepting write workload with pxc_strict_mode = ENFORCING or MASTER
+--let $assert_count= 3
+--source include/assert_grep.inc
+
+# Test warning while writing data
+SET GLOBAL pxc_strict_mode = PERMISSIVE;
+INSERT INTO tb1 VALUES (4);
+UPDATE tb1 SET ID = 5 WHERE ID = 3;
+DELETE FROM tb1 WHERE ID = 2;
+--let $assert_text= Assert that the expected entry is in the error log when pxc_strict_mode = ENFORCING
+--let $assert_file=$MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = Synchronized with group, ready for connections
+--let $assert_select= .* \[Warning\] .* Percona-XtraDB-Cluster doesn't recommend use of multiple major versions while accepting write workload with pxc_strict_mode = PERMISSIVE
+--let $assert_count= 3
+--source include/assert_grep.inc
+
+# Cleanup 
+--disable_query_log
+SET GLOBAL pxc_strict_mode = @global_saved_strict_tmp;
+SET GLOBAL debug="-d,simulate_wsrep_multiple_major_versions";
+SET GLOBAL wsrep_cluster_address=@@wsrep_cluster_address;
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment'
+--source include/wait_condition.inc
+SET SESSION wsrep_sync_wait = DEFAULT;
+DROP TABLE tb1;
+--enable_query_log
+

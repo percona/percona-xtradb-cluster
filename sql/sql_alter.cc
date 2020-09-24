@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -20,89 +20,91 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
-#include "sql_alter.h"
-#ifdef WITH_WSREP
-#include "wsrep_mysqld.h"
-#include "sql_parse.h"
-#endif /* WITH_WSREP */
+#include "sql/sql_alter.h"
 
-#include "auth_common.h"                     // check_access
-#include "sql_table.h"                       // mysql_alter_table,
-                                             // mysql_exchange_partition
-#include "sql_base.h"                        // open_temporary_tables
+#include <limits.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "m_ctype.h"
+#include "m_string.h"
+#include "my_dbug.h"
+#include "my_inttypes.h"
+#include "my_macros.h"
+#include "my_sys.h"
+#include "mysql/plugin.h"
+#include "mysqld_error.h"
+#include "sql/auth/auth_acls.h"
+#include "sql/auth/auth_common.h"  // check_access
+#include "sql/create_field.h"
+#include "sql/dd/types/trigger.h"  // dd::Trigger
+#include "sql/derror.h"            // ER_THD
+#include "sql/error_handler.h"     // Strict_error_handler
+// mysql_exchange_partition
+#include "sql/log.h"
+#include "sql/mysqld.h"              // lower_case_table_names
+#include "sql/parse_tree_helpers.h"  // is_identifier
+#include "sql/sql_class.h"           // THD
+#include "sql/sql_error.h"
+#include "sql/sql_lex.h"
+#include "sql/sql_servers.h"
+#include "sql/sql_table.h"  // mysql_alter_table,
+#include "sql/table.h"
+#include "template_utils.h"  // delete_container_pointers
+
 #ifdef WITH_WSREP
-#include "wsrep_mysqld.h"
+#include "mysql/components/services/log_builtins.h"
+#include "sql/dd/types/table.h"                // dd::Table
+#include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
+#include "sql/dd/dd_table.h"                 // dd::table_storage_engine
 #include "sql_parse.h"
+#include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
-#include "log.h"
 
 bool has_external_data_or_index_dir(partition_info &pi);
 
 Alter_info::Alter_info(const Alter_info &rhs, MEM_ROOT *mem_root)
-  :drop_list(rhs.drop_list, mem_root),
-  alter_list(rhs.alter_list, mem_root),
-  key_list(rhs.key_list, mem_root),
-  alter_rename_key_list(rhs.alter_rename_key_list, mem_root),
-  create_list(rhs.create_list, mem_root),
-  delayed_key_list(rhs.delayed_key_list, mem_root),
-  delayed_key_info(rhs.delayed_key_info),
-  delayed_key_count(rhs.delayed_key_count),
-  flags(rhs.flags),
-  keys_onoff(rhs.keys_onoff),
-  partition_names(rhs.partition_names, mem_root),
-  num_parts(rhs.num_parts),
-  requested_algorithm(rhs.requested_algorithm),
-  requested_lock(rhs.requested_lock),
-  with_validation(rhs.with_validation)
-{
+    : drop_list(mem_root, rhs.drop_list.begin(), rhs.drop_list.end()),
+      alter_list(mem_root, rhs.alter_list.begin(), rhs.alter_list.end()),
+      key_list(mem_root, rhs.key_list.begin(), rhs.key_list.end()),
+      alter_rename_key_list(mem_root, rhs.alter_rename_key_list.begin(),
+                            rhs.alter_rename_key_list.end()),
+      alter_index_visibility_list(mem_root,
+                                  rhs.alter_index_visibility_list.begin(),
+                                  rhs.alter_index_visibility_list.end()),
+      alter_constraint_enforcement_list(
+          mem_root, rhs.alter_constraint_enforcement_list.begin(),
+          rhs.alter_constraint_enforcement_list.end()),
+      check_constraint_spec_list(mem_root,
+                                 rhs.check_constraint_spec_list.begin(),
+                                 rhs.check_constraint_spec_list.end()),
+      create_list(rhs.create_list, mem_root),
+      delayed_key_list(mem_root, rhs.delayed_key_list.cbegin(),
+                       rhs.delayed_key_list.cend()),
+      delayed_key_info(rhs.delayed_key_info),
+      delayed_key_count(rhs.delayed_key_count),
+      flags(rhs.flags),
+      keys_onoff(rhs.keys_onoff),
+      partition_names(rhs.partition_names, mem_root),
+      num_parts(rhs.num_parts),
+      requested_algorithm(rhs.requested_algorithm),
+      requested_lock(rhs.requested_lock),
+      with_validation(rhs.with_validation),
+      new_db_name(rhs.new_db_name),
+      new_table_name(rhs.new_table_name) {
   /*
     Make deep copies of used objects.
     This is not a fully deep copy - clone() implementations
-    of Alter_drop, Alter_column, Key, foreign_key, Key_part_spec
-    do not copy string constants. At the same length the only
+    of Create_list do not copy string constants. At the same length the only
     reason we make a copy currently is that ALTER/CREATE TABLE
     code changes input Alter_info definitions, but string
     constants never change.
   */
-  list_copy_and_replace_each_value(drop_list, mem_root);
-  list_copy_and_replace_each_value(alter_list, mem_root);
-  list_copy_and_replace_each_value(key_list, mem_root);
-  list_copy_and_replace_each_value(alter_rename_key_list, mem_root);
-  list_copy_and_replace_each_value(create_list, mem_root);
-  list_copy_and_replace_each_value(delayed_key_list, mem_root);
+  List_iterator<Create_field> it(create_list);
+  Create_field *el;
+  while ((el = it++)) it.replace(el->clone(mem_root));
+
   /* partition_names are not deeply copied currently */
-}
-
-
-bool Alter_info::set_requested_algorithm(const LEX_STRING *str)
-{
-  // To avoid adding new keywords to the grammar, we match strings here.
-  if (!my_strcasecmp(system_charset_info, str->str, "INPLACE"))
-    requested_algorithm= ALTER_TABLE_ALGORITHM_INPLACE;
-  else if (!my_strcasecmp(system_charset_info, str->str, "COPY"))
-    requested_algorithm= ALTER_TABLE_ALGORITHM_COPY;
-  else if (!my_strcasecmp(system_charset_info, str->str, "DEFAULT"))
-    requested_algorithm= ALTER_TABLE_ALGORITHM_DEFAULT;
-  else
-    return true;
-  return false;
-}
-
-
-bool Alter_info::set_requested_lock(const LEX_STRING *str)
-{
-  // To avoid adding new keywords to the grammar, we match strings here.
-  if (!my_strcasecmp(system_charset_info, str->str, "NONE"))
-    requested_lock= ALTER_TABLE_LOCK_NONE;
-  else if (!my_strcasecmp(system_charset_info, str->str, "SHARED"))
-    requested_lock= ALTER_TABLE_LOCK_SHARED;
-  else if (!my_strcasecmp(system_charset_info, str->str, "EXCLUSIVE"))
-    requested_lock= ALTER_TABLE_LOCK_EXCLUSIVE;
-  else if (!my_strcasecmp(system_charset_info, str->str, "DEFAULT"))
-    requested_lock= ALTER_TABLE_LOCK_DEFAULT;
-  else
-    return true;
-  return false;
 }
 
 /**
@@ -112,39 +114,49 @@ bool Alter_info::set_requested_lock(const LEX_STRING *str)
   @retval false there are no compressed columns
   @retval true there is at least one compressed column
 */
-bool Alter_info::has_compressed_columns() const
-{
-  List_iterator<Create_field> it(
-    const_cast<List<Create_field>&>(create_list));
-  const Create_field* sql_field;
-  while ((sql_field= it++))
+bool Alter_info::has_compressed_columns() const {
+  List_iterator<Create_field> it(const_cast<List<Create_field> &>(create_list));
+  const Create_field *sql_field;
+  while ((sql_field = it++))
     if (sql_field->column_format() == COLUMN_FORMAT_TYPE_COMPRESSED)
       return true;
   return false;
 }
 
-
 Alter_table_ctx::Alter_table_ctx()
-  : datetime_field(NULL), error_if_not_empty(false),
-    tables_opened(0),
-    db(NULL), table_name(NULL), alias(NULL),
-    new_db(NULL), new_name(NULL), new_alias(NULL)
+    : datetime_field(nullptr),
+      error_if_not_empty(false),
+      tables_opened(0),
+      db(nullptr),
+      table_name(nullptr),
+      alias(nullptr),
+      new_db(nullptr),
+      new_name(nullptr),
+      new_alias(nullptr),
+      fk_info(nullptr),
+      fk_count(0),
+      fk_max_generated_name_number(0)
 #ifndef DBUG_OFF
-    , tmp_table(false)
+      ,
+      tmp_table(false)
 #endif
 {
 }
 
-
 Alter_table_ctx::Alter_table_ctx(THD *thd, TABLE_LIST *table_list,
-                                 uint tables_opened_arg,
-                                 const char *new_db_arg,
+                                 uint tables_opened_arg, const char *new_db_arg,
                                  const char *new_name_arg)
-  : datetime_field(NULL), error_if_not_empty(false),
-    tables_opened(tables_opened_arg),
-    new_db(new_db_arg), new_name(new_name_arg)
+    : datetime_field(nullptr),
+      error_if_not_empty(false),
+      tables_opened(tables_opened_arg),
+      new_db(new_db_arg),
+      new_name(new_name_arg),
+      fk_info(nullptr),
+      fk_count(0),
+      fk_max_generated_name_number(0)
 #ifndef DBUG_OFF
-    , tmp_table(false)
+      ,
+      tmp_table(false)
 #endif
 {
   /*
@@ -152,68 +164,59 @@ Alter_table_ctx::Alter_table_ctx(THD *thd, TABLE_LIST *table_list,
     to simplify further comparisions: we want to see if it's a RENAME
     later just by comparing the pointers, avoiding the need for strcmp.
   */
-  db= table_list->db;
-  table_name= table_list->table_name;
-  alias= (lower_case_table_names == 2) ? table_list->alias : table_name;
+  db = table_list->db;
+  table_name = table_list->table_name;
+  alias = (lower_case_table_names == 2) ? table_list->alias : table_name;
 
-  if (!new_db || !my_strcasecmp(table_alias_charset, new_db, db))
-    new_db= db;
+  if (!new_db || !my_strcasecmp(table_alias_charset, new_db, db)) new_db = db;
 
-  if (new_name)
-  {
+  if (new_name) {
     DBUG_PRINT("info", ("new_db.new_name: '%s'.'%s'", new_db, new_name));
 
-    if (lower_case_table_names == 1) // Convert new_name/new_alias to lower case
+    if (lower_case_table_names ==
+        1)  // Convert new_name/new_alias to lower case
     {
-      my_casedn_str(files_charset_info, const_cast<char*>(new_name));
-      new_alias= new_name;
-    }
-    else if (lower_case_table_names == 2) // Convert new_name to lower case
+      my_casedn_str(files_charset_info, const_cast<char *>(new_name));
+      new_alias = new_name;
+    } else if (lower_case_table_names == 2)  // Convert new_name to lower case
     {
       my_stpcpy(new_alias_buff, new_name);
-      new_alias= (const char*)new_alias_buff;
-      my_casedn_str(files_charset_info, const_cast<char*>(new_name));
-    }
-    else
-      new_alias= new_name; // LCTN=0 => case sensitive + case preserving
+      new_alias = (const char *)new_alias_buff;
+      my_casedn_str(files_charset_info, const_cast<char *>(new_name));
+    } else
+      new_alias = new_name;  // LCTN=0 => case sensitive + case preserving
 
     if (!is_database_changed() &&
-        !my_strcasecmp(table_alias_charset, new_name, table_name))
-    {
+        !my_strcasecmp(table_alias_charset, new_name, table_name)) {
       /*
         Source and destination table names are equal:
         make is_table_renamed() more efficient.
       */
-      new_alias= table_name;
-      new_name= table_name;
+      new_alias = table_name;
+      new_name = table_name;
     }
-  }
-  else
-  {
-    new_alias= alias;
-    new_name= table_name;
+  } else {
+    new_alias = alias;
+    new_name = table_name;
   }
 
-  my_snprintf(tmp_name, sizeof(tmp_name), "%s-%lx_%x", tmp_file_prefix,
-              current_pid, thd->thread_id());
+  snprintf(tmp_name, sizeof(tmp_name), "%s-%lx_%x", tmp_file_prefix,
+           current_pid, thd->thread_id());
   /* Safety fix for InnoDB */
-  if (lower_case_table_names)
-    my_casedn_str(files_charset_info, tmp_name);
+  if (lower_case_table_names) my_casedn_str(files_charset_info, tmp_name);
 
-  if (table_list->table->s->tmp_table == NO_TMP_TABLE)
-  {
+  if (table_list->table->s->tmp_table == NO_TMP_TABLE) {
     build_table_filename(path, sizeof(path) - 1, db, table_name, "", 0);
 
-    build_table_filename(new_path, sizeof(new_path) - 1, new_db, new_name, "", 0);
+    build_table_filename(new_path, sizeof(new_path) - 1, new_db, new_name, "",
+                         0);
 
-    build_table_filename(new_filename, sizeof(new_filename) - 1,
-                         new_db, new_name, reg_ext, 0);
+    build_table_filename(new_filename, sizeof(new_filename) - 1, new_db,
+                         new_name, reg_ext, 0);
 
     build_table_filename(tmp_path, sizeof(tmp_path) - 1, new_db, tmp_name, "",
                          FN_IS_TMP);
-  }
-  else
-  {
+  } else {
     /*
       We are not filling path, new_path and new_filename members if
       we are altering temporary table as these members are not used in
@@ -221,19 +224,36 @@ Alter_table_ctx::Alter_table_ctx(THD *thd, TABLE_LIST *table_list,
     */
     build_tmptable_filename(thd, tmp_path, sizeof(tmp_path));
 #ifndef DBUG_OFF
-    tmp_table= true;
+    tmp_table = true;
 #endif
+  }
+
+  /* Initialize MDL requests on new table name and database if necessary. */
+  if (table_list->table->s->tmp_table == NO_TMP_TABLE) {
+    if (is_table_renamed()) {
+      MDL_REQUEST_INIT(&target_mdl_request, MDL_key::TABLE, new_db, new_name,
+                       MDL_EXCLUSIVE, MDL_TRANSACTION);
+
+      if (is_database_changed()) {
+        MDL_REQUEST_INIT(&target_db_mdl_request, MDL_key::SCHEMA, new_db, "",
+                         MDL_INTENTION_EXCLUSIVE, MDL_TRANSACTION);
+      }
+    }
   }
 }
 
+Alter_table_ctx::~Alter_table_ctx() {}
 
-bool Sql_cmd_alter_table::execute(THD *thd)
-{
-  LEX *lex= thd->lex;
+bool Sql_cmd_alter_table::execute(THD *thd) {
+  /* Verify that none one of the DISCARD and IMPORT flags are set. */
+  DBUG_ASSERT(!thd_tablespace_op(thd));
+  DBUG_EXECUTE_IF("delay_alter_table_by_one_second", { my_sleep(1000000); });
+
+  LEX *lex = thd->lex;
   /* first SELECT_LEX (have special meaning for many of non-SELECTcommands) */
-  SELECT_LEX *select_lex= lex->select_lex;
+  SELECT_LEX *select_lex = lex->select_lex;
   /* first table of first SELECT_LEX */
-  TABLE_LIST *first_table= select_lex->get_table_list();
+  TABLE_LIST *first_table = select_lex->get_table_list();
   /*
     Code in mysql_alter_table() may modify its HA_CREATE_INFO argument,
     so we have to use a copy of this structure to make execution
@@ -241,49 +261,47 @@ bool Sql_cmd_alter_table::execute(THD *thd)
     referenced from this structure will be modified.
     @todo move these into constructor...
   */
-  HA_CREATE_INFO create_info(lex->create_info);
-  Alter_info alter_info(lex->alter_info, thd->mem_root);
-  ulong priv=0;
-  ulong priv_needed= ALTER_ACL;
+  HA_CREATE_INFO create_info(*lex->create_info);
+  Alter_info alter_info(*m_alter_info, thd->mem_root);
+  ulong priv = 0;
+  ulong priv_needed = ALTER_ACL;
   bool result;
 
-  DBUG_ENTER("Sql_cmd_alter_table::execute");
+  DBUG_TRACE;
 
-  if (thd->is_fatal_error) /* out of memory creating a copy of alter_info */
-    DBUG_RETURN(TRUE);
+  if (thd->is_fatal_error()) /* out of memory creating a copy of alter_info */
+    return true;
 
   {
-    partition_info *part_info= thd->lex->part_info;
-    if (part_info != NULL && has_external_data_or_index_dir(*part_info) &&
-        check_access(thd, FILE_ACL, any_db, NULL, NULL, FALSE, FALSE))
+    partition_info *part_info = thd->lex->part_info;
+    if (part_info != nullptr && has_external_data_or_index_dir(*part_info) &&
+        check_access(thd, FILE_ACL, any_db, nullptr, nullptr, false, false))
 
-      DBUG_RETURN(TRUE);
+      return true;
   }
   /*
     We also require DROP priv for ALTER TABLE ... DROP PARTITION, as well
     as for RENAME TO, as being done by SQLCOM_RENAME_TABLE
   */
-  if (alter_info.flags & (Alter_info::ALTER_DROP_PARTITION |
-                          Alter_info::ALTER_RENAME))
-    priv_needed|= DROP_ACL;
+  if (alter_info.flags &
+      (Alter_info::ALTER_DROP_PARTITION | Alter_info::ALTER_RENAME))
+    priv_needed |= DROP_ACL;
 
   /* Must be set in the parser */
-  DBUG_ASSERT(select_lex->db);
+  DBUG_ASSERT(alter_info.new_db_name.str);
   DBUG_ASSERT(!(alter_info.flags & Alter_info::ALTER_EXCHANGE_PARTITION));
   DBUG_ASSERT(!(alter_info.flags & Alter_info::ALTER_ADMIN_PARTITION));
   if (check_access(thd, priv_needed, first_table->db,
                    &first_table->grant.privilege,
-                   &first_table->grant.m_internal,
-                   0, 0) ||
-      check_access(thd, INSERT_ACL | CREATE_ACL, select_lex->db,
+                   &first_table->grant.m_internal, false, false) ||
+      check_access(thd, INSERT_ACL | CREATE_ACL, alter_info.new_db_name.str,
                    &priv,
-                   NULL, /* Don't use first_tab->grant with sel_lex->db */
-                   0, 0))
-    DBUG_RETURN(TRUE);                  /* purecov: inspected */
+                   nullptr, /* Don't use first_tab->grant with sel_lex->db */
+                   false, false))
+    return true; /* purecov: inspected */
 
   /* If it is a merge table, check privileges for merge children. */
-  if (create_info.merge_list.first)
-  {
+  if (create_info.merge_list.first) {
     /*
       The user must have (SELECT_ACL | UPDATE_ACL | DELETE_ACL) on the
       underlying base tables, even if there are temporary tables with the same
@@ -302,7 +320,7 @@ bool Sql_cmd_alter_table::execute(THD *thd)
           In other words, once a merge table is created, the privileges of
           the underlying tables can be revoked, but the user will still have
           access to the merge table (provided that the user has privileges on
-          the merge table itself). 
+          the merge table itself).
 
         - Temporary tables shadow base tables.
 
@@ -320,41 +338,56 @@ bool Sql_cmd_alter_table::execute(THD *thd)
     */
 
     if (check_table_access(thd, SELECT_ACL | UPDATE_ACL | DELETE_ACL,
-                           create_info.merge_list.first, FALSE, UINT_MAX, FALSE))
-      DBUG_RETURN(TRUE);
+                           create_info.merge_list.first, false, UINT_MAX,
+                           false))
+      return true;
   }
 
-  if (check_grant(thd, priv_needed, first_table, FALSE, UINT_MAX, FALSE))
-    DBUG_RETURN(TRUE);                  /* purecov: inspected */
+  if (check_grant(thd, priv_needed, first_table, false, UINT_MAX, false))
+    return true; /* purecov: inspected */
 
-  if (lex->name.str && !test_all_bits(priv, INSERT_ACL | CREATE_ACL))
-  {
+  if (alter_info.new_table_name.str &&
+      !test_all_bits(priv, INSERT_ACL | CREATE_ACL)) {
     // Rename of table
+    DBUG_ASSERT(alter_info.flags & Alter_info::ALTER_RENAME);
     TABLE_LIST tmp_table;
-
-    tmp_table.table_name= lex->name.str;
-    tmp_table.db= select_lex->db;
-    tmp_table.grant.privilege= priv;
-    if (check_grant(thd, INSERT_ACL | CREATE_ACL, &tmp_table, FALSE,
-                    UINT_MAX, FALSE))
-      DBUG_RETURN(TRUE);                  /* purecov: inspected */
+    tmp_table.table_name = alter_info.new_table_name.str;
+    tmp_table.db = alter_info.new_db_name.str;
+    tmp_table.grant.privilege = priv;
+    if (check_grant(thd, INSERT_ACL | CREATE_ACL, &tmp_table, false, UINT_MAX,
+                    false))
+      return true; /* purecov: inspected */
   }
 
   /* Don't yet allow changing of symlinks with ALTER TABLE */
   if (create_info.data_file_name)
-    push_warning_printf(thd, Sql_condition::SL_WARNING,
-                        WARN_OPTION_IGNORED, ER(WARN_OPTION_IGNORED),
-                        "DATA DIRECTORY");
+    push_warning_printf(thd, Sql_condition::SL_WARNING, WARN_OPTION_IGNORED,
+                        ER_THD(thd, WARN_OPTION_IGNORED), "DATA DIRECTORY");
   if (create_info.index_file_name)
-    push_warning_printf(thd, Sql_condition::SL_WARNING,
-                        WARN_OPTION_IGNORED, ER(WARN_OPTION_IGNORED),
-                        "INDEX DIRECTORY");
-  create_info.data_file_name= create_info.index_file_name= NULL;
+    push_warning_printf(thd, Sql_condition::SL_WARNING, WARN_OPTION_IGNORED,
+                        ER_THD(thd, WARN_OPTION_IGNORED), "INDEX DIRECTORY");
+  create_info.data_file_name = create_info.index_file_name = nullptr;
 
   thd->set_slow_log_for_admin_command();
 
-
 #ifdef WITH_WSREP
+  /* Check if foreign keys are accessible.
+  1. Transaction is replicated first, then is done locally.
+  2. Replicated node applies write sets in context
+  of root user.
+  Above two conditions may cause that even if we have no access to FKs,
+  transactions will replicate with success, but fail locally.
+
+  Here we check only for FK access, not if the engine supports FKs.
+  That's enough, because right now we need only to know if transaction
+  should be rolled back because of lack of access and not replicated,
+  or we can replicate it and let replicated node do the rest of the job. */
+  if (alter_info.flags & Alter_info::ADD_FOREIGN_KEY) {
+    if (check_fk_parent_table_access(thd, &create_info, &alter_info, false)) {
+      return true;
+    }
+  }
+
   /* PXC doesn't recommend/allow ALTER operation on table created using
   non-transactional storage engine (like MyISAM, HEAP/MEMORY, etc....)
   except ALTER operation to change storage engine to transactional storage
@@ -364,158 +397,206 @@ bool Sql_cmd_alter_table::execute(THD *thd)
   so we continue to allow them for now as avoid breaking the application.
   Note: Temporary table are never replicated. */
 
-  char path[FN_REFLEN + 1];
-  enum legacy_db_type existing_db_type, new_db_type;
-  (void) build_table_filename(path, sizeof(path) - 1, first_table->db,
-                              first_table->table_name, reg_ext, 0);
-  dd_frm_type(thd, path, &existing_db_type);
+  if (WSREP_ON && !is_temporary_table(first_table)) {
+    enum legacy_db_type existing_db_type, new_db_type;
 
-  bool is_system_db= (first_table &&
-                      ((strcmp(first_table->db, "mysql") == 0) ||
-                       (strcmp(first_table->db, "information_schema") == 0)));
+    TABLE_LIST* table = first_table;
 
-  if (!is_temporary_table(first_table) && !is_system_db)
-  {
-    bool safe_ops= false;
-
-    /* If create_info.db_type = NULL that means ALTER operation
-    is modifying the no changing the engine/dbtype. */
-    new_db_type = ((create_info.db_type != NULL)
-                  ? create_info.db_type->db_type : existing_db_type);
-
-    /* Existing table is created with non-transactional storage engine
-    and so switching it to transactional storage engine is allowed.
-    Currently transactional storage engine supported is InnoDB/XtraDB */
-    if ((existing_db_type != DB_TYPE_INNODB)                        &&
-        (alter_info.flags & Alter_info::ALTER_OPTIONS)              &&
-        (create_info.used_fields & HA_CREATE_USED_ENGINE)           &&
-        (new_db_type == DB_TYPE_INNODB ||
-         existing_db_type == new_db_type))
-      safe_ops= true;
-
-    /* Existing table is created with transactional storage engine
-    and switching it to non-transactional storage engine is blocked
-    other operations are allowed. */
-    if ((existing_db_type == DB_TYPE_INNODB) &&
-        (alter_info.flags & Alter_info::ALTER_OPTIONS)              &&
-        (create_info.used_fields & HA_CREATE_USED_ENGINE)           &&
-        (new_db_type != DB_TYPE_INNODB))
-      safe_ops= false;
-    else if (existing_db_type == DB_TYPE_INNODB ||
-             existing_db_type == DB_TYPE_PERFORMANCE_SCHEMA)
-      safe_ops= true;
-
-    if (!safe_ops &&
-        existing_db_type != DB_TYPE_INNODB &&
-        existing_db_type != DB_TYPE_UNKNOWN)
+    // mdl_lock scope begin
     {
-      bool block= false;
+      // Acquire lock on the table as it is needed to get the instance from DD
+      MDL_request mdl_request;
+      MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db,
+                       table->table_name, MDL_SHARED, MDL_EXPLICIT);
+      wsrep_scope_guard mdl_lock(
+          [thd, &mdl_request]() {
+            thd->mdl_context.acquire_lock(&mdl_request,
+                                          thd->variables.lock_wait_timeout);
+          },
+          [thd, &mdl_request]() {
+            thd->mdl_context.release_lock(mdl_request.ticket);
+          });
 
-      switch(pxc_strict_mode)
-      {
-      case PXC_STRICT_MODE_DISABLED:
-        break;
-      case PXC_STRICT_MODE_PERMISSIVE:
-        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
-                   " ALTER command on a table (%s.%s) that resides in"
-                   " non-transactional storage engine"
-                   " (except switching to transactional engine)"
-                   " with pxc_strict_mode = PERMISSIVE",
-                   first_table->db, first_table->table_name);
-        push_warning_printf(
-          thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
-          "Percona-XtraDB-Cluster doesn't recommend use of"
-          " ALTER command on a table (%s.%s) that resides in"
-          " non-transactional storage engine"
-          " (except switching to transactional engine)"
-          " with pxc_strict_mode = PERMISSIVE",
-          first_table->db, first_table->table_name);
-        break;
-      case PXC_STRICT_MODE_ENFORCING:
-      case PXC_STRICT_MODE_MASTER:
-      default:
-        block= true;
-        WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
-                    " ALTER command on a table (%s.%s) that resides in"
-                    " non-transactional storage engine"
-                    " (except switching to transactional engine)"
-                    " with pxc_strict_mode = ENFORCING or MASTER",
-                    first_table->db, first_table->table_name);
-        char message[1024];
-        sprintf(message,
+      const char *schema_name = table->db;
+      const char *table_name = table->table_name;
+      dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+      const dd::Table *table_ref = NULL;
+
+      if (thd->dd_client()->acquire(schema_name, table_name, &table_ref)) {
+        return true;
+      }
+
+      if (table_ref == nullptr ||
+          table_ref->hidden() == dd::Abstract_table::HT_HIDDEN_SE) {
+        my_error(ER_NO_SUCH_TABLE, MYF(0), schema_name, table_name);
+        return true;
+      }
+
+      handlerton *hton = nullptr;
+      if (dd::table_storage_engine(thd, table_ref, &hton)) {
+        return true;
+      }
+
+      existing_db_type = hton->db_type;
+    }  // mdl_lock scope end
+
+    bool is_system_db =
+        (first_table && ((strcmp(first_table->db, "mysql") == 0) ||
+                         (strcmp(first_table->db, "information_schema") == 0)));
+
+    if (!is_temporary_table(first_table) && !is_system_db) {
+      bool safe_ops = false;
+
+      /* If create_info.db_type = NULL that means ALTER operation
+      is modifying existing table. */
+      new_db_type =
+          ((create_info.db_type != NULL) ? create_info.db_type->db_type
+                                          : existing_db_type);
+
+      /* Existing table is created with non-transactional storage engine
+      and so switching it to transactional storage engine is allowed.
+      Currently transactional storage engine supported is InnoDB/XtraDB */
+      if ((existing_db_type != DB_TYPE_INNODB) &&
+          (alter_info.flags & Alter_info::ALTER_OPTIONS) &&
+          (create_info.used_fields & HA_CREATE_USED_ENGINE) &&
+          (new_db_type == DB_TYPE_INNODB || existing_db_type == new_db_type))
+        safe_ops = true;
+
+      /* Existing table is created with transactional storage engine
+      and switching it to non-transactional storage engine is blocked
+      other operations are allowed. */
+      if ((existing_db_type == DB_TYPE_INNODB) &&
+          (alter_info.flags & Alter_info::ALTER_OPTIONS) &&
+          (create_info.used_fields & HA_CREATE_USED_ENGINE) &&
+          (new_db_type != DB_TYPE_INNODB))
+        safe_ops = false;
+      else if (existing_db_type == DB_TYPE_INNODB ||
+               existing_db_type == DB_TYPE_PERFORMANCE_SCHEMA)
+        safe_ops = true;
+
+      if (!safe_ops && existing_db_type != DB_TYPE_INNODB &&
+          existing_db_type != DB_TYPE_UNKNOWN) {
+        bool block = false;
+
+        switch (pxc_strict_mode) {
+          case PXC_STRICT_MODE_DISABLED:
+            break;
+          case PXC_STRICT_MODE_PERMISSIVE:
+            WSREP_WARN(
+                "Percona-XtraDB-Cluster doesn't recommend use of"
+                " ALTER command on a table (%s.%s) that resides in"
+                " non-transactional storage engine"
+                " (except switching to transactional engine)"
+                " with pxc_strict_mode = PERMISSIVE",
+                first_table->db, first_table->table_name);
+            push_warning_printf(
+                thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                "Percona-XtraDB-Cluster doesn't recommend use of"
+                " ALTER command on a table (%s.%s) that resides in"
+                " non-transactional storage engine"
+                " (except switching to transactional engine)"
+                " with pxc_strict_mode = PERMISSIVE",
+                first_table->db, first_table->table_name);
+            break;
+          case PXC_STRICT_MODE_ENFORCING:
+          case PXC_STRICT_MODE_MASTER:
+          default:
+            block = true;
+            WSREP_ERROR(
                 "Percona-XtraDB-Cluster prohibits use of"
                 " ALTER command on a table (%s.%s) that resides in"
                 " non-transactional storage engine"
                 " (except switching to transactional engine)"
                 " with pxc_strict_mode = ENFORCING or MASTER",
                 first_table->db, first_table->table_name);
-        my_message(ER_UNKNOWN_ERROR, message, MYF(0));
-        break;
-      }
-
-      if (block)
-        DBUG_RETURN(TRUE);
-    }
-    else if (!safe_ops && existing_db_type == DB_TYPE_INNODB)
-    {
-      bool block= false;
-
-      switch(pxc_strict_mode)
-      {
-      case PXC_STRICT_MODE_DISABLED:
-        break;
-      case PXC_STRICT_MODE_PERMISSIVE:
-        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend changing"
-                   " storage engine of a table (%s.%s) from"
-                   " transactional to non-transactional"
-                   " with pxc_strict_mode = PERMISSIVE",
-                   first_table->db, first_table->table_name);
-        push_warning_printf(
-          thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
-          "Percona-XtraDB-Cluster doesn't recommend changing"
-          " storage engine of a table (%s.%s) from"
-          " transactional to non-transactional"
-          " with pxc_strict_mode = PERMISSIVE",
-          first_table->db, first_table->table_name);
-        break;
-      case PXC_STRICT_MODE_ENFORCING:
-      case PXC_STRICT_MODE_MASTER:
-      default:
-        block= true;
-        WSREP_ERROR("Percona-XtraDB-Cluster prohibits changing"
-                    " storage engine of a table (%s.%s) from"
-                    " transactional to non-transactional"
+            char message[1024];
+            sprintf(message,
+                    "Percona-XtraDB-Cluster prohibits use of"
+                    " ALTER command on a table (%s.%s) that resides in"
+                    " non-transactional storage engine"
+                    " (except switching to transactional engine)"
                     " with pxc_strict_mode = ENFORCING or MASTER",
                     first_table->db, first_table->table_name);
-        char message[1024];
-        sprintf(message,
+            my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+            break;
+        }
+
+        if (block) return true;
+      } else if (!safe_ops && existing_db_type == DB_TYPE_INNODB) {
+        bool block = false;
+
+        switch (pxc_strict_mode) {
+          case PXC_STRICT_MODE_DISABLED:
+            break;
+          case PXC_STRICT_MODE_PERMISSIVE:
+            WSREP_WARN(
+                "Percona-XtraDB-Cluster doesn't recommend changing"
+                " storage engine of a table (%s.%s) from"
+                " transactional to non-transactional"
+                " with pxc_strict_mode = PERMISSIVE",
+                first_table->db, first_table->table_name);
+            push_warning_printf(
+                thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                "Percona-XtraDB-Cluster doesn't recommend changing"
+                " storage engine of a table (%s.%s) from"
+                " transactional to non-transactional"
+                " with pxc_strict_mode = PERMISSIVE",
+                first_table->db, first_table->table_name);
+            break;
+          case PXC_STRICT_MODE_ENFORCING:
+          case PXC_STRICT_MODE_MASTER:
+          default:
+            block = true;
+            WSREP_ERROR(
                 "Percona-XtraDB-Cluster prohibits changing"
                 " storage engine of a table (%s.%s) from"
                 " transactional to non-transactional"
                 " with pxc_strict_mode = ENFORCING or MASTER",
                 first_table->db, first_table->table_name);
-        my_message(ER_UNKNOWN_ERROR, message, MYF(0));
-        break;
-      }
+            char message[1024];
+            sprintf(message,
+                    "Percona-XtraDB-Cluster prohibits changing"
+                    " storage engine of a table (%s.%s) from"
+                    " transactional to non-transactional"
+                    " with pxc_strict_mode = ENFORCING or MASTER",
+                    first_table->db, first_table->table_name);
+            my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+            break;
+        }
 
-      if (block)
-        DBUG_RETURN(TRUE);
+        if (block) return true;
+      }
     }
   }
 
-  TABLE *find_temporary_table(THD *thd, const TABLE_LIST *tl);
+  /* This could be looked upon as too restrictive given it is taking
+  a global mutex but anyway being TOI if there is alter tablespace
+  operation active in parallel TOI would streamline it. */
+  if (create_info.tablespace) {
+    mysql_mutex_lock(&LOCK_wsrep_alter_tablespace);
+  }
 
-  if ((!thd->is_current_stmt_binlog_format_row() ||
-       !find_temporary_table(thd, first_table)))
   {
-    if (WSREP(thd) &&
-        wsrep_to_isolation_begin(thd,
-                                 ((lex->name.str) ? select_lex->db : NULL),
-                                 ((lex->name.str) ? lex->name.str : NULL),
-                                 first_table, &alter_info)) {
-      WSREP_WARN("ALTER TABLE isolation failure");
-      DBUG_RETURN(TRUE);
+    extern TABLE *find_temporary_table(THD * thd, const TABLE_LIST *tl);
+
+    if ((!thd->is_current_stmt_binlog_format_row() ||
+         !find_temporary_table(thd, first_table))) {
+      if (WSREP(thd) &&
+          wsrep_to_isolation_begin(
+              thd, ((thd->lex->name.str) ? thd->lex->select_lex->db : NULL),
+              ((thd->lex->name.str) ? thd->lex->name.str : NULL), first_table,
+              NULL, &alter_info)) {
+        WSREP_WARN("ALTER TABLE isolation failure");
+        if (create_info.tablespace) {
+          mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
+        }
+        return true;
+      }
     }
+  }
+
+  if (create_info.tablespace) {
+    mysql_mutex_unlock(&LOCK_wsrep_alter_tablespace);
   }
 #endif /* WITH_WSREP */
 
@@ -524,72 +605,99 @@ bool Sql_cmd_alter_table::execute(THD *thd)
   if (!thd->lex->is_ignore() && thd->is_strict_mode())
     thd->push_internal_handler(&strict_handler);
 
-  Partition_in_shared_ts_error_handler partition_in_shared_ts_handler;
-  thd->push_internal_handler(&partition_in_shared_ts_handler);
-  result= mysql_alter_table(thd, select_lex->db, lex->name.str,
-                            &create_info, first_table, &alter_info);
-  thd->pop_internal_handler();
+  result = mysql_alter_table(thd, alter_info.new_db_name.str,
+                             alter_info.new_table_name.str, &create_info,
+                             first_table, &alter_info);
 
   if (!thd->lex->is_ignore() && thd->is_strict_mode())
     thd->pop_internal_handler();
-  DBUG_RETURN(result);
+  return result;
 }
 
+bool Sql_cmd_discard_import_tablespace::execute(THD *thd) {
+  /* Verify that exactly one of the DISCARD and IMPORT flags are set. */
+  DBUG_ASSERT((m_alter_info->flags & Alter_info::ALTER_DISCARD_TABLESPACE) ^
+              (m_alter_info->flags & Alter_info::ALTER_IMPORT_TABLESPACE));
 
-bool Sql_cmd_discard_import_tablespace::execute(THD *thd)
-{
+  /*
+    Verify that none of the other flags are set, except for
+    ALTER_ALL_PARTITION, which may be set or not, and is
+    therefore masked away along with the DISCARD/IMPORT flags.
+  */
+  DBUG_ASSERT(!(m_alter_info->flags & ~(Alter_info::ALTER_DISCARD_TABLESPACE |
+                                        Alter_info::ALTER_IMPORT_TABLESPACE |
+                                        Alter_info::ALTER_ALL_PARTITION)));
+
   /* first SELECT_LEX (have special meaning for many of non-SELECTcommands) */
-  SELECT_LEX *select_lex= thd->lex->select_lex;
+  SELECT_LEX *select_lex = thd->lex->select_lex;
   /* first table of first SELECT_LEX */
-  TABLE_LIST *table_list= select_lex->get_table_list();
+  TABLE_LIST *table_list = select_lex->get_table_list();
 
 #ifdef WITH_WSREP
   /* Disable DISCARD/IMPORT TABLESPACE as this command
   will execute on single node and can introduce data
   in-consistency in cluster. */
-  bool block= false;
-  switch(pxc_strict_mode)
-  {
-  case PXC_STRICT_MODE_DISABLED:
-    break;
-  case PXC_STRICT_MODE_PERMISSIVE:
-     WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend"
-                " DISCARD/IMPORT of tablespace as it can introduce"
-                " data in-consistency (if not done in tandem on all nodes)"
-                " with pxc_strict_mode = PERMISSIVE");
-     push_warning_printf(
-        thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
-        "Percona-XtraDB-Cluster doesn't recommend"
-        " DISCARD/IMPORT of tablespace as it can introduce"
-        " data in-consistency (if not done in tandem on all nodes)"
-        " with pxc_strict_mode = PERMISSIVE");
+  bool block = false;
+  switch (pxc_strict_mode) {
+    case PXC_STRICT_MODE_DISABLED:
       break;
-  case PXC_STRICT_MODE_ENFORCING:
-  case PXC_STRICT_MODE_MASTER:
-  default:
-     block= true;
-     WSREP_ERROR("Percona-XtraDB-Cluster doesn't recommend"
-                 " DISCARD/IMPORT of tablespace as it can introduce"
-                 " data in-consistency (if not done in tandem on all nodes)"
-                 " with pxc_strict_mode = ENFORCING or MASTER");
-     char message[1024];
-     sprintf(message,
-             "Percona-XtraDB-Cluster prohibits"
-             " DISCARD/IMPORT of tablespace as it can introduce"
-             " data in-consistency (if not done in tandem on all nodes)"
-             " with pxc_strict_mode = ENFORCING or MASTER");
-     my_message(ER_UNKNOWN_ERROR, message, MYF(0));
-     break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN(
+          "Percona-XtraDB-Cluster doesn't recommend"
+          " DISCARD/IMPORT of tablespace as it can introduce"
+          " data in-consistency (if not done in tandem on all nodes)"
+          " with pxc_strict_mode = PERMISSIVE");
+      push_warning_printf(
+          thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+          "Percona-XtraDB-Cluster doesn't recommend"
+          " DISCARD/IMPORT of tablespace as it can introduce"
+          " data in-consistency (if not done in tandem on all nodes)"
+          " with pxc_strict_mode = PERMISSIVE");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+      block = true;
+      WSREP_ERROR(
+          "Percona-XtraDB-Cluster doesn't recommend"
+          " DISCARD/IMPORT of tablespace as it can introduce"
+          " data in-consistency (if not done in tandem on all nodes)"
+          " with pxc_strict_mode = ENFORCING or MASTER");
+      char message[1024];
+      sprintf(message,
+              "Percona-XtraDB-Cluster prohibits"
+              " DISCARD/IMPORT of tablespace as it can introduce"
+              " data in-consistency (if not done in tandem on all nodes)"
+              " with pxc_strict_mode = ENFORCING or MASTER");
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+      break;
   }
 
-  if (block)
-    return true;
+  if (block) return true;
+
+  /* Setting this to true will avoid processing this statement through
+  wsrep_replicate that is not meant to handle non-replicated atomic DDL. */
+  thd->wsrep_non_replicating_atomic_ddl = true;
+
+  if (WSREP(thd)) {
+    WSREP_WARN(
+        "While running PXC node in cluster mode it will skip"
+        " binlogging of non-replicating DDL statement");
+
+    /* Cache the state of sql_bin_log before toggling it. */
+    if (thd->variables.option_bits & OPTION_BIN_LOG) {
+      thd->variables.wsrep_saved_binlog_state =
+          System_variables::wsrep_binlog_state_t::WSREP_BINLOG_ENABLED;
+    } else {
+      thd->variables.wsrep_saved_binlog_state =
+          System_variables::wsrep_binlog_state_t::WSREP_BINLOG_DISABLED;
+    }
+    thd->variables.option_bits &= ~OPTION_BIN_LOG;
+  }
 #endif /* WITH_WSREP */
 
-  if (check_access(thd, ALTER_ACL, table_list->db,
-                   &table_list->grant.privilege,
-                   &table_list->grant.m_internal,
-                   0, 0))
+  if (check_access(thd, ALTER_ACL, table_list->db, &table_list->grant.privilege,
+                   &table_list->grant.m_internal, false, false))
     return true;
 
   if (check_grant(thd, ALTER_ACL, table_list, false, UINT_MAX, false))
@@ -603,14 +711,12 @@ bool Sql_cmd_discard_import_tablespace::execute(THD *thd)
     it is the case.
     TODO: this design is obsolete and will be removed.
   */
-  enum_log_table_type table_kind=
-    query_logger.check_if_log_table(table_list, false);
+  enum_log_table_type table_kind =
+      query_logger.check_if_log_table(table_list, false);
 
-  if (table_kind != QUERY_LOG_NONE)
-  {
+  if (table_kind != QUERY_LOG_NONE) {
     /* Disable alter of enabled query log tables */
-    if (query_logger.is_log_table_enabled(table_kind))
-    {
+    if (query_logger.is_log_table_enabled(table_kind)) {
       my_error(ER_BAD_LOG_STATEMENT, MYF(0), "ALTER");
       return true;
     }
@@ -622,7 +728,27 @@ bool Sql_cmd_discard_import_tablespace::execute(THD *thd)
   */
   thd->add_to_binlog_accessed_dbs(table_list->db);
 
-  return
-    mysql_discard_or_import_tablespace(thd, table_list,
-                                       m_tablespace_op == DISCARD_TABLESPACE);
+  return mysql_discard_or_import_tablespace(thd, table_list);
+}
+
+bool Sql_cmd_secondary_load_unload::execute(THD *thd) {
+  // One of the SECONDARY_LOAD/SECONDARY_UNLOAD flags must have been set.
+  DBUG_ASSERT(
+      ((m_alter_info->flags & Alter_info::ALTER_SECONDARY_LOAD) == 0) !=
+      ((m_alter_info->flags & Alter_info::ALTER_SECONDARY_UNLOAD) == 0));
+
+  // No other flags should've been set.
+  DBUG_ASSERT(!(m_alter_info->flags & ~(Alter_info::ALTER_SECONDARY_LOAD |
+                                        Alter_info::ALTER_SECONDARY_UNLOAD)));
+
+  TABLE_LIST *table_list = thd->lex->select_lex->get_table_list();
+
+  if (check_access(thd, ALTER_ACL, table_list->db, &table_list->grant.privilege,
+                   &table_list->grant.m_internal, false, false))
+    return true;
+
+  if (check_grant(thd, ALTER_ACL, table_list, false, UINT_MAX, false))
+    return true;
+
+  return mysql_secondary_load_or_unload(thd, table_list);
 }

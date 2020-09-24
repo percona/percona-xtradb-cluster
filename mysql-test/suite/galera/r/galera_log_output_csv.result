@@ -1,3 +1,5 @@
+call mtr.add_suppression("Although a path was specified for the.*");
+call mtr.add_suppression("Although a path was specified for the.*");
 TRUNCATE TABLE mysql.general_log;
 TRUNCATE TABLE mysql.slow_log;
 TRUNCATE TABLE mysql.general_log;

@@ -1,0 +1,5 @@
+!include ../galera_2nodes.cnf
+
+[sst]
+# Don't use the default value of 100 seconds.
+sst-initial-timeout=15

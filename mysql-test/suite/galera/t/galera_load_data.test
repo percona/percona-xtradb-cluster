@@ -4,7 +4,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # Empty LOAD DATA
@@ -41,7 +40,7 @@ RESET MASTER;
 
 # Expect no recorded output
 
-SHOW BINLOG EVENTS FROM 123;
+SHOW BINLOG EVENTS FROM 125;
 
 #
 # One line loaded, so less than the wsrep-load-data-splitting value
@@ -93,11 +92,11 @@ SELECT COUNT(*) = 1 FROM t1;
 
 --connection node_1
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS FROM 123;
+SHOW BINLOG EVENTS FROM 125;
 
 --connection node_2
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS FROM 123;
+SHOW BINLOG EVENTS FROM 125;
 
 --connection node_1
 TRUNCATE TABLE t1;
@@ -134,7 +133,11 @@ RESET MASTER;
 
 SELECT COUNT(*) = 0 FROM t1;
 
-SHOW BINLOG EVENTS FROM 123;
+SHOW BINLOG EVENTS FROM 125;
 
 --connection node_1
 DROP TABLE t1;
+
+--remove_file "$MYSQLTEST_VARDIR/tmp/galera_load_data_duplicate.csv"
+--remove_file "$MYSQLTEST_VARDIR/tmp/galera_load_data_empty.csv"
+--remove_file "$MYSQLTEST_VARDIR/tmp/galera_load_data_one.csv"

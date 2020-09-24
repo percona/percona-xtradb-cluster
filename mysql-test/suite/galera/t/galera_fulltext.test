@@ -1,6 +1,5 @@
 --source include/big_test.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # InnoDB FULLTEXT indexes
@@ -17,7 +16,7 @@ INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 CREATE TABLE t1 (f1 INT PRIMARY KEY AUTO_INCREMENT, f2 VARCHAR(100), FULLTEXT (f2)) ENGINE=InnoDB;
 
 --connection node_2
-SELECT COUNT(*) = 13 FROM INFORMATION_SCHEMA.INNODB_SYS_TABLES WHERE name LIKE 'test/%';
+SELECT COUNT(*) = 13 FROM INFORMATION_SCHEMA.INNODB_TABLES WHERE name LIKE 'test/%';
 
 #
 # Fulltext insertion causes a flurry of updates on those system tables

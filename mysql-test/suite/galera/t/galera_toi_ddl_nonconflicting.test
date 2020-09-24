@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # In this test, we simultaneously send two non-conflicting ALTER TABLE statements

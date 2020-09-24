@@ -1,10 +1,9 @@
 
 #
-# Test different options with different variation of pxc-strict-mode.
+# Test if performance schema is being exercised in needed way.
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/force_restart.inc
 
 --connection node_1
@@ -46,7 +45,7 @@ select * from t;
 --connection node_1
 --echo #node-1
 truncate performance_schema.events_waits_current;
---let $condvar = `select count(*) from performance_schema.events_waits_current where event_name like '%COND_wsrep_rollback%'`
+--let $condvar = `select count(*) from performance_schema.events_waits_current where event_name like '%COND_wsrep_thd_queue%'`
 use test;
 begin;
 insert into t values (3);
@@ -61,6 +60,9 @@ insert into t values (3);
 --sleep 2
 --error ER_LOCK_DEADLOCK
 commit;
+#
 --replace_regex /[1-9][0-9]+/PREVIOUS_COUNT/
---eval select count(*) > $condvar from performance_schema.events_waits_current where event_name like '%COND_wsrep_rollback%';
+--let $wait_condition = select count(*) > $condvar from performance_schema.events_waits_current where event_name like '%COND_wsrep_thd_queue%';
+--source include/wait_condition.inc
+#
 drop table t;

@@ -6,6 +6,8 @@
 --source include/big_test.inc
 
 --connection node_1
+--let $wsrep_provider_options_orig = `SELECT @@wsrep_provider_options`
+set global wsrep_provider_options="pc.ignore_sb=true";
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 SELECT 1;
 INSERT INTO t1 SELECT * FROM t1;
@@ -29,11 +31,11 @@ SET SESSION wsrep_sync_wait = 0;
 --source include/kill_galera.inc
 
 --connection node_1
---error 0,ER_UNKNOWN_COM_ERROR
+--error 0,ER_ERROR_DURING_COMMIT,ER_UNKNOWN_COM_ERROR
 --reap
 SET SESSION wsrep_on = OFF;
 SET SESSION wsrep_sync_wait = 0;
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
 
 --echo Performing --wsrep-recover ...
@@ -41,7 +43,7 @@ SET SESSION wsrep_sync_wait = 0;
 
 --perl
         use strict;
-        my $wsrep_start_position = `grep 'WSREP: Recovered position:' $ENV{MYSQL_TMP_DIR}/galera_var_wsrep_recover.log | sed 's/.*WSREP\:\ Recovered\ position://' | sed 's/^[ \t]*//'`;
+        my $wsrep_start_position = `grep 'Recovered position:' $ENV{MYSQL_TMP_DIR}/galera_var_wsrep_recover.log | sed 's/.*Recovered\ position://' | sed 's/^[ \t]*//'`;
         chomp($wsrep_start_position);
 
         $wsrep_start_position ne '' or die 'wsrep_start_position not found';
@@ -57,9 +59,14 @@ EOF
 --connection node_1
 SET SESSION wsrep_on = ON;
 SET SESSION wsrep_sync_wait = 15;
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
+#
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = "$wsrep_provider_options_orig"
+--enable_query_log
 
 DROP TABLE t1;
+--remove_file $MYSQL_TMP_DIR/galera_var_wsrep_recover.log
 
 

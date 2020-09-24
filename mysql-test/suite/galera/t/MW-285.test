@@ -3,7 +3,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 CREATE TABLE parent1 ( id INT PRIMARY KEY, KEY (id) ) ENGINE=InnoDB;
 CREATE TABLE parent2 ( id INT PRIMARY KEY, KEY (id) ) ENGINE=InnoDB;

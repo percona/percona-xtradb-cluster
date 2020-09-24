@@ -12,50 +12,41 @@ The daemon accepts incoming traffic from |MySQL| clients and forwards it to
 backend |MySQL| servers.
 
 The proxy is designed to run continuously without needing to be restarted.  Most
-configuration can be done at runtime using queries similar to SQL statements.
-These include runtime parameters, server grouping, and traffic-related settings.
+configuration can be done at runtime using queries similar to SQL statements in
+the ProxySQL admin interface.  These include runtime parameters, server
+grouping, and traffic-related settings.
 
-.. note::
+.. seealso:: `More information about ProxySQL <https://github.com/sysown/proxysql/tree/master/doc>`_.
 
-   For more information about ProxySQL, see `ProxySQL documentation
-   <https://github.com/sysown/proxysql/tree/master/doc>`_.
+:ref:`ProxySQL v2 <pxc.proxysql.v2>` natively supports |PXC|. With this version,
+|proxysql-admin| tool does not require any custom scripts to keep track of |PXC|
+status.
 
-ProxySQL is available from the Percona software repositories in two
-versions. ProxySQL v1 does not natively support |PXC| and requires
-custom bash scripts to keep track of the status of |PXC| nodes using the
-|proxysql| scheduler.
+.. important::
 
-ProxySQL v2 natively supports |PXC|. With this version,
-|proxysql-admin| tool does not require custom scripts to keep track of
-|PXC| status.
-
-.. toctree::
-
-   proxysql-v1
-   proxysql-v2
+   In version |version|, |PXC| does not support ProxySQL v1.   
 
 Manual Configuration
 ====================
 
-This tutorial describes how to configure ProxySQL with three |PXC| nodes.
+This section describes how to configure ProxySQL with three |PXC| nodes.
 
 +--------+-----------+---------------+
 | Node   | Host Name | IP address    |
 +========+===========+===============+
-| Node 1 | pxc1      | 192.168.70.61 |
+| Node 1 | pxc1      | 192.168.70.71 |
 +--------+-----------+---------------+
-| Node 2 | pxc2      | 192.168.70.62 |
+| Node 2 | pxc2      | 192.168.70.72 |
 +--------+-----------+---------------+
-| Node 3 | pxc3      | 192.168.70.63 |
+| Node 3 | pxc3      | 192.168.70.73 |
 +--------+-----------+---------------+
-| Node 4 | proxysql  | 192.168.70.64 |
+| Node 4 | proxysql  | 192.168.70.74 |
 +--------+-----------+---------------+
 
-ProxySQL can be configured either using the :file:`/etc/proxysql.cnf` file
-or through the admin interface.
-Using the admin interface is preferable,
-because it allows you to change the configuration dynamically
-(without having to restart the proxy).
+ProxySQL can be configured either using the :file:`/etc/proxysql.cnf` file or
+through the admin interface.  Using the admin interface is preferable, because
+it allows you to change the configuration dynamically without having to restart
+the proxy.
 
 To connect to the ProxySQL admin interface, you need a ``mysql`` client.
 You can either connect to the admin interface from |PXC| nodes
@@ -63,17 +54,25 @@ that already have the ``mysql`` client installed (Node 1, Node 2, Node 3)
 or install the client on Node 4 and connect locally.
 For this tutorial, install |PXC| on Node 4:
 
+.. admonition:: Changes in the installation procedure
+
+   In |PXC| |version|, ProxySQL is not installed automatically as a dependency
+   of the ``percona-xtradb-cluster-client-8.0`` package. You should install the
+   ``proxysql`` package separately.
+
 * On Debian or Ubuntu:
 
   .. code-block:: bash
 
-     root@proxysql:~# apt-get install percona-xtradb-cluster-client-5.7
+     root@proxysql:~# apt-get install percona-xtradb-cluster-client
+     root@proxysql:~# apt-get install proxysql2
 
 * On Red Hat Enterprise Linux or CentOS:
 
   .. code-block:: bash
 
-     [root@proxysql ~]# yum install Percona-XtraDB-Cluster-client-57
+     [root@proxysql ~]# yum install Percona-XtraDB-Cluster-client-80
+     [root@proxysql ~]# yum install proxysql2
 
 To connect to the admin interface,
 use the credentials, host name and port specified in the `global variables
@@ -90,10 +89,10 @@ with default credentials:
 
    Welcome to the MySQL monitor.  Commands end with ; or \g.
    Your MySQL connection id is 2
-   Server version: 5.1.30 (ProxySQL Admin Module)
+   Server version: 5.5.30 (ProxySQL Admin Module)
 
-   Copyright (c) 2009-2016 Percona LLC and/or its affiliates
-   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2009-2020 Percona LLC and/or its affiliates
+   Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
    Oracle is a registered trademark of Oracle Corporation and/or its
    affiliates. Other names may be trademarks of their respective
@@ -148,9 +147,7 @@ see `Admin Tables
   ProxySQL has 3 areas where the configuration can reside:
 
   * MEMORY (your current working place)
-
   * RUNTIME (the production settings)
-
   * DISK (durable configuration, saved inside an SQLITE database)
 
   When you change a parameter, you change it in MEMORY area.
@@ -167,7 +164,7 @@ insert corresponding records into the ``mysql_servers`` table.
    This enables you to balance the load in a cluster by
    routing different types of traffic to different groups.
    There are many ways you can configure hostgroups
-   (for example master and slaves, read and write load, etc.)
+   (for example source and replicas, read and write load, etc.)
    and a every node can be a member of multiple hostgroups.
 
 This example adds three |PXC| nodes to the default hostgroup (``0``),
@@ -175,9 +172,9 @@ which receives both write and read traffic:
 
 .. code-block:: text
 
-   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.61',3306);
-   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.62',3306);
-   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.63',3306);
+   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.71',3306);
+   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.72',3306);
+   mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.73',3306);
 
 To see the nodes:
 
@@ -188,9 +185,9 @@ To see the nodes:
   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
   | hostgroup_id | hostname      | port | status | weight | compression | max_connections | max_replication_lag | use_ssl | max_latency_ms | comment |
   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
-  | 0            | 192.168.70.62 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
-  | 0            | 192.168.70.63 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+  | 0            | 192.168.70.71 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+  | 0            | 192.168.70.72 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+  | 0            | 192.168.70.73 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
   3 rows in set (0.00 sec)
 
@@ -205,7 +202,7 @@ The following example shows how to add a monitoring user on Node 2:
 
 .. code-block:: text
 
-  mysql@pxc2> CREATE USER 'proxysql'@'%' IDENTIFIED BY 'ProxySQLPa55';
+  mysql@pxc2> CREATE USER 'proxysql'@'%' IDENTIFIED WITH mysql_native_password by '$3Kr$t';
   mysql@pxc2> GRANT USAGE ON *.* TO 'proxysql'@'%';
 
 The following example shows how to configure this user on the ProxySQL node:
@@ -236,12 +233,12 @@ check the monitoring logs:
   +---------------+------+------------------+----------------------+---------------+
   | hostname      | port | time_start_us    | connect_success_time | connect_error |
   +---------------+------+------------------+----------------------+---------------+
-  | 192.168.70.61 | 3306 | 1469635762434625 | 1695                 | NULL          |
-  | 192.168.70.62 | 3306 | 1469635762434625 | 1779                 | NULL          |
-  | 192.168.70.63 | 3306 | 1469635762434625 | 1627                 | NULL          |
-  | 192.168.70.61 | 3306 | 1469635642434517 | 1557                 | NULL          |
-  | 192.168.70.62 | 3306 | 1469635642434517 | 2737                 | NULL          |
-  | 192.168.70.63 | 3306 | 1469635642434517 | 1447                 | NULL          |
+  | 192.168.70.71 | 3306 | 1469635762434625 | 1695                 | NULL          |
+  | 192.168.70.72 | 3306 | 1469635762434625 | 1779                 | NULL          |
+  | 192.168.70.73 | 3306 | 1469635762434625 | 1627                 | NULL          |
+  | 192.168.70.71 | 3306 | 1469635642434517 | 1557                 | NULL          |
+  | 192.168.70.72 | 3306 | 1469635642434517 | 2737                 | NULL          |
+  | 192.168.70.73 | 3306 | 1469635642434517 | 1447                 | NULL          |
   +---------------+------+------------------+----------------------+---------------+
   6 rows in set (0.00 sec)
 
@@ -251,12 +248,12 @@ check the monitoring logs:
   +---------------+------+------------------+-------------------+------------+
   | hostname      | port | time_start_us    | ping_success_time | ping_error |
   +---------------+------+------------------+-------------------+------------+
-  | 192.168.70.61 | 3306 | 1469635762416190 | 948               | NULL       |
-  | 192.168.70.62 | 3306 | 1469635762416190 | 803               | NULL       |
-  | 192.168.70.63 | 3306 | 1469635762416190 | 711               | NULL       |
-  | 192.168.70.61 | 3306 | 1469635702416062 | 783               | NULL       |
-  | 192.168.70.62 | 3306 | 1469635702416062 | 631               | NULL       |
-  | 192.168.70.63 | 3306 | 1469635702416062 | 542               | NULL       |
+  | 192.168.70.71 | 3306 | 1469635762416190 | 948               | NULL       |
+  | 192.168.70.72 | 3306 | 1469635762416190 | 803               | NULL       |
+  | 192.168.70.73 | 3306 | 1469635762416190 | 711               | NULL       |
+  | 192.168.70.71 | 3306 | 1469635702416062 | 783               | NULL       |
+  | 192.168.70.72 | 3306 | 1469635702416062 | 631               | NULL       |
+  | 192.168.70.73 | 3306 | 1469635702416062 | 542               | NULL       |
   +---------------+------+------------------+-------------------+------------+
   6 rows in set (0.00 sec)
 
@@ -304,10 +301,10 @@ To confirm that the user has been set up correctly, you can try to log in:
 
   Welcome to the MySQL monitor.  Commands end with ; or \g.
   Your MySQL connection id is 1491
-  Server version: 5.1.30 (ProxySQL)
+  Server version: 5.5.30 (ProxySQL)
 
-  Copyright (c) 2009-2016 Percona LLC and/or its affiliates
-  Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2009-2020 Percona LLC and/or its affiliates
+  Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
   Oracle is a registered trademark of Oracle Corporation and/or its
   affiliates. Other names may be trademarks of their respective
@@ -320,138 +317,11 @@ add this user on one of the |PXC| nodes:
 
 .. code-block:: text
 
-  mysql@pxc3> CREATE USER 'sbuser'@'192.168.70.64' IDENTIFIED BY 'sbpass';
+  mysql@pxc3> CREATE USER 'sbuser'@'192.168.70.74' IDENTIFIED BY 'sbpass';
   Query OK, 0 rows affected (0.01 sec)
 
-  mysql@pxc3> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.64';
+  mysql@pxc3> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.74';
   Query OK, 0 rows affected (0.00 sec)
-
-Adding Galera Support in ProxySQL v1
---------------------------------------------------------------------------------
-
-ProxySQL v2 supports monitoring the status |PXC| nodes. ProxySQL v1 cannot
-detect a node which is not in ``Synced`` state.  To monitor the status of |PXC|
-nodes in ProxySQL v1, use the :file:`proxysql_galera_checker` script.  The
-script is located here: :file:`/usr/bin/proxysql_galera_checker`.
-
-To use this script, load it into ProxySQL v1
-`Scheduler <https://github.com/sysown/proxysql/blob/master/doc/scheduler.md>`_.
-
-The following example shows how you can load the script
-for default ProxySQL v1 configuration:
-
-.. code-block:: text
-
-   INSERT INTO scheduler (active,interval_ms,filename,arg1,comment)
-   VALUES (1,10000,'/usr/bin/proxysql_galera_checker','--config-file=/etc/proxysql-admin.cnf
-   --write-hg=10 --read-hg=11 --writer-count=1 --mode=singlewrite 
-   --priority=192.168.100.20:3306,192.168.100.40:3306,192.168.100.10:3306,192.168.100.30:3306 
-   --log=/var/lib/proxysql/cluster_one_proxysql_galera_check.log','cluster_one');
-
-This scheduler script accepts the following options in the ``arg1`` argument:
-
-.. list-table::
-   :widths: 15 20 25 40
-   :header-rows: 1
-
-   * - Option
-     - Name
-     - Required
-     - Description
-   * - ``--config-file``
-     - Configuration File
-     - Yes
-     - Specify ``proxysql-admin`` configuration file.
-   * - ``--write-hg``
-     - ``HOSTGROUP WRITERS``
-     - No
-     - Specify ProxySQL write hostgroup.
-   * - ``--read-hg``
-     - ``HOSTGROUP READERS``
-     - No
-     - Specify ProxySQL read hostgroup.
-   * - ``--writer-count``
-     - ``NUMBER WRITERS``
-     - No
-     - Specify write nodes count. ``0`` for ``loadbal`` mode and ``1`` for
-       ``singlewrite`` mode.
-   * - ``--mode``
-     - ``MODE``
-     - No
-     - Specify ProxySQL read/write configuration mode.
-   * - ``--priority``
-     - ``WRITER PRIORITY``
-     - No
-     - Specify write nodes priority.
-   * - ``--log``
-     - ``LOG FILE``
-     - No
-     - Specify ``proxysql_galera_checker`` log file.
-
-.. note:: Specify cluster name in `comment` column.
-
-To load the scheduler changes into the runtime space:
-
-.. code-block:: text
-
-   mysql@proxysql> LOAD SCHEDULER TO RUNTIME;
-
-To make sure that the script has been loaded,
-check the :table:`runtime_scheduler` table:
-
-.. code-block:: text
-
-   mysql@proxysql> SELECT * FROM scheduler\G
-   *************************** 1. row ***************************
-            id: 1
-        active: 1
-   interval_ms: 10000
-      filename: /bin/proxysql_galera_checker
-          arg1: --config-file=/etc/proxysql-admin.cnf --write-hg=10 --read-hg=11 
-                --writer-count=1 --mode=singlewrite 
-                --priority=192.168.100.20:3306,192.168.100.40:3306,192.168.100.10:3306,192.168.100.30:3306 
-                --log=/var/lib/proxysql/cluster_one_proxysql_galera_check.log
-          arg2: NULL
-          arg3: NULL
-          arg4: NULL
-          arg5: NULL
-       comment: cluster_one
-   1 row in set (0.00 sec)
-
-To check the status of available nodes, run the following command:
-
-.. code-block:: text
-
-   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
-   +--------------+---------------+------+--------+
-   | hostgroup_id | hostname      | port | status |
-   +--------------+---------------+------+--------+
-   | 0            | 192.168.70.61 | 3306 | ONLINE |
-   | 0            | 192.168.70.62 | 3306 | ONLINE |
-   | 0            | 192.168.70.63 | 3306 | ONLINE |
-   +--------------+---------------+------+--------+
-   3 rows in set (0.00 sec)
-
-.. note::
-
-   Each node can have the following status:
-
-   * ``ONLINE``: backend node is fully operational.
-
-   * ``SHUNNED``: backend node is temporarily taken out of use,
-     because either too many connection errors hapenned in a short time,
-     or replication lag exceeded the allowed threshold.
-
-   * ``OFFLINE_SOFT``: new incoming connections aren't accepted,
-     while existing connections are kept until they become inactive.
-     In other words, connections are kept in use
-     until the current transaction is completed.
-     This allows to gracefully detach a backend node.
-
-   * ``OFFLINE_HARD``: existing connections are dropped,
-     and new incoming connections aren't accepted.
-     This is equivalent to deleting the node from a hostgroup,
-     or temporarily taking it out of the hostgroup for maintenance.
 
 Testing Cluster with sysbench
 -----------------------------
@@ -549,7 +419,9 @@ For example, to see the number of commands that run on the cluster:
    +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
    45 rows in set (0.00 sec)
 
-Automatic Fail-over
+.. _proxysql.automatic-failover:
+
+Automatic failover
 -------------------
 
 ProxySQL will automatically detect if a node is not available
@@ -563,9 +435,9 @@ You can check the status of all available nodes by running:
    +--------------+---------------+------+--------+
    | hostgroup_id | hostname      | port | status |
    +--------------+---------------+------+--------+
-   | 0            | 192.168.70.61 | 3306 | ONLINE |
-   | 0            | 192.168.70.62 | 3306 | ONLINE |
-   | 0            | 192.168.70.63 | 3306 | ONLINE |
+   | 0            | 192.168.70.71 | 3306 | ONLINE |
+   | 0            | 192.168.70.72 | 3306 | ONLINE |
+   | 0            | 192.168.70.73 | 3306 | ONLINE |
    +--------------+---------------+------+--------+
    3 rows in set (0.00 sec)
 
@@ -584,9 +456,9 @@ ProxySQL will detect that the node is down and update its status to
    +--------------+---------------+------+--------------+
    | hostgroup_id | hostname      | port | status       |
    +--------------+---------------+------+--------------+
-   | 0            | 192.168.70.61 | 3306 | ONLINE       |
-   | 0            | 192.168.70.62 | 3306 | ONLINE       |
-   | 0            | 192.168.70.63 | 3306 | OFFLINE_SOFT |
+   | 0            | 192.168.70.71 | 3306 | ONLINE       |
+   | 0            | 192.168.70.72 | 3306 | ONLINE       |
+   | 0            | 192.168.70.73 | 3306 | OFFLINE_SOFT |
    +--------------+---------------+------+--------------+
    3 rows in set (0.00 sec)
 
@@ -605,9 +477,9 @@ The script will detect the change and mark the node as
    +--------------+---------------+------+--------+
    | hostgroup_id | hostname      | port | status |
    +--------------+---------------+------+--------+
-   | 0            | 192.168.70.61 | 3306 | ONLINE |
-   | 0            | 192.168.70.62 | 3306 | ONLINE |
-   | 0            | 192.168.70.63 | 3306 | ONLINE |
+   | 0            | 192.168.70.71 | 3306 | ONLINE |
+   | 0            | 192.168.70.72 | 3306 | ONLINE |
+   | 0            | 192.168.70.73 | 3306 | ONLINE |
    +--------------+---------------+------+--------+
    3 rows in set (0.00 sec)
 
@@ -677,8 +549,14 @@ but the user can still open conenctions to monitor status.
 .. note:: If you increase the transition period,
    the packaging script may determine it as a server stall.
 
+-----
+
+.. admonition:: Related sections
+
+   - :ref:`testing-env-proxysql.setting-up`
+
+   
+
 
 .. |proxysql| replace:: ProxySQL
 .. |proxysql-admin| replace:: ``proxysql-admin``
-
-

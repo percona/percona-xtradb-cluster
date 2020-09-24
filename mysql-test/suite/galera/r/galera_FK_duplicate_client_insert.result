@@ -31,3 +31,5 @@ truncate user_session;
 set debug_sync = reset;
 drop table user_session;
 drop table user;
+set global innodb_status_output = 0;
+set global innodb_status_output_locks = 0;

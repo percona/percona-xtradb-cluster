@@ -2,7 +2,6 @@
 # Dirty reads from INFORMATION_SCHEMA tables.
 #
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --disable_info
 USE performance_schema;
 SELECT * FROM session_variables WHERE VARIABLE_NAME LIKE "wsrep_dirty_reads";

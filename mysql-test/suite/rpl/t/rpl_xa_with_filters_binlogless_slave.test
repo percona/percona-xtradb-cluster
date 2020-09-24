@@ -17,6 +17,8 @@
 #
 # BUG#27442477: ASSERT `THD->GET_HA_DATA...HAS_STATE(XID_STATE::XA_ACTIVE))' AT HANDLER.CC:1396
 
+# The test cannot run in Valgrind since it generates an assert on the slave
+--source include/not_valgrind.inc
 --source include/have_binlog_format_row.inc
 --source include/master-slave.inc
 
@@ -33,6 +35,7 @@ CREATE TABLE t1 (a INT);
 # 2) Add a replication filter to the slave node
 #
 --source include/stop_slave_sql.inc
+CALL mtr.add_suppression(".*You need to use --log-bin to make --binlog-format work.*");
 CALL mtr.add_suppression(".*The slave coordinator and worker threads are stopped, possibly leaving data in inconsistent state.*");
 CALL mtr.add_suppression(".*The use of replication filters with XA transactions is not supported, and can lead to an undefined state in the replication slave.*");
 CHANGE REPLICATION FILTER Replicate_Ignore_Table=(test.t1);

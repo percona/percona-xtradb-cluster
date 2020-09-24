@@ -276,7 +276,6 @@ extern bool create_notification_pipe(LIBEVENT_THREAD *me);
 extern bool wsrep_is_wsrep_on(void);
 #endif /* WITH_WSREP */
 
-
 extern LIBEVENT_THREAD* tap_thread;
 
 typedef struct conn conn;

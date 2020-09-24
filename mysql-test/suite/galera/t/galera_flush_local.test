@@ -3,14 +3,11 @@
 # PXC-391
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
---source include/have_query_cache.inc
 
 #
 # PXC-267
 #
-SET STATEMENT sort_buffer_size=0,myisam_repair_threads=0 FOR OPTIMIZE TABLE t0;
-
+OPTIMIZE  /*+ SET_VAR(sort_buffer_size = 0) SET_VAR(myisam_repair_threads=0) */ TABLE t0;
 
 --disable_warnings
 DROP TABLE IF EXISTS t1, t2, x1, x2;
@@ -45,9 +42,7 @@ INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 --let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
 
 --connection node_1
-FLUSH LOCAL DES_KEY_FILE;
 FLUSH LOCAL HOSTS;
-FLUSH LOCAL QUERY CACHE;
 FLUSH LOCAL STATUS;
 FLUSH LOCAL PRIVILEGES;
 FLUSH LOCAL USER_RESOURCES;
@@ -126,9 +121,7 @@ INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 
 --connection node_1
 set wsrep_on=0;
-FLUSH DES_KEY_FILE;
 FLUSH HOSTS;
-FLUSH QUERY CACHE;
 FLUSH STATUS;
 FLUSH PRIVILEGES;
 FLUSH USER_RESOURCES;

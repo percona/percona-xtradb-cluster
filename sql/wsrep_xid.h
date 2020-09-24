@@ -16,17 +16,21 @@
 #ifndef WSREP_XID_H
 #define WSREP_XID_H
 
-#include "handler.h" // XID typedef
-#include "wsrep_api.h"
+#include "handler.h"  // XID typedef
+#include "wsrep-lib/include/wsrep/gtid.hpp"
 
-void wsrep_xid_init(xid_t*, const wsrep_uuid_t&, wsrep_seqno_t);
-int wsrep_is_wsrep_xid(const void* xid);
-const wsrep_uuid_t* wsrep_xid_uuid(const XID&);
-wsrep_seqno_t wsrep_xid_seqno(const XID&);
+#define WSREP_XID_PREFIX "WSREPXid"
+#define WSREP_XID_PREFIX_LEN 8
+#define WSREP_XID_UUID_OFFSET 8
+#define WSREP_XID_SEQNO_OFFSET (WSREP_XID_UUID_OFFSET + sizeof(wsrep_uuid_t))
+#define WSREP_XID_GTRID_LEN (WSREP_XID_SEQNO_OFFSET + sizeof(wsrep_seqno_t))
 
-//void wsrep_get_SE_checkpoint(XID&); uncomment if needed
-void wsrep_get_SE_checkpoint(wsrep_uuid_t&, wsrep_seqno_t&);
-//void wsrep_set_SE_checkpoint(XID&); uncomment if needed
-void wsrep_set_SE_checkpoint(const wsrep_uuid_t&, wsrep_seqno_t);
+void wsrep_xid_init(xid_t *, const wsrep::gtid &);
+int wsrep_is_wsrep_xid(const void *xid);
+const wsrep::id &wsrep_xid_uuid(const XID &);
+wsrep::seqno wsrep_xid_seqno(const XID &);
+
+wsrep::gtid wsrep_get_SE_checkpoint();
+bool wsrep_set_SE_checkpoint(const wsrep::gtid &gtid);
 
 #endif /* WSREP_UTILS_H */

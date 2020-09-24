@@ -3,7 +3,12 @@
 # The relevant options are set using a -master.opt file
 # wsrep_replicate_myisam is not used as it crashes in MTR with mysql-wsrep#14
 --source include/galera_cluster.inc
---source include/have_innodb.inc
+
+--connection node_1
+call mtr.add_suppression("Although a path was specified for the.*");
+
+--connection node_2
+call mtr.add_suppression("Although a path was specified for the.*");
 
 --connection node_1
 TRUNCATE TABLE mysql.general_log;

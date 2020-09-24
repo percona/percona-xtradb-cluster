@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # Ensure that the read_only option does not apply to Galera appliers and that replication

@@ -1,0 +1,21 @@
+#!/bin/sh
+config=/etc/default/garbd
+if [ -e /usr/bin/deb-systemd-helper ]; then
+    deb-systemd-helper unmask garbd.service >/dev/null || true
+    if deb-systemd-helper --quiet was-enabled garbd.service; then
+        deb-systemd-helper enable garbd.service >/dev/null || true
+    else
+        deb-systemd-helper update-state garbd.service >/dev/null || true
+    fi
+    if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
+        if [ -x "/etc/init.d/garbd" ]; then
+            update-rc.d garbd defaults >/dev/null
+            if grep -q -E '^# REMOVE' $config; then
+                echo  "Garbd config $config is not configured yet"
+                exit 0
+            else
+                invoke-rc.d garbd start || exit $?
+            fi
+        fi
+    fi
+fi

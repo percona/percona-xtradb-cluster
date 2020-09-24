@@ -16,8 +16,10 @@
 #ifndef WSREP_VAR_H
 #define WSREP_VAR_H
 
-#define WSREP_CLUSTER_NAME        "my_wsrep_cluster"
-#define WSREP_NODE_INCOMING_AUTO  "AUTO"
+#include <my_config.h>
+
+#define WSREP_CLUSTER_NAME "my_wsrep_cluster"
+#define WSREP_NODE_INCOMING_AUTO "AUTO"
 #define WSREP_START_POSITION_ZERO "00000000-0000-0000-0000-000000000000:-1"
 #define WSREP_CLUSTER_NAME_MAX_LEN 32
 
@@ -31,72 +33,73 @@ class THD;
 
 int wsrep_init_vars();
 
-#define CHECK_ARGS   (sys_var *self, THD* thd, set_var *var)
-#define UPDATE_ARGS  (sys_var *self, THD* thd, enum_var_type type)
-#define DEFAULT_ARGS (THD* thd, enum_var_type var_type)
-#define INIT_ARGS    (const char* opt)
+#define CHECK_ARGS (sys_var * self, THD * thd, set_var * var)
+#define UPDATE_ARGS (sys_var * self, THD * thd, enum_var_type type)
+#define DEFAULT_ARGS (THD * thd, enum_var_type var_type)
+#define INIT_ARGS (const char *opt)
 
-extern bool wsrep_on_check                   CHECK_ARGS;
-extern bool wsrep_on_update                  UPDATE_ARGS;
-extern bool wsrep_causal_reads_update        UPDATE_ARGS;
-extern bool wsrep_sync_wait_update           UPDATE_ARGS;
-extern bool wsrep_start_position_check       CHECK_ARGS;
-extern bool wsrep_start_position_update      UPDATE_ARGS;
-extern void wsrep_start_position_init        INIT_ARGS;
+extern bool wsrep_on_check CHECK_ARGS;
+extern bool wsrep_on_update UPDATE_ARGS;
+extern bool wsrep_causal_reads_update UPDATE_ARGS;
+extern bool wsrep_sync_wait_update UPDATE_ARGS;
+extern bool wsrep_start_position_check CHECK_ARGS;
+extern bool wsrep_start_position_update UPDATE_ARGS;
+extern void wsrep_start_position_init INIT_ARGS;
 
-extern bool wsrep_provider_check             CHECK_ARGS;
-extern bool wsrep_provider_update            UPDATE_ARGS;
-extern void wsrep_provider_init              INIT_ARGS;
+extern bool wsrep_provider_check CHECK_ARGS;
+extern bool wsrep_provider_update UPDATE_ARGS;
+extern void wsrep_provider_init INIT_ARGS;
 
-extern bool wsrep_provider_options_check     CHECK_ARGS;
-extern bool wsrep_provider_options_update    UPDATE_ARGS;
-extern void wsrep_provider_options_init      INIT_ARGS;
+extern bool wsrep_provider_options_check CHECK_ARGS;
+extern bool wsrep_provider_options_update UPDATE_ARGS;
+extern void wsrep_provider_options_init INIT_ARGS;
 
-extern bool wsrep_cluster_address_check      CHECK_ARGS;
-extern bool wsrep_cluster_address_update     UPDATE_ARGS;
-extern void wsrep_cluster_address_init       INIT_ARGS;
+extern bool wsrep_cluster_address_check CHECK_ARGS;
+extern bool wsrep_cluster_address_update UPDATE_ARGS;
+extern void wsrep_cluster_address_init INIT_ARGS;
 
-extern bool wsrep_cluster_name_check         CHECK_ARGS;
-extern bool wsrep_cluster_name_update        UPDATE_ARGS;
+extern bool wsrep_cluster_name_check CHECK_ARGS;
+extern bool wsrep_cluster_name_update UPDATE_ARGS;
 
-extern bool wsrep_node_name_check            CHECK_ARGS;
-extern bool wsrep_node_name_update           UPDATE_ARGS;
+extern bool wsrep_node_name_check CHECK_ARGS;
+extern bool wsrep_node_name_update UPDATE_ARGS;
 
-extern bool wsrep_node_address_check         CHECK_ARGS;
-extern bool wsrep_node_address_update        UPDATE_ARGS;
-extern void wsrep_node_address_init          INIT_ARGS;
+extern bool wsrep_node_address_check CHECK_ARGS;
+extern bool wsrep_node_address_update UPDATE_ARGS;
+extern void wsrep_node_address_init INIT_ARGS;
 
-extern bool wsrep_sst_method_check           CHECK_ARGS;
-extern bool wsrep_sst_method_update          UPDATE_ARGS;
-extern void wsrep_sst_method_init            INIT_ARGS;
+extern bool wsrep_sst_method_check CHECK_ARGS;
+extern bool wsrep_sst_method_update UPDATE_ARGS;
+extern void wsrep_sst_method_init INIT_ARGS;
 
-extern bool wsrep_sst_receive_address_check  CHECK_ARGS;
+extern bool wsrep_sst_receive_address_check CHECK_ARGS;
 extern bool wsrep_sst_receive_address_update UPDATE_ARGS;
 
-extern bool wsrep_sst_auth_check             CHECK_ARGS;
-extern bool wsrep_sst_auth_update            UPDATE_ARGS;
-extern void wsrep_sst_auth_init              INIT_ARGS;
+extern bool wsrep_sst_donor_check CHECK_ARGS;
+extern bool wsrep_sst_donor_update UPDATE_ARGS;
 
-extern bool wsrep_sst_donor_check            CHECK_ARGS;
-extern bool wsrep_sst_donor_update           UPDATE_ARGS;
+extern bool wsrep_slave_threads_check CHECK_ARGS;
+extern bool wsrep_slave_threads_update UPDATE_ARGS;
 
-extern bool wsrep_slave_threads_check        CHECK_ARGS;
-extern bool wsrep_slave_threads_update       UPDATE_ARGS;
+extern bool wsrep_desync_check CHECK_ARGS;
+extern bool wsrep_desync_update UPDATE_ARGS;
 
-extern bool wsrep_desync_check               CHECK_ARGS;
-extern bool wsrep_desync_update              UPDATE_ARGS;
+extern bool wsrep_trx_fragment_size_check CHECK_ARGS;
+extern bool wsrep_trx_fragment_size_update UPDATE_ARGS;
 
-extern bool wsrep_forced_binlog_format_check CHECK_ARGS;
+extern bool wsrep_trx_fragment_unit_update UPDATE_ARGS;
 
-extern bool wsrep_max_ws_size_update         UPDATE_ARGS;
+extern bool wsrep_max_ws_size_update UPDATE_ARGS;
 
-extern bool wsrep_reject_queries_update    UPDATE_ARGS;
+extern bool wsrep_reject_queries_update UPDATE_ARGS;
 
-extern bool wsrep_replicate_myisam_check     CHECK_ARGS;
+extern bool wsrep_debug_update UPDATE_ARGS;
 
-extern bool pxc_strict_mode_check            CHECK_ARGS;
+extern bool wsrep_replicate_myisam_check CHECK_ARGS;
 
-extern bool pxc_maint_mode_check            CHECK_ARGS;
-extern bool pxc_maint_mode_update           UPDATE_ARGS;
+extern bool pxc_strict_mode_check CHECK_ARGS;
+
+extern bool pxc_maint_mode_check CHECK_ARGS;
+extern bool pxc_maint_mode_update UPDATE_ARGS;
 
 #endif /* WSREP_VAR_H */

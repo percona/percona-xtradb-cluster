@@ -4,11 +4,10 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --let $wsrep_debug_orig = `SELECT @@wsrep_debug`
 
-SET GLOBAL wsrep_debug = ON;
+SET GLOBAL wsrep_debug = 1;
 
 CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 
@@ -22,6 +21,7 @@ CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 DROP USER u1;
 
 --connection node_2
+call mtr.add_suppression("Query apply failed.*");
 --let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.user WHERE USER = 'u1';
 --source include/wait_condition.inc
 
@@ -45,16 +45,16 @@ DROP USER u1;
 # Check that the obfuscated password appears in the logs
 
 # Five times for the first node, in the various wsrep_debug messages
---let $assert_text = 'mysql_native_password' AS '<secret>'
---let $assert_select = 'mysql_native_password' AS '<secret>'
---let $assert_count = 6
+--let $assert_text = <secret>
+--let $assert_select = <secret>
+--let $assert_count = 9 
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
 
 # Once for the second node, in the 'Slave SQL' error
---let $assert_text = 'mysql_native_password' AS '<secret>'
---let $assert_select = 'mysql_native_password' AS '<secret>'
+--let $assert_text = <secret>
+--let $assert_select = <secret>
 --let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
 --let $assert_only_after = CURRENT_TEST

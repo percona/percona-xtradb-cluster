@@ -1,0 +1,44 @@
+#
+# Test ACL cache access conflict between event and user thread
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source include/count_sessions.inc
+
+--connection node_2
+call mtr.add_suppression("Operation DROP USER failed");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
+
+--connection node_1
+call mtr.add_suppression("Operation DROP USER failed");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
+CREATE TABLE t1(a INT AUTO_INCREMENT, b INT, PRIMARY KEY pka(a));
+--send SET DEBUG_SYNC = 'now WAIT_FOR has_global_grant.got_lock'; 
+--sleep 1
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+
+SET @@global.debug = '+d,has_global_grant_hold_lock';
+CREATE EVENT ev2 ON SCHEDULE EVERY 60 SECOND DO INSERT INTO t1(b) VALUES (1);
+
+# wait for event to get the lock
+--connection node_1
+--reap
+SET @@global.debug = '-d,has_global_grant_hold_lock';
+
+# at this point event execution thread owns the lock and waits on debug_sync point
+
+--error ER_CANNOT_USER
+DROP USER 'testuser'@'%';
+
+# allow event execution to continue
+SET DEBUG_SYNC = 'now signal has_global_grant.release_lock';
+
+# cleanup
+SET DEBUG_SYNC = 'RESET';
+DROP EVENT ev2;
+DROP TABLE t1;
+--disconnect node_1a
+--source include/wait_until_count_sessions.inc

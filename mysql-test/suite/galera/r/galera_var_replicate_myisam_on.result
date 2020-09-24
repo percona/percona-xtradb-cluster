@@ -74,9 +74,11 @@ START TRANSACTION;
 INSERT INTO t1 VALUES (1);
 INSERT INTO t2 VALUES (1);
 INSERT INTO t1 VALUES (1);
-ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
+ERROR 23000: Duplicate entry '1' for key 't1.PRIMARY'
 COMMIT;
 SET AUTOCOMMIT=ON;
+call mtr.add_suppression("Query apply failed.*");
+call mtr.add_suppression("Ignoring error 'Duplicate entry '1' for key 'PRIMARY''");
 DROP TABLE t1;
 DROP TABLE t2;
 use test;

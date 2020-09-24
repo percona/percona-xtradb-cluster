@@ -4,7 +4,6 @@
 # The galera/galera_2node_as_master_with_event.cnf describes the setup of the nodes
 #
 
---source include/have_innodb.inc
 --source include/have_log_bin.inc
 --source include/galera_cluster.inc
 --source include/big_test.inc

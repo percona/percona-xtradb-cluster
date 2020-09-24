@@ -3,7 +3,6 @@
 ##
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/big_test.inc
 
 # Create a second connection to node1 so that we can run transactions concurrently

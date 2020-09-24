@@ -1,7 +1,0 @@
-CREATE TABLE t1 (id INT PRIMARY KEY AUTO_INCREMENT) ENGINE=InnoDB;
-INSERT INTO t1 VALUES (DEFAULT);
-SET GLOBAL query_cache_size=1355776;
-Warnings:
-Warning	1287	'@@query_cache_size' is deprecated and will be removed in a future release.
-Warnings:
-Warning	1287	'@@query_cache_size' is deprecated and will be removed in a future release.

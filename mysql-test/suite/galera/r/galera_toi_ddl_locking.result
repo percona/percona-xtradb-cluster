@@ -1,8 +1,10 @@
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
-SET DEBUG_SYNC = 'alter_table_before_open_tables SIGNAL parked WAIT_FOR continue';
+SET DEBUG_SYNC= 'RESET';
+SET DEBUG_SYNC = 'alter_table_before_open_tables SIGNAL before_open_tables WAIT_FOR continue';
 ALTER TABLE t1 ADD COLUMN f2 INTEGER;;
-SET DEBUG_SYNC = "now WAIT_FOR parked";
+SET DEBUG_SYNC = "now WAIT_FOR before_open_tables";
+SET wsrep_retry_autocommit=0;
 SET SESSION wsrep_sync_wait = 0;
 SELECT COUNT(*) = 0 FROM t1;
 COUNT(*) = 0
@@ -10,10 +12,16 @@ COUNT(*) = 0
 SELECT COUNT(*) = 0 FROM t2;
 COUNT(*) = 0
 1
-INSERT INTO t1 VALUES (1);
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+INSERT INTO t1 VALUES (1);;
+SET SESSION wsrep_sync_wait = 0;
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
+SELECT COUNT(*) = 0 FROM t1;
+COUNT(*) = 0
+1
+SELECT COUNT(*) = 0 FROM t2;
+COUNT(*) = 0
+1
 INSERT INTO t2 VALUES (1);
 COMMIT;;
 SET SESSION wsrep_sync_wait = 0;
@@ -24,6 +32,7 @@ SELECT COUNT(*) = 0 FROM t2;
 COUNT(*) = 0
 1
 SET DEBUG_SYNC= 'now SIGNAL continue';
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SELECT COUNT(*) = 0 FROM t1;
 COUNT(*) = 0
 1

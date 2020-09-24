@@ -1,0 +1,41 @@
+#
+# 1. Create a two node cluster.
+#
+# 2. Shutdown node2 and remove the grastate.dat file.
+[connection node_2]
+[connection node_1]
+#
+# 3. Execute some transactions on node1 so that node2 forces an SST when it
+#    joins next time.
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES(1);
+INSERT INTO t1 VALUES(2);
+INSERT INTO t1 VALUES(3);
+INSERT INTO t1 VALUES(4);
+#
+# 4. Add a debug point on node1 to stop after reading xid from InnoDB.
+# Adding debug point 'stop_after_reading_xid' to @@GLOBAL.debug
+#
+# 5. Start node2 in background and wait till node1 reads the wsrep_xid from
+#    InnoDB.
+[connection node_1]
+SET SESSION wsrep_sync_wait=0;
+SET DEBUG_SYNC='now wait_for read_xid';
+#
+# 6. Kill node1 and wait till SST failure is handled and node2 is shutdown.
+Killing server ...
+#
+# 7. Restart node1 and node2
+[connection node_1]
+# restart
+[connection node_2]
+# restart
+SET SESSION wsrep_sync_wait = 0;
+#
+# 8. Verify that the reason for the shutdown is logged in the error log.
+include/assert_grep.inc [Appropriate message has been written to the error log explaining the reason for the shutdown.]
+CALL mtr.add_suppression("Found a stale sst_in_progress file");
+#
+# 9. Cleanup
+[connection node_1]
+DROP TABLE t1;

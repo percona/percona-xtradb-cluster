@@ -18,217 +18,375 @@
 
 #include "wsrep_priv.h"
 
-unsigned int wsrep_check_ip (const char* addr);
-size_t wsrep_guess_ip (char* buf, size_t buf_len);
-
-/* returns the length of the host part of the address string */
-size_t wsrep_host_len(const char* addr, size_t addr_len);
+unsigned int wsrep_check_ip(const char *addr, bool *is_ipv6);
+size_t wsrep_guess_ip(char *buf, size_t buf_len);
 
 namespace wsp {
-class node_status
-{
-public:
-  node_status() : status(WSREP_MEMBER_UNDEFINED) {}
-  void set(wsrep_member_status_t new_status,
-           const wsrep_view_info_t* view = 0)
-  {
-    if (status != new_status || 0 != view)
-    {
+class node_status {
+ public:
+  node_status() : status(wsrep::server_state::s_disconnected) {}
+  void set(enum wsrep::server_state::state new_status,
+           const wsrep::view *view = 0) {
+    if (status != new_status || 0 != view) {
       wsrep_notify_status(new_status, view);
       status = new_status;
     }
   }
-  wsrep_member_status_t get() const { return status; }
-private:
-  wsrep_member_status_t status;
+  enum wsrep::server_state::state get() const { return status; }
+
+ private:
+  enum wsrep::server_state::state status;
 };
 } /* namespace wsp */
 
 extern wsp::node_status local_status;
 
+/* returns the length of the host part of the address string */
+size_t wsrep_host_len(const char *addr, size_t addr_len);
+
+namespace wsp {
+
+class Address {
+ public:
+  Address() : m_address_len(0), m_family(UNSPEC), m_port(0), m_valid(false) {
+    memset(m_address, 0, sizeof(m_address));
+  }
+  Address(const char *addr_in)
+      : m_address_len(0), m_family(UNSPEC), m_port(0), m_valid(false) {
+    memset(m_address, 0, sizeof(m_address));
+    parse_addr(addr_in);
+  }
+  bool is_valid() { return m_valid; }
+  bool is_ipv6() { return (m_family == INET6); }
+
+  const char *get_address() { return m_address; }
+  size_t get_address_len() { return m_address_len; }
+  int get_port() { return m_port; }
+
+ private:
+  enum family {
+    UNSPEC = 0,
+    INET,  /* IPv4 */
+    INET6, /* IPv6 */
+  };
+
+  char m_address[256];
+  size_t m_address_len;
+  family m_family;
+  int m_port;
+  bool m_valid;
+
+  void parse_addr(const char *addr_in) {
+    const char *start;
+    const char *end;
+    const char *port;
+    const char *open_bracket = strchr(const_cast<char *>(addr_in), '[');
+    const char *close_bracket = strchr(const_cast<char *>(addr_in), ']');
+    const char *colon = strchr(const_cast<char *>(addr_in), ':');
+    const char *dot = strchr(const_cast<char *>(addr_in), '.');
+
+    int cc = colon_count(addr_in);
+
+    if (open_bracket != NULL || dot == NULL ||
+        (colon != NULL && (dot == NULL || colon < dot))) {
+      // This could be an IPv6 address or a hostname
+      if (open_bracket != NULL) {
+        /* Sanity check: Address with '[' must include ']' */
+        if (close_bracket == NULL &&
+            open_bracket < close_bracket) /* Error: malformed address */
+        {
+          m_valid = false;
+          return;
+        }
+
+        start = open_bracket + 1;
+        end = close_bracket;
+
+        /* Check for port */
+        port = strchr(close_bracket, ':');
+        if ((port != NULL) && parse_port(port + 1)) {
+          return; /* Error: invalid port */
+        }
+        m_family = INET6;
+      } else {
+        switch (cc) {
+          case 0:
+            /* Hostname with no port */
+            start = addr_in;
+            end = addr_in + strlen(addr_in);
+            break;
+          case 1:
+            /* Hostname with port (host:port) */
+            start = addr_in;
+            end = colon;
+            if (parse_port(colon + 1)) return; /* Error: invalid port */
+            break;
+          default:
+            /* IPv6 address */
+            start = addr_in;
+            end = addr_in + strlen(addr_in);
+            m_family = INET6;
+            break;
+        }
+      }
+    } else { /* IPv4 address or hostname */
+      start = addr_in;
+      if (colon != NULL) { /* Port */
+        end = colon;
+        if (parse_port(colon + 1)) return; /* Error: invalid port */
+      } else {
+        end = addr_in + strlen(addr_in);
+      }
+    }
+
+    size_t len = end - start;
+
+    /* Safety */
+    if (len >= sizeof(m_address)) {
+      // The supplied address is too large to fit into the internal buffer.
+      m_valid = false;
+      return;
+    }
+
+    memcpy(m_address, start, len);
+    m_address[len] = '\0';
+    m_address_len = ++len;
+    m_valid = true;
+    return;
+  }
+
+  int colon_count(const char *addr) {
+    int count = 0, i = 0;
+
+    while (addr[i] != '\0') {
+      if (addr[i] == ':') ++count;
+      ++i;
+    }
+    return count;
+  }
+
+  bool parse_port(const char *port) {
+    errno = 0; /* Reset the errno */
+    m_port = strtol(port, NULL, 10);
+    if (errno == EINVAL || errno == ERANGE) {
+      m_port = 0; /* Error: invalid port */
+      m_valid = false;
+      return true;
+    }
+    return false;
+  }
+};
+} /* namespace wsp */
+
 namespace wsp {
 /* a class to manage env vars array */
-class env
-{
-private:
-    size_t len_;
-    char** env_;
-    int    errno_;
-    bool ctor_common(char** e);
-    void dtor();
-    env& operator =(env);
-public:
-    explicit env(char** env);
-    explicit env(const env&);
-    ~env();
-    int append(const char* var); /* add a new env. var */
-    int error() const { return errno_; }
-    char** operator()() { return env_; }
+class env {
+ private:
+  size_t len_;
+  char **env_;
+  int errno_;
+  bool ctor_common(char **e);
+  void dtor();
+  env &operator=(env);
+
+ public:
+  explicit env(char **env);
+  explicit env(const env &);
+  ~env();
+  int append(const char *var); /* add a new env. var */
+  int error() const { return errno_; }
+  char **operator()() { return env_; }
 };
 
 /* A small class to run external programs. */
-class process
-{
-private:
-    const char* const str_;
-    FILE*       io_;
-    int         err_;
-    pid_t       pid_;
+class process {
+ private:
+  const char *const str_;
+  FILE *io_;
+  FILE *io_w_;
 
-public:
-/*! @arg type is a pointer to a null-terminated string which  must  contain
-         either  the  letter  'r'  for  reading  or the letter 'w' for writing.
-    @arg env optional null-terminated vector of environment variables
- */
-    process  (const char* cmd, const char* type, char** env);
-    ~process ();
+  /* Read end of STDERR */
+  FILE *io_err_;
 
-    FILE* pipe () { return io_;  }
-    int   error() { return err_; }
-    int   wait ();
-    const char* cmd() { return str_; }
-    void terminate ();
+  int err_;
+  pid_t pid_;
+
+ public:
+  /*! @arg type is a pointer to a null-terminated string which must contain
+           either the letter 'r' for reading, or the letter 'w' for writing,
+           or the letters 'rw' for both reading and writing.
+      @arg env optional null-terminated vector of environment variables
+      @arg execute_immediately  If this is set to true, then the command will
+           be executed while in the constructor.
+           Executing the command from the constructor caused problems
+           due to dealing with errors, so the ability to execute the
+           command separately was added.
+   */
+  process(const char *cmd, const char *type, char **env,
+          bool execute_immediately = true);
+  ~process();
+
+  /* If type is 'r' or 'rw' this is the read pipe
+     Else if type is 'w', this is the write pipe
+  */
+  FILE *pipe() { return io_; }
+
+  /* If type is 'rw' this is the write pipe
+     Else if type is 'r' or 'w' this is NULL
+     This variable is only set if the type is 'rw'
+  */
+  FILE *write_pipe() { return io_w_; }
+
+  /* This is the read end of a stderr pipe.
+     The process being started will write to stderr.
+     This is where we will read from stderr.
+     All processses will have their stderr redirected to this pipe.
+  */
+  FILE *err_pipe() { return io_err_; }
+
+  /* Closes the write pipe so that the other side will get an EOF
+     (and not hang while waiting for the rest of the data).
+  */
+  void close_write_pipe();
+
+  /* Clears the err_pipe.  This does NOT close the err pipe. This means
+     that this class is no longer responsible for closing the pipe.
+  */
+  void clear_err_pipe() { io_err_ = NULL; }
+
+  void execute(const char *type, char **env);
+
+  int error() { return err_; }
+  int wait();
+  const char *cmd() { return str_; }
+  void terminate();
 };
 
-class thd
-{
-  class thd_init
-  {
-  public:
-    thd_init()  { my_thread_init(); }
-    ~thd_init() { my_thread_end();  }
-  }
-  init;
+class thd {
+  class thd_init {
+   public:
+    thd_init() { my_thread_init(); }
+    ~thd_init() { my_thread_end(); }
+  } init;
 
-  thd (const thd&);
-  thd& operator= (const thd&);
+  thd(const thd &);
+  thd &operator=(const thd &);
 
-public:
-
-  thd(my_bool wsrep_on);
+ public:
+  thd(bool wsrep_on);
   ~thd();
-  THD* const ptr;
+  THD *ptr;
 };
 
-class string
-{
-public:
-    string() : string_(0) {}
-    explicit string(size_t s) : string_(static_cast<char*>(malloc(s))) {}
-    char* operator()() { return string_; }
-    void set(char* str) { if (string_) free (string_); string_ = str; }
-    ~string() { set (0); }
-private:
-    char* string_;
+class string {
+ public:
+  string() : string_(0) {}
+  explicit string(size_t s) : string_(static_cast<char *>(malloc(s))) {}
+  char *operator()() { return string_; }
+  void set(char *str) {
+    if (string_) free(string_);
+    string_ = str;
+  }
+  ~string() { set(0); }
+
+ private:
+  char *string_;
+};
+
+/* scope level lock */
+class auto_lock {
+ public:
+  auto_lock(mysql_mutex_t *m) : m_(m) { mysql_mutex_lock(m_); }
+  ~auto_lock() { mysql_mutex_unlock(m_); }
+
+ private:
+  mysql_mutex_t &operator=(mysql_mutex_t &);
+  mysql_mutex_t *const m_;
 };
 
 #ifdef REMOVED
-class lock
-{
-  pthread_mutex_t* const mtx_;
+class lock {
+  pthread_mutex_t *const mtx_;
 
-public:
+ public:
+  lock(pthread_mutex_t *mtx) : mtx_(mtx) {
+    int err = pthread_mutex_lock(mtx_);
 
-  lock (pthread_mutex_t* mtx) : mtx_(mtx)
-  {
-    int err = pthread_mutex_lock (mtx_);
-
-    if (err)
-    {
+    if (err) {
       WSREP_ERROR("Mutex lock failed: %s", strerror(err));
       abort();
     }
   }
 
-  virtual ~lock ()
-  {
-    int err = pthread_mutex_unlock (mtx_);
+  virtual ~lock() {
+    int err = pthread_mutex_unlock(mtx_);
 
-    if (err)
-    {
+    if (err) {
       WSREP_ERROR("Mutex unlock failed: %s", strerror(err));
       abort();
     }
   }
 
-  inline void wait (pthread_cond_t* cond)
-  {
-    pthread_cond_wait (cond, mtx_);
-  }
+  inline void wait(pthread_cond_t *cond) { pthread_cond_wait(cond, mtx_); }
 
-private:
-
-  lock (const lock&);
-  lock& operator=(const lock&);
-
+ private:
+  lock(const lock &);
+  lock &operator=(const lock &);
 };
 
-class monitor
-{
-  int             mutable refcnt;
+class monitor {
+  int mutable refcnt;
   pthread_mutex_t mutable mtx;
-  pthread_cond_t  mutable cond;
+  pthread_cond_t mutable cond;
 
-public:
-
-  monitor() : refcnt(0)
-  {
-    pthread_mutex_init (&mtx, NULL);
-    pthread_cond_init  (&cond, NULL);
+ public:
+  monitor() : refcnt(0) {
+    pthread_mutex_init(&mtx, NULL);
+    pthread_cond_init(&cond, NULL);
   }
 
-  ~monitor()
-  {
-    pthread_mutex_destroy (&mtx);
-    pthread_cond_destroy  (&cond);
+  ~monitor() {
+    pthread_mutex_destroy(&mtx);
+    pthread_cond_destroy(&cond);
   }
 
-  void enter() const
-  {
+  void enter() const {
     lock l(&mtx);
 
-    while (refcnt)
-    {
+    while (refcnt) {
       l.wait(&cond);
     }
     refcnt++;
   }
 
-  void leave() const
-  {
+  void leave() const {
     lock l(&mtx);
 
     refcnt--;
-    if (refcnt == 0)
-    {
-      pthread_cond_signal (&cond);
+    if (refcnt == 0) {
+      pthread_cond_signal(&cond);
     }
   }
 
-private:
-
-  monitor (const monitor&);
-  monitor& operator= (const monitor&);
+ private:
+  monitor(const monitor &);
+  monitor &operator=(const monitor &);
 };
 
-class critical
-{
-  const monitor& mon;
+class critical {
+  const monitor &mon;
 
-public:
-
-  critical(const monitor& m) : mon(m) { mon.enter(); }
+ public:
+  critical(const monitor &m) : mon(m) { mon.enter(); }
 
   ~critical() { mon.leave(); }
 
-private:
-
-  critical (const critical&);
-  critical& operator= (const critical&);
+ private:
+  critical(const critical &);
+  critical &operator=(const critical &);
 };
 #endif
 
-} // namespace wsp
-
+}  // namespace wsp
 
 #endif /* WSREP_UTILS_H */

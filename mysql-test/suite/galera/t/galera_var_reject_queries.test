@@ -3,7 +3,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 CREATE TABLE t1 (f1 INTEGER);
 
@@ -42,5 +41,11 @@ INSERT INTO t1 VALUES (1);
 SET GLOBAL wsrep_reject_queries = NONE;
 
 SELECT COUNT(*) = 1 FROM t1;
+
+# PXC-3165 - Allow COM_FIELD_LIST to be executed when WSREP is not ready
+--connection node_2
+SET GLOBAL wsrep_reject_queries = ALL;
+--exec $MYSQL_SHOW -P $NODE_MYPORT_1 test t1;
+SET GLOBAL wsrep_reject_queries = NONE;
 
 DROP TABLE t1;

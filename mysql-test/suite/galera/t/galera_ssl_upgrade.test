@@ -5,7 +5,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';

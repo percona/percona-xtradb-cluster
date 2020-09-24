@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # A local transaction running FLUSH TABLES WITH READ LOCK will not be aborted by a slave transaction

@@ -45,6 +45,5 @@ select "node1", id, j from t;
 node1	id	j
 node1	1	0
 node1	2	0
-SET GLOBAL event_scheduler = OFF;
 DROP EVENT e_minutely;
 DROP TABLE t;

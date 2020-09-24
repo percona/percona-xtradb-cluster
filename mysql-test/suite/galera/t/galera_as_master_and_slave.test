@@ -5,7 +5,6 @@
 # replicated with no missing GTID.
 #
 
---source include/have_innodb.inc
 --source include/have_log_bin.inc
 --source include/force_restart.inc
 

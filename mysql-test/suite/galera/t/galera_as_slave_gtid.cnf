@@ -6,4 +6,4 @@ log-bin=mysqld-bin
 log-slave-updates
 enforce-gtid-consistency
 binlog-format=ROW
-wsrep_debug=on
+wsrep_debug=1

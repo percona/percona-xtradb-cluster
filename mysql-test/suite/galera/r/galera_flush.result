@@ -1,5 +1,4 @@
 DROP TABLE IF EXISTS t1, t2;
-FLUSH DES_KEY_FILE;
 FLUSH HOSTS;
 SET SESSION wsrep_replicate_myisam = TRUE;
 CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
@@ -7,11 +6,6 @@ FLUSH PRIVILEGES;
 DELETE FROM mysql.user WHERE user = 'user1';
 SET SESSION wsrep_replicate_myisam = FALSE;
 FLUSH PRIVILEGES;
-FLUSH QUERY CACHE;
-Warnings:
-Warning	1681	'FLUSH QUERY CACHE' is deprecated and will be removed in a future release.
-wsrep_last_committed_diff
-1
 FLUSH STATUS;
 FLUSH USER_RESOURCES;
 FLUSH TABLES;
@@ -38,9 +32,6 @@ UNLOCK TABLES;
 FLUSH TABLES t1 FOR EXPORT;
 UNLOCK TABLES;
 RESET CHANGED_PAGE_BITMAPS;
-RESET QUERY CACHE;
-Warnings:
-Warning	1681	'RESET QUERY CACHE' is deprecated and will be removed in a future release.
 wsrep_last_committed_diff
 1
 LOCK TABLES t1 WRITE;

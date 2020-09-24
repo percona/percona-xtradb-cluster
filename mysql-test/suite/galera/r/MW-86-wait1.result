@@ -1,6 +1,7 @@
 SELECT @@debug_sync;
 @@debug_sync
 ON - signals: ''
+set debug_sync='RESET';
 SET SESSION wsrep_sync_wait = 1;
 SET GLOBAL debug = "+d,sync.wsrep_apply_cb";
 CREATE TABLE t_wait1 (f1 INTEGER) ENGINE=InnoDB;
@@ -39,20 +40,20 @@ SET GLOBAL wsrep_provider_options = 'repl.causal_read_timeout=PT0.5S';
 # Node 1
 CREATE TABLE t1(id INT PRIMARY KEY);
 # Node 2 : block at the point right after we have left the commit monitor
-SET GLOBAL wsrep_provider_options = 'dbug=d,sync.applier_interim_commit.after_commit_leave';
+SET SESSION wsrep_sync_wait = 0;
+set GLOBAL debug = "+d,sync.wsrep_ordered_commit";
 # Node 1 : Perform the insert. This will succeed on node1 but will block on node2
 INSERT INTO t1 VALUES(1);
 # Node 2 : Wait for the commit point
-SET SESSION wsrep_sync_wait = 0;
-SET SESSION wsrep_on = 0;
-SET SESSION wsrep_on = 1;
+SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_ordered_commit_reached";
 SET SESSION wsrep_sync_wait = 1;
 # Node 2 : try a SELECT, this should timeout
 SELECT COUNT(*) FROM t1;
 ERROR HY000: Lock wait timeout exceeded; try restarting transaction
 # Node 2 : Unblock the commit point
-SET GLOBAL wsrep_provider_options = 'dbug=';
-SET GLOBAL wsrep_provider_options = 'signal=sync.applier_interim_commit.after_commit_leave';
+SET GLOBAL debug = "-d,sync.wsrep_ordered_commit";
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_ordered_commit_continue";
+SET DEBUG_SYNC = "RESET";
 SELECT COUNT(*) FROM t1;
 COUNT(*)
 1

@@ -1,10 +1,13 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 # Suppress expected warnings:
 
 CALL mtr.add_suppression("Aborting");
 CALL mtr.add_suppression("unknown option '--galera-unknown-option'");
+call mtr.add_suppression("The privilege system failed to initialize correctly");
+call mtr.add_suppression("SST failed/interrupted");
+call mtr.add_suppression("IST was interrupted");
+call mtr.add_suppression("IST didn't contain all write sets");
 
 #
 # We should count the number of "Assertion failed" warnings
@@ -37,7 +40,7 @@ SELECT * FROM t1;
 
 --connection node_1
 
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Some updates on node 1:
@@ -70,7 +73,7 @@ SELECT * FROM t1;
 --echo Starting server ...
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Sanity check (node 2 is running now and can perform SQL operators):
@@ -85,7 +88,7 @@ SELECT * FROM t1;
 
 --connection node_1
 
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Some updates on node 1 - to initiate IST next time:
@@ -115,7 +118,7 @@ SELECT * FROM t1;
 --echo Starting server ...
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Sanity check (node 2 is running now and can perform SQL operators):

@@ -1,0 +1,117 @@
+
+#
+#
+--source include/big_test.inc
+--source include/galera_cluster.inc
+
+# Force a restart at the end of the test
+--source include/force_restart.inc
+
+#
+# this test-case cover parallel double write buffer encrpytion.
+# redo log are node specific and has role to play only during
+# SST when backup is taken and restored.
+#
+
+#-------------------------------------------------------------------------------
+# prerequisite for running test.
+#
+CREATE TABLE ten (f1 INTEGER);
+INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
+
+#-------------------------------------------------------------------------------
+# direct repliction of encrypted tablespace
+#
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
+INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;
+
+--connection node_2
+--echo #node-2
+SELECT COUNT(*) = 10000 from t1;
+DROP TABLE t1;
+
+#-------------------------------------------------------------------------------
+# sst of the encrypted table
+#
+--connection node_2
+--echo #node-2 being killed
+--source include/kill_galera.inc
+
+#
+--connection node_1
+--echo #node-1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+#
+CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
+begin; INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten as a5;
+
+--connection node_2
+--echo #node-2 restarted
+--source include/start_mysqld.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+SELECT COUNT(*) = 0 from t1;
+
+--connection node_1
+--echo #node-1
+commit;
+SELECT COUNT(*) = 100000 from t1;
+
+--connection node_2
+--echo #node-2
+--let $wait_condition = SELECT COUNT(*) = 100000 FROM t1
+--source include/wait_condition.inc
+DROP TABLE t1;
+
+#-------------------------------------------------------------------------------
+# ist of the encrypted table
+#
+--connection node_2
+--echo #node-2 being shutdown 
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+--echo #node-1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+#
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY AUTO_INCREMENT) ENGINE=InnoDB;
+DELIMITER |;
+CREATE PROCEDURE proc_insert ()
+BEGIN
+        DECLARE i INT;
+        DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
+        SET SESSION wsrep_sync_wait = 0;
+
+        SET i = 0;
+        WHILE i < 1000 DO
+            INSERT INTO t1 VALUES (DEFAULT);
+            SET i = i + 1;
+        END WHILE;
+END|
+DELIMITER ;|
+# 1000 independent transaction committed
+CALL proc_insert();
+SELECT COUNT(*) from t1;
+
+--connection node_2
+--echo #node-2 restart
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
+--connection node_2
+--echo #node-2
+--let $wait_condition = SELECT COUNT(*) = 1000 FROM t1
+--source include/wait_condition.inc
+DROP TABLE t1;
+DROP PROCEDURE proc_insert;
+

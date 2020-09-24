@@ -15,12 +15,12 @@ SELECT @@wsrep_provider_options LIKE '%ist.recv_bind = 127.0.0.1%';
 
 SET GLOBAL wsrep_provider_options = 'gmcast.isolate = 1';
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
 
 --connection node_2
 SET SESSION wsrep_on = OFF;
---let $wait_condition = SELECT VARIABLE_VALUE = 'non-Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+--let $wait_condition = SELECT VARIABLE_VALUE = 'non-Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 --source include/wait_condition.inc
 SET SESSION wsrep_on = ON;
 
@@ -36,11 +36,11 @@ INSERT INTO t1 VALUES (1);
 SET GLOBAL wsrep_provider_options = 'gmcast.isolate = 0';
 
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 --source include/wait_condition.inc
 
 # Confirm that IST has taken place

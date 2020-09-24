@@ -1,4 +1,4 @@
-# Last Modified: Fri Mar  1 18:55:47 2013
+# Last Modified: Thu Mar  7 21:58:51 2013
 # Based on usr.sbin.mysqld packaged in mysql-server in Ubuntu.
 # For Percona Server and Percona XtraDB Cluster
 
@@ -10,6 +10,8 @@
   #include <abstractions/nameservice>
   #include <abstractions/user-tmp>
   #include <abstractions/winbind>
+  #include <local/usr.sbin.mysqld>
+
 
   capability chown,
   capability dac_override,
@@ -22,8 +24,8 @@
 
   /bin/dash rcx,
   /dev/dm-0 r,
-  /etc/gai.conf r,
   /etc/group r,
+  /etc/gai.conf r,
   /etc/hosts.allow r,
   /etc/hosts.deny r,
   /etc/ld.so.cache r,

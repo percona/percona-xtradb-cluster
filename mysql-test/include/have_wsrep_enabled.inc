@@ -4,7 +4,8 @@
 
 --source include/have_wsrep.inc
 
---require r/have_wsrep.require
 --disable_query_log
+--disable_result_log
 SHOW VARIABLES LIKE 'wsrep_on';
+--enable_result_log
 --enable_query_log

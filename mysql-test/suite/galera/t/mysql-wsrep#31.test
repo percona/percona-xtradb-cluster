@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --connection node_1
 
@@ -14,8 +13,8 @@ CREATE DATABASE db;
 --let $wait_condition = SELECT COUNT(*) = 1 FROM t1
 --source include/wait_condition.inc
 
---let $expected_position_uuid = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_uuid'`
---let $expected_position_seqno = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $expected_position_uuid = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_uuid'`
+--let $expected_position_seqno = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
 
 --let $expected_position = $expected_position_uuid:$expected_position_seqno
 
@@ -53,12 +52,14 @@ if ($galera_wsrep_start_position != $expected_position)
 --let $galera_wsrep_extra_cmdline_parameter=''
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 --source include/galera_wait_ready.inc
 
 --connection node_1
 DROP TABLE t1;
 DROP DATABASE db;
+
+--remove_file $MYSQL_TMP_DIR/galera_wsrep_recover.log
 
 

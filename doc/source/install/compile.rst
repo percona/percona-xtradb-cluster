@@ -76,9 +76,6 @@ dependencies:
    libboost-all-dev libasio-dev libaio-dev libncurses5-dev libreadline-dev \
    libpam-dev socat libcurl-dev
    
-   .. libcurl-dev (not found on debian; used libcurl4-gnutls-dev
-   .. zlib-dev is missing here. on debian worked with zlib1g-dev
-
 * For Red Hat Enterprise Linux or CentOS:
 
 .. code-block:: bash
@@ -100,12 +97,12 @@ To compile |PXC| from source code:
       Clone the latest repository or update it to the latest state.
       Old codebase may not be compatible with the build script.
 
-#. Check out the ``5.7`` branch:
+#. Check out the ``8.0`` branch:
 
    .. code-block:: bash
 
       $ cd percona-xtradb-cluster-galera
-      $ git checkout 5.7
+      $ git checkout 8.0
 
 #. Initialize the submodule:
 
@@ -133,7 +130,4 @@ When the compilation completes, |pxc-build| contains a tarball, such as |tarball
 
    The exact version and release numbers may differ.
 
-
-.. |pxc-build| replace:: :file:`pxc-build`
-.. |tarball| replace:: :file:`Percona-XtraDB-Cluster-5.7.25-rel28-31.35.1.Linux.x86_64.tar.gz`
-   
+.. include:: ../.res/replace.file.txt

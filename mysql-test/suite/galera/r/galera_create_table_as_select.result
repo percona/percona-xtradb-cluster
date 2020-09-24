@@ -7,6 +7,11 @@ DROP TABLE t1,t2;
 CREATE TABLE t1 AS SELECT * FROM t2;
 ERROR 42S02: Table 'test.t2' doesn't exist
 CREATE TABLE t1 AS SELECT 1 FROM DUAL;
+call mtr.add_suppression("Slave SQL: Error \'Table \'t1\' already exists\' on query");
+call mtr.add_suppression("Slave SQL: Error \'Table \'test.t2\' doesn\'t exist\' on query");
+call mtr.add_suppression("Ignoring error 'Table 't1' already exists'");
+call mtr.add_suppression("Ignoring error 'Table 'test.t2' doesn't exist'");
+call mtr.add_suppression("Query apply failed.*");
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1
@@ -23,8 +28,8 @@ CREATE TABLE t1 AS SELECT * FROM t2;
 SELECT COUNT(*) = 5 FROM t1;
 COUNT(*) = 5
 1
-SELECT COUNT(*) = 5 FROM t1;
-COUNT(*) = 5
+SELECT COUNT(*) = 0 FROM t1;
+COUNT(*) = 0
 1
 DROP TABLE t1,t2;
 CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
@@ -65,9 +70,12 @@ CREATE TABLE t1 AS SELECT * FROM t2;;
 SELECT COUNT(*) = 5 FROM t2;
 COUNT(*) = 5
 1
-CREATE TABLE t1 AS SELECT * FROM t2;
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 UNLOCK TABLES;
-Got one of the listed errors
 DROP TABLE t1, t2;
 CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t2 VALUES (1),(2),(3),(4),(5);
@@ -75,4 +83,13 @@ CREATE TEMPORARY TABLE t1 AS SELECT * FROM t2;
 SELECT * FROM t1;
 ERROR 42S02: Table 'test.t1' doesn't exist
 CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query");
+DROP TABLE t1, t2;
+SET big_tables=ON;
+CREATE TABLE t1 (id INT, a INT, b INT, PRIMARY KEY pkid(id));
+INSERT INTO t1 VALUES (1, 2, 1);
+INSERT INTO t1 VALUES (2, 2, 1);
+CREATE TEMPORARY TABLE t2 AS SELECT a, count(*) c FROM t1 GROUP BY a;
+SHOW TABLES;
+Tables_in_test
+t1
 DROP TABLE t1, t2;

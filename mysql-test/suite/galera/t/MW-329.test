@@ -1,14 +1,25 @@
 #
 # #MW-329 Fix incorrect affected rows count after replay
 #
+# The following test starts insert thread on node_1 and parallel update thread on node_2
+# Then it is expected to update to be BF aborted on node_2 after it is replicated, but before it is certified.
+# This will cause update transaction to be replayed.
+# However under high CPU load, when running this test like
+# ./mtr MW-329{,,,,,,,,,,} --parallel=11 --mem --testcase-timeout=10
+# it happened sometimes that t1 on some instances grown so much that update transaction was BF aborted always before
+# being replicated (no replay), so we ended up with infinite update loop and test finished with timeout.
+# To prevent this update thread is paused, t1 data is pruned after reaching threshold and update thread is resumed.
 
 --source include/galera_cluster.inc
 --source include/force_restart.inc
 
 CREATE TABLE t1 (f1 INTEGER, f2 CHAR(20) DEFAULT 'abc') ENGINE=InnoDB;
+CREATE TABLE sig_t (can_update INTEGER, can_delete INTEGER) ENGINE=InnoDB;
 
 # We start with a populated table
 INSERT INTO t1 (f1) VALUES (1),(65535);
+
+INSERT INTO sig_t(can_update, can_delete) values (1, 0);
 
 # Clear the wsrep_local_replays counter
 
@@ -16,16 +27,49 @@ FLUSH STATUS;
 SELECT VARIABLE_VALUE = 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
 
 #
-# Run concurrent INSERTs 
+# Run concurrent INSERTs
 #
 
 DELIMITER |;
 CREATE PROCEDURE proc_insert ()
 BEGIN
+        DECLARE inserts_done INT DEFAULT 0;
+        DECLARE delete_allowed INT DEFAULT 0;
+        DECLARE rows_to_delete INT DEFAULT 0;
+
         DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
         SET SESSION wsrep_sync_wait = 0;
         WHILE 1 DO
-		INSERT INTO t1 (f1) VALUES (FLOOR( 1 + RAND( ) * 65535 ));
+                INSERT INTO t1 (f1) VALUES (FLOOR( 1 + RAND( ) * 65535 ));
+                SET inserts_done = inserts_done + 1;
+
+                IF inserts_done > 2000 THEN
+                        # We reached table size threshold. sig_t update thread to pause.
+                        UPDATE sig_t SET can_update = 0;
+
+                        # Now wait for update thread to be paused and deletes from t1 to be allowed.
+                        SELECT can_delete FROM sig_t INTO delete_allowed;
+                        WHILE delete_allowed = 0 DO
+                                SET @foo = (SELECT SLEEP(0.1));
+                                SELECT can_delete FROM sig_t INTO delete_allowed;
+                        END WHILE;
+
+                        # Update thread paused, deletes allowed. Trim t1 leaving only 2 rows.
+                        SELECT COUNT(*) FROM t1 INTO rows_to_delete;
+                        set rows_to_delete = rows_to_delete - 2;
+                        DELETE FROM t1 LIMIT rows_to_delete;
+                        SET inserts_done = 0;
+
+                        # sig_t update thread to resume
+                        UPDATE sig_t SET can_update = 1;
+
+                        # Wait for update thread to resume. When resumed, it will signal that deletes are not allowed anymore.
+                        SELECT can_delete FROM sig_t INTO delete_allowed;
+                        WHILE delete_allowed DO
+                                SET @foo = (SELECT SLEEP(0.1));
+                                SELECT can_delete FROM sig_t INTO delete_allowed;
+                        END WHILE;
+		END IF;
         END WHILE;
 END|
 DELIMITER ;|
@@ -41,28 +85,55 @@ DELIMITER ;|
 #
 
 --connection node_2
---let $count = 20
+select sleep(0.5);
+--let $count = 5
+--let $wsrep_local_replays_old = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+
 while ($count)
 {
-	--let $signature = `SELECT LEFT(MD5(RAND()), 10)`
-	--disable_query_log
-	--error 0,ER_LOCK_DEADLOCK
-	--eval UPDATE t1 SET f2 = '$signature'
-	--enable_query_log
-	--let $row_count = `SELECT ROW_COUNT()`
-	if (`SELECT @@error_count = 0`) {
-		if (`SELECT $row_count = 0`) {
-			--die ROW_COUNT() = 0
-		}
-	}
-	--dec $count
+        # If we updated block was sig_ted, stop and allow deletion from t1.
+        # Then if update gets unblocked, allow deletion again.
+        --disable_query_log
+        if (`SELECT can_update = 0 FROM sig_t`) {
+                UPDATE sig_t SET can_delete = 1;
+                --let $wait_condition = SELECT can_update = 1 FROM sig_t
+                --let $wait_timeout = 3600
+                --source include/wait_condition.inc
+                UPDATE sig_t SET can_delete = 0;
+        }
+        --let $signature = `SELECT LEFT(MD5(RAND()), 10)`
+        --error 0,ER_LOCK_DEADLOCK
+        --eval UPDATE t1 SET f2 = '$signature'
+        --enable_query_log
+        --let $row_count = `SELECT ROW_COUNT()`
+        if (`SELECT @@error_count = 0`) {
+                if (`SELECT $row_count = 0`) {
+                        --die ROW_COUNT() = 0
+                }
+        }
+
+        # if by the time next update get scheduled insert thread doesn't get chance to run.
+        --sleep 0.5
+
+        #
+        # Ensure at least one replay happens
+        #
+        --let $wsrep_replays = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+        --disable_query_log
+        if (`SELECT $wsrep_replays - $wsrep_local_replays_old > 0`) {
+                --dec $count
+        }
+        --enable_query_log
 }
 
 #
 # Confirm that some transaction replays occurred
 #
 
-SELECT VARIABLE_VALUE > 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
+--let $wsrep_local_replays_new = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--disable_query_log
+--eval SELECT $wsrep_local_replays_new - $wsrep_local_replays_old > 0 AS wsrep_local_replays;
+--enable_query_log
 
 #
 # Terminate the stored procedure
@@ -80,6 +151,7 @@ SELECT VARIABLE_VALUE > 0 FROM performance_schema.global_status WHERE VARIABLE_N
 --connection node_1
 DROP PROCEDURE proc_insert;
 DROP TABLE t1;
+DROP TABLE sig_t;
 
 # Due to MW-330, Multiple "conflict state 3 after post commit" warnings if table is dropped while SP is running
 CALL mtr.add_suppression("conflict state 3 after post commit");

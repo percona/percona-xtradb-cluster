@@ -1,0 +1,14 @@
+CREATE TABLE t1(a int);
+BEGIN;
+SELECT * FROM t1 WHERE a = 0;
+a
+SET DEBUG_SYNC="thread_attach_after_acquire_ownership SIGNAL reached WAIT_FOR continue";
+SELECT * FROM t1 WHERE a = 0;;
+SET DEBUG_SYNC="now WAIT_FOR reached";
+SET DEBUG_SYNC="wsrep_after_bf_abort SIGNAL aborted";
+ALTER TABLE t1 ADD COLUMN b INT;;
+SET DEBUG_SYNC="now WAIT_FOR aborted";
+set DEBUG_SYNC="now SIGNAL continue";
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+DROP TABLE t1;
+SET DEBUG_SYNC = 'RESET';

@@ -1,11 +1,15 @@
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 SET GLOBAL wsrep_load_data_splitting = TRUE;
+Warnings:
+Warning	1287	'@@wsrep_load_data_splitting' is deprecated and will be removed in a future release.
 SELECT COUNT(*) = 95000 FROM t1;
 COUNT(*) = 95000
 1
 wsrep_last_applied_diff
 1
-SET GLOBAL wsrep_load_data_splitting = 1;;
+SET GLOBAL wsrep_load_data_splitting = 0;;
+Warnings:
+Warning	1287	'@@wsrep_load_data_splitting' is deprecated and will be removed in a future release.
 DROP TABLE t1;
 #node-1
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB
@@ -18,10 +22,10 @@ PARTITION p2 VALUES LESS THAN (100000)
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `f1` int(11) NOT NULL,
+  `f1` int NOT NULL,
   PRIMARY KEY (`f1`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
-/*!50100 PARTITION BY RANGE (f1)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+/*!50100 PARTITION BY RANGE (`f1`)
 (PARTITION p0 VALUES LESS THAN (10000) ENGINE = InnoDB,
  PARTITION p1 VALUES LESS THAN (20000) ENGINE = InnoDB,
  PARTITION p2 VALUES LESS THAN (100000) ENGINE = InnoDB) */

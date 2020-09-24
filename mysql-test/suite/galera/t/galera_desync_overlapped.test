@@ -2,7 +2,6 @@
 # Test for overlapped transactions under manual desync.
 #
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/have_debug_sync.inc
 
 --let $galera_connection_name = node_1a

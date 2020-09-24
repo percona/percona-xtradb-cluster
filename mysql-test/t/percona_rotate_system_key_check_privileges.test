@@ -1,4 +1,3 @@
---source include/not_embedded.inc
 # This test is to check that only SUPER users can rotate_system_key
 
 CREATE USER 'regular_user'@'localhost' IDENTIFIED BY 'pass';

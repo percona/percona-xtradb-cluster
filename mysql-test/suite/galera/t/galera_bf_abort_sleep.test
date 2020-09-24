@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # Test a local transaction being aborted by a slave one while it is running a SLEEP()

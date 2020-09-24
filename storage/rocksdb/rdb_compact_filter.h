@@ -17,12 +17,12 @@
 #pragma once
 
 #ifdef USE_PRAGMA_IMPLEMENTATION
-#pragma implementation // gcc: Class implementation
+#pragma implementation  // gcc: Class implementation
 #endif
 
 /* C++ system header files */
-#include <string>
 #include <time.h>
+#include <string>
 
 /* RocksDB includes */
 #include "rocksdb/compaction_filter.h"
@@ -34,7 +34,7 @@
 namespace myrocks {
 
 class Rdb_compact_filter : public rocksdb::CompactionFilter {
-public:
+ public:
   Rdb_compact_filter(const Rdb_compact_filter &) = delete;
   Rdb_compact_filter &operator=(const Rdb_compact_filter &) = delete;
 
@@ -132,10 +132,10 @@ public:
 
     struct Rdb_index_info index_info;
     if (!rdb_get_dict_manager()->get_index_info(gl_index_id, &index_info)) {
-      // NO_LINT_DEBUG
-      sql_print_error("RocksDB: Could not get index information "
-                      "for Index Number (%u,%u)",
-                      gl_index_id.cf_id, gl_index_id.index_id);
+      LogPluginErrMsg(
+          ERROR_LEVEL, 0,
+          "Could not get index information for Index Number (%u,%u)",
+          gl_index_id.cf_id, gl_index_id.index_id);
     }
 
 #if !defined(DBUG_OFF)
@@ -162,8 +162,8 @@ public:
       std::string buf;
       buf = rdb_hexdump(existing_value.data(), existing_value.size(),
                         RDB_MAX_HEXDUMP_LEN);
-      // NO_LINT_DEBUG
-      sql_print_error("Decoding ttl from PK value failed in compaction filter, "
+      LogPluginErrMsg(ERROR_LEVEL, 0,
+                      "Decoding ttl from PK value failed in compaction filter, "
                       "for index (%u,%u), val: %s",
                       m_prev_index.cf_id, m_prev_index.index_id, buf.c_str());
       abort();
@@ -197,10 +197,10 @@ public:
 };
 
 class Rdb_compact_filter_factory : public rocksdb::CompactionFilterFactory {
-public:
+ public:
   Rdb_compact_filter_factory(const Rdb_compact_filter_factory &) = delete;
-  Rdb_compact_filter_factory &
-  operator=(const Rdb_compact_filter_factory &) = delete;
+  Rdb_compact_filter_factory &operator=(const Rdb_compact_filter_factory &) =
+      delete;
   Rdb_compact_filter_factory() {}
 
   ~Rdb_compact_filter_factory() {}
@@ -214,4 +214,4 @@ public:
   }
 };
 
-} // namespace myrocks
+}  // namespace myrocks

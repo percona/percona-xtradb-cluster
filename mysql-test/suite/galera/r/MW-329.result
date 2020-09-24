@@ -1,21 +1,53 @@
 CREATE TABLE t1 (f1 INTEGER, f2 CHAR(20) DEFAULT 'abc') ENGINE=InnoDB;
+CREATE TABLE sig_t (can_update INTEGER, can_delete INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 (f1) VALUES (1),(65535);
+INSERT INTO sig_t(can_update, can_delete) values (1, 0);
 FLUSH STATUS;
 SELECT VARIABLE_VALUE = 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
 VARIABLE_VALUE = 0
 1
 CREATE PROCEDURE proc_insert ()
 BEGIN
+DECLARE inserts_done INT DEFAULT 0;
+DECLARE delete_allowed INT DEFAULT 0;
+DECLARE rows_to_delete INT DEFAULT 0;
 DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
 SET SESSION wsrep_sync_wait = 0;
 WHILE 1 DO
 INSERT INTO t1 (f1) VALUES (FLOOR( 1 + RAND( ) * 65535 ));
+SET inserts_done = inserts_done + 1;
+IF inserts_done > 2000 THEN
+# We reached table size threshold. sig_t update thread to pause.
+UPDATE sig_t SET can_update = 0;
+# Now wait for update thread to be paused and deletes from t1 to be allowed.
+SELECT can_delete FROM sig_t INTO delete_allowed;
+WHILE delete_allowed = 0 DO
+SET @foo = (SELECT SLEEP(0.1));
+SELECT can_delete FROM sig_t INTO delete_allowed;
+END WHILE;
+# Update thread paused, deletes allowed. Trim t1 leaving only 2 rows.
+SELECT COUNT(*) FROM t1 INTO rows_to_delete;
+set rows_to_delete = rows_to_delete - 2;
+DELETE FROM t1 LIMIT rows_to_delete;
+SET inserts_done = 0;
+# sig_t update thread to resume
+UPDATE sig_t SET can_update = 1;
+# Wait for update thread to resume. When resumed, it will signal that deletes are not allowed anymore.
+SELECT can_delete FROM sig_t INTO delete_allowed;
+WHILE delete_allowed DO
+SET @foo = (SELECT SLEEP(0.1));
+SELECT can_delete FROM sig_t INTO delete_allowed;
+END WHILE;
+END IF;
 END WHILE;
 END|
 CALL proc_insert();;
-SELECT VARIABLE_VALUE > 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
-VARIABLE_VALUE > 0
+select sleep(0.5);
+sleep(0.5)
+0
+wsrep_local_replays
 1
 DROP PROCEDURE proc_insert;
 DROP TABLE t1;
+DROP TABLE sig_t;
 CALL mtr.add_suppression("conflict state 3 after post commit");

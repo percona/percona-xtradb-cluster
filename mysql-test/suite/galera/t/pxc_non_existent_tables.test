@@ -1,0 +1,17 @@
+--source include/have_binlog_format_row.inc
+--source include/galera_cluster.inc
+
+ANALYZE TABLE nonexestint1;
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE VIEW v AS SELECT * FROM t1;
+ANALYZE TABLE nonexestint2;
+OPTIMIZE TABLE nonexstent1;
+
+INSERT INTO t1 VALUES (1);
+ANALYZE TABLE t1, nonexistent3;
+ANALYZE TABLE v;
+CHECK TABLE t1, v;
+
+
+DROP VIEW v;
+DROP TABLE t1;

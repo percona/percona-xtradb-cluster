@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # This tests MyISAM tables in transactions. No MyISAM updates arrive on the slave, but InnoDB ones do.

@@ -110,8 +110,6 @@ SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
 SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
 SET GLOBAL wsrep_provider_options = 'signal=after_replicate_sync';
-Warnings:
-Error	1317	Query execution was interrupted
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
 f1	f2
@@ -144,8 +142,6 @@ SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
 SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
 SET GLOBAL wsrep_provider_options = 'signal=after_replicate_sync';
-Warnings:
-Error	1317	Query execution was interrupted
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
 f1	f2
@@ -178,8 +174,6 @@ SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
 SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
 SET GLOBAL wsrep_provider_options = 'signal=after_replicate_sync';
-Warnings:
-Error	1317	Query execution was interrupted
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
 f1	f2

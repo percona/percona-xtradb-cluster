@@ -5,7 +5,6 @@
 
 --source include/big_test.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/force_restart.inc
 
 --connection node_1
@@ -59,7 +58,7 @@ SHOW STATUS LIKE 'wsrep_local_state_comment';
 
 # For Node #1, we expect a primary component of size 1
 
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --let $wait_condition_on_error_output = SELECT VARIABLE_NAME,VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME LIKE 'wsrep_%'
 --source include/wait_condition_with_debug.inc
 
@@ -122,12 +121,12 @@ SET GLOBAL wsrep_provider_options = 'pc.weight=1';
 --let $wait_condition = SELECT @@wsrep_provider_options LIKE '%pc.weight = 1%'
 --source include/wait_condition.inc
 
-CALL mtr.add_suppression('WSREP: gcs_caused\\(\\) returned -1');
+CALL mtr.add_suppression('gcs_caused\\(\\) returned -1');
 
 --connection node_2
 CALL mtr.add_suppression('overriding reported weight for');
 
 --connection node_3
-CALL mtr.add_suppression('WSREP: user message in state LEAVING');
+CALL mtr.add_suppression('user message in state LEAVING');
 CALL mtr.add_suppression('sending install message failed: Transport endpoint is not connected');
 CALL mtr.add_suppression('overriding reported weight for');

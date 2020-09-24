@@ -155,7 +155,6 @@ include/assert.inc ['t2 is on node_3']
 # connection node_2
 INSERT INTO dbx1.t2(id) VALUES(99);
 # connection node_3
-INSERT INTO dbx1.t2(id) VALUES(99);
 #
 # Test async.tbl.ddl.2.4 : TRUNCATE TABLE
 #
@@ -327,7 +326,6 @@ INSERT INTO dbx1.t1(id) VALUES(99);
 # connection node_2
 INSERT INTO dbx1.t1(id) VALUES(99);
 # connection node_3
-INSERT INTO dbx1.t1(id) VALUES(99);
 #
 # Test async.tbl.ddl.4.4 : TRUNCATE TABLE
 #
@@ -455,7 +453,6 @@ include/assert.inc ["Insert not replicated to node_3"]
 # connection node_2
 INSERT INTO dbx1.t2(id) VALUES(1);
 # connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
 #
 # Test async.tbl.dml.2.2 : UPDATE
 #
@@ -543,7 +540,6 @@ include/assert.inc ["Insert not replicated to node_3"]
 # connection node_2
 INSERT INTO dbx1.t2(id) VALUES(1);
 # connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
 #
 # Test async.tbl.dml.4.2 : UPDATE
 #
@@ -990,7 +986,6 @@ include/assert.inc ['t2 is on node_3']
 # connection node_2
 INSERT INTO dbx1.t2(id) VALUES(99);
 # connection node_3
-INSERT INTO dbx1.t2(id) VALUES(99);
 #
 # Test galera.tbl.ddl.2.4 : TRUNCATE TABLE
 #
@@ -1109,7 +1104,6 @@ include/assert.inc ['t2 is on node_3']
 # connection node_2
 INSERT INTO dbx1.t2(id) VALUES(99);
 # connection node_3
-INSERT INTO dbx1.t2(id) VALUES(99);
 #
 # Test galera.tbl.ddl.4.4 : TRUNCATE TABLE
 #
@@ -1195,12 +1189,12 @@ INSERT INTO dbx1.t2(id) VALUES(1);
 INSERT INTO db.counter(count) VALUES(72);
 include/assert.inc ["Insert succeeded on node_2"]
 # connection node_3
-include/assert.inc ["Insert not replicated to node_3"]
+include/assert.inc ["Insert replicated to node_3"]
 #
 # Test galera.tbl.dml.2 test preparation
 #
 # connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
+include/assert.inc ["node_2 and node_3 are the same"]
 #
 # Test galera.tbl.dml.2.2 : UPDATE
 #
@@ -1210,7 +1204,7 @@ UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 INSERT INTO db.counter(count) VALUES(73);
 include/assert.inc ["Update succeeded on node_2"]
 # connection node_3
-include/assert.inc ["Update not replicated to node_3"]
+include/assert.inc ["Update replicated to node_3"]
 #
 # Test galera.tbl.dml.2.3 : DELETE
 #
@@ -1220,7 +1214,7 @@ DELETE FROM dbx1.t2 WHERE id = 1;
 INSERT INTO db.counter(count) VALUES(74);
 include/assert.inc ["Delete succeeded on node_2"]
 # connection node_3
-include/assert.inc ["Delete not replicated to node_3"]
+include/assert.inc ["Delete replicated to node_3"]
 #
 # Testcase galera.tbl.dml.2.3 cleanup
 #
@@ -1269,12 +1263,12 @@ INSERT INTO dbx1.t2(id) VALUES(1);
 INSERT INTO db.counter(count) VALUES(78);
 include/assert.inc ["Insert succeeded on node_2"]
 # connection node_3
-include/assert.inc ["Insert not replicated to node_3"]
+include/assert.inc ["Insert replicated to node_3"]
 #
 # Test galera.tbl.dml.4 test preparation
 #
 # connection node_3
-INSERT INTO dbx1.t2(id) VALUES(1);
+include/assert.inc ["node_2 and node_3 are the same"]
 #
 # Test galera.tbl.dml.4.2 : UPDATE
 #
@@ -1284,7 +1278,7 @@ UPDATE dbx1.t2 SET f2 = "abcde" WHERE id = 1;
 INSERT INTO db.counter(count) VALUES(79);
 include/assert.inc ["Update succeeded on node_2"]
 # connection node_3
-include/assert.inc ["Update not replicated to node_3"]
+include/assert.inc ["Update replicated to node_3"]
 #
 # Test galera.tbl.dml.4.3 : DELETE
 #
@@ -1294,7 +1288,7 @@ DELETE FROM dbx1.t2 WHERE id = 1;
 INSERT INTO db.counter(count) VALUES(80);
 include/assert.inc ["Delete succeeded on node_2"]
 # connection node_3
-include/assert.inc ["Delete not replicated to node_3"]
+include/assert.inc ["Delete replicated to node_3"]
 #
 # Testcase galera.tbl.dml.4.3 cleanup
 #
@@ -1499,6 +1493,6 @@ STOP SLAVE;
 RESET SLAVE ALL;
 # connection node_1
 RESET MASTER;
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
-call mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");
+call mtr.add_suppression("Pending to replicate MySQL GTID event.*");

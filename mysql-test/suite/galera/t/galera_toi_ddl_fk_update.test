@@ -1,6 +1,5 @@
 --source include/big_test.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # This test creates a new FK constraint while an UPDATE is running

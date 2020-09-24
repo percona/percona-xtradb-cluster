@@ -3,12 +3,11 @@
 # for two different reasons.
 #
 
---source include/galera_cluster.inc
---source include/have_innodb.inc
+--source include/galera_cluster_3nodes.inc
 
---let $galera_connection_name = node_3
---let $galera_server_number = 3
---source include/galera_connect.inc
+#--let $galera_connection_name = node_3
+#--let $galera_server_number = 3
+#--source include/galera_connect.inc
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
@@ -20,9 +19,13 @@ INSERT INTO t1 VALUES (1);
 INSERT INTO t2 VALUES (1);
 
 --connection node_2
+# this transaction will create conflict and force abort active
+# transaction on node-1
 INSERT INTO t1 VALUES (1);
 
 --connection node_3
+# transaction is already aborted so even though this transaction
+# has conflict data it should not effect.
 INSERT INTO t2 VALUES (1);
 
 --connection node_1

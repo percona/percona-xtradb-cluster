@@ -16,6 +16,7 @@ set -ue
 #
 # Step-0: Set default configuration.
 #
+TARGET="$(uname -m)"
 
 # check the machine type (x86_64, i686) and accordingly configure
 # the compliation flag.
@@ -67,6 +68,9 @@ KEEP_BUILD=0
 # enable asan
 ENABLE_ASAN=0
 
+# build comment
+BUILD_COMMENT=""
+
 #-------------------------------------------------------------------------------
 #
 # Step-1: Set default configuration.
@@ -95,7 +99,7 @@ do
     -d | --debug )
         shift
         CMAKE_BUILD_TYPE='Debug'
-        BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
+        BUILD_COMMENT="debug."
         DEBUG_EXTRA="-DDEBUG_EXTNAME=ON"
         SCONS_ARGS+=' debug=0'
         ;;
@@ -110,7 +114,7 @@ do
     -v | --valgrind )
         shift
         CMAKE_OPTS="${CMAKE_OPTS:-} -DWITH_VALGRIND=ON"
-        BUILD_COMMENT="${BUILD_COMMENT:-}-valgrind"
+        BUILD_COMMENT="valgrind."
         ;;
     -q | --verbose )
         shift
@@ -244,12 +248,12 @@ fi
 
 source "$SOURCEDIR/VERSION"
 MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
-PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
+PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 
 # Note: WSREP_INTERFACE_VERSION act as compatibility check between wsrep-plugin
 # and galera plugin so we include it as part of our component.
-WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/src/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep-lib/wsrep-API/v26/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep-lib.cmake" | cut -d '"' -f2)"
 
 if [[ $COPYGALERA -eq 0 ]];then
     GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
@@ -257,8 +261,8 @@ fi
 TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
-PRODUCT_NAME="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
-PRODUCT_FULL_NAME="$PRODUCT_NAME-$RELEASE_TAG$WSREP_VERSION${BUILD_COMMENT:-}.$TAG.$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
+PRODUCT_NAME="Percona-XtraDB-Cluster_$MYSQL_VERSION$MYSQL_VERSION_EXTRA"
+PRODUCT_FULL_NAME="${PRODUCT_NAME}.${TAG}_${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${GLIBC_VER:-}"
 
 #
 # This corresponds to GIT revision when the build/package is created.
@@ -271,14 +275,15 @@ then
 else
     REVISION=""
 fi
-COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
-COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
+PRODUCT_FULL="Percona-XtraDB-Cluster_${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
+PRODUCT_FULL="${PRODUCT_FULL}.${TAG}${BUILD_COMMENT:+_}${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}"
+COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION"
+COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
 
 #-------------------------------------------------------------------------------
 #
 # Step-4: Set compilation options.
 #
-
 export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
 
@@ -293,7 +298,6 @@ if [[ $ENABLE_ASAN -eq 1 ]]; then
         fi
     fi
 fi
-
 COMMON_FLAGS="-DPERCONA_INNODB_VERSION=$PERCONA_SERVER_EXTENSION"
 export CFLAGS=" $COMMON_FLAGS -static-libgcc $MACHINE_SPECS_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $MACHINE_SPECS_CFLAGS ${CXXFLAGS:-}"
@@ -327,23 +331,44 @@ fi
         export CC=${GALERA_CC:-gcc}
         export CXX=${GALERA_CXX:-g++}
 
+        # Look for boost_program_options static library
+        # (use if possible to avoid additional installation requirements)
+        BOOST_PROGRAM_OPTIONS_ARGS=""
+        BOOST_PROGRAM_OPTIONS_LIB=""
+        if [[ -r /usr/lib/x86_64-linux-gnu/libboost_program_options.a ]]; then
+            BOOST_PROGRAM_OPTIONS_LIB="/usr/lib/x86_64-linux-gnu/libboost_program_options.a"
+        elif [[ -r /usr/lib64/libboost_program_options.a ]]; then
+            BOOST_PROGRAM_OPTIONS_LIB="/usr/lib64/libboost_program_options.a"
+        else
+            BOOST_PROGRAM_OPTIONS_LIB=$(locate libboost_program_options.a)
+        fi
+        if [[ -n $BOOST_PROGRAM_OPTIONS_LIB ]]; then
+            BOOST_PROGRAM_OPTIONS_ARGS="bpostatic=$BOOST_PROGRAM_OPTIONS_LIB"
+        fi
+
         cd "percona-xtradb-cluster-galera"
         if grep builtin <<< "$STAG";then
             # No builtin SSL in galera yet.
             scons $MAKE_JFLAG psi=1 --config=force ssl=0 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 libgalera_smm.so
             scons $MAKE_JFLAG --config=force ssl=0 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 garb/garbd
         elif grep static <<< "$STAG";then
             # Disable SSL in galera for now
             scons $MAKE_JFLAG psi=1 --config=force static_ssl=1 with_ssl=$GALERA_SSL \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 libgalera_smm.so
             scons $MAKE_JFLAG --config=force static_ssl=1 with_ssl=$GALERA_SSL \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 garb/garbd
         else
             scons $MAKE_JFLAG psi=1 --config=force revno="$GALERA_REVISION" ${SCONS_ARGS} \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 libgalera_smm.so
             scons $MAKE_JFLAG --config=force revno="$GALERA_REVISION" ${SCONS_ARGS} \
+                $BOOST_PROGRAM_OPTIONS_ARGS \
                 garb/garbd
         fi
         mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
@@ -353,8 +378,8 @@ fi
     else
         mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
              "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
-        mv $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
-        mv $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
+        cp $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
+        cp $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
     fi
     ) || exit 1
 
@@ -373,54 +398,66 @@ fi
         cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=Debug \
             $DEBUG_EXTRA \
-            -DWITH_EMBEDDED_SERVER=OFF \
             -DFEATURE_SET=community \
-            -DENABLE_DTRACE=OFF \
-            $SSL_OPT \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
-            -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
-            -DWITH_INNODB_DISALLOW_WRITES=ON \
-            -DWITH_WSREP=ON \
-            -DWITH_UNIT_TESTS=0 \
-            -DWITH_READLINE=system \
-            -DWITHOUT_TOKUDB=ON \
-            -DWITHOUT_ROCKSDB=ON \
-            -DWITH_DEBUG=ON \
             -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
             -DWITH_PAM=ON \
+            -DWITHOUT_ROCKSDB=ON \
+            -DWITHOUT_TOKUDB=ON \
             -DWITH_INNODB_MEMCACHED=ON \
             -DDOWNLOAD_BOOST=1 \
+            -DFORCE_INSOURCE_BUILD=1 \
+            -DWITH_SYSTEM_LIBS=ON \
+            -DWITH_PROTOBUF=bundled \
+            -DWITH_RAPIDJSON=bundled \
+            -DWITH_ICU=bundled \
+            -DWITH_LZ4=bundled \
+            -DWITH_RE2=bundled \
+            -DWITH_LIBEVENT=bundled \
+            -DWITH_EDITLINE=bundled \
+            -DWITH_ZSTD=bundled \
+            -DWITH_NUMA=ON \
+            -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
-            -DWITH_SCALABILITY_METRICS=ON \
+            -DMYSQL_SERVER_SUFFIX=".$TAG" \
+            -DWITH_WSREP=ON \
+            -DWITH_UNIT_TESTS=0 \
+            -DWITH_DEBUG=ON \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
         (make install) || exit 1
-        (cp -v sql/mysqld-debug $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/mysqld) || true
+        (cp -v runtime_output_directory/mysqld-debug $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/mysqld) || true
         echo "mysqld in build in debug mode"
     else
         cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
-            -DWITH_EMBEDDED_SERVER=OFF \
             -DFEATURE_SET=community \
-            -DENABLE_DTRACE=OFF \
-            $SSL_OPT \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
-            -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
-            -DWITH_INNODB_DISALLOW_WRITES=ON \
-            -DWITH_WSREP=ON \
-            -DWITH_UNIT_TESTS=0 \
-            -DWITH_READLINE=system \
-            -DWITHOUT_TOKUDB=ON \
-            -DWITHOUT_ROCKSDB=ON \
             -DCOMPILATION_COMMENT="$COMMENT" \
             -DWITH_PAM=ON \
+            -DWITHOUT_ROCKSDB=ON \
+            -DWITHOUT_TOKUDB=ON \
             -DWITH_INNODB_MEMCACHED=ON \
             -DDOWNLOAD_BOOST=1 \
+            -DFORCE_INSOURCE_BUILD=1 \
+            -DWITH_SYSTEM_LIBS=ON \
+            -DWITH_PROTOBUF=bundled \
+            -DWITH_RAPIDJSON=bundled \
+            -DWITH_ICU=bundled \
+            -DWITH_LZ4=bundled \
+            -DWITH_RE2=bundled \
+            -DWITH_EDITLINE=bundled \
+            -DWITH_LIBEVENT=bundled \
+            -DWITH_ZSTD=bundled \
+            -DWITH_NUMA=ON \
+            -DWITH_LDAP=system \
             -DWITH_BOOST="$TARGETDIR/libboost" \
-            -DWITH_SCALABILITY_METRICS=ON \
+            -DMYSQL_SERVER_SUFFIX=".$TAG" \
+            -DWITH_WSREP=ON \
+            -DWITH_UNIT_TESTS=0 \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
@@ -450,13 +487,217 @@ fi
     ) || exit 1
     fi
 
+    # Extract the Percona Xtrabackup binaries
+    # Look for the pxb 2.4 tarball
+    (
+        cd "$TARGETDIR"
+        pxb_tar=$(ls -1td percona-xtrabackup-2.4.* | grep ".tar" | sort --version-sort | tail -n1)
+        if [[ -z $pxb_tar ]]; then
+            echo "Could not find percona-xtrabackup-2.4 tarball in $TARGETDIR.  Terminating."
+            exit 1
+        fi
+        # Remove the .tar.gz extension
+        pxb_basename=${pxb_tar%.tar*}
+        # Pull the name (up-to-the x86_64 part
+        if [[ $pxb_basename =~ x86_64 ]]; then
+            pxb_basename="${pxb_basename%x86_64*}x86_64"
+        fi
+        pxb_dir="pxb-2.4"
+
+        mkdir -p pxc_extra
+        cd pxc_extra
+        if [[ -d ${pxb_basename} ]]; then
+            echo "Using existing pxb 2.4 directory : ${pxb_basename}"
+        else
+            echo "Removing existing percona-xtrabackup-2.4 basedir (if found)"
+            find . -maxdepth 1 -type d -name 'percona-xtrabackup-2.*' -exec rm -rf {} \+
+
+            echo "Extracting pxb 2.4 tarball"
+            tar -xzf "../$pxb_tar"
+        fi
+        echo "Creating symlink $pxb_dir --> $pxb_basename"
+        rm -f pxb-2.4
+        ln -s ./${pxb_basename} pxb-2.4
+    ) || exit 1
+
+    (
+        cd "$TARGETDIR"
+        pxb_tar=$(ls -1td percona-xtrabackup-8.0.* | grep ".tar" | sort --version-sort | tail -n1)
+        if [[ -z $pxb_tar ]]; then
+            echo "Could not find percona-xtrabackup-8.0 tarball in $TARGETDIR.  Terminating."
+            exit 1
+        fi
+        # Remove the .tar.gz extension
+        pxb_basename=${pxb_tar%.tar*}
+        # Pull the name (up-to-the x86_64 part
+        if [[ $pxb_basename =~ x86_64 ]]; then
+            pxb_basename="${pxb_basename%x86_64*}x86_64"
+        fi
+        pxb_dir="pxb-8.0"
+
+        mkdir -p pxc_extra
+        cd pxc_extra
+        if [[ -d ${pxb_basename} ]]; then
+            echo "Using existing pxb 8.0 directory : ${pxb_basename}"
+        else
+            echo "Removing existing percona-xtrabackup-8.0 basedir (if found)"
+            find . -maxdepth 1 -type d -name 'percona-xtrabackup-8.*' -exec rm -rf {} \+
+
+            echo "Extracting pxb 8.0 tarball"
+            tar -xzf "../$pxb_tar"
+        fi
+        echo "Creating symlink $pxb_dir --> $pxb_basename"
+        rm -f pxb-8.0
+        ln -s ./${pxb_basename} pxb-8.0
+    ) || exit 1
+
+    # Only copy over the bin and lib portions of the xtrabackup packages
+    # Test cases and other files are not copied
+    mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4"
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-2.4/bin/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4) || true
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-2.4/lib/  $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-2.4) || true
+
+    mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0"
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-8.0/bin/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0) || true
+    (cp -v -r $TARGETDIR/pxc_extra/pxb-8.0/lib/ $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/pxc_extra/pxb-8.0) || true
+
 ) || exit 1
+
+# Patch needed libraries
+(
+    LIBLIST="libcrypto.so libssl.so libgcrypt.so libreadline.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so libgssapi_krb5.so libkrb5.so libkrb5support.so libk5crypto.so librtmp.so libgssapi.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libtirpc.so"
+    DIRLIST="bin bin/pxc_extra/pxb-8.0/bin bin/pxc_extra/pxb-2.4/bin lib bin/pxc_extra/pxb-8.0/lib/plugin bin/pxc_extra/pxb-2.4/lib/plugin lib/private lib/plugin"
+
+    LIBPATH=""
+
+    function gather_libs {
+        local elf_path=$1
+        for lib in ${LIBLIST}; do
+            for elf in $(find ${elf_path} -maxdepth 1 -exec file {} \; | grep 'ELF ' | cut -d':' -f1); do
+                IFS=$'\n'
+                for libfromelf in $(ldd ${elf} | grep ${lib} | awk '{print $3}'); do
+                    lib_realpath="$(readlink -f ${libfromelf})"
+                    lib_realpath_basename="$(basename $(readlink -f ${libfromelf}))"
+                    lib_without_version_suffix=$(echo ${lib_realpath_basename} | awk -F"." 'BEGIN { OFS = "." }{ print $1, $2}')
+
+                    if [ ! -f "lib/private/${lib_realpath_basename}" ] && [ ! -L "lib/private/${lib_realpath_basename}" ]; then
+                    
+                        echo "Copying lib ${lib_realpath_basename}"
+                        cp ${lib_realpath} lib/private
+
+                        echo "Symlinking lib from ${lib_realpath_basename} to ${lib_without_version_suffix}"
+                        cd lib/
+                        ln -s private/${lib_realpath_basename} ${lib_without_version_suffix}
+                        cd -
+                        if [ ${lib_realpath_basename} != ${lib_without_version_suffix} ]; then
+                            cd lib/private
+                            ln -s ${lib_realpath_basename} ${lib_without_version_suffix}
+                            cd -
+                        fi
+
+                        patchelf --set-soname ${lib_without_version_suffix} lib/private/${lib_realpath_basename}
+
+                        LIBPATH+=" $(echo ${libfromelf} | grep -v $(pwd))"
+                    fi
+                done
+                unset IFS
+            done
+        done
+    }
+
+    function set_runpath {
+        # Set proper runpath for bins but check before doing anything
+        local elf_path=$1
+        local r_path=$2
+        for elf in $(find ${elf_path} -maxdepth 1 -exec file {} \; | grep 'ELF ' | cut -d':' -f1); do
+            echo "Checking LD_RUNPATH for ${elf}"
+            if [[ -z $(patchelf --print-rpath ${elf}) ]]; then
+                echo "Changing RUNPATH for ${elf}"
+                patchelf --set-rpath ${r_path} ${elf}
+            fi
+        done
+    }
+
+    function replace_libs {
+        local elf_path=$1
+        for libpath_sorted in ${LIBPATH}; do
+            for elf in $(find ${elf_path} -maxdepth 1 -exec file {} \; | grep 'ELF ' | cut -d':' -f1); do
+                LDD=$(ldd ${elf} | grep ${libpath_sorted}|head -n1|awk '{print $1}')
+                lib_realpath_basename="$(basename $(readlink -f ${libpath_sorted}))"
+                lib_without_version_suffix="$(echo ${lib_realpath_basename} | awk -F"." 'BEGIN { OFS = "." }{ print $1, $2}')"
+                if [[ ! -z $LDD  ]]; then
+                    echo "Replacing lib ${lib_realpath_basename} to ${lib_without_version_suffix} for ${elf}"
+                    patchelf --replace-needed ${LDD} ${lib_without_version_suffix} ${elf}
+                fi
+            done
+        done
+    }
+
+    function check_libs {
+        local elf_path=$1
+        for elf in $(find ${elf_path} -maxdepth 1 -exec file {} \; | grep 'ELF ' | cut -d':' -f1); do
+            if ! ldd ${elf}; then
+                exit 1
+            fi
+        done
+    }
+
+    function link {
+        if [ ! -d lib/private ]; then
+            mkdir -p lib/private
+        fi
+        # Gather libs
+        for DIR in ${DIRLIST}; do
+            gather_libs ${DIR}
+        done
+
+        # Set proper runpath
+        set_runpath bin '$ORIGIN/../lib/private/'
+        set_runpath bin/pxc_extra/pxb-2.4/bin '$ORIGIN/../../../../lib/private/'
+        set_runpath bin/pxc_extra/pxb-8.0/bin '$ORIGIN/../../../../lib/private/'
+        set_runpath lib '$ORIGIN/private/'
+        set_runpath bin/pxc_extra/pxb-2.4/lib/plugin '$ORIGIN/../../../../../lib/private/'
+        set_runpath bin/pxc_extra/pxb-8.0/lib/plugin '$ORIGIN/../../../../../lib/private/'
+        set_runpath lib/plugin '$ORIGIN/../private/'
+        set_runpath lib/private '$ORIGIN'
+
+        # Replace libs
+        for DIR in ${DIRLIST}; do
+            replace_libs ${DIR}
+        done
+
+        # Make final check in order to determine any error after linkage
+        for DIR in ${DIRLIST}; do
+            check_libs ${DIR}
+        done
+    }
+
+    mkdir -p "$TARGETDIR/usr/local/minimal"
+    cp -r "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
+
+    # NORMAL TARBALL
+    cd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME"
+    link
+
+    # MIN TARBALL
+    cd "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
+    rm -rf mysql-test 2> /dev/null
+    rm -rf percona-xtradb-cluster-tests 2> /dev/null
+    find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
+    link
+)
 
 # Package the archive
 (
     cd "$TARGETDIR/usr/local/"
-
+    # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
+    find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
+
+    cd "$TARGETDIR/usr/local/minimal/"
+    # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
+    find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
+    $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
 ) || exit 1
 
 if [[ $KEEP_BUILD -eq 0 ]]

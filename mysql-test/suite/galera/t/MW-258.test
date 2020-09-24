@@ -46,7 +46,7 @@ UNLOCK TABLES;
 
 --connection node_1
 
---let $wait_condition = SELECT VARIABLE_VALUE = 0 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_desync_count'
+--let $wait_condition = SELECT VARIABLE_VALUE = 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_desync_count'
 --source include/wait_condition.inc
 
 --echo value after RSU:

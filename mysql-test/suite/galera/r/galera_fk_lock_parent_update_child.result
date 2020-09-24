@@ -1,0 +1,156 @@
+SET GLOBAL innodb_lock_wait_timeout = 2;
+
+# ===========================================================================
+# Case 1: Delete a row from the child table.
+# Expectation: Delete should be successful.
+# ===========================================================================
+CREATE TABLE parent_t (id INT AUTO_INCREMENT PRIMARY KEY )ENGINE = INNODB;
+CREATE TABLE child_t (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT,
+CONSTRAINT `FK_child_parent_id` FOREIGN KEY (`parent_id`)
+REFERENCES `parent_t` (`id`)) ENGINE = INNODB;
+INSERT INTO parent_t VALUES (), (), (), (), ();
+INSERT INTO child_t (parent_id) SELECT id FROM parent_t;
+BEGIN;
+SELECT * FROM parent_t WHERE id = 1 FOR UPDATE;
+id
+1
+DELETE FROM child_t WHERE parent_id = 1;
+COMMIT;
+DROP TABLE child_t;
+DROP TABLE parent_t;
+
+# ===========================================================================
+# Case 2: Update non-referenced field of the child table.
+# Expectation: Update should fail with lock wait timeout error.
+# ===========================================================================
+CREATE TABLE parent_t (id INT AUTO_INCREMENT PRIMARY KEY )ENGINE = INNODB;
+CREATE TABLE child_t (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT,
+CONSTRAINT `FK_child_parent_id` FOREIGN KEY (`parent_id`)
+REFERENCES `parent_t` (`id`)) ENGINE = INNODB;
+INSERT INTO parent_t VALUES (), (), (), (), ();
+INSERT INTO child_t (parent_id) SELECT id FROM parent_t;
+BEGIN;
+SELECT * FROM parent_t WHERE id = 1 FOR UPDATE;
+id
+1
+UPDATE child_t SET id = id - 1;
+ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+COMMIT;
+DROP TABLE child_t;
+DROP TABLE parent_t;
+
+# ===========================================================================
+# Case 3: Update non-referenced field of the child table and unlock the parent row.
+# Expectation: Update should be successful.
+# ===========================================================================
+CREATE TABLE parent_t (id INT AUTO_INCREMENT PRIMARY KEY )ENGINE = INNODB;
+CREATE TABLE child_t (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT,
+CONSTRAINT `FK_child_parent_id` FOREIGN KEY (`parent_id`)
+REFERENCES `parent_t` (`id`)) ENGINE = INNODB;
+INSERT INTO parent_t VALUES (), (), (), (), ();
+INSERT INTO child_t (parent_id) SELECT id FROM parent_t;
+BEGIN;
+SELECT * FROM parent_t WHERE id = 1 FOR UPDATE;
+id
+1
+UPDATE child_t SET id = id - 1;
+ROLLBACK;
+DROP TABLE child_t;
+DROP TABLE parent_t;
+
+# ===========================================================================
+# Case 4: Update referenced field of the child table.
+# Expectation: Update should fail with lock wait timeout error.
+# ===========================================================================
+CREATE TABLE parent_t (id INT AUTO_INCREMENT PRIMARY KEY )ENGINE = INNODB;
+CREATE TABLE child_t (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT,
+CONSTRAINT `FK_child_parent_id` FOREIGN KEY (`parent_id`)
+REFERENCES `parent_t` (`id`)) ENGINE = INNODB;
+INSERT INTO parent_t VALUES (), (), (), (), ();
+INSERT INTO child_t (parent_id) SELECT id FROM parent_t;
+BEGIN;
+SELECT * FROM parent_t WHERE id = 1 FOR UPDATE;
+id
+1
+UPDATE child_t SET parent_id=3 WHERE parent_id=1;
+ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+ROLLBACK;
+DROP TABLE child_t;
+DROP TABLE parent_t;
+
+# ===========================================================================
+# Case 5: Update referenced field of the child table and unlock the parent row.
+# Expectation: Update should be successful.
+# ===========================================================================
+CREATE TABLE parent_t (id INT AUTO_INCREMENT PRIMARY KEY )ENGINE = INNODB;
+CREATE TABLE child_t (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT,
+CONSTRAINT `FK_child_parent_id` FOREIGN KEY (`parent_id`)
+REFERENCES `parent_t` (`id`)) ENGINE = INNODB;
+INSERT INTO parent_t VALUES (), (), (), (), ();
+INSERT INTO child_t (parent_id) SELECT id FROM parent_t;
+BEGIN;
+SELECT * FROM parent_t WHERE id = 1 FOR UPDATE;
+id
+1
+UPDATE child_t SET parent_id=3 WHERE parent_id=1;
+ROLLBACK;
+DROP TABLE child_t;
+DROP TABLE parent_t;
+
+# ===========================================================================
+# Case 6: Delete a row from the child table from node2.
+# Expectation: Commit on node1 should fail with deadlock error due to BF abort.
+# ===========================================================================
+CREATE TABLE parent_t (id INT AUTO_INCREMENT PRIMARY KEY )ENGINE = INNODB;
+CREATE TABLE child_t (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT,
+CONSTRAINT `FK_child_parent_id` FOREIGN KEY (`parent_id`)
+REFERENCES `parent_t` (`id`) ON UPDATE CASCADE) ENGINE = INNODB;
+INSERT INTO parent_t VALUES (), (), (), (), ();
+INSERT INTO child_t (parent_id) SELECT id FROM parent_t;
+BEGIN;
+UPDATE parent_t SET id = id * 10;
+DELETE FROM child_t WHERE parent_id = 1;
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+DROP TABLE child_t;
+DROP TABLE parent_t;
+
+# ===========================================================================
+# Case 7: Update non-referenced field in the child table from node2.
+# Expectation: Commit on node1 should fail with deadlock error due to BF abort.
+# ===========================================================================
+CREATE TABLE parent_t (id INT AUTO_INCREMENT PRIMARY KEY )ENGINE = INNODB;
+CREATE TABLE child_t (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT,
+CONSTRAINT `FK_child_parent_id` FOREIGN KEY (`parent_id`)
+REFERENCES `parent_t` (`id`) ON UPDATE CASCADE) ENGINE = INNODB;
+INSERT INTO parent_t VALUES (), (), (), (), ();
+INSERT INTO child_t (parent_id) SELECT id FROM parent_t;
+BEGIN;
+UPDATE parent_t SET id = id * 10;
+UPDATE child_t SET id = id - 1;
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+DROP TABLE child_t;
+DROP TABLE parent_t;
+
+# ===========================================================================
+# Case 8: Update referenced field in the child table from node2.
+# Expectation: Commit on node1 should fail with deadlock error due to BF abort.
+# ===========================================================================
+CREATE TABLE parent_t (id INT AUTO_INCREMENT PRIMARY KEY )ENGINE = INNODB;
+CREATE TABLE child_t (id INT AUTO_INCREMENT PRIMARY KEY, parent_id INT,
+CONSTRAINT `FK_child_parent_id` FOREIGN KEY (`parent_id`)
+REFERENCES `parent_t` (`id`) ON UPDATE CASCADE) ENGINE = INNODB;
+INSERT INTO parent_t VALUES (), (), (), (), ();
+INSERT INTO child_t (parent_id) SELECT id FROM parent_t;
+BEGIN;
+UPDATE parent_t SET id = id * 10;
+UPDATE child_t SET parent_id=3 WHERE parent_id=1;
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+DROP TABLE child_t;
+DROP TABLE parent_t;
+
+# ===========================================================================
+# Test Cleanup
+# ===========================================================================

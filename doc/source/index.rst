@@ -4,74 +4,66 @@
 Percona XtraDB Cluster |version| Documentation
 ==============================================
 
-|PXC|_ is a database clustering solution for MySQL.
-It ensures high availability, prevents downtime and data loss,
-and provides linear scalability for a growing environment.
+|PXC|_ is a database clustering solution for MySQL.  It ensures high
+availability, prevents downtime and data loss, and provides linear scalability
+for a growing environment.
 
-Features of |PXC| include:
+.. rubric:: Features of |PXC|
 
-* **Synchronous replication**
+.. list-table::
+   :header-rows: 1
 
-  Data is written to all nodes simultaneously,
-  or not written at all if it fails even on a single node.
+   * - Feature
+     - Details
+   * - Synchronous replication**
+     - Data is written to all nodes simultaneously, or not written at all in
+       case of a failure even on a single node
+   * - Multi-source replication
+     - Any node can trigger a data update.
+   * - True parallel replication
+     - Multiple threads on replica performing replication on row level
+   * - Automatic node provisioning
+     - You simply add a node and it automatically syncs.
+   * - Data consistency
+     - No more unsynchronized nodes.
+   * - PXC Strict Mode
+     - Avoids the use of experimental and unsupported features
+   * - Configuration script for ProxySQL
+     - |PXC| includes the ``proxysql-admin`` tool that automatically configures
+       |PXC| nodes using ProxySQL.
+   * - Automatic configuration of SSL encryption
+     - |PXC| includes the ``pxc-encrypt-cluster-traffic`` variable
+       that enables automatic configuration of SSL encryption
+   * - Optimized Performance
+     - |PXC| performance is optimized to scale with a growing production
+       workload
 
-* **Multi-master replication**
 
-  Any node can trigger a data update.
+|PXC| |version| is fully compatible with |MySQL| Server Community Edition
+|version| and |ps-last|.
 
-* **True parallel replication**
+.. seealso::
 
-  Multiple threads on slave performing replication on row level.
+   Overview of changes in the most recent |pxc| release
+      :ref:`upgrade-guide-changed`
 
-* **Automatic node provisioning**
-
-  You simply add a node and it automatically syncs.
-
-* **Data consistency**
-
-  No more unsynchronized nodes.
-
-* **PXC Strict Mode**
-
-  Avoids the use of experimental and unsupported features.
-
-* **Configuration script for ProxySQL**
-
-  Percona provides a ProxySQL package with the ``proxysql-admin`` tool
-  that automatically configures |PXC| nodes.
-
-* **Automatic configuration of SSL encryption**
-
-  |PXC| includes the ``pxc-encrypt-cluster-traffic`` variable
-  that enables automatic configuration of SSL encrytion.
-
-* **Optimized Performance**
-
-  |PXC| performance is optimized to scale with a growing production workload.
-
-  For more information, see the following blog posts:
-
-  * `How We Made Percona XtraDB Cluster Scale
-    <https://www.percona.com/blog/2017/04/19/how-we-made-percona-xtradb-cluster-scale/>`_
-
-  * `Performance improvements in Percona XtraDB Cluster 5.7.17-29.20
-    <https://www.percona.com/blog/2017/04/19/performance-improvements-percona-xtradb-cluster-5-7-17/>`_
-
-|PXC| is fully compatible with `MySQL Server Community Edition <MySQL>`_,
-|PS|_, and MariaDB_ in the following sense:
-
-* **Data compatibility**:
-  You can use data created by any MySQL variant.
-
-* **Application compatibility**:
-  There is no or minimal application changes required.
+   |MySQL| Community Edition
+      https://www.mysql.com/products/community/
+   |percona-server|
+      https://www.percona.com/doc/percona-server/LATEST/index.html
+   How We Made Percona XtraDB Cluster Scale
+       https://www.percona.com/blog/2017/04/19/how-we-made-percona-xtradb-cluster-scale
+      
+Data compatibility
+   You can use data created by any MySQL variant.
+Application compatibility
+   There is no or minimal application changes required.
 
 Introduction
 ============
 
 .. toctree::
    :maxdepth: 1
-   :glob:
 
    intro
    limitation
@@ -84,7 +76,7 @@ Getting Started
    :includehidden:
    :titlesonly:
 
-   Overview <overview>
+   overview
    install/index
    configure
    bootstrap
@@ -96,10 +88,9 @@ Features
 
 .. toctree::
    :maxdepth: 1
-   :glob:
 
    features/highavailability
-   features/multimaster-replication
+   features/multisource-replication
    features/pxc-strict-mode
 
 PXC Security
@@ -117,7 +108,6 @@ User\'s Manual
 
 .. toctree::
    :maxdepth: 1
-   :glob:
 
    manual/state_snapshot_transfer
    manual/xtrabackup_sst
@@ -130,25 +120,14 @@ User\'s Manual
    manual/performance_schema_instrumentation
    management/data_at_rest_encryption
 
-Flexibility
-================================================================================
-
-.. toctree::
-   :maxdepth: 1
-   
-   flexibility/binlogging_replication_improvements
-   flexibility/innodb_fts_improvements
-   diagnostics/innodb_fragmentation_count
-   performance/aio_page_requests
-
 How-tos
 =======
 
 .. toctree::
    :maxdepth: 1
-   :glob:
 
    howtos/upgrade_guide
+   howtos/crash-recovery
    howtos/centos_howto
    howtos/ubuntu_howto
    howtos/garbd_howto
@@ -156,6 +135,7 @@ How-tos
    howtos/3nodesec2
    howtos/haproxy
    howtos/proxysql
+   howtos/proxysql-v2
    howtos/virt_sandbox
 
 Reference
@@ -163,7 +143,6 @@ Reference
 
 .. toctree::
    :maxdepth: 1
-   :glob:
 
    release-notes/release-notes_index
    wsrep-status-index
@@ -176,3 +155,4 @@ Reference
 * :ref:`genindex`
 * :ref:`search`
 
+.. include:: .res/replace.txt

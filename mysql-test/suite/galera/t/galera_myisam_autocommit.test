@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # This tests simple autocommit replication of MyISAM tables. No updates arrive on the slave.

@@ -26,16 +26,16 @@ COMMIT;
 --source include/shutdown_mysqld.inc
 
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 --echo Cleaning var directory ...
---remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/mtr
---remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/performance_schema
---remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/test
---remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/mysql
---remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/sys
---remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data
+--remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/mtr *
+--remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/performance_schema *
+--remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/test *
+--remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/mysql *
+--remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data/sys *
+--remove_files_wildcard $MYSQLTEST_VARDIR/mysqld.2/data *
 
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
@@ -66,7 +66,7 @@ INSERT INTO t1 VALUES ('node1_to_be_rollbacked_after');
 --echo Starting server ...
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 SET AUTOCOMMIT=OFF;

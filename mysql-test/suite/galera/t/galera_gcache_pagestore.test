@@ -9,7 +9,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/force_restart.inc
 
 --connection node_1

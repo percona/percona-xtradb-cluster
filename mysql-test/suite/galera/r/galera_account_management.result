@@ -25,9 +25,7 @@ COUNT(*) = 0
 SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user3';
 COUNT(*) = 1
 1
-SET PASSWORD FOR user3 = PASSWORD('foo');
-Warnings:
-Warning	1287	'SET PASSWORD FOR <user> = PASSWORD('<plaintext_password>')' is deprecated and will be removed in a future release. Please use SET PASSWORD FOR <user> = '<plaintext_password>' instead
+SET PASSWORD FOR user3 = 'foo';
 SELECT 1 FROM DUAL;
 1
 1
@@ -38,9 +36,8 @@ DROP USER user1, user3;
 SELECT COUNT(*) = 0 FROM mysql.user WHERE user IN ('user1', 'user2');
 COUNT(*) = 0
 1
-GRANT ALL ON *.* TO user4 IDENTIFIED BY 'password';
-Warnings:
-Warning	1287	Using GRANT for creating new user is deprecated and will be removed in future release. Create new user with CREATE USER statement.
+CREATE USER user4 IDENTIFIED BY 'password';
+GRANT ALL ON *.* TO user4;
 SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user4';
 COUNT(*) = 1
 1

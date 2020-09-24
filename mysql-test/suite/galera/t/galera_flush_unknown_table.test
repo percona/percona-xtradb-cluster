@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # FTWRL or FTFE should ensure that they unlock/resume wsrep only
@@ -7,7 +6,7 @@
 #
 use test;
 FLUSH TABLE WITH READ LOCK;
---error ER_NO_SUCH_TABLE
+--error ER_BAD_DB_ERROR
 FLUSH TABLES wl0.t0 FOR EXPORT;
 FLUSH TABLE WITH READ LOCK;
 UNLOCK TABLES;

@@ -6,7 +6,6 @@
 # transfer.
 #
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/have_debug_sync.inc
 
 --connection node_1
@@ -42,7 +41,7 @@ INSERT INTO t1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 
 --connection node_1
 
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Do some changes on node 1:
@@ -80,7 +79,7 @@ while ($count)
 
 # Waiting until start of node 2:
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Sanity check (node 2 is running now and can perform SQL operators):

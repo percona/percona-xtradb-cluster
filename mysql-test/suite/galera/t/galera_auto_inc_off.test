@@ -7,7 +7,6 @@
 #    passed via command line.
 #
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/have_debug_sync.inc
 
 --connection node_2
@@ -28,8 +27,8 @@ SHOW VARIABLES LIKE '%auto_increment%';
 SET GLOBAL wsrep_auto_increment_control='ON';
 
 --disable_warnings
-SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size');
-SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
 --enable_warnings
 SELECT @@wsrep_auto_increment_control = 1;
 
@@ -42,8 +41,8 @@ SELECT @@wsrep_auto_increment_control = 1;
 --connection node_2b
 
 --disable_warnings
-SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size');
-SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
 --enable_warnings
 SELECT @@wsrep_auto_increment_control = 1;
 
@@ -58,12 +57,12 @@ SET GLOBAL wsrep_auto_increment_control='ON';
 --let $restart_parameters = "restart:--auto-increment-increment=7 --auto-increment-offset=5"
 --source include/restart_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 --disable_warnings
-SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size');
-SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
 --enable_warnings
 SELECT @@wsrep_auto_increment_control = 1;
 
@@ -74,8 +73,8 @@ SHOW VARIABLES LIKE '%auto_increment%';
 SET GLOBAL wsrep_auto_increment_control='ON';
 
 --disable_warnings
-SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size');
-SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
 --enable_warnings
 SELECT @@wsrep_auto_increment_control = 1;
 

@@ -9,5 +9,5 @@ wsrep_flow_control_interval	[ 100, 100 ]
 Killing garbd ...
 Restarting node #2 to satisfy MTR's end-of-test checks
 # restart
-CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
-CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");

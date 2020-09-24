@@ -8,7 +8,6 @@
 
 --source include/big_test.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # PXC-2345

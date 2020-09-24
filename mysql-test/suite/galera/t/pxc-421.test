@@ -4,7 +4,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --connection node_1
 --let $wsrep_slave_1 = `SELECT @@wsrep_slave_threads`

@@ -17,17 +17,19 @@ AAAAAAAAAAAAAAAAAAC6ecBVEzgNAAgAEgAEBAQEEgAAXAAEGggAAAAICAgCAAAACgoKGRkAAKNu
 Jfk=
 '/*!*/;
 # at 120
-<ISO TIMESTAMP> server id 1  end_log_pos 91 	Query	thread_id=<THREAD_ID>	exec_time=0	error_code=0
+<ISO TIMESTAMP> server id 1  end_log_pos 0 	Query	thread_id=<THREAD_ID>	exec_time=0	error_code=0
 use `test`/*!*/;
 SET TIMESTAMP=<TIMESTAMP>/*!*/;
 SET @@session.pseudo_thread_id=<PSEUDO_THREAD_ID>/*!*/;
 SET @@session.foreign_key_checks=1, @@session.sql_auto_is_null=0, @@session.unique_checks=1, @@session.autocommit=1/*!*/;
-SET @@session.sql_mode=1436549152/*!*/;
+SET @@session.sql_mode=1168113696/*!*/;
 SET @@session.auto_increment_increment=1, @@session.auto_increment_offset=1/*!*/;
-/*!\C latin1 *//*!*/;
-SET @@session.character_set_client=8,@@session.collation_connection=8,@@session.collation_server=8/*!*/;
+/*!\C utf8mb4 *//*!*/;
+SET @@session.character_set_client=255,@@session.collation_connection=255,@@session.collation_server=255/*!*/;
 SET @@session.lc_time_names=0/*!*/;
 SET @@session.collation_database=DEFAULT/*!*/;
+/*!80011 SET @@session.default_collation_for_utf8mb4=255*//*!*/;
+/*!80013 SET @@session.sql_require_primary_key=0*//*!*/;
 CREATE TABLE t1 (f1 INTEGER)
 /*!*/;
 SET @@SESSION.GTID_NEXT= 'AUTOMATIC' /* added by mysqlbinlog */ /*!*/;
@@ -37,4 +39,6 @@ DELIMITER ;
 /*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=0*/;
 SET SESSION wsrep_on=ON;
 CALL mtr.add_suppression("Slave SQL: Error 'Table 't1' already exists' on query");
+call mtr.add_suppression("Ignoring error 'Table 't1' already exists'");
+call mtr.add_suppression("Query apply failed.*");
 DROP TABLE t1;

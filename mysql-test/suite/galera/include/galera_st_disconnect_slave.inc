@@ -24,7 +24,7 @@ COMMIT;
 --source suite/galera/include/galera_unload_provider.inc
 
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 SET AUTOCOMMIT=OFF;
@@ -55,7 +55,7 @@ INSERT INTO t1 VALUES ('node1_to_be_rollbacked_after');
 --connection node_2
 --source suite/galera/include/galera_load_provider.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 SET AUTOCOMMIT=OFF;

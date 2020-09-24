@@ -9,27 +9,24 @@ related to write-set replication.
 
 .. variable:: pxc_encrypt_cluster_traffic
 
-   :version 5.7.16: Variable introduced
    :cli: ``--pxc-encrypt-cluster-traffic``
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: ``OFF``
+   :default: ``ON``
 
 Enables automatic configuration of SSL encryption.
 When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
 
 Possible values:
 
-* ``OFF``, ``0``, ``false``: Disabled (default)
-
-* ``ON``, ``1``, ``true``: Enabled
+* ``ON``, ``1``, ``true``: Enabled (default)
+* ``OFF``, ``0``, ``false``: Disabled
 
 For more information, see :ref:`ssl-auto-conf`.
 
 .. variable:: pxc_maint_mode
 
-   :version 5.7.16: Variable introduced
    :cli: ``--pxc-maint-mode``
    :conf: Yes
    :scope: Global
@@ -53,7 +50,6 @@ For more information, see :ref:`pxc-maint-mode`.
 
 .. variable:: pxc_maint_transition_period
 
-   :version 5.7.16: Variable introduced
    :cli: ``--pxc-maint-transition-period``
    :conf: Yes
    :scope: Global
@@ -70,7 +66,6 @@ For more information, see :ref:`pxc-maint-mode`.
 
 .. variable:: pxc_strict_mode
 
-   :version 5.7: Variable introduced
    :cli: ``--pxc-strict-mode``
    :conf: Yes
    :scope: Global
@@ -142,25 +137,59 @@ It is enabled by default.
 
 Automatic adjustment may not be desirable depending on application's use
 and assumptions of auto-increments.
-It can be disabled in master-slave clusters.
+It can be disabled in source-replica clusters.
+
+.. seealso:: `MySQL wsrep option: wsrep_auto_increment_control
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-auto-increment-control>`_
 
 .. variable:: wsrep_causal_reads
 
-   :version 5.6.20-25.7: Variable deprecated
    :cli: ``--wsrep-causal-reads``
    :conf: Yes
    :scope: Global, Session
    :dyn: Yes
    :default: ``OFF``
 
-In some cases, the master may apply events faster than a slave,
-which can cause master and slave to become out of sync for a brief moment.
-When this variable is set to ``ON``, the slave will wait
+In some cases, the source may apply events faster than a replica,
+which can cause source and replica to become out of sync for a brief moment.
+When this variable is set to ``ON``, the replica will wait
 until that event is applied before doing any other queries.
 Enabling this variable will result in larger latencies.
 
 .. note:: This variable was deprecated because enabling it
    is the equivalent of setting :variable:`wsrep_sync_wait` to ``1``.
+
+.. seealso:: `MySQL wsrep option: wsrep_causal_reads
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-causal-reads>`_
+
+.. variable:: wsrep_certification_rules
+
+   :cli: ``--wsrep-certification-rules``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :values: STRICT, OPTIMIZED
+   :default: STRICT
+
+This variable controls how certification is done in the cluster, in particular
+this affects how foreign keys are handled.
+
+STRICT
+   Two INSERTs that happen at about the same time on two different nodes in a
+   child table, that insert different (non conflicting rows), but both rows
+   point to the same row in the parent table **may result** in the certification
+   failure.
+
+OPTIMIZED
+   Two INSERTs that happen at about the same time on two different nodes in a
+   child table, that insert different (non conflicting rows), but both rows
+   point to the same row in the parent table **will not result** in the
+   certification failure.
+
+.. seealso::
+
+   |galera-cluster| Documentation: |MySQL| wsrep options
+      https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-certification-rules
 
 .. variable:: wsrep_certify_nonPK
 
@@ -175,6 +204,9 @@ Write set replication requires primary keys on all tables
 to allow for parallel applying of transactions.
 This variable is enabled by default.
 As a rule, make sure that all tables have primary keys.
+
+.. seealso:: `MySQL wsrep option: wsrep_certify_nonPK
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-certify-nonpk>`_
 
 .. variable:: wsrep_cluster_address
 
@@ -209,6 +241,9 @@ after the cluster has been bootstrapped initially.
 If you want to bootstrap a new cluster with a node,
 you should pass the ``--wsrep-new-cluster`` option when starting.
 
+.. seealso:: `MySQL wsrep option: wsrep_cluster_address
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-cluster-address>`_
+
 .. variable:: wsrep_cluster_name
 
    :cli: ``--wsrep-cluster-name``
@@ -221,9 +256,11 @@ Specifies the name of the cluster and should be identical on all nodes.
 
 .. note:: It should not exceed 32 characters.
 
+.. seealso:: `MySQL wsrep option: wsrep_cluster_name
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-cluster-name>`_
+
 .. variable:: wsrep_convert_lock_to_trx
 
-   :version 5.7.23-31.31: Variable deprecated
    :cli: ``--wsrep-convert-lock-to-trx``
    :conf: Yes
    :scope: Global
@@ -234,12 +271,15 @@ Defines whether locking sessions should be converted into transactions.
 By default, this is disabled.
 
 Enabling this variable can help older applications to work
-in a multi-master setup by converting ``LOCK/UNLOCK TABLES`` statements
+in a multi-source setup by converting ``LOCK/UNLOCK TABLES`` statements
 into ``BEGIN/COMMIT`` statements.
 It is not the same as support for locking sessions,
 but it does prevent the database from ending up
 in a logically inconsistent state.
 Enabling this variable can also result in having huge write-sets.
+
+.. seealso:: `MySQL wsrep option: wsrep_convert_lock_to_trx
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-convert-lock-to-trx>`_
 
 .. variable:: wsrep_data_home_dir
 
@@ -253,6 +293,9 @@ Enabling this variable can also result in having huge write-sets.
 Specifies the path to the directory where the wsrep provider stores its files
 (such as :file:`grastate.dat`).
 
+.. seealso:: `MySQL wsrep option: wsrep_data_home_dir
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-data-home-dir>`_
+
 .. variable:: wsrep_dbug_option
 
    :cli: ``--wsrep-dbug-option``
@@ -262,26 +305,55 @@ Specifies the path to the directory where the wsrep provider stores its files
 
 Defines ``DBUG`` options to pass to the wsrep provider.
 
+.. seealso:: `MySQL wsrep option: wsrep_dbug_option
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-dbug-option>`_
+
 .. variable:: wsrep_debug
 
    :cli: ``--wsrep-debug``
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: ``OFF``
+   :default: ``NONE``
 
-Enables additional debugging output for the database server error log.
-By default, it is disabled.
-This variable can be used when trying to diagnose problems
-or when submitting a bug.
+Enables debug level logging for the database server and `wsrep-lib
+<https://github.com/codership/wsrep-lib>`_ - an integration library for WSREP
+API with additional convenience for transaction processing.  By default,
+:variable:`--wsrep-debug` is disabled.
+
+This variable can be used when trying to diagnose problems or when submitting a
+bug.
 
 You can set ``wsrep_debug`` in the following :file:`my.cnf` groups:
 
 * Under ``[mysqld]`` it enables debug logging for ``mysqld`` and the SST script
 * Under ``[sst]`` it enables debug logging for the SST script only
 
+This variable may be set to one of the following values:
+
+NONE
+   No debug-level messages.
+
+SERVER
+
+   ``wsrep-lib`` general debug-level messages and detailed debug-level messages
+   from the *server_state* part are printed out.  Galera debug-level logs are
+   printed out.
+
+TRANSACTION
+   Same as SERVER + wsrep-lib *transaction* part
+
+STREAMING
+   Same as TRANSACTION + wsrep-lib *streaming* part
+
+CLIENT
+   Same as STREAMING + wsrep-lib *client_service* part
+
 .. note:: Do not enable debugging in production environments,
    because it logs authentication info (that is, passwords).
+
+.. seealso:: `MySQL wsrep option: wsrep_debug
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-debug>`_
 
 .. variable:: wsrep_desync
 
@@ -313,6 +385,9 @@ for a long period of time or for several nodes at once.
 .. note:: You can also desync a node
    using the ``/*! WSREP_DESYNC */`` query comment.
 
+.. seealso:: `MySQL wsrep option: wsrep_desync
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-desync>`_
+
 .. variable:: wsrep_dirty_reads
 
    :cli: ``--wsrep-dirty-reads``
@@ -337,9 +412,11 @@ To avoid deadlock errors,
 set the :variable:`wsrep_sync_wait` variable to ``0``
 if you enable ``wsrep_dirty_reads``.
 
+.. seealso:: `MySQL wsrep option: wsrep_dirty_reads
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-dirty-reads>`_
+
 .. variable:: wsrep_drupal_282555_workaround
 
-   :version 5.7.24-31.33: Variable deprecated
    :cli: ``--wsrep-drupal-282555-workaround``
    :conf: Yes
    :scope: Global
@@ -352,9 +429,11 @@ and `MySQL bug #41984 <http://bugs.mysql.com/bug.php?id=41984>`_).
 In some cases, duplicate key errors would occur
 when inserting the ``DEFAULT`` value into an ``AUTO_INCREMENT`` column.
 
+.. seealso:: `MySQL wsrep option: wsrep_drupal_282555_workaround
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-drupal-282555-workaround>`_
+
 .. variable:: wsrep_forced_binlog_format
 
-   :version 5.7.22-29.26: Variable deprecated
    :cli: ``--wsrep-forced-binlog-format``
    :conf: Yes
    :scope: Global
@@ -373,7 +452,123 @@ Possible values for this variable are:
     and use whatever is set by the |binlog_format| variable (default)
 
 .. |binlog_format| replace:: ``binlog_format``
-.. _binlog_format: https://dev.mysql.com/doc/refman/5.7/en/binary-log-setting.html
+.. _binlog_format: https://dev.mysql.com/doc/refman/8.0/en/binary-log-setting.html
+
+.. seealso:: `MySQL wsrep option: wsrep_forced_binlog_format
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-forced-binlog-format>`_
+
+.. variable:: wsrep_ignore_apply_errors
+
+    :cli: ``--wsrep-ignore-apply-errors``
+    :conf: Yes
+    :scope: Global
+    :dyn: Yes
+    :default: 0
+    
+Defines the rules of wsrep applier behavior on errors. You can change the settings by editing the ``my.cnf`` file under ``[mysqld]`` or at runtime.
+
+.. note::
+
+    In |PXC| version 8.0.19-10, the default value has changed from ``7`` to ``0``. If you have been working with an earlier version of the PXC 8.0 series, you may see different behavior when upgrading to this version or later.
+
+The variable has the following options:
+
+.. list-table::
+    :widths: 25 30
+    :header-rows: 1
+    
+    * - Value
+      - Description
+    * - WSREP_IGNORE_ERRORS_NONE
+      - All replication errors are treated as errors and will shutdown the node (default behavior)
+    * - WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL
+      - DROP DATABASE, DROP TABLE, DROP INDEX, ALTER TABLE are converted to a warning if they result in ER_DB_DROP_EXISTS, ER_BAD_TABLE_ERROR OR ER_CANT_DROP_FIELD_OR_KEY errors
+    * - WSREP_IGNORE_ERRORS_ON_RECONCILING_DML
+      - DELETE events are treated as warnings if they failed because the deleted row was not found (ER_KEY_NOT_FOUND)
+    * - WSREP_IGNORE_ERRORS_ON_DDL
+      - All DDL errors will be treated as a warning
+    * - WSREP_IGNORE_ERRORS_MAX
+      - Infers WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL, WSREP_IGNORE_ERRORS_ON_RECONCILING_DML and WSREP_IGNORE_ERRORS_ON_DDL
+
+Setting the variable between ``0`` and ``7`` has the following behavior:
+
+..  list-table::
+    :widths: 25 30
+    :header-rows: 1
+    
+    * - Setting
+      - Behavior
+    * - 0
+      - WSREP_IGNORE_ERRORS_NONE
+    * - 1
+      - WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL
+    * - 2
+      - WSREP_IGNORE_ERRORS_ON_RECONCILING_DML
+    * - 3
+      - WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL, WSREP_IGNORE_ERRORS_ON_RECONCILING_DML
+    * - 4
+      - WSREP_IGNORE_ERRORS_ON_DDL
+    * - 5
+      - WSREP_IGNORE_ERRORS_ON_DDL, WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL
+    * - 6
+      - WSREP_IGNORE_ERRORS_ON_DDL, WSREP_IGNORE_ERRORS_ON_RECONCILING_DML
+    * - 7
+      - WSREP_IGNORE_ERRORS_ON_DDL, WSREP_IGNORE_ERRORS_ON_RECONCILING_DML, WSREP_IGNORE_ERRORS_ON_RECONCILING_DDL
+
+.. variable:: wsrep_min_log_verbosity
+
+   :cli: ``--wsrep-min-log-verbosity``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: 3
+
+This variable defines the *minimum* logging verbosity of wsrep/Galera and acts
+in conjunction with the ``log_error_verbosity`` variable. The
+:variable:`wsrep_min_log_verbosity` has the same values as
+``log_error_verbosity``.
+
+The actual log verbosity of wsrep/Galera can be greater than the value of
+:variable:`wsrep_min_log_verbosity` if ``log_error_verbosity`` is greater than
+:variable:`wsrep_min_log_verbosity`.
+
+A few examples:
+
+.. list-table::
+   :header-rows: 1
+
+   * - log_error_verbosity
+     - wsrep_min_log_verbosity
+     - |MySQL| Logs Verbosity
+     - wsrep Logs Verbosity
+   * - 2
+     - 3
+     - system error, warning
+     - system error, warning, info
+   * - 1
+     - 3
+     - system error
+     - system error, warning, info
+   * - 1
+     - 2
+     - system error
+     - system error, warning
+   * - 3
+     - 1
+     - system error, warning, info
+     - system error, warning, info
+
+Note the case where ``log_error_verbosity=3`` and
+``wsrep_min_log_verbosity=1``. The actual log verbosity of wsrep/Galera is *3*
+(system error, warning, info) because ``log_error_verbosity`` is greater.
+
+.. seealso::
+
+   |MySQL| Documentation: log_error_verbosity
+      https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_log_error_verbosity
+   |galera-cluster| Documentation: Database Server Logs
+      https://galeracluster.com/library/documentation/log.html
+
 
 .. variable:: wsrep_load_data_splitting
 
@@ -393,6 +588,9 @@ and whatever gets committed stays committed.
 
 .. note:: It doesn't work as expected with ``autocommit=0`` when enabled.
 
+.. seealso:: `MySQL wsrep option: wsrep_load_data_splitting
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-load-data-splitting>`_
+
 .. variable:: wsrep_log_conflicts
 
    :cli: ``--wsrep-log-conflicts``
@@ -409,6 +607,9 @@ If you enable this variable, it will also log table and schema
 where the conflict occurred, as well as the actual values for keys
 that produced the conflict.
 
+.. seealso:: `MySQL wsrep option: wsrep_log_conflicts
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-log-conflicts>`_
+
 .. variable:: wsrep_max_ws_rows
 
    :cli: ``--wsrep-max-ws-rows``
@@ -422,6 +623,9 @@ Defines the maximum number of rows each write-set can contain.
 By default, there is no limit for the maximum number of rows in a write-set.
 The maximum allowed value is ``1048576``.
 
+.. seealso:: `MySQL wsrep option: wsrep_max_ws_rows
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-max-ws-rows>`_
+
 .. variable:: wsrep_max_ws_size
 
    :cli: ``--wsrep_max_ws_size``
@@ -434,6 +638,9 @@ Defines the maximum write-set size (in bytes).
 Anything bigger than the specified value will be rejected.
 
 You can set it to any value between ``1024`` and the default ``2147483647``.
+
+.. seealso:: `MySQL wsrep option: wsrep_max_ws_size
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-max-ws-size>`_
 
 .. variable:: wsrep_node_address
 
@@ -469,6 +676,9 @@ The value should be specified in the following format::
    for the :variable:`wsrep_sst_receive_address` variable
    and the :variable:`ist.recv_addr` option.
 
+.. seealso:: `MySQL wsrep option: wsrep_node_address
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-node-address>`_
+
 .. variable:: wsrep_node_incoming_address
 
    :cli: ``--wsrep-node-incoming-address``
@@ -483,6 +693,9 @@ and port number 3306.
 
 This information is used for the :variable:`wsrep_incoming_addresses` variable
 which shows all active cluster nodes.
+
+.. seealso:: `MySQL wsrep option: wsrep_node_incoming_address
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-node-incoming-address>`_
 
 .. variable:: wsrep_node_name
 
@@ -517,25 +730,32 @@ that the node should execute
 whenever cluster membership or local node status changes.
 This can be used for alerting or to reconfigure load balancers.
 
-.. note:: The node will block and wait
-   until the command or script completes and returns before it can proceed.
-   If the script performs any potentially blocking
-   or long-running operations, such as network communication,
-   you should consider initiating such operations in the background
-   and have the script return immediately.
+.. note::
+
+   The node will block and wait until the command or script completes
+   and returns before it can proceed.  If the script performs any
+   potentially blocking or long-running operations, such as network
+   communication, you should consider initiating such operations in
+   the background and have the script return immediately.
+
+.. seealso:: `MySQL wsrep option: wsrep_notify_cmd
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-notify-cmd>`_
 
 .. variable:: wsrep_on
 
-   :version 5.6.27-25.13: Variable available only in session scope
    :cli: No
    :conf: No
    :scope: Session
    :dyn: Yes
    :default: ``ON``
 
-Defines whether updates from the current session should be replicated.
-If disabled, it does not cause the node to leave the cluster
-and the node continues to communicate with other nodes.
+Defines if current session transaction changes for a node are replicated to the cluster.
+
+If set to ``OFF`` for a session, no transaction changes are replicated in that session. The setting does not cause the node to leave the cluster, and the node communicates with other nodes.
+
+
+.. seealso:: `MySQL wsrep option: wsrep_on
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-on>`_
 
 .. variable:: wsrep_OSU_method
 
@@ -574,7 +794,7 @@ The following methods are available:
   .. important::
 
      Under the ``TOI`` method, when DDL operations are performed,
-     |abbr-mdl| is ignored. If |abr-mdl| is important, use the ``RSU``
+     |abbr-mdl| is ignored. If |abbr-mdl| is important, use the ``RSU``
      method.
 
 * ``RSU``: When the *Rolling Schema Upgrade* method is selected,
@@ -601,28 +821,8 @@ The following methods are available:
    will change the variable globally
    but it won't have effect on the current session.
 
-.. variable:: wsrep_preordered
-
-   :version 5.7.24-31.33: Variable deprecated
-   :cli: ``--wsrep-preordered``
-   :conf: Yes
-   :scope: Global
-   :dyn: Yes
-   :default: ``OFF``
-
-Defines whether the node should use transparent handling
-of preordered replication events (like replication from traditional master).
-By default, this is disabled.
-
-If you enable this variable, such events will be applied locally first
-before being replicated to other nodes in the cluster.
-This could increase the rate at which they can be processed,
-which would be otherwise limited by the latency
-between the nodes in the cluster.
-
-Preordered events should not interfere with events that originate on the local
-node. Therefore, you should not run local update queries on a table that is
-also being updated through asynchronous replication.
+.. seealso:: `MySQL wsrep option: wsrep_OSU_method
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-osu-method>`_
 
 .. variable:: wsrep_provider
 
@@ -639,6 +839,9 @@ This is usually
 If you do not specify a path or the value is not valid,
 the node will behave as standalone instance of MySQL.
 
+.. seealso:: `MySQL wsrep option: wsrep_provider
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-provider>`_
+
 .. variable:: wsrep_provider_options
 
    :cli: ``--wsrep-provider-options``
@@ -649,6 +852,9 @@ the node will behave as standalone instance of MySQL.
 Specifies optional settings for the replication provider
 documented in :ref:`wsrep_provider_index`.
 These options affect how various situations are handled during replication.
+
+.. seealso:: `MySQL wsrep option: wsrep_provider_options
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-provider-options>`_
 
 .. variable:: wsrep_recover
 
@@ -675,9 +881,9 @@ Rejecting queries can be useful during upgrades,
 when you want to keep the node up and apply write-sets
 without accepting queries.
 
-When a query is rejected, the following error is returned::
+When a query is rejected, the following error appears:
 
- Error 1047: Unknown command
+   ERROR 1047 (08S01): WSREP has not yet prepared node for application use
 
 The following values are available:
 
@@ -692,6 +898,11 @@ The following values are available:
 .. note:: This variable doesn't affect Galera replication in any way,
    only the applications that connect to the database are affected.
    If you want to desync a node, use :variable:`wsrep_desync`.
+
+When a query is rejected, an error is returned.
+
+.. seealso:: `MySQL wsrep option: wsrep_reject_queries
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-reject-queries>`_
 
 .. variable:: wsrep_replicate_myisam
 
@@ -709,8 +920,8 @@ can be set only during startup.
 On session level, you can change it during runtime as well.
 
 For older nodes in the cluster, :variable:`wsrep_replicate_myisam` should work
-since the TOI decision (for MyISAM DDL) is done on origin node.
-Mixing of non-MyISAM and MyISAM tables in the same DDL statement
+since the TOI decision (for MyISAM DDL) is done on the origin node.
+Mixing non-MyISAM and MyISAM tables in the same DDL statement
 is not recommended when :variable:`wsrep_replicate_myisam` is disabled,
 since if any table in the list is MyISAM,
 the whole DDL statement is not put under TOI.
@@ -726,13 +937,12 @@ the whole DDL statement is not put under TOI.
     (it will get MyISAM tables from donor)
   * Difference in configuration of ``pxc-cluster`` node
     on `enforce_storage_engine
-    <https://www.percona.com/doc/percona-server/5.7/management/enforce_engine.html>`_
+    <https://www.percona.com/doc/percona-server/8.0/management/enforce_engine.html>`_
     front may result in picking up different engine for the same table
     on different nodes
-  * ``CREATE TABLE AS SELECT`` (CTAS) statements use non-TOI replication
-    and are replicated only if there is involvement of InnoDB table
-    that needs transactions
-    (in case of MyISAM table, CTAS statements will not be replicated).
+  * ``CREATE TABLE AS SELECT`` (CTAS) statements use TOI
+    replication. MyISAM tables are created and loaded even if
+    :variable:`wsrep_replicate_myisam` is set to **ON**.
 
 .. variable:: wsrep_restart_slave
 
@@ -742,11 +952,14 @@ the whole DDL statement is not put under TOI.
    :dyn: Yes
    :default: ``OFF``
 
-Defines whether replication slave should be restarted
+Defines whether replication replica should be restarted
 when the node joins back to the cluster.
-Enabling this can be useful because asynchronous replication slave thread
+Enabling this can be useful because asynchronous replication replica thread
 is stopped when the node tries to apply the next replication event
 while the node is in non-primary state.
+
+.. seealso:: `MySQL wsrep option: wsrep_restart_slave
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-restart-slave>`_
 
 .. variable:: wsrep_retry_autocommit
 
@@ -756,17 +969,18 @@ while the node is in non-primary state.
    :dyn: No
    :default: ``1``
 
-Specifies the number of times autocommit transactions will be retried
-in the cluster if it encounters certification errors.
-In case there is a conflict, it should be safe for the cluster node
-to simply retry the statement without returning an error to the client,
-hoping that it will pass next time.
+Specifies the number of times autocommit transactions will be retried in the
+cluster if it encounters certification errors.  In case there is a conflict, it
+should be safe for the cluster node to simply retry the statement without
+returning an error to the client, hoping that it will pass next time.
 
-This can be useful to help an application using autocommit
-to avoid deadlock errors that can be triggered by replication conflicts.
+This can be useful to help an application using autocommit to avoid deadlock
+errors that can be triggered by replication conflicts.
 
-If this variable is set to ``0``,
-autocommit transactions won't be retried.
+If this variable is set to ``0``, autocommit transactions won't be retried.
+
+.. seealso:: `MySQL wsrep option: wsrep_retry_autocommit
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-retry-autocommit>`_
 
 .. variable:: wsrep_RSU_commit_timeout
 
@@ -805,6 +1019,9 @@ microseconds. Unit of variable is in micro-secs so set accordingly.
 Defines whether foreign key checking is done for applier threads.
 This is enabled by default.
 
+.. seealso:: `MySQL wsrep option: wsrep_slave_FK_checks
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-slave-fk-checks>`_
+
 .. variable:: wsrep_slave_threads
 
    :cli: ``--wsrep-slave-threads``
@@ -833,7 +1050,7 @@ You may want to increase it as suggested
 `in Codership documentation for flow control
 <http://galeracluster.com/documentation-webpages/nodestates.html#flow-control>`_:
 when the node is in ``JOINED`` state,
-increasing the number of slave threads can speed up the catchup to ``SYNCED``.
+increasing the number of replica threads can speed up the catchup to ``SYNCED``.
 
 You can also estimate the optimal value for this from
 :variable:`wsrep_cert_deps_distance` as suggested `on this page
@@ -841,6 +1058,9 @@ You can also estimate the optimal value for this from
 
 For more configuration tips, see `this document
 <http://galeracluster.com/documentation-webpages/configurationtips.html#setting-parallel-slave-threads>`_.
+
+.. seealso:: `MySQL wsrep option: wsrep_slave_threads
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-slave-threads>`_
 
 .. variable:: wsrep_slave_UK_checks
 
@@ -853,23 +1073,8 @@ For more configuration tips, see `this document
 Defines whether unique key checking is done for applier threads.
 This is disabled by default.
 
-.. variable:: wsrep_sst_auth
-
-   :cli: Yes
-   :conf: Yes
-   :scope: Global
-   :dyn: Yes
-   :format: <username>:<password>
-
-Specifies authentication information for State Snapshot Transfer (SST).
-Required information depends on the method
-specified in the :variable:`wsrep_sst_method` variable.
-
-For more information about SST authentication,
-see :ref:`state_snapshot_transfer`.
-
-.. note:: Value of this variable is masked in the log
-   and in the ``SHOW VARIABLES`` query output.
+.. seealso:: `MySQL wsrep option: wsrep_slave_UK_checks
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-slave-uk-checks>`_
 
 .. variable:: wsrep_sst_donor
 
@@ -914,21 +1119,8 @@ then the joining node will consider *only* ``node1`` and ``node2``.
    (or disable it completely
    if you don't mind the joiner node waiting for the state transfer indefinitely).
 
-.. variable:: wsrep_sst_donor_rejects_queries
-
-   :cli: ``--wsrep-sst-donor-rejects-queries``
-   :conf: Yes
-   :scope: Global
-   :dyn: Yes
-   :default: OFF
-
-Defines whether the node should reject blocking client sessions
-when it is serving as a donor during a blocking state transfer method
-(when :variable:`wsrep_sst_method` is set to ``mysqldump`` or ``rsync``).
-This is disabled by default, meaning that the node accepts such queries.
-
-If you enable this variable, queries will return the ``Unknown command`` error.
-This can be used to signal load-balancer that the node isn't available.
+.. seealso:: `MySQL wsrep option: wsrep_sst_donor
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-sst-donor>`_
 
 .. variable:: wsrep_sst_method
 
@@ -949,20 +1141,7 @@ Available values are:
   can be found `in Percona XtraBackup documentation
   <https://www.percona.com/doc/percona-xtrabackup/2.4/using_xtrabackup/privileges.html>`_.
 
-  This is the **recommended** and default method for |PXC|.
   For more information, see :ref:`xtrabackup_sst`.
-
-* ``rsync``: Uses ``rsync`` to perform SST.
-  This method doesn't use the :variable:`wsrep_sst_auth` variable.
-
-* ``mysqldump``: Uses ``mysqldump`` to perform SST
-  This method requires superuser credentials for the donor node
-  to be specified in the :variable:`wsrep_sst_auth` variable.
-
-  .. note:: This method is deprecated as of :rn:`5.7.22-29.26`
-     and not recommended unless it is required for specific reasons.
-     Also, it is not compatible with ``bind_address`` set to ``127.0.0.1``
-     or ``localhost``, and will cause startup to fail in this case.
 
 * ``<custom_script_name>``: Galera supports `Scriptable State Snapshot Transfer
   <http://galeracluster.com/documentation-webpages/statetransfer.html#scriptable-state-snapshot-transfer>`_.
@@ -976,8 +1155,12 @@ Available values are:
   It shouldn't be used permanently
   because it could lead to data inconsistency across the nodes.
 
-.. note:: Only ``xtrabackup-v2`` and ``rsync`` provide support
-   for clusters with GTIDs and async slaves.
+.. note::
+
+   ``xtrabackup-v2`` provides support for clusters with GTIDs and async replicas.
+
+.. seealso:: `MySQL wsrep option: wsrep_sst_method
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-sst-method>`_
 
 .. variable:: wsrep_sst_receive_address
 
@@ -991,6 +1174,9 @@ Specifies the network address where donor node should send state transfers.
 By default, this variable is set to ``AUTO``,
 meaning that the IP address from :variable:`wsrep_node_address` is used.
 
+.. seealso:: `MySQL wsrep option: wsrep_sst_receive_address
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-sst-receive-address>`_
+
 .. variable:: wsrep_start_position
 
    :cli: ``--wsrep-start-position``
@@ -1003,9 +1189,11 @@ Specifies the node's start position as ``UUID:seqno``.
 By setting all the nodes to have the same value for this variable,
 the cluster can be set up without the state transfer.
 
+.. seealso:: `MySQL wsrep option: wsrep_start_position
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-start-position>`_
+
 .. variable:: wsrep_sync_wait
 
-   :version 5.6.20-25.7: Variable introduced
    :cli: ``--wsrep-sync-wait``
    :conf: Yes
    :scope: Session
@@ -1044,4 +1232,8 @@ is determined by bitmask:
 .. note:: Setting :variable:`wsrep_sync_wait` to ``1`` is the equivalent
    of setting the deprecated :variable:`wsrep_causal_reads` to ``ON``.
 
+.. seealso:: `MySQL wsrep option: wsrep_sync_wait
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-sync-wait>`_
+
 .. |abbr-mdl| replace:: :abbr:`MDL (Metadata Locking)`
+.. include:: .res/replace.txt

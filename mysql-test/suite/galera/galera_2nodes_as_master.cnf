@@ -7,6 +7,7 @@
 
 [mysqld]
 default-storage-engine=InnoDB
+mysqlx=0
 
 [mysqld.1]
 server-id=1

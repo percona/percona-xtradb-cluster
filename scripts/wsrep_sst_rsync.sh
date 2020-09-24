@@ -30,6 +30,12 @@ export PATH="/usr/sbin:/sbin:$PATH"
 . $(dirname $0)/wsrep_sst_common
 
 wsrep_check_programs rsync
+if [[ $? -ne 0 ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "rsync not found in PATH! Make sure you have it installed."
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    exit 2 # ENOENT
+fi
 
 keyring_plugin=0
 keyring_file_data=""
@@ -55,6 +61,16 @@ if [[ $keyring_plugin -eq 1 ]]; then
                       " (using keyring) with rsync. Please use SST with xtrabackup."
 fi
 
+auto_upgrade=$(parse_cnf sst auto-upgrade "")
+auto_upgrade=$(normalize_boolean "$auto_upgrade" "on")
+
+# Check the WSREP_SST_OPT_FORCE_UPGRADE environment variable
+force_upgrade=${WSREP_SST_OPT_FORCE_UPGRADE:-""}
+if [[ -z $force_upgrade ]]; then
+    force_upgrade=$(parse_cnf sst force-upgrade "")
+fi
+force_upgrade=$(normalize_boolean "$force_upgrade" "off")
+
 cleanup_joiner()
 {
     local PID=$(cat "$RSYNC_PID" 2>/dev/null || echo 0)
@@ -66,6 +82,8 @@ cleanup_joiner()
     rm -f "$RSYNC_LOG_FILE"
     rm -f "$RSYNC_PID"
     rm -f "$KEYRING_FILE"
+    rm -rf "$MYSQL_UPGRADE_TMPDIR"
+    rm -f $BINLOG_TAR_FILE
     wsrep_log_debug "Joiner cleanup done."
     if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
         wsrep_cleanup_progress_file
@@ -84,8 +102,11 @@ check_pid_and_port()
     local rsync_pid=$2
     local rsync_port=$3
 
-    if ! which lsof > /dev/null; then
+    wsrep_check_programs lsof
+    if [[ $? -ne 0 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "lsof tool not found in PATH! Make sure you have it installed."
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         exit 2 # ENOENT
     fi
 
@@ -104,6 +125,45 @@ check_pid_and_port()
         [ -n "$port_info" ] && [ -n "$is_rsync" ] && \
         [ $(cat $pid_file) -eq $rsync_pid ]
 }
+
+# Tries to send an error to the JOINER
+# (although if rsync itself fails, then this will do nothing)
+#
+function send_rsync_error()
+{
+    local err=$1
+    echo "error=$err" > "$MAGIC_FILE"
+    rsync --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR || true
+}
+
+# Removes the redo logs (ib_logfile*) from the given directory
+#
+# Globals:
+#   None
+#
+# Parameters:
+#   Argument 1: the redo log directory
+#
+function remove_redo_logs()
+{
+    local redo_log_dir=$1
+    (
+        if [[ -d $redo_log_dir ]]; then
+            cd "${redo_log_dir}"
+            rm -f ib_logfile*
+        fi
+    )
+    return 0
+}
+
+
+MYSQL_VERSION=$WSREP_SST_OPT_VERSION
+if [[ -z $MYSQL_VERSION ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "FATAL: Cannot determine the mysqld server version"
+    wsrep_log_error "****************************************************** "
+    exit 2
+fi
 
 MAGIC_FILE="$WSREP_SST_OPT_DATA/rsync_sst_complete"
 rm -rf "$MAGIC_FILE"
@@ -145,6 +205,11 @@ else
     WSREP_LOG_DIR=$(cd $WSREP_SST_OPT_DATA; pwd -P)
 fi
 
+# Note: the variables read from stdin will override any
+# other settings
+read_variables_from_stdin
+[[ $? -ne 0 ]] && exit 2
+
 # Old filter - include everything except selected
 # FILTER=(--exclude '*.err' --exclude '*.pid' --exclude '*.sock' \
 #         --exclude '*.conf' --exclude core --exclude 'galera.*' \
@@ -165,6 +230,9 @@ FILTER=(-f '- /lost+found'
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
+    # Let the joiner know if the data is being transferred
+    # by SST or IST
+    transfer_type=""
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
@@ -232,6 +300,7 @@ then
             *)  RC=255 # unknown error
                 ;;
             esac
+            send_rsync_error "Failed to send datadir : $RC"
             exit $RC
         fi
 
@@ -245,6 +314,7 @@ then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "rsync innodb_log_group_home_dir returned code $RC:"
             wsrep_log_error "****************************************************** "
+            send_rsync_error "Failed to send innodb log files : $RC"
             exit 255 # unknown error
         fi
 
@@ -259,6 +329,7 @@ then
                 wsrep_log_error "******************* FATAL ERROR ********************** "
                 wsrep_log_error "rsync keyring returned code $RC:"
                 wsrep_log_error "****************************************************** "
+                send_rsync_error "Failed to send keyring file : $RC"
                 exit 255 # unknown error
             fi
         fi
@@ -283,18 +354,21 @@ then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "find/rsync returned code $RC:"
             wsrep_log_error "****************************************************** "
+            send_rsync_error "Failed to send database dirs : $RC"
             exit 255 # unknown error
         fi
         wsrep_log_info "...............rsync completed"
+        transfer_type="sst"
     else # BYPASS
         wsrep_log_info "Bypassing state dump (SST)."
         STATE="$WSREP_SST_OPT_GTID"
+        transfer_type="ist"
     fi
 
     # This is the very last piece of data to send
     # After receiving the MAGIC_FILE, the joiner knows that it has
     # received all the data.
-    printf "$STATE\n" > "$MAGIC_FILE"
+    printf "$STATE\ntransfer_type=${transfer_type}\ndonor_version=${WSREP_SST_OPT_VERSION}\n" > "$MAGIC_FILE"
     rsync --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
 
     echo "continue" # now server can resume updating data
@@ -302,8 +376,6 @@ then
 
 elif [ "$WSREP_SST_OPT_ROLE" = "joiner" ]
 then
-    wsrep_check_programs lsof
-
     touch $SST_PROGRESS_FILE
     MYSQLD_PID=$WSREP_SST_OPT_PARENT
 
@@ -326,18 +398,19 @@ then
 
     RSYNC_CONF="$WSREP_SST_OPT_DATA/$MODULE.conf"
 
+# script
 cat << EOF > "$RSYNC_CONF"
-pid file = $RSYNC_PID
-use chroot = no
-read only = no
-timeout = 300
-transfer logging = true
-log file = $RSYNC_LOG_FILE
-log format = %o %a file:%f %l
-[$MODULE]
-    path = $WSREP_SST_OPT_DATA
-[$MODULE-log_dir]
-    path = $WSREP_LOG_DIR
+    pid file = $RSYNC_PID
+    use chroot = no
+    read only = no
+    timeout = 300
+    transfer logging = true
+    log file = $RSYNC_LOG_FILE
+    log format = %o %a file:%f %l
+    [$MODULE]
+        path = $WSREP_SST_OPT_DATA
+    [$MODULE-log_dir]
+        path = $WSREP_LOG_DIR
 EOF
 
 #    rm -rf "$DATA"/ib_logfile* # we don't want old logs around
@@ -362,11 +435,82 @@ EOF
         sleep 1
     done
 
+    # Kill the rsync daemon
+    kill $RSYNC_REAL_PID && sleep 0.5 && kill -9 $RSYNC_REAL_PID >/dev/null 2>&1 || true
+    rm -rf $RSYNC_PID
+
     if ! ps -p $MYSQLD_PID >/dev/null
     then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Parent mysqld process (PID:$MYSQLD_PID) terminated unexpectedly."
         wsrep_log_error "****************************************************** "
+        exit 32
+    fi
+
+    rsync_sst_output=""
+    DONOR_MYSQL_VERSION="0.0.0"
+    transfer_type=""
+
+    if [[ -r $MAGIC_FILE ]]; then
+        # Pull the needed data out of the MAGIC_FILE
+        while read line; do
+            if [[ $line =~ ^donor_version= ]]; then
+                DONOR_MYSQL_VERSION=${line#*=}
+
+                # If donor < local, then this is unsupported, we cannot
+                # have a higher version node donating to a lower version node
+                # (there is no way to downgrade the DB)
+                if compare_versions "$MYSQL_VERSION" "<" "$DONOR_MYSQL_VERSION"; then
+                    wsrep_log_error "******************* FATAL ERROR ********************** "
+                    wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
+                    wsrep_log_error "This node's PXC version is $MYSQL_VERSION.  The donor's PXC version is $DONOR_MYSQL_VERSION."
+                    wsrep_log_error "Upgrade this node before joining the cluster."
+                    wsrep_log_error "Line $LINENO"
+                    wsrep_log_error "****************************************************** "
+                    exit 2
+                elif compare_versions "$DONOR_MYSQL_VERSION" "<" "8.0.0"; then
+                    wsrep_log_error "******************* FATAL ERROR ********************** "
+                    wsrep_log_error "FATAL: PXC JOINER is from 8.x ($MYSQL_VERSION) series and DONOR from 5.x ($DONOR_MYSQL_VERSION) series."
+                    wsrep_log_error "This node's PXC version is $MYSQL_VERSION.  The donor's PXC version is $DONOR_MYSQL_VERSION."
+                    wsrep_log_error "Upgrade this node before joining the cluster."
+                    wsrep_log_error "Line $LINENO"
+                    wsrep_log_error "****************************************************** "
+                    exit 2
+                fi
+            elif [[ $line =~ ^error= ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "The donor reported an error : ${line#*=}"
+                wsrep_log_error "****************************************************** "
+                wsrep_log_info "..............rsync failed"
+                exit 32
+            elif [[ $line =~ ^transfer_type= ]]; then
+                transfer_type=${line#*=}
+            elif [[ $line =~ = ]]; then
+                # This is some unknown setting, so ignore and move on
+                # The UUID:seqno should not contain an "="
+                wsrep_log_warning "Unknown data received: $line"
+            elif [[ -n $line ]]; then
+                # Else (it's the UUID:seqno)
+                # Have to do it this way for backwards compatibility with 5.7
+                rsync_sst_output=$line
+            fi
+        done < $MAGIC_FILE
+    else
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "The rsync process failed (ended without creating $MAGIC_FILE)"
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_info "..............rsync failed"
+
+        # this message should cause joiner to abort
+        echo "rsync process ended without creating '$MAGIC_FILE'"
+        exit 32
+    fi
+
+    if [[ -z $rsync_sst_output ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Did not receive the expected output (uuid:seqno)"
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_info "..............rsync failed"
         exit 32
     fi
 
@@ -388,23 +532,26 @@ EOF
         popd &> /dev/null
     fi
 
-    # We need to determine the transfer_type
+    # The transfer-type was not received (probably from 5.7)
+    # Thus we need to use another method to determine if we received an IST or SST
     # Do this by looking at the rsync transfer logs
-    transfer_type=""
-    if [[ ! -r $RSYNC_LOG_FILE ]]; then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "FATAL: Could not find the rsync log file : $RSYNC_LOG_FILE"
-        wsrep_log_error "****************************************************** "
-        exit 32
+    if [[ -z $transfer_type ]]; then
+        if [[ ! -r $RSYNC_LOG_FILE ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "FATAL: Could not find the rsync log file : $RSYNC_LOG_FILE"
+            wsrep_log_error "****************************************************** "
+            wsrep_log_info "..............rsync failed"
+            exit 32
+        fi
+        # If we're received a file from the mysql/ directory
+        # Then this is an SST, for an IST we will only receive the $MAGIC_FILE
+        if grep -q file:mysql/ "$RSYNC_LOG_FILE"; then
+            transfer_type="sst"
+        else
+            transfer_type="ist"
+        fi
+        wsrep_log_debug "Transfer-type determined to be: $transfer_type"
     fi
-    # If we're received a file from the mysql/ directory
-    # Then this is an SST, for an IST we will only receive the $MAGIC_FILE
-    if grep -q file:mysql/ "$RSYNC_LOG_FILE"; then
-        transfer_type="sst"
-    else
-        transfer_type="ist"
-    fi
-    wsrep_log_debug "Transfer-type determined to be: $transfer_type"
 
     if [[ $transfer_type == "sst" ]]; then
         if [[ -n $keyring_file_data ]]; then
@@ -419,6 +566,7 @@ EOF
                 wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
                 wsrep_log_error "both sides are using a keyring file"
                 wsrep_log_error "****************************************************** "
+                wsrep_log_info "..............rsync failed"
                 exit 32
             fi
         else
@@ -430,21 +578,42 @@ EOF
                 wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
                 wsrep_log_error "both sides are using a keyring file"
                 wsrep_log_error "****************************************************** "
+                wsrep_log_info "..............rsync failed"
                 rm -rf $KEYRING_FILE
                 exit 32
             fi
         fi
     fi
 
-    if [[ -r $MAGIC_FILE ]]; then
-        cat "$MAGIC_FILE" # output UUID:seqno
-    else
-        # this message should cause joiner to abort
-        echo "rsync process ended without creating '$MAGIC_FILE'"
-    fi
-
     wsrep_cleanup_progress_file
     wsrep_log_info "..............rsync completed"
+
+    #-----------------------------------------------------------------------
+    # start mysql-upgrade execution.
+    #-----------------------------------------------------------------------
+
+    # Read the values of the wsrep_state.dat
+    if [[ -r "${WSREP_SST_OPT_DATA}/wsrep_state.dat" ]]; then
+        read_variables_from_wsrep_state "${WSREP_SST_OPT_DATA}/wsrep_state.dat"
+        [[ $? -ne 0 ]] && exit 2
+    fi
+
+    wsrep_log_info "Running post-processing ..........."
+    set +e
+    run_post_processing_steps "$WSREP_SST_OPT_DATA" "$RSYNC_PORT" \
+        "$DONOR_MYSQL_VERSION" "$MYSQL_VERSION" "rsync" "$transfer_type" "$force_upgrade" "$auto_upgrade"
+    errcode=$?
+    set -e
+    if [[ $errcode -ne 0 ]]; then
+        wsrep_log_info "...........post-processing failed.  Exiting"
+        exit $errcode
+    else
+        wsrep_log_info "...........post-processing done"
+    fi
+
+    # If we get here, everything should have succeeded
+    echo "$rsync_sst_output" # output UUID:seqno
+
 else
     wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "Unrecognized role: '$WSREP_SST_OPT_ROLE'"
@@ -452,6 +621,7 @@ else
     exit 22 # EINVAL
 fi
 
-rm -f $BINLOG_TAR_FILE || :
+rm -f $BINLOG_TAR_FILE
+BINLOG_TAR_FILE=""
 
 exit 0

@@ -36,22 +36,17 @@ help:
 
 clean:
 	-rm -rf $(BUILDDIR)/*
-	-rm -f source/percona-theme/built
 
-source/percona-theme/built:
+html:
 	@echo "Downloading percona-theme ..."
-	@wget -O percona-theme.tar.gz https://www.percona.com/docs/theme-1-4/percona-xtradb-cluster/5.6/
+	@wget -O percona-theme.tar.gz https://www.percona.com/docs/theme-1-4/percona-server/5.6
 	@echo "Extracting theme."
-	@tar -zxf percona-theme.tar.gz
+	@tar -mzxf percona-theme.tar.gz
 	@rm -rf source/percona-theme
 	@mv percona-theme-1-4 source/percona-theme
 	@rm percona-theme.tar.gz
-	@touch source/percona-theme/built
-
-theme:  source/percona-theme/built
-
-html:   theme
 	@echo "Building html doc"
+
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."

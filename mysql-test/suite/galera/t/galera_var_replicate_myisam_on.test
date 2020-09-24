@@ -3,8 +3,11 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
+--connection node_1
+--disable_query_log
+call mtr.add_suppression("Ignoring error 'Duplicate entry '1' for key 't1.PRIMARY");
+--enable_query_log
 
 --connection node_1
 SET SESSION wsrep_replicate_myisam = TRUE;
@@ -127,6 +130,8 @@ START TRANSACTION;
 INSERT INTO t1 VALUES (1);
 INSERT INTO t2 VALUES (1);
 
+--connection node_1
+
 --connection node_2
 # The MyISAM update is replicated immediately, so a duplicate key error happens even before the COMMIT
 --error ER_DUP_ENTRY
@@ -135,6 +140,10 @@ INSERT INTO t1 VALUES (1);
 --connection node_1
 COMMIT;
 SET AUTOCOMMIT=ON;
+#
+# for duplicate key error
+call mtr.add_suppression("Query apply failed.*");
+call mtr.add_suppression("Ignoring error 'Duplicate entry '1' for key 'PRIMARY''");
 
 DROP TABLE t1;
 DROP TABLE t2;

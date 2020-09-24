@@ -1,0 +1,28 @@
+select @@wsrep_trx_fragment_size;
+@@wsrep_trx_fragment_size
+0
+set global wsrep_trx_fragment_size = default;
+ERROR 42000: Variable 'wsrep_trx_fragment_size' can't be set to the value of 'DEFAULT'
+select @@wsrep_trx_fragment_size;
+@@wsrep_trx_fragment_size
+0
+set global wsrep_trx_fragment_size=102400;
+ERROR 42000: Variable 'wsrep_trx_fragment_size' can't be set to the value of '102400'
+select @@wsrep_trx_fragment_size;
+@@wsrep_trx_fragment_size
+0
+set global wsrep_trx_fragment_size=1000000000000;
+ERROR 42000: Variable 'wsrep_trx_fragment_size' can't be set to the value of '1000000000000'
+select @@wsrep_trx_fragment_size;
+@@wsrep_trx_fragment_size
+0
+set global wsrep_trx_fragment_size=-1;
+ERROR 42000: Variable 'wsrep_trx_fragment_size' can't be set to the value of '-1'
+select @@wsrep_trx_fragment_size;
+@@wsrep_trx_fragment_size
+0
+set session wsrep_trx_fragment_size=10000;
+ERROR 42000: Variable 'wsrep_trx_fragment_size' can't be set to the value of '10000'
+select @@wsrep_trx_fragment_size;
+@@wsrep_trx_fragment_size
+0

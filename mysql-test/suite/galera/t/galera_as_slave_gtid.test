@@ -7,13 +7,12 @@
 # In addition to performing DDL and DML, we check that the gtid of the master is preserved inside the cluster
 #
 
---source include/have_innodb.inc
 --source include/have_log_bin.inc
 --source include/force_restart.inc
 
 # As node #1 is not a Galera node, we connect to node #2 in order to run include/galera_cluster.inc
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
---source include/galera_cluster.inc
+--source include/galera_cluster_master_slave.inc
 
 --connection node_2
 --disable_query_log
@@ -33,7 +32,7 @@ SHOW BINARY LOGS;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
 --connection node_2
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
@@ -48,7 +47,7 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /table_id: [0-9]+/table_id: #/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 125;
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
@@ -65,7 +64,7 @@ SELECT COUNT(*) = 1 FROM t1;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /table_id: [0-9]+/table_id: #/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000004' FROM 125;
 
 --connection node_1
 DROP TABLE t1;

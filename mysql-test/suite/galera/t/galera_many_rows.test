@@ -1,7 +1,6 @@
 
 --source include/big_test.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --connection node_1
 SET SESSION innodb_lock_wait_timeout=600;

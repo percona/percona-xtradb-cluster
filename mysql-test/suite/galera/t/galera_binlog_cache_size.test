@@ -4,7 +4,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 CREATE TABLE t1 (f1 VARCHAR(767)) ENGINE=InnoDB;
 CREATE TABLE ten (f1 INTEGER);

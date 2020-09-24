@@ -13,7 +13,7 @@ SET wsrep_sync_wait=0;
 #
 # we will count number of replaying during this test
 #
---let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 
 #
 # make sure event scheduling is disbaled
@@ -84,7 +84,7 @@ SELECT * FROM t;
 #
 # verify that event replaying happened
 #
---let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 1 AS wsrep_local_replays;
 --enable_query_log
@@ -103,6 +103,5 @@ select "node1", id, j from t;
 # cleanup
 #
 --connection node_1
-SET GLOBAL event_scheduler = OFF;
 DROP EVENT e_minutely;
 DROP TABLE t;

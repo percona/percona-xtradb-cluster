@@ -1,6 +1,5 @@
 # Test fragmentation over configuration changes
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 # This tc set debug sync point and so need galera library build in debug mode
 --source include/have_debug.inc
 

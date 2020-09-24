@@ -1,0 +1,51 @@
+CREATE TABLE ten (f1 INTEGER);
+INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
+#node-1
+CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
+INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;
+#node-2
+SELECT COUNT(*) = 10000 from t1;
+COUNT(*) = 10000
+1
+DROP TABLE t1;
+#node-2 being killed
+Killing server ...
+#node-1
+CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
+begin;
+INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten as a5;
+#node-2 restarted
+# restart
+SELECT COUNT(*) = 0 from t1;
+COUNT(*) = 0
+1
+#node-1
+commit;
+SELECT COUNT(*) = 100000 from t1;
+COUNT(*) = 100000
+1
+#node-2
+DROP TABLE t1;
+#node-2 being shutdown 
+#node-1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY AUTO_INCREMENT) ENGINE=InnoDB;
+CREATE PROCEDURE proc_insert ()
+BEGIN
+DECLARE i INT;
+DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
+SET SESSION wsrep_sync_wait = 0;
+SET i = 0;
+WHILE i < 1000 DO
+INSERT INTO t1 VALUES (DEFAULT);
+SET i = i + 1;
+END WHILE;
+END|
+CALL proc_insert();
+SELECT COUNT(*) from t1;
+COUNT(*)
+1000
+#node-2 restart
+# restart
+#node-2
+DROP TABLE t1;
+DROP PROCEDURE proc_insert;

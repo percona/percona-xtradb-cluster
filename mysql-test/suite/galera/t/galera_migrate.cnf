@@ -10,6 +10,8 @@ binlog-format=row
 innodb_autoinc_lock_mode=2
 innodb_flush_log_at_trx_commit=2
 log-bin=mysqld-bin
+mysqlx=0
+wsrep_debug=1
 
 wsrep_node_address=127.0.0.1
 wsrep_causal_reads=ON

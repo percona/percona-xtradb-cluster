@@ -4,7 +4,6 @@
 # and wsrep_ready becomes 0.
 #
 
---source include/have_innodb.inc
 --source include/galera_cluster.inc
 
 # Force node_2 gcomm background thread to terminate via exception.
@@ -16,13 +15,13 @@ SET SESSION wsrep_sync_wait = 0;
 SET GLOBAL wsrep_provider_options="gmcast.isolate=2";
 
 # Wait until wsrep_ready becomes 0.
---let $wait_condition = SELECT VARIABLE_VALUE = 0 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME ='wsrep_ready'
+--let $wait_condition = SELECT VARIABLE_VALUE = 0 FROM performance_schema.global_status WHERE VARIABLE_NAME ='wsrep_ready'
 --source include/wait_condition.inc
 
 # Wait until node_1 ends up in non-prim and rebootstrap the cluster.
 --connection node_1
 SET SESSION wsrep_sync_wait = 0;
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME ='wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME ='wsrep_cluster_size'
 --source include/wait_condition.inc
 SHOW STATUS LIKE 'wsrep_cluster_status';
 SET SESSION wsrep_sync_wait = default;
@@ -34,4 +33,4 @@ SET SESSION wsrep_on=0;
 --source include/restart_mysqld.inc
 
 --connection node_2
-CALL mtr.add_suppression("WSREP: exception from gcomm, backend must be restarted: Gcomm backend termination was requested by setting gmcast.isolate=2.");
+CALL mtr.add_suppression("exception from gcomm, backend must be restarted: Gcomm backend termination was requested by setting gmcast.isolate=2.");

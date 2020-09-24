@@ -13,20 +13,16 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
    USA */
-
-#define MYSQL_SERVER 1
-
 #include "ha_rockspart.h"
-#include "../../sql/table.h"
 #include "ha_rocksdb.h"
-#include "item.h"
 
 using myrocks::ha_rocksdb;
 namespace myrocks {
 extern handlerton *rocksdb_hton;
 }
 
-handler *ha_rockspart::get_file_handler(TABLE_SHARE *share, MEM_ROOT *alloc) {
+handler *ha_rockspart::get_file_handler(TABLE_SHARE *share,
+                                        MEM_ROOT *alloc) const {
   ha_rocksdb *file = new (alloc) ha_rocksdb(myrocks::rocksdb_hton, share);
   file->init();
   return file;
@@ -37,15 +33,18 @@ void ha_rockspart::set_pk_can_be_decoded_for_each_partition() {
     (*file)->set_pk_can_be_decoded(m_pk_can_be_decoded);
 }
 
-int ha_rockspart::open(const char *name, int mode, uint test_if_locked) {
-  int result = native_part::Partition_base::open(name, mode, test_if_locked);
+int ha_rockspart::open(const char *name, int mode, uint test_if_locked,
+                       const dd::Table *table_def) {
+  int result =
+      native_part::Partition_base::open(name, mode, test_if_locked, table_def);
   set_pk_can_be_decoded_for_each_partition();
   return result;
 }
 
 int ha_rockspart::create(const char *name, TABLE *form,
-                         HA_CREATE_INFO *create_info) {
-  int result = native_part::Partition_base::create(name, form, create_info);
+                         HA_CREATE_INFO *create_info, dd::Table *table_def) {
+  int result =
+      native_part::Partition_base::create(name, form, create_info, table_def);
   set_pk_can_be_decoded_for_each_partition();
   return result;
 }
@@ -70,15 +69,13 @@ handler *ha_rockspart::clone(const char *name, MEM_ROOT *mem_root) {
 
   DBUG_ENTER("ha_rockspart::clone");
 
-  /* If this->table == nullptr, then the current handler has been created but not
-  opened. Prohibit cloning such handler. */
-  if (!table)
-    DBUG_RETURN(nullptr);
+  /* If this->table == nullptr, then the current handler has been created but
+  not opened. Prohibit cloning such handler. */
+  if (!table) DBUG_RETURN(nullptr);
 
   new_handler =
       new (mem_root) ha_rockspart(ht, table_share, m_part_info, this, mem_root);
-  if (!new_handler)
-    DBUG_RETURN(nullptr);
+  if (!new_handler) DBUG_RETURN(nullptr);
 
   /*
     Allocate new_handler->ref here because otherwise ha_open will allocate it
@@ -86,7 +83,7 @@ handler *ha_rockspart::clone(const char *name, MEM_ROOT *mem_root) {
     when the clone handler object is destroyed.
   */
   if (!(new_handler->ref =
-            (uchar *)alloc_root(mem_root, ALIGN_SIZE(ref_length) * 2)))
+            (uchar *)mem_root->Alloc(ALIGN_SIZE(ref_length) * 2)))
     goto err;
 
   /* We will not use clone() interface to clone individual partition
@@ -95,7 +92,7 @@ handler *ha_rockspart::clone(const char *name, MEM_ROOT *mem_root) {
   info in TABLE_SHARE. New partition handlers are created for each partiton
   in native_part::Partition_base::open() */
   if (new_handler->ha_open(table, name, table->db_stat,
-                           HA_OPEN_IGNORE_IF_LOCKED | HA_OPEN_NO_PSI_CALL))
+                           HA_OPEN_IGNORE_IF_LOCKED, nullptr))
     goto err;
 
   new_handler->m_pk_can_be_decoded = m_pk_can_be_decoded;
@@ -113,16 +110,4 @@ ulong ha_rockspart::index_flags(uint idx, uint part, bool all_parts) const {
                                           part, all_parts);
 }
 
-const char **ha_rockspart::bas_ext() const {
-  static const char *null_ext = nullptr;
-  return &null_ext;
-}
-
-/** Get partition row type
-@param[in] Id of partition for which row type to be retrieved
-@return Partition row type */
-enum row_type ha_rockspart::get_partition_row_type(
-        uint part_id)
-{
-  return get_row_type();
-}
+bool ha_rockspart::rpl_lookup_rows() { return true; }

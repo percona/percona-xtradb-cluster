@@ -10,7 +10,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/have_debug_sync.inc
 --source suite/galera/include/galera_have_debug_sync.inc
 

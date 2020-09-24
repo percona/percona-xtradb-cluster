@@ -1,6 +1,3 @@
---source include/not_embedded.inc
---source include/have_statement_timeout.inc
---source include/have_query_cache.inc
 --source include/have_debug.inc
 --source include/not_valgrind.inc
 --source include/big_test.inc
@@ -19,19 +16,14 @@ CREATE PROCEDURE load_test_data()
 BEGIN
 
 DECLARE cnt INTEGER UNSIGNED DEFAULT 1;
-	INSERT INTO fttest04(str, str2) VALUES('徳島県','徳島県');
-	WHILE (cnt <= 19) DO
-		INSERT INTO fttest04(str, str2) SELECT str, str2 FROM fttest04;
+	WHILE (cnt <= 600220) DO
+		INSERT INTO fttest04(str, str2) VALUES('徳島県','徳島県');
 		SET cnt= cnt+1;
 	END WHILE;
-	INSERT INTO fttest04(str, str2) SELECT str, str2 FROM fttest04 LIMIT 75932;
 END|
 DELIMITER ;|
 
-SET autocommit=OFF;
 CALL load_test_data();
-COMMIT;
-SET autocommit=default;
 DROP PROCEDURE load_test_data;
 
 --enable_result_log

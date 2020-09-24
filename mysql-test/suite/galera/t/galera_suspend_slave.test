@@ -5,7 +5,6 @@
 ##
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
@@ -23,6 +22,13 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 	system("kill -SIGSTOP $mysqld_pid");
 	exit(0);
 EOF
+
+SET SESSION wsrep_sync_wait = 0;
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+SET SESSION wsrep_sync_wait = 15;
 
 --error ER_UNKNOWN_COM_ERROR,ER_LOCK_WAIT_TIMEOUT,ER_LOCK_DEADLOCK
 INSERT INTO t1 VALUES (1);

@@ -1,0 +1,45 @@
+#
+# Test different setting option for wsrep_trx_fragment_unit
+
+# Save initial value
+--let $saved_wsrep_trx_fragment_unit = `SELECT @@global.wsrep_trx_fragment_unit`
+select @@wsrep_trx_fragment_unit;
+
+#
+# try to set default value
+set global wsrep_trx_fragment_unit = default;
+select @@wsrep_trx_fragment_unit;
+
+#
+# try to different valid values
+set global wsrep_trx_fragment_unit=0;
+select @@wsrep_trx_fragment_unit;
+set global wsrep_trx_fragment_unit=1;
+select @@wsrep_trx_fragment_unit;
+set global wsrep_trx_fragment_unit=2;
+select @@wsrep_trx_fragment_unit;
+
+#
+# try to different invalid values
+--error ER_WRONG_VALUE_FOR_VAR
+set global wsrep_trx_fragment_unit=1000;
+select @@wsrep_trx_fragment_unit;
+#
+--error ER_WRONG_VALUE_FOR_VAR
+set global wsrep_trx_fragment_unit=-1;
+select @@wsrep_trx_fragment_unit;
+
+#
+# try to valid value at session level
+set session wsrep_trx_fragment_unit=0;
+select @@wsrep_trx_fragment_unit;
+set session wsrep_trx_fragment_unit=1;
+select @@wsrep_trx_fragment_unit;
+set session wsrep_trx_fragment_unit=2;
+select @@wsrep_trx_fragment_unit;
+
+# Clean up
+--disable_query_log
+--eval SET GLOBAL wsrep_trx_fragment_unit = $saved_wsrep_trx_fragment_unit
+--enable_query_log
+

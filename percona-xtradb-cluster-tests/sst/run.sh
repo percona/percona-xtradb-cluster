@@ -35,6 +35,82 @@ SUCCESSFUL_COUNT=0
 TOTAL_COUNT=0
 TOTAL_TIME=0
 
+# Returns the version string in a standardized format
+# Input "1.2.3" => echoes "010203"
+# Wrongly formatted values => echoes "000000"
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   Parameter 1: a version string
+#                like "5.1.12"
+#                anything after the major.minor.revision is ignored
+# Outputs:
+#   A string that can be used directly with string comparisons.
+#   So, the string "5.1.12" is transformed into "050112"
+#   Note that individual version numbers can only go up to 99.
+#
+function normalize_version()
+{
+    local major=0
+    local minor=0
+    local patch=0
+
+    # Only parses purely numeric version numbers, 1.2.3
+    # Everything after the first three values are ignored
+    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([^ ])* ]]; then
+        major=${BASH_REMATCH[1]}
+        minor=${BASH_REMATCH[2]}
+        patch=${BASH_REMATCH[3]}
+    fi
+
+    printf %02d%02d%02d $major $minor $patch
+}
+
+# Compares two version strings
+#   The version strings passed in will be normalized to a
+#   string-comparable version.
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   Parameter 1: The left-side of the comparison
+#   Parameter 2: the comparison operation
+#                   '>', '>=', '=', '==', '<', '<='
+#   Parameter 3: The right-side of the comparison
+#
+# Returns:
+#   Returns 0 (success) if param1 op param2
+#   Returns 1 (failure) otherwise
+#
+function compare_versions()
+{
+    local version_1="$( normalize_version $1 )"
+    local op=$2
+    local version_2="$( normalize_version $3 )"
+
+    if [[ ! " = == > >= < <= " =~ " $op " ]]; then
+        wsrep_log_error "******************* ERROR ********************** "
+        wsrep_log_error "Unknown operation : $op"
+        wsrep_log_error "Must be one of : = == > >= < <="
+        wsrep_log_error "******************* ERROR ********************** "
+        return 1
+    fi
+
+    [[ $op == "<"  &&   $version_1 <  $version_2 ]] && return 0
+    [[ $op == "<=" && ! $version_1 >  $version_2 ]] && return 0
+    [[ $op == "="  &&   $version_1 == $version_2 ]] && return 0
+    [[ $op == "==" &&   $version_1 == $version_2 ]] && return 0
+    [[ $op == ">"  &&   $version_1 >  $version_2 ]] && return 0
+    [[ $op == ">=" && ! $version_1 <  $version_2 ]] && return 0
+
+    return 1
+}
+
+MYSQL_VERSION_CHECK=$(${MYSQL_BASEDIR}/bin/mysqld --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1)
+
 function usage()
 {
 cat <<EOF
@@ -299,17 +375,24 @@ function set_vars()
     else
 	TAR=tar
     fi
-
-    find_program MYSQL_INSTALL_DB mysql_install_db $MYSQL_BASEDIR/bin \
-	$MYSQL_BASEDIR/scripts
+    # Check mysql_install_db script if the version is below 8.0.0. mysql_install_db script is not present in 8.0.0 version.
+    if compare_versions $MYSQL_VERSION_CHECK "<" "8.0.0" ; then
+      find_program MYSQL_INSTALL_DB mysql_install_db $MYSQL_BASEDIR/bin \
+        $MYSQL_BASEDIR/scripts
+    fi
     find_program MYSQLD mysqld $MYSQL_BASEDIR/bin/ $MYSQL_BASEDIR/libexec
     # Use the global mysql client binary, if available. This is a workaround for
     # PS packageing bug LP 1153950
     if which mysql >/dev/null 2>&1
     then
-        MYSQL=`which mysql`
+        # Check mysql client binary if the version is below 5.7.0 (LP 1153950 is fixed in 5.6.10)
+        if compare_versions $MYSQL_VERSION_CHECK "<" "5.7.0" ; then
+          MYSQL=`which mysql`
+        else
+          find_program MYSQL mysql $MYSQL_BASEDIR/bin
+        fi
     else
-    find_program MYSQL mysql $MYSQL_BASEDIR/bin
+        find_program MYSQL mysql $MYSQL_BASEDIR/bin
     fi
     find_program MYSQLADMIN mysqladmin $MYSQL_BASEDIR/bin
     find_program MYSQLDUMP mysqldump $MYSQL_BASEDIR/bin
@@ -448,7 +531,7 @@ function get_version_info()
             ;;
         5.5 )
             ;;
-        5.6 | 10.0 | 5.7 )
+        5.6 | 10.0 | 5.7 | 8.0 )
             DEFAULT_IBDATA_SIZE="12M"
             ;;
         *)

@@ -4,7 +4,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 
@@ -16,6 +15,11 @@ INSERT INTO t1 VALUES (1);
 
 CREATE USER 'demo'@'localhost' IDENTIFIED BY 's3kr3t';
 
+# PXC-2992
+CREATE COMPRESSION_DICTIONARY numbers('');
+CREATE TABLE t3(id INT,a BLOB COLUMN_FORMAT COMPRESSED WITH COMPRESSION_DICTIONARY numbers);
+INSERT INTO t3 VALUES(1, "abc");
+
 SET SESSION sql_log_bin = 1;
 
 INSERT INTO t1 VALUES (2);
@@ -24,6 +28,13 @@ SELECT @@global.gtid_executed;
 
 --connection node_2
 CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t2'' on query");
+call mtr.add_suppression("Ignoring error 'Unknown table 'test.t2'' on query");
+CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t3'' on query");
+call mtr.add_suppression("Ignoring error 'Unknown table 'test.t3'' on query");
+CALL mtr.add_suppression("Slave SQL: Error 'Compression dictionary 'numbers' does not exist'");
+call mtr.add_suppression("Ignoring error 'Compression dictionary 'numbers' does not exist'");
+call mtr.add_suppression("Query apply failed.*");
+
 SELECT COUNT(*) = 1 FROM t1;
 SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 1;
 SHOW TABLES;
@@ -33,6 +44,8 @@ DROP USER 'demo'@'localhost';
 --connection node_1
 DROP TABLE t1;
 DROP TABLE t2;
+DROP TABLE t3;
+DROP COMPRESSION_DICTIONARY numbers;
 
 
 #-------------------------------------------------------------------------------

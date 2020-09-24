@@ -6,7 +6,7 @@ SET rocksdb_bulk_load_allow_unsorted=1;
 ### Test individual INSERTs ###
 
 # A table with only a PK won't have rows until the bulk load is finished
-eval CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a) COMMENT "$pk_cf")
+eval CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a) COMMENT "cfname=$pk_cf")
      ENGINE=ROCKSDB;
 SET rocksdb_bulk_load=1;
 --disable_query_log
@@ -28,7 +28,7 @@ SELECT * FROM t1 FORCE INDEX (PRIMARY);
 DROP TABLE t1;
 
 # A table with a PK and a SK shows rows immediately
-eval CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a) COMMENT "$pk_cf", KEY(b))
+eval CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a) COMMENT "cfname=$pk_cf", KEY(b))
      ENGINE=ROCKSDB;
 SET rocksdb_bulk_load=1;
 --disable_query_log
@@ -51,9 +51,9 @@ SELECT * FROM t1 FORCE INDEX (PRIMARY);
 DROP TABLE t1;
 
 # Inserting into another table finishes bulk load to the previous table
-eval CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a) COMMENT "$pk_cf")
+eval CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a) COMMENT "cfname=$pk_cf")
      ENGINE=ROCKSDB;
-eval CREATE TABLE t2(a INT, b INT, PRIMARY KEY(a) COMMENT "$pk_cf")
+eval CREATE TABLE t2(a INT, b INT, PRIMARY KEY(a) COMMENT "cfname=$pk_cf")
      ENGINE=ROCKSDB;
 
 SET rocksdb_bulk_load=1;
@@ -68,11 +68,11 @@ SELECT * FROM t1 FORCE INDEX (PRIMARY);
 DROP TABLE t1, t2;
 
 ### Test bulk load from a file ###
-eval CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a) COMMENT "$pk_cf")
+eval CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a) COMMENT "cfname=$pk_cf")
      ENGINE=ROCKSDB;
-eval CREATE TABLE t2(a INT, b INT, PRIMARY KEY(b) COMMENT "$pk_cf")
+eval CREATE TABLE t2(a INT, b INT, PRIMARY KEY(b) COMMENT "cfname=$pk_cf")
      ENGINE=ROCKSDB;
-eval CREATE TABLE t3(a INT, b INT, PRIMARY KEY(a) COMMENT "$pk_cf")
+eval CREATE TABLE t3(a INT, b INT, PRIMARY KEY(a) COMMENT "cfname=$pk_cf")
      ENGINE=ROCKSDB PARTITION BY KEY() PARTITIONS 4;
 
 --let $file = `SELECT CONCAT(@@datadir, "test_loadfile.txt")`
@@ -98,9 +98,10 @@ EOF
 # Make sure a snapshot held by another user doesn't block the bulk load
 connect (other,localhost,root,,);
 set session transaction isolation level repeatable read;
-select * from information_schema.rocksdb_dbstats where stat_type='DB_NUM_SNAPSHOTS';
 start transaction with consistent snapshot;
-select * from information_schema.rocksdb_dbstats where stat_type='DB_NUM_SNAPSHOTS';
+
+# Assert that there is a pending snapshot
+select VALUE > 0 as 'Has opened snapshots' from information_schema.rocksdb_dbstats where stat_type='DB_NUM_SNAPSHOTS';
 
 connection default;
 set rocksdb_bulk_load=1;
@@ -118,12 +119,12 @@ set rocksdb_bulk_load=0;
 --remove_file $file
 
 # Make sure row count index stats are correct
---replace_column 6 # 7 # 8 # 9 # 10 #
+--replace_column 6 # 7 # 8 # 9 # 10 # 12 # 13 #
 SHOW TABLE STATUS WHERE name LIKE 't%';
 
 ANALYZE TABLE t1, t2, t3;
 
---replace_column 6 # 7 # 8 # 9 # 10 #
+--replace_column 6 # 7 # 8 # 9 # 10 # 12 # 13 #
 SHOW TABLE STATUS WHERE name LIKE 't%';
 
 # Make sure all the data is there.

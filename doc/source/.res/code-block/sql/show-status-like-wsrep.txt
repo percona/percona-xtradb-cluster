@@ -1,0 +1,25 @@
+
+.. code-block:: sql
+
+   mysql@pxc2> show status like 'wsrep%';
+   +----------------------------------+--------------------------------------------------+
+   | Variable_name                    | Value                                            |
+   +----------------------------------+--------------------------------------------------+
+   | wsrep_local_state_uuid           | a08247c1-5807-11ea-b285-e3a50c8efb41             |
+   | ...                              | ...                                              |
+   | wsrep_local_state                | 4                                                |
+   | wsrep_local_state_comment        | Synced                                           |
+   | ...                              |                                                  |
+   | wsrep_cluster_size               | 2                                                |
+   | wsrep_cluster_status             | Primary                                          |
+   | wsrep_connected                  | ON                                               |
+   | ...                              | ...                                              |
+   | wsrep_provider_capabilities      | :MULTI_MASTER:CERTIFICATION: ...                 |
+   | wsrep_provider_name              | Galera                                           |
+   | wsrep_provider_vendor            | Codership Oy <info@codership.com>                |
+   | wsrep_provider_version           | 4.3(r752664d)                                    |
+   | wsrep_ready                      | ON                                               |
+   | ...                              | ...                                              |
+   +----------------------------------+--------------------------------------------------+
+   75 rows in set (0.00 sec)
+   

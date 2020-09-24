@@ -1,155 +1,97 @@
+CREATE TABLE ten (f1 INTEGER);
+INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 #node-1
-use test;
-create table t1 (i int, primary key pk(i)) encryption='y';
-create table t2 (i int, primary key pk(i));
-insert into t1 values (1), (2), (3);
-insert into t1 values (10), (20), (30);
-select * from t1;
-i
-1
-2
-3
-10
-20
-30
-show create table t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
-  PRIMARY KEY (`i`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
-Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	123	Start_encryption	1	163	
+CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
+INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
 #node-2
-select * from t1;
-i
+SELECT COUNT(*) = 10000 from t1;
+COUNT(*) = 10000
 1
-2
-3
-10
-20
-30
-show create table t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
-  PRIMARY KEY (`i`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
-select * from t2;
-i
-show create table t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `i` int(11) NOT NULL,
-  PRIMARY KEY (`i`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
-drop table t1, t2;
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
-Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	123	Start_encryption	2	163	
+DROP TABLE t1;
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
 #node-2 being killed
 Killing server ...
 #node-1
-use test;
-create table t1 (i int, primary key pk(i)) encryption='y';
-create table t2 (i int, primary key pk(i));
-insert into t1 values (1), (2), (3);
-insert into t1 values (10), (20), (30);
-select * from t1;
-i
-1
-2
-3
-10
-20
-30
-show create table t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
-  PRIMARY KEY (`i`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
-Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	123	Start_encryption	1	163	
-#node-2 restarted (should get encrypted table through SST)
+CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
+INSERT INTO t1 (f2) SELECT a1.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten as a5;
+#node-1a (open read only transaction)
+begin;
+select count(*) from t1 where f1 > 1000;
+count(*)
+99000
+#node-1b (open read only transaction)
+begin;
+select count(*) from t1 where f1 < 1000;
+count(*)
+999
+#node-1 (open trx that would involve use of undo)
+update t1 set f2 = 9999999 where f1 > 1000;
+begin;
+update t1 set f2 = 8888888 where f1 < 1000;
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+#node-2 restarted
 # restart
-select * from t1;
-i
+SELECT COUNT(*) = 0 from t1 where f2 = 8888888;
+COUNT(*) = 0
 1
-2
-3
-10
-20
-30
-show create table t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
-  PRIMARY KEY (`i`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
-select * from t2;
-i
-show create table t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `i` int(11) NOT NULL,
-  PRIMARY KEY (`i`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
-drop table t1, t2;
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
-Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	123	Start_encryption	2	163	
-#node-2 being shutdown
+SELECT COUNT(*) from t1 where f2 = 9999999;
+COUNT(*)
+99000
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
 #node-1
-use test;
-create table t1 (i int, primary key pk(i)) encryption='y';
-create table t2 (i int, primary key pk(i));
-insert into t1 values (1), (2), (3);
-insert into t1 values (10), (20), (30);
-select * from t1;
-i
-1
-2
-3
-10
-20
-30
-show create table t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
-  PRIMARY KEY (`i`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
-Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	123	Start_encryption	1	163	
+commit;
+#node-1a
+commit;
+#node-1b
+commit;
+#node-2
+DROP TABLE t1;
+#node-2 being shutdown 
+#node-1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY AUTO_INCREMENT) ENGINE=InnoDB;
+CREATE PROCEDURE proc_insert ()
+BEGIN
+DECLARE i INT;
+DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
+SET SESSION wsrep_sync_wait = 0;
+SET i = 0;
+WHILE i < 10000 DO
+INSERT INTO t1 VALUES (DEFAULT);
+SET i = i + 1;
+END WHILE;
+END|
+CALL proc_insert();
+SELECT COUNT(*) from t1;
+COUNT(*)
+10000
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
 #node-2 restarted (should get encrypted table through IST)
 # restart
-select * from t1;
-i
-1
-2
-3
-10
-20
-30
-show create table t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `i` int(11) NOT NULL,
-  PRIMARY KEY (`i`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ENCRYPTION='y'
-select * from t2;
-i
-show create table t2;
-Table	Create Table
-t2	CREATE TABLE `t2` (
-  `i` int(11) NOT NULL,
-  PRIMARY KEY (`i`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
-drop table t1, t2;
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123 LIMIT 1;
-Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	123	Start_encryption	2	163	
+SHOW BINARY LOGS;
+Log_name	File_size	Encrypted
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+mysqld-bin.NUMBER	NUMBER	Yes
+#node-2
+DROP TABLE t1;
+DROP PROCEDURE proc_insert;

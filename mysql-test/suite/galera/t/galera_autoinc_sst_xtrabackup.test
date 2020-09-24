@@ -5,9 +5,9 @@
 
 --source include/big_test.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --connection node_1
+--echo #node-1
 --let $connection_id = `SELECT CONNECTION_ID()`
 --let $wsrep_sync_wait_orig = `SELECT @@global.wsrep_sync_wait`
 set global wsrep_sync_wait=0;
@@ -23,7 +23,8 @@ BEGIN
 	DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
 
 	WHILE 1 DO
-	        INSERT INTO t1 VALUES (DEFAULT);
+	    INSERT INTO t1 VALUES (DEFAULT);
+	    DO SLEEP(0.1);
 		COMMIT;
 	END WHILE;
 END|
@@ -40,19 +41,32 @@ DELIMITER ;|
 
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
 --connection node_2a
+--echo #node-2a
 --source include/kill_galera.inc
 
 --sleep 10
 --source include/start_mysqld.inc
---sleep 25
+#--sleep 25
 --source include/wait_until_connected_again.inc
 
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--echo #node-1a
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--connection node_2a
+--echo #node-2a
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_ready';
+--source include/wait_condition.inc
 INSERT INTO t1 VALUES (DEFAULT);
 
 # Terminate the stored procedure
 
---connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
 --connection node_1a
+--echo #node-1a
 --disable_query_log
 --eval KILL CONNECTION $connection_id
 --enable_query_log
@@ -60,11 +74,13 @@ INSERT INTO t1 VALUES (DEFAULT);
 INSERT INTO t1 VALUES (DEFAULT);
 
 --connection node_1
+--echo #node-1
 # CR_SERVER_LOST
 --error 2013,2006
 --reap
 
 --connection node_2
+--echo #node-2
 # CR_SERVER_LOST
 --error 2013,2006
 --reap
@@ -81,7 +97,8 @@ INSERT INTO t1 VALUES (DEFAULT);
 --eval SELECT COUNT(*) = $count AS count_equal FROM t1
 --enable_query_log
 
-CALL mtr.add_suppression("WSREP: Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("Failed to remove page file");
 
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
@@ -94,7 +111,7 @@ DROP PROCEDURE p1;
 DROP TABLE t1;
 
 CALL mtr.add_suppression("gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)");
-CALL mtr.add_suppression("WSREP: Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("Action message in non-primary configuration from member 0");
 
 --connection node_1a
 --disable_query_log

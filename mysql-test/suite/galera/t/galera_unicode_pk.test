@@ -3,11 +3,10 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 CREATE TABLE t1 (
 	f1 VARCHAR(255) PRIMARY KEY
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=UTF8MB4;
 
 INSERT INTO t1 VALUES ('текст');
 

@@ -3,7 +3,6 @@
 # when WSREP is enabled.
 #
 
---source include/have_innodb.inc
 --source include/have_memcached_plugin.inc
 --source suite/galera/include/have_perl_memcached_module.inc
 --source include/galera_cluster.inc
@@ -57,6 +56,7 @@ INSERT INTO t1 VALUES ('bb', 'Goodbye', 0, 0, 0);
 #
 
 INSTALL PLUGIN daemon_memcached SONAME 'libmemcached.so';
+--sleep 2
 
 --echo # Test that the calls fail when WSREP is enabled (text protocol)
 --let $MEMCACHED_SERVER_ADDRESS=127.0.0.1:11017
@@ -85,7 +85,7 @@ INSTALL PLUGIN daemon_memcached SONAME 'libmemcached.so';
 #
 set global wsrep_provider="none";
 
---let $wait_condition = SELECT VARIABLE_VALUE = 0 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 --echo # Test that the calls succeed when WSREP is disabled (text protocol)

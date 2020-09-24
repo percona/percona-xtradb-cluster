@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # Ensure that ALTER LOCK=SHARED works under TOI. It is difficult to check that concurrent operations 

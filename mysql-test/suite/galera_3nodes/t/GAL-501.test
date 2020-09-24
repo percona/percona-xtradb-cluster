@@ -4,7 +4,7 @@
 # wsrep_node_address=[::1]
 # ist.recv_addr=[::1]
 
---source include/galera_cluster.inc
+--source include/galera_cluster_3nodes.inc
 --source include/have_ipv6.inc
 
 # Confirm that initial handshake happened over ipv6

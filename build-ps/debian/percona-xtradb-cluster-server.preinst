@@ -1,0 +1,124 @@
+#!/bin/bash
+
+get_pcount () {
+	PSCOUNT=$(ps -ef | grep "/usr/sbin/mysqld" | wc -l)
+	echo "${PSCOUNT}"
+}
+
+server_stop () {
+        if ! pgrep -x mysqld > /dev/null; then
+                echo 1 > /var/lib/mysql/service.state
+                return;
+        fi
+
+        set +e
+        systemctl is-active mysql@bootstrap.service mysql.service --quiet && EC=$?
+        echo $EC > /var/lib/mysql/service.state
+        systemctl stop mysql@bootstrap.service mysql.service
+        errno=$?
+        set -e
+
+        # 0=ok, 100=no init script (fresh install)
+        if [ "$errno" != 0 -a "$errno" != 100 ]; then
+                echo "'systemctl stop mysql' returned $errno" 1>&2
+                echo "There is a MySQL server running, but we failed in our attempts to stop it." 1>&2
+                echo "Stop it manually and try again!" 1>&2
+                exit 1
+        fi
+}
+
+case "$1" in
+	install)
+
+	if [ -z "$2" ];
+	then
+
+		set -e
+
+		if [ -x "/etc/init.d/mysql" ];
+		then
+			invoke-rc.d mysql stop || exit $?
+			server_stop
+		fi
+
+		MYSQLDATA=/var/lib/mysql
+		MYSQLFILES=/var/lib/mysql-files
+		MYSQLLOG=/var/log/mysql
+		MYSQLRUN=/var/run/mysqld
+		MYSQLKEYRING=/var/lib/mysql-keyring
+
+		if ! getent group mysql >/dev/null;
+		then
+			addgroup --system mysql >/dev/null
+		fi
+
+		if ! getent passwd mysql >/dev/null;
+		then
+			adduser --ingroup mysql --system --disabled-login --no-create-home --home ${MYSQLDATA} --shell /bin/false --gecos "MySQL Server" mysql >/dev/null
+		fi
+
+		if [ ! -d ${MYSQLDATA} -a ! -L ${MYSQLDATA} ];
+		then
+			mkdir ${MYSQLDATA}
+			chown mysql:mysql ${MYSQLDATA}
+			chmod 750 ${MYSQLDATA}
+		fi
+
+		if [ ! -d ${MYSQLFILES} -a ! -L ${MYSQLFILES} ];
+		then
+			mkdir ${MYSQLFILES}
+			chown mysql:mysql ${MYSQLFILES}
+			chmod 770 ${MYSQLFILES}
+		fi
+
+		if [ ! -d ${MYSQLKEYRING} -a ! -L ${MYSQLKEYRING} ];
+		then
+			mkdir ${MYSQLKEYRING}
+			chown mysql:mysql ${MYSQLKEYRING}
+			chmod 750 ${MYSQLKEYRING}
+		fi
+
+		if [ ! -d ${MYSQLLOG} -a ! -L ${MYSQLLOG} ];
+		then
+			mkdir ${MYSQLLOG}
+			chown mysql:adm ${MYSQLLOG}
+			chmod 750 ${MYSQLLOG}
+			touch ${MYSQLLOG}/error.log
+			chmod 640 ${MYSQLLOG}/error.log
+			chown mysql:adm ${MYSQLLOG}/error.log
+		fi
+
+		if [ ! -d ${MYSQLRUN} -a ! -L ${MYSQLRUN} ];
+		then
+			mkdir ${MYSQLRUN}
+			chown mysql:mysql ${MYSQLRUN}
+			chmod 755 ${MYSQLRUN}
+		fi
+
+		set +e
+
+	fi
+
+	;;
+
+	upgrade)
+
+	set -e
+
+	#DEBHELPER#
+	server_stop
+
+	set +e
+
+	;;
+
+	abort-upgrade)
+
+	;;
+
+	*)
+        exit 1
+        ;;
+esac
+
+exit 0

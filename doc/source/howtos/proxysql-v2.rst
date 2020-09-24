@@ -4,10 +4,10 @@
 The |proxysql-admin| Tool with ProxySQL v2
 ================================================================================
 
-With |proxysql| 2.0.3, the |proxysql-admin| tool now uses the native ProxySQL
-support for |PXC| and does not require custom bash scripts to keep track of PXC
-status. As a result, proxysql_galera_checker and proxysql_node_monitor have been
-removed.
+With |proxysql| 2.0.3, the |proxysql-admin| tool now uses the native |proxysql|
+support for |PXC| and does not require custom bash scripts to keep track of
+|PXC| status. As a result, ``proxysql_galera_checker`` and
+``proxysql_node_monitor`` have been removed.
 
 Summary of Changes in |proxysql-admin| Tool with ProxySQL v2
 ================================================================================
@@ -18,36 +18,71 @@ Summary of Changes in |proxysql-admin| Tool with ProxySQL v2
 Added Features
 --------------------------------------------------------------------------------
 
-- New option ``--use-ssl`` to use SSL for connections between ProxySQL and the backend database servers
-- New option ``--max-transactions-behind`` to determine the maximum number of writesets that can be queued before the node is SHUNNED to avoid stale reads. The default value is 100
-- New operation ``--update-cluster`` to update the cluster membership by adding server nodes as found. (Note that nodes are added but not removed).  The ``--writer-hg`` option may be used to specify which galera hostgroup to update. The ``--remove-all-servers`` option instructs to remove all servers from the mysql_servers table before updating the cluster.
-- Hostgroups can be specified on the command-line: ``--writer-hg``, ``--reader-hg``, ``--backup-writer-hg``, and ``--offline-hg``.
-  Previously, these host groups were only read from the configuration file.
-- The ``--enable`` and ``--update-cluster`` options used simultaneously have special meaning. If the cluster has not been enabled, then ``--enable`` is run.  If the cluster has already been enabled, then ``--update-cluster`` is run.
-- New command ``--is-enabled`` to see if a cluster has been enabled. This command checks for the existence of a row in the mysql_galera_hostgroups table.  The ``--writer-hg`` option may be used to specify the writer hostgroup used to search the mysql_galera_hostgroups table.
-- New command ``--status`` to display galera hostgroup information. This command lists all rows in the current ``mysql_galera_hostgroups`` table as well as all servers that belong to these hostgroups.  With the ``--writer-hg`` option, only the information for the galera hostgroup with that writer hostgroup is displayed.
+- New option ``--use-ssl`` to use SSL for connections between ProxySQL and the
+  backend database servers
+- New option ``--max-transactions-behind`` to determine the maximum number of
+  writesets that can be queued before the node is SHUNNED to avoid stale
+  reads. The default value is 100
+- New operation ``--update-cluster`` to update the cluster membership by adding
+  server nodes as found. (Note that nodes are added but not removed).  The
+  ``--writer-hg`` option may be used to specify which galera hostgroup to
+  update. The ``--remove-all-servers`` option instructs to remove all servers
+  from the mysql_servers table before updating the cluster.
+- Hostgroups can be specified on the command-line: ``--writer-hg``,
+  ``--reader-hg``, ``--backup-writer-hg``, and ``--offline-hg``.  Previously,
+  these host groups were only read from the configuration file.
+- The ``--enable`` and ``--update-cluster`` options used simultaneously have
+  special meaning. If the cluster has not been enabled, then ``--enable`` is
+  run.  If the cluster has already been enabled, then ``--update-cluster`` is
+  run.
+- New command ``--is-enabled`` to see if a cluster has been enabled. This
+  command checks for the existence of a row in the mysql_galera_hostgroups
+  table.  The ``--writer-hg`` option may be used to specify the writer hostgroup
+  used to search the mysql_galera_hostgroups table.
+- New command ``--status`` to display galera hostgroup information. This command
+  lists all rows in the current ``mysql_galera_hostgroups`` table as well as all
+  servers that belong to these hostgroups.  With the ``--writer-hg`` option,
+  only the information for the galera hostgroup with that writer hostgroup is
+  displayed.
 
 Changed Features
 --------------------------------------------------------------------------------
 
-- Setting ``--node-check-interval`` changes the ProxySQL global variable ``mysql-monitor_galera_healthcheck_interval``. Note that this is a global variable, not a per-cluster variable.
-- The option ``--write-node``  takes only a single address as a parameter. In the singlewrite mode we only set the weight if ``--write-node`` specifies *address:port*.  A priority list of addresses is no longer accepted.
-- The option ``--writers-as-readers`` option accepts a different set of values. Due to changes in the behavior of ProxySQL between version 1.4 and version 2.0 related to Galera support, the values of ``--writers-as-readers`` have been changed.  This option accepts the following values: yes, no, and backup.
+- Setting ``--node-check-interval`` changes the ProxySQL global variable
+  ``mysql-monitor_galera_healthcheck_interval``. Note that this is a global
+  variable, not a per-cluster variable.
+- The option ``--write-node`` takes only a single address as a parameter. In the
+  singlewrite mode we only set the weight if ``--write-node`` specifies
+  *address:port*.  A priority list of addresses is no longer accepted.
+- The option ``--writers-as-readers`` option accepts a different set of
+  values. Due to changes in the behavior of ProxySQL between version 1.4 and
+  version 2.0 related to Galera support, the values of ``--writers-as-readers``
+  have been changed.  This option accepts the following values: yes, no, and
+  backup.
 
   :yes: writers, backup-writers, and read-only nodes can act as readers.
   :no: only read-only nodes can act as readers.
   :backup: only backup-writers can act as readers.
 
-- The commands ``--syncusers``, ``--sync-multi-cluster-users``, ``--adduser``, and ``--disable`` can use the ``--writer-hg`` option.
-- The command ``--disable`` removes all users associated with the galera cluster hostgroups. Previously, this command only removed the users with the **CLUSTER_APP_USERNAME**.
-- The command ``--disable`` accepts the ``--writer-hg`` option to disable the Galera cluster associated with that hostgroup overriding the value specified in the configuration file.
+- The commands ``--syncusers``, ``--sync-multi-cluster-users``, ``--adduser``,
+  and ``--disable`` can use the ``--writer-hg`` option.
+- The command ``--disable`` removes all users associated with the galera cluster
+  hostgroups. Previously, this command only removed the users with the
+  **CLUSTER_APP_USERNAME**.
+- The command ``--disable`` accepts the ``--writer-hg`` option to disable the
+  Galera cluster associated with that hostgroup overriding the value specified
+  in the configuration file.
 
 Removed Features
 --------------------------------------------------------------------------------
 
-- Asynchronous slave reader support has been removed: the ``--include-slaves`` option is not supported.
-- A list of nodes in the priority order is not supported in |proxysql| v2. Only a single node is supported at this time.
-- Since the galera_proxysql_checker and galera_node_monitor scripts are no longer run in the scheduler, automatic cluster membership updates are not supported.
+- Asynchronous replica reader support has been removed: the ``--include-slaves``
+  option is not supported.
+- A list of nodes in the priority order is not supported in |proxysql| v2. Only
+  a single node is supported at this time.
+- Since the galera_proxysql_checker and galera_node_monitor scripts are no
+  longer run in the scheduler, automatic cluster membership updates are not
+  supported.
 - Checking the pxc_maint_mode variable is no longer supported
 - Using desynced nodes if no other nodes are available is no longer supported.
 - The server status is no longer maintained in the mysql_servers table.
@@ -123,6 +158,7 @@ To view the usage information, run ``proxysql-admin`` without any options:
 .. code-block:: text
 
    Usage: proxysql-admin [ options ]
+
    Options:
 
    --config-file=<config-file>        Read login credentials from a configuration file
@@ -207,7 +243,8 @@ To view the usage information, run ``proxysql-admin`` without any options:
    --quick-demo                       Setup a quick demo with no authentication
    --syncusers                        Sync user accounts currently configured in MySQL to ProxySQL
                                       May be used with --enable.
-                                      (deletes ProxySQL users not in MySQL)
+                                      (deletes ProxySQL users not in MySQL).
+				      See :ref:`pxc.proxysql.v2.admin-tool.syncusers` for more information
    --sync-multi-cluster-users         Sync user accounts currently configured in MySQL to ProxySQL
                                       May be used with --enable.
                                       (doesn't delete ProxySQL users not in MySQL)
@@ -328,33 +365,33 @@ is for connecting to the PXC Cluster node via the ProxySQL console.
       This script will assist with configuring ProxySQL for use with
       Percona XtraDB Cluster (currently only PXC in combination
       with ProxySQL is supported)
-      
+
       ProxySQL read/write configuration mode is singlewrite
-      
+
       Configuring the ProxySQL monitoring user.
       ProxySQL monitor user name as per command line/config-file is monitor
-      
+
       User 'monitor'@'127.%' has been added with USAGE privileges
-      
+
       Configuring the Percona XtraDB Cluster application user to connect through ProxySQL
       Percona XtraDB Cluster application user name as per command line/config-file is proxysql_user
-      
+
       Percona XtraDB Cluster application user 'proxysql_user'@'127.%' has been added with ALL privileges, this user is created for testing purposes
       Adding the Percona XtraDB Cluster server nodes to ProxySQL
-      
+
       Write node info
       +-----------+--------------+-------+--------+
       | hostname  | hostgroup_id | port  | weight |
       +-----------+--------------+-------+--------+
       | 127.0.0.1 | 10           | 26100 | 1000   |
       +-----------+--------------+-------+--------+
-      
+
       ProxySQL configuration completed!
-      
+
       ProxySQL has been successfully configured to use with Percona XtraDB Cluster
-      
+   
       You can use the following login credentials to connect your application through ProxySQL
-      
+
       mysql --user=proxysql_user -p --host=localhost --port=6033 --protocol=tcp
    
 You can use the following login credentials to connect your application through
@@ -455,9 +492,28 @@ database for you
 --syncusers
 --------------------------------------------------------------------------------
 
-This option will sync user accounts currently configured in Percona XtraDB Cluster
-with the ProxySQL database except password-less users and admin users.
-It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL database.
+This option synchronizes user accounts currently configured in |PXC| with the
+ProxySQL database except password-less users and admin users.
+
+.. important::
+
+   This option does not work if the |PXC| user is created using the
+   ``caching_sha2_password`` plugin (used by default in |PXC| |version|). Create
+   a mysql user using the ``mysql_native_password`` authentication plugin.
+
+   .. code-block:: guess
+
+      mysql> CREATE USER 'proxysql'@'%' IDENTIFIED WITH mysql_native_password by '$3Kr$t';
+
+   .. seealso::
+
+      |MySQL| Documentation: CREATE USER statement
+         https://dev.mysql.com/doc/refman/8.0/en/create-user.html
+
+
+It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL
+database.
+
 
 .. code-block:: bash
 
@@ -478,15 +534,17 @@ It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL d
 
 .. admonition:: Output
 
-   +---------------+
-   | username      |
-   +---------------+
-   | monitor       |
-   | one           |
-   | proxysql_user |
-   | two           |
-   +---------------+
-   4 rows in set (0.00 sec)
+   .. code-block:: guess
+
+      +---------------+
+      | username      |
+      +---------------+
+      | monitor       |
+      | one           |
+      | proxysql_user |
+      | two           |
+      +---------------+
+      4 rows in set (0.00 sec)
 
 .. rubric:: From PXC
 
@@ -496,15 +554,17 @@ It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL d
 
 .. admonition:: Output
 
-   +---------------+-------+
-   | user          | host  |
-   +---------------+-------+
-   | monitor       | 192.% |
-   | proxysql_user | 192.% |
-   | two           | %     |
-   | one           | %     |
-   +---------------+-------+
-   4 rows in set (0.00 sec)
+   .. code-block:: guess
+
+      +---------------+-------+
+      | user          | host  |
+      +---------------+-------+
+      | monitor       | 192.% |
+      | proxysql_user | 192.% |
+      | two           | %     |
+      | one           | %     |
+      +---------------+-------+
+      4 rows in set (0.00 sec)
 
 .. _pxc.proxysql.v2.admin-tool.sync-multi-cluster-users:
 
@@ -607,6 +667,7 @@ This option is used to setup a dummy proxysql configuration.
 This option will check the Percona XtraDB Cluster to see if any new nodes have
 joined the cluster.  If so, the new nodes are added to ProxySQL.  Any offline
 nodes are not removed from the cluster by default.
+
 
 If used with ``--remove-all-servers``, then the server list for this configuration
 will be removed before running the update cluster function.
@@ -722,8 +783,8 @@ This will skip existing configuration checks with the ``--enable`` option in
 --------------------------------------------------------------------------------
 
 This option will updates mysql server version (specified by the writer
-hostgroup, either from ``--writer-hg`` or from the config file) in proxysql db based
-on online writer node.
+hostgroup, either from ``--writer-hg`` or from the config file) in proxysql db
+based on online writer node.
 
 .. code-block:: bash
 
@@ -858,38 +919,14 @@ is `singlewrite`.  This option can be used with `--enable` and `--update-cluster
 A single IP address and port combination is expected.  For instance,
 "--write-node=127.0.0.1:3306"
 
-The |proxysql-status| script
+ProxySQL Status
 ================================================================================
 
-|proxysql-status| is a simple script to dump |proxysql| configuration
-and statistics. 
+Simple script to dump ProxySQL config and stats
 
 .. code-block:: bash
 
    $ proxysql-status admin admin 127.0.0.1 6032
 
-The default behaviour is to display all tables and files. By using the following
-options, you can retrieve more specific information:
-
-======================  =========================================================================
-Option                  Use to display
-======================  =========================================================================
---files                 The contents of proxysql-admin related files
---main                  Main tables (both on-disk and runtime)
---monitor               Monitor tables
---runtime               Runtime-related data (implies --main)
---stats                 Stats tables
---table=<table_name>    Only tables that contain the table name (this is a case-sensitive match)
---with-stats-reset      ``_reset`` tables, by default _reset tables will not be queried.
-
-======================  =========================================================================
-
-.. note::
-
-   If no credentials are specified the credentials in
-   ``/etc/proxysql-admin.cnf`` are used.
-
-
-.. |proxysql| replace:: ProxySQL
-.. |proxysql-admin| replace:: ``proxysql-admin``
-.. |proxysql-status| replace:: ``proxysql-status``
+.. include:: ../.res/replace.txt
+.. include:: ../.res/replace.program.txt

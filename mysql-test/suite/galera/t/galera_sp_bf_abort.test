@@ -3,7 +3,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/have_debug_sync.inc
 
 --connection node_1
@@ -33,7 +32,7 @@ DELIMITER ;|
 
 INSERT INTO t1 VALUES (1, 'a'), (3, 'a');
 SET SESSION wsrep_sync_wait = 0;
---let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --let $galera_sp_bf_abort_proc = proc_update_insert
 --let $galera_sp_bf_abort_conflict = INSERT INTO t1 VALUES (2, 'c')
 --source galera_sp_bf_abort.inc
@@ -41,7 +40,7 @@ SET SESSION wsrep_sync_wait = 0;
 --reap
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
---let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 1 AS wsrep_local_replays;
 --enable_query_log
@@ -68,7 +67,7 @@ DELIMITER ;|
 
 INSERT INTO t1 VALUES (1, 'a'), (3, 'a');
 SET SESSION wsrep_sync_wait = 0;
---let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --let $galera_sp_bf_abort_proc = proc_update_insert_with_exit_handler
 --let $galera_sp_bf_abort_conflict = INSERT INTO t1 VALUES (2, 'c')
 --source galera_sp_bf_abort.inc
@@ -76,7 +75,7 @@ SET SESSION wsrep_sync_wait = 0;
 --reap
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
---let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 1 AS wsrep_local_replays;
 --enable_query_log
@@ -104,7 +103,7 @@ DELIMITER ;|
 
 INSERT INTO t1 VALUES (1, 'a'), (3, 'a');
 SET SESSION wsrep_sync_wait = 0;
---let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --let $galera_sp_bf_abort_proc = proc_update_insert_with_continue_handler
 --let $galera_sp_bf_abort_conflict = INSERT INTO t1 VALUES (2, 'c')
 --source galera_sp_bf_abort.inc
@@ -112,7 +111,7 @@ SET SESSION wsrep_sync_wait = 0;
 --reap
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
---let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 1 AS wsrep_local_replays;
 --enable_query_log
@@ -138,7 +137,7 @@ END|
 DELIMITER ;|
 
 INSERT INTO t1 VALUES (1, 'a'), (3, 'a');
---let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --let $galera_sp_bf_abort_proc = proc_update_insert_transaction
 --let $galera_sp_bf_abort_conflict = INSERT INTO t1 VALUES (2, 'c')
 SET SESSION wsrep_sync_wait = 0;
@@ -147,7 +146,7 @@ SET SESSION wsrep_sync_wait = 0;
 --reap
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
---let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 1 AS wsrep_local_replays;
 --enable_query_log
@@ -175,7 +174,7 @@ END|
 DELIMITER ;|
 
 INSERT INTO t1 VALUES (1, 'a'), (3, 'a');
---let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --let $galera_sp_bf_abort_proc = proc_update_insert_transaction_with_continue_handler
 --let $galera_sp_bf_abort_conflict = INSERT INTO t1 VALUES (2, 'c')
 SET SESSION wsrep_sync_wait = 0;
@@ -184,7 +183,7 @@ SET SESSION wsrep_sync_wait = 0;
 --reap
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
---let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 1 AS wsrep_local_replays;
 --enable_query_log
@@ -211,7 +210,7 @@ END|
 DELIMITER ;|
 
 INSERT INTO t1 VALUES (1, 'a'), (3, 'a');
---let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --let $galera_sp_bf_abort_proc = proc_update_insert_transaction_with_exit_handler
 --let $galera_sp_bf_abort_conflict = INSERT INTO t1 VALUES (2, 'c')
 SET SESSION wsrep_sync_wait = 0;
@@ -220,7 +219,7 @@ SET SESSION wsrep_sync_wait = 0;
 --reap
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
---let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 1 AS wsrep_local_replays;
 --enable_query_log
@@ -248,7 +247,7 @@ END|
 DELIMITER ;|
 
 INSERT INTO t1 VALUES (1, 'a'), (3, 'a');
---let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --let $galera_sp_bf_abort_proc = proc_insert_insert_conflict
 --let $galera_sp_bf_abort_conflict = INSERT INTO t1 VALUES (2, 'c')
 SET SESSION wsrep_sync_wait = 0;
@@ -258,7 +257,7 @@ SET SESSION wsrep_sync_wait = 0;
 --reap
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
---let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 0 AS wsrep_local_replays;
 --enable_query_log
@@ -284,7 +283,7 @@ END|
 DELIMITER ;|
 
 INSERT INTO t1 VALUES (1, 'a'), (3, 'a');
---let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --let $galera_sp_bf_abort_proc = proc_insert_insert_conflict_with_exit_handler
 --let $galera_sp_bf_abort_conflict = INSERT INTO t1 VALUES (2, 'c')
 SET SESSION wsrep_sync_wait = 0;
@@ -293,7 +292,7 @@ SET SESSION wsrep_sync_wait = 0;
 --reap
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
---let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 0 AS wsrep_local_replays;
 --enable_query_log
@@ -319,7 +318,7 @@ END|
 DELIMITER ;|
 
 INSERT INTO t1 VALUES (1, 'a'), (3, 'a');
---let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_orig = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --let $galera_sp_bf_abort_proc = proc_insert_insert_conflict_with_continue_handler
 --let $galera_sp_bf_abort_conflict = INSERT INTO t1 VALUES (2, 'c')
 SET SESSION wsrep_sync_wait = 0;
@@ -328,7 +327,7 @@ SET SESSION wsrep_sync_wait = 0;
 --reap
 SET SESSION wsrep_sync_wait = default;
 SELECT * FROM t1;
---let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM information_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_curr = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_curr - $wsrep_local_replays_orig = 0 AS wsrep_local_replays;
 --enable_query_log

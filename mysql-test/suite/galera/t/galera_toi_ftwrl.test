@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # At this time, issing a FLUSH TABLES WITH READ LOCK on one node does not prevent DDLs from other nodes

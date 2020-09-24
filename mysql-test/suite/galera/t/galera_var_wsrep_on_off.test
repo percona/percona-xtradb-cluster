@@ -3,7 +3,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 call mtr.add_suppression("Cannot modify @@session.wsrep_on");
 
@@ -32,6 +31,7 @@ SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 3;
 
 DROP TABLE t1;
 
+#-------------------------------------------------------------------------------
 #
 # Use-case that try to switch-off wsrep in middle of active transaction.
 #
@@ -44,6 +44,8 @@ insert into t1 values (1), (2);
 
 --connection node_2
 --echo #node-2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1'
+--source include/wait_condition.inc
 select * from t1;
 
 # This will be replicated as wsrep_on = true
@@ -107,3 +109,37 @@ select * from t1;
 --echo #node-1
 set session wsrep_on = TRUE;
 drop table t1;
+
+
+#-------------------------------------------------------------------------------
+#
+# Use-case: setting wsrep_on = off also affect sql_log_bin
+#           (in turn logging to binlog)
+#
+--connection node_1
+--echo #node-1
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+--connection node_2
+--echo #node-2
+SET SESSION wsrep_on=OFF;
+RESET MASTER;
+SET SESSION wsrep_on=ON;
+
+--connection node_1
+--echo #node-1
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1);
+set session wsrep_on = OFF;
+insert into t values (2);
+set session wsrep_on = ON;
+insert into t values (3);
+drop table t;
+
+--replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+
+
+

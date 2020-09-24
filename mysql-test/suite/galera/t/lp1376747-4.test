@@ -5,7 +5,8 @@
 # after provider is unpaused
 #
 --source include/galera_cluster.inc
---source include/have_innodb.inc
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
 
 --let $galera_connection_name = node_2a
 --let $galera_server_number = 2
@@ -28,22 +29,58 @@ INSERT INTO t1 VALUES (2,3);
 SET session wsrep_sync_wait=0;
 SET session wsrep_causal_reads=OFF;
 SHOW CREATE TABLE t1;
---sleep 1
+--sleep 2
+#
+--let $galera_sync_point = sync.apply_trx.start_of_apply_trx
+--source include/galera_set_sync_point.inc
+#
 --send FLUSH TABLES t1 WITH READ LOCK;
 
 --connection node_2
-# let the flush table wait in pause state before we unlock
-# table otherwise there is window where-in flush table is
-# yet to wait in pause and unlock allows alter table to proceed.
-# this is because send is asynchronous.
+SET session wsrep_sync_wait=0;
+# local-monitor maintains a queue for incoming write-sets.
+# when ftwrl is executed local_monitor is locked and released
+# only when unlock table is called.
+
+# in meantime, if ddl or dml (or other FTWRL) hits the queue
+# then these statements are added to queue waiting for their turn
+# to get serivce.
+
+# in case above:
+# - FTWRL locks local_monitor.
+# - ddl (alter) that is fired after FTWRL is replicated and enters the queue
+#   waiting to execute cert (first action post replication).
+# - in meantime, another FTWRL (with table) hits the node and also enters
+#   wait queue behind ddl (alter).
+
+# now when FTWRL is unlocked, alter get first chance to execute.
+
+# if alter completes its execution (apply_trx) before FTWRL (with table) is done
+# then show create will reflect altered table.
+
+# if alter is done with cert and yet to complete apply_trx and in meantime
+# FTWRL (with table) executes then alter apply_trx action is blocked.
+
+# this execution pattern will determine whether we see altered or
+# non-altered table.
+
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE Info LIKE 'FLUSH TABLES t1 WITH READ LOCK';
 --let $wait_condition_on_error_output = SHOW PROCESSLIST
 --source include/wait_condition_with_debug.inc
 
+--sleep 3
+
 # this will release existing lock but will not resume
 # the cluster as there is new FTRL that is still pausing it.
 UNLOCK TABLES;
+#
+# this will cause alter to wait while FTRL locks table.
+--source include/galera_wait_sync_point.inc
 SHOW CREATE TABLE t1;
+#
+--source include/galera_clear_sync_point.inc
+--source include/galera_signal_sync_point.inc
+
 
 --connection node_2a
 --reap

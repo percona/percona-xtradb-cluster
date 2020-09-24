@@ -3,7 +3,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 # From the Innodb manual: "The maximum row length, except for variable-length columns (VARBINARY, VARCHAR, BLOB and TEXT),
 # is slightly less than half of a database page. That is, the maximum row length is about 8000 bytes"

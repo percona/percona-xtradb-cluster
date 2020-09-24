@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # Ensure that transactions that do not write anything do not cause the wsrep_last_applied counter to advance

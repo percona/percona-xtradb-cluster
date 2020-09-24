@@ -1,6 +1,5 @@
 #
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 CREATE USER 'userMW416'@'localhost';
 GRANT SELECT, INSERT, UPDATE ON test.* TO 'userMW416'@'localhost';
@@ -140,7 +139,7 @@ SHOW DATABASES;
 #
 --connection node_1
 --echo #node-1 (create tmp user)
-call mtr.add_suppression("WSREP: Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
+call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
 #
 --error ER_UNKNOWN_ERROR
 CREATE USER CURRENT_USER();
@@ -175,6 +174,7 @@ REVOKE ALL ON *.* FROM CURRENT_USER();
 --connection node_2
 --echo #node-2
 call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
+call mtr.add_suppression("Query apply failed.*");
 
 #-------------------------------------------------------------------------------
 # test the use of mysqladmin password change feature

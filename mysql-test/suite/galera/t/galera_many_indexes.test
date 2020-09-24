@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/force_restart.inc
 
 CREATE TABLE t1 (f1 VARCHAR(767) PRIMARY KEY) ENGINE=InnoDB;

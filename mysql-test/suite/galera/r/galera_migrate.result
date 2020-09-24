@@ -23,11 +23,9 @@ VARIABLE_VALUE
 INSERT INTO t1 VALUES (6);
 CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
-SET GLOBAL wsrep_sst_auth = 'sst:';
 CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
-Warnings:
-Warning	1105	Percona-XtraDB-Cluster has deprecated SST through mysqldump. Percona-XtraDB-Cluster recommends using xtrabackup. Please switch to use xtrabackup or rsync.
+
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 VARIABLE_VALUE
 Synced
@@ -70,20 +68,22 @@ VARIABLE_VALUE
 DROP TABLE t1;
 DROP TABLE t1;
 SET GLOBAL wsrep_provider = 'none';
-SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;
 DROP USER sst;
 SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_method = default;
-SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;
 DROP USER sst;
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
-CALL mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
+CALL mtr.add_suppression("Pending to replicate MySQL GTID event.*");
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
 CALL mtr.add_suppression("`innodb_index_stats` not found");
 CALL mtr.add_suppression("`innodb_table_stats` not found");
 CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table");
+call mtr.add_suppression("Failed to open the relay log.*");
+call mtr.add_suppression("Could not find target log file.*");
+call mtr.add_suppression("Slave: Failed to initialize the master info structure.*");
+call mtr.add_suppression("Failed to create or recover replication info repositories.*");

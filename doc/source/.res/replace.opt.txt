@@ -1,0 +1,37 @@
+.. RocksDB options: Each is defined with and without the rocksdb
+   prefix. Some have the abbreviated syntax 
+
+.. |opt.rocksdb-no-create-column-family| replace:: :variable:`rocksdb_no_create_column_family`
+.. |opt.no-create-column-family|         replace:: :variable:`rocksdb_no_create_column_family`
+.. |opt.nccf|                            replace:: :variable:`rocksdb_no_create_column_family`
+
+.. |opt.rocksdb-override-cf-options| replace:: :variable:`rocksdb_override_cf_options`
+.. |opt.override-cf-options|         replace:: :variable:`rocksdb_override_cf_options`
+.. |opt.ocfo|                        replace:: :variable:`rocksdb_override_cf_options`
+
+.. |opt.rocksdb-default-cf-options| replace:: :variable:`rocksdb_default_cf_options`
+.. |opt.default-cf-options|         replace:: :variable:`rocksdb_default_cf_options`
+.. |opt.dcfo|                       replace:: :variable:`rocksdb_default_cf_options`
+
+.. |opt.rocksdb-update-cf-options| replace:: :variable:`rocksdb_update_cf_options`
+.. |opt.update-cf-options|         replace:: :variable:`rocksdb_update_cf_options`
+.. |opt.ucfo|                      replace:: :variable:`rocksdb_update_cf_options`
+.. |opt.encrypt-cluster-traffic| replace:: :variable:`pxc-encrypt-cluster-traffic`
+.. |wsrep-sst-auth| replace:: :variable:`wsrep_sst_auth`
+.. |opt.wsrep-sst-auth| replace:: :variable:`wsrep_sst_auth`
+.. |pxc-encrypt-cluster-traffic| replace:: :variable:`pxc-encrypt-cluster-traffic`
+.. |opt.pxc-encrypt-cluster-traffic| replace:: :variable:`pxc-encrypt-cluster-traffic`
+.. |opt.encrypt| replace:: :variable:`encrypt`
+.. |opt.ssl-key| replace:: :variable:`ssl_key`
+.. |opt.node-address| replace:: :variable:`wsrep_node_address`
+.. |wsrep-node-address| replace:: :variable:`wsrep_node_address`
+.. |wsrep-node-name| replace:: :variable:`wsrep_node_name`
+.. |opt.node-name| replace:: :variable:`wsrep_node_name`
+.. |opt.wsrep-max-ws-rows| replace:: :variable:`wsrep_max_ws_rows`
+.. |max-ws-rows| replace:: :variable:`wsrep_max_ws_rows`
+.. |opt.wsrep-max-ws-size| replace:: :variable:`wsrep_max_ws_size`
+.. |max-ws-size| replace:: :variable:`wsrep_max_ws_size`
+
+.. |opt.ssl-ca| replace:: ``ssl-ca``
+.. |opt.ssl-cert| replace:: ``ssl-cert``
+

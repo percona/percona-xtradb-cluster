@@ -3,7 +3,7 @@ Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 SET SESSION binlog_format='STATEMENT';
 CREATE TABLE t1 (
-i int(11) NOT NULL AUTO_INCREMENT,
+i int NOT NULL AUTO_INCREMENT,
 c char(32) DEFAULT 'dummy_text',
 PRIMARY KEY (i)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
@@ -60,8 +60,8 @@ binlog_format	ROW
 show variables like 'auto_increment_increment';
 Variable_name	Value
 auto_increment_increment	2
-SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
-@@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+@@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
 1
 select * from t1;
 i	c
@@ -81,8 +81,8 @@ binlog_format	ROW
 show variables like 'auto_increment_increment';
 Variable_name	Value
 auto_increment_increment	2
-SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
-@@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+@@auto_increment_offset = (SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
 1
 DROP TABLE t1;
 STOP SLAVE;

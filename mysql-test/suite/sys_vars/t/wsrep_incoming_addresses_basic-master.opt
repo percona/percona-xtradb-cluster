@@ -1,0 +1,1 @@
+--wsrep_provider=$WSREP_PROVIDER --wsrep_cluster_address='gcomm://' --wsrep_new_cluster

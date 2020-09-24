@@ -1,0 +1,15 @@
+call mtr.add_suppression("Operation DROP USER failed");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
+call mtr.add_suppression("Operation DROP USER failed");
+call mtr.add_suppression("Event [0-9]* Query apply failed: [0-9]*, seqno [0-9]*");
+CREATE TABLE t1(a INT AUTO_INCREMENT, b INT, PRIMARY KEY pka(a));
+SET DEBUG_SYNC = 'now WAIT_FOR has_global_grant.got_lock'; ;
+SET @@global.debug = '+d,has_global_grant_hold_lock';
+CREATE EVENT ev2 ON SCHEDULE EVERY 60 SECOND DO INSERT INTO t1(b) VALUES (1);
+SET @@global.debug = '-d,has_global_grant_hold_lock';
+DROP USER 'testuser'@'%';
+ERROR HY000: Operation DROP USER failed for 'testuser'@'%'
+SET DEBUG_SYNC = 'now signal has_global_grant.release_lock';
+SET DEBUG_SYNC = 'RESET';
+DROP EVENT ev2;
+DROP TABLE t1;

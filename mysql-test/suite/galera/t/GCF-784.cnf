@@ -1,5 +1,8 @@
 !include include/default_mysqld.cnf
 
+[mysqld]
+mysqlx=0
+
 [mysqld.1]
 log-bin=mysqld-bin
 binlog-format=row

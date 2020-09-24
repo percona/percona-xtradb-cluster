@@ -40,15 +40,15 @@ j
 show create table tdict;
 Table	Create Table
 tdict	CREATE TABLE `tdict` (
-  `id` int(11) NOT NULL,
+  `id` int NOT NULL,
   `a` blob /*!50633 COLUMN_FORMAT COMPRESSED */,
   `b` blob /*!50633 COLUMN_FORMAT COMPRESSED WITH COMPRESSION_DICTIONARY `numbers` */,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 # ensure dictionary is created
-select * from information_schema.xtradb_zip_dict where name like '%number%';
-id	name	zip_dict
-1	numbers	percona
+select * from information_schema.compression_dictionary_tables where dict_name like '%number%';
+TABLE_SCHEMA	TABLE_NAME	COLUMN_NAME	DICT_NAME
+test	tdict	b	numbers
 #node-1
 truncate table t1;
 truncate table t2;
@@ -74,27 +74,67 @@ drop table tdict;
 drop compression_dictionary numbers;
 #node-2
 # ensure dictionary drop is replicated
-select * from information_schema.xtradb_zip_dict where name like '%number%';
-id	name	zip_dict
+select * from information_schema.compression_dictionary_tables where dict_name like '%number%';
+TABLE_SCHEMA	TABLE_NAME	COLUMN_NAME	DICT_NAME
 #node-2
 call mtr.add_suppression("Can't create database");
+call mtr.add_suppression("Query apply failed.*");
 #node-1
 set global wsrep_debug=1;
 create table t (i int, primary key pk(i)) engine=innodb;
 SET SESSION wsrep_sync_wait = 0;
 SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
 insert into t values (1);;
+#node-1b
+SET SESSION wsrep_sync_wait = 0;
 #node-1a
 SET SESSION wsrep_sync_wait = 0;
 SET DEBUG_SYNC = "now WAIT_FOR entered1";
-create database test;
-ERROR HY000: Can't create database 'test'; database exists
+create database test;;
+#node-1b
 SET DEBUG_SYNC = "now SIGNAL continue1";
+#node-1a
+ERROR HY000: Can't create database 'test'; database exists
 #node-1
 select * from t;
 i
 1
-SET GLOBAL wsrep_debug = 0;
+SET GLOBAL wsrep_debug = NONE;
+SET DEBUG_SYNC = 'RESET';
+drop table t;
+call mtr.add_suppression("Slave SQL: Error \'Table \'t\' already exists\' on query.*");
+call mtr.add_suppression("Ignoring error \'Table \'t\' already exists' on query");
+call mtr.add_suppression("Slave SQL: Error \'Table \'t\' already exists\' on query.*");
+call mtr.add_suppression("Ignoring error \'Table \'t\' already exists' on query");
+#node-1 (this connection will take handler lock)
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1);
+handler t open h1;
+#node-2 (this connection will issue a conflicting ddl)
+alter table t engine=innodb;
+#node-1a
+#node-1 (now close handler)
+handler h1 close;
+create table t (i int, primary key pk(i)) engine=innodb;
+ERROR 42S01: Table 't' already exists
+drop table t;
+#node-1 (this connection will take user level lock)
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1);
+select get_lock('a', 10);
+get_lock('a', 10)
+1
+#node-2 (this connection will issue a conflicting ddl)
+alter table t engine=innodb;
+select sleep(5);
+sleep(5)
+0
+#node-1 (now release user level lock)
+select release_lock('a');
+release_lock('a')
+1
+create table t (i int, primary key pk(i)) engine=innodb;
+ERROR 42S01: Table 't' already exists
 drop table t;
 use test;
 create table t (i int, c1 char(10), c2 char(10), c12 char(20) as (CONCAT(c1, c2)), b blob);
@@ -113,4 +153,35 @@ mysqlus
 mysqlcroatia
 mysqlindia
 drop table t;
+use test;
+create table t (i int, c1 char(10), c2 char(10), primary key pk(i));
+insert into t values (1, 'newyork', 'us');
+insert into t values (2, 'zagreb', 'croatia');
+insert into t values (3, 'pune', 'india');
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `i` int NOT NULL,
+  `c1` char(10) DEFAULT NULL,
+  `c2` char(10) DEFAULT NULL,
+  PRIMARY KEY (`i`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+#node-1a (obtain backup instance lock)
+lock instance for backup;
+#node-1b (fire alter table that should wait for explicit backup lock)
+alter table t add index idx(c1);;
+#node-1a (release backup instance lock)
+unlock instance;
+#node-1b (check if alter is complete)
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `i` int NOT NULL,
+  `c1` char(10) DEFAULT NULL,
+  `c2` char(10) DEFAULT NULL,
+  PRIMARY KEY (`i`),
+  KEY `idx` (`c1`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+drop table t;
 set @@wsrep_replicate_myisam = 0;;
+SET DEBUG_SYNC = "reset";

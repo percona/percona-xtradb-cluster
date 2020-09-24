@@ -4,7 +4,7 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 SET SESSION wsrep_retry_autocommit = 0;
 INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;;
 TRUNCATE TABLE t1;;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SELECT COUNT(*) = 0 FROM t1;
 COUNT(*) = 0
 1

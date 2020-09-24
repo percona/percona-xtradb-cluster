@@ -5,7 +5,6 @@
 
 --source include/big_test.inc
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # INSERT and TRUNCATE on different nodes

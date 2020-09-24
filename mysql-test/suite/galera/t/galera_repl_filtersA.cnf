@@ -2,6 +2,7 @@
 
 [mysqld]
 replicate-do-db=db
+default-authentication-plugin=mysql_native_password
 
 [mysqld.2]
 replicate-do-db=db1

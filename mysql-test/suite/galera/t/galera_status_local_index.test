@@ -3,7 +3,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 --connection node_1
 CREATE TABLE wsrep_local_indexes (wsrep_local_index INTEGER);

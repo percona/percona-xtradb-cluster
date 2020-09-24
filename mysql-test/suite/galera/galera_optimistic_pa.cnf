@@ -1,0 +1,5 @@
+[mysqld.1]
+wsrep_provider_options='cert.optimistic_pa=yes;repl.causal_read_timeout=PT90S;base_port=@mysqld.1.#galera_port;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S'
+
+[mysqld.2]
+wsrep_provider_options='cert.optimistic_pa=yes;repl.causal_read_timeout=PT90S;base_port=@mysqld.2.#galera_port;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S'

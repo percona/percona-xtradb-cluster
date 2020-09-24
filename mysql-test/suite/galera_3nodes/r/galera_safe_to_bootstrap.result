@@ -20,13 +20,13 @@ safe_to_bootstrap: 0
 # restart
 # restart
 # restart
-CALL mtr.add_suppression("WSREP: moving position backwards: [0-9]+ -> 0");
+CALL mtr.add_suppression("moving position backwards: [0-9]+ -> 0");
 CALL mtr.add_suppression("Failed to prepare for incremental state transfer");
-CALL mtr.add_suppression("WSREP: moving position backwards: [0-9]+ -> 0");
+CALL mtr.add_suppression("moving position backwards: [0-9]+ -> 0");
 CALL mtr.add_suppression("Failed to prepare for incremental state transfer");
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `f1` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
+  `f1` int DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 DROP TABLE t1;

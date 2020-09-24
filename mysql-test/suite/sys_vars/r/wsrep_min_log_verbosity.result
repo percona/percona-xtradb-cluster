@@ -1,0 +1,105 @@
+#
+# wsrep_min_log_verbosity
+#
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+Variable_name	Value
+wsrep_min_log_verbosity	3
+SHOW VARIABLES LIKE 'log_error_verbosity';
+Variable_name	Value
+log_error_verbosity	2
+CREATE DATABASE db1;
+expected match
+Pattern ".Note. .+ .WSREP. Executing Query .CREATE DATABASE db1" found
+DROP DATABASE db1;
+SET GLOBAL wsrep_min_log_verbosity=2;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+Variable_name	Value
+wsrep_min_log_verbosity	2
+SHOW VARIABLES LIKE 'log_error_verbosity';
+Variable_name	Value
+log_error_verbosity	2
+CREATE DATABASE db2;
+expected no match
+Pattern ".Note. .+ .WSREP. Executing Query .CREATE DATABASE db2" not found
+DROP DATABASE db2;
+SET GLOBAL wsrep_min_log_verbosity=1;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+Variable_name	Value
+wsrep_min_log_verbosity	1
+SHOW VARIABLES LIKE 'log_error_verbosity';
+Variable_name	Value
+log_error_verbosity	2
+CREATE DATABASE db3;
+expected no match
+Pattern ".Note. .+ .WSREP. Executing Query .CREATE DATABASE db3" not found
+DROP DATABASE db3;
+SET GLOBAL log_error_verbosity=3;
+SET GLOBAL wsrep_min_log_verbosity=3;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+Variable_name	Value
+wsrep_min_log_verbosity	3
+SHOW VARIABLES LIKE 'log_error_verbosity';
+Variable_name	Value
+log_error_verbosity	3
+CREATE DATABASE db4;
+expected match
+Pattern ".Note. .+ .WSREP. Executing Query .CREATE DATABASE db4" found
+DROP DATABASE db4;
+SET GLOBAL wsrep_min_log_verbosity=2;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+Variable_name	Value
+wsrep_min_log_verbosity	2
+SHOW VARIABLES LIKE 'log_error_verbosity';
+Variable_name	Value
+log_error_verbosity	3
+CREATE DATABASE db5;
+expected match
+Pattern ".Note. .+ .WSREP. Executing Query .CREATE DATABASE db5" found
+DROP DATABASE db5;
+SET GLOBAL wsrep_min_log_verbosity=1;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+Variable_name	Value
+wsrep_min_log_verbosity	1
+SHOW VARIABLES LIKE 'log_error_verbosity';
+Variable_name	Value
+log_error_verbosity	3
+CREATE DATABASE db6;
+expected match
+Pattern ".Note. .+ .WSREP. Executing Query .CREATE DATABASE db6" found
+DROP DATABASE db6;
+SET GLOBAL log_error_verbosity=1;
+SET GLOBAL wsrep_min_log_verbosity=3;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+Variable_name	Value
+wsrep_min_log_verbosity	3
+SHOW VARIABLES LIKE 'log_error_verbosity';
+Variable_name	Value
+log_error_verbosity	1
+CREATE DATABASE db7;
+expected match
+Pattern ".Note. .+ .WSREP. Executing Query .CREATE DATABASE db7" found
+DROP DATABASE db7;
+SET GLOBAL wsrep_min_log_verbosity=2;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+Variable_name	Value
+wsrep_min_log_verbosity	2
+SHOW VARIABLES LIKE 'log_error_verbosity';
+Variable_name	Value
+log_error_verbosity	1
+CREATE DATABASE db8;
+expected no match
+Pattern ".Note. .+ .WSREP. Executing Query .CREATE DATABASE db8" not found
+DROP DATABASE db8;
+SET GLOBAL wsrep_min_log_verbosity=1;
+SHOW VARIABLES LIKE 'wsrep_min_log_verbosity';
+Variable_name	Value
+wsrep_min_log_verbosity	1
+SHOW VARIABLES LIKE 'log_error_verbosity';
+Variable_name	Value
+log_error_verbosity	1
+CREATE DATABASE db9;
+expected no match
+Pattern ".Note. .+ .WSREP. Executing Query .CREATE DATABASE db9" not found
+DROP DATABASE db9;
+SET GLOBAL wsrep_min_log_verbosity = 3;;
+SET GLOBAL log_error_verbosity = 2;;

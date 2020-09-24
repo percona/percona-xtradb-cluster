@@ -5,7 +5,6 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/have_debug.inc
 --source include/force_restart.inc
 
@@ -18,7 +17,7 @@
 --echo #node-1
 select @@sync_binlog;
 
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 --source include/galera_wait_ready.inc
 
@@ -46,13 +45,13 @@ insert into t1 values (4);
 --let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 --source include/galera_wait_ready.inc
 
 #
 # continue with same table but this time insert some rows with wsrep_on=off
-# these transaction will be committed with mysql xid and not wsrep xid.
+# this transfer will not be committed as it is operating with sql_log_bin = 0
 set session wsrep_on=0;
 set debug="+d,crash_before_trx_commit_in_memory";
 --error 2013
@@ -67,7 +66,7 @@ insert into t1 values (40);
 --let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 --source include/galera_wait_ready.inc
 
@@ -81,8 +80,8 @@ drop table t1;
 --let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 --source include/galera_wait_ready.inc
 
-call mtr.add_suppression("WSREP: Failed to prepare for incremental state transfer.*");
+call mtr.add_suppression("Failed to prepare for incremental state transfer.*");

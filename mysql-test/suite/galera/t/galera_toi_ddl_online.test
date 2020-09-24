@@ -1,5 +1,4 @@
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 
 #
 # In this test, we run concurrent INSERT against a table against which we have issued concurrent DDL statements that are fully online,

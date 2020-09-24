@@ -1,2 +1,0 @@
-debian/extra/percona-xtradb-cluster.cnf etc/mysql/
-debian/extra/percona-xtradb-cluster.conf.d etc/mysql/

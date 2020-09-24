@@ -30,7 +30,7 @@ LENGTH(f1) = 512 * 1024
 1
 1
 1
-CALL mtr.add_suppression("WSREP: Unsupported protocol downgrade: incremental data collection disabled");
+CALL mtr.add_suppression("Unsupported protocol downgrade: incremental data collection disabled");
 SELECT COUNT(*) = 30 FROM t1;
 COUNT(*) = 30
 1
@@ -42,5 +42,5 @@ LENGTH(f1) = 512 * 1024
 1
 1
 1
-CALL mtr.add_suppression("WSREP: Unsupported protocol downgrade: incremental data collection disabled");
+CALL mtr.add_suppression("Unsupported protocol downgrade: incremental data collection disabled");
 DROP TABLE t1, t2;

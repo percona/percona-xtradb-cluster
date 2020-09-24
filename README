@@ -1,4 +1,4 @@
-Percona XtraDB Cluster 5.7
+Percona XtraDB Cluster 8.0
 --------------------------
 
 Percona XtraDB Cluster is based on Percona Server and Codership wsrep API
@@ -7,7 +7,7 @@ on synchronous replication.
 
 https://www.percona.com/software/mysql-database/percona-xtradb-cluster
 
-Documentation: https://www.percona.com/doc/percona-xtradb-cluster/5.7/index.html
+Documentation: https://www.percona.com/doc/percona-xtradb-cluster/8.0/index.html
 
 Jira (bugs): https://jira.percona.com/projects/PXC/issues
 

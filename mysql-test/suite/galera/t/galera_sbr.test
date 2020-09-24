@@ -4,14 +4,19 @@
 # SBR is not currently supported but we expect that no crashes or binlog-related assertions will be triggered.
 # 
 
---source include/have_innodb.inc
 --source include/galera_cluster.inc
 
 --connection node_1
 # Not allowed in PXC
 --error ER_WRONG_VALUE_FOR_VAR
+SET PERSIST binlog_format = 'STATEMENT';
+--error ER_WRONG_VALUE_FOR_VAR
+SET PERSIST binlog_format = 'MIXED';
+
+--error ER_WRONG_VALUE_FOR_VAR
 SET GLOBAL binlog_format = 'STATEMENT';
 --disable_warnings
+--error ER_WRONG_VALUE_FOR_VAR
 SET SESSION binlog_format = 'STATEMENT';
 --enable_warnings
 
@@ -19,16 +24,20 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 
 --disable_warnings
+--error ER_WRONG_VALUE_FOR_VAR
 SET SESSION binlog_format = 'MIXED';
 --enable_warnings
 
---error ER_LOCK_DEADLOCK
 INSERT INTO t1 VALUES (2);
 
 --connection node_2
-SELECT COUNT(*) = 1 FROM t1;
+SELECT COUNT(*) = 2 FROM t1;
 
 DROP TABLE t1;
 
 --connection node_1
 SET GLOBAL binlog_format = 'ROW';
+SET PERSIST binlog_format = 'ROW';
+
+RESET PERSIST binlog_format;
+call mtr.add_suppression("Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED");
