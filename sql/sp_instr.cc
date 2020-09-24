@@ -39,6 +39,7 @@
 #include "binlog.h"
 #include "item_cmpfunc.h" // Item_func_eq
 #include "debug_sync.h"   // DEBUG_SYNC
+#include "sql_audit.h"
 
 #include <algorithm>
 #include <functional>
@@ -971,7 +972,7 @@ bool sp_instr_stmt::execute(THD *thd, uint *nextp)
     }
 
     query_cache.end_of_result(thd);
-
+    
 #ifndef EMBEDDED_LIBRARY
     mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_STATUS),
                        thd->get_stmt_da()->is_error() ?
@@ -1001,7 +1002,7 @@ bool sp_instr_stmt::execute(THD *thd, uint *nextp)
       problem.
     */
     DBUG_ASSERT((thd->query_name_consts == 0) ||
-                (thd->rewritten_query.length() == 0));
+                (thd->rewritten_query().length() == 0));
   }
   else
     *nextp= get_ip() + 1;

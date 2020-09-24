@@ -37,6 +37,7 @@ Prefix: %{_sysconfdir}
 %define percona_server_version @@PERCONA_VERSION@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}
+%define xb_version @@XB_VERSION@@
 
 #
 %bcond_with tokudb
@@ -414,7 +415,7 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = %{version}-%{release}
-Requires:	percona-xtrabackup-24 >= 2.4.12 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:	percona-xtrabackup-24 >= %{xb_version} socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -1795,7 +1796,7 @@ done
 
 %if 0%{?systemd}
 if [ $1 -eq 0 ];then
-    %systemd_postun
+    /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
 else
     serv=$(/usr/bin/systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
     numint=0
@@ -1818,7 +1819,7 @@ else
             else
                 echo "Not bootstrapping with $(( numint-1 )) nodes already in cluster PC"
                 echo "Restarting with mysql.service in its stead"
-                %systemd_postun
+                /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
                 /usr/bin/systemctl stop mysql@bootstrap.service
                 /usr/bin/systemctl start mysql.service
             fi

@@ -437,33 +437,30 @@ trx_sys_read_wsrep_checkpoint(XID* xid)
 
 	sys_header = trx_sysf_get(&mtr);
 
-	if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
-		+ TRX_SYS_WSREP_XID_MAGIC_N_FLD))
-		!= TRX_SYS_WSREP_XID_MAGIC_N) {
+        if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
+                                      + TRX_SYS_WSREP_XID_MAGIC_N_FLD))
+            != TRX_SYS_WSREP_XID_MAGIC_N) {
+				xid->reset();
+                trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
+                mtr_commit(&mtr);
+                return;
+        }
 
-		memset(static_cast<void*>(xid), 0, sizeof(*xid));
-		xid->set_format_id(-1);
-		trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
-		mtr_commit(&mtr);
-		return;
-
-	}
-
-	/* Make sure we first load it to int32_t so the sign bit is preserved.*/
-	int32_t format_id = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
-					     + TRX_SYS_WSREP_XID_FORMAT);
-	xid->set_format_id(format_id);
-
-	xid->set_gtrid_length(mach_read_from_4(sys_header
-				+ TRX_SYS_WSREP_XID_INFO
-				+ TRX_SYS_WSREP_XID_GTRID_LEN));
-
-	xid->set_bqual_length(mach_read_from_4(sys_header
-				+ TRX_SYS_WSREP_XID_INFO
-				+ TRX_SYS_WSREP_XID_BQUAL_LEN));
-
-	xid->set_data(sys_header + TRX_SYS_WSREP_XID_INFO
-			+ TRX_SYS_WSREP_XID_DATA, XIDDATASIZE);
+        xid->set_format_id((long)mach_read_from_4(
+                sys_header
+                + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_FORMAT));
+        xid->set_gtrid_length((long)mach_read_from_4(
+                sys_header
+                + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_GTRID_LEN));
+        xid->set_bqual_length((long)mach_read_from_4(
+                sys_header
+                + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_BQUAL_LEN));
+        //ut_memcpy(xid->data,
+        //          sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_DATA,
+        //          XIDDATASIZE);
+        xid->set_data(
+                      sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_DATA, 
+                      XIDDATASIZE);
 
 	mtr_commit(&mtr);
 }

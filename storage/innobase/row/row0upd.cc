@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2019, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -420,10 +420,8 @@ wsrep_row_upd_check_foreign_constraints(
 		NOT break the constraint. */
 
 		if (foreign->foreign_index == index
-		    && (node->is_delete
-			|| row_upd_changes_first_fields_binary(
-				entry, index, node->update,
-				foreign->n_fields))) {
+		    && row_upd_changes_first_fields_binary(
+		        entry, index, node->update, foreign->n_fields)) {
 
 			if (foreign->referenced_table == NULL) {
 				foreign->referenced_table = 
@@ -2496,6 +2494,16 @@ row_upd_sec_index_entry(
 				case DB_NO_REFERENCED_ROW:
 					err = DB_SUCCESS;
 					break;
+				/* We can expect DB_LOCK_WAIT when the transaction that blocked
+				our lock was rolled back or committed while we were waiting
+				for the lock. In such cases, we can retry the operation.
+
+				See row_mysql_handle_errors() and
+				row_update_for_mysql_using_upd_graph()
+				for more details.*/
+
+				case DB_LOCK_WAIT:
+					break;
 				case DB_DEADLOCK:
 					if (wsrep_debug) {
 						ib::warn() << "WSREP: sec index FK check fail for deadlock"
@@ -2504,7 +2512,6 @@ row_upd_sec_index_entry(
 					}
 					break;
 				case DB_LOCK_WAIT_TIMEOUT:
-				case DB_LOCK_WAIT:
 					err = DB_LOCK_WAIT_TIMEOUT;
 					break;
 				default:
@@ -2836,7 +2843,7 @@ check_fk:
 
 	err = row_ins_clust_index_entry(
 		index, entry, thr,
-		node->upd_ext ? node->upd_ext->n_ext : 0, false);
+		entry->get_n_ext(), false);
 	node->state = UPD_NODE_INSERT_CLUSTERED;
 
 	mem_heap_free(heap);

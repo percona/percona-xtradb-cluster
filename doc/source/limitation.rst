@@ -19,7 +19,7 @@ The following limitations apply to |PXC|:
 * Unsupported queries:
 
   * ``LOCK TABLES`` and ``UNLOCK TABLES`` is not supported
-    in multi-master setups
+    in multi-source setups
 
   * Lock functions, such as ``GET_LOCK()``, ``RELEASE_LOCK()``, and so on
 
@@ -47,7 +47,7 @@ The following limitations apply to |PXC|:
 * Due to cluster-level optimistic concurrency control, a
   transaction issuing a ``COMMIT`` may still be aborted at that stage.
   There can be two transactions writing to the same rows
-  and committing in separate |PXC| nodes,
+  and committing in separate |PXC| :term:`nodes <Node>`,
   and only one of the them can successfully commit.
   The failing one will be aborted.
   For cluster-level aborts, |PXC| gives back deadlock error code: ::
@@ -56,7 +56,7 @@ The following limitations apply to |PXC|:
 
 * `XA transactions <https://dev.mysql.com/doc/refman/5.7/en/xa.html>`_ are not supported due to possible rollback on commit.
 
-* The write throughput of the whole cluster is limited by the weakest node.  If
+* The write throughput of the whole cluster is limited by the weakest :term:`node`.  If
   one node becomes slow, the whole cluster slows down.  If you have requirements
   for stable high performance, then it should be supported by corresponding
   hardware.
@@ -73,10 +73,10 @@ The following limitations apply to |PXC|:
 
 * When running |PXC| in cluster mode,
   avoid ``ALTER TABLE ... IMPORT/EXPORT`` workloads.
-  It can lead to node inconsistency if not executed in sync on all nodes.
+  It can lead to :term:`node` inconsistency if not executed in sync on all nodes.
 
 * All tables must have the primary key. This ensures that the same rows appear
-  in the same order on different nodes. The ``DELETE`` statement is not supported on
+  in the same order on different :term:`nodes <Node>`. The ``DELETE`` statement is not supported on
   tables without a primary key.
 
   .. seealso::
