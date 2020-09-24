@@ -6,7 +6,7 @@
 
 * :file:`GRA_*.log`
    These files contain binlog events in ROW format representing the failed
-   transaction. That means that the slave thread was not able to apply one of
+   transaction. That means that the replica thread was not able to apply one of
    the transactions. For each of those file, a corresponding warning or error
    message is present in the mysql error log file. Those error can also be
    false positives like a bad ``DDL`` statement (dropping  a table that doesn't
@@ -63,6 +63,16 @@
      160805  9:33:37 8:52:21 [Warning] WSREP: RBR event 1 Query apply warning: 1, 3
 
    In this example ``DROP TABLE`` statement was executed on a table that doesn't exist.
+
+
+* :file:`gcache.page`
+
+  See :variable:`gcache.page_size`  
+
+  .. seealso::
+
+     |percona| Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
+        https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/
 
 .. _galera.cache: galera_cache
 

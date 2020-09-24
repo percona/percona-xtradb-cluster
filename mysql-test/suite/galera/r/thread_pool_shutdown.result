@@ -1,0 +1,8 @@
+#node-2a
+SELECT 1;
+1
+1
+#node-2
+SET GLOBAL wsrep_reject_queries=ALL_KILL;
+SET GLOBAL wsrep_reject_queries=NONE;
+# restart

@@ -565,6 +565,43 @@ static void wsrep_pfs_instr_cb(
 }
 #endif /* HAVE_PSI_INTERFACE */
 
+void WSREP_LOG(void (*fun)(const char* fmt, ...), const char* fmt, ...)
+{
+  /* Allocate short buffer from stack. If the vsnprintf() return value
+     indicates that the message was truncated, a new buffer will be allocated
+     dynamically and the message will be reprinted. */
+  char msg[128] = {'\0'};
+  va_list arglist;
+  va_start(arglist, fmt);
+  int n= vsnprintf(msg, sizeof(msg) - 1, fmt, arglist);
+  va_end(arglist);
+  if (n < 0)
+  {
+    sql_print_warning("WSREP: Printing message failed");
+  }
+  else if (n < (int)sizeof(msg))
+  {
+    fun("WSREP: %s", msg);
+  }
+  else
+  {
+    try
+    {
+      std::vector<char> dynbuf(std::max(n, 4096));
+      va_start(arglist, fmt);
+      (void)vsnprintf(&dynbuf[0], dynbuf.size() - 1, fmt, arglist);
+      va_end(arglist);
+      dynbuf[dynbuf.size() - 1] = '\0';
+      fun("WSREP: %s", &dynbuf[0]);
+    }
+    catch (const std::bad_alloc&)
+    {
+      /* Memory allocation for vector failed, print truncated message. */
+      fun("WSREP: %s", msg);
+    }
+  }
+}
+
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   switch (level) {
   case WSREP_LOG_INFO:
@@ -2379,13 +2416,13 @@ void wsrep_to_isolation_end(THD *thd)
       wsrep_get_query_state(req->wsrep_query_state),                           \
       wsrep_get_conflict_state(req->wsrep_conflict_state),                     \
       req->get_command(), req->lex->sql_command,                               \
-      (req->rewritten_query.length() ? req->rewritten_query.c_ptr_safe() : req->query().str), \
+      (req->rewritten_query().length() ? wsrep_thd_rewritten_query(req).c_ptr_safe() : req->query().str), \
       gra->thread_id(), (long long)wsrep_thd_trx_seqno(gra),                   \
       wsrep_get_exec_mode(gra->wsrep_exec_mode),                               \
       wsrep_get_query_state(gra->wsrep_query_state),                           \
       wsrep_get_conflict_state(gra->wsrep_conflict_state),                     \
       gra->get_command(), gra->lex->sql_command,                               \
-      (gra->rewritten_query.length() ? gra->rewritten_query.c_ptr_safe() : gra->query().str));
+      (gra->rewritten_query().length() ? wsrep_thd_rewritten_query(gra).c_ptr_safe() : gra->query().str))
 
 bool
 wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
@@ -2582,4 +2619,18 @@ const char* wsrep_get_wsrep_status(wsrep_status status)
   }
 
   return "NULL";
+}
+
+/*
+ Returns non-const copy of thd->rewritten_query().
+
+ PXC code uses rewritten_query.c_ptr_safe() in several places.
+ As c_ptr_save() is non const method, it requires non const object.
+ Here we return copy of thd->rewritten_query() instead of const-casting
+ thd->rewritten_query() in place.
+ This is to avoid interference of PXC specific part with generic server part.
+ */
+String wsrep_thd_rewritten_query(THD *thd)
+{
+  return thd->rewritten_query();
 }

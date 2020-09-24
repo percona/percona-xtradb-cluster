@@ -190,6 +190,9 @@ The following options may be given as the first argument:
  --console           Write error output on screen; don't remove the console
  window on windows.
  --core-file         Write core on errors.
+ --coredumper[=name] Use coredumper library to generate coredumps. Specify a
+ path for coredump otherwise it will be generated on
+ datadir
  --csv-mode=name     Control CSV parser mode: []: default, ietf_quotes:
  standards-compatible embedded quote and comma parsing
  --daemonize         Run mysqld as sysv daemon
@@ -740,8 +743,8 @@ The following options may be given as the first argument:
  firstmatch, duplicateweedout,
  subquery_materialization_cost_based, block_nested_loop,
  batched_key_access, use_index_extensions,
- condition_fanout_filter, derived_merge} and val is one of
- {on, off, default}
+ condition_fanout_filter, derived_merge, favor_range_scan}
+ and val is one of {on, off, default}
  --optimizer-trace=name 
  Controls tracing of the Optimizer:
  optimizer_trace=option=val[,option=val...], where option
@@ -958,6 +961,15 @@ The following options may be given as the first argument:
  networks. If the network doesn't contain mask, it is
  considered to be a single host. "*" represents all
  networks and must the only directive on the line.
+ --pxc-encrypt-cluster-traffic 
+ PXC cluster traffic SSL auto-configuration
+ --pxc-maint-mode[=name] 
+ ProxySQL assisted PXC maintenance mode
+ --pxc-maint-transition-period=# 
+ Period before the shutdown signal is delivered
+ --pxc-strict-mode[=name] 
+ PXC strict mode help control behavior of experimental
+ features
  --query-alloc-block-size=# 
  Allocation block size for query parsing and execution
  --query-cache-limit=# 
@@ -1379,6 +1391,10 @@ The following options may be given as the first argument:
  connection before closing it
  --wsrep-OSU-method[=name] 
  Method for Online Schema Upgrade
+ --wsrep-RSU-commit-timeout[=#] 
+ Wait for wsrep_RSU_commit_timeout (in micro-seconds) to
+ allow active connection to complete COMMIT action before
+ starting RSU
  --wsrep-auto-increment-control 
  To automatically control the assignment of autoincrement
  variables
@@ -1400,7 +1416,7 @@ The following options may be given as the first argument:
  --wsrep-cluster-name=name 
  Name for the cluster
  --wsrep-convert-LOCK-to-trx 
- To convert locking sessions into transactions
+ To convert locking sessions (deprecated)into transactions
  --wsrep-data-home-dir=name 
  home directory for wsrep provider
  --wsrep-dbug-option=name 
@@ -1422,8 +1438,6 @@ The following options may be given as the first argument:
  Max number of rows in write set
  --wsrep-max-ws-size=# 
  Max write set size (bytes)
- --wsrep-mysql-replication-bundle=# 
- mysql replication group commit 
  --wsrep-node-address=name 
  Node address
  --wsrep-node-incoming-address=name 
@@ -1517,6 +1531,7 @@ completion-type NO_CHAIN
 concurrent-insert AUTO
 connect-timeout 10
 console FALSE
+coredumper (No default value)
 csv-mode 
 daemonize FALSE
 date-format %Y-%m-%d
@@ -1735,7 +1750,7 @@ performance-schema-max-rwlock-instances -1
 performance-schema-max-socket-classes 10
 performance-schema-max-socket-instances -1
 performance-schema-max-sql-text-length 1024
-performance-schema-max-stage-classes 150
+performance-schema-max-stage-classes 180
 performance-schema-max-statement-classes 203
 performance-schema-max-statement-stack 10
 performance-schema-max-table-handles -1
@@ -1752,6 +1767,10 @@ port-open-timeout 0
 preload-buffer-size 32768
 profiling-history-size 15
 proxy-protocol-networks 
+pxc-encrypt-cluster-traffic FALSE
+pxc-maint-mode DISABLED
+pxc-maint-transition-period 10
+pxc-strict-mode DISABLED
 query-alloc-block-size 8192
 query-cache-limit 1048576
 query-cache-min-res-unit 4096
@@ -1824,7 +1843,7 @@ sql-mode ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERR
 stored-program-cache 256
 super-read-only FALSE
 symbolic-links FALSE
-sync-binlog 1
+sync-binlog 0
 sync-frm TRUE
 sync-master-info 10000
 sync-relay-log 10000
@@ -1853,6 +1872,7 @@ validate-user-plugins TRUE
 verbose TRUE
 wait-timeout 28800
 wsrep-OSU-method TOI
+wsrep-RSU-commit-timeout 5000
 wsrep-auto-increment-control TRUE
 wsrep-causal-reads FALSE
 wsrep-certification-rules strict
@@ -1860,7 +1880,6 @@ wsrep-certify-nonPK TRUE
 wsrep-cluster-address 
 wsrep-cluster-name my_wsrep_cluster
 wsrep-convert-LOCK-to-trx FALSE
-wsrep-data-home-dir 
 wsrep-dbug-option 
 wsrep-debug FALSE
 wsrep-desync FALSE
@@ -1871,7 +1890,6 @@ wsrep-load-data-splitting TRUE
 wsrep-log-conflicts FALSE
 wsrep-max-ws-rows 0
 wsrep-max-ws-size 2147483647
-wsrep-mysql-replication-bundle 0
 wsrep-node-address 
 wsrep-node-incoming-address AUTO
 wsrep-notify-cmd 
@@ -1890,7 +1908,7 @@ wsrep-slave-threads 1
 wsrep-sst-auth (No default value)
 wsrep-sst-donor 
 wsrep-sst-donor-rejects-queries FALSE
-wsrep-sst-method rsync
+wsrep-sst-method xtrabackup-v2
 wsrep-sst-receive-address AUTO
 wsrep-start-position 00000000-0000-0000-0000-000000000000:-1
 wsrep-sync-wait 0

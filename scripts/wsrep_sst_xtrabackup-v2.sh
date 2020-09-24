@@ -33,14 +33,17 @@
 #
 
 # encryption specific variables.
+OS=$(uname)
 ealgo=""
 ekey=""
 ekeyfile=""
 encrypt=0
 ieopts=""
-xbstreameopts=""
-xbstreameopts_sst=""
-xbstreameopts_other=""
+xbstream_eopts=""
+xbstream_eopts_sst=""
+xbstream_eopts_other=""
+
+xbstream_opts=""
 
 nproc=1
 ecode=0
@@ -269,13 +272,13 @@ get_keys()
 
         if [[ "$WSREP_SST_OPT_ROLE" == "joiner" ]]; then
             # Decryption is done by xbstream for SST
-            xbstreameopts_sst=" --decrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
-            xbstreameopts_other=""
+            xbstream_eopts_sst=" --decrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
+            xbstream_eopts_other=""
             ieopts=""
         else
             # Encryption is done by xtrabackup for SST
-            xbstreameopts_sst=""
-            xbstreameopts_other=""
+            xbstream_eopts_sst=""
+            xbstream_eopts_other=""
             ieopts=" --encrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
         fi
     else
@@ -748,6 +751,7 @@ read_cnf()
         sockopt+=",retry=30"
     fi
 
+    xbstream_opts=$(parse_cnf sst xbstream-opts "")
 }
 
 #
@@ -802,12 +806,12 @@ adjust_progress()
 #
 get_stream()
 {
-    if [[ $sfmt == 'xbstream' ]]; then
-        wsrep_log_debug "Streaming with xbstream"
-        if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-            strmcmd="xbstream \$xbstreameopts -x"
+    if [[ $sfmt == 'xbstream' ]];then 
+        wsrep_log_info "Streaming with xbstream"
+        if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
+            strmcmd="xbstream -x $xbstream_opts \$xbstream_eopts"
         else
-            strmcmd="xbstream \$xbstreameopts -c \${FILE_TO_STREAM}"
+            strmcmd="xbstream -c $xbstream_opts \$xbstream_eopts \${FILE_TO_STREAM}"
         fi
     else
         sfmt="tar"
@@ -826,7 +830,9 @@ get_stream()
 get_proc()
 {
     set +e
-    nproc=$(grep -c processor /proc/cpuinfo)
+    nproc=1
+    [ "$OS" = "Linux" ] && nproc=$(grep -c processor /proc/cpuinfo)
+    [ "$OS" = "Darwin" -o "$OS" = "FreeBSD" ] && nproc=$(sysctl -n hw.ncpu)
     [[ -z $nproc || $nproc -eq 0 ]] && nproc=1
     set -e
 }
@@ -1281,7 +1287,8 @@ send_data_from_donor_to_joiner()
 }
 
 # Returns the version string in a standardized format
-# Input "1.2.3" => echoes "010203"
+# Input
+#   "1.2.3" => echoes "010203"
 # Wrongly formatted values => echoes "000000"
 normalize_version()
 {
@@ -1289,9 +1296,9 @@ normalize_version()
     local minor=0
     local patch=0
 
-    # Only parses purely numeric version numbers, 1.2.3 
+    # Only parses purely numeric version numbers, 1.2.3
     # Everything after the first three values are ignored
-    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([\.0-9])*$ ]]; then
+    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([^ ])* ]]; then
         major=${BASH_REMATCH[1]}
         minor=${BASH_REMATCH[2]}
         patch=${BASH_REMATCH[3]}
@@ -1421,8 +1428,10 @@ fi
 #
 # 2.4.17  PXB added Data-At-Rest Encryption support found in PS/PXC 5.7.28
 #
+# 2.4.20  Transition-key fixes
+#
 
-XB_REQUIRED_VERSION="2.4.17"
+XB_REQUIRED_VERSION="2.4.20"
 
 XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
 if [[ -z $XB_VERSION ]]; then
@@ -1614,7 +1623,7 @@ then
     # append transition_key only if keyring is being used.
     if [[ $keyring_plugin -eq 1 ]]; then
         echo "transition-key=$transition_key" >> "$sst_info_file_path"
-        encrypt_backup_options="--transition-key=\$transition_key"
+        encrypt_backup_options="--transition-key=$transition_key"
     fi
 
     #
@@ -1659,7 +1668,7 @@ then
             tcmd=" \$ecmd_other | $tcmd "
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_other
+            xbstream_eopts=$xbstream_eopts_other
         fi
 
         # Before the real SST,send the sst-info
@@ -1693,7 +1702,7 @@ then
             tcmd=" \$ecmd | $tcmd "
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_sst
+            xbstream_eopts=$xbstream_eopts_sst
         fi
 
         set +e
@@ -1731,7 +1740,7 @@ then
             tcmd=" \$ecmd_other | $tcmd "
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_other
+            xbstream_eopts=$xbstream_eopts_other
         fi
 
         strmcmd+=" \${IST_FILE}"
@@ -1787,7 +1796,7 @@ then
         strmcmd=" $sdecomp | $strmcmd"
     fi
     if [[ $encrypt -eq 1 ]]; then
-        xbstreameopts=$xbstreameopts_other
+        xbstream_eopts=$xbstream_eopts_other
     fi
 
     initialize_tmpdir
@@ -1811,9 +1820,18 @@ then
         DONOR_MYSQL_VERSION=$(parse_sst_info "$sst_file_info_path" sst mysql-version "")
 
         transition_key=$(parse_sst_info "$sst_file_info_path" sst transition-key "")
+
         if [[ -n $transition_key ]]; then
-            encrypt_prepare_options="--transition-key=\$transition_key"
-            encrypt_move_options="--transition-key=\$transition_key --generate-new-master-key"
+
+            # Use the broken key if the donor version is < 5.7.29 and is not 5.7.28-31-57.2
+            # In other words, 5.7.28-31-57.2 and above will use the key that was sent
+            if ! check_for_version "$DONOR_MYSQL_VERSION" "5.7.29" &&
+               [[ $DONOR_MYSQL_VERSION != "5.7.28-31-57.2" ]]; then
+                transition_key="\$transition_key"
+            fi
+
+            encrypt_prepare_options="--transition-key=$transition_key"
+            encrypt_move_options="--transition-key=$transition_key --generate-new-master-key"
         fi
     elif [[ -r "${STATDIR}/${XB_GTID_INFO_FILE}" ]]; then
         #
@@ -1943,7 +1961,7 @@ then
             strmcmd=" $sdecomp | $strmcmd"
         fi
         if [[ $encrypt -eq 1 ]]; then
-            xbstreameopts=$xbstreameopts_sst
+            xbstream_eopts=$xbstream_eopts_sst
         fi
 
         # For compatibility, if the tmpdir is not specified, then use

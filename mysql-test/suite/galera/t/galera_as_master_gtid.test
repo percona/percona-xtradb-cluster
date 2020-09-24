@@ -13,7 +13,18 @@
 --source include/galera_cluster.inc
 --source include/force_restart.inc
 
+--connection node_1
+SET SESSION wsrep_on = OFF;
+RESET MASTER;
+SET SESSION wsrep_on = ON;
+
+--connection node_2
+SET SESSION wsrep_on = OFF;
+RESET MASTER;
+SET SESSION wsrep_on = ON;
+
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+RESET MASTER;
 --disable_query_log
 --eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
 --enable_query_log
@@ -69,3 +80,4 @@ DROP TABLE t1;
 
 STOP SLAVE;
 RESET SLAVE ALL;
+
