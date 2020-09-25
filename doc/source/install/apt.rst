@@ -27,6 +27,14 @@ by other software. |PXC| requires them for communication.
 * 4567
 * 4568
 
+.. note::
+
+    To view the listening ports, enter the following command:
+    
+    .. code-block:: bash
+    
+        $ sudo ss -tunlp
+        
 .. rubric:: If |MySQL| Is Installed
 
 If you previously had MySQL installed on the server, there might be an
@@ -43,13 +51,12 @@ other reasons, it is possible to disable or extend the MySQL profile.
 
 .. rubric:: Dependencies on Ubuntu
 
-When installating on a Ubuntu system, make sure that the ``universe``
+When installing on a Ubuntu system, make sure that the ``universe``
 repository is enabled to satisfy all essential dependencies.
 
 .. seealso::
 
-   Ubuntu Documentation: Repositories
-      https://help.ubuntu.com/community/Repositories/Ubuntu
+   `Ubuntu Documentation: Repositories <https://help.ubuntu.com/community/Repositories/Ubuntu>`_
 
 Installing from Repository
 ==========================
