@@ -500,10 +500,8 @@ static void *sst_joiner_thread(void *a) {
         proc.wait();
         if (proc.error()) err = proc.error();
       } else {
-        // Clear the pointer to SST process:
-        if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
-        sst_process = NULL;
-        mysql_mutex_unlock(&LOCK_wsrep_sst);
+        // Do not clear the pointer to SST process. It will be useful if
+        // we decide to interrupt it.
         err = 0;
       }
     } else {
@@ -615,6 +613,10 @@ static void *sst_joiner_thread(void *a) {
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_delete_thread();
 #endif /* HAVE_PSI_INTERFACE */
+
+  if (mysql_mutex_lock(&LOCK_wsrep_sst)) abort();
+  sst_process = NULL;
+  mysql_mutex_unlock(&LOCK_wsrep_sst);
 
   return NULL;
 }
@@ -1398,7 +1400,7 @@ static int sst_donate_other(const char *method, const char *addr,
   if (ret) {
     WSREP_ERROR("sst_donate_other(): pthread_create() failed: %d (%s)", ret,
                 strerror(ret));
-    return ret;
+    return -ret;
   }
   mysql_cond_wait(&arg.COND_wsrep_sst_thread, &arg.LOCK_wsrep_sst_thread);
 
@@ -1416,6 +1418,8 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
   const char *method = msg.data();
   size_t method_len = strlen(method);
   const char *data = method + method_len + 1;
+
+  DBUG_EXECUTE_IF("wsrep_sst_donate_cb_fails", { return WSREP_CB_FAILURE; });
 
   wsp::env env(NULL);
   if (env.error()) {
@@ -1437,5 +1441,9 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
   int ret;
   ret = sst_donate_other(method, data, current_gtid, bypass, env());
 
+  /* Above methods should return 0 in case of success and negative value
+   * in case of failure. If we have any positive value here it means that we
+   * handle errors in above functions in the wrong way */
+  DBUG_ASSERT(ret <= 0);
   return (ret >= 0 ? WSREP_CB_SUCCESS : WSREP_CB_FAILURE);
 }
