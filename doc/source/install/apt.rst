@@ -4,17 +4,8 @@
 Installing |PXC| on Debian or Ubuntu
 ====================================
 
-Percona provides :file:`.deb` packages for 64-bit versions
-of the following distributions:
-
-* Debian 9 (stretch)
-* Debian 10 (buster)
-* Ubuntu 16.04 LTS (Xenial Xerus)
-* Ubuntu 18.04 LTS (Bionic Beaver)
-* Ubuntu 20.04 LTS (Bionic Beaver)
-
-.. note:: |PXC| should work on other DEB-based distributions,
-   but it is tested only on platforms listed above.
+Specific information on the supported platforms, products, and versions
+is described in `Percona Software and Platform Lifecycle <https://www.percona.com/services/policies/percona-software-platform-lifecycle#mysql>`_.
 
 The packages are available in the official Percona software repository
 and on the `download page
