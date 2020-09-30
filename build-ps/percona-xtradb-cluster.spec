@@ -18,6 +18,7 @@
 # Some common macro definitions
 ##############################################################################
 
+%define _build_id_links none
 %undefine _missing_build_ids_terminate_build
 
 %define galera_src_dir percona-xtradb-cluster-galera
