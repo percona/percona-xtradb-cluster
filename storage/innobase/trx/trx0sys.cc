@@ -361,7 +361,17 @@ trx_sys_update_wsrep_checkpoint(
             read_wsrep_xid_uuid(xid, xid_uuid);
             if (!memcmp(xid_uuid, trx_sys_cur_xid_uuid, 8))
             {
-                ut_ad(xid_seqno > trx_sys_cur_xid_seqno);
+                /* We have the case when REPLACE INTO ... SELECT or
+                INSERT INTO ... SELECT is executed as TOI. This is done by 
+                pt-table-checksum tool. In such case statement execution
+                causes InnoDB commit and storing of xid_seqno 
+                (wsrep_apply_cb) and then because of TOI, storing of 
+                xid_seqno is requested again from wsrep_commit_cb with the 
+                same xid_seqno. 
+                Allow current and new values be the same, without 
+                introducing new flags and logic to prevent double storing
+                of the same value */ 
+                ut_ad(xid_seqno >= trx_sys_cur_xid_seqno);
                 trx_sys_cur_xid_seqno = xid_seqno;
             }
             else
