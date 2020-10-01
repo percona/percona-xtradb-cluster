@@ -29,7 +29,7 @@ INSERT INTO t1 VALUES(1);
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 125;
 
 --connection node_2
 INSERT INTO t1 VALUES(2);
@@ -41,7 +41,7 @@ INSERT INTO t1 VALUES(2);
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000004' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000004' FROM 125;
 
 --connection node_3
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
@@ -57,7 +57,7 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000004' FROM 124;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
 --connection node_1
 DROP TABLE t1;

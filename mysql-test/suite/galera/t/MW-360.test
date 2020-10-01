@@ -94,7 +94,7 @@ DROP TABLE t1;
 
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
 --replace_result $local_uuid <local_uuid> $cluster_uuid <cluster_uuid>
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
 --connection node_2
 --let $local_uuid = `SELECT LEFT(@@global.gtid_executed, 36)`
@@ -102,4 +102,4 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
 
 --replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
 --replace_result $local_uuid <local_uuid> $cluster_uuid <cluster_uuid>
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;

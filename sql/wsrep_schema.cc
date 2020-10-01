@@ -357,7 +357,12 @@ static int delete_row(TABLE *table) {
   do {
     error = table->file->ha_delete_row(table->record[0]);
     retry--;
-  } while (error && retry);
+
+    /*
+      HA_ERR_LOCK_DEADLOCK can occur if the trx is BF-aborted,
+      in this case, do not retry, just exit.
+     */
+  } while (error && (error != HA_ERR_LOCK_DEADLOCK) && retry);
 
   if (error) {
     WSREP_ERROR("Error deleting row from %s.%s: %d", table->s->db.str,
@@ -510,6 +515,15 @@ static int init_for_index_scan(TABLE *table, const uchar *key,
       WSREP_ERROR("init_for_index_scan failed to read first record, error %d",
                   error);
   }
+
+  /*
+    If an error occurs, we want the state to be the same as if the init
+    failed, so clear the state.
+  */
+  if (error) {
+    table->file->ha_index_end();
+  }
+
   return error;
 }
 
@@ -873,6 +887,7 @@ int Wsrep_schema::update_fragment_meta(THD *thd,
                                                frag_table->record[0]))) {
     WSREP_ERROR("Error updating record in %s.%s: %d", frag_table->s->db.str,
                 frag_table->s->table_name.str, error);
+    Wsrep_schema_impl::end_index_scan(frag_table);
     Wsrep_schema_impl::finish_stmt(thd);
     DBUG_RETURN(1);
   }
@@ -914,11 +929,13 @@ static int remove_fragment(THD *thd, TABLE *frag_table,
                   transaction_id.get(), seqno.get(), error);
     }
     ret = error;
-  } else if (Wsrep_schema_impl::delete_row(frag_table)) {
-    ret = 1;
+  } else {
+    if (Wsrep_schema_impl::delete_row(frag_table)) {
+      ret = 1;
+    }
+    Wsrep_schema_impl::end_index_scan(frag_table);
   }
 
-  Wsrep_schema_impl::end_index_scan(frag_table);
   return ret;
 }
 
@@ -1025,7 +1042,7 @@ int Wsrep_schema::replay_transaction(
     if (error2) {
       WSREP_WARN("Failed to init streaming log table for index scan: %d",
                  error);
-      Wsrep_schema_impl::end_index_scan(frag_table);
+      Wsrep_schema_impl::finish_stmt(&thd);
       ret = 1;
       break;
     }
@@ -1044,6 +1061,8 @@ int Wsrep_schema::replay_transaction(
       if (ret) {
         WSREP_WARN(
             "Wsrep_schema::replay_transaction: failed to apply fragments");
+        Wsrep_schema_impl::end_index_scan(frag_table);
+        Wsrep_schema_impl::finish_stmt(&thd);
         break;
       }
     }
@@ -1063,7 +1082,7 @@ int Wsrep_schema::replay_transaction(
     if (error) {
       WSREP_WARN("Failed to init streaming log table for index scan: %d",
                  error);
-      Wsrep_schema_impl::end_index_scan(frag_table);
+      Wsrep_schema_impl::finish_stmt(&thd);
       ret = 1;
       break;
     }
@@ -1072,6 +1091,7 @@ int Wsrep_schema::replay_transaction(
     if (error) {
       WSREP_WARN("Could not delete row from streaming log table: %d", error);
       Wsrep_schema_impl::end_index_scan(frag_table);
+      Wsrep_schema_impl::finish_stmt(&thd);
       ret = 1;
       break;
     }

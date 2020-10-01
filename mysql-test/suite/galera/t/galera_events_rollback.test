@@ -26,6 +26,7 @@ SET GLOBAL event_scheduler = ON;
 DELIMITER |;
 CREATE EVENT foo
 	ON SCHEDULE AT CURRENT_TIMESTAMP
+	ON COMPLETION PRESERVE
 	DISABLE
 	DO BEGIN
 		SET DEBUG_SYNC = "ha_innobase_update_row SIGNAL before_commit WAIT_FOR commit_ok";

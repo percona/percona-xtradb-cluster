@@ -123,7 +123,7 @@ START SLAVE;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
 --error 1049
 USE test2;
@@ -139,7 +139,7 @@ USE test2;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 
 #
 # Cleanup

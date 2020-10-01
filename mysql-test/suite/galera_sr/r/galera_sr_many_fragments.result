@@ -22,7 +22,16 @@ COUNT(*) = 0
 SELECT COUNT(*) = 0 FROM t1;
 COUNT(*) = 0
 1
+"# Resetting wsrep_provider_options on node 2"
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_provider_options = 'repl.causal_read_timeout=PT10M';
+SET SESSION wsrep_sync_wait = 7;
+SELECT COUNT(*) = 0 FROM mysql.wsrep_streaming_log;
 COUNT(*) = 0
 1
+SELECT COUNT(*) = 0 FROM t1;
 COUNT(*) = 0
 1
+"# Resetting wsrep_provider_options on node 1"
+DROP TABLE ten;
+DROP TABLE t1;

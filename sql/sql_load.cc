@@ -284,9 +284,9 @@ bool Sql_cmd_load_table::execute_inner(THD *thd,
               !table_list->is_derived()
           ?  // derived tables not allowed
           table_list->updatable_base_table()
-          : NULL;
+          : nullptr;
 
-  if (insert_table_ref == NULL ||
+  if (insert_table_ref == nullptr ||
       check_key_in_view(thd, table_list, insert_table_ref)) {
     my_error(ER_NON_UPDATABLE_TABLE, MYF(0), table_list->alias, "LOAD");
     return true;
@@ -334,7 +334,7 @@ bool Sql_cmd_load_table::execute_inner(THD *thd,
       Item *item;
       if (!(item = field_iterator.create_item(thd))) return true;
 
-      if (item->field_for_view_update() == NULL) {
+      if (item->field_for_view_update() == nullptr) {
         my_error(ER_NONUPDATEABLE_COLUMN, MYF(0), item->item_name.ptr());
         return true;
       }
@@ -370,7 +370,7 @@ bool Sql_cmd_load_table::execute_inner(THD *thd,
     while ((item = it++)) {
       if ((item->type() == Item::FIELD_ITEM ||
            item->type() == Item::REF_ITEM) &&
-          item->field_for_view_update() == NULL) {
+          item->field_for_view_update() == nullptr) {
         my_error(ER_NONUPDATEABLE_COLUMN, MYF(0), item->item_name.ptr());
         return true;
       }
@@ -383,7 +383,7 @@ bool Sql_cmd_load_table::execute_inner(THD *thd,
         */
         Item_func_set_user_var *user_var = new (thd->mem_root)
             Item_func_set_user_var(item->item_name, item, false);
-        if (user_var == NULL) return true;
+        if (user_var == nullptr) return true;
         thd->lex->set_var_list.push_back(user_var);
       }
     }
@@ -582,7 +582,7 @@ bool Sql_cmd_load_table::execute_inner(THD *thd,
       table->file->print_error(my_errno(), MYF(0));
       error = true;
     }
-    table->next_number_field = 0;
+    table->next_number_field = nullptr;
   }
   if (file >= 0) mysql_file_close(file, MYF(0));
   free_blobs(table); /* if pack_blob was used */
@@ -703,13 +703,13 @@ bool Sql_cmd_load_table::write_execute_load_query_log_event(
     bool is_concurrent, enum enum_duplicates duplicates,
     bool transactional_table, int errcode) {
   const char *tbl = table_name_arg;
-  const char *tdb = (thd->db().str != NULL ? thd->db().str : db_arg);
-  const String *query = NULL;
+  const char *tdb = (thd->db().str != nullptr ? thd->db().str : db_arg);
+  const String *query = nullptr;
   String string_buf;
   size_t fname_start = 0;
   size_t fname_end = 0;
 
-  if (thd->db().str == NULL || strcmp(db_arg, thd->db().str)) {
+  if (thd->db().str == nullptr || strcmp(db_arg, thd->db().str)) {
     /*
       If used database differs from table's database,
       prefix table name with database name so that it
@@ -804,7 +804,7 @@ bool Sql_cmd_load_table::read_fixed_length(THD *thd, COPY_INFO &info,
                             ER_WARN_TOO_FEW_RECORDS,
                             ER_THD(thd, ER_WARN_TOO_FEW_RECORDS),
                             thd->get_stmt_da()->current_row_for_condition());
-        if (field->type() == FIELD_TYPE_TIMESTAMP && !field->maybe_null()) {
+        if (field->type() == FIELD_TYPE_TIMESTAMP && !field->is_nullable()) {
           // Specific of TIMESTAMP NOT NULL: set to CURRENT_TIMESTAMP.
           Item_func_now_local::store_in(field);
         }
@@ -849,7 +849,7 @@ bool Sql_cmd_load_table::read_fixed_length(THD *thd, COPY_INFO &info,
       goto continue_loop;
     }
 
-    err = write_record(thd, table, &info, NULL);
+    err = write_record(thd, table, &info, nullptr);
     if (err) return true;
 
     /*
@@ -873,7 +873,7 @@ bool Sql_cmd_load_table::read_fixed_length(THD *thd, COPY_INFO &info,
 
 class Field_tmp_nullability_guard {
  public:
-  explicit Field_tmp_nullability_guard(Item *item) : m_field(NULL) {
+  explicit Field_tmp_nullability_guard(Item *item) : m_field(nullptr) {
     if (item->type() == Item::FIELD_ITEM) {
       m_field = ((Item_field *)item)->field;
       /*
@@ -955,8 +955,7 @@ bool Sql_cmd_load_table::read_sep_field(THD *thd, COPY_INFO &info,
                      thd->get_stmt_da()->current_row_for_condition());
             return true;
           }
-          if (!field->real_maybe_null() &&
-              field->type() == FIELD_TYPE_TIMESTAMP) {
+          if (!field->is_nullable() && field->type() == FIELD_TYPE_TIMESTAMP) {
             // Specific of TIMESTAMP NOT NULL: set to CURRENT_TIMESTAMP.
             Item_func_now_local::store_in(field);
           } else {
@@ -967,7 +966,8 @@ bool Sql_cmd_load_table::read_sep_field(THD *thd, COPY_INFO &info,
             field->set_null();
           }
         } else if (item->type() == Item::STRING_ITEM) {
-          DBUG_ASSERT(NULL != dynamic_cast<Item_user_var_as_out_param *>(item));
+          DBUG_ASSERT(nullptr !=
+                      dynamic_cast<Item_user_var_as_out_param *>(item));
           ((Item_user_var_as_out_param *)item)
               ->set_null_value(read_info.read_charset);
         }
@@ -983,7 +983,8 @@ bool Sql_cmd_load_table::read_sep_field(THD *thd, COPY_INFO &info,
           table->autoinc_field_has_explicit_non_null_value = true;
         field->store((char *)pos, length, read_info.read_charset);
       } else if (item->type() == Item::STRING_ITEM) {
-        DBUG_ASSERT(NULL != dynamic_cast<Item_user_var_as_out_param *>(item));
+        DBUG_ASSERT(nullptr !=
+                    dynamic_cast<Item_user_var_as_out_param *>(item));
         ((Item_user_var_as_out_param *)item)
             ->set_value((char *)pos, length, read_info.read_charset);
       }
@@ -1012,7 +1013,7 @@ bool Sql_cmd_load_table::read_sep_field(THD *thd, COPY_INFO &info,
                      thd->get_stmt_da()->current_row_for_condition());
             return true;
           }
-          if (field->type() == FIELD_TYPE_TIMESTAMP && !field->maybe_null())
+          if (field->type() == FIELD_TYPE_TIMESTAMP && !field->is_nullable())
             // Specific of TIMESTAMP NOT NULL: set to CURRENT_TIMESTAMP.
             Item_func_now_local::store_in(field);
           /*
@@ -1027,7 +1028,8 @@ bool Sql_cmd_load_table::read_sep_field(THD *thd, COPY_INFO &info,
                               ER_THD(thd, ER_WARN_TOO_FEW_RECORDS),
                               thd->get_stmt_da()->current_row_for_condition());
         } else if (item->type() == Item::STRING_ITEM) {
-          DBUG_ASSERT(NULL != dynamic_cast<Item_user_var_as_out_param *>(item));
+          DBUG_ASSERT(nullptr !=
+                      dynamic_cast<Item_user_var_as_out_param *>(item));
           ((Item_user_var_as_out_param *)item)
               ->set_null_value(read_info.read_charset);
         }
@@ -1076,7 +1078,7 @@ bool Sql_cmd_load_table::read_sep_field(THD *thd, COPY_INFO &info,
       goto continue_loop;
     }
 
-    err = write_record(thd, table, &info, NULL);
+    err = write_record(thd, table, &info, nullptr);
     if (err) return true;
     /*
       We don't need to reset auto-increment field since we are restoring
@@ -1124,7 +1126,7 @@ bool Sql_cmd_load_table::read_xml_field(THD *thd, COPY_INFO &info,
 
     List_iterator_fast<XML_TAG> xmlit(read_info.taglist);
     xmlit.rewind();
-    XML_TAG *tag = NULL;
+    XML_TAG *tag = nullptr;
 
 #ifndef DBUG_OFF
     DBUG_PRINT("read_xml_field", ("skip_lines=%d", (int)skip_lines));
@@ -1167,7 +1169,7 @@ bool Sql_cmd_load_table::read_xml_field(THD *thd, COPY_INFO &info,
           field->set_null();
           if (field == table->next_number_field)
             table->autoinc_field_has_explicit_non_null_value = true;
-          if (!field->maybe_null()) {
+          if (!field->is_nullable()) {
             if (field->type() == FIELD_TYPE_TIMESTAMP)
               // Specific of TIMESTAMP NOT NULL: set to CURRENT_TIMESTAMP.
               Item_func_now_local::store_in(field);
@@ -1176,7 +1178,8 @@ bool Sql_cmd_load_table::read_xml_field(THD *thd, COPY_INFO &info,
                                  ER_WARN_NULL_TO_NOTNULL, 1);
           }
         } else {
-          DBUG_ASSERT(NULL != dynamic_cast<Item_user_var_as_out_param *>(item));
+          DBUG_ASSERT(nullptr !=
+                      dynamic_cast<Item_user_var_as_out_param *>(item));
           ((Item_user_var_as_out_param *)item)->set_null_value(cs);
         }
         continue;
@@ -1189,7 +1192,8 @@ bool Sql_cmd_load_table::read_xml_field(THD *thd, COPY_INFO &info,
           table->autoinc_field_has_explicit_non_null_value = true;
         field->store(tag->value.ptr(), tag->value.length(), cs);
       } else {
-        DBUG_ASSERT(NULL != dynamic_cast<Item_user_var_as_out_param *>(item));
+        DBUG_ASSERT(nullptr !=
+                    dynamic_cast<Item_user_var_as_out_param *>(item));
         ((Item_user_var_as_out_param *)item)
             ->set_value(tag->value.ptr(), tag->value.length(), cs);
       }
@@ -1220,7 +1224,8 @@ bool Sql_cmd_load_table::read_xml_field(THD *thd, COPY_INFO &info,
                               ER_THD(thd, ER_WARN_TOO_FEW_RECORDS),
                               thd->get_stmt_da()->current_row_for_condition());
         } else {
-          DBUG_ASSERT(NULL != dynamic_cast<Item_user_var_as_out_param *>(item));
+          DBUG_ASSERT(nullptr !=
+                      dynamic_cast<Item_user_var_as_out_param *>(item));
           ((Item_user_var_as_out_param *)item)->set_null_value(cs);
         }
       }
@@ -1244,7 +1249,7 @@ bool Sql_cmd_load_table::read_xml_field(THD *thd, COPY_INFO &info,
       goto continue_loop;
     }
 
-    if (write_record(thd, table, &info, NULL)) return true;
+    if (write_record(thd, table, &info, nullptr)) return true;
 
     /*
       We don't need to reset auto-increment field since we are restoring
@@ -1315,7 +1320,7 @@ READ_INFO::READ_INFO(File file_par, uint tot_length, const CHARSET_INFO *cs,
 
   level = 0; /* for load xml */
   if (line_start.length() == 0) {
-    line_start_ptr = 0;
+    line_start_ptr = nullptr;
     start_of_line = false;
   } else {
     line_start_ptr = line_start.ptr();
@@ -1326,7 +1331,7 @@ READ_INFO::READ_INFO(File file_par, uint tot_length, const CHARSET_INFO *cs,
   if (field_term_length == line_term_length &&
       !memcmp(field_term_ptr, line_term_ptr, field_term_length)) {
     line_term_length = 0;
-    line_term_ptr = NULL;
+    line_term_ptr = nullptr;
   }
   enclosed_char = (enclosed_length = enclosed_par.length())
                       ? (uchar)enclosed_par[0]
@@ -1350,7 +1355,7 @@ READ_INFO::READ_INFO(File file_par, uint tot_length, const CHARSET_INFO *cs,
             (get_it_from_net) ? READ_NET : (is_fifo ? READ_FIFO : READ_CACHE),
             0L, true, MYF(MY_WME))) {
       my_free(buffer); /* purecov: inspected */
-      buffer = NULL;
+      buffer = nullptr;
       error = true;
     } else {
       /*
@@ -1371,7 +1376,7 @@ READ_INFO::READ_INFO(File file_par, uint tot_length, const CHARSET_INFO *cs,
 READ_INFO::~READ_INFO() {
   if (need_end_io_cache) ::end_io_cache(&cache);
 
-  if (buffer != NULL) my_free(buffer);
+  if (buffer != nullptr) my_free(buffer);
   List_iterator<XML_TAG> xmlit(taglist);
   XML_TAG *t;
   while ((t = xmlit++)) delete (t);
@@ -1408,7 +1413,7 @@ READ_INFO::~READ_INFO() {
            true if terminator was not found
 */
 inline bool READ_INFO::terminator(const uchar *ptr, size_t length) {
-  int chr = 0;  // Keep gcc happy
+  int chr = 0;
   size_t i;
   for (i = 1; i < length; i++) {
     chr = GET;
@@ -1664,7 +1669,7 @@ found_eof:
 */
 bool READ_INFO::next_line() {
   line_truncated = false;
-  start_of_line = line_start_ptr != 0;
+  start_of_line = line_start_ptr != nullptr;
   if (found_end_of_line || eof) {
     found_end_of_line = false;
     return eof;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -32,6 +32,8 @@
 #include <atomic>
 #include <utility>
 
+#include <mysql/components/minimal_chassis.h>
+#include <mysql/components/services/dynamic_loader_scheme_file.h>
 #include "lex_string.h"
 #include "m_ctype.h"
 #include "map_helpers.h"
@@ -393,6 +395,7 @@ extern ulong connection_errors_peer_addr;
 extern char *opt_log_error_suppression_list;
 extern char *opt_log_error_services;
 extern bool encrypt_tmp_files;
+extern ulonglong tf_sequence_table_max_upper_bound;
 extern char *opt_protocol_compression_algorithms;
 /** The size of the host_cache. */
 extern uint host_cache_size;
@@ -402,6 +405,7 @@ extern char *utility_user;
 extern char *utility_user_password;
 extern char *utility_user_schema_access;
 extern ulonglong utility_user_privileges;
+extern char *utility_user_dynamic_privileges;
 
 extern bool persisted_globals_load;
 extern bool opt_keyring_operations;
@@ -646,6 +650,8 @@ extern PSI_stage_info stage_suspending;
 extern PSI_stage_info stage_starting;
 extern PSI_stage_info stage_waiting_for_no_channel_reference;
 extern PSI_stage_info stage_hook_begin_trans;
+extern PSI_stage_info stage_binlog_transaction_compress;
+extern PSI_stage_info stage_binlog_transaction_decompress;
 extern PSI_stage_info stage_restoring_secondary_keys;
 
 #ifdef WITH_WSREP
@@ -703,9 +709,7 @@ extern PSI_statement_info com_statement_info[(uint)COM_END + 1];
 extern PSI_statement_info stmt_info_rpl;
 #endif /* HAVE_PSI_STATEMENT_INTERFACE */
 
-#ifdef HAVE_OPENSSL
 extern struct st_VioSSLFd *ssl_acceptor_fd;
-#endif /* HAVE_OPENSSL */
 
 extern bool opt_large_pages;
 extern uint opt_large_page_size;
@@ -871,6 +875,16 @@ bool update_named_pipe_full_access_group(const char *new_group_name);
 extern LEX_STRING opt_mandatory_roles;
 extern bool opt_mandatory_roles_cache;
 extern bool opt_always_activate_granted_roles;
+
+extern mysql_component_t mysql_component_mysql_server;
+extern mysql_component_t mysql_component_performance_schema;
+/* This variable is a registry handler, defined in mysql_server component and
+   used as a output parameter for minimal chassis. */
+extern SERVICE_TYPE_NO_CONST(registry) * srv_registry;
+/* These global variables which are defined and used in
+   mysql_server component */
+extern SERVICE_TYPE(dynamic_loader_scheme_file) * scheme_file_srv;
+extern SERVICE_TYPE(dynamic_loader) * dynamic_loader_srv;
 
 #ifdef WITH_WSREP
 extern "C" void *start_wsrep_THD(void *);

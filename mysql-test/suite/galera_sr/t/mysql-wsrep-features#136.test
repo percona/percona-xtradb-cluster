@@ -30,7 +30,7 @@ COMMIT;
 --connection node_1
 --echo #node-1
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 362;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 363;
 
 --connection node_2
 --echo #node-2
@@ -40,7 +40,7 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 362;
 SELECT COUNT(*) = 4 FROM t1;
 
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 362;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 363;
 
 --connection node_1
 DROP TABLE t1;

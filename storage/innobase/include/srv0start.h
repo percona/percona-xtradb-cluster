@@ -89,7 +89,7 @@ dberr_t srv_undo_tablespaces_upgrade();
 /** Start InnoDB.
 @param[in]	create_new_db		Whether to create a new database
 @return DB_SUCCESS or error code */
-dberr_t srv_start(bool create_new_db);
+dberr_t srv_start(bool create_new_db) MY_ATTRIBUTE((warn_unused_result));
 
 /** Fix up an undo tablespace if it was in the process of being truncated
 when the server crashed. This is the second call and is done after the DD
@@ -203,6 +203,10 @@ enum srv_shutdown_t {
 /** At a shutdown this value climbs from SRV_SHUTDOWN_NONE to
 SRV_SHUTDOWN_CLEANUP and then to SRV_SHUTDOWN_LAST_PHASE, and so on */
 extern std::atomic<enum srv_shutdown_t> srv_shutdown_state;
+
+/** true if shared MDL is taken by background thread for all tablespaces, for
+ *  which (un)encryption is to be rolled forward*/
+extern bool shared_mdl_is_taken;
 
 /** Call exit(3) */
 void srv_fatal_error() MY_ATTRIBUTE((noreturn));

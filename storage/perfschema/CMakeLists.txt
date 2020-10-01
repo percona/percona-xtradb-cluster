@@ -313,6 +313,7 @@ table_log_status.cc
 table_plugin_table.cc
 table_replication_applier_filters.cc
 table_replication_applier_global_filters.cc
+table_binary_log_transaction_compression_stats.cc
 # -- WITH_WSREP
 table_pxc_cluster_view.cc
 # -- WITH_WSREP

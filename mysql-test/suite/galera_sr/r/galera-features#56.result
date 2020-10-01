@@ -29,3 +29,7 @@ COUNT(*) = 5
 #node-1
 DROP TABLE t1;
 DROP TABLE ten;
+#node-2
+CALL mtr.add_suppression("Failed to init table");
+CALL mtr.add_suppression("Error deleting row");
+CALL mtr.add_suppression("init_for_index_scan failed to read first record");

@@ -15,34 +15,34 @@ ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 FLUSH LOGS;
 SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 124;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000002	124	Previous_gtids	1	155	
+mysqld-bin.000002	125	Previous_gtids	1	156	
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';
 COUNT(*) = 2
 1
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 124;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	124	Previous_gtids	2	155	
-mysqld-bin.000001	155	Anonymous_Gtid	1	232	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000001	232	Query	1	370	use `test`; CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB /* xid=# */
-mysqld-bin.000001	370	Anonymous_Gtid	1	449	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000001	449	Query	1	524	BEGIN
-mysqld-bin.000001	524	Table_map	1	572	table_id: # (test.t1)
-mysqld-bin.000001	572	Write_rows	1	612	table_id: # flags: STMT_END_F
-mysqld-bin.000001	612	Xid	1	643	COMMIT /* xid=# */
-mysqld-bin.000001	643	Anonymous_Gtid	1	720	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000001	720	Query	1	846	use `test`; CREATE TABLE t2 (id INT) ENGINE=InnoDB /* xid=# */
-mysqld-bin.000001	846	Anonymous_Gtid	1	925	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000001	925	Query	1	1000	BEGIN
-mysqld-bin.000001	1000	Table_map	1	1048	table_id: # (test.t2)
-mysqld-bin.000001	1048	Write_rows	1	1088	table_id: # flags: STMT_END_F
-mysqld-bin.000001	1088	Xid	1	1119	COMMIT /* xid=# */
-mysqld-bin.000001	1119	Anonymous_Gtid	1	1198	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000001	1198	Query	1	1273	BEGIN
-mysqld-bin.000001	1273	Table_map	1	1321	table_id: # (test.t2)
-mysqld-bin.000001	1321	Write_rows	1	1361	table_id: # flags: STMT_END_F
-mysqld-bin.000001	1361	Xid	1	1392	COMMIT /* xid=# */
-mysqld-bin.000001	1392	Anonymous_Gtid	1	1469	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
-mysqld-bin.000001	1469	Query	1	1593	use `test`; ALTER TABLE t1 ADD COLUMN f2 INTEGER /* xid=# */
+mysqld-bin.000001	125	Previous_gtids	2	156	
+mysqld-bin.000001	156	Anonymous_Gtid	1	233	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	233	Query	1	371	use `test`; CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB /* xid=# */
+mysqld-bin.000001	371	Anonymous_Gtid	1	450	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	450	Query	1	525	BEGIN
+mysqld-bin.000001	525	Table_map	1	573	table_id: # (test.t1)
+mysqld-bin.000001	573	Write_rows	1	613	table_id: # flags: STMT_END_F
+mysqld-bin.000001	613	Xid	1	644	COMMIT /* xid=# */
+mysqld-bin.000001	644	Anonymous_Gtid	1	721	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	721	Query	1	847	use `test`; CREATE TABLE t2 (id INT) ENGINE=InnoDB /* xid=# */
+mysqld-bin.000001	847	Anonymous_Gtid	1	926	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	926	Query	1	1001	BEGIN
+mysqld-bin.000001	1001	Table_map	1	1049	table_id: # (test.t2)
+mysqld-bin.000001	1049	Write_rows	1	1089	table_id: # flags: STMT_END_F
+mysqld-bin.000001	1089	Xid	1	1120	COMMIT /* xid=# */
+mysqld-bin.000001	1120	Anonymous_Gtid	1	1199	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	1199	Query	1	1274	BEGIN
+mysqld-bin.000001	1274	Table_map	1	1322	table_id: # (test.t2)
+mysqld-bin.000001	1322	Write_rows	1	1362	table_id: # flags: STMT_END_F
+mysqld-bin.000001	1362	Xid	1	1393	COMMIT /* xid=# */
+mysqld-bin.000001	1393	Anonymous_Gtid	1	1470	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	1470	Query	1	1594	use `test`; ALTER TABLE t1 ADD COLUMN f2 INTEGER /* xid=# */
 DROP TABLE t1;
 DROP TABLE t2;
 RESET MASTER;
