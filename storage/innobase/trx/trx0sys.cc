@@ -431,12 +431,23 @@ void trx_sys_update_wsrep_checkpoint(
         /* Wait and unregister from wsrep group commit */
         wsrep_wait_for_turn_in_group_commit(current_thd);
 
-        /* DDL transaction are executed as TOI.
+        /* Case 1:
+        DDL transactions are executed as TOI.
         With 8.0, DDL are atomic and will cause commit of transaction
         in InnoDB world that will cause xid to persist.
         Same xid is re-persisted when TOI ends.
         Latter call is still needed for DDL transaction that non-atomic.
         So condition check is now >= and not just > */
+
+        /* Case 2:
+        We have the case when REPLACE INTO ... SELECT or
+        INSERT INTO ... SELECT is executed as TOI. This is done by
+        pt-table-checksum tool. In such case statement execution causes InnoDB
+        commit and storing of xid_seqno (wsrep_apply_cb) and then because of
+        TOI, storing of xid_seqno is requested again from wsrep_commit_cb with
+        the same xid_seqno.
+        Allow current and new values be the same, without introducing new flags
+        and logic to prevent double storing of the same value */
         ut_ad(xid_seqno >= trx_sys_cur_xid_seqno);
         trx_sys_cur_xid_seqno = xid_seqno;
 
