@@ -244,6 +244,7 @@ mix-match keyring plugins. For example, user has node-1 configured to use
    cluster. Mix-match (in keyring plugins) is recommended only during
    transition from one keying to other.
 
+
 Upgrade and compatibility issues
 --------------------------------
 
@@ -260,6 +261,14 @@ configure some nodes to use ``keyring_file`` and other to use
 ``keyring_vault``, but still this setup is not recommended and should be used
 during transitioning to vault only.
 
+.. note::
+
+    A 5.7.21 DONOR with a keyring_file and a JOINER >= 5.7.22 with
+    a keyring_file can be used to perform a rolling upgrade of the cluster.
+    XtraBackup SST does not work between 5.7.21 and 5.7.22 with the
+    keyring_file plugin. If
+    there are issues, change the SST method to rsync.
+    
 If all the nodes are using |PXC| 5.7.21 and user would like to move to use
 ``keyring_vault`` plugin, all the nodes should be upgraded to use |PXC| 5.7.22
 (that’s where vault plugin support was introduced in PXC). Once all nodes are
