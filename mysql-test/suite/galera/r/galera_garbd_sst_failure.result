@@ -1,0 +1,31 @@
+#
+# 1. Create a two node cluster.
+#
+# 2. Shutdown node2 and use its ports for garbd.
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+Variable_name	Value
+wsrep_flow_control_interval	[ 100, 100 ]
+#
+# 3. Add a debug point on node1 to stop after reading xid from InnoDB.
+# Adding debug point 'stop_after_reading_xid' to @@GLOBAL.debug
+#
+# 4. Start garbd in background and wait till node1 reads the
+#    wsrep_xid from InnoDB.
+[connection node_1]
+SET SESSION wsrep_sync_wait=0;
+SET DEBUG_SYNC='now wait_for read_xid';
+#
+# 5. Kill node1 and wait till SST failure is handled and garbd is shutdown.
+Killing server ...
+#
+# 6. Restart node1 and node2
+[connection node_1]
+# restart
+[connection node_2]
+# restart
+#
+# 7. Verify that the reason for the shutdown is logged in the garbd log.
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+CALL mtr.add_suppression("Member .*garb.* requested state transfer from 'node1', but it is impossible to select State Transfer donor: No route to host");
+#
+# 8. Cleanup
