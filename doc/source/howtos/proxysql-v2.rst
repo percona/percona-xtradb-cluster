@@ -45,7 +45,7 @@ Changed Features
 Removed Features
 --------------------------------------------------------------------------------
 
-- Asynchronous slave reader support has been removed: the ``--include-slaves`` option is not supported.
+- Asynchronous replica reader support has been removed: the ``--include-slaves`` option is not supported.
 - A list of nodes in the priority order is not supported in |proxysql| v2. Only a single node is supported at this time.
 - Since the galera_proxysql_checker and galera_node_monitor scripts are no longer run in the scheduler, automatic cluster membership updates are not supported.
 - Checking the pxc_maint_mode variable is no longer supported
@@ -478,15 +478,17 @@ It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL d
 
 .. admonition:: Output
 
-   +---------------+
-   | username      |
-   +---------------+
-   | monitor       |
-   | one           |
-   | proxysql_user |
-   | two           |
-   +---------------+
-   4 rows in set (0.00 sec)
+   .. code-block:: text
+
+      +---------------+
+      | username      |
+      +---------------+
+      | monitor       |
+      | one           |
+      | proxysql_user |
+      | two           |
+      +---------------+
+      4 rows in set (0.00 sec)
 
 .. rubric:: From PXC
 
@@ -496,15 +498,17 @@ It also deletes ProxySQL users not in Percona XtraDB Cluster from the ProxySQL d
 
 .. admonition:: Output
 
-   +---------------+-------+
-   | user          | host  |
-   +---------------+-------+
-   | monitor       | 192.% |
-   | proxysql_user | 192.% |
-   | two           | %     |
-   | one           | %     |
-   +---------------+-------+
-   4 rows in set (0.00 sec)
+   .. code-block:: text
+
+      +---------------+-------+
+      | user          | host  |
+      +---------------+-------+
+      | monitor       | 192.% |
+      | proxysql_user | 192.% |
+      | two           | %     |
+      | one           | %     |
+      +---------------+-------+
+      4 rows in set (0.00 sec)
 
 .. _pxc.proxysql.v2.admin-tool.sync-multi-cluster-users:
 

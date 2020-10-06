@@ -1,3 +1,7 @@
+# innodb_redo_log_encrypt is read only for PXC, 
+# so no way to proceed with this test
+--skip innodb_redo_log_encrypt is read-only for PXC
+
 # InnoDB transparent encryption on redo log.
 # This test case will check innodb_redo_log_encrypt=ON/OFF with bootstrap
 # and start server by setting innodb_redo_log_encrypt=ON/OFF

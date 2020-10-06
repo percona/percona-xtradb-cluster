@@ -120,21 +120,21 @@ EXAMPLE_STATUS_VAR6	8250
 
 SELECT variable_name, variable_value FROM information_schema.global_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e1
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	8.500000
 EXAMPLE_ULONG_VAR	8
 EXAMPLE_DOUBLE_VAR	8.500000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e1
 
 SELECT variable_name, variable_value FROM information_schema.session_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e1
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	8.500000
 EXAMPLE_ULONG_VAR	8
 EXAMPLE_DOUBLE_VAR	8.500000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e1
 disconnect con0;
 
 ================================================================================
@@ -212,21 +212,21 @@ EXAMPLE_STATUS_VAR6	8250
 
 SELECT variable_name, variable_value FROM information_schema.global_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e1
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	101.999100
 EXAMPLE_ULONG_VAR	100
 EXAMPLE_DOUBLE_VAR	100.999000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e1
 
 SELECT variable_name, variable_value FROM information_schema.session_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e1
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	102.999200
 EXAMPLE_ULONG_VAR	100
 EXAMPLE_DOUBLE_VAR	100.999000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e1
 
 ================================================================================
 2.4 - UNINSTALL PLUGIN
@@ -342,21 +342,21 @@ EXAMPLE_STATUS_VAR6	8250
 
 SELECT variable_name, variable_value FROM information_schema.global_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e2
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	201.888100
 EXAMPLE_ULONG_VAR	200
 EXAMPLE_DOUBLE_VAR	200.888000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e2
 
 SELECT variable_name, variable_value FROM information_schema.session_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e2
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	202.888200
 EXAMPLE_ULONG_VAR	200
 EXAMPLE_DOUBLE_VAR	200.888000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e2
 
 ================================================================================
 2.9 - UNINSTALL PLUGIN
@@ -488,21 +488,21 @@ EXAMPLE_STATUS_VAR6	8250
 
 SELECT variable_name, variable_value FROM information_schema.global_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e1
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	302.000000
 EXAMPLE_ULONG_VAR	300
 EXAMPLE_DOUBLE_VAR	301.000000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e1
 
 SELECT variable_name, variable_value FROM information_schema.session_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e1
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	300.000000
 EXAMPLE_ULONG_VAR	300
 EXAMPLE_DOUBLE_VAR	301.000000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e1
 
 # Variables by thread
 SELECT variable_name, variable_value FROM performance_schema.variables_by_thread
@@ -596,21 +596,21 @@ EXAMPLE_STATUS_VAR6	8250
 
 SELECT variable_name, variable_value FROM information_schema.global_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e1
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	302.000000
 EXAMPLE_ULONG_VAR	300
 EXAMPLE_DOUBLE_VAR	301.000000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e1
 
 SELECT variable_name, variable_value FROM information_schema.session_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e1
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	300.000000
 EXAMPLE_ULONG_VAR	300
 EXAMPLE_DOUBLE_VAR	301.000000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e1
 
 # Variables by thread
 SELECT variable_name, variable_value FROM performance_schema.variables_by_thread
@@ -698,21 +698,21 @@ EXAMPLE_STATUS_VAR6	8250
 
 SELECT variable_name, variable_value FROM information_schema.global_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e1
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	302.000000
 EXAMPLE_ULONG_VAR	300
 EXAMPLE_DOUBLE_VAR	301.000000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e1
 
 SELECT variable_name, variable_value FROM information_schema.session_variables WHERE variable_name LIKE "example_%";
 variable_name	variable_value
-EXAMPLE_CREATE_COUNT_THDVAR	0
-EXAMPLE_ENUM_VAR	e1
 EXAMPLE_LAST_CREATE_THDVAR	
 EXAMPLE_DOUBLE_THDVAR	300.000000
 EXAMPLE_ULONG_VAR	300
 EXAMPLE_DOUBLE_VAR	301.000000
+EXAMPLE_CREATE_COUNT_THDVAR	0
+EXAMPLE_ENUM_VAR	e1
 
 # Variables by thread
 SELECT variable_name, variable_value FROM performance_schema.variables_by_thread

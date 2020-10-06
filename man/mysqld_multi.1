@@ -2,12 +2,12 @@
 .\"     Title: \fBmysqld_multi\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 12/20/2018
+.\"      Date: 06/02/2020
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.7
 .\"  Language: English
 .\"
-.TH "\FBMYSQLD_MULTI\FR" "1" "12/20/2018" "MySQL 5\&.7" "MySQL Database System"
+.TH "\FBMYSQLD_MULTI\FR" "1" "06/02/2020" "MySQL 5\&.7" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -202,7 +202,7 @@ option, if one is given\&. (If the option is given multiple times, the last valu
 .RE
 .PP
 For additional information about these and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .PP
 Option files read are searched for
 [mysqld_multi]
@@ -245,7 +245,6 @@ supports the following options\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-help\fR
-.sp
 Display a help message and exit\&.
 .RE
 .sp
@@ -258,7 +257,6 @@ Display a help message and exit\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-example\fR
-.sp
 Display a sample option file\&.
 .RE
 .sp
@@ -271,7 +269,6 @@ Display a sample option file\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-log=\fR\fB\fIfile_name\fR\fR
-.sp
 Specify the name of the log file\&. If the file exists, log output is appended to it\&.
 .RE
 .sp
@@ -284,7 +281,6 @@ Specify the name of the log file\&. If the file exists, log output is appended t
 .IP \(bu 2.3
 .\}
 \fB\-\-mysqladmin=\fR\fB\fIprog_name\fR\fR
-.sp
 The
 \fBmysqladmin\fR
 binary to be used to stop servers\&.
@@ -299,7 +295,6 @@ binary to be used to stop servers\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-mysqld=\fR\fB\fIprog_name\fR\fR
-.sp
 The
 \fBmysqld\fR
 binary to be used\&. Note that you can specify
@@ -339,7 +334,6 @@ ledir  = /opt/local/mysql/libexec
 .IP \(bu 2.3
 .\}
 \fB\-\-no\-log\fR
-.sp
 Print log information to
 stdout
 rather than to the log file\&. By default, output goes to the log file\&.
@@ -354,7 +348,6 @@ rather than to the log file\&. By default, output goes to the log file\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-password=\fR\fB\fIpassword\fR\fR
-.sp
 The password of the MySQL account to use when invoking
 \fBmysqladmin\fR\&. Note that the password value is not optional for this option, unlike for other MySQL programs\&.
 .RE
@@ -368,7 +361,6 @@ The password of the MySQL account to use when invoking
 .IP \(bu 2.3
 .\}
 \fB\-\-silent\fR
-.sp
 Silent mode; disable warnings\&.
 .RE
 .sp
@@ -381,7 +373,6 @@ Silent mode; disable warnings\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-tcp\-ip\fR
-.sp
 Connect to each MySQL server through the TCP/IP port instead of the Unix socket file\&. (If a socket file is missing, the server might still be running, but accessible only through the TCP/IP port\&.) By default, connections are made using the Unix socket file\&. This option affects
 stop
 and
@@ -398,7 +389,6 @@ operations\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-user=\fR\fB\fIuser_name\fR\fR
-.sp
 The user name of the MySQL account to use when invoking
 \fBmysqladmin\fR\&.
 .RE
@@ -412,7 +402,6 @@ The user name of the MySQL account to use when invoking
 .IP \(bu 2.3
 .\}
 \fB\-\-verbose\fR
-.sp
 Be more verbose\&.
 .RE
 .sp
@@ -425,7 +414,6 @@ Be more verbose\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-version\fR
-.sp
 Display version information and exit\&.
 .RE
 .PP
@@ -514,7 +502,7 @@ mysql> \fBGRANT SHUTDOWN ON *\&.* TO \*(Aqmulti_admin\*(Aq@\*(Aqlocalhost\*(Aq;\
 .\}
 .sp
 See
-Section\ \&6.2, \(lqThe MySQL Access Privilege System\(rq\&. You have to do this for each
+Section\ \&6.2, \(lqAccess Control and Account Management\(rq\&. You have to do this for each
 \fBmysqld\fR
 server\&. Change the connection parameters appropriately when connecting to each one\&. Note that the host name part of the account name must permit you to connect as
 multi_admin
@@ -531,9 +519,9 @@ from the host where you want to run
 .IP \(bu 2.3
 .\}
 The Unix socket file and the TCP/IP port number must be different for every
-\fBmysqld\fR\&. (Alternatively, if the host has multiple network addresses, you can use
-\fB\-\-bind\-address\fR
-to cause different servers to listen to different interfaces\&.)
+\fBmysqld\fR\&. (Alternatively, if the host has multiple network addresses, you can set the
+bind_address
+system variable to cause different servers to listen to different interfaces\&.)
 .RE
 .sp
 .RS 4
@@ -641,11 +629,11 @@ user       = unix_user4
 .\}
 .PP
 See
-Section\ \&4.2.6, \(lqUsing Option Files\(rq\&.
+Section\ \&4.2.2.2, \(lqUsing Option Files\(rq\&.
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 1997, 2020, Oracle and/or its affiliates.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP

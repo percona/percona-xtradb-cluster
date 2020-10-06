@@ -86,3 +86,5 @@ drop table t1;
 --source include/galera_wait_ready.inc
 
 call mtr.add_suppression("WSREP: Failed to prepare for incremental state transfer.*");
+--connection node_1
+call mtr.add_suppression(".*Discovered discontinuity in recovered wsrep transaction XIDs.*");

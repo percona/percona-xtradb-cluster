@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2015, 2019 Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2015, 2020 Oracle and/or its affiliates. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -277,13 +277,6 @@ void Mysql_crawler::enumerate_views(const Database& db)
       const Mysql::Tools::Base::Mysql_query_runner::Row& is_view= **view_it;
       if (is_view[0] == "1")
       {
-        /* Check if view dependent objects exists */
-        if (runner->run_query(std::string("LOCK TABLES ")
-              + this->get_quoted_object_full_name(db.get_name(), table_name)
-              + " READ") != 0)
-          return;
-        else
-          runner->run_query(std::string("UNLOCK TABLES"));
         View* view= new View(this->generate_new_object_id(),
                               table_name,
                               db.get_name(),

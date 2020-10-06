@@ -554,10 +554,8 @@ static void* sst_joiner_thread (void* a)
       }
       else
       {
-        // Clear the pointer to SST process:
-        if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
-        sst_process = NULL;
-        mysql_mutex_unlock (&LOCK_wsrep_sst);
+        // Do not clear the pointer to SST process. It will be useful if 
+        // we decide to interrupt it.
         err = 0;
       }
     }
@@ -584,10 +582,16 @@ static void* sst_joiner_thread (void* a)
     mysql_cond_signal  (&arg->COND_wsrep_sst_thread);
     mysql_mutex_unlock (&arg->LOCK_wsrep_sst_thread); //! @note arg is unusable after that.
 
-    if (err) return NULL; /* lp:808417 - return immediately, don't signal
-                           * initializer thread to ensure single thread of
-                           * shutdown. */
+    if (err)
+    {
+      if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+      sst_process = NULL;
+      mysql_mutex_unlock (&LOCK_wsrep_sst);
 
+      return NULL; /* lp:808417 - return immediately, don't signal
+                    * initializer thread to ensure single thread of
+                    * shutdown. */
+    }
     wsrep_uuid_t  ret_uuid  = WSREP_UUID_UNDEFINED;
     wsrep_seqno_t ret_seqno = WSREP_SEQNO_UNDEFINED;
 
@@ -626,6 +630,10 @@ static void* sst_joiner_thread (void* a)
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_delete_thread();
 #endif /* HAVE_PSI_INTERFACE */
+
+  if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+  sst_process = NULL;
+  mysql_mutex_unlock (&LOCK_wsrep_sst);
 
   return NULL;
 }
@@ -1311,7 +1319,7 @@ static int sst_donate_other (const char*   method,
   {
     WSREP_ERROR("sst_donate_other(): pthread_create() failed: %d (%s)",
                 ret, strerror(ret));
-    return ret;
+    return -ret;
   }
   mysql_cond_wait (&arg.COND_wsrep_sst_thread, &arg.LOCK_wsrep_sst_thread);
 
@@ -1337,6 +1345,11 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
 
   char uuid_str[37];
   wsrep_uuid_print (&current_gtid->uuid, uuid_str, sizeof(uuid_str));
+
+  DBUG_EXECUTE_IF("wsrep_sst_donate_cb_fails", 
+  {
+    return WSREP_CB_FAILURE;
+  });
 
   wsp::env env(NULL);
   if (env.error())
@@ -1377,6 +1390,10 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
                            current_gtid->seqno, bypass, env());
   }
 
+  /* Above methods should return 0 in case of success and negative value
+   * in case of failure. If we have any positive value here it means that we
+   * handle errors in above functions in the wrong way */
+  DBUG_ASSERT(ret <= 0); 
   return (ret >= 0 ? WSREP_CB_SUCCESS : WSREP_CB_FAILURE);
 }
 

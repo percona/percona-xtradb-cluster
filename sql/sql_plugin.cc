@@ -3610,7 +3610,6 @@ static bool plugin_var_memalloc_session_update(THD *thd,
   DBUG_RETURN(false);
 }
 
-
 /**
   Set value for a thread local variable.
 
