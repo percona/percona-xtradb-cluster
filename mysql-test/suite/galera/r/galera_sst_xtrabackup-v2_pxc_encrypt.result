@@ -1,3 +1,13 @@
 SELECT 1;
 1
 1
+[connection node_2]
+# Restart node2 using relative paths for SSL certs
+# Shutting down node2
+# restarting node2 (with SST)
+# restart:--defaults-file=RELATIVE_SSL_CERTS_FILE
+SET SESSION wsrep_sync_wait = 0;
+SELECT 1;
+1
+1
+# restart:<hidden args>

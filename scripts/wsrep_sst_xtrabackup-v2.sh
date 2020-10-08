@@ -476,6 +476,15 @@ get_transfer()
                 exit 2
             fi
 
+            # Convert the dhparams path into an absolute path
+            if [[ -n $ssl_dhparams ]]; then
+                pushd "$DATA" &>/dev/null
+                ssl_dhparams=$(get_absolute_path "$ssl_dhparams")
+                popd &>/dev/null
+
+                wsrep_log_debug "dhparams (absolute) : $ssl_dhparams"
+            fi
+
             # socat versions < 1.7.3 will have 512-bit dhparams (too small)
             #       so create 2048-bit dhparams and send that as a parameter
             # socat version >= 1.7.3, checks to see if the peername matches the hostname
@@ -502,6 +511,14 @@ get_transfer()
             wsrep_log_warning "**** WARNING **** encrypt=2 is deprecated and will be removed in a future release"
             wsrep_log_debug "Using openssl based encryption with socat: with crt and ca"
 
+            pushd "$DATA" &>/dev/null
+            tcert=$(get_absolute_path "$tcert")
+            tca=$(get_absolute_path "$tca")
+            popd &>/dev/null
+
+            wsrep_log_debug "tcert (absolute) : $tcert"
+            wsrep_log_debug "tca (absolute) : $tca"
+
             verify_file_exists "$tcert" "Both certificate and CA files are required." \
                                         "Please check the 'tcert' option.           "
             verify_file_exists "$tca" "Both certificate and CA files are required." \
@@ -520,6 +537,14 @@ get_transfer()
             wsrep_log_warning "**** WARNING **** encrypt=3 is deprecated and will be removed in a future release"
             wsrep_log_debug "Using openssl based encryption with socat: with key and crt"
 
+            pushd "$DATA" &>/dev/null
+            tcert=$(get_absolute_path "$tcert")
+            tkey=$(get_absolute_path "$tkey")
+            popd &>/dev/null
+
+            wsrep_log_debug "tcert (absolute) : $tcert"
+            wsrep_log_debug "tkey (absolute) : $tkey"
+
             verify_file_exists "$tcert" "Both certificate and key files are required." \
                                         "Please check the 'tcert' option.            "
             verify_file_exists "$tkey" "Both certificate and key files are required." \
@@ -536,6 +561,16 @@ get_transfer()
             fi
         elif [[ $encrypt -eq 4 ]]; then
             wsrep_log_debug "Using openssl based encryption with socat: with key, crt, and ca"
+
+            pushd "$DATA" &>/dev/null
+            ssl_ca=$(get_absolute_path "$ssl_ca")
+            ssl_cert=$(get_absolute_path "$ssl_cert")
+            ssl_key=$(get_absolute_path "$ssl_key")
+            popd &>/dev/null
+
+            wsrep_log_debug "ssl_ca (absolute) : $ssl_ca"
+            wsrep_log_debug "ssl_cert (absolute) : $ssl_cert"
+            wsrep_log_debug "ssl_key (absolute) : $ssl_key"
 
             verify_file_exists "$ssl_ca" "CA, certificate, and key files are required." \
                                          "Please check the 'ssl-ca' option.           "
