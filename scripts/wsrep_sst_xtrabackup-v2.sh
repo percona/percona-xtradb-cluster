@@ -151,6 +151,8 @@ SST_INFO_FILE="sst_info"
 # Used to pass status of pipelined processes executed in background
 PIPESTATUS_FILE="pipestatus"
 
+JOINER_SST_DIR=""
+
 # Setting the path for ss and ip
 # ss: is utility to investigate socket, ip for network routes.
 export PATH="/usr/sbin:/sbin:$PATH"
@@ -535,6 +537,15 @@ get_transfer()
                 exit 2
             fi
 
+            # Convert the dhparams path into an absolute path
+            if [[ -n $ssl_dhparams ]]; then
+                pushd "$DATA" &>/dev/null
+                ssl_dhparams=$(get_absolute_path "$ssl_dhparams")
+                popd &>/dev/null
+
+                wsrep_log_debug "dhparams (absolute) : $ssl_dhparams"
+            fi
+
             # socat versions < 1.7.3 will have 512-bit dhparams (too small)
             #       so create 2048-bit dhparams and send that as a parameter
             # socat version >= 1.7.3, checks to see if the peername matches the hostname
@@ -570,6 +581,18 @@ get_transfer()
         fi
 
         if [[ $encrypt -eq 4 ]]; then
+            wsrep_log_debug "Using openssl based encryption with socat: with key, crt, and ca"
+
+            pushd "$DATA" &>/dev/null
+            ssl_ca=$(get_absolute_path "$ssl_ca")
+            ssl_cert=$(get_absolute_path "$ssl_cert")
+            ssl_key=$(get_absolute_path "$ssl_key")
+            popd &>/dev/null
+
+            wsrep_log_debug "ssl_ca (absolute) : $ssl_ca"
+            wsrep_log_debug "ssl_cert (absolute) : $ssl_cert"
+            wsrep_log_debug "ssl_key (absolute) : $ssl_key"
+
             verify_file_exists "$ssl_ca" "CA, certificate, and key files are required." \
                                          "Please check the 'ssl-ca' option.           "
             verify_file_exists "$ssl_cert" "CA, certificate, and key files are required." \
