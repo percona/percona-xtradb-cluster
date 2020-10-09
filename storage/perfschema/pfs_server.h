@@ -53,7 +53,15 @@
   #define PFS_MAX_SOCKET_CLASS 10
 #endif
 #ifndef PFS_MAX_STAGE_CLASS
+#ifdef WITH_WSREP
+  /* PS default is enough for PS, however
+   * PXC defines 22 additional stage instruments (mysqld.cc).
+     Make some room for them.
+   */
+  #define PFS_MAX_STAGE_CLASS 180
+#else
   #define PFS_MAX_STAGE_CLASS 150
+#endif
 #endif
 #ifndef PFS_STATEMENTS_STACK_SIZE
   #define PFS_STATEMENTS_STACK_SIZE 10

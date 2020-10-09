@@ -1,4 +1,4 @@
-.. orphan::
+:orphan:
 
 Using ProxySQL v1 with ``proxysql-admin``
 ================================================================================
@@ -89,14 +89,14 @@ To view usage information, run ``proxysql-admin`` without any options:
                                       This option is supported only when using --mode=singlewrite
                                       Can accept comma delimited list with the first listed being
                                       the highest priority.
-   --include-slaves=host_name:port    Add specified slave node(s) to ProxySQL, these nodes will go
+   --include-slaves=host_name:port    Add specified replica node(s) to ProxySQL, these nodes will go
                                       into the reader hostgroup and will only be put into
                                       the writer hostgroup if all cluster nodes are down (this
                                       depends on the value of --use-slave-as-writer).
-                                      Slaves must be read only.  Can accept a comma delimited list.
-                                      If this is used make sure 'read_only=1' is in the slave's my.cnf
-   --use-slave-as-writer=<yes/no>     If this value is 'yes', then a slave may be used as a writer
-                                      if the entire cluster is down. If 'no', then a slave
+                                      Replicas must be read only.  Can accept a comma delimited list.
+                                      If this is used make sure 'read_only=1' is in the replica's my.cnf
+   --use-slave-as-writer=<yes/no>     If this value is 'yes', then a replica may be used as a writer
+                                      if the entire cluster is down. If 'no', then a replica
                                       will not be used as a writer. This option is required
                                       if '--include-slaves' is used.
    --writer-is-reader=<value>         Defines if the writer node also accepts writes.
@@ -477,13 +477,13 @@ The following extra options can be used:
 
 * ``--include-slaves=host_name:port``
 
-  This option helps to include specified slave node(s) to ProxySQL database.
+  This option helps to include specified replica node(s) to ProxySQL database.
   These nodes will go into the reader hostgroup and will only be put into the
-  writer hostgroup if all cluster nodes are down. Slaves must be read only. Can
+  writer hostgroup if all cluster nodes are down. Replicas must be read only. Can
   accept comma delimited list. If this is used, make sure ``read_only=1`` is
-  included into the slave's ``my.cnf`` configuration file.
+  included into the replica's ``my.cnf`` configuration file.
 
-  .. note:: With ``loadbal`` mode slave hosts only accept read/write requests
+  .. note:: With ``loadbal`` mode replica hosts only accept read/write requests
      when all cluster nodes are down.
 
 ProxySQL Status script

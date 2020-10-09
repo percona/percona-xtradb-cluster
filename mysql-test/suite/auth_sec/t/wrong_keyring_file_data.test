@@ -1,3 +1,11 @@
+# Failure while loading keyring_file or keyring_vault plugin
+# causes PXC to terminate, not just skip plugin loading.
+# See sql_plugin.cc test_plugin_options()
+# Bad options were configured in *.opt file, but as *.opt file
+# does not support comments, we removed it and then simply skip this test.
+
+--skip keyring_file plugin load failure causes PXC to terminate, not continue
+
 --disable_ps_protocol
 --disable_warnings
 --source include/not_embedded.inc

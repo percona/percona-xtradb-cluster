@@ -40,3 +40,7 @@ CALL mtr.add_suppression("WSREP: Try 1/3: 'wsrep_sst_mysqldump.*");
 CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
 CALL mtr.add_suppression("InnoDB: Cannot open.*");
 CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
+
+# this is needed because somehow wsrep_sst_receive_address gets corrupted
+# on repeat run.
+--source include/force_restart.inc

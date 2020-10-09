@@ -27,6 +27,9 @@
 #include "sql_class.h"             // THD
 #include "debug_sync.h"            // DEBUG_SYNC
 #include "binlog.h"
+#include "rpl_group_replication.h" // is_group_replication_plugin_loaded()
+
+#include <vector>
 
 PSI_memory_key key_memory_Gtid_state_group_commit_sidno;
 
@@ -148,6 +151,16 @@ void Gtid_state::broadcast_owned_sidnos(const THD *thd)
   }
 }
 
+void Gtid_state::get_snapshot_gtid_executed(
+    std::string &snapshot_gtid_executed)
+{
+  global_sid_lock->wrlock();
+  size_t size= executed_gtids.get_string_length() + 1;
+  std::vector<char> buf(size);
+  executed_gtids.to_string(buf.data());
+  snapshot_gtid_executed= buf.data();
+  global_sid_lock->unlock();
+}
 
 void Gtid_state::update_commit_group(THD *first_thd)
 {
@@ -533,12 +546,14 @@ enum_return_status Gtid_state::generate_automatic_gtid(THD *thd,
     Gtid automatic_gtid= { specified_sidno, specified_gno };
 
 #ifdef WITH_WSREP
-    /* If the trx has been executed in wsrep then get wsrep_sidno
-    and not the normal server_sid no. */
-    if (WSREP(thd) && thd->wsrep_trx_meta.gtid.seqno != -1 &&
+    /* If the trx has been executed in wsrep then get wsrep_sidno and not the
+     * normal server_sidno. Retain the same sidno if group_replication is
+     * loaded on to the server */
+    if (!is_group_replication_plugin_loaded() && WSREP(thd) &&
+        thd->wsrep_trx_meta.gtid.seqno != -1 &&
         !thd->wsrep_skip_wsrep_GTID)
       automatic_gtid.sidno= wsrep_sidno;
-    else
+    else if (automatic_gtid.sidno == 0)
       automatic_gtid.sidno= get_server_sidno();
 #else
     if (automatic_gtid.sidno == 0)

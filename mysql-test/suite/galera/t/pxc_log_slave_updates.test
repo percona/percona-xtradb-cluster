@@ -1,0 +1,22 @@
+#
+# Test that executing INSERT INTO ... SELECT in TOI mode, like pt-table-checksum
+# tool does, does not cause cluster node to crash if started with 
+# log_slave_updates=ON option.
+#
+--source include/galera_cluster.inc
+
+--connection node_1
+CREATE TABLE t1 (a INT PRIMARY KEY);
+CREATE TABLE t2 (a INT PRIMARY KEY);
+INSERT INTO t1 VALUES (0);
+
+--connection node_2
+INSERT INTO t2 SELECT /*!99997*/ * FROM t1;
+
+--connection node_1
+--let $assert_text = node_1 should be alive and t2 should contain one row
+--let $assert_cond = [SELECT COUNT(*) FROM t2] = 1
+--source include/assert.inc
+
+# cleanup
+DROP TABLE t1, t2;

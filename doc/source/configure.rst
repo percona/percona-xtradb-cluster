@@ -26,9 +26,10 @@ Configuration examples assume there are three |PXC| nodes:
 +--------+-----------+---------------+
 
 If you are running Debian or Ubuntu,
-add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
+add the following configuration variables to :file:`/etc/mysql/percona-xtradb-cluster.conf.d/wsrep.cnf`
 on the first node::
 
+[mysqld]
  wsrep_provider=/usr/lib/libgalera_smm.so
 
  wsrep_cluster_name=pxc-cluster
@@ -50,6 +51,7 @@ If you are running Red Hat or CentOS,
 add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
 on the first node::
 
+[mysqld]
  wsrep_provider=/usr/lib64/galera3/libgalera_smm.so
 
  wsrep_cluster_name=pxc-cluster
@@ -131,7 +133,7 @@ Configuration Reference
 :variable:`wsrep_sst_auth`
 
   Specify authentication credentials for :term:`SST`
-  as ``<sst_user>:<sst_pass>``.
+  as ``<sstuser>:<sst_pass>``.
   You must create this user when :ref:`bootstrap`
   and provide necessary privileges for it:
 

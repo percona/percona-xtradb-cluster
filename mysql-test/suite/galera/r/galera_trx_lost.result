@@ -33,3 +33,4 @@ drop table t1;
 #node-2
 # restart:
 call mtr.add_suppression("WSREP: Failed to prepare for incremental state transfer.*");
+call mtr.add_suppression(".*Discovered discontinuity in recovered wsrep transaction XIDs.*");
