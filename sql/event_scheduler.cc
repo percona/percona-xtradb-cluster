@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -30,7 +30,9 @@
 #include "sql_connect.h"         // init_new_connection_handler_thread
 #include "sql_acl.h"             // SUPER_ACL
 #include "global_threads.h"
+#ifdef WITH_WSREP
 #include "debug_sync.h"
+#endif
 
 /**
   @addtogroup Event_Scheduler
@@ -369,9 +371,9 @@ Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event)
                           job_data.definer.str,
                           job_data.dbname.str, job_data.name.str);
 
+#ifdef WITH_WSREP
   DEBUG_SYNC(thd, "event_worker_thread_end");
 
-#ifdef WITH_WSREP
   if (WSREP(thd))
   {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -568,6 +570,7 @@ Event_scheduler::run(THD *thd)
       DBUG_PRINT("info", ("job_data is NULL, the thread was killed"));
     }
     DBUG_PRINT("info", ("state=%s", scheduler_states_names[state].str));
+    free_root(thd->mem_root, MYF(0));
   }
 
   LOCK_DATA();

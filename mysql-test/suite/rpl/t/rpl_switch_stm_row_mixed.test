@@ -39,7 +39,9 @@ show session variables like "binlog_format%";
 set session binlog_format=row;
 show session variables like "binlog_format%";
 
-set global binlog_format=DEFAULT;
+# For PXC, the default is ROW
+# set global binlog_format=DEFAULT;
+set global binlog_format=STATEMENT;
 show global variables like "binlog_format%";
 set global binlog_format=MIXED;
 show global variables like "binlog_format%";

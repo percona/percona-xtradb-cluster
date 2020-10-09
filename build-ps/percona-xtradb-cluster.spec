@@ -31,6 +31,7 @@ Prefix: %{_sysconfdir}
 %define percona_server_version @@PERCONA_VERSION@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}
+%define xb_version @@XB_VERSION@@
 %define galera_version @@GALERA_VERSION@@
 
 #
@@ -235,15 +236,6 @@ Prefix: %{_sysconfdir}
   %define distro_requires               coreutils grep procps /sbin/chkconfig /usr/sbin/useradd /usr/sbin/groupadd
 %endif
 
-# ----------------------------------------------------------------------------
-# Support optional "tcmalloc" library (experimental)
-# ----------------------------------------------------------------------------
-%if %{defined malloc_lib_target}
-%define WITH_TCMALLOC 1
-%else
-%define WITH_TCMALLOC 0
-%endif
-
 ##############################################################################
 # Configuration based upon above user input, not to be set directly
 ##############################################################################
@@ -339,8 +331,9 @@ Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-galera-3 = %{galera_version}
-Requires:	percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:	percona-xtrabackup >= %{xb_version} socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
+Requires:       openssl
 %if 0%{?systemd}
 Requires(post):   systemd
 Requires(preun):  systemd
@@ -738,14 +731,6 @@ ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 install -m 600 $MBD/support-files/RHEL4-SElinux/mysql.{fc,te} \
   $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
 
-%if %{WITH_TCMALLOC}
-# Even though this is a shared library, put it under /usr/lib*/mysql, so it
-# doesn't conflict with possible shared lib by the same name in /usr/lib*.  See
-# `mysql_config --variable=pkglibdir` and mysqld_safe for how this is used.
-install -m 644 "%{malloc_lib_source}" \
-  "$RBR%{_libdir}/mysql/%{malloc_lib_target}"
-%endif
-
 # Remove files we explicitly do not want to package, avoids 'unpackaged
 # files' warning.
 rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
@@ -1098,7 +1083,13 @@ fi
   sleep 5
 fi
 
-echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
+if [ ! -d %{_datadir}/mysql ]; then
+    pushd %{_datadir}
+    ln -s percona-xtradb-cluster mysql
+    popd
+fi
+
+echo "Percona XtraDB Cluster is distributed with several useful UDF (User Defined Function) from Percona Toolkit."
 echo "Run the following commands to create these functions:"
 echo "mysql -e \"CREATE FUNCTION fnv1a_64 RETURNS INTEGER SONAME 'libfnv1a_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION fnv_64 RETURNS INTEGER SONAME 'libfnv_udf.so'\""
@@ -1132,6 +1123,10 @@ mv -f  $STATUS_FILE ${STATUS_FILE}-LAST  # for "triggerpostun"
 #  http://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/RPM_Guide/ch09s04s05.html
  
 if [ $1 = 0 ] ; then
+  if [ -L %{_datadir}/mysql ]; then
+      rm %{_datadir}/mysql
+  fi
+
 %if 0%{?systemd}
     serv=$(/usr/bin/systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
     if [[ -n ${serv:-} ]] && /usr/bin/systemctl is-active $serv;then
@@ -1365,10 +1360,6 @@ fi
 %if "%rhel" >= "6"
     %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
 %endif 
-
-%if %{WITH_TCMALLOC}
-%attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
-%endif
 
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
@@ -1645,8 +1636,7 @@ fi
 
 * Mon Nov 16 2009 Joerg Bruehe <joerg.bruehe@sun.com>
 
-- Fix some problems with the directives around "tcmalloc" (experimental),
-  remove erroneous traces of the InnoDB plugin (that is 5.1 only).
+- remove erroneous traces of the InnoDB plugin (that is 5.1 only).
 
 * Fri Oct 06 2009 Magnus Blaudd <mvensson@mysql.com>
 

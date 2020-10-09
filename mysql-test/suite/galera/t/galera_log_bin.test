@@ -8,6 +8,12 @@
 # rather than Galera's own implementation
 #
 
+--connection node_2
+RESET MASTER;
+
+--connection node_1
+RESET MASTER;
+
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 
@@ -43,6 +49,3 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
 
 DROP TABLE t1;
 DROP TABLE t2;
-
---connection node_1
-RESET MASTER;

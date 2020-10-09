@@ -6921,7 +6921,7 @@ static void downgrade_mdl_if_lock_tables_mode(THD *thd, MDL_ticket *ticket,
   previously prepared.
 
   @param thd                           Thread object
-  @param table                         Original table object with new part_info
+  @param table                         Original table object
   @param alter_info                    ALTER TABLE info
   @param create_info                   Create info for CREATE TABLE
   @param table_list                    List of the table involved

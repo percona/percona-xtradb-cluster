@@ -2513,7 +2513,9 @@ row_log_table_apply_ops(
 	const ulint	new_trx_id_col	= dict_col_get_clust_pos(
 		dict_table_get_sys_col(new_table, DATA_TRX_ID), new_index);
 	trx_t*		trx		= thr_get_trx(thr);
+#ifdef WITH_WSREP
         int unused __attribute__((unused));
+#endif
 
 	ut_ad(dict_index_is_clust(index));
 	ut_ad(dict_index_is_online_ddl(index));
@@ -2640,7 +2642,7 @@ all_done:
 		and be ignored when the operation is unsupported. */
 		fallocate(index->online_log->fd,
 			  FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
-			  ofs, srv_sort_buf_size);
+			  ofs, srv_buf_size);
 #endif /* FALLOC_FL_PUNCH_HOLE */
 
 		next_mrec = index->online_log->head.block;
@@ -3361,7 +3363,9 @@ row_log_apply_ops(
 	bool		has_index_lock;
 	const ulint	i	= 1 + REC_OFFS_HEADER_SIZE
 		+ dict_index_get_n_fields(index);
+#ifdef WITH_WSREP
         int unused __attribute__((unused));
+#endif
 
 	ut_ad(dict_index_is_online_ddl(index));
 	ut_ad(*index->name == TEMP_INDEX_PREFIX);
@@ -3476,7 +3480,7 @@ all_done:
 		and be ignored when the operation is unsupported. */
 		fallocate(index->online_log->fd,
 			  FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
-			  ofs, srv_sort_buf_size);
+			  ofs, srv_buf_size);
 #endif /* FALLOC_FL_PUNCH_HOLE */
 
 		next_mrec = index->online_log->head.block;

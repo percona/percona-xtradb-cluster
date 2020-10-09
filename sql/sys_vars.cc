@@ -829,9 +829,11 @@ static bool fix_binlog_format_after_update(sys_var *self, THD *thd,
 static Sys_var_test_flag Sys_core_file(
        "core_file", "write a core-file on crashes", TEST_CORE_ON_SIGNAL);
 
+#ifdef WITH_WSREP
 /*
   Bug#1243228 Changed from BINLOG_FORMAT_STMT to BINLOG_FORMAT_ROW here.
 */
+#endif
 static Sys_var_enum Sys_binlog_format(
        "binlog_format", "What form of binary logging the master will "
        "use: either ROW for row-based binary logging, STATEMENT "
@@ -2365,7 +2367,7 @@ static const char *optimizer_switch_names[]=
   "materialization", "semijoin", "loosescan", "firstmatch",
   "subquery_materialization_cost_based",
 #endif
-  "use_index_extensions", "default", NullS
+  "use_index_extensions", "favor_range_scan", "default", NullS
 };
 /** propagates changes to @@engine_condition_pushdown */
 static bool fix_optimizer_switch(sys_var *self, THD *thd,
@@ -2387,8 +2389,8 @@ static Sys_var_flagset Sys_optimizer_switch(
        ", materialization, semijoin, loosescan, firstmatch,"
        " subquery_materialization_cost_based"
 #endif
-       ", block_nested_loop, batched_key_access, use_index_extensions"
-       "} and val is one of {on, off, default}",
+       ", block_nested_loop, batched_key_access, use_index_extensions,"
+       " favor_range_scan} and val is one of {on, off, default}",
        SESSION_VAR(optimizer_switch), CMD_LINE(REQUIRED_ARG),
        optimizer_switch_names, DEFAULT(OPTIMIZER_SWITCH_DEFAULT),
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(NULL),
@@ -2539,7 +2541,9 @@ static bool check_read_only(sys_var *self, THD *thd, set_var *var)
 static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 {
   bool result= true;
+#ifdef WITH_WSREP
   bool own_lock= false;
+#endif
 
   if (read_only == FALSE && super_read_only == TRUE)
   {
@@ -2592,7 +2596,11 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
   read_only= opt_readonly;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
+#ifdef WITH_WSREP
   if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
+  if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif
     goto end_with_mutex_unlock;
 
   if ((result= thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -2605,10 +2613,14 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 
  end_with_read_lock:
   /* Release the lock */
+#ifdef WITH_WSREP
   if (own_lock)
   {
+#endif
     thd->global_read_lock.unlock_global_read_lock(thd);
+#ifdef WITH_WSREP
   }
+#endif
  end_with_mutex_unlock:
   mysql_mutex_lock(&LOCK_global_system_variables);
  end:
@@ -3736,8 +3748,8 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
     if (trans_commit_stmt(thd) || trans_commit(thd))
     {
       thd->variables.option_bits&= ~OPTION_AUTOCOMMIT;
-      thd->mdl_context.release_transactional_locks();
 #ifdef WITH_WSREP
+      thd->mdl_context.release_transactional_locks();
       WSREP_DEBUG("autocommit, MDL TRX lock released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       return true;
@@ -4507,7 +4519,45 @@ void init_log_slow_verbosity()
 {
   update_slow_query_log_use_global_control(0,0,OPT_GLOBAL);
 }
-static Sys_var_set Sys_slow_query_log_use_global_control(
+
+/**
+  Specialized class that handles "none" value of
+  slow_query_log_use_global_control_set variable.
+  When "none" only value is detected, it is rewriten to empty
+  causing set to be cleared.
+*/
+class Sys_var_set_none: public Sys_var_set {
+public:
+  Sys_var_set_none(const char *name_arg,
+        const char *comment, int flag_args, ptrdiff_t off, size_t size,
+        CMD_LINE getopt, const char *values[], ulonglong def_val, PolyLock *lock =
+        0, enum binlog_status_enum binlog_status_arg = VARIABLE_NOT_IN_BINLOG,
+        on_check_function on_check_func = 0,
+        on_update_function on_update_func = 0, const char *substitute = 0)
+    : Sys_var_set(name_arg, comment, flag_args, off, size, getopt, values,
+          def_val, lock, binlog_status_arg, on_check_func, on_update_func,
+          substitute)
+  {
+  }
+
+  virtual bool do_check(THD *thd, set_var *var)
+  {
+    if (var->value->result_type() == STRING_RESULT) {
+      char buff[STRING_BUFFER_USUAL_SIZE];
+      String str(buff, sizeof(buff), system_charset_info);
+
+      String *res = var->value->val_str(&str);
+      if (res
+          && (res->length() > 0)
+          && (0 == my_strcasecmp(system_charset_info, res->ptr(), "none"))) {
+        var->value = new Item_string("", 0, system_charset_info);
+      }
+    }
+    return Sys_var_set::do_check(thd, var);
+  }
+};
+
+static Sys_var_set_none Sys_slow_query_log_use_global_control(
        "slow_query_log_use_global_control",
        "Choose flags, wich always use the global variables. Multiple flags allowed in a comma-separated string. [none, log_slow_filter, log_slow_rate_limit, log_slow_verbosity, long_query_time, min_examined_row_limit, all]",
        GLOBAL_VAR(opt_slow_query_log_use_global_control), CMD_LINE(REQUIRED_ARG),
@@ -5696,7 +5746,9 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
   DBUG_ENTER("fix_gtid_deployment_step");
   bool new_gtid_deployment_step= gtid_deployment_step;
   bool result= true;
+#ifdef WITH_WSREP
   bool own_lock= false;
+#endif
 
   if (gtid_deployment_step == opt_gtid_deployment_step)
   {
@@ -5709,7 +5761,11 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
   gtid_deployment_step= opt_gtid_deployment_step;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
+#ifdef WITH_WSREP
   if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
+  if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif
     goto end_with_mutex_unlock;
 
   if ((result= thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -5731,10 +5787,14 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
 
  end_with_read_lock:
   /* Release the lock */
+#ifdef WITH_WSREP
   if (own_lock)
   {
+#endif
     thd->global_read_lock.unlock_global_read_lock(thd);
+#ifdef WITH_WSREP
   }
+#endif
  end_with_mutex_unlock:
   mysql_mutex_lock(&LOCK_global_system_variables);
  end:

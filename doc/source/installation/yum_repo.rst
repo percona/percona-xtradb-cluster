@@ -4,16 +4,7 @@
 Installing |PXC| on RHEL and CentOS
 ===================================
 
-Percona provides :file:`.rpm` packages for 64-bit versions
-of the following distributions:
-
-* Red Hat Enterprise Linux and CentOS 6
-* Red Hat Enterprise Linux and CentOS 7
-
-.. note::
-  |PXC| should work on other RPM-based distributions
-  (such as Oracle Linux and Amazon Linux AMI),
-  but it is tested only on platforms listed above.
+Specific information on the supported platforms, products, and versions is described in `Percona Software and Platform Lifecycle <https://www.percona.com/services/policies/percona-software-platform-lifecycle#mysql>`_.
 
 The packages are available in the official Percona software repositories
 and on the
