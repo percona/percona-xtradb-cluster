@@ -5,7 +5,7 @@
 ================================================================================
 
 :Date: October 9, 2020
-:Installation: `Installing Percona XtraDB Cluster <https://www.percona.com/doc/percona-xtradb-cluster/5.7/installation.html>`_
+:Installation: `Installing Percona XtraDB Cluster <https://www.percona.com/doc/percona-xtradb-cluster/5.7/install/index.html>`_
 
 This release fixes the security vulnerability `CVE-2020-15180 <https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-15180>`_
 
