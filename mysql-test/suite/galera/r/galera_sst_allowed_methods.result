@@ -1,0 +1,71 @@
+Killing node #2 to free ports for garbd ...
+#
+# Sending malformed sst requests
+#
+Starting garbd with --sst unknown-method:127.0.0.1:4444/xtrabackup_sst//1
+Starting garbd with --sst ;forbidden_char_method ;:127.0.0.1:4444/xtrabackup_sst//1
+Starting garbd with --sst xtrabackup-v2:;/usr/bin/destroy;
+Starting garbd with --sst xtrabackup-v2:|forbidden_char_data;
+Starting garbd with --sst xtrabackup-v2:<2001:db8::1:0>:123/xtrabackup_sst//1
+Starting garbd with --sst :
+Starting garbd with --sst :proper_data
+#
+# Sending proper sst requests
+#
+Starting garbd with --sst xtrabackup-v2:
+Starting garbd with --sst xtrabackup-v2:127.0.0.1:4444/xtrabackup_sst//1
+Starting garbd with --sst xtrabackup-v2:[2001:db8:85a3:8d3:1319:8a2e:370:7348]:123/xtrabackup_sst//1
+Starting garbd with --sst xtrabackup-v2:[2001:db8::1:0]:123/xtrabackup_sst//1
+Starting garbd with --sst xtrabackup-v2:[2001:db8::1:0]/xtrabackup_sst//1
+Starting garbd with --sst xtrabackup-v2:2001:db8::1:0/xtrabackup_sst//1
+Starting garbd with --sst xtrabackup-v2:some-domain-1.098-abc-def/xtrabackup_sst//1
+#
+# Sending custom sst request
+#
+Starting garbd with --sst custom-sst_method:/custom/data/1.2.3.4:123
+#
+# Starting node_1 with wrong params
+#
+Starting server with --wsrep-sst-allowed-methods=',,test_method'
+Starting server with --wsrep-sst-allowed-methods='test_method,'
+Starting server with --wsrep-sst-allowed-methods='test-method1,test method,test-method2'
+Starting server with --wsrep-sst-allowed-methods='test_method,test;method2'
+Starting server with --wsrep-sst-allowed-methods='-test_method'
+Starting server with --wsrep-sst-allowed-methods='test_method-'
+Starting server with --wsrep-sst-allowed-methods='/bin/rm'
+Starting server with --wsrep-sst-allowed-methods=','
+Starting server with --wsrep-sst-allowed-methods=''
+#
+# Starting node_1 with proper params
+#
+Starting server with --wsrep-sst-allowed-methods='test_method'
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	test_method
+Starting server with --wsrep-sst-allowed-methods='test_method-1,test-method_2,testmethod-3'
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	test_method-1,test-method_2,testmethod-3
+Starting server with --wsrep-sst-allowed-methods='1'
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	1
+Starting server with --wsrep-sst-allowed-methods='02'
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	02
+Starting server with --wsrep-sst-allowed-methods='_method'
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	_method
+Starting server with --wsrep-sst-allowed-methods='method_'
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	method_
+Restarting nodes to satisfy MTR's end-of-test checks
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	mysqldump,rsync,skip,xtrabackup,xtrabackup-v2
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	mysqldump,rsync,skip,xtrabackup,xtrabackup-v2
