@@ -1,0 +1,5 @@
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	mysqldump,rsync,skip,xtrabackup,xtrabackup-v2
+SET GLOBAL wsrep_sst_allowed_methods = 'test_method';
+ERROR HY000: Variable 'wsrep_sst_allowed_methods' is a read only variable

@@ -1,0 +1,180 @@
+# Test sst requests handling by mysqld server.
+#
+# Test server behavior when client sends valid/malformed sst requests.
+# Test server behavior when starting with valid/malformed/default value
+# of wsrep_sst_allowed_methods parameter
+
+--source include/big_test.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+
+################################################################################
+# Test validation of requests done by clients. We will use garbd for making requests.
+
+--echo Killing node #2 to free ports for garbd ...
+--connection node_2
+--source include/shutdown_mysqld.inc
+--let $_expect_file_name_node_2 = $_expect_file_name
+
+--connection node_1
+
+
+--echo #
+--echo # Sending malformed sst requests
+--echo #
+
+--let $expect_rejection = yes
+
+--let $sst_request_method = unknown-method
+--let $sst_request_data = 127.0.0.1:4444/xtrabackup_sst//1
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = ;forbidden_char_method ;
+--let $sst_request_data = 127.0.0.1:4444/xtrabackup_sst//1
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = xtrabackup-v2
+--let $sst_request_data = ;/usr/bin/destroy;
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = xtrabackup-v2
+--let $sst_request_data = |forbidden_char_data;
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = xtrabackup-v2
+--let $sst_request_data = <2001:db8::1:0>:123/xtrabackup_sst//1
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = 
+--let $sst_request_data = 
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = 
+--let $sst_request_data = proper_data
+--source galera_sst_allowed_methods_garbd.inc
+
+
+--echo #
+--echo # Sending proper sst requests
+--echo #
+
+--let $expect_rejection = no
+
+# As the protocol is method:data and data can be empty (for example for mysqldump)
+# the following will not be rejected by request sanitizer. It will be rejected by
+# xtrabackup-v2 script 
+--let $sst_request_method = xtrabackup-v2
+--let $sst_request_data = 
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = xtrabackup-v2
+--let $sst_request_data = 127.0.0.1:4444/xtrabackup_sst//1
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = xtrabackup-v2
+--let $sst_request_data = [2001:db8:85a3:8d3:1319:8a2e:370:7348]:123/xtrabackup_sst//1
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = xtrabackup-v2
+--let $sst_request_data = [2001:db8::1:0]:123/xtrabackup_sst//1
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = xtrabackup-v2
+--let $sst_request_data = [2001:db8::1:0]/xtrabackup_sst//1
+--source galera_sst_allowed_methods_garbd.inc
+
+--let $sst_request_method = xtrabackup-v2
+--let $sst_request_data = 2001:db8::1:0/xtrabackup_sst//1
+--source galera_sst_allowed_methods_garbd.inc
+
+--echo #
+--echo # Sending custom sst request
+--echo #
+
+--let $expect_rejection = no
+--let $sst_allowed_methods = xtrabackup-v2,custom-sst_method,mysqldump
+--let $sst_request_method = custom-sst_method
+--let $sst_request_data = /custom/data/1.2.3.4:123
+--source galera_sst_allowed_methods_garbd.inc
+
+
+################################################################################
+# Test wsrep-sst-allowed-methods parameter validation on server startup
+--connection node_1
+--source include/shutdown_mysqld.inc
+
+--echo #
+--echo # Starting node_1 with wrong params
+--echo #
+
+--let $expect_abort = yes
+
+--let $sst_allowed_methods = ,,test_method
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = test_method,
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = test-method1,test method,test-method2
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = test_method,test;method2
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = -test_method
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = test_method-
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = /bin/rm
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = ,
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = 
+--source galera_sst_allowed_methods_start.inc
+
+
+--echo #
+--echo # Starting node_1 with proper params
+--echo #
+
+--let $expect_abort = no
+
+--let $sst_allowed_methods = test_method
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = test_method-1,test-method_2,testmethod-3
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = 1
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = 02
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = _method
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = method_
+--source galera_sst_allowed_methods_start.inc
+
+
+################################################################################
+# cleanup
+--echo Restarting nodes to satisfy MTR's end-of-test checks
+--let $restart_parameters = "restart"
+
+--connection node_1
+--source include/start_mysqld.inc
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+
+--let $_expect_file_name = $_expect_file_name_node_2
+--connection node_2
+--source include/start_mysqld.inc
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+
+--source include/wait_until_count_sessions.inc
