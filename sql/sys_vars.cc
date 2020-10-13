@@ -6376,6 +6376,12 @@ static Sys_var_charptr sys_wsrep_sst_method(
        ON_CHECK(wsrep_sst_method_check),
        ON_UPDATE(wsrep_sst_method_update)); 
 
+static Sys_var_charptr sys_wsrep_sst_allowed_methods(
+       "wsrep_sst_allowed_methods", "SST methods accepted by server",
+       READ_ONLY GLOBAL_VAR(wsrep_sst_allowed_methods), CMD_LINE(REQUIRED_ARG),
+       IN_FS_CHARSET, DEFAULT(wsrep_sst_allowed_methods), NO_MUTEX_GUARD,
+       NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0));
+
 static Sys_var_charptr Sys_wsrep_sst_receive_address( 
        "wsrep_sst_receive_address", "Address where node is waiting for "
        "SST contact", 

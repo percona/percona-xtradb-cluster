@@ -1,0 +1,7 @@
+--source include/have_wsrep.inc
+
+# wsrep_sst_allowed_methods is global readonly variable
+
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SET GLOBAL wsrep_sst_allowed_methods = 'test_method';
