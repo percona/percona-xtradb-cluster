@@ -18,10 +18,11 @@ Starting garbd with --sst xtrabackup-v2:[2001:db8:85a3:8d3:1319:8a2e:370:7348]:1
 Starting garbd with --sst xtrabackup-v2:[2001:db8::1:0]:123/xtrabackup_sst//1
 Starting garbd with --sst xtrabackup-v2:[2001:db8::1:0]/xtrabackup_sst//1
 Starting garbd with --sst xtrabackup-v2:2001:db8::1:0/xtrabackup_sst//1
+Starting garbd with --sst xtrabackup-v2:some-domain-1.098-abc-def/xtrabackup_sst//1
 #
 # Sending custom sst request
 #
-Starting garbd with --sst custom-sst_method:/custom/data/1.2.3.4:123
+Starting garbd with --sst custom-sst_method.py:/custom/data/1.2.3.4:123
 #
 # Starting node_1 with wrong params
 #
@@ -61,6 +62,10 @@ Starting server with --wsrep-sst-allowed-methods='method_'
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
 wsrep_sst_allowed_methods	method_
+Starting server with --wsrep-sst-allowed-methods='method_1.py,method-2.sh'
+SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	method_1.py,method-2.sh
 Restarting nodes to satisfy MTR's end-of-test checks
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value

@@ -17,21 +17,20 @@
 
 if ($expect_abort == 'yes')
 {
-	--let $mysqld=$MYSQLD_CMD --core-file --console > $error_log 2>&1 $start_params
-	--error 1
-	--exec $mysqld
-	--let SEARCH_FILE = $error_log
-	--let SEARCH_PATTERN = \[ERROR\] WSREP: Wrong format of --wsrep-sst-allowed-methods parameter value: $sst_allowed_methods
-	--source include/search_pattern_in_file.inc
+  --let $mysqld=$MYSQLD_CMD --core-file --console > $error_log 2>&1 $start_params
+  --error 1
+  --exec $mysqld
+  --let SEARCH_FILE = $error_log
+  --let SEARCH_PATTERN = \[ERROR\] WSREP: Wrong format of --wsrep-sst-allowed-methods parameter value: $sst_allowed_methods
+  --source include/search_pattern_in_file.inc
 }
 
 if ($expect_abort != 'yes')
 { 
   --let $restart_parameters = "restart:$start_params --log-error=$error_log"
-	--source include/start_mysqld.inc
-	SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
-	--source include/shutdown_mysqld.inc
+  --source include/start_mysqld.inc
+  SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
+  --source include/shutdown_mysqld.inc
 }
 
 --remove_file $error_log
-

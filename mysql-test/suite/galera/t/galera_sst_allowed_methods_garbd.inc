@@ -42,6 +42,3 @@ if ($expect_rejection != 'yes')
 --source include/search_pattern_in_file.inc
 
 --remove_file $error_log
-
-
-
