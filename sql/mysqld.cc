@@ -5167,6 +5167,8 @@ int init_common_variables() {
   WSREP statements. */
   global_system_variables.wsrep_on = true;
 
+  if (wsrep_setup_allowed_sst_methods()) return 1;
+
   /*
     We need to initialize auxiliary variables, that will be
     further keep the original values of auto-increment options

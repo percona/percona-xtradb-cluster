@@ -31,6 +31,7 @@ extern const char *wsrep_sst_method;
 extern const char *wsrep_sst_receive_address;
 extern const char *wsrep_sst_donor;
 extern bool wsrep_sst_donor_rejects_queries;
+extern const char *wsrep_sst_allowed_methods;
 
 /*! Cancel the SST script if it is running */
 extern void wsrep_sst_cancel(bool call_wsrep_cb);

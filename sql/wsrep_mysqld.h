@@ -194,6 +194,9 @@ void wsrep_init_startup(bool before);
 /* Recover streaming transactions from fragment storage */
 void wsrep_recover_sr_from_storage(THD *);
 
+/* Setup SST request methods that will be accepted by server */
+bool wsrep_setup_allowed_sst_methods();
+
 extern "C" wsrep_ws_handle_t *wsrep_thd_ws_handle(THD *thd);
 extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id);
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
