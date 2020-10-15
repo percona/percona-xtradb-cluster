@@ -154,28 +154,30 @@ bool wsrep_setup_allowed_sst_methods() {
      alpha-num
      underscore
      dash
-     but w do not allow leading and trailing dash.
+     dot
+     but we do not allow leading and trailing dash/dot.
      Method names have to be separated by colons (spaces before/after colon are
      allowed). Below regex may seem difficult, but in fact it is not:
 
      1. Any number of leading spaces
 
        2. Followed by  alpha-num character or underscore
-         3. Followed by any number of underscore/dash
+         3. Followed by any number of underscore/dash/dot
          4. Followed by alpha-num character or underscore
          5. 3 - 4 group is optional
        6. Followed by colon (possibly with leading and/or trailing spaces)
        7. 2 - 6 group is optional
 
      8. Followed by alpha-num character or underscore
-       9. Followed by any number of underscore/dash
+       9. Followed by any number of underscore/dash/dot
        10. Followed by alpha-num character or underscore
        11. 9 -10 group is optional
 
      11. Followed by any number of trailing spaces */
 
   static std::regex validate_regex(
-      "\\s*(\\w([_-]*\\w)*(\\s*,\\s*))*\\w([_-]*\\w)*\\s*", std::regex::nosubs);
+      "\\s*(\\w([-_.]*\\w)*(\\s*,\\s*))*\\w([-_.]*\\w)*\\s*",
+      std::regex::nosubs);
 
   if (!std::regex_match(methods, validate_regex)) {
     WSREP_FATAL(
@@ -1500,9 +1502,9 @@ static bool is_sst_request_valid(const std::string &msg) {
       characters and the ways they could be used to inject the command to
       the OS. However this approach seems to be too error prone.
       Instead of this we will just allow alpha-num + a few special characters
-      (colon, slash, dot, underscore, square brackets). */
+      (colon, slash, dot, underscore, square brackets, hyphen). */
     std::string data = msg.substr(method_len + 1, data_len);
-    static const std::regex allowed_chars_regex("[\\w:\\/\\.\\[\\]]+");
+    static const std::regex allowed_chars_regex("[\\w:/.[\\]-]+");
     if (!std::regex_match(data, allowed_chars_regex)) {
       return false;
     }
