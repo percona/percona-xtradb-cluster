@@ -27,6 +27,74 @@
 #include "wsrep_xid.h"
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
+#include <sstream>
+#include <string>
+
+/* We don't need PSI instrumentation for regex mutex, however
+   Regex class has its constructor compiled conditionally.
+   Disable instrumentation.
+   Regex class uses c++11 nullptr. As we are in c++03 world
+   let's define nullptr to satisfy compiler */
+#ifdef HAVE_PSI_INTERFACE
+#undef HAVE_PSI_INTERFACE
+#endif
+#define nullptr 0
+#include <sql_regex.h>
+
+/* Check if the string is valid. In method name we allow only:
+   alpha-num
+   underscore
+   dash
+   but w do not allow leading and trailing dash.
+   Method names have to be separated by colons (spaces before/after colon are allowed).
+   Below regex may seem difficult, but in fact it is not:
+
+   1. Any number of leading spaces
+
+     2. Followed by  alpha-num character or underscore
+       3. Followed by any number of underscore/dash
+       4. Followed by alpha-num character or underscore
+       5. 3 - 4 group is optional
+     6. Followed by colon (possibly with leading and/or trailing spaces)
+     7. 2 - 6 group is optional
+
+   8. Followed by alpha-num character or underscore
+     9. Followed by any number of underscore/dash
+     10. Followed by alpha-num character or underscore
+     11. 9 -10 group is optional
+
+   11. Followed by any number of trailing spaces
+
+   It is the same as:
+   ^\s*(\w([_-]*\w)*(\s*,\s*))*\w([_-]*\w)*\s*$    */
+
+#define COLON_REGEX "([[:blank:]]*,[[:blank:]]*)"
+#define METHOD_REGEX "[[:alnum:]_]([_-]*[[:alnum:]_])*"
+#define SST_ALLOWED_METHODS_REGEX_PATTERN \
+    "^[[:blank:]]*(" METHOD_REGEX COLON_REGEX ")*" METHOD_REGEX "[[:blank:]]*$"
+
+static Regex sst_allowed_methods_regex;
+
+/* We allow custom sst scripts, so data can be anything.
+
+   We could create and maintain the list of forbidden
+   characters and the ways they could be used to inject the command to
+   the OS. However this approach seems to be too error prone.
+   Instead of this we will just allow alpha-num + a few special characters
+   (colon, slash, dot, underscore, square brackets).
+
+   It is the same as ^[\w:\/\.\[\]]+$    */
+
+   /* For some reason regex engine is not able to handle the following pattern
+   allowing square brackets as well:
+   "^[[:alnum:]:\\/\\._\\[\\]]+$"
+   We will substitute square brackets with lt/gt before validation
+   and we will revert to square brackets after validation. */
+static const char *sst_method_allowed_chars_regex_pattern=
+    "^[[:alnum:]:\\/\\._<>]+$";
+static Regex sst_method_allowed_chars_regex;
+
 
 extern const char wsrep_defaults_file[];
 extern const char wsrep_defaults_group_suffix[];
@@ -66,6 +134,15 @@ const char* wsrep_sst_method          = WSREP_SST_DEFAULT;
 const char* wsrep_sst_receive_address = WSREP_SST_ADDRESS_AUTO;
 const char* wsrep_sst_donor           = "";
       char* wsrep_sst_auth            = NULL;
+
+#define WSREP_SST_ALLOWED_METHODS_DEFAULT WSREP_SST_MYSQLDUMP "," \
+                                          WSREP_SST_RSYNC "," \
+                                          WSREP_SST_SKIP "," \
+                                          WSREP_SST_XTRABACKUP "," \
+                                          WSREP_SST_XTRABACKUP_V2
+
+const char *wsrep_sst_allowed_methods = WSREP_SST_ALLOWED_METHODS_DEFAULT;
+static std::vector<std::string> allowed_sst_methods;
 
 // container for real auth string
 static const char* sst_auth_real      = NULL;
@@ -213,6 +290,65 @@ bool wsrep_before_SE()
           && strcmp (wsrep_sst_method, WSREP_SST_SKIP)
           && strcmp (wsrep_sst_method, WSREP_SST_MYSQLDUMP));
 }
+
+/* Helper class for splitting string tokens separated with
+   commas. Spaces are stripped. */
+struct Splitter : public std::unary_function<char, void> {
+  Splitter(std::vector<std::string> &vec) : vec_(vec) {}
+
+  void flush()
+  {
+    if (tmp_.length() > 0)
+    {
+      vec_.push_back(tmp_);
+      tmp_.clear();
+    }
+  }
+  void operator()(char ch)
+  {
+    if (ch == ',')
+    {
+      vec_.push_back(tmp_);
+      tmp_.clear();
+    }
+    else
+    {
+      if (ch != ' ')
+      {
+        tmp_+= ch;
+      }
+    }
+  }
+  std::vector<std::string> &vec_;
+  std::string               tmp_;
+};
+
+bool wsrep_setup_allowed_sst_methods()
+{
+  sst_allowed_methods_regex.compile(SST_ALLOWED_METHODS_REGEX_PATTERN,
+                                    MY_REG_EXTENDED | MY_REG_NOSUB,
+                                    &my_charset_latin1);
+  sst_method_allowed_chars_regex.compile(
+      sst_method_allowed_chars_regex_pattern, MY_REG_EXTENDED | MY_REG_NOSUB,
+      &my_charset_latin1);
+
+  std::string methods(wsrep_sst_allowed_methods);
+
+  if (!sst_allowed_methods_regex.match(methods))
+  {
+    WSREP_ERROR(
+        "Wrong format of --wsrep-sst-allowed-methods parameter value: %s",
+        wsrep_sst_allowed_methods);
+    return true;
+  }
+
+  // split it into tokens and strip
+  Splitter splitter(allowed_sst_methods);
+  std::for_each(methods.begin(), methods.end(), splitter).flush();
+
+  return false;
+}
+
 
 static bool            sst_complete = false;
 static bool            sst_needed   = false;
@@ -1276,6 +1412,78 @@ static int sst_donate_other (const char*   method,
   return arg.err;
 }
 
+/*
+  Validate SST request string.
+  The protocol is: method\0data\0
+
+  For xtrabackup-v2 it is: method\0addresspath\0
+  like:
+  "xtrabackup-v2\000127.0.0.1:4444/xtrabackup_sst//1"
+*/
+static bool is_sst_request_valid(const std::string &msg)
+{
+  size_t method_len= strlen(msg.c_str());
+
+  if (method_len == 0)
+  {
+    return false;
+  }
+
+  std::string method= msg.substr(0, method_len);
+
+  // Is this method allowed?
+  std::vector<std::string>::iterator res= std::find(
+      allowed_sst_methods.begin(), allowed_sst_methods.end(), method);
+  if (res == allowed_sst_methods.end())
+  {
+    return false;
+  }
+
+  const char *data_ptr= msg.c_str() + method_len + 1;
+  size_t      data_len= strlen(data_ptr);
+
+  // method + null + data + null
+  if (method_len + 1 + data_len + 1 != msg.length())
+  {
+    // Someone tries to piggyback after 2nd null
+    return false;
+  }
+
+  if (data_len > 0)
+  {
+    std::string data= msg.substr(method_len + 1, data_len);
+
+    // first make sure we don't have lt/gt which are not allowed
+    if (std::string::npos != data.find('<') ||
+        std::string::npos != data.find('>'))
+    {
+      return false;
+    }
+
+    // square brackets workaround
+    std::replace(data.begin(), data.end(), '[', '<');
+    std::replace(data.begin(), data.end(), ']', '>');
+
+    return sst_method_allowed_chars_regex.match(data);
+  }
+  return true;
+}
+
+/* Helper functor class for conversion of std::string
+   containing null characters into printable string */
+struct StringBuilder : public std::unary_function<char, void> {
+  StringBuilder(std::ostringstream &ss) : ss_(ss) {}
+
+  void operator()(char ch)
+  {
+    if (ch != 0)
+      ss_ << ch;
+    else
+      ss_ << "<nullptr>";
+  }
+  std::ostringstream &ss_;
+};
+
 wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
                                        const void* msg, size_t msg_len,
                                        const wsrep_gtid_t* current_gtid,
@@ -1285,6 +1493,16 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
   /* This will be reset when sync callback is called.
    * Should we set wsrep_ready to FALSE here too? */
   local_status.set(WSREP_MEMBER_DONOR);
+
+  std::string message(reinterpret_cast<const char *>(msg), msg_len);
+  if (!is_sst_request_valid(message))
+  {
+    std::ostringstream ss;
+    StringBuilder      stringBuilder(ss);
+    std::for_each(message.begin(), message.end(), stringBuilder);
+    WSREP_ERROR("Invalid sst_request: %s", ss.str().c_str());
+    return WSREP_CB_FAILURE;
+  }
 
   const char* method = (char*)msg;
   size_t method_len  = strlen (method);
