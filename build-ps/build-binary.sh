@@ -470,14 +470,13 @@ fi
                         echo "Copying lib ${lib_realpath_basename}"
                         cp ${lib_realpath} lib/private
 
-                        echo "Symlinking lib from ${lib_realpath_basename} to ${lib_without_version_suffix}"
-                        cd lib/
-                        ln -s private/${lib_realpath_basename} ${lib_without_version_suffix}
-                        cd -
-                        if [ ${lib_realpath_basename} != ${lib_without_version_suffix} ]; then
-                            cd lib/private
+                        if [ ${lib_realpath_basename} != ${lib_without_version_suffix} ] && [ ! -L lib/${lib_without_version_suffix} ]; then
+                            echo "Symlinking lib from ${lib_realpath_basename} to ${lib_without_version_suffix}"
+                            cd lib/
+                            ln -s private/${lib_realpath_basename} ${lib_without_version_suffix}
+                            cd private
                             ln -s ${lib_realpath_basename} ${lib_without_version_suffix}
-                            cd -
+                            cd ../../
                         fi
 
                         patchelf --set-soname ${lib_without_version_suffix} lib/private/${lib_realpath_basename}
