@@ -31,7 +31,7 @@
 #include <cstdlib>
 #include "log_event.h"
 #include <rpl_slave.h>
-#include "sql_base.h"           // TEMP_PREFIX 
+#include "sql_base.h"           // TEMP_PREFIX
 #include "rpl_msr.h"           // channel_map
 #include <functional>
 #include <sstream>
@@ -52,31 +52,32 @@
    alpha-num
    underscore
    dash
-   but w do not allow leading and trailing dash.
+   dot
+   but we do not allow leading and trailing dash/dot.
    Method names have to be separated by colons (spaces before/after colon are allowed).
    Below regex may seem difficult, but in fact it is not:
 
    1. Any number of leading spaces
 
      2. Followed by  alpha-num character or underscore
-       3. Followed by any number of underscore/dash
+       3. Followed by any number of underscore/dash/dot
        4. Followed by alpha-num character or underscore
        5. 3 - 4 group is optional
      6. Followed by colon (possibly with leading and/or trailing spaces)
      7. 2 - 6 group is optional
 
    8. Followed by alpha-num character or underscore
-     9. Followed by any number of underscore/dash
+     9. Followed by any number of underscore/dash/dot
      10. Followed by alpha-num character or underscore
      11. 9 -10 group is optional
 
    11. Followed by any number of trailing spaces
 
    It is the same as:
-   ^\s*(\w([_-]*\w)*(\s*,\s*))*\w([_-]*\w)*\s*$    */
+   ^\s*(\w([-_.]*\w)*(\s*,\s*))*\w([-_.]*\w)*\s*$    */
 
 #define COLON_REGEX "([[:blank:]]*,[[:blank:]]*)"
-#define METHOD_REGEX "[[:alnum:]_]([_-]*[[:alnum:]_])*"
+#define METHOD_REGEX "[[:alnum:]_]([-_.]*[[:alnum:]_])*"
 #define SST_ALLOWED_METHODS_REGEX_PATTERN \
     "^[[:blank:]]*(" METHOD_REGEX COLON_REGEX ")*" METHOD_REGEX "[[:blank:]]*$"
 
@@ -88,17 +89,18 @@ static Regex sst_allowed_methods_regex;
    characters and the ways they could be used to inject the command to
    the OS. However this approach seems to be too error prone.
    Instead of this we will just allow alpha-num + a few special characters
-   (colon, slash, dot, underscore, square brackets).
+   (colon, slash, dot, underscore, square brackets, hyphen).
 
-   It is the same as ^[\w:\/\.\[\]]+$    */
+   It is the same as ^[\w:/.[\]-]+$    */
 
    /* For some reason regex engine is not able to handle the following pattern
-   allowing square brackets as well:
-   "^[[:alnum:]:\\/\\._\\[\\]]+$"
-   We will substitute square brackets with lt/gt before validation
-   and we will revert to square brackets after validation. */
+   allowing square brackets:
+   "^[[:alnum:]:/._[\\]-]+$"
+   We will substitute square brackets with lt/gt for validation.
+   Because of another regex engine problem, hyphen literal has to be located
+   at the end of matching set (cannot be escaped when in the middle). */
 static const char *sst_method_allowed_chars_regex_pattern=
-    "^[[:alnum:]:\\/\\._<>]+$";
+    "^[[:alnum:]:/._<>-]+$";
 static Regex sst_method_allowed_chars_regex;
 
 

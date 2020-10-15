@@ -88,14 +88,18 @@
 --let $sst_request_data = 2001:db8::1:0/xtrabackup_sst//1
 --source galera_sst_allowed_methods_garbd.inc
 
+--let $sst_request_method = xtrabackup-v2
+--let $sst_request_data = some-domain-1.098-abc-def/xtrabackup_sst//1
+--source galera_sst_allowed_methods_garbd.inc
+
 
 --echo #
 --echo # Sending custom sst request
 --echo #
 
 --let $expect_rejection = no
---let $sst_allowed_methods = xtrabackup-v2,custom-sst_method,mysqldump
---let $sst_request_method = custom-sst_method
+--let $sst_allowed_methods = xtrabackup-v2,custom-sst_method.py,mysqldump
+--let $sst_request_method = custom-sst_method.py
 --let $sst_request_data = /custom/data/1.2.3.4:123
 --source galera_sst_allowed_methods_garbd.inc
 
@@ -161,6 +165,9 @@
 --source galera_sst_allowed_methods_start.inc
 
 --let $sst_allowed_methods = method_
+--source galera_sst_allowed_methods_start.inc
+
+--let $sst_allowed_methods = method_1.py,method-2.sh
 --source galera_sst_allowed_methods_start.inc
 
 

@@ -1,7 +1,7 @@
 # Start server with provided value for --wsrep-sst-allowed-methods or with defaults.
 # Then make sst request using garbd
 # Validate the log accordingly.
-# Expected server state before execution is started. 
+# Expected server state before execution is started.
 # Server state after execution is started.
 #
 # Usage:
