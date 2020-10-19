@@ -152,7 +152,7 @@ Mysqlx.Resultset.ColumnMetaData {
   catalog: "def"
   collation: 33
   fractional_digits: 0
-  length: 3072
+  length: 12288
   flags: 0
 }
 
@@ -794,7 +794,7 @@ Mysqlx.Resultset.ColumnMetaData {
   catalog: "def"
   collation: 33
   fractional_digits: 0
-  length: 3072
+  length: 12288
   flags: 0
 }
 
@@ -839,7 +839,7 @@ Mysqlx.Resultset.ColumnMetaData {
   catalog: "def"
   collation: 33
   fractional_digits: 0
-  length: 3072
+  length: 12288
   flags: 0
 }
 
@@ -884,7 +884,7 @@ Mysqlx.Resultset.ColumnMetaData {
   catalog: "def"
   collation: 33
   fractional_digits: 0
-  length: 3072
+  length: 12288
   flags: 0
 }
 
@@ -1137,7 +1137,7 @@ Mysqlx.Resultset.ColumnMetaData {
   catalog: "def"
   collation: 33
   fractional_digits: 0
-  length: 3072
+  length: 12288
   flags: 0
 }
 
@@ -2777,7 +2777,7 @@ Mysqlx.Resultset.ColumnMetaData {
   catalog: "def"
   collation: 33
   fractional_digits: 0
-  length: 3072
+  length: 12288
   flags: 0
 }
 

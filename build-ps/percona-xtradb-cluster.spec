@@ -37,6 +37,7 @@ Prefix: %{_sysconfdir}
 %define percona_server_version @@PERCONA_VERSION@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}
+%define xb_version @@XB_VERSION@@
 
 #
 %bcond_with tokudb
@@ -72,10 +73,6 @@ Prefix: %{_sysconfdir}
 
 %if %{undefined scons_args}
  %define scons_args %{nil}
-%endif
-
-%if %{undefined galera_version}
- %define galera_version 3.31
 %endif
 
 %if %{undefined galera_revision}
@@ -414,7 +411,7 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = %{version}-%{release}
-Requires:	percona-xtrabackup-24 >= 2.4.12 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:	percona-xtrabackup-24 >= %{xb_version} socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -680,14 +677,14 @@ mkdir debug
   # Attempt to remove any optimisation flags from the debug build
   CFLAGS=`echo " ${CFLAGS} " | \
             sed -e 's/ -O[0-9]* / /' \
-                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
+                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
                 -e 's/ -unroll2 / /' \
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
                 -e 's/ $//'`
   CXXFLAGS=`echo " ${CXXFLAGS} " | \
               sed -e 's/ -O[0-9]* / /' \
-                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
+                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
                   -e 's/ -unroll2 / /' \
                   -e 's/ -ip / /' \
                   -e 's/^ //' \
@@ -810,8 +807,8 @@ pushd percona-xtradb-cluster-galera
 #  RPM_OPT_FLAGS=
 %endif
 
-scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
-scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
+scons %{?_smp_mflags}  revno=%{galera_revision} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
+scons %{?_smp_mflags}  revno=%{galera_revision} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
 popd
 
 
@@ -934,6 +931,9 @@ install -m 644 "%{malloc_lib_source}" \
 rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
 rm -f $RBR%{_bindir}/ps_tokudb_admin
 rm -f $RBR%{_bindir}/ps-admin
+rm -rf $RBR/usr/cmake/coredumper-relwithdebinfo.cmake
+rm -rf $RBR/usr/cmake/coredumper.cmake
+
 
 %if 0%{?systemd}
 rm -rf $RBR%{_sysconfdir}/init.d/mysql
@@ -1664,6 +1664,9 @@ fi
 %if 0%{?rhel} > 6
 %config(noreplace) %{_sysconfdir}/my.cnf
 %endif
+#coredumper
+%attr(755, root, root) %{_includedir}/coredumper/coredumper.h
+%attr(755, root, root) /usr/lib/libcoredumper.a
 
 
 # ----------------------------------------------------------------------------
@@ -1795,7 +1798,7 @@ done
 
 %if 0%{?systemd}
 if [ $1 -eq 0 ];then
-    %systemd_postun
+    /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
 else
     serv=$(/usr/bin/systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
     numint=0
@@ -1818,7 +1821,7 @@ else
             else
                 echo "Not bootstrapping with $(( numint-1 )) nodes already in cluster PC"
                 echo "Restarting with mysql.service in its stead"
-                %systemd_postun
+                /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
                 /usr/bin/systemctl stop mysql@bootstrap.service
                 /usr/bin/systemctl start mysql.service
             fi

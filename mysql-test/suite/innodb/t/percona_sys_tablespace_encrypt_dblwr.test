@@ -1,3 +1,7 @@
+# innodb_parallel_dblwr_encrypt is read only for PXC, 
+# so no way to proceed with this test
+--skip innodb_parallel_dblwr_encrypt is read-only for PXC
+
 --source include/have_innodb.inc
 --source include/have_debug.inc
 --source include/not_embedded.inc

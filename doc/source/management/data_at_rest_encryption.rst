@@ -4,8 +4,9 @@
 Data at Rest Encryption
 =======================
 
- .. contents::
-   :local:
+.. contents::
+
+    :local:
 
 .. _innodb_general_tablespace_encryption:
 
@@ -162,8 +163,8 @@ Keyring (or, more generally, the |PXC| SST process) is backward compatible, as
 in higher version JOINER can join from lower version DONOR, but not vice-versa.
 More details are covered in the `Upgrade and compatibility issues`_ section.
 
-.. note:: Since |PXC| 5.6 didn't have encrypted tablespace, no major
-   upgrade scenario for data-at-rest encryption is possible from it.
+.. note:: Since |PXC| 5.6 does not have encrypted tablespaces, no major
+   upgrade scenario for data-at-rest encryption is possible.
 
 Configuring PXC to use keyring_vault plugin
 ===========================================
@@ -172,11 +173,11 @@ keyring_vault
 -------------
 
 The ``keyring_vault`` plugin is supported starting from PXC 5.7.22. This plugin
-allows storing the master-key in vault-server (vs. local file as in case of
-``keyring_file``). 
+allows storing the master-key in vault-server (vs. local file as in the
+``keyring_file``).
 
-.. warning:: rsync doesn't support ``keyring_vault``, and SST on JOINER is
-   aborted if rsync is used on the node with ``keyring_vault`` configured. 
+.. warning:: rsync does not support ``keyring_vault``, and SST on a joiner is
+   aborted if rsync is used on the node with ``keyring_vault`` configured.
 
 Configuration
 *************
@@ -276,6 +277,7 @@ mix and match keyring plugins. For example, the user has node-1 configured to us
 Upgrade and compatibility issues
 --------------------------------
 
+
 |PXC| server before ``5.7.22`` only supported ``keyring_file`` and the
 dependent |xtrabackup| did not have the concept of transition-key. This makes the
 mix and match of old |PXC| server (pre-5.7.21) using ``keyring_file`` with new
@@ -291,13 +293,41 @@ during transitioning to vault only.
 
 If all the nodes are using |PXC| 5.7.21 and the user would like to use
 ``keyring_vault`` plugin, all the nodes should be upgraded to use |PXC| 5.7.22
-(that’s where vault plugin support was introduced in PXC). Once all nodes are
-configured to use |PXC| 5.7.22, user can switch one node at a time to use
+(that is where vault plugin support was introduced in PXC) or newer. Once all nodes are
+configured to use |PXC| 5.7.22, users can switch one node to use
 ``vault-plugin``.
 
 .. note:: |MySQL| 5.7.21 supports `migration between keystores
 <https://dev.mysql.com/doc/mysql-security-excerpt/5.7/en/keyring-key-migration.html>`_.
 Migration requires a restart.
+=======
+.. note:: |MySQL| 5.7.21 has support for `migration between keystores <https://dev.mysql.com/doc/mysql-security-excerpt/5.7/en/keyring-key-migration.html>`_. Although a restart is required.
+
+|PXC| currently supports data-at-rest encryption for file-per-tablespace and temporary files.
+
+InnoDB tablespace encryption
+============================
+
+|MySQL| supports tablespace encryption, but only for the file-per-table tablespace.
+The user should create a table with a dedicated tablespace, making this
+tablespace encrypted by specifying the appropriate option.
+
+Percona Server starting from :rn:`5.7.21-20` is extending support for
+encrypting `other tablespaces <https://www.percona.com/doc/percona-server/LATEST/management/data_at_rest_encryption.html>`_ too.
+
+|PXC| already supported data-at-rest encryption starting from ``5.7``.
+File-per-tablespace and general tablespace encryption are table/tablespace
+specific features and are enabled on the object level through DDL:
+
+.. code-block:: guess
+
+   CREATE TABLE t1 (c1 INT, PRIMARY KEY pk(c1)) ENCRYPTION=’Y’;
+   CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
+
+DDL statements are replicated in PXC cluster, thus creating an encrypted table or
+tablespace on all the nodes of the cluster.
+
+Temporary file encryption
 
 Migrating Keys Between Keyring Keystores
 ========================================
@@ -313,7 +343,7 @@ takes care of migrating keys for the said server to a new keystore.
 
 Following example illustrates this scenario:
 
-1. Let's say there are 3 |PXC| nodes n1, n2, n3 - all using ``keyring_file``, 
+1. Three |PXC| nodes n1, n2, n3 - all using ``keyring_file``, 
    and n2 should be migrated to use ``keyring_vault``
 2. The user shuts down n2 node.
 3. The user starts the Migration Server (``mysqld`` with a special option).
@@ -368,12 +398,12 @@ the node.
 
 The following example illustrates this scenario:
 
-1. Let's say there are 3 |PXC| nodes n1, n2, n3 - all using ``keyring_file``, 
+1. Three |PXC| nodes n1, n2, n3 - all using ``keyring_file``, 
    and n3 should be migrated to use ``keyring_vault``
-2. User start's Migration Server (``mysqld`` with a special option).
-3. Migration Server copies keys from n3 keyring file and adds them to the vault
+2. User starts the Migration Server (``mysqld`` with a special option).
+3. Migration Server copies keys from the n3 keyring file and adds them to the vault
    server.
-4. User restarts n3 node with the vault parameter, and keys should be available.
+4. The user restarts n3 node with the vault parameter, and keys should be available.
 
 Here is how the migration server output should look like:
 
@@ -421,21 +451,19 @@ Migration server options
 * ``--keyring-migration-destination``: The destination keyring plugin to which
   the migrated keys are to be copied
   
-  .. note:: For an offline migration, no additional key migration options are
+  .. note:: For offline migration, no additional key migration options are
      needed. 
 
 * ``--keyring-migration-host``: The host where the running server is located.
   This host is always the local host.
 
 * ``--keyring-migration-user``, ``--keyring-migration-password``: The username
-  and password for the account to use to connect to the running server.
+  and password for the account used to connect to the running server.
 
-* ``--keyring-migration-port``: For TCP/IP connections, the port number to
-  connect to on the running server.
+* ``--keyring-migration-port``: Used for TCP/IP connections, the running server's port  number used to connect.
 
-* ``--keyring-migration-socket``: For Unix socket file or Windows named pipe
-  connections, the socket file or named pipe to connect to on the running
-  server. 
+* ``--keyring-migration-socket``: Used for Unix socket file or Windows named pipe
+  connections, the running server socket or named pipe used to connect.
 
 Prerequisite for migration:
 
