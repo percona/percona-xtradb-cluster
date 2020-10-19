@@ -122,7 +122,7 @@ class Mts_submode_wsrep : public Mts_submode {
     return NULL;
   }
 
-  ~Mts_submode_wsrep(){};
+  ~Mts_submode_wsrep(){}
 
   int wait_for_workers_to_finish(Relay_log_info *,
                                  MY_ATTRIBUTE((__unused__))

@@ -472,8 +472,11 @@ dberr_t lock_prdt_insert_check_and_lock(
       /* If another transaction has an explicit lock request which locks
       the predicate, waiting or granted, on the successor, the insert
       has to wait.
+      Similar to GAP lock, we do not consider lock from inserts conflicts
+      with each other */
 
-<<<<<<< HEAD
+      const ulint mode = LOCK_X | LOCK_PREDICATE | LOCK_INSERT_INTENTION;
+
 #ifdef WITH_WSREP
   lock_t *const wait_for =
       (lock_t *)lock_prdt_other_has_conflicting(mode, block, prdt, trx);
@@ -481,18 +484,6 @@ dberr_t lock_prdt_insert_check_and_lock(
   const lock_t *wait_for =
       lock_prdt_other_has_conflicting(mode, block, prdt, trx);
 #endif /* WITH_WSREP */
-||||||| 5b5a5d2584a
-  const lock_t *wait_for =
-      lock_prdt_other_has_conflicting(mode, block, prdt, trx);
-=======
-      Similar to GAP lock, we do not consider lock from inserts conflicts
-      with each other */
->>>>>>> Percona-Server-8.0.21-12
-
-      const ulint mode = LOCK_X | LOCK_PREDICATE | LOCK_INSERT_INTENTION;
-
-      const lock_t *wait_for =
-          lock_prdt_other_has_conflicting(mode, block, prdt, trx);
 
       if (wait_for != nullptr) {
         rtr_mbr_t *mbr = prdt_get_mbr_from_prdt(prdt);

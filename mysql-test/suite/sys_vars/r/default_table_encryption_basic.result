@@ -118,22 +118,12 @@ SELECT @@session.default_table_encryption;
 @@session.default_table_encryption
 OFF
 SET SESSION default_table_encryption=ONLINE_TO_KEYRING;
-<<<<<<< HEAD
 ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-||||||| 5b5a5d2584a
-=======
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
->>>>>>> Percona-Server-8.0.21-12
 SELECT @@session.default_table_encryption;
 @@session.default_table_encryption
 OFF
 SET SESSION default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-<<<<<<< HEAD
 ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-||||||| 5b5a5d2584a
-=======
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
->>>>>>> Percona-Server-8.0.21-12
 SELECT @@session.default_table_encryption;
 @@session.default_table_encryption
 OFF
@@ -151,22 +141,12 @@ SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 ON
 SET PERSIST default_table_encryption=ONLINE_TO_KEYRING;
-<<<<<<< HEAD
 ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-||||||| 5b5a5d2584a
-=======
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
->>>>>>> Percona-Server-8.0.21-12
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 ON
 SET PERSIST default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-<<<<<<< HEAD
 ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-||||||| 5b5a5d2584a
-=======
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
->>>>>>> Percona-Server-8.0.21-12
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 ON
@@ -206,22 +186,12 @@ SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 OFF
 SET PERSIST default_table_encryption=ONLINE_TO_KEYRING;
-<<<<<<< HEAD
 ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-||||||| 5b5a5d2584a
-=======
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
->>>>>>> Percona-Server-8.0.21-12
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 OFF
 SET PERSIST default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
-<<<<<<< HEAD
 ERROR 42000: Keyring encryption is not supported in Percona XtraDB Cluster.
-||||||| 5b5a5d2584a
-=======
-ERROR HY000: The default_table_encryption option cannot be changed, keyring plugin is not available
->>>>>>> Percona-Server-8.0.21-12
 SELECT @@global.default_table_encryption;
 @@global.default_table_encryption
 OFF

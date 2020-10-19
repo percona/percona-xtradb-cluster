@@ -285,16 +285,12 @@ my @mysqld_rules = (
   { 'character-sets-dir'                           => \&fix_charset_dir },
   { 'datadir'                                      => \&fix_datadir },
   { 'port'                                         => \&fix_port },
-<<<<<<< HEAD
   # Galera base_port and port used during SST
   { '#galera_port'                                 => \&fix_port },
   # Galera uses base_port + 1 for IST, so we do not use it for things such as SST
   { '#ist_port'                                    => \&fix_port },
   { '#sst_port'                                    => \&fix_port },
-||||||| 5b5a5d2584a
-=======
   { 'admin-port'                                   => \&fix_admin_port },
->>>>>>> Percona-Server-8.0.21-12
   { 'general_log'                                  => 1 },
   { 'general_log_file'                             => \&fix_log },
   { 'loose-mysqlx-port'                            => \&fix_x_port },

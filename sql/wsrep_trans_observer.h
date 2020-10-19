@@ -432,6 +432,8 @@ static inline int wsrep_after_rollback(THD *thd, bool all) {
     WSREP_DEBUG("wsrep_after_rollback stmt transaction rolled back");
     thd->wsrep_stmt_transaction_rolled_back = true;
   }
+  /* resetting aborter thread ID after full rollback */
+  if (wsrep_is_real(thd, all)) thd->wsrep_aborter = 0;
   DBUG_RETURN(
       (wsrep_is_real(thd, all) && wsrep_is_active(thd) &&
        thd->wsrep_cs().transaction().state() != wsrep::transaction::s_aborted)

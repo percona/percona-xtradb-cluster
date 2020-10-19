@@ -81,18 +81,12 @@ BEGIN
     WHERE variable_name NOT IN ('timestamp', 'server_uuid',
                                 'gtid_executed', 'gtid_purged',
                                 'group_replication_group_name',
-<<<<<<< HEAD
                                 'wsrep_start_position',
                                 'auto_increment_offset',
                                 'auto_increment_increment',
                                 'wsrep_data_home_dir',
-                                'keyring_file_data')
-||||||| 5b5a5d2584a
-                                'keyring_file_data')
-=======
                                 'keyring_file_data',
                                 'innodb_thread_sleep_delay')
->>>>>>> Percona-Server-8.0.21-12
   ORDER BY VARIABLE_NAME;
 
   -- Dump all persisted variables, those that may change.

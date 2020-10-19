@@ -932,7 +932,6 @@ The documentation is based on the source files such as:
 #include "sql/sql_udf.h"
 #include "sql/ssl_acceptor_context_iterator.h"
 #include "sql/ssl_acceptor_context_operator.h"
-#include "sql/ssl_acceptor_context_status.h"
 #include "sql/ssl_init_callback.h"
 #include "sql/sys_vars.h"         // fixup_enforce_gtid_consistency_...
 #include "sql/sys_vars_shared.h"  // intern_find_sys_var
@@ -3039,7 +3038,7 @@ static void clean_up_mutexes() {
   mysql_mutex_destroy(&LOCK_global_table_stats);
   mysql_mutex_destroy(&LOCK_global_index_stats);
   mysql_rwlock_destroy(&LOCK_consistent_snapshot);
-<<<<<<< HEAD
+  mysql_mutex_destroy(&LOCK_admin_tls_ctx_options);
 #ifdef WITH_WSREP
   mysql_mutex_destroy(&LOCK_wsrep_ready);
   mysql_cond_destroy(&COND_wsrep_ready);
@@ -3059,10 +3058,6 @@ static void clean_up_mutexes() {
   mysql_mutex_destroy(&LOCK_wsrep_SR_store);
   mysql_mutex_destroy(&LOCK_wsrep_alter_tablespace);
 #endif /* WITH_WSREP */
-||||||| 5b5a5d2584a
-=======
-  mysql_mutex_destroy(&LOCK_admin_tls_ctx_options);
->>>>>>> Percona-Server-8.0.21-12
 }
 
 /****************************************************************************
@@ -4130,7 +4125,14 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused))) {
         // fall through
       case SIGTERM:
       case SIGQUIT:
-<<<<<<< HEAD
+#ifndef __APPLE__  // Mac OS doesn't have sigwaitinfo.
+        if (sig_info.si_pid != getpid())
+          LogErr(SYSTEM_LEVEL, ER_SERVER_SHUTDOWN_INFO, "<via user signal>",
+                 server_version, MYSQL_COMPILATION_COMMENT_SERVER);
+#else
+        LogErr(SYSTEM_LEVEL, ER_SERVER_SHUTDOWN_INFO, "<via user signal>",
+               server_version, MYSQL_COMPILATION_COMMENT_SERVER);
+#endif  // __APPLE__
 #ifdef WITH_WSREP
         if (WSREP_ON) {
           pxc_maint_mode = PXC_MAINT_MODE_SHUTDOWN;
@@ -4142,17 +4144,6 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused))) {
           sleep(pxc_maint_transition_period);
         }
 #endif /* WITH_WSREP */
-||||||| 5b5a5d2584a
-=======
-#ifndef __APPLE__  // Mac OS doesn't have sigwaitinfo.
-        if (sig_info.si_pid != getpid())
-          LogErr(SYSTEM_LEVEL, ER_SERVER_SHUTDOWN_INFO, "<via user signal>",
-                 server_version, MYSQL_COMPILATION_COMMENT_SERVER);
-#else
-        LogErr(SYSTEM_LEVEL, ER_SERVER_SHUTDOWN_INFO, "<via user signal>",
-               server_version, MYSQL_COMPILATION_COMMENT_SERVER);
-#endif  // __APPLE__
->>>>>>> Percona-Server-8.0.21-12
         // Switch to the file log message processing.
         query_logger.set_handlers((log_output_options != LOG_NONE) ? LOG_FILE
                                                                    : LOG_NONE);
@@ -5866,8 +5857,8 @@ static int init_thread_environment() {
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_rotate_binlog_master_key,
                    &LOCK_rotate_binlog_master_key, MY_MUTEX_INIT_FAST);
-<<<<<<< HEAD
-
+  mysql_mutex_init(key_LOCK_admin_tls_ctx_options, &LOCK_admin_tls_ctx_options,
+                   MY_MUTEX_INIT_FAST);
 #ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_ready, &LOCK_wsrep_ready, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_ready, &COND_wsrep_ready);
@@ -5896,11 +5887,6 @@ static int init_thread_environment() {
   mysql_mutex_init(key_LOCK_wsrep_alter_tablespace,
                    &LOCK_wsrep_alter_tablespace, MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
-||||||| 5b5a5d2584a
-=======
-  mysql_mutex_init(key_LOCK_admin_tls_ctx_options, &LOCK_admin_tls_ctx_options,
-                   MY_MUTEX_INIT_FAST);
->>>>>>> Percona-Server-8.0.21-12
   return 0;
 }
 
@@ -6445,7 +6431,12 @@ static int init_server_components() {
     if (pxc_encrypt_cluster_traffic && !opt_initialize) {
       bool bootstrap = (wsrep_new_cluster ||
                         (strcmp(wsrep_cluster_address, "gcomm://") == 0));
-      if (SslAcceptorContext::wsrep_ssl_artifacts_check(bootstrap)) {
+      if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
+                                      opt_use_ssl, &server_main_callback,
+                                      opt_initialize)) {
+        unireg_abort(MYSQLD_ABORT_EXIT);
+      }
+      if (server_main_callback.wsrep_ssl_artifacts_check(bootstrap)) {
         unireg_abort(MYSQLD_ABORT_EXIT);
       }
     }
@@ -7173,35 +7164,15 @@ static int init_server_components() {
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (!wsrep_recovery) {
 #endif /* WITH_WSREP */
-
-    /// @todo: this looks suspicious, revisit this /sven
-    enum_gtid_mode gtid_mode = get_gtid_mode(GTID_MODE_LOCK_NONE);
-
-    if (gtid_mode == GTID_MODE_ON &&
-        _gtid_consistency_mode != GTID_CONSISTENCY_MODE_ON) {
-      LogErr(ERROR_LEVEL,
-             ER_RPL_GTID_MODE_REQUIRES_ENFORCE_GTID_CONSISTENCY_ON);
-      unireg_abort(MYSQLD_ABORT_EXIT);
-    }
-#ifdef WITH_WSREP
-||||||| 5b5a5d2584a
-  /// @todo: this looks suspicious, revisit this /sven
-  enum_gtid_mode gtid_mode = get_gtid_mode(GTID_MODE_LOCK_NONE);
-
-  if (gtid_mode == GTID_MODE_ON &&
-      _gtid_consistency_mode != GTID_CONSISTENCY_MODE_ON) {
-    LogErr(ERROR_LEVEL, ER_RPL_GTID_MODE_REQUIRES_ENFORCE_GTID_CONSISTENCY_ON);
-    unireg_abort(MYSQLD_ABORT_EXIT);
-=======
   if (global_gtid_mode.get() == Gtid_mode::ON &&
       _gtid_consistency_mode != GTID_CONSISTENCY_MODE_ON) {
     LogErr(ERROR_LEVEL, ER_RPL_GTID_MODE_REQUIRES_ENFORCE_GTID_CONSISTENCY_ON);
     unireg_abort(MYSQLD_ABORT_EXIT);
->>>>>>> Percona-Server-8.0.21-12
+  }
+#ifdef WITH_WSREP
   }
 #endif /* WITH_WSREP */
 
@@ -9757,6 +9728,7 @@ static int init_wsrep_thread(THD *thd) {
 #if !defined(DBUG_OFF)
   int simulate_error = 0;
 #endif
+  thd->thd_tx_priority = 1;  
   thd->system_thread = SYSTEM_THREAD_SLAVE_WORKER;
 
   thd->security_context()->skip_grants();
@@ -10263,95 +10235,6 @@ static int show_table_definitions(THD *, SHOW_VAR *var, char *buff) {
   return 0;
 }
 
-/*
-   Functions relying on SSL
-   Note: In the show_ssl_* functions, we need to check if we have a
-         valid vio-object since this isn't always true, specifically
-         when session_status or global_status is requested from
-         inside an Event.
- */
-static int show_ssl_get_version(THD *thd, SHOW_VAR *var, char *) {
-  SSL_handle ssl = thd->get_ssl();
-  var->type = SHOW_CHAR;
-  if (ssl)
-    var->value = const_cast<char *>(SSL_get_version(ssl));
-  else
-    var->value = const_cast<char *>("");
-  return 0;
-}
-
-static int show_ssl_session_reused(THD *thd, SHOW_VAR *var, char *buff) {
-  SSL_handle ssl = thd->get_ssl();
-  var->type = SHOW_LONG;
-  var->value = buff;
-  if (ssl)
-    *((long *)buff) = (long)SSL_session_reused(ssl);
-  else
-    *((long *)buff) = 0;
-  return 0;
-}
-
-static int show_ssl_get_default_timeout(THD *thd, SHOW_VAR *var, char *buff) {
-  SSL_handle ssl = thd->get_ssl();
-  var->type = SHOW_LONG;
-  var->value = buff;
-  if (ssl)
-    *((long *)buff) = (long)SSL_get_default_timeout(ssl);
-  else
-    *((long *)buff) = 0;
-  return 0;
-}
-
-static int show_ssl_get_verify_mode(THD *thd, SHOW_VAR *var, char *buff) {
-  SSL_handle ssl = thd->get_ssl();
-  var->type = SHOW_LONG;
-  var->value = buff;
-  if (ssl)
-    *((long *)buff) = (long)SSL_get_verify_mode(ssl);
-  else
-    *((long *)buff) = 0;
-  return 0;
-}
-
-static int show_ssl_get_verify_depth(THD *thd, SHOW_VAR *var, char *buff) {
-  SSL_handle ssl = thd->get_ssl();
-  var->type = SHOW_LONG;
-  var->value = buff;
-  if (ssl)
-    *((long *)buff) = (long)SSL_get_verify_depth(ssl);
-  else
-    *((long *)buff) = 0;
-  return 0;
-}
-
-static int show_ssl_get_cipher(THD *thd, SHOW_VAR *var, char *) {
-  SSL_handle ssl = thd->get_ssl();
-  var->type = SHOW_CHAR;
-  if (ssl)
-    var->value = const_cast<char *>(SSL_get_cipher(ssl));
-  else
-    var->value = const_cast<char *>("");
-  return 0;
-}
-
-static int show_ssl_get_cipher_list(THD *thd, SHOW_VAR *var, char *buff) {
-  SSL_handle ssl = thd->get_ssl();
-  var->type = SHOW_CHAR;
-  var->value = buff;
-  if (ssl) {
-    int i;
-    const char *p;
-    char *end = buff + SHOW_VAR_FUNC_BUFF_SIZE;
-    for (i = 0; (p = SSL_get_cipher_list(ssl, i)) && buff < end; i++) {
-      buff = my_stpnmov(buff, p, end - buff - 1);
-      *buff++ = ':';
-    }
-    if (i) buff--;
-  }
-  *buff = 0;
-  return 0;
-}
-
 #ifdef HAVE_POOL_OF_THREADS
 static int show_threadpool_idle_threads(THD *thd MY_ATTRIBUTE((unused)),
                                         SHOW_VAR *var, char *buff) {
@@ -10647,94 +10530,6 @@ SHOW_VAR status_vars[] = {
      SHOW_LONGLONG_STATUS, SHOW_SCOPE_ALL},
     {"Sort_scan", (char *)offsetof(System_status_var, filesort_scan_count),
      SHOW_LONGLONG_STATUS, SHOW_SCOPE_ALL},
-    {"Ssl_accept_renegotiates",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_accept_renegotiate,
-     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-    {"Ssl_accepts", (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_accept,
-     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-    {"Ssl_callback_cache_hits",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_cb_hits, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_cipher", (char *)&show_ssl_get_cipher, SHOW_FUNC, SHOW_SCOPE_ALL},
-    {"Ssl_cipher_list", (char *)&show_ssl_get_cipher_list, SHOW_FUNC,
-     SHOW_SCOPE_ALL},
-    {"Ssl_client_connects",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_connect, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_connect_renegotiates",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_connect_renegotiate,
-     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-    {"Ssl_ctx_verify_depth",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_get_verify_depth, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_ctx_verify_mode",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_get_verify_mode, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_default_timeout", (char *)&show_ssl_get_default_timeout, SHOW_FUNC,
-     SHOW_SCOPE_ALL},
-    {"Ssl_finished_accepts",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_accept_good, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_finished_connects",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_connect_good, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_session_cache_hits",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_hits, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_session_cache_misses",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_misses, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_session_cache_mode",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_get_session_cache_mode,
-     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-    {"Ssl_session_cache_overflows",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_cache_full, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_session_cache_size",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_get_cache_size,
-     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-    {"Ssl_session_cache_timeouts",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_timeouts, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_sessions_reused", (char *)&show_ssl_session_reused, SHOW_FUNC,
-     SHOW_SCOPE_ALL},
-    {"Ssl_used_session_cache_entries",
-     (char *)&Ssl_mysql_main_status::show_ssl_ctx_sess_number, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Ssl_verify_depth", (char *)&show_ssl_get_verify_depth, SHOW_FUNC,
-     SHOW_SCOPE_ALL},
-    {"Ssl_verify_mode", (char *)&show_ssl_get_verify_mode, SHOW_FUNC,
-     SHOW_SCOPE_ALL},
-    {"Ssl_version", (char *)&show_ssl_get_version, SHOW_FUNC, SHOW_SCOPE_ALL},
-    {"Ssl_server_not_before",
-     (char *)&Ssl_mysql_main_status::show_ssl_get_server_not_before, SHOW_FUNC,
-     SHOW_SCOPE_ALL},
-    {"Ssl_server_not_after",
-     (char *)&Ssl_mysql_main_status::show_ssl_get_server_not_after, SHOW_FUNC,
-     SHOW_SCOPE_ALL},
-    {"Current_tls_ca", (char *)&Ssl_mysql_main_status::show_ssl_get_ssl_ca,
-     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-    {"Current_tls_capath",
-     (char *)&Ssl_mysql_main_status::show_ssl_get_ssl_capath, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Current_tls_cert", (char *)&Ssl_mysql_main_status::show_ssl_get_ssl_cert,
-     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-    {"Current_tls_key", (char *)&Ssl_mysql_main_status::show_ssl_get_ssl_key,
-     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-    {"Current_tls_version",
-     (char *)&Ssl_mysql_main_status::show_ssl_get_tls_version, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Current_tls_cipher",
-     (char *)&Ssl_mysql_main_status::show_ssl_get_ssl_cipher, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Current_tls_ciphersuites",
-     (char *)&Ssl_mysql_main_status::show_ssl_get_tls_ciphersuites, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
-    {"Current_tls_crl", (char *)&Ssl_mysql_main_status::show_ssl_get_ssl_crl,
-     SHOW_FUNC, SHOW_SCOPE_GLOBAL},
-    {"Current_tls_crlpath",
-     (char *)&Ssl_mysql_main_status::show_ssl_get_ssl_crlpath, SHOW_FUNC,
-     SHOW_SCOPE_GLOBAL},
     {"Rsa_public_key", (char *)&show_rsa_public_key, SHOW_FUNC,
      SHOW_SCOPE_GLOBAL},
     {"Table_locks_immediate", (char *)&locks_immediate, SHOW_LONG,

@@ -247,6 +247,11 @@ static void trx_init(trx_t *trx) {
 
     trx->in_innodb &= TRX_FORCE_ROLLBACK_MASK;
   }
+#ifdef WITH_WSREP
+  query_id_t	query_id = trx->wsrep_killed_by_query;
+  os_compare_and_swap_thread_id(&trx->wsrep_killed_by_query, query_id, 0);
+  trx->wsrep_UK_scan = false;
+#endif /* WITH_WSREP */
 
   trx->flush_observer = nullptr;
 
@@ -388,6 +393,11 @@ struct TrxFactory {
     ut_ad(!trx->abort);
 
     ut_ad(trx->killed_by == 0);
+
+#ifdef WITH_WSREP
+    ut_ad(trx->wsrep_killed_by_query == 0);
+    ut_ad(trx->wsrep_UK_scan == false);
+#endif /* WITH_WSREP */
 
     return (true);
   }
@@ -691,6 +701,10 @@ void trx_disconnect_prepared(trx_t *trx) {
 /** Free a transaction object for MySQL.
 @param[in,out]	trx	transaction */
 void trx_free_for_mysql(trx_t *trx) {
+#ifdef WITH_WSREP
+  /* for sanity, this may not have been cleared yet */
+  trx->wsrep_killed_by_query = 0;
+#endif /* WITH_WSREP */
   trx_disconnect_plain(trx);
   trx_free_for_background(trx);
 }
@@ -1617,11 +1631,31 @@ static bool trx_write_serialisation_history(
     skip updating wsrep co-ordinates. */
   if (wsrep_is_wsrep_xid(trx->xid) && trx->mysql_thd &&
       wsrep_safe_to_persist_xid(trx->mysql_thd)) {
-    trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
+    if (trx->lock.was_chosen_as_wsrep_victim)
+    {
+#ifdef UNIV_DEBUG
+      ib::info() << "trx->lock_was_chosen_as_wsrep_victim is on, "
+                 << "skipping wsrep XID update";
+#endif /* UNIV_DEBUG */
+    }
+    else
+    {
+      trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
+    }
   } else if (trx->wsrep_recover_xid &&
              wsrep_is_wsrep_xid(trx->wsrep_recover_xid)) {
-    trx_sys_update_wsrep_checkpoint(trx->wsrep_recover_xid, sys_header, mtr,
+    if (trx->lock.was_chosen_as_wsrep_victim)
+    {
+#ifdef UNIV_DEBUG
+      ib::info() << "trx->lock_was_chosen_as_wsrep_victim is on, "
+                 << "skipping wsrep XID update";
+#endif /* UNIV_DEBUG */
+    }
+    else
+    {
+      trx_sys_update_wsrep_checkpoint(trx->wsrep_recover_xid, sys_header, mtr,
                                     true);
+    }
   }
 
   trx->wsrep_recover_xid = NULL;
@@ -2693,7 +2727,6 @@ void trx_print_latched(FILE *f, const trx_t *trx, ulint max_query_len) {
                 mem_heap_get_size(trx->lock.lock_heap));
 }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 /** Prints info about a transaction.
  Transaction information may be retrieved without having trx_sys->mutex acquired
@@ -2709,7 +2742,7 @@ void wsrep_trx_print_locking(
   ibool newline;
   const char *op_info;
 
-  ut_ad(lock_mutex_own());
+  ut_ad(locksys::owns_exclusive_global_latch());
   ut_ad(trx->lock.trx_locks.count > 0);
 
   fprintf(f, "TRANSACTION " TRX_ID_FMT, trx->id);
@@ -2807,46 +2840,9 @@ state_ok:
 }
 #endif /* WITH_WSREP */
 
-/** Prints info about a transaction.
- Acquires and releases lock_sys->mutex and trx_sys->mutex. */
-void trx_print(FILE *f,             /*!< in: output stream */
-               const trx_t *trx,    /*!< in: transaction */
-               ulint max_query_len) /*!< in: max query length to print,
-                                    or 0 to use the default max length */
-{
-  ulint n_rec_locks;
-  ulint n_trx_locks;
-  ulint heap_size;
-
-  lock_mutex_enter();
-  n_rec_locks = lock_number_of_rows_locked(&trx->lock);
-  n_trx_locks = UT_LIST_GET_LEN(trx->lock.trx_locks);
-  heap_size = mem_heap_get_size(trx->lock.lock_heap);
-  lock_mutex_exit();
-
-||||||| 5b5a5d2584a
-/** Prints info about a transaction.
- Acquires and releases lock_sys->mutex and trx_sys->mutex. */
-void trx_print(FILE *f,             /*!< in: output stream */
-               const trx_t *trx,    /*!< in: transaction */
-               ulint max_query_len) /*!< in: max query length to print,
-                                    or 0 to use the default max length */
-{
-  ulint n_rec_locks;
-  ulint n_trx_locks;
-  ulint heap_size;
-
-  lock_mutex_enter();
-  n_rec_locks = lock_number_of_rows_locked(&trx->lock);
-  n_trx_locks = UT_LIST_GET_LEN(trx->lock.trx_locks);
-  heap_size = mem_heap_get_size(trx->lock.lock_heap);
-  lock_mutex_exit();
-
-=======
 void trx_print(FILE *f, const trx_t *trx, ulint max_query_len) {
   /* trx_print_latched() requires exclusive global latch */
   locksys::Global_exclusive_latch_guard guard{};
->>>>>>> Percona-Server-8.0.21-12
   mutex_enter(&trx_sys->mutex);
   trx_print_latched(f, trx, max_query_len);
   mutex_exit(&trx_sys->mutex);
@@ -3622,6 +3618,9 @@ void trx_kill_blocking(trx_t *trx) {
   if (hit_list.empty()) {
     DBUG_VOID_RETURN;
   }
+#ifdef WITH_WSREP
+  if (wsrep_debug) ib::info() << "trx_kill_blocking";
+#endif /* WITH_WSREP */
 
   DEBUG_SYNC_C("trx_kill_blocking_enter");
 
@@ -3709,6 +3708,13 @@ void trx_kill_blocking(trx_t *trx) {
       srv_conc_force_enter_innodb(trx);
       trx_mutex_enter(victim_trx);
     }
+
+#ifdef WITH_WSREP
+    victim_trx->in_innodb &= ~TRX_FORCE_ROLLBACK_ASYNC;
+    victim_trx->in_innodb &= ~TRX_FORCE_ROLLBACK;
+    trx_mutex_exit(victim_trx);
+    continue;
+#endif
 
     /* Compare the version to check if the transaction has
     already finished */

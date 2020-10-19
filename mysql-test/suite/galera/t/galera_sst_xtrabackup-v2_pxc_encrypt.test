@@ -6,6 +6,11 @@
 --source include/big_test.inc
 --source include/galera_cluster.inc
 
+--disable_query_log
+call mtr.add_suppression("Failed to initialize TLS for channel");
+call mtr.add_suppression("Failed to set up SSL because");
+--enable_query_log
+
 SELECT 1;
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';

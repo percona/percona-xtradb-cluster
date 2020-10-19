@@ -474,6 +474,7 @@ THD::THD(bool enable_plugins)
       wsrep_gtid_event_buf(NULL),
       wsrep_gtid_event_buf_len(0),
       wsrep_skip_wsrep_GTID(false),
+      wsrep_aborter(0),
       wsrep_skip_wsrep_hton(false),
       wsrep_intermediate_commit(false),
       wsrep_non_replicating_atomic_ddl(false),
@@ -934,6 +935,7 @@ void THD::init(void) {
   m_wsrep_next_trx_id = WSREP_UNDEFINED_TRX_ID;
 
   wsrep_skip_wsrep_GTID = false;
+  wsrep_aborter = 0;
   wsrep_skip_wsrep_hton = false;
   wsrep_intermediate_commit = false;
   wsrep_non_replicating_atomic_ddl = false;
@@ -1069,6 +1071,7 @@ void THD::cleanup(void) {
     wsrep_cs().cleanup();
   }
   wsrep_client_thread = false;
+  wsrep_aborter = 0;
 #endif /* WITH_WSREP */
 
   if (trn_ctx->xid_state()->has_state(XID_STATE::XA_PREPARED)) {

@@ -33,7 +33,7 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli, const void *events_buf,
 
 class wsrep_apply_error {
  public:
-  wsrep_apply_error() : str_(NULL), len_(0){};
+  wsrep_apply_error() : str_(NULL), len_(0){}
   ~wsrep_apply_error() { ::free(str_); }
   /* stores the current THD error info from the diagnostic area. Works only
    * once, subsequent invocations are ignored in order to preserve the original

@@ -181,14 +181,10 @@ enum options_client {
   OPT_MYSQL_BINARY_AS_HEX,
   OPT_START_SQL_FILE,
   OPT_FINISH_SQL_FILE,
-<<<<<<< HEAD
+  OPT_LOAD_DATA_LOCAL_DIR,
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif /* WITH_WSREP */
-||||||| 5b5a5d2584a
-=======
-  OPT_LOAD_DATA_LOCAL_DIR,
->>>>>>> Percona-Server-8.0.21-12
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };

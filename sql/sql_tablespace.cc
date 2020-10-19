@@ -1527,14 +1527,11 @@ bool Sql_cmd_create_undo_tablespace::execute(THD *thd) {
     return true;
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
     return true;
 #endif /* WITH_WSREP */
 
-||||||| 5b5a5d2584a
-=======
   // Acquire Percona's LOCK TABLES FOR BACKUP lock
   if (thd->backup_tables_lock.abort_if_acquired() ||
       thd->backup_tables_lock.acquire_protection(
@@ -1542,7 +1539,6 @@ bool Sql_cmd_create_undo_tablespace::execute(THD *thd) {
     return true;
   }
 
->>>>>>> Percona-Server-8.0.21-12
   handlerton *hton = nullptr;
   if (get_stmt_hton(thd, m_options->engine_name, m_undo_tablespace_name.str,
                     "CREATE UNDO TABLESPACE", &hton)) {
@@ -1690,14 +1686,11 @@ bool Sql_cmd_alter_undo_tablespace::execute(THD *thd) {
     return true;
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
     return true;
 #endif /* WITH_WSREP */
 
-||||||| 5b5a5d2584a
-=======
   // Acquire Percona's LOCK TABLES FOR BACKUP lock
   if (thd->backup_tables_lock.abort_if_acquired() ||
       thd->backup_tables_lock.acquire_protection(
@@ -1705,7 +1698,6 @@ bool Sql_cmd_alter_undo_tablespace::execute(THD *thd) {
     return true;
   }
 
->>>>>>> Percona-Server-8.0.21-12
   handlerton *hton = nullptr;
   if (get_stmt_hton(thd, m_options->engine_name, m_undo_tablespace_name.str,
                     "ALTER UNDO TABLESPACE", &hton)) {
@@ -1797,14 +1789,11 @@ bool Sql_cmd_drop_undo_tablespace::execute(THD *thd) {
     return true;
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
     return true;
 #endif /* WITH_WSREP */
 
-||||||| 5b5a5d2584a
-=======
   // Acquire Percona's LOCK TABLES FOR BACKUP lock
   if (thd->backup_tables_lock.abort_if_acquired() ||
       thd->backup_tables_lock.acquire_protection(
@@ -1812,7 +1801,6 @@ bool Sql_cmd_drop_undo_tablespace::execute(THD *thd) {
     return true;
   }
 
->>>>>>> Percona-Server-8.0.21-12
   handlerton *hton = nullptr;
   if (get_stmt_hton(thd, m_options->engine_name, m_undo_tablespace_name.str,
                     "DROP UNDO TABLESPACE", &hton)) {

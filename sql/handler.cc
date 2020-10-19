@@ -979,6 +979,13 @@ static bool kill_handlerton(THD *thd, plugin_ref plugin, void *) {
 }
 
 void ha_kill_connection(THD *thd) {
+#ifdef WITH_WSREP
+  if (thd->wsrep_aborter)
+  {
+    WSREP_DEBUG("thd is already aborted in innodb: %u", thd->wsrep_aborter);
+    return;
+  }
+#endif /* WITH_WSREP */
   plugin_foreach(thd, kill_handlerton, MYSQL_STORAGE_ENGINE_PLUGIN, nullptr);
 }
 
@@ -2177,7 +2184,7 @@ int ha_rollback_low(THD *thd, bool all) {
 
 #ifdef WITH_WSREP
   if (thd->is_error()) {
-    WSREP_DEBUG("ha_rollback_trans(%u, %s) rolled back: %s: %s;",
+    WSREP_DEBUG("ha_rollback_trans(%u, %s) rolled back: %s: XX%s;",
                 thd->thread_id(), all ? "TRUE" : "FALSE", WSREP_QUERY(thd),
                 thd->get_stmt_da()->message_text());
   }

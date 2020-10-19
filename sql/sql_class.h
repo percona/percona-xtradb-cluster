@@ -2952,6 +2952,9 @@ class THD : public MDL_context_owner,
 
   bool wsrep_skip_wsrep_GTID;
 
+  /* thread who has started kill for this THD */
+  my_thread_id              wsrep_aborter;
+
   /**
     Skip registering wsrep_hton handler for a DDL statement that got skipped
     from TOI replication probably due to sql_log_bin=0.
@@ -3177,12 +3180,6 @@ class THD : public MDL_context_owner,
     ~Permanent_transform() { m_thd->m_permanent_transform = m_old_value; }
   };
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  explicit THD(bool enable_plugins = true, bool is_applier = false);
-#else
-||||||| 5b5a5d2584a
-=======
   /*
     Audit API events are generated, when this flag is true. The flag
     is initially true, but it can be set false in some cases, e.g.
@@ -3191,7 +3188,9 @@ class THD : public MDL_context_owner,
   */
   bool m_audited;
 
->>>>>>> Percona-Server-8.0.21-12
+#ifdef WITH_WSREP
+  explicit THD(bool enable_plugins = true, bool is_applier = false);
+#else
   explicit THD(bool enable_plugins = true);
 #endif /* WITH_WSREP */
 

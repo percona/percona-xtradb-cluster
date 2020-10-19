@@ -1741,7 +1741,7 @@ class Item_func_wsrep_last_written_gtid : public Item_str_func {
     maybe_null = true;
     return false;
   }
-  const char *func_name() const { return "wsrep_last_written_gtid"; }
+  const char *func_name() const override { return "wsrep_last_written_gtid"; }
 };
 
 class Item_func_wsrep_last_seen_gtid : public Item_str_func {
@@ -1757,7 +1757,7 @@ class Item_func_wsrep_last_seen_gtid : public Item_str_func {
     maybe_null = true;
     return false;
   }
-  const char *func_name() const { return "wsrep_last_seen_gtid"; }
+  const char *func_name() const override { return "wsrep_last_seen_gtid"; }
 };
 
 class Item_func_wsrep_sync_wait_upto_gtid : public Item_bool_func {

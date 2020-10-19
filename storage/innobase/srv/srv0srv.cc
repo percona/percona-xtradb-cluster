@@ -1268,7 +1268,7 @@ static void srv_init(void) {
   always set the event here regardless of innobase_disallow_writes.
   That flag will always be 0 at this point because it isn't settable
   via my.cnf or command line arg. */
-  srv_allow_writes_event = os_event_create("allow_write_events");
+  srv_allow_writes_event = os_event_create();
   os_event_set(srv_allow_writes_event);
 #endif /* WITH_WSREP */
 

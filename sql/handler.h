@@ -2642,53 +2642,6 @@ struct handlerton {
 /** Engine supports table or tablespace encryption . */
 #define HTON_SUPPORTS_TABLE_ENCRYPTION (1 << 16)
 
-<<<<<<< HEAD
-/**
-   Set if the storage engine supports 'online' backups. This means that there
-   exists a way to create a consistent copy of its tables without blocking
-   updates to them. If so, statements that update such tables will not be
-   affected by an active LOCK TABLES FOR BACKUP.
-*/
-#define HTON_SUPPORTS_ONLINE_BACKUPS (1 << 17)
-
-/**
-  Engine supports secondary clustered keys.
-*/
-#define HTON_SUPPORTS_CLUSTERED_KEYS (1 << 18)
-
-/**
-  Engine supports compressed columns.
-*/
-#define HTON_SUPPORTS_COMPRESSED_COLUMNS (1 << 19)
-
-#ifdef WITH_WSREP
-/**
-  Engine support replication through wsrep-replication provider plugin
-*/
-#define HTON_WSREP_REPLICATION (1 << 18)
-#endif /* WITH_WSREP */
-
-||||||| 5b5a5d2584a
-/**
-   Set if the storage engine supports 'online' backups. This means that there
-   exists a way to create a consistent copy of its tables without blocking
-   updates to them. If so, statements that update such tables will not be
-   affected by an active LOCK TABLES FOR BACKUP.
-*/
-#define HTON_SUPPORTS_ONLINE_BACKUPS (1 << 17)
-
-/**
-  Engine supports secondary clustered keys.
-*/
-#define HTON_SUPPORTS_CLUSTERED_KEYS (1 << 18)
-
-/**
-  Engine supports compressed columns.
-*/
-#define HTON_SUPPORTS_COMPRESSED_COLUMNS (1 << 19)
-
-=======
->>>>>>> Percona-Server-8.0.21-12
 struct TABLE_STATS {
   ulonglong rows_read, rows_changed;
   ulonglong rows_changed_x_indexes;
@@ -2724,6 +2677,13 @@ constexpr const decltype(handlerton::flags) HTON_SUPPORTS_ENGINE_ATTRIBUTE{
   Engine supports compressed columns.
 */
 #define HTON_SUPPORTS_COMPRESSED_COLUMNS (1 << 20)
+
+#ifdef WITH_WSREP
+/**
+  Engine support replication through wsrep-replication provider plugin
+*/
+#define HTON_WSREP_REPLICATION (1 << 21)
+#endif /* WITH_WSREP */
 
 inline bool ddl_is_atomic(const handlerton *hton) {
   return (hton->flags & HTON_SUPPORTS_ATOMIC_DDL) != 0;

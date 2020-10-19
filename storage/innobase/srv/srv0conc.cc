@@ -132,7 +132,7 @@ static dberr_t srv_conc_enter_innodb_with_atomics(
     if (wsrep_on(trx->mysql_thd) && wsrep_thd_is_aborting(trx->mysql_thd)) {
       WSREP_DEBUG("srv_conc_enter due to MUST_ABORT");
       srv_conc_force_enter_innodb(trx);
-      return;
+      return DB_SUCCESS;
     }
 #endif /* WITH_WSREP */
 

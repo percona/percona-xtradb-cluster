@@ -55,17 +55,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 enum status_severity { STATUS_VERBOSE, STATUS_INFO, STATUS_ERR };
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 extern bool wsrep_recovery;
 #endif /* WITH_WSREP */
 
-#define SHUTTING_DOWN() (srv_shutdown_state.load() != SRV_SHUTDOWN_NONE)
-||||||| 5b5a5d2584a
-#define SHUTTING_DOWN() (srv_shutdown_state.load() != SRV_SHUTDOWN_NONE)
-=======
 #define SHUTTING_DOWN() (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP)
->>>>>>> Percona-Server-8.0.21-12
 
 /* Flags that tell the buffer pool dump/load thread which action should it
 take after being waked up. */

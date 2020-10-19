@@ -10,8 +10,6 @@ SELECT @@session.wsrep_replicate_myisam;
 0
 # Create MyISAM table which should be replicated due to enforce_storage_engine.
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=MyISAM;
-Warnings:
-Note	1266	Using storage engine InnoDB for table 't1'
 # The next step should crash it without the fix
 INSERT INTO t1 values (1);
 # The table should exist and be InnoDB.
@@ -53,8 +51,6 @@ f1
 # Make sure wsrep_replicate_myisam doesn't interfere
 SET @@session.wsrep_replicate_myisam = ON;
 CREATE TABLE t4 (f1 INTEGER PRIMARY KEY) ENGINE=MyISAM;
-Warnings:
-Note	1266	Using storage engine InnoDB for table 't4'
 CREATE TABLE t5 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 CREATE TABLE t6 (f1 INTEGER PRIMARY KEY);
 INSERT INTO t4 values (1);

@@ -88,8 +88,21 @@ class Ssl_init_callback_server_main final : public Ssl_init_callback {
 
   virtual ~Ssl_init_callback_server_main() {}
 
+
+#ifdef WITH_WSREP
+  bool wsrep_ssl_artifacts_check(bool bootstrapping_node);
+  void populate_wsrep_ssl_options(char *buff, unsigned int sz);
+  bool is_wsrep_context_initialized() {
+    return wsrep_context_initialized;
+  }
+#endif /* WITH_WSREP */
+
  private:
   ssl_artifacts_status auto_detect_ssl();
+
+#ifdef WITH_WSREP
+  bool wsrep_context_initialized;
+#endif /* WITH_WSREP */
 };
 
 /**

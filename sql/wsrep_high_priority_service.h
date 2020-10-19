@@ -69,6 +69,7 @@ class Wsrep_high_priority_service : public wsrep::high_priority_service,
     // my_hrtime_t user_time;
     longlong row_count_func;
     bool wsrep_applier;
+    int  thd_tx_priority;
   } m_shadow;
 };
 

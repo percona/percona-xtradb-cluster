@@ -80,6 +80,9 @@ extern "C" bool wsrep_thd_is_local(const THD *thd);
 /* todo: rename to is_high_priority() */
 extern "C" bool wsrep_thd_is_applying(const THD *thd);
 
+/* set wsrep_aborter for the target THD */
+extern "C" bool wsrep_thd_set_wsrep_aborter(THD* bf_thd, THD* victim_thd);
+
 /* Return true if thd is in TOI mode */
 extern "C" bool wsrep_thd_is_toi(const THD *thd);
 

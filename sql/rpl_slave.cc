@@ -484,7 +484,8 @@ int init_slave() {
     LogErr(ERROR_LEVEL,
            ER_RPL_SLAVE_FAILED_TO_CREATE_OR_RECOVER_INFO_REPOSITORIES);
 
-<<<<<<< HEAD
+  group_replication_cleanup_after_clone();
+
 #ifdef WITH_WSREP
   /*
      for only wsrep, create active_mi, for async slave restart purpose
@@ -492,11 +493,6 @@ int init_slave() {
   active_mi = channel_map.get_default_channel_mi();
 #endif /* WITH_WSREP */
 
-||||||| 5b5a5d2584a
-=======
-  group_replication_cleanup_after_clone();
-
->>>>>>> Percona-Server-8.0.21-12
 #ifndef DBUG_OFF
   /* @todo: Print it for all the channels */
   {

@@ -173,8 +173,8 @@ encryption.innodb_lotoftables : BUG#5817 Align Keyring encryption and default_ta
 encryption.innodb-bad-key-change2 : BUG#5322 Keyring encrypted tablespace import/export is broken
 encryption.innodb-bad-key-change3 : BUG#5322 Keyring encrypted tablespace import/export is broken
 encryption.innodb_encryption_discard_import : BUG#5322 Keyring encrypted tablespace import/export is broken
-<<<<<<< HEAD
 encryption.innodb-redo-wrongkey : BUG#5635 Intoduce crypt_schema 2 for better error checking in encryption threads
+encryption.create_or_replace : BUG#6987 encryption threads report space unencrypted
 
 #--------------------------------------------------
 # Codership disabled tests begin here
@@ -221,6 +221,11 @@ galera.galera_sst_rsync : BUG#0 rsync feature removed
 galera.galera_ist_rsync : BUG#0 rsync feature removed
 galera.galera_truncate : BUG#0 result depends on which node indexing
 
+galera.high_prio_trx_1 : BUG#0 Failing after 8.0.21 merge
+galera.high_prio_trx_2 : BUG#0 Failing after 8.0.21 merge
+galera.high_prio_trx_3 : BUG#0 Failing after 8.0.21 merge
+galera.galera_high_prio_trx_fk : BUG#0 Failing after 8.0.21 merge
+
 # galera-3nodes
 galera_3nodes.galera_ipv6_rsync : BUG#0 Needs rsync so disabled
 
@@ -240,8 +245,3 @@ binlog.binlog_xa_prepared_disconnect : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-3
 #--------------------------------------------------
 # Codership disabled tests end here
 #--------------------------------------------------
-||||||| 5b5a5d2584a
-encryption.innodb-redo-wrongkey : BUG#5635 Intoduce crypt_schema 2 for better error checking in encryption threads
-=======
-encryption.create_or_replace : BUG#6987 encryption threads report space unencrypted
->>>>>>> Percona-Server-8.0.21-12

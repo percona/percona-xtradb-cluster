@@ -20,7 +20,7 @@
 #include "sql/key_spec.h"
 #include "sql/sql_alter.h"
 #include "sql/sql_lex.h"
-#include "sql/ssl_acceptor_context.h"
+#include "sql/ssl_init_callback.h"
 #include "sql/thd_raii.h"
 #include "sql_base.h"
 #include "sql_class.h"
@@ -1035,7 +1035,7 @@ int wsrep_init() {
   char buffer[4096];
 
   if (pxc_encrypt_cluster_traffic) {
-    if (!SslAcceptorContext::is_wsrep_context_initialized()) {
+    if (!server_main_callback.is_wsrep_context_initialized()) {
       WSREP_ERROR(
           "ssl-ca, ssl-cert, and ssl-key must all be defined"
           " to use encrypted mode traffic. Unable to configure SSL."
@@ -1044,7 +1044,8 @@ int wsrep_init() {
     }
 
     char ssl_opts[4096];
-    SslAcceptorContext::populate_wsrep_ssl_options(ssl_opts, sizeof(ssl_opts));
+    // TODO
+    server_main_callback.populate_wsrep_ssl_options(ssl_opts, sizeof(ssl_opts));
     snprintf(buffer, sizeof(buffer), "%s%s%s",
              provider_options ? provider_options : "",
              ((provider_options && *provider_options) ? ";" : ""), ssl_opts);

@@ -114,6 +114,8 @@ Wsrep_high_priority_service::Wsrep_high_priority_service(THD *thd)
   m_shadow.user_time = thd->user_time;
   m_shadow.row_count_func = thd->get_row_count_func();
   m_shadow.wsrep_applier = thd->wsrep_applier;
+  m_shadow.thd_tx_priority = thd->thd_tx_priority;
+  thd->thd_tx_priority = 1;
 
   /* Disable general logging on applier threads */
   thd->variables.option_bits |= OPTION_LOG_OFF;
@@ -167,6 +169,7 @@ Wsrep_high_priority_service::~Wsrep_high_priority_service() {
   LEX_CSTRING db_str = {m_shadow.db, m_shadow.db_length};
   thd->reset_db(db_str);
   thd->user_time = m_shadow.user_time;
+  thd->thd_tx_priority = m_shadow.thd_tx_priority;
 
   if (thd->wsrep_rli) {
     delete thd->wsrep_rli->current_mts_submode;

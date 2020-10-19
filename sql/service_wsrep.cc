@@ -164,6 +164,16 @@ extern "C" bool wsrep_thd_bf_abort(const THD *bf_thd, THD *victim_thd,
    */
   if ((ret || !wsrep_on(victim_thd)) && signal) {
     mysql_mutex_lock(&victim_thd->LOCK_thd_data);
+
+    if (victim_thd->wsrep_aborter && victim_thd->wsrep_aborter != bf_thd->thread_id())
+    {
+      WSREP_DEBUG("victim is killed already by %u, skipping awake",
+                  victim_thd->wsrep_aborter);
+      mysql_mutex_unlock(&victim_thd->LOCK_thd_data);
+      return false;
+    }
+    victim_thd->wsrep_aborter = bf_thd->thread_id();
+
     victim_thd->awake(THD::KILL_QUERY);
     mysql_mutex_unlock(&victim_thd->LOCK_thd_data);
   }
@@ -246,6 +256,24 @@ extern "C" void wsrep_commit_ordered(THD *thd) {
       !wsrep_commit_will_write_binlog(thd)) {
     thd->wsrep_cs().ordered_commit();
   }
+}
+
+extern "C" bool wsrep_thd_set_wsrep_aborter(THD *bf_thd, THD *victim_thd)
+{
+  if (!bf_thd)
+  {
+    victim_thd->wsrep_aborter = 0;
+    WSREP_DEBUG("wsrep_thd_set_wsrep_aborter resetting wsrep_aborter");
+    return false;
+  }
+  if (victim_thd->wsrep_aborter && victim_thd->wsrep_aborter != bf_thd->thread_id())
+  {
+    return true;
+  }
+  victim_thd->wsrep_aborter = bf_thd->thread_id();
+  WSREP_DEBUG("wsrep_thd_set_wsrep_aborter setting wsrep_aborter %u",
+              victim_thd->wsrep_aborter);
+  return false;
 }
 
 extern "C" bool wsrep_consistency_check(const MYSQL_THD thd) {

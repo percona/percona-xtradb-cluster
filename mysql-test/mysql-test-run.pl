@@ -245,34 +245,6 @@ our $opt_xml_report;
 #
 # Suites run by default (i.e. when invoking ./mtr without parameters)
 #
-<<<<<<< HEAD
-our $DEFAULT_SUITES = 
-  "auth_sec,binlog_gtid,binlog_nogtid,clone,collations,connection_control,encryption,federated,funcs_2,gcol,sysschema,gis,information_schema,innodb,innodb_fts,innodb_gis,innodb_undo,innodb_zip,json,main,opt_trace,parts,perfschema,query_rewrite_plugins,rpl,rpl_gtid,rpl_nogtid,secondary_engine,service_status_var_registration,service_sys_var_registration,service_udf_registration,sys_vars,binlog,test_service_sql_api,test_services,x,"
-  # Percona suites
-  ."audit_log,binlog_57_decryption,percona-pam-for-mysql,"
-  ."data_masking,"
-  ."keyring_vault,"
-  ."rocksdb,rocksdb_rpl,rocksdb_sys_vars,"
-  ."rpl_encryption,"
-  ."tokudb,tokudb_add_index,tokudb_alter_table,tokudb_bugs,tokudb_parts,"
-  ."tokudb_perfschema,tokudb_rpl,"
-  ."galera,galera_3nodes,galera_sr,galera_3nodes,sr,"
-  # MySQL suites tested by Percona by default
-  ."audit_null,engines/iuds,engines/funcs,funcs_1,group_replication,interactive_utilities,jp,stress";
-||||||| 5b5a5d2584a
-our $DEFAULT_SUITES = 
-  "auth_sec,binlog_gtid,binlog_nogtid,clone,collations,connection_control,encryption,federated,funcs_2,gcol,sysschema,gis,information_schema,innodb,innodb_fts,innodb_gis,innodb_undo,innodb_zip,json,main,opt_trace,parts,perfschema,query_rewrite_plugins,rpl,rpl_gtid,rpl_nogtid,secondary_engine,service_status_var_registration,service_sys_var_registration,service_udf_registration,sys_vars,binlog,test_service_sql_api,test_services,x,"
-  # Percona suites
-  ."audit_log,binlog_57_decryption,percona-pam-for-mysql,"
-  ."data_masking,"
-  ."keyring_vault,"
-  ."rocksdb,rocksdb_rpl,rocksdb_sys_vars,"
-  ."rpl_encryption,"
-  ."tokudb,tokudb_add_index,tokudb_alter_table,tokudb_bugs,tokudb_parts,"
-  ."tokudb_perfschema,tokudb_rpl,"
-  # MySQL suites tested by Percona by default
-  ."audit_null,engines/iuds,engines/funcs,funcs_1,group_replication,interactive_utilities,jp,stress";
-=======
 our @DEFAULT_SUITES = qw(
   auth_sec
   binlog
@@ -337,10 +309,14 @@ our @DEFAULT_SUITES = qw(
   interactive_utilities
   jp
   stress
+  galera
+  galera_3nodes
+  galera_sr
+  galera_3nodes
+  sr
   );
 
 our $DEFAULT_SUITES = join ',', @DEFAULT_SUITES;
->>>>>>> Percona-Server-8.0.21-12
 
 # End of list of default suites
 
@@ -1685,12 +1661,8 @@ sub command_line_setup {
     'build-thread|mtr-build-thread=i' => \$opt_build_thread,
     'mysqlx-port=i'                   => \$opt_mysqlx_baseport,
     'port-base|mtr-port-base=i'       => \$opt_port_base,
-<<<<<<< HEAD
     'port-group-size=s'               => \$opt_port_group_size,
-||||||| 5b5a5d2584a
-=======
     'port-exclude|mtr-port-exclude=s' => \$opt_port_exclude,
->>>>>>> Percona-Server-8.0.21-12
 
     # Test case authoring
     'check-testcases!' => \$opt_check_testcases,
@@ -5208,19 +5180,12 @@ sub run_testcase ($) {
   # Maintain a queue to keep track of server processes which have
   # died expectedly in order to wait for them to be restarted.
   my @waiting_procs = ();
-<<<<<<< HEAD
   my $keep_waiting_proc = 0;
   my $print_timeout     = start_timer($print_freq * 60);
-||||||| 5b5a5d2584a
-  my $print_timeout     = start_timer($print_freq * 60);
-=======
-  my $print_timeout = start_timer($print_freq * 60);
->>>>>>> Percona-Server-8.0.21-12
 
   my @procs;
   while (1) {
-<<<<<<< HEAD
-    if (!@procs && $test_timeout > $print_timeout)
+if (!@procs && $test_timeout > $print_timeout)
     {
       my $timer = $ENV{'MTR_MANUAL_DEBUG'} ? start_timer(2) : $print_timeout;   
       my $proc = My::SafeProcess->wait_any_timeout($print_timeout);
@@ -5238,81 +5203,6 @@ sub run_testcase ($) {
             # Keep waiting if it returned 2, if 1 don't wait or stop waiting.   
             $keep_waiting_proc = 0     if $check_crash == 1;
             $keep_waiting_proc = $proc if $check_crash == 2;
-||||||| 5b5a5d2584a
-    my $proc;
-    if (scalar(@waiting_procs)) {
-      # Any other process exited?
-      $proc = My::SafeProcess->check_any();
-      if ($proc) {
-        mtr_verbose("Found exited process $proc");
-
-        # Insert the process into waiting queue and pick an other
-        # process which needs to be checked. This is done to avoid
-        # starvation.
-        unshift @waiting_procs, $proc;
-        $proc = pop @waiting_procs;
-      } else {
-        # Pick a process from the waiting queue
-        $proc = pop @waiting_procs;
-
-        # Also check if timer has expired, if so cancel waiting
-        if (has_expired($test_timeout)) {
-          $proc = undef;
-          @waiting_procs = ();
-        }
-      }
-    }
-
-    # Check for test timeout if the waiting queue is empty and no
-    # process needs to be checked if it has been restarted.
-    if (not scalar(@waiting_procs) and not defined $proc) {
-      if ($test_timeout > $print_timeout) {
-        my $timer = $ENV{'MTR_MANUAL_DEBUG'} ? start_timer(2) : $print_timeout;
-        $proc = My::SafeProcess->wait_any_timeout($timer);
-        if ($proc->{timeout}) {
-          if (has_expired($print_timeout)) {
-            # Print out that the test is still on
-            mtr_print("Test still running: $tinfo->{name}");
-            # Reset the timer
-            $print_timeout = start_timer($print_freq * 60);
-=======
-    my $proc;
-    if (scalar(@waiting_procs)) {
-      # Any other process exited?
-      $proc = My::SafeProcess->check_any();
-      if ($proc) {
-        mtr_verbose("Found exited process $proc");
-
-        # Insert the process into waiting queue and pick an other
-        # process which needs to be checked. This is done to avoid
-        # starvation.
-        unshift @waiting_procs, $proc;
-        $proc = pop @waiting_procs;
-      } else {
-        # Pick a process from the waiting queue
-        $proc = pop @waiting_procs;
-
-        # Also check if timer has expired, if so cancel waiting
-        if (has_expired($test_timeout)) {
-          $proc          = undef;
-          @waiting_procs = ();
-        }
-      }
-    }
-
-    # Check for test timeout if the waiting queue is empty and no
-    # process needs to be checked if it has been restarted.
-    if (not scalar(@waiting_procs) and not defined $proc) {
-      if ($test_timeout > $print_timeout) {
-        my $timer = $ENV{'MTR_MANUAL_DEBUG'} ? start_timer(2) : $print_timeout;
-        $proc = My::SafeProcess->wait_any_timeout($timer);
-        if ($proc->{timeout}) {
-          if (has_expired($print_timeout)) {
-            # Print out that the test is still on
-            mtr_print("Test still running: $tinfo->{name}");
-            # Reset the timer
-            $print_timeout = start_timer($print_freq * 60);
->>>>>>> Percona-Server-8.0.21-12
             next;
           }
         }
@@ -6119,35 +6009,6 @@ sub check_expected_crash_and_restart($$) {
         } else {
           delete $mysqld->{'restart_opts'};
         }
-
-<<<<<<< HEAD
-||||||| 5b5a5d2584a
-        # Attempt to remove the .expect file. If it fails in
-        # windows, retry removal after a sleep.
-        my $retry = 1;
-        while (
-          unlink($expect_file) == 0 &&
-          $! == 13 &&    # Error = 13, Permission denied
-          IS_WINDOWS && $retry-- >= 0
-        ) {
-          # Permission denied to unlink.
-          # Race condition seen on windows. Wait and retry.
-          mtr_milli_sleep(1000);
-        }
-=======
-        # Attempt to remove the .expect file. If it fails in
-        # windows, retry removal after a sleep.
-        my $retry = 1;
-        while (
-          unlink($expect_file) == 0 &&
-          $! == 13 &&    # Error = 13, Permission denied
-          IS_WINDOWS && $retry-- >= 0
-          ) {
-          # Permission denied to unlink.
-          # Race condition seen on windows. Wait and retry.
-          mtr_milli_sleep(1000);
-        }
->>>>>>> Percona-Server-8.0.21-12
 
        if ($try == 1) {
           my $handle;
@@ -8033,13 +7894,9 @@ Options that specify ports
                         a build thread id that is unique to current host.
   mtr-build-thread=#    Specify unique number to calculate port number(s) from.
   mtr-port-base=#       Base for port numbers.
-<<<<<<< HEAD
   port-group-size=N     Reserve groups of TCP ports of size N for each MTR thread
-||||||| 5b5a5d2584a
-=======
   mtr-port-exclude=#-#  Specify the range of ports to exclude when searching
                         for available port ranges to use.
->>>>>>> Percona-Server-8.0.21-12
   mysqlx-port           Specify the port number to be used for mysqlxplugin.
                         Can be set in environment variable MYSQLXPLUGIN_PORT.
                         If not specified will create its own ports. This option

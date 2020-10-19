@@ -2578,7 +2578,7 @@ dispatch_end:
   /*
     BF aborted before sending response back to client
   */
-  if (thd->killed == KILL_QUERY) {
+  if (thd->killed == THD::KILL_QUERY) {
     WSREP_DEBUG("THD is killed at dispatch_end");
   }
   wsrep_after_command_before_result(thd);
@@ -3632,7 +3632,12 @@ int mysql_execute_command(THD *thd, bool first_level) {
     goto error;
   }
 
-<<<<<<< HEAD
+  DBUG_EXECUTE_IF(
+      "force_rollback_in_slave_on_transactional_ddl_commit",
+      if (thd->m_transactional_ddl.inited() &&
+          thd->lex->sql_command == SQLCOM_COMMIT) {
+        lex->sql_command = SQLCOM_ROLLBACK;
+      });
 #ifdef WITH_WSREP
   /*
     Always start a new transaction for a wsrep THD unless the
@@ -3657,16 +3662,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
   }
 #endif /* WITH_WSREP */
 
-||||||| 5b5a5d2584a
-=======
-  DBUG_EXECUTE_IF(
-      "force_rollback_in_slave_on_transactional_ddl_commit",
-      if (thd->m_transactional_ddl.inited() &&
-          thd->lex->sql_command == SQLCOM_COMMIT) {
-        lex->sql_command = SQLCOM_ROLLBACK;
-      });
-
->>>>>>> Percona-Server-8.0.21-12
   /*
     We do not flag "is DML" (TX_STMT_DML) here as replication expects us to
     test for LOCK TABLE etc. first. To rephrase, we try not to set TX_STMT_DML
@@ -4865,7 +4860,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
       if (first_table && lex->type & REFRESH_READ_LOCK) {
 #ifdef WITH_WSREP
         if (pxc_strict_mode_lock_check(thd)) goto error;
-        bool already_paused;
+        bool already_paused = false;
 #endif /* WITH_WSREP */
 
         /*
@@ -4898,7 +4893,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
       } else if (first_table && lex->type & REFRESH_FOR_EXPORT) {
 #ifdef WITH_WSREP
         if (pxc_strict_mode_lock_check(thd)) goto error;
-        bool already_paused;
+        bool already_paused = false;
 #endif /* WITH_WSREP */
         /*
            Do not allow FLUSH TABLES ... FOR EXPORT under an active LOCK TABLES
@@ -5519,8 +5514,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
     case SQLCOM_EXPLAIN_OTHER:
     case SQLCOM_RESTART_SERVER:
     case SQLCOM_CREATE_SRS:
-<<<<<<< HEAD
-    case SQLCOM_DROP_SRS:
+    case SQLCOM_DROP_SRS: {
 
 #ifdef WITH_WSREP
 
@@ -5558,12 +5552,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       }
 #endif /* WITH_WSREP */
 
-||||||| 5b5a5d2584a
-    case SQLCOM_DROP_SRS:
-
-=======
-    case SQLCOM_DROP_SRS: {
->>>>>>> Percona-Server-8.0.21-12
       DBUG_ASSERT(lex->m_sql_cmd != nullptr);
 
       Enable_derived_merge_guard derived_merge_guard(
@@ -7711,8 +7699,25 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query) {
         if (tmp->is_system_user() && !thd->is_system_user()) {
           error = ER_KILL_DENIED_ERROR;
         } else {
+#ifdef WITH_WSREP
+	  DEBUG_SYNC(thd, "before_awake_no_mutex");
+	  if (tmp->wsrep_aborter && tmp->wsrep_aborter != thd->thread_id())
+	  {
+	    /* victim is in hit list already, bail out */
+	    WSREP_DEBUG("victim has wsrep aborter: %u, skipping awake()",
+			tmp->wsrep_aborter);
+	    error = 0;
+	  }
+	  else
+	  {
+	    WSREP_DEBUG("kill_one_thread victim: %u aborter %u kill query %d",
+			id, tmp->wsrep_aborter, only_kill_query);
+#endif /* WITH_WSREP */
           tmp->awake(only_kill_query ? THD::KILL_QUERY : THD::KILL_CONNECTION);
           error = 0;
+#ifdef WITH_WSREP
+	  }
+#endif /* WITH_WSREP */
         }
       } else
         error = 0;
@@ -7730,6 +7735,7 @@ static void wsrep_prepare_for_autocommit_retry(THD *thd, const char *rawbuf,
                                                uint length,
                                                Parser_state *parser_state) {
   thd->clear_error();
+  thd->wsrep_aborter = 0;
   close_thread_tables(thd);
   /* Ensure the gtid is resetted on query retry so retry attempt operates
   with same flow as normal attempt waiting for sync_wait if needed. */

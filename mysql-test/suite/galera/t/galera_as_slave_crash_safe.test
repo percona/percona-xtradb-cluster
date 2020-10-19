@@ -13,6 +13,7 @@
 --connection node_3
 --echo #node-3 (async slave)
 call mtr.add_suppression("Recovery from master pos");
+call mtr.add_suppression("when attempting to connect");
 --disable_query_log
 --eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
 --enable_query_log

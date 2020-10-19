@@ -3131,15 +3131,22 @@ and return. don't execute actual insert. */
   /* Try first optimistic descent to the B-tree */
   uint32_t flags;
 
-#ifdef WITH_WSREP
-  const bool skip_locking = wsrep_thd_skip_locking(thr_get_trx(thr)->mysql_thd);
-#endif /* WITH_WSREP */
-
   if (!index->table->is_intrinsic()) {
     log_free_check();
+
 #ifdef WITH_WSREP
-    flags = (index->table->is_temporary() || skip_locking) ? BTR_NO_LOCKING_FLAG
-                                                           : 0;
+  const bool skip_locking = wsrep_thd_skip_locking(thr_get_trx(thr)->mysql_thd);
+    flags = (index->table->is_temporary() || skip_locking) ? BTR_NO_LOCKING_FLAG : 0;
+#ifdef UNIV_DEBUG
+  if (skip_locking && strcmp(wsrep_get_sr_table_name(),
+                             index->table->name.m_name)) {
+    WSREP_ERROR("Record locking is disabled in this thread, "
+                "but the table being modified is not "
+                "`%s`: `%s`.", wsrep_get_sr_table_name(),
+                index->table->name.m_name);
+    ut_error;
+  }
+#endif /* UNIV_DEBUG */
 #else
     flags = index->table->is_temporary() ? BTR_NO_LOCKING_FLAG : 0;
 #endif /* WITH_WSREP */

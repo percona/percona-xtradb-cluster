@@ -289,7 +289,6 @@ INSERT INTO global_suppressions VALUES
  */
  ("The transaction owned GTID is already in the gtid_executed table"),
 
-<<<<<<< HEAD
  /*
    Galera suppressions
  */
@@ -362,14 +361,11 @@ INSERT INTO global_suppressions VALUES
 -- PXC enabled log_verbosity=3 for mtr run so PXC needs it.
  ("Failed to set O_DIRECT "),
 
-||||||| 5b5a5d2584a
-=======
  /*
    TLS warnings
  */
  ("Channel mysql_main configured to support TLS"),
 
->>>>>>> Percona-Server-8.0.21-12
  ("THE_LAST_SUPPRESSION");
 
 
