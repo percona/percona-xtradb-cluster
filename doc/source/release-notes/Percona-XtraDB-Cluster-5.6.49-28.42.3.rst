@@ -10,4 +10,5 @@
 Bugs Fixed
 ================================================================================
 
-* :jirabug:`3456`: Allow specific characters in SST method names and SST request data.
+* :jirabug:`PXC-3456`: Allow specific characters in SST method names and SST request data.
+
