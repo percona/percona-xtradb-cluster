@@ -26,8 +26,10 @@
 
 /* Classes in mysql */
 
+#ifdef WITH_WSREP
 #include <vector>
 using std::vector;
+#endif
 
 #include "my_global.h"                          /* NO_EMBEDDED_ACCESS_CHECKS */
 #ifdef MYSQL_SERVER
@@ -2206,7 +2208,11 @@ public:
       m_mdl_blocks_commits_lock(NULL)
   {}
 
+#ifdef WITH_WSREP
   bool lock_global_read_lock(THD *thd, bool *own_lock);
+#else
+  bool lock_global_read_lock(THD *thd);
+#endif
   void unlock_global_read_lock(THD *thd);
 
   /**
@@ -2690,8 +2696,12 @@ public:
   int is_current_stmt_binlog_format_row() const {
     DBUG_ASSERT(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
                 current_stmt_binlog_format == BINLOG_FORMAT_ROW);
+#ifdef WITH_WSREP
     return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
             BINLOG_FORMAT_ROW);
+#else
+    return current_stmt_binlog_format == BINLOG_FORMAT_ROW;
+#endif
   }
 
   bool is_current_stmt_binlog_disabled() const;
@@ -3706,7 +3716,9 @@ public:
   void shutdown_active_vio();
 #endif
   void awake(THD::killed_state state_to_set);
+#ifdef WITH_WSREP
   void awake(void);
+#endif
 
   /** Disconnect the associated communication endpoint. */
   void disconnect();
@@ -5842,11 +5854,6 @@ public:
 #else
 #define CF_SKIP_WSREP_CHECK     0
 #endif /* WITH_WSREP */
-
-/**
-  Do not check that wsrep snapshot is ready before allowing this command
-*/
-#define CF_SKIP_WSREP_CHECK     (1U << 2)
 
 void add_to_status(STATUS_VAR *to_var, STATUS_VAR *from_var);
 

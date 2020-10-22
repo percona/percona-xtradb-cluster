@@ -3462,7 +3462,6 @@ bool Prepared_statement::prepare(const char *packet, uint packet_len)
   error= parse_sql(thd, & parser_state, NULL) ||
     thd->is_error() ||
     init_param_array(this);
-  thd->m_statement_psi= parent_locker;
 
   lex->set_trg_event_type_for_tables();
 
@@ -4148,25 +4147,6 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
     else
       thd->protocol->send_out_parameters(&this->lex->param_list);
   }
-
-  /*
-    Log COM_STMT_EXECUTE to the general log. Note, that in case of SQL
-    prepared statements this causes two records to be output:
-
-    Query       EXECUTE <statement name>
-    Execute     <statement SQL text>
-
-    This is considered user-friendly, since in the
-    second log entry we output values of parameter markers.
-
-    Rewriting/password obfuscation:
-
-    - Any passwords in the "Execute" line should be substituted with
-      their hashes, or a notice.
-
-  */
-  if (error == 0)
-    log_execute_line(thd);
 
 error:
   flags&= ~ (uint) IS_IN_USE;

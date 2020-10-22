@@ -5,6 +5,9 @@
 # https://bugs.launchpad.net/percona-server/+bug/1188162
 #
 
+# https://www.percona.com/doc/percona-xtradb-cluster/5.6/limitation.html
+--skip InnoDB Fake Changes not supported for PXC
+
 --source include/have_log_bin.inc
 --source include/have_innodb.inc
 

@@ -92,8 +92,8 @@ DELETE FROM t1;
 INSERT INTO t1 VALUES (b), ('hello');
 CALL p1();
 b
-n/a
 hello
+n/a
 
 # 1.4 Check if table's recreation is handled correctly
 # inside a call of stored procedure. 

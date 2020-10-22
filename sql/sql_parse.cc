@@ -1032,7 +1032,7 @@ bool do_command(THD *thd)
   if (WSREP(thd))
   {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_IDLE;
+    wsrep_thd_set_query_state(thd, QUERY_IDLE);
     if (thd->wsrep_conflict_state==MUST_ABORT)
     {
       wsrep_client_rollback(thd);
@@ -1118,7 +1118,7 @@ bool do_command(THD *thd)
       thd->store_globals();
     }
 
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
 #endif /* WITH_WSREP */
@@ -1483,10 +1483,8 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   /* To avoid cross initialization in case of pxc/wsrep due to following jump */
   double start_busy_usecs = 0.0;
   double start_cpu_nsecs = 0.0;
-#endif /* WITH_WSREP */
 
   if (unlikely(opt_userstat))
-#ifdef WITH_WSREP
   if (WSREP(thd)) {
     if (!thd->in_multi_stmt_transaction_mode())
     {
@@ -1494,7 +1492,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     }
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       thd->wsrep_conflict_state= NO_CONFLICT;
@@ -1768,7 +1766,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     }
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       thd->wsrep_conflict_state= NO_CONFLICT;
@@ -3360,13 +3358,15 @@ mysql_execute_command(THD *thd)
 
     /* Commit the normal transaction if one is active. */
     if (trans_commit_implicit(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("implicit commit failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif /* WITH_WSREP */
     /* Release metadata locks acquired in this transaction. */
     thd->mdl_context.release_transactional_locks();
   }
@@ -4163,9 +4163,7 @@ end_with_restore_list:
 
     WSREP_TO_ISOLATION_BEGIN(0, 0, first_table)
     if (mysql_rename_tables(thd, first_table, 0))
-    {
       goto error;
-    }
     break;
   }
 #ifndef EMBEDDED_LIBRARY
@@ -4757,8 +4755,10 @@ end_with_restore_list:
   }
 
   case SQLCOM_UNLOCK_TABLES:
+#ifdef WITH_WSREP
   {
     bool table_lock= false;
+#endif
     /*
       It is critical for mysqldump --single-transaction --master-data that
       UNLOCK TABLES does not implicitely commit a connection which has only
@@ -4767,7 +4767,9 @@ end_with_restore_list:
     */
     if (thd->variables.option_bits & OPTION_TABLE_LOCK)
     {
+#ifdef WITH_WSREP
       table_lock= true;
+#endif
       DBUG_ASSERT(!thd->backup_tables_lock.is_acquired());
       /*
         Can we commit safely? If not, return to avoid releasing
@@ -4816,7 +4818,9 @@ end_with_restore_list:
       goto error;
     my_ok(thd);
     break;
+#ifdef WITH_WSREP
   }
+#endif
   case SQLCOM_UNLOCK_BINLOG:
     if (thd->backup_binlog_lock.is_acquired())
       thd->backup_binlog_lock.release(thd);
@@ -5265,6 +5269,7 @@ end_with_restore_list:
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
+#ifdef WITH_WSREP
       /*
         Note:
         We don't check for multiple non-idempotent invocations
@@ -5274,7 +5279,6 @@ end_with_restore_list:
         hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
-#ifdef WITH_WSREP
       if (WSREP(thd) &&
           !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
@@ -5308,6 +5312,7 @@ end_with_restore_list:
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
+#ifdef WITH_WSREP
       /*
         Note:
         We don't check for multiple non-idempotent invocations
@@ -5317,7 +5322,6 @@ end_with_restore_list:
         hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
-#ifdef WITH_WSREP
       if (WSREP(thd) &&
           !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
@@ -5442,13 +5446,15 @@ end_with_restore_list:
 #endif
   case SQLCOM_BEGIN:
     if (trans_begin(thd, lex->start_transaction_opt))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("BEGIN failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif
     my_ok(thd);
     break;
   case SQLCOM_COMMIT:
@@ -5462,13 +5468,15 @@ end_with_restore_list:
                       (thd->variables.completion_type == 2 &&
                        lex->tx_release != TVL_NO));
     if (trans_commit(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("COMMIT failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif /* WITH_WSREP */
     thd->mdl_context.release_transactional_locks();
     /* Begin transaction with the same isolation level. */
     if (tx_chain)
@@ -5512,13 +5520,15 @@ end_with_restore_list:
                       (thd->variables.completion_type == 2 &&
                        lex->tx_release != TVL_NO));
     if (trans_rollback(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("rollback failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif /* WITH_WSREP */
     thd->mdl_context.release_transactional_locks();
     /* Begin transaction with the same isolation level. */
     if (tx_chain)
@@ -6099,13 +6109,15 @@ create_sp_error:
     break;
   case SQLCOM_XA_COMMIT:
     if (trans_xa_commit(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("XA commit failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif
     thd->mdl_context.release_transactional_locks();
     /*
       We've just done a commit, reset transaction
@@ -6117,13 +6129,15 @@ create_sp_error:
     break;
   case SQLCOM_XA_ROLLBACK:
     if (trans_xa_rollback(thd))
+#ifdef WITH_WSREP
     {
       thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
       WSREP_DEBUG("XA rollback failed, MDL released: %lu", thd->thread_id);
 #endif /* WITH_WSREP */
       goto error;
+#ifdef WITH_WSREP
     }
+#endif
     thd->mdl_context.release_transactional_locks();
     /*
       We've just done a rollback, reset transaction
@@ -6296,17 +6310,30 @@ finish:
 
   if (! thd->in_sub_stmt)
   {
-    /* report error issued during command execution */
-    if (thd->killed_errno())
-      thd->send_kill_message();
-    if (thd->is_error() || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
-      trans_rollback_stmt(thd);
 #ifdef WITH_WSREP
-    else if (thd->sp_runtime_ctx &&
-             (thd->wsrep_conflict_state == MUST_ABORT ||
-              thd->wsrep_conflict_state == CERT_FAILURE ||
-              thd->wsrep_conflict_state == ABORTED))
+
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+
+    const int killed_errno(thd->killed_errno());
+    const bool is_error(thd->is_error());
+    const THD::killed_state killed(thd->killed);
+    const bool has_sp_runtime_ctx(thd->sp_runtime_ctx != NULL);
+    const wsrep_conflict_state conflict_state(wsrep_thd_conflict_state(thd));
+
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+    /* report error issued during command execution */
+    if (killed_errno)
+      thd->send_kill_message();
+    if (is_error || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
+      trans_rollback_stmt(thd);
+    else if (has_sp_runtime_ctx &&
+             (conflict_state == MUST_ABORT ||
+              conflict_state == CERT_FAILURE ||
+              conflict_state == ABORTED))
     {
+      trans_rollback_stmt(thd);
+
       /*
         The error was cleared, but THD was aborted by wsrep and
         wsrep_conflict_state is still set accordingly. This
@@ -6314,12 +6341,51 @@ finish:
         that declares a handler that catches ER_LOCK_DEADLOCK error.
         In which case the error may have been cleared in method
         sp_rcontext::handle_sql_condition().
+
+        PXC-3243
+        If BF-aborted, do not clear the conflict-state/killed variables.
+        Let the error propagate upward (if this was called from an SP),
+        to ensure that the locks are cleared.
       */
-      trans_rollback_stmt(thd);
-      thd->wsrep_conflict_state= NO_CONFLICT;
-      thd->killed= THD::NOT_KILLED;
+      if (conflict_state != MUST_ABORT)
+      {
+        thd->wsrep_conflict_state= NO_CONFLICT;
+        thd->killed= THD::NOT_KILLED;
+      }
     }
-#endif /* WITH_WSREP */
+    else
+    {
+      /* If commit fails, we should be able to reset the OK status. */
+      thd->get_stmt_da()->set_overwrite_status(true);
+      trans_commit_stmt(thd);
+      thd->get_stmt_da()->set_overwrite_status(false);
+    }
+    if (killed == THD::KILL_QUERY ||
+        killed == THD::KILL_TIMEOUT ||
+        killed == THD::KILL_BAD_DATA)
+    {
+      /*
+        PXC-3243
+        To handle the error in an SP, the thd->killed must be propagated
+        back up to the SP call so that the trans_rollback_stmt()
+        can be invoked for the SP call.
+
+        So leaving thd->killed unchanged will ensure that sp_head::execute
+        will set the err_status to true.
+       */
+      if (!has_sp_runtime_ctx || conflict_state != MUST_ABORT)
+      {
+        thd->killed= THD::NOT_KILLED;
+        thd->mysys_var->abort= 0;
+        thd->reset_query_for_display();
+      }
+    }
+#else
+    /* report error issued during command execution */
+    if (thd->killed_errno())
+      thd->send_kill_message();
+    if (thd->is_error() || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
+      trans_rollback_stmt(thd);
     else
     {
       /* If commit fails, we should be able to reset the OK status. */
@@ -6335,6 +6401,7 @@ finish:
       thd->mysys_var->abort= 0;
       thd->reset_query_for_display();
     }
+#endif /* WITH_WSREP */
   }
 
   lex->unit.cleanup();
@@ -7123,19 +7190,36 @@ bool check_global_access(THD *thd, ulong want_access)
   @retval
    true	  error or access denied. Error is sent to client in this case.
 */
+#ifdef WITH_WSREP
+bool check_fk_parent_table_access(THD *thd,
+                                  const char *child_table_db,
+                                  HA_CREATE_INFO *create_info,
+                                  Alter_info *alter_info,
+                                  bool check_fk_support)
+#else
 bool check_fk_parent_table_access(THD *thd,
                                   const char *child_table_db,
                                   HA_CREATE_INFO *create_info,
                                   Alter_info *alter_info)
+#endif
 {
   Key *key;
   List_iterator<Key> key_iterator(alter_info->key_list);
-  handlerton *db_type= create_info->db_type ? create_info->db_type :
-                                             ha_default_handlerton(thd);
 
-  // Return if engine does not support Foreign key Constraint.
-  if (!ha_check_storage_engine_flag(db_type, HTON_SUPPORTS_FOREIGN_KEYS))
-    return false;
+#ifdef WITH_WSREP
+  if (check_fk_support)
+  {
+#endif
+    handlerton *db_type= create_info->db_type ? create_info->db_type :
+                                                ha_default_handlerton(thd);
+
+    // Return if engine does not support Foreign key Constraint.
+    if (!ha_check_storage_engine_flag(db_type, HTON_SUPPORTS_FOREIGN_KEYS))
+      return false;
+#ifdef WITH_WSREP
+  }
+
+#endif
 
   while ((key= key_iterator++))
   {
@@ -8892,12 +8976,17 @@ uint kill_one_thread(THD *thd, ulong id, bool only_kill_query)
       slayage if both are string-equal.
     */
 
+    const bool is_utility_connection =
+        acl_is_utility_user(tmp->security_ctx->priv_user,
+                            tmp->security_ctx->get_host()->ptr(),
+                            tmp->security_ctx->get_ip()->ptr());
+
 #ifdef WITH_WSREP
-    if (((thd->security_ctx->master_access & SUPER_ACL) ||
+    if ((((thd->security_ctx->master_access & SUPER_ACL) && !is_utility_connection) ||
         thd->security_ctx->user_matches(tmp->security_ctx)) &&
         !wsrep_thd_is_BF((void *)tmp, true))
 #else
-    if ((thd->security_ctx->master_access & SUPER_ACL) ||
+    if (((thd->security_ctx->master_access & SUPER_ACL) && !is_utility_connection) ||
         thd->security_ctx->user_matches(tmp->security_ctx))
 #endif /* WITH_WSREP */
     {

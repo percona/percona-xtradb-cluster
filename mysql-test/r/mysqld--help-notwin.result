@@ -607,8 +607,8 @@ The following options may be given as the first argument:
  mrr_cost_based, materialization, semijoin, loosescan,
  firstmatch, subquery_materialization_cost_based,
  block_nested_loop, batched_key_access,
- use_index_extensions} and val is one of {on, off,
- default}
+ use_index_extensions, favor_range_scan} and val is one of
+ {on, off, default}
  --optimizer-trace=name 
  Controls tracing of the Optimizer:
  optimizer_trace=option=val[,option=val...], where option
@@ -1151,6 +1151,10 @@ The following options may be given as the first argument:
  connection before closing it
  --wsrep-OSU-method[=name] 
  Method for Online Schema Upgrade
+ --wsrep-RSU-commit-timeout[=#] 
+ Wait for wsrep_RSU_commit_timeout (in micro-seconds) to
+ allow active connection to complete COMMIT action before
+ starting RSU
  --wsrep-auto-increment-control 
  To automatically control the assignment of autoincrement
  variables
@@ -1281,7 +1285,7 @@ binlog-cache-size 32768
 binlog-checksum CRC32
 binlog-direct-non-transactional-updates FALSE
 binlog-error-action IGNORE_ERROR
-binlog-format STATEMENT
+binlog-format ROW
 binlog-gtid-simple-recovery FALSE
 binlog-max-flush-queue-time 0
 binlog-order-commits TRUE
@@ -1589,6 +1593,7 @@ validate-user-plugins TRUE
 verbose TRUE
 wait-timeout 28800
 wsrep-OSU-method TOI
+wsrep-RSU-commit-timeout 5000
 wsrep-auto-increment-control TRUE
 wsrep-causal-reads FALSE
 wsrep-certification-rules strict
@@ -1596,7 +1601,6 @@ wsrep-certify-nonPK TRUE
 wsrep-cluster-address 
 wsrep-cluster-name my_wsrep_cluster
 wsrep-convert-LOCK-to-trx FALSE
-wsrep-data-home-dir 
 wsrep-dbug-option 
 wsrep-debug FALSE
 wsrep-desync FALSE
@@ -1626,7 +1630,7 @@ wsrep-slave-threads 1
 wsrep-sst-auth (No default value)
 wsrep-sst-donor 
 wsrep-sst-donor-rejects-queries FALSE
-wsrep-sst-method rsync
+wsrep-sst-method xtrabackup-v2
 wsrep-sst-receive-address AUTO
 wsrep-start-position 00000000-0000-0000-0000-000000000000:-1
 wsrep-sync-wait 0

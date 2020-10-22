@@ -71,6 +71,8 @@ datadir=
 service_startup_timeout=900
 startup_sleep=1
 
+[ -e /etc/sysconfig/mysql ] && . /etc/sysconfig/mysql
+
 # Lock directory for RedHat / SuSE.
 lockdir='/var/lock/subsys'
 lock_file_path="$lockdir/mysql"

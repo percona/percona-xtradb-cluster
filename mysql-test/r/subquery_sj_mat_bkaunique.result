@@ -2165,8 +2165,8 @@ DEALLOCATE PREPARE stmt;
 EXPLAIN SELECT * FROM t1 WHERE (t1.i) IN 
 (SELECT t3.i FROM t2 RIGHT JOIN t3 ON t2.i=t3.i);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	<subquery2>	ALL	NULL	NULL	NULL	NULL	NULL	NULL
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	2	Using where; Using join buffer (Block Nested Loop)
+1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	2	Using where
+1	SIMPLE	<subquery2>	eq_ref	<auto_key>	<auto_key>	5	test.t1.i	1	NULL
 2	MATERIALIZED	t3	ALL	NULL	NULL	NULL	NULL	2	NULL
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	0	Using where; Using join buffer (Block Nested Loop)
 SELECT * FROM t1 WHERE (t1.i) IN 
@@ -2475,8 +2475,8 @@ DEALLOCATE PREPARE stmt;
 EXPLAIN SELECT * FROM t1 WHERE (t1.i) IN 
 (SELECT t3.i FROM t2 RIGHT JOIN t3 ON t2.i=t3.i);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	<subquery2>	ALL	NULL	NULL	NULL	NULL	NULL	NULL
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	2	Using where; Using join buffer (Block Nested Loop)
+1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	2	Using where
+1	SIMPLE	<subquery2>	eq_ref	<auto_key>	<auto_key>	5	test.t1.i	1	NULL
 2	MATERIALIZED	t3	ALL	NULL	NULL	NULL	NULL	2	NULL
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	1	Using where; Using join buffer (Block Nested Loop)
 SELECT * FROM t1 WHERE (t1.i) IN 
@@ -2493,8 +2493,8 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 SELECT * FROM t1 WHERE (t1.i) IN 
 (SELECT t3.i FROM t2 STRAIGHT_JOIN t3);
 i
-2
 1
+2
 EXPLAIN SELECT * FROM t1 WHERE (11) IN 
 (SELECT t3.i FROM t2 LEFT JOIN t3 ON t2.i=t3.i);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
