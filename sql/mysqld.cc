@@ -3618,6 +3618,9 @@ int init_common_variables()
 #endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP
+  if (wsrep_setup_allowed_sst_methods())
+    return 1;
+
   /*
     We need to initialize auxiliary variables, that will be
     further keep the original values of auto-increment options

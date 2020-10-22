@@ -187,6 +187,9 @@ bool wsrep_before_SE(); // initialize wsrep before storage
  * @param before wsrep_before_SE() value */
 void wsrep_init_startup(bool before);
 
+/* Setup SST request methods that will be accepted by server */
+bool wsrep_setup_allowed_sst_methods();
+
 
 extern "C" enum wsrep_exec_mode wsrep_thd_exec_mode(THD *thd);
 extern "C" enum wsrep_conflict_state wsrep_thd_conflict_state(THD *thd);
