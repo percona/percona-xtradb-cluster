@@ -16,6 +16,7 @@
 #include "wsrep_sst.h"
 #include <cstdio>
 #include <cstdlib>
+#include <regex>
 #include <sstream>
 #include "debug_sync.h"
 #include "log_event.h"
@@ -77,6 +78,10 @@ extern const char wsrep_defaults_group_suffix[];
 const char *wsrep_sst_method = WSREP_SST_DEFAULT;
 const char *wsrep_sst_receive_address = WSREP_SST_ADDRESS_AUTO;
 const char *wsrep_sst_donor = "";
+
+#define WSREP_SST_ALLOWED_METHODS_DEFAULT WSREP_SST_XTRABACKUP_V2
+const char *wsrep_sst_allowed_methods = WSREP_SST_ALLOWED_METHODS_DEFAULT;
+static std::vector<std::string> allowed_sst_methods;
 
 bool wsrep_sst_donor_rejects_queries = false;
 
@@ -140,6 +145,56 @@ bool wsrep_sst_donor_update(sys_var *, THD *, enum_var_type) { return 0; }
 bool wsrep_before_SE() {
   return (wsrep_provider != NULL && strcmp(wsrep_provider, WSREP_NONE) &&
           strcmp(wsrep_sst_method, WSREP_SST_SKIP));
+}
+
+bool wsrep_setup_allowed_sst_methods() {
+  std::string methods(wsrep_sst_allowed_methods);
+
+  /* Check if the string is valid. In method name we allow only:
+     alpha-num
+     underscore
+     dash
+     dot
+     but we do not allow leading and trailing dash/dot.
+     Method names have to be separated by colons (spaces before/after colon are
+     allowed). Below regex may seem difficult, but in fact it is not:
+
+     1. Any number of leading spaces
+
+       2. Followed by  alpha-num character or underscore
+         3. Followed by any number of underscore/dash/dot
+         4. Followed by alpha-num character or underscore
+         5. 3 - 4 group is optional
+       6. Followed by colon (possibly with leading and/or trailing spaces)
+       7. 2 - 6 group is optional
+
+     8. Followed by alpha-num character or underscore
+       9. Followed by any number of underscore/dash/dot
+       10. Followed by alpha-num character or underscore
+       11. 9 -10 group is optional
+
+     11. Followed by any number of trailing spaces */
+
+  static std::regex validate_regex(
+      "\\s*(\\w([-_.]*\\w)*(\\s*,\\s*))*\\w([-_.]*\\w)*\\s*",
+      std::regex::nosubs);
+
+  if (!std::regex_match(methods, validate_regex)) {
+    WSREP_FATAL(
+        "Wrong format of --wsrep-sst-allowed-methods parameter value: %s",
+        wsrep_sst_allowed_methods);
+    return true;
+  }
+
+  // split it into tokens and trim
+  static std::regex split_regex("[^,\\s][^,]*[^,\\s]");
+  for (auto it =
+           std::sregex_iterator(methods.begin(), methods.end(), split_regex);
+       it != std::sregex_iterator(); ++it) {
+    allowed_sst_methods.push_back(it->str());
+  }
+
+  return false;
 }
 
 // True if wsrep awaiting sst_received callback:
@@ -1409,11 +1464,73 @@ static int sst_donate_other(const char *method, const char *addr,
   return arg.err;
 }
 
+/*
+  Validate SST request string.
+  The protocol is: method\0data\0
+
+  For xtrabackup-v2 it is: method\0addresspath\0
+  like:
+  "xtrabackup-v2\000127.0.0.1:4444/xtrabackup_sst//1"
+*/
+static bool is_sst_request_valid(const std::string &msg) {
+  size_t method_len = strlen(msg.c_str());
+
+  if (method_len == 0) {
+    return false;
+  }
+
+  std::string method = msg.substr(0, method_len);
+
+  // Is this method allowed?
+  auto res = std::find(std::begin(allowed_sst_methods),
+                       std::end(allowed_sst_methods), method);
+  if (res == std::end(allowed_sst_methods)) {
+    return false;
+  }
+
+  const char *data_ptr = msg.c_str() + method_len + 1;
+  size_t data_len = strlen(data_ptr);
+
+  // method + null + data + null
+  if (method_len + 1 + data_len + 1 != msg.length()) {
+    // Someone tries to piggyback after 2nd null
+    return false;
+  }
+
+  if (data_len > 0) {
+    /* We allow custom sst scripts, so data can be anything.
+
+      We could create and maintain the list of forbidden
+      characters and the ways they could be used to inject the command to
+      the OS. However this approach seems to be too error prone.
+      Instead of this we will just allow alpha-num + a few special characters
+      (colon, slash, dot, underscore, square brackets, hyphen). */
+    std::string data = msg.substr(method_len + 1, data_len);
+    static const std::regex allowed_chars_regex("[\\w:/.[\\]-]+");
+    if (!std::regex_match(data, allowed_chars_regex)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
                      const bool bypass) {
   /* This will be reset when sync callback is called.
    * Should we set wsrep_ready to false here too? */
   local_status.set(wsrep::server_state::s_donor);
+
+  if (!is_sst_request_valid(msg)) {
+    std::ostringstream ss;
+    std::for_each(std::begin(msg), std::end(msg), [&ss](char ch) {
+      if (ch != 0)
+        ss << ch;
+      else
+        ss << "<nullptr>";
+    });
+    WSREP_ERROR("Invalid sst_request: %s", ss.str().c_str());
+    return WSREP_CB_FAILURE;
+  }
 
   const char *method = msg.data();
   size_t method_len = strlen(method);
