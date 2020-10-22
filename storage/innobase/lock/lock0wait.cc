@@ -203,7 +203,14 @@ in: trx to check for lock priority
 */
 static bool wsrep_is_BF_lock_timeout(trx_t *trx) {
   if (wsrep_on(trx->mysql_thd) && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
-    fprintf(stderr, "WSREP: BF lock wait long\n");
+    size_t unused;
+    ib::warn() << "WSREP: BF lock wait long\n"
+               << " THD: " << wsrep_thd_thread_id(trx->mysql_thd)
+               << " Trx id: " << trx_get_id_for_print(trx)
+               << " WSREP trx_id: " << wsrep_thd_transaction_id(trx->mysql_thd)
+               << " Seqno: " << wsrep_thd_trx_seqno(trx->mysql_thd) << "\n"
+               << " Query: " << innobase_get_stmt_unsafe(trx->mysql_thd,
+                                                         &unused);
     srv_print_innodb_monitor = true;
     srv_print_innodb_lock_monitor = true;
     os_event_set(srv_monitor_event);
