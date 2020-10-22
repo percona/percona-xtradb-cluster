@@ -31,6 +31,7 @@ extern const char* wsrep_sst_receive_address;
 extern const char* wsrep_sst_donor;
 extern       char* wsrep_sst_auth;
 extern    my_bool  wsrep_sst_donor_rejects_queries;
+extern const char *wsrep_sst_allowed_methods;
 
 /*! Synchronizes applier thread start with init thread */
 extern void wsrep_sst_grab();

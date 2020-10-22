@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -344,6 +344,7 @@ my_bool locked_in_memory;
 bool opt_using_transactions;
 bool volatile abort_loop;
 ulong opt_tc_log_size;
+bool opt_libcoredumper, opt_corefile= 0;
 
 static enum_server_operational_state server_operational_state= SERVER_BOOTING;
 ulong log_warnings;
@@ -696,6 +697,8 @@ char* utility_user= NULL;
 char* utility_user_password= NULL;
 char* utility_user_schema_access= NULL;
 
+char* opt_libcoredumper_path= NULL;
+
 /* Plucking this from sql/sql_acl.cc for an array of privilege names */
 extern TYPELIB utility_user_privileges_typelib;
 ulonglong utility_user_privileges= 0;
@@ -798,7 +801,6 @@ char *opt_general_logname, *opt_slow_logname, *opt_bin_logname;
 /* Static variables */
 
 static volatile sig_atomic_t kill_in_progress;
-
 
 static my_bool opt_myisam_log;
 static int cleanup_done;
@@ -1123,6 +1125,29 @@ private:
 };
 
 #ifdef WITH_WSREP
+/**
+  This class implements callback function used by
+  wsrep_close_client_connections() to set KILL_CONNECTION
+  flag on all client thds and awake the thread.
+*/
+class Set_wsrep_kill_client_conn : public Do_THD_Impl
+{
+ public:
+  Set_wsrep_kill_client_conn()
+  {}
+
+  virtual void operator()(THD *killing_thd)
+  {
+    if (killing_thd->get_protocol()->connection_alive() &&
+        (WSREP(killing_thd) || killing_thd->wsrep_exec_mode == LOCAL_STATE) &&
+        killing_thd != current_thd)
+    {
+      mysql_mutex_lock(&killing_thd->LOCK_thd_data);
+      killing_thd->awake(THD::KILL_CONNECTION);
+      mysql_mutex_unlock(&killing_thd->LOCK_thd_data);
+    }
+  }
+};
 /**
   This class implements callback function used by close_connections()
   to set KILL_CONNECTION flag on all thds in thd list.
@@ -3593,6 +3618,9 @@ int init_common_variables()
 #endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP
+  if (wsrep_setup_allowed_sst_methods())
+    return 1;
+
   /*
     We need to initialize auxiliary variables, that will be
     further keep the original values of auto-increment options
@@ -3874,6 +3902,11 @@ int init_common_variables()
     return 1;
   }
 
+  /* We set the atomic field m_opt_tracking_mode to the value of the sysvar
+     variable m_opt_tracking_mode_value here, as it now has the user given
+     value
+  */
+  set_mysqld_opt_tracking_mode();
   if (global_system_variables.transaction_write_set_extraction == HASH_ALGORITHM_OFF
       && mysql_bin_log.m_dependency_tracker.m_opt_tracking_mode != DEPENDENCY_TRACKING_COMMIT_ORDER)
   {
@@ -5096,6 +5129,29 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
+  if (opt_libcoredumper)
+  {
+#if HAVE_LIBCOREDUMPER
+    if (opt_corefile)
+    {
+      sql_print_warning(
+          "Started with --core-file and --coredumper. "
+          "--coredumper will take precedence.");
+    }
+    if (opt_libcoredumper_path != NULL)
+    {
+      if (!validate_libcoredumper_path(opt_libcoredumper_path))
+      {
+        unireg_abort(MYSQLD_ABORT_EXIT);
+      }
+    }
+#else
+    sql_print_warning(
+        "This version of MySQL has not been compiled with "
+        "libcoredumper support, ignoring --coredumper argument");
+#endif
+  }
+
   /* We have to initialize the storage engines before CSV logging */
   if (ha_init())
   {
@@ -5874,6 +5930,15 @@ int mysqld_main(int argc, char **argv)
   Service.SetSlowStarting(slow_start_timeout);
 #endif
 
+#ifdef WITH_WSREP
+  /*
+    Make sure that SSL library gets initialized before WSREP provider
+    is loaded. This is to ensure that possible server side initialization
+    does not have any side effects while the provider is already running
+    with open SSL sessions.
+  */
+  ssl_start();
+#endif /* */
   if (init_server_components())
     unireg_abort(MYSQLD_ABORT_EXIT);
 
@@ -6872,6 +6937,11 @@ struct my_option my_long_early_options[]=
   {"core-file", OPT_WANT_CORE,
    "Write core on errors.",
    0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
+   {"coredumper", OPT_COREDUMPER,
+    "Use coredumper library to generate coredumps. Specify a path for coredump "
+    "otherwise it will be generated on datadir",
+    &opt_libcoredumper_path, &opt_libcoredumper_path, 0, GET_STR,
+    OPT_ARG, 0, 0, 0, 0, 0, 0},
   {"skip-stack-trace", OPT_SKIP_STACK_TRACE,
    "Don't print a stack trace on failure.", 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0,
    0, 0, 0, 0},
@@ -7613,19 +7683,24 @@ void wsrep_close_client_connections(my_bool wait_to_end, bool server_shutdown)
 
   Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
   /*
-    First signal all threads that it's time to die
-    This will give the threads some time to gracefully abort their
-    statements and inform their clients that the server is about to die.
-  */
+   * wsrep_close_client_connections can be used when there is a cluster
+   * reconfiguration or when we set wsrep_reject_queries=ALL_KILL
+   * on those cases if we are using thread pooling,
+   * we cannot close the connections abruptly otherwise the thread pool workers
+   * won't get signaled and will hang forever when we shutdown the server.
+   * Sending a kill signal and awaking the thread.
+   */
 
   sql_print_information("Giving %d client threads a chance to die gracefully",
                         static_cast<int>(thd_manager->get_thd_count()));
+  Set_wsrep_kill_client_conn set_wsrep_kill_client_conn;
+  thd_manager->do_for_all_thd(&set_wsrep_kill_client_conn);
+  if (thd_manager->get_thd_count() > 0)
+    sleep(2);  // Give threads time to die
 
   Call_wsrep_close_client_conn call_wsrep_close_client_conn(server_shutdown);
   thd_manager->do_for_all_thd(&call_wsrep_close_client_conn);
 
-  if (thd_manager->get_thd_count() > 0)
-    sleep(2);         // Give threads time to die
 
 }
 
@@ -8348,7 +8423,65 @@ static int show_slave_open_temp_tables(THD *thd, SHOW_VAR *var, char *buf)
   *((int *) buf)= slave_open_temp_tables.atomic_get();
   return 0;
 }
+bool validate_libcoredumper_path(char *libcoredumper_path)
+{
+  /* validate path */
+  if (!is_valid_log_name(libcoredumper_path, strlen(libcoredumper_path)))
+  {  //filename contain .cnf or .ini on it
+    sql_print_error("Variable --coredumper cannot be set to value %s",
+                    libcoredumper_path);
+    return false;
+  }
+  char   libcoredumper_dir[FN_REFLEN];
+  size_t libcoredumper_dir_length;
+  size_t opt_libcoredumper_path_length= strlen(libcoredumper_path);
+  (void)dirname_part(libcoredumper_dir, libcoredumper_path,
+                     &libcoredumper_dir_length);
 
+  if (!libcoredumper_dir_length)
+  {
+    sql_print_error("Error processing --coredumper path: %s",
+                    libcoredumper_path);
+    return false;
+  }
+  size_t libcoredumper_file_length=
+      opt_libcoredumper_path_length - libcoredumper_dir_length;
+  if (libcoredumper_file_length == 0)  //path is a directory
+  {
+    libcoredumper_file_length= 19;  //file is set to core.yyyymmddhhmmss
+  }
+  else
+  {
+    libcoredumper_file_length+= 15;  //file gets .yyyymmddhhmmss appended
+  }
+  if (opt_libcoredumper_path_length > FN_REFLEN)
+  {  // path is too long
+    sql_print_error("Variable --coredumper set to a too long path");
+    return false;
+  }
+  if (libcoredumper_file_length > FN_LEN)
+  {  // filename is too long
+    sql_print_error("Variable --coredumper set to a too long filename");
+    return false;
+  }
+  if (my_access(libcoredumper_dir, F_OK))
+  {
+    sql_print_error("Directory specified at --coredumper: %s does not exist",
+                    libcoredumper_dir);
+    return false;
+  }
+  if (my_access(libcoredumper_dir, (F_OK | W_OK)))
+  {
+    sql_print_error("Directory specified at --coredumper: %s is not writable",
+                    libcoredumper_dir);
+    return false;
+  }
+  if (libcoredumper_dir_length == strlen(libcoredumper_path))
+  {  //only dirname was specified, append core to libcoredumper_path
+    strcat(libcoredumper_path, "core");
+  }
+  return true;
+}
 /*
   Variables shown by SHOW STATUS in alphabetical order
 */
@@ -9048,6 +9181,11 @@ mysqld_get_one_option(int optid,
     break;
   case (int) OPT_WANT_CORE:
     test_flags |= TEST_CORE_ON_SIGNAL;
+    opt_corefile= MY_TEST(argument != disabled_my_option);
+    break;
+  case (int) OPT_COREDUMPER:
+    test_flags |= TEST_CORE_ON_SIGNAL;
+    opt_libcoredumper= MY_TEST(argument != disabled_my_option);
     break;
   case (int) OPT_SKIP_STACK_TRACE:
     test_flags|=TEST_NO_STACKTRACE;
@@ -11388,3 +11526,8 @@ bool update_named_pipe_full_access_group(const char *new_group_name)
 #endif  /* _WIN32 && !EMBEDDED_LIBRARY */
 
 
+void set_mysqld_opt_tracking_mode()
+{
+  my_atomic_store64(&mysql_bin_log.m_dependency_tracker.m_opt_tracking_mode,
+          static_cast<int64>(mysql_bin_log.m_dependency_tracker.m_opt_tracking_mode_value));
+}

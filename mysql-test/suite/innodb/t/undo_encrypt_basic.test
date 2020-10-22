@@ -1,3 +1,7 @@
+# innodb_undo_log_encrypt is read only for PXC, 
+# so no way to proceed with this test
+--skip innodb_undo_log_encrypt is read-only for PXC
+
 --source include/not_embedded.inc
 --source include/have_innodb.inc
 --source include/big_test.inc

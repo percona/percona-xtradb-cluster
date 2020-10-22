@@ -1,3 +1,7 @@
+# innodb_encrypt_tables is read only for PXC, 
+# so no way to proceed with this test
+--skip innodb_encrypt_tables is read-only for PXC
+
 -- source include/have_innodb.inc
 # embedded does not support restart
 -- source include/not_embedded.inc

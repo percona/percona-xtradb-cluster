@@ -247,10 +247,6 @@ MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
 PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
 PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 
-# Note: WSREP_INTERFACE_VERSION act as compatibility check between wsrep-plugin
-# and galera plugin so we include it as part of our component.
-WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/src/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
-
 if [[ $COPYGALERA -eq 0 ]];then
     GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
 fi
@@ -258,7 +254,7 @@ TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
 PRODUCT_NAME="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
-PRODUCT_FULL_NAME="$PRODUCT_NAME-$RELEASE_TAG$WSREP_VERSION${BUILD_COMMENT:-}.$TAG.$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
+PRODUCT_FULL_NAME="$PRODUCT_NAME-$RELEASE_TAG$PXC_VERSION_EXTRA${BUILD_COMMENT:-}.$TAG.$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${GLIBC_VER:-}"
 
 #
 # This corresponds to GIT revision when the build/package is created.
@@ -271,7 +267,7 @@ then
 else
     REVISION=""
 fi
-COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
+COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$PERCONA_SERVER_EXTENSION-$RELEASE_TAG$PXC_VERSION_EXTRA"
 COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
 
 #-------------------------------------------------------------------------------
@@ -353,8 +349,8 @@ fi
     else
         mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
              "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
-        mv $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
-        mv $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
+        cp $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
+        cp $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
     fi
     ) || exit 1
 
@@ -379,7 +375,7 @@ fi
             $SSL_OPT \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
-            -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
+            -DMYSQL_SERVER_SUFFIX="-$PXC_VERSION_EXTRA" \
             -DWITH_INNODB_DISALLOW_WRITES=ON \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
@@ -408,7 +404,7 @@ fi
             $SSL_OPT \
             -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
             -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
-            -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
+            -DMYSQL_SERVER_SUFFIX="-$PXC_VERSION_EXTRA" \
             -DWITH_INNODB_DISALLOW_WRITES=ON \
             -DWITH_WSREP=ON \
             -DWITH_UNIT_TESTS=0 \
@@ -452,11 +448,131 @@ fi
 
 ) || exit 1
 
+# Patch needed libraries
+(
+    LIBLIST="libcrypto.so libssl.so libreadline.so libtinfo.so libsasl2.so libgssapi_krb5.so libkrb5.so libkrb5support.so libk5crypto.so libgssapi.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libncurses.so"
+    DIRLIST="bin lib lib/private lib/mysql/plugin"
+
+    LIBPATH=""
+
+    function gather_libs {
+        local elf_path=$1
+        for lib in ${LIBLIST}; do
+            for elf in $(find ${elf_path} -maxdepth 1 -exec file {} \; | grep 'ELF ' | cut -d':' -f1); do
+                IFS=$'\n'
+                for libfromelf in $(ldd ${elf} | grep ${lib} | awk '{print $3}'); do
+                    lib_realpath="$(readlink -f ${libfromelf})"
+                    lib_realpath_basename="$(basename $(readlink -f ${libfromelf}))"
+                    lib_without_version_suffix=$(echo ${lib_realpath_basename} | awk -F"." 'BEGIN { OFS = "." }{ print $1, $2}')
+
+                    if [ ! -f "lib/private/${lib_realpath_basename}" ] && [ ! -L "lib/private/${lib_realpath_basename}" ]; then
+                    
+                        echo "Copying lib ${lib_realpath_basename}"
+                        cp ${lib_realpath} lib/private
+
+                        if [ ${lib_realpath_basename} != ${lib_without_version_suffix} ] && [ ! -L lib/${lib_without_version_suffix} ]; then
+                            echo "Symlinking lib from ${lib_realpath_basename} to ${lib_without_version_suffix}"
+                            cd lib/
+                            ln -s private/${lib_realpath_basename} ${lib_without_version_suffix}
+                            cd private
+                            ln -s ${lib_realpath_basename} ${lib_without_version_suffix}
+                            cd ../../
+                        fi
+
+                        patchelf --set-soname ${lib_without_version_suffix} lib/private/${lib_realpath_basename}
+
+                        LIBPATH+=" $(echo ${libfromelf} | grep -v $(pwd))"
+                    fi
+                done
+                unset IFS
+            done
+        done
+    }
+
+    function set_runpath {
+        # Set proper runpath for bins but check before doing anything
+        local elf_path=$1
+        local r_path=$2
+        for elf in $(find ${elf_path} -maxdepth 1 -exec file {} \; | grep 'ELF ' | cut -d':' -f1); do
+            echo "Checking LD_RUNPATH for ${elf}"
+            if [[ -z $(patchelf --print-rpath ${elf}) ]]; then
+                echo "Changing RUNPATH for ${elf}"
+                patchelf --set-rpath ${r_path} ${elf}
+            fi
+        done
+    }
+
+    function replace_libs {
+        local elf_path=$1
+        for libpath_sorted in ${LIBPATH}; do
+            for elf in $(find ${elf_path} -maxdepth 1 -exec file {} \; | grep 'ELF ' | cut -d':' -f1); do
+                LDD=$(ldd ${elf} | grep ${libpath_sorted}|head -n1|awk '{print $1}')
+                lib_realpath_basename="$(basename $(readlink -f ${libpath_sorted}))"
+                lib_without_version_suffix="$(echo ${lib_realpath_basename} | awk -F"." 'BEGIN { OFS = "." }{ print $1, $2}')"
+                if [[ ! -z $LDD  ]]; then
+                    echo "Replacing lib ${lib_realpath_basename} to ${lib_without_version_suffix} for ${elf}"
+                    patchelf --replace-needed ${LDD} ${lib_without_version_suffix} ${elf}
+                fi
+            done
+        done
+    }
+
+    function check_libs {
+        local elf_path=$1
+        for elf in $(find ${elf_path} -maxdepth 1 -exec file {} \; | grep 'ELF ' | cut -d':' -f1); do
+            if ! ldd ${elf}; then
+                exit 1
+            fi
+        done
+    }
+
+    function link {
+        if [ ! -d lib/private ]; then
+            mkdir -p lib/private
+        fi
+        # Gather libs
+        for DIR in ${DIRLIST}; do
+            gather_libs ${DIR}
+        done
+        
+        # Set proper runpath
+        set_runpath bin '$ORIGIN/../lib/private/'
+        set_runpath lib '$ORIGIN/private/'
+        set_runpath lib/mysql/plugin '$ORIGIN/../../private/'
+        set_runpath lib/private '$ORIGIN'
+
+        # Replace libs
+        for DIR in ${DIRLIST}; do
+            replace_libs ${DIR}
+        done
+
+        # Make final check in order to determine any error after linkage
+        for DIR in ${DIRLIST}; do
+            check_libs ${DIR}
+        done
+    }
+
+    mkdir -p "$TARGETDIR/usr/local/minimal"
+    cp -r "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
+
+    # NORMAL TARBALL
+    cd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME"
+    link
+
+    # MIN TARBALL
+    cd "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
+    rm -rf mysql-test 2> /dev/null
+    rm -rf percona-xtradb-cluster-tests 2> /dev/null
+    find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
+    link
+)
+
 # Package the archive
 (
     cd "$TARGETDIR/usr/local/"
-
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
+    cd "$TARGETDIR/usr/local/minimal/"
+    $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
 ) || exit 1
 
 if [[ $KEEP_BUILD -eq 0 ]]

@@ -4935,6 +4935,10 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
         if (thd->m_digest != NULL)
           thd->m_digest->reset(thd->m_token_array, max_digest_length);
 
+        /*
+          Prevent "hanging" of previous rewritten query in SHOW PROCESSLIST.
+        */
+        thd->reset_rewritten_query();
         mysql_parse(thd, &parser_state, true);
 
         /*
@@ -5026,10 +5030,11 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
       else
       {
 #ifdef WITH_WSREP
+        String rewritten_query = thd->rewritten_query();
         rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER, ER(ER_ERROR_ON_MASTER),
                     expected_error,
-                    (!opt_general_log_raw) && thd->rewritten_query.length()
-                      ? thd->rewritten_query.c_ptr_safe() : thd->query().str);
+                    (!opt_general_log_raw) && thd->rewritten_query().length()
+                      ? rewritten_query.c_ptr_safe() : thd->query().str);
 #else
         rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER, ER(ER_ERROR_ON_MASTER),
                     expected_error, thd->query().str);
@@ -5043,20 +5048,21 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
     if (!thd->is_error() ||
         thd->get_stmt_da()->mysql_errno() != ER_SLAVE_IGNORED_TABLE)
     {
-      /* log the rewritten query if the query was rewritten 
-         and the option to log raw was not set.
-        
-         There is an assumption here. We assume that query log
-         events can never have multi-statement queries, thus the
-         parsed statement is the same as the raw one.
-       */
-      if (opt_general_log_raw || thd->rewritten_query.length() == 0)
+      /*
+        Log the rewritten query if the query was rewritten
+        and the option to log raw was not set.
+
+        There is an assumption here. We assume that query log
+        events can never have multi-statement queries, thus the
+        parsed statement is the same as the raw one.
+      */
+      if (opt_general_log_raw || thd->rewritten_query().length() == 0)
         query_logger.general_log_write(thd, COM_QUERY, thd->query().str,
                                        thd->query().length);
       else
         query_logger.general_log_write(thd, COM_QUERY,
-                                       thd->rewritten_query.c_ptr_safe(),
-                                       thd->rewritten_query.length());
+                                       thd->rewritten_query().ptr(),
+                                       thd->rewritten_query().length());
     }
 
 compare_errors:
@@ -5109,8 +5115,8 @@ compare_errors:
                      "no error"),
 #ifdef WITH_WSREP
                     actual_error, print_slave_db_safe(db),
-                    (!opt_general_log_raw) && thd->rewritten_query.length()
-                    ? thd->rewritten_query.c_ptr_safe() : query_arg);
+                    (!opt_general_log_raw) && thd->rewritten_query().length()
+                    ? wsrep_thd_rewritten_query(thd).c_ptr_safe() : query_arg);
 #else
                     actual_error, print_slave_db_safe(db), query_arg);
 #endif /* WITH_WSREP */
@@ -5173,8 +5179,8 @@ compare_errors:
                      "unexpected success or fatal error"),
 #ifdef WITH_WSREP
                     print_slave_db_safe(db),
-                      (!opt_general_log_raw) && thd->rewritten_query.length()
-                      ? thd->rewritten_query.c_ptr_safe() : query_arg);
+                      (!opt_general_log_raw) && thd->rewritten_query().length()
+                      ? wsrep_thd_rewritten_query(thd).c_ptr_safe() : query_arg);
 #else
                     print_slave_db_safe(thd->db().str), query_arg);
 #endif /* WITH_WSREP */
@@ -5249,6 +5255,13 @@ end:
   MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
   thd->m_statement_psi= NULL;
   thd->m_digest= NULL;
+
+  /*
+    Prevent rewritten query from getting "stuck" in SHOW PROCESSLIST,
+    and performance_schema.threads.
+  */
+  thd->reset_rewritten_query();
+  thd->reset_query_for_display();
 
   /*
     As a disk space optimization, future masters will not log an event for
@@ -7691,6 +7704,10 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli)
   mysql_mutex_lock(&rli_ptr->data_lock);
   if (error)
   {
+#ifdef WITH_WSREP
+    /* if slave transaction has to be replayed, do not report error message */
+    if ((!WSREP(thd) || thd->wsrep_conflict_state != MUST_REPLAY))
+#endif /* WITH_WSREP */
     rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
                 "Error in Xid_log_event: Commit could not be completed, '%s'",
                 thd->get_stmt_da()->message_text());
@@ -10115,17 +10132,13 @@ Rows_log_event::decide_row_lookup_algorithm_and_key()
                                       get_flags(COMPLETE_ROWS_F) &&
                                       !m_table->file->rpl_lookup_rows())))
   {
-    /**
-       Only TokuDB engine can satisfy delete/update row lookup optimization,
-       so we don't need to check engine type here.
-    */
     if (delete_update_lookup_condition &&
         table->s->primary_key == MAX_KEY)
     {
         if (!table->s->rfr_lookup_warning)
         {
           sql_print_warning("Slave: read free replication is disabled "
-                            "for tokudb table `%s.%s` "
+                            "for TokuDB/RocksDB table `%s.%s` "
                             "as it does not have implicit primary key, "
                             "continue with rows lookup",
                             print_slave_db_safe(table->s->db.str),
@@ -11585,11 +11598,6 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
 
     DBUG_PRINT_BITSET("debug", "Setting table's read_set from: %s", &m_cols);
 
-    bitmap_set_all(table->read_set);
-    if (get_general_type_code() == binary_log::DELETE_ROWS_EVENT ||
-        get_general_type_code() == binary_log::UPDATE_ROWS_EVENT)
-        bitmap_intersect(table->read_set,&m_cols);
-
     /*
       Call mark_generated_columns() to set read_set/write_set bits of the
       virtual generated columns as required in order to get these computed.
@@ -11607,15 +11615,31 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
       into the binlog).
     */
 
-    if (m_table->vfield)
-      m_table->mark_generated_columns(get_general_type_code() == binary_log::UPDATE_ROWS_EVENT);
-
+    bitmap_set_all(table->read_set);
     bitmap_set_all(table->write_set);
 
-    /* WRITE ROWS EVENTS store the bitmap in m_cols instead of m_cols_ai */
-    MY_BITMAP *after_image= ((get_general_type_code() == binary_log::UPDATE_ROWS_EVENT) ?
-                             &m_cols_ai : &m_cols);
-    bitmap_intersect(table->write_set, after_image);
+    switch (get_general_type_code()) {
+      case binary_log::DELETE_ROWS_EVENT:
+        bitmap_intersect(table->read_set, &m_cols);
+        bitmap_intersect(table->write_set, &m_cols);
+        if (m_table->vfield)
+          m_table->mark_generated_columns(false);
+        break;
+      case binary_log::UPDATE_ROWS_EVENT:
+        bitmap_intersect(table->read_set, &m_cols);
+        bitmap_intersect(table->write_set, &m_cols_ai);
+        if (m_table->vfield)
+          m_table->mark_generated_columns(true);
+        break;
+      case binary_log::WRITE_ROWS_EVENT:
+        /* WRITE ROWS EVENTS store the bitmap in m_cols instead of m_cols_ai */
+        bitmap_intersect(table->write_set, &m_cols);
+        if (m_table->vfield)
+          m_table->mark_generated_columns(false);
+        break;
+      default:
+        DBUG_ASSERT(false);
+    }
 
     if (thd->slave_thread) // set the mode for slave
       this->rbr_exec_mode= slave_exec_mode_options;

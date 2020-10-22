@@ -1,4 +1,4 @@
-#!/bin/bash -ue
+#!/usr/bin/env bash
 # Copyright (C) 2009-2015 Codership Oy
 #
 # This program is free software; you can redistribute it and/or modify
@@ -16,6 +16,8 @@
 # MA  02110-1301  USA.
 
 # This is a reference script for mysqldump-based state snapshot tansfer
+
+set -o nounset -o errexit
 
 . $(dirname $0)/wsrep_sst_common
 

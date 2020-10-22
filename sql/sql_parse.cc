@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -372,6 +372,7 @@ void init_update_queries(void)
   server_command_flags[COM_TIME]         |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_INIT_DB]      |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_END]          |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_FIELD_LIST]   |= CF_SKIP_WSREP_CHECK;
  
   /*
     COM_QUERY and COM_SET_OPTION are allowed to pass the early COM_xxx filter,
@@ -1000,7 +1001,7 @@ bool do_command(THD *thd)
   if (WSREP(thd))
   {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_IDLE;
+    wsrep_thd_set_query_state(thd, QUERY_IDLE);
     if (thd->wsrep_conflict_state==MUST_ABORT)
     {
       wsrep_client_rollback(thd);
@@ -1092,7 +1093,7 @@ bool do_command(THD *thd)
       thd->store_globals();
     }
 
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
 #endif /* WITH_WSREP */
@@ -1178,7 +1179,7 @@ bool do_command(THD *thd)
   }
 #endif /* WITH_WSREP */
   DBUG_PRINT("info", ("packet: '%*.s'; command: %d",
-             thd->get_protocol_classic()->get_packet_length(),
+             (int)thd->get_protocol_classic()->get_packet_length(),
              thd->get_protocol_classic()->get_raw_packet(), command));
   if (thd->get_protocol_classic()->bad_packet)
     DBUG_ASSERT(0);                // Should be caught earlier
@@ -1507,7 +1508,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       thd->wsrep_conflict_state= NO_CONFLICT;
@@ -1620,7 +1621,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
   }
   thd->set_query_id(next_query_id());
-  thd->rewritten_query.mem_free();
+  thd->reset_rewritten_query();
   thd_manager->inc_thread_running();
 
   if (!(server_command_flags[command] & CF_SKIP_QUESTIONS))
@@ -1827,7 +1828,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       thd->wsrep_conflict_state= NO_CONFLICT;
@@ -2406,7 +2407,7 @@ done:
   thd->m_digest= NULL;
 
   /* Prevent rewritten query from getting "stuck" in SHOW PROCESSLIST. */
-  thd->rewritten_query.mem_free();
+  thd->reset_rewritten_query();
 
   thd_manager->dec_thread_running();
   free_root(thd->mem_root,MYF(MY_KEEP_PREALLOC));
@@ -6206,17 +6207,30 @@ finish:
                                      "MYSQL_AUDIT_QUERY_NESTED_STATUS_END");
 #endif /* !EMBEDDED_LIBRARY */
 
-    /* report error issued during command execution */
-    if (thd->killed_errno())
-      thd->send_kill_message();
-    if (thd->is_error() || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
-      trans_rollback_stmt(thd);
 #ifdef WITH_WSREP
-    else if (thd->sp_runtime_ctx &&
-             (thd->wsrep_conflict_state == MUST_ABORT ||
-              thd->wsrep_conflict_state == CERT_FAILURE ||
-              thd->wsrep_conflict_state == ABORTED))
+
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+
+    const int killed_errno(thd->killed_errno());
+    const bool is_error(thd->is_error());
+    const THD::killed_state killed(thd->killed);
+    const bool has_sp_runtime_ctx(thd->sp_runtime_ctx != NULL);
+    const wsrep_conflict_state conflict_state(wsrep_thd_conflict_state(thd));
+
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+    /* report error issued during command execution */
+    if (killed_errno)
+      thd->send_kill_message();
+    if (is_error || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
+      trans_rollback_stmt(thd);
+    else if (has_sp_runtime_ctx &&
+             (conflict_state == MUST_ABORT ||
+              conflict_state == CERT_FAILURE ||
+              conflict_state == ABORTED))
     {
+      trans_rollback_stmt(thd);
+
       /*
         The error was cleared, but THD was aborted by wsrep and
         wsrep_conflict_state is still set accordingly. This
@@ -6224,12 +6238,50 @@ finish:
         that declares a handler that catches ER_LOCK_DEADLOCK error.
         In which case the error may have been cleared in method
         sp_rcontext::handle_sql_condition().
+
+        PXC-3243
+        If BF-aborted, do not clear the conflict-state/killed variables.
+        Let the error propagate upward (if this was called from an SP),
+        to ensure that the locks are cleared.
       */
-      trans_rollback_stmt(thd);
-      thd->wsrep_conflict_state= NO_CONFLICT;
-      thd->killed= THD::NOT_KILLED;
+      if (conflict_state != MUST_ABORT)
+      {
+        thd->wsrep_conflict_state= NO_CONFLICT;
+        thd->killed= THD::NOT_KILLED;
+      }
     }
-#endif /* WITH_WSREP */
+    else
+    {
+      /* If commit fails, we should be able to reset the OK status. */
+      thd->get_stmt_da()->set_overwrite_status(true);
+      trans_commit_stmt(thd);
+      thd->get_stmt_da()->set_overwrite_status(false);
+    }
+    if (killed == THD::KILL_QUERY ||
+        killed == THD::KILL_TIMEOUT ||
+        killed == THD::KILL_BAD_DATA)
+    {
+      /*
+        PXC-3243
+        To handle the error in an SP, the thd->killed must be propagated
+        back up to the SP call so that the trans_rollback_stmt()
+        can be invoked for the SP call.
+
+        So leaving thd->killed unchanged will ensure that sp_head::execute
+        will set the err_status to true.
+       */
+      if (!has_sp_runtime_ctx || conflict_state != MUST_ABORT)
+      {
+        thd->killed= THD::NOT_KILLED;
+        thd->reset_query_for_display();
+      }
+    }
+#else
+    /* report error issued during command execution */
+    if (thd->killed_errno())
+      thd->send_kill_message();
+    if (thd->is_error() || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
+      trans_rollback_stmt(thd);
     else
     {
       /* If commit fails, we should be able to reset the OK status. */
@@ -6244,6 +6296,7 @@ finish:
       thd->killed= THD::NOT_KILLED;
       thd->reset_query_for_display();
     }
+#endif /* WITH_WSREP */
   }
 
 #ifdef WITH_WSREP
@@ -6787,29 +6840,29 @@ void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat)
     if (!err)
     {
       /*
-        Rewrite the query for logging and for the Performance Schema statement
-        tables. Raw logging happened earlier.
-      
+        Rewrite the query for logging and for the Performance Schema
+        statement tables. (Raw logging happened earlier.)
+
         Query-cache only handles SELECT, which we don't rewrite, so it's no
         concern of ours.
 
         Sub-routines of mysql_rewrite_query() should try to only rewrite when
         necessary (e.g. not do password obfuscation when query contains no
         password).
-      
-        If rewriting does not happen here, thd->rewritten_query is still empty
-        from being reset in alloc_query().
+
+        If rewriting does not happen here, thd->m_rewritten_query is still
+        empty from being reset in alloc_query().
       */
-      // bool general= !(opt_general_log_raw || thd->slave_thread);
 
-      mysql_rewrite_query(thd);
+      if (thd->rewritten_query().length() == 0)
+        mysql_rewrite_query(thd);
 
-      if (thd->rewritten_query.length())
+      if (thd->rewritten_query().length())
       {
         lex->safe_to_cache_query= false; // see comments below
 
-        thd->set_query_for_display(thd->rewritten_query.c_ptr_safe(),
-                                   thd->rewritten_query.length());
+        thd->set_query_for_display(thd->rewritten_query().ptr(),
+                                   thd->rewritten_query().length());
       } else if (thd->slave_thread) {
         /*
           In the slave, we add the information to pfs.events_statements_history,
@@ -6824,16 +6877,16 @@ void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat)
 
       if (!(opt_general_log_raw || thd->slave_thread))
       {
-        if (thd->rewritten_query.length())
+        if (thd->rewritten_query().length())
           query_logger.general_log_write(thd, COM_QUERY,
-                                         thd->rewritten_query.c_ptr_safe(),
-                                         thd->rewritten_query.length());
+                                         thd->rewritten_query().ptr(),
+                                         thd->rewritten_query().length());
         else
         {
           size_t qlen= found_semicolon
             ? (found_semicolon - thd->query().str)
             : thd->query().length;
-          
+
           query_logger.general_log_write(thd, COM_QUERY,
                                          thd->query().str, qlen);
         }
@@ -7807,12 +7860,17 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query)
       slayage if both are string-equal.
     */
 
+    const bool is_utility_connection =
+        acl_is_utility_user(tmp->m_security_ctx->user().str,
+                            tmp->m_security_ctx->host().str,
+                            tmp->m_security_ctx->ip().str);
+
 #ifdef WITH_WSREP
-    if (((thd->security_context()->check_access(SUPER_ACL)) ||
+    if ((((thd->security_context()->check_access(SUPER_ACL)) && !is_utility_connection) ||
          thd->security_context()->user_matches(tmp->security_context())) &&
         !wsrep_thd_is_BF((void *)tmp, true))
 #else
-    if ((thd->security_context()->check_access(SUPER_ACL)) ||
+    if (((thd->security_context()->check_access(SUPER_ACL)) && !is_utility_connection) ||
         thd->security_context()->user_matches(tmp->security_context()))
 #endif /* WITH_WSREP */
     {

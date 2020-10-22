@@ -1,0 +1,151 @@
+#
+# PXC-3243: Test BF-aborting during a transaction in an SP
+# This tests the behavior while an SP is BF-aborted during
+# an operation in a transaction within the SP.
+#
+
+--source include/have_debug_sync.inc
+--source include/have_innodb.inc
+--source include/galera_cluster.inc
+
+
+# Test setup
+--echo # Node 1
+--connection node_1
+CREATE DATABASE database1;
+USE database1;
+
+DELIMITER |;
+CREATE PROCEDURE proc_with_transaction()
+BEGIN
+  START TRANSACTION;
+    UPDATE t1 SET f2 = "from sp" WHERE f1 > 1;
+    INSERT INTO t1 VALUES (10, "from sp");
+  COMMIT;
+END|
+
+CREATE PROCEDURE proc_with_transaction_continue_handler()
+BEGIN
+  DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
+  START TRANSACTION;
+    UPDATE t1 SET f2 = "from sp" WHERE f1 > 1;
+    INSERT INTO t1 VALUES (10, "from sp continue");
+  COMMIT;
+END|
+
+CREATE PROCEDURE proc_with_transaction_exit_handler()
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN END;
+  START TRANSACTION;
+    UPDATE t1 SET f2 = "from sp" WHERE f1 > 1;
+    INSERT INTO t1 VALUES (10, "from sp exit");
+  COMMIT;
+END|
+DELIMITER ;|
+
+# Determine initial number of connections (set $count_sessions)
+--source include/count_sessions.inc
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+
+# ------------------------------------
+# Test 1a: no handlers, wsrep_retry_autocommit=0
+# The call to the SP will fail and return an error.
+#
+--connection node_1a
+--echo # Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 0;
+--let $galera_sp_bf_abort_proc = proc_with_transaction
+--let $galera_sp_bf_abort2_expect_error = 1
+--source galera_sp_bf_abort2.inc
+
+
+# ------------------------------------
+# Test 1b: exit handler, wsrep_retry_autocommit=0
+# The call to the SP will fail and return an error.
+#
+--connection node_1a
+--echo # Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 0;
+--let $galera_sp_bf_abort_proc = proc_with_transaction_exit_handler
+--let $galera_sp_bf_abort2_expect_error = 1
+--source galera_sp_bf_abort2.inc
+
+
+# ------------------------------------
+# Test 1c: continue handler, wsrep_retry_autocommit=0
+# The call to the SP will fail and return an error.
+#
+--connection node_1a
+--echo # Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 0;
+--let $galera_sp_bf_abort_proc = proc_with_transaction_continue_handler
+--let $galera_sp_bf_abort2_expect_error = 1
+--source galera_sp_bf_abort2.inc
+
+
+# ------------------------------------
+# Test 2a: no handlers, wsrep_retry_autocommit=1
+# The first call to the SP will fail, but it will be retried
+# and will return success.
+#
+--connection node_1a
+--echo # Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 1;
+--let $galera_sp_bf_abort_proc = proc_with_transaction
+
+# No error as the SP is retried
+--let $galera_sp_bf_abort2_expect_error = 0
+
+--source galera_sp_bf_abort2.inc
+
+
+# ------------------------------------
+# Test 2b: exit handler, wsrep_retry_autocommit=1
+# The first call to the SP will fail, but it will be retried
+# and will return success.
+#
+--connection node_1a
+--echo # Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 1;
+--let $galera_sp_bf_abort_proc = proc_with_transaction_exit_handler
+
+# No error as the SP is retried
+--let $galera_sp_bf_abort2_expect_error = 0
+
+--source galera_sp_bf_abort2.inc
+
+
+# ------------------------------------
+# Test 2c: continue handler, wsrep_retry_autocommit=1
+# The first call to the SP will fail, but it will be retried
+# and will return success.
+#
+--connection node_1a
+--echo # Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 1;
+--let $galera_sp_bf_abort_proc = proc_with_transaction_continue_handler
+
+# No error as the SP is retried
+--let $galera_sp_bf_abort2_expect_error = 0
+
+--source galera_sp_bf_abort2.inc
+
+
+# Test cleanup
+--connection node_1a
+DROP DATABASE database1;
+
+--connection default
+--disconnect node_1a
+
+# Wait until we have reached the initial number of connections
+# or more than the sleep time above (10 seconds) has passed.
+# $count_sessions
+--source include/wait_until_count_sessions.inc

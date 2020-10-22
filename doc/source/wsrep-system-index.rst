@@ -61,7 +61,7 @@ For more information, see :ref:`pxc-maint-mode`.
    :default: ``10`` (ten seconds)
 
 Defines the transition period
-when you change :variable:`pxc_maint_mode` to ``SHUTDOWN`` or ``MAINTENANCE``.
+when you change :variable:`pxc_maint_mode` to ``SHUTDOWN``.
 By default, the period is set to 10 seconds,
 which should be enough for most transactions to finish.
 You can increase the value to accommodate for longer-running transactions.
@@ -142,7 +142,7 @@ It is enabled by default.
 
 Automatic adjustment may not be desirable depending on application's use
 and assumptions of auto-increments.
-It can be disabled in master-slave clusters.
+It can be disabled in source-replica clusters.
 
 .. variable:: wsrep_causal_reads
 
@@ -153,9 +153,9 @@ It can be disabled in master-slave clusters.
    :dyn: Yes
    :default: ``OFF``
 
-In some cases, the master may apply events faster than a slave,
-which can cause master and slave to become out of sync for a brief moment.
-When this variable is set to ``ON``, the slave will wait
+In some cases, the source may apply events faster than a replica,
+which can cause source and replica to become out of sync for a brief moment.
+When this variable is set to ``ON``, the replica will wait
 until that event is applied before doing any other queries.
 Enabling this variable will result in larger latencies.
 
@@ -234,7 +234,7 @@ Defines whether locking sessions should be converted into transactions.
 By default, this is disabled.
 
 Enabling this variable can help older applications to work
-in a multi-master setup by converting ``LOCK/UNLOCK TABLES`` statements
+in a multi-source setup by converting ``LOCK/UNLOCK TABLES`` statements
 into ``BEGIN/COMMIT`` statements.
 It is not the same as support for locking sessions,
 but it does prevent the database from ending up
@@ -526,16 +526,16 @@ This can be used for alerting or to reconfigure load balancers.
 
 .. variable:: wsrep_on
 
-   :version 5.6.27-25.13: Variable available only in session scope
    :cli: No
    :conf: No
    :scope: Session
    :dyn: Yes
    :default: ``ON``
 
-Defines whether updates from the current session should be replicated.
-If disabled, it does not cause the node to leave the cluster
-and the node continues to communicate with other nodes.
+Defines if current session transaction changes for a node are replicated to the cluster.
+
+If set to ``OFF`` for a session, no transaction changes are replicated in that session. The setting does not cause the node to leave the cluster, and the node communicates with other nodes.
+
 
 .. variable:: wsrep_OSU_method
 
@@ -574,7 +574,7 @@ The following methods are available:
   .. important::
 
      Under the ``TOI`` method, when DDL operations are performed,
-     |abbr-mdl| is ignored. If |abr-mdl| is important, use the ``RSU``
+     |abbr-mdl| is ignored. If |abbr-mdl| is important, use the ``RSU``
      method.
 
 * ``RSU``: When the *Rolling Schema Upgrade* method is selected,
@@ -611,7 +611,7 @@ The following methods are available:
    :default: ``OFF``
 
 Defines whether the node should use transparent handling
-of preordered replication events (like replication from traditional master).
+of preordered replication events (like replication from traditional source).
 By default, this is disabled.
 
 If you enable this variable, such events will be applied locally first
@@ -742,9 +742,9 @@ the whole DDL statement is not put under TOI.
    :dyn: Yes
    :default: ``OFF``
 
-Defines whether replication slave should be restarted
+Defines whether replication replica should be restarted
 when the node joins back to the cluster.
-Enabling this can be useful because asynchronous replication slave thread
+Enabling this can be useful because asynchronous replication replica thread
 is stopped when the node tries to apply the next replication event
 while the node is in non-primary state.
 
@@ -833,7 +833,7 @@ You may want to increase it as suggested
 `in Codership documentation for flow control
 <http://galeracluster.com/documentation-webpages/nodestates.html#flow-control>`_:
 when the node is in ``JOINED`` state,
-increasing the number of slave threads can speed up the catchup to ``SYNCED``.
+increasing the number of replica threads can speed up the catchup to ``SYNCED``.
 
 You can also estimate the optimal value for this from
 :variable:`wsrep_cert_deps_distance` as suggested `on this page
@@ -977,7 +977,7 @@ Available values are:
   because it could lead to data inconsistency across the nodes.
 
 .. note:: Only ``xtrabackup-v2`` and ``rsync`` provide support
-   for clusters with GTIDs and async slaves.
+   for clusters with GTIDs and async replicas.
 
 .. variable:: wsrep_sst_receive_address
 

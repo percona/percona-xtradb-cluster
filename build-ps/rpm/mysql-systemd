@@ -98,7 +98,7 @@ wait_for_pid () {
   local sst_progress_file=$datadir/sst_in_progress
   i=0
 
-  while [[ $i -lt $service_startup_timeout ]]; do
+  while [[ $service_startup_timeout -lt 0 || $i -lt $service_startup_timeout ]]; do
 
     set +e
     case "$verb" in
