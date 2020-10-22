@@ -818,10 +818,10 @@ include/assert.inc [QUERY_RESPONSE_TIME_WRITE query counts must be equal regardl
 BEGIN;
 SELECT * FROM t1;
 a	b
-7	1
-8	1
-9	1
 10	1
+9	1
+8	1
+7	1
 COMMIT;
 ------------------Test body end----------------------
 SELECT * FROM INFORMATION_SCHEMA.QUERY_RESPONSE_TIME WHERE count != 0;
@@ -854,12 +854,12 @@ INSERT INTO t1 (b) VALUES (1), (2);
 UPDATE t1 SET b = 1;
 SELECT * FROM t1;
 a	b
-7	1
-8	1
-9	1
-10	1
-11	1
 12	1
+11	1
+10	1
+9	1
+8	1
+7	1
 DELETE FROM t1;
 COMMIT;
 ------------------Test body end----------------------

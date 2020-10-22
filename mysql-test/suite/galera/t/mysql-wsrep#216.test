@@ -26,38 +26,31 @@ DROP USER u1;
 --source include/wait_condition.inc
 
 --connection node_1
+--let $assert_only_after = CURRENT_TEST
+
 # Check that the plaintext password does not appear in the logs
-
---let $assert_text = plaintext_password
 --let $assert_select = plaintext_password
 --let $assert_count = 0
+--let $assert_text = Plaintext password count is 0
+
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
---let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
-
---let $assert_text = plaintext_password
---let $assert_select = plaintext_password
---let $assert_count = 0
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
---let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
 
 # Check that the obfuscated password appears in the logs
+--let $assert_select = 9CAB2BAE176801E82ABA9E55CCCDDBF388E0301D
 
 # Four times for the first node, in the various wsrep_debug messages
---let $assert_text = obfuscated password
---let $assert_select = 9CAB2BAE176801E82ABA9E55CCCDDBF388E0301D
 --let $assert_count = 4
+--let $assert_text = Obfuscated password count is 4 on the master node
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
---let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
 
 # Once for the second node, in the 'Slave SQL' error
---let $assert_text = obfuscated password
---let $assert_select = 9CAB2BAE176801E82ABA9E55CCCDDBF388E0301D
 --let $assert_count = 1
+--let $assert_text = Obfuscated password count is 1 on the slave node
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
---let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
 
 --disable_query_log

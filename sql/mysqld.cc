@@ -1313,9 +1313,7 @@ bool mysqld_embedded=0;
 bool mysqld_embedded=1;
 #endif
 
-#ifndef EMBEDDED_LIBRARY
 static my_bool plugins_are_initialized= FALSE;
-#endif
 
 #ifndef DBUG_OFF
 static const char* default_dbug_option;
@@ -3062,13 +3060,15 @@ void dec_connection_count(THD *thd)
     applier as well as rollbacker threads.
   */
   if (!thd->wsrep_applier)
-#endif /* WITH_WSREP */
   {
+#endif /* WITH_WSREP */
     mysql_mutex_lock(&LOCK_connection_count);
     if (--(*thd->scheduler->connection_count) == 0)
       mysql_cond_signal(&COND_connection_count);
     mysql_mutex_unlock(&LOCK_connection_count);
+#ifdef WITH_WSREP
   }
+#endif /* WITH_WSREP */
 }
 
 
@@ -4320,6 +4320,9 @@ int init_common_variables()
     return 1;
 
 #ifdef WITH_WSREP
+  if (wsrep_setup_allowed_sst_methods())
+    return 1;
+
   /*
     We need to initialize auxiliary variables, that will be
     further keep the original values of auto-increment options
@@ -5505,7 +5508,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(1);
   }
 
-#ifdef WITH_WSREP
   if (plugin_init(&remaining_argc, remaining_argv,
                   (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
                   (opt_help ? PLUGIN_INIT_SKIP_INITIALIZATION : 0)))
@@ -5514,7 +5516,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(1);
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
-#endif /* WITH_WSREP */
   /* we do want to exit if there are any other unknown options */
   if (remaining_argc > 1)
   {
@@ -6635,6 +6636,15 @@ int mysqld_main(int argc, char **argv)
   Service.SetSlowStarting(slow_start_timeout);
 #endif
 
+#ifdef WITH_WSREP
+  /*
+    Make sure that SSL library gets initialized before WSREP provider
+    is loaded. This is to ensure that possible server side initialization
+    does not have any side effects while the provider is already running
+    with open SSL sessions.
+  */
+  ssl_start();
+#endif /* */
   if (init_server_components())
     unireg_abort(1);
 

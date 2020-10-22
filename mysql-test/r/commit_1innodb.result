@@ -708,12 +708,12 @@ SUCCESS
 #
 drop temporary table t2;
 call p_verify_status_increment(1, 0, 1, 0);
-SUCCESS
-
+ERROR
+Expected commit increment: 1 actual: 0
 commit;
 call p_verify_status_increment(1, 0, 1, 0);
-SUCCESS
-
+ERROR
+Expected commit increment: 1 actual: 0
 # 26. Verify that SET AUTOCOMMIT issues an implicit commit
 #
 insert t1 set a=3;

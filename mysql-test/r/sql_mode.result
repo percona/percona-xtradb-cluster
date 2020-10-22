@@ -668,16 +668,16 @@ EXECUTE insert_stmt USING @var8;
 EXECUTE insert_stmt USING @var9;
 SELECT * FROM test_table;
 c1
-abcd'ef
-abcd"ef
-abcdef
+abcd\_ef
+abcd\%ef
+abcd\ef
+abcd	ef
+abcdef
 abcd
 ef
-abcdef
-abcd	ef
-abcd\ef
-abcd\%ef
-abcd\_ef
+abcdef
+abcd"ef
+abcd'ef
 EXECUTE update_stmt USING @to_var1, @var1;
 EXECUTE update_stmt USING @to_var2, @var2;
 EXECUTE update_stmt USING @to_var3, @var3;
@@ -689,16 +689,16 @@ EXECUTE update_stmt USING @to_var8, @var8;
 EXECUTE update_stmt USING @to_var9, @var9;
 SELECT * FROM test_table;
 c1
-wxyz'ef
-wxyz"ef
-wxyzef
+wxyz\_ef
+wxyz\%ef
+wxyz\ef
+wxyz	ef
+wxyzef
 wxyz
 ef
-wxyzef
-wxyz	ef
-wxyz\ef
-wxyz\%ef
-wxyz\_ef
+wxyzef
+wxyz"ef
+wxyz'ef
 
 # END OF CASE - STRING LILTERAL WITH BACKSLASH IN PREPARE STATEMENT
 # STRING LILTERAL WITH BACKSLASH IN FUNCTION RETURNING STRING

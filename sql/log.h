@@ -1,4 +1,4 @@
-/* Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2005, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -265,6 +265,10 @@ extern TC_LOG_DUMMY tc_log_dummy;
    before extension number is exhausted.
 */
 #define LOG_WARN_UNIQUE_FN_EXT_LEFT 1000
+
+/* max size of log messages (error log, plugins' logging, general log) */
+#define MAX_LOG_BUFFER_SIZE 1024
+#define MAX_TIME_SIZE 32
 
 #ifdef HAVE_PSI_INTERFACE
 extern PSI_mutex_key key_LOG_INFO_lock;
@@ -602,10 +606,12 @@ enum enum_binlog_row_image {
 };
 
 enum enum_binlog_format {
+#ifdef WITH_WSREP
   /*
     statement-based except for cases where only row-based can work (UUID()
     etc):
   */
+#endif /* WITH_WSREP */
   BINLOG_FORMAT_MIXED= 0, ///< statement if safe, otherwise row - autodetected
   BINLOG_FORMAT_STMT=  1, ///< statement-based
   BINLOG_FORMAT_ROW=   2, ///< row-based

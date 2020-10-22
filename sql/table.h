@@ -2069,6 +2069,7 @@ public:
    */
   char *get_table_name() const { return view != NULL ? view_name.str : table_name; }
 
+#ifdef WITH_WSREP
   /**
      @brief Returns the table alias that this TABLE_LIST represents.
      This is needed to get the real name of the temporary table as the normal
@@ -2078,6 +2079,7 @@ public:
      @details The unqualified table alias
    */
   char *get_table_alias() const { return alias; }
+#endif
 
   int fetch_number_of_rows();
   bool update_derived_keys(Field*, Item**, uint);

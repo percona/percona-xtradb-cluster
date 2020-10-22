@@ -2,12 +2,12 @@
 .\"     Title: \fBmysqlshow\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 12/20/2018
+.\"      Date: 06/02/2020
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.6
 .\"  Language: English
 .\"
-.TH "\FBMYSQLSHOW\FR" "1" "12/20/2018" "MySQL 5\&.6" "MySQL Database System"
+.TH "\FBMYSQLSHOW\FR" "1" "06/02/2020" "MySQL 5\&.6" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -42,7 +42,7 @@ client can be used to quickly see which databases exist, their tables, or a tabl
 provides a command\-line interface to several SQL
 SHOW
 statements\&. See
-Section\ \&13.7.5, \(lqSHOW Syntax\(rq\&. The same information can be obtained by using those statements directly\&. For example, you can issue them from the
+Section\ \&13.7.5, \(lqSHOW Statements\(rq\&. The same information can be obtained by using those statements directly\&. For example, you can issue them from the
 \fBmysql\fR
 client program\&.
 .PP
@@ -120,7 +120,7 @@ supports the following options, which can be specified on the command line or in
 and
 [client]
 groups of an option file\&. For information about option files used by MySQL programs, see
-Section\ \&4.2.6, \(lqUsing Option Files\(rq\&.
+Section\ \&4.2.2.2, \(lqUsing Option Files\(rq\&.
 .sp
 .RS 4
 .ie n \{\
@@ -132,7 +132,6 @@ Section\ \&4.2.6, \(lqUsing Option Files\(rq\&.
 .\}
 \fB\-\-help\fR,
 \fB\-?\fR
-.sp
 Display a help message and exit\&.
 .RE
 .sp
@@ -145,10 +144,7 @@ Display a help message and exit\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-bind\-address=\fR\fB\fIip_address\fR\fR
-.sp
 On a computer having multiple network interfaces, use this option to select which interface to use for connecting to the MySQL server\&.
-.sp
-This option is supported beginning with MySQL 5\&.6\&.1\&.
 .RE
 .sp
 .RS 4
@@ -160,9 +156,8 @@ This option is supported beginning with MySQL 5\&.6\&.1\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-character\-sets\-dir=\fR\fB\fIdir_name\fR\fR
-.sp
 The directory where character sets are installed\&. See
-Section\ \&10.14, \(lqCharacter Set Configuration\(rq\&.
+Section\ \&10.15, \(lqCharacter Set Configuration\(rq\&.
 .RE
 .sp
 .RS 4
@@ -175,8 +170,8 @@ Section\ \&10.14, \(lqCharacter Set Configuration\(rq\&.
 .\}
 \fB\-\-compress\fR,
 \fB\-C\fR
-.sp
-Compress all information sent between the client and the server if both support compression\&.
+Compress all information sent between the client and the server if possible\&. See
+Section\ \&4.2.5, \(lqConnection Compression Control\(rq\&.
 .RE
 .sp
 .RS 4
@@ -188,7 +183,6 @@ Compress all information sent between the client and the server if both support 
 .IP \(bu 2.3
 .\}
 \fB\-\-count\fR
-.sp
 Show the number of rows per table\&. This can be slow for non\-MyISAM
 tables\&.
 .RE
@@ -203,12 +197,16 @@ tables\&.
 .\}
 \fB\-\-debug[=\fR\fB\fIdebug_options\fR\fR\fB]\fR,
 \fB\-# [\fR\fB\fIdebug_options\fR\fR\fB]\fR
-.sp
 Write a debugging log\&. A typical
 \fIdebug_options\fR
 string is
 d:t:o,\fIfile_name\fR\&. The default is
 d:t:o\&.
+.sp
+This option is available only if MySQL was built using
+\fBWITH_DEBUG\fR\&. MySQL release binaries provided by Oracle are
+\fInot\fR
+built using this option\&.
 .RE
 .sp
 .RS 4
@@ -220,8 +218,12 @@ d:t:o\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-debug\-check\fR
-.sp
 Print some debugging information when the program exits\&.
+.sp
+This option is available only if MySQL was built using
+\fBWITH_DEBUG\fR\&. MySQL release binaries provided by Oracle are
+\fInot\fR
+built using this option\&.
 .RE
 .sp
 .RS 4
@@ -233,8 +235,12 @@ Print some debugging information when the program exits\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-debug\-info\fR
-.sp
 Print debugging information and memory and CPU usage statistics when the program exits\&.
+.sp
+This option is available only if MySQL was built using
+\fBWITH_DEBUG\fR\&. MySQL release binaries provided by Oracle are
+\fInot\fR
+built using this option\&.
 .RE
 .sp
 .RS 4
@@ -246,11 +252,10 @@ Print debugging information and memory and CPU usage statistics when the program
 .IP \(bu 2.3
 .\}
 \fB\-\-default\-character\-set=\fR\fB\fIcharset_name\fR\fR
-.sp
 Use
 \fIcharset_name\fR
 as the default character set\&. See
-Section\ \&10.14, \(lqCharacter Set Configuration\(rq\&.
+Section\ \&10.15, \(lqCharacter Set Configuration\(rq\&.
 .RE
 .sp
 .RS 4
@@ -262,11 +267,8 @@ Section\ \&10.14, \(lqCharacter Set Configuration\(rq\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-default\-auth=\fR\fB\fIplugin\fR\fR
-.sp
-A hint about the client\-side authentication plugin to use\&. See
-Section\ \&6.3.7, \(lqPluggable Authentication\(rq\&.
-.sp
-This option was added in MySQL 5\&.6\&.2\&.
+A hint about which client\-side authentication plugin to use\&. See
+Section\ \&6.2.11, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
 .RS 4
@@ -278,13 +280,12 @@ This option was added in MySQL 5\&.6\&.2\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-defaults\-extra\-file=\fR\fB\fIfile_name\fR\fR
-.sp
 Read this option file after the global option file but (on Unix) before the user option file\&. If the file does not exist or is otherwise inaccessible, an error occurs\&.
 \fIfile_name\fR
 is interpreted relative to the current directory if given as a relative path name rather than a full path name\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -296,7 +297,6 @@ Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\
 .IP \(bu 2.3
 .\}
 \fB\-\-defaults\-file=\fR\fB\fIfile_name\fR\fR
-.sp
 Use only the given option file\&. If the file does not exist or is otherwise inaccessible, an error occurs\&.
 \fIfile_name\fR
 is interpreted relative to the current directory if given as a relative path name rather than a full path name\&.
@@ -306,7 +306,7 @@ Exception: Even with
 \&.mylogin\&.cnf\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -318,7 +318,6 @@ Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\
 .IP \(bu 2.3
 .\}
 \fB\-\-defaults\-group\-suffix=\fR\fB\fIstr\fR\fR
-.sp
 Read not only the usual option groups, but also groups with the usual names and a suffix of
 \fIstr\fR\&. For example,
 \fBmysqlshow\fR
@@ -337,7 +336,7 @@ and
 groups\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -349,11 +348,10 @@ Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\
 .IP \(bu 2.3
 .\}
 \fB\-\-enable\-cleartext\-plugin\fR
-.sp
 Enable the
 mysql_clear_password
 cleartext authentication plugin\&. (See
-Section\ \&6.5.1.5, \(lqClient-Side Cleartext Pluggable Authentication\(rq\&.)
+Section\ \&6.4.1.5, \(lqClient-Side Cleartext Pluggable Authentication\(rq\&.)
 .sp
 This option was added in MySQL 5\&.6\&.28\&.
 .RE
@@ -368,7 +366,6 @@ This option was added in MySQL 5\&.6\&.28\&.
 .\}
 \fB\-\-host=\fR\fB\fIhost_name\fR\fR,
 \fB\-h \fR\fB\fIhost_name\fR\fR
-.sp
 Connect to the MySQL server on the given host\&.
 .RE
 .sp
@@ -382,7 +379,6 @@ Connect to the MySQL server on the given host\&.
 .\}
 \fB\-\-keys\fR,
 \fB\-k\fR
-.sp
 Show table indexes\&.
 .RE
 .sp
@@ -395,7 +391,6 @@ Show table indexes\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-login\-path=\fR\fB\fIname\fR\fR
-.sp
 Read options from the named login path in the
 \&.mylogin\&.cnf
 login path file\&. A
@@ -406,7 +401,7 @@ utility\&. See
 \fBmysql_config_editor\fR(1)\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -418,7 +413,6 @@ Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\
 .IP \(bu 2.3
 .\}
 \fB\-\-no\-defaults\fR
-.sp
 Do not read any option files\&. If program startup fails due to reading unknown options from an option file,
 \fB\-\-no\-defaults\fR
 can be used to prevent them from being read\&.
@@ -434,7 +428,7 @@ utility\&. See
 \fBmysql_config_editor\fR(1)\&.)
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -447,21 +441,24 @@ Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\
 .\}
 \fB\-\-password[=\fR\fB\fIpassword\fR\fR\fB]\fR,
 \fB\-p[\fR\fB\fIpassword\fR\fR\fB]\fR
-.sp
-The password to use when connecting to the server\&. If you use the short option form (\fB\-p\fR), you
-\fIcannot\fR
-have a space between the option and the password\&. If you omit the
-\fIpassword\fR
-value following the
-\fB\-\-password\fR
+The password of the MySQL account used for connecting to the server\&. The password value is optional\&. If not given,
+\fBmysqlshow\fR
+prompts for one\&. If given, there must be
+\fIno space\fR
+between
+\fB\-\-password=\fR
 or
 \fB\-p\fR
-option on the command line,
-\fBmysqlshow\fR
-prompts for one\&.
+and the password following it\&. If no password option is specified, the default is to send no password\&.
 .sp
-Specifying a password on the command line should be considered insecure\&. See
-Section\ \&6.1.2.1, \(lqEnd-User Guidelines for Password Security\(rq\&. You can use an option file to avoid giving the password on the command line\&.
+Specifying a password on the command line should be considered insecure\&. To avoid giving the password on the command line, use an option file\&. See
+Section\ \&6.1.2.1, \(lqEnd-User Guidelines for Password Security\(rq\&.
+.sp
+To explicitly specify that there is no password and that
+\fBmysqlshow\fR
+should not prompt for one, use the
+\fB\-\-skip\-password\fR
+option\&.
 .RE
 .sp
 .RS 4
@@ -474,8 +471,11 @@ Section\ \&6.1.2.1, \(lqEnd-User Guidelines for Password Security\(rq\&. You can
 .\}
 \fB\-\-pipe\fR,
 \fB\-W\fR
-.sp
-On Windows, connect to the server using a named pipe\&. This option applies only if the server supports named\-pipe connections\&.
+On Windows, connect to the server using a named pipe\&. This option applies only if the server was started with the
+named_pipe
+system variable enabled to support named\-pipe connections\&. In addition, the user making the connection must be a member of the Windows group specified by the
+named_pipe_full_access_group
+system variable\&.
 .RE
 .sp
 .RS 4
@@ -487,15 +487,12 @@ On Windows, connect to the server using a named pipe\&. This option applies only
 .IP \(bu 2.3
 .\}
 \fB\-\-plugin\-dir=\fR\fB\fIdir_name\fR\fR
-.sp
 The directory in which to look for plugins\&. Specify this option if the
 \fB\-\-default\-auth\fR
 option is used to specify an authentication plugin but
 \fBmysqlshow\fR
 does not find it\&. See
-Section\ \&6.3.7, \(lqPluggable Authentication\(rq\&.
-.sp
-This option was added in MySQL 5\&.6\&.2\&.
+Section\ \&6.2.11, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
 .RS 4
@@ -508,8 +505,7 @@ This option was added in MySQL 5\&.6\&.2\&.
 .\}
 \fB\-\-port=\fR\fB\fIport_num\fR\fR,
 \fB\-P \fR\fB\fIport_num\fR\fR
-.sp
-The TCP/IP port number to use for the connection\&.
+For TCP/IP connections, the port number to use\&.
 .RE
 .sp
 .RS 4
@@ -521,11 +517,10 @@ The TCP/IP port number to use for the connection\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-print\-defaults\fR
-.sp
 Print the program name and all options that it gets from option files\&.
 .sp
 For additional information about this and other option\-file options, see
-Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+Section\ \&4.2.2.3, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -537,9 +532,8 @@ Section\ \&4.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\
 .IP \(bu 2.3
 .\}
 \fB\-\-protocol={TCP|SOCKET|PIPE|MEMORY}\fR
-.sp
-The connection protocol to use for connecting to the server\&. It is useful when the other connection parameters normally would cause a protocol to be used other than the one you want\&. For details on the permissible values, see
-Section\ \&4.2.2, \(lqConnecting to the MySQL Server\(rq\&.
+The connection protocol to use for connecting to the server\&. It is useful when the other connection parameters normally result in use of a protocol other than the one you want\&. For details on the permissible values, see
+Section\ \&4.2.4, \(lqConnecting to the MySQL Server Using Command Options\(rq\&.
 .RE
 .sp
 .RS 4
@@ -551,7 +545,6 @@ Section\ \&4.2.2, \(lqConnecting to the MySQL Server\(rq\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-secure\-auth\fR
-.sp
 Do not send passwords to the server in old (pre\-4\&.1) format\&. This prevents connections except for servers that use the newer password format\&. This option is enabled by default; use
 \fB\-\-skip\-secure\-auth\fR
 to disable it\&. This option was added in MySQL 5\&.6\&.17\&.
@@ -568,7 +561,7 @@ to disable it\&. This option was added in MySQL 5\&.6\&.17\&.
 .ps -1
 .br
 Passwords that use the pre\-4\&.1 hashing method are less secure than passwords that use the native password hashing method and should be avoided\&. Pre\-4\&.1 passwords are deprecated and support for them will be removed in a future MySQL release\&. For account upgrade instructions, see
-Section\ \&6.5.1.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mysql_old_password Plugin\(rq\&.
+Section\ \&6.4.1.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mysql_old_password Plugin\(rq\&.
 .sp .5v
 .RE
 .if n \{\
@@ -597,13 +590,12 @@ This option is deprecated and will be removed in a future release\&. As of MySQL
 .IP \(bu 2.3
 .\}
 \fB\-\-shared\-memory\-base\-name=\fR\fB\fIname\fR\fR
-.sp
-On Windows, the shared\-memory name to use, for connections made using shared memory to a local server\&. The default value is
+On Windows, the shared\-memory name to use for connections made using shared memory to a local server\&. The default value is
 MYSQL\&. The shared\-memory name is case\-sensitive\&.
 .sp
-The server must be started with the
-\fB\-\-shared\-memory\fR
-option to enable shared\-memory connections\&.
+This option applies only if the server was started with the
+shared_memory
+system variable enabled to support shared\-memory connections\&.
 .RE
 .sp
 .RS 4
@@ -616,7 +608,6 @@ option to enable shared\-memory connections\&.
 .\}
 \fB\-\-show\-table\-type\fR,
 \fB\-t\fR
-.sp
 Show a column indicating the table type, as in
 SHOW FULL TABLES\&. The type is
 BASE TABLE
@@ -634,9 +625,14 @@ VIEW\&.
 .\}
 \fB\-\-socket=\fR\fB\fIpath\fR\fR,
 \fB\-S \fR\fB\fIpath\fR\fR
-.sp
 For connections to
 localhost, the Unix socket file to use, or, on Windows, the name of the named pipe to use\&.
+.sp
+On Windows, this option applies only if the server was started with the
+named_pipe
+system variable enabled to support named\-pipe connections\&. In addition, the user making the connection must be a member of the Windows group specified by the
+named_pipe_full_access_group
+system variable\&.
 .RE
 .sp
 .RS 4
@@ -648,11 +644,10 @@ localhost, the Unix socket file to use, or, on Windows, the name of the named pi
 .IP \(bu 2.3
 .\}
 \fB\-\-ssl*\fR
-.sp
 Options that begin with
 \fB\-\-ssl\fR
 specify whether to connect to the server using SSL and indicate where to find SSL keys and certificates\&. See
-Section\ \&6.4.2, \(lqCommand Options for Encrypted Connections\(rq\&.
+the section called \(lqCommand Options for Encrypted Connections\(rq\&.
 .RE
 .sp
 .RS 4
@@ -665,7 +660,6 @@ Section\ \&6.4.2, \(lqCommand Options for Encrypted Connections\(rq\&.
 .\}
 \fB\-\-status\fR,
 \fB\-i\fR
-.sp
 Display extra information about each table\&.
 .RE
 .sp
@@ -679,8 +673,7 @@ Display extra information about each table\&.
 .\}
 \fB\-\-user=\fR\fB\fIuser_name\fR\fR,
 \fB\-u \fR\fB\fIuser_name\fR\fR
-.sp
-The MySQL user name to use when connecting to the server\&.
+The user name of the MySQL account to use for connecting to the server\&.
 .RE
 .sp
 .RS 4
@@ -693,7 +686,6 @@ The MySQL user name to use when connecting to the server\&.
 .\}
 \fB\-\-verbose\fR,
 \fB\-v\fR
-.sp
 Verbose mode\&. Print more information about what the program does\&. This option can be used multiple times to increase the amount of information\&.
 .RE
 .sp
@@ -707,13 +699,12 @@ Verbose mode\&. Print more information about what the program does\&. This optio
 .\}
 \fB\-\-version\fR,
 \fB\-V\fR
-.sp
 Display version information and exit\&.
 .RE
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 1997, 2020, Oracle and/or its affiliates.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP
