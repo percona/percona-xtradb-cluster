@@ -1063,10 +1063,11 @@ static MYSQL_SESSION setup_server_session(bool initialize_thread) {
         "Failed to fetch the security context when contacting the server");
     return NULL;
   }
-  if (security_context_lookup(sc, "mysql.pxc.internal.session", "localhost",
-                              NULL, NULL)) {
+  if (security_context_lookup(sc, PXC_INTERNAL_SESSION_USER.str,
+                              PXC_INTERNAL_SESSION_HOST.str, NULL, NULL)) {
     cleanup_server_session(session, initialize_thread);
-    WSREP_ERROR("Error accessing server with user:mysql.pxc.internal.session");
+    WSREP_ERROR("Error accessing server with user:%s@%s",
+                PXC_INTERNAL_SESSION_USER.str, PXC_INTERNAL_SESSION_HOST.str);
     return NULL;
   }
   // Turn wsrep off here (because the server session has it's own THD object)

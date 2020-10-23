@@ -1,7 +1,60 @@
 SELECT 1;
 1
 1
+[connection node_2]
+"# restarting node2 (no SST)"
+# restart:<hidden args>
 SET SESSION wsrep_sync_wait = 0;
-# restart
-SET GLOBAL super_read_only = OFF;
-SET GLOBAL read_only = OFF;
+SELECT 1;
+1
+1
+include/assert_grep.inc [Could not find warnings about super-read-only]
+"# shutting down node2"
+SET SESSION wsrep_sync_wait = 0;
+"# restarting node2 (with SST)"
+# restart:<hidden args>
+SET SESSION wsrep_sync_wait = 0;
+SELECT 1;
+1
+1
+include/assert_grep.inc [Could not find warnings about super-read-only]
+"# shutting down node2"
+[connection node_2]
+SET SESSION wsrep_sync_wait = 0;
+"# shutting down node1"
+[connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+"# restarting node1 (bootstrapped with super-read-only)"
+# restart:<hidden args>
+SET SESSION wsrep_sync_wait = 0;
+SELECT 1;
+1
+1
+include/assert_grep.inc [Could not find warnings about super-read-only in the logs]
+[connection node_2]
+"# starting node2 (no SST)"
+# restart:<hidden args>
+SET SESSION wsrep_sync_wait = 0;
+SELECT 1;
+1
+1
+include/assert_grep.inc [Could not find warnings about super-read-only in the donor logs]
+include/assert_grep.inc [Could not find warnings about super-read-only in the joiner logs]
+[connection node_2]
+"# shutting down node2"
+SET SESSION wsrep_sync_wait = 0;
+"# restarting node2 (with SST)"
+# restart:<hidden args>
+SET SESSION wsrep_sync_wait = 0;
+SELECT 1;
+1
+1
+include/assert_grep.inc [Could not find warnings about super-read-only in the joiner logs]
+include/assert_grep.inc [Could not find warnings about super-read-only in the donor logs]
+"# restarting node1"
+[connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+# restart:<hidden args>
+"# restarting node2"
+[connection node_2]
+# restart:<hidden args>

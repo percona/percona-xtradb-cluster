@@ -316,9 +316,9 @@ extern wsrep_seqno_t wsrep_locked_seqno;
     if (victim_thd) WSREP_LOG_CONFLICT_THD(victim_thd, "Victim thread");      \
   }
 
-#define WSREP_QUERY(thd)                                           \
-  ((!opt_general_log_raw) && thd->rewritten_query().length()       \
-       ? wsrep_thd_rewritten_query(thd).c_ptr_safe()               \
+#define WSREP_QUERY(thd)                                     \
+  ((!opt_general_log_raw) && thd->rewritten_query().length() \
+       ? wsrep_thd_rewritten_query(thd).c_ptr_safe()         \
        : thd->query().str)
 
 // Use this for logging output received from the SST scripts
@@ -535,5 +535,11 @@ class wsrep_scope_guard {
  private:
   std::function<void()> _scope_leave;
 };
+
+/**
+ * User/Host components for the PXC internal session user.
+ */
+extern LEX_CSTRING PXC_INTERNAL_SESSION_USER;
+extern LEX_CSTRING PXC_INTERNAL_SESSION_HOST;
 
 #endif /* WSREP_MYSQLD_H */

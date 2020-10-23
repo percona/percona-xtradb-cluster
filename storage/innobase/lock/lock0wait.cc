@@ -209,8 +209,8 @@ static bool wsrep_is_BF_lock_timeout(trx_t *trx) {
                << " Trx id: " << trx_get_id_for_print(trx)
                << " WSREP trx_id: " << wsrep_thd_transaction_id(trx->mysql_thd)
                << " Seqno: " << wsrep_thd_trx_seqno(trx->mysql_thd) << "\n"
-               << " Query: " << innobase_get_stmt_unsafe(trx->mysql_thd,
-                                                         &unused);
+               << " Query: "
+               << innobase_get_stmt_unsafe(trx->mysql_thd, &unused);
     srv_print_innodb_monitor = true;
     srv_print_innodb_lock_monitor = true;
     os_event_set(srv_monitor_event);

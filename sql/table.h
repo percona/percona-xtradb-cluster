@@ -3930,6 +3930,12 @@ extern LEX_CSTRING RLI_INFO_NAME;
 extern LEX_CSTRING MI_INFO_NAME;
 extern LEX_CSTRING WORKER_INFO_NAME;
 
+#ifdef WITH_WSREP
+/* WSREP tables */
+extern LEX_CSTRING WSREP_DB_NAME;
+extern LEX_CSTRING WSREP_TABLE_PREFIX;
+#endif /* WITH_WSREP */
+
 inline bool is_infoschema_db(const char *name, size_t len) {
   return (
       INFORMATION_SCHEMA_NAME.length == len &&
@@ -3958,6 +3964,18 @@ inline bool is_user_table(TABLE *table) {
   const char *name = table->s->table_name.str;
   return strncmp(name, tmp_file_prefix, tmp_file_prefix_length);
 }
+
+#ifdef WITH_WSREP
+inline bool is_wsrep_system_table(const char *db_name, size_t db_len,
+                                  const char *table_name, size_t table_len) {
+  return (
+      WSREP_DB_NAME.length == db_len &&
+      !native_strncasecmp(db_name, WSREP_DB_NAME.str, WSREP_DB_NAME.length) &&
+      WSREP_TABLE_PREFIX.length < table_len &&
+      !native_strncasecmp(table_name, WSREP_TABLE_PREFIX.str,
+                          WSREP_TABLE_PREFIX.length));
+}
+#endif
 
 bool is_simple_order(ORDER *order);
 

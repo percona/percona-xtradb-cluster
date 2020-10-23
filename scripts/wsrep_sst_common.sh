@@ -791,7 +791,7 @@ function run_post_processing_steps()
         --log-error=${mysqld_err_log} \
         --log_output=NONE \
         --server-id=1 \
-        --super_read_only=OFF \
+        --read_only=OFF --super_read_only=OFF \
         --pid-file=${mysql_upgrade_dir_path}/mysqld.pid \
         --socket=$upgrade_socket \
         --datadir=$datadir --wsrep_provider=none"
