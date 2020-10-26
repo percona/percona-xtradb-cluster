@@ -373,12 +373,12 @@ fi
         fi
         mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
              "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
-        cp garb/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
+        install -m 0755 garb/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
         cp libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
     else
         mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
              "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
-        cp $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
+        install -m 0755 $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
         cp $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
     fi
     ) || exit 1
