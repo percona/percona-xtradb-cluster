@@ -63,9 +63,16 @@ SELECT COUNT(*) = 5 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system use
 DROP TABLE t1;
 DROP TABLE ten;
 
+--connection node_1
+--echo #node-1
+# These error messages can appear if the node op is BF-aborted
+CALL mtr.add_suppression("Failed to init table");
+CALL mtr.add_suppression("Error deleting row");
+CALL mtr.add_suppression("init_for_index_scan failed to read first record");
+
 --connection node_2
 --echo #node-2
-# These error messages can appear if the node2 op is BF-aborted
+# These error messages can appear if the node op is BF-aborted
 CALL mtr.add_suppression("Failed to init table");
 CALL mtr.add_suppression("Error deleting row");
 CALL mtr.add_suppression("init_for_index_scan failed to read first record");
