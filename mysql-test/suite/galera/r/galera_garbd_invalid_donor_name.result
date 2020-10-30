@@ -1,0 +1,18 @@
+#
+# 1. Create a two node cluster.
+#
+# 2. Shutdown node2 and use its ports for garbd.
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+Variable_name	Value
+wsrep_flow_control_interval	[ 100, 100 ]
+
+# 3. Start garbd in background with an invalid donor name and wait till garbd is shutdown.
+#
+# 4. Restart node2
+[connection node_2]
+# restart
+# 5. Verify that the reason for the shutdown is logged in the garbd log.
+include/assert_grep.inc [Appropriate message has been written to the garbd log explaining the reason for the shutdown.]
+CALL mtr.add_suppression("Member .*garb.* requested state transfer from 'invalid_donor', but it is impossible to select State Transfer donor: No route to host");
+#
+# 6. Cleanup

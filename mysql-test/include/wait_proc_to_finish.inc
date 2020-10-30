@@ -17,7 +17,7 @@
 
 if (!$pid_file)
 {
-  --die ERROR IN TEST: 'pid_file' parameter specified
+  --die ERROR IN TEST: 'pid_file' parameter is not specified
 }
 
 --let _PID_FILE = $pid_file
