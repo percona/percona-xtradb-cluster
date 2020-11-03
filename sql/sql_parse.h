@@ -67,15 +67,11 @@ bool check_fk_parent_table_access(THD *thd,
                                   const char *child_table_db,
                                   HA_CREATE_INFO *create_info,
                                   Alter_info *alter_info);
-<<<<<<< HEAD
 #endif
-||||||| d043d300a6e
 
-=======
 bool check_lock_view_underlying_table_access(THD *thd, TABLE_LIST *tbl,
                                              bool *fake_lock_tables_acl);
 
->>>>>>> 100e92eb7c6503a1b6211ba041506bbbaafa7a31
 bool parse_sql(THD *thd,
                Parser_state *parser_state,
                Object_creation_ctx *creation_ctx);
