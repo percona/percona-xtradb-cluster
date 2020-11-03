@@ -1940,12 +1940,23 @@ bool check_readonly(THD *thd, bool err_if_readonly) {
   */
   if (thd->slave_thread || thd->is_cmd_skip_readonly()) return false;
 
+  Security_context *sctx = thd->security_context();
+
 #ifdef WITH_WSREP
   /* Ignore readonly for background wsrep applier too (like slave thread) */
   if (WSREP(thd) && thd->wsrep_applier) return false;
+
+  /* Ignore readonly for PXC internal user */
+  if (sctx->user().str != nullptr &&
+      !strncmp(sctx->user().str, PXC_INTERNAL_SESSION_USER.str,
+               PXC_INTERNAL_SESSION_USER.length) &&
+      sctx->host().str != nullptr &&
+      !strncmp(sctx->host().str, PXC_INTERNAL_SESSION_HOST.str,
+               PXC_INTERNAL_SESSION_HOST.length)) {
+    return false;
+  }
 #endif /* WITH_WSREP */
 
-  Security_context *sctx = thd->security_context();
   bool is_super =
       sctx->check_access(SUPER_ACL) ||
       sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN")).first;

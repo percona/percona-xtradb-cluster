@@ -159,6 +159,14 @@ LEX_CSTRING GTID_EXECUTED_NAME = {STRING_WITH_LEN("gtid_executed")};
 /* Keyword for parsing generated column functions */
 LEX_CSTRING PARSE_GCOL_KEYWORD = {STRING_WITH_LEN("parse_gcol_expr")};
 
+#ifdef WITH_WSREP
+/* WSREP schema DB name */
+LEX_CSTRING WSREP_DB_NAME = {STRING_WITH_LEN("mysql")};
+
+/* WSREP tablename prefix */
+LEX_CSTRING WSREP_TABLE_PREFIX = {STRING_WITH_LEN("wsrep_")};
+#endif /* WITH_WSREP */
+
 /* Functions defined in this file */
 
 static Item *create_view_field(THD *thd, TABLE_LIST *view, Item **field_ref,

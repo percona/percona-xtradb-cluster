@@ -1,26 +1,235 @@
 #
-# This test checks the pxc-encrypt-cluster-traffic option (auto SSL config).
-# Initial SST happens via xtrabackup, so there is not much to do in the body of the test
+# This test checks that the cluster starts up (without error)
+# if super-read-only=ON.  This will check server startup
+# as well as the SST process.
 #
 
 --source include/big_test.inc
+--source include/have_util_sed.inc
 --source include/galera_cluster.inc
-
-SELECT 1;
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
 
+SELECT 1;
+
+# --------------------------------
+# Test 1: Joiner node is super-read-only
+# --------------------------------
+
+--let $SUPER_READ_ONLY_CONFIG_FILE = $MYSQLTEST_VARDIR/tmp/galera_sst_xtrabackup-v2_super_read_only.test.cnf
+--copy_file $MYSQLTEST_VARDIR/my.cnf $SUPER_READ_ONLY_CONFIG_FILE
+--append_file $SUPER_READ_ONLY_CONFIG_FILE
+	[mysqld]
+	super_read_only=ON
+EOF
+
+# --------------------------------
+# Test 1a: Joiner (node2) is super-read-only (no SST)
+# --------------------------------
+
+# restart the node2 with super-read-only=ON (no SST)
 --connection node_2
+--echo [connection node_2]
+
+--echo "# restarting node2 (no SST)"
+--let $restart_hide_args=1
+--let $restart_parameters = "restart: --defaults-file=$SUPER_READ_ONLY_CONFIG_FILE"
+--source include/restart_mysqld.inc
+
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+SELECT 1;
+
+# We should not find the super-read-only warnings in the logs
+--let $assert_text = Could not find warnings about super-read-only
+--let $assert_select = super-read-only
+--let $assert_count = 0
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+
+# --------------------------------
+# Test 1b: Joiner (node2) is super-read-only (with SST)
+# --------------------------------
+--echo "# shutting down node2"
 SET SESSION wsrep_sync_wait = 0;
 --source include/shutdown_mysqld.inc
+
+# remove the grastate.dat file to force an SST
 --remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
---exec sed -i '/^\[mysqld.2\]/a super_read_only=ON' $MYSQLTEST_VARDIR/my.cnf
+
+# restart the server with super-read-only=ON (SST)
+--echo "# restarting node2 (with SST)"
+--let $restart_hide_args=1
+--let $start_mysqld_params = "--defaults-file=$SUPER_READ_ONLY_CONFIG_FILE"
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --source include/start_mysqld.inc
 
-#cleanup
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+SELECT 1;
+
+# We should not find the super-read-only warnings in the logs
+--let $assert_text = Could not find warnings about super-read-only
+--let $assert_select = super-read-only
+--let $assert_count = 0
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+
+# --------------------------------
+# Test 2: Bootstrapped node is super-read-only
+# Restart node1 (it should startup as bootstrapped)
+# --------------------------------
+
+# Shutdown the cluster
+--echo "# shutting down node2"
 --connection node_2
-SET GLOBAL super_read_only = OFF;
-SET GLOBAL read_only = OFF;
---exec sed -i '/^super_read_only=ON/d' $MYSQLTEST_VARDIR/my.cnf
+--echo [connection node_2]
+SET SESSION wsrep_sync_wait = 0;
+--source include/shutdown_mysqld.inc
+
+--echo "# shutting down node1"
+--connection node_1
+--echo [connection node_1]
+SET SESSION wsrep_sync_wait = 0;
+--source include/shutdown_mysqld.inc
+
+# ensure that we can startup with grastate.dat
+--exec $SED -i "s/safe_to_bootstrap:[ \t]*0/safe_to_bootstrap: 1/" $MYSQLTEST_VARDIR/mysqld.1/data/grastate.dat
+
+# restart node1 with super-read-only=ON (SST)
+--echo "# restarting node1 (bootstrapped with super-read-only)"
+--let $restart_hide_args=1
+--let $start_mysqld_params = "--defaults-file=$SUPER_READ_ONLY_CONFIG_FILE --wsrep-new-cluster"
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--source include/start_mysqld.inc
+
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+SELECT 1;
+
+# We should not find the super-read-only warnings in the logs
+--let $assert_text = Could not find warnings about super-read-only in the logs
+--let $assert_select = super-read-only
+--let $assert_count = 0
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+
+# --------------------------------
+# Test 3: Donor node (node1) is super-read-only
+# --------------------------------
+
+# --------------------------------
+# Test 3a: Donor (node2) is super-read-only (no SST)
+# --------------------------------
+
+--connection node_2
+--echo [connection node_2]
+--echo "# starting node2 (no SST)"
+--let $restart_hide_args=1
+--let $start_mysqld_params = "--defaults-file=$SUPER_READ_ONLY_CONFIG_FILE"
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+SELECT 1;
+
+# We should not find the super-read-only warnings in the logs
+--let $assert_text = Could not find warnings about super-read-only in the donor logs
+--let $assert_select = super-read-only
+--let $assert_count = 0
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+# We should not find the super-read-only warnings in the logs
+--let $assert_text = Could not find warnings about super-read-only in the joiner logs
+--let $assert_select = super-read-only
+--let $assert_count = 0
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+# --------------------------------
+# Test 3b: Donor (node2) is super-read-only (with SST)
+# --------------------------------
+
+--connection node_2
+--echo [connection node_2]
+--echo "# shutting down node2"
+SET SESSION wsrep_sync_wait = 0;
+--source include/shutdown_mysqld.inc
+
+# remove the grastate.dat file to force an SST
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+# restart node2 with super-read-only=ON (SST)
+--echo "# restarting node2 (with SST)"
+--let $restart_hide_args=1
+--let $start_mysqld_params = "--defaults-file=$SUPER_READ_ONLY_CONFIG_FILE"
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+SELECT 1;
+
+# We should not find the super-read-only warnings in the logs
+--let $assert_text = Could not find warnings about super-read-only in the joiner logs
+--let $assert_select = super-read-only
+--let $assert_count = 0
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+# We should not find the super-read-only warnings in the logs
+--let $assert_text = Could not find warnings about super-read-only in the donor logs
+--let $assert_select = super-read-only
+--let $assert_count = 0
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+#cleanup
+--echo "# restarting node1"
+--connection node_1
+--echo [connection node_1]
+
+SET SESSION wsrep_sync_wait = 0;
+--source include/shutdown_mysqld.inc
+
+# ensure that we can bootstrap with grastate.dat
+--exec $SED -i "s/safe_to_bootstrap:[ \t]*0/safe_to_bootstrap: 1/" $MYSQLTEST_VARDIR/mysqld.1/data/grastate.dat
+
+# restart node1
+--let $restart_hide_args=1
+--let $start_mysqld_params = ""
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--source include/start_mysqld.inc
+
+
+--echo "# restarting node2"
+--connection node_2
+--echo [connection node_2]
+--let $restart_hide_args=1
+--let $restart_parameters = "restart:"
+--source include/restart_mysqld.inc
+
+--remove_file $SUPER_READ_ONLY_CONFIG_FILE

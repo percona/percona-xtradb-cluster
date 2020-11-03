@@ -349,6 +349,10 @@ bool some_non_temp_table_to_be_updated(THD *thd, TABLE_LIST *tables) {
       in readonly mode.
     */
     if (table->updating && !find_temporary_table(thd, table) &&
+#ifdef WITH_WSREP
+        !is_wsrep_system_table(table->db, table->db_length, table->table_name,
+                               table->table_name_length) &&
+#endif /* WITH_WSREP */
         !is_perfschema_db(table->db, table->db_length))
       return true;
   }
@@ -447,7 +451,7 @@ void init_sql_command_flags(void) {
   server_command_flags[COM_TIME] |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_INIT_DB] |= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_END] |= CF_SKIP_WSREP_CHECK;
-  server_command_flags[COM_FIELD_LIST]   |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_FIELD_LIST] |= CF_SKIP_WSREP_CHECK;
 
   /*
     COM_QUERY and COM_SET_OPTION are allowed to pass the early COM_xxx filter,

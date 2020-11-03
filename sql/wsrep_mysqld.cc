@@ -344,6 +344,10 @@ PSI_file_info all_galera_files[] = {
 typedef std::vector<void *> wsrep_psi_key_vec_t;
 static wsrep_psi_key_vec_t wsrep_psi_key_vec;
 
+LEX_CSTRING PXC_INTERNAL_SESSION_USER = {
+    STRING_WITH_LEN("mysql.pxc.internal.session")};
+LEX_CSTRING PXC_INTERNAL_SESSION_HOST = {STRING_WITH_LEN("localhost")};
+
 /*!
  * @brief a callback to create PFS instrumented mutex/condition variables
  *
@@ -2284,16 +2288,16 @@ void wsrep_to_isolation_end(THD *thd) {
       wsrep_thd_client_state_str(req), wsrep_thd_transaction_state_str(req), \
       req->get_command(), req->lex->sql_command,                             \
       (req->rewritten_query().length()                                       \
-                ? wsrep_thd_rewritten_query(req).c_ptr_safe()                \
-                : req->query().str),                                         \
+           ? wsrep_thd_rewritten_query(req).c_ptr_safe()                     \
+           : req->query().str),                                              \
                                                                              \
       gra->thread_id(), (long long)wsrep_thd_trx_seqno(gra),                 \
       wsrep_thd_client_mode_str(gra), wsrep_thd_client_state_str(gra),       \
       wsrep_thd_transaction_state_str(gra), gra->get_command(),              \
       gra->lex->sql_command,                                                 \
       (gra->rewritten_query().length()                                       \
-            ? wsrep_thd_rewritten_query(gra).c_ptr_safe()                    \
-            : gra->query().str));
+           ? wsrep_thd_rewritten_query(gra).c_ptr_safe()                     \
+           : gra->query().str));
 
 bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
                                MDL_ticket *ticket, const MDL_key *key) {
@@ -2541,7 +2545,4 @@ bool wsrep_consistency_check(THD *thd) {
  thd->rewritten_query() in place.
  This is to avoid interference of PXC specific part with generic server part.
  */
-String wsrep_thd_rewritten_query(THD *thd)
-{
-  return thd->rewritten_query();
-}
+String wsrep_thd_rewritten_query(THD *thd) { return thd->rewritten_query(); }
