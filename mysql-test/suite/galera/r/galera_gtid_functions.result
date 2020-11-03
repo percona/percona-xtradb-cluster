@@ -1,0 +1,38 @@
+[connection node_1]
+CREATE TABLE t1 (id INT PRIMARY KEY);
+INSERT INTO t1 VALUES (1);
+include/assert_grep.inc [check the output for the last seen GTID]
+include/assert_grep.inc [check the output for the last written GTID]
+include/assert_grep.inc [check the output for the last written GTID]
+[connection node_2]
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+[connection node_1]
+INSERT INTO t1 VALUES (20);
+[connection node_2]
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+# Call to WSREP_SYNC_WAIT_UPTO_GTID() which should fail (with bad arguments)
+ERROR HY000: Incorrect arguments to wsrep_sync_wait_upto_gtid
+# Call to WSREP_SYNC_WAIT_UPTO_GTID() which should fail (timeout due to blocked applier)
+ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+WSREP_SYNC_WAIT_UPTO_GTID_EXPECTED
+1
+[connection node_1]
+SELECT * FROM test.t1;
+id
+1
+10
+20
+[connection node_2]
+SELECT * FROM test.t1;
+id
+1
+10
+20
+[connection node_1]
+DROP TABLE t1;
+[connection node_2]
+SET SESSION wsrep_sync_wait = 15;
