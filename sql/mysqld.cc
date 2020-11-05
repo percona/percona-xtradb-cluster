@@ -4320,9 +4320,6 @@ int init_common_variables()
     return 1;
 
 #ifdef WITH_WSREP
-  if (wsrep_setup_allowed_sst_methods())
-    return 1;
-
   /*
     We need to initialize auxiliary variables, that will be
     further keep the original values of auto-increment options
@@ -4470,6 +4467,13 @@ int init_common_variables()
 #else
   my_regex_init(&my_charset_latin1, NULL);
 #endif
+
+#ifdef WITH_WSREP
+  /* To be called after initializing the regex engine. */
+  if (wsrep_setup_allowed_sst_methods())
+    return 1;
+#endif
+
   /*
     Process a comma-separated character set list and choose
     the first available character set. This is mostly for
