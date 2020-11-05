@@ -4,8 +4,6 @@
 Using Simple LDAP Authentication
 ======================================================
 
-This feature is **Experimental** quality.
-
 This feature was implemented in |Percona Server| version :rn:`8.0.19-10`.
 
 LDAP (Lightweight Directory Access Protocol) provides an alternative method to

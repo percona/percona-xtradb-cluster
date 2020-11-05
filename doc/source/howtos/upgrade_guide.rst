@@ -88,9 +88,9 @@ the :variable:`pxc_strict_mode` variable set to ``PERMISSIVE`` in the |MySQL|
 configuration file (on Debian and Ubuntu |file.debian-conf|; on CentOS and Red
 Hat |file.centos-conf|).
 
-After you check the log for any experimental or unsupported features and fix any
-encountered incompatibilities, you can set the variable back to ``ENFORCING`` at
-run time:
+After you check the log for any tech preview features or unsupported features
+and you have fixed any of the encountered incompatibilities, set the variable
+back to ``ENFORCING`` at run time:
 
 .. code-block:: mysql
 

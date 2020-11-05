@@ -155,7 +155,7 @@ Essential configuration variables
 :variable:`pxc_strict_mode`
 
   :ref:`pxc-strict-mode` is enabled by default and set to ``ENFORCING``,
-  which blocks the use of experimental and unsupported features in |PXC|.
+  which blocks the use of tech preview features and unsupported features in |PXC|.
 
 |binlog_format|_
 

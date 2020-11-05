@@ -27,7 +27,7 @@ for a growing environment.
    * - Data consistency
      - No more unsynchronized nodes.
    * - PXC Strict Mode
-     - Avoids the use of experimental and unsupported features
+     - Avoids the use of tech preview features and unsupported features
    * - Configuration script for ProxySQL
      - |PXC| includes the ``proxysql-admin`` tool that automatically configures
        |PXC| nodes using ProxySQL.
