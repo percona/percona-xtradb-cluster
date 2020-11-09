@@ -344,6 +344,7 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
+Obsoletes:      mariadb-connector-c-config
 Conflicts:	Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
