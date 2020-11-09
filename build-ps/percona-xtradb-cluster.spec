@@ -374,7 +374,10 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
-Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
+%if 0%{?rhel} == 8
+Obsoletes:      mariadb-connector-c-config
+%endif
+Conflicts:      Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56 Percona-Server-server-57
 
 %description -n percona-xtradb-cluster-server
 Percona XtraDB Cluster is based on the Percona Server database server and
