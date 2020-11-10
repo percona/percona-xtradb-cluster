@@ -1,4 +1,5 @@
 usr/lib/mysql/plugin/*.so
+usr/lib/mysql/plugin/data_masking.ini
 usr/bin/comp_err
 usr/bin/mysql_ssl_rsa_setup
 usr/bin/lz4_decompress
