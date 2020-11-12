@@ -1,54 +1,61 @@
 .. _data_at_rest_encryption:
 
-=======================
+========================
 Data at Rest Encryption
-=======================
+========================
 
 .. contents::
-   :local:
 
-.. _innodb_general_tablespace_encryption:
+   :local:
 
 Introduction
 ============
 
-The *data at rest* term refers to all the data stored on disk on some server within
-system tablespace, general tablespace, redo-logs, undo-logs, etc. As an
-opposite, *data in transit* means data transmitted to other node or client.
-Data-in-transit can be encrypted using SSL connection (details are available in
-the `encrypt traffic documentation <https://www.percona.com/doc/percona-xtradb-cluster/LATEST/security/encrypt-traffic.html>`_) and
-therefore supposed to be safe. Below sections are about securing the
-data-at-rest only. 
+The *data at rest* encryption refers to encrypting data stored on a disk on a
+server. If an unauthorized user accesses the data files from the file system,
+encryption ensures the user cannot read the file contents. |Percona Server| lets
+you enable, disable, and apply encryptions to the following objects:
 
-|PXC| |version| supports all |data-at-rest| generally-available encryption features available from |percona-server| 8.0.
+ The within the following objects:
 
-.. seealso::
+* File-per-tablespace table
 
-   |percona-server| Documentation: Transparent Data Encryption
-      https://www.percona.com/doc/percona-server/8.0/security/data-at-rest-encryption.html#data-at-rest-encryption
+* Schema
 
-The "data-at-rest" term refers to all the data stored on disk by some server within system tablespace, general tablespace, redo-logs, undo-logs, etc. As the opposite, "data-in-transit" means data transmitted to another node or client.
-Data-in-transit can be encrypted using SSL connections (details are available in the `encrypt traffic documentation <https://www.percona.com/doc/percona-xtradb-cluster/LATEST/security/encrypt-traffic.html>`_).
+* General tablespace
 
-This feature requires a keyring plugin to be loaded before it can be used.
-Currently, Percona Server (and in turn |PXC|) supports two types of keyring
-plugin: ``keyring_file`` and ``keyring_vault``.
+* System tablespace
+
+* Temporary table
+
+* Binary log files
+
+* Redo log files
+
+* Undo tablespaces
+
+* Doublewrite buffer files
+
+ The transit data defines data transmitted to another node or client, and
+ is encrypted using an SSL connection.
+
+|PXC| |version| supports all |data-at-rest| generally-available encryption
+features available from |percona-server| 8.0.
 
 Configuring PXC to use keyring_file plugin
 ==========================================
 keyring_file
 --------------------------------------------------------------------------------
 
-The following subsection covers some of the important semantics of
-``keyring_file`` plugin needed to use it in scope of data-at-rest encryption.
-
-``keyring_file`` stores encryption key to a physical file. The location of this
+The ``keyring_file`` stores an encryption key to a physical file. The location
+of this
 file is specified by the ``keyring_file_data`` parameter configured during startup.
 
 Configuration
 --------------------------------------------------------------------------------
 
-|PXC| inherits upstream (Percona Server) behavior to configure ``keyring_file``
+|PXC| inherits upstream (Percona Server) behavior to configure the
+``keyring_file``
 plugin. The following options are set in the configuration file:
 
 .. code-block:: text
@@ -57,48 +64,53 @@ plugin. The following options are set in the configuration file:
    early-plugin-load=keyring_file.so
    keyring_file_data=<PATH>/keyring
 
-A ``SHOW PLUGINS`` statement can be used further to check if the plugin has been
+A ``SHOW PLUGINS`` statement checks if the plugin has been
 successfully loaded.
 
-.. note:: PXC recommends the same configuration on all the nodes of the cluster,
-   and that also means all the nodes of the cluster should have keyring
-   configured. Mismatch in keyring configuration will not allow the joiner node to
+.. note:: PXC recommends the same configuration on all cluster nodes,
+   and all nodes should have the keyring
+   configured. A mismatch in the keyring configuration does not allow the JOINER
+   node to
    join the cluster.
 
-If the user has bootstrapped node with keyring enabled, then upcoming nodes of the
-cluster will inherit the keyring (encrypted key) from the DONOR node
-or generate it.
+If the user has a bootstrapped node with keyring enabled, then upcoming cluster
+nodes inherit the keyring (the encrypted key) from the DONOR node.
 
 Usage
---------------------------------------------------------------------------------
+*****
 
 |xtrabackup| re-encrypts the data using a transition-key and the JOINER node
 re-encrypts it using a newly generated master-key.
 
-The keyring is generated on the JOINER node. SST is done using the
-``xtrabackup-v2`` method. The keyring is sent over explicitly before
-the real data backup/streaming starts.
+Keyring (or, more generally, the |PXC| SST process) is backward compatible, as
+in higher version JOINER can join from lower version DONOR, but not vice-versa.
+More details are covered in the `Upgrade and compatibility issues`_ section.
 
-|PXC| doesn't allow you to combine nodes with encryption and nodes without encryption. This combination is not allowed to maintain data consistency. For
+|PXC| does not allow the combination of nodes with encryption and nodes without
+encryption to maintain data consistency. For
 example, the user creates node-1 with encryption (keyring) enabled and node-2
-with encryption (keyring) disabled. If the user tries to create a table with
-encryption on node-1, it will fail on node-2, causing data inconsistency.
-A node fails to start if it fails to load the keyring plugin. 
+with encryption (keyring) disabled. If the user attempts to create a table with
+encryption on node-1, the creation fails on node-2, causing data inconsistency.
+A node fails to start if it fails to load the keyring plugin.
 
-.. note:: If the user does not specify the keyring parameters, the node does not know that it must load the keyring. The JOINER node may start, but it eventually shuts down when the DML level inconsistency with encrypted tablespace is detected.
+.. note:: If the user does not specify the keyring parameters, the node does not
+   know that it must load the keyring. The JOINER node may start, but it
+   eventually shuts down when the DML level inconsistency with encrypted
+   tablespace is detected.
 
-If a node does not have an encrypted tablespace, the keyring is not generated and the keyring file is empty. The actual keyring is generated only when the node starts using encrypted tablespace.
+If a node does not have an encrypted tablespace, the keyring is not generated,
+and the keyring file is empty. Creating an encrypted table on the node generates
+the keyring.
 
-The user can rotate the key as needed. This operation is local to the
-node. The ``ALTER INSTANCE ROTATE INNODB MASTER KEY`` statement is
-not replicated on cluster.
+In an operation that is local to the node, you can rotate the key as needed. The ``ALTER INSTANCE ROTATE INNODB MASTER KEY`` statement is not replicated on cluster.
 
-The JOINER node generates its own keyring. 
+The JOINER node generates its keyring.
 
 Compatibility
 --------------------------------------------------------------------------------
 
-Keyring (or, more generally, the |PXC| SST process) is backward compatible, a higher version JOINER can join from lower version DONOR, but not vice-versa.
+Keyring (or, more generally, the |PXC| SST process) is backward compatible. A
+higher version JOINER can join from lower version DONOR, but not vice-versa.
 More details are covered below, in
 :ref:`data-at-rest-encryption-upgrade-compatibility-issues` section.
 
@@ -117,9 +129,11 @@ The ``keyring_vault`` plugin allows storing the master-key in vault-server
 Configuration
 --------------------------------------------------------------------------------
 
-Configuration options are same as `upstream
-<https://www.percona.com/doc/percona-server/8.0/security/using-keyring-plugin.html>`_. The
-``my.cnf`` configuration file should contain following options:
+Configuration options are the same as
+`upstream
+<https://www.percona.com/doc/percona-server/8.0/security/using-keyring-plugin.html>`_.
+The ``my.cnf`` configuration file should contain
+the following options:
 
 .. code-block:: text
 
@@ -136,68 +150,86 @@ Also ``keyring_vault_n1.conf`` file contents should be :
    token = e0345eb4-35dd-3ddd-3b1e-e42bb9f2525d
    vault_ca = /data/keyring_vault_confs/vault_ca.crt
 
-Detailed description of these options can be found in the `upstream documentation <https://www.percona.com/doc/percona-server/8.0/security/using-keyring-plugin.html>`_.
+The detailed description of these options can be found in the `upstream
+documentation
+<https://www.percona.com/doc/percona-server/8.0/security/using-keyring-plugin.html>`_.
 
-Vault-server is an external server, make sure the PXC node can reach the said
+Vault-server is an external server, so make sure the PXC node can reach the
 server.
 
-.. note:: |PXC| recommends using the same keyring_plugin on all the nodes of the
-   cluster. Mix-match is recommended to use it only while transitioning from
+.. note:: |PXC| recommends using the same keyring_plugin type on all
+   cluster nodes. Mixing the keyring plugin types is recommended only while
+   transitioning
+   from
    ``keyring_file`` -> ``keyring_vault`` or vice-versa.
 
-It is not necessary that all the nodes refer to the same vault server, but ensure the vault server is accessible from the respective node. If a node cannot reach/connect to a vault server, an error is raised during the server boot, and node refuses to start:
+All nodes do not need to refer to the same vault server. Whatever
+vault server is used, it must be accessible from the respective node. All nodes
+do not need to use the same mount point.
+
+If the node is not able to reach or connect to the vault server, an error is
+notified during the server boot, and the node refuses to start:
 
 .. code-block:: text
 
-   ... [Warning] Plugin keyring_vault reported: 'There is no vault_ca specified in keyring_vault's configuration file. ...
-   ... [ERROR] Plugin keyring_vault reported: 'CURL returned this error code: 7 with error message : ...
+   2018-05-29T03:54:33.859613Z 0 [Warning] Plugin keyring_vault reported:
+   'There is no vault_ca specified in keyring_vault's configuration file.
+   Please make sure that Vault's CA certificate is trusted by the machine
+   from which you intend to connect to Vault.'
+   2018-05-29T03:54:33.977145Z 0 [ERROR] Plugin keyring_vault reported:
+   'CURL returned this error code: 7 with error message : Failed to connect
+   to 127.0.0.1 port 8200: Connection refused'
 
-If any nodes of the cluster cannot connect to the vault-server, users cannot access the encrypted data on that node.
+If some nodes of the cluster are unable to connect to vault-server, this
+relates only to these specific nodes: e.g., if node-1 can connect, and
+node-2 cannot connect, only node-2 refuses to start. Also, if the server has
+a pre-existing encrypted object and on reboot, the server fails to connect to
+the vault-server, the object is not accessible.
 
-If the vault-server is accessible but the authentication credential is wrong,
-the consequences are the same. The corresponding error message looks like the following:
+In case when vault-server is accessible, but authentication credential is incorrect,
+the consequences are the same, and the corresponding error looks like the following:
 
 .. code-block:: text
 
-   ... [Warning] Plugin keyring_vault reported: 'There is no vault_ca specified in keyring_vault's configuration file. ...
-   ... [ERROR] Plugin keyring_vault reported: 'Could not retrieve list of keys from Vault. ...
+   2018-05-29T03:58:54.461911Z 0 [Warning] Plugin keyring_vault reported:
+   'There is no vault_ca specified in keyring_vault's configuration file.
+   Please make sure that Vault's CA certificate is trusted by the machine
+   from which you intend to connect to Vault.'
+   2018-05-29T03:58:54.577477Z 0 [ERROR] Plugin keyring_vault reported:
+   'Could not retrieve list of keys from Vault. Vault has returned the
+   following error(s): ["permission denied"]'
 
-All nodes are not required to use the same mount point. In the case of an accessible vault-server with the wrong mount point, there is no
-error during server boot, but node refuses to start:
+In case of accessible vault-server with the wrong mount point, there is no
+error during server boot, but the node still refuses to start:
 
 .. code-block:: text
 
    mysql> CREATE TABLE t1 (c1 INT, PRIMARY KEY pk(c1)) ENCRYPTION='Y';
-   ERROR 3185 (HY000): Can't find master key from keyring, please check keyring plugin is loaded.
+   ERROR 3185 (HY000): Can't find master key from keyring, please check keyring
+   plugin is loaded.
 
    ... [ERROR] Plugin keyring_vault reported: 'Could not write key to Vault. ...
    ... [ERROR] Plugin keyring_vault reported: 'Could not flush keys to keyring'
 
-Mix-match keyring plugins
-=========================
+Mixing keyring plugin types
+============================
 
 With |xtrabackup| introducing transition-key logic, it is now possible to
-mix-match keyring plugins. For example, the user has node-1 configured to use
+mix and match keyring plugins. For example, the user has node-1 configured to use the 
 ``keyring_file`` plugin and node-2 configured to use ``keyring_vault``.
 
-.. note:: Percona recommends using the same configuration for all the nodes of the
-   cluster. Mix-match (in keyring plugins) is recommended only during the
-   transition from one keying method to another.
-
-.. _data-at-rest-encryption-upgrade-compatibility-issues:
-
-Upgrade and compatibility issues
---------------------------------
-
-If all the nodes are using |PXC| 8.0, then the user can freely
-configure some nodes to use ``keyring_file`` and other to use
-``keyring_vault``. This setup, however, is not recommended and should be used
-during transitioning to vault only.
+.. note:: Percona recommends the same configuration for all the nodes of the
+   cluster. A mix and match in keyring plugin types is recommended only during
+   the transition from one keying type to another.
 
 Temporary file encryption
-==========================
+=========================
 
-Percona Server supports the encryption of temporary file storage which is enabled using ``encrypt-tmp-files``. The storage or files are local to the node and have no effect on |PXC| replication. |PXC| recommends enabling the variable on all nodes of the cluster, although this action is not mandatory. The parameter to enable this option is the same as Percona Server:
+Percona Server supports the encryption of temporary file storage which is
+enabled using ``encrypt-tmp-files``. The storage or files are local to the node
+and do not affect |PXC| replication. |PXC| recommends enabling the variable
+on all cluster nodes, although this action is not mandatory. The
+parameter to enable this option is the same as Percona Server:
 
 .. code-block:: text
 
@@ -216,15 +248,14 @@ Offline Migration
 In offline migration, the node to migrate is shut down, and the migration server
 takes care of migrating keys for the said server to a new keystore.
 
-Following example illustrates this scenario:
+For example, a cluster has three |PXC| nodes, n1, n2, and n3. The nodes use the
+``keyring_file``. To migrate the n2 node to use ``keyring_vault``, use the following procedure:
 
-1. Three |PXC| nodes n1, n2, n3 - all using ``keyring_file``, 
-   and n2 should be migrated to use ``keyring_vault``
-2. The user shuts down the n2 node.
-3. The user starts the Migration Server (``mysqld`` with a special option).
-4. Migration Server copies keys from the n2 keyring file and adds them to the vault
-   server.
-5. The User starts n2 node with the vault parameter, and keys should be available.
+1. Shut down the n2 node.
+2. Start the Migration Server (``mysqld`` with a special option).
+3. The Migration Server copies the keys from the n2 keyring file and adds them
+   to the vault server.
+4. Start the n2 node with the vault parameter, and the keys are available.
 
 Here is how the migration server output should look like:
 
@@ -244,28 +275,28 @@ Here is how the migration server output should look like:
    ... [Note] /dev/shm/pxc80/bin/mysqld (mysqld 8.0-debug) starting as process 5710 ...
    ... [Note] Keyring migration successful.
 
-On successful migration, destination keystore receives additional migrated keys
+On a successful migration, the destination keystore receives additional migrated keys
 (pre-existing keys in the destination keystore are not touched or removed). The source
-keystore retains the keys as migration performs copy operation and
-not move operation.
+keystore retains the keys as the migration performs a copy operation and
+not a move operation.
 
-If the migration fails, then destination keystore is left untouched.
+If the migration fails, the destination keystore is unchanged.
 
 Online Migration
 ----------------
 
-In online migration, node to migrate is kept running and migration server takes
+In online migration, the node to migrate is kept running, and the migration
+server takes
 care of migrating keys for the said server to a new keystore by connecting to
 the node.
 
-The following example illustrates this scenario:
+For example, a cluster has three |PXC| nodes, n1, n2, and n3. The nodes use the
+``keyring_file``. Migrate the n3 node to use ``keyring_vault`` using the following procedure:
 
-1. Three |PXC| nodes n1, n2, n3 - all using ``keyring_file``, 
-   and n3 should be migrated to use ``keyring_vault``
-2. User starts the Migration Server (``mysqld`` with a special option).
-3. Migration Server copies keys from the n3 keyring file and adds them to the vault
-   server.
-4. The user restarts n3 node with the vault parameter, and keys should be available.
+1. Start the Migration Server (``mysqld`` with a special option).
+2. The Migration Server copies the keys from the n3 keyring file and adds them
+   to the vault server.
+3. Restart the n3 node with the vault parameter, and the keys are available.
 
 .. code-block:: text
 
@@ -279,13 +310,12 @@ The following example illustrates this scenario:
    --keyring-migration-port=16300 \
    --keyring-migration-password='' &
 
-   
-On a successful migration, the destination keystore receives additional migrated keys
-(pre-existing keys in destination keystore are not touched or removed). The source
-keystore retains the keys as the migration performs copy operation and
-not move operation. 
+On a successful migration, the destination keystore receives the additional
+migrated keys. Any pre-existing keys in the destination keystore are unchanged.
+The source keystore retains the keys as the migration performs a copy operation and
+not a move operation.
 
-If the migration fails, then the destination keystore will be left untouched.
+If the migration fails, the destination keystore is not changed.
 
 Migration server options
 ------------------------
@@ -295,9 +325,9 @@ Migration server options
 
 * ``--keyring-migration-destination``: The destination keyring plugin to which
   the migrated keys are to be copied
-  
+
   .. note:: For offline migration, no additional key migration options are
-     needed. 
+     needed.
 
 * ``--keyring-migration-host``: The host where the running server is located.
   This host is always the local host.
@@ -305,7 +335,8 @@ Migration server options
 * ``--keyring-migration-user``, ``--keyring-migration-password``: The username
   and password for the account used to connect to the running server.
 
-* ``--keyring-migration-port``: Used for TCP/IP connections, the running server's port  number used to connect.
+* ``--keyring-migration-port``: Used for TCP/IP connections, the running
+  server's port  number used to connect.
 
 * ``--keyring-migration-socket``: Used for Unix socket file or Windows named pipe
   connections, the running server socket or named pipe used to connect.
@@ -331,3 +362,10 @@ the required options.
    port=16400
 
 .. include:: ../.res/replace.txt
+
+.. seealso::
+
+    `encrypt traffic documentation <https://www.percona.com/doc/percona-xtradb-cluster/LATEST/security/encrypt-traffic.html>`_
+
+    |percona-server| Documentation:  Data-at-Rest Encryption
+       https://www.percona.com/doc/percona-server/8.0/security/data-at-rest-encryption.html#data-at-rest-encryption
