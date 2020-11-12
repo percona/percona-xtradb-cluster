@@ -29,15 +29,13 @@ In |Percona XtraDB Cluster| 8.0.20-11 and later, the multiple binary tarballs av
 
 Both binary tarballs support all distributions.
 
-For installations before |Percona XtraDB Cluster| 8.0.20-11, the **Linux - Generic** section contains multiple tarballs which are based on the *OpenSSL* library available in your distribution:
+For installations before |Percona XtraDB Cluster| 8.0.20-11, the **Linux - Generic** section contains multiple tarballs based on the operating system names:
 
-* ``ssl100``: for Debian prior to 9, and Ubuntu prior to 14.04 versions
-* ``ssl101``: for CentOS 7, and 8
-* ``ssl102``: for Debian 9, or 10, and Ubuntu versions starting from 14.04
+.. code-block:: text
 
-.. note::
-
-    In CentOS version 7.04 and later, the *OpenSSL* library is ``ssl102``. 
+    Percona-XtraDB-Cluster_8.0.18-9.3_Linux.x86_64.bionic.tar.gz
+    Percona-XtraDB-Cluster_8.0.18-9.3_Linux.x86_64.buster.tar.gz
+    ...
 
 For example, you can use ``curl`` as follows:
 
