@@ -4,28 +4,7 @@
 Installing Percona XtraDB Cluster
 =================================
 
-|Percona XtraDB Cluster| supports most 64-bit Linux distributions.
-Percona provides packages for popular DEB-based and RPM-based distributions:
-
-* Debian 7 ("wheezy")
-* Debian 8 ("jessie")
-* Debian 9 ("stretch")
-* Ubuntu 14.04 LTS (Trusty Tahr)
-* Ubuntu 16.04 LTS (Xenial Xerus)
-* Ubuntu 18.04 LTS (Bionic Beaver)
-* Ubuntu 18.10 (Cosmic Cuttlefish)
-* Red Hat Enterprise Linux / CentOS 6
-* Red Hat Enterprise Linux / CentOS 7
-
-.. note:: CentOS 5 includes ``openssl-0.9.8``
-   that doesn't support TLS 1.1/1.2,
-   which is a requirement as of Galera 3.19.
-   This means PXC 5.6.34 does not support SSL
-   encryption on CentOS 5 (while PXC 5.6.35
-   and later do not support CentOS 5 at all).
-
-   We recommend upgrading from CentOS 5 anyway,
-   because it already reached EOL on March 31, 2017.
+Specific information on the supported platforms, products, and versions is described in `Percona Software and Platform Lifecycle <https://www.percona.com/services/policies/percona-software-platform-lifecycle#mysql>`_.
 
 Prerequisites
 =============
