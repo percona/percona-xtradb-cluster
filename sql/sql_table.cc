@@ -71,6 +71,7 @@
 #include "nullable.h"
 #include "prealloced_array.h"
 #include "scope_guard.h"
+#include "service_wsrep.h"
 #include "sql/auth/auth_acls.h"
 #include "sql/auth/auth_common.h"  // check_fk_parent_table_access
 #include "sql/binlog.h"            // mysql_bin_log
@@ -10367,7 +10368,7 @@ bool mysql_create_like_table(THD *thd, TABLE_LIST *table, TABLE_LIST *src_table,
          enable the create to succeed
        */
       TABLE_LIST tbl;
-      memset(static_cast<void*>(&tbl), 0, sizeof(tbl));
+      memset(static_cast<void *>(&tbl), 0, sizeof(tbl));
       tbl.db = src_table->db;
       tbl.table_name = tbl.alias = src_table->table_name;
       tbl.table = tmp_table;
@@ -12938,6 +12939,12 @@ static bool mysql_inplace_alter_table(
       }
     }
 
+    DBUG_EXECUTE_IF("halt_alter_table_after_lock_downgrade", {
+      const char act[] =
+          "now SIGNAL alter_table_inplace_after_downgrade "
+          "WAIT_FOR continue_inplace_alter";
+      DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+    };);
     DEBUG_SYNC(thd, "alter_table_inplace_after_lock_downgrade");
     THD_STAGE_INFO(thd, stage_alter_inplace);
 
@@ -16988,6 +16995,19 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
       close_temporary_table(thd, altered_table, true, false);
       goto err_new_table_cleanup;
     }
+
+#ifdef WITH_WSREP
+    // Force PXC to use HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE for all
+    // inplace ALTERs
+    //
+    // i.e, Upgrade to SHARED LOCK when thread is a WSREP thd, and exec mode is
+    // either TOI or replicated and lock acquisition is a variant of NO_LOCK.
+    if ((wsrep_thd_is_toi(thd) || wsrep_thd_is_in_rsu(thd)) &&
+        (inplace_supported == HA_ALTER_INPLACE_NO_LOCK ||
+         inplace_supported == HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE)) {
+      inplace_supported = HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE;
+    }
+#endif
 
     switch (inplace_supported) {
       case HA_ALTER_INPLACE_EXCLUSIVE_LOCK:
