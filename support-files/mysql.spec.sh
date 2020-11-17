@@ -217,10 +217,120 @@
 # Avoid debuginfo RPMs, leaves binaries unstripped
 %define debug_package   %{nil}
 
+<<<<<<< HEAD
 # Hack to work around bug in RHEL5 __os_install_post macro, wrong inverted
 # test for __debug_package
 %define __strip         /bin/true
 
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+# ----------------------------------------------------------------------------
+# Support optional "tcmalloc" library (experimental)
+# ----------------------------------------------------------------------------
+%if %{defined malloc_lib_target}
+%define WITH_TCMALLOC 1
+%else
+%define WITH_TCMALLOC 0
+%endif
+
+||||||||| 2acf164f591
+# Hack to work around bug in RHEL5 __os_install_post macro, wrong inverted
+# test for __debug_package
+%define __strip         /bin/true
+
+# ----------------------------------------------------------------------------
+# Support optional "tcmalloc" library (experimental)
+# ----------------------------------------------------------------------------
+%if %{defined malloc_lib_target}
+%define WITH_TCMALLOC 1
+%else
+%define WITH_TCMALLOC 0
+%endif
+
+=========
+# Hack to work around bug in RHEL5 __os_install_post macro, wrong inverted
+# test for __debug_package
+%define __strip         /bin/true
+
+>>>>>>>>> Temporary merge branch 2
+##############################################################################
+# Settings for the "compatibility libs", the version depends on the target platform
+##############################################################################
+
+# To differ between current main version and libs-compat:
+%global currentlib            18
+
+%if 0%{?rhel} == 6
+%global compatver             5.1.73
+%global compatlib             16
+%global compatsrc             https://cdn.mysql.com/Downloads/MySQL-5.1/mysql-%{compatver}.tar.gz
+%global compatch              mysql-5173-charset-dir.patch
+%endif
+
+# mysql-wsrep-5.5 has libmysqlclient.so.18, as has 5.6;
+# same as preinstalled mariadb-libs, so we currently need no libs-compat on RHEL 7.
+# This becomes relevant with a MySQL 5.7 (or higher) that has a libmysqlclient.so.20 or higher.
+#
+# %%if 0%%{?rhel} == 7
+# %%global compatver             5.5.45
+# %%global compatlib             18
+# %%global compatsrc             https://cdn.mysql.com/Downloads/MySQL-5.5/mysql-%%{compatver}.tar.gz
+# %%global compatch              mysql-5545-charset-dir.patch
+# # By default, a build will include the bundeled "yaSSL" library for SSL.
+# %%{?with_ssl:                  %%global ssl_option -DWITH_SSL=%%{with_ssl}}
+# %%endif
+
+%if 0%{?compatlib}
+# Attention: "compat_src_dir" is the old version (e.g. 5.1.73), depends on platform
+%global compat_src_dir               mysql-%{compatver}
+%endif
+
+=======
+# ----------------------------------------------------------------------------
+# Support optional "tcmalloc" library (experimental)
+# ----------------------------------------------------------------------------
+%if %{defined malloc_lib_target}
+%define WITH_TCMALLOC 1
+%else
+%define WITH_TCMALLOC 0
+%endif
+# Hack to work around bug in RHEL5 __os_install_post macro, wrong inverted
+# test for __debug_package
+%define __strip         /bin/true
+
+##############################################################################
+# Settings for the "compatibility libs", the version depends on the target platform
+##############################################################################
+
+# To differ between current main version and libs-compat:
+%global currentlib            18
+
+%if 0%{?rhel} == 6
+%global compatver             5.1.73
+%global compatlib             16
+%global compatsrc             https://cdn.mysql.com/Downloads/MySQL-5.1/mysql-%{compatver}.tar.gz
+%global compatch              mysql-5173-charset-dir.patch
+%endif
+
+# mysql-wsrep-5.5 has libmysqlclient.so.18, as has 5.6;
+# same as preinstalled mariadb-libs, so we currently need no libs-compat on RHEL 7.
+# This becomes relevant with a MySQL 5.7 (or higher) that has a libmysqlclient.so.20 or higher.
+#
+# %%if 0%%{?rhel} == 7
+# %%global compatver             5.5.45
+# %%global compatlib             18
+# %%global compatsrc             https://cdn.mysql.com/Downloads/MySQL-5.5/mysql-%%{compatver}.tar.gz
+# %%global compatch              mysql-5545-charset-dir.patch
+# # By default, a build will include the bundeled "yaSSL" library for SSL.
+# %%{?with_ssl:                  %%global ssl_option -DWITH_SSL=%%{with_ssl}}
+# %%endif
+
+%if 0%{?compatlib}
+# Attention: "compat_src_dir" is the old version (e.g. 5.1.73), depends on platform
+%global compat_src_dir               mysql-%{compatver}
+%endif
+
+>>>>>>> wsrep_5.6.49-25.31
 ##############################################################################
 # Configuration based upon above user input, not to be set directly
 ##############################################################################
@@ -591,6 +701,46 @@ touch $RBR%{_sysconfdir}/my.cnf
 install -m 600 $MBD/%{src_dir}/support-files/RHEL4-SElinux/mysql.{fc,te} \
   $RBR%{_datadir}/mysql/SELinux/RHEL4
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+# Get the list of "_datadir" files, remove those that go into "libs-compat"
+find $RBR%{_datadir}/mysql -type f -print | sed -e "s=$RBR==" \
+  | fgrep -v "charsets-%{compatver}" | sort >> $MBD/release/support-files/plugins.files
+
+%if %{WITH_TCMALLOC}
+# Even though this is a shared library, put it under /usr/lib*/mysql, so it
+# doesn't conflict with possible shared lib by the same name in /usr/lib*.  See
+# `mysql_config --variable=pkglibdir` and mysqld_safe for how this is used.
+install -m 644 "%{malloc_lib_source}" \
+  "$RBR%{_libdir}/mysql/%{malloc_lib_target}"
+%endif
+
+||||||||| 2acf164f591
+%if %{WITH_TCMALLOC}
+# Even though this is a shared library, put it under /usr/lib*/mysql, so it
+# doesn't conflict with possible shared lib by the same name in /usr/lib*.  See
+# `mysql_config --variable=pkglibdir` and mysqld_safe for how this is used.
+install -m 644 "%{malloc_lib_source}" \
+  "$RBR%{_libdir}/mysql/%{malloc_lib_target}"
+%endif
+
+=========
+>>>>>>>>> Temporary merge branch 2
+=======
+# Get the list of "_datadir" files, remove those that go into "libs-compat"
+find $RBR%{_datadir}/mysql -type f -print | sed -e "s=$RBR==" \
+  | fgrep -v "charsets-%{compatver}" | sort >> $MBD/release/support-files/plugins.files
+
+%if %{WITH_TCMALLOC}
+# Even though this is a shared library, put it under /usr/lib*/mysql, so it
+# doesn't conflict with possible shared lib by the same name in /usr/lib*.  See
+# `mysql_config --variable=pkglibdir` and mysqld_safe for how this is used.
+install -m 644 "%{malloc_lib_source}" \
+  "$RBR%{_libdir}/mysql/%{malloc_lib_target}"
+%endif
+
+>>>>>>> wsrep_5.6.49-25.31
 # Remove man pages we explicitly do not want to package, avoids 'unpackaged
 # files' warning.
 # This has become obsolete:  rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*

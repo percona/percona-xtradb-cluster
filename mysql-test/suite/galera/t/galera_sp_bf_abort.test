@@ -4,7 +4,12 @@
 
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
+<<<<<<< HEAD
 --source include/have_debug_sync.inc
+||||||| merged common ancestors
+=======
+--source suite/galera/include/galera_have_debug_sync.inc
+>>>>>>> wsrep_5.6.49-25.31
 
 --connection node_1
 

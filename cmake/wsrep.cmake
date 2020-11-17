@@ -17,11 +17,17 @@
 # so WSREP_VERSION is produced regardless
 
 # Set the patch version
+<<<<<<< HEAD
 SET(WSREP_PATCH_VERSION "42")
 # PXC needs this because it still support execvpe approach for forking
 # while initiating SST.
 INCLUDE(CheckFunctionExists)
 CHECK_FUNCTION_EXISTS(execvpe HAVE_EXECVPE)
+||||||| merged common ancestors
+SET(WSREP_PATCH_VERSION "30")
+=======
+SET(WSREP_PATCH_VERSION "31")
+>>>>>>> wsrep_5.6.49-25.31
 
 # Obtain patch revision number
 SET(WSREP_REVISION $ENV{WSREP_REV})

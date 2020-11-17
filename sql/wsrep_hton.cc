@@ -449,6 +449,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   wsrep_thd_set_query_state(thd, QUERY_COMMITTING);
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
+  DEBUG_SYNC(thd, "wsrep_before_certification");
   cache = get_trans_log(thd);
   rcode = 0;
   if (cache) {
