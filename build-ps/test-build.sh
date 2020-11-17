@@ -17,13 +17,18 @@ function prepare {
     mkdir -p "$CURDIR"/temp
     mkdir -p "$TMP_DIR"/dbdeployer/tarball "$TMP_DIR"/dbdeployer/deployment "$TMP_DIR"/dbdeployer/logs
 
-    if [ -f /etc/redhat-release ]; then 
+    if [ -f /etc/redhat-release ]; then
         export PATH=$PATH:/usr/sbin
+        GLIBC_VER="$(rpm glibc -qa --qf %{VERSION})"
+    else
+        GLIBC_VER="$(dpkg-query -W -f='${Version}' libc6 | awk -F'-' '{print $1}')"
     fi
 
     TARBALLS=""
     for tarball in $(find . -name "*.tar.gz"); do
-        TARBALLS+=" $(basename $tarball)"
+        if [[ "$(echo $tarball | grep -o "glibc2.*" | awk -F '.' '{print $2}')" -le "$(echo $GLIBC_VER | awk -F '.' '{print $2}')" ]]; then
+            TARBALLS+=" $(basename $tarball)"
+        fi
     done
 
     DIRLIST="bin bin/pxc_extra/pxb-8.0/bin bin/pxc_extra/pxb-2.4/bin lib bin/pxc_extra/pxb-8.0/lib/plugin bin/pxc_extra/pxb-2.4/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
