@@ -78,7 +78,34 @@ software, run the corresponding command:
    $ sudo yum install proxysql2
 
 Alternatively, you can download the packages from
-https://www.percona.com/downloads/proxysql2/.
+https://www.percona.com/downloads/proxysql2/, if you cannot use either an apt or yum package. 
+
+ As of ProxySQL 2.0.15 and later, the multiple tarball files are combined into the following files:
+
+         .. tabularcolumns:: |p{5cm}|p{11cm}|
+
+       .. list-table::
+          :header-rows: 1
+
+          * - Name
+            - Description
+          * - proxysql-2.0.XX-Linux-x86_64.glibc2.12.tar.gz
+            - For every supported operating system but ``xenial``
+
+              For CentOS 7, install OpenSSL 1.1.1, if needed. 
+          * - proxysql-2.0.XX-Linux-x86_64.glibc2.23.xenial.tar.gz
+            - For Ubuntu 16.04 ``xenial`` only
+
+The password-based file encryption requires OpenSSL 1.1.1, but Ubuntu 16.04 does not support this OpenSSL version. A special statically linked OpenSSL 1.1.1 binary is packaged with the executable. This packaged binary avoids conflicts with the system OpenSSL and any shared libraries. Each new release rebuilds the binary.
+
+For versions 2.0.13 or lower, extract the files from the archive and change to the directory that contains the extracted files:
+
+   .. code-block:: bash
+      
+      $ # Extract the files (assuming you have changed to the download destination directory)
+      $ tar xzf proxysql-VERSION-Linux-PLATFORM-ARCHITECTURE*.tar.gz
+      $ # Change to the directory that contains the extracted files
+      $ cd proxysql-VERSION-Linux-PLATFORM-ARCHITECTURE
 
 To start ProxySQL, run the following command:
 
