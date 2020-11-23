@@ -1443,7 +1443,7 @@ row_ins_foreign_check_on_constraint(
 	err = wsrep_append_foreign_key(
 					thr_get_trx(thr),
 					foreign,
-					clust_rec,
+					cascade->pcur->old_rec,
 					clust_index,
 					FALSE, WSREP_KEY_EXCLUSIVE);
 	if (err != DB_SUCCESS) {
