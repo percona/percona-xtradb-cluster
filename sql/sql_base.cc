@@ -64,29 +64,11 @@
 #include <io.h>
 #endif
 #include "table_cache.h" // Table_cache_manager, Table_cache
-<<<<<<< HEAD
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-=======
-#include "global_threads.h" // LOCK_thread_count
->>>>>>> wsrep_5.6.49-25.31
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
-<<<<<<< HEAD
 #include "global_threads.h" // LOCK_thread_count
 
-||||||| merged common ancestors
-
-||||||||| 2acf164f591
-
-=========
-#include "global_threads.h" // LOCK_thread_count
->>>>>>>>> Temporary merge branch 2
-
-=======
-
->>>>>>> wsrep_5.6.49-25.31
 bool
 No_such_table_error_handler::handle_condition(THD *,
                                               uint sql_errno,

@@ -27,7 +27,6 @@
 #include "wsrep_xid.h"
 #include <cstdio>
 #include <cstdlib>
-<<<<<<< HEAD
 #include <functional>
 #include <sstream>
 #include <string>
@@ -98,10 +97,6 @@ static const char *sst_method_allowed_chars_regex_pattern=
     "^[[:alnum:]:/._<>-]+$";
 static Regex sst_method_allowed_chars_regex;
 
-||||||| merged common ancestors
-=======
-#include <cctype>
->>>>>>> wsrep_5.6.49-25.31
 
 extern const char wsrep_defaults_file[];
 extern const char wsrep_defaults_group_suffix[];
@@ -276,14 +271,6 @@ void wsrep_sst_auth_init (const char* value)
 {
     if (wsrep_sst_auth == value) wsrep_sst_auth = NULL;
     if (value) sst_auth_real_set (value);
-}
-
-void wsrep_sst_auth_free()
-{
-  if (wsrep_sst_auth) { my_free ((void*)wsrep_sst_auth); }
-  if (sst_auth_real) { free (const_cast<char*>(sst_auth_real)); }
-  wsrep_sst_auth= NULL;
-  sst_auth_real= NULL;
 }
 
 bool  wsrep_sst_donor_check (sys_var *self, THD* thd, set_var* var)
@@ -1435,7 +1422,6 @@ static int sst_donate_other (const char*   method,
   return arg.err;
 }
 
-<<<<<<< HEAD
 /*
   Validate SST request string.
   The protocol is: method\0data\0
@@ -1508,48 +1494,12 @@ struct StringBuilder : public std::unary_function<char, void> {
   std::ostringstream &ss_;
 };
 
-||||||| merged common ancestors
-=======
-/* return true if character can be a part of a filename */
-static bool filename_char(int const c)
-{
-  return isalnum(c) || (c == '-') || (c == '_') || (c == '.');
-}
-
-/* return true if character can be a part of an address string */
-static bool address_char(int const c)
-{
-  return filename_char(c) ||
-         (c == ':') || (c == '[') || (c == ']') || (c == '/');
-}
-
-static bool check_request_str(const char* const str,
-                              bool (*check) (int c))
-{
-  for (size_t i(0); str[i] != '\0'; ++i)
-  {
-    if (!check(str[i]))
-    {
-      WSREP_WARN("Illegal character in state transfer request: %i (%c).",
-                 str[i], str[i]);
-      return true;
-    }
-  }
-
-  return false;
-}
-
->>>>>>> wsrep_5.6.49-25.31
 wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
                                        const void* msg, size_t msg_len,
                                        const wsrep_gtid_t* current_gtid,
                                        const char* state, size_t state_len,
                                        bool bypass)
 {
-<<<<<<< HEAD
-  /* This will be reset when sync callback is called.
-   * Should we set wsrep_ready to FALSE here too? */
-  local_status.set(WSREP_MEMBER_DONOR);
 
   std::string message(reinterpret_cast<const char *>(msg), msg_len);
   if (!is_sst_request_valid(message))
@@ -1561,46 +1511,22 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
     return WSREP_CB_FAILURE;
   }
 
-||||||| merged common ancestors
-  /* This will be reset when sync callback is called.
-   * Should we set wsrep_ready to FALSE here too? */
-  local_status.set(WSREP_MEMBER_DONOR);
-
-=======
->>>>>>> wsrep_5.6.49-25.31
   const char* method = (char*)msg;
   size_t method_len  = strlen (method);
-
-  if (check_request_str(method, filename_char))
-  {
-    WSREP_ERROR("Bad SST method name. SST canceled.");
-    return WSREP_CB_FAILURE;
-  }
-
   const char* data   = method + method_len + 1;
-
-  if (check_request_str(data, address_char))
-  {
-    WSREP_ERROR("Bad SST address string. SST canceled.");
-    return WSREP_CB_FAILURE;
-  }
 
   char uuid_str[37];
   wsrep_uuid_print (&current_gtid->uuid, uuid_str, sizeof(uuid_str));
 
-<<<<<<< HEAD
   DBUG_EXECUTE_IF("wsrep_sst_donate_cb_fails", 
   {
     return WSREP_CB_FAILURE;
   });
 
-||||||| merged common ancestors
-=======
   /* This will be reset when sync callback is called.
    * Should we set wsrep_ready to FALSE here too? */
   local_status.set(WSREP_MEMBER_DONOR);
 
->>>>>>> wsrep_5.6.49-25.31
   wsp::env env(NULL);
   if (env.error())
   {

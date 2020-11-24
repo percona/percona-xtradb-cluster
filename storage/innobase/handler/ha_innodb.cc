@@ -4266,43 +4266,9 @@ my_bool
 innobase_flush_changed_page_bitmaps()
 /*=================================*/
 {
-<<<<<<< HEAD
 	if (srv_track_changed_pages) {
 		os_event_reset(srv_checkpoint_completed_event);
 		log_online_follow_redo_log();
-||||||| merged common ancestors
-#ifdef WITH_WSREP
-	THD* thd = (THD*)trx->mysql_thd;
-	const char* tmp = 0;
-	if (wsrep_on((void*)thd)) {
-#ifdef WSREP_PROC_INFO
-		char info[64];
-		info[sizeof(info) - 1] = '\0';
-		snprintf(info, sizeof(info) - 1,
-			 "innobase_commit_low():trx_commit_for_mysql(%lld)",
-			 (long long) wsrep_thd_trx_seqno(thd));
-		tmp = thd_proc_info(thd, info);
-
-#else
-		tmp = thd_proc_info(thd, "innobase_commit_low()");
-#endif /* WSREP_PROC_INFO */
-	}
-#endif /* WITH_WSREP */
-	if (trx_is_started(trx)) {
-
-		trx_commit_for_mysql(trx);
-=======
-#ifdef WITH_WSREP
-	THD* thd = (THD*)trx->mysql_thd;
-	const char* tmp = 0;
-	if (wsrep_on((void*)thd)) {
-		tmp = thd_proc_info(thd, "innobase_commit_low()");
-	}
-#endif /* WITH_WSREP */
-	if (trx_is_started(trx)) {
-
-		trx_commit_for_mysql(trx);
->>>>>>> wsrep_5.6.49-25.31
 	}
 	return FALSE;
 }
