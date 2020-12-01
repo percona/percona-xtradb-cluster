@@ -203,18 +203,10 @@ my $DEFAULT_SUITES= "main,sys_vars,binlog,binlog_encryption,rpl_encryption,encry
   ."query_response_time,audit_log,json,connection_control,"
   ."tokudb.add_index,tokudb.alter_table,tokudb,tokudb.bugs,tokudb.parts,"
   ."tokudb.rpl,tokudb.perfschema,"
-<<<<<<< HEAD
-  ."rocksdb,rocksdb_rpl,rocksdb_sys_vars,"
-  ."keyring_vault,audit_null,percona-pam-for-mysql,"
-  ."galera,galera_3nodes";
-||||||| 2e686374321
-  ."rocksdb,rocksdb_rpl,rocksdb_sys_vars,"
-  ."keyring_vault,audit_null,percona-pam-for-mysql";
-=======
   ."rocksdb,rocksdb_rpl,rocksdb_sys_vars,rocksdb_stress,"
-  ."keyring_vault,audit_null,percona-pam-for-mysql,data_masking";
+  ."keyring_vault,audit_null,percona-pam-for-mysql,data_masking,"
+  ."galera,galera_3nodes";
 
->>>>>>> e75cc37907886e9c8225ed83aaad051f83b537c3
 my $opt_suites;
 
 our $opt_verbose= 0;  # Verbose output, enable with --verbose

@@ -725,13 +725,9 @@ bool check_fk_parent_table_access(THD *thd,
                                   const char *child_table_db,
                                   HA_CREATE_INFO *create_info,
                                   Alter_info *alter_info);
-<<<<<<< HEAD
 #endif
-||||||| 2e686374321
-=======
 bool check_lock_view_underlying_table_access(THD *thd, TABLE_LIST *tbl,
                                              bool *fake_lock_tables_acl);
->>>>>>> e75cc37907886e9c8225ed83aaad051f83b537c3
 bool check_readonly(THD *thd, bool err_if_readonly);
 void err_readonly(THD *thd);
 
