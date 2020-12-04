@@ -7,6 +7,12 @@
 # Force a restart at the end of the test
 --source include/force_restart.inc
 
+--disable_query_log
+call mtr.add_suppression("Failed to initialize TLS for channel");
+call mtr.add_suppression("Failed to set up SSL because");
+--enable_query_log
+
+
 #
 # This test-case will cover data-at-rest encryption scenarios.
 # MySQL-5.7 introduced

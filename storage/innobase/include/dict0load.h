@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2020, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -110,7 +110,7 @@ a foreign key references columns in this table.
 @param[in]	ignore_err	Error to be ignored when loading
                                 table and its index definition
 @return table, NULL if does not exist; if the table is stored in an
-.ibd file, but the file does not exist, then we set the file_unreadable
+.ibd file, but the file does not exist, then we set the ibd_file_missing
 flag in the table object we return. */
 dict_table_t *dict_load_table(const char *name, bool cached,
                               dict_err_ignore_t ignore_err);
@@ -215,5 +215,11 @@ const char *dict_process_sys_zip_dict(mem_heap_t *heap,
                                       const rec_t *rec, ulint *id,
                                       const char **name, ulint *name_len,
                                       const char **data, ulint *data_len);
+
+/** This bool denotes if we found a Table or Partition with discarded Tablespace
+during load of SYS_TABLES (in dict_check_sys_tables).
+
+We use it to stop upgrade from 5.7 to 8.0 if there are discarded Tablespaces. */
+extern bool has_discarded_tablespaces;
 
 #endif

@@ -1,5 +1,5 @@
 # Copyright (c) 2006, 2020, Oracle and/or its affiliates. All rights reserved.
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
 # as published by the Free Software Foundation.
@@ -117,6 +117,7 @@ SET(MYSYS_SOURCES
   thr_rwlock.cc
   tree.cc
   typelib.cc
+  unhex.cc
   # From deleted mysys_ssl library
   crypt_genhash_impl.cc
   my_crypt.cc
@@ -166,6 +167,10 @@ IF(FREEBSD)
   ADD_COMPILE_FLAGS(stacktrace.cc COMPILE_FLAGS ${LIBUNWIND_CFLAGS})
 ENDIF()
 
+IF (WITH_COREDUMPER)
+  INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/extra/coredumper/include)
+ENDIF()
+
 ADD_CONVENIENCE_LIBRARY(mysys ${MYSYS_SOURCES}
   LINK_LIBRARIES
   mytime
@@ -188,6 +193,9 @@ ENDIF()
 # Need explicit pthread for gcc -fsanitize=address
 IF(CMAKE_USE_PTHREADS_INIT AND CMAKE_C_FLAGS MATCHES "-fsanitize=")
   TARGET_LINK_LIBRARIES(mysys pthread)
+ENDIF()
+IF (WITH_COREDUMPER)
+  TARGET_LINK_LIBRARIES(mysys coredumper)
 ENDIF()
 # Needed to resolve OpenSSL dependency on Windows
 IF(WIN32)

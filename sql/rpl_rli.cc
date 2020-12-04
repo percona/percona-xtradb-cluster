@@ -238,6 +238,14 @@ Relay_log_info::Relay_log_info(bool is_slave_recovery,
     );
     Sid_map *sid_map = new Sid_map(sid_lock);
     gtid_set = new Gtid_set(sid_map, sid_lock);
+
+    /*
+      Group replication applier channel shall not use checksum on its relay
+      log files.
+    */
+    if (channel_map.is_group_replication_channel_name(param_channel, true)) {
+      relay_log.relay_log_checksum_alg = binary_log::BINLOG_CHECKSUM_ALG_OFF;
+    }
   }
   gtid_monitoring_info = new Gtid_monitoring_info();
   do_server_version_split(::server_version, slave_version_split);
@@ -481,8 +489,8 @@ bool Relay_log_info::cannot_safely_rollback() const {
        ++it) {
     Slave_worker *worker = *it;
     mysql_mutex_lock(&worker->jobs_lock);
-    ret = worker->info_thd->get_transaction()->cannot_safely_rollback(
-        Transaction_ctx::SESSION);
+    const auto &trx = worker->info_thd->get_transaction();
+    ret = trx ? trx->cannot_safely_rollback(Transaction_ctx::SESSION) : false;
     mysql_mutex_unlock(&worker->jobs_lock);
   }
   return ret;
@@ -1756,12 +1764,16 @@ int Relay_log_info::rli_init_info(bool skip_received_gtid_set_recovery) {
       goto err;
     }
 
-    if (clone_startup) {
+    /*
+      Clone required cleanup must be done only once, thence we only
+      do it when server is booting.
+    */
+    if (clone_startup && get_server_state() == SERVER_BOOTING) {
       char *channel_name =
           (const_cast<Relay_log_info *>(mi->rli))->get_channel();
-      bool is_group_replication_applier_channel =
+      bool is_group_replication_channel =
           channel_map.is_group_replication_channel_name(channel_name);
-      if (is_group_replication_applier_channel) {
+      if (is_group_replication_channel) {
         if (clear_info()) {
           msg =
               "Error cleaning relay log configuration for group replication "

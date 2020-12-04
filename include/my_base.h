@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -556,6 +556,9 @@ enum ha_base_keytype {
 /** Multi-valued key */
 #define HA_MULTI_VALUED_KEY (1 << 19)
 
+constexpr const ulong HA_INDEX_USES_ENGINE_ATTRIBUTE{1UL << 20};
+constexpr const ulong HA_INDEX_USES_SECONDARY_ENGINE_ATTRIBUTE{1UL << 21};
+
 /* These flags can be added to key-seg-flag */
 
 #define HA_SPACE_PACK 1   /* Pack space in key-seg */
@@ -997,7 +1000,6 @@ Information in the data-dictionary needs to be updated. */
 /* Number of different errors */
 #define HA_ERR_ERRORS (HA_ERR_LAST - HA_ERR_FIRST + 1)
 
-#define HA_ERR_DECRYPTION_FAILED 500 /* Table encrypted but decypt failed */
 #define HA_ERR_ENCRYPTION_KEY_MISSING 501
 
 /* Other constants */

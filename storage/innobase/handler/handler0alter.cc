@@ -932,10 +932,10 @@ enum_alter_inplace_result ha_innobase::check_if_supported_inplace_alter(
         return HA_ALTER_INPLACE_NOT_SUPPORTED;
       }
 
-      DBUG_ASSERT((key_part->field->auto_flags & Field::NEXT_NUMBER) ==
-                  !!(key_part->field->flags & AUTO_INCREMENT_FLAG));
+      DBUG_ASSERT(((key_part->field->auto_flags & Field::NEXT_NUMBER) != 0) ==
+                  key_part->field->is_flag_set(AUTO_INCREMENT_FLAG));
 
-      if (key_part->field->flags & AUTO_INCREMENT_FLAG) {
+      if (key_part->field->is_flag_set(AUTO_INCREMENT_FLAG)) {
         /* We cannot assign an AUTO_INCREMENT
         column values during online ALTER. */
         DBUG_ASSERT(key_part->field == altered_table->found_next_number_field);
@@ -994,7 +994,8 @@ enum_alter_inplace_result ha_innobase::check_if_supported_inplace_alter(
     renaming the FTS_DOC_ID. */
 
     for (Field **fp = table->field; *fp; fp++) {
-      if (!((*fp)->flags & (FIELD_IS_RENAMED | FIELD_IS_DROPPED))) {
+      if (!((*fp)->is_flag_set(FIELD_IS_RENAMED) ||
+            (*fp)->is_flag_set(FIELD_IS_DROPPED))) {
         continue;
       }
 
@@ -1918,7 +1919,7 @@ static void innobase_col_to_mysql(
     Field *field)          /*!< in/out: MySQL field */
 {
   uchar *ptr;
-  uchar *dest = field->ptr;
+  uchar *dest = field->field_ptr();
   ulint flen = field->pack_length();
 
   switch (col->mtype) {
@@ -1932,7 +1933,7 @@ static void innobase_col_to_mysql(
         *--ptr = *data++;
       }
 
-      if (!(field->flags & UNSIGNED_FLAG)) {
+      if (!field->is_flag_set(UNSIGNED_FLAG)) {
         ((byte *)dest)[len - 1] ^= 0x80;
       }
 
@@ -2521,7 +2522,7 @@ bool innobase_fts_check_doc_id_col(
       my_error(ER_WRONG_COLUMN_NAME, MYF(0), field->field_name);
     } else if (field->type() != MYSQL_TYPE_LONGLONG ||
                field->pack_length() != 8 || field->is_nullable() ||
-               !(field->flags & UNSIGNED_FLAG) || innobase_is_v_fld(field)) {
+               !field->is_flag_set(UNSIGNED_FLAG) || innobase_is_v_fld(field)) {
       my_error(ER_INNODB_FT_WRONG_DOCID_COLUMN, MYF(0), field->field_name);
     } else {
       *fts_doc_col_no = i - *num_v;
@@ -3038,7 +3039,7 @@ static void innobase_build_col_map_add(mem_heap_t *heap, dfield_t *dfield,
 
   byte *buf = static_cast<byte *>(mem_heap_alloc(heap, size));
 
-  const byte *mysql_data = field->ptr;
+  const byte *mysql_data = field->field_ptr();
 
   row_mysql_store_col_in_innobase_format(
       dfield, buf, true, mysql_data, size, comp,
@@ -3870,10 +3871,8 @@ static MY_ATTRIBUTE((warn_unused_result)) bool dd_prepare_inplace_alter_table(
     ut_free(path);
 
     bool discarded = false;
-    const dd::Properties &p = old_dd_tab->se_private_data();
-    if (dict_table_is_file_per_table(old_table) &&
-        p.exists(dd_table_key_strings[DD_TABLE_DISCARD])) {
-      p.get(dd_table_key_strings[DD_TABLE_DISCARD], &discarded);
+    if (dict_table_is_file_per_table(old_table)) {
+      discarded = dd_is_discarded(*old_dd_tab);
     }
 
     dd::Object_id dd_space_id;
@@ -4035,8 +4034,7 @@ static void dd_commit_inplace_alter_table(
 
   /* For discarded table, need set this to dd. */
   if (old_info.m_discarded) {
-    dd::Properties &p = new_dd_tab->se_private_data();
-    p.set(dd_table_key_strings[DD_TABLE_DISCARD], true);
+    dd_set_discarded(*new_dd_tab, true);
   }
 }
 
@@ -4597,11 +4595,13 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
         dict_mem_table_add_v_col(
             ctx->new_table, ctx->heap, field->field_name, col_type,
             dtype_form_prtype(field_type, charset_no), col_len, i,
-            field->gcol_info->non_virtual_base_columns());
+            field->gcol_info->non_virtual_base_columns(),
+            !field->is_hidden_from_user());
       } else {
-        dict_mem_table_add_col(
-            ctx->new_table, ctx->heap, field->field_name, col_type,
-            dtype_form_prtype(field_type, charset_no), col_len);
+        dict_mem_table_add_col(ctx->new_table, ctx->heap, field->field_name,
+                               col_type,
+                               dtype_form_prtype(field_type, charset_no),
+                               col_len, !field->is_hidden_from_user());
       }
     }
 
@@ -4871,7 +4871,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool prepare_inplace_alter_table_dict(
     log is unnecessary. When rebuilding the table
     (new_clustered), we will allocate the log for the
     clustered index of the old table, later. */
-    if (new_clustered || !ctx->online || !user_table->is_readable() ||
+    if (new_clustered || !ctx->online || user_table->ibd_file_missing ||
         dict_table_is_discarded(user_table)) {
       /* No need to allocate a modification log. */
       ut_ad(!ctx->add_index[a]->online_log);
@@ -5439,7 +5439,7 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
   create_table_info_t info(m_user_thd, altered_table,
                            ha_alter_info->create_info, nullptr, nullptr,
                            indexed_table->tablespace ? tablespace : nullptr,
-                           is_file_per_table, false, 0, 0);
+                           is_file_per_table, false, 0, 0, false);
 
   info.set_tablespace_type(is_file_per_table);
 
@@ -5451,36 +5451,10 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
            altered_table))) {  // We need to make sure spatial index was not
                                // added if this is to be keyring encrypted
     const char *invalid_opt = info.create_options_are_invalid();
-    if (invalid_opt) {
+    if (invalid_opt != nullptr) {
       my_error(ER_ILLEGAL_HA_CREATE_OPTION, MYF(0), table_type(), invalid_opt);
       goto err_exit_no_heap;
     }
-  }
-
-  if (indexed_table->is_readable()) {
-  } else {
-    if (indexed_table->is_corrupt) {
-      /* Handled below */
-    } else {
-      FilSpace space(indexed_table->space, true);
-
-      if (space()) {
-        String str;
-        const char *engine = table_type();
-        ib::warn(ER_XB_MSG_4, table_share->table_name.str);
-        my_error(ER_GET_ERRMSG, MYF(0), HA_ERR_DECRYPTION_FAILED, str.c_ptr(),
-                 engine);
-        return true;
-      }
-    }
-  }
-
-  if (indexed_table->is_corrupt ||
-      UT_LIST_GET_FIRST(indexed_table->indexes) == NULL ||
-      UT_LIST_GET_FIRST(indexed_table->indexes)->is_corrupted()) {
-    /* The clustered index is corrupted. */
-    my_error(ER_CHECK_NO_SUCH_TABLE, MYF(0));
-    return true;
   }
 
   /* Check if any index name is reserved. */
@@ -5511,7 +5485,7 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
         ha_alter_info->alter_info->create_list);
 
     for (Field **fp = table->field; *fp; fp++) {
-      if (!((*fp)->flags & FIELD_IS_RENAMED)) {
+      if (!(*fp)->is_flag_set(FIELD_IS_RENAMED)) {
         continue;
       }
 
@@ -5992,10 +5966,10 @@ bool ha_innobase::prepare_inplace_alter_table_impl(
 
     field = altered_table->field[i];
 
-    DBUG_ASSERT((field->auto_flags & Field::NEXT_NUMBER) ==
-                !!(field->flags & AUTO_INCREMENT_FLAG));
+    DBUG_ASSERT(((field->auto_flags & Field::NEXT_NUMBER) != 0) ==
+                field->is_flag_set(AUTO_INCREMENT_FLAG));
 
-    if (field->flags & AUTO_INCREMENT_FLAG) {
+    if (field->is_flag_set(AUTO_INCREMENT_FLAG)) {
       if (add_autoinc_col_no != ULINT_UNDEFINED) {
         /* This should have been blocked earlier. */
         ut_ad(0);
@@ -6170,7 +6144,7 @@ bool ha_innobase::inplace_alter_table_impl(TABLE *altered_table,
 
   ctx->m_stage = UT_NEW_NOKEY(ut_stage_alter_t(pk));
 
-  if (m_prebuilt->table->file_unreadable ||
+  if (m_prebuilt->table->ibd_file_missing ||
       dict_table_is_discarded(m_prebuilt->table)) {
     goto all_done;
   }
@@ -6320,14 +6294,6 @@ oom:
                get_error_key_name(m_prebuilt->trx->error_key_num, ha_alter_info,
                                   m_prebuilt->table));
       break;
-    case DB_IO_DECRYPT_FAIL: {
-      String str;
-      const char *engine = table_type();
-      get_error_message(HA_ERR_DECRYPTION_FAILED, &str);
-      my_error(ER_GET_ERRMSG, MYF(0), HA_ERR_DECRYPTION_FAILED, str.c_ptr(),
-               engine);
-      break;
-    }
     default:
       my_error_innodb(error, table_share->table_name.str,
                       m_prebuilt->table->flags);
@@ -6544,7 +6510,7 @@ static void innobase_rename_or_enlarge_columns_cache(
         }
       }
 
-      if ((*fp)->flags & FIELD_IS_RENAMED) {
+      if ((*fp)->is_flag_set(FIELD_IS_RENAMED)) {
         dict_mem_table_col_rename(user_table, col_n, cf->field->field_name,
                                   cf->field_name, is_virtual);
       }
@@ -6617,7 +6583,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool commit_get_autoinc(
       dict_index_t *index;
 
       index = dict_table_get_index_on_first_col(ctx->old_table,
-                                                autoinc_field->field_index);
+                                                autoinc_field->field_index());
 
       err = row_search_max_autoinc(index, autoinc_field->field_name,
                                    &max_value_table);
@@ -6816,7 +6782,7 @@ static void innobase_rename_col_discard_foreign(
   ut_ad(ha_alter_info->handler_flags & Alter_inplace_info::ALTER_COLUMN_NAME);
 
   for (Field **fp = mysql_table->field; *fp; fp++) {
-    if (!((*fp)->flags & FIELD_IS_RENAMED)) {
+    if (!(*fp)->is_flag_set(FIELD_IS_RENAMED)) {
       continue;
     }
 
@@ -7001,7 +6967,7 @@ inline MY_ATTRIBUTE((warn_unused_result)) bool commit_try_rebuild(
   /* The new table must inherit the flag from the
   "parent" table. */
   if (dict_table_is_discarded(user_table)) {
-    rebuilt_table->set_file_unreadable();
+    rebuilt_table->ibd_file_missing = true;
     rebuilt_table->flags2 |= DICT_TF2_DISCARDED;
   }
   /* We must be still holding a table handle. */
@@ -7362,17 +7328,17 @@ static void alter_stats_rebuild(dict_table_t *table, const char *table_name,
   }
 
 #ifdef UNIV_DEBUG
-  bool file_unreadable_orig = false;
+  bool ibd_file_missing_orig = false;
 #endif /* UNIV_DEBUG */
 
   DBUG_EXECUTE_IF("ib_rename_index_fail2",
-                  file_unreadable_orig = table->file_unreadable;
-                  table->set_file_unreadable(););
+                  ibd_file_missing_orig = table->ibd_file_missing;
+                  table->ibd_file_missing = true;);
 
   dberr_t ret = dict_stats_update(table, DICT_STATS_RECALC_PERSISTENT);
 
   DBUG_EXECUTE_IF("ib_rename_index_fail2",
-                  table->file_unreadable = file_unreadable_orig;);
+                  table->ibd_file_missing = ibd_file_missing_orig;);
 
   if (ret != DB_SUCCESS) {
     push_warning_printf(thd, Sql_condition::SL_WARNING, ER_ALTER_INFO,
@@ -7469,20 +7435,6 @@ bool ha_innobase::commit_inplace_alter_table_impl(
     ha_innobase_inplace_ctx *ctx =
         static_cast<ha_innobase_inplace_ctx *>(*pctx);
     DBUG_ASSERT(ctx->prebuilt->trx == m_prebuilt->trx);
-
-    /* If decryption failed for old table or new table
-    fail here. */
-    if ((!ctx->old_table->is_readable() &&
-         fil_space_get(ctx->old_table->space)) ||
-        (!ctx->new_table->is_readable() &&
-         fil_space_get(ctx->new_table->space))) {
-      String str;
-      const char *engine = table_type();
-      get_error_message(HA_ERR_DECRYPTION_FAILED, &str);
-      my_error(ER_GET_ERRMSG, MYF(0), HA_ERR_DECRYPTION_FAILED, str.c_ptr(),
-               engine);
-      return true;
-    }
 
     /* Exclusively lock the table, to ensure that no other
     transaction is holding locks on the table while we
@@ -7832,7 +7784,7 @@ rollback_trx:
       dict_table_autoinc_lock(t);
       dict_table_autoinc_initialize(t, ctx->max_autoinc);
       t->autoinc_persisted = ctx->max_autoinc - 1;
-      dict_table_autoinc_set_col_pos(t, field->field_index);
+      dict_table_autoinc_set_col_pos(t, field->field_index());
       dict_table_autoinc_unlock(t);
     }
 

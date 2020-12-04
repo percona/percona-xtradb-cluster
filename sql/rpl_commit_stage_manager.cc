@@ -112,7 +112,7 @@ bool Commit_stage_manager::Mutex_queue::append(THD *first) {
   commit are executed as atomic action. */
   if (WSREP(thd_to_append) && interim_commit &&
       thd_to_append->run_wsrep_ordered_commit) {
-    wsrep_ordered_commit(thd_to_append, true, wsrep_apply_error());
+    wsrep_ordered_commit(thd_to_append, true);
 
     DBUG_EXECUTE_IF("sync.wsrep_ordered_commit", {
       const char act[] =

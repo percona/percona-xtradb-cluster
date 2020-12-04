@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -128,8 +128,8 @@ class Item_str_func : public Item_func {
     set_data_type_string_init();
   }
 
-  longlong val_int() override;
-  double val_real() override;
+  longlong val_int() override { return val_int_from_string(); }
+  double val_real() override { return val_real_from_string(); }
   my_decimal *val_decimal(my_decimal *) override;
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate) override {
     return get_date_from_string(ltime, fuzzydate);
@@ -1741,7 +1741,7 @@ class Item_func_wsrep_last_written_gtid : public Item_str_func {
     maybe_null = true;
     return false;
   }
-  const char *func_name() const { return "wsrep_last_written_gtid"; }
+  const char *func_name() const override { return "wsrep_last_written_gtid"; }
 };
 
 class Item_func_wsrep_last_seen_gtid : public Item_str_func {
@@ -1757,7 +1757,7 @@ class Item_func_wsrep_last_seen_gtid : public Item_str_func {
     maybe_null = true;
     return false;
   }
-  const char *func_name() const { return "wsrep_last_seen_gtid"; }
+  const char *func_name() const override { return "wsrep_last_seen_gtid"; }
 };
 
 class Item_func_wsrep_sync_wait_upto_gtid : public Item_bool_func {

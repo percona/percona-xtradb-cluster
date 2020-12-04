@@ -143,9 +143,13 @@ direction they go alphabetically: FSP_DOWN, FSP_UP, FSP_NO_DIR
 @param[in,out]	mtr			mini-transaction
 @param[in,out]	init_mtr		mtr or another mini-transaction in
 which the page should be initialized. If init_mtr != mtr, but the page is
-already latched in mtr, do not initialize the page
+already latched in mtr, do not initialize the page */
+#ifdef UNIV_DEBUG
+/**
 @param[in]	has_done_reservation	TRUE if the space has already been
-reserved, in this case we will never return NULL
+reserved, in this case we will never return NULL */
+#endif /* UNIV_DEBUG */
+/**
 @retval NULL	if no page could be allocated
 @retval block	rw_lock_x_lock_count(&block->lock) == 1 if allocation succeeded
 (init_mtr == mtr, or the page was not previously freed in mtr)
@@ -712,15 +716,22 @@ static void fsp_space_modify_check(space_id_t id, const mtr_t *mtr) {
   ut_ad(mtr);
   switch (mtr->get_log_mode()) {
     case MTR_LOG_SHORT_INSERTS:
-    case MTR_LOG_NONE:
       /* These modes are only allowed within a non-bitmap page
       when there is a higher-level redo log record written. */
       break;
+
+    case MTR_LOG_NONE:
+      /* We allow MTR_LOG_NONE to be set over MTR_LOG_NO_REDO. */
+      if (!mtr_t::s_logging.is_enabled()) {
+        return;
+      }
+      break;
+
     case MTR_LOG_NO_REDO:
 #ifdef UNIV_DEBUG
     {
       const fil_type_t type = fil_space_get_type(id);
-      ut_a(fsp_is_system_temporary(id) ||
+      ut_a(fsp_is_system_temporary(id) || !mtr_t::s_logging.is_enabled() ||
            fil_space_get_flags(id) == UINT32_UNDEFINED ||
            type == FIL_TYPE_TEMPORARY || type == FIL_TYPE_IMPORT ||
            fil_space_is_redo_skipped(id) || !undo::is_active(id, false));
@@ -734,6 +745,9 @@ static void fsp_space_modify_check(space_id_t id, const mtr_t *mtr) {
       /* If we write redo log, the tablespace must exist. */
       ut_ad(fil_space_get_type(id) == FIL_TYPE_TABLESPACE);
       return;
+
+    default:
+      break;
   }
 
   ut_ad(0);
@@ -1137,7 +1151,7 @@ bool fsp_header_init(space_id_t space_id, page_no_t size, mtr_t *mtr,
     if (space->crypt_data) {
       space->crypt_data->write_page0(
           space, page, mtr, space->crypt_data->min_key_version,
-          space->crypt_data->type, space->crypt_data->encryption_rotation);
+          space->crypt_data->max_key_version, space->crypt_data->type);
     }
   }
 
@@ -2741,9 +2755,13 @@ direction they go alphabetically: FSP_DOWN, FSP_UP, FSP_NO_DIR
 @param[in,out]	mtr			mini-transaction
 @param[in,out]	init_mtr		mtr or another mini-transaction in
 which the page should be initialized. If init_mtr != mtr, but the page is
-already latched in mtr, do not initialize the page
+already latched in mtr, do not initialize the page */
+#ifdef UNIV_DEBUG
+/**
 @param[in]	has_done_reservation	TRUE if the space has already been
-reserved, in this case we will never return NULL
+reserved, in this case we will never return NULL */
+#endif /* UNIV_DEBUG */
+/**
 @retval NULL	if no page could be allocated
 @retval block	rw_lock_x_lock_count(&block->lock) == 1 if allocation succeeded
 (init_mtr == mtr, or the page was not previously freed in mtr)
@@ -4169,6 +4187,11 @@ static void mark_all_page_dirty_in_tablespace(THD *thd, space_id_t space_id,
   /* Confirm that all pages are covered. */
   ut_ad(progress_monitor.is_completed());
 #endif
+
+  // Tablespace could have been temporarily removed from rotation
+  // to not interfere with encryption threads. Now that Master
+  // Key encryption/decryption was finished - readd it to rotation.
+  fil_crypt_readd_space_to_rotation(space_id);
 }
 
 /** Encrypt/Unencrypt a tablespace.

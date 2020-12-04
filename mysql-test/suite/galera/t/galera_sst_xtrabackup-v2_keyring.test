@@ -8,6 +8,14 @@
 --source include/big_test.inc
 --source include/galera_cluster.inc
 
+
+--disable_query_log
+--connection node_1
+CALL mtr.add_suppression("Failed to remove page file");
+--connection node_2
+CALL mtr.add_suppression("Failed to remove page file");
+--enable_query_log
+
 # Force a restart at the end of the test
 --source include/force_restart.inc
 

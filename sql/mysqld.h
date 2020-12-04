@@ -492,6 +492,7 @@ extern PSI_mutex_key key_LOCK_wsrep_thd_attachable_trx;
 extern PSI_rwlock_key key_rwlock_LOCK_logger;
 extern PSI_rwlock_key key_rwlock_channel_map_lock;
 extern PSI_rwlock_key key_rwlock_channel_lock;
+extern PSI_rwlock_key key_rwlock_gtid_mode_lock;
 extern PSI_rwlock_key key_rwlock_receiver_sid_lock;
 extern PSI_rwlock_key key_rwlock_rpl_filter_lock;
 extern PSI_rwlock_key key_rwlock_channel_to_filter_lock;
@@ -767,6 +768,7 @@ extern mysql_mutex_t LOCK_compress_gtid_table;
 extern mysql_mutex_t LOCK_keyring_operations;
 extern mysql_mutex_t LOCK_collect_instance_log;
 extern mysql_mutex_t LOCK_tls_ctx_options;
+extern mysql_mutex_t LOCK_admin_tls_ctx_options;
 extern mysql_mutex_t LOCK_rotate_binlog_master_key;
 
 extern mysql_cond_t COND_server_started;
@@ -864,6 +866,11 @@ bool mysqld_partial_revokes();
 */
 void set_mysqld_partial_revokes(bool value);
 
+/**
+  Set m_opt_tracking_mode with a user given value associated with sysvar.
+*/
+void set_mysqld_opt_tracking_mode();
+
 #ifdef _WIN32
 
 bool is_windows_service();
@@ -875,6 +882,11 @@ bool update_named_pipe_full_access_group(const char *new_group_name);
 extern LEX_STRING opt_mandatory_roles;
 extern bool opt_mandatory_roles_cache;
 extern bool opt_always_activate_granted_roles;
+
+/* coredumper */
+extern bool opt_libcoredumper;
+extern char *opt_libcoredumper_path;
+bool validate_libcoredumper_path(char *opt_libcoredumper_path);
 
 extern mysql_component_t mysql_component_mysql_server;
 extern mysql_component_t mysql_component_performance_schema;

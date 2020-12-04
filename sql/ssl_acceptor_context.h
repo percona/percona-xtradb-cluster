@@ -111,14 +111,6 @@ class SslAcceptorContext {
   static int show_ssl_get_ssl_crl(THD *, SHOW_VAR *var, char *buff);
   static int show_ssl_get_ssl_crlpath(THD *, SHOW_VAR *var, char *buff);
 
-#ifdef WITH_WSREP
-  static bool wsrep_ssl_artifacts_check(bool bootstrapping_node);
-  static void populate_wsrep_ssl_options(char *buff, unsigned int sz);
-  static bool is_wsrep_context_initialized() {
-    return wsrep_context_initialized;
-  }
-#endif /* WITH_WSREP */
-
   /**
     Check if SSL was initialized
 
@@ -292,10 +284,6 @@ class SslAcceptorContext {
 
   /** singleton lock */
   static SslAcceptorContextLockType *s_lock;
-
-#ifdef WITH_WSREP
-  static bool wsrep_context_initialized;
-#endif /* WITH_WSREP */
 };
 
 #endif  // SSL_ACCEPTOR_CONTEXT_INCLUDED

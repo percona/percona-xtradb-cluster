@@ -1,0 +1,7 @@
+call mtr.add_suppression("Tablespace InnoDB_System doesn't exist.");
+call mtr.add_suppression("Event 1 Query apply failed");
+call mtr.add_suppression("Tablespace InnoDB_System doesn't exist.");
+call mtr.add_suppression("Event 1 Query apply failed");
+SET @@session.max_error_count=-0;
+DROP TABLESPACE InnoDB_System;
+ERROR HY000: Tablespace InnoDB_System doesn't exist.

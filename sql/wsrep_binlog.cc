@@ -251,8 +251,9 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
   DBUG_ENTER("wsrep_dump_rbr_buf_with_header");
 
   File file;
-  IO_CACHE cache;
-  assert(0);
+  Binlog_cache_storage cache;
+  //IO_CACHE cache;
+  //assert(0);
   // TODO: need to find way to persist event (Format_description_log_event to
   // cache) Log_event_writer writer(&cache, 0);
   Format_description_log_event *ev = 0;
@@ -287,12 +288,11 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
     goto cleanup1;
   }
 
-  if (init_io_cache(&cache, file, 0, WRITE_CACHE, 0, 0,
-                    MYF(MY_WME | MY_NABP))) {
+  if (cache.open(file, 1024000)) {
     goto cleanup2;
   }
 
-  if (my_b_safe_write(&cache, (const uchar *)BINLOG_MAGIC,
+  if (cache.write((const uchar *)BINLOG_MAGIC,
                       BIN_LOG_HEADER_SIZE)) {
     goto cleanup2;
   }
@@ -305,15 +305,15 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
                             : (new Format_description_log_event());
 
   // if (writer.write(ev) || my_b_write(&cache, (uchar *)rbr_buf, buf_len) ||
-  if (my_b_write(&cache, static_cast<uchar *>(const_cast<void *>(rbr_buf)),
+  if (ev->write(&cache) || cache.write(static_cast<uchar *>(const_cast<void *>(rbr_buf)),
                  buf_len) ||
-      flush_io_cache(&cache)) {
+      cache.flush()) {
     WSREP_ERROR("Failed to write to '%s'.", filename);
     goto cleanup2;
   }
 
 cleanup2:
-  end_io_cache(&cache);
+  //end_io_cache(&cache);
 
 cleanup1:
   free(filename);

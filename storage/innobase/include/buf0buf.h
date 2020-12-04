@@ -403,7 +403,7 @@ bool buf_page_get_known_nowait(ulint rw_latch, buf_block_t *block,
 
 /** Given a tablespace id and page number tries to get that page. If the
 page is not in the buffer pool it is not loaded and NULL is returned.
-Suitable for using when holding the lock_sys_t::mutex.
+Suitable for using when holding the lock_sys latches (as it avoids deadlock).
 @param[in]	page_id	page id
 @param[in]	file	file name
 @param[in]	line	line where called
@@ -413,9 +413,9 @@ const buf_block_t *buf_page_try_get_func(const page_id_t &page_id,
                                          const char *file, ulint line,
                                          mtr_t *mtr);
 
-/** Tries to get a page.
-If the page is not in the buffer pool it is not loaded. Suitable for using
-when holding the lock_sys_t::mutex.
+/** Given a tablespace id and page number tries to get that page. If the
+page is not in the buffer pool it is not loaded and NULL is returned.
+Suitable for using when holding the lock_sys latches (as it avoids deadlock).
 @param[in]	page_id	page identifier
 @param[in]	mtr	mini-transaction
 @return the page if in buffer pool, NULL if not */
@@ -451,8 +451,7 @@ buf_block_t *buf_page_get_gen(const page_id_t &page_id,
                               const page_size_t &page_size, ulint rw_latch,
                               buf_block_t *guess, Page_fetch mode,
                               const char *file, ulint line, mtr_t *mtr,
-                              bool dirty_with_no_latch = false,
-                              dberr_t *err = nullptr);
+                              bool dirty_with_no_latch = false);
 
 /** Initializes a page to the buffer buf_pool. The page is usually not read
 from a file even if it cannot be found in the buffer buf_pool. This is one
@@ -572,9 +571,13 @@ void buf_block_modify_clock_inc(buf_block_t *block);
 UNIV_INLINE
 uint64_t buf_block_get_modify_clock(const buf_block_t *block);
 
-/** Increments the bufferfix count.
+/** Increments the bufferfix count. */
+#ifdef UNIV_DEBUG
+/**
 @param[in]	file	file name
-@param[in]	line	line
+@param[in]	line	line */
+#endif /* UNIV_DEBUG */
+/**
 @param[in,out]	block	block to bufferfix */
 UNIV_INLINE
 void buf_block_buf_fix_inc_func(
@@ -974,13 +977,8 @@ buf_page_t *buf_page_init_for_read(dberr_t *err, ulint mode,
 the buffer pool.
 @param[in]	bpage	pointer to the block in question
 @param[in]	evict	whether or not to evict the page from LRU list
-@return whether the operation succeeded
-@retval DB_SUCCESS              always when writing, or if a read page was OK
-@retval	DB_PAGE_CORRUPTED       if the checksum fails on a page read
-@retval	DB_IO_DECRYPT_FAIL    if page post encryption checksum matches but
-                                after decryption normal page checksum does
-                                not match */
-dberr_t buf_page_io_complete(buf_page_t *bpage, bool evict = false);
+@return true if successful */
+bool buf_page_io_complete(buf_page_t *bpage, bool evict);
 
 /** Calculates the index of a buffer pool to the buf_pool[] array.
  @return the position of the buffer pool in buf_pool[] */
@@ -1508,6 +1506,10 @@ struct buf_block_t {
   pool mutex), io_fix, buf_fix_count, and accessed; we introduce this
   new mutex in InnoDB-5.1 to relieve contention on the buffer pool mutex */
   BPageMutex mutex;
+
+  /** Get the page number and space id of the current buffer block.
+  @return page number of the current buffer block. */
+  const page_id_t &get_page_id() const { return page.id; }
 
   /** Get the page number of the current buffer block.
   @return page number of the current buffer block. */

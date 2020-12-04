@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2020, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2012, Facebook Inc.
 
 This program is free software; you can redistribute it and/or modify it under
@@ -169,11 +169,6 @@ buf_block_t *btr_root_block_get(
 
   buf_block_t *block = btr_block_get(page_id, page_size, mode, index, mtr);
 
-  if (!block && index && index->table && !index->table->is_readable()) {
-    ib::warn(ER_XB_MSG_4, index->table_name);
-    return nullptr;
-  }
-
   SRV_CORRUPT_TABLE_CHECK(block, return (nullptr););
 
   btr_assert_not_corrupted(block, index);
@@ -209,14 +204,7 @@ page_t *btr_root_get(const dict_index_t *index, /*!< in: index tree */
   /* Intended to be used for segment list access.
   SX lock doesn't block reading user data by other threads.
   And block the segment list access by others.*/
-
-  buf_block_t *root = btr_root_block_get(index, RW_SX_LATCH, mtr);
-
-  if (root && root->page.encrypted == true) {
-    root = nullptr;
-  }
-
-  return (root ? buf_block_get_frame(root) : nullptr);
+  return (buf_block_get_frame(btr_root_block_get(index, RW_SX_LATCH, mtr)));
 }
 
 /** Gets the height of the B-tree (the level of the root, when the leaf
@@ -238,14 +226,13 @@ ulint btr_height_get(dict_index_t *index, /*!< in: index tree */
   /* S latches the page */
   root_block = btr_root_block_get(index, RW_S_LATCH, mtr);
 
-  if (root_block) {
-    height = btr_page_get_level(buf_block_get_frame(root_block), mtr);
+  height = btr_page_get_level(buf_block_get_frame(root_block), mtr);
 
-    /* Release the S latch on the root page. */
-    mtr->memo_release(root_block, MTR_MEMO_PAGE_S_FIX);
+  /* Release the S latch on the root page. */
+  mtr->memo_release(root_block, MTR_MEMO_PAGE_S_FIX);
 
-    ut_d(sync_check_unlock(&root_block->lock));
-  }
+  ut_d(sync_check_unlock(&root_block->lock));
+
   return (height);
 }
 
@@ -520,8 +507,6 @@ ulint btr_get_size(dict_index_t *index, /*!< in: index */
 
   root = btr_root_get(index, mtr);
 
-  if (!root && index->table->is_readable() == false) return ULINT_UNDEFINED;
-
   SRV_CORRUPT_TABLE_CHECK(root, {
     mtr_commit(mtr);
     return (ULINT_UNDEFINED);
@@ -681,19 +666,16 @@ void btr_node_ptr_set_child_page_no(
   }
 }
 
-buf_block_t *btr_node_ptr_get_child(
-    const rec_t *node_ptr, /*!< in: node pointer */
-    dict_index_t *index,   /*!< in: index */
-    const ulint *offsets,  /*!< in: array returned by rec_get_offsets() */
-    mtr_t *mtr)            /*!< in: mtr */
-{
+buf_block_t *btr_node_ptr_get_child(const rec_t *node_ptr, dict_index_t *index,
+                                    const ulint *offsets, mtr_t *mtr,
+                                    rw_lock_type_t type) {
   ut_ad(rec_offs_validate(node_ptr, index, offsets));
 
   const page_id_t page_id(page_get_space_id(page_align(node_ptr)),
                           btr_node_ptr_get_child_page_no(node_ptr, offsets));
 
-  return (btr_block_get(page_id, dict_table_page_size(index->table),
-                        RW_SX_LATCH, index, mtr));
+  return (btr_block_get(page_id, dict_table_page_size(index->table), type,
+                        index, mtr));
 }
 
 /** Returns the upper level node pointer to a page. It is assumed that mtr holds
@@ -874,20 +856,18 @@ static MY_ATTRIBUTE((warn_unused_result)) buf_block_t *btr_free_root_check(
   ut_ad(index_id != BTR_FREED_INDEX_ID);
 
   buf_block_t *block = buf_page_get(page_id, page_size, RW_X_LATCH, mtr);
+  buf_block_dbg_add_level(block, SYNC_TREE_NODE);
 
-  if (block) {
-    buf_block_dbg_add_level(block, SYNC_TREE_NODE);
-
-    if (fil_page_index_page_check(block->frame) &&
-        index_id == btr_page_get_index_id(block->frame)) {
-      /* This should be a root page.
-      It should not be possible to reassign the same
-      index_id for some other index in the tablespace. */
-      ut_ad(page_is_root(block->frame));
-    } else {
-      block = nullptr;
-    }
+  if (fil_page_index_page_check(block->frame) &&
+      index_id == btr_page_get_index_id(block->frame)) {
+    /* This should be a root page.
+    It should not be possible to reassign the same
+    index_id for some other index in the tablespace. */
+    ut_ad(page_is_root(block->frame));
+  } else {
+    block = nullptr;
   }
+
   return (block);
 }
 
@@ -1409,7 +1389,7 @@ func_exit:
 #ifndef UNIV_HOTBACKUP
   if (success) {
     mlog_id_t type;
-    byte *log_ptr;
+    byte *log_ptr = nullptr;
 
     /* Write the log record */
     if (page_zip) {
@@ -1421,12 +1401,15 @@ func_exit:
       type = MLOG_PAGE_REORGANIZE;
     }
 
-    log_ptr = log_compressed ? nullptr
-                             : mlog_open_and_write_index(mtr, page, index, type,
-                                                         page_zip ? 1 : 0);
+    bool opened = false;
+
+    if (!log_compressed) {
+      opened = mlog_open_and_write_index(mtr, page, index, type,
+                                         page_zip ? 1 : 0, log_ptr);
+    }
 
     /* For compressed pages write the compression level. */
-    if (log_ptr && page_zip) {
+    if (opened && page_zip) {
       mach_write_to_1(log_ptr, z_level);
       mlog_close(mtr, log_ptr + 1);
     }
@@ -3037,9 +3020,8 @@ static buf_block_t *btr_lift_page_up(
   if (!dict_table_is_locking_disabled(index->table)) {
     /* Free predicate page locks on the block */
     if (dict_index_is_spatial(index)) {
-      lock_mutex_enter();
+      locksys::Shard_latch_guard guard{block->get_page_id()};
       lock_prdt_page_free_from_discard(block, lock_sys->prdt_page_hash);
-      lock_mutex_exit();
     }
     lock_update_copy_and_discard(father_block, block);
   }
@@ -3306,10 +3288,9 @@ retry:
       }
 
       /* No GAP lock needs to be worrying about */
-      lock_mutex_enter();
+      locksys::Shard_latch_guard guard{block->get_page_id()};
       lock_prdt_page_free_from_discard(block, lock_sys->prdt_page_hash);
       lock_rec_free_all_from_discard_page(block);
-      lock_mutex_exit();
     } else {
       btr_node_ptr_delete(index, block, mtr);
       if (!dict_table_is_locking_disabled(index->table)) {
@@ -3441,10 +3422,9 @@ retry:
         rtr_merge_and_update_mbr(&cursor2, &father_cursor, offsets2, offsets,
                                  merge_page, merge_block, block, index, mtr);
       }
-      lock_mutex_enter();
+      locksys::Shard_latch_guard guard{block->get_page_id()};
       lock_prdt_page_free_from_discard(block, lock_sys->prdt_page_hash);
       lock_rec_free_all_from_discard_page(block);
-      lock_mutex_exit();
     } else {
       compressed = btr_cur_pessimistic_delete(
           &err, TRUE, &cursor2, BTR_CREATE_FLAG, false, 0, 0, 0, mtr);
@@ -3878,7 +3858,7 @@ void btr_print_index(dict_index_t *index, /*!< in: index */
 
   mtr_commit(&mtr);
 
-  ut_ad(btr_validate_index(index, 0, false) == DB_SUCCESS);
+  ut_ad(btr_validate_index(index, 0, false));
 }
 #endif /* UNIV_BTR_PRINT */
 
@@ -4623,20 +4603,19 @@ static bool btr_validate_spatial_index(
 
 /** Checks the consistency of an index tree.
  @return true if ok */
-dberr_t btr_validate_index(
+bool btr_validate_index(
     dict_index_t *index, /*!< in: index */
     const trx_t *trx,    /*!< in: transaction or NULL */
     bool lockout)        /*!< in: true if X-latch index is intended */
 {
-  dberr_t err = DB_SUCCESS;
   /* Full Text index are implemented by auxiliary tables,
   not the B-tree */
   if (dict_index_is_online_ddl(index) || (index->type & DICT_FTS)) {
-    return (err);
+    return (true);
   }
 
   if (dict_index_is_spatial(index)) {
-    return btr_validate_spatial_index(index, trx) ? DB_SUCCESS : DB_ERROR;
+    return btr_validate_spatial_index(index, trx);
   }
 
   mtr_t mtr;
@@ -4651,31 +4630,26 @@ dberr_t btr_validate_index(
     }
   }
 
+  bool ok = true;
   page_t *root = btr_root_get(index, &mtr);
-
-  if (root == NULL && !index->is_readable()) {
-    err = DB_IO_DECRYPT_FAIL;
-    mtr_commit(&mtr);
-    return err;
-  }
 
   SRV_CORRUPT_TABLE_CHECK(root, {
     mtr_commit(&mtr);
-    return DB_CORRUPTION;
+    return (false);
   });
 
   ulint n = btr_page_get_level(root, &mtr);
 
   for (ulint i = 0; i <= n; ++i) {
     if (!btr_validate_level(index, trx, n - i, lockout)) {
-      err = DB_CORRUPTION;
+      ok = false;
       break;
     }
   }
 
   mtr_commit(&mtr);
 
-  return (err);
+  return (ok);
 }
 
 /** Checks if the page in the cursor can be merged with given page.

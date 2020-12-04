@@ -50,6 +50,8 @@ SET SESSION wsrep_sync_wait = 0;
 --eval SET SESSION wsrep_trx_fragment_size = $wsrep_trx_fragment_size;
 
 --disable_query_log
+--disable_result_log
+
 --let $i = `SELECT $count`
 while ($i)
 {
@@ -65,22 +67,23 @@ while ($i)
 	--send_eval $query_node_2
 
         --connection node_1
-        --error 0,ER_QUERY_INTERRUPTED,ER_LOCK_DEADLOCK,ER_DUP_ENTRY
+        --error 0,ER_ERROR_DURING_COMMIT,ER_QUERY_INTERRUPTED,ER_LOCK_DEADLOCK,ER_DUP_ENTRY
 	--reap
 
 	--connection node_1a
         if ($query_node_1a) {
-	        --error 0,ER_QUERY_INTERRUPTED,ER_LOCK_DEADLOCK,ER_DUP_ENTRY
+	        --error 0,ER_ERROR_DURING_COMMIT,ER_QUERY_INTERRUPTED,ER_LOCK_DEADLOCK,ER_DUP_ENTRY
 	        --reap
 	}
 
         --connection node_2
-        --error 0,ER_QUERY_INTERRUPTED,ER_LOCK_DEADLOCK,ER_DUP_ENTRY
+        --error 0,ER_ERROR_DURING_COMMIT,ER_QUERY_INTERRUPTED,ER_LOCK_DEADLOCK,ER_DUP_ENTRY
         --reap
         --dec $i
 }
 
 SET SESSION wsrep_sync_wait = 15;
+--enable_result_log
 --enable_query_log
 
 --let $diff_servers = 1 2

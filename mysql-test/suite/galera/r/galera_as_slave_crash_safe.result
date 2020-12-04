@@ -1,5 +1,6 @@
 #node-3 (async slave)
 call mtr.add_suppression("Recovery from master pos");
+call mtr.add_suppression("when attempting to connect");
 START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.

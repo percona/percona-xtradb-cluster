@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -384,7 +384,6 @@ int Slave_worker::init_worker(Relay_log_info *rli, ulong i) {
    minimum context for MTS recovery.
 
    @param is_gaps_collecting_phase
-
           clarifies what state the caller
           executes this method from. When it's @c true
           that is @c mts_recovery_groups() and Worker should
@@ -505,16 +504,17 @@ bool Slave_worker::read_info(Rpl_info_handler *from) {
   if (from->prepare_info_for_read()) return true;
 
   if (!!from->get_info(&temp_internal_id, 0) ||
-      !!from->get_info(group_relay_log_name, sizeof(group_relay_log_name), "") ||
+      !!from->get_info(group_relay_log_name, sizeof(group_relay_log_name),
+                       "") ||
       !!from->get_info(&temp_group_relay_log_pos, 0UL) ||
       !!from->get_info(temp_group_master_log_name,
-                     sizeof(temp_group_master_log_name), "") ||
+                       sizeof(temp_group_master_log_name), "") ||
       !!from->get_info(&temp_group_master_log_pos, 0UL) ||
       !!from->get_info(checkpoint_relay_log_name,
-                     sizeof(checkpoint_relay_log_name), "") ||
+                       sizeof(checkpoint_relay_log_name), "") ||
       !!from->get_info(&temp_checkpoint_relay_log_pos, 0UL) ||
       !!from->get_info(checkpoint_master_log_name,
-                     sizeof(checkpoint_master_log_name), "") ||
+                       sizeof(checkpoint_master_log_name), "") ||
       !!from->get_info(&temp_checkpoint_master_log_pos, 0UL) ||
       !!from->get_info(&temp_checkpoint_seqno, 0UL) ||
       !!from->get_info(&nbytes, 0UL) ||
@@ -1168,6 +1168,23 @@ void Slave_worker::slave_worker_ends_group(Log_event *ev, int error) {
       mysql_mutex_unlock(&jobs_lock);
 
       // Fatal error happens, it notifies the following transaction to rollback
+      if (get_commit_order_manager()) {
+        /*
+          If we still have the deadlock flag set, it means that the current
+          thread was involved in a deadlock in its last retry (or all retries
+          have been exhausted). In such a case, we must release all transaction
+          locks by rolling back the transaction and clear the deadlock flag
+          before we wait for this worker's turn in report_rollback().
+        */
+        if (found_commit_order_deadlock()) {
+          /*
+            We call cleanup_context() because it is even capable of rolling
+            back XA transactions.
+          */
+          cleanup_context(info_thd, true);
+          reset_commit_order_deadlock();
+        }
+      }
       Commit_order_manager::wait_and_finish(info_thd, true);
 
       // Killing Coordinator to indicate eventual consistency error
@@ -1860,6 +1877,8 @@ std::tuple<bool, bool, uint> Slave_worker::check_and_report_end_of_retries(
         has_temporary_error(thd, da->is_error() ? da->mysql_errno() : 0,
                             &silent)) {
       error = ER_LOCK_DEADLOCK;
+      DBUG_EXECUTE_IF("simulate_exhausted_trans_retries",
+                      { trans_retries = slave_trans_retries; };);
     }
 #ifndef DBUG_OFF
     else {
@@ -1880,7 +1899,8 @@ std::tuple<bool, bool, uint> Slave_worker::check_and_report_end_of_retries(
 
   if (trans_retries >= slave_trans_retries) {
     thd->fatal_error();
-    c_rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
+    c_rli->report(ERROR_LEVEL,
+                  thd->is_error() ? thd->get_stmt_da()->mysql_errno() : error,
                   "worker thread retried transaction %lu time(s) "
                   "in vain, giving up. Consider raising the value of "
                   "the slave_transaction_retries variable.",

@@ -325,8 +325,7 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
 
   Return zero on succes, non-zero on failure.
  */
-static inline int wsrep_ordered_commit(THD *thd, bool all,
-                                       const wsrep_apply_error &) {
+static inline int wsrep_ordered_commit(THD *thd, bool all) {
   /* Interim Commit Optimization can be used only if log_slave_updates is
   ON that ensures all slave thread (including pxc replication threads)
   binlogs the events there-by following group commit protocol.
@@ -432,6 +431,8 @@ static inline int wsrep_after_rollback(THD *thd, bool all) {
     WSREP_DEBUG("wsrep_after_rollback stmt transaction rolled back");
     thd->wsrep_stmt_transaction_rolled_back = true;
   }
+  /* resetting aborter thread ID after full rollback */
+  if (wsrep_is_real(thd, all)) thd->wsrep_aborter = 0;
   DBUG_RETURN(
       (wsrep_is_real(thd, all) && wsrep_is_active(thd) &&
        thd->wsrep_cs().transaction().state() != wsrep::transaction::s_aborted)

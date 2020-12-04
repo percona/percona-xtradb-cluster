@@ -67,10 +67,6 @@ static PolyLock_mutex lock_ssl_ctx(&LOCK_tls_ctx_options);
 SslAcceptorContext::SslAcceptorContextLockType *SslAcceptorContext::s_lock =
     nullptr;
 
-#ifdef WITH_WSREP
-bool SslAcceptorContext::wsrep_context_initialized = false;
-#endif /* WITH_WSREP */
-
 void SslAcceptorContext::singleton_deinit() {
   delete s_lock;
   s_lock = nullptr;
@@ -464,62 +460,6 @@ int SslAcceptorContext::show_ssl_get_ssl_crlpath(THD *, SHOW_VAR *var,
   var->value = buff;
   return 0;
 }
-
-#ifdef WITH_WSREP
-bool SslAcceptorContext::wsrep_ssl_artifacts_check(bool bootstrapping_node) {
-  if (!WSREP_ON) {
-    /* No-op if node is running in non-cluster mode. */
-    return false;
-  }
-
-  ssl_artifacts_status auto_detection_status =
-      SslAcceptorContext::auto_detect_ssl();
-
-  if (auto_detection_status == SSL_ARTIFACTS_AUTO_DETECTED)
-    LogErr(INFORMATION_LEVEL, ER_SSL_TRYING_DATADIR_DEFAULTS,
-           DEFAULT_SSL_CA_CERT, DEFAULT_SSL_SERVER_CERT,
-           DEFAULT_SSL_SERVER_KEY);
-
-  /* Generate certs automatically only when bootstrapping
-  to avoid cases where starting up creates incompatible certs */
-  if (bootstrapping_node) {
-    if (do_auto_cert_generation(auto_detection_status, &opt_ssl_ca,
-                                &opt_ssl_key, &opt_ssl_cert) == false)
-      return true;
-  } else {
-    switch (auto_detection_status) {
-      case SSL_ARTIFACTS_AUTO_DETECTED:
-        WSREP_INFO("New joining cluster node found needed SSL artifacts");
-        break;
-      case SSL_ARTIFACTS_VIA_OPTIONS:
-        WSREP_INFO(
-            "New joining cluster node configured to use specified SSL "
-            "artifacts");
-        break;
-      case SSL_ARTIFACT_TRACES_FOUND:
-      case SSL_ARTIFACTS_NOT_FOUND:
-        WSREP_ERROR(
-            "New joining cluster node didn't find %sneeded SSL artifacts",
-            (auto_detection_status == SSL_ARTIFACT_TRACES_FOUND) ? "all " : "");
-        return true;
-        break;
-      default:
-        break;
-    }
-  }
-
-  wsrep_context_initialized = true;
-
-  return false;
-}
-
-void SslAcceptorContext::populate_wsrep_ssl_options(char *buff,
-                                                    unsigned int sz) {
-  memset(buff, 0, sz);
-  snprintf(buff, sz, "socket.ssl_key=%s;socket.ssl_ca=%s;socket.ssl_cert=%s",
-           opt_ssl_key, opt_ssl_ca, opt_ssl_cert);
-}
-#endif /* WITH_WSREP */
 
 bool SslAcceptorContext::have_ssl() {
   AutoLock c;

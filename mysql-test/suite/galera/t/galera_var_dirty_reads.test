@@ -41,7 +41,6 @@ SET @@session.wsrep_dirty_reads=OFF;
 --error ER_UNKNOWN_COM_ERROR
 SELECT i, variable_name, variable_value FROM t1, performance_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
 
---error ER_UNKNOWN_COM_ERROR
 SELECT 1;
 
 --error ER_UNKNOWN_COM_ERROR

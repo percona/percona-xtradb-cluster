@@ -1,0 +1,9 @@
+!include ../galera_3nodes.cnf
+
+[mysqld]
+wsrep-ignore-apply-errors=0
+wsrep_debug=1
+
+# [mysqld.3]
+# wsrep-sst-method=mysqldump
+# wsrep_sst_receive_address=127.0.0.2:@mysqld.3.port

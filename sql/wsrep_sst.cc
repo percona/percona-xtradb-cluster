@@ -432,7 +432,7 @@ static int sst_scan_uuid_seqno(const char *str, wsrep_uuid_t *uuid,
 static int generate_binlog_opt_val(char **ret) {
   DBUG_ASSERT(ret);
   *ret = NULL;
-  if (opt_bin_log && get_gtid_mode(GTID_MODE_LOCK_NONE) > GTID_MODE_OFF) {
+  if (opt_bin_log && global_gtid_mode.get() > Gtid_mode::OFF) {
     assert(opt_bin_logname);
     *ret = strcmp(opt_bin_logname, "0")
                ? my_strdup(key_memory_wsrep, opt_bin_logname, MYF(0))

@@ -1,0 +1,57 @@
+CREATE TABLE test.t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1)) ENGINE=InnoDB;
+SET SESSION wsrep_on=OFF;
+INSERT INTO t1 VALUES (1, 'a');
+SET SESSION wsrep_on=ON;
+LOCK TABLE t1 WRITE;
+INSERT INTO t1 VALUES (1, 'b');
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=1';
+SET SESSION wsrep_sync_wait=0;
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 2 FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+UNLOCK TABLES;
+Timeout in wait_condition.inc for SELECT 1 FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready' AND VARIABLE_VALUE = 'OFF'
+SHOW STATUS LIKE 'wsrep_cluster_status';
+Variable_name	Value
+wsrep_cluster_status	non-Primary
+SET SESSION wsrep_sync_wait=0;
+SHOW STATUS LIKE 'wsrep_cluster_status';
+Variable_name	Value
+wsrep_cluster_status	Disconnected
+SHOW STATUS LIKE 'wsrep_cluster_size';
+Variable_name	Value
+wsrep_cluster_size	0
+SET SESSION wsrep_on=OFF;
+SELECT * FROM t1;
+f1	f2
+1	a
+SET SESSION wsrep_sync_wait=0;
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 1 FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+SHOW STATUS LIKE 'wsrep_cluster_status';
+Variable_name	Value
+wsrep_cluster_status	Primary
+SHOW STATUS LIKE 'wsrep_cluster_size';
+Variable_name	Value
+wsrep_cluster_size	1
+SELECT * FROM t1;
+f1	f2
+1	b
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=0';
+# restart
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 3 FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+SELECT * FROM t1;
+f1	f2
+1	b
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 3 FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+SELECT * FROM t1;
+f1	f2
+1	b
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 3 FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+SELECT * FROM t1;
+f1	f2
+1	b
+DROP TABLE t1;
+CALL mtr.add_suppression("Slave SQL: Could not execute Write_rows event on table test.t1; Duplicate entry '1'");
+CALL mtr.add_suppression("Event (.*) Write_rows_v1 apply failed: 121, seqno ");
+CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on (.*)");
+CALL mtr.add_suppression("Plugin 'InnoDB' will be forced to shutdown");
+CALL mtr.add_suppression("Failed to apply write set: ");
+CALL mtr.add_suppression("Write_rows apply failed");

@@ -1,6 +1,6 @@
 /***********************************************************************
 
-Copyright (c) 1995, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2020, Oracle and/or its affiliates.
 Copyright (c) 2009, 2016, Percona Inc.
 
 Portions of this file contain modifications contributed and copyrighted
@@ -454,7 +454,7 @@ class AIO {
   /** Non const version */
   Slot *at(ulint i) MY_ATTRIBUTE((warn_unused_result)) {
     if (i >= m_slots.size()) {
-      ib::fatal() << "i: " << i << " slots: " << m_slots.size();
+      ib::fatal(ER_IB_MSG_1357) << "i: " << i << " slots: " << m_slots.size();
     }
 
     return (&m_slots[i]);
@@ -709,6 +709,13 @@ class AIO {
   @return DB_SUCCESS or error code */
   dberr_t init_linux_native_aio() MY_ATTRIBUTE((warn_unused_result));
 #endif /* LINUX_NATIVE_AIO */
+
+  /** Submit buffered AIO requests on the array to the kernel.
+  (low level function).
+  @param[in] acquire_mutex specifies whether to lock array mutex
+  @param[in] array for which to submit IO */
+  static void os_aio_dispatch_read_array_submit_low_for_array(
+      bool acquire_mutex MY_ATTRIBUTE((unused)), const AIO *arr);
 
  private:
   typedef std::vector<Slot> Slots;
@@ -1697,51 +1704,47 @@ void os_file_read_string(FILE *file, char *str, ulint size) {
   }
 }
 
-static dberr_t verify_post_encryption_checksum(const IORequest &type,
-                                               Encryption &encryption,
-                                               byte *buf, ulint src_len) {
+/** In case we resume Master Key to Keyring re-encryption we need a way of
+telling which pages were already re-encrypted. For Keyring encrypted page during
+MK => Keyring re-encryption we calculate a checksum. In case this checksum
+matches it means that the page is Keyring encrypted, it not it means page is MK
+encrypted.
+@param[in] type IO context
+@param[in,out] encryption information. Gets m_type set to appropriate encryption
+               either Encryption::KEYRING or ENCRYPTION::AES
+@param[in] page - for which we are determining the encryption
+@param[in] page_size size of the page */
+static void verify_encryption_for_rotation(const IORequest &type,
+                                           Encryption &encryption, byte *page,
+                                           ulint page_size) {
+  ut_ad(encryption.get_type() == Encryption::KEYRING &&
+        encryption.get_encryption_rotation() ==
+            Encryption_rotation::MASTER_KEY_TO_KEYRING);
+
   bool is_crypt_checksum_correct =
       false;  // For MK encryption is_crypt_checksum_correct stays false
   ulint original_type =
-      static_cast<uint16_t>(mach_read_from_2(buf + FIL_PAGE_ORIGINAL_TYPE_V1));
+      static_cast<uint16_t>(mach_read_from_2(page + FIL_PAGE_ORIGINAL_TYPE_V1));
 
-  if (encryption.get_type() == Encryption::KEYRING &&
-      Encryption::can_page_be_keyring_encrypted(original_type)) {
+  if (Encryption::can_page_be_keyring_encrypted(original_type)) {
     if (type.is_page_zip_compressed()) {
       byte zip_magic[Encryption::ZIP_PAGE_KEYRING_ENCRYPTION_MAGIC_LEN];
-      memcpy(zip_magic, buf + FIL_PAGE_ZIP_KEYRING_ENCRYPTION_MAGIC,
+      memcpy(zip_magic, page + FIL_PAGE_ZIP_KEYRING_ENCRYPTION_MAGIC,
              Encryption::ZIP_PAGE_KEYRING_ENCRYPTION_MAGIC_LEN);
       is_crypt_checksum_correct =
           memcmp(zip_magic, Encryption::ZIP_PAGE_KEYRING_ENCRYPTION_MAGIC,
                  Encryption::ZIP_PAGE_KEYRING_ENCRYPTION_MAGIC_LEN) == 0;
     } else {
       is_crypt_checksum_correct = fil_space_verify_crypt_checksum(
-          buf, src_len, type.is_page_zip_compressed(),
-          encryption.is_encrypted_and_compressed(buf));
+          page, page_size, type.is_page_zip_compressed(),
+          encryption.is_encrypted_and_compressed(page));
     }
 
-    if (encryption.get_encryption_rotation() ==
-            Encryption_rotation::NO_ROTATION &&
-        !is_crypt_checksum_correct) {  // There is no re-encryption going on
-      const auto space_id =
-          mach_read_from_4(buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
-      const auto page_no = mach_read_from_4(buf + FIL_PAGE_OFFSET);
-      ib::error() << "Post - encryption checksum verification failed - "
-                     "decryption failed for space id = "
-                  << space_id << " page_no = " << page_no;
-      return (DB_IO_DECRYPT_FAIL);
-    }
-  }
-
-  if (encryption.get_encryption_rotation() ==
-      Encryption_rotation::MASTER_KEY_TO_KEYRING) {  // There is re-encryption
-                                                     // going on
     encryption.set_type(
         is_crypt_checksum_correct
             ? Encryption::KEYRING  // assume page is RK encrypted
             : Encryption::AES);    // assume page is MK encrypted
   }
-  return DB_SUCCESS;
 }
 
 static void assing_key_version(byte *buf, Encryption &encryption,
@@ -1773,30 +1776,13 @@ static bool load_key_needed_for_decryption(const IORequest &type,
     ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_INVALID);
     ut_ad(key_version_read_from_page != ENCRYPTION_KEY_VERSION_NOT_ENCRYPTED);
 
-    // in rare cases - when (re-)encryption was aborted there can be pages
-    // encrypted with different key versions in a given tablespace - retrieve
-    // needed key here
+    ut_ad(encryption.get_key_versions_cache() != nullptr);
 
-    byte *key_read;
-
-    size_t key_len;
-    if (Encryption::get_tablespace_key(
-            encryption.get_key_id(), encryption.get_key_id_uuid(),
-            key_version_read_from_page, &key_read, &key_len) == false) {
-      return false;
+    if (encryption.get_key_version() != key_version_read_from_page) {
+      encryption.set_key(
+          (*encryption.get_key_versions_cache())[key_version_read_from_page],
+          Encryption::KEY_LEN);
     }
-
-    // For test
-    if (key_version_read_from_page == encryption.get_key_version()) {
-      ut_ad(memcmp(key_read, encryption.get_key(), key_len) == 0);
-    }
-
-    // TODO: Allocated or not depends on whether key was taken from cache or
-    // keyring
-    encryption.set_key(key_read, static_cast<ulint>(key_len), true);
-    // encryption.m_key = key_read;
-    //******
-
     encryption.set_key_version(key_version_read_from_page);
   } else {
     ut_ad(encryption.get_type() == Encryption::AES);
@@ -1808,8 +1794,7 @@ static bool load_key_needed_for_decryption(const IORequest &type,
     ut_ad(encryption.get_encryption_rotation() ==
               Encryption_rotation::MASTER_KEY_TO_KEYRING &&
           encryption.get_tablespace_key() != nullptr);
-    encryption.set_key(encryption.get_tablespace_key(), Encryption::KEY_LEN,
-                       false);
+    encryption.set_key(encryption.get_tablespace_key(), Encryption::KEY_LEN);
   }
 
   return true;
@@ -1851,9 +1836,18 @@ static dberr_t os_file_io_complete(const IORequest &type, os_file_t fh,
                                  : encryption.is_encrypted_page(buf);
 
     if (is_page_encrypted && encryption.get_type() != Encryption::NONE) {
-      dberr_t err =
-          verify_post_encryption_checksum(type, encryption, buf, src_len);
-      if (err != DB_SUCCESS) return err;
+      // for Master Key to Keyring re-encryption we do not have yet information
+      // whether the page we are going to decrypt is Master Key or Keyring
+      // encrypted. We differentiate it by looking at checksum generated for
+      // keyring encrypted pages. If the checksum is correct - it means the page
+      // was already encrypted with keyring encryption (important when we are
+      // resuming the re-encryption, which was previously stopped by shutdown or
+      // a crash).
+      if (encryption.get_type() == Encryption::KEYRING &&
+          encryption.get_encryption_rotation() ==
+              Encryption_rotation::MASTER_KEY_TO_KEYRING) {
+        verify_encryption_for_rotation(type, encryption, buf, src_len);
+      }
 
       if (!load_key_needed_for_decryption(type, encryption, buf))
         return DB_IO_DECRYPT_FAIL;
@@ -1900,20 +1894,6 @@ static dberr_t os_file_io_complete(const IORequest &type, os_file_t fh,
 
     return (os_file_punch_hole(fh, offset, src_len - len));
   }
-
-#ifdef UNIV_DEBUG
-  if (type.is_write() &&
-      type.encryption_algorithm().get_type() == Encryption::KEYRING) {
-    Encryption encryption(type.encryption_algorithm());
-    bool was_page_encrypted = encryption.is_encrypted_page(buf);
-
-    // TODO:Robert czy bez type.is_page_zip_compressed to działa - powinno
-    ut_ad(!was_page_encrypted ||  //! type.is_page_zip_compressed() ||
-          fil_space_verify_crypt_checksum(
-              buf, src_len, type.is_page_zip_compressed(),
-              encryption.is_encrypted_and_compressed(buf)));
-  }
-#endif
 
   ut_ad(!type.is_log());
 
@@ -2758,11 +2738,23 @@ static dberr_t os_aio_linux_handler(ulint global_segment, fil_node_t **m1,
 @param[in] acquire_mutex specifies whether to lock array mutex */
 void AIO::os_aio_dispatch_read_array_submit_low(
     bool acquire_mutex MY_ATTRIBUTE((unused))) {
+  os_aio_dispatch_read_array_submit_low_for_array(acquire_mutex, s_reads);
+  if (s_ibuf != nullptr) {
+    os_aio_dispatch_read_array_submit_low_for_array(acquire_mutex, s_ibuf);
+  }
+}
+
+/** Submit buffered AIO requests on the array to the kernel.
+(low level function).
+@param[in] acquire_mutex specifies whether to lock array mutex
+@param[in] array for which to submit IO */
+void AIO::os_aio_dispatch_read_array_submit_low_for_array(
+    bool acquire_mutex MY_ATTRIBUTE((unused)), const AIO *arr) {
   if (!srv_use_native_aio) {
     return;
   }
 #if defined(LINUX_NATIVE_AIO)
-  AIO *array = AIO::s_reads;
+  const AIO *array = arr;
   ulint total_submitted = 0;
   if (acquire_mutex) array->acquire();
   /* Submit aio requests buffered on all segments. */
@@ -2840,7 +2832,7 @@ bool AIO::linux_dispatch(Slot *slot, bool should_buffer) {
   ulint io_ctx_index = slot->pos / slots_per_segment;
 
   if (should_buffer) {
-    ut_ad(this == s_reads);
+    ut_ad(this == s_reads || this == s_ibuf);
 
     acquire();
     /* There are m_slots.size() elements in m_pending,
@@ -2857,7 +2849,7 @@ bool AIO::linux_dispatch(Slot *slot, bool should_buffer) {
     m_pending[n] = iocb;
     ++count;
     if (count == slots_per_segment) {
-      AIO::os_aio_dispatch_read_array_submit_low(false);
+      AIO::os_aio_dispatch_read_array_submit_low_for_array(false, this);
     }
     release();
     return (true);
@@ -3173,9 +3165,10 @@ static int os_file_fsync_posix(os_file_t file) {
       case EIO: {
         const auto fd_path = os_file_find_path_for_fd(file);
         if (!fd_path.empty())
-          ib::fatal() << "fsync(\"" << fd_path << "\") returned EIO, aborting.";
+          ib::fatal(ER_IB_MSG_1358)
+              << "fsync(\"" << fd_path << "\") returned EIO, aborting.";
         else
-          ib::fatal() << "fsync() returned EIO, aborting.";
+          ib::fatal(ER_IB_MSG_1358) << "fsync() returned EIO, aborting.";
         break;
       }
 
@@ -3207,9 +3200,11 @@ static bool os_file_status_posix(const char *path, bool *exists,
 
   int ret = stat(path, &statinfo);
 
-  *exists = !ret;
+  if (exists != nullptr) {
+    *exists = !ret;
+  }
 
-  if (!ret) {
+  if (ret == 0) {
     /* file exists, everything OK */
 
   } else if (errno == ENOENT || errno == ENOTDIR) {
@@ -3230,8 +3225,8 @@ static bool os_file_status_posix(const char *path, bool *exists,
   } else {
     *type = OS_FILE_TYPE_FAILED;
 
-    /* file exists, but stat call failed */
-    os_file_handle_error_no_exit(path, "stat", false);
+    /* The stat() call failed with some other error. */
+    os_file_handle_error_no_exit(path, "file_status_posix_stat", false);
     return (false);
   }
 
@@ -3253,6 +3248,28 @@ static bool os_file_status_posix(const char *path, bool *exists,
   }
 
   return (true);
+}
+
+/** Check the existence and usefulness of a given path.
+@param[in]  path  path name
+@retval true if the path exists and can be used
+@retval false if the path does not exist or if the path is
+unuseable to get to a possibly existing file or directory. */
+static bool os_file_exists_posix(const char *path) {
+  struct stat statinfo;
+
+  int ret = stat(path, &statinfo);
+
+  if (ret == 0) {
+    return (true);
+  }
+
+  if (!(errno == ENOENT || errno == ENOTDIR || errno == ENAMETOOLONG ||
+        errno == EACCES)) {
+    os_file_handle_error_no_exit(path, "file_exists_posix_stat", false);
+  }
+
+  return (false);
 }
 
 /** NOTE! Use the corresponding macro os_file_flush(), not directly this
@@ -3756,16 +3773,14 @@ file is closed before calling this function.
 @return true if success */
 bool os_file_rename_func(const char *oldpath, const char *newpath) {
 #ifdef UNIV_DEBUG
+  /* New path must be valid but not exist. */
   os_file_type_t type;
   bool exists;
-
-  /* New path must not exist. */
   ut_ad(os_file_status(newpath, &exists, &type));
   ut_ad(!exists);
 
   /* Old path must exist. */
-  ut_ad(os_file_status(oldpath, &exists, &type));
-  ut_ad(exists);
+  ut_ad(os_file_exists(oldpath));
 #endif /* UNIV_DEBUG */
 
 #ifdef WITH_WSREP
@@ -4182,16 +4197,20 @@ static dberr_t os_file_punch_hole_win32(os_file_t fh, os_offset_t off,
   return (!result ? DB_IO_NO_PUNCH_HOLE : DB_SUCCESS);
 }
 
-/** Check the existence and type of the given file.
-@param[in]	path		path name of file
-@param[out]	exists		true if the file exists
-@param[out]	type		Type of the file, if it exists
+/** Check the existence and type of a given path.
+@param[in]   path    pathname of the file
+@param[out]  exists  true if file exists
+@param[out]  type    type of the file (if it exists)
 @return true if call succeeded */
 static bool os_file_status_win32(const char *path, bool *exists,
                                  os_file_type_t *type) {
   struct _stat64 statinfo;
 
   int ret = _stat64(path, &statinfo);
+
+  if (exists != nullptr) {
+    *exists = !ret;
+  }
 
   if (ret == 0) {
     /* file exists, everything OK */
@@ -4214,8 +4233,8 @@ static bool os_file_status_win32(const char *path, bool *exists,
   } else {
     *type = OS_FILE_TYPE_FAILED;
 
-    /* file exists, but stat call failed */
-    os_file_handle_error_no_exit(path, "stat", false);
+    /* The _stat64() call failed with some other error */
+    os_file_handle_error_no_exit(path, "file_status_win_stat64", false);
     return (false);
   }
 
@@ -4234,6 +4253,28 @@ static bool os_file_status_win32(const char *path, bool *exists,
   }
 
   return (true);
+}
+
+/** Check the existence and usefulness of a given path.
+@param[in]  path  path name
+@retval true if the path exists and can be used
+@retval false if the path does not exist or if the path is
+unuseable to get to a possibly existing file or directory. */
+static bool os_file_exists_win32(const char *path) {
+  struct _stat64 statinfo;
+
+  int ret = _stat64(path, &statinfo);
+
+  if (ret == 0) {
+    return (true);
+  }
+
+  if (!(errno == ENOENT || errno == EINVAL || errno == EACCES)) {
+    /* The _stat64() call failed with an unknown error */
+    os_file_handle_error_no_exit(path, "file_exists_win_stat64", false);
+  }
+
+  return (false);
 }
 
 /** NOTE! Use the corresponding macro os_file_flush(), not directly this
@@ -4910,16 +4951,14 @@ file is closed before calling this function.
 @return true if success */
 bool os_file_rename_func(const char *oldpath, const char *newpath) {
 #ifdef UNIV_DEBUG
+  /* New path must be valid but not exist. */
   os_file_type_t type;
   bool exists;
-
-  /* New path must not exist. */
   ut_ad(os_file_status(newpath, &exists, &type));
   ut_ad(!exists);
 
   /* Old path must exist. */
-  ut_ad(os_file_status(oldpath, &exists, &type));
-  ut_ad(exists);
+  ut_ad(os_file_exists(oldpath));
 #endif /* UNIV_DEBUG */
 
   if (MoveFile((LPCTSTR)oldpath, (LPCTSTR)newpath)) {
@@ -5868,8 +5907,8 @@ bool os_file_set_size_fast(const char *name, pfs_os_file_t pfs_file,
 
   /* Print the failure message only once for all the redo log files. */
   if (print_message) {
-    ib::info() << "fallocate() failed with errno " << errno
-               << " - falling back to writing NULLs.";
+    ib::info(ER_IB_MSG_1359) << "fallocate() failed with errno " << errno
+                             << " - falling back to writing NULLs.";
     print_message = false;
   }
 #endif /* !NO_FALLOCATE && UNIV_LINUX && HAVE_FALLOC_FL_ZERO_RANGE */
@@ -6266,16 +6305,19 @@ dberr_t os_file_write_func(IORequest &type, const char *name, os_file_t file,
   return (os_file_write_page(type, name, file, ptr, offset, n));
 }
 
-/** Check the existence and type of the given file.
-@param[in]	path		path name of file
-@param[out]	exists		true if the file exists
-@param[out]	type		Type of the file, if it exists
-@return true if call succeeded */
 bool os_file_status(const char *path, bool *exists, os_file_type_t *type) {
 #ifdef _WIN32
   return (os_file_status_win32(path, exists, type));
 #else
   return (os_file_status_posix(path, exists, type));
+#endif /* _WIN32 */
+}
+
+bool os_file_exists(const char *path) {
+#ifdef _WIN32
+  return (os_file_exists_win32(path));
+#else
+  return (os_file_exists_posix(path));
 #endif /* _WIN32 */
 }
 
@@ -6498,8 +6540,8 @@ AIO::AIO(latch_id_t id, ulint n, ulint segments)
 
   mutex_create(id, &m_mutex);
 
-  m_not_full = os_event_create("aio_not_full");
-  m_is_empty = os_event_create("aio_is_empty");
+  m_not_full = os_event_create();
+  m_is_empty = os_event_create();
 
 #ifdef LINUX_NATIVE_AIO
   memset(&m_events[0], 0x0, sizeof(m_events[0]) * m_events.size());
@@ -6780,7 +6822,7 @@ bool AIO::start(ulint n_per_seg, ulint n_readers, ulint n_writers,
   }
 
   for (ulint i = 0; i < n_segments; ++i) {
-    os_aio_segment_wait_events[i] = os_event_create(nullptr);
+    os_aio_segment_wait_events[i] = os_event_create();
   }
 
   os_last_printout = ut_time_monotonic();

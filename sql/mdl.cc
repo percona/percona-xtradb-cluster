@@ -1489,11 +1489,17 @@ void MDL_context::destroy() {
 /**
   Allocate pins which are necessary to work with MDL_map container
   if they are not allocated already.
+
+  @return true with error in DA if pinbox is exhausted, false otherwise.
 */
 
 bool MDL_context::fix_pins() {
   if (!m_pins) m_pins = mdl_locks.get_pins();
-  return (m_pins == nullptr);
+  if (m_pins == nullptr) {
+    my_error(ER_MDL_OUT_OF_RESOURCES, MYF(0));
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -3344,7 +3350,7 @@ slow_path:
   vice versa -- when we COMMIT, we don't mistakenly
   release a ticket for an open HANDLER.
 
-  @retval true   Out of memory.
+  @retval true   An error occured.
   @retval false  Success.
 */
 
@@ -3619,7 +3625,14 @@ bool MDL_context::acquire_lock(MDL_request *mdl_request,
   /* There is a shared or exclusive lock on the object. */
   DEBUG_SYNC(get_thd(), "mdl_acquire_lock_wait");
 
-  find_deadlock();
+  /* We skip deadlock checks for ACL cache lock as there is severe contention
+  on internal RW lock of MDL lock. Since ACL cache lock is used during
+  connection process, all connections get stuck and will soon run out of
+  max_connections. All we need is good RW lock implementation. By removing this
+  deadlock checks, we remove contention on internal RW lock of MDL lock. This
+  means if ever there is deadlock due to code bug, we rely on
+  ACL_CACHE_LOCK_TIMEOUT value. */
+  if (mdl_request->key.mdl_namespace() != MDL_key::ACL_CACHE) find_deadlock();
 
   if (lock->needs_notification(ticket) || lock->needs_connection_check()) {
     struct timespec abs_shortwait;
@@ -3995,6 +4008,8 @@ bool MDL_lock::visit_subgraph(MDL_ticket *waiting_ticket,
   bool result = true;
 
   mysql_prlock_rdlock(&m_rwlock);
+
+  DEBUG_SYNC(src_ctx->get_thd(), "acl_mdl_dead_lock");
 
   /*
     Iterators must be initialized after taking a read lock.
@@ -4552,7 +4567,7 @@ bool MDL_context::owns_equal_or_stronger_lock(
   Find the first context which owns the lock and inspect it by
   calling MDL_context_visitor::visit_context() method.
 
-  @return True in case error (e.g. OOM). False otherwise. There
+  @return True in case error. False otherwise. There
           is no guarantee that owner was found in either case.
   @note This method only works properly for locks which were
         acquired using "slow" path.

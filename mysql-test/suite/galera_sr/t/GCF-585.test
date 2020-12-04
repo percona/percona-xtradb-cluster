@@ -39,9 +39,9 @@ SET SESSION wsrep_trx_fragment_size=1;
 SET SESSION innodb_lock_wait_timeout=1;
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
---error ER_LOCK_DEADLOCK
-delete from t1 where f1 > 10;
---error ER_LOCK_DEADLOCK
+--error ER_LOCK_DEADLOCK,ER_LOCK_WAIT_TIMEOUT
+delete from t1 where f1 > 9;
+--error 0,ER_LOCK_DEADLOCK
 delete from t1 where f1 > 10 and f1 < 100;
 
 DROP TABLE t1;

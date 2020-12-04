@@ -348,8 +348,11 @@ int wsrep_abort_thd(const THD *bf_thd, THD *victim_thd, bool signal) {
 }
 
 bool wsrep_bf_abort(const THD *bf_thd, THD *victim_thd) {
+  DBUG_TRACE;
   WSREP_LOG_THD(const_cast<THD *>(bf_thd), "BF aborter before");
+
   WSREP_LOG_THD(victim_thd, "victim before");
+
   wsrep::seqno bf_seqno(bf_thd->wsrep_trx().ws_meta().seqno());
 
   if (WSREP(victim_thd) && !victim_thd->wsrep_trx().active()) {

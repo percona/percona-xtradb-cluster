@@ -1,0 +1,50 @@
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate = 1';
+SET SESSION wsrep_on=OFF;
+CREATE TABLE t1 (f1 INTEGER);
+SET SESSION wsrep_on=ON;
+DROP TABLE t1;
+CREATE TABLE t2 (f1 INTEGER);
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate = 0';
+SELECT COUNT(*) AS expect_0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+expect_0
+0
+SELECT COUNT(*) AS expect_1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+expect_1
+1
+SET SESSION wsrep_on=OFF;
+Killing server ...
+Starting mysqld
+# restart
+SELECT COUNT(*) AS expect_0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+expect_0
+0
+SELECT COUNT(*) AS expect_1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+expect_1
+1
+CALL mtr.add_suppression("Slave SQL: Error 'Unknown table");
+CALL mtr.add_suppression("Query apply failed");
+SELECT COUNT(*) AS expect_0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+expect_0
+0
+SELECT COUNT(*) AS expect_1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+expect_1
+1
+CALL mtr.add_suppression("Slave SQL: Error 'Unknown table");
+CALL mtr.add_suppression("Query apply failed");
+SELECT COUNT(*) AS expect_0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+expect_0
+0
+SELECT COUNT(*) AS expect_1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+expect_1
+1
+CALL mtr.add_suppression("Slave SQL: Error 'Unknown table");
+CALL mtr.add_suppression("Query apply failed");
+SELECT COUNT(*) AS expect_0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+expect_0
+0
+SELECT COUNT(*) AS expect_1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+expect_1
+1
+CALL mtr.add_suppression("Vote 0 \\(success\\) on .* is inconsistent with group. Leaving cluster.");
+CALL mtr.add_suppression("Query apply failed");
+DROP TABLE t2;

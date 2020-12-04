@@ -11,3 +11,6 @@
 --let $query_node_2 = REPLACE INTO t1 VALUES (1,'y'),(2,'y'),(3,'y')
 
 --source suite/galera/include/galera_concurrent_test.inc
+
+CALL mtr.add_suppression("Error deleting row from mysql.wsrep_streaming_log:");
+CALL mtr.add_suppression("Failed to init table for index scan:");

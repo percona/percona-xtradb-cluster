@@ -1,0 +1,43 @@
+SET wsrep_on=OFF;
+DROP SCHEMA test;
+SET wsrep_on=OFF;
+CREATE TABLE test.t1 (f1 INTEGER);
+CREATE TABLE test.t1 (f1 INTEGER);
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 1 FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status'
+SHOW STATUS LIKE 'wsrep_cluster_status';
+Variable_name	Value
+wsrep_cluster_status	Primary
+DROP TABLE test.t1;
+SET SESSION wsrep_sync_wait=0;
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'OFF' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready'
+SHOW STATUS LIKE 'wsrep_cluster_status';
+Variable_name	Value
+wsrep_cluster_status	Disconnected
+Killing server ...
+Starting node_2
+# restart
+SET SESSION wsrep_sync_wait=0;
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'OFF' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready'
+SHOW STATUS LIKE 'wsrep_cluster_status';
+Variable_name	Value
+wsrep_cluster_status	Disconnected
+Killing server ...
+Starting node_3
+# restart
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 3 FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+Nodes 2 and 3 started
+USE test;
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready'
+Node 2 synced
+CALL mtr.add_suppression("Slave SQL: Error 'Unknown database 'test'' on query");
+CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query");
+CALL mtr.add_suppression("Query apply failed");
+CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on .*");
+CALL mtr.add_suppression("Plugin 'InnoDB' will be forced to shutdown");
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready'
+Node 3 synced
+CALL mtr.add_suppression("Slave SQL: Error 'Table 't1' already exists' on query");
+CALL mtr.add_suppression("Query apply failed");
+CALL mtr.add_suppression("Inconsistency detected: Inconsistent by consensus on .*");
+CALL mtr.add_suppression("Plugin 'InnoDB' will be forced to shutdown");

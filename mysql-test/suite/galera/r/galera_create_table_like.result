@@ -55,10 +55,6 @@ insert into t2 values (2);
 create temporary table t1 (c1 int) engine=innodb;
 create temporary table tmp (c1 int) engine=innodb;
 insert into tmp values (100);
-create table ctas2 select * from tmp;
-select * from ctas2;
-c1
-100
 create table ctas1 select * from t1;
 select count(*) = 0 from ctas1;
 count(*) = 0
@@ -79,13 +75,10 @@ c1
 select count(*) = 1 from ctas1;
 count(*) = 1
 1
-select * from ctas2;
-ERROR 42S02: Table 'test.ctas2' doesn't exist
 #node-1
 drop table t2, t1;
 insert into t1 values (11);
 drop table ctas1;
-drop table ctas2;
 #node-2
 select * from t1;
 c1

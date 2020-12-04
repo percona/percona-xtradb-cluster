@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2019, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2020, Oracle and/or its affiliates. All rights reserved.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -85,7 +85,8 @@ BEGIN
                                 'auto_increment_offset',
                                 'auto_increment_increment',
                                 'wsrep_data_home_dir',
-                                'keyring_file_data')
+                                'keyring_file_data',
+                                'innodb_thread_sleep_delay')
   ORDER BY VARIABLE_NAME;
 
   -- Dump all persisted variables, those that may change.

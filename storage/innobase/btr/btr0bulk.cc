@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2014, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2014, 2020, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -44,7 +44,6 @@ long innobase_fill_factor;
 Note: we commit all mtrs on failure.
 @return error code. */
 dberr_t PageBulk::init() {
-  mtr_t *mtr;
   buf_block_t *new_block;
   page_t *new_page;
   page_zip_des_t *new_page_zip;
@@ -54,7 +53,8 @@ dberr_t PageBulk::init() {
 
   m_heap = mem_heap_create(1000);
 
-  mtr = static_cast<mtr_t *>(mem_heap_alloc(m_heap, sizeof(mtr_t)));
+  auto mtr_alloc = mem_heap_alloc(m_heap, sizeof(mtr_t));
+  mtr_t *mtr = new (mtr_alloc) mtr_t();
   mtr_start(mtr);
 
   if (!dict_index_is_online_ddl(m_index)) {
@@ -614,7 +614,7 @@ void PageBulk::release() {
 }
 
 /** Start mtr and latch the block */
-dberr_t PageBulk::latch() {
+void PageBulk::latch() {
   mtr_start(m_mtr);
 
   if (!dict_index_is_online_ddl(m_index)) {
@@ -633,13 +633,9 @@ dberr_t PageBulk::latch() {
     page_id_t page_id(dict_index_get_space(m_index), m_page_no);
     page_size_t page_size(dict_table_page_size(m_index->table));
 
-    m_block = buf_page_get_gen(page_id, page_size, RW_X_LATCH, m_block,
-                               Page_fetch::IF_IN_POOL, __FILE__, __LINE__,
-                               m_mtr, false, &m_err);
-
-    if (m_err != DB_SUCCESS) {
-      return (m_err);
-    }
+    m_block =
+        buf_page_get_gen(page_id, page_size, RW_X_LATCH, m_block,
+                         Page_fetch::IF_IN_POOL, __FILE__, __LINE__, m_mtr);
 
     ut_ad(m_block != nullptr);
   }
@@ -647,8 +643,6 @@ dberr_t PageBulk::latch() {
   buf_block_buf_fix_dec(m_block);
 
   ut_ad(m_cur_rec > m_page && m_cur_rec < m_heap_top);
-
-  return (m_err);
 }
 
 #ifdef UNIV_DEBUG
@@ -1115,7 +1109,6 @@ dberr_t BtrBulk::finish(dberr_t err) {
   ut_ad(!sync_check_iterate(check));
 #endif /* UNIV_DEBUG */
 
-  ut_ad(err != DB_SUCCESS ||
-        btr_validate_index(m_index, nullptr, false) == DB_SUCCESS);
+  ut_ad(err != DB_SUCCESS || btr_validate_index(m_index, nullptr, false));
   return (err);
 }

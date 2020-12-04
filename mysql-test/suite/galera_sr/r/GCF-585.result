@@ -21,8 +21,7 @@ SET SESSION wsrep_trx_fragment_size=1;
 SET SESSION innodb_lock_wait_timeout=1;
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
-delete from t1 where f1 > 10;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+delete from t1 where f1 > 9;
+Got one of the listed errors
 delete from t1 where f1 > 10 and f1 < 100;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 DROP TABLE t1;

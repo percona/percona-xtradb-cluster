@@ -1171,7 +1171,7 @@ bool reset_master(THD *thd, bool unlock_global_read_lock) {
       lead to an inconsistent state.
     */
 #ifdef WITH_WSREP
-    if (WSREP(thd) && get_gtid_mode(GTID_MODE_LOCK_NONE) > 0) {
+    if (WSREP(thd) && global_gtid_mode.get() > Gtid_mode::OFF) {
       /* RESET MASTER will initialize GTID sequence, and that would happen
          locally in this node only, so better reject it
       */

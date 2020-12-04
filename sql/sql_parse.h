@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2020, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -126,10 +126,6 @@ bool show_precheck(THD *thd, LEX *lex, bool lock);
 
 extern uint sql_command_flags[];
 extern const LEX_CSTRING command_name[];
-
-inline bool is_supported_parser_charset(const CHARSET_INFO *cs) {
-  return (cs->mbminlen == 1);
-}
 
 #ifdef WITH_WSREP
 
@@ -321,11 +317,17 @@ bool set_default_collation(HA_CREATE_INFO *create_info,
 */
 #define CF_REQUIRE_ACL_CACHE (1U << 20)
 
+
+/**
+  Identifies statements as SHOW commands using INFORMATION_SCHEMA system views.
+*/
+#define CF_SHOW_USES_SYSTEM_VIEW (1U << 21)
+
 #ifdef WITH_WSREP
 /**
   DDL statement that may be subject to error filtering.
 */
-#define CF_WSREP_MAY_IGNORE_ERRORS (1U << 21)
+#define CF_WSREP_MAY_IGNORE_ERRORS (1U << 22)
 #endif /* WITH_WSREP */
 
 /* Bits in server_command_flags */

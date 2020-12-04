@@ -1,4 +1,4 @@
-/* Copyright (C) 2013-2015 Codership Oy <info@codership.com>
+/* Copyright (C) 2013-2019 Codership Oy <info@codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -21,7 +21,6 @@
 #include "wsrep_xid.h"
 
 #include "debug_sync.h"
-#include "log_event.h"  // class THD, EVENT_LEN_OFFSET, etc.
 #include "mysql/plugin.h"
 #include "sql/binlog_reader.h"
 #include "sql/sql_lex.h"
@@ -79,7 +78,7 @@ Format_description_log_event *wsrep_get_apply_format(THD *thd) {
   return thd->wsrep_rli->get_rli_description_event();
 }
 
-void wsrep_apply_error::store(const THD *const thd) {
+void wsrep_store_error(const THD *const thd, wsrep::mutable_buffer& dst) {
   Diagnostics_area::Sql_condition_iterator it =
       thd->get_stmt_da()->sql_conditions();
   const Sql_condition *cond;
@@ -87,24 +86,18 @@ void wsrep_apply_error::store(const THD *const thd) {
   static size_t const max_len =
       2 * MAX_SLAVE_ERRMSG;  // 2x so that we have enough
 
-  if (NULL == str_) {
-    // this must be freeable by standard free()
-    str_ = static_cast<char *>(malloc(max_len));
-    if (NULL == str_) {
-      WSREP_ERROR("Failed to allocate %zu bytes for error buffer.", max_len);
-      len_ = 0;
-      return;
-    }
-  } else {
-    /* This is possible when we invoke rollback after failed applying.
-     * In this situation DA should not be reset yet and should contain
-     * all previous errors from applying and new ones from rollbacking,
-     * so we just overwrite is from scratch */
+
+  dst.resize(max_len);
+
+  char *slider = dst.data();
+  const char *const buf_end = slider + max_len - 1; // -1: leave space for \0
+
+  auto da = thd->get_stmt_da();
+  if(da->cond_count() == 0) {
+    slider += snprintf(slider, buf_end - slider, " %s, Error_code: %d;",
+                       da->message_text(), da->mysql_errno());
   }
-
-  char *slider = str_;
-  const char *const buf_end = str_ + max_len - 1;  // -1: leave space for \0
-
+  
   for (cond = it++; cond && slider < buf_end; cond = it++) {
     uint const err_code = cond->mysql_errno();
     const char *const err_str = cond->message_text();
@@ -113,12 +106,16 @@ void wsrep_apply_error::store(const THD *const thd) {
                        err_str, err_code);
   }
 
-  *slider = '\0';
-  len_ = slider - str_ + 1;  // +1: add \0
+  if (slider != dst.data()) {
+    *slider = '\0';
+    slider++;
+  }
 
-  WSREP_DEBUG("Error buffer for thd %u seqno %lld, %zu bytes: %s",
-              thd->thread_id(), (long long)wsrep_thd_trx_seqno(thd), len_,
-              str_ ? str_ : "(null)");
+  dst.resize(slider - dst.data());
+
+  WSREP_DEBUG("Error buffer for thd %u seqno %lld, %zu bytes: '%s'",
+              thd->thread_id(), (long long)wsrep_thd_trx_seqno(thd), dst.size(),
+              dst.size() ? dst.data() : "(null)");
 }
 
 /**

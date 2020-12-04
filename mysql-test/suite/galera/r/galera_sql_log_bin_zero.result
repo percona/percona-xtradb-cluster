@@ -27,12 +27,15 @@ COUNT(*) = 0
 SHOW TABLES;
 Tables_in_test
 t1
-DROP USER 'demo'@'localhost';
-ERROR HY000: Operation DROP USER failed for 'demo'@'localhost'
+SHOW CREATE USER 'demo'@'localhost';
+ERROR HY000: Operation SHOW CREATE USER failed for 'demo'@'localhost'
 DROP TABLE t1;
+SET SESSION sql_log_bin = 0;
 DROP TABLE t2;
 DROP TABLE t3;
 DROP COMPRESSION_DICTIONARY numbers;
+DROP USER 'demo'@'localhost';
+SET SESSION sql_log_bin = 1;
 use test;
 create table t (i int, primary key pk(i)) engine=innodb;
 insert into t values (1);

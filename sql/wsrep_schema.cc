@@ -1167,7 +1167,7 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd) {
     goto out;
   }
 
-  while (true) {
+  while (0 == error) {
     if ((error = Wsrep_schema_impl::next_record(frag_table)) == 0) {
       wsrep::id server_id;
       Wsrep_schema_impl::scan(frag_table, 0, server_id);
@@ -1210,15 +1210,16 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd) {
       }
       applier->store_globals();
       wsrep::mutable_buffer unused;
-      applier->apply_write_set(ws_meta, data, unused);
-      applier->after_apply();
+      if((ret= applier->apply_write_set(ws_meta, data, unused)) != 0) {
+        WSREP_ERROR("SR trx recovery applying returned %d", ret);
+      } else {
+        applier->after_apply();
+      }
       storage_service.store_globals();
     } else if (error == HA_ERR_END_OF_FILE) {
       ret = 0;
-      break;
     } else {
       WSREP_ERROR("SR table scan returned error %d", error);
-      break;
     }
   }
   Wsrep_schema_impl::end_scan(frag_table);

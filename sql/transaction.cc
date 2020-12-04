@@ -258,6 +258,11 @@ bool trans_commit(THD *thd, bool ignore_global_read_lock) {
   int res;
   DBUG_TRACE;
 
+  DBUG_EXECUTE_IF(
+      "crash_on_transactional_ddl_commit",
+      if (thd->m_transactional_ddl.inited() &&
+          thd->lex->sql_command == SQLCOM_COMMIT) { DBUG_SUICIDE(); });
+
   if (trans_check_state(thd)) return true;
 
   thd->server_status &=
@@ -312,6 +317,8 @@ bool trans_commit(THD *thd, bool ignore_global_read_lock) {
   }
 
   thd->locked_tables_list.adjust_renamed_tablespace_mdls(&thd->mdl_context);
+
+  thd->m_transactional_ddl.post_ddl();
 
   return res;
 }
@@ -415,6 +422,8 @@ bool trans_rollback(THD *thd) {
 
   if (trans_check_state(thd)) return true;
 
+  thd->m_transactional_ddl.rollback();
+
   thd->server_status &=
       ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
   DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
@@ -441,6 +450,8 @@ bool trans_rollback(THD *thd) {
     thd->dd_client()->rollback_modified_objects();
 
   thd->locked_tables_list.discard_renamed_tablespace_mdls();
+
+  thd->m_transactional_ddl.post_ddl();
 
   return res;
 }
