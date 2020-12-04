@@ -895,7 +895,7 @@ static ssize_t sst_prepare_mysqldump (const char*  addr_in,
   return ret;
 }
 
-static bool SE_initialized = false;
+static enum Wsrep_SE_init_result SE_initialized= WSREP_SE_INIT_RESULT_NONE;
 
 ssize_t wsrep_sst_prepare (void** msg)
 {
@@ -1500,9 +1500,6 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
                                        const char* state, size_t state_len,
                                        bool bypass)
 {
-  /* This will be reset when sync callback is called.
-   * Should we set wsrep_ready to FALSE here too? */
-  local_status.set(WSREP_MEMBER_DONOR);
 
   std::string message(reinterpret_cast<const char *>(msg), msg_len);
   if (!is_sst_request_valid(message))
@@ -1525,6 +1522,10 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
   {
     return WSREP_CB_FAILURE;
   });
+
+  /* This will be reset when sync callback is called.
+   * Should we set wsrep_ready to FALSE here too? */
+  local_status.set(WSREP_MEMBER_DONOR);
 
   wsp::env env(NULL);
   if (env.error())
@@ -1558,27 +1559,25 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
   return (ret >= 0 ? WSREP_CB_SUCCESS : WSREP_CB_FAILURE);
 }
 
-void wsrep_SE_init_grab()
+enum Wsrep_SE_init_result wsrep_SE_init_wait()
 {
-  if (mysql_mutex_lock (&LOCK_wsrep_sst_init)) abort();
-}
-
-void wsrep_SE_init_wait()
-{
-  while (SE_initialized == false)
+  mysql_mutex_lock (&LOCK_wsrep_sst_init);
+  while (SE_initialized == WSREP_SE_INIT_RESULT_NONE)
   {
     mysql_cond_wait (&COND_wsrep_sst_init, &LOCK_wsrep_sst_init);
   }
+  enum Wsrep_SE_init_result ret= SE_initialized;
   mysql_mutex_unlock (&LOCK_wsrep_sst_init);
+  return ret;
 }
 
-void wsrep_SE_init_done()
+void wsrep_SE_initialized(enum Wsrep_SE_init_result result)
 {
+  mysql_mutex_lock (&LOCK_wsrep_sst_init);
+  if (SE_initialized == WSREP_SE_INIT_RESULT_NONE)
+  {
+    SE_initialized= result;
+  }
   mysql_cond_signal (&COND_wsrep_sst_init);
   mysql_mutex_unlock (&LOCK_wsrep_sst_init);
-}
-
-void wsrep_SE_initialized()
-{
-  SE_initialized = true;
 }

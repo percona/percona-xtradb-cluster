@@ -1,7 +1,8 @@
 #
---source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/have_debug.inc
+--source include/have_debug_sync.inc
+--source include/have_innodb.inc
+--source include/galera_cluster.inc
 
 --echo #
 --echo # Test LCF handling
