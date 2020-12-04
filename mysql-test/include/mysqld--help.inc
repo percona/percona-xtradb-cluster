@@ -23,7 +23,13 @@ perl;
                pid-file slow-query-log-file
                language lc-messages-dir
                datadir slave-load-tmpdir tmpdir socket table-definition-cache table-open-cache
+<<<<<<< HEAD
                tls-version secure-file-priv wsrep-node-name/;
+||||||| 5b5a5d2584a
+               tls-version secure-file-priv/;
+=======
+               tls-version admin-tls-version secure-file-priv/;
+>>>>>>> Percona-Server-8.0.21-12
 
   # Variables which we don't want to display in result file since
   # they depend on type of build

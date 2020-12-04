@@ -191,6 +191,7 @@ struct st_vio_network {
 
 void vio_proxy_protocol_add(const st_vio_network &net) noexcept;
 void vio_proxy_cleanup() noexcept;
+void vio_force_skip_proxy(MYSQL_VIO vio);
 /* setsockopt TCP_NODELAY at IPPROTO_TCP level, when possible */
 int vio_fastsend(MYSQL_VIO vio);
 /* setsockopt SO_KEEPALIVE at SOL_SOCKET level, when possible */
@@ -272,6 +273,7 @@ enum enum_ssl_init_error {
   SSL_FIPS_MODE_INVALID,
   SSL_FIPS_MODE_FAILED,
   SSL_INITERR_ECDHFAIL,
+  SSL_INITERR_X509_VERIFY_PARAM,
   SSL_INITERR_LASTERR
 };
 const char *sslGetErrString(enum enum_ssl_init_error err);
@@ -289,7 +291,7 @@ struct st_VioSSLFd *new_VioSSLConnectorFd(
     const char *key_file, const char *cert_file, const char *ca_file,
     const char *ca_path, const char *cipher, const char *ciphersuites,
     enum enum_ssl_init_error *error, const char *crl_file, const char *crl_path,
-    const long ssl_ctx_flags);
+    const long ssl_ctx_flags, const char *server_host);
 
 long process_tls_version(const char *tls_version);
 
@@ -365,6 +367,7 @@ struct Vio {
   int write_timeout = {-1}; /* Timeout value (ms) for write ops. */
   int retry_count = {1};    /* Retry count */
   bool inactive = {false};  /* Connection has been shutdown */
+  bool force_skip_proxy = {false};
 
   struct sockaddr_storage local;  /* Local internet address */
   struct sockaddr_storage remote; /* Remote internet address */

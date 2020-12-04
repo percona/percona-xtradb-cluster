@@ -60,7 +60,6 @@
 #include "sql/item_geofunc.h"       // Item_func_st_area
 #include "sql/item_inetfunc.h"      // Item_func_inet_ntoa
 #include "sql/item_json_func.h"     // Item_func_json
-#include "sql/item_keyring_func.h"  // Item_func_rotate_system_key
 #include "sql/item_pfs_func.h"      // Item_pfs_func_thread_id
 #include "sql/item_regexp_func.h"   // Item_func_regexp_xxx
 #include "sql/item_strfunc.h"       // Item_func_aes_encrypt
@@ -1478,7 +1477,6 @@ static const std::pair<const char *, Create_func *> func_array[] = {
     {"RELEASE_LOCK", SQL_FN(Item_func_release_lock, 1)},
     {"REVERSE", SQL_FN(Item_func_reverse, 1)},
     {"ROLES_GRAPHML", SQL_FN(Item_func_roles_graphml, 0)},
-    {"ROTATE_SYSTEM_KEY", SQL_FN(Item_func_rotate_system_key, 1)},
     {"ROUND", SQL_FACTORY(Round_instantiator)},
     {"RPAD", SQL_FN(Item_func_rpad, 3)},
     {"RTRIM", SQL_FN(Item_func_rtrim, 1)},
@@ -1771,12 +1769,13 @@ Item *create_func_cast(THD *thd, const POS &pos, Item *a,
   type.charset = cs;
   type.length = nullptr;
   type.dec = nullptr;
-  return create_func_cast(thd, pos, a, &type);
+  return create_func_cast(thd, pos, a, type, false);
 }
 
 /**
   Validates a cast target type and extracts the specified length and precision
-  of the target type.
+  of the target type. Helper function for creating Items representing CAST
+  expressions, and Items performing CAST-like tasks, such as JSON_VALUE.
 
   @param thd        thread handler
   @param pos        the location of the expression
@@ -1959,18 +1958,19 @@ static bool validate_cast_type_and_extract_length(
 }
 
 Item *create_func_cast(THD *thd, const POS &pos, Item *arg,
-                       const Cast_type *type, bool as_array) {
+                       const Cast_type &type, bool as_array) {
   int64_t length = 0;
   unsigned precision = 0;
-  if (validate_cast_type_and_extract_length(thd, pos, arg, *type, as_array,
+  if (validate_cast_type_and_extract_length(thd, pos, arg, type, as_array,
                                             &length, &precision))
     return nullptr;
 
-  if (as_array)
+  if (as_array) {
     return new (thd->mem_root) Item_func_array_cast(
-        pos, arg, type->target, length, precision, type->charset);
+        pos, arg, type.target, length, precision, type.charset);
+  }
 
-  switch (type->target) {
+  switch (type.target) {
     case ITEM_CAST_SIGNED_INT:
       return new (thd->mem_root) Item_typecast_signed(pos, arg);
     case ITEM_CAST_UNSIGNED_INT:
@@ -1985,7 +1985,7 @@ Item *create_func_cast(THD *thd, const POS &pos, Item *arg,
       return new (thd->mem_root)
           Item_typecast_decimal(pos, arg, length, precision);
     case ITEM_CAST_CHAR: {
-      const CHARSET_INFO *cs = type->charset;
+      const CHARSET_INFO *cs = type.charset;
       if (cs == nullptr) cs = thd->variables.collation_connection;
       return new (thd->mem_root) Item_typecast_char(pos, arg, length, cs);
     }
@@ -2003,6 +2003,29 @@ Item *create_func_cast(THD *thd, const POS &pos, Item *arg,
   DBUG_ASSERT(false);
   return nullptr;
   /* purecov: end */
+}
+
+Item *create_func_json_value(THD *thd, const POS &pos, Item *arg, Item *path,
+                             const Cast_type &cast_type,
+                             Json_on_response_type on_empty_type,
+                             Item *on_empty_default,
+                             Json_on_response_type on_error_type,
+                             Item *on_error_default) {
+  int64_t length = 0;
+  unsigned precision = 0;
+  if (validate_cast_type_and_extract_length(thd, pos, arg, cast_type, false,
+                                            &length, &precision))
+    return nullptr;
+
+  // Create dummy items for the default values, if they haven't been specified.
+  if (on_empty_default == nullptr)
+    on_empty_default = new (thd->mem_root) Item_null;
+  if (on_error_default == nullptr)
+    on_error_default = new (thd->mem_root) Item_null;
+
+  return new (thd->mem_root) Item_func_json_value(
+      pos, arg, path, cast_type, length, precision, on_empty_type,
+      on_empty_default, on_error_type, on_error_default);
 }
 
 /**

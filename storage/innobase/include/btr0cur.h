@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2020, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -140,7 +140,7 @@ bool btr_cur_optimistic_latch_leaves(buf_block_t *block,
  Note that if mode is PAGE_CUR_LE, which is used in inserts, then
  cursor->up_match and cursor->low_match both will have sensible values.
  If mode is PAGE_CUR_GE, then up_match will a have a sensible value. */
-dberr_t btr_cur_search_to_nth_level(
+void btr_cur_search_to_nth_level(
     dict_index_t *index,   /*!< in: index */
     ulint level,           /*!< in: the tree level of search */
     const dtuple_t *tuple, /*!< in: data tuple; NOTE: n_fields_cmp in
@@ -197,7 +197,7 @@ void btr_cur_search_to_nth_level_with_no_latch(
     mtr_t *mtr, bool mark_dirty = true);
 
 /** Opens a cursor at either end of an index. */
-dberr_t btr_cur_open_at_index_side_func(
+void btr_cur_open_at_index_side_func(
     bool from_left,      /*!< in: true if open to the low end,
                          false if to the high end */
     dict_index_t *index, /*!< in: index */
@@ -585,8 +585,12 @@ bool btr_estimate_number_of_different_key_vals(
 @param[in]	page_size	BLOB page size
 @param[in]	no		field number
 @param[out]	len		length of the field
-@param[out]	lob_version	version of lob
-@param[in]	is_sdi		true for SDI Indexes
+@param[out]	lob_version	version of lob */
+#ifdef UNIV_DEBUG
+/**
+@param[in]	is_sdi		true for SDI Indexes */
+#endif /* UNIV_DEBUG */
+/**
 @param[in,out]	heap		mem heap
 @return the field copied to heap, or NULL if the field is incomplete */
 byte *btr_rec_copy_externally_stored_field_func(

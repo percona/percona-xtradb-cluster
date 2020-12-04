@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2020, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, Google Inc.
 Copyright (c) 2012, Facebook Inc.
 
@@ -313,12 +313,6 @@ btr_latch_leaves_t btr_cur_latch_leaves(buf_block_t *block,
         cursor->left_block = get_block;
 
         SRV_CORRUPT_TABLE_CHECK(get_block, return latch_leaves;);
-
-#ifdef UNIV_BTR_DEBUG
-        ut_a(page_is_comp(get_block->frame) == page_is_comp(page));
-        ut_a(btr_page_get_next(get_block->frame, mtr) ==
-             page_get_page_no(page));
-#endif /* UNIV_BTR_DEBUG */
       }
 
       latch_leaves.savepoints[1] = mtr_set_savepoint(mtr);
@@ -328,6 +322,12 @@ btr_latch_leaves_t btr_cur_latch_leaves(buf_block_t *block,
 
       latch_leaves.blocks[1] = get_block;
 #ifdef UNIV_BTR_DEBUG
+      /* Sanity check only after both the blocks are latched. */
+      if (latch_leaves.blocks[0] != nullptr) {
+        ut_a(page_is_comp(latch_leaves.blocks[0]->frame) == page_is_comp(page));
+        ut_a(btr_page_get_next(latch_leaves.blocks[0]->frame, mtr) ==
+             page_get_page_no(page));
+      }
       ut_a(page_is_comp(get_block->frame) == page_is_comp(page));
 #endif /* UNIV_BTR_DEBUG */
       return (latch_leaves);
@@ -634,7 +634,7 @@ static bool btr_cur_need_opposite_intention(const page_t *page,
  search tuple should be performed in the B-tree. InnoDB does an insert
  immediately after the cursor. Thus, the cursor may end up on a user record,
  or on a page infimum record. */
-dberr_t btr_cur_search_to_nth_level(
+void btr_cur_search_to_nth_level(
     dict_index_t *index,   /*!< in: index */
     ulint level,           /*!< in: the tree level of search */
     const dtuple_t *tuple, /*!< in: data tuple; NOTE: n_fields_cmp in
@@ -681,7 +681,6 @@ dberr_t btr_cur_search_to_nth_level(
   page_cur_t *page_cursor;
   btr_op_t btr_op;
   ulint root_height = 0; /* remove warning */
-  dberr_t err = DB_SUCCESS;
 
   ulint upper_rw_latch, root_leaf_rw_latch;
   btr_intention_t lock_intention;
@@ -829,7 +828,7 @@ dberr_t btr_cur_search_to_nth_level(
     ut_ad(cursor->low_match != ULINT_UNDEFINED || mode != PAGE_CUR_LE);
     btr_cur_n_sea++;
 
-    return err;
+    return;
   }
 #endif /* BTR_CUR_HASH_ADAPT */
 #endif /* BTR_CUR_ADAPT */
@@ -994,20 +993,8 @@ retry_page_get:
   ut_ad(n_blocks < BTR_MAX_LEVELS);
   tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
   block = buf_page_get_gen(page_id, page_size, rw_latch, guess, fetch, file,
-                           line, mtr, false, &err);
+                           line, mtr);
   tree_blocks[n_blocks] = block;
-
-  if (err == DB_IO_DECRYPT_FAIL) {
-    ut_ad(block == nullptr);
-    ib::warn(ER_XB_MSG_4, index->table_name);
-    page_cursor->block = 0;
-    page_cursor->rec = 0;
-    index->table->set_file_unreadable();
-    if (estimate) {
-      cursor->path_arr->nth_rec = ULINT_UNDEFINED;
-    }
-    goto func_exit;
-  }
 
   if (block == nullptr) {
     SRV_CORRUPT_TABLE_CHECK(fetch == Page_fetch::IF_IN_POOL ||
@@ -1104,9 +1091,9 @@ retry_page_get:
       ut_ad(prev_n_blocks < leftmost_from_level);
 
       prev_tree_savepoints[prev_n_blocks] = mtr_set_savepoint(mtr);
-      get_block = buf_page_get_gen(page_id_t(page_id.space(), left_page_no),
-                                   page_size, rw_latch, nullptr, fetch, file,
-                                   line, mtr, false, &err);
+      get_block =
+          buf_page_get_gen(page_id_t(page_id.space(), left_page_no), page_size,
+                           rw_latch, nullptr, fetch, file, line, mtr);
       prev_tree_blocks[prev_n_blocks] = get_block;
       prev_n_blocks++;
 
@@ -1121,18 +1108,7 @@ retry_page_get:
 
     tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
     block = buf_page_get_gen(page_id, page_size, rw_latch, nullptr, fetch, file,
-                             line, mtr, false, &err);
-
-    if (err == DB_IO_DECRYPT_FAIL) {
-      ib::warn(ER_XB_MSG_4, index->table_name);
-      if (estimate) {
-        page_cursor->block = 0;
-        page_cursor->rec = 0;
-        cursor->path_arr->nth_rec = ULINT_UNDEFINED;
-      }
-      index->table->set_file_unreadable();
-      goto func_exit;
-    }
+                             line, mtr);
     tree_blocks[n_blocks] = block;
   }
 
@@ -1782,8 +1758,6 @@ func_exit:
     /* remember that we will need to adjust parent MBR */
     cursor->rtr_info->mbr_adj = true;
   }
-
-  return err;
 }
 
 /** Searches an index tree and positions a tree cursor on a given level.
@@ -1931,7 +1905,7 @@ void btr_cur_search_to_nth_level_with_no_latch(dict_index_t *index, ulint level,
 }
 
 /** Opens a cursor at either end of an index. */
-dberr_t btr_cur_open_at_index_side_func(
+void btr_cur_open_at_index_side_func(
     bool from_left,      /*!< in: true if open to the low end,
                          false if to the high end */
     dict_index_t *index, /*!< in: index */
@@ -1959,7 +1933,6 @@ dberr_t btr_cur_open_at_index_side_func(
   mem_heap_t *heap = nullptr;
   ulint offsets_[REC_OFFS_NORMAL_SIZE];
   ulint *offsets = offsets_;
-  dberr_t err = DB_SUCCESS;
   rec_offs_init(offsets_);
 
   estimate = latch_mode & BTR_ESTIMATE;
@@ -2049,21 +2022,9 @@ dberr_t btr_cur_open_at_index_side_func(
     }
 
     tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
-    block =
-        buf_page_get_gen(page_id, page_size, rw_latch, nullptr,
-                         cursor->m_fetch_mode, file, line, mtr, false, &err);
+    block = buf_page_get_gen(page_id, page_size, rw_latch, nullptr,
+                             cursor->m_fetch_mode, file, line, mtr);
     tree_blocks[n_blocks] = block;
-
-    if (err == DB_IO_DECRYPT_FAIL) {
-      ib::warn(ER_XB_MSG_4, index->table_name);
-      page_cursor->block = 0;
-      page_cursor->rec = 0;
-      if (estimate) {
-        cursor->path_arr->nth_rec = ULINT_UNDEFINED;
-      }
-      index->table->set_file_unreadable();
-      goto exit_loop;
-    }
 
     page = buf_block_get_frame(block);
 
@@ -2266,8 +2227,6 @@ exit_loop:
   if (heap) {
     mem_heap_free(heap);
   }
-
-  return err;
 }
 
 /** Opens a cursor at either end of an index.
@@ -2449,7 +2408,6 @@ bool btr_cur_open_at_rnd_pos_func(
 
   page_id_t page_id(dict_index_get_space(index), dict_index_get_page(index));
   const page_size_t &page_size = dict_table_page_size(index->table);
-  dberr_t err = DB_SUCCESS;
 
   if (root_leaf_rw_latch == RW_X_LATCH) {
     node_ptr_max_size = dict_index_node_ptr_max_size(index);
@@ -2471,20 +2429,9 @@ bool btr_cur_open_at_rnd_pos_func(
     }
 
     tree_savepoints[n_blocks] = mtr_set_savepoint(mtr);
-    block =
-        buf_page_get_gen(page_id, page_size, rw_latch, nullptr,
-                         cursor->m_fetch_mode, file, line, mtr, false, &err);
+    block = buf_page_get_gen(page_id, page_size, rw_latch, nullptr,
+                             cursor->m_fetch_mode, file, line, mtr);
     tree_blocks[n_blocks] = block;
-
-    ut_ad((block != NULL) == (err == DB_SUCCESS));
-
-    if (err == DB_IO_DECRYPT_FAIL) {
-      ib::warn(ER_XB_MSG_4, index->table_name);
-      page_cursor->block = 0;
-      page_cursor->rec = 0;
-      index->table->set_file_unreadable();
-      goto exit_loop;
-    }
 
     page = buf_block_get_frame(block);
 
@@ -3278,18 +3225,18 @@ void btr_cur_update_in_place_log(
     roll_ptr_t roll_ptr, /*!< in: roll ptr */
     mtr_t *mtr)          /*!< in: mtr */
 {
-  byte *log_ptr;
+  byte *log_ptr = nullptr;
   const page_t *page = page_align(rec);
   ut_ad(flags < 256);
   ut_ad(!!page_is_comp(page) == dict_table_is_comp(index->table));
 
-  log_ptr = mlog_open_and_write_index(
+  const bool opened = mlog_open_and_write_index(
       mtr, rec, index,
       page_is_comp(page) ? MLOG_COMP_REC_UPDATE_IN_PLACE
                          : MLOG_REC_UPDATE_IN_PLACE,
-      1 + DATA_ROLL_PTR_LEN + 14 + 2 + MLOG_BUF_MARGIN);
+      1 + DATA_ROLL_PTR_LEN + 14 + 2 + MLOG_BUF_MARGIN, log_ptr);
 
-  if (!log_ptr) {
+  if (!opened) {
     /* Logging in mtr is switched off during crash recovery */
     return;
   }
@@ -4083,6 +4030,22 @@ dberr_t btr_cur_pessimistic_update(ulint flags, btr_cur_t *cursor,
     lob::BtrContext ctx(mtr, pcur, index, rec, *offsets, block);
 
     ctx.free_updated_extern_fields(trx_id, undo_no, update, true);
+
+    /* The cursor position could have changed because of the call to
+    lob::purge() above. */
+    if (rec != pcur->get_rec()) {
+      cursor = pcur->get_btr_cur();
+      block = btr_cur_get_block(cursor);
+      page = buf_block_get_frame(block);
+      page_zip = buf_block_get_page_zip(block);
+      rec = pcur->get_rec();
+      rec_offs_make_valid(rec, index, *offsets);
+    }
+
+    ut_ad(block == pcur->get_block());
+    ut_ad(mtr_is_block_fix(mtr, block, MTR_MEMO_PAGE_X_FIX, index->table));
+    ut_ad(rw_lock_own(&(((buf_block_t *)block)->lock), RW_LOCK_X) ||
+          rw_lock_own(&(((buf_block_t *)block)->lock), RW_LOCK_S));
   }
 
   if (optim_err == DB_OVERFLOW) {
@@ -4301,17 +4264,17 @@ void btr_cur_del_mark_set_clust_rec_log(
     roll_ptr_t roll_ptr, /*!< in: roll ptr to the undo log record */
     mtr_t *mtr)          /*!< in: mtr */
 {
-  byte *log_ptr;
+  byte *log_ptr = nullptr;
 
   ut_ad(!!page_rec_is_comp(rec) == dict_table_is_comp(index->table));
 
-  log_ptr = mlog_open_and_write_index(mtr, rec, index,
-                                      page_rec_is_comp(rec)
-                                          ? MLOG_COMP_REC_CLUST_DELETE_MARK
-                                          : MLOG_REC_CLUST_DELETE_MARK,
-                                      1 + 1 + DATA_ROLL_PTR_LEN + 14 + 2);
+  const bool opened = mlog_open_and_write_index(
+      mtr, rec, index,
+      page_rec_is_comp(rec) ? MLOG_COMP_REC_CLUST_DELETE_MARK
+                            : MLOG_REC_CLUST_DELETE_MARK,
+      1 + 1 + DATA_ROLL_PTR_LEN + 14 + 2, log_ptr);
 
-  if (!log_ptr) {
+  if (!opened) {
     /* Logging in mtr is switched off during crash recovery */
     return;
   }
@@ -4491,14 +4454,12 @@ void btr_cur_del_mark_set_sec_rec_log(rec_t *rec, /*!< in: record */
                                       ibool val,  /*!< in: value to set */
                                       mtr_t *mtr) /*!< in: mtr */
 {
-  byte *log_ptr;
+  byte *log_ptr = nullptr;
   ut_ad(val <= 1);
 
-  log_ptr = mlog_open(mtr, 11 + 1 + 2);
-
-  if (!log_ptr) {
+  if (!mlog_open(mtr, 11 + 1 + 2, log_ptr)) {
     /* Logging in mtr is switched off during crash recovery:
-    in that case mlog_open returns NULL */
+    in that case mlog_open returns false */
     return;
   }
 
@@ -4654,8 +4615,7 @@ ibool btr_cur_compress_if_useful(
     }
 
     /* Check whether page lock prevents the compression */
-    if (!lock_test_prdt_page_lock(trx, page_get_space_id(page),
-                                  page_get_page_no(page))) {
+    if (!lock_test_prdt_page_lock(trx, page_get_page_id(page))) {
       return (false);
     }
   }
@@ -4829,9 +4789,6 @@ ibool btr_cur_pessimistic_delete(dberr_t *err, ibool has_reserved_extents,
     /* The following call will restart the btr_mtr, which could change the
     cursor position. */
     btr_ctx.free_externally_stored_fields(trx_id, undo_no, rollback, rec_type);
-#ifdef UNIV_ZIP_DEBUG
-    ut_a(!page_zip || page_zip_validate(page_zip, page, index));
-#endif /* UNIV_ZIP_DEBUG */
 
     /* The cursor position could have changed now. */
     if (pcur != nullptr) {
@@ -4840,7 +4797,14 @@ ibool btr_cur_pessimistic_delete(dberr_t *err, ibool has_reserved_extents,
       page = buf_block_get_frame(block);
       rec = btr_cur_get_rec(cursor);
       rec_offs_make_valid(rec, index, offsets);
+#ifdef UNIV_ZIP_DEBUG
+      page_zip = buf_block_get_page_zip(block);
+#endif /* UNIV_ZIP_DEBUG */
     }
+
+#ifdef UNIV_ZIP_DEBUG
+    ut_a(!page_zip || page_zip_validate(page_zip, page, index));
+#endif /* UNIV_ZIP_DEBUG */
 
     /* While purging LOBs, there are intermediate mtr commits which releases
     the latches.  In that duration, it is possible that the clust_rec is reused.
@@ -5072,7 +5036,6 @@ static int64_t btr_estimate_n_rows_in_range_on_level(
     mtr_t mtr;
     page_t *page;
     buf_block_t *block;
-    dberr_t err = DB_SUCCESS;
 
     mtr_start(&mtr);
 
@@ -5081,18 +5044,9 @@ static int64_t btr_estimate_n_rows_in_range_on_level(
     attempting to read a page that is no longer part of
     the B-tree. We pass Page_fetch::POSSIBLY_FREED in order to
     silence a debug assertion about this. */
-    block = buf_page_get_gen(page_id, page_size, RW_S_LATCH, nullptr,
-                             Page_fetch::POSSIBLY_FREED, __FILE__, __LINE__,
-                             &mtr, false, &err);
-
-    ut_ad((block != nullptr) == (err == DB_SUCCESS));
-
-    if (err == DB_IO_DECRYPT_FAIL) {
-      ib::warn(ER_XB_MSG_4, index->table_name);
-      index->table->set_file_unreadable();
-      mtr_commit(&mtr);
-      goto inexact;
-    }
+    block =
+        buf_page_get_gen(page_id, page_size, RW_S_LATCH, nullptr,
+                         Page_fetch::POSSIBLY_FREED, __FILE__, __LINE__, &mtr);
 
     page = buf_block_get_frame(block);
 
@@ -5216,50 +5170,37 @@ static int64_t btr_estimate_n_rows_in_range_low(
 
   cursor.path_arr = path1.data();
 
-  bool should_count_the_left_border = false;
+  bool should_count_the_left_border;
 
   if (dtuple_get_n_fields(tuple1) > 0) {
     btr_cur_search_to_nth_level(index, 0, tuple1, mode1,
                                 BTR_SEARCH_LEAF | BTR_ESTIMATE, &cursor, 0,
                                 __FILE__, __LINE__, &mtr);
-    if (index->is_readable()) {
-      /* We should count the border if there are any records to
-      match the criteria, i.e. if the maximum record on the tree is
-      5 and x > 3 is specified then the cursor will be positioned at
-      5 and we should count the border, but if x > 7 is specified,
-      then the cursor will be positioned at 'sup' on the rightmost
-      leaf page in the tree and we should not count the border. */
-      should_count_the_left_border =
-          !page_rec_is_supremum(btr_cur_get_rec(&cursor));
-    }
+
+    ut_ad(!page_rec_is_infimum(btr_cur_get_rec(&cursor)));
+
+    /* We should count the border if there are any records to
+    match the criteria, i.e. if the maximum record on the tree is
+    5 and x > 3 is specified then the cursor will be positioned at
+    5 and we should count the border, but if x > 7 is specified,
+    then the cursor will be positioned at 'sup' on the rightmost
+    leaf page in the tree and we should not count the border. */
+    should_count_the_left_border =
+        !page_rec_is_supremum(btr_cur_get_rec(&cursor));
   } else {
-    dberr_t err = btr_cur_open_at_index_side(
-        true, index, BTR_SEARCH_LEAF | BTR_ESTIMATE, &cursor, 0, &mtr);
+    btr_cur_open_at_index_side(true, index, BTR_SEARCH_LEAF | BTR_ESTIMATE,
+                               &cursor, 0, &mtr);
 
-    if (err != DB_SUCCESS) {
-      ib::warn() << " Error code: " << err
-                 << " btr_estimate_n_rows_in_range_low "
-                 << " called from file: " << __FILE__ << " line: " << __LINE__
-                 << " table: " << index->table->name
-                 << " index: " << index->name;
-    }
+    ut_ad(page_rec_is_infimum(btr_cur_get_rec(&cursor)));
 
-    if (index->is_readable()) {
-      ut_ad(page_rec_is_infimum(btr_cur_get_rec(&cursor)));
-
-      /* The range specified is wihout a left border, just
-      'x < 123' or 'x <= 123' and btr_cur_open_at_index_side()
-      positioned the cursor on the infimum record on the leftmost
-      page, which must not be counted. */
-      should_count_the_left_border = false;
-    }
+    /* The range specified is wihout a left border, just
+    'x < 123' or 'x <= 123' and btr_cur_open_at_index_side()
+    positioned the cursor on the infimum record on the leftmost
+    page, which must not be counted. */
+    should_count_the_left_border = false;
   }
 
   mtr_commit(&mtr);
-
-  if (!index->is_readable()) {
-    return 0;
-  }
 
 #ifdef UNIV_DEBUG
   if (!strcmp(index->name, "iC")) {
@@ -5305,16 +5246,9 @@ static int64_t btr_estimate_n_rows_in_range_low(
     the requested one (can also be positioned on the 'sup') and
     we should not count the right border. */
   } else {
-    dberr_t err = btr_cur_open_at_index_side(
-        false, index, BTR_SEARCH_LEAF | BTR_ESTIMATE, &cursor, 0, &mtr);
+    btr_cur_open_at_index_side(false, index, BTR_SEARCH_LEAF | BTR_ESTIMATE,
+                               &cursor, 0, &mtr);
 
-    if (err != DB_SUCCESS) {
-      ib::warn() << " Error code: " << err
-                 << " btr_estimate_n_rows_in_range_low "
-                 << " called from file: " << __FILE__ << " line: " << __LINE__
-                 << " table: " << index->table->name
-                 << " index: " << index->name;
-    }
     ut_ad(page_rec_is_supremum(btr_cur_get_rec(&cursor)));
 
     /* The range specified is wihout a right border, just

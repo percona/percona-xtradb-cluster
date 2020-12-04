@@ -103,7 +103,7 @@ struct Block {
 
   byte *m_ptr;
 
-  byte pad[INNOBASE_CACHE_LINE_SIZE - sizeof(ulint)];
+  byte pad[ut::INNODB_CACHE_LINE_SIZE - sizeof(ulint)];
   lock_word_t m_in_use;
 };
 
@@ -418,7 +418,7 @@ class IORequest {
 
   /** @return true if the read should be validated */
   bool validate() const MY_ATTRIBUTE((warn_unused_result)) {
-    ut_a(is_read() ^ is_write());
+    ut_ad(is_read() ^ is_write());
 
     return (!is_read() || !punch_hole());
   }
@@ -511,10 +511,11 @@ class IORequest {
   @param[in] key		The encryption key to use
   @param[in] key_len	length of the encryption key
   @param[in] iv		The encryption iv to use */
-  void encryption_key(byte *key, ulint key_len, bool key_allocated, byte *iv,
-                      uint key_version, uint key_id, byte *tablespace_key,
-                      const char *uuid) {
-    m_encryption.set_key(key, key_len, key_allocated);
+  void encryption_key(byte *key, ulint key_len, byte *iv, uint key_version,
+                      uint key_id, byte *tablespace_key, const char *uuid,
+                      std::map<uint, byte *> *key_versions_cache) {
+    m_encryption.set_key(key, key_len);
+    m_encryption.set_key_versions_cache(key_versions_cache);
     m_encryption.set_initial_vector(iv);
     m_encryption.set_key_version(key_version);
     m_encryption.set_key_id(key_id);
@@ -549,8 +550,9 @@ class IORequest {
 
   /** Clear all encryption related flags */
   void clear_encrypted() {
-    m_encryption.set_key(nullptr, 0, false);
+    m_encryption.set_key(nullptr, 0);
     m_encryption.set_initial_vector(nullptr);
+    m_encryption.set_key_versions_cache(nullptr);
     m_encryption.set_type(Encryption::NONE);
     m_encryption.set_encryption_rotation(Encryption_rotation::NO_ROTATION);
     m_encryption.set_key_id(0);
@@ -1740,12 +1742,19 @@ dberr_t os_file_write_func(IORequest &type, const char *name, os_file_t file,
                            const void *buf, os_offset_t offset, ulint n)
     MY_ATTRIBUTE((warn_unused_result));
 
-/** Check the existence and type of the given file.
-@param[in]	path		pathname of the file
-@param[out]	exists		true if file exists
-@param[out]	type		type of the file (if it exists)
+/** Check the existence and type of a given path.
+@param[in]   path    pathname of the file
+@param[out]  exists  true if file exists
+@param[out]  type    type of the file (if it exists)
 @return true if call succeeded */
 bool os_file_status(const char *path, bool *exists, os_file_type_t *type);
+
+/** Check the existence and usefulness of a given path.
+@param[in]  path  path name
+@retval true if the path exists and can be used
+@retval false if the path does not exist or if the path is
+unuseable to get to a possibly existing file or directory. */
+bool os_file_exists(const char *path);
 
 /** Create all missing subdirectories along the given path.
 @return DB_SUCCESS if OK, otherwise error code. */

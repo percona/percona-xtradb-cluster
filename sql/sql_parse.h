@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2020, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -127,6 +127,7 @@ bool show_precheck(THD *thd, LEX *lex, bool lock);
 extern uint sql_command_flags[];
 extern const LEX_CSTRING command_name[];
 
+<<<<<<< HEAD
 inline bool is_supported_parser_charset(const CHARSET_INFO *cs) {
   return (cs->mbminlen == 1);
 }
@@ -169,6 +170,13 @@ inline bool is_supported_parser_charset(const CHARSET_INFO *cs) {
 
 #endif /* WITH_WSREP */
 
+||||||| 5b5a5d2584a
+inline bool is_supported_parser_charset(const CHARSET_INFO *cs) {
+  return (cs->mbminlen == 1);
+}
+
+=======
+>>>>>>> Percona-Server-8.0.21-12
 bool sqlcom_can_generate_row_events(enum enum_sql_command command);
 
 bool all_tables_not_ok(THD *thd, TABLE_LIST *tables);
@@ -321,6 +329,7 @@ bool set_default_collation(HA_CREATE_INFO *create_info,
 */
 #define CF_REQUIRE_ACL_CACHE (1U << 20)
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
 /**
   DDL statement that may be subject to error filtering.
@@ -328,6 +337,14 @@ bool set_default_collation(HA_CREATE_INFO *create_info,
 #define CF_WSREP_MAY_IGNORE_ERRORS (1U << 21)
 #endif /* WITH_WSREP */
 
+||||||| 5b5a5d2584a
+=======
+/**
+  Identifies statements as SHOW commands using INFORMATION_SCHEMA system views.
+*/
+#define CF_SHOW_USES_SYSTEM_VIEW (1U << 21)
+
+>>>>>>> Percona-Server-8.0.21-12
 /* Bits in server_command_flags */
 
 /**

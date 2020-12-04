@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2000, 2020, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -77,7 +77,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "trx0rec.h"
 #include "trx0roll.h"
 #include "trx0undo.h"
-#include "ut0mpmcbq.h"
+#include "ut0cpu_cache.h"
 #include "ut0new.h"
 #include "zlib.h"
 
@@ -1152,7 +1152,6 @@ handle_new_error:
     case DB_FTS_INVALID_DOCID:
     case DB_INTERRUPTED:
     case DB_CANT_CREATE_GEOMETRY_OBJECT:
-    case DB_IO_DECRYPT_FAIL:
     case DB_COMPUTE_VALUE_FAILED:
     case DB_LOCK_NOWAIT:
     case DB_BTREE_LEVEL_LIMIT_EXCEEDED:
@@ -1623,8 +1622,11 @@ dberr_t row_lock_table_autoinc_for_mysql(
   ibool was_lock_wait;
 
   /* If we already hold an AUTOINC lock on the table then do nothing.
-  Note: We peek at the value of the current owner without acquiring
-  the lock mutex. */
+  Note: We peek at the value of the current owner without acquiring any latch,
+  which is OK, because if the equality holds, it means we were granted the lock,
+  and the only way table->autoinc_trx can subsequently change is by releasing
+  the lock, which can not happen concurrently with the thread running the trx.*/
+  ut_ad(trx_can_be_handled_by_current_thread(trx));
   if (trx == table->autoinc_trx) {
     return (DB_SUCCESS);
   }
@@ -1784,10 +1786,9 @@ static dberr_t row_explicit_rollback(dict_index_t *index, const dtuple_t *entry,
 
   /* Void call just to set mtr modification flag
   to true failing which block is not scheduled for flush*/
-  byte *log_ptr = mlog_open(mtr, 0);
-  ut_ad(log_ptr == nullptr);
-  if (log_ptr != nullptr) {
-    /* To keep complier happy. */
+  byte *log_ptr = nullptr;
+  if (mlog_open(mtr, 0, log_ptr)) {
+    ut_ad(false);
     mlog_close(mtr, log_ptr);
   }
 
@@ -1980,42 +1981,6 @@ static dberr_t row_insert_for_mysql_using_cursor(const byte *mysql_rec,
   return (err);
 }
 
-/** Determine is tablespace encrypted but decryption failed, is table corrupted
-or is tablespace .ibd file missing.
-@param[in] table                Table
-@param[in] trx                  Transaction
-@param[in] push_warning         true if we should push warning to user
-@retval DB_IO_DECRYPT_FAIL    table is encrypted but decryption failed
-@retval DB_CORRUPTION           table is corrupted
-@retval DB_TABLESPACE_NOT_FOUND tablespace .ibd file not found */
-static dberr_t row_mysql_get_table_status(const dict_table_t *table, trx_t *trx,
-                                          bool push_warning = true) {
-  dberr_t err;
-  if (fil_space_t *space = fil_space_acquire_silent(table->space)) {
-    if (space->is_encrypted) {
-      if (push_warning) {
-        ib::warn(ER_XB_MSG_4, table->name);
-      }
-      err = DB_IO_DECRYPT_FAIL;
-    } else {
-      if (push_warning) {
-        push_warning_printf(trx->mysql_thd, Sql_condition::SL_WARNING,
-                            HA_ERR_CRASHED,
-                            "Table %s in tablespace %u corrupted.",
-                            table->name.m_name, table->space);
-      }
-      err = DB_CORRUPTION;
-    }
-    fil_space_release(space);
-  } else {
-    ib::error(ER_IB_MSG_977)
-        << ".ibd file is missing for table " << table->name;
-    err = DB_TABLESPACE_NOT_FOUND;
-  }
-
-  return (err);
-}
-
 /** Does an insert for MySQL using INSERT graph. This function will run/execute
 INSERT graph.
 @param[in]	mysql_rec	row in the MySQL format
@@ -2046,8 +2011,12 @@ static dberr_t row_insert_for_mysql_using_ins_graph(const byte *mysql_rec,
 
     return (DB_TABLESPACE_DELETED);
 
-  } else if (!prebuilt->table->is_readable()) {
-    return (row_mysql_get_table_status(prebuilt->table, trx, true));
+  } else if (prebuilt->table->ibd_file_missing) {
+    ib::error(ER_IB_MSG_977)
+        << ".ibd file is missing for table " << prebuilt->table->name;
+
+    return (DB_TABLESPACE_NOT_FOUND);
+
   } else if (srv_force_recovery &&
              !(srv_force_recovery < SRV_FORCE_NO_UNDO_LOG_SCAN &&
                (dict_sys_t::is_dd_table_id(prebuilt->table->id) ||
@@ -2535,10 +2504,9 @@ static dberr_t row_delete_for_mysql_using_cursor(const upd_node_t *node,
 
       /* Void call just to set mtr modification flag
       to true failing which block is not scheduled for flush*/
-      byte *log_ptr = mlog_open(&mtr, 0);
-      ut_ad(log_ptr == nullptr);
-      if (log_ptr != nullptr) {
-        /* To keep complier happy. */
+      byte *log_ptr = nullptr;
+      if (mlog_open(&mtr, 0, log_ptr)) {
+        ut_ad(false);
         mlog_close(&mtr, log_ptr);
       }
 
@@ -2569,10 +2537,9 @@ static dberr_t row_delete_for_mysql_using_cursor(const upd_node_t *node,
         /* Void call just to set mtr modification flag
         to true failing which block is not scheduled for
         flush. */
-        byte *log_ptr = mlog_open(&mtr, 0);
-        ut_ad(log_ptr == nullptr);
-        if (log_ptr != nullptr) {
-          /* To keep complier happy. */
+        byte *log_ptr = nullptr;
+        if (mlog_open(&mtr, 0, log_ptr)) {
+          ut_ad(false);
           mlog_close(&mtr, log_ptr);
         }
       }
@@ -2792,7 +2759,7 @@ static dberr_t row_update_for_mysql_using_upd_graph(const byte *mysql_rec,
   ut_a(prebuilt->magic_n2 == ROW_PREBUILT_ALLOCATED);
   UT_NOT_USED(mysql_rec);
 
-  if (prebuilt->table->file_unreadable) {
+  if (prebuilt->table->ibd_file_missing) {
     ib::error(ER_IB_MSG_984)
         << "MySQL is trying to use a table handle but the"
            " .ibd file for table "
@@ -4017,7 +3984,7 @@ static dberr_t row_discard_tablespace(trx_t *trx, dict_table_t *table,
   4) FOREIGN KEY operations: if table->n_foreign_key_checks_running > 0,
   we do not allow the discard. */
 
-  /* For SDI tables, acquire exclusive MDL and set sdi_table->file_unreadable
+  /* For SDI tables, acquire exclusive MDL and set sdi_table->ibd_file_missing
   to true. Purge on SDI table acquire shared MDL & also check for missing
   flag. */
   mutex_exit(&dict_sys->mutex);
@@ -4060,7 +4027,7 @@ static dberr_t row_discard_tablespace(trx_t *trx, dict_table_t *table,
       /* All persistent operations successful, update the
       data dictionary memory cache. */
 
-      table->set_file_unreadable();
+      table->ibd_file_missing = true;
 
       table->flags2 |= DICT_TF2_DISCARDED;
 
@@ -4078,7 +4045,7 @@ static dberr_t row_discard_tablespace(trx_t *trx, dict_table_t *table,
       {
         dict_table_t *sdi_table = dict_sdi_get_table(table->space, true, false);
         if (sdi_table) {
-          sdi_table->set_file_unreadable();
+          sdi_table->ibd_file_missing = true;
           dict_sdi_close_table(sdi_table);
         }
       }
@@ -4105,7 +4072,7 @@ static dberr_t row_discard_tablespace(trx_t *trx, dict_table_t *table,
 
 /** Discards the tablespace of a table which stored in an .ibd file. Discarding
  means that this function renames the .ibd file and assigns a new table id for
- the table. Also the flag table->file_unreadable is set to TRUE.
+ the table. Also the flag table->ibd_file_missing is set to TRUE.
  @return error code or DB_SUCCESS */
 dberr_t row_discard_tablespace_for_mysql(
     const char *name, /*!< in: table name */
@@ -4370,9 +4337,14 @@ dberr_t row_drop_table_for_mysql(const char *name, trx_t *trx, bool nonatomic,
     /* If it's called from server, then it should exist in cache */
     if (table == nullptr) {
       /* MDL should already be held by server */
+      int error = 0;
       table = dd_table_open_on_name(
           thd, nullptr, name, true,
-          DICT_ERR_IGNORE_INDEX_ROOT | DICT_ERR_IGNORE_CORRUPT);
+          DICT_ERR_IGNORE_INDEX_ROOT | DICT_ERR_IGNORE_CORRUPT, &error);
+      if (table == nullptr && error == HA_ERR_GENERIC) {
+        err = DB_ERROR;
+        goto funct_exit;
+      }
     } else {
       table->acquire();
     }
@@ -4528,8 +4500,8 @@ dberr_t row_drop_table_for_mysql(const char *name, trx_t *trx, bool nonatomic,
     if (!table->is_intrinsic()) {
       lock_remove_all_on_table(table, TRUE);
     }
-    ut_a(table->n_rec_locks == 0);
-  } else if (table->get_ref_count() > 0 || table->n_rec_locks > 0) {
+    ut_a(table->n_rec_locks.load() == 0);
+  } else if (table->get_ref_count() > 0 || table->n_rec_locks.load() > 0) {
     ibool added;
 
     ut_ad(0);
@@ -4756,7 +4728,7 @@ dberr_t row_rename_table_for_mysql(const char *old_name, const char *new_name,
     err = DB_TABLE_NOT_FOUND;
     goto funct_exit;
 
-  } else if (table->file_unreadable && !dict_table_is_discarded(table)) {
+  } else if (table->ibd_file_missing && !dict_table_is_discarded(table)) {
     err = DB_TABLE_NOT_FOUND;
 
     ib::error(ER_IB_MSG_996) << "Table " << old_name
@@ -4944,8 +4916,7 @@ dberr_t row_mysql_parallel_select_count_star(
   Shards n_recs;
   Counter::clear(n_recs);
 
-  struct Check_interrupt {
-    byte m_pad[INNOBASE_CACHE_LINE_SIZE - (sizeof(size_t) + sizeof(void *))];
+  struct alignas(ut::INNODB_CACHE_LINE_SIZE) Check_interrupt {
     size_t m_count{};
     const buf_block_t *m_prev_block{};
   };
@@ -4964,9 +4935,9 @@ dberr_t row_mysql_parallel_select_count_star(
 
     success =
       reader.add_scan(trx, config, [&](const Parallel_reader::Ctx *ctx) {
-      Counter::inc(n_recs, ctx->m_thread_id);
+      Counter::inc(n_recs, ctx->thread_id());
 
-      auto &check = checker[ctx->m_thread_id];
+      auto &check = checker[ctx->thread_id()];
 
       if (ctx->m_block != check.m_prev_block) {
         check.m_prev_block = ctx->m_block;
@@ -5055,7 +5026,7 @@ static dberr_t parallel_check_table(trx_t *trx, dict_index_t *index,
 
     const auto rec = ctx->m_rec;
     const auto block = ctx->m_block;
-    const auto id = ctx->m_thread_id;
+    const auto id = ctx->thread_id();
 
     Counter::inc(n_recs, id);
 
@@ -5105,18 +5076,20 @@ static dberr_t parallel_check_table(trx_t *trx, dict_index_t *index,
       if (cmp > 0) {
         Counter::inc(n_corrupt, id);
 
-        ib::error() << "Index records in a wrong order in " << index->name
-                    << " of table " << index->table->name << ": " << *prev_tuple
-                    << ", " << rec_offsets_print(rec, offsets);
+        ib::error(ER_IB_ERR_INDEX_RECORDS_WRONG_ORDER)
+          << "Index records in a wrong order in " << index->name
+          << " of table " << index->table->name << ": " << *prev_tuple
+          << ", " << rec_offsets_print(rec, offsets);
         /* Continue reading */
       } else if (dict_index_is_unique(index) && !contains_null &&
                  matched_fields >=
                      dict_index_get_n_ordering_defined_by_user(index)) {
         Counter::inc(n_dups, id);
 
-        ib::error() << "Duplicate key in " << index->name << " of table "
-                    << index->table->name << ": " << *prev_tuple << ", "
-                    << rec_offsets_print(rec, offsets);
+        ib::error(ER_IB_ERR_INDEX_DUPLICATE_KEY)
+          << "Duplicate key in " << index->name << " of table "
+          << index->table->name << ": " << *prev_tuple << ", "
+          << rec_offsets_print(rec, offsets);
       }
     }
 
@@ -5155,14 +5128,15 @@ static dberr_t parallel_check_table(trx_t *trx, dict_index_t *index,
   }
 
   if (Counter::total(n_dups) > 0) {
-    ib::error() << "Found " << Counter::total(n_dups) << " duplicate rows in "
-                << index->name;
+    ib::error(ER_IB_ERR_FOUND_N_DUPLICATE_KEYS)
+      << "Found " << Counter::total(n_dups) << " duplicate rows in "
+      << index->name;
 
     err = DB_DUPLICATE_KEY;
   }
 
   if (Counter::total(n_corrupt) > 0) {
-    ib::error() << "Found " << Counter::total(n_corrupt)
+    ib::error(ER_IB_ERR_FOUND_N_RECORDS_WRONG_ORDER) << "Found " << Counter::total(n_corrupt)
                 << " rows in the wrong order in " << index->name;
 
     err = DB_INDEX_CORRUPT;
@@ -5411,7 +5385,7 @@ bool row_prebuilt_t::skip_concurrency_ticket() const {
   The reads, updates as part of DDLs should be exempt for concurrency
   tickets. */
   if (table->is_intrinsic() || table->is_dd_table) {
-    return (true);
+    return true;
   }
 
   /* Skip concurrency ticket while implicitly updating GTID table. This is to
@@ -5423,8 +5397,15 @@ bool row_prebuilt_t::skip_concurrency_ticket() const {
     thd = current_thd;
   }
 
-  if (thd != nullptr &&  thd->is_operating_gtid_table_implicitly) {
-    return (true);
+  if (thd != nullptr) {
+    /* Skip concurrency ticket for attachable transactions opened for
+    operating within innodb implicitly. Since it is an independent transaction
+    apart from the regular transaction owned by this THD in same thread, we
+    could end up in deadlock. */
+    if (thd->is_attachable_transaction_active() ||
+        thd->is_operating_gtid_table_implicitly) {
+      return true;
+    }
   }
-  return (false);
+  return false;
 }

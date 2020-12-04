@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2020, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2009, Google Inc.
 Copyright (c) 2016, Percona Inc. All Rights Reserved.
 
@@ -524,12 +524,12 @@ bool log_sys_init(uint32_t n_files, uint64_t file_size, space_id_t space_id) {
   log.current_file_real_offset = LOG_FILE_HDR_SIZE;
   log_files_update_offsets(log, log.current_file_lsn);
 
-  log.checkpointer_event = os_event_create("log_checkpointer_event");
-  log.closer_event = os_event_create("log_closer_event");
-  log.write_notifier_event = os_event_create("log_write_notifier_event");
-  log.flush_notifier_event = os_event_create("log_flush_notifier_event");
-  log.writer_event = os_event_create("log_writer_event");
-  log.flusher_event = os_event_create("log_flusher_event");
+  log.checkpointer_event = os_event_create();
+  log.closer_event = os_event_create();
+  log.write_notifier_event = os_event_create();
+  log.flush_notifier_event = os_event_create();
+  log.writer_event = os_event_create();
+  log.flusher_event = os_event_create();
 
   mutex_create(LATCH_ID_LOG_CHECKPOINTER, &log.checkpointer_mutex);
   mutex_create(LATCH_ID_LOG_CLOSER, &log.closer_mutex);
@@ -559,6 +559,10 @@ bool log_sys_init(uint32_t n_files, uint64_t file_size, space_id_t space_id) {
 
   log_calc_buf_size(log);
   log_calc_max_ages(log);
+
+  log.m_crash_unsafe = false;
+  log.m_disable = false;
+  log.m_first_file_lsn = LOG_START_LSN;
 
   if (!log_calc_concurrency_margin(log)) {
     ib::error(ER_IB_MSG_1267)
@@ -863,6 +867,7 @@ void log_print(const log_t &log, FILE *file) {
   lsn_t max_assigned_lsn;
   lsn_t current_lsn;
   lsn_t oldest_lsn;
+  lsn_t max_checkpoint_age;
 
   last_checkpoint_lsn = log.last_checkpoint_lsn.load();
   dirty_pages_added_up_to_lsn = log_buffer_dirty_pages_added_up_to_lsn(log);
@@ -874,6 +879,7 @@ void log_print(const log_t &log, FILE *file) {
 
   log_limits_mutex_enter(log);
   oldest_lsn = log.available_for_checkpoint_lsn;
+  max_checkpoint_age = log_get_free_check_capacity(log);
   log_limits_mutex_exit(log);
 
   fprintf(file,
@@ -897,14 +903,24 @@ void log_print(const log_t &log, FILE *file) {
           last_checkpoint_lsn);
 
   fprintf(file,
-          "Checkpoint age target " LSN_PF
+          "Checkpoint age target        " LSN_PF
           "\n"
-          "Modified age no less than " LSN_PF
+          "Modified age no less than    " LSN_PF
           "\n"
-          "Checkpoint age        " LSN_PF "\n",
+          "Checkpoint age               " LSN_PF
+          "\n"
+          "Max checkpoint age           " LSN_PF "\n",
           log_sys->max_checkpoint_age_async,
           current_lsn - buf_pool_get_oldest_modification_lwm(),
-          current_lsn - log_sys->last_checkpoint_lsn);
+          current_lsn - log_sys->last_checkpoint_lsn, max_checkpoint_age);
+
+  fprintf(file,
+          "Number of logs               " UINT32PF
+          "\n"
+          "Log size                     " LSN_PF
+          "\n"
+          "Log total size               " LSN_PF "\n",
+          log.n_files, log.file_size, log.files_real_capacity);
 
   time_t current_time = time(nullptr);
 
@@ -924,8 +940,10 @@ void log_print(const log_t &log, FILE *file) {
     checkpoint age */
     fprintf(file,
             "Log tracking enabled\n"
-            "Log tracked up to   " LSN_PF "\n",
-            log_sys->tracked_lsn.load());
+            "Log tracked up to            " LSN_PF
+            "\n"
+            "Max tracked LSN age          " LSN_PF "\n",
+            log_sys->tracked_lsn.load(), max_checkpoint_age);
   }
 
   log.n_log_ios_old = log.n_log_ios;
@@ -1096,7 +1114,7 @@ static void log_allocate_flush_events(log_t &log) {
   log.flush_events = UT_NEW_ARRAY_NOKEY(os_event_t, n);
 
   for (size_t i = 0; i < log.flush_events_size; ++i) {
-    log.flush_events[i] = os_event_create("log_flush_event");
+    log.flush_events[i] = os_event_create();
   }
 }
 
@@ -1122,7 +1140,7 @@ static void log_allocate_write_events(log_t &log) {
   log.write_events = UT_NEW_ARRAY_NOKEY(os_event_t, n);
 
   for (size_t i = 0; i < log.write_events_size; ++i) {
-    log.write_events[i] = os_event_create("log_write_event");
+    log.write_events[i] = os_event_create();
   }
 }
 

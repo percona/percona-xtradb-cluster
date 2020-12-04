@@ -1157,14 +1157,15 @@ void dict_table_add_system_columns(dict_table_t *table, /*!< in/out: table */
   for these tables. */
 
   dict_mem_table_add_col(table, heap, "DB_ROW_ID", DATA_SYS,
-                         DATA_ROW_ID | DATA_NOT_NULL, DATA_ROW_ID_LEN);
+                         DATA_ROW_ID | DATA_NOT_NULL, DATA_ROW_ID_LEN, false);
 
   dict_mem_table_add_col(table, heap, "DB_TRX_ID", DATA_SYS,
-                         DATA_TRX_ID | DATA_NOT_NULL, DATA_TRX_ID_LEN);
+                         DATA_TRX_ID | DATA_NOT_NULL, DATA_TRX_ID_LEN, false);
 
   if (!table->is_intrinsic()) {
     dict_mem_table_add_col(table, heap, "DB_ROLL_PTR", DATA_SYS,
-                           DATA_ROLL_PTR | DATA_NOT_NULL, DATA_ROLL_PTR_LEN);
+                           DATA_ROLL_PTR | DATA_NOT_NULL, DATA_ROLL_PTR_LEN,
+                           false);
 
     /* This check reminds that if a new system column is added to
     the program, it should be dealt with here */
@@ -1491,8 +1492,6 @@ dberr_t dict_table_rename_in_cache(
   dict_index_t *index;
   ulint fold;
   char old_name[MAX_FULL_NAME_LEN + 1];
-  os_file_type_t ftype;
-  bool exists;
 
   ut_ad(mutex_own(&dict_sys->mutex));
 
@@ -1558,6 +1557,8 @@ dberr_t dict_table_rename_in_cache(
     }
 
     /* Delete any temp file hanging around. */
+    os_file_type_t ftype;
+    bool exists;
     if (os_file_status(filepath, &exists, &ftype) && exists &&
         !os_file_delete_if_exists(innodb_temp_file_key, filepath, nullptr)) {
       ib::info(ER_IB_MSG_180) << "Delete of " << filepath << " failed.";
@@ -1892,7 +1893,7 @@ static void dict_table_remove_from_cache_low(
   ut_ad(table);
   ut_ad(dict_lru_validate());
   ut_a(table->get_ref_count() == 0);
-  ut_a(table->n_rec_locks == 0);
+  ut_a(table->n_rec_locks.load() == 0);
   ut_ad(mutex_own(&dict_sys->mutex));
   ut_ad(table->magic_n == DICT_TABLE_MAGIC_N);
 
@@ -2607,7 +2608,7 @@ static void dict_index_remove_from_cache_low(
     if (retries >= 60000) {
       ut_error;
     }
-  } while (srv_shutdown_state.load() == SRV_SHUTDOWN_NONE || !lru_evict);
+  } while (srv_shutdown_state.load() < SRV_SHUTDOWN_CLEANUP || !lru_evict);
 
   rw_lock_free(&index->lock);
 
@@ -4098,37 +4099,6 @@ void dict_set_corrupted(dict_index_t *index) {
   }
 }
 
-/** Flags a table with specified space_id encrypted in the data dictionary
-cache
-@param[in] space_id Tablespace id */
-void dict_table_set_encrypted_by_space(space_id_t space_id,
-                                       bool need_mutex) noexcept {
-  ut_a(space_id != 0);
-  ut_a(space_id < dict_sys_t::s_log_space_first_id);
-
-  if (need_mutex) mutex_enter(&(dict_sys->mutex));
-
-  dict_table_t *table = UT_LIST_GET_FIRST(dict_sys->table_LRU);
-  bool found = false;
-
-  while (table) {
-    if (table->space == space_id) {
-      table->set_file_unreadable();
-      found = true;
-    }
-
-    table = UT_LIST_GET_NEXT(table_LRU, table);
-  }
-
-  if (need_mutex) mutex_exit(&(dict_sys->mutex));
-
-  if (!found) {
-    ib::warn() << "Space to be marked as encrypted was not found "
-                  "for id "
-               << space_id << ".";
-  }
-}
-
 #ifndef UNIV_HOTBACKUP
 /** Write the dirty persistent dynamic metadata for a table to
 DD TABLE BUFFER table. This is the low level function to write back.
@@ -4345,7 +4315,6 @@ void dict_table_set_corrupt_by_space(space_id_t space_id,
   while (table) {
     if (table->space == space_id) {
       table->is_corrupt = true;
-      table->file_unreadable = true;
       found = true;
     }
 
@@ -4368,7 +4337,7 @@ void dict_ind_init(void) {
   /* create dummy table and index for REDUNDANT infimum and supremum */
   table = dict_mem_table_create("SYS_DUMMY1", DICT_HDR_SPACE, 1, 0, 0, 0, 0);
   dict_mem_table_add_col(table, nullptr, nullptr, DATA_CHAR,
-                         DATA_ENGLISH | DATA_NOT_NULL, 8);
+                         DATA_ENGLISH | DATA_NOT_NULL, 8, true);
 
   dict_ind_redundant =
       dict_mem_index_create("SYS_DUMMY1", "SYS_DUMMY1", DICT_HDR_SPACE, 0, 1);
@@ -5197,13 +5166,14 @@ void DDTableBuffer::open() {
       MYSQL_TYPE_LONGLONG | DATA_NOT_NULL | DATA_UNSIGNED | DATA_BINARY_TYPE,
       0);
 
-  dict_mem_table_add_col(table, heap, table_id_name, DATA_INT, prtype, 8);
-  dict_mem_table_add_col(table, heap, version_name, DATA_INT, prtype, 8);
+  dict_mem_table_add_col(table, heap, table_id_name, DATA_INT, prtype, 8, true);
+  dict_mem_table_add_col(table, heap, version_name, DATA_INT, prtype, 8, true);
 
   prtype =
       dtype_form_prtype(MYSQL_TYPE_BLOB | DATA_NOT_NULL | DATA_BINARY_TYPE, 63);
 
-  dict_mem_table_add_col(table, heap, metadata_name, DATA_BLOB, prtype, 10);
+  dict_mem_table_add_col(table, heap, metadata_name, DATA_BLOB, prtype, 10,
+                         true);
 
   dict_table_add_system_columns(table, heap);
 
@@ -5492,8 +5462,11 @@ void Persister::write_log(table_id_t id,
 
   ut_ad(size > 0);
 
-  log_ptr = mlog_open_metadata(mtr, metadata_log_header_size + size);
-  ut_ad(log_ptr != nullptr);
+  if (!mlog_open_metadata(mtr, metadata_log_header_size + size, log_ptr)) {
+    /* Currently possible only when global redo logging is not enabled. */
+    ut_ad(!mtr_t::s_logging.is_enabled());
+    return;
+  }
 
   log_ptr = mlog_write_initial_dict_log_record(
       MLOG_TABLE_DYNAMIC_META, id, metadata.get_version(), log_ptr, mtr);

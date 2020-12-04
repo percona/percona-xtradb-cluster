@@ -93,6 +93,12 @@ So we maintain a std::set, which is later used to register the
 tablespaces to dictionary table mysql.tablespaces */
 missing_sys_tblsp_t missing_spaces;
 
+/** This bool denotes if we found a Table or Partition with discarded Tablespace
+during load of SYS_TABLES (in dict_check_sys_tables).
+
+We use it to stop upgrade from 5.7 to 8.0 if there are discarded Tablespaces. */
+bool has_discarded_tablespaces = false;
+
 /** Loads a table definition and also all its index definitions.
 
 Loads those foreign key constraints whose referenced table is already in
@@ -110,7 +116,7 @@ key constraints are loaded into memory.
                                 constraints are loaded.
 @return table, NULL if does not exist; if the table is stored in an
 .ibd file, but the file does not exist, then we set the
-file_unreadable flag TRUE in the table object we return */
+ibd_file_missing flag TRUE in the table object we return */
 static dict_table_t *dict_load_table_one(table_name_t &name, bool cached,
                                          dict_err_ignore_t ignore_err,
                                          dict_names_t &fk_tables);
@@ -596,14 +602,15 @@ static const char *dict_load_column_low(
       dict_v_col_t *vcol =
 #endif
           dict_mem_table_add_v_col(table, heap, name, mtype, prtype, col_len,
-                                   dict_get_v_col_mysql_pos(pos), num_base);
+                                   dict_get_v_col_mysql_pos(pos), num_base,
+                                   true);
       ut_ad(vcol->v_pos == dict_get_v_col_pos(pos));
     } else {
       ut_ad(num_base == 0);
-      dict_mem_table_add_col(table, heap, name, mtype, prtype, col_len);
+      dict_mem_table_add_col(table, heap, name, mtype, prtype, col_len, true);
     }
   } else {
-    dict_mem_fill_column_struct(column, pos, mtype, prtype, col_len);
+    dict_mem_fill_column_struct(column, pos, mtype, prtype, col_len, true);
   }
 
   /* Report the virtual column number */
@@ -1361,9 +1368,8 @@ std::pair<bool, space_id_t> dict_check_sys_tablespaces(bool validate) {
     }
 
     // For tables in cache check if they contain crypt_data in page0
-    if (fil_space_exists_in_mem(space_id, space_name, false, true, nullptr,
-                                0)) {
-      if (is_space_keyring_v1_encrypted(space_id)) {
+    if (fil_space_exists_in_mem(space_id, space_name, false, true, NULL, 0)) {
+      if (is_space_keyring_pre_v3_encrypted(space_id)) {
         mtr_commit(&mtr);
         return std::make_pair(true, 0);  // will cause upgrade to fail
       }
@@ -1377,7 +1383,16 @@ std::pair<bool, space_id_t> dict_check_sys_tablespaces(bool validate) {
     opened. */
     char *filepath = dict_get_first_path(space_id);
 
+    // We do not need to validate tablespace for online encryption as encryption
+    // threads do not work in 5.7. Only ENCRYPTION='KEYRING' works.
     Keyring_encryption_info keyring_encryption_info;
+
+    /* Check that this ibd is in a known location. If not, allow this
+    but make some noise. */
+    if (!fil_path_is_known(filepath)) {
+      ib::warn(ER_IB_MSG_UNPROTECTED_LOCATION_ALLOWED, filepath, space_name);
+    }
+
     /* Check that the .ibd file exists. */
     dberr_t err = fil_ibd_open(validate, FIL_TYPE_TABLESPACE, space_id,
                                fsp_flags, space_name, space_name, filepath,
@@ -1387,7 +1402,7 @@ std::pair<bool, space_id_t> dict_check_sys_tablespaces(bool validate) {
       ib::warn(ER_IB_MSG_191) << "Ignoring tablespace " << id_name_t(space_name)
                               << " because it could not be opened.";
     } else {
-      if (is_space_keyring_v1_encrypted(space_id)) {
+      if (is_space_keyring_pre_v3_encrypted(space_id)) {
         ut_free(filepath);
         mtr_commit(&mtr);
         return std::make_pair(true, 0);  // will cause upgrade to fail
@@ -1545,9 +1560,12 @@ std::pair<bool, space_id_t> dict_check_sys_tables(bool validate) {
     }
 
     if (flags2 & DICT_TF2_DISCARDED) {
-      ib::info(ER_IB_MSG_193) << "Ignoring tablespace " << table_name
-                              << " because the DISCARD flag is set .";
+      ib::info(ER_IB_MSG_193)
+          << "Tablespace " << table_name
+          << " is set as DISCARDED. Upgrade will stop, please make sure "
+             "there are no discarded Tables/Partitions before upgrading.";
       ut_free(table_name.m_name);
+      has_discarded_tablespaces = true;
       continue;
     }
 
@@ -1604,7 +1622,7 @@ std::pair<bool, space_id_t> dict_check_sys_tables(bool validate) {
                                 0)) {
       ut_free(table_name.m_name);
       ut_free(space_name_from_dict);
-      if (is_space_keyring_v1_encrypted(space_id)) {
+      if (is_space_keyring_pre_v3_encrypted(space_id)) {
         mtr_commit(&mtr);
         return std::make_pair(true, 0);  // will cause upgrade to fail
       }
@@ -1641,9 +1659,17 @@ std::pair<bool, space_id_t> dict_check_sys_tables(bool validate) {
       }
     }
 
+    /* Check that this ibd is in a known location. If not, allow this
+    but make some noise. */
+    if (!fil_path_is_known(filepath)) {
+      ib::warn(ER_IB_MSG_UNPROTECTED_LOCATION_ALLOWED, filepath, space_name);
+    }
+
     /* Check that the .ibd file exists. */
     Keyring_encryption_info keyring_encryption_info;
 
+    // We do not need to validate tablespace for online encryption as encryption
+    // threads do not work in 5.7. Only ENCRYPTION='KEYRING' works.
     dberr_t err = fil_ibd_open(validate, FIL_TYPE_TABLESPACE, space_id,
                                fsp_flags, space_name, tbl_name, filepath, true,
                                true, keyring_encryption_info);
@@ -1652,7 +1678,7 @@ std::pair<bool, space_id_t> dict_check_sys_tables(bool validate) {
       ib::warn(ER_IB_MSG_194) << "Ignoring tablespace " << id_name_t(space_name)
                               << " because it could not be opened.";
     } else {
-      if (is_space_keyring_v1_encrypted(space_id)) {
+      if (is_space_keyring_pre_v3_encrypted(space_id)) {
         ut_free(table_name.m_name);
         ut_free(space_name_from_dict);
         ut_free(filepath);
@@ -2127,7 +2153,7 @@ static const char *dict_load_table_low(table_name_t &name, const rec_t *rec,
                                  n_v_col, 0, flags, flags2);
 
   (*table)->id = table_id;
-  (*table)->set_file_readable();
+  (*table)->ibd_file_missing = false;
 
   return (nullptr);
 }
@@ -2255,7 +2281,7 @@ a foreign key references columns in this table.
 @param[in]	ignore_err	Error to be ignored when loading
                                 table and its index definition
 @return table, NULL if does not exist; if the table is stored in an
-.ibd file, but the file does not exist, then we set the file_unreadable
+.ibd file, but the file does not exist, then we set the ibd_file_missing
 flag in the table object we return. */
 dict_table_t *dict_load_table(const char *name, bool cached,
                               dict_err_ignore_t ignore_err) {
@@ -2307,7 +2333,7 @@ void dict_load_tablespace(dict_table_t *table, mem_heap_t *heap,
   if (table->flags2 & DICT_TF2_DISCARDED) {
     ib::warn(ER_IB_MSG_204)
         << "Tablespace for table " << table->name << " is set as discarded.";
-    table->set_file_unreadable();
+    table->ibd_file_missing = true;
     return;
   }
 
@@ -2405,7 +2431,7 @@ void dict_load_tablespace(dict_table_t *table, mem_heap_t *heap,
 
   if (err != DB_SUCCESS) {
     /* We failed to find a sensible tablespace file */
-    table->set_file_unreadable();
+    table->ibd_file_missing = true;
   }
 
   table->keyring_encryption_info = keyring_encryption_info;
@@ -2431,7 +2457,7 @@ key constraints are loaded into memory.
                                 constraints are loaded.
 @return table, NULL if does not exist; if the table is stored in an
 .ibd file, but the file does not exist, then we set the
-file_unreadable flag TRUE in the table object we return */
+ibd_file_missing flag TRUE in the table object we return */
 static dict_table_t *dict_load_table_one(table_name_t &name, bool cached,
                                          dict_err_ignore_t ignore_err,
                                          dict_names_t &fk_tables) {
@@ -2550,7 +2576,7 @@ static dict_table_t *dict_load_table_one(table_name_t &name, bool cached,
   transactions, the tablespace should exist, because DDL operations
   were not allowed while the table is being locked by a transaction. */
   dict_err_ignore_t index_load_err =
-      !(ignore_err & DICT_ERR_IGNORE_RECOVER_LOCK) && table->file_unreadable
+      !(ignore_err & DICT_ERR_IGNORE_RECOVER_LOCK) && table->ibd_file_missing
           ? DICT_ERR_IGNORE_ALL
           : ignore_err;
   err = dict_load_indexes(table, heap, index_load_err);
@@ -2625,7 +2651,7 @@ static dict_table_t *dict_load_table_one(table_name_t &name, bool cached,
   of the error condition, since the user may want to dump data from the
   clustered index. However we load the foreign key information only if
   all indexes were loaded. */
-  if (!cached || table->file_unreadable) {
+  if (!cached || table->ibd_file_missing) {
     /* Don't attempt to load the indexes from disk. */
   } else if (err == DB_SUCCESS) {
     err = dict_load_foreigns(table->name.m_name, nullptr, true, true,
@@ -2661,7 +2687,7 @@ func_exit:
   mem_heap_free(heap);
 
   ut_ad(!table || ignore_err != DICT_ERR_IGNORE_NONE ||
-        table->file_unreadable || !table->is_corrupted());
+        table->ibd_file_missing || !table->is_corrupted());
 
   if (table && table->fts) {
     /* We do not add fts tables to optimize thread

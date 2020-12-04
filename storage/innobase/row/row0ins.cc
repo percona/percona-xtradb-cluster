@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2020, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -705,11 +705,14 @@ static void row_ins_foreign_trx_print(trx_t *trx) /*!< in: transaction */
     return;
   }
 
-  lock_mutex_enter();
-  n_rec_locks = lock_number_of_rows_locked(&trx->lock);
-  n_trx_locks = UT_LIST_GET_LEN(trx->lock.trx_locks);
-  heap_size = mem_heap_get_size(trx->lock.lock_heap);
-  lock_mutex_exit();
+  {
+    /** lock_number_of_rows_locked() requires global exclusive latch, and so
+    does accessing trx_locks with trx->mutex */
+    locksys::Global_exclusive_latch_guard guard{};
+    n_rec_locks = lock_number_of_rows_locked(&trx->lock);
+    n_trx_locks = UT_LIST_GET_LEN(trx->lock.trx_locks);
+    heap_size = mem_heap_get_size(trx->lock.lock_heap);
+  }
 
   trx_sys_mutex_enter();
 
@@ -1498,7 +1501,7 @@ dberr_t row_ins_check_foreign_constraint(
     check_index = foreign->foreign_index;
   }
 
-  if (check_table == nullptr || !check_table->is_readable() ||
+  if (check_table == nullptr || check_table->ibd_file_missing ||
       check_index == nullptr) {
     if (!srv_read_only_mode && check_ref) {
       FILE *ef = dict_foreign_err_file;
@@ -2299,23 +2302,25 @@ of a clustered index entry.
 @param[in]	entry	index entry to insert
 @param[in]	big_rec	externally stored fields
 @param[in,out]	offsets	rec_get_offsets()
-@param[in,out]	heap	memory heap
-@param[in]	thd	client connection, or NULL
+@param[in,out]	heap	memory heap */
+#ifdef UNIV_DEBUG
+/**
+@param[in]	thd	client connection, or NULL */
+#endif /* UNIV_DEBUG */
+/**
 @param[in]	index	clustered index
 @return	error code
 @retval	DB_SUCCESS
 @retval DB_OUT_OF_FILE_SPACE */
-static dberr_t row_ins_index_entry_big_rec_func(
-    trx_t *trx,               /*!< in: current transaction */
-    const dtuple_t *entry,    /*!< in/out: index entry to insert */
-    const big_rec_t *big_rec, /*!< in: externally stored fields */
-    ulint *offsets,           /*!< in/out: rec offsets */
-    mem_heap_t **heap,        /*!< in/out: memory heap */
+static dberr_t row_ins_index_entry_big_rec_func(trx_t *trx,
+                                                const dtuple_t *entry,
+                                                const big_rec_t *big_rec,
+                                                ulint *offsets,
+                                                mem_heap_t **heap,
 #ifdef UNIV_DEBUG
-    const THD *thd,      /*!< in: connection, or NULL */
-#endif                   /* UNIV_DEBUG */
-    dict_index_t *index) /*!< in: index */
-{
+                                                const THD *thd,
+#endif /* UNIV_DEBUG */
+                                                dict_index_t *index) {
   mtr_t mtr;
   btr_pcur_t pcur;
   rec_t *rec;
@@ -2459,14 +2464,7 @@ and return. don't execute actual insert. */
   /* Note that we use PAGE_CUR_LE as the search mode, because then
   the function will return in both low_match and up_match of the
   cursor sensible values */
-  err = btr_pcur_open(index, entry, PAGE_CUR_LE, mode, &pcur, &mtr);
-
-  if (err != DB_SUCCESS) {
-    index->table->set_file_unreadable();
-    mtr.commit();
-    goto func_exit;
-  }
-
+  btr_pcur_open(index, entry, PAGE_CUR_LE, mode, &pcur, &mtr);
   cursor = btr_pcur_get_btr_cur(&pcur);
   cursor->thr = thr;
 
@@ -2910,9 +2908,9 @@ dberr_t row_ins_sec_index_entry_low(uint32_t flags, ulint mode,
     rtr_init_rtr_info(&rtr_info, false, &cursor, index, false);
     rtr_info_update_btr(&cursor, &rtr_info);
 
-    err = btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_RTREE_INSERT,
-                                      search_mode, &cursor, 0, __FILE__,
-                                      __LINE__, &mtr);
+    btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_RTREE_INSERT,
+                                search_mode, &cursor, 0, __FILE__, __LINE__,
+                                &mtr);
 
     if (mode == BTR_MODIFY_LEAF && rtr_info.mbr_adj) {
       mtr_commit(&mtr);
@@ -2926,9 +2924,9 @@ dberr_t row_ins_sec_index_entry_low(uint32_t flags, ulint mode,
 
       search_mode |= BTR_MODIFY_TREE;
 
-      err = btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_RTREE_INSERT,
-                                        search_mode, &cursor, 0, __FILE__,
-                                        __LINE__, &mtr);
+      btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_RTREE_INSERT,
+                                  search_mode, &cursor, 0, __FILE__, __LINE__,
+                                  &mtr);
       mode = BTR_MODIFY_TREE;
     }
 
@@ -2941,18 +2939,9 @@ dberr_t row_ins_sec_index_entry_low(uint32_t flags, ulint mode,
       ut_ad(cursor.page_cur.block != nullptr);
       ut_ad(cursor.page_cur.block->made_dirty_with_no_latch);
     } else {
-      err =
-          btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_LE, search_mode,
-                                      &cursor, 0, __FILE__, __LINE__, &mtr);
+      btr_cur_search_to_nth_level(index, 0, entry, PAGE_CUR_LE, search_mode,
+                                  &cursor, 0, __FILE__, __LINE__, &mtr);
     }
-  }
-
-  if (err != DB_SUCCESS) {
-    if (err == DB_IO_DECRYPT_FAIL) {
-      ib::warn(ER_XB_MSG_4, index->table_name);
-      index->table->set_file_unreadable();
-    }
-    goto func_exit;
   }
 
   if (cursor.flag == BTR_CUR_INSERT_TO_IBUF) {

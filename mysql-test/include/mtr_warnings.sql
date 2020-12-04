@@ -251,9 +251,11 @@ INSERT INTO global_suppressions VALUES
  ("\\[GCS\\] Error pushing message into group communication engine."),
  ("\\[GCS\\] Message cannot be sent because the member does not belong to a group."),
  ("\\[GCS\\] Automatically adding IPv. localhost address to the whitelist. It is mandatory that it is added."),
+ ("\\[GCS\\] Unable to bind to INADDR_ANY:.*"),
  ("\\[GCS\\] Unable to announce tcp port .*. Port already in use\\?"),
  ("\\[GCS\\] Error joining the group while waiting for the network layer to become ready."),
  ("\\[GCS\\] The member was unable to join the group. Local port: .*"),
+ ("Shutting down an outgoing connection. This happens because something might be wrong .*"),
  ("Member with address .* has become unreachable."),
  ("This server is not able to reach a majority of members in the group.*"),
  ("Member with address .* is reachable again."),
@@ -287,6 +289,7 @@ INSERT INTO global_suppressions VALUES
  */
  ("The transaction owned GTID is already in the gtid_executed table"),
 
+<<<<<<< HEAD
  /*
    Galera suppressions
  */
@@ -359,6 +362,14 @@ INSERT INTO global_suppressions VALUES
 -- PXC enabled log_verbosity=3 for mtr run so PXC needs it.
  ("Failed to set O_DIRECT "),
 
+||||||| 5b5a5d2584a
+=======
+ /*
+   TLS warnings
+ */
+ ("Channel mysql_main configured to support TLS"),
+
+>>>>>>> Percona-Server-8.0.21-12
  ("THE_LAST_SUPPRESSION");
 
 

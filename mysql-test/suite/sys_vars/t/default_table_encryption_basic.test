@@ -123,11 +123,21 @@ SELECT @@session.default_table_encryption;
 SET SESSION default_table_encryption=KEYRING_ON;
 SELECT @@session.default_table_encryption;
 
+<<<<<<< HEAD
 --Error ER_WRONG_VALUE_FOR_VAR
+||||||| 5b5a5d2584a
+=======
+--error ER_WRONG_ARGUMENTS
+>>>>>>> Percona-Server-8.0.21-12
 SET SESSION default_table_encryption=ONLINE_TO_KEYRING;
 SELECT @@session.default_table_encryption;
 
+<<<<<<< HEAD
 --Error ER_WRONG_VALUE_FOR_VAR
+||||||| 5b5a5d2584a
+=======
+--error ER_WRONG_ARGUMENTS
+>>>>>>> Percona-Server-8.0.21-12
 SET SESSION default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SELECT @@session.default_table_encryption;
 
@@ -141,11 +151,21 @@ SELECT @@global.default_table_encryption;
 SET PERSIST default_table_encryption=KEYRING_ON;
 SELECT @@global.default_table_encryption;
 
+<<<<<<< HEAD
 --Error ER_WRONG_VALUE_FOR_VAR
+||||||| 5b5a5d2584a
+=======
+--error ER_WRONG_ARGUMENTS
+>>>>>>> Percona-Server-8.0.21-12
 SET PERSIST default_table_encryption=ONLINE_TO_KEYRING;
 SELECT @@global.default_table_encryption;
 
+<<<<<<< HEAD
 --Error ER_WRONG_VALUE_FOR_VAR
+||||||| 5b5a5d2584a
+=======
+--error ER_WRONG_ARGUMENTS
+>>>>>>> Percona-Server-8.0.21-12
 SET PERSIST default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SELECT @@global.default_table_encryption;
 
@@ -180,11 +200,21 @@ SELECT @@global.default_table_encryption;
 SET PERSIST default_table_encryption=KEYRING_ON;
 SELECT @@global.default_table_encryption;
 
+<<<<<<< HEAD
 --Error ER_WRONG_VALUE_FOR_VAR
+||||||| 5b5a5d2584a
+=======
+--error ER_WRONG_ARGUMENTS
+>>>>>>> Percona-Server-8.0.21-12
 SET PERSIST default_table_encryption=ONLINE_TO_KEYRING;
 SELECT @@global.default_table_encryption;
 
+<<<<<<< HEAD
 --Error ER_WRONG_VALUE_FOR_VAR
+||||||| 5b5a5d2584a
+=======
+--error ER_WRONG_ARGUMENTS
+>>>>>>> Percona-Server-8.0.21-12
 SET PERSIST default_table_encryption=ONLINE_FROM_KEYRING_TO_UNENCRYPTED;
 SELECT @@global.default_table_encryption;
 

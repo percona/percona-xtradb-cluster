@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -77,6 +77,7 @@ enum options_mysqld {
   OPT_SSL_KEY,
   OPT_UPDATE_LOG,
   OPT_WANT_CORE,
+  OPT_COREDUMPER,
   OPT_LOG_ERROR,
   OPT_MAX_LONG_DATA_SIZE,
   OPT_PLUGIN_LOAD,
@@ -109,6 +110,7 @@ enum options_mysqld {
   OPT_RELAY_LOG_INFO_FILE,
   OPT_MASTER_INFO_FILE,
   OPT_LOG_BIN_USE_V1_ROW_EVENTS,
+<<<<<<< HEAD
   OPT_SLAVE_ROWS_SEARCH_ALGORITHMS
 #ifdef WITH_WSREP
   ,
@@ -118,6 +120,20 @@ enum options_mysqld {
   OPT_WSREP_START_POSITION,
   OPT_WSREP_RECOVER
 #endif /* WITH_WSREP */
+||||||| 5b5a5d2584a
+  OPT_SLAVE_ROWS_SEARCH_ALGORITHMS
+=======
+  OPT_SLAVE_ROWS_SEARCH_ALGORITHMS,
+  OPT_ADMIN_SSL_CA,
+  OPT_ADMIN_SSL_CAPATH,
+  OPT_ADMIN_SSL_CERT,
+  OPT_ADMIN_SSL_CIPHER,
+  OPT_ADMIN_TLS_CIPHERSUITES,
+  OPT_ADMIN_TLS_VERSION,
+  OPT_ADMIN_SSL_KEY,
+  OPT_ADMIN_SSL_CRL,
+  OPT_ADMIN_SSL_CRLPATH,
+>>>>>>> Percona-Server-8.0.21-12
 };
 
 #endif  // OPTIONS_MYSQLD_INCLUDED

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2006, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2006, 2020, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -343,7 +343,7 @@ ulonglong innobase_next_autoinc(
     ulonglong step,      /*!< in: AUTOINC increment step */
     ulonglong offset,    /*!< in: AUTOINC offset */
     ulonglong max_value) /*!< in: max value for type */
-    MY_ATTRIBUTE((pure, warn_unused_result));
+    MY_ATTRIBUTE((warn_unused_result));
 
 /**********************************************************************
 Check if the length of the identifier exceeds the maximum allowed.
@@ -418,16 +418,6 @@ InnoDB extended statistics should be collected.
 @return transaction object if statistics should be collected, or NULL. */
 MY_NODISCARD
 trx_t *innobase_get_trx_for_slow_log(void) noexcept;
-
-enum srv_encrypt_tables_values {
-  SRV_ENCRYPT_TABLES_OFF = 0,
-  SRV_ENCRYPT_TABLES_ON = 1,
-  SRV_ENCRYPT_TABLES_FORCE = 2,
-  SRV_ENCRYPT_TABLES_KEYRING_FORCE = 3,
-  SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING = 4,
-  SRV_ENCRYPT_TABLES_ONLINE_TO_KEYRING_FORCE = 5,
-  SRV_ENCRYPT_TABLES_ONLINE_FROM_KEYRING_TO_UNENCRYPTED = 6
-};
 
 extern bool innodb_inited;
 
