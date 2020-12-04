@@ -1,5 +1,6 @@
 #
-# Test ALTER TABLE hang due to Apply Monitor and MDL hang
+# Test to check that DMLs are blocked when there is an ongoing inplace ALTER
+# TABLE.
 #
 --source include/have_debug.inc
 --source include/have_debug_sync.inc
@@ -35,10 +36,6 @@ ALTER TABLE t1 ENGINE = InnoDB;
 
 --connection node_1
 SET DEBUG_SYNC = 'now WAIT_FOR alter_table_inplace_after_downgrade';
-
-# Enable the galera debug point
---let $galera_sync_point = simulate_low_process_size
---source include/galera_set_sync_point.inc
 
 --connection node_1_2
 --send INSERT INTO test.t1 VALUES(10)
@@ -81,7 +78,6 @@ RESET MASTER;
 --connection node_1_1
 SET DEBUG_SYNC = 'now WAIT_FOR alter_table_inplace_after_downgrade';
 
-# Galera debug point is already set
 --connection node_1_2
 --send INSERT INTO test.t1 VALUES(11)
 
@@ -126,7 +122,6 @@ SET SESSION wsrep_OSU_method = "RSU";
 --connection node_1_1
 SET DEBUG_SYNC = 'now WAIT_FOR alter_table_inplace_after_downgrade';
 
-# Galera debug point is already set
 --connection node_1_2
 --send INSERT INTO test.t1 VALUES(12)
 
@@ -227,7 +222,6 @@ CALL mtr.add_suppression("LOCK=NONE/SHARED is not supported for this operation. 
 --disconnect node_1_2
 --connection node_1
 --eval SET GLOBAL wsrep_sync_wait = $wsrep_sync_wait_saved;
---source include/galera_clear_sync_point.inc
 DROP TABLE t1;
 
 --source include/wait_until_count_sessions.inc

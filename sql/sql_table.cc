@@ -7945,6 +7945,7 @@ static bool mysql_inplace_alter_table(THD *thd,
     }
   }
 
+#ifdef WITH_WSREP
   DBUG_EXECUTE_IF("halt_alter_table_after_lock_downgrade",
                 {
                   const char act[]=
@@ -7953,6 +7954,7 @@ static bool mysql_inplace_alter_table(THD *thd,
                   DBUG_ASSERT(!debug_sync_set_action(thd,
                                                      STRING_WITH_LEN(act)));
                 };);
+#endif /* WITH_WSREP */
   DEBUG_SYNC(thd, "alter_table_inplace_after_lock_downgrade");
   THD_STAGE_INFO(thd, stage_alter_inplace);
 

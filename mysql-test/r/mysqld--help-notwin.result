@@ -1470,6 +1470,8 @@ The following options may be given as the first argument:
  Should slave thread do secondary index uniqueness chesks
  --wsrep-slave-threads=# 
  Number of slave appliers to launch
+ --wsrep-sst-allowed-methods=name 
+ SST methods accepted by server
  --wsrep-sst-auth=name 
  Authentication for SST connection
  --wsrep-sst-donor=name 
@@ -1905,6 +1907,7 @@ wsrep-retry-autocommit 1
 wsrep-slave-FK-checks TRUE
 wsrep-slave-UK-checks FALSE
 wsrep-slave-threads 1
+wsrep-sst-allowed-methods mysqldump,rsync,skip,xtrabackup,xtrabackup-v2
 wsrep-sst-auth (No default value)
 wsrep-sst-donor 
 wsrep-sst-donor-rejects-queries FALSE
