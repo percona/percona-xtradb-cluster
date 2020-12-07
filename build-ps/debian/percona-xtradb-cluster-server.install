@@ -56,5 +56,5 @@ libgalera_smm.so usr/lib/galera4
 lib/systemd/system/mysql.service
 lib/systemd/system/mysql@.service
 #private shared libs
-usr/lib/mysql/private/libprotobuf-lite.so.3.6.1
-usr/lib/mysql/private/libprotobuf.so.3.6.1
+usr/lib/mysql/private/libprotobuf-lite.so.*
+usr/lib/mysql/private/libprotobuf.so.*
