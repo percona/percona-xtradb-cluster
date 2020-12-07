@@ -75,7 +75,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 4.3 
+ %define galera_version 4.5
 %endif
 
 %if %{undefined galera_revision}
@@ -654,14 +654,14 @@ mkdir debug
   # Attempt to remove any optimisation flags from the debug build
   CFLAGS=`echo " ${CFLAGS} " | \
             sed -e 's/ -O[0-9]* / /' \
-                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
+                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
                 -e 's/ -unroll2 / /' \
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
                 -e 's/ $//'`
   CXXFLAGS=`echo " ${CXXFLAGS} " | \
               sed -e 's/ -O[0-9]* / /' \
-                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
+                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ -Wno-missing-field-initializers -Wno-error /' \
                   -e 's/ -unroll2 / /' \
                   -e 's/ -ip / /' \
                   -e 's/^ //' \
@@ -875,6 +875,8 @@ install -m 644 "%{malloc_lib_source}" \
 rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
 rm -f $RBR%{_bindir}/ps_tokudb_admin
 rm -f $RBR%{_bindir}/ps-admin
+rm -rf $RBR/usr/cmake/coredumper-relwithdebinfo.cmake
+rm -rf $RBR/usr/cmake/coredumper.cmake
 
 %if 0%{?systemd}
   rm -rf $RBR%{_sysconfdir}/init.d/mysql
@@ -916,8 +918,6 @@ install -m 644 $MBD/%{galera_src_dir}/asio/LICENSE_1_0.txt    \
     $RBR%{galera_docs}/LICENSE.asio
 install -m 644 $MBD/%{galera_src_dir}/www.evanjones.ca/LICENSE \
     $RBR%{galera_docs}/LICENSE.crc32c
-install -m 644 $MBD/%{galera_src_dir}/chromium/LICENSE       \
-    $RBR%{galera_docs}/LICENSE.chromium
 
 install -d $RBR%{galera_docs2}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
@@ -1472,8 +1472,8 @@ fi
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
 %dir %{_libdir}/mysql/private
-%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.6.1
-%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.6.1
+%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.*
+%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.*
 %if 0%{?systemd} == 0
 %attr(755, root, root) %{_sbindir}/rcmysql
 %endif
@@ -1521,7 +1521,6 @@ fi
 %doc %attr(0644,root,root) %{galera_docs}/README-MySQL
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.crc32c
-%doc %attr(0644,root,root) %{galera_docs}/LICENSE.chromium
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d
 
@@ -1570,6 +1569,9 @@ fi
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/mysql/libperconaserver*.so*
+#coredumper
+%attr(755, root, root) %{_includedir}/coredumper/coredumper.h
+%attr(755, root, root) /usr/lib/libcoredumper.a
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-garbd
