@@ -9487,6 +9487,9 @@ ER_DTE_ENCRYPTION_THREADS_ACTIVE
 ER_PXC_GR_INIT
   eng "%s"
 
+ER_WRAPPED_UDF_EXCEPTION
+  eng "Wrapped UDF exception in function '%-.192s'; %-.80s"
+
 #
 # End of Percona Server 8.0 client messages
 #
