@@ -30,6 +30,11 @@ usr/bin/mysql-systemd
 debian/extra/mysql.cnf  etc/mysql/
 debian/extra/mysqld.cnf /etc/mysql/mysql.conf.d/
 debian/extra/mysql.bootstrap etc/default/
+
+# AppArmor profile
+debian/extra/apparmor.d/usr.sbin.mysqld.in etc/apparmor.d/
+debian/extra/apparmor.d/local/usr.sbin.mysqld.in etc/apparmor.d/local/
+
 usr/share/man/man1/ibd2sdi.1
 usr/share/man/man1/lz4_decompress.1
 usr/share/man/man1/mysql_ssl_rsa_setup.1
