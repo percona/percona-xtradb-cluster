@@ -34,6 +34,7 @@ debian/extra/mysql.bootstrap etc/default/
 # AppArmor profile
 debian/extra/apparmor.d/usr.sbin.mysqld.in etc/apparmor.d/
 debian/extra/apparmor.d/local/usr.sbin.mysqld.in etc/apparmor.d/local/
+debian/extra/apparmor.d/usr.bin.wsrep_sst_xtrabackup-v2.in etc/apparmor.d/
 
 usr/share/man/man1/ibd2sdi.1
 usr/share/man/man1/lz4_decompress.1

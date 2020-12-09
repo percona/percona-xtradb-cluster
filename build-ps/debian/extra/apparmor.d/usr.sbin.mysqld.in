@@ -40,7 +40,7 @@
   /run/mysqld/mysqlx.sock.lock rw,
 
 # Allow systemd notify messages
-  /{,var/}run/systemd/notify w,
+  /{,var/}run/systemd/notify rw,
 
 # Allow execution of server binary
   /usr/sbin/mysqld mr,
@@ -78,78 +78,14 @@
 ################################################################################
 # Percona XtraDB Cluster specific
 
-  # wsrep_sst script
-  # It would be easier to grant access to /usr/bin/** ixrw, but that will cause
-  # hardening to be weaker.
-
-  # By default Ubuntu uses Dash
-  /bin/dash ix,
-  /bin/bash ix,
+  /bin/?ash ix,
   /bin/sh ix,
-  /bin/grep ix,
-  /bin/rm ixr,
-  /bin/mktemp ixr,
-  /bin/ps ixr,
-  /bin/sleep ix,
-  /bin/ls ix,
-  /bin/cat ixr,
-  /bin/mkdir ixr,
 
-  /{,usr/}bin/wsrep* ixrw,
-  /{,usr/}bin/dirname ix,
-  /{,usr/}bin/cut ix,
-  /{,usr/}bin/which ixr,
-
-  /{,usr/}bin/gawk ix,
-  /{,usr/}bin/awk ix,
-  /{,usr/}bin/my_print_defaults ix,
-  /{,usr/}bin/tail ix, 
-  /{,usr/}bin/head ix,
-  /{,usr/}bin/tr ix,
-  /{,usr/}bin/touch ix,
-  /{,usr/}bin/id ix,
-  /{,usr/}bin/timeout ix,
-  /{,usr/}bin/socat ix,
-  /{,usr/}bin/expr ixr,
-  /{,usr/}bin/fold ixr,
-  /{,usr/}bin/basename ixr,
-  /{,usr/}bin/perl ix,
-  /{,usr/}bin/find ixr,
-  /{,usr/}bin/mysqladmin ixr,
-  /{,usr/}bin/mysql ixr,
-  /{,usr/}bin/openssl ixr,
-  /{,usr/}bin/diff ixr,
-  /{,usr/}bin/pxc_extra/** ixr,
-
-  /{,usr/}sbin/mysqld ix,
-
-  /dev/tty wr,
-
-  # It would be easier to grant access to /proc/** ixrw, but that will cause
-  # hardening to be weaker.
-
-  /proc/*/net/tcp r,
-  /proc/*/net/tcp6 r,
-  /proc/sys/vm/min/_free_kbytes r,
-  /proc/*/exe r,
-  /proc/*/cmdline r,
-  /proc/cpuinfo r,
-  /proc/*/fd/ ixr,
-  /proc/*/fd/** ixr,
-  /proc/*/stat r,
-  /proc/sys/kernel/osrelease r,  
-
-  # Needed only by debug builds?
-#  /proc/sys/kernel/pid_max r,  
-#  /proc/ r,
-#  /proc/uptime r,
-#  /usr/share/perl/** r,
-
-#  ptrace (trace) peer=/usr/sbin/mysqld,
+  /{,usr/}bin/wsrep_sst_* PUx,
 
 ################################################################################
-
 
   # Site-specific additions and overrides. See local/README for details.
   #include <local/usr.sbin.mysqld>
 }
+
