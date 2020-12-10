@@ -1,0 +1,60 @@
+module percona-xtradb-cluster 1.0;
+
+require {
+	type mysqld_t;
+	type mysqld_tmp_t;
+	# type mysqld_port_t;
+	type kerberos_port_t;
+	type sysctl_vm_t;
+
+	class capability dac_override;
+	class process setpgid;
+	class tcp_socket name_bind;
+
+	class unix_dgram_socket sendto;
+
+	class unix_stream_socket connectto;
+
+	class file {open read};
+
+	class sock_file { create unlink write};
+}
+
+#============= mysqld_t ==============
+# 2. 7. 8. posix_spawnp is used by wsrep_utils.c process::execute()
+allow mysqld_t self:capability dac_override;
+allow mysqld_t self:process setpgid;
+
+# 3. sst uses socat
+#!!!! This avc can be allowed using the boolean 'nis_enabled'
+allow mysqld_t kerberos_port_t:tcp_socket name_bind;
+
+# 4. socat send problems
+allow mysqld_t self:unix_dgram_socket sendto;
+
+# 5. 6. IST needs 4568 port open <<-- need to move it somewhere else
+# https://danwalsh.livejournal.com/10607.html
+# this labeling should be done in %post install phase  in .spec file
+# or we can use more general rule here
+# semanage port -a -t mysqld_port_t  -p tcp 4568
+
+# 9. SST script connection error to DB on donor side
+# TODO: this probably can be narrowed like
+# allow mysqld_t mysqld_var_run_t:unix_stream_socket connectto;
+# !!!! This avc can be allowed using the boolean 'daemons_enable_cluster_mode'
+allow mysqld_t self:unix_stream_socket connectto;
+
+# 10. 11. sst script needs access to /proc filesystem
+allow mysqld_t sysctl_vm_t:file {open read};
+
+# 13. Joinder script - mysql update part - socket creation
+allow mysqld_t mysqld_tmp_t:sock_file { create unlink };
+
+# 14. Joinder script - mysql update part - write to socket
+allow mysqld_t mysqld_tmp_t:sock_file write;
+
+# Note: Maybe it is possible to give this socket some narrow context and then allow mysqld to access it?
+# !!!! This avc can be allowed using the boolean 'daemons_enable_cluster_mode'
+# we have it in 9.
+# allow mysqld_t self:unix_stream_socket connectto;
+

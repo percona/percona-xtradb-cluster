@@ -359,6 +359,16 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
+Requires:             selinux-policy
+Requires:		policycoreutils
+Requires(pre):		policycoreutils
+Requires(post):		policycoreutils
+Requires(postun):       policycoreutils
+%if 0%{?rhel} == 6
+BuildRequires: 		selinux-policy
+%else
+BuildRequires: 		selinux-policy-devel
+%endif
 %if 0%{?compatlib}
 Requires:             percona-xtradb-cluster-shared-compat = %{version}-%{release}
 %endif
@@ -811,6 +821,12 @@ install -d -m 0755 %{buildroot}/var/run/mysqld
 install -d -m 0755 %{buildroot}/var/run/mysqlrouter
 install -d -m 0755 %{buildroot}/var/log/mysqlrouter
 
+# SElinux
+pushd $MBD/build-ps/rpm/selinux
+make -f /usr/share/selinux/devel/Makefile
+install -D -m 0644 $MBD/build-ps/rpm/selinux/percona-xtradb-cluster.pp %{buildroot}%{_datadir}/selinux/percona-xtradb-cluster.pp
+popd
+# SElinux END
 
 (
   cd $MBD/release
@@ -1222,6 +1238,12 @@ if [ -f /etc/redhat-release ] \
   echo
 fi
 
+# ----------------------------------------------------------------------
+# install PXC specific SELinux files
+# ----------------------------------------------------------------------
+/usr/sbin/semodule -i %{_datadir}/selinux/percona-xtradb-cluster.pp >/dev/null 2>&1 || :
+semanage port -a -t mysqld_port_t  -p tcp 4568
+
 if [ -x sbin/restorecon ] ; then
   sbin/restorecon -R var/lib/mysql
 fi
@@ -1519,6 +1541,9 @@ fi
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.chromium
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d
+
+%dir %attr(755, root, root) %{_datadir}/selinux
+%attr(644, root, root) %{_datadir}/selinux/percona-xtradb-cluster.pp
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-client
