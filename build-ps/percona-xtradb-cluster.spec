@@ -824,7 +824,8 @@ install -d -m 0755 %{buildroot}/var/log/mysqlrouter
 # SElinux
 pushd $MBD/build-ps/rpm/selinux
 make -f /usr/share/selinux/devel/Makefile
-install -D -m 0644 $MBD/build-ps/rpm/selinux/percona-xtradb-cluster.pp %{buildroot}%{_datadir}/selinux/percona-xtradb-cluster.pp
+install -D -m 0644 $MBD/build-ps/rpm/selinux/percona-xtradb-cluster.pp %{buildroot}%{_datadir}/percona-xtradb-cluster/selinux/percona-xtradb-cluster.pp
+install -D -m 0644 $MBD/build-ps/rpm/selinux/wsrep-sst-xtrabackup-v2.pp %{buildroot}%{_datadir}/percona-xtradb-cluster/selinux/wsrep-sst-xtrabackup-v2.pp
 popd
 # SElinux END
 
@@ -1241,7 +1242,8 @@ fi
 # ----------------------------------------------------------------------
 # install PXC specific SELinux files
 # ----------------------------------------------------------------------
-/usr/sbin/semodule -i %{_datadir}/selinux/percona-xtradb-cluster.pp >/dev/null 2>&1 || :
+/usr/sbin/semodule -i %{_datadir}/percona-xtradb-cluster/selinux/percona-xtradb-cluster.pp >/dev/null 2>&1 || :
+/usr/sbin/semodule -i %{_datadir}/percona-xtradb-cluster/selinux/wsrep-sst-xtrabackup-v2.pp >/dev/null 2>&1 || :
 semanage port -a -t mysqld_port_t  -p tcp 4568
 
 if [ -x sbin/restorecon ] ; then
@@ -1485,6 +1487,8 @@ fi
 # Explicit %attr() mode not applicaple to symlink
 %attr(755, root, root) %{_bindir}/lz4_decompress
 %attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
+#KH:
+%attr(755, root, root) %{_bindir}/zlib_decompress
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
@@ -1542,8 +1546,9 @@ fi
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d
 
-%dir %attr(755, root, root) %{_datadir}/selinux
-%attr(644, root, root) %{_datadir}/selinux/percona-xtradb-cluster.pp
+%dir %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/selinux
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/selinux/percona-xtradb-cluster.pp
+%attr(644, root, root) %{_datadir}/percona-xtradb-cluster/selinux/wsrep-sst-xtrabackup-v2.pp
 
 # ----------------------------------------------------------------------------
 %files -n percona-xtradb-cluster-client
