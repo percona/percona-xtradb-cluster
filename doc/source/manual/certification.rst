@@ -126,7 +126,7 @@ The following happens if two nodes get ready with their packet at same time:
   * Node 1: ``update i = i + 10;``
   * Node 2: ``update i = i + 100;``
 
-  Let's associate transaction ID (``trx-id``) for an update transaction
+  Let's associate transaction ID (``trx_id``) for an update transaction
   that is executed on Node 1 and Node 2 in parallel.
   Although the real algorithm is more involved (with ``uuid`` + ``seqno``),
   it is conceptually the same, so we are using ``trx_id``.
