@@ -943,11 +943,26 @@ max_fast_restarts=5
 # flag whether a usable sleep command exists
 have_sleep=1
 
+# maximum number of wsrep restarts
+max_wsrep_restarts=0
+
 while true
 do
   start_time=`date +%M%S`
 
-  eval_log_error "$cmd"
+  # this sets wsrep_start_position_opt
+  wsrep_recover_position "$cmd"
+
+  [ $? -ne 0 ] && exit 1 #
+
+  [ -n "$wsrep_urls" ] && url=`wsrep_pick_url $wsrep_urls` # check connect address
+
+  if [ -z "$url" ]
+  then
+    eval_log_error "$cmd $wsrep_start_position_opt $nohup_redir"
+  else
+    eval_log_error "$cmd $wsrep_start_position_opt --wsrep_cluster_address=$url $nohup_redir"
+  fi
 
   # hypothetical: log was renamed but not
   # flushed yet. we'd recreate it with
