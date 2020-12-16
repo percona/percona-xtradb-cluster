@@ -1,0 +1,14 @@
+# Test SHOW INDEXES statement when binlog is disabled
+
+--source include/galera_cluster.inc
+
+--connection node_1
+--let $assert_text=node_1 binlog should be disabled
+--let $log_bin = query_get_value(SHOW VARIABLES LIKE 'log_bin', Value, 1)
+--let $assert_cond= "$log_bin" = "OFF"
+--source include/assert.inc
+
+CREATE TABLE t1 (a INT PRIMARY KEY, b INT, UNIQUE KEY bkey (b));
+SHOW INDEXES FROM t1;
+
+DROP TABLE t1;
