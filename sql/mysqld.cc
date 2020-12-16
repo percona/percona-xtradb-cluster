@@ -6428,7 +6428,8 @@ static int init_server_components() {
   if (wsrep_init_server()) unireg_abort(MYSQLD_ABORT_EXIT);
 
   if (!wsrep_recovery) {
-    if (pxc_encrypt_cluster_traffic && !opt_initialize) {
+    if (pxc_encrypt_cluster_traffic && !opt_initialize &&
+        !is_help_or_validate_option()) {
       bool bootstrap = (wsrep_new_cluster ||
                         (strcmp(wsrep_cluster_address, "gcomm://") == 0));
       if (TLS_channel::singleton_init(&mysql_main, mysql_main_channel,
