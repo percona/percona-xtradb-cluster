@@ -218,9 +218,8 @@ int thd_non_transactional_update(const THD *thd) {
 
 int thd_binlog_format(const THD *thd) {
 #ifdef WITH_WSREP
-  if ((WSREP(thd) && wsrep_emulate_bin_log) ||
-      ((mysql_bin_log.is_open()) &&
-       (thd->variables.option_bits & OPTION_BIN_LOG)))
+  if (((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()) &&
+      (thd->variables.option_bits & OPTION_BIN_LOG))
     return (int)thd->variables.binlog_format;
 #else
   if (mysql_bin_log.is_open() && (thd->variables.option_bits & OPTION_BIN_LOG))
