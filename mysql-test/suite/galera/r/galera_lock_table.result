@@ -38,3 +38,28 @@ use mysql;
 select count(*) from wsrep_cluster;
 count(*)
 1
+SET GLOBAL wsrep_provider='none';
+include/assert.inc [No backup locks expected]
+LOCK TABLES FOR BACKUP;
+include/assert.inc [One backup lock expected]
+BEGIN;
+SET GLOBAL log_bin='wrong value';
+ERROR HY000: Variable 'log_bin' is a read only variable
+SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE='BACKUP TABLES';
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+include/assert.inc [One backup lock expected]
+UNLOCK TABLES;
+include/assert.inc [No backup locks expected]
+ROLLBACK;
+include/assert.inc [No backup locks expected]
+LOCK INSTANCE FOR BACKUP;
+include/assert.inc [One backup lock expected]
+BEGIN;
+SET GLOBAL log_bin='wrong value';
+ERROR HY000: Variable 'log_bin' is a read only variable
+SELECT COUNT(*) FROM performance_schema.metadata_locks WHERE OBJECT_TYPE='BACKUP LOCK';
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+include/assert.inc [One backup lock expected]
+UNLOCK INSTANCE;
+include/assert.inc [No backup locks expected]
+ROLLBACK;

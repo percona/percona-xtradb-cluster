@@ -1389,7 +1389,9 @@ bool do_command(THD *thd) {
   if (wsrep_before_command(thd)) {
     thd->store_globals();
     WSREP_LOG_THD(thd, "enter found BF aborted");
-    DBUG_ASSERT(!thd->mdl_context.has_locks());
+    /* We don't expect stmt/transactional locks. Explicit locks are allowed */
+    DBUG_ASSERT(!thd->mdl_context.has_stmt_locks());
+    DBUG_ASSERT(!thd->mdl_context.has_transactional_locks());
     DBUG_ASSERT(!thd->get_stmt_da()->is_set());
     /* We let COM_QUIT and COM_STMT_CLOSE to execute even if wsrep aborted. */
     if (command != COM_STMT_CLOSE && command != COM_QUIT) {
