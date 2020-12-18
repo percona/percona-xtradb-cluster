@@ -505,6 +505,20 @@ get_transfer()
             if compare_versions "$SOCAT_VERSION" ">=" "1.7.3"; then
                 donor_extra=',commonname=""'
             fi
+
+            # PXC-3508 : If 'ssl_dhparams' option has been set, then always add it
+            # to the socat command (both donor and joiner)
+            if [[ $encrypt -eq 2 || $encrypt -eq 3 ]]; then
+                if [[ -n $ssl_dhparams ]]; then
+                    if [[ ! $donor_extra =~ dhparam= ]]; then
+                        donor_extra+=",dhparam=$ssl_dhparams"
+                    fi
+                    if [[ ! $joiner_extra =~ dhparam= ]]; then
+                        joiner_extra+=",dhparam=$ssl_dhparams"
+                    fi
+                fi
+            fi
+
         fi
 
         # prepend a comma if it's not already there
