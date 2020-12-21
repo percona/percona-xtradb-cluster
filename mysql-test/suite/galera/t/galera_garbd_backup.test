@@ -12,6 +12,9 @@ CALL mtr.add_suppression("State transfer to .*");
 CALL mtr.add_suppression("Process completed with error:.*");
 CALL mtr.add_suppression("Command did not run:.*");
 CALL mtr.add_suppression("WSREP-SST.*");
+CALL mtr.add_suppression("SST start failed");
+CALL mtr.add_suppression("SST failed");
+CALL mtr.add_suppression("Invalid sst_request");
 
 --connection node_2
 CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
@@ -19,6 +22,9 @@ CALL mtr.add_suppression("State transfer to .*");
 CALL mtr.add_suppression("Process completed with error:.*");
 CALL mtr.add_suppression("Command did not run:.*");
 CALL mtr.add_suppression("WSREP-SST.*");
+CALL mtr.add_suppression("SST start failed");
+CALL mtr.add_suppression("SST failed");
+CALL mtr.add_suppression("Invalid sst_request");
 
 --exec `chmod +x "$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh"`
 

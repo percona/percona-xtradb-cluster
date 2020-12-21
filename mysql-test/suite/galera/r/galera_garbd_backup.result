@@ -6,11 +6,17 @@ CALL mtr.add_suppression("State transfer to .*");
 CALL mtr.add_suppression("Process completed with error:.*");
 CALL mtr.add_suppression("Command did not run:.*");
 CALL mtr.add_suppression("WSREP-SST.*");
+CALL mtr.add_suppression("SST start failed");
+CALL mtr.add_suppression("SST failed");
+CALL mtr.add_suppression("Invalid sst_request");
 CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
 CALL mtr.add_suppression("State transfer to .*");
 CALL mtr.add_suppression("Process completed with error:.*");
 CALL mtr.add_suppression("Command did not run:.*");
 CALL mtr.add_suppression("WSREP-SST.*");
+CALL mtr.add_suppression("SST start failed");
+CALL mtr.add_suppression("SST failed");
+CALL mtr.add_suppression("Invalid sst_request");
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE
 2
