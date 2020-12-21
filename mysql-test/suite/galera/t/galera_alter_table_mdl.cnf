@@ -3,5 +3,11 @@
 [mysqld.1]
 log_slave_updates
 
+# Since the DML in the test can fail certification if DML is executed after
+# ALTER TABLE releases the MDL and before it calls `wsrep_to_isolation_end()`,
+# we set wsrep_retry_autocommit to satisfy assert_binlog_events.inc used in the
+# test file.
+wsrep_retry_autocommit=20
+
 [mysqld.2]
 log_slave_updates

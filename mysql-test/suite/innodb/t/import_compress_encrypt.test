@@ -13,6 +13,8 @@
 call mtr.add_suppression("Resizing redo log");
 call mtr.add_suppression("Starting to delete and rewrite log files");
 call mtr.add_suppression("New log files created");
+# zipped datadir doesn't have perfschema table 'performance_schema.pxc_cluster_view' 
+call mtr.add_suppression("Native table .* has the wrong structure");
 --enable_query_log
 
 --echo # SETUP

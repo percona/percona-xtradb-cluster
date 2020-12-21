@@ -7,7 +7,6 @@ CREATE TABLE t1 (a INTEGER PRIMARY KEY);
 # Adding debug point 'halt_alter_table_after_lock_downgrade' to @@GLOBAL.debug
 ALTER TABLE t1 ENGINE = InnoDB;
 SET DEBUG_SYNC = 'now WAIT_FOR alter_table_inplace_after_downgrade';
-SET GLOBAL wsrep_provider_options = 'dbug=d,simulate_low_process_size';
 INSERT INTO test.t1 VALUES(10);
 SET SESSION wsrep_sync_wait = 0;
 include/assert.inc [INSERT query should be waiting for the metadata lock.]
@@ -140,5 +139,4 @@ CALL mtr.add_suppression("LOCK=NONE is not supported for this operation. Try LOC
 CALL mtr.add_suppression("LOCK=NONE is not supported. Reason: COPY algorithm requires a lock. Try LOCK=SHARED.");
 CALL mtr.add_suppression("LOCK=NONE/SHARED is not supported for this operation. Try LOCK=EXCLUSIVE.");
 SET GLOBAL wsrep_sync_wait = 15;;
-SET GLOBAL wsrep_provider_options = 'dbug=';
 DROP TABLE t1;
