@@ -296,7 +296,7 @@ wsrep_recover_position() {
 
   eval_log_error "$mysqld_cmd --wsrep_recover $wr_options"
 
-  local rp="$(grep 'WSREP: Recovered position:' $wr_logfile)"
+  local rp="$(grep '\[WSREP\] Recovered position:' $wr_logfile)"
   if [ -z "$rp" ]; then
     local skipped="$(grep WSREP $wr_logfile | grep 'skipping position recovery')"
     if [ -z "$skipped" ]; then
@@ -306,7 +306,7 @@ wsrep_recover_position() {
       log_notice "WSREP: Position recovery skipped"
     fi
   else
-    local start_pos="$(echo $rp | sed 's/.*WSREP\:\ Recovered\ position://' \
+    local start_pos="$(echo $rp | sed 's/.*WSREP\]\ Recovered\ position://' \
         | sed 's/^[ \t]*//')"
     log_notice "WSREP: Recovered position $start_pos"
     wsrep_start_position_opt="--wsrep_start_position=$start_pos"
