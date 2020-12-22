@@ -31,6 +31,7 @@
 #include <cstdlib>
 #include "log_event.h"
 #include <rpl_slave.h>
+<<<<<<< HEAD
 #include "sql_base.h"		// TEMP_PREFIX 
 #include "rpl_msr.h"           // channel_map
 #ifdef HAVE_PSI_INTERFACE
@@ -41,6 +42,12 @@
 #endif /* HAVE_PSI_INTERFACE */
 
 #include "debug_sync.h"
+||||||| merged common ancestors
+#include "rpl_msr.h"            // channel_map
+=======
+#include "rpl_msr.h"            // channel_map
+#include "debug_sync.h"
+>>>>>>> wsrep_5.7.31-25.23
 
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
@@ -780,11 +787,14 @@ wsrep_view_handler_cb (void*                    app_ctx,
     {
       if (wsrep_before_SE())
       {
-        wsrep_SE_init_grab();
         // Signal mysqld init thread to continue
         wsrep_sst_complete (&cluster_uuid, view->state_id.seqno, false);
         // and wait for SE initialization
-        wsrep_SE_init_wait(thd);
+        if (wsrep_SE_init_wait(thd) == WSREP_SE_INIT_RESULT_FAILURE)
+        {
+            WSREP_ERROR("Storage engine initialization failed.");
+            return WSREP_CB_FAILURE;
+        }
       }
       else
       {
@@ -890,12 +900,13 @@ static void wsrep_synced_cb(void* app_ctx)
 
   if (signal_main)
   {
-      wsrep_SE_init_grab();
-      // Signal mysqld init thread to continue
-      wsrep_sst_complete (&local_uuid, local_seqno, false);
-      // and wait for SE initialization
-      /* we don't have recv_ctx (THD*) here */
-      wsrep_SE_init_wait(current_thd);
+    // Signal mysqld init thread to continue
+    wsrep_sst_complete (&local_uuid, local_seqno, false);
+    // And wait for SE initialization. Return immediately in
+    // case of failure, the server is going to shut down.
+    /* we don't have recv_ctx (THD*) here */
+    if (wsrep_SE_init_wait(current_thd) == WSREP_SE_INIT_RESULT_FAILURE)
+      return;
   }
   if (wsrep_restart_slave_activated)
   {
@@ -1279,6 +1290,7 @@ void wsrep_init_startup (bool first)
 
 void wsrep_deinit()
 {
+  wsrep_sst_auth_free();
   wsrep_unload(wsrep);
   wsrep= 0;
   provider_name[0]=    '\0';
@@ -1957,14 +1969,22 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
     return true;
 
   case SQLCOM_CREATE_TRIGGER:
+  case SQLCOM_DROP_TRIGGER:
 
+<<<<<<< HEAD
 #if 0
     /* Trigger statement is invoked with table_list with length = 1 */
     DBUG_ASSERT(!table_list);
 #endif
     DBUG_ASSERT(first_table);
+||||||| merged common ancestors
+    DBUG_ASSERT(!table_list);
+    DBUG_ASSERT(first_table);
+=======
+    DBUG_ASSERT(table_list);
+>>>>>>> wsrep_5.7.31-25.23
 
-    if (find_temporary_table(thd, first_table))
+    if (find_temporary_table(thd, table_list))
     {
       return false;
     }
@@ -2358,6 +2378,7 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
     switch (thd->variables.wsrep_OSU_method) {
     case WSREP_OSU_TOI:
       ret= wsrep_TOI_begin(thd, db_, table_, table_list, alter_info);
+      DEBUG_SYNC(thd, "wsrep_after_toi_begin");
       break;
     case WSREP_OSU_RSU:
       ret= wsrep_RSU_begin(thd, db_, table_);

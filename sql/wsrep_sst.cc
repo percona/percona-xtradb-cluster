@@ -29,6 +29,7 @@
 #include "wsrep_xid.h"
 #include <cstdio>
 #include <cstdlib>
+<<<<<<< HEAD
 #include "log_event.h"
 #include <rpl_slave.h>
 #include "sql_base.h"           // TEMP_PREFIX
@@ -103,6 +104,10 @@ static const char *sst_method_allowed_chars_regex_pattern=
     "^[[:alnum:]:/._<>-]+$";
 static Regex sst_method_allowed_chars_regex;
 
+||||||| merged common ancestors
+=======
+#include <cctype>
+>>>>>>> wsrep_5.7.31-25.23
 
 extern const char wsrep_defaults_file[];
 extern const char wsrep_defaults_group_suffix[];
@@ -293,6 +298,14 @@ void wsrep_sst_auth_init (const char* value)
 {
     if (wsrep_sst_auth == value) wsrep_sst_auth = NULL;
     if (value) sst_auth_real_set (value);
+}
+
+void wsrep_sst_auth_free()
+{
+  if (wsrep_sst_auth) { my_free ((void*)wsrep_sst_auth); }
+  if (sst_auth_real) { free (const_cast<char*>(sst_auth_real)); }
+  wsrep_sst_auth= NULL;
+  sst_auth_real= NULL;
 }
 
 bool  wsrep_sst_donor_check (sys_var *self, THD* thd, set_var* var)
@@ -927,7 +940,7 @@ static ssize_t sst_prepare_mysqldump (const char*  addr_in,
   return ret;
 }
 
-static bool SE_initialized = false;
+static enum Wsrep_SE_init_result SE_initialized= WSREP_SE_INIT_RESULT_NONE;
 
 ssize_t wsrep_sst_prepare (void** msg, THD* thd)
 {
@@ -1466,6 +1479,7 @@ static int sst_donate_other (const char*   method,
   return arg.err;
 }
 
+<<<<<<< HEAD
 /*
   Validate SST request string.
   The protocol is: method\0data\0
@@ -1538,12 +1552,45 @@ struct StringBuilder : public std::unary_function<char, void> {
   std::ostringstream &ss_;
 };
 
+||||||| merged common ancestors
+=======
+/* return true if character can be a part of a filename */
+static bool filename_char(int const c)
+{
+  return isalnum(c) || (c == '-') || (c == '_') || (c == '.');
+}
+
+/* return true if character can be a part of an address string */
+static bool address_char(int const c)
+{
+  return filename_char(c) ||
+         (c == ':') || (c == '[') || (c == ']') || (c == '/');
+}
+
+static bool check_request_str(const char* const str,
+                              bool (*check) (int c))
+{
+  for (size_t i(0); str[i] != '\0'; ++i)
+  {
+    if (!check(str[i]))
+    {
+      WSREP_WARN("Illegal character in state transfer request: %i (%c).",
+                 str[i], str[i]);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+>>>>>>> wsrep_5.7.31-25.23
 wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
                                        const void* msg, size_t msg_len,
                                        const wsrep_gtid_t* current_gtid,
                                        const char* state, size_t state_len,
                                        bool bypass)
 {
+<<<<<<< HEAD
   /* This will be reset when sync callback is called.
    * Should we set wsrep_ready to FALSE here too? */
 //  wsrep_notify_status(WSREP_MEMBER_DONOR);
@@ -1559,18 +1606,46 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
     return WSREP_CB_FAILURE;
   }
 
+||||||| merged common ancestors
+  /* This will be reset when sync callback is called.
+   * Should we set wsrep_ready to FALSE here too? */
+  local_status.set(WSREP_MEMBER_DONOR);
+
+=======
+>>>>>>> wsrep_5.7.31-25.23
   const char* method = (char*)msg;
   size_t method_len  = strlen (method);
+
+  if (check_request_str(method, filename_char))
+  {
+    WSREP_ERROR("Bad SST method name. SST canceled.");
+    return WSREP_CB_FAILURE;
+  }
+
   const char* data   = method + method_len + 1;
+
+  if (check_request_str(data, address_char))
+  {
+    WSREP_ERROR("Bad SST address string. SST canceled.");
+    return WSREP_CB_FAILURE;
+  }
 
   char uuid_str[37];
   wsrep_uuid_print (&current_gtid->uuid, uuid_str, sizeof(uuid_str));
 
+<<<<<<< HEAD
   DBUG_EXECUTE_IF("wsrep_sst_donate_cb_fails", 
   {
     return WSREP_CB_FAILURE;
   });
 
+||||||| merged common ancestors
+=======
+  /* This will be reset when sync callback is called.
+   * Should we set wsrep_ready to FALSE here too? */
+  local_status.set(WSREP_MEMBER_DONOR);
+
+>>>>>>> wsrep_5.7.31-25.23
   wsp::env env(NULL);
   if (env.error())
   {
@@ -1617,14 +1692,11 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
   return (ret >= 0 ? WSREP_CB_SUCCESS : WSREP_CB_FAILURE);
 }
 
-void wsrep_SE_init_grab()
+enum Wsrep_SE_init_result wsrep_SE_init_wait(THD* thd)
 {
-  if (mysql_mutex_lock (&LOCK_wsrep_sst_init)) abort();
-}
-
-void wsrep_SE_init_wait(THD* thd)
-{
-  while (SE_initialized == false && thd->killed == THD::NOT_KILLED)
+  mysql_mutex_lock (&LOCK_wsrep_sst_init);
+  while (SE_initialized == WSREP_SE_INIT_RESULT_NONE &&
+         thd->killed == THD::NOT_KILLED)
   {
     mysql_mutex_lock(&thd->LOCK_thd_data);
     thd->current_cond= &COND_wsrep_sst_init;
@@ -1643,19 +1715,27 @@ void wsrep_SE_init_wait(THD* thd)
     thd->current_mutex= NULL;
     mysql_mutex_unlock(&thd->LOCK_thd_data);
   }
+  enum Wsrep_SE_init_result ret= SE_initialized;
   mysql_mutex_unlock (&LOCK_wsrep_sst_init);
 
   mysql_mutex_lock(&thd->LOCK_thd_data);
   thd->current_cond= NULL;
   thd->current_mutex= NULL;
   mysql_mutex_unlock(&thd->LOCK_thd_data);
+  return ret;
 }
 
-void wsrep_SE_init_done()
+void wsrep_SE_initialized(enum Wsrep_SE_init_result result)
 {
+  mysql_mutex_lock (&LOCK_wsrep_sst_init);
+  if (SE_initialized == WSREP_SE_INIT_RESULT_NONE)
+  {
+    SE_initialized= result;
+  }
   mysql_cond_signal (&COND_wsrep_sst_init);
   mysql_mutex_unlock (&LOCK_wsrep_sst_init);
 }
+<<<<<<< HEAD
 
 void wsrep_SE_initialized()
 {
@@ -1666,3 +1746,11 @@ bool wsrep_is_SE_initialized()
 {
   return SE_initialized;
 }
+||||||| merged common ancestors
+
+void wsrep_SE_initialized()
+{
+  SE_initialized = true;
+}
+=======
+>>>>>>> wsrep_5.7.31-25.23

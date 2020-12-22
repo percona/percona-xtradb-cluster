@@ -5,7 +5,12 @@
 --source include/have_log_bin.inc
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
+<<<<<<< HEAD
 --source include/have_debug.inc
+||||||| merged common ancestors
+=======
+--source suite/galera/include/galera_have_debug_sync.inc
+>>>>>>> wsrep_5.7.31-25.23
 
 --connection node_1
 CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;

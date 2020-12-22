@@ -29,6 +29,13 @@
 #include "sql_class.h"              // THD
 
 
+#ifdef WITH_WSREP
+#define tmp_disable_wsrep(A)                                            \
+    do {                                                                \
+    my_bool tmp_disable_wsrep__save_wsrep_on= (A)->variables.wsrep_on;  \
+    (A)->variables.wsrep_on= 0
+#define reenable_wsrep(A)    (A)->variables.wsrep_on= tmp_disable_wsrep__save_wsrep_on; } while (0)
+#endif /* WITH_WSREP */
 Rpl_info_table::Rpl_info_table(uint nparam,
                                const char* param_schema,
                                const char *param_table,
@@ -106,6 +113,9 @@ int Rpl_info_table::do_init_info(enum_find_method method, uint instance)
   saved_mode= thd->variables.sql_mode;
   tmp_disable_binlog(thd);
 
+#ifdef WITH_WSREP
+  tmp_disable_wsrep(thd);
+#endif /* WITH_WSREP */
   /*
     Opens and locks the rpl_info table before accessing it.
   */
@@ -152,6 +162,9 @@ end:
     Unlocks and closes the rpl_info table.
   */
   error= access->close_table(thd, table, &backup, error) || error;
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif /* WITH_WSREP */
   reenable_binlog(thd);
   thd->variables.sql_mode= saved_mode;
   access->drop_thd(thd);
@@ -179,6 +192,9 @@ int Rpl_info_table::do_flush_info(const bool force)
   tmp_disable_binlog(thd);
   thd->is_operating_substatement_implicitly= true;
 
+#ifdef WITH_WSREP
+  tmp_disable_wsrep(thd);
+#endif /* WITH_WSREP */
   /*
     Opens and locks the rpl_info table before accessing it.
   */
@@ -263,6 +279,9 @@ end:
   */
   error= access->close_table(thd, table, &backup, error) || error;
   thd->is_operating_substatement_implicitly= false;
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif /* WITH_WSREP */
   reenable_binlog(thd);
   thd->variables.sql_mode= saved_mode;
   access->drop_thd(thd);
@@ -288,6 +307,10 @@ int Rpl_info_table::do_clean_info()
 
   saved_mode= thd->variables.sql_mode;
   tmp_disable_binlog(thd);
+
+#ifdef WITH_WSREP
+  tmp_disable_wsrep(thd);
+#endif /* WITH_WSREP */
 
   /*
     Opens and locks the rpl_info table before accessing it.
@@ -318,6 +341,9 @@ end:
     Unlocks and closes the rpl_info table.
   */
   error= access->close_table(thd, table, &backup, error) || error;
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif /* WITH_WSREP */
   reenable_binlog(thd);
   thd->variables.sql_mode= saved_mode;
   access->drop_thd(thd);
@@ -360,6 +386,9 @@ int Rpl_info_table::do_reset_info(uint nparam,
   saved_mode= thd->variables.sql_mode;
   tmp_disable_binlog(thd);
 
+#ifdef WITH_WSREP
+  tmp_disable_wsrep(thd);
+#endif /* WITH_WSREP */
   /*
     Opens and locks the rpl_info table before accessing it.
   */
@@ -431,6 +460,9 @@ end:
     Unlocks and closes the rpl_info table.
   */
   error= info->access->close_table(thd, table, &backup, error) || error;
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif /* WITH_WSREP */
   reenable_binlog(thd);
   thd->variables.sql_mode= saved_mode;
   info->access->drop_thd(thd);
@@ -787,6 +819,9 @@ bool Rpl_info_table::do_update_is_transactional()
   saved_mode= thd->variables.sql_mode;
   tmp_disable_binlog(thd);
 
+#ifdef WITH_WSREP
+  tmp_disable_wsrep(thd);
+#endif /* WITH_WSREP */
   /*
     Opens and locks the rpl_info table before accessing it.
   */
@@ -800,6 +835,9 @@ bool Rpl_info_table::do_update_is_transactional()
 
 end:
   error= access->close_table(thd, table, &backup, 0) || error;
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif /* WITH_WSREP */
   reenable_binlog(thd);
   thd->variables.sql_mode= saved_mode;
   access->drop_thd(thd);

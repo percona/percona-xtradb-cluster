@@ -5272,6 +5272,7 @@ innobase_commit_low(
 #ifdef WITH_WSREP
 	THD* thd = (THD*)trx->mysql_thd;
 	if (wsrep_on((void*)thd)) {
+<<<<<<< HEAD
 		char info[64];
 		info[sizeof(info) - 1] = '\0';
 		snprintf(info, sizeof(info) - 1,
@@ -5279,6 +5280,21 @@ innobase_commit_low(
 			 (long long) wsrep_thd_trx_seqno(thd));
 		wsrep_set_thd_proc_info(thd, info);
 		thd_proc_info(thd, wsrep_get_thd_proc_info(thd));
+||||||| merged common ancestors
+#ifdef WSREP_PROC_INFO
+		char info[64];
+		info[sizeof(info) - 1] = '\0';
+		snprintf(info, sizeof(info) - 1,
+			 "innobase_commit_low():trx_commit_for_mysql(%lld)",
+			 (long long) wsrep_thd_trx_seqno(thd));
+		tmp = thd_proc_info(thd, info);
+
+#else
+		tmp = thd_proc_info(thd, "innobase_commit_low()");
+#endif /* WSREP_PROC_INFO */
+=======
+		tmp = thd_proc_info(thd, "innobase_commit_low()");
+>>>>>>> wsrep_5.7.31-25.23
 	}
 #endif /* WITH_WSREP */
 	if (trx_is_started(trx)) {

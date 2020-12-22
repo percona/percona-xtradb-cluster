@@ -1373,9 +1373,6 @@ int ha_partition::write_row_in_new_part(uint part_id)
   }
 
   tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
-#ifdef WITH_WSREP
-  reenable_wsrep(thd);
-#endif
   error= m_new_file[part_id]->ha_write_row(table->record[0]);
   reenable_binlog(thd);
   DBUG_RETURN(error);
@@ -3041,9 +3038,6 @@ int ha_partition::write_row_in_part(uint part_id, uchar *buf)
   start_part_bulk_insert(thd, part_id);
 
   tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
-#ifdef WITH_WSREP
-  reenable_wsrep(thd);
-#endif
   error= m_file[part_id]->ha_write_row(buf);
   reenable_binlog(thd);
   DBUG_RETURN(error);
@@ -3059,9 +3053,6 @@ int ha_partition::update_row_in_part(uint part_id,
   DBUG_ENTER("ha_partition::update_row_in_part");
   start_part_bulk_insert(thd, part_id);
   tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
-#ifdef WITH_WSREP
-  reenable_wsrep(thd);
-#endif
   error= m_file[part_id]->ha_update_row(old_data, new_data);
   reenable_binlog(thd);
   DBUG_RETURN(error);
@@ -3098,9 +3089,6 @@ int ha_partition::delete_row_in_part(uint part_id, const uchar *buf)
   m_last_part= part_id;
   /* Do not replicate low level changes, already registered in ha_* wrapper. */
   tmp_disable_binlog(thd);
-#ifdef WITH_WSREP
-  reenable_wsrep(thd);
-#endif
   error= m_file[part_id]->ha_delete_row(buf);
   reenable_binlog(thd);
   DBUG_RETURN(error);

@@ -570,6 +570,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   wsrep_thd_set_query_state(thd, QUERY_COMMITTING);
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
+  DEBUG_SYNC(thd, "wsrep_before_certification");
   rcode = 0;
   if ((thd->lex->sql_command == SQLCOM_CREATE_TABLE) &&
       !thd->wsrep_applier                            &&

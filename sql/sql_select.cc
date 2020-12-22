@@ -2703,6 +2703,7 @@ ORDER *simple_remove_const(ORDER *order, Item *where)
   SYNOPSIS
     test_if_equality_guarantees_uniqueness()
       l          the left comparison argument (a field if any)
+<<<<<<< HEAD
       r          the right comparison argument (a const of any)
   
   DESCRIPTION    
@@ -2831,6 +2832,3599 @@ const_expression_in_where(Item *cond, Item *comp_item, Field *comp_field,
 
 
 /**
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+<<<<<<<<< Temporary merge branch 1
+||||||||| merged common ancestors
+<<<<<<<<<<< Temporary merge branch 1
+=========
+>>>>>>>>> Temporary merge branch 2
+      r          the right comparison argument (a const of any)
+  
+  DESCRIPTION    
+    Checks if an equality predicate can be used to take away 
+    DISTINCT/GROUP BY because it is known to be true for exactly one 
+    distinct value (e.g. <expr> == <const>).
+    Arguments must be of the same type because e.g. 
+    <string_field> = <int_const> may match more than 1 distinct value from 
+    the column. 
+    We must take into consideration and the optimization done for various 
+    string constants when compared to dates etc (see Item_int_with_ref) as
+    well as the collation of the arguments.
+  
+  RETURN VALUE  
+    TRUE    can be used
+    FALSE   cannot be used
+*/
+static bool
+test_if_equality_guarantees_uniqueness(Item *l, Item *r)
+{
+  return r->const_item() &&
+    /* elements must be compared as dates */
+     (Arg_comparator::can_compare_as_dates(l, r, 0) ||
+      /* or of the same result type */
+      (r->result_type() == l->result_type() &&
+       /* and must have the same collation if compared as strings */
+       (l->result_type() != STRING_RESULT ||
+        l->collation.collation == r->collation.collation)));
+}
+<<<<<<<<< Temporary merge branch 1
+||||||||| 2acf164f591
+      r          the right comparison argument (a const of any)
+  
+  DESCRIPTION    
+    Checks if an equality predicate can be used to take away 
+    DISTINCT/GROUP BY because it is known to be true for exactly one 
+    distinct value (e.g. <expr> == <const>).
+    Arguments must be of the same type because e.g. 
+    <string_field> = <int_const> may match more than 1 distinct value from 
+    the column. 
+    We must take into consideration and the optimization done for various 
+    string constants when compared to dates etc (see Item_int_with_ref) as
+    well as the collation of the arguments.
+  
+  RETURN VALUE  
+    TRUE    can be used
+    FALSE   cannot be used
+*/
+static bool
+test_if_equality_guarantees_uniqueness(Item *l, Item *r)
+{
+  return r->const_item() &&
+    /* elements must be compared as dates */
+     (Arg_comparator::can_compare_as_dates(l, r, 0) ||
+      /* or of the same result type */
+      (r->result_type() == l->result_type() &&
+       /* and must have the same collation if compared as strings */
+       (l->result_type() != STRING_RESULT ||
+        l->collation.collation == r->collation.collation)));
+}
+
+
+/*
+  Return TRUE if i1 and i2 (if any) are equal items,
+  or if i1 is a wrapper item around the f2 field.
+*/
+
+static bool equal(Item *i1, Item *i2, Field *f2)
+{
+  DBUG_ASSERT((i2 == NULL) ^ (f2 == NULL));
+
+  if (i2 != NULL)
+    return i1->eq(i2, 1);
+  else if (i1->type() == Item::FIELD_ITEM)
+    return f2->eq(((Item_field *) i1)->field);
+  else
+    return FALSE;
+}
+
+
+/**
+  Test if a field or an item is equal to a constant value in WHERE
+
+  @param        cond            WHERE clause expression
+  @param        comp_item       Item to find in WHERE expression
+                                (if comp_field != NULL)
+  @param        comp_field      Field to find in WHERE expression
+                                (if comp_item != NULL)
+  @param[out]   const_item      intermediate arg, set to Item pointer to NULL 
+
+  @return TRUE if the field is a constant value in WHERE
+
+  @note
+    comp_item and comp_field parameters are mutually exclusive.
+*/
+bool
+const_expression_in_where(Item *cond, Item *comp_item, Field *comp_field,
+                          Item **const_item)
+{
+  DBUG_ASSERT((comp_item == NULL) ^ (comp_field == NULL));
+
+  Item *intermediate= NULL;
+  if (const_item == NULL)
+    const_item= &intermediate;
+
+  if (cond->type() == Item::COND_ITEM)
+  {
+    bool and_level= (((Item_cond*) cond)->functype()
+		     == Item_func::COND_AND_FUNC);
+    List_iterator_fast<Item> li(*((Item_cond*) cond)->argument_list());
+    Item *item;
+    while ((item=li++))
+    {
+      bool res=const_expression_in_where(item, comp_item, comp_field,
+                                         const_item);
+      if (res)					// Is a const value
+      {
+	if (and_level)
+	  return 1;
+      }
+      else if (!and_level)
+	return 0;
+    }
+    return and_level ? 0 : 1;
+  }
+  else if (cond->eq_cmp_result() != Item::COND_OK)
+  {						// boolean compare function
+    Item_func* func= (Item_func*) cond;
+    if (func->functype() != Item_func::EQUAL_FUNC &&
+	func->functype() != Item_func::EQ_FUNC)
+      return 0;
+    Item *left_item=	((Item_func*) cond)->arguments()[0];
+    Item *right_item= ((Item_func*) cond)->arguments()[1];
+    if (equal(left_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (left_item, right_item))
+      {
+	if (*const_item)
+	  return right_item->eq(*const_item, 1);
+	*const_item=right_item;
+	return 1;
+      }
+    }
+    else if (equal(right_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (right_item, left_item))
+      {
+	if (*const_item)
+	  return left_item->eq(*const_item, 1);
+	*const_item=left_item;
+	return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+
+/**
+  Test if one can use the key to resolve ORDER BY.
+
+  @param order                 Sort order
+  @param table                 Table to sort
+  @param idx                   Index to check
+  @param used_key_parts [out]  NULL by default, otherwise return value for
+                               used key parts.
+
+
+  @note
+    used_key_parts is set to correct key parts used if return value != 0
+    (On other cases, used_key_part may be changed)
+    Note that the value may actually be greater than the number of index 
+    key parts. This can happen for storage engines that have the primary 
+    key parts as a suffix for every secondary key.
+
+  @retval
+    1   key is ok.
+  @retval
+    0   Key can't be used
+  @retval
+    -1   Reverse key can be used
+*/
+
+int test_if_order_by_key(ORDER *order, TABLE *table, uint idx,
+                         uint *used_key_parts)
+{
+  KEY_PART_INFO *key_part,*key_part_end;
+  key_part=table->key_info[idx].key_part;
+  key_part_end=key_part+table->key_info[idx].user_defined_key_parts;
+  key_part_map const_key_parts=table->const_key_parts[idx];
+  int reverse=0;
+  uint key_parts;
+  my_bool on_pk_suffix= FALSE;
+  DBUG_ENTER("test_if_order_by_key");
+
+  for (; order ; order=order->next, const_key_parts>>=1)
+  {
+
+    /*
+      Since only fields can be indexed, ORDER BY <something> that is
+      not a field cannot be resolved by using an index.
+    */
+    Item *real_itm= (*order->item)->real_item();
+    if (real_itm->type() != Item::FIELD_ITEM)
+      DBUG_RETURN(0);
+
+    Field *field= static_cast<Item_field*>(real_itm)->field;
+    int flag;
+
+    /*
+      Skip key parts that are constants in the WHERE clause.
+      These are already skipped in the ORDER BY by const_expression_in_where()
+    */
+    for (; const_key_parts & 1 ; const_key_parts>>= 1)
+      key_part++; 
+
+    if (key_part == key_part_end)
+    {
+      /* 
+        We are at the end of the key. Check if the engine has the primary
+        key as a suffix to the secondary keys. If it has continue to check
+        the primary key as a suffix.
+      */
+      if (!on_pk_suffix &&
+          (table->file->ha_table_flags() & HA_PRIMARY_KEY_IN_READ_INDEX) &&
+          table->s->primary_key != MAX_KEY &&
+          table->s->primary_key != idx)
+      {
+        on_pk_suffix= TRUE;
+        key_part= table->key_info[table->s->primary_key].key_part;
+        key_part_end=key_part +
+          table->key_info[table->s->primary_key].user_defined_key_parts;
+        const_key_parts=table->const_key_parts[table->s->primary_key];
+
+        for (; const_key_parts & 1 ; const_key_parts>>= 1)
+          key_part++; 
+        /*
+         The primary and secondary key parts were all const (i.e. there's
+         one row).  The sorting doesn't matter.
+        */
+        if (key_part == key_part_end && reverse == 0)
+        {
+          key_parts= 0;
+          reverse= 1;
+          goto ok;
+        }
+      }
+      else
+        DBUG_RETURN(0);
+    }
+
+    if (key_part->field != field || !field->part_of_sortkey.is_set(idx))
+      DBUG_RETURN(0);
+
+    const ORDER::enum_order keypart_order= 
+      (key_part->key_part_flag & HA_REVERSE_SORT) ? 
+      ORDER::ORDER_DESC : ORDER::ORDER_ASC;
+    /* set flag to 1 if we can use read-next on key, else to -1 */
+    flag= (order->direction == keypart_order) ? 1 : -1;
+    if (reverse && flag != reverse)
+      DBUG_RETURN(0);
+    reverse=flag;				// Remember if reverse
+    key_part++;
+  }
+  if (on_pk_suffix)
+  {
+    uint used_key_parts_secondary= table->key_info[idx].user_defined_key_parts;
+    uint used_key_parts_pk=
+      (uint) (key_part - table->key_info[table->s->primary_key].key_part);
+    key_parts= used_key_parts_pk + used_key_parts_secondary;
+
+    if (reverse == -1 &&
+        (!(table->file->index_flags(idx, used_key_parts_secondary - 1, 1) &
+           HA_READ_PREV) ||
+         !(table->file->index_flags(table->s->primary_key,
+                                    used_key_parts_pk - 1, 1) & HA_READ_PREV)))
+      reverse= 0;                               // Index can't be used
+  }
+  else
+  {
+    key_parts= (uint) (key_part - table->key_info[idx].key_part);
+    if (reverse == -1 && 
+        !(table->file->index_flags(idx, key_parts-1, 1) & HA_READ_PREV))
+      reverse= 0;                               // Index can't be used
+  }
+ok:
+  if (used_key_parts != NULL)
+    *used_key_parts= key_parts;
+  DBUG_RETURN(reverse);
+}
+
+
+/**
+  Find shortest key suitable for full table scan.
+
+  @param table                 Table to scan
+  @param usable_keys           Allowed keys
+
+  @note
+     As far as 
+     1) clustered primary key entry data set is a set of all record
+        fields (key fields and not key fields) and
+     2) secondary index entry data is a union of its key fields and
+        primary key fields (at least InnoDB and its derivatives don't
+        duplicate primary key fields there, even if the primary and
+        the secondary keys have a common subset of key fields),
+     then secondary index entry data is always a subset of primary key entry.
+     Unfortunately, key_info[nr].key_length doesn't show the length
+     of key/pointer pair but a sum of key field lengths only, thus
+     we can't estimate index IO volume comparing only this key_length
+     value of secondary keys and clustered PK.
+     So, try secondary keys first, and choose PK only if there are no
+     usable secondary covering keys or found best secondary key include
+     all table fields (i.e. same as PK):
+
+  @return
+    MAX_KEY     no suitable key found
+    key index   otherwise
+*/
+
+uint find_shortest_key(TABLE *table, const key_map *usable_keys)
+{
+  uint best= MAX_KEY;
+  uint usable_clustered_pk= (table->file->primary_key_is_clustered() &&
+                             table->s->primary_key != MAX_KEY &&
+                             usable_keys->is_set(table->s->primary_key)) ?
+                            table->s->primary_key : MAX_KEY;
+  if (!usable_keys->is_clear_all())
+  {
+    uint min_length= (uint) ~0;
+    for (uint nr=0; nr < table->s->keys ; nr++)
+    {
+      if (nr == usable_clustered_pk)
+        continue;
+      if (usable_keys->is_set(nr))
+      {
+        if (table->key_info[nr].key_length < min_length)
+        {
+          min_length=table->key_info[nr].key_length;
+          best=nr;
+        }
+      }
+    }
+  }
+  if (usable_clustered_pk != MAX_KEY)
+  {
+    /*
+     If the primary key is clustered and found shorter key covers all table
+     fields then primary key scan normally would be faster because amount of
+     data to scan is the same but PK is clustered.
+     It's safe to compare key parts with table fields since duplicate key
+     parts aren't allowed.
+     */
+    if (best == MAX_KEY ||
+        table->key_info[best].user_defined_key_parts >= table->s->fields)
+      best= usable_clustered_pk;
+  }
+  return best;
+}
+
+/**
+  Test if a second key is the subkey of the first one.
+
+  @param key_part              First key parts
+  @param ref_key_part          Second key parts
+  @param ref_key_part_end      Last+1 part of the second key
+
+  @note
+    Second key MUST be shorter than the first one.
+
+  @retval
+    1	is a subkey
+  @retval
+    0	no sub key
+*/
+
+inline bool 
+is_subkey(KEY_PART_INFO *key_part, KEY_PART_INFO *ref_key_part,
+	  KEY_PART_INFO *ref_key_part_end)
+{
+  for (; ref_key_part < ref_key_part_end; key_part++, ref_key_part++)
+    if (!key_part->field->eq(ref_key_part->field))
+      return 0;
+  return 1;
+}
+
+/**
+  Test if REF_OR_NULL optimization will be used if the specified
+  ref_key is used for REF-access to 'tab'
+
+  @retval
+    true	JT_REF_OR_NULL will be used
+  @retval
+    false	no JT_REF_OR_NULL access
+*/
+bool
+is_ref_or_null_optimized(const JOIN_TAB *tab, uint ref_key)
+{
+  if (tab->keyuse)
+  {
+    const Key_use *keyuse= tab->keyuse;
+    while (keyuse->key != ref_key && keyuse->table == tab->table)
+      keyuse++;
+
+    const table_map const_tables= tab->join->const_table_map;
+    while (keyuse->key == ref_key && keyuse->table == tab->table)
+    {
+      if (!(keyuse->used_tables & ~const_tables))
+      {
+        if (keyuse->optimize & KEY_OPTIMIZE_REF_OR_NULL)
+          return true;
+      }
+      keyuse++;
+    }
+  }
+  return false;
+}
+
+/**
+  Test if we can use one of the 'usable_keys' instead of 'ref' key
+  for sorting.
+
+  @param ref			Number of key, used for WHERE clause
+  @param usable_keys		Keys for testing
+
+  @return
+    - MAX_KEY			If we can't use other key
+    - the number of found key	Otherwise
+*/
+
+static uint
+test_if_subkey(ORDER *order, JOIN_TAB *tab, uint ref, uint ref_key_parts,
+	       const key_map *usable_keys)
+{
+  uint nr;
+  uint min_length= (uint) ~0;
+  uint best= MAX_KEY;
+  TABLE *table= tab->table;
+  KEY_PART_INFO *ref_key_part= table->key_info[ref].key_part;
+  KEY_PART_INFO *ref_key_part_end= ref_key_part + ref_key_parts;
+
+  for (nr= 0 ; nr < table->s->keys ; nr++)
+  {
+    if (usable_keys->is_set(nr) &&
+	table->key_info[nr].key_length < min_length &&
+	table->key_info[nr].user_defined_key_parts >= ref_key_parts &&
+	is_subkey(table->key_info[nr].key_part, ref_key_part,
+		  ref_key_part_end) &&
+        !is_ref_or_null_optimized(tab, nr) &&
+	test_if_order_by_key(order, table, nr))
+    {
+      min_length= table->key_info[nr].key_length;
+      best= nr;
+    }
+  }
+  return best;
+}
+
+
+/**
+  It is not obvious to see that test_if_skip_sort_order() never changes the
+  plan if no_changes is true. So we double-check: creating an instance of this
+  class saves some important access-path-related information of the current
+  table; when the instance is destroyed, the latest access-path information is
+  compared with saved data.
+*/
+class Plan_change_watchdog
+{
+#ifndef DBUG_OFF
+public:
+  /**
+    @param tab_arg     table whose access path is being determined
+    @param no_changes  whether a change to the access path is allowed
+  */
+  Plan_change_watchdog(const JOIN_TAB *tab_arg, const bool no_changes_arg)
+  {
+    // Only to keep gcc 4.1.2-44 silent about uninitialized variables
+    quick= NULL;
+    quick_index= 0;
+    if (no_changes_arg)
+    {
+      tab= tab_arg;
+      type= tab->type;
+      if ((select= tab->select))
+        if ((quick= tab->select->quick))
+          quick_index= quick->index;
+      use_quick= tab->use_quick;
+      ref_key= tab->ref.key;
+      ref_key_parts= tab->ref.key_parts;
+      index= tab->index;
+    }
+    else
+    {
+      tab= NULL;
+      // Only to keep gcc 4.1.2-44 silent about uninitialized variables
+      type= JT_UNKNOWN;
+      select= NULL;
+      ref_key= ref_key_parts= index= 0;
+      use_quick= QS_NONE;
+    }
+  }
+  ~Plan_change_watchdog()
+  {
+    if (tab == NULL)
+      return;
+    // changes are not allowed, we verify:
+    DBUG_ASSERT(tab->type == type);
+    DBUG_ASSERT(tab->select == select);
+    if (select != NULL)
+    {
+      DBUG_ASSERT(tab->select->quick == quick);
+      if (quick != NULL)
+        DBUG_ASSERT(tab->select->quick->index == quick_index);
+    }
+    DBUG_ASSERT(tab->use_quick == use_quick);
+    DBUG_ASSERT(tab->ref.key == ref_key);
+    DBUG_ASSERT(tab->ref.key_parts == ref_key_parts);
+    DBUG_ASSERT(tab->index == index);
+  }
+private:
+  const JOIN_TAB *tab;            ///< table, or NULL if changes are allowed
+  enum join_type type;            ///< copy of tab->type
+  // "Range / index merge" info
+  const SQL_SELECT *select;       ///< copy of tab->select
+  const QUICK_SELECT_I *quick;    ///< copy of tab->select->quick
+  uint quick_index;               ///< copy of tab->select->quick->index
+  enum quick_type use_quick;      ///< copy of tab->use_quick
+  // "ref access" info
+  int ref_key;                    ///< copy of tab->ref.key
+  uint ref_key_parts;/// copy of tab->ref.key_parts
+  // Other index-related info
+  uint index;                     ///< copy of tab->index
+#else // in non-debug build, empty class
+public:
+  Plan_change_watchdog(const JOIN_TAB *tab_arg, const bool no_changes_arg) {}
+#endif
+};
+
+
+/**
+  Test if we can skip the ORDER BY by using an index.
+
+  SYNOPSIS
+    test_if_skip_sort_order()
+      tab
+      order
+      select_limit
+      no_changes
+      map
+
+  If we can use an index, the JOIN_TAB / tab->select struct
+  is changed to use the index.
+
+  The index must cover all fields in <order>, or it will not be considered.
+
+  @param tab           NULL or JOIN_TAB of the accessed table
+  @param order         Linked list of ORDER BY arguments
+  @param select_limit  LIMIT value, or HA_POS_ERROR if no limit
+  @param no_changes    No changes will be made to the query plan.
+  @param map           key_map of applicable indexes.
+  @param clause_type   "ORDER BY" etc for printing in optimizer trace
+
+  @todo
+    - sergeyp: Results of all index merge selects actually are ordered 
+    by clustered PK values.
+
+  @retval
+    0    We have to use filesort to do the sorting
+  @retval
+    1    We can use an index.
+*/
+
+bool
+test_if_skip_sort_order(JOIN_TAB *tab, ORDER *order, ha_rows select_limit,
+                        const bool no_changes, const key_map *map,
+                        const char *clause_type)
+{
+  int ref_key;
+  uint ref_key_parts;
+  int order_direction= 0;
+  uint used_key_parts;
+  TABLE *table=tab->table;
+  SQL_SELECT *select=tab->select;
+  QUICK_SELECT_I *save_quick= select ? select->quick : NULL;
+  int best_key= -1;
+  Item *orig_cond;
+  bool orig_cond_saved= false, set_up_ref_access_to_key= false;
+  bool can_skip_sorting= false;                  // used as return value
+  int changed_key= -1;
+  DBUG_ENTER("test_if_skip_sort_order");
+  LINT_INIT(ref_key_parts);
+  LINT_INIT(orig_cond);
+
+  /* Check that we are always called with first non-const table */
+  DBUG_ASSERT(tab == tab->join->join_tab + tab->join->const_tables); 
+
+  Plan_change_watchdog watchdog(tab, no_changes);
+
+  /* Sorting a single row can always be skipped */
+  if (tab->type == JT_EQ_REF ||
+      tab->type == JT_CONST  ||
+      tab->type == JT_SYSTEM)
+  {
+    DBUG_RETURN(1);
+  }
+
+  /*
+    Keys disabled by ALTER TABLE ... DISABLE KEYS should have already
+    been taken into account.
+  */
+  key_map usable_keys= *map;
+
+  for (ORDER *tmp_order=order; tmp_order ; tmp_order=tmp_order->next)
+  {
+    Item *item= (*tmp_order->item)->real_item();
+    if (item->type() != Item::FIELD_ITEM)
+    {
+      usable_keys.clear_all();
+      DBUG_RETURN(0);
+    }
+    usable_keys.intersect(((Item_field*) item)->field->part_of_sortkey);
+    if (usable_keys.is_clear_all())
+      DBUG_RETURN(0);					// No usable keys
+  }
+
+  ref_key= -1;
+  /* Test if constant range in WHERE */
+  if (tab->ref.key >= 0 && tab->ref.key_parts)
+  {
+    if (tab->type == JT_REF_OR_NULL || tab->type == JT_FT)
+      DBUG_RETURN(0);
+    ref_key=	   tab->ref.key;
+    ref_key_parts= tab->ref.key_parts;
+  }
+  else if (select && select->quick)		// Range found by opt_range
+  {
+    int quick_type= select->quick->get_type();
+    /* 
+      assume results are not ordered when index merge is used 
+      TODO: sergeyp: Results of all index merge selects actually are ordered 
+      by clustered PK values.
+    */
+  
+    if (quick_type == QUICK_SELECT_I::QS_TYPE_INDEX_MERGE || 
+        quick_type == QUICK_SELECT_I::QS_TYPE_ROR_UNION || 
+        quick_type == QUICK_SELECT_I::QS_TYPE_ROR_INTERSECT)
+      DBUG_RETURN(0);
+    ref_key=	   select->quick->index;
+    ref_key_parts= select->quick->used_key_parts;
+  }
+
+  /*
+    If part of the select condition has been pushed we use the
+    select condition as it was before pushing. The original
+    select condition is saved so that it can be restored when
+    exiting this function (if we have not changed index).
+  */
+  if (tab->pre_idx_push_cond)
+  {
+    orig_cond=
+      tab->set_jt_and_sel_condition(tab->pre_idx_push_cond, __LINE__);
+    orig_cond_saved= true;
+  }
+
+  Opt_trace_context * const trace= &tab->join->thd->opt_trace;
+  Opt_trace_object trace_wrapper(trace);
+  Opt_trace_object
+    trace_skip_sort_order(trace, "reconsidering_access_paths_for_index_ordering");
+  trace_skip_sort_order.add_alnum("clause", clause_type);
+
+  if (ref_key >= 0)
+  {
+    /*
+      We come here when there is a {ref or or ordered range access} key.
+    */
+    if (!usable_keys.is_set(ref_key))
+    {
+      /*
+        We come here when ref_key is not among usable_keys, try to find a
+        usable prefix key of that key.
+      */
+      uint new_ref_key;
+      /*
+	If using index only read, only consider other possible index only
+	keys
+      */
+      if (table->covering_keys.is_set(ref_key))
+	usable_keys.intersect(table->covering_keys);
+
+      if ((new_ref_key= test_if_subkey(order, tab, ref_key, ref_key_parts,
+				       &usable_keys)) < MAX_KEY)
+      {
+	/* Found key that can be used to retrieve data in sorted order */
+	if (tab->ref.key >= 0)
+        {
+          /*
+            We'll use ref access method on key new_ref_key. The actual change
+            is done further down in this function where we update the plan.
+          */
+          set_up_ref_access_to_key= true;
+        }
+	else if (!no_changes)
+	{
+          /*
+            The range optimizer constructed QUICK_RANGE for ref_key, and
+            we want to use instead new_ref_key as the index. We can't
+            just change the index of the quick select, because this may
+            result in an incosistent QUICK_SELECT object. Below we
+            create a new QUICK_SELECT from scratch so that all its
+            parameres are set correctly by the range optimizer.
+
+            Note that the range optimizer is NOT called if
+            no_changes==true. This reason is that the range optimizer
+            cannot find a QUICK that can return ordered result unless
+            index access (ref or index scan) is also able to do so
+            (which test_if_order_by_key () will tell).
+            Admittedly, range access may be much more efficient than
+            e.g. index scan, but the only thing that matters when
+            no_change==true is the answer to the question: "Is it
+            possible to avoid sorting if an index is used to access
+            this table?". The answer does not depend on the outcome of
+            the range optimizer.
+          */
+          key_map new_ref_key_map;  // Force the creation of quick select
+          new_ref_key_map.set_bit(new_ref_key); // only for new_ref_key.
+
+          Opt_trace_object
+            trace_recest(trace, "rows_estimation");
+          trace_recest.add_utf8_table(tab->table).
+          add_utf8("index", table->key_info[new_ref_key].name);
+          select->quick= 0;
+          if (select->test_quick_select(tab->join->thd, 
+                                        new_ref_key_map, 
+                                        0,       // empty table_map
+                                        (tab->join->select_options &
+                                         OPTION_FOUND_ROWS) ?
+                                        HA_POS_ERROR :
+                                        tab->join->unit->select_limit_cnt,
+                                        false,   // don't force quick range
+                                        order->direction) <= 0)
+          {
+            can_skip_sorting= false;
+            goto fix_ICP;
+          }
+	}
+        ref_key= new_ref_key;
+        changed_key= new_ref_key;
+      }
+    }
+    /* Check if we get the rows in requested sorted order by using the key */
+    if (usable_keys.is_set(ref_key) &&
+        (order_direction= test_if_order_by_key(order,table,ref_key,
+					       &used_key_parts)))
+      goto check_reverse_order;
+  }
+  {
+    /*
+      There was no {ref or or ordered range access} key, or it was not
+      satisfying, neither was any prefix of it. Do a cost-based search on all
+      keys:
+    */
+    uint best_key_parts= 0;
+    uint saved_best_key_parts= 0;
+    int best_key_direction= 0;
+    JOIN *join= tab->join;
+    ha_rows table_records= table->file->stats.records;
+
+    test_if_cheaper_ordering(tab, order, table, usable_keys,
+                             ref_key, select_limit,
+                             &best_key, &best_key_direction,
+                             &select_limit, &best_key_parts,
+                             &saved_best_key_parts);
+
+    if (best_key < 0)
+    {
+      // No usable key has been found
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
+
+    /*
+      Does the query have a "FORCE INDEX [FOR GROUP BY] (idx)" (if
+      clause is group by) or a "FORCE INDEX [FOR ORDER BY] (idx)" (if
+      clause is order by)?
+    */
+    const bool is_group_by= join && join->group && order == join->group_list;
+    const bool is_force_index= table->force_index ||
+      (is_group_by ? table->force_index_group : table->force_index_order);
+
+    /*
+      filesort() and join cache are usually faster than reading in
+      index order and not using join cache. Don't use index scan
+      unless:
+       - the user specified FORCE INDEX [FOR {GROUP|ORDER} BY] (have to assume
+         the user knows what's best)
+       - the chosen index is clustered primary key (table scan is not cheaper)
+    */
+    if (!is_force_index &&
+        (select_limit >= table_records) &&
+        (tab->type == JT_ALL &&
+         tab->join->primary_tables > tab->join->const_tables + 1) &&
+         ((unsigned) best_key != table->s->primary_key ||
+          !table->file->primary_key_is_clustered()))
+    {
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
+
+    if (select &&
+        table->quick_keys.is_set(best_key) &&
+        !tab->quick_order_tested.is_set(best_key) &&
+        best_key != ref_key)
+    {
+      tab->quick_order_tested.set_bit(best_key);
+      Opt_trace_object
+        trace_recest(trace, "rows_estimation");
+      trace_recest.add_utf8_table(tab->table).
+        add_utf8("index", table->key_info[best_key].name);
+
+      key_map map;           // Force the creation of quick select
+      map.set_bit(best_key); // only best_key.
+      select->quick= 0;
+      select->test_quick_select(join->thd, 
+                                map, 
+                                0,        // empty table_map
+                                join->select_options & OPTION_FOUND_ROWS ?
+                                HA_POS_ERROR :
+                                join->unit->select_limit_cnt,
+                                true,     // force quick range
+                                order->direction);
+    }
+    order_direction= best_key_direction;
+    /*
+      saved_best_key_parts is actual number of used keyparts found by the
+      test_if_order_by_key function. It could differ from keyinfo->key_parts,
+      thus we have to restore it in case of desc order as it affects
+      QUICK_SELECT_DESC behaviour.
+    */
+    used_key_parts= (order_direction == -1) ?
+      saved_best_key_parts :  best_key_parts;
+    changed_key= best_key;
+    // We will use index scan or range scan:
+    set_up_ref_access_to_key= false;
+  }
+=========
+      r          the right comparison argument (a const of any)
+  
+  DESCRIPTION    
+    Checks if an equality predicate can be used to take away 
+    DISTINCT/GROUP BY because it is known to be true for exactly one 
+    distinct value (e.g. <expr> == <const>).
+    Arguments must be of the same type because e.g. 
+    <string_field> = <int_const> may match more than 1 distinct value from 
+    the column. 
+    We must take into consideration and the optimization done for various 
+    string constants when compared to dates etc (see Item_int_with_ref) as
+    well as the collation of the arguments.
+  
+  RETURN VALUE  
+    TRUE    can be used
+    FALSE   cannot be used
+*/
+static bool
+test_if_equality_guarantees_uniqueness(Item *l, Item *r)
+{
+  return r->const_item() &&
+    /* elements must be compared as dates */
+     (Arg_comparator::can_compare_as_dates(l, r, 0) ||
+      /* or of the same result type */
+      (r->result_type() == l->result_type() &&
+       /* and must have the same collation if compared as strings */
+       (l->result_type() != STRING_RESULT ||
+        l->collation.collation == r->collation.collation)));
+}
+
+
+/*
+  Return TRUE if i1 and i2 (if any) are equal items,
+  or if i1 is a wrapper item around the f2 field.
+*/
+
+static bool equal(Item *i1, Item *i2, Field *f2)
+{
+  DBUG_ASSERT((i2 == NULL) ^ (f2 == NULL));
+
+  if (i2 != NULL)
+    return i1->eq(i2, 1);
+  else if (i1->type() == Item::FIELD_ITEM)
+    return f2->eq(((Item_field *) i1)->field);
+  else
+    return FALSE;
+}
+
+
+/**
+  Test if a field or an item is equal to a constant value in WHERE
+
+  @param        cond            WHERE clause expression
+  @param        comp_item       Item to find in WHERE expression
+                                (if comp_field != NULL)
+  @param        comp_field      Field to find in WHERE expression
+                                (if comp_item != NULL)
+  @param[out]   const_item      intermediate arg, set to Item pointer to NULL 
+
+  @return TRUE if the field is a constant value in WHERE
+
+  @note
+    comp_item and comp_field parameters are mutually exclusive.
+*/
+bool
+const_expression_in_where(Item *cond, Item *comp_item, Field *comp_field,
+                          Item **const_item)
+{
+  DBUG_ASSERT((comp_item == NULL) ^ (comp_field == NULL));
+
+  Item *intermediate= NULL;
+  if (const_item == NULL)
+    const_item= &intermediate;
+
+  if (cond->type() == Item::COND_ITEM)
+  {
+    bool and_level= (((Item_cond*) cond)->functype()
+		     == Item_func::COND_AND_FUNC);
+    List_iterator_fast<Item> li(*((Item_cond*) cond)->argument_list());
+    Item *item;
+    while ((item=li++))
+    {
+      bool res=const_expression_in_where(item, comp_item, comp_field,
+                                         const_item);
+      if (res)					// Is a const value
+      {
+	if (and_level)
+	  return 1;
+      }
+      else if (!and_level)
+	return 0;
+    }
+    return and_level ? 0 : 1;
+  }
+  else if (cond->eq_cmp_result() != Item::COND_OK)
+  {						// boolean compare function
+    Item_func* func= (Item_func*) cond;
+    if (func->functype() != Item_func::EQUAL_FUNC &&
+	func->functype() != Item_func::EQ_FUNC)
+      return 0;
+    Item *left_item=	((Item_func*) cond)->arguments()[0];
+    Item *right_item= ((Item_func*) cond)->arguments()[1];
+    if (equal(left_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (left_item, right_item))
+      {
+	if (*const_item)
+	  return right_item->eq(*const_item, 1);
+	*const_item=right_item;
+	return 1;
+      }
+    }
+    else if (equal(right_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (right_item, left_item))
+      {
+	if (*const_item)
+	  return left_item->eq(*const_item, 1);
+	*const_item=left_item;
+	return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+/**
+  Test if this is a prefix index.
+
+  @param   table     table
+  @param   idx       index to check
+
+  @return TRUE if this is a prefix index
+*/
+bool is_prefix_index(TABLE* table, uint idx)
+{
+  if (!table || !table->key_info)
+  {
+    return false;
+  }
+  KEY* key_info = table->key_info;
+  uint key_parts = key_info[idx].user_defined_key_parts;
+  KEY_PART_INFO* key_part = key_info[idx].key_part;
+
+  for (uint i = 0; i < key_parts; i++, key_part++)
+  {
+    if (key_part->field &&
+      (key_part->length !=
+        table->field[key_part->fieldnr - 1]->key_length() &&
+        !(key_info->flags & (HA_FULLTEXT | HA_SPATIAL))))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+  Test if one can use the key to resolve ORDER BY.
+
+  @param order                 Sort order
+  @param table                 Table to sort
+  @param idx                   Index to check
+  @param used_key_parts [out]  NULL by default, otherwise return value for
+                               used key parts.
+
+
+  @note
+    used_key_parts is set to correct key parts used if return value != 0
+    (On other cases, used_key_part may be changed)
+    Note that the value may actually be greater than the number of index 
+    key parts. This can happen for storage engines that have the primary 
+    key parts as a suffix for every secondary key.
+
+  @retval
+    1   key is ok.
+  @retval
+    0   Key can't be used
+  @retval
+    -1   Reverse key can be used
+*/
+
+int test_if_order_by_key(ORDER *order, TABLE *table, uint idx,
+                         uint *used_key_parts)
+{
+  KEY_PART_INFO *key_part,*key_part_end;
+  key_part=table->key_info[idx].key_part;
+  key_part_end=key_part+table->key_info[idx].user_defined_key_parts;
+  key_part_map const_key_parts=table->const_key_parts[idx];
+  int reverse=0;
+  uint key_parts;
+  my_bool on_pk_suffix= FALSE;
+  DBUG_ENTER("test_if_order_by_key");
+
+  for (; order ; order=order->next, const_key_parts>>=1)
+  {
+    /*
+      Since only fields can be indexed, ORDER BY <something> that is
+      not a field cannot be resolved by using an index.
+    */
+    Item *real_itm= (*order->item)->real_item();
+    if (real_itm->type() != Item::FIELD_ITEM)
+      DBUG_RETURN(0);
+
+    Field *field= static_cast<Item_field*>(real_itm)->field;
+    int flag;
+
+    /*
+      Skip key parts that are constants in the WHERE clause.
+      These are already skipped in the ORDER BY by const_expression_in_where()
+    */
+    for (; const_key_parts & 1 ; const_key_parts>>= 1)
+      key_part++; 
+
+    /* Avoid usage of prefix index for sorting a partition table */
+    if (table->part_info && key_part != table->key_info[idx].key_part &&
+	key_part != key_part_end && is_prefix_index(table, idx))
+     DBUG_RETURN(0);
+
+    if (key_part == key_part_end)
+    {
+      /* 
+        We are at the end of the key. Check if the engine has the primary
+        key as a suffix to the secondary keys. If it has continue to check
+        the primary key as a suffix.
+      */
+      if (!on_pk_suffix &&
+          (table->file->ha_table_flags() & HA_PRIMARY_KEY_IN_READ_INDEX) &&
+          table->s->primary_key != MAX_KEY &&
+          table->s->primary_key != idx)
+      {
+        on_pk_suffix= TRUE;
+        key_part= table->key_info[table->s->primary_key].key_part;
+        key_part_end=key_part +
+          table->key_info[table->s->primary_key].user_defined_key_parts;
+        const_key_parts=table->const_key_parts[table->s->primary_key];
+
+        for (; const_key_parts & 1 ; const_key_parts>>= 1)
+          key_part++; 
+        /*
+         The primary and secondary key parts were all const (i.e. there's
+         one row).  The sorting doesn't matter.
+        */
+        if (key_part == key_part_end && reverse == 0)
+        {
+          key_parts= 0;
+          reverse= 1;
+          goto ok;
+        }
+      }
+      else
+        DBUG_RETURN(0);
+    }
+
+    if (key_part->field != field || !field->part_of_sortkey.is_set(idx))
+      DBUG_RETURN(0);
+
+    const ORDER::enum_order keypart_order= 
+      (key_part->key_part_flag & HA_REVERSE_SORT) ? 
+      ORDER::ORDER_DESC : ORDER::ORDER_ASC;
+    /* set flag to 1 if we can use read-next on key, else to -1 */
+    flag= (order->direction == keypart_order) ? 1 : -1;
+    if (reverse && flag != reverse)
+      DBUG_RETURN(0);
+    reverse=flag;				// Remember if reverse
+    key_part++;
+  }
+  if (on_pk_suffix)
+  {
+    uint used_key_parts_secondary= table->key_info[idx].user_defined_key_parts;
+    uint used_key_parts_pk=
+      (uint) (key_part - table->key_info[table->s->primary_key].key_part);
+    key_parts= used_key_parts_pk + used_key_parts_secondary;
+
+    if (reverse == -1 &&
+        (!(table->file->index_flags(idx, used_key_parts_secondary - 1, 1) &
+           HA_READ_PREV) ||
+         !(table->file->index_flags(table->s->primary_key,
+                                    used_key_parts_pk - 1, 1) & HA_READ_PREV)))
+      reverse= 0;                               // Index can't be used
+  }
+  else
+  {
+    key_parts= (uint) (key_part - table->key_info[idx].key_part);
+    if (reverse == -1 && 
+        !(table->file->index_flags(idx, key_parts-1, 1) & HA_READ_PREV))
+      reverse= 0;                               // Index can't be used
+  }
+ok:
+  if (used_key_parts != NULL)
+    *used_key_parts= key_parts;
+  DBUG_RETURN(reverse);
+}
+
+
+/**
+  Find shortest key suitable for full table scan.
+
+  @param table                 Table to scan
+  @param usable_keys           Allowed keys
+
+  @note
+     As far as 
+     1) clustered primary key entry data set is a set of all record
+        fields (key fields and not key fields) and
+     2) secondary index entry data is a union of its key fields and
+        primary key fields (at least InnoDB and its derivatives don't
+        duplicate primary key fields there, even if the primary and
+        the secondary keys have a common subset of key fields),
+     then secondary index entry data is always a subset of primary key entry.
+     Unfortunately, key_info[nr].key_length doesn't show the length
+     of key/pointer pair but a sum of key field lengths only, thus
+     we can't estimate index IO volume comparing only this key_length
+     value of secondary keys and clustered PK.
+     So, try secondary keys first, and choose PK only if there are no
+     usable secondary covering keys or found best secondary key include
+     all table fields (i.e. same as PK):
+
+  @return
+    MAX_KEY     no suitable key found
+    key index   otherwise
+*/
+
+uint find_shortest_key(TABLE *table, const key_map *usable_keys)
+{
+  uint best= MAX_KEY;
+  uint usable_clustered_pk= (table->file->primary_key_is_clustered() &&
+                             table->s->primary_key != MAX_KEY &&
+                             usable_keys->is_set(table->s->primary_key)) ?
+                            table->s->primary_key : MAX_KEY;
+  if (!usable_keys->is_clear_all())
+  {
+    uint min_length= (uint) ~0;
+    for (uint nr=0; nr < table->s->keys ; nr++)
+    {
+      if (nr == usable_clustered_pk)
+        continue;
+      if (usable_keys->is_set(nr))
+      {
+        if (table->key_info[nr].key_length < min_length)
+        {
+          min_length=table->key_info[nr].key_length;
+          best=nr;
+        }
+      }
+    }
+  }
+  if (usable_clustered_pk != MAX_KEY)
+  {
+    /*
+     If the primary key is clustered and found shorter key covers all table
+     fields then primary key scan normally would be faster because amount of
+     data to scan is the same but PK is clustered.
+     It's safe to compare key parts with table fields since duplicate key
+     parts aren't allowed.
+     */
+    if (best == MAX_KEY ||
+        table->key_info[best].user_defined_key_parts >= table->s->fields)
+      best= usable_clustered_pk;
+  }
+  return best;
+}
+
+/**
+  Test if a second key is the subkey of the first one.
+
+  @param key_part              First key parts
+  @param ref_key_part          Second key parts
+  @param ref_key_part_end      Last+1 part of the second key
+
+  @note
+    Second key MUST be shorter than the first one.
+
+  @retval
+    1	is a subkey
+  @retval
+    0	no sub key
+*/
+
+inline bool 
+is_subkey(KEY_PART_INFO *key_part, KEY_PART_INFO *ref_key_part,
+	  KEY_PART_INFO *ref_key_part_end)
+{
+  for (; ref_key_part < ref_key_part_end; key_part++, ref_key_part++)
+    if (!key_part->field->eq(ref_key_part->field))
+      return 0;
+  return 1;
+}
+
+/**
+  Test if REF_OR_NULL optimization will be used if the specified
+  ref_key is used for REF-access to 'tab'
+
+  @retval
+    true	JT_REF_OR_NULL will be used
+  @retval
+    false	no JT_REF_OR_NULL access
+*/
+bool
+is_ref_or_null_optimized(const JOIN_TAB *tab, uint ref_key)
+{
+  if (tab->keyuse)
+  {
+    const Key_use *keyuse= tab->keyuse;
+    while (keyuse->key != ref_key && keyuse->table == tab->table)
+      keyuse++;
+
+    const table_map const_tables= tab->join->const_table_map;
+    while (keyuse->key == ref_key && keyuse->table == tab->table)
+    {
+      if (!(keyuse->used_tables & ~const_tables))
+      {
+        if (keyuse->optimize & KEY_OPTIMIZE_REF_OR_NULL)
+          return true;
+      }
+      keyuse++;
+    }
+  }
+  return false;
+}
+
+/**
+  Test if we can use one of the 'usable_keys' instead of 'ref' key
+  for sorting.
+
+  @param ref			Number of key, used for WHERE clause
+  @param usable_keys		Keys for testing
+
+  @return
+    - MAX_KEY			If we can't use other key
+    - the number of found key	Otherwise
+*/
+
+static uint
+test_if_subkey(ORDER *order, JOIN_TAB *tab, uint ref, uint ref_key_parts,
+	       const key_map *usable_keys)
+{
+  uint nr;
+  uint min_length= (uint) ~0;
+  uint best= MAX_KEY;
+  TABLE *table= tab->table;
+  KEY_PART_INFO *ref_key_part= table->key_info[ref].key_part;
+  KEY_PART_INFO *ref_key_part_end= ref_key_part + ref_key_parts;
+
+  for (nr= 0 ; nr < table->s->keys ; nr++)
+  {
+    if (usable_keys->is_set(nr) &&
+	table->key_info[nr].key_length < min_length &&
+	table->key_info[nr].user_defined_key_parts >= ref_key_parts &&
+	is_subkey(table->key_info[nr].key_part, ref_key_part,
+		  ref_key_part_end) &&
+        !is_ref_or_null_optimized(tab, nr) &&
+	test_if_order_by_key(order, table, nr))
+    {
+      min_length= table->key_info[nr].key_length;
+      best= nr;
+    }
+  }
+  return best;
+}
+
+
+/**
+  It is not obvious to see that test_if_skip_sort_order() never changes the
+  plan if no_changes is true. So we double-check: creating an instance of this
+  class saves some important access-path-related information of the current
+  table; when the instance is destroyed, the latest access-path information is
+  compared with saved data.
+*/
+class Plan_change_watchdog
+{
+#ifndef DBUG_OFF
+public:
+  /**
+    @param tab_arg     table whose access path is being determined
+    @param no_changes  whether a change to the access path is allowed
+  */
+  Plan_change_watchdog(const JOIN_TAB *tab_arg, const bool no_changes_arg)
+  {
+    // Only to keep gcc 4.1.2-44 silent about uninitialized variables
+    quick= NULL;
+    quick_index= 0;
+    if (no_changes_arg)
+    {
+      tab= tab_arg;
+      type= tab->type;
+      if ((select= tab->select))
+        if ((quick= tab->select->quick))
+          quick_index= quick->index;
+      use_quick= tab->use_quick;
+      ref_key= tab->ref.key;
+      ref_key_parts= tab->ref.key_parts;
+      index= tab->index;
+    }
+    else
+    {
+      tab= NULL;
+      // Only to keep gcc 4.1.2-44 silent about uninitialized variables
+      type= JT_UNKNOWN;
+      select= NULL;
+      ref_key= ref_key_parts= index= 0;
+      use_quick= QS_NONE;
+    }
+  }
+  ~Plan_change_watchdog()
+  {
+    if (tab == NULL)
+      return;
+    // changes are not allowed, we verify:
+    DBUG_ASSERT(tab->type == type);
+    DBUG_ASSERT(tab->select == select);
+    if (select != NULL)
+    {
+      DBUG_ASSERT(tab->select->quick == quick);
+      if (quick != NULL)
+        DBUG_ASSERT(tab->select->quick->index == quick_index);
+    }
+    DBUG_ASSERT(tab->use_quick == use_quick);
+    DBUG_ASSERT(tab->ref.key == ref_key);
+    DBUG_ASSERT(tab->ref.key_parts == ref_key_parts);
+    DBUG_ASSERT(tab->index == index);
+  }
+private:
+  const JOIN_TAB *tab;            ///< table, or NULL if changes are allowed
+  enum join_type type;            ///< copy of tab->type
+  // "Range / index merge" info
+  const SQL_SELECT *select;       ///< copy of tab->select
+  const QUICK_SELECT_I *quick;    ///< copy of tab->select->quick
+  uint quick_index;               ///< copy of tab->select->quick->index
+  enum quick_type use_quick;      ///< copy of tab->use_quick
+  // "ref access" info
+  int ref_key;                    ///< copy of tab->ref.key
+  uint ref_key_parts;/// copy of tab->ref.key_parts
+  // Other index-related info
+  uint index;                     ///< copy of tab->index
+#else // in non-debug build, empty class
+public:
+  Plan_change_watchdog(const JOIN_TAB *tab_arg, const bool no_changes_arg) {}
+#endif
+};
+
+/**
+  Test if we can skip the ORDER BY by using an index.
+
+  SYNOPSIS
+    test_if_skip_sort_order()
+      tab
+      order
+      select_limit
+      no_changes
+      map
+
+  If we can use an index, the JOIN_TAB / tab->select struct
+  is changed to use the index.
+
+  The index must cover all fields in <order>, or it will not be considered.
+
+  @param tab           NULL or JOIN_TAB of the accessed table
+  @param order         Linked list of ORDER BY arguments
+  @param select_limit  LIMIT value, or HA_POS_ERROR if no limit
+  @param no_changes    No changes will be made to the query plan.
+  @param map           key_map of applicable indexes.
+  @param clause_type   "ORDER BY" etc for printing in optimizer trace
+
+  @todo
+    - sergeyp: Results of all index merge selects actually are ordered 
+    by clustered PK values.
+
+  @retval
+    0    We have to use filesort to do the sorting
+  @retval
+    1    We can use an index.
+*/
+
+bool
+test_if_skip_sort_order(JOIN_TAB *tab, ORDER *order, ha_rows select_limit,
+                        const bool no_changes, const key_map *map,
+                        const char *clause_type)
+{
+  int ref_key;
+  uint ref_key_parts;
+  int order_direction= 0;
+  uint used_key_parts;
+  TABLE *table=tab->table;
+  SQL_SELECT *select=tab->select;
+  QUICK_SELECT_I *save_quick= select ? select->quick : NULL;
+  int best_key= -1;
+  Item *orig_cond;
+  bool orig_cond_saved= false, set_up_ref_access_to_key= false;
+  bool can_skip_sorting= false;                  // used as return value
+  int changed_key= -1;
+  DBUG_ENTER("test_if_skip_sort_order");
+  LINT_INIT(ref_key_parts);
+  LINT_INIT(orig_cond);
+
+  /* Check that we are always called with first non-const table */
+  DBUG_ASSERT(tab == tab->join->join_tab + tab->join->const_tables); 
+
+  Plan_change_watchdog watchdog(tab, no_changes);
+
+  /* Sorting a single row can always be skipped */
+  if (tab->type == JT_EQ_REF ||
+      tab->type == JT_CONST  ||
+      tab->type == JT_SYSTEM)
+  {
+    DBUG_RETURN(1);
+  }
+
+  /*
+    Keys disabled by ALTER TABLE ... DISABLE KEYS should have already
+    been taken into account.
+  */
+  key_map usable_keys= *map;
+
+  for (ORDER *tmp_order=order; tmp_order ; tmp_order=tmp_order->next)
+  {
+    Item *item= (*tmp_order->item)->real_item();
+    if (item->type() != Item::FIELD_ITEM)
+    {
+      usable_keys.clear_all();
+      DBUG_RETURN(0);
+    }
+    usable_keys.intersect(((Item_field*) item)->field->part_of_sortkey);
+    if (usable_keys.is_clear_all())
+      DBUG_RETURN(0);					// No usable keys
+  }
+
+  ref_key= -1;
+  /* Test if constant range in WHERE */
+  if (tab->ref.key >= 0 && tab->ref.key_parts)
+  {
+    if (tab->type == JT_REF_OR_NULL || tab->type == JT_FT)
+      DBUG_RETURN(0);
+    ref_key=	   tab->ref.key;
+    ref_key_parts= tab->ref.key_parts;
+  }
+  else if (select && select->quick)		// Range found by opt_range
+  {
+    int quick_type= select->quick->get_type();
+    /* 
+      assume results are not ordered when index merge is used 
+      TODO: sergeyp: Results of all index merge selects actually are ordered 
+      by clustered PK values.
+    */
+  
+    if (quick_type == QUICK_SELECT_I::QS_TYPE_INDEX_MERGE || 
+        quick_type == QUICK_SELECT_I::QS_TYPE_ROR_UNION || 
+        quick_type == QUICK_SELECT_I::QS_TYPE_ROR_INTERSECT)
+      DBUG_RETURN(0);
+    ref_key=	   select->quick->index;
+    ref_key_parts= select->quick->used_key_parts;
+  }
+
+  /*
+    If part of the select condition has been pushed we use the
+    select condition as it was before pushing. The original
+    select condition is saved so that it can be restored when
+    exiting this function (if we have not changed index).
+  */
+  if (tab->pre_idx_push_cond)
+  {
+    orig_cond=
+      tab->set_jt_and_sel_condition(tab->pre_idx_push_cond, __LINE__);
+    orig_cond_saved= true;
+  }
+
+  Opt_trace_context * const trace= &tab->join->thd->opt_trace;
+  Opt_trace_object trace_wrapper(trace);
+  Opt_trace_object
+    trace_skip_sort_order(trace, "reconsidering_access_paths_for_index_ordering");
+  trace_skip_sort_order.add_alnum("clause", clause_type);
+
+  if (ref_key >= 0)
+  {
+    /*
+      We come here when there is a {ref or or ordered range access} key.
+    */
+    if (!usable_keys.is_set(ref_key))
+    {
+      /*
+        We come here when ref_key is not among usable_keys, try to find a
+        usable prefix key of that key.
+      */
+      uint new_ref_key;
+      /*
+	If using index only read, only consider other possible index only
+	keys
+      */
+      if (table->covering_keys.is_set(ref_key))
+	usable_keys.intersect(table->covering_keys);
+
+      if ((new_ref_key= test_if_subkey(order, tab, ref_key, ref_key_parts,
+				       &usable_keys)) < MAX_KEY)
+      {
+	/* Found key that can be used to retrieve data in sorted order */
+	if (tab->ref.key >= 0)
+        {
+          /*
+            We'll use ref access method on key new_ref_key. The actual change
+            is done further down in this function where we update the plan.
+          */
+          set_up_ref_access_to_key= true;
+        }
+	else if (!no_changes)
+	{
+          /*
+            The range optimizer constructed QUICK_RANGE for ref_key, and
+            we want to use instead new_ref_key as the index. We can't
+            just change the index of the quick select, because this may
+            result in an incosistent QUICK_SELECT object. Below we
+            create a new QUICK_SELECT from scratch so that all its
+            parameres are set correctly by the range optimizer.
+
+            Note that the range optimizer is NOT called if
+            no_changes==true. This reason is that the range optimizer
+            cannot find a QUICK that can return ordered result unless
+            index access (ref or index scan) is also able to do so
+            (which test_if_order_by_key () will tell).
+            Admittedly, range access may be much more efficient than
+            e.g. index scan, but the only thing that matters when
+            no_change==true is the answer to the question: "Is it
+            possible to avoid sorting if an index is used to access
+            this table?". The answer does not depend on the outcome of
+            the range optimizer.
+          */
+          key_map new_ref_key_map;  // Force the creation of quick select
+          new_ref_key_map.set_bit(new_ref_key); // only for new_ref_key.
+
+          Opt_trace_object
+            trace_recest(trace, "rows_estimation");
+          trace_recest.add_utf8_table(tab->table).
+          add_utf8("index", table->key_info[new_ref_key].name);
+          select->quick= 0;
+          if (select->test_quick_select(tab->join->thd, 
+                                        new_ref_key_map, 
+                                        0,       // empty table_map
+                                        (tab->join->select_options &
+                                         OPTION_FOUND_ROWS) ?
+                                        HA_POS_ERROR :
+                                        tab->join->unit->select_limit_cnt,
+                                        false,   // don't force quick range
+                                        order->direction) <= 0)
+          {
+            can_skip_sorting= false;
+            goto fix_ICP;
+          }
+	}
+        ref_key= new_ref_key;
+        changed_key= new_ref_key;
+      }
+    }
+    /* Check if we get the rows in requested sorted order by using the key */
+    if (usable_keys.is_set(ref_key) &&
+        (order_direction= test_if_order_by_key(order,table,ref_key,
+					       &used_key_parts)))
+      goto check_reverse_order;
+  }
+  {
+    /*
+      There was no {ref or or ordered range access} key, or it was not
+      satisfying, neither was any prefix of it. Do a cost-based search on all
+      keys:
+    */
+    uint best_key_parts= 0;
+    uint saved_best_key_parts= 0;
+    int best_key_direction= 0;
+    JOIN *join= tab->join;
+    ha_rows table_records= table->file->stats.records;
+
+    test_if_cheaper_ordering(tab, order, table, usable_keys,
+                             ref_key, select_limit,
+                             &best_key, &best_key_direction,
+                             &select_limit, &best_key_parts,
+                             &saved_best_key_parts);
+
+    if (best_key < 0)
+    {
+      // No usable key has been found
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
+
+    /*
+      Does the query have a "FORCE INDEX [FOR GROUP BY] (idx)" (if
+      clause is group by) or a "FORCE INDEX [FOR ORDER BY] (idx)" (if
+      clause is order by)?
+    */
+    const bool is_group_by= join && join->group && order == join->group_list;
+    const bool is_force_index= table->force_index ||
+      (is_group_by ? table->force_index_group : table->force_index_order);
+
+    /*
+      filesort() and join cache are usually faster than reading in
+      index order and not using join cache. Don't use index scan
+      unless:
+       - the user specified FORCE INDEX [FOR {GROUP|ORDER} BY] (have to assume
+         the user knows what's best)
+       - the chosen index is clustered primary key (table scan is not cheaper)
+    */
+    if (!is_force_index &&
+        (select_limit >= table_records) &&
+        (tab->type == JT_ALL &&
+         tab->join->primary_tables > tab->join->const_tables + 1) &&
+         ((unsigned) best_key != table->s->primary_key ||
+          !table->file->primary_key_is_clustered()))
+    {
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
+
+    if (select &&
+        table->quick_keys.is_set(best_key) &&
+        !tab->quick_order_tested.is_set(best_key) &&
+        best_key != ref_key)
+    {
+      tab->quick_order_tested.set_bit(best_key);
+      Opt_trace_object
+        trace_recest(trace, "rows_estimation");
+      trace_recest.add_utf8_table(tab->table).
+        add_utf8("index", table->key_info[best_key].name);
+
+      key_map map;           // Force the creation of quick select
+      map.set_bit(best_key); // only best_key.
+      select->quick= 0;
+      select->test_quick_select(join->thd, 
+                                map, 
+                                0,        // empty table_map
+                                join->select_options & OPTION_FOUND_ROWS ?
+                                HA_POS_ERROR :
+                                join->unit->select_limit_cnt,
+                                true,     // force quick range
+                                order->direction);
+    }
+    order_direction= best_key_direction;
+    /*
+      saved_best_key_parts is actual number of used keyparts found by the
+      test_if_order_by_key function. It could differ from keyinfo->key_parts,
+      thus we have to restore it in case of desc order as it affects
+      QUICK_SELECT_DESC behaviour.
+    */
+    used_key_parts= (order_direction == -1) ?
+      saved_best_key_parts :  best_key_parts;
+    changed_key= best_key;
+    // We will use index scan or range scan:
+    set_up_ref_access_to_key= false;
+  }
+>>>>>>>>> Temporary merge branch 2
+||||||||| merged common ancestors
+||||||||||| 4812bae3baa
+      r          the right comparison argument (a const of any)
+  
+  DESCRIPTION    
+    Checks if an equality predicate can be used to take away 
+    DISTINCT/GROUP BY because it is known to be true for exactly one 
+    distinct value (e.g. <expr> == <const>).
+    Arguments must be of the same type because e.g. 
+    <string_field> = <int_const> may match more than 1 distinct value from 
+    the column. 
+    We must take into consideration and the optimization done for various 
+    string constants when compared to dates etc (see Item_int_with_ref) as
+    well as the collation of the arguments.
+  
+  RETURN VALUE  
+    TRUE    can be used
+    FALSE   cannot be used
+*/
+static bool
+test_if_equality_guarantees_uniqueness(Item *l, Item *r)
+{
+  return r->const_item() &&
+    /* elements must be compared as dates */
+     (Arg_comparator::can_compare_as_dates(l, r, 0) ||
+      /* or of the same result type */
+      (r->result_type() == l->result_type() &&
+       /* and must have the same collation if compared as strings */
+       (l->result_type() != STRING_RESULT ||
+        l->collation.collation == r->collation.collation)));
+}
+
+
+/*
+  Return TRUE if i1 and i2 (if any) are equal items,
+  or if i1 is a wrapper item around the f2 field.
+*/
+
+static bool equal(Item *i1, Item *i2, Field *f2)
+{
+  DBUG_ASSERT((i2 == NULL) ^ (f2 == NULL));
+
+  if (i2 != NULL)
+    return i1->eq(i2, 1);
+  else if (i1->type() == Item::FIELD_ITEM)
+    return f2->eq(((Item_field *) i1)->field);
+  else
+    return FALSE;
+}
+
+
+/**
+  Test if a field or an item is equal to a constant value in WHERE
+
+  @param        cond            WHERE clause expression
+  @param        comp_item       Item to find in WHERE expression
+                                (if comp_field != NULL)
+  @param        comp_field      Field to find in WHERE expression
+                                (if comp_item != NULL)
+  @param[out]   const_item      intermediate arg, set to Item pointer to NULL 
+
+  @return TRUE if the field is a constant value in WHERE
+
+  @note
+    comp_item and comp_field parameters are mutually exclusive.
+*/
+bool
+const_expression_in_where(Item *cond, Item *comp_item, Field *comp_field,
+                          Item **const_item)
+{
+  DBUG_ASSERT((comp_item == NULL) ^ (comp_field == NULL));
+
+  Item *intermediate= NULL;
+  if (const_item == NULL)
+    const_item= &intermediate;
+
+  if (cond->type() == Item::COND_ITEM)
+  {
+    bool and_level= (((Item_cond*) cond)->functype()
+		     == Item_func::COND_AND_FUNC);
+    List_iterator_fast<Item> li(*((Item_cond*) cond)->argument_list());
+    Item *item;
+    while ((item=li++))
+    {
+      bool res=const_expression_in_where(item, comp_item, comp_field,
+                                         const_item);
+      if (res)					// Is a const value
+      {
+	if (and_level)
+	  return 1;
+      }
+      else if (!and_level)
+	return 0;
+    }
+    return and_level ? 0 : 1;
+  }
+  else if (cond->eq_cmp_result() != Item::COND_OK)
+  {						// boolean compare function
+    Item_func* func= (Item_func*) cond;
+    if (func->functype() != Item_func::EQUAL_FUNC &&
+	func->functype() != Item_func::EQ_FUNC)
+      return 0;
+    Item *left_item=	((Item_func*) cond)->arguments()[0];
+    Item *right_item= ((Item_func*) cond)->arguments()[1];
+    if (equal(left_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (left_item, right_item))
+      {
+	if (*const_item)
+	  return right_item->eq(*const_item, 1);
+	*const_item=right_item;
+	return 1;
+      }
+    }
+    else if (equal(right_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (right_item, left_item))
+      {
+	if (*const_item)
+	  return left_item->eq(*const_item, 1);
+	*const_item=left_item;
+	return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+
+/**
+  Test if one can use the key to resolve ORDER BY.
+
+  @param order                 Sort order
+  @param table                 Table to sort
+  @param idx                   Index to check
+  @param used_key_parts [out]  NULL by default, otherwise return value for
+                               used key parts.
+
+
+  @note
+    used_key_parts is set to correct key parts used if return value != 0
+    (On other cases, used_key_part may be changed)
+    Note that the value may actually be greater than the number of index 
+    key parts. This can happen for storage engines that have the primary 
+    key parts as a suffix for every secondary key.
+
+  @retval
+    1   key is ok.
+  @retval
+    0   Key can't be used
+  @retval
+    -1   Reverse key can be used
+*/
+
+int test_if_order_by_key(ORDER *order, TABLE *table, uint idx,
+                         uint *used_key_parts)
+{
+  KEY_PART_INFO *key_part,*key_part_end;
+  key_part=table->key_info[idx].key_part;
+  key_part_end=key_part+table->key_info[idx].user_defined_key_parts;
+  key_part_map const_key_parts=table->const_key_parts[idx];
+  int reverse=0;
+  uint key_parts;
+  my_bool on_pk_suffix= FALSE;
+  DBUG_ENTER("test_if_order_by_key");
+
+  for (; order ; order=order->next, const_key_parts>>=1)
+  {
+
+    /*
+      Since only fields can be indexed, ORDER BY <something> that is
+      not a field cannot be resolved by using an index.
+    */
+    Item *real_itm= (*order->item)->real_item();
+    if (real_itm->type() != Item::FIELD_ITEM)
+      DBUG_RETURN(0);
+
+    Field *field= static_cast<Item_field*>(real_itm)->field;
+    int flag;
+
+    /*
+      Skip key parts that are constants in the WHERE clause.
+      These are already skipped in the ORDER BY by const_expression_in_where()
+    */
+    for (; const_key_parts & 1 ; const_key_parts>>= 1)
+      key_part++; 
+
+    if (key_part == key_part_end)
+    {
+      /* 
+        We are at the end of the key. Check if the engine has the primary
+        key as a suffix to the secondary keys. If it has continue to check
+        the primary key as a suffix.
+      */
+      if (!on_pk_suffix &&
+          (table->file->ha_table_flags() & HA_PRIMARY_KEY_IN_READ_INDEX) &&
+          table->s->primary_key != MAX_KEY &&
+          table->s->primary_key != idx)
+      {
+        on_pk_suffix= TRUE;
+        key_part= table->key_info[table->s->primary_key].key_part;
+        key_part_end=key_part +
+          table->key_info[table->s->primary_key].user_defined_key_parts;
+        const_key_parts=table->const_key_parts[table->s->primary_key];
+
+        for (; const_key_parts & 1 ; const_key_parts>>= 1)
+          key_part++; 
+        /*
+         The primary and secondary key parts were all const (i.e. there's
+         one row).  The sorting doesn't matter.
+        */
+        if (key_part == key_part_end && reverse == 0)
+        {
+          key_parts= 0;
+          reverse= 1;
+          goto ok;
+        }
+      }
+      else
+        DBUG_RETURN(0);
+    }
+
+    if (key_part->field != field || !field->part_of_sortkey.is_set(idx))
+      DBUG_RETURN(0);
+
+    const ORDER::enum_order keypart_order= 
+      (key_part->key_part_flag & HA_REVERSE_SORT) ? 
+      ORDER::ORDER_DESC : ORDER::ORDER_ASC;
+    /* set flag to 1 if we can use read-next on key, else to -1 */
+    flag= (order->direction == keypart_order) ? 1 : -1;
+    if (reverse && flag != reverse)
+      DBUG_RETURN(0);
+    reverse=flag;				// Remember if reverse
+    key_part++;
+  }
+  if (on_pk_suffix)
+  {
+    uint used_key_parts_secondary= table->key_info[idx].user_defined_key_parts;
+    uint used_key_parts_pk=
+      (uint) (key_part - table->key_info[table->s->primary_key].key_part);
+    key_parts= used_key_parts_pk + used_key_parts_secondary;
+
+    if (reverse == -1 &&
+        (!(table->file->index_flags(idx, used_key_parts_secondary - 1, 1) &
+           HA_READ_PREV) ||
+         !(table->file->index_flags(table->s->primary_key,
+                                    used_key_parts_pk - 1, 1) & HA_READ_PREV)))
+      reverse= 0;                               // Index can't be used
+  }
+  else
+  {
+    key_parts= (uint) (key_part - table->key_info[idx].key_part);
+    if (reverse == -1 && 
+        !(table->file->index_flags(idx, key_parts-1, 1) & HA_READ_PREV))
+      reverse= 0;                               // Index can't be used
+  }
+ok:
+  if (used_key_parts != NULL)
+    *used_key_parts= key_parts;
+  DBUG_RETURN(reverse);
+}
+
+
+/**
+  Find shortest key suitable for full table scan.
+
+  @param table                 Table to scan
+  @param usable_keys           Allowed keys
+
+  @note
+     As far as 
+     1) clustered primary key entry data set is a set of all record
+        fields (key fields and not key fields) and
+     2) secondary index entry data is a union of its key fields and
+        primary key fields (at least InnoDB and its derivatives don't
+        duplicate primary key fields there, even if the primary and
+        the secondary keys have a common subset of key fields),
+     then secondary index entry data is always a subset of primary key entry.
+     Unfortunately, key_info[nr].key_length doesn't show the length
+     of key/pointer pair but a sum of key field lengths only, thus
+     we can't estimate index IO volume comparing only this key_length
+     value of secondary keys and clustered PK.
+     So, try secondary keys first, and choose PK only if there are no
+     usable secondary covering keys or found best secondary key include
+     all table fields (i.e. same as PK):
+
+  @return
+    MAX_KEY     no suitable key found
+    key index   otherwise
+*/
+
+uint find_shortest_key(TABLE *table, const key_map *usable_keys)
+{
+  uint best= MAX_KEY;
+  uint usable_clustered_pk= (table->file->primary_key_is_clustered() &&
+                             table->s->primary_key != MAX_KEY &&
+                             usable_keys->is_set(table->s->primary_key)) ?
+                            table->s->primary_key : MAX_KEY;
+  if (!usable_keys->is_clear_all())
+  {
+    uint min_length= (uint) ~0;
+    for (uint nr=0; nr < table->s->keys ; nr++)
+    {
+      if (nr == usable_clustered_pk)
+        continue;
+      if (usable_keys->is_set(nr))
+      {
+        if (table->key_info[nr].key_length < min_length)
+        {
+          min_length=table->key_info[nr].key_length;
+          best=nr;
+        }
+      }
+    }
+  }
+  if (usable_clustered_pk != MAX_KEY)
+  {
+    /*
+     If the primary key is clustered and found shorter key covers all table
+     fields then primary key scan normally would be faster because amount of
+     data to scan is the same but PK is clustered.
+     It's safe to compare key parts with table fields since duplicate key
+     parts aren't allowed.
+     */
+    if (best == MAX_KEY ||
+        table->key_info[best].user_defined_key_parts >= table->s->fields)
+      best= usable_clustered_pk;
+  }
+  return best;
+}
+
+/**
+  Test if a second key is the subkey of the first one.
+
+  @param key_part              First key parts
+  @param ref_key_part          Second key parts
+  @param ref_key_part_end      Last+1 part of the second key
+
+  @note
+    Second key MUST be shorter than the first one.
+
+  @retval
+    1	is a subkey
+  @retval
+    0	no sub key
+*/
+
+inline bool 
+is_subkey(KEY_PART_INFO *key_part, KEY_PART_INFO *ref_key_part,
+	  KEY_PART_INFO *ref_key_part_end)
+{
+  for (; ref_key_part < ref_key_part_end; key_part++, ref_key_part++)
+    if (!key_part->field->eq(ref_key_part->field))
+      return 0;
+  return 1;
+}
+
+/**
+  Test if REF_OR_NULL optimization will be used if the specified
+  ref_key is used for REF-access to 'tab'
+
+  @retval
+    true	JT_REF_OR_NULL will be used
+  @retval
+    false	no JT_REF_OR_NULL access
+*/
+bool
+is_ref_or_null_optimized(const JOIN_TAB *tab, uint ref_key)
+{
+  if (tab->keyuse)
+  {
+    const Key_use *keyuse= tab->keyuse;
+    while (keyuse->key != ref_key && keyuse->table == tab->table)
+      keyuse++;
+
+    const table_map const_tables= tab->join->const_table_map;
+    while (keyuse->key == ref_key && keyuse->table == tab->table)
+    {
+      if (!(keyuse->used_tables & ~const_tables))
+      {
+        if (keyuse->optimize & KEY_OPTIMIZE_REF_OR_NULL)
+          return true;
+      }
+      keyuse++;
+    }
+  }
+  return false;
+}
+
+/**
+  Test if we can use one of the 'usable_keys' instead of 'ref' key
+  for sorting.
+
+  @param ref			Number of key, used for WHERE clause
+  @param usable_keys		Keys for testing
+
+  @return
+    - MAX_KEY			If we can't use other key
+    - the number of found key	Otherwise
+*/
+
+static uint
+test_if_subkey(ORDER *order, JOIN_TAB *tab, uint ref, uint ref_key_parts,
+	       const key_map *usable_keys)
+{
+  uint nr;
+  uint min_length= (uint) ~0;
+  uint best= MAX_KEY;
+  TABLE *table= tab->table;
+  KEY_PART_INFO *ref_key_part= table->key_info[ref].key_part;
+  KEY_PART_INFO *ref_key_part_end= ref_key_part + ref_key_parts;
+
+  for (nr= 0 ; nr < table->s->keys ; nr++)
+  {
+    if (usable_keys->is_set(nr) &&
+	table->key_info[nr].key_length < min_length &&
+	table->key_info[nr].user_defined_key_parts >= ref_key_parts &&
+	is_subkey(table->key_info[nr].key_part, ref_key_part,
+		  ref_key_part_end) &&
+        !is_ref_or_null_optimized(tab, nr) &&
+	test_if_order_by_key(order, table, nr))
+    {
+      min_length= table->key_info[nr].key_length;
+      best= nr;
+    }
+  }
+  return best;
+}
+
+
+/**
+  It is not obvious to see that test_if_skip_sort_order() never changes the
+  plan if no_changes is true. So we double-check: creating an instance of this
+  class saves some important access-path-related information of the current
+  table; when the instance is destroyed, the latest access-path information is
+  compared with saved data.
+*/
+class Plan_change_watchdog
+{
+#ifndef DBUG_OFF
+public:
+  /**
+    @param tab_arg     table whose access path is being determined
+    @param no_changes  whether a change to the access path is allowed
+  */
+  Plan_change_watchdog(const JOIN_TAB *tab_arg, const bool no_changes_arg)
+  {
+    // Only to keep gcc 4.1.2-44 silent about uninitialized variables
+    quick= NULL;
+    quick_index= 0;
+    if (no_changes_arg)
+    {
+      tab= tab_arg;
+      type= tab->type;
+      if ((select= tab->select))
+        if ((quick= tab->select->quick))
+          quick_index= quick->index;
+      use_quick= tab->use_quick;
+      ref_key= tab->ref.key;
+      ref_key_parts= tab->ref.key_parts;
+      index= tab->index;
+    }
+    else
+    {
+      tab= NULL;
+      // Only to keep gcc 4.1.2-44 silent about uninitialized variables
+      type= JT_UNKNOWN;
+      select= NULL;
+      ref_key= ref_key_parts= index= 0;
+      use_quick= QS_NONE;
+    }
+  }
+  ~Plan_change_watchdog()
+  {
+    if (tab == NULL)
+      return;
+    // changes are not allowed, we verify:
+    DBUG_ASSERT(tab->type == type);
+    DBUG_ASSERT(tab->select == select);
+    if (select != NULL)
+    {
+      DBUG_ASSERT(tab->select->quick == quick);
+      if (quick != NULL)
+        DBUG_ASSERT(tab->select->quick->index == quick_index);
+    }
+    DBUG_ASSERT(tab->use_quick == use_quick);
+    DBUG_ASSERT(tab->ref.key == ref_key);
+    DBUG_ASSERT(tab->ref.key_parts == ref_key_parts);
+    DBUG_ASSERT(tab->index == index);
+  }
+private:
+  const JOIN_TAB *tab;            ///< table, or NULL if changes are allowed
+  enum join_type type;            ///< copy of tab->type
+  // "Range / index merge" info
+  const SQL_SELECT *select;       ///< copy of tab->select
+  const QUICK_SELECT_I *quick;    ///< copy of tab->select->quick
+  uint quick_index;               ///< copy of tab->select->quick->index
+  enum quick_type use_quick;      ///< copy of tab->use_quick
+  // "ref access" info
+  int ref_key;                    ///< copy of tab->ref.key
+  uint ref_key_parts;/// copy of tab->ref.key_parts
+  // Other index-related info
+  uint index;                     ///< copy of tab->index
+#else // in non-debug build, empty class
+public:
+  Plan_change_watchdog(const JOIN_TAB *tab_arg, const bool no_changes_arg) {}
+#endif
+};
+
+
+/**
+  Test if we can skip the ORDER BY by using an index.
+
+  SYNOPSIS
+    test_if_skip_sort_order()
+      tab
+      order
+      select_limit
+      no_changes
+      map
+
+  If we can use an index, the JOIN_TAB / tab->select struct
+  is changed to use the index.
+
+  The index must cover all fields in <order>, or it will not be considered.
+
+  @param tab           NULL or JOIN_TAB of the accessed table
+  @param order         Linked list of ORDER BY arguments
+  @param select_limit  LIMIT value, or HA_POS_ERROR if no limit
+  @param no_changes    No changes will be made to the query plan.
+  @param map           key_map of applicable indexes.
+  @param clause_type   "ORDER BY" etc for printing in optimizer trace
+
+  @todo
+    - sergeyp: Results of all index merge selects actually are ordered 
+    by clustered PK values.
+
+  @retval
+    0    We have to use filesort to do the sorting
+  @retval
+    1    We can use an index.
+*/
+
+bool
+test_if_skip_sort_order(JOIN_TAB *tab, ORDER *order, ha_rows select_limit,
+                        const bool no_changes, const key_map *map,
+                        const char *clause_type)
+{
+  int ref_key;
+  uint ref_key_parts;
+  int order_direction= 0;
+  uint used_key_parts;
+  TABLE *table=tab->table;
+  SQL_SELECT *select=tab->select;
+  QUICK_SELECT_I *save_quick= select ? select->quick : NULL;
+  int best_key= -1;
+  Item *orig_cond;
+  bool orig_cond_saved= false, set_up_ref_access_to_key= false;
+  bool can_skip_sorting= false;                  // used as return value
+  int changed_key= -1;
+  DBUG_ENTER("test_if_skip_sort_order");
+  LINT_INIT(ref_key_parts);
+  LINT_INIT(orig_cond);
+
+  /* Check that we are always called with first non-const table */
+  DBUG_ASSERT(tab == tab->join->join_tab + tab->join->const_tables); 
+
+  Plan_change_watchdog watchdog(tab, no_changes);
+
+  /* Sorting a single row can always be skipped */
+  if (tab->type == JT_EQ_REF ||
+      tab->type == JT_CONST  ||
+      tab->type == JT_SYSTEM)
+  {
+    DBUG_RETURN(1);
+  }
+
+  /*
+    Keys disabled by ALTER TABLE ... DISABLE KEYS should have already
+    been taken into account.
+  */
+  key_map usable_keys= *map;
+
+  for (ORDER *tmp_order=order; tmp_order ; tmp_order=tmp_order->next)
+  {
+    Item *item= (*tmp_order->item)->real_item();
+    if (item->type() != Item::FIELD_ITEM)
+    {
+      usable_keys.clear_all();
+      DBUG_RETURN(0);
+    }
+    usable_keys.intersect(((Item_field*) item)->field->part_of_sortkey);
+    if (usable_keys.is_clear_all())
+      DBUG_RETURN(0);					// No usable keys
+  }
+
+  ref_key= -1;
+  /* Test if constant range in WHERE */
+  if (tab->ref.key >= 0 && tab->ref.key_parts)
+  {
+    if (tab->type == JT_REF_OR_NULL || tab->type == JT_FT)
+      DBUG_RETURN(0);
+    ref_key=	   tab->ref.key;
+    ref_key_parts= tab->ref.key_parts;
+  }
+  else if (select && select->quick)		// Range found by opt_range
+  {
+    int quick_type= select->quick->get_type();
+    /* 
+      assume results are not ordered when index merge is used 
+      TODO: sergeyp: Results of all index merge selects actually are ordered 
+      by clustered PK values.
+    */
+  
+    if (quick_type == QUICK_SELECT_I::QS_TYPE_INDEX_MERGE || 
+        quick_type == QUICK_SELECT_I::QS_TYPE_ROR_UNION || 
+        quick_type == QUICK_SELECT_I::QS_TYPE_ROR_INTERSECT)
+      DBUG_RETURN(0);
+    ref_key=	   select->quick->index;
+    ref_key_parts= select->quick->used_key_parts;
+  }
+
+  /*
+    If part of the select condition has been pushed we use the
+    select condition as it was before pushing. The original
+    select condition is saved so that it can be restored when
+    exiting this function (if we have not changed index).
+  */
+  if (tab->pre_idx_push_cond)
+  {
+    orig_cond=
+      tab->set_jt_and_sel_condition(tab->pre_idx_push_cond, __LINE__);
+    orig_cond_saved= true;
+  }
+
+  Opt_trace_context * const trace= &tab->join->thd->opt_trace;
+  Opt_trace_object trace_wrapper(trace);
+  Opt_trace_object
+    trace_skip_sort_order(trace, "reconsidering_access_paths_for_index_ordering");
+  trace_skip_sort_order.add_alnum("clause", clause_type);
+
+  if (ref_key >= 0)
+  {
+    /*
+      We come here when there is a {ref or or ordered range access} key.
+    */
+    if (!usable_keys.is_set(ref_key))
+    {
+      /*
+        We come here when ref_key is not among usable_keys, try to find a
+        usable prefix key of that key.
+      */
+      uint new_ref_key;
+      /*
+	If using index only read, only consider other possible index only
+	keys
+      */
+      if (table->covering_keys.is_set(ref_key))
+	usable_keys.intersect(table->covering_keys);
+
+      if ((new_ref_key= test_if_subkey(order, tab, ref_key, ref_key_parts,
+				       &usable_keys)) < MAX_KEY)
+      {
+	/* Found key that can be used to retrieve data in sorted order */
+	if (tab->ref.key >= 0)
+        {
+          /*
+            We'll use ref access method on key new_ref_key. The actual change
+            is done further down in this function where we update the plan.
+          */
+          set_up_ref_access_to_key= true;
+        }
+	else if (!no_changes)
+	{
+          /*
+            The range optimizer constructed QUICK_RANGE for ref_key, and
+            we want to use instead new_ref_key as the index. We can't
+            just change the index of the quick select, because this may
+            result in an incosistent QUICK_SELECT object. Below we
+            create a new QUICK_SELECT from scratch so that all its
+            parameres are set correctly by the range optimizer.
+
+            Note that the range optimizer is NOT called if
+            no_changes==true. This reason is that the range optimizer
+            cannot find a QUICK that can return ordered result unless
+            index access (ref or index scan) is also able to do so
+            (which test_if_order_by_key () will tell).
+            Admittedly, range access may be much more efficient than
+            e.g. index scan, but the only thing that matters when
+            no_change==true is the answer to the question: "Is it
+            possible to avoid sorting if an index is used to access
+            this table?". The answer does not depend on the outcome of
+            the range optimizer.
+          */
+          key_map new_ref_key_map;  // Force the creation of quick select
+          new_ref_key_map.set_bit(new_ref_key); // only for new_ref_key.
+
+          Opt_trace_object
+            trace_recest(trace, "rows_estimation");
+          trace_recest.add_utf8_table(tab->table).
+          add_utf8("index", table->key_info[new_ref_key].name);
+          select->quick= 0;
+          if (select->test_quick_select(tab->join->thd, 
+                                        new_ref_key_map, 
+                                        0,       // empty table_map
+                                        (tab->join->select_options &
+                                         OPTION_FOUND_ROWS) ?
+                                        HA_POS_ERROR :
+                                        tab->join->unit->select_limit_cnt,
+                                        false,   // don't force quick range
+                                        order->direction) <= 0)
+          {
+            can_skip_sorting= false;
+            goto fix_ICP;
+          }
+	}
+        ref_key= new_ref_key;
+        changed_key= new_ref_key;
+      }
+    }
+    /* Check if we get the rows in requested sorted order by using the key */
+    if (usable_keys.is_set(ref_key) &&
+        (order_direction= test_if_order_by_key(order,table,ref_key,
+					       &used_key_parts)))
+      goto check_reverse_order;
+  }
+  {
+    /*
+      There was no {ref or or ordered range access} key, or it was not
+      satisfying, neither was any prefix of it. Do a cost-based search on all
+      keys:
+    */
+    uint best_key_parts= 0;
+    uint saved_best_key_parts= 0;
+    int best_key_direction= 0;
+    JOIN *join= tab->join;
+    ha_rows table_records= table->file->stats.records;
+
+    test_if_cheaper_ordering(tab, order, table, usable_keys,
+                             ref_key, select_limit,
+                             &best_key, &best_key_direction,
+                             &select_limit, &best_key_parts,
+                             &saved_best_key_parts);
+
+    if (best_key < 0)
+    {
+      // No usable key has been found
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
+
+    /*
+      Does the query have a "FORCE INDEX [FOR GROUP BY] (idx)" (if
+      clause is group by) or a "FORCE INDEX [FOR ORDER BY] (idx)" (if
+      clause is order by)?
+    */
+    const bool is_group_by= join && join->group && order == join->group_list;
+    const bool is_force_index= table->force_index ||
+      (is_group_by ? table->force_index_group : table->force_index_order);
+
+    /*
+      filesort() and join cache are usually faster than reading in
+      index order and not using join cache. Don't use index scan
+      unless:
+       - the user specified FORCE INDEX [FOR {GROUP|ORDER} BY] (have to assume
+         the user knows what's best)
+       - the chosen index is clustered primary key (table scan is not cheaper)
+    */
+    if (!is_force_index &&
+        (select_limit >= table_records) &&
+        (tab->type == JT_ALL &&
+         tab->join->primary_tables > tab->join->const_tables + 1) &&
+         ((unsigned) best_key != table->s->primary_key ||
+          !table->file->primary_key_is_clustered()))
+    {
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
+
+    if (select &&
+        table->quick_keys.is_set(best_key) &&
+        !tab->quick_order_tested.is_set(best_key) &&
+        best_key != ref_key)
+    {
+      tab->quick_order_tested.set_bit(best_key);
+      Opt_trace_object
+        trace_recest(trace, "rows_estimation");
+      trace_recest.add_utf8_table(tab->table).
+        add_utf8("index", table->key_info[best_key].name);
+
+      key_map map;           // Force the creation of quick select
+      map.set_bit(best_key); // only best_key.
+      select->quick= 0;
+      select->test_quick_select(join->thd, 
+                                map, 
+                                0,        // empty table_map
+                                join->select_options & OPTION_FOUND_ROWS ?
+                                HA_POS_ERROR :
+                                join->unit->select_limit_cnt,
+                                true,     // force quick range
+                                order->direction);
+    }
+    order_direction= best_key_direction;
+    /*
+      saved_best_key_parts is actual number of used keyparts found by the
+      test_if_order_by_key function. It could differ from keyinfo->key_parts,
+      thus we have to restore it in case of desc order as it affects
+      QUICK_SELECT_DESC behaviour.
+    */
+    used_key_parts= (order_direction == -1) ?
+      saved_best_key_parts :  best_key_parts;
+    changed_key= best_key;
+    // We will use index scan or range scan:
+    set_up_ref_access_to_key= false;
+  }
+===========
+      r          the right comparison argument (a const of any)
+  
+  DESCRIPTION    
+    Checks if an equality predicate can be used to take away 
+    DISTINCT/GROUP BY because it is known to be true for exactly one 
+    distinct value (e.g. <expr> == <const>).
+    Arguments must be of the same type because e.g. 
+    <string_field> = <int_const> may match more than 1 distinct value from 
+    the column. 
+    We must take into consideration and the optimization done for various 
+    string constants when compared to dates etc (see Item_int_with_ref) as
+    well as the collation of the arguments.
+  
+  RETURN VALUE  
+    TRUE    can be used
+    FALSE   cannot be used
+*/
+static bool
+test_if_equality_guarantees_uniqueness(Item *l, Item *r)
+{
+  return r->const_item() &&
+    /* elements must be compared as dates */
+     (Arg_comparator::can_compare_as_dates(l, r, 0) ||
+      /* or of the same result type */
+      (r->result_type() == l->result_type() &&
+       /* and must have the same collation if compared as strings */
+       (l->result_type() != STRING_RESULT ||
+        l->collation.collation == r->collation.collation)));
+}
+
+
+/*
+  Return TRUE if i1 and i2 (if any) are equal items,
+  or if i1 is a wrapper item around the f2 field.
+*/
+
+static bool equal(Item *i1, Item *i2, Field *f2)
+{
+  DBUG_ASSERT((i2 == NULL) ^ (f2 == NULL));
+
+  if (i2 != NULL)
+    return i1->eq(i2, 1);
+  else if (i1->type() == Item::FIELD_ITEM)
+    return f2->eq(((Item_field *) i1)->field);
+  else
+    return FALSE;
+}
+
+
+/**
+  Test if a field or an item is equal to a constant value in WHERE
+
+  @param        cond            WHERE clause expression
+  @param        comp_item       Item to find in WHERE expression
+                                (if comp_field != NULL)
+  @param        comp_field      Field to find in WHERE expression
+                                (if comp_item != NULL)
+  @param[out]   const_item      intermediate arg, set to Item pointer to NULL 
+
+  @return TRUE if the field is a constant value in WHERE
+
+  @note
+    comp_item and comp_field parameters are mutually exclusive.
+*/
+bool
+const_expression_in_where(Item *cond, Item *comp_item, Field *comp_field,
+                          Item **const_item)
+{
+  DBUG_ASSERT((comp_item == NULL) ^ (comp_field == NULL));
+
+  Item *intermediate= NULL;
+  if (const_item == NULL)
+    const_item= &intermediate;
+
+  if (cond->type() == Item::COND_ITEM)
+  {
+    bool and_level= (((Item_cond*) cond)->functype()
+		     == Item_func::COND_AND_FUNC);
+    List_iterator_fast<Item> li(*((Item_cond*) cond)->argument_list());
+    Item *item;
+    while ((item=li++))
+    {
+      bool res=const_expression_in_where(item, comp_item, comp_field,
+                                         const_item);
+      if (res)					// Is a const value
+      {
+	if (and_level)
+	  return 1;
+      }
+      else if (!and_level)
+	return 0;
+    }
+    return and_level ? 0 : 1;
+  }
+  else if (cond->eq_cmp_result() != Item::COND_OK)
+  {						// boolean compare function
+    Item_func* func= (Item_func*) cond;
+    if (func->functype() != Item_func::EQUAL_FUNC &&
+	func->functype() != Item_func::EQ_FUNC)
+      return 0;
+    Item *left_item=	((Item_func*) cond)->arguments()[0];
+    Item *right_item= ((Item_func*) cond)->arguments()[1];
+    if (equal(left_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (left_item, right_item))
+      {
+	if (*const_item)
+	  return right_item->eq(*const_item, 1);
+	*const_item=right_item;
+	return 1;
+      }
+    }
+    else if (equal(right_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (right_item, left_item))
+      {
+	if (*const_item)
+	  return left_item->eq(*const_item, 1);
+	*const_item=left_item;
+	return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+/**
+  Test if this is a prefix index.
+
+  @param   table     table
+  @param   idx       index to check
+
+  @return TRUE if this is a prefix index
+*/
+bool is_prefix_index(TABLE* table, uint idx)
+{
+  if (!table || !table->key_info)
+  {
+    return false;
+  }
+  KEY* key_info = table->key_info;
+  uint key_parts = key_info[idx].user_defined_key_parts;
+  KEY_PART_INFO* key_part = key_info[idx].key_part;
+
+  for (uint i = 0; i < key_parts; i++, key_part++)
+  {
+    if (key_part->field &&
+      (key_part->length !=
+        table->field[key_part->fieldnr - 1]->key_length() &&
+        !(key_info->flags & (HA_FULLTEXT | HA_SPATIAL))))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+  Test if one can use the key to resolve ORDER BY.
+
+  @param order                 Sort order
+  @param table                 Table to sort
+  @param idx                   Index to check
+  @param used_key_parts [out]  NULL by default, otherwise return value for
+                               used key parts.
+
+
+  @note
+    used_key_parts is set to correct key parts used if return value != 0
+    (On other cases, used_key_part may be changed)
+    Note that the value may actually be greater than the number of index 
+    key parts. This can happen for storage engines that have the primary 
+    key parts as a suffix for every secondary key.
+
+  @retval
+    1   key is ok.
+  @retval
+    0   Key can't be used
+  @retval
+    -1   Reverse key can be used
+*/
+
+int test_if_order_by_key(ORDER *order, TABLE *table, uint idx,
+                         uint *used_key_parts)
+{
+  KEY_PART_INFO *key_part,*key_part_end;
+  key_part=table->key_info[idx].key_part;
+  key_part_end=key_part+table->key_info[idx].user_defined_key_parts;
+  key_part_map const_key_parts=table->const_key_parts[idx];
+  int reverse=0;
+  uint key_parts;
+  my_bool on_pk_suffix= FALSE;
+  DBUG_ENTER("test_if_order_by_key");
+
+  for (; order ; order=order->next, const_key_parts>>=1)
+  {
+    /*
+      Since only fields can be indexed, ORDER BY <something> that is
+      not a field cannot be resolved by using an index.
+    */
+    Item *real_itm= (*order->item)->real_item();
+    if (real_itm->type() != Item::FIELD_ITEM)
+      DBUG_RETURN(0);
+
+    Field *field= static_cast<Item_field*>(real_itm)->field;
+    int flag;
+
+    /*
+      Skip key parts that are constants in the WHERE clause.
+      These are already skipped in the ORDER BY by const_expression_in_where()
+    */
+    for (; const_key_parts & 1 ; const_key_parts>>= 1)
+      key_part++; 
+
+    /* Avoid usage of prefix index for sorting a partition table */
+    if (table->part_info && key_part != table->key_info[idx].key_part &&
+	key_part != key_part_end && is_prefix_index(table, idx))
+     DBUG_RETURN(0);
+
+    if (key_part == key_part_end)
+    {
+      /* 
+        We are at the end of the key. Check if the engine has the primary
+        key as a suffix to the secondary keys. If it has continue to check
+        the primary key as a suffix.
+      */
+      if (!on_pk_suffix &&
+          (table->file->ha_table_flags() & HA_PRIMARY_KEY_IN_READ_INDEX) &&
+          table->s->primary_key != MAX_KEY &&
+          table->s->primary_key != idx)
+      {
+        on_pk_suffix= TRUE;
+        key_part= table->key_info[table->s->primary_key].key_part;
+        key_part_end=key_part +
+          table->key_info[table->s->primary_key].user_defined_key_parts;
+        const_key_parts=table->const_key_parts[table->s->primary_key];
+
+        for (; const_key_parts & 1 ; const_key_parts>>= 1)
+          key_part++; 
+        /*
+         The primary and secondary key parts were all const (i.e. there's
+         one row).  The sorting doesn't matter.
+        */
+        if (key_part == key_part_end && reverse == 0)
+        {
+          key_parts= 0;
+          reverse= 1;
+          goto ok;
+        }
+      }
+      else
+        DBUG_RETURN(0);
+    }
+
+    if (key_part->field != field || !field->part_of_sortkey.is_set(idx))
+      DBUG_RETURN(0);
+
+    const ORDER::enum_order keypart_order= 
+      (key_part->key_part_flag & HA_REVERSE_SORT) ? 
+      ORDER::ORDER_DESC : ORDER::ORDER_ASC;
+    /* set flag to 1 if we can use read-next on key, else to -1 */
+    flag= (order->direction == keypart_order) ? 1 : -1;
+    if (reverse && flag != reverse)
+      DBUG_RETURN(0);
+    reverse=flag;				// Remember if reverse
+    key_part++;
+  }
+  if (on_pk_suffix)
+  {
+    uint used_key_parts_secondary= table->key_info[idx].user_defined_key_parts;
+    uint used_key_parts_pk=
+      (uint) (key_part - table->key_info[table->s->primary_key].key_part);
+    key_parts= used_key_parts_pk + used_key_parts_secondary;
+
+    if (reverse == -1 &&
+        (!(table->file->index_flags(idx, used_key_parts_secondary - 1, 1) &
+           HA_READ_PREV) ||
+         !(table->file->index_flags(table->s->primary_key,
+                                    used_key_parts_pk - 1, 1) & HA_READ_PREV)))
+      reverse= 0;                               // Index can't be used
+  }
+  else
+  {
+    key_parts= (uint) (key_part - table->key_info[idx].key_part);
+    if (reverse == -1 && 
+        !(table->file->index_flags(idx, key_parts-1, 1) & HA_READ_PREV))
+      reverse= 0;                               // Index can't be used
+  }
+ok:
+  if (used_key_parts != NULL)
+    *used_key_parts= key_parts;
+  DBUG_RETURN(reverse);
+}
+
+
+/**
+  Find shortest key suitable for full table scan.
+
+  @param table                 Table to scan
+  @param usable_keys           Allowed keys
+
+  @note
+     As far as 
+     1) clustered primary key entry data set is a set of all record
+        fields (key fields and not key fields) and
+     2) secondary index entry data is a union of its key fields and
+        primary key fields (at least InnoDB and its derivatives don't
+        duplicate primary key fields there, even if the primary and
+        the secondary keys have a common subset of key fields),
+     then secondary index entry data is always a subset of primary key entry.
+     Unfortunately, key_info[nr].key_length doesn't show the length
+     of key/pointer pair but a sum of key field lengths only, thus
+     we can't estimate index IO volume comparing only this key_length
+     value of secondary keys and clustered PK.
+     So, try secondary keys first, and choose PK only if there are no
+     usable secondary covering keys or found best secondary key include
+     all table fields (i.e. same as PK):
+
+  @return
+    MAX_KEY     no suitable key found
+    key index   otherwise
+*/
+
+uint find_shortest_key(TABLE *table, const key_map *usable_keys)
+{
+  uint best= MAX_KEY;
+  uint usable_clustered_pk= (table->file->primary_key_is_clustered() &&
+                             table->s->primary_key != MAX_KEY &&
+                             usable_keys->is_set(table->s->primary_key)) ?
+                            table->s->primary_key : MAX_KEY;
+  if (!usable_keys->is_clear_all())
+  {
+    uint min_length= (uint) ~0;
+    for (uint nr=0; nr < table->s->keys ; nr++)
+    {
+      if (nr == usable_clustered_pk)
+        continue;
+      if (usable_keys->is_set(nr))
+      {
+        if (table->key_info[nr].key_length < min_length)
+        {
+          min_length=table->key_info[nr].key_length;
+          best=nr;
+        }
+      }
+    }
+  }
+  if (usable_clustered_pk != MAX_KEY)
+  {
+    /*
+     If the primary key is clustered and found shorter key covers all table
+     fields then primary key scan normally would be faster because amount of
+     data to scan is the same but PK is clustered.
+     It's safe to compare key parts with table fields since duplicate key
+     parts aren't allowed.
+     */
+    if (best == MAX_KEY ||
+        table->key_info[best].user_defined_key_parts >= table->s->fields)
+      best= usable_clustered_pk;
+  }
+  return best;
+}
+
+/**
+  Test if a second key is the subkey of the first one.
+
+  @param key_part              First key parts
+  @param ref_key_part          Second key parts
+  @param ref_key_part_end      Last+1 part of the second key
+
+  @note
+    Second key MUST be shorter than the first one.
+
+  @retval
+    1	is a subkey
+  @retval
+    0	no sub key
+*/
+
+inline bool 
+is_subkey(KEY_PART_INFO *key_part, KEY_PART_INFO *ref_key_part,
+	  KEY_PART_INFO *ref_key_part_end)
+{
+  for (; ref_key_part < ref_key_part_end; key_part++, ref_key_part++)
+    if (!key_part->field->eq(ref_key_part->field))
+      return 0;
+  return 1;
+}
+
+/**
+  Test if REF_OR_NULL optimization will be used if the specified
+  ref_key is used for REF-access to 'tab'
+
+  @retval
+    true	JT_REF_OR_NULL will be used
+  @retval
+    false	no JT_REF_OR_NULL access
+*/
+bool
+is_ref_or_null_optimized(const JOIN_TAB *tab, uint ref_key)
+{
+  if (tab->keyuse)
+  {
+    const Key_use *keyuse= tab->keyuse;
+    while (keyuse->key != ref_key && keyuse->table == tab->table)
+      keyuse++;
+
+    const table_map const_tables= tab->join->const_table_map;
+    while (keyuse->key == ref_key && keyuse->table == tab->table)
+    {
+      if (!(keyuse->used_tables & ~const_tables))
+      {
+        if (keyuse->optimize & KEY_OPTIMIZE_REF_OR_NULL)
+          return true;
+      }
+      keyuse++;
+    }
+  }
+  return false;
+}
+
+/**
+  Test if we can use one of the 'usable_keys' instead of 'ref' key
+  for sorting.
+
+  @param ref			Number of key, used for WHERE clause
+  @param usable_keys		Keys for testing
+
+  @return
+    - MAX_KEY			If we can't use other key
+    - the number of found key	Otherwise
+*/
+
+static uint
+test_if_subkey(ORDER *order, JOIN_TAB *tab, uint ref, uint ref_key_parts,
+	       const key_map *usable_keys)
+{
+  uint nr;
+  uint min_length= (uint) ~0;
+  uint best= MAX_KEY;
+  TABLE *table= tab->table;
+  KEY_PART_INFO *ref_key_part= table->key_info[ref].key_part;
+  KEY_PART_INFO *ref_key_part_end= ref_key_part + ref_key_parts;
+
+  for (nr= 0 ; nr < table->s->keys ; nr++)
+  {
+    if (usable_keys->is_set(nr) &&
+	table->key_info[nr].key_length < min_length &&
+	table->key_info[nr].user_defined_key_parts >= ref_key_parts &&
+	is_subkey(table->key_info[nr].key_part, ref_key_part,
+		  ref_key_part_end) &&
+        !is_ref_or_null_optimized(tab, nr) &&
+	test_if_order_by_key(order, table, nr))
+    {
+      min_length= table->key_info[nr].key_length;
+      best= nr;
+    }
+  }
+  return best;
+}
+
+
+/**
+  It is not obvious to see that test_if_skip_sort_order() never changes the
+  plan if no_changes is true. So we double-check: creating an instance of this
+  class saves some important access-path-related information of the current
+  table; when the instance is destroyed, the latest access-path information is
+  compared with saved data.
+*/
+class Plan_change_watchdog
+{
+#ifndef DBUG_OFF
+public:
+  /**
+    @param tab_arg     table whose access path is being determined
+    @param no_changes  whether a change to the access path is allowed
+  */
+  Plan_change_watchdog(const JOIN_TAB *tab_arg, const bool no_changes_arg)
+  {
+    // Only to keep gcc 4.1.2-44 silent about uninitialized variables
+    quick= NULL;
+    quick_index= 0;
+    if (no_changes_arg)
+    {
+      tab= tab_arg;
+      type= tab->type;
+      if ((select= tab->select))
+        if ((quick= tab->select->quick))
+          quick_index= quick->index;
+      use_quick= tab->use_quick;
+      ref_key= tab->ref.key;
+      ref_key_parts= tab->ref.key_parts;
+      index= tab->index;
+    }
+    else
+    {
+      tab= NULL;
+      // Only to keep gcc 4.1.2-44 silent about uninitialized variables
+      type= JT_UNKNOWN;
+      select= NULL;
+      ref_key= ref_key_parts= index= 0;
+      use_quick= QS_NONE;
+    }
+  }
+  ~Plan_change_watchdog()
+  {
+    if (tab == NULL)
+      return;
+    // changes are not allowed, we verify:
+    DBUG_ASSERT(tab->type == type);
+    DBUG_ASSERT(tab->select == select);
+    if (select != NULL)
+    {
+      DBUG_ASSERT(tab->select->quick == quick);
+      if (quick != NULL)
+        DBUG_ASSERT(tab->select->quick->index == quick_index);
+    }
+    DBUG_ASSERT(tab->use_quick == use_quick);
+    DBUG_ASSERT(tab->ref.key == ref_key);
+    DBUG_ASSERT(tab->ref.key_parts == ref_key_parts);
+    DBUG_ASSERT(tab->index == index);
+  }
+private:
+  const JOIN_TAB *tab;            ///< table, or NULL if changes are allowed
+  enum join_type type;            ///< copy of tab->type
+  // "Range / index merge" info
+  const SQL_SELECT *select;       ///< copy of tab->select
+  const QUICK_SELECT_I *quick;    ///< copy of tab->select->quick
+  uint quick_index;               ///< copy of tab->select->quick->index
+  enum quick_type use_quick;      ///< copy of tab->use_quick
+  // "ref access" info
+  int ref_key;                    ///< copy of tab->ref.key
+  uint ref_key_parts;/// copy of tab->ref.key_parts
+  // Other index-related info
+  uint index;                     ///< copy of tab->index
+#else // in non-debug build, empty class
+public:
+  Plan_change_watchdog(const JOIN_TAB *tab_arg, const bool no_changes_arg) {}
+#endif
+};
+
+/**
+  Test if we can skip the ORDER BY by using an index.
+
+  SYNOPSIS
+    test_if_skip_sort_order()
+      tab
+      order
+      select_limit
+      no_changes
+      map
+
+  If we can use an index, the JOIN_TAB / tab->select struct
+  is changed to use the index.
+
+  The index must cover all fields in <order>, or it will not be considered.
+
+  @param tab           NULL or JOIN_TAB of the accessed table
+  @param order         Linked list of ORDER BY arguments
+  @param select_limit  LIMIT value, or HA_POS_ERROR if no limit
+  @param no_changes    No changes will be made to the query plan.
+  @param map           key_map of applicable indexes.
+  @param clause_type   "ORDER BY" etc for printing in optimizer trace
+
+  @todo
+    - sergeyp: Results of all index merge selects actually are ordered 
+    by clustered PK values.
+
+  @retval
+    0    We have to use filesort to do the sorting
+  @retval
+    1    We can use an index.
+*/
+
+bool
+test_if_skip_sort_order(JOIN_TAB *tab, ORDER *order, ha_rows select_limit,
+                        const bool no_changes, const key_map *map,
+                        const char *clause_type)
+{
+  int ref_key;
+  uint ref_key_parts;
+  int order_direction= 0;
+  uint used_key_parts;
+  TABLE *table=tab->table;
+  SQL_SELECT *select=tab->select;
+  QUICK_SELECT_I *save_quick= select ? select->quick : NULL;
+  int best_key= -1;
+  Item *orig_cond;
+  bool orig_cond_saved= false, set_up_ref_access_to_key= false;
+  bool can_skip_sorting= false;                  // used as return value
+  int changed_key= -1;
+  DBUG_ENTER("test_if_skip_sort_order");
+  LINT_INIT(ref_key_parts);
+  LINT_INIT(orig_cond);
+
+  /* Check that we are always called with first non-const table */
+  DBUG_ASSERT(tab == tab->join->join_tab + tab->join->const_tables); 
+
+  Plan_change_watchdog watchdog(tab, no_changes);
+
+  /* Sorting a single row can always be skipped */
+  if (tab->type == JT_EQ_REF ||
+      tab->type == JT_CONST  ||
+      tab->type == JT_SYSTEM)
+  {
+    DBUG_RETURN(1);
+  }
+
+  /*
+    Keys disabled by ALTER TABLE ... DISABLE KEYS should have already
+    been taken into account.
+  */
+  key_map usable_keys= *map;
+
+  for (ORDER *tmp_order=order; tmp_order ; tmp_order=tmp_order->next)
+  {
+    Item *item= (*tmp_order->item)->real_item();
+    if (item->type() != Item::FIELD_ITEM)
+    {
+      usable_keys.clear_all();
+      DBUG_RETURN(0);
+    }
+    usable_keys.intersect(((Item_field*) item)->field->part_of_sortkey);
+    if (usable_keys.is_clear_all())
+      DBUG_RETURN(0);					// No usable keys
+  }
+
+  ref_key= -1;
+  /* Test if constant range in WHERE */
+  if (tab->ref.key >= 0 && tab->ref.key_parts)
+  {
+    if (tab->type == JT_REF_OR_NULL || tab->type == JT_FT)
+      DBUG_RETURN(0);
+    ref_key=	   tab->ref.key;
+    ref_key_parts= tab->ref.key_parts;
+  }
+  else if (select && select->quick)		// Range found by opt_range
+  {
+    int quick_type= select->quick->get_type();
+    /* 
+      assume results are not ordered when index merge is used 
+      TODO: sergeyp: Results of all index merge selects actually are ordered 
+      by clustered PK values.
+    */
+  
+    if (quick_type == QUICK_SELECT_I::QS_TYPE_INDEX_MERGE || 
+        quick_type == QUICK_SELECT_I::QS_TYPE_ROR_UNION || 
+        quick_type == QUICK_SELECT_I::QS_TYPE_ROR_INTERSECT)
+      DBUG_RETURN(0);
+    ref_key=	   select->quick->index;
+    ref_key_parts= select->quick->used_key_parts;
+  }
+
+  /*
+    If part of the select condition has been pushed we use the
+    select condition as it was before pushing. The original
+    select condition is saved so that it can be restored when
+    exiting this function (if we have not changed index).
+  */
+  if (tab->pre_idx_push_cond)
+  {
+    orig_cond=
+      tab->set_jt_and_sel_condition(tab->pre_idx_push_cond, __LINE__);
+    orig_cond_saved= true;
+  }
+
+  Opt_trace_context * const trace= &tab->join->thd->opt_trace;
+  Opt_trace_object trace_wrapper(trace);
+  Opt_trace_object
+    trace_skip_sort_order(trace, "reconsidering_access_paths_for_index_ordering");
+  trace_skip_sort_order.add_alnum("clause", clause_type);
+
+  if (ref_key >= 0)
+  {
+    /*
+      We come here when there is a {ref or or ordered range access} key.
+    */
+    if (!usable_keys.is_set(ref_key))
+    {
+      /*
+        We come here when ref_key is not among usable_keys, try to find a
+        usable prefix key of that key.
+      */
+      uint new_ref_key;
+      /*
+	If using index only read, only consider other possible index only
+	keys
+      */
+      if (table->covering_keys.is_set(ref_key))
+	usable_keys.intersect(table->covering_keys);
+
+      if ((new_ref_key= test_if_subkey(order, tab, ref_key, ref_key_parts,
+				       &usable_keys)) < MAX_KEY)
+      {
+	/* Found key that can be used to retrieve data in sorted order */
+	if (tab->ref.key >= 0)
+        {
+          /*
+            We'll use ref access method on key new_ref_key. The actual change
+            is done further down in this function where we update the plan.
+          */
+          set_up_ref_access_to_key= true;
+        }
+	else if (!no_changes)
+	{
+          /*
+            The range optimizer constructed QUICK_RANGE for ref_key, and
+            we want to use instead new_ref_key as the index. We can't
+            just change the index of the quick select, because this may
+            result in an incosistent QUICK_SELECT object. Below we
+            create a new QUICK_SELECT from scratch so that all its
+            parameres are set correctly by the range optimizer.
+
+            Note that the range optimizer is NOT called if
+            no_changes==true. This reason is that the range optimizer
+            cannot find a QUICK that can return ordered result unless
+            index access (ref or index scan) is also able to do so
+            (which test_if_order_by_key () will tell).
+            Admittedly, range access may be much more efficient than
+            e.g. index scan, but the only thing that matters when
+            no_change==true is the answer to the question: "Is it
+            possible to avoid sorting if an index is used to access
+            this table?". The answer does not depend on the outcome of
+            the range optimizer.
+          */
+          key_map new_ref_key_map;  // Force the creation of quick select
+          new_ref_key_map.set_bit(new_ref_key); // only for new_ref_key.
+
+          Opt_trace_object
+            trace_recest(trace, "rows_estimation");
+          trace_recest.add_utf8_table(tab->table).
+          add_utf8("index", table->key_info[new_ref_key].name);
+          select->quick= 0;
+          if (select->test_quick_select(tab->join->thd, 
+                                        new_ref_key_map, 
+                                        0,       // empty table_map
+                                        (tab->join->select_options &
+                                         OPTION_FOUND_ROWS) ?
+                                        HA_POS_ERROR :
+                                        tab->join->unit->select_limit_cnt,
+                                        false,   // don't force quick range
+                                        order->direction) <= 0)
+          {
+            can_skip_sorting= false;
+            goto fix_ICP;
+          }
+	}
+        ref_key= new_ref_key;
+        changed_key= new_ref_key;
+      }
+    }
+    /* Check if we get the rows in requested sorted order by using the key */
+    if (usable_keys.is_set(ref_key) &&
+        (order_direction= test_if_order_by_key(order,table,ref_key,
+					       &used_key_parts)))
+      goto check_reverse_order;
+  }
+  {
+    /*
+      There was no {ref or or ordered range access} key, or it was not
+      satisfying, neither was any prefix of it. Do a cost-based search on all
+      keys:
+    */
+    uint best_key_parts= 0;
+    uint saved_best_key_parts= 0;
+    int best_key_direction= 0;
+    JOIN *join= tab->join;
+    ha_rows table_records= table->file->stats.records;
+
+    test_if_cheaper_ordering(tab, order, table, usable_keys,
+                             ref_key, select_limit,
+                             &best_key, &best_key_direction,
+                             &select_limit, &best_key_parts,
+                             &saved_best_key_parts);
+
+    if (best_key < 0)
+    {
+      // No usable key has been found
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
+
+    /*
+      Does the query have a "FORCE INDEX [FOR GROUP BY] (idx)" (if
+      clause is group by) or a "FORCE INDEX [FOR ORDER BY] (idx)" (if
+      clause is order by)?
+    */
+    const bool is_group_by= join && join->group && order == join->group_list;
+    const bool is_force_index= table->force_index ||
+      (is_group_by ? table->force_index_group : table->force_index_order);
+
+    /*
+      filesort() and join cache are usually faster than reading in
+      index order and not using join cache. Don't use index scan
+      unless:
+       - the user specified FORCE INDEX [FOR {GROUP|ORDER} BY] (have to assume
+         the user knows what's best)
+       - the chosen index is clustered primary key (table scan is not cheaper)
+    */
+    if (!is_force_index &&
+        (select_limit >= table_records) &&
+        (tab->type == JT_ALL &&
+         tab->join->primary_tables > tab->join->const_tables + 1) &&
+         ((unsigned) best_key != table->s->primary_key ||
+          !table->file->primary_key_is_clustered()))
+    {
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
+
+    if (select &&
+        table->quick_keys.is_set(best_key) &&
+        !tab->quick_order_tested.is_set(best_key) &&
+        best_key != ref_key)
+    {
+      tab->quick_order_tested.set_bit(best_key);
+      Opt_trace_object
+        trace_recest(trace, "rows_estimation");
+      trace_recest.add_utf8_table(tab->table).
+        add_utf8("index", table->key_info[best_key].name);
+
+      key_map map;           // Force the creation of quick select
+      map.set_bit(best_key); // only best_key.
+      select->quick= 0;
+      select->test_quick_select(join->thd, 
+                                map, 
+                                0,        // empty table_map
+                                join->select_options & OPTION_FOUND_ROWS ?
+                                HA_POS_ERROR :
+                                join->unit->select_limit_cnt,
+                                true,     // force quick range
+                                order->direction);
+    }
+    order_direction= best_key_direction;
+    /*
+      saved_best_key_parts is actual number of used keyparts found by the
+      test_if_order_by_key function. It could differ from keyinfo->key_parts,
+      thus we have to restore it in case of desc order as it affects
+      QUICK_SELECT_DESC behaviour.
+    */
+    used_key_parts= (order_direction == -1) ?
+      saved_best_key_parts :  best_key_parts;
+    changed_key= best_key;
+    // We will use index scan or range scan:
+    set_up_ref_access_to_key= false;
+  }
+>>>>>>>>>>> Temporary merge branch 2
+=========
+>>>>>>>>> Temporary merge branch 2
+
+
+/*
+  Return TRUE if i1 and i2 (if any) are equal items,
+  or if i1 is a wrapper item around the f2 field.
+*/
+
+static bool equal(Item *i1, Item *i2, Field *f2)
+{
+  DBUG_ASSERT((i2 == NULL) ^ (f2 == NULL));
+
+  if (i2 != NULL)
+    return i1->eq(i2, 1);
+  else if (i1->type() == Item::FIELD_ITEM)
+    return f2->eq(((Item_field *) i1)->field);
+  else
+    return FALSE;
+}
+
+
+/**
+  Test if a field or an item is equal to a constant value in WHERE
+
+  @param        cond            WHERE clause expression
+  @param        comp_item       Item to find in WHERE expression
+                                (if comp_field != NULL)
+  @param        comp_field      Field to find in WHERE expression
+                                (if comp_item != NULL)
+  @param[out]   const_item      intermediate arg, set to Item pointer to NULL 
+
+  @return TRUE if the field is a constant value in WHERE
+
+  @note
+    comp_item and comp_field parameters are mutually exclusive.
+*/
+bool
+const_expression_in_where(Item *cond, Item *comp_item, Field *comp_field,
+                          Item **const_item)
+{
+  DBUG_ASSERT((comp_item == NULL) ^ (comp_field == NULL));
+
+  Item *intermediate= NULL;
+  if (const_item == NULL)
+    const_item= &intermediate;
+
+  if (cond->type() == Item::COND_ITEM)
+  {
+    bool and_level= (((Item_cond*) cond)->functype()
+		     == Item_func::COND_AND_FUNC);
+    List_iterator_fast<Item> li(*((Item_cond*) cond)->argument_list());
+    Item *item;
+    while ((item=li++))
+    {
+      bool res=const_expression_in_where(item, comp_item, comp_field,
+                                         const_item);
+      if (res)					// Is a const value
+      {
+	if (and_level)
+	  return 1;
+      }
+      else if (!and_level)
+	return 0;
+    }
+    return and_level ? 0 : 1;
+  }
+  else if (cond->eq_cmp_result() != Item::COND_OK)
+  {						// boolean compare function
+    Item_func* func= (Item_func*) cond;
+    if (func->functype() != Item_func::EQUAL_FUNC &&
+	func->functype() != Item_func::EQ_FUNC)
+      return 0;
+    Item *left_item=	((Item_func*) cond)->arguments()[0];
+    Item *right_item= ((Item_func*) cond)->arguments()[1];
+    if (equal(left_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (left_item, right_item))
+      {
+	if (*const_item)
+	  return right_item->eq(*const_item, 1);
+	*const_item=right_item;
+	return 1;
+      }
+    }
+    else if (equal(right_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (right_item, left_item))
+      {
+	if (*const_item)
+	  return left_item->eq(*const_item, 1);
+	*const_item=left_item;
+	return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+
+/**
+=======
+      r          the right comparison argument (a const of any)
+  
+  DESCRIPTION    
+    Checks if an equality predicate can be used to take away 
+    DISTINCT/GROUP BY because it is known to be true for exactly one 
+    distinct value (e.g. <expr> == <const>).
+    Arguments must be of the same type because e.g. 
+    <string_field> = <int_const> may match more than 1 distinct value from 
+    the column. 
+    We must take into consideration and the optimization done for various 
+    string constants when compared to dates etc (see Item_int_with_ref) as
+    well as the collation of the arguments.
+  
+  RETURN VALUE  
+    TRUE    can be used
+    FALSE   cannot be used
+*/
+static bool
+test_if_equality_guarantees_uniqueness(Item *l, Item *r)
+{
+  return r->const_item() &&
+    /* elements must be compared as dates */
+     (Arg_comparator::can_compare_as_dates(l, r, 0) ||
+      /* or of the same result type */
+      (r->result_type() == l->result_type() &&
+       /* and must have the same collation if compared as strings */
+       (l->result_type() != STRING_RESULT ||
+        l->collation.collation == r->collation.collation)));
+}
+
+
+/*
+  Return TRUE if i1 and i2 (if any) are equal items,
+  or if i1 is a wrapper item around the f2 field.
+*/
+
+static bool equal(Item *i1, Item *i2, Field *f2)
+{
+  DBUG_ASSERT((i2 == NULL) ^ (f2 == NULL));
+
+  if (i2 != NULL)
+    return i1->eq(i2, 1);
+  else if (i1->type() == Item::FIELD_ITEM)
+    return f2->eq(((Item_field *) i1)->field);
+  else
+    return FALSE;
+}
+
+
+/**
+  Test if a field or an item is equal to a constant value in WHERE
+
+  @param        cond            WHERE clause expression
+  @param        comp_item       Item to find in WHERE expression
+                                (if comp_field != NULL)
+  @param        comp_field      Field to find in WHERE expression
+                                (if comp_item != NULL)
+  @param[out]   const_item      intermediate arg, set to Item pointer to NULL 
+
+  @return TRUE if the field is a constant value in WHERE
+
+  @note
+    comp_item and comp_field parameters are mutually exclusive.
+*/
+bool
+const_expression_in_where(Item *cond, Item *comp_item, Field *comp_field,
+                          Item **const_item)
+{
+  DBUG_ASSERT((comp_item == NULL) ^ (comp_field == NULL));
+
+  Item *intermediate= NULL;
+  if (const_item == NULL)
+    const_item= &intermediate;
+
+  if (cond->type() == Item::COND_ITEM)
+  {
+    bool and_level= (((Item_cond*) cond)->functype()
+		     == Item_func::COND_AND_FUNC);
+    List_iterator_fast<Item> li(*((Item_cond*) cond)->argument_list());
+    Item *item;
+    while ((item=li++))
+    {
+      bool res=const_expression_in_where(item, comp_item, comp_field,
+                                         const_item);
+      if (res)					// Is a const value
+      {
+	if (and_level)
+	  return 1;
+      }
+      else if (!and_level)
+	return 0;
+    }
+    return and_level ? 0 : 1;
+  }
+  else if (cond->eq_cmp_result() != Item::COND_OK)
+  {						// boolean compare function
+    Item_func* func= (Item_func*) cond;
+    if (func->functype() != Item_func::EQUAL_FUNC &&
+	func->functype() != Item_func::EQ_FUNC)
+      return 0;
+    Item *left_item=	((Item_func*) cond)->arguments()[0];
+    Item *right_item= ((Item_func*) cond)->arguments()[1];
+    if (equal(left_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (left_item, right_item))
+      {
+	if (*const_item)
+	  return right_item->eq(*const_item, 1);
+	*const_item=right_item;
+	return 1;
+      }
+    }
+    else if (equal(right_item, comp_item, comp_field))
+    {
+      if (test_if_equality_guarantees_uniqueness (right_item, left_item))
+      {
+	if (*const_item)
+	  return left_item->eq(*const_item, 1);
+	*const_item=left_item;
+	return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+
+/**
+>>>>>>> wsrep_5.7.31-25.23
   Update TMP_TABLE_PARAM with count of the different type of fields.
 
   This function counts the number of fields, functions and sum

@@ -1,7 +1,12 @@
 --source include/big_test.inc
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
+<<<<<<< HEAD
 --source include/force_restart.inc
+||||||| merged common ancestors
+=======
+--source include/have_debug.inc
+>>>>>>> wsrep_5.7.31-25.23
 
 --source suite/galera/include/galera_sst_set_mysqldump.inc
 
