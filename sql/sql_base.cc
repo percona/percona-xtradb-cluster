@@ -1,30 +1,4 @@
-<<<<<<< HEAD
 /* Copyright (c) 2000, 2020, Oracle and/or its affiliates.
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-<<<<<<<<< Temporary merge branch 1
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
-||||||||| 2acf164f591
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
-=========
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
-||||||||||| 4812bae3baa
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
-===========
-=========
->>>>>>>>> Temporary merge branch 2
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
-<<<<<<<<< Temporary merge branch 1
->>>>>>>>> Temporary merge branch 2
-||||||||| merged common ancestors
->>>>>>>>>>> Temporary merge branch 2
-=========
->>>>>>>>> Temporary merge branch 2
-=======
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
->>>>>>> wsrep_5.7.31-25.23
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -84,19 +58,6 @@
 #include "sql_tmp_table.h" // free_tmp_table
 #include "sql_update.h" // records_are_comparable
 #include "table_cache.h" // Table_cache_manager, Table_cache
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-#include "wsrep_mysqld.h"
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-<<<<<<<<< Temporary merge branch 1
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-=========
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> wsrep_5.7.31-25.23
 #include "log.h"
 #include "binlog.h"
 #include "sql_audit.h"  // mysql_audit_table_access_notify

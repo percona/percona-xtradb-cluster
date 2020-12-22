@@ -639,14 +639,9 @@ static void wsrep_rollback_process(THD *thd)
                   wsrep_get_conflict_state(aborting->wsrep_conflict_state));
       mysql_mutex_unlock(&aborting->LOCK_wsrep_thd);
 
-<<<<<<< HEAD
       /* Clear the thread state, since the rollback thread is done with it */
       aborting->restore_globals();
-
-||||||| merged common ancestors
-=======
       thd->store_globals();
->>>>>>> wsrep_5.7.31-25.23
       mysql_mutex_lock(&LOCK_wsrep_rollback);
     }
   }

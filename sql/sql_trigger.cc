@@ -221,12 +221,6 @@ bool mysql_create_or_drop_trigger(THD *thd, TABLE_LIST *tables, bool create)
     if (err_status)
       goto end;
   }
-<<<<<<< HEAD
-||||||| merged common ancestors
-  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-=======
-  WSREP_TO_ISOLATION_BEGIN(tables->db, tables->table_name, tables)
->>>>>>> wsrep_5.7.31-25.23
 
   /* We should have only one table in table list. */
   DBUG_ASSERT(tables->next_global == 0);

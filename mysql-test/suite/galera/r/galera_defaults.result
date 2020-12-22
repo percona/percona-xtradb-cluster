@@ -52,13 +52,7 @@ SELECT COUNT(*) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters';
 COUNT(*)
-<<<<<<< HEAD
-71
-||||||| merged common ancestors
-60
-=======
-63
->>>>>>> wsrep_5.7.31-25.23
+74
 SELECT UPPER(VARIABLE_NAME) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters'
@@ -86,14 +80,10 @@ WSREP_EVS_DELAYED
 WSREP_EVS_EVICT_LIST
 WSREP_EVS_REPL_LATENCY
 WSREP_EVS_STATE
-<<<<<<< HEAD
+WSREP_FLOW_CONTROL_ACTIVE
 WSREP_FLOW_CONTROL_INTERVAL
 WSREP_FLOW_CONTROL_INTERVAL_HIGH
 WSREP_FLOW_CONTROL_INTERVAL_LOW
-||||||| merged common ancestors
-=======
-WSREP_FLOW_CONTROL_ACTIVE
->>>>>>> wsrep_5.7.31-25.23
 WSREP_FLOW_CONTROL_PAUSED
 WSREP_FLOW_CONTROL_PAUSED_NS
 WSREP_FLOW_CONTROL_RECV

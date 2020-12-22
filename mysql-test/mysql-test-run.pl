@@ -103,7 +103,6 @@ use My::CoreDump;
 use mtr_cases;
 use mtr_cases_from_list;
 use mtr_report;
-use mtr_report_junit;
 use mtr_match;
 use mtr_unique;
 use mtr_results;
@@ -388,8 +387,6 @@ my $opt_include_ndbcluster= 0;
 my $opt_skip_ndbcluster= 0;
 
 my $opt_skip_sys_schema= 0;
-our $opt_junit_output= undef;
-our $opt_junit_package= undef;
 
 my $exe_ndbd;
 my $exe_ndbmtd;
@@ -638,7 +635,6 @@ sub main {
     # Not all tests completed
     mtr_report();
     mtr_report("Only ", int(@$completed), " of $num_tests completed.");
-<<<<<<< HEAD
     mtr_report("Not all tests completed. This means that a test scheduled for a worker did not report anything, the worker most likely crashed.");
 
     my %comp;
@@ -652,11 +648,6 @@ sub main {
         mtr_report("Missing result for testcase: ", $t->{name});
       }
     }
-||||||| merged common ancestors
-    mtr_error("Not all tests completed");
-=======
-    report_stats("Not all tests completed", $completed);
->>>>>>> wsrep_5.7.31-25.23
   }
 
   mark_time_used('init');
@@ -734,22 +725,11 @@ sub main {
 
   print_total_times($opt_parallel) if $opt_report_times;
 
-  report_stats("Completed", $completed);
+  mtr_report_stats("Completed", $completed);
 
   remove_vardir_subs() if $opt_clean_vardir;
 
   exit(0);
-}
-
-
-sub report_stats($$;$) {
-  my ($prefix, $tests, $skip_error) = @_;
-
-  if ($opt_junit_output) {
-    mtr_report_stats_junit($tests, $opt_junit_output, $opt_junit_package);
-  }
-
-  mtr_report_stats($prefix, $tests, $skip_error);
 }
 
 
@@ -879,7 +859,7 @@ sub run_test_server ($$$) {
 	    elsif ($opt_max_test_fail > 0 and
 		   $num_failed_test >= $opt_max_test_fail) {
 	      push(@$completed, $result);
-	      report_stats("Too many failed", $completed, 1);
+	      mtr_report_stats("Too many failed", $completed, 1);
 	      mtr_report("Too many tests($num_failed_test) failed!",
 			 "Terminating...");
 	      return undef;
@@ -1047,7 +1027,7 @@ sub run_test_server ($$$) {
     # ----------------------------------------------------
     if ( has_expired($suite_timeout) )
     {
-      report_stats("Timeout", $completed, 1);
+      mtr_report_stats("Timeout", $completed, 1);
       mtr_report("Test suite timeout! Terminating...");
       return undef;
     }
@@ -1457,9 +1437,8 @@ sub command_line_setup {
 	     'unit-tests!'              => \$opt_ctest,
 	     'unit-tests-report!'	=> \$opt_ctest_report,
 	     'stress=s'                 => \$opt_stress,
-         'suite-opt=s'              => \$opt_suite_opt,
-	     'junit-output=s'           => \$opt_junit_output,
-	     'junit-package=s'          => \$opt_junit_package,
+             'suite-opt=s'              => \$opt_suite_opt,
+
              'help|h'                   => \$opt_usage,
 	     # list-options is internal, not listed in help
 	     'list-options'             => \$opt_list_options,
@@ -1473,12 +1452,6 @@ sub command_line_setup {
 
   usage("") if $opt_usage;
   list_options(\%options) if $opt_list_options;
-
-  # Make sure that XML::Simple support exists for JUnit output
-  if ($opt_junit_output and !mtr_junit_supported()) {
-    mtr_error("JUnit XML reporting is not supported.  The XML::Simple package",
-              "could not be loaded.");
-  }
 
   # --------------------------------------------------------------------------
   # Setup verbosity
@@ -5139,56 +5112,10 @@ sub run_testcase ($) {
         my $check_res;
         if ( restart_forced_by_test('force_restart') )
         {
-<<<<<<< HEAD
           my $ret = stop_all_servers($opt_shutdown_timeout);
           if ($ret != 0) {
             shutdown_exit_reports();
             $shutdown_report = 1;
-||||||| merged common ancestors
-          my $check_res;
-          if ( restart_forced_by_test('force_restart') )
-          {
-            stop_all_servers($opt_shutdown_timeout);
-          }
-          elsif ( $opt_check_testcases and
-            $check_res= check_testcase($tinfo, "after"))
-          {
-            if ($check_res == 1) {
-              # Test case had sideeffects, not fatal error, just continue
-              stop_all_servers($opt_shutdown_timeout);
-              mtr_report("Resuming tests...\n");
-              resfile_output($tinfo->{'check'}) if $opt_resfile;
-            }
-            else {
-              # Test case check failed fatally, probably a server crashed
-              report_failure_and_restart($tinfo);
-              return 1;
-            }
-=======
-          my $check_res;
-          if ( restart_forced_by_test('force_restart') )
-          {
-            my $ret = stop_all_servers($opt_shutdown_timeout);
-            if ($ret != 0) {
-              shutdown_exit_reports();
-              $shutdown_report = 1;
-            }
-          }
-          elsif ( $opt_check_testcases and
-            $check_res= check_testcase($tinfo, "after"))
-          {
-            if ($check_res == 1) {
-              # Test case had sideeffects, not fatal error, just continue
-              stop_all_servers($opt_shutdown_timeout);
-              mtr_report("Resuming tests...\n");
-              resfile_output($tinfo->{'check'}) if $opt_resfile;
-            }
-            else {
-              # Test case check failed fatally, probably a server crashed
-              report_failure_and_restart($tinfo);
-              return 1;
-            }
->>>>>>> wsrep_5.7.31-25.23
           }
         }
         elsif ( $opt_check_testcases and
@@ -5267,103 +5194,7 @@ sub run_testcase ($) {
           unlink($path_current_testlog);
         }
 
-<<<<<<< HEAD
         return ($res == 62) ? 0 : $res;
-||||||| merged common ancestors
-        return ($res == 62) ? 0 : $res;
-||||||||| merged common ancestors
-      if ( $res == 0 )
-      {
-	my $check_res;
-	if ( restart_forced_by_test('force_restart') )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-	elsif ( $opt_check_testcases and
-	     $check_res= check_testcase($tinfo, "after"))
-	{
-	  if ($check_res == 1) {
-	    # Test case had sideeffects, not fatal error, just continue
-	    stop_all_servers($opt_shutdown_timeout);
-	    mtr_report("Resuming tests...\n");
-	    resfile_output($tinfo->{'check'}) if $opt_resfile;
-	  }
-	  else {
-	    # Test case check failed fatally, probably a server crashed
-	    report_failure_and_restart($tinfo);
-	    return 1;
-	  }
-	}
-	mtr_report_test_passed($tinfo);
-      }
-      elsif ( $res == 62 )
-      {
-	# Testcase itself tell us to skip this one
-	$tinfo->{skip_detected_by_test}= 1;
-	# Try to get reason from test log file
-	find_testcase_skipped_reason($tinfo);
-	mtr_report_test_skipped($tinfo);
-	# Restart if skipped due to missing perl, it may have had side effects
-	if ( restart_forced_by_test('force_restart_if_skipped') ||
-             $tinfo->{'comment'} =~ /^perl not found/ )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-=========
-      if ( $res == 0 )
-      {
-	my $check_res;
-	if ( restart_forced_by_test('force_restart') )
-	{
-	  my $ret = stop_all_servers($opt_shutdown_timeout);
-          if ($ret != 0) {
-            shutdown_exit_reports();
-            $shutdown_report = 1;
-          }
-	}
-	elsif ( $opt_check_testcases and
-	     $check_res= check_testcase($tinfo, "after"))
-	{
-	  if ($check_res == 1) {
-	    # Test case had sideeffects, not fatal error, just continue
-	    stop_all_servers($opt_shutdown_timeout);
-	    mtr_report("Resuming tests...\n");
-	    resfile_output($tinfo->{'check'}) if $opt_resfile;
-	  }
-	  else {
-	    # Test case check failed fatally, probably a server crashed
-	    report_failure_and_restart($tinfo);
-	    return 1;
-	  }
-	}
-	mtr_report_test_passed($tinfo);
-      }
-      elsif ( $res == 62 )
-      {
-	# Testcase itself tell us to skip this one
-	$tinfo->{skip_detected_by_test}= 1;
-	# Try to get reason from test log file
-	find_testcase_skipped_reason($tinfo);
-	mtr_report_test_skipped($tinfo);
-	# Restart if skipped due to missing perl, it may have had side effects
-	if ( restart_forced_by_test('force_restart_if_skipped') ||
-             $tinfo->{'comment'} =~ /^perl not found/ )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
->>>>>>>>> Temporary merge branch 2
-=======
-        # Remove testcase .log file produce in var/log/ to save space since
-        # relevant part of logfile has already been appended to master log
-        {
-          my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
-          if (-e $log_file_name && ($tinfo->{'result'} ne 'MTR_RES_FAILED')) {
-            unlink($log_file_name);
-          }
-        }
-
-        return ($res == 62) ? 0 : $res;
->>>>>>> wsrep_5.7.31-25.23
       }
 
       # ----------------------------------------------------
@@ -8111,8 +7942,6 @@ Misc options
   sanitize              Scan server log files for warnings from various
                         sanitizers. Assumes that you have built with
                         -DWITH_ASAN.
-  junit-output=FILE     Output JUnit test summary XML to FILE.
-  junit-package=NAME    Set the JUnit package name to NAME for this test run.
 
 Some options that control enabling a feature for normal test runs,
 can be turned off by prepending 'no' to the option, e.g. --notimer.

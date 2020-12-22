@@ -2,36 +2,14 @@ CREATE TABLE ten (f1 INTEGER NOT NULL PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 SET SESSION wsrep_retry_autocommit = 0;
-<<<<<<< HEAD
-INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;;
-TRUNCATE TABLE t1;;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
-SELECT COUNT(*) = 0 FROM t1;
-COUNT(*) = 0
-1
-SELECT COUNT(*) = 0 FROM t1;
-COUNT(*) = 0
-1
-||||||| merged common ancestors
-INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;;
-TRUNCATE TABLE t1;;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
-SELECT COUNT(*) = 0 FROM t1;
-COUNT(*) = 0
-1
-SELECT COUNT(*) = 0 FROM t1;
-COUNT(*) = 0
-1
-=======
 INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6, ten AS a7, ten AS a8;
 TRUNCATE TABLE t1;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
 SELECT COUNT(*) AS EXPECT_0 FROM t1;
 EXPECT_0
 0
 SELECT COUNT(*) AS EXPECT_0 FROM t1;
 EXPECT_0
 0
->>>>>>> wsrep_5.7.31-25.23
 DROP TABLE t1;
 DROP TABLE ten;

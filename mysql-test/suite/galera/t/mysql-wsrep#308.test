@@ -1,11 +1,8 @@
---source include/galera_cluster.inc
---source include/have_innodb.inc
-<<<<<<< HEAD
+--source include/have_debug.inc
 --source include/have_debug_sync.inc
-||||||| merged common ancestors
-=======
 --source suite/galera/include/galera_have_debug_sync.inc
->>>>>>> wsrep_5.7.31-25.23
+--source include/have_innodb.inc
+--source include/galera_cluster.inc
 
 --connection node_2
 --let $wsrep_provider_orig = `SELECT @@wsrep_provider`

@@ -8743,70 +8743,8 @@ bool MYSQL_BIN_LOG::write_incident(Incident_log_event *ev, THD *thd,
 
   DBUG_RETURN(error);
 }
-<<<<<<< HEAD
 
 bool MYSQL_BIN_LOG::write_stmt_directly(THD* thd, const char *stmt, size_t stmt_len,
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-<<<<<<<<< Temporary merge branch 1
-
-bool MYSQL_BIN_LOG::write_dml_directly(THD* thd, const char *stmt, size_t stmt_len)
-{
-  bool ret= false;
-  /* backup the original command */
-  enum_sql_command save_sql_command= thd->lex->sql_command;
-
-  /* Fake it as a DELETE statement, so it can be binlogged correctly */
-  thd->lex->sql_command= SQLCOM_DELETE;
-
-  if (thd->binlog_query(THD::STMT_QUERY_TYPE, stmt, stmt_len,
-                        FALSE, FALSE, FALSE, 0) ||
-      commit(thd, false) != TC_LOG::RESULT_SUCCESS)
-  {
-    ret= true;
-  }
-
-  thd->lex->sql_command= save_sql_command;
-  return ret;
-}
-
-
-||||||||| 2acf164f591
-=========
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-
-bool MYSQL_BIN_LOG::write_dml_directly(THD* thd, const char *stmt, size_t stmt_len)
-{
-  bool ret= false;
-  /* backup the original command */
-  enum_sql_command save_sql_command= thd->lex->sql_command;
-
-  /* Fake it as a DELETE statement, so it can be binlogged correctly */
-  thd->lex->sql_command= SQLCOM_DELETE;
-
-  if (thd->binlog_query(THD::STMT_QUERY_TYPE, stmt, stmt_len,
-                        FALSE, FALSE, FALSE, 0) ||
-      commit(thd, false) != TC_LOG::RESULT_SUCCESS)
-  {
-    ret= true;
-  }
-
-  thd->lex->sql_command= save_sql_command;
-  return ret;
-}
-
-
-||||||||||| 4812bae3baa
-===========
-=========
->>>>>>>>> Temporary merge branch 2
-
-bool MYSQL_BIN_LOG::write_dml_directly(THD* thd, const char *stmt, size_t stmt_len,
-=======
-
-bool MYSQL_BIN_LOG::write_dml_directly(THD* thd, const char *stmt, size_t stmt_len,
->>>>>>> wsrep_5.7.31-25.23
                                        enum_sql_command sql_command)
 {
   bool ret= false;
@@ -10922,16 +10860,19 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
     wsrep co-ordinates and wsrep co-ordinates are updated to reflect
     the recovery committed transaction.
   */
+  wsrep_uuid_t uuid;
+  wsrep_seqno_t seqno;
   if (WSREP_ON)
   {
-    wsrep_uuid_t uuid;
-    wsrep_seqno_t seqno;
     wsrep_get_SE_checkpoint(uuid, seqno);
     char uuid_str[40];
     wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
     WSREP_INFO("Before binlog recovery (wsrep position %s:%lld)", uuid_str,
                (long long)seqno);
   }
+  const wsrep_seqno_t last_xid_seqno= (WSREP_ON) ? seqno :
+                                                   WSREP_SEQNO_UNDEFINED;
+  wsrep_seqno_t cur_xid_seqno= WSREP_SEQNO_UNDEFINED;
 #endif /* WITH_WSREP */
 
   if (! fdle->is_valid() ||
@@ -10944,19 +10885,6 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
                   &mem_root, memory_page_size, memory_page_size);
 
   while ((ev= Log_event::read_log_event(log, 0, fdle, TRUE))
-<<<<<<< HEAD
-         && ev->is_valid()
-      )
-  {
-||||||| merged common ancestors
-         && ev->is_valid()
-#ifdef WITH_WSREP
-         && (last_xid_seqno == WSREP_SEQNO_UNDEFINED ||
-             last_xid_seqno != cur_xid_seqno)
-#endif
-      )
-  {
-=======
          && ev->is_valid())
   {
 #ifdef WITH_WSREP
@@ -10967,7 +10895,6 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
       continue;
     }
 #endif
->>>>>>> wsrep_5.7.31-25.23
     if (ev->get_type_code() == binary_log::QUERY_EVENT &&
         !strcmp(((Query_log_event*)ev)->query, "BEGIN"))
       in_transaction= TRUE;

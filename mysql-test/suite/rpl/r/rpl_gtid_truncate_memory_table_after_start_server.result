@@ -111,7 +111,7 @@ include/gtid_step_reset.inc
 include/save_binlog_position.inc
 ALTER TABLE db2.mem_t4 ADD COLUMN c2 INT;
 include/gtid_step_assert.inc [count=2, only_count=0]
-include/assert_binlog_events.inc [#Gtid # !Q(TRUNCATE.*) #Gtid # !Q(ALTER.*) ]
+include/assert_binlog_events.inc [#Gtid # !Q(TRUNCATE.*) #Gtid # !Q(ALTER.*)]
 include/sync_slave_sql_with_master.inc
 SELECT * FROM db2.mem_t4;
 c1	c2

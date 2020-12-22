@@ -56,33 +56,6 @@ send call p1(1000);
 send call p1(1000);
 
 --connection node_2
-<<<<<<< HEAD
---let $count = 1000
-while ($count)
-{
-  --disable_query_log
-  INSERT INTO t1 (f2) SELECT 1 FROM ten AS a1;
-  --enable_query_log
-  --dec $count
-}
-
-SELECT COUNT(*) = 20000 FROM t1;
-SELECT COUNT(DISTINCT f1) = 20000 FROM t1;
-SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
-||||||| merged common ancestors
---let $count = 1000
-while ($count)
-{
-  --disable_query_log
-  INSERT INTO t1 (f2) SELECT 1 FROM ten AS a1;
-  --enable_query_log
-  --dec $count
-}
-
-SELECT COUNT(*) = 20000 FROM t1;
-SELECT COUNT(DISTINCT f1) = 20000 FROM t1;
-SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'committed%';
-=======
 --disable_query_log
 --let $wait_condition = select count(*)=1 from information_schema.routines WHERE routine_name='p1';
 --source include/wait_condition.inc
@@ -109,7 +82,6 @@ SELECT COUNT(DISTINCT f1) FROM t1;
 
 --disconnect node_1a
 --disconnect node_1b
->>>>>>> wsrep_5.7.31-25.23
 
 --disable_query_log
 --eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;
