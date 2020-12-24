@@ -696,11 +696,13 @@ fi
     link
 
     # MIN TARBALL
-    cd "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
-    rm -rf mysql-test 2> /dev/null
-    rm -rf percona-xtradb-cluster-tests 2> /dev/null
-    find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
-    link
+    if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
+        cd "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
+        rm -rf mysql-test 2> /dev/null
+        rm -rf percona-xtradb-cluster-tests 2> /dev/null
+        find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
+        link
+    fi
 )
 
 # Package the archive
@@ -710,10 +712,12 @@ fi
     find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
 
-    cd "$TARGETDIR/usr/local/minimal/"
-    # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
-    find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
-    $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
+    if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
+        cd "$TARGETDIR/usr/local/minimal/"
+        # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
+        find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
+        $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
+    fi
 ) || exit 1
 
 if [[ $KEEP_BUILD -eq 0 ]]
