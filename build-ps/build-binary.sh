@@ -100,6 +100,7 @@ do
         shift
         CMAKE_BUILD_TYPE='Debug'
         BUILD_COMMENT="debug."
+        TARBALL_SUFFIX="-debug"
         DEBUG_EXTRA="-DDEBUG_EXTNAME=ON"
         SCONS_ARGS+=' debug=0'
         ;;
@@ -262,7 +263,7 @@ TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
 PRODUCT_NAME="Percona-XtraDB-Cluster_$MYSQL_VERSION$MYSQL_VERSION_EXTRA"
-PRODUCT_FULL_NAME="${PRODUCT_NAME}.${TAG}_${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${GLIBC_VER:-}"
+PRODUCT_FULL_NAME="${PRODUCT_NAME}.${TAG}_$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${GLIBC_VER:-}${TARBALL_SUFFIX:-}"
 
 #
 # This corresponds to GIT revision when the build/package is created.
