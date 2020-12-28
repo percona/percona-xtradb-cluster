@@ -115,7 +115,8 @@ or the node is bootstrapping, then :variable:`pxc_strict_mode` defaults to
    * ``wsrep_replicate_myisam=OFF``
    * ``binlog_format=ROW``
    * ``log_output=FILE`` or ``log_output=NONE`` or ``log_output=FILE,NONE``
-   * ``tx_isolation=SERIALIZABLE``
+  
+   The ``SERIALIZABLE`` method of isolation is not allowed in ``ENFORCING`` mode.
 
 For more information, see :ref:`pxc-strict-mode`.
 
