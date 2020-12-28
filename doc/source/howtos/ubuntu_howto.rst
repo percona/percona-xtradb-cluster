@@ -66,7 +66,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
     # In order for Galera to work correctly binlog format should be ROW
     binlog_format=ROW
 
-    # MyISAM storage engine has only experimental support
+    # Using the MyISAM storage engine is not recommended
     default_storage_engine=InnoDB
 
     # This InnoDB autoincrement locking mode is a requirement for Galera
@@ -147,7 +147,7 @@ Step 3. Configuring the second node
     # In order for Galera to work correctly binlog format should be ROW
     binlog_format=ROW
 
-    # MyISAM storage engine has only experimental support
+    # Using the MyISAM storage engine is not recommended
     default_storage_engine=InnoDB
 
     # This InnoDB autoincrement locking mode is a requirement for Galera
@@ -213,7 +213,7 @@ Step 4. Configuring the third node
     # In order for Galera to work correctly binlog format should be ROW
     binlog_format=ROW
 
-    # MyISAM storage engine has only experimental support
+    # Using the MyISAM storage engine is not recommended
     default_storage_engine=InnoDB
 
     # This InnoDB autoincrement locking mode is a requirement for Galera

@@ -73,7 +73,7 @@ For more information, see :ref:`pxc-maint-mode`.
    :default: ``ENFORCING`` or ``DISABLED``
 
 Controls :ref:`pxc-strict-mode`, which runs validations
-to avoid the use of experimental and unsupported features in |PXC|.
+to avoid the use of tech preview features and unsupported features in |PXC|.
 
 Depending on the actual mode you select,
 upon encountering a failed validation,
@@ -913,7 +913,8 @@ When a query is rejected, an error is returned.
    :default: ``OFF``
 
 Defines whether DML statements for MyISAM tables should be replicated.
-It is disabled by default, because MyISAM replication is still experimental.
+It is disabled by default, because MyISAM replication is not recommended
+and you should only use a MyISAM cluster at your own risk.
 
 On the global level, :variable:`wsrep_replicate_myisam`
 can be set only during startup.

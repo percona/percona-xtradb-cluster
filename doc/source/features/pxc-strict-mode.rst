@@ -5,7 +5,7 @@ PXC Strict Mode
 ===============
 
 PXC Strict Mode is designed to avoid the use of
-experimental and unsupported features in |PXC|.
+tech preview features and unsupported features in |PXC|.
 It performs a number of validations at startup and during runtime.
 
 Depending on the actual mode you select,
@@ -36,7 +36,7 @@ except if the node is acting as a standalone server
 or the node is bootstrapping, then PXC Strict Mode defaults to ``DISABLED``.
 
 It is recommended to keep PXC Strict Mode set to ``ENFORCING``,
-because in this case whenever |PXC| encounters an experimental feature
+because in this case whenever |PXC| encounters a tech preview feature
 or an unsupported operation, the server will deny it.
 This will force you to re-evaluate your |PXC| configuration
 without risking the consistency of your data.
@@ -73,7 +73,7 @@ Validations
 ================================================================================
 
 PXC Strict Mode validations are designed to ensure optimal operation
-for common cluster setups that do not require experimental features
+for common cluster setups that do not require tech preview features
 and do not rely on operations not supported by |PXC|.
 
 .. warning:: If an unsupported operation is performed on a node
@@ -178,10 +178,12 @@ Depending on the selected mode, the following happens:
 MyISAM replication
 ------------------
 
-|PXC| provides experimental support for replication of tables
-that use the MyISAM storage engine.
-Due to the non-transactional nature of MyISAM,
-it is not likely to ever be fully supported in |PXC|.
+|PXC| provides support for replication of tables
+that use the MyISAM storage engine. The use of the MyISAM storage engine
+in a cluster is not recommended and if you use the storage engine, this is
+your own risk.
+Due to the non-transactional nature of MyISAM, the storage
+engine is not fully-supported in |PXC|.
 
 MyISAM replication is controlled
 using the :variable:`wsrep_replicate_myisam` variable,
@@ -303,7 +305,7 @@ Depending on the selected mode, the following happens:
 Explicit table locking
 ----------------------
 
-|PXC| has only experimental support for explicit table locking operations,
+|PXC| provides only the tech-preview-level of support for explicit table locking operations,
 The following undesirable operations lead to explicit table locking
 and are covered by this validation:
 
@@ -384,8 +386,8 @@ write-sets when strict mode was set to ``PERMISSIVE`` or ``DISABLED``.
    
    MyISAM tables are created and loaded even if
    :variable:`wsrep_replicate_myisam` equals to 1.  |PXC| does not recommend
-   using the |MyISAM| storage engine. The support for |MyISAM| is experimental
-   and may be removed in a future release.
+   using the |MyISAM| storage engine. The support for |MyISAM| may be removed
+   in a future release.
 
 .. seealso::
 
