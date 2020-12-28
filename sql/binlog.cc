@@ -8905,7 +8905,16 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
         DBUG_RETURN(RESULT_ABORTED);
       }
     }
+#ifdef WITH_WSREP
+    /* LOAD DATA splitting sub-transactions are not properly registered
+       and we compensate here to get the XID event to be created
+    */
+    else if (real_trans && xid &&
+             ((trn_ctx->rw_ha_count(trx_scope) > 1) ||
+              (WSREP(thd) && thd->lex->sql_command == SQLCOM_LOAD)) &&
+#else
     else if (real_trans && xid && trn_ctx->rw_ha_count(trx_scope) > 1 &&
+#endif /* WITH_WSREP */
              !trn_ctx->no_2pc(trx_scope))
     {
       Xid_log_event end_evt(thd, xid);

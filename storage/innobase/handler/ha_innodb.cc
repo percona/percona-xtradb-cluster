@@ -8059,17 +8059,24 @@ no_commit:
 			    !thd_test_options(
 				m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
 			{
-				switch (wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1))
+				int ret= 0;
+				switch ((ret= wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1)))
 				{
 				case WSREP_TRX_OK:
 				  break;
 				case WSREP_TRX_SIZE_EXCEEDED:
 				case WSREP_TRX_CERT_FAIL:
 				case WSREP_TRX_ERROR:
-				  DBUG_RETURN(1);
+					WSREP_WARN(
+					  "LOAD DATA sub trx commit failed: %d",
+					  ret);
+					DBUG_RETURN(1);
 				}
-
-				if (tc_log->commit(m_user_thd, 1)) DBUG_RETURN(1);
+				if (tc_log->commit(m_user_thd, 1))
+				{
+					WSREP_WARN("LOAD DATA sub trx post commit failed");
+					DBUG_RETURN(1);
+				}
 				wsrep_post_commit(m_user_thd, TRUE);
 				wsrep_thd_set_next_trx_id(m_user_thd);
 			}
@@ -8090,16 +8097,24 @@ no_commit:
 			    !thd_test_options(
 				m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
 			{
-				switch (wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1))
+				int ret= 0;
+				switch ((ret= wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1)))
 				{
 				case WSREP_TRX_OK:
 				  break;
 				case WSREP_TRX_SIZE_EXCEEDED:
 				case WSREP_TRX_CERT_FAIL:
 				case WSREP_TRX_ERROR:
-				  DBUG_RETURN(1);
+					WSREP_WARN(
+					  "LOAD DATA sub trans commit failed: %d",
+					  ret);
+					DBUG_RETURN(1);
 				}
-				if (tc_log->commit(m_user_thd, 1))  DBUG_RETURN(1);
+				if (tc_log->commit(m_user_thd, 1))
+				{
+					WSREP_WARN("LOAD DATA sub trans post commit failed");
+					DBUG_RETURN(1);
+				}
 				wsrep_post_commit(m_user_thd, TRUE);
 				wsrep_thd_set_next_trx_id(m_user_thd);
 			}
