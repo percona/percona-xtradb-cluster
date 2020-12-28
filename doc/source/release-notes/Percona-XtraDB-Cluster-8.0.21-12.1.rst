@@ -21,7 +21,6 @@ Bugs Fixed
 * :jirabug:`PXC-3468`: Resolve package conflict when installing PXC 5.7 on RHEL/CentOS8
 * :jirabug:`PXC-3418`: Prevent DDL-DML deadlock by making in-place ALTER take shared MDL for the whole duration.
 * :jirabug:`PXC-3416`: Fix memory leaks in garbd when started with invalid group name
-* :jirabug:`PXC-3454`: Change garbd binary file permission in the binary tarball.
 * :jirabug:`PXC-3445`: Correct MTR test failures
 * :jirabug:`PXC-3442`: Fix crash when log_slave_updates=ON and consistency check statement is executed
 * :jirabug:`PXC-3424`: Fix error handling when the donor is not able to serve SST
