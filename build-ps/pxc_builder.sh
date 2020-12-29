@@ -181,7 +181,7 @@ get_sources(){
     if [ -f /etc/redhat-release ]; then
       export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
       RHEL=$(rpm --eval %rhel)
-      source /opt/rh/devtoolset-7/enable
+      source /opt/rh/devtoolset-8/enable
       if [ "x${RHEL}" = "x8" ]; then
           cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1
       else
@@ -292,8 +292,8 @@ install_deps() {
                 echo "waiting"
                 sleep 1
             done
-            yum -y install  gcc-c++ devtoolset-7-gcc-c++ devtoolset-7-binutils
-            source /opt/rh/devtoolset-7/enable
+            yum -y install  gcc-c++ devtoolset-8-gcc-c++ devtoolset-8-binutils
+            source /opt/rh/devtoolset-8/enable
             yum -y install scons check-devel boost-devel cmake3
             yum -y install zstd libzstd libzstd-devel
             alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake 10 \
@@ -548,12 +548,12 @@ build_rpm(){
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
     #
     mv *.src.rpm rpmbuild/SRPMS
-    source /opt/rh/devtoolset-7/enable
+    source /opt/rh/devtoolset-8/enable
     build_mecab_lib
     build_mecab_dict
 
     cd ${WORKDIR}  || exit
-    source /opt/rh/devtoolset-7/enable
+    source /opt/rh/devtoolset-8/enable
     source ${WORKDIR}/pxc-80.properties
     source ${CURDIR}/srpm/pxc-80.properties
     #
@@ -746,7 +746,7 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
         export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
         RHEL=$(rpm --eval %rhel)
-        source /opt/rh/devtoolset-7/enable
+        source /opt/rh/devtoolset-8/enable
     fi
     #
 
