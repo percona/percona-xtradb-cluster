@@ -552,27 +552,33 @@ fi
         done
     }
 
-    mkdir -p "$TARGETDIR/usr/local/minimal"
-    cp -r "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
+    if [[ $CMAKE_BUILD_TYPE != 'Debug' ]]; then
+        mkdir -p "$TARGETDIR/usr/local/minimal"
+        cp -r "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
+    fi
 
     # NORMAL TARBALL
     cd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME"
     link
 
     # MIN TARBALL
-    cd "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
-    rm -rf mysql-test 2> /dev/null
-    rm -rf percona-xtradb-cluster-tests 2> /dev/null
-    find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
-    link
+    if [[ $CMAKE_BUILD_TYPE != 'Debug' ]]; then
+        cd "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
+        rm -rf mysql-test 2> /dev/null
+        rm -rf percona-xtradb-cluster-tests 2> /dev/null
+        find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
+        link
+    fi
 )
 
 # Package the archive
 (
     cd "$TARGETDIR/usr/local/"
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
-    cd "$TARGETDIR/usr/local/minimal/"
-    $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
+    if [[ $CMAKE_BUILD_TYPE != 'Debug' ]]; then
+        cd "$TARGETDIR/usr/local/minimal/"
+        $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
+    fi
 ) || exit 1
 
 if [[ $KEEP_BUILD -eq 0 ]]
