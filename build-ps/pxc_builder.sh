@@ -21,6 +21,7 @@ Usage: $0 [OPTIONS]
         --rpm_release       RPM version( default = 1)
         --deb_release       DEB version( default = 1)
         --bin_release       BIN version( default = 1)
+        --debug             Build debug tarball
         --help) usage ;;
 Example $0 --builddir=/tmp/PXC80 --get_sources=1 --build_src_rpm=1 --build_rpm=1
 EOF
@@ -57,6 +58,7 @@ parse_arguments() {
             --deb_release=*) DEB_RELEASE="$val" ;;
             --bin_release=*) BIN_RELEASE="$val" ;;
             --no_clone=*) NO_CLONE="$val" ;;
+            --debug=*) DEBUG="$val" ;;
             --help) usage ;;      
             *)
               if test -n "$pick_args"
@@ -206,6 +208,7 @@ get_sources(){
     # add git submodules because make dist uses git archive which doesn't include them
     rsync -av ${WORKDIR}/percona-xtradb-cluster/percona-xtradb-cluster-galera/ ${PXCDIR}/percona-xtradb-cluster-galera --exclude .git
     rsync -av ${WORKDIR}/percona-xtradb-cluster/wsrep-lib/ ${PXCDIR}/wsrep-lib --exclude .git
+    rsync -av ${WORKDIR}/percona-xtradb-cluster/extra/coredumper/ ${PXCDIR}/extra/coredumper --exclude .git
 
     sed -i 's:ROUTER_RUNTIMEDIR:/var/run/mysqlrouter/:g' ${PXCDIR}/packaging/rpm-common/*
     cd ${PXCDIR}/packaging/rpm-common || exit
@@ -834,7 +837,11 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
         sed -i 's:cmake ../../:/usr/bin/cmake3 ../../:g' ./build-ps/build-binary.sh
     fi
-    bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
+    if [[ ${DEBUG} == 1 ]]; then
+        bash -x ./build-ps/build-binary.sh --debug --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
+    else
+        bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
+    fi
     mkdir -p ${WORKDIR}/tarball
     mkdir -p ${CURDIR}/tarball
     cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/tarball
@@ -862,6 +869,7 @@ INSTALL=0
 RPM_RELEASE=1
 DEB_RELEASE=1
 BIN_RELEASE=1
+DEBUG=0
 REVISION=0
 BRANCH="8.0"
 MECAB_INSTALL_DIR="${WORKDIR}/mecab-install"
