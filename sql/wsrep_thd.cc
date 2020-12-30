@@ -21,6 +21,7 @@
 #include "sql_parse.h"
 #include "sql_base.h" // close_thread_tables()
 #include "mysqld.h"   // start_wsrep_THD();
+#include "debug_sync.h"
 
 static long long wsrep_bf_aborts_counter = 0;
 
@@ -336,6 +337,16 @@ void wsrep_replay_transaction(THD *thd)
       thd->variables.option_bits|= OPTION_BEGIN;
       thd->server_status|= SERVER_STATUS_IN_TRANS;
 
+      // Allow tests to block the applier thread using the DBUG facilities.
+      DBUG_EXECUTE_IF("sync.wsrep_replay_cb",
+                      {
+                        const char act[]=
+                          "now "
+                          "SIGNAL sync.wsrep_replay_cb_reached "
+                          "WAIT_FOR signal.wsrep_replay_cb";
+                        DBUG_ASSERT(!debug_sync_set_action(thd,
+                                                           STRING_WITH_LEN(act)));
+                      };);
       int rcode = wsrep->replay_trx(wsrep,
                                     &thd->wsrep_ws_handle,
                                     (void *)thd);

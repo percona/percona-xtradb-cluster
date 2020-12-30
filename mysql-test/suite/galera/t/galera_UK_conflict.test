@@ -148,3 +148,130 @@ INSERT INTO t1 VALUES (8,8,8);
 
 DROP TABLE t1;
 
+##################################################################################
+# test scenario 2
+#
+# commit order is now: INSERT-1, local COMMIT, INSERT-2
+# while local trx is replaying, the latter applier has applied and is waiting
+# for commit.
+# The point in this scenario is to verify that replayer does not try to abort
+# the latter applier
+#################################################################################
+
+--echo Test scenario 2
+
+--connection node_1
+--let $wsrep_local_replays_old = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 int, f3 int,  unique key keyj (f2));
+INSERT INTO t1 VALUES (1, 1, 0);
+INSERT INTO t1 VALUES (3, 3, 0);
+INSERT INTO t1 VALUES (10, 10, 0);
+
+# we will need 2 appliers threads for applyin two writes sets in parallel in node1
+# and 1 applier thread for handling replaying 
+SET GLOBAL wsrep_slave_threads = 3;
+
+# set sync point for the first INSERT applier
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_1
+# starting a transaction, which deletes and inserts the middle row in test table
+# this will be victim of false positive conflict with appliers
+SET SESSION wsrep_sync_wait=0;
+START TRANSACTION;
+
+DELETE FROM t1 WHERE f2 = 3;
+INSERT INTO t1 VALUES (3, 3, 1);
+
+# Control connection to manage sync points for appliers
+--connection node_1a
+SET SESSION wsrep_sync_wait=0;
+
+# send from node 2 first an INSERT transaction,  which will conflict on GAP lock in node 1
+--connection node_2
+INSERT INTO t1 VALUES (5, 5, 2);
+
+--connection node_1a
+# wait to see the INSERT in apply_cb sync point
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# Block the local commit, send the COMMIT and wait until it gets blocked
+--let $galera_sync_point = commit_monitor_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_1
+--send COMMIT
+
+--connection node_1a
+# wait for the local commit to enter in commit monitor wait state
+--let $galera_sync_point = apply_monitor_slave_enter_sync commit_monitor_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# first applier is now  waiting in before commit, and local trx in commit monitor
+
+# set sync point before replaying
+SET GLOBAL debug = "d,sync.wsrep_replay_cb";
+
+# release the local transaction to continue with commit
+# it should advance and end up waiting in commit monitor for his turn
+--let $galera_sync_point = commit_monitor_enter_sync
+--source include/galera_signal_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# and now release the first applier, it should force local trx to abort
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_signal_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# waiting for local replayer to reach sync point
+SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_replay_cb_reached";
+
+# remember wsrep_local_received value, we will wait for the next INSERT
+# to arrive from node 2
+--let $received_expected = `SELECT VARIABLE_VALUE+1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_received'`
+
+--connection node_2
+# send second insert into same GAP in test table
+INSERT INTO t1 VALUES (4, 4, 2);
+
+--connection node_1a
+--let $wait_condition = SELECT VARIABLE_VALUE=$received_expected FROM performance_schema.global_status WHERE VARIABLE_NAME='wsrep_received'
+--source include/wait_condition.inc
+
+# and now release the replayer, if all is good, it will commit before the second applier
+SET GLOBAL debug = "";
+SET DEBUG_SYNC = "now SIGNAL signal.wsrep_replay_cb";
+SET GLOBAL debug = NULL;
+SET debug_sync='RESET';
+
+# local commit should succeed
+--connection node_1
+--reap
+
+--let $wait_condition = SELECT COUNT(*)=5 FROM t1;
+--source include/wait_condition.inc
+
+# returning original slave thread count
+SET GLOBAL wsrep_slave_threads = DEFAULT;
+
+# wsrep_local_replays has increased by 1
+--let $wsrep_local_replays_new = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--disable_query_log
+--eval SELECT $wsrep_local_replays_new - $wsrep_local_replays_old = 1 AS wsrep_local_replays;
+--enable_query_log
+
+--connection node_2
+SELECT * FROM t1;
+
+# replicate some transactions, so that wsrep slave thread count can reach
+# original state in node 1
+INSERT INTO t1 VALUES (7,7,7);
+INSERT INTO t1 VALUES (8,8,8);
+
+DROP TABLE t1;
+
