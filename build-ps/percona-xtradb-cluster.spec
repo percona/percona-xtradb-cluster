@@ -976,8 +976,6 @@ install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README-MySQL \
     $RBR%{galera_docs}/README-MySQL
 install -m 644 $MBD/%{galera_src_dir}/asio/LICENSE_1_0.txt    \
     $RBR%{galera_docs}/LICENSE.asio
-install -m 644 $MBD/%{galera_src_dir}/www.evanjones.ca/LICENSE \
-    $RBR%{galera_docs}/LICENSE.crc32c
 install -m 644 $MBD/%{galera_src_dir}/chromium/LICENSE       \
     $RBR%{galera_docs}/LICENSE.chromium
 
@@ -1656,7 +1654,6 @@ fi
 %doc %attr(0644,root,root) %{galera_docs}/README
 %doc %attr(0644,root,root) %{galera_docs}/README-MySQL
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
-%doc %attr(0644,root,root) %{galera_docs}/LICENSE.crc32c
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.chromium
 %dir %{_sysconfdir}/my.cnf.d
 %dir %{_sysconfdir}/percona-xtradb-cluster.conf.d
