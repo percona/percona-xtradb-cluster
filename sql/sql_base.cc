@@ -58,9 +58,6 @@
 #include "sql_tmp_table.h" // free_tmp_table
 #include "sql_update.h" // records_are_comparable
 #include "table_cache.h" // Table_cache_manager, Table_cache
-#ifdef WITH_WSREP
-#include "wsrep_mysqld.h"
-#endif /* WITH_WSREP */
 #include "log.h"
 #include "binlog.h"
 #include "sql_audit.h"  // mysql_audit_table_access_notify

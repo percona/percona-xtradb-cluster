@@ -165,6 +165,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
 
   delete thd->wsrep_rli->current_mts_submode;
   thd->wsrep_rli->current_mts_submode = 0;
+  thd->wsrep_rli->cleanup_after_session();
   delete thd->wsrep_rli;
   thd->wsrep_rli = 0;
   thd->slave_thread = (thd->rli_slave) ? TRUE : FALSE;
@@ -640,7 +641,7 @@ static void wsrep_rollback_process(THD *thd)
 
       /* Clear the thread state, since the rollback thread is done with it */
       aborting->restore_globals();
-
+      thd->store_globals();
       mysql_mutex_lock(&LOCK_wsrep_rollback);
     }
   }
@@ -654,7 +655,6 @@ static void wsrep_rollback_process(THD *thd)
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 
   sql_print_information("WSREP: rollbacker thread exiting");
-  thd->store_globals();
   DBUG_PRINT("wsrep",("wsrep rollbacker thread exiting"));
   DBUG_VOID_RETURN;
 }

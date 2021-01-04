@@ -10860,16 +10860,19 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
     wsrep co-ordinates and wsrep co-ordinates are updated to reflect
     the recovery committed transaction.
   */
+  wsrep_uuid_t uuid;
+  wsrep_seqno_t seqno;
   if (WSREP_ON)
   {
-    wsrep_uuid_t uuid;
-    wsrep_seqno_t seqno;
     wsrep_get_SE_checkpoint(uuid, seqno);
     char uuid_str[40];
     wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
     WSREP_INFO("Before binlog recovery (wsrep position %s:%lld)", uuid_str,
                (long long)seqno);
   }
+  const wsrep_seqno_t last_xid_seqno= (WSREP_ON) ? seqno :
+                                                   WSREP_SEQNO_UNDEFINED;
+  wsrep_seqno_t cur_xid_seqno= WSREP_SEQNO_UNDEFINED;
 #endif /* WITH_WSREP */
 
   if (! fdle->is_valid() ||
@@ -10882,9 +10885,16 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
                   &mem_root, memory_page_size, memory_page_size);
 
   while ((ev= Log_event::read_log_event(log, 0, fdle, TRUE))
-         && ev->is_valid()
-      )
+         && ev->is_valid())
   {
+#ifdef WITH_WSREP
+    if (last_xid_seqno != WSREP_SEQNO_UNDEFINED &&
+        last_xid_seqno == cur_xid_seqno)
+    {
+      delete ev;
+      continue;
+    }
+#endif
     if (ev->get_type_code() == binary_log::QUERY_EVENT &&
         !strcmp(((Query_log_event*)ev)->query, "BEGIN"))
       in_transaction= TRUE;

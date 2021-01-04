@@ -254,7 +254,9 @@ Requires:       procps
 Requires:       shadow-utils
 Requires:       net-tools
 Requires:       lsof
-%{?el7:Requires:       socat}
+%if 0%{?el7} || 0%{?el8}
+Requires:       socat
+%endif
 # ??? Requires:       %{name}-client%{?_isa} >= %{min}
 # ??? Requires:       %{name}-common%{?_isa} = %{version}-%{release}
 %if 0%{?commercial}
