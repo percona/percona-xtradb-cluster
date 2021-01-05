@@ -1077,6 +1077,14 @@ trx_start_low(
 
 	trx->id = trx_sys_get_new_trx_id();
 
+#ifndef WITH_WSREP
+	/* Cache the state of fake_changes that transaction will use for
+	lifetime. Any change in session/global fake_changes configuration during
+	lifetime of transaction will not be honored by already started
+	transaction. */
+	trx->fake_changes = thd_fake_changes(trx->mysql_thd);
+#endif
+
 	ut_ad(!trx->in_rw_trx_list);
 	ut_ad(!trx->in_ro_trx_list);
 
@@ -2584,11 +2592,20 @@ trx_get_trx_by_xid_low(
 		    && memcmp(xid->data, trx->xid.data,
 			      xid->gtrid_length + xid->bqual_length) == 0) {
 
+#ifdef WITH_WSREP
+			/* The commit of a prepared recovered Galera
+			transaction needs a valid trx->xid for
+			invoking trx_sys_update_wsrep_checkpoint(). */
+			if (!wsrep_is_wsrep_xid(&trx->xid)) {
+#endif
 			/* Invalidate the XID, so that subsequent calls
 			will not find it. */
 			memset(static_cast<void*>(&trx->xid), 0,
 			       sizeof(trx->xid));
 			trx->xid.formatID = -1;
+#ifdef WITH_WSREP
+			}
+#endif /* WITH_WSREP */
 			break;
 		}
 	}

@@ -21,9 +21,9 @@ All Percona software is open-source and free.
 Bugs Fixed
 ================================================================================
 
-- :jirabug:`2729`: A cluster node could hang when trying to access a table which
+- :jirabug:`PXC-2729`: A cluster node could hang when trying to access a table which
   was being updated by another node.
-- :jirabug:`2704`: After a row was updated with a variable-length unique key,
+- :jirabug:`PXC-2704`: After a row was updated with a variable-length unique key,
   the entire cluster could crash.
 
 .. |release| replace:: 5.6.46-28.38

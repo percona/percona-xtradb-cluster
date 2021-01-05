@@ -1,0 +1,27 @@
+Killing server ...
+Expect seqno 0
+0
+Using --wsrep-start-position when starting mysqld ...
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+Killing server ...
+Expect seqno 1
+1
+Using --wsrep-start-position when starting mysqld ...
+INSERT INTO t1 VALUES (2);
+Killing server ...
+Expect seqno 2
+2
+Using --wsrep-start-position when starting mysqld ...
+SET SESSION debug_sync = "wsrep_before_commit SIGNAL wsrep_before_commit_reached WAIT_FOR wsrep_before_commit_continue";
+INSERT INTO t1 VALUES (3);
+SET SESSION debug_sync = "now WAIT_FOR wsrep_before_commit_reached";
+Killing server ...
+Expect seqno 3
+3
+Using --wsrep-start-position when starting mysqld ...
+Expect 2 3
+SELECT * FROM t1;
+f1
+2
+3
+DROP TABLE t1;

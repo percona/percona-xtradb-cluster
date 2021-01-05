@@ -41,8 +41,9 @@ sub add_opt_values {
   my ($self, $config)= @_;
 
   # add auto-options
-  $config->insert('OPT', 'port'   => sub { fix_port($self, $config) });
-  $config->insert('mysqld', "loose-skip-plugin-$_" => undef) for (@::optional_plugins);
+  $config->insert('OPT', 'port'   => fix_port($self, $config) );
+  $config->insert('OPT', 'vardir' => sub { $self->{ARGS}->{vardir} });
+  $config->insert('mysqld', "loose-skip-$_" => undef) for (@::optional_plugins);
 }
 
 my @pre_rules=
@@ -654,8 +655,20 @@ sub new_config {
     croak "you must pass '$required'" unless defined $args->{$required};
   }
 
+  # Fill in hosts/port hash
+  my $hosts= {};
+  my $baseport= $args->{baseport};
+  $args->{hosts}= [ 'localhost' ] unless exists($args->{hosts});
+  foreach my $host ( @{$args->{hosts}} ) {
+     $hosts->{$host}= $baseport;
+  }
+
   # Open the config template
   my $config= My::Config->new($args->{'template_path'});
+  my $extra_template_path= $args->{'extra_template_path'};
+  if ($extra_template_path){
+    $config->append(My::Config->new($extra_template_path));
+  }
   my $self= bless {
 		   CONFIG       => $config,
 		   ARGS         => $args,

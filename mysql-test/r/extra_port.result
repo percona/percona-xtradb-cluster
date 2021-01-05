@@ -43,12 +43,9 @@ KILL QUERY $con2_id
 KILL QUERY $con3_id
 KILL QUERY $extracon_id
 DROP USER nonprivuser@localhost;
-sleep(500000)
-1
-sleep(500000)
-1
-sleep(500000)
-1
+ERROR 70100: Query execution was interrupted
+ERROR 70100: Query execution was interrupted
+ERROR 70100: Query execution was interrupted
 SHOW GLOBAL STATUS LIKE 'Threads_connected';
 Variable_name	Value
 Threads_connected	1

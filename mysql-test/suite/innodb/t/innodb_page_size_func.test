@@ -1,3 +1,8 @@
+#
+# PXC: PXC requires 16k page. See comment in ha_innodb.cc
+#
+-- skip PXC requires 16k page. See comment in ha_innodb.cc
+
 # Purpose of this test:
 #    Check that server and InnoDB behave correct and give the right messages in
 #    case it is tried to restart the server with

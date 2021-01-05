@@ -212,11 +212,9 @@ void my_thread_global_end(void)
         are killed when we enter here.
       */
       if (THR_thread_count)
-      {
         fprintf(stderr,
                 "Error in my_thread_global_end(): %d threads didn't exit\n",
                 THR_thread_count);
-      }
 #endif
       all_threads_killed= 0;
       break;

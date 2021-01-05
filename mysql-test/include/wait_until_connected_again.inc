@@ -10,6 +10,9 @@
 
 --disable_result_log
 --disable_query_log
+# Wsrep change: The native $counter initial value was 500, but this
+# may not be enough for all tests which restart a node which joins
+# back with SST.
 let $counter= 5000;
 if ($VALGRIND_TEST) {
   let $counter= 30000;

@@ -1,0 +1,45 @@
+# Test if donor node goes back to SYNC state after it desyncs for donating
+# another node, but failing to start SST.
+
+--source include/have_debug.inc
+--source include/galera_cluster.inc
+
+--connection node_1
+CALL mtr.add_suppression(".*WSREP: SST failed.*");
+CALL mtr.add_suppression(".*WSREP: .* State transfer to .* failed: -125 .Operation canceled.*");
+
+--let $assert_text=node_1 should be in SYNC state after serving SST to node_2
+--let $wsrep_local_state_comment = query_get_value(SHOW STATUS LIKE 'wsrep_local_state_comment', Value, 1)
+--let $assert_cond= "$wsrep_local_state_comment" = "Synced"
+--source include/assert.inc
+
+# Setup node_1 to fail SST on next SST request
+SET GLOBAL debug = "+d,wsrep_sst_donate_cb_fails";
+
+# Restart node 2 forcing SST
+--connection node_2
+--source include/shutdown_mysqld.inc
+
+# Remove the grastate.dat file to force an SST
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+# As SST fails on donor side, the joiner will abort
+--let $error_log= $MYSQLTEST_VARDIR/tmp/test_error_log.err
+--let $mysqld2=$MYSQLD --defaults-group-suffix=.2 --defaults-file=$PATH_CONFIG_FILE --wsrep-provider-options='base_port=$NODE_GALERAPORT_2' --console > $error_log 2>&1
+--error 134
+--exec $mysqld2
+--remove_file $error_log
+
+# node_1 should go back to SYNC state
+--connection node_1
+--let $assert_text=node_1 should go back to SYNC state
+--let $wsrep_local_state_comment = query_get_value(SHOW STATUS LIKE 'wsrep_local_state_comment', Value, 1)
+--let $assert_cond= "$wsrep_local_state_comment" = "Synced"
+--source include/assert.inc
+
+# cleanup
+SET GLOBAL debug = "-d,wsrep_sst_donate_cb_fails";
+
+--connection node_2
+--echo cleanup
+--source include/start_mysqld.inc

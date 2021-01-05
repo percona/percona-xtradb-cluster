@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -204,6 +204,7 @@ static const char *HA_ERR(int i)
   case HA_ERR_CORRUPT_EVENT: return "HA_ERR_CORRUPT_EVENT";
   case HA_ERR_ROWS_EVENT_APPLY : return "HA_ERR_ROWS_EVENT_APPLY";
   case HA_ERR_INNODB_READ_ONLY: return "HA_ERR_INNODB_READ_ONLY";
+  case HA_ERR_FTS_TOO_MANY_NESTED_EXP: return "HA_ERR_FTS_TOO_MANY_NESTED_EXP";
   }
   return "No Error!";
 }
@@ -7731,6 +7732,10 @@ int Xid_log_event::do_apply_event(Relay_log_info const *rli)
   mysql_mutex_lock(&rli_ptr->data_lock);
   if (error)
   {
+#ifdef WITH_WSREP
+    /* if slave transaction has to be replayed, do not report error message */
+    if ((!WSREP(thd) || thd->wsrep_conflict_state != MUST_REPLAY))
+#endif /* WITH_WSREP */
     rli->report(ERROR_LEVEL, thd->get_stmt_da()->sql_errno(),
                 "Error in Xid_log_event: Commit could not be completed, '%s'",
                 thd->get_stmt_da()->message());
@@ -11535,10 +11540,12 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
         RPL_TABLE_LIST *ptr= static_cast<RPL_TABLE_LIST*>(table_list_ptr);
         DBUG_ASSERT(ptr->m_tabledef_valid);
         TABLE *conv_table;
+#ifdef WITH_WSREP
         /*
           Use special mem_root 'Log_event::m_event_mem_root' while doing
           compatiblity check (i.e., while creating temporary table)
          */
+#endif
         if (!ptr->m_tabledef.compatible_with(thd, const_cast<Relay_log_info*>(rli),
                                              ptr->table, &conv_table))
         {

@@ -19,11 +19,6 @@ UNINSTALL PLUGIN audit_log;
 Warnings:
 Warning	1620	Plugin is busy and will be uninstalled on shutdown
 INSTALL PLUGIN audit_log SONAME 'audit_log.so';
-SELECT * FROM t;
-a
-db2
-use 	`db1`;
-ERROR 42000: Access denied for user 'user2'@'%' to database 'db1'
 connect(localhost,user2,111,db1,MASTER_MYPORT,MASTER_MYSOCK);
 ERROR 42000: Access denied for user 'user2'@'%' to database 'db1'
 connect(localhost,user2,112,db2,MASTER_MYPORT,MASTER_MYSOCK);
@@ -57,11 +52,6 @@ set global audit_log_flush= ON;
 ===================================================================
 "Query","<ID>","<DATETIME>","install_plugin","<CONN_ID>",0,"INSTALL PLUGIN audit_log SONAME 'audit_log.so'","root[root] @ localhost []","localhost","","",""
 "Quit","<ID>","<DATETIME>","<CONN_ID>",0,"root","root","","","localhost","","test"
-"Connect","<ID>","<DATETIME>","<CONN_ID>",0,"user1","user1","","","localhost","","db2"
-"Query","<ID>","<DATETIME>","select","<CONN_ID>",0,"SELECT * FROM t","user1[user1] @ localhost []","localhost","","","db2"
-"Query","<ID>","<DATETIME>","change_db","<CONN_ID>",0,"use 	`db1`","user1[user1] @ localhost []","localhost","","","db1"
-"Change user","<ID>","<DATETIME>","<CONN_ID>",1044,"user2","user2","","","localhost","",""
-"Quit","<ID>","<DATETIME>","<CONN_ID>",0,"user1","user1","","","localhost","","db1"
 "Connect","<ID>","<DATETIME>","<CONN_ID>",1044,"user2","user2","","","localhost","",""
 "Quit","<ID>","<DATETIME>","<CONN_ID>",0,"user2","user2","","","localhost","",""
 "Connect","<ID>","<DATETIME>","<CONN_ID>",1045,"user2","user2","","","localhost","",""

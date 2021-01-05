@@ -21,9 +21,9 @@ All Percona software is open-source and free.
 Bugs Fixed
 ================================================================================
 
-- :jirabug:`2432`: PXC was not updating the information_schema user/client
+- :jirabug:`PXC-2432`: PXC was not updating the information_schema user/client
   statistics properly.
-- :jirabug:`2555`: SST initialization delay: fixed a bug where the SST process
+- :jirabug:`PXC-2555`: SST initialization delay: fixed a bug where the SST process
   took too long to detect if a child process was running.
 
 .. |release| replace:: 5.6.45-28.36

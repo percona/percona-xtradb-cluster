@@ -24,3 +24,7 @@ innodb_stats_table_flag_auto_recalc : Performs multiple restarts in a row which 
 innodb_deadlock_with_autoinc : Test uses autoinc_lock_mode = 0
 ibuf_not_empty : InnoDB: Failing assertion: !srv_read_only_mode with server restart
 innodb_force_recovery : InnoDB: Failing assertion: !srv_read_only_mode with server restart
+innodb-log-file-size-1 : Process exit code mismatch on SE init failure.
+innodb-log-file-size : Process exit code mismatch on SE init failure.
+innodb_bug70867 : Process exit code mismatch on SE init failure.
+innodb_page_size_func : Process exit code mismatch on SE init failure.

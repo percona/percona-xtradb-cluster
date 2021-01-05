@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
    Copyright (c) 2009, 2013, Monty Program Ab
    Copyright (C) 2012 Percona Inc.
 
@@ -66,10 +66,6 @@ using std::max;
 #include "debug_sync.h"
 #include "sql_show.h"
 #include "mysqld.h"
-
-/* max size of log messages (error log, plugins' logging, general log) */
-#define MAX_LOG_BUFFER_SIZE 1024
-#define MAX_TIME_SIZE 32
 
 static
 const TABLE_FIELD_TYPE slow_query_log_table_fields[SQLT_FIELD_COUNT] =
@@ -2903,13 +2899,12 @@ int TC_LOG_MMAP::open(const char *opt_name)
     mysql_mutex_init(key_PAGE_lock, &pg->lock, MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_PAGE_cond, &pg->cond, 0);
     pg->ptr= pg->start=(my_xid *)(data + i*tc_log_page_size);
-#ifdef WITH_WSREP
-    if (!WSREP_ON) 
-#endif /* WITH_WSREP */
-    pg->end=(my_xid *)(pg->start + tc_log_page_size);
     pg->size=pg->free=tc_log_page_size/sizeof(my_xid);
 #ifdef WITH_WSREP
-    if (WSREP_ON) pg->end=pg->start + pg->size;
+    if (!WSREP_ON) 
+      pg->end=(my_xid *)(pg->start + tc_log_page_size);
+    else
+      pg->end=pg->start + pg->size;
 #else
     pg->end=pg->start + pg->size;
 #endif /* WITH_WSREP */

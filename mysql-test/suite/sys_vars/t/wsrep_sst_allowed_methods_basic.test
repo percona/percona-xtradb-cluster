@@ -1,0 +1,22 @@
+--source include/have_wsrep.inc
+
+# wsrep_sst_allowed_methods is global readonly variable
+
+--echo # default
+SELECT @@global.wsrep_sst_allowed_methods;
+
+--echo
+--echo # scope
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SELECT @@session.wsrep_sst_allowed_methods;
+SHOW GLOBAL VARIABLES LIKE 'wsrep_sst_allowed_methods';
+SHOW SESSION VARIABLES LIKE 'wsrep_sst_allowed_methods';
+SELECT * FROM information_schema.global_variables WHERE variable_name = 'wsrep_sst_allowed_methods';
+SELECT * FROM information_schema.session_variables WHERE variable_name = 'wsrep_sst_allowed_methods';
+
+--echo
+--echo # readonly
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SET GLOBAL wsrep_sst_allowed_methods = 'test_method';
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SET SESSION wsrep_sst_allowed_methods = 'test_method';

@@ -635,11 +635,6 @@ static bool mysql_admin_table(THD* thd, TABLE_LIST* tables,
         table->mdl_request.ticket= NULL;
 
         tmp_disable_binlog(thd); // binlogging is done by caller if wanted
-#ifdef WITH_WSREP
-        /* Re-create table should run with wsrep_on = ON that got disabled
-        by tmp_disable_binlog as it takes MDL lock that can force abort. */
-        reenable_wsrep(thd);
-#endif /* WITH_WSREP */
         result_code= mysql_recreate_table(thd, table, false);
         reenable_binlog(thd);
         /*
@@ -799,11 +794,6 @@ send_result_message:
                  *save_next_global= table->next_global;
       table->next_local= table->next_global= 0;
       tmp_disable_binlog(thd); // binlogging is done by caller if wanted
-#ifdef WITH_WSREP
-        /* Re-create table should run with wsrep_on = ON that got disabled
-        by tmp_disable_binlog as it takes MDL lock that can force abort. */
-        reenable_wsrep(thd);
-#endif /* WITH_WSREP */
       /* Don't forget to pre-open temporary tables. */
       result_code= (open_temporary_tables(thd, table) ||
                     mysql_recreate_table(thd, table, false));
@@ -1086,10 +1076,12 @@ bool Sql_cmd_analyze_table::execute(THD *thd)
                          FALSE, UINT_MAX, FALSE))
     goto error;
 
+#ifdef WITH_WSREP
   DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command",
                   { sql_print_information("In Sql_cmd_analyze_table::execute()");});
 
   WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
+#endif
   thd->set_slow_log_for_admin_command();
   res= mysql_admin_table(thd, first_table, &thd->lex->check_opt,
                          "analyze", lock_type, 1, 0, 0, 0,
@@ -1121,8 +1113,10 @@ bool Sql_cmd_check_table::execute(THD *thd)
                          TRUE, UINT_MAX, FALSE))
     goto error; /* purecov: inspected */
 
+#ifdef WITH_WSREP
   DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command",
                   { sql_print_information("In Sql_cmd_check_table::execute()");});
+#endif
 
   thd->enable_slow_log= opt_log_slow_admin_statements;
 
@@ -1148,8 +1142,10 @@ bool Sql_cmd_optimize_table::execute(THD *thd)
                          FALSE, UINT_MAX, FALSE))
     goto error; /* purecov: inspected */
 
+#ifdef WITH_WSREP
   DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command",
                   { sql_print_information("In Sql_cmd_optimize_table::execute()");});
+#endif
 
   WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
   thd->set_slow_log_for_admin_command();
@@ -1184,8 +1180,10 @@ bool Sql_cmd_repair_table::execute(THD *thd)
                          FALSE, UINT_MAX, FALSE))
     goto error; /* purecov: inspected */
 
+#ifdef WITH_WSREP
   DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command",
                   { sql_print_information("In Sql_cmd_repair_table::execute()");});
+#endif
 
   WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
   thd->set_slow_log_for_admin_command();

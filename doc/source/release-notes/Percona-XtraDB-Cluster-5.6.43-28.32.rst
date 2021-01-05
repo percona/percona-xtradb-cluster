@@ -22,7 +22,7 @@ All Percona software is open-source and free.
 Bugs Fixed
 ================================================================================
 
-- :jirabug:`2388`: In some cases, ``DROP FUNCTION`` with an explicit name was not
+- :jirabug:`PXC-2388`: In some cases, ``DROP FUNCTION`` with an explicit name was not
   replicated.
 
 .. |release| replace:: 5.6.43-28.32

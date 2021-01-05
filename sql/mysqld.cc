@@ -1313,9 +1313,7 @@ bool mysqld_embedded=0;
 bool mysqld_embedded=1;
 #endif
 
-#ifndef EMBEDDED_LIBRARY
 static my_bool plugins_are_initialized= FALSE;
-#endif
 
 #ifndef DBUG_OFF
 static const char* default_dbug_option;
@@ -1959,6 +1957,9 @@ extern "C" void unireg_abort(int exit_code)
     WSREP_INFO("Waiting to close threads......");
     sleep(5); /* so give some time to exit for those which can */
     WSREP_INFO("Some threads may fail to exit.");
+    /* Signal possible SE initialization waiters with error. */
+    wsrep_SE_initialized(WSREP_SE_INIT_RESULT_FAILURE);
+    wsrep_deinit();
   }
 #endif // WITH_WSREP
 
@@ -3062,13 +3063,15 @@ void dec_connection_count(THD *thd)
     applier as well as rollbacker threads.
   */
   if (!thd->wsrep_applier)
-#endif /* WITH_WSREP */
   {
+#endif /* WITH_WSREP */
     mysql_mutex_lock(&LOCK_connection_count);
     if (--(*thd->scheduler->connection_count) == 0)
       mysql_cond_signal(&COND_connection_count);
     mysql_mutex_unlock(&LOCK_connection_count);
+#ifdef WITH_WSREP
   }
+#endif /* WITH_WSREP */
 }
 
 
@@ -4467,6 +4470,13 @@ int init_common_variables()
 #else
   my_regex_init(&my_charset_latin1, NULL);
 #endif
+
+#ifdef WITH_WSREP
+  /* To be called after initializing the regex engine. */
+  if (wsrep_setup_allowed_sst_methods())
+    return 1;
+#endif
+
   /*
     Process a comma-separated character set list and choose
     the first available character set. This is mostly for
@@ -5505,7 +5515,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(1);
   }
 
-#ifdef WITH_WSREP
   if (plugin_init(&remaining_argc, remaining_argv,
                   (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
                   (opt_help ? PLUGIN_INIT_SKIP_INITIALIZATION : 0)))
@@ -5514,7 +5523,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(1);
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
-#endif /* WITH_WSREP */
   /* we do want to exit if there are any other unknown options */
   if (remaining_argc > 1)
   {
@@ -6635,6 +6643,15 @@ int mysqld_main(int argc, char **argv)
   Service.SetSlowStarting(slow_start_timeout);
 #endif
 
+#ifdef WITH_WSREP
+  /*
+    Make sure that SSL library gets initialized before WSREP provider
+    is loaded. This is to ensure that possible server side initialization
+    does not have any side effects while the provider is already running
+    with open SSL sessions.
+  */
+  ssl_start();
+#endif /* */
   if (init_server_components())
     unireg_abort(1);
 
@@ -6844,13 +6861,9 @@ int mysqld_main(int argc, char **argv)
   }
   else
   {
-    wsrep_SE_initialized();
-
+    wsrep_SE_initialized(WSREP_SE_INIT_RESULT_SUCCESS);
     if (wsrep_before_SE())
     {
-      /*! in case of no SST wsrep waits in view handler callback */
-      wsrep_SE_init_grab();
-      wsrep_SE_init_done();
       /*! in case of SST wsrep waits for wsrep->sst_received */
       wsrep_sst_continue();
     }

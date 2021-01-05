@@ -4,18 +4,30 @@
  Percona XtraDB Cluster In-Place Upgrading Guide: From 5.5 to 5.6
 ==================================================================
 
-.. warning::
-   * Some variables (possibly deprecated) in PS 5.5 may have been removed in PS 5.6 (hence in PXC 5.6), please check that the variable is still valid before upgrade.
-   * Also, make sure to avoid SST during upgrade since a SST between nodes with 5.5 and 5.6 may not work as expected (especially, if 5.5 is donor and 5.6 is joiner, mysql_upgrade will be required on joiner; vice-versa, package upgrade will be required on joiner). You can also avoid automatic SST for the duration of upgrade by setting ```wsrep-sst-method``` to 'skip' for the duration of upgrade. (Note that ```wsrep-sst-method``` is a dynamic variable.) Having a large enough gcache helps here. Also, setting it to ``skip`` ensures that you can handle SST manually if and when required.
-
-Upgrading cluster involves following major stages:
+Upgrading cluster involves the following major stages:
 
 I) Upgrade a single node.
 II) Upgrade the whole cluster while not breaking replication.
 III) [Optional] Restarting nodes with non-compat options.
+
+.. warning::
+   
+   Do not apply :term:`SST` during upgrade. |sst| between nodes with
+   |percona-server| or |mysql| 5.5 and |percona-server| or |mysql| 5.6
+   may not work as expected.
+
+   To avoid automatic |sst| for the duration of the upgrade, set the
+   :variable:`wsrep-sst-method` variable to `skip` to ensure that you
+   can handle |sst| manually when required. Consider setting Having a
+   large enough the gcache size to a value large enough.
+
+   .. seealso::
+
+      Percona Blog: How to calculate the correct size of Percona XtraDB Cluster’s gcache
+         https://www.percona.com/blog/2014/09/08/calculate-correct-size-percona-xtradb-clusters-gcache/
+
  
-.. note::
-    Following upgrade process is for a **rolling** upgrade, ie. an upgrade without downtime for the cluster. If you intend to allow for downtime - bring down all nodes, upgrade them, bootstrap and start nodes - then you can just follow Stage I sans the compatibility variables part. Make sure to bootstrap the first node in the cluster after upgrade.
+Following upgrade process is for a **rolling** upgrade, ie. an upgrade without downtime for the cluster. If you intend to allow for downtime - bring down all nodes, upgrade them, bootstrap and start nodes - then you can just follow Stage I sans the compatibility variables part. Make sure to bootstrap the first node in the cluster after upgrade.
 
 Following is the upgrade process on CentOS 6.4
 ==============================================
@@ -242,3 +254,5 @@ Stage III [Optional]
 .. note::
     Making this stage without cluster downtime can be achieved by removing the
     config options and restarting node-by-node.
+
+.. |sst| replace:: :abbr:`SST (State Snapshot Transfer)`

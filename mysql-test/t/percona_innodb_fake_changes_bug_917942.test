@@ -1,6 +1,9 @@
 # Test for bug 917942, based on FB percona_innodb_fake_changes_bugs2 and ... _bugs3 test cases.
 # Meant to be run under Valgrind.
 
+# https://www.percona.com/doc/percona-xtradb-cluster/5.6/limitation.html
+--skip InnoDB Fake Changes not supported for PXC
+
 --source include/have_innodb.inc 
 
 --disable_warnings

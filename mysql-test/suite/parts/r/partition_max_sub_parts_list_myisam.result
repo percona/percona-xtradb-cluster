@@ -4166,15 +4166,15 @@ a
 update t2 partition (p4095) set a=16381 where a= 16382;
 select * from t2 partition (p4095);
 a
-16383
 16381
+16383
 load data infile 'MYSQL_TMP_DIR/data01' into table t2 partition (p4095) fields terminated by ',';
 select * from t2 partition (p4095);
 a
-16380
 16382
-16383
+16380
 16381
+16383
 alter table t2 add partition (partition p4096 values in (16384,16385,16386,16387));
 ERROR HY000: Too many partitions (including subpartitions) were defined
 drop table t2;

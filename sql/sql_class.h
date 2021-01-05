@@ -26,8 +26,10 @@
 
 /* Classes in mysql */
 
+#ifdef WITH_WSREP
 #include <vector>
 using std::vector;
+#endif
 
 #include "my_global.h"                          /* NO_EMBEDDED_ACCESS_CHECKS */
 #ifdef MYSQL_SERVER
@@ -2206,7 +2208,11 @@ public:
       m_mdl_blocks_commits_lock(NULL)
   {}
 
+#ifdef WITH_WSREP
   bool lock_global_read_lock(THD *thd, bool *own_lock);
+#else
+  bool lock_global_read_lock(THD *thd);
+#endif
   void unlock_global_read_lock(THD *thd);
 
   /**
@@ -2690,8 +2696,12 @@ public:
   int is_current_stmt_binlog_format_row() const {
     DBUG_ASSERT(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
                 current_stmt_binlog_format == BINLOG_FORMAT_ROW);
+#ifdef WITH_WSREP
     return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
             BINLOG_FORMAT_ROW);
+#else
+    return current_stmt_binlog_format == BINLOG_FORMAT_ROW;
+#endif
   }
 
   bool is_current_stmt_binlog_disabled() const;
@@ -3706,7 +3716,9 @@ public:
   void shutdown_active_vio();
 #endif
   void awake(THD::killed_state state_to_set);
+#ifdef WITH_WSREP
   void awake(void);
+#endif
 
   /** Disconnect the associated communication endpoint. */
   void disconnect();
@@ -4711,30 +4723,11 @@ my_eof(THD *thd)
   thd->get_stmt_da()->set_eof_status(thd);
 }
 
-#ifdef WITH_WSREP
+#define tmp_disable_binlog(A)                                           \
+  {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits; \
+  (A)->variables.option_bits&= ~OPTION_BIN_LOG
 
-  #define tmp_disable_binlog(A)                                               \
-    {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits;  \
-    my_bool tmp_disable_binlog__save_wsrep_on= (A)->variables.wsrep_on;       \
-    (A)->variables.wsrep_on= 0;                                               \
-    (A)->variables.option_bits&= ~OPTION_BIN_LOG
-  
-  #define reenable_binlog(A)                                                  \
-    (A)->variables.wsrep_on= tmp_disable_binlog__save_wsrep_on;               \
-    (A)->variables.option_bits= tmp_disable_binlog__save_options;}
-
-  #define reenable_wsrep(A)    (A)->variables.wsrep_on= tmp_disable_binlog__save_wsrep_on;
-
-#else
-
-  #define tmp_disable_binlog(A)       \
-    {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits; \
-    (A)->variables.option_bits&= ~OPTION_BIN_LOG
-
-  #define reenable_binlog(A)   (A)->variables.option_bits= tmp_disable_binlog__save_options;}
-
-#endif
-
+#define reenable_binlog(A)   (A)->variables.option_bits= tmp_disable_binlog__save_options;}
 
 LEX_STRING *
 make_lex_string_root(MEM_ROOT *mem_root,
@@ -5842,11 +5835,6 @@ public:
 #else
 #define CF_SKIP_WSREP_CHECK     0
 #endif /* WITH_WSREP */
-
-/**
-  Do not check that wsrep snapshot is ready before allowing this command
-*/
-#define CF_SKIP_WSREP_CHECK     (1U << 2)
 
 void add_to_status(STATUS_VAR *to_var, STATUS_VAR *from_var);
 

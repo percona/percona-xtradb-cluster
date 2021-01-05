@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -69,9 +69,11 @@
 using std::max;
 using std::min;
 
+#ifdef WITH_WSREP
 #if !defined(MYSQL_MAX_VARIABLE_VALUE_LEN)
 #define MYSQL_MAX_VARIABLE_VALUE_LEN 1024
 #endif // !defined(MYSQL_MAX_VARIABLE_VALUE_LEN)
+#endif
 #define STR_OR_NIL(S) ((S) ? (S) : "<nil>")
 
 #ifdef WITH_PARTITION_STORAGE_ENGINE
@@ -8230,6 +8232,9 @@ int hton_fill_schema_table(THD *thd, TABLE_LIST *tables, Item *cond)
   args.tables= tables;
   args.cond= cond;
 
+  if (check_global_access(thd, PROCESS_ACL))
+    DBUG_RETURN(1);
+
   plugin_foreach(thd, run_hton_fill_schema_table,
                  MYSQL_STORAGE_ENGINE_PLUGIN, &args);
 
@@ -8720,8 +8725,12 @@ ST_FIELD_INFO variables_fields_info[]=
 {
   {"VARIABLE_NAME", 64, MYSQL_TYPE_STRING, 0, 0, "Variable_name",
    SKIP_OPEN_TABLE},
+#ifdef WITH_WSREP
   {"VARIABLE_VALUE", MYSQL_MAX_VARIABLE_VALUE_LEN, MYSQL_TYPE_STRING, 0, 1,
    "Value", SKIP_OPEN_TABLE},
+#else
+  {"VARIABLE_VALUE", 1024, MYSQL_TYPE_STRING, 0, 1, "Value", SKIP_OPEN_TABLE},
+#endif
   {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE}
 };
 

@@ -117,8 +117,10 @@ public:
   update_event(THD *thd, Event_parse_data *parse_data,
                LEX_STRING *new_dbname, LEX_STRING *new_name);
 
+#ifdef WITH_WSREP
   static bool
   drop_event_precheck(THD *thd, LEX_STRING dbname);
+#endif
 
   static bool
   drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists);

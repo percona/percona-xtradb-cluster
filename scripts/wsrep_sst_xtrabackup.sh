@@ -1,4 +1,4 @@
-#!/bin/bash -ue
+#!/usr/bin/env bash
 # Copyright (C) 2013 Percona Inc
 #
 # This program is free software; you can redistribute it and/or modify
@@ -18,8 +18,7 @@
 # Optional dependencies and options documented here: http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html 
 # Make sure to read that before proceeding!
 
-
-
+set -o nounset -o errexit
 
 . $(dirname $0)/wsrep_sst_common
 

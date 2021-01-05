@@ -408,7 +408,9 @@ enum legacy_db_type
   DB_TYPE_MARIA,
   /** Performance schema engine. */
   DB_TYPE_PERFORMANCE_SCHEMA,
+#ifdef WITH_WSREP
   DB_TYPE_WSREP,
+#endif /* WITH_WSREP */
   DB_TYPE_TOKUDB=41,
   DB_TYPE_ROCKSDB=42,
   DB_TYPE_FIRST_DYNAMIC=43,
@@ -935,11 +937,13 @@ struct handlerton
                      const char *wild, bool dir, List<LEX_STRING> *files);
    int (*table_exists_in_engine)(handlerton *hton, THD* thd, const char *db,
                                  const char *name);
+#ifdef WITH_WSREP
    int (*wsrep_abort_transaction)(handlerton *hton, THD *bf_thd, 
 				  THD *victim_thd, my_bool signal);
    int (*wsrep_set_checkpoint)(handlerton *hton, const XID* xid);
    int (*wsrep_get_checkpoint)(handlerton *hton, XID* xid);
    void (*wsrep_fake_trx_id)(handlerton *hton, THD *thd);
+#endif /* WITH_WSREP */
    int (*make_pushed_join)(handlerton *hton, THD* thd, 
                            const AQP::Join_plan* plan);
 
@@ -3748,9 +3752,6 @@ int ha_release_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal);
 void ha_wsrep_fake_trx_id(THD *thd);
 #endif /* WITH_WSREP */
-
-/* Build pushed joins in handlers implementing this feature */
-int ha_make_pushed_joins(THD *thd, const AQP::Join_plan* plan);
 
 /* Build pushed joins in handlers implementing this feature */
 int ha_make_pushed_joins(THD *thd, const AQP::Join_plan* plan);

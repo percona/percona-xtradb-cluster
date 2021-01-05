@@ -1,5 +1,5 @@
 #
-# Test that --log-output=FILE works with Galera.
+# Test that --log-output=TABLE works with Galera.
 # The relevant options are set using a -master.opt file
 # wsrep_replicate_myisam is not used as it crashes in MTR with mysql-wsrep#14
 #
@@ -18,18 +18,20 @@ TRUNCATE TABLE mysql.slow_log;
 
 --connection node_1
 
-CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
-INSERT INTO t1 VALUES (1);
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 INTEGER DEFAULT 0) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, DEFAULT);
 
 SELECT COUNT(*) > 0 FROM mysql.general_log;
 
-SELECT 1 = 1 FROM t1;
-SELECT COUNT(*) = 1 FROM mysql.slow_log WHERE sql_text = 'SELECT 1 = 1 FROM t1';
+TRUNCATE mysql.slow_log;
+SELECT COUNT(*) = 0 FROM t1 WHERE f2 = 1;
+SELECT COUNT(*) = 1 FROM mysql.slow_log WHERE sql_text = 'SELECT COUNT(*) = 0 FROM t1 WHERE f2 = 1';
 
 --connection node_2
 
-SELECT 2 = 2 FROM t1;
-SELECT COUNT(*) = 1 FROM mysql.slow_log WHERE sql_text = 'SELECT 2 = 2 FROM t1';
+TRUNCATE mysql.slow_log;
+SELECT COUNT(*) = 0 FROM t1 WHERE f2 = 2;
+SELECT COUNT(*) = 1 FROM mysql.slow_log WHERE sql_text = 'SELECT COUNT(*) = 0 FROM t1 WHERE f2 = 2';
 
 --connection node_1
 DROP TABLE t1;

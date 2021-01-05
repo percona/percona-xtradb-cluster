@@ -314,7 +314,7 @@ bool
 Events::create_event(THD *thd, Event_parse_data *parse_data,
                      bool if_not_exists)
 {
-  bool ret= TRUE;
+  bool ret;
   bool save_binlog_row_based, event_already_exists;
   ulong save_binlog_format= thd->variables.binlog_format;
   DBUG_ENTER("Events::create_event");
@@ -454,7 +454,7 @@ bool
 Events::update_event(THD *thd, Event_parse_data *parse_data,
                      LEX_STRING *new_dbname, LEX_STRING *new_name)
 {
-  int ret= TRUE;
+  int ret;
   bool save_binlog_row_based;
   ulong save_binlog_format= thd->variables.binlog_format;
   Event_queue_element *new_element;
@@ -583,9 +583,6 @@ err:
   and COMMIT/ROLLBACK is not allowed in stored functions and
   triggers.
 
-  @note Call Events::drop_event_precheck before calling this to
-  perform access checks.
-
   @retval  FALSE  OK
   @retval  TRUE   Error (reported)
 */
@@ -593,7 +590,7 @@ err:
 bool
 Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
 {
-  int ret= TRUE;
+  int ret;
   bool save_binlog_row_based;
   DBUG_ENTER("Events::drop_event");
 

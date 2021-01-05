@@ -362,22 +362,20 @@ The ``tmpdir`` option can be set in the following :file:`my.cnf` groups:
 XtraBackup SST Dependencies
 ---------------------------
 
-Although any current version of |PXB| *may* be compatible
-with any current version of |PXC|,
-there are certain differences that may break compatibility.
-As a result, starting from |PXC| 5.6
-every version is tested against a specific |PXB| version only:
+Each suppored version of |PXC| is tested against a specific version of |PXB|:
 
 * |PXC| 5.6 requires |PXB| 2.3
 * |PXC| 5.7 requires |PXB| 2.4
+* |PXC| 8.0 requires |PXB| 8.0
 
 Other combinations are not guaranteed to work.
 
 The following are optional dependencies of |Percona XtraDB Cluster| introduced
 by :file:`wsrep_sst_xtrabackup` (except for obvious and direct dependencies):
 
-* ``qpress`` for decompression. It is an dependency of |Percona XtraBackup| and
-  it is available in Percona software repositories.
+* ``qpress`` for decompression.
+  It is an optional dependency of |Percona XtraBackup| 
+  and it is available in our software repositories.
 
 * ``my_print_defaults`` to extract values from :file:`my.cnf`. Provided by the
   server package.

@@ -39,7 +39,9 @@
 #include "sp_head.h"
 #include "sql_show.h"                // append_definer, append_identifier
 
+#ifdef WITH_WSREP
 #include "wsrep_thd.h"
+#endif
 
 /**
   @addtogroup Event_Scheduler
