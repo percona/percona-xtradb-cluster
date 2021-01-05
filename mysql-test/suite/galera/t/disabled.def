@@ -23,3 +23,5 @@ pxc_encrypt_rest_gt_vault : Vault server availability is unreliable
 pxc_encrypt_rest_fpt_vault : Vault server availability is unreliable
 #galera_var_wsrep_recover : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 #mysql-wsrep#216 : GCF-1021 0000-00-00 CODERSHIP 5.7 Regression: obfuscated passwords not consistent in error logs
+galera_fk_lock_parent_update_child : 2021-01-04 Disabled by Percona as few cases fail due to timing issue (PXC-3431) and few are invalid after PXC-3501
+galera_toi_ddl_fk_insert : qa#39 2021-01-04 CODERSHIP galera_toi_ddl_fk_insert fails sporadically / PXC-3431
