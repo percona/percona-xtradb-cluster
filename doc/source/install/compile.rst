@@ -108,11 +108,14 @@ To compile |PXC| from source code:
 
    .. code-block:: bash
 
-      $ git submodule init wsrep/src && git submodule update wsrep/src
+      $ git submodule update --init -recursive
+      $ cd wsrep-lib
+      $ git submodule init wsrep-API/v26 && git submodule update wsrep-API/v26
       $ git submodule init percona-xtradb-cluster-galera && git submodule update percona-xtradb-cluster-galera
       $ cd  percona-xtradb-cluster-galera
       $ git submodule init wsrep/src && git submodule update wsrep/src
       & git submodule init && git submodule update
+      $ git submodule init extra/coredumper && git submodule update extra/coredumper/
       $ cd ..
 
 #. Run the build script :file:`./build-ps/build-binary.sh`.
