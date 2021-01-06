@@ -1,0 +1,68 @@
+#
+# This test verifies that, in a foreign key relationship, child table DELETE
+# followed by parent table DELETE are not parallelized and are handled
+# sequentially by the applier threads when wsrep_slave_threads > 1.
+#
+--source include/galera_cluster.inc
+
+# Create two tables with FK relationship.
+--echo # [connection node_1]
+CREATE TABLE t1 (
+  id int primary key
+);
+
+CREATE TABLE t2 (
+  id int primary key,
+  f_id int, FOREIGN KEY(f_id) REFERENCES t1(id)
+);
+
+INSERT INTO t1 SELECT 1;
+
+# Ensure that node_2 is configured with wsrep_slave_threads > 1.
+--echo # [connection node_2]
+--connection node_2
+--let $assert_text = node2 has parallel applier threads configured
+--let $assert_cond = [SELECT @@GLOBAL.wsrep_slave_threads > 1] = 1
+--source include/assert.inc
+
+# Insert 2000 rows on node_1.
+--echo # [connection node_1]
+--connection node_1
+--disable_query_log
+--let $count=2000
+while($count)
+{
+  --eval INSERT INTO t2 VALUES ($count, 1);
+  --dec $count
+}
+--enable_query_log
+
+# Verify that all rows have been applied.
+--echo # [connection node_2]
+--connection node_2
+--let $assert_text = t2 on node_2 has 2000 rows
+--let $assert_cond = [SELECT COUNT(*) = 2000 FROM t2] = 1
+--source include/assert.inc
+
+# This is the main part of the test.
+#
+# Here we try delete rows from both the tables. If foreign key dependencies
+# are not included in the writesets, then the below DELETE statements would
+# allow parent table DELETE to be executed in parallel with the child table
+# DELETE when wsrep-slave-threads > 1, thus making the wsrep applier thread
+# to error out with HA_ERR_ROW_IS_REFERENCED when it tries to delete the
+# parent row while some of the rows in the child table are still referring
+# to the same row.
+#
+# If foreign key dependencies are written to the writesets, then
+# depends_seqno of the parent table delete would point to the global seqno
+# of the child table delete and it ensures that we don't parallelize these
+# statements on other nodes.
+
+--echo # [connection node_1]
+--connection node_1
+DELETE FROM t2;
+DELETE FROM t1;
+
+# Cleanup.
+DROP TABLE t2,t1;

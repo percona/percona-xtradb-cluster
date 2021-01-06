@@ -357,8 +357,9 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
     NOT break the constraint. */
 
     if (foreign->foreign_index == index &&
-        row_upd_changes_first_fields_binary(entry, index, node->update,
-                                            foreign->n_fields)) {
+        (node->is_delete ||
+         row_upd_changes_first_fields_binary(entry, index, node->update,
+                                             foreign->n_fields))) {
       if (foreign->referenced_table == NULL) {
         MDL_ticket *mdl;
 
