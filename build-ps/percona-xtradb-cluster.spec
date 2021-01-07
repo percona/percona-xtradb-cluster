@@ -1665,9 +1665,6 @@ fi
 %if 0%{?rhel} > 6
 %config(noreplace) %{_sysconfdir}/my.cnf
 %endif
-#coredumper
-%attr(755, root, root) %{_includedir}/coredumper/coredumper.h
-%attr(755, root, root) /usr/lib/libcoredumper.a
 
 
 # ----------------------------------------------------------------------------
@@ -1719,6 +1716,10 @@ fi
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libperconaserver*.so*
+#coredumper
+%attr(755, root, root) %{_includedir}/coredumper/coredumper.h
+%attr(755, root, root) /usr/lib/libcoredumper.a
+
 #%if 0%{?systemd}
 #%{_sysconfdir}/my.cnf.d
 #%attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
