@@ -14,21 +14,19 @@ If the :variable:`wsrep_cluster_address` variable is empty,
 |PXC| assumes that this is the first node and initializes the cluster.
 
 Instead of changing the configuration,
-start the first node using the following command:
+start the first node and use either of the following commands:
 
 .. code-block:: bash
 
    [root@pxc1 ~]# /etc/init.d/mysql bootstrap-pxc
 
-.. note::
+or
 
-   On RHEL or CentOS 7, use the following bootstrap command:
+.. code-block:: bash
 
-   .. code-block:: bash
+    [root@pxc1 ~]# systemctl start mysql@bootstrap.service
 
-      [root@pxc1 ~]# systemctl start mysql@bootstrap.service
-
-When you start the node using the previous command,
+When you start the node using the ``bootstrap.server`` command,
 it runs in bootstrap mode with ``wsrep_cluster_address=gcomm://``.
 This tells the node to initialize the cluster
 with :variable:`wsrep_cluster_conf_id` set to ``1``.

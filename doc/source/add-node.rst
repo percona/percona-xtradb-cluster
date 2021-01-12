@@ -30,11 +30,17 @@ This requires the following:
 Starting the Second Node
 ========================
 
-Start the second node using the following command:
+Start the second node by using either of the following commands:
 
 .. code-block:: bash
 
    [root@pxc2 ~]# /etc/init.d/mysql start
+
+or
+
+.. code-block:: bash
+
+       [root@pxc2 ~]# systemctl start mysql
 
 After the server starts, it should receive :term:`SST` automatically.
 
@@ -75,11 +81,18 @@ and you can proceed to add the next node.
 Starting the Third Node
 =======================
 
-To add the third node, start it as usual:
+To add the third node, start the node using either command:
 
 .. code-block:: bash
 
    [root@pxc3 ~]# /etc/init.d/mysql start
+   
+or
+
+.. code-block:: bash
+
+   [root@pxc3 ~]# systemctl start mysql
+
 
 To check the status of the third node, run the following:
 
