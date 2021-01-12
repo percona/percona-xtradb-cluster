@@ -54,8 +54,9 @@ on the first node:
 
 .. code-block:: text
 
-   wsrep_provider=/usr/lib64/galera3/libgalera_smm.so
 
+  [mysqld]
+   wsrep_provider=/usr/lib64/galera3/libgalera_smm.so
    wsrep_cluster_name=pxc-cluster
    wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
@@ -135,7 +136,7 @@ Configuration Reference
 :variable:`wsrep_sst_auth`
 
   Specify authentication credentials for :term:`SST`
-  as ``<sst_user>:<sst_pass>``.
+  as ``<sstuser>:<sst_pass>``.
   You must create this user when :ref:`bootstrap`
   and provide necessary privileges for it:
 

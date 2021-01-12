@@ -2137,8 +2137,8 @@ SET GLOBAL debug="d,crash_after_commit_and_update_pos";;
 FAILURE d,crash_after_commit_and_update_pos and OUTCOME O2
 rpl_mixing_engines.inc [commands=N-func]
 -b-b-b-b-b-b-b-b-b-b-b- >> N-func << -b-b-b-b-b-b-b-b-b-b-b-
-SELECT fc_i_nt_5_suc (39, 1);
-fc_i_nt_5_suc (39, 1)
+SELECT fc_i_nt_5_suc (49, 1);
+fc_i_nt_5_suc (49, 1)
 fc_i_nt_5_suc
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 master-bin.000001	#	Gtid	#	#	SET @@SESSION.GTID_NEXT= Gtid_set

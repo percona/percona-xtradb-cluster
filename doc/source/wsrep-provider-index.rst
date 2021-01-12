@@ -427,8 +427,16 @@ This variable can be used to specify the name of the Galera cache file.
    :dyn: No
    :default: 128M
 
-This variable can be used to specify the size of the page files in the page
-storage.
+Size of the page files in page storage. The limit on overall page storage is the
+size of the disk. Pages are prefixed by gcache.page.
+
+.. seealso::
+
+   |galera| Documentation: gcache.page_size
+      https://galeracluster.com/library/documentation/galera-parameters.html#gcache-page-size
+   |percona| Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
+      https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/
+
 
 .. variable:: gcache.size
 
@@ -463,7 +471,7 @@ flow control will be posted.
    :default: 1
 
 This variable is used for replication flow control. Replication is resumed when
-the slave queue drops below :variable:`gcs.fc_factor` *
+the replica queue drops below :variable:`gcs.fc_factor` *
 :variable:`gcs.fc_limit`.
 
 .. variable:: gcs.fc_limit
@@ -476,7 +484,7 @@ the slave queue drops below :variable:`gcs.fc_factor` *
    :default: 100
 
 This variable is used for replication flow control. Replication is paused when
-the slave queue exceeds this limit. In the default operation mode, flow control
+the replica queue exceeds this limit. In the default operation mode, flow control
 limit is dynamically recalculated based on the amount of nodes in the
 cluster, but this recalculation can be turned off with use of the
 :variable:`gcs.fc_master_slave` variable to make manual setting of the :variable:`gcs.fc_limit` having an effect  (e.g. for configurations
@@ -490,7 +498,7 @@ when writing is done to a single node in |PXC|).
    :dyn: No
    :default: NO
 
-This variable is used to specify if there is only one master node in the
+This variable is used to specify if there is only one source node in the
 cluster. It affects whether flow control limit is recalculated dynamically
 (when ``NO``) or not (when ``YES``).
 
@@ -668,8 +676,8 @@ not.
    :default: false
 
 When this variable is set to ``TRUE``, the node will completely ignore quorum
-calculations. This should be used with extreme caution even in master-slave
-setups, because slaves won't automatically reconnect to master in this case.
+calculations. This should be used with extreme caution even in source-replica
+setups, because replicas won't automatically reconnect to source in this case.
 
 .. variable::  pc.ignore_sb
 
@@ -681,7 +689,7 @@ setups, because slaves won't automatically reconnect to master in this case.
 
 When this variable is set to ``TRUE``, the node will process updates even in
 the case of a split brain. This should be used with extreme caution in
-multi-master setup, but should simplify things in master-slave cluster
+multi-source setup, but should simplify things in source-replica cluster
 (especially if only 2 nodes are used).
 
 .. variable::  pc.linger
@@ -929,3 +937,5 @@ This variable is used to specify if the SSL compression is to be used.
    :default: AES128-SHA
 
 This variable is used to specify what cypher will be used for encryption.
+
+.. include:: .res/replace.txt

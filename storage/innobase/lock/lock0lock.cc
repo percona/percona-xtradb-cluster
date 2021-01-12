@@ -1983,20 +1983,21 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 	gathering) transactions. The problem is that we don't currently
 	block them using the TrxInInnoDB() mechanism. */
 
+	bool	high_priority = trx_is_high_priority(m_trx);
 #ifdef WITH_WSREP
 	if (wsrep_on(m_trx->mysql_thd) &&
 	    m_trx->lock.was_chosen_as_deadlock_victim) {
 		return(DB_DEADLOCK);
 	}
 
-	lock = create(m_trx, true, true, prdt,
+	lock = create(m_trx, true, !high_priority, prdt,
 			const_cast<lock_t*>(wait_for), m_thr);
 
 #else
-	bool	high_priority = trx_is_high_priority(m_trx);
 
 	/* Don't queue the lock to hash table, if high priority transaction. */
 	lock_t*	lock = create(m_trx, true, !high_priority, prdt);
+#endif /* WITH_WSREP */
 
 	/* Attempt to jump over the low priority waiting locks. */
 	if (high_priority && jump_queue(lock, wait_for)) {
@@ -2006,7 +2007,6 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 	}
 
 	ut_ad(lock_get_wait(lock));
-#endif /* WITH_WSREP */
 
 	dberr_t	err = deadlock_check(lock);
 

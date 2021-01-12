@@ -1,0 +1,9 @@
+!include ../my.cnf
+
+[mysqld.1]
+wsrep-cluster-address=gcomm://
+wsrep-provider=@ENV.WSREP_PROVIDER
+innodb-flush-log-at-trx-commit=1
+binlog-format=ROW
+log-bin
+sync-binlog=1

@@ -1,0 +1,65 @@
+#
+# MDEV-20225 - Verify that DROP TRIGGER gets keys assigned corresponding
+#              to all affected tables.
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_slave_threads = 2;
+
+--connection node_1
+CREATE TABLE t1 (f1 INT NOT NULL PRIMARY KEY AUTO_INCREMENT) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INT NOT NULL PRIMARY KEY AUTO_INCREMENT, f2 INT) ENGINE=InnoDB;
+
+--connection node_2
+SET GLOBAL debug = 'd,sync.mdev_20225';
+
+--connection node_1
+CREATE TRIGGER tr1 BEFORE INSERT ON t1 FOR EACH ROW INSERT INTO t2 VALUES (NULL, NEW.f1);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: now'
+--source include/wait_condition.inc
+
+--connection node_1
+INSERT INTO t1 VALUES (NULL);
+# We must rely on sleep here. If the bug is fixed, the second applier
+# is not allowed to go past apply monitor which would trigger the bug,
+# so there is no sync point or condition to wait.
+--sleep 1
+
+--connection node_2
+SET GLOBAL debug = 'RESET';
+SET DEBUG_SYNC = 'now SIGNAL signal.mdev_20225_continue';
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TRIGGERS WHERE TRIGGER_NAME like '%tr1'
+--source include/wait_condition.inc
+
+# test phase 2, DROP TRIGGER vs INSERT
+SET GLOBAL debug = 'd,sync.mdev_20225';
+
+--connection node_1
+DROP TRIGGER tr1;
+
+--connection node_1
+INSERT INTO t1 VALUES (NULL);
+# We must rely on sleep here. If the bug is fixed, the second applier
+# is not allowed to go past apply monitor which would trigger the bug,
+# so there is no sync point or condition to wait.
+--sleep 1
+
+--connection node_2
+SET GLOBAL debug = 'RESET';
+SET DEBUG_SYNC = 'now SIGNAL signal.mdev_20225_continue';
+
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TRIGGERS WHERE TRIGGER_NAME like '%tr1'
+--source include/wait_condition.inc
+SHOW TRIGGERS;
+
+SET GLOBAL wsrep_slave_threads = 1;
+DROP TABLE t1;
+DROP TABLE t2;
