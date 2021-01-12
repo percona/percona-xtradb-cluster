@@ -1,0 +1,4 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.1]
+log_slave_updates=ON

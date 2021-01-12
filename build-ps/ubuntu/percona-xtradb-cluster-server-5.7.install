@@ -49,3 +49,6 @@ usr/share/mysql
 etc/xinetd.d/mysqlchk
 etc/default/mysql
 libgalera_smm.so usr/lib/galera3
+#coredumper
+usr/include/coredumper/coredumper.h
+usr/lib/libcoredumper.a

@@ -1,3 +1,7 @@
+# innodb_redo_log_encrypt is read only for PXC, 
+# so no way to proceed with this test
+--skip innodb_redo_log_encrypt is read-only for PXC
+
 # test temporary tables encryption
 
 call mtr.add_suppression("\\[Error\\] InnoDB: Encryption can't find master key, please check the keyring plugin is loaded.");

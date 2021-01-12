@@ -4,21 +4,7 @@
 Installing |PXC| on Debian or Ubuntu
 ====================================
 
-Percona provides :file:`.deb` packages for 64-bit versions
-of the following distributions:
-
-* Debian 7 ("wheezy")
-* Debian 8 ("jessie")
-* Ubuntu 12.04 LTS (Precise Pangolin)
-* Ubuntu 14.04 LTS (Trusty Tahr)
-* Ubuntu 16.04 LTS (Xenial Xerus)
-* Ubuntu 18.04 LTS (Bionic Beaver)
-* Ubuntu 18.10 (Cosmic Cuttlefish)
-
-.. note::
-
-   |PXC| should work on other DEB-based distributions, but it is
-   tested only on platforms listed above.
+Specific information on the supported platforms, products, and versions is described in `Percona Software and Platform Lifecycle <https://www.percona.com/services/policies/percona-software-platform-lifecycle#mysql>`_.
 
 The packages are available in the official Percona software repository
 and on the `download page
@@ -41,6 +27,14 @@ by other software. |PXC| requires them for communication.
 * 4567
 * 4568
 
+.. note::
+
+    To view the listening ports, enter the following command:
+    
+    .. code-block:: bash
+    
+        $ sudo ss -tunlp
+        
 .. rubric:: If |MySQL| Is Installed
 
 If you previously had MySQL installed on the server, there might be an
@@ -57,13 +51,12 @@ other reasons, it is possible to disable or extend the MySQL profile.
 
 .. rubric:: Dependencies on Ubuntu
 
-When installating on a Ubuntu system, make sure that the ``universe``
+When installing on a Ubuntu system, make sure that the ``universe``
 repository is enabled to satisfy all essential dependencies.
 
 .. seealso::
 
-   Ubuntu Documentation: Repositories
-      https://help.ubuntu.com/community/Repositories/Ubuntu
+   `Ubuntu Documentation: Repositories <https://help.ubuntu.com/community/Repositories/Ubuntu>`_
 
 Installing from Repository
 ==========================

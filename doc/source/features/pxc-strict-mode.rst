@@ -1,8 +1,8 @@
 .. _pxc-strict-mode:
 
-===============
+================================================================================
 PXC Strict Mode
-===============
+================================================================================
 
 PXC Strict Mode (:variable:`pxc_strict_mode`) is designed to help control
 behavior of cluster when an experimental/unsupported feature is used.  It
@@ -74,7 +74,7 @@ startup.
 .. _validations:
 
 Validations
-===========
+================================================================================
 
 PXC Strict Mode validations are designed to ensure optimal operation
 for common cluster setups that do not require experimental features
@@ -93,7 +93,7 @@ This section describes the purpose and consequences of each validation.
 .. _storage-engine:
 
 Storage engine
---------------
+--------------------------------------------------------------------------------
 
 |PXC| supports only transactional storage engine (XtraDB or InnoDB) as PXC needs
 capability of the storage engine to rollback any given transaction. Storage
@@ -139,7 +139,7 @@ applicable to temporary table. Same is applicable to performance-schema.  (Check
 is also not applied for system tables located in the `mysql` database.)
 
 MyISAM replication
-------------------
+--------------------------------------------------------------------------------
 
 |PXC| provides experimental support for replication of tables that use the
 MyISAM storage engine.  Due to the non-transactional nature of MyISAM, it is not
@@ -178,7 +178,7 @@ replication should not be enabled if you want to ensure data consistency.
    :ref:`storage-engine` validation.
 
 Binary log format
------------------
+--------------------------------------------------------------------------------
 
 |PXC| supports only the default row-based binary logging format.  Setting the
 |binlog_format|_ variable to anything but ``ROW`` at startup is not allowed,
@@ -213,7 +213,7 @@ performed only at runtime and against session scope.
 .. _binlog_format: http://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_binlog_format
 
 Tables without the primary key
----------------------------
+--------------------------------------------------------------------------------
 
 |PXC| cannot properly propagate certain write operations to tables that do not
 have primary keys defined.  Undesirable operations include data manipulation
@@ -246,7 +246,7 @@ Depending on the selected mode, the following happens:
        explicit primary key is denied and an error is logged.
 
 Log output
-----------
+--------------------------------------------------------------------------------
 
 |PXC| does not support tables in the MySQL database as the destination for log
 output.  By default, log entries are written to a file.  This validation checks
@@ -282,7 +282,7 @@ Depending on the selected mode, the following happens:
 .. _explicit-table-locking:
 
 Explicit table locking
-----------------------
+--------------------------------------------------------------------------------
 
 |PXC| has only experimental support for explicit table locking operations,
 The following undesirable operations lead to explicit table locking
@@ -313,7 +313,7 @@ Depending on the selected mode, the following happens:
      - Any undesirable operation is denied and an error is logged.
 
 Auto-increment lock mode
-------------------------
+--------------------------------------------------------------------------------
 
 The lock mode for generating auto-increment values must be *interleaved*
 to ensure that each node generates a unique (but non-sequential) identifier.
@@ -351,7 +351,7 @@ Depending on the strict mode selected, the following happens:
 .. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
 
 Combining schema and data changes in a single statement
--------------------------------------------------------
+--------------------------------------------------------------------------------
 
 |PXC| does not support ``CREATE TABLE ... AS SELECT`` (CTAS) statements, because
 they combine both schema and data changes.
@@ -380,10 +380,10 @@ Depending on the strict mode selected, the following happens:
    CTAS operations for temporary tables are permitted even in strict mode.
 
 Discarding and Importing Tablespaces
-------------------------------------
+--------------------------------------------------------------------------------
 
 ``DISCARD TABLESPACE`` and ``IMPORT TABLESPACE`` are not replicated using
-:term:`TOI`.  This can lead to data inconsistency if executed on only one node.
+:abbr:`TOI (Total Order Isolation)`.  This can lead to data inconsistency if executed on only one node.
 
 Depending on the strict mode selected, the following happens:
 

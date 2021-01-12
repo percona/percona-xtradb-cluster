@@ -195,7 +195,7 @@ with other transactions on the corresponding node.
 Does it work with regular MySQL replication?
 ============================================
 
-Yes. On the node you are going to use as master,
+Yes. On the node you are going to use as source,
 you should enable ``log-bin`` and ``log-slave-update`` options.
 
 Why the init script (/etc/init.d/mysql) does not start?

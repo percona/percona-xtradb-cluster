@@ -411,6 +411,7 @@ parse_arguments() {
       --wsrep[-_]urls=*) wsrep_urls="$val"; ;;
       --wsrep-data-home-dir=*) wsrep_data_home_dir="$val"; ;;
       --flush-caches=*) flush_caches="$val" ;;
+      --numa-interleave) append_arg_to_args "--innodb-numa-interleave=1" ;;
       --exit-on-recover-fail) resume_on_fail=0 ;;
       --wsrep[-_]provider=*)
         if test -n "$val" && test "$val" != "none"
@@ -504,8 +505,6 @@ mysqld_ld_preload_text() {
 
 # set_malloc_lib LIB
 # - If LIB is empty, do nothing and return
-# - If LIB is 'tcmalloc', look for tcmalloc shared library in $malloc_dirs.
-#   tcmalloc is part of the Google perftools project.
 # - If LIB is an absolute path, assume it is a malloc shared library
 #
 # Put LIB in mysqld_ld_preload, which will be added to LD_PRELOAD when
@@ -514,24 +513,6 @@ set_malloc_lib() {
   # This list is kept intentionally simple.
   malloc_dirs="/usr/lib /usr/lib64 /usr/lib/i386-linux-gnu /usr/lib/x86_64-linux-gnu"
   malloc_lib="$1"
-
-  if [ "$malloc_lib" = tcmalloc ]; then
-    malloc_lib=
-    for libdir in `echo $malloc_dirs`; do
-      for flavor in _minimal '' _and_profiler _debug; do
-        tmp="$libdir/libtcmalloc$flavor.so"
-        #log_notice "DEBUG: Checking for malloc lib '$tmp'"
-        [ -r "$tmp" ] || continue
-        malloc_lib="$tmp"
-        break 2
-      done
-    done
-
-    if [ -z "$malloc_lib" ]; then
-      log_error "no shared library for --malloc-lib=tcmalloc found in $malloc_dirs"
-      exit 1
-    fi
-  fi
 
   # Allow --malloc-lib='' to override other settings
   [ -z  "$malloc_lib" ] && return
@@ -556,8 +537,7 @@ set_malloc_lib() {
       esac
       ;;
     *)
-      log_error "--malloc-lib must be an absolute path or 'tcmalloc'; " \
-        "ignoring value '$malloc_lib'"
+      log_error "--malloc-lib must be an absolute path ignoring value '$malloc_lib'"
       exit 1
       ;;
   esac
@@ -952,11 +932,6 @@ fi
 if test -n "$mysql_tcp_port"
 then
   append_arg_to_args "--port=$mysql_tcp_port"
-fi
-
-if test -n "$numa_interleave"
-then
-  append_arg_to_args "--innodb-numa-interleave=1"
 fi
 
 if test $niceness -eq 0

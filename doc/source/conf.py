@@ -27,8 +27,8 @@ sys.path.append(os.path.abspath('ext'))
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.intersphinx', 'sphinx.ext.todo', 
-              'sphinx.ext.coverage', 'sphinx.ext.ifconfig', 
+extensions = ['sphinx.ext.intersphinx', 'sphinx.ext.todo',
+              'sphinx.ext.coverage', 'sphinx.ext.ifconfig',
               'sphinx.ext.extlinks', 'psdom']
 
 # Add any paths that contain templates here, relative to this directory.
@@ -227,7 +227,7 @@ html_static_path = ['_static']
 
 # Custom sidebar templates, maps document names to template names.
 #html_sidebars = {}
-html_sidebars = { 
+html_sidebars = {
         '**': ['localtoc.html', 'sourcelink.html'],
         'using/windows': ['windowssidebar.html'],
 }

@@ -42,8 +42,9 @@ sub add_opt_values {
   my ($self, $config)= @_;
 
   # add auto-options
-  $config->insert('OPT', 'port'   => sub { fix_port($self, $config) });
-  $config->insert('mysqld', "loose-skip-plugin-$_" => undef) for (@::optional_plugins);
+  $config->insert('OPT', 'port'   => fix_port($self, $config) );
+  $config->insert('OPT', 'vardir' => sub { $self->{ARGS}->{vardir} });
+  $config->insert('mysqld', "loose-skip-$_" => undef) for (@::optional_plugins);
 }
 
 my @pre_rules=
@@ -279,6 +280,8 @@ my @mysqld_rules=
  # Galera uses base_port + 1 for IST, so we do not use it for things such as SST
  { '#ist_port' => \&fix_port },
  { '#sst_port' => \&fix_port },
+ # Reserve a port for group_replication
+ { '#group_replication_port' => \&fix_port },
  { 'socket' => \&fix_socket },
  { 'loose-mysqlx-port' => \&fix_x_port },
  { 'loose-mysqlx-socket' => \&fix_x_socket },
@@ -700,8 +703,20 @@ sub new_config {
     croak "you must pass '$required'" unless defined $args->{$required};
   }
 
+  # Fill in hosts/port hash
+  my $hosts= {};
+  my $baseport= $args->{baseport};
+  $args->{hosts}= [ 'localhost' ] unless exists($args->{hosts});
+  foreach my $host ( @{$args->{hosts}} ) {
+     $hosts->{$host}= $baseport;
+  }
+
   # Open the config template
   my $config= My::Config->new($args->{'template_path'});
+  my $extra_template_path= $args->{'extra_template_path'};
+  if ($extra_template_path){
+    $config->append(My::Config->new($extra_template_path));
+  }
   my $self= bless {
 		   CONFIG       => $config,
 		   ARGS         => $args,

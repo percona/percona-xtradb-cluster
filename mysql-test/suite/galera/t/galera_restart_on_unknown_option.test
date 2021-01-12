@@ -5,6 +5,7 @@
 
 CALL mtr.add_suppression("Aborting");
 CALL mtr.add_suppression("unknown option '--galera-unknown-option'");
+CALL mtr.add_suppression("IST didn't contain all write sets");
 
 #
 # We should count the number of "Assertion failed" warnings

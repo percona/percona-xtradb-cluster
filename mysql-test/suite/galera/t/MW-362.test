@@ -2,8 +2,10 @@
 # MW-362 RESET MASTER initializes GTID sequence only in master node
 #
 
---source include/galera_cluster.inc
 --source include/have_binlog_format_row.inc
+--source include/galera_cluster.inc
+# Force a restart at the end of the test.
+--source include/force_restart.inc
 
 # Running RESET MASTER on a live cluster results in an error
 

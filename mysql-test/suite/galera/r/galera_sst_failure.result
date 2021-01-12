@@ -1,0 +1,8 @@
+CALL mtr.add_suppression(".*WSREP: SST failed.*");
+CALL mtr.add_suppression(".*WSREP: .* State transfer to .* failed: -125 .Operation canceled.*");
+include/assert.inc [node_1 should be in SYNC state after serving SST to node_2]
+SET GLOBAL debug = "+d,wsrep_sst_donate_cb_fails";
+include/assert.inc [node_1 should go back to SYNC state]
+SET GLOBAL debug = "-d,wsrep_sst_donate_cb_fails";
+cleanup
+# restart

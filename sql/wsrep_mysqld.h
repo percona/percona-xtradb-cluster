@@ -187,6 +187,9 @@ bool wsrep_before_SE(); // initialize wsrep before storage
  * @param before wsrep_before_SE() value */
 void wsrep_init_startup(bool before);
 
+/* Setup SST request methods that will be accepted by server */
+bool wsrep_setup_allowed_sst_methods();
+
 
 extern "C" enum wsrep_exec_mode wsrep_thd_exec_mode(THD *thd);
 extern "C" enum wsrep_conflict_state wsrep_thd_conflict_state(THD *thd);
@@ -250,6 +253,8 @@ extern void wsrep_prepend_PATH (const char* path);
 /* Provide a wrapper of the WSREP_ON macro for plugins to use */
 extern "C" bool wsrep_is_wsrep_on(void);
 
+/* return non-const copy of thd->rewritten_query() */
+extern String wsrep_thd_rewritten_query(THD *thd);
 
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
@@ -276,14 +281,10 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 #define WSREP_EMULATE_BINLOG(thd) \
   (WSREP(thd) && wsrep_emulate_bin_log)
 
-// MySQL logging functions don't seem to understand long long length modifer.
-// This is a workaround. It also prefixes all messages with "WSREP"
-#define WSREP_LOG(fun, ...)                                       \
-    {                                                             \
-        char msg[4096] = {'\0'};                                  \
-        snprintf(msg, sizeof(msg) - 1, ## __VA_ARGS__);           \
-        fun("WSREP: %s", msg);                                    \
-    }
+/* A wrapper function for MySQL log functions. The call will prefix
+   the log message with WSREP and forwards the result buffer to
+   MySQL log function specified in fun. */
+void WSREP_LOG(void (*fun)(const char* fmt, ...), const char* fmt, ...);
 
 #define WSREP_DEBUG(...)                                                \
     if (wsrep_debug)     WSREP_LOG(sql_print_information, ##__VA_ARGS__)
@@ -314,8 +315,8 @@ extern wsrep_seqno_t wsrep_locked_seqno;
   }
 
 #define WSREP_QUERY(thd)                                \
-  ((!opt_general_log_raw) && thd->rewritten_query.length()      \
-   ? thd->rewritten_query.c_ptr_safe() : thd->query().str)
+  ((!opt_general_log_raw) && thd->rewritten_query().length()      \
+   ? wsrep_thd_rewritten_query(thd).c_ptr_safe() : thd->query().str)
 
 extern my_bool wsrep_ready_get();
 extern void wsrep_ready_wait();

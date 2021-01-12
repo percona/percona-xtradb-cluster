@@ -123,6 +123,8 @@ enum options_client
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif /* WITH_WSREP */
+  OPT_START_SQL_FILE,
+  OPT_FINISH_SQL_FILE,
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };
