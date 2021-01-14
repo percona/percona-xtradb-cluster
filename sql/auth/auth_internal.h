@@ -205,19 +205,8 @@ int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables,
                       const char *table = NULL);
 #else
 int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables);
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-void grant_tables_setup_for_open(
-    TABLE_LIST *tables, thr_lock_type lock_type = TL_WRITE,
-    enum_mdl_type mdl_type = MDL_SHARED_NO_READ_WRITE);
-||||||| 7ddfdfe87b8
-void grant_tables_setup_for_open(
-    TABLE_LIST *tables, thr_lock_type lock_type = TL_WRITE,
-    enum_mdl_type mdl_type = MDL_SHARED_NO_READ_WRITE);
-=======
 void acl_tables_setup_for_read(TABLE_LIST *tables);
->>>>>>> tag/Percona-Server-8.0.22-13
-
 void acl_print_ha_error(int handler_error);
 bool check_engine_type_for_acl_table(TABLE_LIST *tables, bool report_error);
 bool log_and_commit_acl_ddl(THD *thd, bool transactional_tables,

@@ -76,18 +76,14 @@
 #include "sql_update.h"  // Sql_cmd_update
 #include "template_utils.h"
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
 #include "sql/log.h"
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
-||||||| 7ddfdfe87b8
-=======
 class PT_hint_list;
 
->>>>>>> tag/Percona-Server-8.0.22-13
 extern int HINT_PARSER_parse(THD *thd, Hint_scanner *scanner,
                              PT_hint_list **ret);
 

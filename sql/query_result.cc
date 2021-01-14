@@ -65,9 +65,12 @@
 
 using std::min;
 
-<<<<<<< HEAD
-bool Query_result_send::send_result_set_metadata(THD *thd, List<Item> &list,
-                                                 uint flags) {
+uint Query_result::field_count(const mem_root_deque<Item *> &fields) const {
+  return CountVisibleFields(fields);
+}
+
+bool Query_result_send::send_result_set_metadata(
+    THD *thd, const mem_root_deque<Item *> &list, uint flags) {
 #ifdef WITH_WSREP
   if (WSREP(thd) && thd->wsrep_retry_query) {
     /* Metadata is already send during first try that failed so avoid
@@ -77,17 +80,6 @@ bool Query_result_send::send_result_set_metadata(THD *thd, List<Item> &list,
   }
 #endif /* WITH_WSREP */
 
-||||||| 7ddfdfe87b8
-bool Query_result_send::send_result_set_metadata(THD *thd, List<Item> &list,
-                                                 uint flags) {
-=======
-uint Query_result::field_count(const mem_root_deque<Item *> &fields) const {
-  return CountVisibleFields(fields);
-}
-
-bool Query_result_send::send_result_set_metadata(
-    THD *thd, const mem_root_deque<Item *> &list, uint flags) {
->>>>>>> tag/Percona-Server-8.0.22-13
   bool res;
   if (!(res = thd->send_result_metadata(list, flags)))
     is_result_set_started = true;

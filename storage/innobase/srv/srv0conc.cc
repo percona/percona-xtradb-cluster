@@ -297,8 +297,9 @@ int32_t srv_conc_get_waiting_threads(void) {
 }
 
 /** Get the count of threads active inside InnoDB. */
-<<<<<<< HEAD
-ulint srv_conc_get_active_threads(void) { return (srv_conc.n_active); }
+int32_t srv_conc_get_active_threads(void) {
+  return srv_conc.n_active.load(std::memory_order_relaxed);
+}
 
 #ifdef WITH_WSREP
 void wsrep_srv_conc_cancel_wait(trx_t *trx) {
@@ -308,10 +309,3 @@ void wsrep_srv_conc_cancel_wait(trx_t *trx) {
   WSREP_DEBUG("WSREP: conc slot cancel, no atomics\n");
 }
 #endif /* WITH_WSREP */
-||||||| 7ddfdfe87b8
-ulint srv_conc_get_active_threads(void) { return (srv_conc.n_active); }
-=======
-int32_t srv_conc_get_active_threads(void) {
-  return srv_conc.n_active.load(std::memory_order_relaxed);
-}
->>>>>>> tag/Percona-Server-8.0.22-13

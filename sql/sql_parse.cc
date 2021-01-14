@@ -187,7 +187,6 @@
 #include "sql/debug_lock_order.h"
 #endif /* WITH_LOCK_ORDER */
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "wsrep_binlog.h"
 #include "wsrep_mysqld.h"
@@ -199,15 +198,6 @@ static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                               Parser_state *parser_state, bool update_userstat);
 #endif /* WITH_WSREP */
 
-namespace dd {
-class Spatial_reference_system;
-}  // namespace dd
-||||||| 7ddfdfe87b8
-namespace dd {
-class Spatial_reference_system;
-}  // namespace dd
-=======
->>>>>>> tag/Percona-Server-8.0.22-13
 namespace resourcegroups {
 class Resource_group;
 }  // namespace resourcegroups
@@ -1562,48 +1552,6 @@ static bool deny_updates_if_read_only_option(THD *thd, TABLE_LIST *all_tables) {
   return false;
 }
 
-/**
-<<<<<<< HEAD
-  Check whether the statement is a SHOW command using INFORMATION_SCHEMA system
-  views.
-
-  @param  thd   Thread (session) context.
-
-  @return true  if command uses INFORMATION_SCHEMA system view.
-  @return false otherwise.
-
-*/
-inline bool is_show_cmd_using_system_view(THD *thd) {
-  return sql_command_flags[thd->lex->sql_command] & CF_SHOW_USES_SYSTEM_VIEW;
-}
-
-/**
-  Check whether max statement time is applicable to statement or not.
-
-
-  @param  thd   Thread (session) context.
-
-  @return true  if max statement time is applicable to statement
-  @return false otherwise.
-*/
-static inline bool is_timer_applicable_to_statement(THD *thd) {
-  bool timer_value_is_set =
-      (thd->lex->max_execution_time || thd->variables.max_execution_time);
-
-  /**
-    Following conditions are checked,
-      - is SELECT statement.
-      - timer support is implemented and it is initialized.
-      - statement is not made by the slave threads.
-      - timer is not set for statement
-      - timer out value of is set
-      - SELECT statement is not from any stored programs.
-  */
-  return (thd->lex->sql_command == SQLCOM_SELECT &&
-          (have_statement_timeout == SHOW_OPTION_YES) && !thd->slave_thread &&
-          !thd->timer && timer_value_is_set && !thd->sp_runtime_ctx);
-}
-
 #ifdef WITH_WSREP
 static bool wsrep_read_only_option(THD *thd, TABLE_LIST *all_tables) {
   int opt_readonly_saved = opt_readonly;
@@ -1725,50 +1673,6 @@ static bool block_write_while_in_rolling_upgrade(THD *thd) {
 #endif /* WITH_WSREP */
 
 /**
-||||||| 7ddfdfe87b8
-  Check whether the statement is a SHOW command using INFORMATION_SCHEMA system
-  views.
-
-  @param  thd   Thread (session) context.
-
-  @return true  if command uses INFORMATION_SCHEMA system view.
-  @return false otherwise.
-
-*/
-inline bool is_show_cmd_using_system_view(THD *thd) {
-  return sql_command_flags[thd->lex->sql_command] & CF_SHOW_USES_SYSTEM_VIEW;
-}
-
-/**
-  Check whether max statement time is applicable to statement or not.
-
-
-  @param  thd   Thread (session) context.
-
-  @return true  if max statement time is applicable to statement
-  @return false otherwise.
-*/
-static inline bool is_timer_applicable_to_statement(THD *thd) {
-  bool timer_value_is_set =
-      (thd->lex->max_execution_time || thd->variables.max_execution_time);
-
-  /**
-    Following conditions are checked,
-      - is SELECT statement.
-      - timer support is implemented and it is initialized.
-      - statement is not made by the slave threads.
-      - timer is not set for statement
-      - timer out value of is set
-      - SELECT statement is not from any stored programs.
-  */
-  return (thd->lex->sql_command == SQLCOM_SELECT &&
-          (have_statement_timeout == SHOW_OPTION_YES) && !thd->slave_thread &&
-          !thd->timer && timer_value_is_set && !thd->sp_runtime_ctx);
-}
-
-/**
-=======
->>>>>>> tag/Percona-Server-8.0.22-13
   Check if a statement should be restarted in another storage engine,
   and restart the statement if needed.
 
@@ -3506,7 +3410,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
   Opt_trace_object trace_command(&thd->opt_trace);
   Opt_trace_array trace_command_steps(&thd->opt_trace, "steps");
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     /*
@@ -3533,12 +3436,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
   }
 #endif /* WITH_WSREP */
 
-||||||| 7ddfdfe87b8
-=======
   if (lex->m_sql_cmd && lex->m_sql_cmd->owner())
     lex->m_sql_cmd->owner()->trace_parameter_types();
 
->>>>>>> tag/Percona-Server-8.0.22-13
   DBUG_ASSERT(thd->get_transaction()->cannot_safely_rollback(
                   Transaction_ctx::STMT) == false);
 
@@ -3752,132 +3652,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
   */
 
   switch (lex->sql_command) {
-<<<<<<< HEAD
-    case SQLCOM_SHOW_STATUS: {
-      System_status_var old_status_var = thd->status_var;
-      thd->initial_status_var = &old_status_var;
-
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
-#endif /* WITH_WSREP */
-
-      if (!(res = show_precheck(thd, lex, true)))
-        res = execute_show(thd, all_tables);
-
-      /* Don't log SHOW STATUS commands to slow query log */
-      thd->server_status &=
-          ~(SERVER_QUERY_NO_INDEX_USED | SERVER_QUERY_NO_GOOD_INDEX_USED);
-      /*
-        restore status variables, as we don't want 'show status' to cause
-        changes
-      */
-      mysql_mutex_lock(&LOCK_status);
-      add_diff_to_status(&global_status_var, &thd->status_var, &old_status_var);
-      thd->status_var = old_status_var;
-      thd->initial_status_var = nullptr;
-      mysql_mutex_unlock(&LOCK_status);
-      break;
-    }
-    case SQLCOM_SHOW_EVENTS:
-    case SQLCOM_SHOW_STATUS_PROC:
-    case SQLCOM_SHOW_STATUS_FUNC:
-    case SQLCOM_SHOW_DATABASES:
-    case SQLCOM_SHOW_TRIGGERS:
-    case SQLCOM_SHOW_TABLE_STATUS:
-    case SQLCOM_SHOW_OPEN_TABLES:
-    case SQLCOM_SHOW_PLUGINS:
-    case SQLCOM_SHOW_VARIABLES:
-    case SQLCOM_SHOW_CHARSETS:
-    case SQLCOM_SHOW_COLLATIONS:
-    case SQLCOM_SHOW_STORAGE_ENGINES:
-    case SQLCOM_SHOW_PROFILE:
-    case SQLCOM_SHOW_USER_STATS:
-    case SQLCOM_SHOW_TABLE_STATS:
-    case SQLCOM_SHOW_INDEX_STATS:
-    case SQLCOM_SHOW_CLIENT_STATS:
-    case SQLCOM_SHOW_THREAD_STATS: {
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW)
-#endif /* WITH_WSREP */
-
-      DBUG_EXECUTE_IF("use_attachable_trx",
-                      thd->begin_attachable_ro_transaction(););
-
-      thd->clear_current_query_costs();
-
-      Enable_derived_merge_guard derived_merge_guard(
-          thd, is_show_cmd_using_system_view(thd));
-
-      res = show_precheck(thd, lex, true);
-
-      if (!res) res = execute_show(thd, all_tables);
-
-      thd->save_current_query_costs();
-
-      DBUG_EXECUTE_IF("use_attachable_trx", thd->end_attachable_transaction(););
-
-      break;
-    }
-||||||| 7ddfdfe87b8
-    case SQLCOM_SHOW_STATUS: {
-      System_status_var old_status_var = thd->status_var;
-      thd->initial_status_var = &old_status_var;
-
-      if (!(res = show_precheck(thd, lex, true)))
-        res = execute_show(thd, all_tables);
-
-      /* Don't log SHOW STATUS commands to slow query log */
-      thd->server_status &=
-          ~(SERVER_QUERY_NO_INDEX_USED | SERVER_QUERY_NO_GOOD_INDEX_USED);
-      /*
-        restore status variables, as we don't want 'show status' to cause
-        changes
-      */
-      mysql_mutex_lock(&LOCK_status);
-      add_diff_to_status(&global_status_var, &thd->status_var, &old_status_var);
-      thd->status_var = old_status_var;
-      thd->initial_status_var = nullptr;
-      mysql_mutex_unlock(&LOCK_status);
-      break;
-    }
-    case SQLCOM_SHOW_EVENTS:
-    case SQLCOM_SHOW_STATUS_PROC:
-    case SQLCOM_SHOW_STATUS_FUNC:
-    case SQLCOM_SHOW_DATABASES:
-    case SQLCOM_SHOW_TRIGGERS:
-    case SQLCOM_SHOW_TABLE_STATUS:
-    case SQLCOM_SHOW_OPEN_TABLES:
-    case SQLCOM_SHOW_PLUGINS:
-    case SQLCOM_SHOW_VARIABLES:
-    case SQLCOM_SHOW_CHARSETS:
-    case SQLCOM_SHOW_COLLATIONS:
-    case SQLCOM_SHOW_STORAGE_ENGINES:
-    case SQLCOM_SHOW_PROFILE:
-    case SQLCOM_SHOW_USER_STATS:
-    case SQLCOM_SHOW_TABLE_STATS:
-    case SQLCOM_SHOW_INDEX_STATS:
-    case SQLCOM_SHOW_CLIENT_STATS:
-    case SQLCOM_SHOW_THREAD_STATS: {
-      DBUG_EXECUTE_IF("use_attachable_trx",
-                      thd->begin_attachable_ro_transaction(););
-
-      thd->clear_current_query_costs();
-
-      Enable_derived_merge_guard derived_merge_guard(
-          thd, is_show_cmd_using_system_view(thd));
-
-      res = show_precheck(thd, lex, true);
-
-      if (!res) res = execute_show(thd, all_tables);
-
-      thd->save_current_query_costs();
-
-      DBUG_EXECUTE_IF("use_attachable_trx", thd->end_attachable_transaction(););
-
-      break;
-    }
-=======
->>>>>>> tag/Percona-Server-8.0.22-13
     case SQLCOM_PREPARE: {
       mysql_sql_stmt_prepare(thd);
       break;
@@ -3963,91 +3737,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       res = purge_master_logs_before_date(thd, purge_time);
       break;
     }
-<<<<<<< HEAD
-    case SQLCOM_SHOW_WARNS: {
-      res = mysqld_show_warnings(
-          thd, (ulong)((1L << (uint)Sql_condition::SL_NOTE) |
-                       (1L << (uint)Sql_condition::SL_WARNING) |
-                       (1L << (uint)Sql_condition::SL_ERROR)));
-      break;
-    }
-    case SQLCOM_SHOW_ERRORS: {
-      res = mysqld_show_warnings(thd,
-                                 (ulong)(1L << (uint)Sql_condition::SL_ERROR));
-      break;
-    }
-    case SQLCOM_SHOW_PROFILES: {
-#if defined(ENABLED_PROFILING)
-      thd->profiling->discard_current_query();
-      res = thd->profiling->show_profiles();
-      if (res) goto error;
-#else
-      my_error(ER_FEATURE_DISABLED, MYF(0), "SHOW PROFILES",
-               "enable-profiling");
-      goto error;
-#endif
-      break;
-    }
-    case SQLCOM_SHOW_SLAVE_HOSTS: {
-      if (check_global_access(thd, REPL_SLAVE_ACL)) goto error;
-      res = show_slave_hosts(thd);
-      break;
-    }
-    case SQLCOM_SHOW_RELAYLOG_EVENTS: {
-      if (check_global_access(thd, REPL_SLAVE_ACL)) goto error;
-      res = mysql_show_relaylog_events(thd);
-      break;
-    }
-    case SQLCOM_SHOW_BINLOG_EVENTS: {
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
-#endif /* WITH_WSREP */
-      if (check_global_access(thd, REPL_SLAVE_ACL)) goto error;
-      res = mysql_show_binlog_events(thd);
-      break;
-    }
-||||||| 7ddfdfe87b8
-    case SQLCOM_SHOW_WARNS: {
-      res = mysqld_show_warnings(
-          thd, (ulong)((1L << (uint)Sql_condition::SL_NOTE) |
-                       (1L << (uint)Sql_condition::SL_WARNING) |
-                       (1L << (uint)Sql_condition::SL_ERROR)));
-      break;
-    }
-    case SQLCOM_SHOW_ERRORS: {
-      res = mysqld_show_warnings(thd,
-                                 (ulong)(1L << (uint)Sql_condition::SL_ERROR));
-      break;
-    }
-    case SQLCOM_SHOW_PROFILES: {
-#if defined(ENABLED_PROFILING)
-      thd->profiling->discard_current_query();
-      res = thd->profiling->show_profiles();
-      if (res) goto error;
-#else
-      my_error(ER_FEATURE_DISABLED, MYF(0), "SHOW PROFILES",
-               "enable-profiling");
-      goto error;
-#endif
-      break;
-    }
-    case SQLCOM_SHOW_SLAVE_HOSTS: {
-      if (check_global_access(thd, REPL_SLAVE_ACL)) goto error;
-      res = show_slave_hosts(thd);
-      break;
-    }
-    case SQLCOM_SHOW_RELAYLOG_EVENTS: {
-      if (check_global_access(thd, REPL_SLAVE_ACL)) goto error;
-      res = mysql_show_relaylog_events(thd);
-      break;
-    }
-    case SQLCOM_SHOW_BINLOG_EVENTS: {
-      if (check_global_access(thd, REPL_SLAVE_ACL)) goto error;
-      res = mysql_show_binlog_events(thd);
-      break;
-    }
-=======
->>>>>>> tag/Percona-Server-8.0.22-13
     case SQLCOM_CHANGE_MASTER: {
       Security_context *sctx = thd->security_context();
       if (!sctx->check_access(SUPER_ACL) &&
@@ -4263,140 +3952,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       if (mysql_rename_tables(thd, first_table)) goto error;
       break;
     }
-<<<<<<< HEAD
-    case SQLCOM_SHOW_BINLOGS: {
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
-#endif /* WITH_WSREP */
-      if (check_global_access(thd, SUPER_ACL | REPL_CLIENT_ACL)) goto error;
-      res = show_binlogs(thd);
-      break;
-    }
-    case SQLCOM_SHOW_CREATE:
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
-#endif /* WITH_WSREP */
-      DBUG_ASSERT(first_table == all_tables && first_table != nullptr);
-      {
-        /*
-           Access check:
-           SHOW CREATE TABLE require any privileges on the table level (ie
-           effecting all columns in the table).
-           SHOW CREATE VIEW require the SHOW_VIEW and SELECT ACLs on the table
-           level.
-           NOTE: SHOW_VIEW ACL is checked when the view is created.
-         */
-
-        DBUG_PRINT("debug", ("lex->only_view: %d, table: %s.%s", lex->only_view,
-                             first_table->db, first_table->table_name));
-        if (lex->only_view) {
-          if (check_table_access(thd, SELECT_ACL, first_table, false, 1,
-                                 false)) {
-            DBUG_PRINT("debug", ("check_table_access failed"));
-            my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0), "SHOW",
-                     thd->security_context()->priv_user().str,
-                     thd->security_context()->host_or_ip().str,
-                     first_table->alias);
-            goto error;
-          }
-          DBUG_PRINT("debug", ("check_table_access succeeded"));
-
-          /* Ignore temporary tables if this is "SHOW CREATE VIEW" */
-          first_table->open_type = OT_BASE_ONLY;
-
-        } else {
-          /*
-            Temporary tables should be opened for SHOW CREATE TABLE, but not
-            for SHOW CREATE VIEW.
-          */
-          if (open_temporary_tables(thd, all_tables)) goto error;
-
-          /*
-            The fact that check_some_access() returned false does not mean that
-            access is granted. We need to check if first_table->grant.privilege
-            contains any table-specific privilege.
-          */
-          DBUG_PRINT("debug", ("first_table->grant.privilege: %lx",
-                               first_table->grant.privilege));
-          if (check_some_access(thd, TABLE_OP_ACLS, first_table) ||
-              (first_table->grant.privilege & TABLE_OP_ACLS) == 0) {
-            my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0), "SHOW",
-                     thd->security_context()->priv_user().str,
-                     thd->security_context()->host_or_ip().str,
-                     first_table->alias);
-            goto error;
-          }
-        }
-
-        /* Access is granted. Execute the command.  */
-        res = mysqld_show_create(thd, first_table);
-        break;
-      }
-||||||| 7ddfdfe87b8
-    case SQLCOM_SHOW_BINLOGS: {
-      if (check_global_access(thd, SUPER_ACL | REPL_CLIENT_ACL)) goto error;
-      res = show_binlogs(thd);
-      break;
-    }
-    case SQLCOM_SHOW_CREATE:
-      DBUG_ASSERT(first_table == all_tables && first_table != nullptr);
-      {
-        /*
-           Access check:
-           SHOW CREATE TABLE require any privileges on the table level (ie
-           effecting all columns in the table).
-           SHOW CREATE VIEW require the SHOW_VIEW and SELECT ACLs on the table
-           level.
-           NOTE: SHOW_VIEW ACL is checked when the view is created.
-         */
-
-        DBUG_PRINT("debug", ("lex->only_view: %d, table: %s.%s", lex->only_view,
-                             first_table->db, first_table->table_name));
-        if (lex->only_view) {
-          if (check_table_access(thd, SELECT_ACL, first_table, false, 1,
-                                 false)) {
-            DBUG_PRINT("debug", ("check_table_access failed"));
-            my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0), "SHOW",
-                     thd->security_context()->priv_user().str,
-                     thd->security_context()->host_or_ip().str,
-                     first_table->alias);
-            goto error;
-          }
-          DBUG_PRINT("debug", ("check_table_access succeeded"));
-
-          /* Ignore temporary tables if this is "SHOW CREATE VIEW" */
-          first_table->open_type = OT_BASE_ONLY;
-
-        } else {
-          /*
-            Temporary tables should be opened for SHOW CREATE TABLE, but not
-            for SHOW CREATE VIEW.
-          */
-          if (open_temporary_tables(thd, all_tables)) goto error;
-
-          /*
-            The fact that check_some_access() returned false does not mean that
-            access is granted. We need to check if first_table->grant.privilege
-            contains any table-specific privilege.
-          */
-          DBUG_PRINT("debug", ("first_table->grant.privilege: %lx",
-                               first_table->grant.privilege));
-          if (check_some_access(thd, TABLE_OP_ACLS, first_table) ||
-              (first_table->grant.privilege & TABLE_OP_ACLS) == 0) {
-            my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0), "SHOW",
-                     thd->security_context()->priv_user().str,
-                     thd->security_context()->host_or_ip().str,
-                     first_table->alias);
-            goto error;
-          }
-        }
-
-        /* Access is granted. Execute the command.  */
-        res = mysqld_show_create(thd, first_table);
-        break;
-      }
-=======
->>>>>>> tag/Percona-Server-8.0.22-13
     case SQLCOM_CHECKSUM: {
 #ifdef WITH_WSREP
       WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ);
@@ -4797,29 +4352,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       res = mysql_alter_db(thd, lex->name.str, &create_info);
       break;
     }
-<<<<<<< HEAD
-    case SQLCOM_SHOW_CREATE_DB: {
-      DBUG_EXECUTE_IF("4x_server_emul", my_error(ER_UNKNOWN_ERROR, MYF(0));
-                      goto error;);
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
-#endif /* WITH_WSREP */
-      if (check_and_convert_db_name(&lex->name, true) != Ident_name_check::OK)
-        break;
-      res = mysqld_show_create_db(thd, lex->name.str, lex->create_info);
-      break;
-    }
-||||||| 7ddfdfe87b8
-    case SQLCOM_SHOW_CREATE_DB: {
-      DBUG_EXECUTE_IF("4x_server_emul", my_error(ER_UNKNOWN_ERROR, MYF(0));
-                      goto error;);
-      if (check_and_convert_db_name(&lex->name, true) != Ident_name_check::OK)
-        break;
-      res = mysqld_show_create_db(thd, lex->name.str, lex->create_info);
-      break;
-    }
-=======
->>>>>>> tag/Percona-Server-8.0.22-13
     case SQLCOM_CREATE_EVENT:
     case SQLCOM_ALTER_EVENT:
       do {
@@ -4869,23 +4401,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       }
       /* lex->cleanup() is called outside, no need to call it here */
       break;
-<<<<<<< HEAD
-    case SQLCOM_SHOW_CREATE_EVENT: {
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
-#endif /* WITH_WSREP */
-      res = Events::show_create_event(thd, lex->spname->m_db,
-                                      to_lex_cstring(lex->spname->m_name));
-      break;
-    }
-||||||| 7ddfdfe87b8
-    case SQLCOM_SHOW_CREATE_EVENT: {
-      res = Events::show_create_event(thd, lex->spname->m_db,
-                                      to_lex_cstring(lex->spname->m_name));
-      break;
-    }
-=======
->>>>>>> tag/Percona-Server-8.0.22-13
     case SQLCOM_DROP_EVENT: {
       if (!(res = Events::drop_event(thd, lex->spname->m_db,
                                      to_lex_cstring(lex->spname->m_name),
@@ -5610,109 +5125,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
       }
       break;
     }
-<<<<<<< HEAD
-    case SQLCOM_SHOW_CREATE_PROC: {
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
-#endif /* WITH_WSREP */
-      if (sp_show_create_routine(thd, enum_sp_type::PROCEDURE, lex->spname))
-        goto error;
-      break;
-    }
-    case SQLCOM_SHOW_CREATE_FUNC: {
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
-#endif /* WITH_WSREP */
-      if (sp_show_create_routine(thd, enum_sp_type::FUNCTION, lex->spname))
-        goto error;
-      break;
-    }
-    case SQLCOM_SHOW_PROC_CODE:
-    case SQLCOM_SHOW_FUNC_CODE: {
-#ifndef DBUG_OFF
-      sp_head *sp;
-      enum_sp_type sp_type = (lex->sql_command == SQLCOM_SHOW_PROC_CODE)
-                                 ? enum_sp_type::PROCEDURE
-                                 : enum_sp_type::FUNCTION;
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
-#endif /* WITH_WSREP */
-
-      if (sp_cache_routine(thd, sp_type, lex->spname, false, &sp)) goto error;
-      if (!sp || sp->show_routine_code(thd)) {
-        /* We don't distinguish between errors for now */
-        my_error(ER_SP_DOES_NOT_EXIST, MYF(0), SP_COM_STRING(lex),
-                 lex->spname->m_name.str);
-        goto error;
-      }
-      break;
-#else
-      my_error(ER_FEATURE_DISABLED, MYF(0), "SHOW PROCEDURE|FUNCTION CODE",
-               "--with-debug");
-      goto error;
-#endif  // ifndef DBUG_OFF
-    }
-    case SQLCOM_SHOW_CREATE_TRIGGER: {
-      if (lex->spname->m_name.length > NAME_LEN) {
-        my_error(ER_TOO_LONG_IDENT, MYF(0), lex->spname->m_name.str);
-        goto error;
-      }
-
-#ifdef WITH_WSREP
-      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
-#endif /* WITH_WSREP */
-
-      if (show_create_trigger(thd, lex->spname))
-        goto error; /* Error has been already logged. */
-
-      break;
-    }
-||||||| 7ddfdfe87b8
-    case SQLCOM_SHOW_CREATE_PROC: {
-      if (sp_show_create_routine(thd, enum_sp_type::PROCEDURE, lex->spname))
-        goto error;
-      break;
-    }
-    case SQLCOM_SHOW_CREATE_FUNC: {
-      if (sp_show_create_routine(thd, enum_sp_type::FUNCTION, lex->spname))
-        goto error;
-      break;
-    }
-    case SQLCOM_SHOW_PROC_CODE:
-    case SQLCOM_SHOW_FUNC_CODE: {
-#ifndef DBUG_OFF
-      sp_head *sp;
-      enum_sp_type sp_type = (lex->sql_command == SQLCOM_SHOW_PROC_CODE)
-                                 ? enum_sp_type::PROCEDURE
-                                 : enum_sp_type::FUNCTION;
-
-      if (sp_cache_routine(thd, sp_type, lex->spname, false, &sp)) goto error;
-      if (!sp || sp->show_routine_code(thd)) {
-        /* We don't distinguish between errors for now */
-        my_error(ER_SP_DOES_NOT_EXIST, MYF(0), SP_COM_STRING(lex),
-                 lex->spname->m_name.str);
-        goto error;
-      }
-      break;
-#else
-      my_error(ER_FEATURE_DISABLED, MYF(0), "SHOW PROCEDURE|FUNCTION CODE",
-               "--with-debug");
-      goto error;
-#endif  // ifndef DBUG_OFF
-    }
-    case SQLCOM_SHOW_CREATE_TRIGGER: {
-      if (lex->spname->m_name.length > NAME_LEN) {
-        my_error(ER_TOO_LONG_IDENT, MYF(0), lex->spname->m_name.str);
-        goto error;
-      }
-
-      if (show_create_trigger(thd, lex->spname))
-        goto error; /* Error has been already logged. */
-
-      break;
-    }
-=======
->>>>>>> tag/Percona-Server-8.0.22-13
     case SQLCOM_CREATE_VIEW: {
       /*
         Note: SQLCOM_CREATE_VIEW also handles 'ALTER VIEW' commands
@@ -5847,16 +5259,30 @@ int mysql_execute_command(THD *thd, bool first_level) {
     case SQLCOM_DROP_SRS: {
 
 #ifdef WITH_WSREP
-
       if (lex->sql_command == SQLCOM_SELECT)
         WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ)
 
-      if (lex->sql_command == SQLCOM_SHOW_GRANTS ||
-          lex->sql_command == SQLCOM_SHOW_FIELDS ||
-          lex->sql_command == SQLCOM_SHOW_KEYS ||
-          lex->sql_command == SQLCOM_SHOW_TABLES) {
+      static std::vector<enum_sql_command> wait_before_show_commands = {
+          SQLCOM_SHOW_GRANTS, SQLCOM_SHOW_FIELDS, SQLCOM_SHOW_KEYS,
+          SQLCOM_SHOW_TABLES, SQLCOM_SHOW_CREATE_PROC, SQLCOM_SHOW_CREATE_FUNC,
+          SQLCOM_SHOW_PROC_CODE, SQLCOM_SHOW_FUNC_CODE,
+          SQLCOM_SHOW_CREATE_TRIGGER, SQLCOM_SHOW_STATUS,
+          SQLCOM_SHOW_BINLOG_EVENTS, SQLCOM_SHOW_BINLOGS, SQLCOM_SHOW_CREATE,
+          SQLCOM_SHOW_CREATE_DB, SQLCOM_SHOW_CREATE_EVENT,
+          SQLCOM_SHOW_STATUS_PROC, SQLCOM_SHOW_STATUS_FUNC,
+          SQLCOM_SHOW_DATABASES, SQLCOM_SHOW_TRIGGERS, SQLCOM_SHOW_TABLE_STATUS,
+          SQLCOM_SHOW_OPEN_TABLES, SQLCOM_SHOW_PLUGINS, SQLCOM_SHOW_VARIABLES,
+          SQLCOM_SHOW_CHARSETS, SQLCOM_SHOW_COLLATIONS,
+          SQLCOM_SHOW_STORAGE_ENGINES, SQLCOM_SHOW_PROFILE,
+          SQLCOM_SHOW_USER_STATS, SQLCOM_SHOW_TABLE_STATS,
+          SQLCOM_SHOW_INDEX_STATS, SQLCOM_SHOW_CLIENT_STATS,
+          SQLCOM_SHOW_THREAD_STATS};
+      if(std::find(std::begin(wait_before_show_commands),
+                   std::end(wait_before_show_commands), lex->sql_command) !=
+                   std::end(wait_before_show_commands)){
         WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
       }
+
 
       if (lex->sql_command == SQLCOM_ALTER_USER_DEFAULT_ROLE ||
           lex->sql_command == SQLCOM_CREATE_SRS ||

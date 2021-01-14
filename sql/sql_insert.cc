@@ -267,13 +267,13 @@ static bool check_insert_fields(THD *thd, TABLE_LIST *table_list,
             " INSERT on a view (%s.%s) that writes to a table"
             " with no explicit primary key"
             " with pxc_strict_mode = PERMISSIVE",
-            table_list->view_db.str, table_list->view_name.str);
+            table_list->get_db_name(), table_list->get_table_name());
         push_warning_printf(thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
                             "Percona-XtraDB-Cluster doesn't recommend use of"
                             " INSERT on a view (%s.%s) that writes to a table"
                             " with no explicit primary key"
                             " with pxc_strict_mode = PERMISSIVE",
-                            table_list->view_db.str, table_list->view_name.str);
+                            table_list->get_db_name(), table_list->get_table_name());
         break;
       case PXC_STRICT_MODE_ENFORCING:
       case PXC_STRICT_MODE_MASTER:
@@ -284,14 +284,14 @@ static bool check_insert_fields(THD *thd, TABLE_LIST *table_list,
             " INSERT on a view (%s.%s) that writes to a table"
             " with no explicit primary key"
             " with pxc_strict_mode = ENFORCING or MASTER",
-            table_list->view_db.str, table_list->view_name.str);
+            table_list->get_db_name(), table_list->get_table_name());
         char message[1024];
         sprintf(message,
                 "Percona-XtraDB-Cluster prohibits use of"
                 " INSERT on a view (%s.%s) that writes to a table"
                 " with no explicit primary key"
                 " with pxc_strict_mode = ENFORCING or MASTER",
-                table_list->view_db.str, table_list->view_name.str);
+                table_list->get_db_name(), table_list->get_table_name());
         my_message(ER_UNKNOWN_ERROR, message, MYF(0));
         break;
     }
@@ -2521,30 +2521,22 @@ bool Query_result_insert::send_eof(THD *thd) {
              ("trans_table=%d, table_type='%s'",
               table->file->has_transactions(), table->file->table_type()));
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  if (thd->wsrep_cs().current_error())
-    error = -1;
-  else
-    error = (bulk_insert_started ? table->file->ha_end_bulk_insert() : 0);
-#else
-  error = (bulk_insert_started ? table->file->ha_end_bulk_insert() : 0);
-#endif /* WITH_WSREP */
-  bulk_insert_started = false;
-  if (!error && thd->is_error()) error = thd->get_stmt_da()->mysql_errno();
-||||||| 7ddfdfe87b8
-  error = (bulk_insert_started ? table->file->ha_end_bulk_insert() : 0);
-  bulk_insert_started = false;
-  if (!error && thd->is_error()) error = thd->get_stmt_da()->mysql_errno();
-=======
   int error = 0;
-
-  if (bulk_insert_started) {
-    error = table->file->ha_end_bulk_insert();
-    if (!error && thd->is_error()) error = thd->get_stmt_da()->mysql_errno();
+#ifdef WITH_WSREP
+  if (thd->wsrep_cs().current_error()) {
+    error = -1;
     bulk_insert_started = false;
   }
->>>>>>> tag/Percona-Server-8.0.22-13
+  else {
+#endif  /* WITH_WSREP */
+    if (bulk_insert_started) {
+        error = table->file->ha_end_bulk_insert();
+        if (!error && thd->is_error()) error = thd->get_stmt_da()->mysql_errno();
+        bulk_insert_started = false;
+    }
+#ifdef WITH_WSREP
+  }
+#endif  /* WITH_WSREP */
 
   changed = (info.stats.copied || info.stats.deleted || info.stats.updated);
 

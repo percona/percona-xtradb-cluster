@@ -8275,7 +8275,6 @@ static inline uint get_field_offset(const TABLE *table, const Field *field) {
   return field->offset(table->record[0]);
 }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
                               unsigned char *str, unsigned int str_length,
@@ -8624,25 +8623,12 @@ uint wsrep_store_key_val_for_row(THD *thd, TABLE *table, uint keynr, char *buff,
 }
 #endif /* WITH_WSREP */
 
-/** compare two character string according to their charset. */
-int innobase_fts_text_cmp(const void *cs, /*!< in: Character set */
-                          const void *p1, /*!< in: key */
-                          const void *p2) /*!< in: node */
-{
-||||||| 7ddfdfe87b8
-/** compare two character string according to their charset. */
-int innobase_fts_text_cmp(const void *cs, /*!< in: Character set */
-                          const void *p1, /*!< in: key */
-                          const void *p2) /*!< in: node */
-{
-=======
 /** Compare two character string according to their charset.
 @param[in] cs Character set
 @param[in] p1 Key
 @param[in] p2 Node */
 extern int innobase_fts_text_cmp(const void *cs, const void *p1,
                                  const void *p2) {
->>>>>>> tag/Percona-Server-8.0.22-13
   const CHARSET_INFO *charset = (const CHARSET_INFO *)cs;
   const fts_string_t *s1 = (const fts_string_t *)p1;
   const fts_string_t *s2 = (const fts_string_t *)p2;

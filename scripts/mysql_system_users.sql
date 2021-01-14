@@ -49,7 +49,7 @@ CREATE USER 'mysql.infoschema'@localhost IDENTIFIED WITH caching_sha2_password
  ACCOUNT LOCK;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.infoschema'@localhost;
 GRANT SELECT ON *.* TO 'mysql.infoschema'@localhost;
-<<<<<<< HEAD
+GRANT SYSTEM_USER ON *.* TO 'mysql.infoschema'@localhost;
 
 -- Create the PXC internal session user
 -- This user is used by PXC to run commands needed by PXC.
@@ -90,7 +90,3 @@ GRANT CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history
 GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 -- Need this to create the PERCONA_SCHEMA database if needed
 GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
-||||||| 7ddfdfe87b8
-=======
-GRANT SYSTEM_USER ON *.* TO 'mysql.infoschema'@localhost;
->>>>>>> tag/Percona-Server-8.0.22-13

@@ -316,15 +316,12 @@ static void *event_worker_thread(void *arg) {
 
   mysql_thread_set_psi_id(thd->thread_id());
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     wsrep_ready_wait();
   }
 #endif /* WITH_WSREP */
 
-||||||| 7ddfdfe87b8
-=======
 #ifdef HAVE_PSI_THREAD_INTERFACE
   /* Update the thread instrumentation. */
   PSI_THREAD_CALL(set_thread_account)
@@ -335,7 +332,6 @@ static void *event_worker_thread(void *arg) {
   PSI_THREAD_CALL(set_thread_start_time)(thd->query_start_in_secs());
 #endif /* HAVE_PSI_THREAD_INTERFACE */
 
->>>>>>> tag/Percona-Server-8.0.22-13
   Event_worker_thread worker_thread;
   worker_thread.run(thd, event);
 

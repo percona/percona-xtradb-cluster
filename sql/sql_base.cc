@@ -6050,7 +6050,6 @@ restart:
       }
     }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     bool is_dml_stmt = (thd->lex->sql_command == SQLCOM_INSERT ||
                         thd->lex->sql_command == SQLCOM_INSERT_SELECT ||
@@ -6189,8 +6188,6 @@ restart:
     }
 #endif /* WITH_WSREP */
 
-||||||| 7ddfdfe87b8
-=======
     /*
       Access to ACL table in a SELECT ... LOCK IN SHARE MODE are required
       to skip acquiring row locks. So, we use TL_READ_DEFAULT lock on ACL
@@ -6203,7 +6200,6 @@ restart:
       issue_warning_on_skipping_row_lock = true;
     }
 
->>>>>>> tag/Percona-Server-8.0.22-13
     /* Set appropriate TABLE::lock_type. */
     if (tbl && tables->lock_descriptor().type != TL_UNLOCK &&
         !thd->locked_tables_mode) {

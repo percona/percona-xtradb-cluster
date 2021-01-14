@@ -3158,11 +3158,7 @@ struct TABLE_LIST {
      @details The unqualified table name or view name for a table or view,
      respectively.
    */
-<<<<<<< HEAD
-  const char *get_table_name() const {
-    return view != nullptr ? view_name.str : table_name;
-  }
-
+  const char *get_table_name() const { return table_name; }
 #ifdef WITH_WSREP
   /**
      @brief Returns the table alias that this TABLE_LIST represents.
@@ -3175,13 +3171,6 @@ struct TABLE_LIST {
   const char *get_table_alias() const { return alias; }
 #endif /* WITH_WSREP */
 
-||||||| 7ddfdfe87b8
-  const char *get_table_name() const {
-    return view != nullptr ? view_name.str : table_name;
-  }
-=======
-  const char *get_table_name() const { return table_name; }
->>>>>>> tag/Percona-Server-8.0.22-13
   int fetch_number_of_rows();
   bool update_derived_keys(THD *, Field *, Item **, uint, bool *);
   bool generate_keys();

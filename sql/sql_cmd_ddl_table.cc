@@ -193,7 +193,6 @@ bool Sql_cmd_create_table::execute(THD *thd) {
 
   if (!select_lex->field_list_is_empty())  // With select
   {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     bool is_temporary_table =
         (lex->create_info->options & HA_LEX_CREATE_TMP_TABLE);
@@ -260,13 +259,6 @@ bool Sql_cmd_create_table::execute(THD *thd) {
     }
 #endif /* WITH_WSREP */
 
-    Query_result *result;
-
-||||||| 7ddfdfe87b8
-    Query_result *result;
-
-=======
->>>>>>> tag/Percona-Server-8.0.22-13
     /*
       CREATE TABLE...IGNORE/REPLACE SELECT... can be unsafe, unless
       ORDER BY PRIMARY KEY clause is used in SELECT statement. We therefore

@@ -1232,7 +1232,6 @@ end:
     set_system_user_flag(thd);
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   // Transaction might have been aborted at the stage
   // when set_system_user_flag() is called.
@@ -1243,12 +1242,7 @@ end:
   wsrep_close(thd);
 #endif /* WITH_WSREP */
 
-  thd->lex->unit->cleanup(thd, true);
-||||||| 7ddfdfe87b8
-  thd->lex->unit->cleanup(thd, true);
-=======
   thd->lex->cleanup(thd, true);
->>>>>>> tag/Percona-Server-8.0.22-13
   thd->end_statement();
   thd->cleanup_after_query();
   /* Avoid races with SHOW PROCESSLIST */

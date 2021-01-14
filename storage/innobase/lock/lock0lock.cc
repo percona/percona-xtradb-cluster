@@ -1275,19 +1275,9 @@ void RecLock::lock_add(lock_t *lock) {
   }
 }
 
-<<<<<<< HEAD
-static void lock_create_wait_for_edge(trx_t *waiter, trx_t *blocker);
-
-/** Create a new lock.
-@param[in,out] trx		Transaction requesting the lock
-||||||| 7ddfdfe87b8
-/** Create a new lock.
-@param[in,out] trx		Transaction requesting the lock
-=======
 /**
 Create a lock for a transaction and initialise it.
 @param[in, out] trx		Transaction requesting the new lock
->>>>>>> tag/Percona-Server-8.0.22-13
 @param[in] prdt			Predicate lock (optional)
 @return new lock instance */
 lock_t *RecLock::create(trx_t *trx, const lock_prdt_t *prdt) {

@@ -353,18 +353,13 @@
 /* coredumper library */
 #cmakedefine01 HAVE_LIBCOREDUMPER
 
-<<<<<<< HEAD
+/* From libmysql/CMakeLists.txt */
+#cmakedefine HAVE_UNIX_DNS_SRV @HAVE_UNIX_DNS_SRV@
+#cmakedefine HAVE_WIN32_DNS_SRV @HAVE_WIN32_DNS_SRV@
+
 /*
  * Needed by wsrep (WITH_WSREP)
  */
 #define HAVE_GETIFADDRS 1
 
-||||||| 7ddfdfe87b8
-=======
-
-/* From libmysql/CMakeLists.txt */
-#cmakedefine HAVE_UNIX_DNS_SRV @HAVE_UNIX_DNS_SRV@
-#cmakedefine HAVE_WIN32_DNS_SRV @HAVE_WIN32_DNS_SRV@
-
->>>>>>> tag/Percona-Server-8.0.22-13
 #endif
