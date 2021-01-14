@@ -3,7 +3,7 @@
 SELECT PLUGIN_NAME, PLUGIN_STATUS, LOAD_OPTION FROM INFORMATION_SCHEMA.PLUGINS
 WHERE PLUGIN_NAME LIKE 'keyring_file';
 PLUGIN_NAME	PLUGIN_STATUS	LOAD_OPTION
-keyring_file	ACTIVE	ON
+keyring_file	ACTIVE	FORCE
 SHOW VARIABLES LIKE 'keyring_file';
 Variable_name	Value
 # 3. Try uninstalling keyring_file plugin

@@ -71,6 +71,7 @@ performance_schema	performance_timers	def
 performance_schema	persisted_variables	def
 performance_schema	prepared_statements_instances	def
 performance_schema	processlist	def
+performance_schema	pxc_cluster_view	def
 performance_schema	replication_applier_configuration	def
 performance_schema	replication_applier_filters	def
 performance_schema	replication_applier_global_filters	def
@@ -183,6 +184,7 @@ performance_timers	BASE TABLE	PERFORMANCE_SCHEMA
 persisted_variables	BASE TABLE	PERFORMANCE_SCHEMA
 prepared_statements_instances	BASE TABLE	PERFORMANCE_SCHEMA
 processlist	BASE TABLE	PERFORMANCE_SCHEMA
+pxc_cluster_view	BASE TABLE	PERFORMANCE_SCHEMA
 replication_applier_configuration	BASE TABLE	PERFORMANCE_SCHEMA
 replication_applier_filters	BASE TABLE	PERFORMANCE_SCHEMA
 replication_applier_global_filters	BASE TABLE	PERFORMANCE_SCHEMA
@@ -295,6 +297,7 @@ performance_timers	10	Fixed
 persisted_variables	10	Dynamic
 prepared_statements_instances	10	Dynamic
 processlist	10	Dynamic
+pxc_cluster_view	10	Fixed
 replication_applier_configuration	10	Dynamic
 replication_applier_filters	10	Dynamic
 replication_applier_global_filters	10	Dynamic
@@ -405,6 +408,7 @@ objects_summary_global_by_type	0
 performance_timers	0
 prepared_statements_instances	0
 processlist	0
+pxc_cluster_view	0
 replication_applier_configuration	0
 replication_applier_filters	0
 replication_applier_global_filters	0
@@ -525,6 +529,7 @@ performance_timers	0	0
 persisted_variables	0	0
 prepared_statements_instances	0	0
 processlist	0	0
+pxc_cluster_view	0	0
 replication_applier_configuration	0	0
 replication_applier_filters	0	0
 replication_applier_global_filters	0	0
@@ -637,6 +642,7 @@ performance_timers	0	0	NULL
 persisted_variables	0	0	NULL
 prepared_statements_instances	0	0	NULL
 processlist	0	0	NULL
+pxc_cluster_view	0	0	NULL
 replication_applier_configuration	0	0	NULL
 replication_applier_filters	0	0	NULL
 replication_applier_global_filters	0	0	NULL
@@ -749,6 +755,7 @@ performance_timers	NULL	NULL	NULL
 persisted_variables	NULL	NULL	NULL
 prepared_statements_instances	NULL	NULL	NULL
 processlist	NULL	NULL	NULL
+pxc_cluster_view	NULL	NULL	NULL
 replication_applier_configuration	NULL	NULL	NULL
 replication_applier_filters	NULL	NULL	NULL
 replication_applier_global_filters	NULL	NULL	NULL
@@ -861,6 +868,7 @@ performance_timers	utf8mb4_0900_ai_ci	NULL
 persisted_variables	utf8mb4_0900_ai_ci	NULL
 prepared_statements_instances	utf8mb4_0900_ai_ci	NULL
 processlist	utf8mb4_0900_ai_ci	NULL
+pxc_cluster_view	utf8mb4_0900_ai_ci	NULL
 replication_applier_configuration	utf8mb4_0900_ai_ci	NULL
 replication_applier_filters	utf8mb4_0900_ai_ci	NULL
 replication_applier_global_filters	utf8mb4_0900_ai_ci	NULL
@@ -973,6 +981,7 @@ performance_timers
 persisted_variables	
 prepared_statements_instances	
 processlist	
+pxc_cluster_view	
 replication_applier_configuration	
 replication_applier_filters	
 replication_applier_global_filters	
@@ -1085,6 +1094,7 @@ performance_timers
 persisted_variables	
 prepared_statements_instances	
 processlist	
+pxc_cluster_view	
 replication_applier_configuration	
 replication_applier_filters	
 replication_applier_global_filters	

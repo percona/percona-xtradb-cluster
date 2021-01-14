@@ -2,8 +2,6 @@ Valid values are 'OFF', 'ON' and 'RE_ENCRYPTING_TO_KEYRING'
 select @@global.innodb_sys_tablespace_encrypt in ('OFF', 'ON', 'RE_ENCRYPTING_TO_KEYRING');
 @@global.innodb_sys_tablespace_encrypt in ('OFF', 'ON', 'RE_ENCRYPTING_TO_KEYRING')
 1
-Warnings:
-Warning	1292	Truncated incorrect DOUBLE value: 'OFF'
 select @@global.innodb_sys_tablespace_encrypt;
 @@global.innodb_sys_tablespace_encrypt
 OFF

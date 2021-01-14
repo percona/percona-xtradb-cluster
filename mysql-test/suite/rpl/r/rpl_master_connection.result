@@ -6,6 +6,8 @@ Note	####	Storing MySQL user name or password information in the master info rep
 SET SQL_LOG_BIN=0;
 SELECT user, plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys','mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 CREATE USER 'plug_user_p' IDENTIFIED WITH 'test_plugin_server' AS 'proxy_user_p';
 CREATE USER 'plug_user_wp' IDENTIFIED WITH 'test_plugin_server' AS 'proxy_user_wp';
 CREATE USER 'proxy_user_p' IDENTIFIED BY 'password';
@@ -14,6 +16,8 @@ CREATE USER 'regular_user_p' IDENTIFIED BY 'password';
 CREATE USER 'regular_user_wp' IDENTIFIED BY '';
 SELECT user, plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys','mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug_user_p	test_plugin_server
 plug_user_wp	test_plugin_server
 proxy_user_p	caching_sha2_password

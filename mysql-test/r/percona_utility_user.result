@@ -130,7 +130,7 @@ ERROR HY000: Operation SHOW CREATE USER failed for 'frank'@'localhost'
 # restart
 SHOW GLOBAL STATUS LIKE "Connections";
 Variable_name	Value
-Connections	10
+Connections	8
 SHOW GLOBAL STATUS LIKE "Threads%";
 Variable_name	Value
 Threads_cached	0
@@ -139,7 +139,7 @@ Threads_created	1
 Threads_running	2
 SHOW GLOBAL STATUS LIKE "Connections";
 Variable_name	Value
-Connections	11
+Connections	9
 SHOW GLOBAL STATUS LIKE "Threads%";
 Variable_name	Value
 Threads_cached	0

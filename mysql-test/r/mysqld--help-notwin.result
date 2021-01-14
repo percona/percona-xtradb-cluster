@@ -1611,6 +1611,8 @@ The following options may be given as the first argument:
  Should slave thread do secondary index uniqueness chesks
  --wsrep-slave-threads=# 
  Number of slave appliers to launch
+ --wsrep-sst-allowed-methods=name 
+ SST methods accepted by server
  --wsrep-sst-donor=name 
  preferred donor node for the SST
  --wsrep-sst-donor-rejects-queries 
@@ -1890,7 +1892,7 @@ performance-schema-events-waits-history-long-size -1
 performance-schema-events-waits-history-size -1
 performance-schema-hosts-size -1
 performance-schema-instrument 
-performance-schema-max-cond-classes 100
+performance-schema-max-cond-classes 120
 performance-schema-max-cond-instances -1
 performance-schema-max-digest-length 1024
 performance-schema-max-digest-sample-age 60
@@ -2054,12 +2056,11 @@ wsrep-certification-rules strict
 wsrep-certify-nonPK TRUE
 wsrep-cluster-address 
 wsrep-cluster-name my_wsrep_cluster
-wsrep-data-home-dir MYSQLTEST_VARDIR/tmp/temp/data/
 wsrep-dbug-option 
 wsrep-debug NONE
 wsrep-desync FALSE
 wsrep-dirty-reads FALSE
-wsrep-ignore-apply-errors 7
+wsrep-ignore-apply-errors 0
 wsrep-load-data-splitting FALSE
 wsrep-log-conflicts FALSE
 wsrep-max-ws-rows 0
@@ -2079,6 +2080,7 @@ wsrep-retry-autocommit 1
 wsrep-slave-FK-checks TRUE
 wsrep-slave-UK-checks FALSE
 wsrep-slave-threads 1
+wsrep-sst-allowed-methods xtrabackup-v2
 wsrep-sst-donor 
 wsrep-sst-donor-rejects-queries FALSE
 wsrep-sst-method xtrabackup-v2

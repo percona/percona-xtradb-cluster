@@ -252,7 +252,7 @@ UNINSTALL COMPONENT "file://component_log_sink_json";
  
 --echo
 --echo # Restarting server with --log-error-verbosity=1
---let restart_parameters="restart: --log-error-verbosity=1"
+--let restart_parameters="restart: --log-error-verbosity=1 --wsrep-min-log-verbosity=1"
 --source include/restart_mysqld.inc
 
 # find "first" entry in latest run
@@ -270,7 +270,7 @@ SELECT COUNT(*)=0
 
 --echo
 --echo # Restarting server with --log-error-verbosity=2
---let restart_parameters="restart: --log-error-verbosity=2"
+--let restart_parameters="restart: --log-error-verbosity=2 --wsrep-min-log-verbosity=1"
 --source include/restart_mysqld.inc
 
 # find "first" entry in latest run
@@ -296,7 +296,7 @@ SELECT COUNT(*)=0
 --echo 
 --echo # verbosity=1
 --let LOG_FILE=$MYSQLTEST_VARDIR/tmp/wl13681.err
---let restart_parameters="restart: --log-error=$LOG_FILE --log-error-verbosity=1"
+--let restart_parameters="restart: --log-error=$LOG_FILE --log-error-verbosity=1 --wsrep-min-log-verbosity=1"
 --replace_result $LOG_FILE LOG_FILE
 --source include/restart_mysqld.inc
 
@@ -315,7 +315,7 @@ SELECT COUNT(*)=0
 --echo
 --echo # verbosity=2
 
---let restart_parameters="restart: --log-error=$LOG_FILE --log-error-verbosity=2"
+--let restart_parameters="restart: --log-error=$LOG_FILE --log-error-verbosity=2 --wsrep-min-log-verbosity=1"
 --replace_result $LOG_FILE LOG_FILE
 --source include/restart_mysqld.inc
 
@@ -399,7 +399,7 @@ SET PERSIST log_error_verbosity=1;
 SET PERSIST log_error_suppression_list="MY-013595,MY-010069,MY-011810,MY-010116";
 SET PERSIST log_error_services="log_filter_internal; log_sink_json";
 
---let restart_parameters="restart: --log-error=$LOG_FILE"
+--let restart_parameters="restart: --log-error=$LOG_FILE --wsrep-min-log-verbosity=1"
 --replace_result $LOG_FILE LOG_FILE
 --source include/restart_mysqld.inc
 

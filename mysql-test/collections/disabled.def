@@ -37,9 +37,36 @@ innodb.innodb_bug14676111                         : BUG#18200831 The test has ne
 innodb.log_first_rec_group                        : Bug#29692047 Disable for now until we can find a better way to test this.
 innodb.fts_exec_interrupt                         : Bug#28534199 The test is unstable and should be rewritten
 innodb.slow_shutdown                              : Bug#31763837 mtr hits this debug assert post test run cleanup
+innodb.innodb_32k                                 : BUG#0 PXC requires 16k InnoDB page size
+innodb.innodb_64k                                 : BUG#0 PXC requires 16k InnoDB page size
+innodb.create_tablespace_4k                       : BUG#0 PXC requires 16k InnoDB page size
+innodb.create_tablespace_64k                      : BUG#0 PXC requires 16k InnoDB page size
+innodb.import_export_4k                           : BUG#0 PXC requires 16k InnoDB page size
+innodb.create_tablespace_8k                       : BUG#0 PXC requires 16k InnoDB page size
+innodb.create_tablespace_32k                      : BUG#0 PXC requires 16k InnoDB page size
+innodb.xdes_fseg_frag                             : BUG#0 PXC requires 16k InnoDB page size
+innodb.innodb_page_size_func                      : BUG#0 PXC requires 16k InnoDB page size
+innodb.innodb_pagesize_max_recordsize             : BUG#0 PXC requires 16k InnoDB page size
+innodb.mysqldump_max_recordsize                   : BUG#0 PXC requires 16k InnoDB page size
+innodb.blob-crash-4k                              : BUG#0 PXC requires 16k InnoDB page size
 
 # innodb_fts suite test
 innodb_fts.sync_block : BUG#2232 percona https://jira.percona.com/browse/PS-2232
+
+# innodb_zip
+innodb_zip.4k                                     : BUG#0 PXC requires 16k InnoDB page size
+innodb_zip.index_large_prefix_4k                  : BUG#0 PXC requires 16k InnoDB page size
+innodb_zip.8k                                     : BUG#0 PXC requires 16k InnoDB page size
+innodb_zip.index_large_prefix_8k                  : BUG#0 PXC requires 16k InnoDB page size
+
+# innodb_undo
+innodb_undo.i_s_files_64k                         : BUG#0 PXC requires 16k InnoDB page size
+innodb_undo.i_s_files_4k                          : BUG#0 PXC requires 16k InnoDB page size
+innodb_undo.i_s_files_8k                          : BUG#0 PXC requires 16k InnoDB page size
+innodb_undo.i_s_files_32k                         : BUG#0 PXC requires 16k InnoDB page size
+
+# innodb_gis
+innodb_gis.gis_split_nan                          : BUG#0 PXC requires 16k InnoDB page size
 
 # keyring tests
 keyring_encrypted_file.keyring_migration_bugs @darwin : Bug#31041633
@@ -186,6 +213,7 @@ main.partition_pruning : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 main.range_icp : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 main.range_none : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 main.xa_prepared_binlog_off : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
+main.percona_rotate_system_key_check_privileges : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 
 # perf-schema
 perfschema.global_read_lock : BUG#0 Issue#79 2018-07-26 CODERSHIP mw-79
@@ -201,6 +229,9 @@ sys_vars.sql_mode_func                       : BUG#0 Differences in result likel
 #sys_vars.innodb_support_xa_func              : BUG#0 XA is not supported by PXC
 sys_vars.wsrep_max_ws_size_basic             : BUG#0 Setting this now also set repl.max_ws_size which is galera internal setting.
 
+# innodb
+innodb.table_encrypt_2_keyring : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+
 # innodb_fts
 innodb_fts.fulltext_table_evict : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 
@@ -211,6 +242,7 @@ rpl.rpl_multi_source_channel_map_stress : BUG#0 Issue#330 2018-07-26 CODERSHIP m
 rpl.rpl_seconds_behind_master : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 #rpl.rpl_semi_sync_ack_thread : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 #rpl.rpl_semi_sync_after_sync : BUG#0 Issue#330 2018-06-19 CODERSHIP mw-330
+rpl.rpl_system_key_rotation : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 
 # galera
 galera.galera_toi_ddl_online : BUG#0 fails randomly with "deadlock error" as sequence of action is causing an issue.
@@ -235,7 +267,7 @@ galera_3nodes_sr.GCF-810A : BUG#0 Test sub-file missing
 galera_3nodes_sr.GCF-810B : BUG#0 Test sub-file missing
 galera_3nodes_sr.GCF-810C : BUG#0 Test sub-file missing
 
-#binlog
+# binlog
 binlog.binlog_index : BUG#0 codership/mysql-wsrep##71
 binlog.binlog_xa_prepared_disconnect : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-330
 
@@ -250,6 +282,67 @@ galera.MW-284 : BUG#0000 test is incompatible with native mysql8.0 server slave 
 galera.galera_fk_lock_parent_update_child : BUG#0 Few cases have timing issues(PXC-3431) and few are invalid after PXC-3501
 galera.galera_toi_ddl_fk_insert : BUG#0 CODERSHIP qa#39 test fails sporadically (PXC-3431)
 
+
+# encryption
+# Probably we should use upstream version of encryption tests for PXC
+encryption.percona_parallel_dblwr_encrypt                               : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.percona_system_key_with_srv_guuid                            : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-first-page-read                                       : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.encrypt_threads_skip_tablespace                              : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.tablespace_encryption                                        : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.explicit_encryption                                          : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_row_compressed                             : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-encryption-alter                                      : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.default_table_encryption_var                                 : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_rotation_mk_to_rk                                     : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-missing-key                                           : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-page_encryption                                       : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-page_encryption_compression                           : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-read-only                                             : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption                                            : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-bad-key-change4                                       : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_page_encryption_key_change                            : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-key-rotation-disable                                  : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_key_rotation                       : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-redo-page0-wrongkey                                   : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-redo-nokeys                                           : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_aborted_flush                                         : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_key_rotation_mk                    : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.encrypt_and_grep                                             : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_key_rotation_mk_page_compressed    : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_onlinealter_encryption                                : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-key-rotation                                          : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_key_rotation_mk_row_compressed     : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_row_compressed_corrupted                   : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-redo-nokeys2_debug                                    : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_key_rotation_page_compressed       : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_rotation                           : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption-page-compression                           : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_key_rotation_row_compressed        : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_rotation_mk                        : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-bad-key-change                                        : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_tables                                     : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.crypt_data_redo                                              : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_rotation_mk_page_compressed        : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_alters                                                : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.percona_system_key_rotation                                  : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_default_key                                           : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_row_compressed_big_table                   : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.keyring_and_mk_encryption_exclusions                         : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_rotation_mk_row_compressed         : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.keyring_and_mk_encryption_exclusions_d_e                     : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_rotation_page_compressed           : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_encryption_aborted_rotation_row_compressed            : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.validation                                                   : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.upgrade_crypt_data_57_v1                                     : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.upgrade_crypt_data_v2					: BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-spatial-index                                         : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb_alter_mk_to_rk                                        : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.upgrade_crypt_data_v1                                        : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-page_encryption-32k                                   : BUG#0 PXC requires 16k InnoDB page size
+
+# auth_sec
+auth_sec.wrong_keyring_file_data                                        : BUG#0 PXC needs keyring_file/keyring_vault to load without errors
 
 #--------------------------------------------------
 # Codership disabled tests end here

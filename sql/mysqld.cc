@@ -13018,31 +13018,42 @@ PSI_stage_info *all_server_stages[] = {
 #ifdef WITH_WSREP
 PSI_stage_info *wsrep_server_stages[] = {
     // log_event
-    &stage_wsrep_writing_rows, &stage_wsrep_deleting_rows,
+    &stage_wsrep_writing_rows,
+    &stage_wsrep_deleting_rows,
     &stage_wsrep_updating_rows,
 
     // wsrep_applier
-    &stage_wsrep_applying_writeset, &stage_wsrep_applied_writeset,
+    &stage_wsrep_applying_writeset,
+    &stage_wsrep_applied_writeset,
 
-    &stage_wsrep_applying_toi_writeset, &stage_wsrep_applied_toi_writeset,
+    &stage_wsrep_applying_toi_writeset,
+    &stage_wsrep_applied_toi_writeset,
 
-    &stage_wsrep_committing, &stage_wsrep_committed,
+    &stage_wsrep_committing,
+    &stage_wsrep_committed,
 
-    &stage_wsrep_toi_committing, &stage_wsrep_toi_committed,
+    &stage_wsrep_toi_committing,
+    &stage_wsrep_toi_committed,
 
-    &stage_wsrep_rolling_back, &stage_wsrep_rolled_back,
+    &stage_wsrep_rolling_back,
+    &stage_wsrep_rolled_back,
 
-    &stage_wsrep_replicating_commit, &stage_wsrep_write_set_replicated,
+    &stage_wsrep_replicating_commit,
+    &stage_wsrep_write_set_replicated,
 
-    &stage_wsrep_replaying_trx, &stage_wsrep_replayed_write_set,
+    &stage_wsrep_replaying_trx,
+    &stage_wsrep_replayed_write_set,
 
     // wsrep_mysqld
     &stage_wsrep_preparing_for_TO_isolation,
-    &stage_wsrep_TO_isolation_initiated, &stage_wsrep_completed_TO_isolation,
+    &stage_wsrep_TO_isolation_initiated,
+    &stage_wsrep_completed_TO_isolation,
 
     // wsrep_thd
-    &stage_wsrep_applier_idle, &stage_wsrep_in_rollback_thread,
-    &stage_wsrep_aborter_idle, &stage_wsrep_aborter_active};
+    &stage_wsrep_applier_idle,
+    &stage_wsrep_in_rollback_thread,
+    &stage_wsrep_aborter_idle,
+    &stage_wsrep_aborter_active};
 
 #endif /* WITH_WSREP */
 

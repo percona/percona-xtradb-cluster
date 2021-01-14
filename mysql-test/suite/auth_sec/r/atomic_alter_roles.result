@@ -9,7 +9,7 @@ GRANT 'administrator', 'qa', 'developer', 'manager' to userX, userY, userZ;
 # Check the number of the roles and users created.
 SELECT COUNT(*) FROM mysql.user;
 COUNT(*)
-11
+13
 # Check the number of default roles.
 SELECT COUNT(*) FROM mysql.default_roles;
 COUNT(*)

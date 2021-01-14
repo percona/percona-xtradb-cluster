@@ -1,19 +1,19 @@
 CREATE TABLE t1(a int);
-# restart: --log-error=LOG_FILE1 --log-error-verbosity=1 --binlog-format=statement
+# restart: --log-error=LOG_FILE1 --log-error-verbosity=1 --wsrep-min-log-verbosity=1 --binlog-format=statement
 INSERT INTO t1 SELECT FOUND_ROWS();
 Warnings:
 Warning	1287	FOUND_ROWS() is deprecated and will be removed in a future release. Consider using COUNT(*) instead.
 Note	1592	Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT. Statement is unsafe because it uses a system function that may return a different value on the slave.
 connect(localhost,unknown_user,,,MASTER_PORT,MASTER_SOCKET);
 ERROR 28000: Access denied for user 'unknown_user'@'localhost' (using password: NO)
-# restart: --log-error=LOG_FILE2 --log-error-verbosity=2 --binlog-format=statement
+# restart: --log-error=LOG_FILE2 --log-error-verbosity=2 --wsrep-min-log-verbosity=1 --binlog-format=statement
 INSERT INTO t1 SELECT FOUND_ROWS();
 Warnings:
 Warning	1287	FOUND_ROWS() is deprecated and will be removed in a future release. Consider using COUNT(*) instead.
 Note	1592	Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT. Statement is unsafe because it uses a system function that may return a different value on the slave.
 connect(localhost,unknown_user,,,MASTER_PORT,MASTER_SOCKET);
 ERROR 28000: Access denied for user 'unknown_user'@'localhost' (using password: NO)
-# restart: --log-error=LOG_FILE3 --log-error-verbosity=3 --binlog-format=statement
+# restart: --log-error=LOG_FILE3 --log-error-verbosity=3 --wsrep-min-log-verbosity=1 --binlog-format=statement
 INSERT INTO t1 SELECT FOUND_ROWS();
 Warnings:
 Warning	1287	FOUND_ROWS() is deprecated and will be removed in a future release. Consider using COUNT(*) instead.
@@ -21,19 +21,19 @@ Note	1592	Unsafe statement written to the binary log using statement format sinc
 connect(localhost,unknown_user,,,MASTER_PORT,MASTER_SOCKET);
 ERROR 28000: Access denied for user 'unknown_user'@'localhost' (using password: NO)
 DROP TABLE t1;
-# restart: --log-error=LOG_FILE8 --lc-messages-dir=MSG_DIR --log-error-verbosity=3
+# restart: --log-error=LOG_FILE8 --lc-messages-dir=MSG_DIR --log-error-verbosity=3 --wsrep-min-log-verbosity=1
 connect(localhost,unknown_user,,,MASTER_PORT,MASTER_SOCKET);
 ERROR 28000: Access denied for user 'unknown_user'@'localhost' (using password: NO)
 # restart: --log-error=LOG_FILE8B --lc-messages=invalid_arg1 --lc-time-names=invalid_arg2
 connect(localhost,unknown_user,,,MASTER_PORT,MASTER_SOCKET);
 ERROR 28000: Access denied for user 'unknown_user'@'localhost' (using password: NO)
-# restart: --log-error=LOG_FILE9 --log-error-verbosity=3 --log-error-services=abcd 
+# restart: --log-error=LOG_FILE9 --log-error-verbosity=3 --wsrep-min-log-verbosity=1 --log-error-services=abcd 
 SELECT @@GLOBAL.LOG_ERROR_SERVICES;
 @@GLOBAL.LOG_ERROR_SERVICES
 log_filter_internal; log_sink_internal
 SET GLOBAL LOG_ERROR_SERVICES=@@GLOBAL.LOG_ERROR_SERVICES;
 Pattern "\[Warning\].*Cannot set services "abcd" requested in --log-error-services, using defaults" found
-# restart: --log-error=LOG_FILE10 --log-error-verbosity=3 --log-error-services=log_sink_json 
+# restart: --log-error=LOG_FILE10 --log-error-verbosity=3 --wsrep-min-log-verbosity=1 --log-error-services=log_sink_json 
 Pattern "\[Warning\].*Cannot set services "log_sink_json" requested in --log-error-services, using defaults" found
 INSTALL COMPONENT "file://component_log_sink_json";
 # restart: --no-console --log-error=LOG_FILE11 --log-error-services=log_filter_internal;log_sink_internal;log_sink_json --log-error-verbosity=3

@@ -61,7 +61,12 @@
 #define PFS_MAX_RWLOCK_CLASS 70
 #endif
 #ifndef PFS_MAX_COND_CLASS
+#ifdef WITH_WSREP
+/* Max value for PXC builds */
+#define PFS_MAX_COND_CLASS 120
+#else
 #define PFS_MAX_COND_CLASS 100
+#endif /* WITH_WSREP */
 #endif
 #ifndef PFS_MAX_THREAD_CLASS
 #define PFS_MAX_THREAD_CLASS 100

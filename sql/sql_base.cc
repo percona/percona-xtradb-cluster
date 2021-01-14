@@ -6064,7 +6064,11 @@ restart:
         (tbl && ((strcmp(tbl->s->db.str, "mysql") == 0) ||
                  (strcmp(tbl->s->db.str, "information_schema") == 0)));
 
-    legacy_db_type db_type = (tbl ? tbl->file->ht->db_type : DB_TYPE_UNKNOWN);
+    /* Schema tables may not have a TABLE object here. */
+    legacy_db_type db_type = DB_TYPE_UNKNOWN;
+    if (tbl && tbl->file) {
+        db_type = tbl->file->ht->db_type;
+    }
 
     if (tables == *start && db_type != DB_TYPE_INNODB &&
         db_type != DB_TYPE_UNKNOWN && db_type != DB_TYPE_PERFORMANCE_SCHEMA &&

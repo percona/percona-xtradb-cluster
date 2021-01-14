@@ -154,6 +154,11 @@ def	mysql	time_zone_transition_type	mysql	PRIMARY
 def	mysql	time_zone_transition_type	mysql	PRIMARY
 def	mysql	user	mysql	PRIMARY
 def	mysql	user	mysql	PRIMARY
+def	mysql	wsrep_cluster	mysql	PRIMARY
+def	mysql	wsrep_cluster_members	mysql	PRIMARY
+def	mysql	wsrep_streaming_log	mysql	PRIMARY
+def	mysql	wsrep_streaming_log	mysql	PRIMARY
+def	mysql	wsrep_streaming_log	mysql	PRIMARY
 def	performance_schema	accounts	performance_schema	ACCOUNT
 def	performance_schema	accounts	performance_schema	ACCOUNT
 def	performance_schema	cond_instances	performance_schema	NAME

@@ -12,9 +12,15 @@
 
 # ---- WITH_WSREP
 --source include/wait_until_connected_again.inc
---source include/galera_wait_ready.inc
-# ---- WITH_WSREP
+
 --disable_query_log
+--let $wsrep_provider_loaded = `SELECT COUNT(*) = 1 FROM performance_schema.global_variables WHERE VARIABLE_NAME LIKE 'wsrep_provider' AND VARIABLE_VALUE NOT LIKE 'none'`
+
+if ($wsrep_provider_loaded)
+{
+  --source include/galera_wait_ready.inc
+}
+# ---- WITH_WSREP
 
 # Wait for any connections opened by a previous testcase (or the testcase
 # warning checker) to finish closing. Exclude binlog dump threads as these may

@@ -13,6 +13,8 @@ root@localhost
 SELECT user, plugin FROM mysql.user;
 user	plugin
 mysql.infoschema	caching_sha2_password
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 mysql.session	caching_sha2_password
 mysql.sys	caching_sha2_password
 root	caching_sha2_password

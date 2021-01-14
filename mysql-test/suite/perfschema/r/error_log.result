@@ -239,7 +239,7 @@ UNINSTALL COMPONENT "file://component_log_sink_json";
 
 
 # Restarting server with --log-error-verbosity=1
-# restart: --log-error-verbosity=1
+# restart: --log-error-verbosity=1 --wsrep-min-log-verbosity=1
 SELECT logged INTO @startup
 FROM performance_schema.error_log
 WHERE error_code="MY-010116"
@@ -253,7 +253,7 @@ COUNT(*)=0
 1
 
 # Restarting server with --log-error-verbosity=2
-# restart: --log-error-verbosity=2
+# restart: --log-error-verbosity=2 --wsrep-min-log-verbosity=1
 SELECT logged INTO @startup
 FROM performance_schema.error_log
 WHERE error_code="MY-010116"
@@ -273,7 +273,7 @@ COUNT(*)=0
 
 
 # verbosity=1
-# restart: --log-error=LOG_FILE --log-error-verbosity=1
+# restart: --log-error=LOG_FILE --log-error-verbosity=1 --wsrep-min-log-verbosity=1
 SELECT logged INTO @startup
 FROM performance_schema.error_log
 WHERE error_code="MY-010116"
@@ -287,7 +287,7 @@ COUNT(*)=0
 1
 
 # verbosity=2
-# restart: --log-error=LOG_FILE --log-error-verbosity=2
+# restart: --log-error=LOG_FILE --log-error-verbosity=2 --wsrep-min-log-verbosity=1
 SELECT logged INTO @startup
 FROM performance_schema.error_log
 WHERE error_code="MY-010116"
@@ -354,7 +354,7 @@ INSTALL COMPONENT 'file://component_log_sink_json';
 SET PERSIST log_error_verbosity=1;
 SET PERSIST log_error_suppression_list="MY-013595,MY-010069,MY-011810,MY-010116";
 SET PERSIST log_error_services="log_filter_internal; log_sink_json";
-# restart: --log-error=LOG_FILE
+# restart: --log-error=LOG_FILE --wsrep-min-log-verbosity=1
 SELECT logged INTO @startup
 FROM performance_schema.error_log
 WHERE error_code="MY-010116"

@@ -87,6 +87,11 @@ def	mysql	time_zone_transition_type	0	mysql	PRIMARY	1	Time_zone_id	A	#CARD#	NULL
 def	mysql	time_zone_transition_type	0	mysql	PRIMARY	2	Transition_type_id	A	#CARD#	NULL	NULL		BTREE			YES	NULL
 def	mysql	user	0	mysql	PRIMARY	1	Host	A	#CARD#	NULL	NULL		BTREE			YES	NULL
 def	mysql	user	0	mysql	PRIMARY	2	User	A	#CARD#	NULL	NULL		BTREE			YES	NULL
+def	mysql	wsrep_cluster	0	mysql	PRIMARY	1	cluster_uuid	A	#CARD#	NULL	NULL		BTREE			YES	NULL
+def	mysql	wsrep_cluster_members	0	mysql	PRIMARY	1	node_uuid	A	#CARD#	NULL	NULL		BTREE			YES	NULL
+def	mysql	wsrep_streaming_log	0	mysql	PRIMARY	1	node_uuid	A	#CARD#	NULL	NULL		BTREE			YES	NULL
+def	mysql	wsrep_streaming_log	0	mysql	PRIMARY	2	trx_id	A	#CARD#	NULL	NULL		BTREE			YES	NULL
+def	mysql	wsrep_streaming_log	0	mysql	PRIMARY	3	seqno	A	#CARD#	NULL	NULL		BTREE			YES	NULL
 # Establish connection testuser1 (user=testuser1)
 SELECT * FROM information_schema.statistics
 WHERE table_schema = 'mysql' AND table_name != 'ndb_binlog_index'

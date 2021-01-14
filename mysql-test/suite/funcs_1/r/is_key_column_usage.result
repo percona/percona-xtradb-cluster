@@ -143,6 +143,11 @@ def	mysql	PRIMARY	def	mysql	time_zone_transition_type	Time_zone_id
 def	mysql	PRIMARY	def	mysql	time_zone_transition_type	Transition_type_id
 def	mysql	PRIMARY	def	mysql	user	Host
 def	mysql	PRIMARY	def	mysql	user	User
+def	mysql	PRIMARY	def	mysql	wsrep_cluster	cluster_uuid
+def	mysql	PRIMARY	def	mysql	wsrep_cluster_members	node_uuid
+def	mysql	PRIMARY	def	mysql	wsrep_streaming_log	node_uuid
+def	mysql	PRIMARY	def	mysql	wsrep_streaming_log	seqno
+def	mysql	PRIMARY	def	mysql	wsrep_streaming_log	trx_id
 def	mysql	table_idx	def	mysql	compression_dictionary_cols	column_id
 def	mysql	table_idx	def	mysql	compression_dictionary_cols	table_id
 def	performance_schema	ACCOUNT	def	performance_schema	accounts	HOST

@@ -20,6 +20,8 @@ SELECT user, host, plugin, LENGTH(authentication_string)
 FROM mysql.user ORDER by user;
 user	host	plugin	LENGTH(authentication_string)
 mysql.infoschema	localhost	caching_sha2_password	70
+mysql.pxc.internal.session	localhost	caching_sha2_password	70
+mysql.pxc.sst.role	localhost	caching_sha2_password	0
 mysql.session	localhost	caching_sha2_password	70
 mysql.sys	localhost	caching_sha2_password	70
 root	localhost	caching_sha2_password	0
@@ -70,6 +72,8 @@ SELECT user, host, plugin, LENGTH(authentication_string)
 FROM mysql.user ORDER BY user;
 user	host	plugin	LENGTH(authentication_string)
 mysql.infoschema	localhost	caching_sha2_password	70
+mysql.pxc.internal.session	localhost	caching_sha2_password	70
+mysql.pxc.sst.role	localhost	caching_sha2_password	0
 mysql.session	localhost	caching_sha2_password	70
 mysql.sys	localhost	caching_sha2_password	70
 root	localhost	caching_sha2_password	0

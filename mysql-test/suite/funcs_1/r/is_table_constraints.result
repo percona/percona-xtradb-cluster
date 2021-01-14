@@ -89,6 +89,9 @@ def	mysql	PRIMARY	mysql	time_zone_name
 def	mysql	PRIMARY	mysql	time_zone_transition
 def	mysql	PRIMARY	mysql	time_zone_transition_type
 def	mysql	PRIMARY	mysql	user
+def	mysql	PRIMARY	mysql	wsrep_cluster
+def	mysql	PRIMARY	mysql	wsrep_cluster_members
+def	mysql	PRIMARY	mysql	wsrep_streaming_log
 def	performance_schema	ACCOUNT	performance_schema	accounts
 def	performance_schema	PRIMARY	performance_schema	cond_instances
 def	performance_schema	PRIMARY	performance_schema	data_locks

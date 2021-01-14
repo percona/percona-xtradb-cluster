@@ -76,6 +76,7 @@ performance_timers
 persisted_variables
 prepared_statements_instances
 processlist
+pxc_cluster_view
 replication_applier_configuration
 replication_applier_filters
 replication_applier_global_filters

@@ -373,6 +373,22 @@ INSERT INTO global_suppressions VALUES
  ("NOTIFY_SOCKET not set in environment. sd_notify messages will not be sent!"),
  ("Invalid systemd notify socket, cannot send: "),
 
+ /*
+   Warnings/errors seen while using group replication with Percona XtraDB Cluster
+ */
+ ("Using group replication with Percona XtraDB Cluster is only supported for migration"),
+
+ /*
+   Warnings from Clone plugin
+
+   In PXC, the table mtr.test_suppressions is created as MyISAM to avoid
+   replication of suppression added to one node to other nodes of the cluster.
+ */
+ ("Non innodb table: mtr.test_suppressions is not cloned and is empty."),
+ ("Clone removing all user data for provisioning: Started"),
+ ("Clone removing all user data for provisioning: Finished"),
+ ("\\[Warning\\] .*Non innodb table: .* is not cloned and is empty."),
+
  ("THE_LAST_SUPPRESSION");
 
 

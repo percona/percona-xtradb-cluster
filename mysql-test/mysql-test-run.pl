@@ -335,10 +335,7 @@ our $opt_quiet                     = $ENV{'MTR_QUIET'} || 0;
 our $opt_repeat                    = 1;
 our $opt_report_times              = 0;
 our $opt_resfile                   = $ENV{'MTR_RESULT_FILE'} || 0;
-#---- wsrep
-our $opt_test_progress             = 0;
-#our $opt_test_progress             = 1;
-#---- wsrep
+our $opt_test_progress             = 1;
 our $opt_sanitize                  = 0;
 our $opt_shutdown_timeout          = $ENV{MTR_SHUTDOWN_TIMEOUT} || 20; # seconds
 our $opt_start_timeout             = $ENV{MTR_START_TIMEOUT} || 240;   # seconds
@@ -777,7 +774,7 @@ sub main {
   }
 
   if ($group_replication) {
-    $ports_per_thread = $ports_per_thread + 10;
+    $ports_per_thread = $ports_per_thread + 40;
   }
 
   if ($secondary_engine_support) {
@@ -4408,9 +4405,11 @@ sub mysql_install_db {
                                  verbose => $opt_verbose,);
 
   if ($res != 0) {
-    mtr_error("Error executing mysqld --initialize\n" .
+    # If bootstrap fails, do not terminate mtr script, just report warning.
+    mtr_warning("Error executing mysqld --initialize\n" .
               "Could not install system database from $bootstrap_sql_file\n" .
               "see $path_bootstrap_log for errors");
+    return 1;
   }
 
   # Remove the auto.cnf so that a new auto.cnf is generated for master
@@ -6944,7 +6943,32 @@ sub start_servers($) {
       # enough for allocating extra Group replication ports.
       $ENV{$xcom_server} = -1;
     } else {
-      my $xcom_port = $baseport + 19 + $server_id;
+      # For PXC's MTR
+      #
+      # Server-1
+      # --------
+      # Port X   - Connection handing
+      # Port X+1 - Galera
+      # Port X+2 - IST
+      # Port X+3 - SST
+      # Port X+4 - Group Replication
+      # Port X+5 - Admin Port
+      #
+      # Server-2
+      # --------
+      # Port X+6 - Connection handing
+      # ..
+      # Port X+10 - Group Replication
+      # Port X+11 - Admin Port
+      #
+      # This follows an arithmetic progression with difference 6 and the final
+      # equation for calculating the group replication ports becomes:
+      #
+      # SERVER-N
+      # --------
+      # GR_PORT = BASEPORT + 6 * SERVER_ID - 2
+
+      my $xcom_port= $baseport + 6 * $server_id - 2;
       $ENV{$xcom_server} = $xcom_port;
     }
 

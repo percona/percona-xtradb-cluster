@@ -121,6 +121,9 @@ DROP SERVER s;
 connection default;
 disconnect con1;
 LOCK INSTANCE FOR BACKUP;
+DROP USER IF EXISTS 'mysql.pxc.sst.user'@'localhost';
+Warnings:
+Note	3162	Authorization ID 'mysql.pxc.sst.user'@'localhost' does not exist.
 # Restart server
 # restart
 CREATE TABLE t2 (c1 int);

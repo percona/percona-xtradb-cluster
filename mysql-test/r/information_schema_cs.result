@@ -155,6 +155,9 @@ time_zone_transition
 time_zone_transition_type
 user
 v1
+wsrep_cluster
+wsrep_cluster_members
+wsrep_streaming_log
 select c,table_name from v1
 inner join information_schema.TABLES v2 on (v1.c=v2.table_name)
 where v1.c rlike "t[1-5]{1}$" order by c;
@@ -543,6 +546,9 @@ GRANTEE	TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	COLUMN_NAME	PRIVILEGE_TYPE	IS_GRAN
 'joe'@'localhost'	def	test	t1	a	SELECT	YES
 select * from INFORMATION_SCHEMA.TABLE_PRIVILEGES WHERE table_schema NOT IN ('sys','mysql');
 GRANTEE	TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	PRIVILEGE_TYPE	IS_GRANTABLE
+'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	SELECT	NO
+'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	INSERT	NO
+'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	CREATE	NO
 drop view v1, v2, v3;
 drop table t1;
 delete from mysql.user where user='joe';
@@ -914,7 +920,7 @@ AND table_name not like 'ndb%' AND table_name COLLATE utf8_general_ci not like '
 GROUP BY TABLE_SCHEMA;
 TABLE_SCHEMA	count(*)
 information_schema	57
-mysql	32
+mysql	35
 create table t1 (i int, j int);
 create trigger trg1 before insert on t1 for each row
 begin
@@ -1294,7 +1300,7 @@ SELECT MAX(table_name)
 FROM information_schema.tables
 WHERE table_schema IN ('mysql', 'information_schema', 'test');
 MAX(table_name)
-user
+wsrep_streaming_log
 SELECT table_name FROM information_schema.tables
 WHERE table_name=(SELECT MAX(table_name)
 FROM information_schema.tables WHERE
@@ -1302,7 +1308,7 @@ table_schema IN ('mysql',
 'information_schema',
 'test')) order by table_name;
 TABLE_NAME
-user
+wsrep_streaming_log
 DROP TABLE IF EXISTS bug23037;
 DROP FUNCTION IF EXISTS get_value;
 SELECT COLUMN_NAME, MD5(COLUMN_DEFAULT), LENGTH(COLUMN_DEFAULT)
@@ -1692,7 +1698,7 @@ drop table if exists t1;drop table if exists t1;
 drop table if exists t1;drop table if exists t1;
 drop table if exists t1;drop table if exists t1;
 drop table if exists t1;drop table if exists t1;
-drop table if exists t1;drop table if exists
+drop table if exists t1;drop table if exists t1;
 set global init_connect="";
 create table t0 select * from performance_schema.global_status where VARIABLE_NAME='COM_SELECT';
 SELECT 1;
