@@ -170,10 +170,10 @@ Description: Percona XtraDB Cluster database client binaries
 Package: percona-xtradb-cluster-server-5.7
 Architecture: any
 Suggests: tinyca, netcat-openbsd, pv 
-Pre-Depends: percona-xtradb-cluster-common-5.7 (= ${binary:Version}),
-             adduser,
+Pre-Depends: adduser,
              debconf (>= 0.2.17)
-Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
+Depends: percona-xtradb-cluster-common-5.7 (= ${binary:Version}),
+         percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
          libdbi-perl,
          libdbd-mysql-perl,
          perl (>= 5.6),

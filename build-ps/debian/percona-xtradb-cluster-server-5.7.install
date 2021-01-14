@@ -1,4 +1,6 @@
 usr/lib/mysql/plugin/*.so
+usr/lib/mysql/plugin/data_masking.ini
+usr/lib/mysql/plugin/daemon_example.ini
 usr/bin/clustercheck
 usr/bin/pyclustercheck
 usr/bin/innochecksum
@@ -49,6 +51,3 @@ usr/share/mysql
 etc/xinetd.d/mysqlchk
 etc/default/mysql
 libgalera_smm.so usr/lib/galera3
-#coredumper
-usr/include/coredumper/coredumper.h
-usr/lib/libcoredumper.a
