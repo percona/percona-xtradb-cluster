@@ -67,7 +67,15 @@ IF(MY_COMPILER_IS_GNU)
   MY_ADD_CXX_WARNING_FLAG("Wstringop-truncation")
   IF(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
     # GCC 8 has bugs with "final".
-    MY_ADD_CXX_WARNING_FLAG("Wsuggest-override")
+
+    # Disable this flag for PXC. Codership's wsrep-lib part and wsrep server
+    # hooks are not compatible with this flag. This causes errors during
+    # compilation of server part and storage engines including wsrep-lib and 
+    # wsrep hooks headers.
+    # Enable it back when wsrep-lib part is fixed. Disabled for now instead of
+    # fixing wsrep-lib to make next upstream merges easier.
+ 
+    # MY_ADD_CXX_WARNING_FLAG("Wsuggest-override")
   ENDIF()
 ENDIF()
 
@@ -108,6 +116,7 @@ IF(MY_COMPILER_IS_CLANG)
   STRING_APPEND(MY_CXX_WARNING_FLAGS " -Wnon-virtual-dtor")
   STRING_APPEND(MY_CXX_WARNING_FLAGS " -Wundefined-reinterpret-cast")
 
+  # Disable for PXC. See GCC part above for detailed explanation.
   MY_ADD_CXX_WARNING_FLAG("Winconsistent-missing-destructor-override")
   MY_ADD_CXX_WARNING_FLAG("Winconsistent-missing-override")
   MY_ADD_CXX_WARNING_FLAG("Wshadow-field")
