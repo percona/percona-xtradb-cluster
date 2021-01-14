@@ -1,4 +1,4 @@
--- Copyright (c) 2018, 2019, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2018, 2020, Oracle and/or its affiliates.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -49,6 +49,7 @@ CREATE USER 'mysql.infoschema'@localhost IDENTIFIED WITH caching_sha2_password
  ACCOUNT LOCK;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.infoschema'@localhost;
 GRANT SELECT ON *.* TO 'mysql.infoschema'@localhost;
+<<<<<<< HEAD
 
 -- Create the PXC internal session user
 -- This user is used by PXC to run commands needed by PXC.
@@ -89,3 +90,7 @@ GRANT CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history
 GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 -- Need this to create the PERCONA_SCHEMA database if needed
 GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
+||||||| 7ddfdfe87b8
+=======
+GRANT SYSTEM_USER ON *.* TO 'mysql.infoschema'@localhost;
+>>>>>>> tag/Percona-Server-8.0.22-13

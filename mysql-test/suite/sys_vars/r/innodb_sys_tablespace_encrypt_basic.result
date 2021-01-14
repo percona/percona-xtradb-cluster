@@ -1,6 +1,6 @@
-Valid values are 'ON' and 'OFF'
-select @@global.innodb_sys_tablespace_encrypt in (0, 1);
-@@global.innodb_sys_tablespace_encrypt in (0, 1)
+Valid values are 'OFF', 'ON' and 'RE_ENCRYPTING_TO_KEYRING'
+select @@global.innodb_sys_tablespace_encrypt in ('OFF', 'ON', 'RE_ENCRYPTING_TO_KEYRING');
+@@global.innodb_sys_tablespace_encrypt in ('OFF', 'ON', 'RE_ENCRYPTING_TO_KEYRING')
 1
 Warnings:
 Warning	1292	Truncated incorrect DOUBLE value: 'OFF'
@@ -32,8 +32,16 @@ innodb_sys_tablespace_encrypt	OFF
 select * from performance_schema.session_variables where variable_name='innodb_sys_tablespace_encrypt';
 VARIABLE_NAME	VARIABLE_VALUE
 innodb_sys_tablespace_encrypt	OFF
+<<<<<<< HEAD
 set @@global.innodb_sys_tablespace_encrypt=0;
 ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '0'
+||||||| 7ddfdfe87b8
+set @@global.innodb_sys_tablespace_encrypt=0;
+ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a read only variable
+=======
+set global innodb_sys_tablespace_encrypt=1;
+ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '1'
+>>>>>>> tag/Percona-Server-8.0.22-13
 select @@global.innodb_sys_tablespace_encrypt;
 @@global.innodb_sys_tablespace_encrypt
 OFF
@@ -43,11 +51,31 @@ innodb_sys_tablespace_encrypt	OFF
 select * from performance_schema.session_variables where variable_name='innodb_sys_tablespace_encrypt';
 VARIABLE_NAME	VARIABLE_VALUE
 innodb_sys_tablespace_encrypt	OFF
+<<<<<<< HEAD
 set global innodb_sys_tablespace_encrypt=1;
 ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '1'
+||||||| 7ddfdfe87b8
+set global innodb_sys_tablespace_encrypt=1;
+ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a read only variable
+=======
+set @@session.innodb_sys_tablespace_encrypt='ON';
+ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a GLOBAL variable and should be set with SET GLOBAL
+set global innodb_sys_tablespace_encrypt='RE_ENCRYPTING_TO_KEYRING';
+ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of 'RE_ENCRYPTING_TO_KEYRING'
+>>>>>>> tag/Percona-Server-8.0.22-13
+select @@global.innodb_sys_tablespace_encrypt;
+@@global.innodb_sys_tablespace_encrypt
+<<<<<<< HEAD
+OFF
+||||||| 7ddfdfe87b8
+0
+=======
+OFF
+set @@global.innodb_sys_tablespace_encrypt=0;
 select @@global.innodb_sys_tablespace_encrypt;
 @@global.innodb_sys_tablespace_encrypt
 OFF
+>>>>>>> tag/Percona-Server-8.0.22-13
 select * from performance_schema.global_variables where variable_name='innodb_sys_tablespace_encrypt';
 VARIABLE_NAME	VARIABLE_VALUE
 innodb_sys_tablespace_encrypt	OFF
@@ -65,15 +93,33 @@ select * from performance_schema.session_variables where variable_name='innodb_s
 VARIABLE_NAME	VARIABLE_VALUE
 innodb_sys_tablespace_encrypt	OFF
 set session innodb_sys_tablespace_encrypt='OFF';
+<<<<<<< HEAD
 ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a GLOBAL variable and should be set with SET GLOBAL
 set @@session.innodb_sys_tablespace_encrypt='ON';
 ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a GLOBAL variable and should be set with SET GLOBAL
+||||||| 7ddfdfe87b8
+ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a read only variable
+set @@session.innodb_sys_tablespace_encrypt='ON';
+ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a read only variable
+=======
+ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a GLOBAL variable and should be set with SET GLOBAL
+>>>>>>> tag/Percona-Server-8.0.22-13
 set global innodb_sys_tablespace_encrypt=1.1;
 ERROR 42000: Incorrect argument type to variable 'innodb_sys_tablespace_encrypt'
 set global innodb_sys_tablespace_encrypt=1e1;
+<<<<<<< HEAD
 ERROR 42000: Incorrect argument type to variable 'innodb_sys_tablespace_encrypt'
 set global innodb_sys_tablespace_encrypt=2;
 ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '2'
+||||||| 7ddfdfe87b8
+ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a read only variable
+set global innodb_sys_tablespace_encrypt=2;
+ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a read only variable
+=======
+ERROR 42000: Incorrect argument type to variable 'innodb_sys_tablespace_encrypt'
+set global innodb_sys_tablespace_encrypt=3;
+ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '3'
+>>>>>>> tag/Percona-Server-8.0.22-13
 set global innodb_sys_tablespace_encrypt=-3;
 ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '-3'
 select @@global.innodb_sys_tablespace_encrypt;

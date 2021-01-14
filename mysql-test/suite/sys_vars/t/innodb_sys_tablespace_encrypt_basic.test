@@ -1,8 +1,8 @@
 #
 # exists as global only
 #
---echo Valid values are 'ON' and 'OFF'
-select @@global.innodb_sys_tablespace_encrypt in (0, 1);
+--echo Valid values are 'OFF', 'ON' and 'RE_ENCRYPTING_TO_KEYRING'
+select @@global.innodb_sys_tablespace_encrypt in ('OFF', 'ON', 'RE_ENCRYPTING_TO_KEYRING');
 select @@global.innodb_sys_tablespace_encrypt;
 --error ER_INCORRECT_GLOBAL_LOCAL_VAR
 select @@session.innodb_sys_tablespace_encrypt;
@@ -23,14 +23,39 @@ select @@global.innodb_sys_tablespace_encrypt;
 select * from performance_schema.global_variables where variable_name='innodb_sys_tablespace_encrypt';
 select * from performance_schema.session_variables where variable_name='innodb_sys_tablespace_encrypt';
 
+<<<<<<< HEAD
 --error ER_WRONG_VALUE_FOR_VAR
 set @@global.innodb_sys_tablespace_encrypt=0;
+||||||| 7ddfdfe87b8
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+set @@global.innodb_sys_tablespace_encrypt=0;
+=======
+--error ER_WRONG_VALUE_FOR_VAR
+set global innodb_sys_tablespace_encrypt=1;
+>>>>>>> tag/Percona-Server-8.0.22-13
 select @@global.innodb_sys_tablespace_encrypt;
 select * from performance_schema.global_variables where variable_name='innodb_sys_tablespace_encrypt';
 select * from performance_schema.session_variables where variable_name='innodb_sys_tablespace_encrypt';
 
+<<<<<<< HEAD
 --error ER_WRONG_VALUE_FOR_VAR
 set global innodb_sys_tablespace_encrypt=1;
+||||||| 7ddfdfe87b8
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+set global innodb_sys_tablespace_encrypt=1;
+=======
+--error ER_GLOBAL_VARIABLE
+set @@session.innodb_sys_tablespace_encrypt='ON';
+
+--error ER_WRONG_VALUE_FOR_VAR
+set global innodb_sys_tablespace_encrypt='RE_ENCRYPTING_TO_KEYRING';
+select @@global.innodb_sys_tablespace_encrypt;
+
+#
+# By default innodb_sys_tablespace_encrypt is OFF, so setting it to OFF again is OK 
+#
+set @@global.innodb_sys_tablespace_encrypt=0;
+>>>>>>> tag/Percona-Server-8.0.22-13
 select @@global.innodb_sys_tablespace_encrypt;
 select * from performance_schema.global_variables where variable_name='innodb_sys_tablespace_encrypt';
 select * from performance_schema.session_variables where variable_name='innodb_sys_tablespace_encrypt';
@@ -43,9 +68,16 @@ select * from performance_schema.session_variables where variable_name='innodb_s
 --error ER_GLOBAL_VARIABLE
 set session innodb_sys_tablespace_encrypt='OFF';
 
+<<<<<<< HEAD
 --error ER_GLOBAL_VARIABLE
 set @@session.innodb_sys_tablespace_encrypt='ON';
 
+||||||| 7ddfdfe87b8
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+set @@session.innodb_sys_tablespace_encrypt='ON';
+
+=======
+>>>>>>> tag/Percona-Server-8.0.22-13
 #
 # incorrect types
 #
@@ -55,8 +87,16 @@ set global innodb_sys_tablespace_encrypt=1.1;
 --error ER_WRONG_TYPE_FOR_VAR
 set global innodb_sys_tablespace_encrypt=1e1;
 
+<<<<<<< HEAD
 --error ER_WRONG_VALUE_FOR_VAR
 set global innodb_sys_tablespace_encrypt=2;
+||||||| 7ddfdfe87b8
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+set global innodb_sys_tablespace_encrypt=2;
+=======
+--error ER_WRONG_VALUE_FOR_VAR
+set global innodb_sys_tablespace_encrypt=3;
+>>>>>>> tag/Percona-Server-8.0.22-13
 
 --error ER_WRONG_VALUE_FOR_VAR
 set global innodb_sys_tablespace_encrypt=-3;

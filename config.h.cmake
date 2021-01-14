@@ -198,6 +198,7 @@
 #cmakedefine HAVE_LINUX_LARGE_PAGES 1
 #cmakedefine HAVE_SOLARIS_LARGE_PAGES 1
 #cmakedefine HAVE_SOLARIS_ATOMIC 1
+#cmakedefine WITH_SYSTEMD_DEBUG
 #define SYSTEM_TYPE "@SYSTEM_TYPE@"
 /* This should mean case insensitive file system */
 #cmakedefine FN_NO_CASE_SENSE 1
@@ -352,9 +353,18 @@
 /* coredumper library */
 #cmakedefine01 HAVE_LIBCOREDUMPER
 
+<<<<<<< HEAD
 /*
  * Needed by wsrep (WITH_WSREP)
  */
 #define HAVE_GETIFADDRS 1
 
+||||||| 7ddfdfe87b8
+=======
+
+/* From libmysql/CMakeLists.txt */
+#cmakedefine HAVE_UNIX_DNS_SRV @HAVE_UNIX_DNS_SRV@
+#cmakedefine HAVE_WIN32_DNS_SRV @HAVE_WIN32_DNS_SRV@
+
+>>>>>>> tag/Percona-Server-8.0.22-13
 #endif
