@@ -721,6 +721,9 @@ bool wsrep_desync_check(sys_var *, THD *thd, set_var *var) {
 bool wsrep_desync_update(sys_var *, THD *, enum_var_type) { return false; }
 
 bool wsrep_max_ws_size_update(sys_var *, THD *, enum_var_type) {
+  if (!Wsrep_server_state::instance().is_provider_loaded())
+    return false;
+
   char max_ws_size_opt[128];
   snprintf(max_ws_size_opt, sizeof(max_ws_size_opt), "repl.max_ws_size=%lu",
            wsrep_max_ws_size);

@@ -8407,6 +8407,20 @@ int mysqld_main(int argc, char **argv)
   start_signal_handler();
 #endif
 
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  /*
+    Initialize wsrep_provider before processing of persisted variables
+    allowing wsrep provider options related variables like
+    'wsrep_max_ws_size_update' to be persisted as well
+  */
+  if (!opt_initialize) {
+    wsrep_init_globals();
+    if (!wsrep_before_SE()) {
+      wsrep_init_startup(false);
+    }
+  }
+#endif /* WITH_WSREP */
+
   /* set all persistent options */
   if (persisted_variables_cache.set_persist_options()) {
     LogErr(ERROR_LEVEL, ER_CANT_SET_UP_PERSISTED_VALUES);
@@ -8426,11 +8440,6 @@ int mysqld_main(int argc, char **argv)
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
   if (!opt_initialize) {
-    wsrep_init_globals();
-    if (!wsrep_before_SE()) {
-      wsrep_init_startup(false);
-    }
-
     wsrep_create_appliers(wsrep_slave_threads - 1);
   }
 #endif /* WITH_WSREP */

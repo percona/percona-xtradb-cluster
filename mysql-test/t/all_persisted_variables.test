@@ -43,7 +43,7 @@ call mtr.add_suppression("\\[Warning\\] .*MY-\\d+.* Changing innodb_extend_and_i
 call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main");
 
 let $total_global_vars=`SELECT COUNT(*) FROM performance_schema.global_variables where variable_name NOT LIKE 'ndb_%'`;
-let $total_persistent_vars=463;
+let $total_persistent_vars=501;
 
 --echo ***************************************************************
 --echo * 0. Verify that variables present in performance_schema.global
@@ -65,6 +65,9 @@ CREATE TABLE global_vars (id INT PRIMARY KEY AUTO_INCREMENT, var_name VARCHAR(64
 # -> SET GLOBAL innodb_default_encryption_key_id = @@global.innodb_default_encryption_key_id;
 # ERROR 1231 (42000): Variable 'innodb_default_encryption_key_id' can't be set to the value of '0'
 
+# pxc_maint_mode pxc_strict_mode can be changed only if node is cluster-node
+# 'Variable 'wsrep_trx_fragment_size' can't be set to the value of '0''
+
 # Bug#27534122 - RBR_EXEC_MODE DOES NOT SUPPORT GLOBAL SCOPE
 INSERT INTO global_vars (var_name, var_value) SELECT * FROM
 performance_schema.global_variables WHERE variable_name NOT IN
@@ -73,7 +76,10 @@ performance_schema.global_variables WHERE variable_name NOT IN
 'innodb_monitor_reset',
 'innodb_monitor_reset_all',
 'innodb_default_encryption_key_id',
-'rbr_exec_mode');
+'rbr_exec_mode',
+'pxc_maint_mode',
+'pxc_strict_mode',
+'wsrep_trx_fragment_size');
 
 --let $count_vars= `SELECT COUNT(*) FROM global_vars;`
 --let $var_id=1
@@ -119,14 +125,17 @@ CREATE TABLE all_vars (id INT PRIMARY KEY AUTO_INCREMENT, var_name VARCHAR(64), 
 #
 # Once the bugs is fixed, below $bug_var_count must be modified along with the query.
 
---let $bug_var_count=2
+# pxc_maint_mode, pxc_strict_mode can be changed only if node is cluster-node
+--let $bug_var_count=4
 --expr $expected_var_count=$total_global_vars - $bug_var_count
 
 INSERT INTO all_vars (var_name, var_value)
 SELECT * FROM performance_schema.global_variables
 WHERE variable_name NOT IN
 ('innodb_default_encryption_key_id',
-'rbr_exec_mode')
+'rbr_exec_mode',
+'pxc_maint_mode',
+'pxc_strict_mode')
 AND variable_name NOT LIKE 'ndb_%'
 ORDER BY variable_name;
 
@@ -144,7 +153,9 @@ ORDER BY variable_name;
 while($var_id <= $count_vars)
 {
   --let $var_names= `SELECT var_name FROM all_vars WHERE id=$var_id;`
-  --error 0,ER_INCORRECT_GLOBAL_LOCAL_VAR,ER_WRONG_VALUE_FOR_VAR
+  --echo "variable: $var_names"
+  # ER_WRONG_ARGUMENTS - 'WSREP (galera) not started'
+  --error 0,ER_INCORRECT_GLOBAL_LOCAL_VAR,ER_WRONG_VALUE_FOR_VAR,ER_WRONG_ARGUMENTS
   --eval SET PERSIST $var_names = @@GLOBAL.$var_names
   --inc $var_id
 }
