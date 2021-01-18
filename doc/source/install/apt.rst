@@ -28,17 +28,9 @@ Prerequisites
    * 4567
    * 4568
 
-- If you previously had MySQL installed on the server, there might be an
-  `AppArmor <https://help.ubuntu.com/community/AppArmor>`_ profile which will
-  prevent |PXC| nodes from communicating with each other.  The best solution is
-  to remove the ``apparmor`` package entirely:
+.. seealso:: 
 
-   .. code-block:: bash
-
-      $ sudo apt-get remove apparmor
-
-  If you need to have AppArmor enabled due to security policies or for other
-  reasons, it is possible to disable or extend the MySQL profile.
+      For more information, see :ref:`apparmor`.
 
 Installing from Repository
 ==========================
