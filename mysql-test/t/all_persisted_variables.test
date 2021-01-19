@@ -153,7 +153,6 @@ ORDER BY variable_name;
 while($var_id <= $count_vars)
 {
   --let $var_names= `SELECT var_name FROM all_vars WHERE id=$var_id;`
-  --echo "variable: $var_names"
   # ER_WRONG_ARGUMENTS - 'WSREP (galera) not started'
   --error 0,ER_INCORRECT_GLOBAL_LOCAL_VAR,ER_WRONG_VALUE_FOR_VAR,ER_WRONG_ARGUMENTS
   --eval SET PERSIST $var_names = @@GLOBAL.$var_names

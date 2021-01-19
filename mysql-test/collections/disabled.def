@@ -37,36 +37,36 @@ innodb.innodb_bug14676111                         : BUG#18200831 The test has ne
 innodb.log_first_rec_group                        : Bug#29692047 Disable for now until we can find a better way to test this.
 innodb.fts_exec_interrupt                         : Bug#28534199 The test is unstable and should be rewritten
 innodb.slow_shutdown                              : Bug#31763837 mtr hits this debug assert post test run cleanup
-innodb.innodb_32k                                 : BUG#0 PXC requires 16k InnoDB page size
-innodb.innodb_64k                                 : BUG#0 PXC requires 16k InnoDB page size
-innodb.create_tablespace_4k                       : BUG#0 PXC requires 16k InnoDB page size
-innodb.create_tablespace_64k                      : BUG#0 PXC requires 16k InnoDB page size
-innodb.import_export_4k                           : BUG#0 PXC requires 16k InnoDB page size
-innodb.create_tablespace_8k                       : BUG#0 PXC requires 16k InnoDB page size
-innodb.create_tablespace_32k                      : BUG#0 PXC requires 16k InnoDB page size
-innodb.xdes_fseg_frag                             : BUG#0 PXC requires 16k InnoDB page size
-innodb.innodb_page_size_func                      : BUG#0 PXC requires 16k InnoDB page size
-innodb.innodb_pagesize_max_recordsize             : BUG#0 PXC requires 16k InnoDB page size
-innodb.mysqldump_max_recordsize                   : BUG#0 PXC requires 16k InnoDB page size
-innodb.blob-crash-4k                              : BUG#0 PXC requires 16k InnoDB page size
+innodb.innodb_32k                                 : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.innodb_64k                                 : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.create_tablespace_4k                       : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.create_tablespace_64k                      : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.import_export_4k                           : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.create_tablespace_8k                       : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.create_tablespace_32k                      : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.xdes_fseg_frag                             : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.innodb_page_size_func                      : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.innodb_pagesize_max_recordsize             : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.mysqldump_max_recordsize                   : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb.blob-crash-4k                              : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 
 # innodb_fts suite test
 innodb_fts.sync_block : BUG#2232 percona https://jira.percona.com/browse/PS-2232
 
 # innodb_zip
-innodb_zip.4k                                     : BUG#0 PXC requires 16k InnoDB page size
-innodb_zip.index_large_prefix_4k                  : BUG#0 PXC requires 16k InnoDB page size
-innodb_zip.8k                                     : BUG#0 PXC requires 16k InnoDB page size
-innodb_zip.index_large_prefix_8k                  : BUG#0 PXC requires 16k InnoDB page size
+innodb_zip.4k                                     : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb_zip.index_large_prefix_4k                  : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb_zip.8k                                     : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb_zip.index_large_prefix_8k                  : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 
 # innodb_undo
-innodb_undo.i_s_files_64k                         : BUG#0 PXC requires 16k InnoDB page size
-innodb_undo.i_s_files_4k                          : BUG#0 PXC requires 16k InnoDB page size
-innodb_undo.i_s_files_8k                          : BUG#0 PXC requires 16k InnoDB page size
-innodb_undo.i_s_files_32k                         : BUG#0 PXC requires 16k InnoDB page size
+innodb_undo.i_s_files_64k                         : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb_undo.i_s_files_4k                          : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb_undo.i_s_files_8k                          : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+innodb_undo.i_s_files_32k                         : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 
 # innodb_gis
-innodb_gis.gis_split_nan                          : BUG#0 PXC requires 16k InnoDB page size
+innodb_gis.gis_split_nan                          : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 
 # keyring tests
 keyring_encrypted_file.keyring_migration_bugs @darwin : Bug#31041633
@@ -285,6 +285,7 @@ galera.galera_toi_ddl_fk_insert : BUG#0 CODERSHIP qa#39 test fails sporadically 
 
 # encryption
 # Probably we should use upstream version of encryption tests for PXC
+# https://jira.percona.com/browse/PXC-3557
 encryption.percona_parallel_dblwr_encrypt                               : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 encryption.percona_system_key_with_srv_guuid                            : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 encryption.innodb-first-page-read                                       : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
@@ -339,7 +340,7 @@ encryption.upgrade_crypt_data_v2					: BUG#0 PXC does not support KEYRING and ON
 encryption.innodb-spatial-index                                         : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 encryption.innodb_alter_mk_to_rk                                        : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 encryption.upgrade_crypt_data_v1                                        : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
-encryption.innodb-page_encryption-32k                                   : BUG#0 PXC requires 16k InnoDB page size
+encryption.innodb-page_encryption-32k                                   : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
 
 # auth_sec
 auth_sec.wrong_keyring_file_data                                        : BUG#0 PXC needs keyring_file/keyring_vault to load without errors
