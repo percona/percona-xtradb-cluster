@@ -152,11 +152,7 @@ The installation adds the following variables:
       - yes
       - string
 
-.. warning::
 
-    The password for the root distinguished name can be read by anyone able to
-    access the server.
-    
 For simple LDAP authentication, you must specify the authentication_ldap_simple
 plugin in the ``CREATE USER`` statement or the ``ALTER USER`` statement.
 

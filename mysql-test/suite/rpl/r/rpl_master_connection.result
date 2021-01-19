@@ -6,6 +6,8 @@ Note	####	Storing MySQL user name or password information in the master info rep
 SET SQL_LOG_BIN=0;
 SELECT user, plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys','mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 CREATE USER 'plug_user_p' IDENTIFIED WITH 'test_plugin_server' AS 'proxy_user_p';
 CREATE USER 'plug_user_wp' IDENTIFIED WITH 'test_plugin_server' AS 'proxy_user_wp';
 CREATE USER 'proxy_user_p' IDENTIFIED BY 'password';
@@ -14,6 +16,8 @@ CREATE USER 'regular_user_p' IDENTIFIED BY 'password';
 CREATE USER 'regular_user_wp' IDENTIFIED BY '';
 SELECT user, plugin FROM mysql.user WHERE user NOT IN ('root', 'mysql.sys','mysql.session', 'mysql.infoschema');
 user	plugin
+mysql.pxc.internal.session	caching_sha2_password
+mysql.pxc.sst.role	caching_sha2_password
 plug_user_p	test_plugin_server
 plug_user_wp	test_plugin_server
 proxy_user_p	caching_sha2_password
@@ -40,31 +44,37 @@ START SLAVE SQL_THREAD USER= 'regular_user_p' PASSWORD= 'password' DEFAULT_AUTH=
 ERROR HY000: Setting authentication options is not possible when only the Slave SQL Thread is being started.
 START SLAVE IO_THREAD USER= 'regular_user_p' PASSWORD= 'password';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_io_to_start.inc
 include/stop_slave_io.inc
 START SLAVE IO_THREAD USER= 'regular_user_p' PASSWORD= 'password' DEFAULT_AUTH= 'auth_test_plugin';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_io_to_start.inc
 include/stop_slave_io.inc
 START SLAVE IO_THREAD USER= 'regular_user_p' PASSWORD= 'password' DEFAULT_AUTH= 'auth_test_plugin' PLUGIN_DIR= 'PLUGIN_AUTH_DIR';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_io_to_start.inc
 include/stop_slave_io.inc
 START SLAVE IO_THREAD, SQL_THREAD USER= 'regular_user_p' PASSWORD= 'password';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_io_to_start.inc
 include/stop_slave_io.inc
 START SLAVE IO_THREAD, SQL_THREAD USER= 'regular_user_p' PASSWORD= 'password' DEFAULT_AUTH= 'auth_test_plugin';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_io_to_start.inc
 include/stop_slave_io.inc
 START SLAVE IO_THREAD, SQL_THREAD USER= 'regular_user_p' PASSWORD= 'password' DEFAULT_AUTH= 'auth_test_plugin' PLUGIN_DIR= 'PLUGIN_AUTH_DIR';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_io_to_start.inc
 include/stop_slave_io.inc
@@ -75,6 +85,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'regular_user_p' PASSWORD= 'password';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -85,6 +96,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'regular_user_wp' PASSWORD= '';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -95,6 +107,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'regular_user_p' PASSWORD= 'password';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -105,6 +118,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'regular_user_wp' PASSWORD= '';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -115,6 +129,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'regular_user_wp';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -125,6 +140,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'plug_user_p' PASSWORD= 'proxy_user_p';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -135,6 +151,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'plug_user_wp' PASSWORD= 'proxy_user_wp';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -145,6 +162,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'plug_user_p' PASSWORD= 'proxy_user_p' PLUGIN_DIR= 'PLUGIN_AUTH_DIR';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -155,6 +173,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'plug_user_wp' PASSWORD= 'proxy_user_wp' PLUGIN_DIR= 'PLUGIN_AUTH_DIR';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -165,6 +184,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'plug_user_p' PASSWORD= 'proxy_user_p' DEFAULT_AUTH= 'auth_test_plugin';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -175,6 +195,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'plug_user_wp' PASSWORD= 'proxy_user_wp' DEFAULT_AUTH= 'auth_test_plugin';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -185,6 +206,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'plug_user_p' PASSWORD= 'proxy_user_p' DEFAULT_AUTH= 'auth_test_plugin' PLUGIN_DIR= 'PLUGIN_AUTH_DIR';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -195,6 +217,7 @@ Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
 START SLAVE USER= 'plug_user_wp' PASSWORD= 'proxy_user_wp' DEFAULT_AUTH= 'auth_test_plugin' PLUGIN_DIR= 'PLUGIN_AUTH_DIR';
 Warnings:
+Warning	####	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
@@ -221,6 +244,8 @@ Note	####	Storing MySQL user name or password information in the master info rep
 include/start_slave.inc
 include/stop_slave.inc
 START SLAVE USER= 'root' PASSWORD= '';
+Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 include/wait_for_slave_to_start.inc
 include/check_slave_is_running.inc
 SET @old_log_output= @@log_output;

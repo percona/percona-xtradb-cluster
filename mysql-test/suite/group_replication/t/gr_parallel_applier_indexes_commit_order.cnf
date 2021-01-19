@@ -2,6 +2,9 @@
 
 [mysqld]
 loose-group_replication_auto_increment_increment= 1
+slave_parallel_type= LOGICAL_CLOCK
+slave_parallel_workers= 4
+slave_preserve_commit_order= ON
 
 [mysqld.3]
 

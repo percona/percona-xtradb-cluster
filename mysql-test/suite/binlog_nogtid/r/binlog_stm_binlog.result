@@ -511,6 +511,8 @@ SHOW SESSION VARIABLES LIKE "%_checks";
 Variable_name	Value
 foreign_key_checks	ON
 unique_checks	ON
+wsrep_slave_FK_checks	ON
+wsrep_slave_UK_checks	OFF
 
 SET @@SESSION.foreign_key_checks= OFF;
 SET @@SESSION.unique_checks= OFF;
@@ -529,6 +531,8 @@ SHOW SESSION VARIABLES LIKE "%_checks";
 Variable_name	Value
 foreign_key_checks	OFF
 unique_checks	OFF
+wsrep_slave_FK_checks	ON
+wsrep_slave_UK_checks	OFF
 # INSERT INTO t1 VALUES(2)
 # foreign_key_checks=1 and unique_checks=1
 # It should not change current session's variables, even error happens
@@ -547,4 +551,6 @@ SHOW SESSION VARIABLES LIKE "%_checks";
 Variable_name	Value
 foreign_key_checks	OFF
 unique_checks	OFF
+wsrep_slave_FK_checks	ON
+wsrep_slave_UK_checks	OFF
 DROP TABLE t1;

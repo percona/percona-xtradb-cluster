@@ -1,5 +1,6 @@
 START SLAVE USER='root';
 Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES(1);
@@ -48,4 +49,8 @@ mysqld-bin.000004	586	Write_rows	1	626	table_id: # flags: STMT_END_F
 mysqld-bin.000004	626	Xid	1	657	COMMIT /* xid=4 */
 DROP TABLE t1;
 STOP SLAVE;
+Warnings:
+Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
 RESET SLAVE ALL;
+Warnings:
+Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead

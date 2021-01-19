@@ -1,9 +1,7 @@
-Valid values are 'ON' and 'OFF'
-select @@global.innodb_sys_tablespace_encrypt in (0, 1);
-@@global.innodb_sys_tablespace_encrypt in (0, 1)
+Valid values are 'OFF', 'ON' and 'RE_ENCRYPTING_TO_KEYRING'
+select @@global.innodb_sys_tablespace_encrypt in ('OFF', 'ON', 'RE_ENCRYPTING_TO_KEYRING');
+@@global.innodb_sys_tablespace_encrypt in ('OFF', 'ON', 'RE_ENCRYPTING_TO_KEYRING')
 1
-Warnings:
-Warning	1292	Truncated incorrect DOUBLE value: 'OFF'
 select @@global.innodb_sys_tablespace_encrypt;
 @@global.innodb_sys_tablespace_encrypt
 OFF
@@ -32,8 +30,8 @@ innodb_sys_tablespace_encrypt	OFF
 select * from performance_schema.session_variables where variable_name='innodb_sys_tablespace_encrypt';
 VARIABLE_NAME	VARIABLE_VALUE
 innodb_sys_tablespace_encrypt	OFF
-set @@global.innodb_sys_tablespace_encrypt=0;
-ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '0'
+set global innodb_sys_tablespace_encrypt=1;
+ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '1'
 select @@global.innodb_sys_tablespace_encrypt;
 @@global.innodb_sys_tablespace_encrypt
 OFF
@@ -43,8 +41,14 @@ innodb_sys_tablespace_encrypt	OFF
 select * from performance_schema.session_variables where variable_name='innodb_sys_tablespace_encrypt';
 VARIABLE_NAME	VARIABLE_VALUE
 innodb_sys_tablespace_encrypt	OFF
-set global innodb_sys_tablespace_encrypt=1;
-ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '1'
+set @@session.innodb_sys_tablespace_encrypt='ON';
+ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a GLOBAL variable and should be set with SET GLOBAL
+set global innodb_sys_tablespace_encrypt='RE_ENCRYPTING_TO_KEYRING';
+ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of 'RE_ENCRYPTING_TO_KEYRING'
+select @@global.innodb_sys_tablespace_encrypt;
+@@global.innodb_sys_tablespace_encrypt
+OFF
+set @@global.innodb_sys_tablespace_encrypt=0;
 select @@global.innodb_sys_tablespace_encrypt;
 @@global.innodb_sys_tablespace_encrypt
 OFF
@@ -66,14 +70,12 @@ VARIABLE_NAME	VARIABLE_VALUE
 innodb_sys_tablespace_encrypt	OFF
 set session innodb_sys_tablespace_encrypt='OFF';
 ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a GLOBAL variable and should be set with SET GLOBAL
-set @@session.innodb_sys_tablespace_encrypt='ON';
-ERROR HY000: Variable 'innodb_sys_tablespace_encrypt' is a GLOBAL variable and should be set with SET GLOBAL
 set global innodb_sys_tablespace_encrypt=1.1;
 ERROR 42000: Incorrect argument type to variable 'innodb_sys_tablespace_encrypt'
 set global innodb_sys_tablespace_encrypt=1e1;
 ERROR 42000: Incorrect argument type to variable 'innodb_sys_tablespace_encrypt'
-set global innodb_sys_tablespace_encrypt=2;
-ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '2'
+set global innodb_sys_tablespace_encrypt=3;
+ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '3'
 set global innodb_sys_tablespace_encrypt=-3;
 ERROR 42000: Variable 'innodb_sys_tablespace_encrypt' can't be set to the value of '-3'
 select @@global.innodb_sys_tablespace_encrypt;

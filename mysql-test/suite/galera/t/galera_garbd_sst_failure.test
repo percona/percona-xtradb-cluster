@@ -105,7 +105,7 @@ SET DEBUG_SYNC='now wait_for read_xid';
 
 --echo #
 --echo # 7. Verify that the reason for the shutdown is logged in the garbd log.
---let $assert_select= Garbd exiting with error: State transfer request failed: 113 \(No route to host\)
+--let $assert_select= Garbd exiting with error: Receiving from group failed: 77 \(File descriptor in bad state\)
 --let $assert_text= Appropriate message has been written to the garbd log explaining the reason for the shutdown.
 --let $assert_count= 1
 --let $assert_file= $GARBD_LOG_FILE

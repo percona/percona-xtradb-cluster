@@ -1,6 +1,7 @@
 # connection node_2 : starting async slave
 START SLAVE USER='root';
 Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #
 # Test preparation
@@ -1490,7 +1491,11 @@ include/assert.inc ['db1 is not on node_3']
 #
 # connection node_2
 STOP SLAVE;
+Warnings:
+Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
 RESET SLAVE ALL;
+Warnings:
+Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 # connection node_1
 RESET MASTER;
 call mtr.add_suppression("Pending to replicate MySQL GTID event.*");

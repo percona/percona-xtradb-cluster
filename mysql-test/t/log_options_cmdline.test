@@ -18,7 +18,7 @@ CREATE TABLE t1(a int);
 # 1.1 Set log_error_verbosity= 1 
 #-------------------------------
 --let LOG_FILE1= $MYSQLTEST_VARDIR/tmp/test1.err
---let restart_parameters="restart: --log-error=$LOG_FILE1 --log-error-verbosity=1 --binlog-format=statement"
+--let restart_parameters="restart: --log-error=$LOG_FILE1 --log-error-verbosity=1 --wsrep-min-log-verbosity=1 --binlog-format=statement"
 --replace_result $LOG_FILE1 LOG_FILE1
 --source include/restart_mysqld.inc
 
@@ -34,7 +34,7 @@ connect(con1,localhost,unknown_user,,*NO-ONE*);
 # 1.2 Set log_error_verbosity= 2 
 #-------------------------------
 --let LOG_FILE2= $MYSQLTEST_VARDIR/tmp/test2.err
---let restart_parameters="restart: --log-error=$LOG_FILE2 --log-error-verbosity=2 --binlog-format=statement"
+--let restart_parameters="restart: --log-error=$LOG_FILE2 --log-error-verbosity=2 --wsrep-min-log-verbosity=1 --binlog-format=statement"
 --replace_result $LOG_FILE2 LOG_FILE2
 --source include/restart_mysqld.inc
 
@@ -50,7 +50,7 @@ connect(con2,localhost,unknown_user,,*NO-ONE*);
 # 1.3 Set log_error_verbosity= 3
 #-------------------------------
 --let LOG_FILE3= $MYSQLTEST_VARDIR/tmp/test3.err
---let restart_parameters="restart: --log-error=$LOG_FILE3 --log-error-verbosity=3 --binlog-format=statement"
+--let restart_parameters="restart: --log-error=$LOG_FILE3 --log-error-verbosity=3 --wsrep-min-log-verbosity=1 --binlog-format=statement"
 --replace_result $LOG_FILE3 LOG_FILE3
 --source include/restart_mysqld.inc
 
@@ -73,21 +73,21 @@ DROP TABLE t1;
 #      minimum - 1)
 #-----------------------------------------------------
 --let LOG_FILE4 = $MYSQLTEST_VARDIR/tmp/bootstrap1.err
---let CMD1= $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE4 --log-error-verbosity=-1 2>&1
+--let CMD1= $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE4 --log-error-verbosity=-1 --wsrep-min-log-verbosity=1 2>&1
 --exec $CMD1
 --force-rmdir $MYSQLTEST_VARDIR/tmp/new_datadir
 
 # 2.2. Set verbosity to 1 explicitly with --initialize
 #-----------------------------------------------------
 --let LOG_FILE5 = $MYSQLTEST_VARDIR/tmp/bootstrap3.err
---let CMD3 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE5 --log-error-verbosity=1 2>&1
+--let CMD3 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE5 --log-error-verbosity=1 --wsrep-min-log-verbosity=1 2>&1
 --exec $CMD3
 --force-rmdir $MYSQLTEST_VARDIR/tmp/new_datadir
 
 # 2.3. Set verbosity to 2 explicitly with --initialize
 #-----------------------------------------------------
 --let LOG_FILE6 = $MYSQLTEST_VARDIR/tmp/bootstrap2.err
---let CMD2 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE6 --log-error-verbosity=2 2>&1
+--let CMD2 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE6 --log-error-verbosity=2 --wsrep-min-log-verbosity=1 2>&1
 --exec $CMD2
 --force-rmdir $MYSQLTEST_VARDIR/tmp/new_datadir
 
@@ -95,7 +95,7 @@ DROP TABLE t1;
 #      to 3)
 #-----------------------------------------------------
 --let LOG_FILE7 = $MYSQLTEST_VARDIR/tmp/bootstrap4.err
---let CMD4 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE7 --log-error-verbosity=7 2>&1
+--let CMD4 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE7 --log-error-verbosity=7 --wsrep-min-log-verbosity=1 2>&1
 --exec $CMD4
 --force-rmdir $MYSQLTEST_VARDIR/tmp/new_datadir
 
@@ -110,7 +110,7 @@ DROP TABLE t1;
 --let LOG_FILE8 = $MYSQLTEST_VARDIR/tmp/wl9344.err
 --let $MSG_DIR = $MYSQLTEST_VARDIR/tmp/empty_lcmsgsdir
 --mkdir $MSG_DIR
---let restart_parameters="restart: --log-error=$LOG_FILE8 --lc-messages-dir=$MSG_DIR --log-error-verbosity=3"
+--let restart_parameters="restart: --log-error=$LOG_FILE8 --lc-messages-dir=$MSG_DIR --log-error-verbosity=3 --wsrep-min-log-verbosity=1"
 --replace_result $LOG_FILE8 LOG_FILE8 $MSG_DIR MSG_DIR
 --source include/restart_mysqld.inc
 --replace_result $MASTER_MYSOCK MASTER_SOCKET $MASTER_MYPORT MASTER_PORT
@@ -146,7 +146,7 @@ connect(con4,localhost,unknown_user,,*NO-ONE*);
 # --------------------------------------------------------
 # Below check is to see that the server doesn't abort
 --let LOG_FILE9= $MYSQLTEST_VARDIR/tmp/test9.err
---let restart_parameters="restart: --log-error=$LOG_FILE9 --log-error-verbosity=3 --log-error-services=abcd "
+--let restart_parameters="restart: --log-error=$LOG_FILE9 --log-error-verbosity=3 --wsrep-min-log-verbosity=1 --log-error-services=abcd "
 --replace_result $LOG_FILE9 LOG_FILE9
 --source include/restart_mysqld.inc
 SELECT @@GLOBAL.LOG_ERROR_SERVICES;
@@ -168,7 +168,7 @@ SET GLOBAL LOG_ERROR_SERVICES=@@GLOBAL.LOG_ERROR_SERVICES;
 # Below check is to see that the server doesn't abort and that
 # log_error_services is reset to default
 --let LOG_FILE10= $MYSQLTEST_VARDIR/tmp/test10.err
---let restart_parameters="restart: --log-error=$LOG_FILE10 --log-error-verbosity=3 --log-error-services=log_sink_json "
+--let restart_parameters="restart: --log-error=$LOG_FILE10 --log-error-verbosity=3 --wsrep-min-log-verbosity=1 --log-error-services=log_sink_json "
 --replace_result $LOG_FILE10 LOG_FILE10
 --source include/restart_mysqld.inc
 

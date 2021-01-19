@@ -42,7 +42,7 @@ while($i)
   # Stop slave and set debug variables
   eval SET @@global.debug="+d,$debug_name";
 
-  START SLAVE;
+  START REPLICA;
   # Crash if error during slave starting takes place
   let $rpl_allow_error= 0;
   source include/wait_for_slave_io_to_start.inc;

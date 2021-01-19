@@ -61,7 +61,12 @@
 #define PFS_MAX_RWLOCK_CLASS 70
 #endif
 #ifndef PFS_MAX_COND_CLASS
+#ifdef WITH_WSREP
+/* Max value for PXC builds */
+#define PFS_MAX_COND_CLASS 120
+#else
 #define PFS_MAX_COND_CLASS 100
+#endif /* WITH_WSREP */
 #endif
 #ifndef PFS_MAX_THREAD_CLASS
 #define PFS_MAX_THREAD_CLASS 100
@@ -128,6 +133,9 @@ struct PFS_global_param {
   bool m_consumer_global_instrumentation_enabled;
   bool m_consumer_thread_instrumentation_enabled;
   bool m_consumer_statement_digest_enabled;
+
+  /** True if SHOW PROCESSLIST is enabeld in the performance schema. */
+  bool m_processlist_enabled;
 
   /** Default instrument configuration option. */
   char *m_pfs_instrument;
@@ -291,6 +299,14 @@ struct PFS_global_param {
   This global variable is set when parsing server startup options.
 */
 extern PFS_global_param pfs_param;
+
+/**
+  Global flag used to enable and disable SHOW PROCESSLIST in the
+  performance schema. This flag only takes effect if the performance schema
+  is configured to support SHOW PROCESSLIST.
+  @sa performance-schema-enable-processlist
+*/
+extern bool pfs_processlist_enabled;
 
 /**
   Null initialization.

@@ -250,7 +250,7 @@ INSERT INTO global_suppressions VALUES
  ("\\[GCS\\] Error on opening a connection to localhost:.* on local port: .*."),
  ("\\[GCS\\] Error pushing message into group communication engine."),
  ("\\[GCS\\] Message cannot be sent because the member does not belong to a group."),
- ("\\[GCS\\] Automatically adding IPv. localhost address to the whitelist. It is mandatory that it is added."),
+ ("\\[GCS\\] Automatically adding IPv. localhost address to the allowlist. It is mandatory that it is added."),
  ("\\[GCS\\] Unable to bind to INADDR_ANY:.*"),
  ("\\[GCS\\] Unable to announce tcp port .*. Port already in use\\?"),
  ("\\[GCS\\] Error joining the group while waiting for the network layer to become ready."),
@@ -365,6 +365,29 @@ INSERT INTO global_suppressions VALUES
    TLS warnings
  */
  ("Channel mysql_main configured to support TLS"),
+
+ /*
+   systemd debug (when built WITH_SYSTEMD and WITH_SYSTEMD_DEBUG,
+   and systemd logging is not actually available)
+ */
+ ("NOTIFY_SOCKET not set in environment. sd_notify messages will not be sent!"),
+ ("Invalid systemd notify socket, cannot send: "),
+
+ /*
+   Warnings/errors seen while using group replication with Percona XtraDB Cluster
+ */
+ ("Using group replication with Percona XtraDB Cluster is only supported for migration"),
+
+ /*
+   Warnings from Clone plugin
+
+   In PXC, the table mtr.test_suppressions is created as MyISAM to avoid
+   replication of suppression added to one node to other nodes of the cluster.
+ */
+ ("Non innodb table: mtr.test_suppressions is not cloned and is empty."),
+ ("Clone removing all user data for provisioning: Started"),
+ ("Clone removing all user data for provisioning: Finished"),
+ ("\\[Warning\\] .*Non innodb table: .* is not cloned and is empty."),
 
  ("THE_LAST_SUPPRESSION");
 

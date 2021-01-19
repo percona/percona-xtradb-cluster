@@ -3,6 +3,7 @@
 * available on all platforms.
 ***********************************************************************
 call mtr.add_suppression("Failed to set up SSL because of the following SSL library error");
+call mtr.add_suppression("\\[Warning\\] .*MY-\\d+.* Changing innodb_extend_and_initialize not supported on this platform.");
 call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main");
 ***************************************************************
 * 0. Verify that variables present in performance_schema.global
@@ -17,7 +18,10 @@ performance_schema.global_variables WHERE variable_name NOT IN
 'innodb_monitor_reset',
 'innodb_monitor_reset_all',
 'innodb_default_encryption_key_id',
-'rbr_exec_mode');
+'rbr_exec_mode',
+'pxc_maint_mode',
+'pxc_strict_mode',
+'wsrep_trx_fragment_size');
 ************************************************************
 * 1. Check that there are no persisted variable settings.
 ************************************************************
@@ -32,7 +36,9 @@ INSERT INTO all_vars (var_name, var_value)
 SELECT * FROM performance_schema.global_variables
 WHERE variable_name NOT IN
 ('innodb_default_encryption_key_id',
-'rbr_exec_mode')
+'rbr_exec_mode',
+'pxc_maint_mode',
+'pxc_strict_mode')
 AND variable_name NOT LIKE 'ndb_%'
 ORDER BY variable_name;
 
@@ -40,7 +46,7 @@ include/assert.inc [Expect 500+ variables in the table. Due to open Bugs, we are
 
 # Test SET PERSIST
 
-include/assert.inc [Expect 457 persisted variables in the table.]
+include/assert.inc [Expect 501 persisted variables in the table.]
 
 ************************************************************
 * 3. Restart server, it must preserve the persisted variable
@@ -48,9 +54,9 @@ include/assert.inc [Expect 457 persisted variables in the table.]
 ************************************************************
 # restart
 
-include/assert.inc [Expect 457 persisted variables in persisted_variables table.]
-include/assert.inc [Expect 457 persisted variables shown as PERSISTED in variables_info table.]
-include/assert.inc [Expect 457 persisted variables with matching peristed and global values.]
+include/assert.inc [Expect 501 persisted variables in persisted_variables table.]
+include/assert.inc [Expect 501 persisted variables shown as PERSISTED in variables_info table.]
+include/assert.inc [Expect 501 persisted variables with matching peristed and global values.]
 
 ************************************************************
 * 4. Test RESET PERSIST IF EXISTS. Verify persisted variable

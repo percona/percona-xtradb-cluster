@@ -4,7 +4,7 @@
 #
 # $wait_counter - can be set before calling the script, will be reset at the end
 #
-# $explicit_default_counter - can be set before calling the script,
+# $explicit_default_wait_counter - can be set before calling the script,
 #                             reset only at the end of the test, overrides $wait_counter
 #
 # $add_wait_counter - can be set before calling the script,
@@ -20,9 +20,9 @@
 --disable_query_log
 
 --let $counter= 1000
-if ($explicit_default_counter)
+if ($explicit_default_wait_counter)
 {
-  --let $wait_counter= $explicit_default_counter
+  --let $wait_counter= $explicit_default_wait_counter
 }
 if ($VALGRIND_TEST) {
   --let $wait_counter= 30000
@@ -49,7 +49,7 @@ while ($mysql_errno)
   # while being shutdown, thus 1040 is an "allowed" error
   # See BUG#36228
   --error 0,1040,1047,1053,1205,2002,2003,2006,2013,1045,ER_CANNOT_FIND_KEY_IN_KEYRING,ER_SECURE_TRANSPORT_REQUIRED,2016,2017
-  show sESsion status;
+  show session status;
   if ($mysql_errno == 1045){
     --let mysql_errno=0
   }
@@ -101,7 +101,7 @@ if ($SECONDARY_ENGINE_TEST) {
 
 # Reset $wait_counter so that its value won't be used on subsequent
 # calls, and default will be used instead.
-if (!$explicit_default_counter)
+if (!$explicit_default_wait_counter)
 {
   --let $wait_counter= 0
 }

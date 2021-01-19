@@ -2,6 +2,7 @@ use test;
 CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=<PORT>;;
 START SLAVE USER='root';
 Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #node-1
 select @@server_id;
@@ -40,9 +41,12 @@ select count(*) from mysql.t;
 count(*)
 NUMBER_OF_ROWS
 STOP SLAVE;
+Warnings:
+Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
 CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=<PORT>;;
 START SLAVE USER='root';
 Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #node-2
 # restart
@@ -58,4 +62,8 @@ ERROR 42S02: Table 'mysql.t' doesn't exist
 use test;
 drop event foo;
 STOP SLAVE;
+Warnings:
+Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
 RESET SLAVE ALL;
+Warnings:
+Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
