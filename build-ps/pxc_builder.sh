@@ -154,7 +154,14 @@ get_sources(){
     WSREP_REV="$(test -r WSREP-REVISION && cat WSREP-REVISION)"
     REVISION=$(git rev-parse --short HEAD)
     GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
-    source VERSION
+    if [ -f VERSION ]; then
+        source VERSION
+    elif [ -f MYSQL_VERSION ]; then
+        source MYSQL_VERSION
+    else
+        echo "VERSION file does not exist"
+       exit 1
+    fi
     export MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
     export MYSQL_RELEASE="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 
