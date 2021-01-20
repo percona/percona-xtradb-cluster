@@ -5,6 +5,7 @@
 .. toctree::
    :maxdepth: 1
 
+   Percona-XtraDB-Cluster 8.0.22-13.1
    Percona-XtraDB-Cluster-8.0.21-12.1
    Percona-XtraDB-Cluster-8.0.20-11.3
    Percona-XtraDB-Cluster-8.0.20-11.2
