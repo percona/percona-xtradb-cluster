@@ -84,7 +84,7 @@ DUMP_DATABASES="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
 $AUTH -S$WSREP_SST_OPT_SOCKET \
 --add-drop-database --add-drop-table --skip-add-locks --create-options \
 --disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
---skip-comments --flush-privileges --all-databases --events"
+--skip-comments --flush-privileges --all-databases --events --routines"
 
 # NOTE: mysqldump --all-databases does not dump (for some reason) mysql.gtid_executed
 # we have to dump it separately here
