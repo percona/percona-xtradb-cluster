@@ -688,7 +688,7 @@ mkdir debug
 %endif
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
-           -DWITH_ZLIB=system \
+           -DWITH_ZLIB=bundled \
            -DWITH_READLINE=system \
            -DWITHOUT_TOKUDB=ON \
            -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
@@ -703,7 +703,6 @@ mkdir debug
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
-           -DWITH_ZLIB=system \
            -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
@@ -728,7 +727,7 @@ mkdir release
 %endif
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
-           -DWITH_ZLIB=system \
+           -DWITH_ZLIB=bundled \
            -DWITH_READLINE=system \
            -DWITHOUT_TOKUDB=ON \
            -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
@@ -743,7 +742,6 @@ mkdir release
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
-           -DWITH_ZLIB=system \
            -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
