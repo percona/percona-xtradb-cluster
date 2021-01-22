@@ -9861,6 +9861,7 @@ err:
     to NULL.
   */
   delete thd;
+  delete static_cast<Wsrep_thd_args*>(arg);
 
   my_thread_end();
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
