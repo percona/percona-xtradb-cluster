@@ -284,19 +284,19 @@ install_deps() {
         percona-release enable tools testing
         add_percona_yum_repo
         if [ "x${RHEL}" = "x8" ]; then
-            yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++
+            yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++ make
             yum -y install git gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
             yum -y install libstdc++-devel libtirpc-devel make ncurses-devel numactl-devel
             yum -y install openldap-devel openssl-devel pam-devel perl perl-Data-Dumper
             yum -y install perl-Dig perl-Digest perl-Digest-MD5 perl-Env perl-JSON perl-Time-HiRes
-            yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel
+            yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel selinux-policy-devel
             wget https://rpmfind.net/linux/fedora/linux/releases/29/Everything/x86_64/os/Packages/r/rpcgen-1.4-1.fc29.x86_64.rpm
             yum -y install rpcgen-1.4-1.fc29.x86_64.rpm
         else
             yum -y install epel-release
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc zstd zstd-devel
-            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel
-            yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static
+            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel make
+            yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static selinux-policy-devel
             yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
             until yum -y install centos-release-scl; do
                 echo "waiting"
@@ -319,10 +319,11 @@ install_deps() {
         fi
         yum -y install yum-utils patchelf
     else
+        apt-get -y update
+        DEBIAN_FRONTEND=noninteractive apt-get -y install curl lsb-release wget apt-transport-https software-properties-common
         apt-get -y install dirmngr || true
         apt-get update
         apt-get -y install dirmngr || true
-        apt-get -y install lsb-release wget
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools testing
         export DEBIAN_FRONTEND="noninteractive"
@@ -626,6 +627,7 @@ build_source_deb(){
     sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" debian/rules
     sed -i "s:@@DEB_RELEASE@@:${DEB_RELEASE}:g" debian/rules
 
+    sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
 
     dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}"
     dpkg-buildpackage -S
