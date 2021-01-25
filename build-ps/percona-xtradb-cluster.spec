@@ -1721,6 +1721,7 @@ fi
 %doc $RPM_BUILD_DIR/%{src_dir}/router/README.router  $RPM_BUILD_DIR/%{src_dir}/router/LICENSE.router
 %dir %{_sysconfdir}/mysqlrouter
 %config(noreplace) %{_sysconfdir}/mysqlrouter/mysqlrouter.conf
+%attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysqlrouter
 %{_bindir}/mysqlrouter
 %{_bindir}/mysqlrouter_keyring
 %{_bindir}/mysqlrouter_plugin_info
@@ -1733,11 +1734,13 @@ fi
 %{_sysconfdir}/init.d/mysqlrouter
 %endif
 %{_libdir}/mysqlrouter/private/libmysqlharness.so.*
+%{_libdir}/mysqlrouter/private/libmysqlharness_stdx.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_backend.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
 %{_libdir}/mysqlrouter/private/libprotobuf-lite.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_io_component.so.*
 %dir %{_libdir}/mysqlrouter
 %dir %{_libdir}/mysqlrouter/private
 %{_libdir}/mysqlrouter/*.so*
