@@ -959,26 +959,8 @@ recv_joiner()
     pushd ${dir} 1>/dev/null
     set +e
 
-<<<<<<< HEAD
     if [[ $tmt -gt 0 ]];then 
          RC=(`interruptable_timeout $tmt "$msg" "$tcmd | $strmcmd"`)
-||||||| merged common ancestors
-    if [[ $tmt -gt 0 && -x `which timeout` ]];then 
-        if timeout --help | grep -q -- '-k';then 
-            ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
-        else 
-            ltcmd="timeout -s9 $tmt $tcmd"
-        fi
-        timeit "$msg" "$ltcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
-=======
-    if [[ $tmt -gt 0 && -x `which timeout` ]];then 
-        if timeout --help 2>&1 | grep -q -- '-k';then
-            ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
-        else 
-            ltcmd="timeout -s9 $tmt $tcmd"
-        fi
-        timeit "$msg" "$ltcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
->>>>>>> wsrep_5.6.50-25.32
     else 
         timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     fi
