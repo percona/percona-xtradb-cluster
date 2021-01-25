@@ -857,8 +857,6 @@ install -d %{buildroot}%{_sysconfdir}/my.cnf.d
 %endif
 
 %if 0%{?systemd}
-install -D -p -m 0644 packaging/rpm-common/mysqlrouter.service %{buildroot}%{_unitdir}/mysqlrouter.service
-install -D -p -m 0644 packaging/rpm-common/mysqlrouter.tmpfiles.d %{buildroot}%{_tmpfilesdir}/mysqlrouter.conf
 %else
 install -D -p -m 0755 packaging/rpm-common/mysqlrouter.init %{buildroot}%{_sysconfdir}/init.d/mysqlrouter
 %endif
