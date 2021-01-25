@@ -929,8 +929,6 @@ install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README-MySQL \
     $RBR%{galera_docs}/README-MySQL
 install -m 644 $MBD/%{galera_src_dir}/asio/LICENSE_1_0.txt    \
     $RBR%{galera_docs}/LICENSE.asio
-install -m 644 $MBD/%{galera_src_dir}/www.evanjones.ca/LICENSE \
-    $RBR%{galera_docs}/LICENSE.crc32c
 
 install -d $RBR%{galera_docs2}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
@@ -1542,7 +1540,6 @@ fi
 %doc %attr(0644,root,root) %{galera_docs}/README
 %doc %attr(0644,root,root) %{galera_docs}/README-MySQL
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
-%doc %attr(0644,root,root) %{galera_docs}/LICENSE.crc32c
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d
 
@@ -1732,8 +1729,6 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter_passwd.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter_plugin_info.1*
 %if 0%{?systemd}
-%{_unitdir}/mysqlrouter.service
-%{_tmpfilesdir}/mysqlrouter.conf
 %else
 %{_sysconfdir}/init.d/mysqlrouter
 %endif
