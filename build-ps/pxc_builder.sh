@@ -280,23 +280,40 @@ install_deps() {
     if [ "x$OS" = "xrpm" ]; then
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
+        yum update -y
+        yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
-        percona-release enable tools testing
+        percona-release enable tools release
         add_percona_yum_repo
         if [ "x${RHEL}" = "x8" ]; then
+            yum -y install dnf-plugins-core epel-release
+            yum config-manager --set-enabled powertools
+            yum -y install python2-scons || true
+            yum -y install python2-pip python36-devel
             yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++ make
             yum -y install git gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
             yum -y install libstdc++-devel libtirpc-devel make ncurses-devel numactl-devel
-            yum -y install openldap-devel openssl-devel pam-devel perl perl-Data-Dumper
+            yum -y install openldap-devel openssl-devel pam-devel perl-Data-Dumper
             yum -y install perl-Dig perl-Digest perl-Digest-MD5 perl-Env perl-JSON perl-Time-HiRes
             yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel selinux-policy-devel
-            wget https://rpmfind.net/linux/fedora/linux/releases/29/Everything/x86_64/os/Packages/r/rpcgen-1.4-1.fc29.x86_64.rpm
-            yum -y install rpcgen-1.4-1.fc29.x86_64.rpm
+            yum -y install bison boost-devel check-devel cmake gcc-c++ glibc-devel libaio-devel libcurl-devel
+            wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/30/Everything/x86_64/os/Packages/r/rpcgen-1.4-2.fc30.x86_64.rpm
+            wget ftp://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora/linux/releases/29/Everything/x86_64/os/Packages/g/gperf-3.1-6.fc29.x86_64.rpm
+            yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+
+            wget https://jenkins.percona.com/yum-repo/percona-dev.repo
+            mv -vf percona-dev.repo /etc/yum.repos.d
+            yum -y clean all
+            yum -y install python2-scons python2-pip python36-devel
+            yum -y install redhat-rpm-config python2-devel
+            /usr/bin/pip3.6 install --user typing pyyaml regex Cheetah3
+            /usr/bin/pip2.7 install --user typing pyyaml regex Cheetah
+            dnf -y module disable mysql
         else
             yum -y install epel-release
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc zstd zstd-devel
             yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel make
-            yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static selinux-policy-devel
+            yum -y install perl-Time-HiRes openldap-devel unzip wget libcurl-devel boost-static selinux-policy-devel
             yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
             until yum -y install centos-release-scl; do
                 echo "waiting"
@@ -328,7 +345,7 @@ install_deps() {
         percona-release enable tools testing
         export DEBIAN_FRONTEND="noninteractive"
         export DIST="$(lsb_release -sc)"
-            until sudo apt-get update; do
+            until apt-get update; do
             sleep 1
             echo "waiting"
         done
@@ -723,7 +740,7 @@ build_deb(){
         sed -i "s:iproute:iproute2:g" debian/control
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
-    sudo chmod 777 debian/rules
+    chmod 777 debian/rules
     dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
@@ -802,7 +819,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.22-15
+        yumdownloader percona-xtrabackup-80-8.0.22
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
