@@ -9328,6 +9328,59 @@ no_commit:
 			/* Unknown situation: do not commit */
 			;
 		} else if (src_table == m_prebuilt->table) {
+<<<<<<< HEAD
+||||||| merged common ancestors
+#ifdef WITH_WSREP
+			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
+			    sql_command == SQLCOM_LOAD                      &&
+			    !thd_test_options(
+				m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
+			{
+				switch (wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1))
+				{
+				case WSREP_TRX_OK:
+				  break;
+				case WSREP_TRX_SIZE_EXCEEDED:
+				case WSREP_TRX_CERT_FAIL:
+				case WSREP_TRX_ERROR:
+				  DBUG_RETURN(1);
+				}
+
+				if (tc_log->commit(m_user_thd, 1)) DBUG_RETURN(1);
+				wsrep_post_commit(m_user_thd, TRUE);
+				wsrep_thd_set_next_trx_id(m_user_thd);
+			}
+#endif /* WITH_WSREP */
+=======
+#ifdef WITH_WSREP
+			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
+			    sql_command == SQLCOM_LOAD                      &&
+			    !thd_test_options(
+				m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
+			{
+				int ret= 0;
+				switch ((ret= wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1)))
+				{
+				case WSREP_TRX_OK:
+				  break;
+				case WSREP_TRX_SIZE_EXCEEDED:
+				case WSREP_TRX_CERT_FAIL:
+				case WSREP_TRX_ERROR:
+					WSREP_WARN(
+					  "LOAD DATA sub trx commit failed: %d",
+					  ret);
+					DBUG_RETURN(1);
+				}
+				if (tc_log->commit(m_user_thd, 1))
+				{
+					WSREP_WARN("LOAD DATA sub trx post commit failed");
+					DBUG_RETURN(1);
+				}
+				wsrep_post_commit(m_user_thd, TRUE);
+				wsrep_thd_set_next_trx_id(m_user_thd);
+			}
+#endif /* WITH_WSREP */
+>>>>>>> wsrep_5.7.32-25.24
 			/* Source table is not in InnoDB format:
 			no need to re-acquire locks on it. */
 
@@ -9338,6 +9391,58 @@ no_commit:
 			/* We will need an IX lock on the destination table. */
 			m_prebuilt->sql_stat_start = TRUE;
 		} else {
+<<<<<<< HEAD
+||||||| merged common ancestors
+#ifdef WITH_WSREP
+			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
+			    sql_command == SQLCOM_LOAD                      &&
+			    !thd_test_options(
+				m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
+			{
+				switch (wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1))
+				{
+				case WSREP_TRX_OK:
+				  break;
+				case WSREP_TRX_SIZE_EXCEEDED:
+				case WSREP_TRX_CERT_FAIL:
+				case WSREP_TRX_ERROR:
+				  DBUG_RETURN(1);
+				}
+				if (tc_log->commit(m_user_thd, 1))  DBUG_RETURN(1);
+				wsrep_post_commit(m_user_thd, TRUE);
+				wsrep_thd_set_next_trx_id(m_user_thd);
+			}
+#endif /* WITH_WSREP */
+=======
+#ifdef WITH_WSREP
+			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
+			    sql_command == SQLCOM_LOAD                      &&
+			    !thd_test_options(
+				m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
+			{
+				int ret= 0;
+				switch ((ret= wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1)))
+				{
+				case WSREP_TRX_OK:
+				  break;
+				case WSREP_TRX_SIZE_EXCEEDED:
+				case WSREP_TRX_CERT_FAIL:
+				case WSREP_TRX_ERROR:
+					WSREP_WARN(
+					  "LOAD DATA sub trans commit failed: %d",
+					  ret);
+					DBUG_RETURN(1);
+				}
+				if (tc_log->commit(m_user_thd, 1))
+				{
+					WSREP_WARN("LOAD DATA sub trans post commit failed");
+					DBUG_RETURN(1);
+				}
+				wsrep_post_commit(m_user_thd, TRUE);
+				wsrep_thd_set_next_trx_id(m_user_thd);
+			}
+#endif /* WITH_WSREP */
+>>>>>>> wsrep_5.7.32-25.24
 			/* Ensure that there are no other table locks than
 			LOCK_IX and LOCK_AUTO_INC on the destination table. */
 
