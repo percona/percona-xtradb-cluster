@@ -7721,7 +7721,7 @@ static Sys_var_charptr Sys_wsrep_data_home_dir(
 
 static Sys_var_charptr Sys_wsrep_cluster_name(
     "wsrep_cluster_name", "Name for the cluster",
-    READ_ONLY GLOBAL_VAR(wsrep_cluster_name), CMD_LINE(REQUIRED_ARG),
+    PREALLOCATED READ_ONLY GLOBAL_VAR(wsrep_cluster_name), CMD_LINE(REQUIRED_ARG),
     IN_FS_CHARSET, DEFAULT(WSREP_CLUSTER_NAME), NO_MUTEX_GUARD, NOT_IN_BINLOG,
     ON_CHECK(wsrep_cluster_name_check), ON_UPDATE(wsrep_cluster_name_update));
 
