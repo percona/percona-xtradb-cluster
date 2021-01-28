@@ -213,7 +213,7 @@ echo "Using $TARGETDIR as target/output directory"
 # source directory hold target directory as immediately child.
 # as in cd source-dir/target-dir should be true
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
-test -e "$SOURCEDIR/VERSION" || exit 2
+test -e "$SOURCEDIR/MYSQL_VERSION" || exit 2
 echo "Using $SOURCEDIR as source directory"
 
 #
@@ -247,7 +247,7 @@ fi
 # (Galera: This is standalone so nothing to consider from here)
 # Extract the version from of each component.
 
-source "$SOURCEDIR/VERSION"
+source "$SOURCEDIR/MYSQL_VERSION"
 MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
 PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
@@ -417,6 +417,7 @@ fi
             -DWITH_RE2=bundled \
             -DWITH_LIBEVENT=bundled \
             -DWITH_EDITLINE=bundled \
+            -DWITH_ZLIB=bundled \
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
@@ -454,6 +455,7 @@ fi
             -DWITH_RE2=bundled \
             -DWITH_EDITLINE=bundled \
             -DWITH_LIBEVENT=bundled \
+            -DWITH_ZLIB=bundled \
             -DWITH_ZSTD=bundled \
             -DWITH_NUMA=ON \
             -DWITH_LDAP=system \
