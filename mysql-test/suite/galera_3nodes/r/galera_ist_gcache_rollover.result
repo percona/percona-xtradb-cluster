@@ -8,6 +8,8 @@ INSERT INTO t1 VALUES (11), (12), (13), (14), (15);
 INSERT INTO t1 VALUES (21), (22), (23), (24), (25);
 SET GLOBAL wsrep_provider_options = 'dbug=d,ist_sender_send_after_get_buffers';
 INSERT INTO t1 VALUES (31), (32), (33), (34), (35);
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
 SHOW STATUS LIKE 'wsrep_debug_sync_waiters';
 Variable_name	Value
 wsrep_debug_sync_waiters	ist_sender_send_after_get_buffers ist_sender_send_after_get_buffers
