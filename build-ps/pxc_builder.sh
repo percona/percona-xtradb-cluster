@@ -871,7 +871,9 @@ build_tarball(){
     mkdir -p ${WORKDIR}/tarball
     mkdir -p ${CURDIR}/tarball
     cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/tarball
+    rm -f ${WORKDIR}/tarball/percona-xtrabackup* || true
     cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/tarball
+    rm -f ${CURDIR}/tarball/percona-xtrabackup* || true
 
 }
 
