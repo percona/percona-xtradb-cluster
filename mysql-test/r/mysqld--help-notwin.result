@@ -1438,16 +1438,8 @@ The following options may be given as the first argument:
  Max number of rows in write set
  --wsrep-max-ws-size=# 
  Max write set size (bytes)
-<<<<<<< HEAD
-||||||| merged common ancestors
- --wsrep-mysql-replication-bundle=# 
- mysql replication group commit 
-=======
  --wsrep-mode=name   Set of WSREP features that are enabled. Legal values:
  IGNORE_NATIVE_REPLICATION_FILTER_RULES 
- --wsrep-mysql-replication-bundle=# 
- mysql replication group commit 
->>>>>>> wsrep_5.7.32-25.24
  --wsrep-node-address=name 
  Node address
  --wsrep-node-incoming-address=name 
@@ -1902,13 +1894,7 @@ wsrep-load-data-splitting TRUE
 wsrep-log-conflicts FALSE
 wsrep-max-ws-rows 0
 wsrep-max-ws-size 2147483647
-<<<<<<< HEAD
-||||||| merged common ancestors
-wsrep-mysql-replication-bundle 0
-=======
 wsrep-mode 
-wsrep-mysql-replication-bundle 0
->>>>>>> wsrep_5.7.32-25.24
 wsrep-node-address 
 wsrep-node-incoming-address AUTO
 wsrep-notify-cmd 

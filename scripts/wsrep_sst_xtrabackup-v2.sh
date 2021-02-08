@@ -1280,29 +1280,9 @@ recv_data_from_donor_to_joiner()
     pushd ${dir} 1>/dev/null
     set +e
 
-<<<<<<< HEAD
     if [[ $tmt -gt 0 ]];then 
          RC=(`interruptable_timeout $tmt "$msg" "$tcmd | $strmcmd"`)
     else
-||||||| merged common ancestors
-    if [[ $tmt -gt 0 && -x `which timeout` ]];then 
-        if timeout --help | grep -q -- '-k';then 
-            ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
-        else 
-            ltcmd="timeout -s9 $tmt $tcmd"
-        fi
-        timeit "$msg" "$ltcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
-    else 
-=======
-    if [[ $tmt -gt 0 && -x `which timeout` ]];then 
-        if timeout --help 2>&1 | grep -q -- '-k';then
-            ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
-        else 
-            ltcmd="timeout -s9 $tmt $tcmd"
-        fi
-        timeit "$msg" "$ltcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
-    else 
->>>>>>> wsrep_5.7.32-25.24
         timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     fi
 

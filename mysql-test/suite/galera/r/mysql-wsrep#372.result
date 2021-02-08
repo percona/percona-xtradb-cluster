@@ -1,7 +1,7 @@
 RESET MASTER;
-SET GLOBAL wsrep_on=OFF;
+SET SESSION wsrep_on=OFF;
 RESET MASTER;
-SET GLOBAL wsrep_on=ON;
+SET SESSION wsrep_on=ON;
 START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
@@ -35,9 +35,9 @@ INSERT INTO galera_replicated_db.t1 VALUES (4);
 DROP TABLE galera_replicated_db.t1;
 DROP DATABASE galera_replicated_db;
 RESET MASTER;
-SET GLOBAL wsrep_on=OFF;
+SET SESSION wsrep_on=OFF;
 RESET MASTER;
-SET GLOBAL wsrep_on=ON;
+SET SESSION wsrep_on=ON;
 START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
@@ -64,9 +64,9 @@ RESET SLAVE ALL;
 INSERT INTO test.galera_replicated_table VALUES (4);
 DROP TABLE test.galera_replicated_table;
 RESET MASTER;
-SET GLOBAL wsrep_on=OFF;
+SET SESSION wsrep_on=OFF;
 RESET MASTER;
-SET GLOBAL wsrep_on=ON;
+SET SESSION wsrep_on=ON;
 START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
@@ -92,5 +92,6 @@ DROP DATABASE master_replicated_db;
 STOP SLAVE;
 RESET SLAVE ALL;
 INSERT INTO master_ignored_db.t1 VALUES (4);
+CALL mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
 DROP TABLE master_ignored_db.t1;
 DROP DATABASE master_ignored_db;

@@ -140,7 +140,6 @@ enum enum_wsrep_sync_wait {
     WSREP_SYNC_WAIT_MAX = 0xF
 };
 
-<<<<<<< HEAD
 enum enum_pxc_strict_modes {
     PXC_STRICT_MODE_DISABLED = 0,
     PXC_STRICT_MODE_PERMISSIVE,
@@ -158,13 +157,10 @@ extern ulong       pxc_maint_mode;
 extern ulong       pxc_maint_transition_period;
 extern my_bool     pxc_encrypt_cluster_traffic;
 
-||||||| merged common ancestors
-=======
 enum enum_wsrep_mode {
     WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0
 };
 
->>>>>>> wsrep_5.7.32-25.24
 // MySQL status variables
 extern my_bool     wsrep_new_cluster;
 extern my_bool     wsrep_connected;

@@ -85,7 +85,6 @@ my_bool wsrep_restart_slave_activated  = 0; // node has dropped, and slave
                                             // restart will be needed
 my_bool wsrep_slave_UK_checks          = 0; // slave thread does UK checks
 my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
-<<<<<<< HEAD
 ulong   wsrep_RSU_commit_timeout       = 5000; // wait for x micr-secs
                                                // to allow active connection to
                                                // commit before starting RSU.
@@ -104,10 +103,8 @@ ulong   pxc_maint_transition_period   = 30;
 /* enables PXC SSL auto-config */
 my_bool pxc_encrypt_cluster_traffic   = 0;
 
-||||||| merged common ancestors
-=======
-ulonglong wsrep_mode                   = 0;
->>>>>>> wsrep_5.7.32-25.24
+/* Set of WSREP features that are enabled */
+ulonglong wsrep_mode                  = 0;
 /*
  * End configuration options
  */

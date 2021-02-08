@@ -91,7 +91,7 @@ SET GLOBAL debug = NULL;
 SET debug_sync='RESET';
 
 # wait for BF abort to happen and replaying begin
---let $wait_condition = SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE= 'wsrep replaying trx' 
+--let $wait_condition = SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: replaying write set%' 
 --source include/wait_condition.inc
 
 

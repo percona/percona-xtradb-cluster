@@ -1163,7 +1163,6 @@ max_fast_restarts=5
 # flag whether a usable sleep command exists
 have_sleep=1
 
-<<<<<<< HEAD
 # maximum number of wsrep restarts
 max_wsrep_restarts=0
 
@@ -1173,12 +1172,6 @@ else
     grastate_loc="${DATADIR}/grastate.dat"
 fi
 
-||||||| merged common ancestors
-=======
-# maximum number of wsrep restarts
-max_wsrep_restarts=0
-
->>>>>>> wsrep_5.7.32-25.24
 while true
 do
   # Some extra safety
@@ -1194,7 +1187,6 @@ do
 
   start_time=`date +%M%S`
 
-<<<<<<< HEAD
   # This file is checked for empty directory because 
   # a) Not having this file means the wsrep-start-position is useless - lp:1112724
   # b) Otherwise I have to check if directory is empty sans a few files like 
@@ -1231,23 +1223,6 @@ do
   else
     eval_log_error "$cmd $wsrep_start_position_opt --wsrep_cluster_address=$url $nohup_redir"
   fi
-||||||| merged common ancestors
-  eval_log_error "$cmd"
-=======
-  # this sets wsrep_start_position_opt
-  wsrep_recover_position "$cmd"
-
-  [ $? -ne 0 ] && exit 1 #
-
-  [ -n "$wsrep_urls" ] && url=`wsrep_pick_url $wsrep_urls` # check connect address
-
-  if [ -z "$url" ]
-  then
-    eval_log_error "$cmd $wsrep_start_position_opt $nohup_redir"
-  else
-    eval_log_error "$cmd $wsrep_start_position_opt --wsrep_cluster_address=$url $nohup_redir"
-  fi
->>>>>>> wsrep_5.7.32-25.24
 
   # hypothetical: log was renamed but not
   # flushed yet. we'd recreate it with
