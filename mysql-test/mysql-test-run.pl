@@ -308,7 +308,7 @@ my $opt_sleep;
 
 my $opt_testcase_timeout= $ENV{MTR_TESTCASE_TIMEOUT} ||  15; # minutes
 my $opt_suite_timeout   = $ENV{MTR_SUITE_TIMEOUT}    || 300; # minutes
-my $opt_shutdown_timeout= $ENV{MTR_SHUTDOWN_TIMEOUT} ||  20; # seconds
+my $opt_shutdown_timeout= $ENV{MTR_SHUTDOWN_TIMEOUT} ||  45; # seconds
 my $opt_start_timeout   = $ENV{MTR_START_TIMEOUT}    || 180; # seconds
 
 sub suite_timeout { return $opt_suite_timeout * 60; };
@@ -3636,7 +3636,7 @@ sub check_wsrep_support() {
 
     # ADD mysql client library path to path so that wsrep_notify_cmd can find mysql
     # client for loading the tables. (Don't assume each machine has mysql install)
-    my ($path) = grep { -f "$_/mysql"; } "$::bindir/scripts", $::path_client_bindir;
+    $path = grep { -f "$_/mysql"; } "$::bindir/scripts", $::path_client_bindir;
     mtr_error("No mysql client found") unless $path;
     $ENV{PATH}="$path:$ENV{PATH}";
 
@@ -4768,7 +4768,7 @@ sub run_testcase ($) {
         elsif ( $res == 62 )
         {
 	  # Testcase itself tell us to skip this one
-	  $tinfo->{skip_detected_by_test}= 1;
+	  $tinfo->{skip_reason} = MTR_SKIP_BY_TEST;
 	  # Try to get reason from test log file
 	  find_testcase_skipped_reason($tinfo);
  	  mtr_report_test_skipped($tinfo);
@@ -4794,74 +4794,6 @@ sub run_testcase ($) {
 	  if ($analyze){
 	    run_on_all($tinfo, "analyze-$analyze");
 	  }
-<<<<<<< HEAD
-||||||| 9dd29a1b274
-	}
-	mtr_report_test_passed($tinfo);
-      }
-      elsif ( $res == 62 )
-      {
-	# Testcase itself tell us to skip this one
-	$tinfo->{skip_detected_by_test}= 1;
-	# Try to get reason from test log file
-	find_testcase_skipped_reason($tinfo);
-	mtr_report_test_skipped($tinfo);
-	# Restart if skipped due to missing perl, it may have had side effects
-	if ( restart_forced_by_test('force_restart_if_skipped') ||
-             $tinfo->{'comment'} =~ /^perl not found/ )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-      }
-      elsif ( $res == 65 )
-      {
-	# Testprogram killed by signal
-	$tinfo->{comment}=
-	  "testprogram crashed(returned code $res)";
-	report_failure_and_restart($tinfo);
-      }
-      elsif ( $res == 1 )
-      {
-	# Check if the test tool requests that
-	# an analyze script should be run
-	my $analyze= find_analyze_request();
-	if ($analyze){
-	  run_on_all($tinfo, "analyze-$analyze");
-	}
-=======
-	}
-	mtr_report_test_passed($tinfo);
-      }
-      elsif ( $res == 62 )
-      {
-	# Testcase itself tell us to skip this one
-	$tinfo->{skip_reason} = MTR_SKIP_BY_TEST;
-	# Try to get reason from test log file
-	find_testcase_skipped_reason($tinfo);
-	mtr_report_test_skipped($tinfo);
-	# Restart if skipped due to missing perl, it may have had side effects
-	if ( restart_forced_by_test('force_restart_if_skipped') ||
-             $tinfo->{'comment'} =~ /^perl not found/ )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-      }
-      elsif ( $res == 65 )
-      {
-	# Testprogram killed by signal
-	$tinfo->{comment}=
-	  "testprogram crashed(returned code $res)";
-	report_failure_and_restart($tinfo);
-      }
-      elsif ( $res == 1 )
-      {
-	# Check if the test tool requests that
-	# an analyze script should be run
-	my $analyze= find_analyze_request();
-	if ($analyze){
-	  run_on_all($tinfo, "analyze-$analyze");
-	}
->>>>>>> 69cc3231188a54deeac5f66946e868d092c640df
 
 	  # Wait a bit and see if a server died, if so report that instead
 	  mtr_milli_sleep(100);
