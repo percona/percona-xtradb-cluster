@@ -28,13 +28,14 @@
 
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
-#include "wsrep_xid.h"
 #include "wsrep_trans_observer.h"
+#include "wsrep_xid.h"
 
 #define WSREP_START_POSITION_ZERO "00000000-0000-0000-0000-000000000000:-1"
 #define WSREP_CLUSTER_NAME "my_wsrep_cluster"
 
 const char *wsrep_provider = 0;
+bool wsrep_provider_set = false;
 const char *wsrep_provider_options = 0;
 const char *wsrep_cluster_address = 0;
 const char *wsrep_cluster_name = 0;
@@ -46,6 +47,7 @@ ulong wsrep_reject_queries;
 
 int wsrep_init_vars() {
   wsrep_provider = my_strdup(key_memory_wsrep, WSREP_NONE, MYF(MY_WME));
+  wsrep_provider_set = false;
   wsrep_provider_options = my_strdup(key_memory_wsrep, "", MYF(MY_WME));
   wsrep_cluster_address = my_strdup(key_memory_wsrep, "", MYF(MY_WME));
   wsrep_cluster_name =
@@ -67,7 +69,7 @@ Toggling of the value inside function or transaction is not allowed
 bool wsrep_on_check(sys_var *, THD *thd, set_var *var) {
   bool new_wsrep_on = (bool)var->save_result.ulonglong_value;
 
-  //if (!thd->security_context()->check_access(SUPER_ACL)) return true;
+  // if (!thd->security_context()->check_access(SUPER_ACL)) return true;
 
   /* If in a stored function/trigger, it's too late to change wsrep_on. */
   if (thd->in_sub_stmt) {
@@ -99,7 +101,7 @@ bool wsrep_on_check(sys_var *, THD *thd, set_var *var) {
       wsrep_after_statement(thd);
       wsrep_after_command_ignore_result(thd);
       wsrep_close(thd);
-      //wsrep_cleanup(thd);
+      // wsrep_cleanup(thd);
       wsrep_close_client_connections(true, true);
     } else if (!global_system_variables.wsrep_on && new_wsrep_on) {
       wsrep_close_client_connections(true, true);
@@ -409,6 +411,9 @@ bool wsrep_provider_update(sys_var *, THD *thd, enum_var_type) {
   }
   free(tmp);
 
+  wsrep_provider_set =
+      (wsrep_provider != nullptr) && strcmp(wsrep_provider, WSREP_NONE) != 0;
+
   // we sure don't want to use old address with new provider
   wsrep_cluster_address_init(NULL);
   wsrep_provider_options_init(NULL);
@@ -439,6 +444,8 @@ void wsrep_provider_init(const char *value) {
 
   if (wsrep_provider) my_free(const_cast<char *>(wsrep_provider));
   wsrep_provider = my_strdup(key_memory_wsrep, value, MYF(0));
+  wsrep_provider_set =
+      (wsrep_provider != nullptr) && strcmp(wsrep_provider, WSREP_NONE) != 0;
 }
 
 bool wsrep_provider_options_check(sys_var *, THD *, set_var *) { return 0; }
@@ -721,8 +728,7 @@ bool wsrep_desync_check(sys_var *, THD *thd, set_var *var) {
 bool wsrep_desync_update(sys_var *, THD *, enum_var_type) { return false; }
 
 bool wsrep_max_ws_size_update(sys_var *, THD *, enum_var_type) {
-  if (!Wsrep_server_state::instance().is_provider_loaded())
-    return false;
+  if (!Wsrep_server_state::instance().is_provider_loaded()) return false;
 
   char max_ws_size_opt[128];
   snprintf(max_ws_size_opt, sizeof(max_ws_size_opt), "repl.max_ws_size=%lu",
