@@ -9385,13 +9385,14 @@ no_commit:
 
 		m_num_write_row = 0;
 
-		switch (
-		    wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, true)) {
+		int ret= wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, true);
+		switch (ret) {
 			case WSREP_TRX_OK:
 				break;
 			case WSREP_TRX_SIZE_EXCEEDED:
 			case WSREP_TRX_CERT_FAIL:
 			case WSREP_TRX_ERROR:
+				WSREP_WARN("LOAD DATA sub trans commit failed: %d",ret);
 				DBUG_RETURN(1);
 		}
 
@@ -9400,7 +9401,10 @@ no_commit:
 		wsrep_thd_mark_split_trx(m_user_thd, true);
 
 		if (tc_log->commit(m_user_thd, 1))
+		{
+			WSREP_WARN("LOAD DATA sub trans post commit failed");
 			DBUG_RETURN(1);
+		}
 
 		wsrep_post_commit(m_user_thd, TRUE);
 

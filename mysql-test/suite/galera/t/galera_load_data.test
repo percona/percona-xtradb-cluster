@@ -137,4 +137,24 @@ SELECT COUNT(*) = 0 FROM t1;
 SHOW BINLOG EVENTS FROM 123;
 
 --connection node_1
+TRUNCATE TABLE t1;
+
+--perl
+open(FILE, ">", "$ENV{'MYSQLTEST_VARDIR'}/tmp/galera_load_data_21K.csv") or die;
+    for (my $i=0; $i <= 21000; $i++) {
+       print FILE "$i\n";
+     }
+close FILE;
+EOF
+
+RESET MASTER;
+--disable_query_log
+--eval LOAD DATA INFILE "$MYSQLTEST_VARDIR/tmp/galera_load_data_21K.csv" INTO TABLE t1;
+--enable_query_log
+
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS FROM 123;
+
+--remove_file $MYSQLTEST_VARDIR/tmp/galera_load_data_21K.csv
+
 DROP TABLE t1;

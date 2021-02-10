@@ -114,6 +114,7 @@ extern my_bool     wsrep_restart_slave;
 extern my_bool     wsrep_restart_slave_activated;
 extern my_bool     wsrep_slave_FK_checks;
 extern my_bool     wsrep_slave_UK_checks;
+extern ulonglong   wsrep_mode;
 extern ulong       wsrep_running_threads;
 extern ulong       wsrep_RSU_commit_timeout;
 
@@ -155,6 +156,10 @@ enum enum_pxc_maint_modes {
 extern ulong       pxc_maint_mode;
 extern ulong       pxc_maint_transition_period;
 extern my_bool     pxc_encrypt_cluster_traffic;
+
+enum enum_wsrep_mode {
+    WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0
+};
 
 // MySQL status variables
 extern my_bool     wsrep_new_cluster;
@@ -246,6 +251,7 @@ extern void wsrep_stop_replication(THD *thd, bool is_server_shutdown);
 extern bool wsrep_start_replication();
 extern bool wsrep_must_sync_wait (THD* thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
 extern bool wsrep_sync_wait (THD* thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
+extern bool wsrep_check_mode(uint mask);
 extern int  wsrep_check_opts (int argc, char* const* argv);
 extern void wsrep_prepend_PATH (const char* path);
 /* some inline functions are defined in wsrep_mysqld_inl.h */

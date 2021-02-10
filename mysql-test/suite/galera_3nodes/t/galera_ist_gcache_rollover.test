@@ -58,7 +58,9 @@ INSERT INTO t1 VALUES (31), (32), (33), (34), (35);
 --enable_query_log
 
 --connection node_1
---sleep 2
+--let $galera_sync_point = ist_sender_send_after_get_buffers ist_sender_send_after_get_buffers
+--source include/galera_wait_sync_point.inc
+--let $galera_sync_point = ist_sender_send_after_get_buffers
 SHOW STATUS LIKE 'wsrep_debug_sync_waiters';
 
 INSERT INTO t1 VALUES (41), (42), (43), (44), (45);

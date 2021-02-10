@@ -103,6 +103,8 @@ ulong   pxc_maint_transition_period   = 30;
 /* enables PXC SSL auto-config */
 my_bool pxc_encrypt_cluster_traffic   = 0;
 
+/* Set of WSREP features that are enabled */
+ulonglong wsrep_mode                  = 0;
 /*
  * End configuration options
  */
@@ -1429,6 +1431,11 @@ bool wsrep_start_replication()
   }
 
   return true;
+}
+
+bool wsrep_check_mode (uint mask)
+{
+  return wsrep_mode & (1ULL << mask);
 }
 
 bool wsrep_must_sync_wait (THD* thd, uint mask)

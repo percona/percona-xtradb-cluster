@@ -12425,9 +12425,17 @@ check_table_map(Relay_log_info const *rli, RPL_TABLE_LIST *table_list)
   DBUG_ENTER("check_table_map");
   enum_tbl_map_status res= OK_TO_PROCESS;
 
+
 #ifdef WITH_WSREP
-  if ((rli->info_thd->slave_thread /* filtering is for slave only */  ||
-       (WSREP(rli->info_thd) && rli->info_thd->wsrep_applier))        &&
+  /* Check if we should ignore replication filter rules for cluster events. */
+  const bool thd_is_wsrep_applier=
+      WSREP(rli->info_thd) && rli->info_thd->wsrep_applier;
+  if (thd_is_wsrep_applier &&
+      wsrep_check_mode(WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES))
+    DBUG_RETURN(res);
+
+  if ((rli->info_thd->slave_thread /* filtering is for slave only */ ||
+       thd_is_wsrep_applier) &&
 #else
   if (rli->info_thd->slave_thread /* filtering is for slave only */ &&
 #endif /* WITH_WSREP */
