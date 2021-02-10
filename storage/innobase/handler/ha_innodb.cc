@@ -16204,44 +16204,6 @@ ha_innobase::get_auto_increment(
 
 		current = *first_value > col_max_value ? autoinc : *first_value;
 
-#ifdef WITH_WSREP
-		/* If the increment step of the auto increment column
-		decreases then it is not affecting the immediate
-		next value in the series. */
-		if (prebuilt->autoinc_increment > increment) {
-
-			WSREP_DEBUG("Refresh change in auto-inc configuration"
-				    " from (off: %llu -> %llu)"
-				    " and (inc: %llu -> %llu)."
-				    " Re-align auto increment"
-				    " value for table (%s)"
-				    " THD: %lu, current: %llu, autoinc: %llu",
-				    prebuilt->autoinc_offset, offset,
-				    prebuilt->autoinc_increment, increment,
-				    prebuilt->table->name,
-				    wsrep_thd_thread_id(ha_thd()),
-				    current, autoinc);
-			if (!wsrep_on(ha_thd()))
-			{
-			/* MySQL flow will construct last_inserted_id but PXC
-			can't do so because any values in that range are
-			potentially unsafe as they were reserved for other node
-			and if other node has used them it will result in
-			conflict. So PXC skip this readjustment logic
-			and re-calibration too as there is no change in
-			current autoinc value. */
-			current = autoinc - prebuilt->autoinc_increment;
-
-			current = innobase_next_autoinc(
-				current, 1, increment, 1, col_max_value);
-			}
-
-			dict_table_autoinc_initialize(prebuilt->table, current);
-
-			*first_value = current;
-		}
-#endif /* WITH_WSREP */
-
 		/* Compute the last value in the interval */
 		next_value = innobase_next_autoinc(
 			current, *nb_reserved_values, increment, offset,
