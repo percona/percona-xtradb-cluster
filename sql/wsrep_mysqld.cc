@@ -954,6 +954,7 @@ int wsrep_init()
   {
     // enable normal operation in case no provider is specified
     wsrep_ready_set(TRUE);
+    wsrep_provider_set = false;
     global_system_variables.wsrep_on = 0;
     wsrep_init_args args;
     args.logger_cb = wsrep_log_cb;

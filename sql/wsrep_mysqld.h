@@ -254,10 +254,11 @@ extern "C" bool wsrep_is_wsrep_on(void);
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
 
-#define WSREP_ON                         \
-  ((global_system_variables.wsrep_on) && \
-   wsrep_provider                     && \
-   strcmp(wsrep_provider, WSREP_NONE))
+extern bool wsrep_provider_set;
+
+#define WSREP_ON                          \
+  ((global_system_variables.wsrep_on) &&  \
+   wsrep_provider_set)
 
 /* use xxxxxx_NNULL macros when thd pointer is guaranteed to be non-null to
  * avoid compiler warnings (GCC 6 and later) */
