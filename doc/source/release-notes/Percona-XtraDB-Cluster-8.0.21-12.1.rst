@@ -7,6 +7,8 @@
 :Date: December 28, 2020
 :Installation: `Installing Percona XtraDB Cluster <https://www.percona.com/doc/percona-xtradb-cluster/8.0/install/index.html>`_
 
+Implement an inconsistency voting policy. In the best case scenario, the node with the inconsistent data is aborted and the cluster continues to operate. 
+
 Improvements
 ================================================================================
 
