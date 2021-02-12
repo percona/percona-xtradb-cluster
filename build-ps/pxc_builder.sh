@@ -868,12 +868,18 @@ build_tarball(){
     else
         bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
     fi
-    mkdir -p ${WORKDIR}/tarball
-    mkdir -p ${CURDIR}/tarball
-    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/tarball
-    rm -f ${WORKDIR}/tarball/percona-xtrabackup* || true
-    cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/tarball
-    rm -f ${CURDIR}/tarball/percona-xtrabackup* || true
+
+    DIRNAME="tarball"
+    if [[ ${DEBUG} == 1 ]]; then
+        DIRNAME="debug"
+    fi
+    mkdir -p ${WORKDIR}/../${DIRNAME}
+    mkdir -p ${WORKDIR}/${DIRNAME}
+    mkdir -p ${CURDIR}/${DIRNAME}
+    rm -f $BUILD_NUMBER/percona-xtrabackup* || true
+    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/../${DIRNAME}
+    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/${DIRNAME}
+    cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/${DIRNAME}
 
 }
 
