@@ -6635,6 +6635,11 @@ int mysqld_main(int argc, char **argv)
 #endif
   }
 
+#ifdef WITH_WSREP
+  // Initialize wsrep_provider_set before anything else wsrep related
+  wsrep_provider_set = wsrep_provider != NULL && strcmp(wsrep_provider, WSREP_NONE) != 0;
+#endif
+
   /* 
    The subsequent calls may take a long time : e.g. innodb log read.
    Thus set the long running service control manager timeout
@@ -6656,6 +6661,7 @@ int mysqld_main(int argc, char **argv)
     unireg_abort(1);
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
+
   if (wsrep_recovery)
   {
     select_thread_in_use= 0;
