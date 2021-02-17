@@ -5188,9 +5188,8 @@ sub run_testcase ($) {
       }
       elsif ( $res == 62 )
       {
-<<<<<<< HEAD
         # Testcase itself tell us to skip this one
-        $tinfo->{skip_detected_by_test}= 1;
+	    $tinfo->{skip_reason} = MTR_SKIP_BY_TEST;
         # Try to get reason from test log file
         find_testcase_skipped_reason($tinfo);
         mtr_report_test_skipped($tinfo);
@@ -5200,31 +5199,6 @@ sub run_testcase ($) {
         {
           stop_all_servers($opt_shutdown_timeout);
         }
-||||||| merged common ancestors
-	# Testcase itself tell us to skip this one
-	$tinfo->{skip_detected_by_test}= 1;
-	# Try to get reason from test log file
-	find_testcase_skipped_reason($tinfo);
-	mtr_report_test_skipped($tinfo);
-	# Restart if skipped due to missing perl, it may have had side effects
-	if ( restart_forced_by_test('force_restart_if_skipped') ||
-             $tinfo->{'comment'} =~ /^perl not found/ )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-=======
-	# Testcase itself tell us to skip this one
-	$tinfo->{skip_reason} = MTR_SKIP_BY_TEST;
-	# Try to get reason from test log file
-	find_testcase_skipped_reason($tinfo);
-	mtr_report_test_skipped($tinfo);
-	# Restart if skipped due to missing perl, it may have had side effects
-	if ( restart_forced_by_test('force_restart_if_skipped') ||
-             $tinfo->{'comment'} =~ /^perl not found/ )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
->>>>>>> 7a7e09659078188bcceb6963e0adbe442cf83579
       }
       elsif ( $res == 65 )
       {
