@@ -33,6 +33,7 @@ our @EXPORT= qw(collect_option collect_test_cases);
 
 use mtr_report;
 use mtr_match;
+use My::Constants;
 
 # Options used for the collect phase
 our $start_from;
@@ -696,6 +697,7 @@ sub optimize_cases {
 	if ( !$supported )
 	{
 	  $tinfo->{'skip'}= 1;
+	  $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
 	  $tinfo->{'comment'}=
 	    "Doesn't support --binlog-format='$binlog_format'";
 	}
@@ -724,6 +726,7 @@ sub optimize_cases {
 	if ( !$supported )
 	{
 	  $tinfo->{'skip'}= 1;
+	  $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
 	  $tinfo->{'comment'}=
 	    "Doesn't support --binlog-format='$test_binlog_format'";
 	  next;
@@ -760,6 +763,7 @@ sub optimize_cases {
 	     ! exists $builtin_engines{$default_engine} )
 	{
 	  $tinfo->{'skip'}= 1;
+	  $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
 	  $tinfo->{'comment'}=
 	    "'$default_engine' not supported";
 	}
@@ -781,6 +785,7 @@ sub optimize_cases {
 	     ! exists $builtin_engines{$default_tmp_engine} )
 	{
 	  $tinfo->{'skip'}= 1;
+	  $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
 	  $tinfo->{'comment'}=
 	    "'$default_tmp_engine' not supported";
 	}
@@ -1025,6 +1030,7 @@ sub collect_one_test_case {
     if ( IS_WIN32PERL )
     {
       $tinfo->{'skip'}= 1;
+      $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
       $tinfo->{'comment'}= "No tests with sh scripts on Windows";
       return $tinfo;
     }
@@ -1043,6 +1049,7 @@ sub collect_one_test_case {
     if ( IS_WIN32PERL )
     {
       $tinfo->{'skip'}= 1;
+      $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
       $tinfo->{'comment'}= "No tests with sh scripts on Windows";
       return $tinfo;
     }
@@ -1076,6 +1083,7 @@ sub collect_one_test_case {
   if ( $tinfo->{'big_test'} and ! $::opt_big_test )
   {
     $tinfo->{'skip'}= 1;
+    $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
     $tinfo->{'comment'}= "Test needs 'big-test' option";
     return $tinfo
   }
@@ -1083,6 +1091,7 @@ sub collect_one_test_case {
   if ( $tinfo->{'need_debug'} && ! $::debug_compiled_binaries )
   {
     $tinfo->{'skip'}= 1;
+    $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
     $tinfo->{'comment'}= "Test needs debug binaries";
     return $tinfo
   }
@@ -1094,6 +1103,7 @@ sub collect_one_test_case {
     {
       # ndbcluster is disabled
       $tinfo->{'skip'}= 1;
+      $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
       $tinfo->{'comment'}= "ndbcluster disabled";
       return $tinfo;
     }
@@ -1105,6 +1115,7 @@ sub collect_one_test_case {
     {
       # Only the ndb test should be run, all other should be skipped
       $tinfo->{'skip'}= 1;
+      $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
       $tinfo->{'comment'}= "Only ndbcluster tests";
       return $tinfo;
     }
@@ -1130,6 +1141,7 @@ sub collect_one_test_case {
     if (grep(/^--skip[-_]log[-_]bin/,  @::opt_extra_mysqld_opt) )
     {
       $tinfo->{'skip'}= 1;
+      $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
       $tinfo->{'comment'}= "Test needs binlog";
       return $tinfo;
     }
@@ -1147,6 +1159,7 @@ sub collect_one_test_case {
     if ( $skip_rpl )
     {
       $tinfo->{'skip'}= 1;
+      $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
       $tinfo->{'comment'}= "No replication tests(--skip-rpl)";
       return $tinfo;
     }
@@ -1157,6 +1170,7 @@ sub collect_one_test_case {
     if ( $tinfo->{'not_embedded'} )
     {
       $tinfo->{'skip'}= 1;
+      $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
       $tinfo->{'comment'}= "Not run for embedded server";
       return $tinfo;
     }
@@ -1176,6 +1190,7 @@ sub collect_one_test_case {
     if ( ! $::opt_ssl_supported ) {
       # SSL is not supported, skip it
       $tinfo->{'skip'}= 1;
+      $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
       $tinfo->{'comment'}= "No SSL support";
       return $tinfo;
     }
@@ -1196,6 +1211,7 @@ sub collect_one_test_case {
   if ( $tinfo->{'not_windows'} && IS_WINDOWS )
   {
     $tinfo->{'skip'}= 1;
+    $tinfo->{'skip_reason'}= MTR_SKIP_BY_FRAMEWORK;
     $tinfo->{'comment'}= "Test not supported on Windows";
     return $tinfo;
   }
