@@ -200,6 +200,11 @@ int log_sink_trad(void *instance MY_ATTRIBUTE((unused)), log_line *ll) {
           msg = ll->item[c].data.data_string.str;
           msg_len = ll->item[c].data.data_string.length;
 
+#ifdef WITH_WSREP
+          /* Provider may want to log multiline messages so skip the newline
+           * sanitation below. */
+          if (5 == subsys_len && !strcmp(subsys, "WSREP")) break;
+#endif /* WITH_WSREP */
           /*
             If the message contains a newline, copy the message and
             replace the newline so we may print a valid log line,
