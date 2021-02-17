@@ -204,6 +204,8 @@ int log_sink_trad(void *instance MY_ATTRIBUTE((unused)), log_line *ll) {
           /* Provider may want to log multiline messages so skip the newline
            * sanitation below. */
           if (5 == subsys_len && !strcmp(subsys, "WSREP")) break;
+          if (9 == subsys_len && !strcmp(subsys, "WSREP-SST")) break;
+          if (6 == subsys_len && !strcmp(subsys, "Galera")) break;
 #endif /* WITH_WSREP */
           /*
             If the message contains a newline, copy the message and
