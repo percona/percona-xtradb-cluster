@@ -7,6 +7,8 @@
 :Date: December 28, 2020
 :Installation: `Installing Percona XtraDB Cluster <https://www.percona.com/doc/percona-xtradb-cluster/8.0/install/index.html>`_
 
+Implement a :ref:`Inconsistency Voting Protocol` for :ref:`Cluster Error Voting <cev>`.
+
 Improvements
 ================================================================================
 

@@ -92,6 +92,7 @@ Features
    features/highavailability
    features/multisource-replication
    features/pxc-strict-mode
+   features/cev
 
 PXC Security
 ============
