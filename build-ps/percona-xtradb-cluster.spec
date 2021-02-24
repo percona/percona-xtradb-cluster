@@ -360,10 +360,21 @@ Requires:       %{distro_requires}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
 Requires:             selinux-policy
-Requires:		policycoreutils
-Requires(pre):		policycoreutils
-Requires(post):		policycoreutils
-Requires(postun):       policycoreutils
+Requires:             policycoreutils
+Requires(pre):        policycoreutils
+Requires(post):       policycoreutils
+Requires(postun):     policycoreutils
+%if 0%{?rhel} == 8
+Requires:             policycoreutils-python-utils
+Requires(pre):        policycoreutils-python-utils
+Requires(post):       policycoreutils-python-utils
+Requires(postun):     policycoreutils-python-utils
+%else
+Requires:             policycoreutils-python
+Requires(pre):        policycoreutils-python
+Requires(post):       policycoreutils-python
+Requires(postun):     policycoreutils-python
+%endif
 %if 0%{?rhel} == 6
 BuildRequires: 		selinux-policy
 %else
@@ -814,6 +825,7 @@ install -d $RBR/var/lib/mysql
 install -d $RBR/var/lib/mysql-files
 install -d $RBR/var/lib/mysql-keyring
 install -d $RBR%{_datadir}/mysql-test
+install -d $RBR/etc/mysql/certs
 # install -d $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
 install -d $RBR%{_includedir}
 install -d $RBR%{_libdir}
@@ -1244,6 +1256,10 @@ fi
 /usr/sbin/semodule -i %{_datadir}/percona-xtradb-cluster/selinux/percona-xtradb-cluster.pp >/dev/null 2>&1 || :
 /usr/sbin/semodule -i %{_datadir}/percona-xtradb-cluster/selinux/wsrep-sst-xtrabackup-v2.pp >/dev/null 2>&1 || :
 semanage port -a -t mysqld_port_t  -p tcp 4568
+# Let's setup mysqld_t in permissive mode, even if SELinux is in enforcing mode.
+# User will switch it back to enforcing if needed after checking audit logs.
+semanage permissive -a  mysqld_t
+
 
 if [ -x sbin/restorecon ] ; then
   sbin/restorecon -R var/lib/mysql
@@ -1522,6 +1538,7 @@ fi
 %dir %attr(751, mysql, mysql) /var/lib/mysql
 %dir %attr(750, mysql, mysql) /var/lib/mysql-files
 %dir %attr(750, mysql, mysql) /var/lib/mysql-keyring
+%dir %attr(755, mysql, mysql) /etc/mysql/certs
 %dir %attr(755, mysql, mysql) /var/run/mysqld
 %if 0%{?systemd}
 %attr(644, root, root) %{_unitdir}/mysql.service
