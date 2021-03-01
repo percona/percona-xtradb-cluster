@@ -5,7 +5,6 @@
 --source include/galera_cluster.inc
 
 --connection node_2
---let $wsrep_provider_orig = `SELECT @@wsrep_provider`
 --let $wsrep_cluster_address_orig = `SELECT @@wsrep_cluster_address`
 
 --let $galera_sync_point = before_async_recv_process_sync
@@ -15,10 +14,8 @@
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 
 --connection node_2
-SET GLOBAL wsrep_provider='none';
 
 --disable_query_log
---eval SET GLOBAL wsrep_provider = '$wsrep_provider_orig';
 --eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig';
 --enable_query_log
 
