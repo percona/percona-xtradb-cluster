@@ -15,3 +15,5 @@ galera_sst_xtrabackup-v2-options : N/A 0000-00-00 CODERSHIP SST Encryption does 
 galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically
 galera_var_innodb_disallow_writes : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 galera_wsrep_provider_unset_set : lp1379204 0000-00-00 CODERSHIP 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
+pxc-421 : BUG#0000 2021-03-02 CODERSHIP variable wsrep_provider is now read-only
+galera_migrate : BUG#0000 2021-03-02 CODERSHIP variable wsrep_provider is now read-only
