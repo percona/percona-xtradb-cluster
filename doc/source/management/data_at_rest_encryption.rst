@@ -4,7 +4,7 @@
 Data at Rest Encryption
 =======================
 
-This feature is considered **BETA** quality.
+This feature is considered **tech preview** quality.
 
 .. contents::
    :local:
@@ -24,6 +24,10 @@ data-at-rest only.
 
 Currently data-at-rest encryption is supported in |PXC| for general tablespace,
 file-per-tablespace, and temporary tables.
+
+.. note::
+
+   |Percona Server| 5.7 data at rest encryption is similar to the `MySQL 5.7 data-at-rest encryption <https://dev.mysql.com/doc/refman/5.7/en/innodb-data-encryption.html>`_. Review the available encryption features for `Percona Server for MySQL 5.7 <https://www.percona.com/doc/percona-server/5.7/security/data-at-rest-encryption.html>`__. |Percona Server| 8.0 provides more encryption features and options which are not available in this version. 
 
 InnoDB tablespace encryption
 ============================
