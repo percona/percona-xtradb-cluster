@@ -19,3 +19,9 @@ galera_restart_on_unknown_option : when node-2 is shutdown with unknown option, 
 MW-360 : drop temporary table is bin logged (PS issue)
 MW-286 : timing issues. Need to work and stablize it.
 galera_as_slave_preordered : Intermittent failure (duplicate entry) observed in mtr.
+
+galera_ist_restart_joiner: Needs dynamic wsrep_provider
+galera_ist_try_again: Needs dynamic wsrep_provider
+pxc-421: Needs dynamic wsrep_provider
+galera_memcached: Needs dynamic wsrep_provider
+galera_migrate: Needs dynamic wsrep_provider
