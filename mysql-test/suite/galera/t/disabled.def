@@ -19,4 +19,7 @@ galera_sst_xtrabackup-v2-options : N/A 0000-00-00 CODERSHIP fails in multiple wa
 galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically
 galera_var_wsrep_recover : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 mysql-wsrep#216 : GCF-1021 0000-00-00 CODERSHIP 5.7 Regression: obfuscated passwords not consistent in error logs
+pxc-421 : BUG#0000 2021-03-02 CODERSHIP variable wsrep_provider is now read-only
+galera_migrate : BUG#0000 2021-03-02 CODERSHIP variable wsrep_provider is now read-only
+galera_wsrep_provider_unset_set : BUG#0000 2021-03-02 CODERSHIP variable wsrep_provider is now read-only
 
