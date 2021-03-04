@@ -30,5 +30,5 @@ SET GLOBAL slow_query_log = ON;
 
 CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_index_stats` not found");
 CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_table_stats` not found");
-CALL mtr.add_suppression("Fetch of persistent statistics requested for table");
+CALL mtr.add_suppression("Recalculation of persistent statistics requested for table");
 
