@@ -191,17 +191,11 @@ static int keyring_vault_init(MYSQL_PLUGIN plugin_info)
 
       if (current_thd != NULL)
         push_warning(current_thd, Sql_condition::SL_WARNING, 42000,
-<<<<<<< HEAD
-        	     "keyring_vault initialization failure. Please check the server log.");
+                     "keyring_vault initialization failure. Please check the "
+                     "server log.");
 #ifdef WITH_WSREP
       return 1;
 #else
-||||||| 7a7e0965907
-        	     "keyring_vault initialization failure. Please check the server log.");
-=======
-                     "keyring_vault initialization failure. Please check the "
-                     "server log.");
->>>>>>> Percona-Server-5.7.33-36
       return 0;
 #endif /* WITH_WSREP */
     }
