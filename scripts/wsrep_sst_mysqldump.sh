@@ -80,12 +80,11 @@ fi
 
 STOP_WSREP="SET wsrep_on=OFF;"
 
-# NOTE: we don't use --routines here because we're dumping mysql.proc table
 MYSQLDUMP_GENERAL="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
 $AUTH -S$WSREP_SST_OPT_SOCKET \
 --add-drop-database --add-drop-table --skip-add-locks --create-options \
 --disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
---skip-comments --flush-privileges --all-databases --events"
+--skip-comments --flush-privileges --all-databases --events --routines"
 
 MYSQLDUMP_GTID_EXECUTED="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
 $AUTH -S$WSREP_SST_OPT_SOCKET \
