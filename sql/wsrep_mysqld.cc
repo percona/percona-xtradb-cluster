@@ -682,6 +682,10 @@ extern int wsrep_on(void *);
 
 void wsrep_init_startup (bool first)
 {
+  /* if server is started with --help (--verbose) options, there is no need
+     to start replication, skipping wsrep initialization
+  */
+  if (opt_help) return;
   if (wsrep_init()) unireg_abort(1);
 
   wsrep_thr_lock_init(wsrep_thd_is_BF, wsrep_abort_thd,
