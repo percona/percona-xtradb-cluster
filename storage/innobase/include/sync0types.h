@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2016, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2020, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -230,6 +230,7 @@ enum latch_level_t {
 	SYNC_BUF_BLOCK,
 	SYNC_BUF_PAGE_HASH,
 	SYNC_BUF_LRU_LIST,
+	SYNC_BUF_CHUNKS,
 
 	SYNC_POOL,
 	SYNC_POOL_MANAGER,
@@ -281,6 +282,7 @@ enum latch_level_t {
 	SYNC_TREE_NODE_FROM_HASH,
 	SYNC_TREE_NODE_NEW,
 	SYNC_INDEX_TREE,
+	SYNC_ANALYZE_INDEX,
 
 	SYNC_IBUF_PESS_INSERT_MUTEX,
 	SYNC_IBUF_HEADER,
@@ -317,6 +319,7 @@ enum latch_id_t {
 	LATCH_ID_NONE = 0,
 	LATCH_ID_AUTOINC,
 	LATCH_ID_BUF_BLOCK_MUTEX,
+	LATCH_ID_BUF_POOL_CHUNKS,
 	LATCH_ID_BUF_POOL_LRU_LIST,
 	LATCH_ID_BUF_POOL_FREE_LIST,
 	LATCH_ID_BUF_POOL_ZIP_FREE,
@@ -411,6 +414,7 @@ enum latch_id_t {
 	LATCH_ID_FIL_CRYPT_DATA_MUTEX,
 	LATCH_ID_FIL_CRYPT_THREADS_MUTEX,
 	LATCH_ID_FIL_CRYPT_START_ROTATE_MUTEX,
+	LATCH_ID_ANALYZE_INDEX_MUTEX,
 	LATCH_ID_TEST_MUTEX,
 	LATCH_ID_MAX = LATCH_ID_TEST_MUTEX
 };
@@ -704,6 +708,7 @@ public:
 	void iterate(Callback& callback) const
 		UNIV_NOTHROW
 	{
+		m_mutex.enter();
 		Counters::const_iterator	end = m_counters.end();
 
 		for (Counters::const_iterator it = m_counters.begin();
@@ -712,6 +717,7 @@ public:
 
 			callback(*it);
 		}
+		m_mutex.exit();
 	}
 
 	/** Disable the monitoring */
@@ -771,7 +777,7 @@ private:
 	typedef std::vector<Count*> Counters;
 
 	/** Mutex protecting m_counters */
-	Mutex			m_mutex;
+	mutable Mutex		m_mutex;
 
 	/** Counters for the latches */
 	Counters		m_counters;

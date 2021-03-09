@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2014, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2014, 2020, Oracle and/or its affiliates. All Rights Reserved.
 
 Portions of this file contain modifications contributed and copyrighted by
 Google, Inc. Those modifications are gratefully acknowledged and are described
@@ -478,6 +478,7 @@ LatchDebug::LatchDebug()
 	LEVEL_MAP_INSERT(SYNC_MONITOR_MUTEX);
 	LEVEL_MAP_INSERT(SYNC_ANY_LATCH);
 	LEVEL_MAP_INSERT(SYNC_DOUBLEWRITE);
+	LEVEL_MAP_INSERT(SYNC_BUF_CHUNKS);
 	LEVEL_MAP_INSERT(SYNC_BUF_FLUSH_LIST);
 	LEVEL_MAP_INSERT(SYNC_BUF_BLOCK);
 	LEVEL_MAP_INSERT(SYNC_BUF_PAGE_HASH);
@@ -528,6 +529,7 @@ LatchDebug::LatchDebug()
 	LEVEL_MAP_INSERT(SYNC_TREE_NODE);
 	LEVEL_MAP_INSERT(SYNC_TREE_NODE_FROM_HASH);
 	LEVEL_MAP_INSERT(SYNC_TREE_NODE_NEW);
+	LEVEL_MAP_INSERT(SYNC_ANALYZE_INDEX);
 	LEVEL_MAP_INSERT(SYNC_INDEX_TREE);
 	LEVEL_MAP_INSERT(SYNC_IBUF_PESS_INSERT_MUTEX);
 	LEVEL_MAP_INSERT(SYNC_IBUF_HEADER);
@@ -844,6 +846,7 @@ LatchDebug::check_order(
 		}
 		break;
 
+	case SYNC_BUF_CHUNKS:
 	case SYNC_BUF_FLUSH_LIST:
 	case SYNC_BUF_LRU_LIST:
 	case SYNC_BUF_FREE_LIST:
@@ -952,6 +955,11 @@ LatchDebug::check_order(
 	case SYNC_INDEX_TREE:
 
 		basic_check(latches, level, SYNC_TREE_NODE - 1);
+		break;
+
+	case SYNC_ANALYZE_INDEX:
+
+		basic_check(latches, level, SYNC_ANALYZE_INDEX - 1);
 		break;
 
 	case SYNC_IBUF_TREE_NODE:
@@ -1353,6 +1361,7 @@ sync_latch_meta_init()
 #else
 	LATCH_ADD_MUTEX(BUF_BLOCK_MUTEX, SYNC_BUF_BLOCK, PFS_NOT_INSTRUMENTED);
 #endif /* !PFS_SKIP_BUFFER_MUTEX_RWLOCK */
+	LATCH_ADD_MUTEX(BUF_POOL_CHUNKS, SYNC_BUF_CHUNKS, buf_pool_chunks_mutex_key);
 
 	LATCH_ADD_MUTEX(BUF_POOL_LRU_LIST, SYNC_BUF_LRU_LIST,
 			buf_pool_LRU_list_mutex_key);
@@ -1613,6 +1622,8 @@ sync_latch_meta_init()
 	LATCH_ADD_MUTEX(FIL_CRYPT_START_ROTATE_MUTEX, SYNC_NO_ORDER_CHECK,
 	    		PFS_NOT_INSTRUMENTED);
 
+	LATCH_ADD_MUTEX(ANALYZE_INDEX_MUTEX, SYNC_ANALYZE_INDEX,
+			analyze_index_mutex_key);
 
 	latch_id_t	id = LATCH_ID_NONE;
 

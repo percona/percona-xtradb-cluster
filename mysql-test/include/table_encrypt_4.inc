@@ -6,7 +6,7 @@
 --source include/not_embedded.inc
 --source include/have_debug.inc
 
---let $restart_parameters="$KEYRING_RESTART_PARAM"
+--let $restart_parameters="$keyring_restart_param"
 --let $restart_hide_args= 1
 --source include/restart_mysqld.inc
 
@@ -17,7 +17,7 @@ call mtr.add_suppression("Operating system error number .* in a file operation")
 call mtr.add_suppression("InnoDB: The error means the system cannot find the path specified.");
 call mtr.add_suppression("'delete' returned OS error 7");
 call mtr.add_suppression("InnoDB: Trying to import a tablespace, but could not open the tablespace file");
-call mtr.add_suppression("InnoDB: Table is not in an encrypted tablespace, but the data file which trying to import is an encrypted tablespace");
+call mtr.add_suppression("Table is not in an encrypted tablespace, but the data file intended for import is an encrypted tablespace");
 --enable_query_log
 
 --disable_warnings
@@ -93,7 +93,7 @@ if($source_db != $dest_db) {
 	eval DROP TABLE $dest_db.t1;
 }
 
---let $restart_parameters="$KEYRING_RESTART_PARAM"
+--let $restart_parameters="$keyring_restart_param"
 --let $restart_hide_args= 1
 --source include/restart_mysqld.inc
 

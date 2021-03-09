@@ -114,6 +114,7 @@ extern my_bool     wsrep_restart_slave;
 extern my_bool     wsrep_restart_slave_activated;
 extern my_bool     wsrep_slave_FK_checks;
 extern my_bool     wsrep_slave_UK_checks;
+extern ulonglong   wsrep_mode;
 extern ulong       wsrep_running_threads;
 extern ulong       wsrep_RSU_commit_timeout;
 
@@ -156,6 +157,10 @@ extern ulong       pxc_maint_mode;
 extern ulong       pxc_maint_transition_period;
 extern my_bool     pxc_encrypt_cluster_traffic;
 
+enum enum_wsrep_mode {
+    WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0
+};
+
 // MySQL status variables
 extern my_bool     wsrep_new_cluster;
 extern my_bool     wsrep_connected;
@@ -186,6 +191,9 @@ bool wsrep_before_SE(); // initialize wsrep before storage
 /* wsrep initialization sequence at startup
  * @param before wsrep_before_SE() value */
 void wsrep_init_startup(bool before);
+
+/* Setup SST request methods that will be accepted by server */
+bool wsrep_setup_allowed_sst_methods();
 
 
 extern "C" enum wsrep_exec_mode wsrep_thd_exec_mode(THD *thd);
@@ -243,6 +251,7 @@ extern void wsrep_stop_replication(THD *thd, bool is_server_shutdown);
 extern bool wsrep_start_replication();
 extern bool wsrep_must_sync_wait (THD* thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
 extern bool wsrep_sync_wait (THD* thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
+extern bool wsrep_check_mode(uint mask);
 extern int  wsrep_check_opts (int argc, char* const* argv);
 extern void wsrep_prepend_PATH (const char* path);
 /* some inline functions are defined in wsrep_mysqld_inl.h */
@@ -250,14 +259,17 @@ extern void wsrep_prepend_PATH (const char* path);
 /* Provide a wrapper of the WSREP_ON macro for plugins to use */
 extern "C" bool wsrep_is_wsrep_on(void);
 
+/* return non-const copy of thd->rewritten_query() */
+extern String wsrep_thd_rewritten_query(THD *thd);
 
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
 
-#define WSREP_ON                         \
-  ((global_system_variables.wsrep_on) && \
-   wsrep_provider                     && \
-   strcmp(wsrep_provider, WSREP_NONE))
+extern bool wsrep_provider_set;
+
+#define WSREP_ON                          \
+  ((global_system_variables.wsrep_on) &&  \
+   wsrep_provider_set)
 
 /* use xxxxxx_NNULL macros when thd pointer is guaranteed to be non-null to
  * avoid compiler warnings (GCC 6 and later) */
@@ -276,14 +288,10 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 #define WSREP_EMULATE_BINLOG(thd) \
   (WSREP(thd) && wsrep_emulate_bin_log)
 
-// MySQL logging functions don't seem to understand long long length modifer.
-// This is a workaround. It also prefixes all messages with "WSREP"
-#define WSREP_LOG(fun, ...)                                       \
-    {                                                             \
-        char msg[4096] = {'\0'};                                  \
-        snprintf(msg, sizeof(msg) - 1, ## __VA_ARGS__);           \
-        fun("WSREP: %s", msg);                                    \
-    }
+/* A wrapper function for MySQL log functions. The call will prefix
+   the log message with WSREP and forwards the result buffer to
+   MySQL log function specified in fun. */
+void WSREP_LOG(void (*fun)(const char* fmt, ...), const char* fmt, ...);
 
 #define WSREP_DEBUG(...)                                                \
     if (wsrep_debug)     WSREP_LOG(sql_print_information, ##__VA_ARGS__)
@@ -314,8 +322,8 @@ extern wsrep_seqno_t wsrep_locked_seqno;
   }
 
 #define WSREP_QUERY(thd)                                \
-  ((!opt_general_log_raw) && thd->rewritten_query.length()      \
-   ? thd->rewritten_query.c_ptr_safe() : thd->query().str)
+  ((!opt_general_log_raw) && thd->rewritten_query().length()      \
+   ? wsrep_thd_rewritten_query(thd).c_ptr_safe() : thd->query().str)
 
 extern my_bool wsrep_ready_get();
 extern void wsrep_ready_wait();

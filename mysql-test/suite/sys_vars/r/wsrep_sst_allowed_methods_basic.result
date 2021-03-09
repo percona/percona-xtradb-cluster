@@ -1,0 +1,30 @@
+# default
+SELECT @@global.wsrep_sst_allowed_methods;
+@@global.wsrep_sst_allowed_methods
+mysqldump,rsync,skip,xtrabackup,xtrabackup-v2
+
+# scope
+SELECT @@session.wsrep_sst_allowed_methods;
+ERROR HY000: Variable 'wsrep_sst_allowed_methods' is a GLOBAL variable
+SHOW GLOBAL VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	mysqldump,rsync,skip,xtrabackup,xtrabackup-v2
+SHOW SESSION VARIABLES LIKE 'wsrep_sst_allowed_methods';
+Variable_name	Value
+wsrep_sst_allowed_methods	mysqldump,rsync,skip,xtrabackup,xtrabackup-v2
+SELECT * FROM information_schema.global_variables WHERE variable_name = 'wsrep_sst_allowed_methods';
+VARIABLE_NAME	VARIABLE_VALUE
+WSREP_SST_ALLOWED_METHODS	mysqldump,rsync,skip,xtrabackup,xtrabackup-v2
+Warnings:
+Warning	1287	'INFORMATION_SCHEMA.GLOBAL_VARIABLES' is deprecated and will be removed in a future release. Please use performance_schema.global_variables instead
+SELECT * FROM information_schema.session_variables WHERE variable_name = 'wsrep_sst_allowed_methods';
+VARIABLE_NAME	VARIABLE_VALUE
+WSREP_SST_ALLOWED_METHODS	mysqldump,rsync,skip,xtrabackup,xtrabackup-v2
+Warnings:
+Warning	1287	'INFORMATION_SCHEMA.SESSION_VARIABLES' is deprecated and will be removed in a future release. Please use performance_schema.session_variables instead
+
+# readonly
+SET GLOBAL wsrep_sst_allowed_methods = 'test_method';
+ERROR HY000: Variable 'wsrep_sst_allowed_methods' is a read only variable
+SET SESSION wsrep_sst_allowed_methods = 'test_method';
+ERROR HY000: Variable 'wsrep_sst_allowed_methods' is a read only variable

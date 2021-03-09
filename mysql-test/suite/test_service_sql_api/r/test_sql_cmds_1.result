@@ -37,10 +37,11 @@ test_query_kill
 session is dead? 0
 Executing select sleep(10)
 run KILL QUERY
+ERROR 1317 Query execution was interrupted
 Killed run_command return value: 0
 thread shutdown: 0 (no)
-thread error: 0
-thread error msg: 
+thread error: 1317
+thread error msg: Query execution was interrupted
 session is dead (after)? 0
 OK
 ======================================================

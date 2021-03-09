@@ -22,14 +22,15 @@
 --let $include_filename= start_transaction_high_prio.inc
 --source include/begin_include_file.inc
 
+let old_debug=`SELECT @@debug`;
 --disable_query_log
-SET GLOBAL DEBUG='+d,dbug_set_high_prio_trx';
+SET GLOBAL DEBUG='d,dbug_set_high_prio_trx';
 --enable_query_log
 
 START TRANSACTION /* HIGH PRIORITY */;
 
 --disable_query_log
-SET GLOBAL DEBUG='-d,dbug_set_high_prio_trx';
+--eval SET GLOBAL DEBUG='$old_debug';
 --enable_query_log
 
 --let $include_filename= start_transaction_high_prio.inc

@@ -1,8 +1,10 @@
+
 ==========
  Glossary
 ==========
 
 .. glossary::
+   
 
    LSN
      Each InnoDB page (usually 16kb in size) contains a log sequence number, or
@@ -51,7 +53,7 @@
      another (SST applies :command:`FLUSH TABLES WITH READ LOCK` command).
      Xtrabackup SST does not require :command:`READ LOCK` for the entire
      syncing process, only for syncing the |MySQL| system tables and writing
-     the information about the binlog, galera and slave information (same as
+     the information about the binlog, galera and replica information (same as
      the regular |Percona XtraBackup| backup). State snapshot transfer method
      can be configured with the :variable:`wsrep_sst_method` variable.
 
@@ -129,6 +131,26 @@
      Normal replication path for cluster members. Can be encrypted (not by
      default) and unicast or multicast (unicast by default). Runs on tcp port
      4567 by default.
+
+   Database replication
+
+      See `Database replication in Galera Cluster documentation
+      <https://galeracluster.com/library/documentation/tech-desc-introduction.html>`_
+
+   Slave database server
+
+      See `Database replication in Galera Cluster documentation
+      <https://galeracluster.com/library/documentation/tech-desc-introduction.html>`_
+
+   Multi-master replication
+
+      See `Multi-master replication in Galera Cluster documentation
+      <https://galeracluster.com/library/documentation/tech-desc-introduction.html>`_
+
+   Node
+
+      See `Database replication in Galera Cluster documentation
+      <https://galeracluster.com/library/documentation/tech-desc-introduction.html>`_
 
    datadir
     The directory in which the database server stores its databases. Most Linux

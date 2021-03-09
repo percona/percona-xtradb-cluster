@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # -*- cperl -*-
 
-# Copyright (c) 2004, 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2004, 2020, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -93,6 +93,7 @@ use File::Copy;
 use File::Find;
 use File::Temp qw/tempdir/;
 use File::Spec::Functions qw/splitdir/;
+use My::Constants;
 use My::Platform;
 use My::SafeProcess;
 use My::ConfigFactory;
@@ -103,6 +104,7 @@ use My::CoreDump;
 use mtr_cases;
 use mtr_cases_from_list;
 use mtr_report;
+use mtr_report_junit;
 use mtr_match;
 use mtr_unique;
 use mtr_results;
@@ -199,12 +201,14 @@ my $DEFAULT_SUITES= "main,sys_vars,binlog,binlog_encryption,rpl_encryption,encry
   ."innodb_fts,innodb_zip,innodb_undo,innodb_stress,perfschema,funcs_1,"
   ."funcs_2,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,"
   ."test_service_sql_api,jp,stress,engines/iuds,engines/funcs,"
-  ."group_replication,x,galera,"
+  ."group_replication,x,"
   ."query_response_time,audit_log,json,connection_control,"
   ."tokudb.add_index,tokudb.alter_table,tokudb,tokudb.bugs,tokudb.parts,"
   ."tokudb.rpl,tokudb.perfschema,"
-  ."rocksdb,rocksdb.rpl,rocksdb.sys_vars,"
-  ."keyring_vault,audit_null,percona-pam-for-mysql";
+  ."rocksdb,rocksdb_rpl,rocksdb_sys_vars,rocksdb_stress,"
+  ."audit_null,percona-pam-for-mysql,data_masking,"
+  ."galera,galera_3nodes";
+
 my $opt_suites;
 
 our $opt_verbose= 0;  # Verbose output, enable with --verbose
@@ -319,7 +323,7 @@ my $opt_skip_core;
 
 our $opt_check_testcases= 1;
 my $opt_mark_progress;
-our $opt_test_progress= 0;
+our $opt_test_progress= 1;
 my $opt_max_connections;
 our $opt_report_times= 0;
 
@@ -327,7 +331,7 @@ my $opt_sleep;
 
 my $opt_testcase_timeout= $ENV{MTR_TESTCASE_TIMEOUT} ||  15; # minutes
 my $opt_suite_timeout   = $ENV{MTR_SUITE_TIMEOUT}    || 300; # minutes
-my $opt_shutdown_timeout= $ENV{MTR_SHUTDOWN_TIMEOUT} ||  10; # seconds
+my $opt_shutdown_timeout= $ENV{MTR_SHUTDOWN_TIMEOUT} ||  60; # seconds
 my $opt_start_timeout   = $ENV{MTR_START_TIMEOUT}    || 180; # seconds
 
 sub suite_timeout { return $opt_suite_timeout * 60; };
@@ -350,12 +354,13 @@ our $opt_user = "root";
 
 our $opt_sanitize= 0;
 our $opt_valgrind= 0;
+my $shutdown_report= 0;
+my $shutdown_report_text= '';
 my $opt_valgrind_mysqld= 0;
 my $opt_valgrind_clients= 0;
 my $opt_valgrind_mysqltest= 0;
 my @valgrind_args;
 my $opt_valgrind_path;
-my $valgrind_reports= 0;
 my $opt_callgrind;
 my $opt_helgrind;
 my %mysqld_logs;
@@ -384,6 +389,9 @@ my $opt_include_ndbcluster= 0;
 my $opt_skip_ndbcluster= 0;
 
 my $opt_skip_sys_schema= 0;
+
+our $opt_junit_output= undef;
+our $opt_junit_package= undef;
 
 my $exe_ndbd;
 my $exe_ndbmtd;
@@ -509,6 +517,10 @@ sub main {
     $opt_parallel= 1;
   }
 
+  # Shutdown report is one extra test created to report
+  # any failures or crashes during shutdown.
+  $num_tests_for_report = $num_tests_for_report + 1;
+
   # When either --valgrind or --sanitize option is enabled, a dummy
   # test is created.
   if ($opt_valgrind_mysqld or $opt_sanitize) {
@@ -562,7 +574,7 @@ sub main {
 
   if ($group_replication)
   {
-    $ports_per_thread= $ports_per_thread + 10;
+    $ports_per_thread= $ports_per_thread + 40;
   }
 
   if ($xplugin)
@@ -624,6 +636,22 @@ sub main {
     mtr_error("Test suite aborted");
   }
 
+  my $aggregated_shutdown_report = '';
+  my $aggregated_valgrind_report = '';
+  foreach my $t (@$completed) {
+    if ($t->{name} eq "shutdown_report") {
+      if (defined $t->{comment} && $t->{comment} ne '') {
+        $aggregated_shutdown_report .= $t->{comment};
+      }
+      if (($opt_valgrind || $opt_sanitize) && defined $t->{valgrind_comment}
+            && $t->{valgrind_comment} ne '') {
+        $aggregated_valgrind_report .= $t->{valgrind_comment};
+      }
+    }
+  }
+
+  @$completed = grep {$_->{name} ne "shutdown_report"} @$completed;
+
   if (@$completed != $num_tests) {
     # Not all tests completed
     mtr_report();
@@ -647,6 +675,25 @@ sub main {
 
   push @$completed, run_ctest() if $opt_ctest;
 
+  # Create minimalistic "test" for the reporting failures at shutdown
+  my $tinfo = My::Test->new(
+    name      => 'shutdown_report',
+    shortname => 'shutdown_report',
+    );
+
+  # Set dummy worker id to align report with normal tests
+  $tinfo->{worker} = 0 if $opt_parallel > 1;
+  if ($shutdown_report && $aggregated_shutdown_report ne '') {
+    $tinfo->{result} = 'MTR_RES_FAILED';
+    $tinfo->{comment} = "Mysqld reported failures at shutdown: \n$aggregated_shutdown_report";
+    $tinfo->{failures} = 1;
+  } else {
+    $tinfo->{result} = 'MTR_RES_PASSED';
+  }
+  mtr_report_test($tinfo);
+  report_option('prev_report_length', 0);
+  push @$completed, $tinfo;
+
   if ($opt_valgrind_mysqld or $opt_sanitize) {
     # Create minimalistic "test" for the reporting
     my $tinfo = My::Test->new(
@@ -656,13 +703,13 @@ sub main {
 
     # Set dummy worker id to align report with normal tests
     $tinfo->{worker} = 0 if $opt_parallel > 1;
-    if ($valgrind_reports) {
+    if ($aggregated_valgrind_report ne '') {
       $tinfo->{result}= 'MTR_RES_FAILED';
       if ($opt_valgrind_mysqld) {
-        $tinfo->{comment} = "Valgrind reported failures at shutdown, see above";
+        $tinfo->{comment} = "Valgrind reported failures at shutdown: \n$aggregated_valgrind_report";
       } else {
         $tinfo->{comment} =
-          "Sanitizer reported failures at shutdown, see above";
+          "Sanitizer reported failures at shutdown: \n$aggregated_valgrind_report";
       }
       $tinfo->{failures}= 1;
     } else {
@@ -698,11 +745,22 @@ sub main {
 
   print_total_times($opt_parallel) if $opt_report_times;
 
-  mtr_report_stats("Completed", $completed);
+  report_stats("Completed", $completed);
 
   remove_vardir_subs() if $opt_clean_vardir;
 
   exit(0);
+}
+
+
+sub report_stats($$;$) {
+  my ($prefix, $tests, $skip_error) = @_;
+
+  if ($opt_junit_output) {
+    mtr_report_stats_junit($tests, $opt_junit_output, $opt_junit_package);
+  }
+
+  mtr_report_stats($prefix, $tests, $skip_error);
 }
 
 
@@ -832,7 +890,7 @@ sub run_test_server ($$$) {
 	    elsif ($opt_max_test_fail > 0 and
 		   $num_failed_test >= $opt_max_test_fail) {
 	      push(@$completed, $result);
-	      mtr_report_stats("Too many failed", $completed, 1);
+	      report_stats("Too many failed", $completed, 1);
 	      mtr_report("Too many tests($num_failed_test) failed!",
 			 "Terminating...");
 	      return undef;
@@ -895,11 +953,10 @@ sub run_test_server ($$$) {
 	elsif ($line =~ /^SPENT/) {
 	  add_total_times($line);
 	}
-	elsif ($line eq 'VALGREP' && ($opt_valgrind or $opt_sanitize)) {
-          # 'VALGREP' means that the worker found some valgrind reports in the
-          # server logs. This will cause the master to flag the pseudo test
-          # valgrind_report as failed.
-	  $valgrind_reports= 1;
+	elsif ($line eq 'SHUTDOWN_REPORT') {
+      # Mysqld detected crash during shutdown
+      $shutdown_report = 1;
+      push(@$completed, My::Test::read_test($sock));
 	}
 	else {
 	  mtr_error("Unknown response: '$line' from client");
@@ -998,7 +1055,7 @@ sub run_test_server ($$$) {
     # ----------------------------------------------------
     if ( has_expired($suite_timeout) )
     {
-      mtr_report_stats("Timeout", $completed, 1);
+      report_stats("Timeout", $completed, 1);
       mtr_report("Test suite timeout! Terminating...");
       return undef;
     }
@@ -1081,19 +1138,34 @@ sub run_worker ($) {
     }
     elsif ($line eq 'BYE'){
       mtr_report("Server said BYE");
+      my $found_err = 0;
+      my $valgrind_report_text = '';
+
       stop_all_servers($opt_shutdown_timeout);
+
+      if ($opt_valgrind || $opt_sanitize) {
+        $valgrind_report_text = valgrind_exit_reports();
+      }
+
+      if ($shutdown_report || $valgrind_report_text) {
+        my $test = My::Test->new(
+          name => 'shutdown_report',
+          comment => $shutdown_report_text,
+          valgrind_comment => $valgrind_report_text,
+        );
+        $test->write_test($server, "SHUTDOWN_REPORT");
+        $found_err = 1;
+      }
+
       mark_time_used('restart');
-      my $valgrind_reports= 0;
-      if ($opt_valgrind_mysqld or $opt_sanitize) {
-        $valgrind_reports= valgrind_exit_reports();
-	print $server "VALGREP\n" if $valgrind_reports;
-      }
+
       if ( $opt_gprof ) {
-	gprof_collect (find_mysqld($basedir), keys %gprof_dirs);
+        gprof_collect(find_mysqld($basedir), keys %gprof_dirs);
       }
+
       mark_time_used('admin');
       print_times_used($server, $thread_num);
-      exit($valgrind_reports);
+      exit($found_err);
     }
     else {
       mtr_error("Could not understand server, '$line'");
@@ -1105,6 +1177,65 @@ sub run_worker ($) {
   exit(1);
 }
 
+# Search server logs for any crashes during mysqld shutdown
+sub shutdown_exit_reports() {
+  my $found_report  = 0;
+  my $clean_shutdown = 0;
+  my $all_exit_reports = {};
+
+  foreach my $log_file (keys %mysqld_logs) {
+    my @culprits = ();
+    my $crash_rep     = "";
+
+    my $LOGF = IO::File->new($log_file) or
+      mtr_error("Could not open file '$log_file' for reading: $!");
+
+    while (my $line = <$LOGF>) {
+      if ($line =~ /^CURRENT_TEST: (.+)$/) {
+        my $testname = $1;
+        # If we have a report, report it if needed and start new list of tests
+        if ($found_report or $clean_shutdown) {
+          # Make ready to collect new report
+          @culprits     = ();
+          $found_report = 0;
+          $clean_shutdown = 0;
+          $crash_rep = "";
+        }
+        push(@culprits, $testname);
+        next;
+      }
+
+      # Clean shutdown
+      $clean_shutdown = 1 if $line =~ /.*Shutdown completed.*/;
+
+      # Mysqld crash at shutdown
+      $found_report = 1 if ($line =~ /.*Assertion.*/ or $line =~ /.*mysqld got signal.*/
+                            or $line =~ /.*mysqld got exception.*/);
+
+      if ($found_report) {
+        $crash_rep .= $line;
+      }
+    }
+
+    my $report_text = '';
+
+    if ($found_report) {
+      $report_text = $crash_rep;
+    } else {
+      # Print last 100 lines of log file since shutdown failed
+      # for some reason.
+      $report_text = mtr_lastlinesfromfile($log_file, 100);
+    }
+
+    $all_exit_reports->{$log_file} = {
+      text => $report_text,
+      after_tests => [@culprits],
+    };
+    $LOGF = undef;
+  }
+
+  return $all_exit_reports;
+}
 
 sub ignore_option {
   my ($opt, $value)= @_;
@@ -1292,7 +1423,7 @@ sub command_line_setup {
              'valgrind-options=s'       => sub {
 	       my ($opt, $value)= @_;
 	       # Deprecated option unless it's what we know pushbuild uses
-	       if ($value eq "--gen-suppressions=all --show-reachable=yes") {
+	       if (option_equals($value,"--gen-suppressions=all --show-reachable=yes")) {
 		 push(@valgrind_args, $_) for (split(' ', $value));
 		 return;
 	       }
@@ -1350,6 +1481,8 @@ sub command_line_setup {
 	     'unit-tests-report!'	=> \$opt_ctest_report,
 	     'stress=s'                 => \$opt_stress,
              'suite-opt=s'              => \$opt_suite_opt,
+	     'junit-output=s'           => \$opt_junit_output,
+	     'junit-package=s'          => \$opt_junit_package,
 
              'help|h'                   => \$opt_usage,
 	     # list-options is internal, not listed in help
@@ -1364,6 +1497,12 @@ sub command_line_setup {
 
   usage("") if $opt_usage;
   list_options(\%options) if $opt_list_options;
+
+  # Make sure that XML::Simple support exists for JUnit output
+  if ($opt_junit_output and !mtr_junit_supported()) {
+    mtr_error("JUnit XML reporting is not supported.  The XML::Simple package",
+              "could not be loaded.");
+  }
 
   # --------------------------------------------------------------------------
   # Setup verbosity
@@ -1548,13 +1687,13 @@ sub command_line_setup {
   # --------------------------------------------------------------------------
   foreach my $arg ( @opt_extra_mysqld_opt )
   {
-    if ( $arg =~ /default-storage-engine=(\S+)/ )
+    if ( $arg =~ /default[-_]storage[-_]engine=(\S+)/ )
     {
       # Save this for collect phase
       collect_option('default-storage-engine', $1);
       mtr_report("Using default engine '$1'")
     }
-    if ( $arg =~ /default-tmp-storage-engine=(\S+)/ )
+    if ( $arg =~ /default[-_]tmp-storage[-_]engine=(\S+)/ )
     {
       # Save this for collect phase
       collect_option('default-tmp-storage-engine', $1);
@@ -2505,7 +2644,7 @@ sub mysqlxtest_arguments(){
    return mtr_args2str($exe, @$args);
  }
 
-sub mysqlpump_arguments ($) {
+sub mysql_pump_arguments ($) {
   my($group_suffix) = @_;
   my $exe= mtr_exe_exists(vs_config_dirs('client/dump','mysqlpump'),
                           "$basedir/client/mysqlpump",
@@ -2520,6 +2659,20 @@ sub mysqlpump_arguments ($) {
   mtr_add_arg($args, "--defaults-file=%s", $path_config_file);
   mtr_add_arg($args, "--defaults-group-suffix=%s", $group_suffix);
   client_debug_arg($args, "mysqlpump-$group_suffix");
+  return mtr_args2str($exe, @$args);
+}
+
+sub mysqlpump_arguments () {
+  my $exe= mtr_exe_exists(vs_config_dirs('client/dump','mysqlpump'),
+                          "$basedir/client/mysqlpump",
+                          "$path_client_bindir/mysqlpump");
+
+  my $args;
+  mtr_init_args(\$args);
+  if ( $opt_valgrind_clients )
+  {
+    valgrind_client_arguments($args, \$exe);
+  }
   return mtr_args2str($exe, @$args);
 }
 #
@@ -2810,7 +2963,8 @@ sub environment_setup {
   $ENV{'MYSQL_IMPORT'}=                client_arguments("mysqlimport");
   $ENV{'MYSQL_SHOW'}=                  client_arguments("mysqlshow");
   $ENV{'MYSQL_CONFIG_EDITOR'}=         client_arguments_no_grp_suffix("mysql_config_editor");
-  $ENV{'MYSQL_PUMP'}=                  mysqlpump_arguments(".1");
+  $ENV{'MYSQL_PUMP'}=                  mysql_pump_arguments(".1");
+  $ENV{'MYSQLPUMP'}=                   mysqlpump_arguments();
 
   if (!IS_WINDOWS)
   {
@@ -5004,51 +5158,55 @@ sub run_testcase ($) {
           resfile_output($tinfo->{'warnings'}) if $opt_resfile;
         }
 
-        if ( $res == 0 )
+      if ( $res == 0 )
+      {
+        my $check_res;
+        if ( restart_forced_by_test('force_restart') )
         {
-          my $check_res;
-          if ( restart_forced_by_test('force_restart') )
-          {
+          my $ret = stop_all_servers($opt_shutdown_timeout);
+          if ($ret != 0) {
+            shutdown_exit_reports();
+            $shutdown_report = 1;
+          }
+        }
+        elsif ( $opt_check_testcases and
+          $check_res= check_testcase($tinfo, "after"))
+        {
+          if ($check_res == 1) {
+            # Test case had sideeffects, not fatal error, just continue
             stop_all_servers($opt_shutdown_timeout);
+            mtr_report("Resuming tests...\n");
+            resfile_output($tinfo->{'check'}) if $opt_resfile;
           }
-          elsif ( $opt_check_testcases and
-            $check_res= check_testcase($tinfo, "after"))
-          {
-            if ($check_res == 1) {
-              # Test case had sideeffects, not fatal error, just continue
-              stop_all_servers($opt_shutdown_timeout);
-              mtr_report("Resuming tests...\n");
-              resfile_output($tinfo->{'check'}) if $opt_resfile;
-            }
-            else {
-              # Test case check failed fatally, probably a server crashed
-              report_failure_and_restart($tinfo);
-              return 1;
-            }
+          else {
+            # Test case check failed fatally, probably a server crashed
+            report_failure_and_restart($tinfo);
+            return 1;
           }
-          mtr_report_test_passed($tinfo);
         }
-        elsif ( $res == 62 )
+        mtr_report_test_passed($tinfo);
+      }
+      elsif ( $res == 62 )
+      {
+        # Testcase itself tell us to skip this one
+	    $tinfo->{skip_reason} = MTR_SKIP_BY_TEST;
+        # Try to get reason from test log file
+        find_testcase_skipped_reason($tinfo);
+        mtr_report_test_skipped($tinfo);
+        # Restart if skipped due to missing perl, it may have had side effects
+        if ( restart_forced_by_test('force_restart_if_skipped') ||
+          $tinfo->{'comment'} =~ /^perl not found/ )
         {
-          # Testcase itself tell us to skip this one
-          $tinfo->{skip_detected_by_test}= 1;
-          # Try to get reason from test log file
-          find_testcase_skipped_reason($tinfo);
-          mtr_report_test_skipped($tinfo);
-          # Restart if skipped due to missing perl, it may have had side effects
-          if ( restart_forced_by_test('force_restart_if_skipped') ||
-            $tinfo->{'comment'} =~ /^perl not found/ )
-          {
-            stop_all_servers($opt_shutdown_timeout);
-          }
+          stop_all_servers($opt_shutdown_timeout);
         }
-        elsif ( $res == 65 )
-        {
-          # Testprogram killed by signal
-          $tinfo->{comment}=
-            "testprogram crashed(returned code $res)";
-          report_failure_and_restart($tinfo);
-        }
+      }
+      elsif ( $res == 65 )
+      {
+        # Testprogram killed by signal
+        $tinfo->{comment}=
+        "testprogram crashed(returned code $res)";
+        report_failure_and_restart($tinfo);
+      }
         elsif ( $res == 1 )
         {
           # Check if the test tool requests that
@@ -5894,7 +6052,8 @@ sub report_failure_and_restart ($) {
     # In these cases we may want valgrind report from normal termination
     $tinfo->{'dont_kill_server'}= 1;
   }
-  # Shotdown properly if not to be killed (for valgrind)
+
+  # Shutdown properly if not to be killed (for valgrind)
   stop_all_servers($tinfo->{'dont_kill_server'} ? $opt_shutdown_timeout : 0);
 
   $tinfo->{'result'}= 'MTR_RES_FAILED';
@@ -5997,7 +6156,7 @@ sub mysqld_arguments ($$$) {
   my $mysqld=            shift;
   my $extra_opts=        shift;
 
-  my @defaults = grep(/^--defaults-file=/, @$extra_opts);
+  my @defaults = grep(/^--defaults[-_]file=/, @$extra_opts);
   if (@defaults > 0) {
     mtr_add_arg($args, pop(@defaults))
   }
@@ -6034,9 +6193,6 @@ sub mysqld_arguments ($$$) {
     mtr_add_arg($args, "--log-output=file");
   }
 
-  # Check if "extra_opt" contains skip-log-bin
-  my $skip_binlog= grep(/^(--|--loose-)skip-log-bin/, @$extra_opts);
-
   # Indicate to mysqld it will be debugged in debugger
   if ( $glob_debugger )
   {
@@ -6054,6 +6210,7 @@ sub mysqld_arguments ($$$) {
   my $found_skip_core= 0;
   my $found_no_console= 0;
   my $found_log_error= 0;
+
 
   # On windows, do not add console if log-error found in .cnf file
   open (CONFIG_FILE, " < $path_config_file") or
@@ -6073,6 +6230,7 @@ sub mysqld_arguments ($$$) {
     # Skip --defaults-file option since it's handled above.
     next if $arg =~ /^--defaults-file/;
 
+
     if ($arg =~ /^--log[-_]error/)
     {
       $found_log_error= 1;
@@ -6087,24 +6245,15 @@ sub mysqld_arguments ($$$) {
     {
         $found_no_console= 1;
     }
-#    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
-#    {
-#      ; # Dont add --binlog-format when running without binlog
-#    }
-    elsif ($arg eq "--loose-skip-log-bin")
-    {
-      if (grep { /--wsrep-provider=/ } @$extra_opts) {
-        # As an exception, allow --binlog-format if MTR is run with
-        # wsrep provider loaded.
-        mtr_add_arg($args, "%s", $arg);
-      } else {
-        ; # Dont add --binlog-format when running without binlog
-      }
-    }
-    elsif ($arg eq "--loose-skip-log-bin" and
+    elsif ($arg =~ /--loose[-_]skip[-_]log[-_]bin/ and
            $mysqld->option("log-slave-updates"))
     {
       ; # Dont add --skip-log-bin when mysqld have --log-slave-updates in config
+    }
+    elsif ($arg =~ /--loose[-_]skip[-_]log[-_]bin/ and
+	       (grep { /--wsrep-provider=/ } @$extra_opts))
+    {
+      ; # Dont add --skip-log-bin when wsrep provider loaded
     }
     elsif ($arg eq "")
     {
@@ -6230,8 +6379,8 @@ sub mysqld_start ($$) {
 
   my $output= $mysqld->value('#log-error');
 
-  # Remember this log file for valgrind error report search
-  $mysqld_logs{$output}= 1 if $opt_valgrind or $opt_sanitize;
+  # Remember this log file for valgrind/shutdown error report search
+  $mysqld_logs{$output} = 1;
 
   # Remember data dir for gmon.out files if using gprof
   $gprof_dirs{$mysqld->value('datadir')}= 1 if $opt_gprof;
@@ -6272,6 +6421,30 @@ sub mysqld_start ($$) {
   return;
 }
 
+sub shutdown_processes {
+  my ($timeout, @servers)= @_;
+  my $append_exit_reports= 0;
+  my %status = My::SafeProcess::shutdown($timeout, @servers);
+
+  if ($status{failed}) {
+    $shutdown_report_text.= "mysqld abnormal exit\n";
+  }
+  if ($status{killed}) {
+    $shutdown_report_text.=
+      "mysqld was killed after it failed to properly shutdown\n";
+  }
+
+  if ($status{failed} or $status{killed}) {
+    $shutdown_report = 1;
+    my $reports= shutdown_exit_reports();
+    while (my ($log_file, $report) = each (%$reports)) {
+      $shutdown_report_text.= $log_file . " after tests: @{$report->{after_tests}}:\n".
+                              "----------SERVER LOG START-----------\n".
+                              $report->{text}.
+                              "----------SERVER LOG END-------------\n";
+    }
+  }
+}
 
 sub stop_all_servers () {
   my $shutdown_timeout = $_[0] or 0;
@@ -6279,8 +6452,8 @@ sub stop_all_servers () {
   mtr_verbose("Stopping all servers...");
 
   # Kill all started servers
-  My::SafeProcess::shutdown($shutdown_timeout,
-			    started(all_servers()));
+  shutdown_processes($shutdown_timeout,
+                     started(all_servers()));
 
   # Remove pidfiles
   foreach my $server ( all_servers() )
@@ -6290,8 +6463,7 @@ sub stop_all_servers () {
   }
 
   # Mark servers as stopped
-  map($_->{proc}= undef, all_servers());
-
+  map($_->{proc} = undef, all_servers());
 }
 
 
@@ -6530,6 +6702,15 @@ sub get_extra_opts {
     $mysqld->option("#!use-slave-opt") ?
       $tinfo->{slave_opt} : $tinfo->{master_opt};
 
+  # For Galera and sys_vars tests skip --loose-skip-log-bin
+  my @galera_test = grep(/^galera\./, $tinfo->{name});
+  my @sys_vars_test = grep(/^sys_vars\./, $tinfo->{name});
+  if(@galera_test > 0 or @sys_vars_test > 0 )
+  {
+    my $skip_item = "--loose-skip-log-bin";
+    @$opts = grep { $_ ne $skip_item } @$opts;
+  }
+
   # Expand environment variables
   foreach my $opt ( @$opts )
   {
@@ -6544,29 +6725,30 @@ sub stop_servers($$) {
   my ($tinfo, @servers)= @_;
 
   # Remember if we restarted for this test case (count restarts)
-  $tinfo->{'restarted'}= 1;
+  $tinfo->{'restarted'} = 1;
 
   if ( join('|', @servers) eq join('|', all_servers()) )
   {
     # All servers are going down, use some kind of order to
     # avoid too many warnings in the log files
 
-   mtr_report("Restarting all servers");
+    mtr_report("Restarting all servers");
 
-    #  mysqld processes
-    My::SafeProcess::shutdown( $opt_shutdown_timeout, started(mysqlds()) );
+    # mysqld processes
+    shutdown_processes($opt_shutdown_timeout,
+                       started(mysqlds()));
 
     # cluster processes
-    My::SafeProcess::shutdown( $opt_shutdown_timeout,
-			       started(ndbds(), ndb_mgmds(), memcacheds()) );
+    shutdown_processes($opt_shutdown_timeout,
+                       started(ndbds(), ndb_mgmds(), memcacheds()));
   }
   else
   {
     mtr_report("Restarting ", started(@servers));
 
-     # Stop only some servers
-    My::SafeProcess::shutdown( $opt_shutdown_timeout,
-			       started(@servers) );
+    # Stop only some servers
+    shutdown_processes($opt_shutdown_timeout,
+                       started(@servers));
   }
 
   foreach my $server (@servers)
@@ -6628,7 +6810,14 @@ sub start_servers($) {
     }
     else
     {
-      my $xcom_port= $baseport + 9 + $server_id;
+      # For PXC's MTR
+      #
+      # Port X   - Connection handling
+      # Port X+1 - Galera
+      # Port X+2 - IST
+      # Port X+3 - SST
+      # Port X+4 - Group Replication
+      my $xcom_port= $baseport + 5 * $server_id;
       $ENV{$xcom_server}= $xcom_port;
     }
 
@@ -7382,7 +7571,7 @@ sub valgrind_arguments {
 #
 
 sub valgrind_exit_reports() {
-  my $found_err= 0;
+  my $aggregate= '';
 
   foreach my $log_file (keys %mysqld_logs)
   {
@@ -7406,11 +7595,8 @@ sub valgrind_exit_reports() {
         {
           if ($err_in_report)
           {
-            mtr_print ("$tool_name report from $log_file after tests:\n",
-                        @culprits);
-            mtr_print_line();
-            print ("$valgrind_rep\n");
-            $found_err= 1;
+            $aggregate.= "$tool_name report from $log_file after tests:\n";
+            $aggregate.= "@culprits\n$valgrind_rep\n";
             $err_in_report= 0;
           }
           # Make ready to collect new report
@@ -7444,19 +7630,19 @@ sub valgrind_exit_reports() {
         $err_in_report= 1 if $line =~ /possibly lost: [1-9]/;
         $err_in_report= 1 if $line =~ /still reachable: [1-9]/;
       }
+
+      $found_report= 1 if $line =~ / \[Note\] .*: Shutdown complete$/;
     }
 
     $LOGF= undef;
 
     if ($err_in_report) {
-      mtr_print ("$tool_name report from $log_file after tests:\n", @culprits);
-      mtr_print_line();
-      print ("$valgrind_rep\n");
-      $found_err= 1;
+      $aggregate.= "$tool_name report from $log_file after tests:\n";
+      $aggregate.= "@culprits\n$valgrind_rep\n";
     }
   }
 
-  return $found_err;
+  return $aggregate;
 }
 
 sub run_ctest() {
@@ -7477,11 +7663,17 @@ sub run_ctest() {
   # Add vs-config option if needed
   $ctest_vs= "-C $opt_vs_config" if $opt_vs_config;
 
+  # Limit ctest execution time
+  my $ctest_timeout= "--timeout @{[$opt_testcase_timeout * 60]}";
+
+  # Request Valgrind for unit tests if former was requested for other tests.
+  my $ctest_memcheck= $opt_valgrind_mysqld ? ' -T memcheck' : '';
+
   # Also silently ignore if we don't have ctest and didn't insist
   # Special override: also ignore in Pushbuild, some platforms may not have it
   # Now, run ctest and collect output
   $ENV{CTEST_OUTPUT_ON_FAILURE} = 1;
-  my $ctest_out= `ctest $ctest_vs 2>&1`;
+  my $ctest_out= `ctest $ctest_vs $ctest_timeout $ctest_memcheck 2>&1`;
   if ($? == $no_ctest && ($opt_ctest == -1 || defined $ENV{PB2WORKDIR})) {
     chdir($olddir);
     return;
@@ -7530,6 +7722,7 @@ sub run_ctest() {
   $ctest_report .= "Report from unit tests in $ctfile";
   $tinfo->{failures}= ($tinfo->{result} eq 'MTR_RES_FAILED');
 
+  $tinfo->{comment} .= "\n" . $ctest_out;
   mark_time_used('test');
   mtr_report_test($tinfo);
   chdir($olddir);
@@ -7822,6 +8015,8 @@ Misc options
   sanitize              Scan server log files for warnings from various
                         sanitizers. Assumes that you have built with
                         -DWITH_ASAN.
+  junit-output=FILE     Output JUnit test summary XML to FILE.
+  junit-package=NAME    Set the JUnit package name to NAME for this test run.
 
 Some options that control enabling a feature for normal test runs,
 can be turned off by prepending 'no' to the option, e.g. --notimer.

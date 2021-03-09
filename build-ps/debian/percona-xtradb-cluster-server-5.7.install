@@ -1,4 +1,6 @@
 usr/lib/mysql/plugin/*.so
+usr/lib/mysql/plugin/data_masking.ini
+usr/lib/mysql/plugin/daemon_example.ini
 usr/bin/clustercheck
 usr/bin/pyclustercheck
 usr/bin/innochecksum

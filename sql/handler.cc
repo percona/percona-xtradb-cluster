@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -800,6 +800,7 @@ int ha_init_errors(void)
   SETMSG(HA_ERR_WRONG_FILE_NAME,		ER_DEFAULT(ER_WRONG_FILE_NAME));
   SETMSG(HA_ERR_NOT_ALLOWED_COMMAND,		ER_DEFAULT(ER_NOT_ALLOWED_COMMAND));
   SETMSG(HA_ERR_COMPUTE_FAILED,		"Compute virtual column value failed");
+  SETMSG(HA_ERR_FTS_TOO_MANY_NESTED_EXP,  "Too many nested sub-expressions in a full-text search");
   /* Register the error messages for use with my_error(). */
   return my_error_register(get_handler_errmsg, HA_ERR_FIRST, HA_ERR_LAST);
 }
@@ -1883,6 +1884,9 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock)
 
     xid_state->set_state(XID_STATE::XA_PREPARED);
   }
+#ifdef WITH_WSREP
+  DEBUG_SYNC(thd, "wsrep_before_commit");
+#endif /* WITH_WSREP */
   if (error || (error= tc_log->commit(thd, all)))
   {
     ha_rollback_trans(thd, all);
@@ -8068,6 +8072,18 @@ int handler::read_range_next()
   }
 }
 
+/**
+  Check if one of the columns in a key is a virtual generated column.
+  @param part    the first part of the key to check
+  @param length  the length of the key
+  @retval true   if the key contains a virtual generated column
+  @retval false  if the key does not contain a virtual generated column
+*/
+static bool key_has_vcol(const KEY_PART_INFO *part, uint length) {
+  for (uint len = 0; len < length; len += part->store_length, ++part)
+    if (part->field->is_virtual_gcol()) return true;
+  return false;
+}
 
 void handler::set_end_range(const key_range* range,
                             enum_range_scan_direction direction)
@@ -8079,6 +8095,7 @@ void handler::set_end_range(const key_range* range,
     range_key_part= table->key_info[active_index].key_part;
     key_compare_result_on_equal= ((range->flag == HA_READ_BEFORE_KEY) ? 1 :
                                   (range->flag == HA_READ_AFTER_KEY) ? -1 : 0);
+    m_virt_gcol_in_end_range = key_has_vcol(range_key_part, range->length);
   }
   else
     end_range= NULL;
@@ -8576,31 +8593,48 @@ int binlog_log_row(TABLE* table,
   {
     if (thd->variables.transaction_write_set_extraction != HASH_ALGORITHM_OFF)
     {
-      if (before_record && after_record)
+      try
       {
-        size_t length= table->s->reclength;
-        uchar* temp_image=(uchar*) my_malloc(PSI_NOT_INSTRUMENTED,
-                                             length,
-                                             MYF(MY_WME));
-        if (!temp_image)
+        if (before_record && after_record)
         {
-          sql_print_error("Out of memory on transaction write set extraction");
-          return 1;
+          size_t length= table->s->reclength;
+          uchar* temp_image=(uchar*) my_malloc(PSI_NOT_INSTRUMENTED,
+                                               length,
+                                               MYF(MY_WME));
+          if (!temp_image)
+          {
+            sql_print_error("Out of memory on transaction write set extraction");
+            return 1;
+          }
+          if (add_pke(table, thd))
+          {
+            my_free(temp_image);
+            return HA_ERR_RBR_LOGGING_FAILED;
+          }
+
+          memcpy(temp_image, table->record[0],(size_t) table->s->reclength);
+          memcpy(table->record[0],table->record[1],(size_t) table->s->reclength);
+
+          if (add_pke(table, thd))
+          {
+            my_free(temp_image);
+            return HA_ERR_RBR_LOGGING_FAILED;
+          }
+
+          memcpy(table->record[0], temp_image, (size_t) table->s->reclength);
+
+          my_free(temp_image);
         }
-        add_pke(table, thd);
-
-        memcpy(temp_image, table->record[0],(size_t) table->s->reclength);
-        memcpy(table->record[0],table->record[1],(size_t) table->s->reclength);
-
-        add_pke(table, thd);
-
-        memcpy(table->record[0], temp_image, (size_t) table->s->reclength);
-
-        my_free(temp_image);
+        else
+        {
+          if (add_pke(table, thd))
+            return HA_ERR_RBR_LOGGING_FAILED;
+        }
       }
-      else
+      catch (const std::bad_alloc &)
       {
-        add_pke(table, thd);
+        my_error(ER_OUT_OF_RESOURCES, MYF(0));
+        return HA_ERR_RBR_LOGGING_FAILED;
       }
     }
     DBUG_DUMP("read_set 10", (uchar*) table->read_set->bitmap,

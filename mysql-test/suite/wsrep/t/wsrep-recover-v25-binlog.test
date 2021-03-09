@@ -1,0 +1,90 @@
+#
+# Verify that the wsrep XID gets updated in InnoDB system header
+# properly and can be recovered with --wsrep-recover
+#
+# The test runs the following scenarios:
+#
+# 1) The server is started but no SQL is run
+# 2) DDL is executed
+# 3) INSERT is executed
+# 4) INSERT is executed and the server is killed before commit happens.
+#
+# After each scenario server is killed and the recovered position
+# is validated.
+#
+
+--source include/have_wsrep.inc
+--source include/have_wsrep_provider.inc
+--source include/have_debug_sync.inc
+--source include/have_log_bin.inc
+
+--let $wsrep_recover_binlog_opt = --log-bin
+
+#
+# Scenario 1
+# The expected recovered seqno is 0 corresponding to initial cluster
+# configuration change.
+#
+--source include/kill_galera.inc
+--source wsrep-recover-step.inc
+--echo Expect seqno 0
+--echo $wsrep_recover_start_position_seqno
+
+--let $galera_wsrep_start_position = $wsrep_recover_start_position_uuid:$wsrep_recover_start_position_seqno
+--source include/start_mysqld.inc
+--source include/wait_wsrep_ready.inc
+
+#
+# Senario 2
+# The expected recovered seqno is 1 corresponding to CREATE TABLE
+#
+
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+--source include/kill_galera.inc
+--source wsrep-recover-step.inc
+--echo Expect seqno 1
+--echo $wsrep_recover_start_position_seqno
+--let $galera_wsrep_start_position = $wsrep_recover_start_position_uuid:$wsrep_recover_start_position_seqno
+--source include/start_mysqld.inc
+--source include/wait_wsrep_ready.inc
+
+#
+# Scenario 3
+# The expected recovered seqno is 2 corresponding CREATE TABLE and INSERT.
+#
+
+INSERT INTO t1 VALUES (2);
+--source include/kill_galera.inc
+--source wsrep-recover-step.inc
+--echo Expect seqno 2
+--echo $wsrep_recover_start_position_seqno
+--let $galera_wsrep_start_position = $wsrep_recover_start_position_uuid:$wsrep_recover_start_position_seqno
+--source include/start_mysqld.inc
+--source include/wait_wsrep_ready.inc
+
+#
+# Scenario 4
+#
+# The INSERT gets prepared but not committed.
+#
+# The INSERT should be rolled back during recovery phase since it has not yet
+# been logged into binlog.
+#
+
+--connect con1, localhost, root
+SET DEBUG_SYNC = "wsrep_before_commit SIGNAL wsrep_before_commit_reached WAIT_FOR continue";
+--send INSERT INTO t1 VALUES (3)
+
+--connection default
+SET DEBUG_SYNC = "now WAIT_FOR wsrep_before_commit_reached";
+--source include/kill_galera.inc
+--source wsrep-recover-step.inc
+--echo Expect seqno 2
+--echo $wsrep_recover_start_position_seqno
+--let $galera_wsrep_start_position = $wsrep_recover_start_position_uuid:$wsrep_recover_start_position_seqno
+--source include/start_mysqld.inc
+--source include/wait_wsrep_ready.inc
+--echo Expect 2
+SELECT * FROM t1;
+
+DROP TABLE t1;

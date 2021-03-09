@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -62,14 +62,6 @@
 
 using std::min;
 using std::max;
-
-/* max size of log messages (error log, plugins' logging, general log) */
-#ifdef WITH_WSREP
-/* make this bigger to accomodate wsrep_provider_options */
-static const uint MAX_LOG_BUFFER_SIZE= 2048;
-#else
-static const uint MAX_LOG_BUFFER_SIZE= 1024;
-#endif /* WITH_WSREP */
 
 #ifndef _WIN32
 static int   log_syslog_facility= 0;
@@ -907,8 +899,8 @@ bool File_query_log::write_slow(THD *thd, ulonglong current_utime,
   if (my_b_printf(&log_file,
                   "# Schema: %s  Last_errno: %u  Killed: %u\n"
                   "# Query_time: %s  Lock_time: %s  Rows_sent: %llu"
-                  "  Rows_examined: %llu  Rows_affected: %llu\n"
-                  "# Bytes_sent: %lu",
+                  "  Rows_examined: %llu  Rows_affected: %llu"
+                  "  Bytes_sent: %lu\n",
                   (thd->db().str ? thd->db().str : ""),
                   thd->last_errno, (uint) thd->killed,
                   query_time_buff, lock_time_buff,
@@ -922,14 +914,11 @@ bool File_query_log::write_slow(THD *thd, ulonglong current_utime,
 
   if (thd->variables.log_slow_verbosity & (1ULL << SLOG_V_QUERY_PLAN))
     if (my_b_printf(&log_file,
-                    "  Tmp_tables: %lu  Tmp_disk_tables: %lu  "
-                    "Tmp_table_sizes: %llu",
+                    "# Tmp_tables: %lu  Tmp_disk_tables: %lu  "
+                    "Tmp_table_sizes: %llu\n",
                     thd->tmp_tables_used, thd->tmp_tables_disk_used,
                     thd->tmp_tables_size) == (uint) -1)
       goto err;
-
-  if (my_b_write(&log_file, (uchar*) "\n", 1))
-    goto err;
 
   if (opt_log_slow_sp_statements == 1 && thd->sp_runtime_ctx &&
       my_b_printf(&log_file,
@@ -1999,10 +1988,10 @@ void log_slow_do(THD *thd)
   THD_STAGE_INFO(thd, stage_logging_slow_query);
   thd->status_var.long_query_count++;
 
-  if (thd->rewritten_query.length())
+  if (thd->rewritten_query().length())
     query_logger.slow_log_write(thd,
-                                thd->rewritten_query.c_ptr_safe(),
-                                thd->rewritten_query.length());
+                                thd->rewritten_query().ptr(),
+                                thd->rewritten_query().length());
   else
     query_logger.slow_log_write(thd, thd->query().str, thd->query().length);
 }

@@ -76,6 +76,7 @@ mysql_upgrade: [ERROR] 1050: Table 'replication_applier_configuration' already e
 mysql_upgrade: [ERROR] 1050: Table 'replication_applier_status' already exists
 mysql_upgrade: [ERROR] 1050: Table 'replication_applier_status_by_coordinator' already exists
 mysql_upgrade: [ERROR] 1050: Table 'replication_applier_status_by_worker' already exists
+mysql_upgrade: [ERROR] 1050: Table 'pxc_cluster_view' already exists
 mysql_upgrade: [ERROR] 1050: Table 'session_connect_attrs' already exists
 mysql_upgrade: [ERROR] 1050: Table 'session_account_connect_attrs' already exists
 mysql_upgrade: [ERROR] 1050: Table 'table_handles' already exists

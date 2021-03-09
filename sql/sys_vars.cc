@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -53,6 +53,7 @@
 #include "log_event.h"                   // MAX_MAX_ALLOWED_PACKET
 #include "rpl_info_factory.h"            // Rpl_info_factory
 #include "rpl_info_handler.h"            // INFO_REPOSITORY_FILE
+#include "rpl_handler.h"                 // delegates_set_lock_type
 #include "rpl_mi.h"                      // Master_info
 #include "rpl_msr.h"                     // channel_map
 #include "rpl_mts_submode.h"             // MTS_PARALLEL_TYPE_DB_NAME
@@ -3153,7 +3154,7 @@ static const char *optimizer_switch_names[]=
   "materialization", "semijoin", "loosescan", "firstmatch", "duplicateweedout",
   "subquery_materialization_cost_based",
   "use_index_extensions", "condition_fanout_filter", "derived_merge",
-  "default", NullS
+  "prefer_ordering_index", "favor_range_scan", "default", NullS
 };
 static Sys_var_flagset Sys_optimizer_switch(
        "optimizer_switch",
@@ -3164,8 +3165,8 @@ static Sys_var_flagset Sys_optimizer_switch(
        ", materialization, semijoin, loosescan, firstmatch, duplicateweedout,"
        " subquery_materialization_cost_based"
        ", block_nested_loop, batched_key_access, use_index_extensions,"
-       " condition_fanout_filter, derived_merge} and val is one of "
-       "{on, off, default}",
+       " condition_fanout_filter, derived_merge, prefer_ordering_index,"
+       " favor_range_scan} and val is one of {on, off, default}",
        SESSION_VAR(optimizer_switch), CMD_LINE(REQUIRED_ARG),
        optimizer_switch_names, DEFAULT(OPTIMIZER_SWITCH_DEFAULT),
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(NULL), ON_UPDATE(NULL));
@@ -3990,13 +3991,28 @@ static bool check_binlog_transaction_dependency_tracking(sys_var *self, THD *thd
 static bool update_binlog_transaction_dependency_tracking(sys_var* var, THD* thd, enum_var_type v)
 {
   /*
+    m_opt_tracking_mode is read and written in an atomic way based
+    on the value of m_opt_tracking_mode_value that is associated
+    with the sys_var variable.
+  */
+    set_mysqld_opt_tracking_mode();
+  /*
     the writeset_history_start needs to be set to 0 whenever there is a
     change in the transaction dependency source so that WS and COMMIT
     transition smoothly.
   */
-  mysql_bin_log.m_dependency_tracker.tracking_mode_changed();
+    mysql_bin_log.m_dependency_tracker.tracking_mode_changed();
+    return false;
+}
+
+static bool update_binlog_transaction_dependency_history_size(sys_var* var, THD* thd, enum_var_type v)
+{
+  my_atomic_store64(&mysql_bin_log.m_dependency_tracker.get_writeset()->m_opt_max_history_size,
+                    static_cast<int64>(mysql_bin_log.m_dependency_tracker.get_writeset()->
+                        m_opt_max_history_size_base_var));
   return false;
 }
+
 
 static PolyLock_mutex
 PLock_slave_trans_dep_tracker(&LOCK_slave_trans_dep_tracker);
@@ -4008,7 +4024,7 @@ static Sys_var_enum Binlog_transaction_dependency_tracking(
        "assess which transactions can be executed in parallel by the "
        "slave's multi-threaded applier. "
        "Possible values are COMMIT_ORDER, WRITESET and WRITESET_SESSION.",
-       GLOBAL_VAR(mysql_bin_log.m_dependency_tracker.m_opt_tracking_mode),
+       GLOBAL_VAR(mysql_bin_log.m_dependency_tracker.m_opt_tracking_mode_value),
        CMD_LINE(REQUIRED_ARG), opt_binlog_transaction_dependency_tracking_names,
        DEFAULT(DEPENDENCY_TRACKING_COMMIT_ORDER),
        &PLock_slave_trans_dep_tracker,
@@ -4017,10 +4033,10 @@ static Sys_var_enum Binlog_transaction_dependency_tracking(
 static Sys_var_ulong Binlog_transaction_dependency_history_size(
        "binlog_transaction_dependency_history_size",
        "Maximum number of rows to keep in the writeset history.",
-       GLOBAL_VAR(mysql_bin_log.m_dependency_tracker.get_writeset()->m_opt_max_history_size),
+       GLOBAL_VAR(mysql_bin_log.m_dependency_tracker.get_writeset()->m_opt_max_history_size_base_var),
        CMD_LINE(REQUIRED_ARG, 0), VALID_RANGE(1, 1000000), DEFAULT(25000),
        BLOCK_SIZE(1), &PLock_slave_trans_dep_tracker, NOT_IN_BINLOG, ON_CHECK(NULL),
-       ON_UPDATE(NULL));
+       ON_UPDATE(update_binlog_transaction_dependency_history_size));
 
 static Sys_var_mybool Sys_slave_preserve_commit_order(
        "slave_preserve_commit_order",
@@ -4882,7 +4898,7 @@ static Sys_var_version Sys_version(
 static char *server_version_suffix_ptr;
 static Sys_var_charptr Sys_version_suffix(
        "version_suffix", "version_suffix",
-       GLOBAL_VAR(server_version_suffix_ptr), NO_CMD_LINE,
+       GLOBAL_VAR(server_version_suffix_ptr), CMD_LINE(REQUIRED_ARG),
        IN_SYSTEM_CHARSET, DEFAULT(server_version_suffix));
 
 static char *server_version_comment_ptr;
@@ -5761,7 +5777,45 @@ void init_log_slow_verbosity()
 {
   update_slow_query_log_use_global_control(0,0,OPT_GLOBAL);
 }
-static Sys_var_set Sys_slow_query_log_use_global_control(
+
+/**
+  Specialized class that handles "none" value of
+  slow_query_log_use_global_control_set variable.
+  When "none" only value is detected, it is rewriten to empty
+  causing set to be cleared.
+*/
+class Sys_var_set_none: public Sys_var_set {
+public:
+  Sys_var_set_none(const char *name_arg,
+        const char *comment, int flag_args, ptrdiff_t off, size_t size,
+        CMD_LINE getopt, const char *values[], ulonglong def_val, PolyLock *lock =
+        0, enum binlog_status_enum binlog_status_arg = VARIABLE_NOT_IN_BINLOG,
+        on_check_function on_check_func = 0,
+        on_update_function on_update_func = 0, const char *substitute = 0)
+    : Sys_var_set(name_arg, comment, flag_args, off, size, getopt, values,
+          def_val, lock, binlog_status_arg, on_check_func, on_update_func,
+          substitute)
+  {
+  }
+
+  virtual bool do_check(THD *thd, set_var *var)
+  {
+    if (var->value->result_type() == STRING_RESULT) {
+      char buff[STRING_BUFFER_USUAL_SIZE];
+      String str(buff, sizeof(buff), system_charset_info);
+
+      String *res = var->value->val_str(&str);
+      if (res
+          && (res->length() > 0)
+          && (0 == my_strcasecmp(system_charset_info, res->ptr(), "none"))) {
+        var->value = new Item_string("", 0, system_charset_info);
+      }
+    }
+    return Sys_var_set::do_check(thd, var);
+  }
+};
+
+static Sys_var_set_none Sys_slow_query_log_use_global_control(
        "slow_query_log_use_global_control",
        "Choose flags, wich always use the global variables. Multiple flags "
        "allowed in a comma-separated string. [none, log_slow_filter, "
@@ -6223,7 +6277,7 @@ static Sys_var_tz Sys_time_zone(
 static PolyLock_mutex PLock_wsrep_slave_threads(&LOCK_wsrep_slave_threads);
 static Sys_var_charptr Sys_wsrep_provider(
        "wsrep_provider", "Path to replication provider library",
-       PREALLOCATED GLOBAL_VAR(wsrep_provider), CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER),
+       READ_ONLY PREALLOCATED GLOBAL_VAR(wsrep_provider), CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER),
        IN_FS_CHARSET, DEFAULT(WSREP_NONE),
        &PLock_wsrep_slave_threads, NOT_IN_BINLOG,
        ON_CHECK(wsrep_provider_check), ON_UPDATE(wsrep_provider_update));
@@ -6376,6 +6430,12 @@ static Sys_var_charptr sys_wsrep_sst_method(
        ON_CHECK(wsrep_sst_method_check),
        ON_UPDATE(wsrep_sst_method_update)); 
 
+static Sys_var_charptr sys_wsrep_sst_allowed_methods(
+       "wsrep_sst_allowed_methods", "SST methods accepted by server",
+       READ_ONLY GLOBAL_VAR(wsrep_sst_allowed_methods), CMD_LINE(REQUIRED_ARG),
+       IN_FS_CHARSET, DEFAULT(wsrep_sst_allowed_methods), NO_MUTEX_GUARD,
+       NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0));
+
 static Sys_var_charptr Sys_wsrep_sst_receive_address( 
        "wsrep_sst_receive_address", "Address where node is waiting for "
        "SST contact", 
@@ -6437,7 +6497,7 @@ static Sys_var_ulong Sys_wsrep_max_ws_rows (
 
 static Sys_var_charptr Sys_wsrep_notify_cmd(
        "wsrep_notify_cmd", "",
-       GLOBAL_VAR(wsrep_notify_cmd),CMD_LINE(REQUIRED_ARG),
+       READ_ONLY GLOBAL_VAR(wsrep_notify_cmd),CMD_LINE(REQUIRED_ARG),
        IN_FS_CHARSET, DEFAULT(""), NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
 static Sys_var_mybool Sys_wsrep_certify_nonPK(
@@ -6474,6 +6534,20 @@ static Sys_var_uint Sys_wsrep_sync_wait(
        BLOCK_SIZE(1),
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(wsrep_sync_wait_update));
+
+static const char *wsrep_mode_names[]= 
+{ "IGNORE_NATIVE_REPLICATION_FILTER_RULES",
+  NullS
+};
+
+static Sys_var_set Sys_wsrep_mode(
+       "wsrep_mode",
+       "Set of WSREP features that are enabled. Legal values:"
+       " IGNORE_NATIVE_REPLICATION_FILTER_RULES ",
+       GLOBAL_VAR(wsrep_mode), CMD_LINE(REQUIRED_ARG),
+       wsrep_mode_names,
+       DEFAULT(0),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
 static const char *wsrep_OSU_method_names[]= { "TOI", "RSU", NullS };
 static Sys_var_enum Sys_wsrep_OSU_method(
@@ -7125,3 +7199,60 @@ static Sys_var_mybool Sys_keyring_operations(
        NOT_IN_BINLOG,
        ON_CHECK(check_keyring_access),
        ON_UPDATE(0));
+
+/**
+  Changes the `Delegate` internal state in regards to which type of lock to
+  use and in regards to whether or not to take plugin locks in each hook
+  invocation.
+ */
+static bool handle_plugin_lock_type_change(sys_var *, THD *,
+                                           enum_var_type)
+{
+  DBUG_ENTER("handle_plugin_lock_type_change");
+  delegates_acquire_locks();
+  delegates_update_lock_type();
+  delegates_release_locks();
+  DBUG_RETURN(false);
+}
+
+static Sys_var_mybool Sys_replication_optimize_for_static_plugin_config(
+       "replication_optimize_for_static_plugin_config",
+       "Optional flag that blocks plugin install/uninstall and allows skipping "
+       "the acquisition of the lock to read from the plugin list and the usage "
+       "of read-optimized spin-locks. Use only when plugin hook callback needs "
+       "optimization (a lot of semi-sync slaves, for instance).",
+       GLOBAL_VAR(opt_replication_optimize_for_static_plugin_config),
+       CMD_LINE(OPT_ARG),
+       DEFAULT(FALSE),
+       NO_MUTEX_GUARD,
+       NOT_IN_BINLOG,
+       ON_CHECK(0),
+       ON_UPDATE(handle_plugin_lock_type_change));
+
+/**
+  Updates the atomic access version of
+  `opt_replication_sender_observe_commit_only`.
+ */
+static bool handle_sender_observe_commit_change(sys_var *, THD *, enum_var_type)
+{
+  DBUG_ENTER("handle_sender_observe_commit_change");
+  my_atomic_store32(&opt_atomic_replication_sender_observe_commit_only,
+                    opt_replication_sender_observe_commit_only);
+  DBUG_RETURN(false);
+}
+
+static Sys_var_mybool Sys_replication_sender_observe_commit_only(
+       "replication_sender_observe_commit_only",
+       "Optional flag that allows for only calling back observer hooks at "
+       "commit.",
+       GLOBAL_VAR(opt_replication_sender_observe_commit_only),
+       CMD_LINE(OPT_ARG),
+       DEFAULT(FALSE),
+       NO_MUTEX_GUARD,
+       NOT_IN_BINLOG,
+       ON_CHECK(0),
+       ON_UPDATE(handle_sender_observe_commit_change));
+
+#ifndef DBUG_OFF
+Debug_shutdown_actions Debug_shutdown_actions::instance;
+#endif

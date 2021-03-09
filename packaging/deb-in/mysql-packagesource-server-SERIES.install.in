@@ -52,6 +52,7 @@ usr/bin/wsrep_sst_xtrabackup-v2
 usr/bin/zlib_decompress usr/lib/mysql/
 # plugins
 usr/lib/mysql/plugin/adt_null.so
+usr/lib/mysql/plugin/audit_log.so
 usr/lib/mysql/plugin/auth_socket.so
 usr/lib/mysql/plugin/auth_pam.so
 usr/lib/mysql/plugin/authentication_ldap_sasl_client.so

@@ -1,0 +1,270 @@
+# Node 1
+CREATE DATABASE database1;
+USE database1;
+CREATE PROCEDURE proc_with_transaction()
+BEGIN
+START TRANSACTION;
+UPDATE t1 SET f2 = "from sp" WHERE f1 > 1;
+INSERT INTO t1 VALUES (10, "from sp");
+COMMIT;
+END|
+CREATE PROCEDURE proc_with_transaction_continue_handler()
+BEGIN
+DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
+START TRANSACTION;
+UPDATE t1 SET f2 = "from sp" WHERE f1 > 1;
+INSERT INTO t1 VALUES (10, "from sp continue");
+COMMIT;
+END|
+CREATE PROCEDURE proc_with_transaction_exit_handler()
+BEGIN
+DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN END;
+START TRANSACTION;
+UPDATE t1 SET f2 = "from sp" WHERE f1 > 1;
+INSERT INTO t1 VALUES (10, "from sp exit");
+COMMIT;
+END|
+# Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 0;
+# Node 1
+USE database1;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 TEXT) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'initial');
+INSERT INTO t1 VALUES (2, 'initial');
+INSERT INTO t1 VALUES (3, 'initial');
+INSERT INTO t1 VALUES (4, 'initial');
+# Node 1a
+USE database1;
+SET DEBUG_SYNC = "ha_innobase_end_of_write_row SIGNAL entered WAIT_FOR continue";
+CALL proc_with_transaction;
+# Node 1
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered";
+# Node 2
+UPDATE database1.t1 SET f2 = "from node2" WHERE f1 < 4;
+# Node 1
+SET DEBUG_SYNC = "now SIGNAL continue";
+# Node 1a
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+# Node 1
+include/assert.inc [wsrep_local_bf_aborts has been incremented once]
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from node2
+3	from node2
+4	initial
+SET DEBUG_SYNC = "RESET";
+# Node 2
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from node2
+3	from node2
+4	initial
+DROP TABLE t1;
+# Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 0;
+# Node 1
+USE database1;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 TEXT) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'initial');
+INSERT INTO t1 VALUES (2, 'initial');
+INSERT INTO t1 VALUES (3, 'initial');
+INSERT INTO t1 VALUES (4, 'initial');
+# Node 1a
+USE database1;
+SET DEBUG_SYNC = "ha_innobase_end_of_write_row SIGNAL entered WAIT_FOR continue";
+CALL proc_with_transaction_exit_handler;
+# Node 1
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered";
+# Node 2
+UPDATE database1.t1 SET f2 = "from node2" WHERE f1 < 4;
+# Node 1
+SET DEBUG_SYNC = "now SIGNAL continue";
+# Node 1a
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+# Node 1
+include/assert.inc [wsrep_local_bf_aborts has been incremented once]
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from node2
+3	from node2
+4	initial
+SET DEBUG_SYNC = "RESET";
+# Node 2
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from node2
+3	from node2
+4	initial
+DROP TABLE t1;
+# Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 0;
+# Node 1
+USE database1;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 TEXT) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'initial');
+INSERT INTO t1 VALUES (2, 'initial');
+INSERT INTO t1 VALUES (3, 'initial');
+INSERT INTO t1 VALUES (4, 'initial');
+# Node 1a
+USE database1;
+SET DEBUG_SYNC = "ha_innobase_end_of_write_row SIGNAL entered WAIT_FOR continue";
+CALL proc_with_transaction_continue_handler;
+# Node 1
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered";
+# Node 2
+UPDATE database1.t1 SET f2 = "from node2" WHERE f1 < 4;
+# Node 1
+SET DEBUG_SYNC = "now SIGNAL continue";
+# Node 1a
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+# Node 1
+include/assert.inc [wsrep_local_bf_aborts has been incremented once]
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from node2
+3	from node2
+4	initial
+SET DEBUG_SYNC = "RESET";
+# Node 2
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from node2
+3	from node2
+4	initial
+DROP TABLE t1;
+# Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 1;
+# Node 1
+USE database1;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 TEXT) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'initial');
+INSERT INTO t1 VALUES (2, 'initial');
+INSERT INTO t1 VALUES (3, 'initial');
+INSERT INTO t1 VALUES (4, 'initial');
+# Node 1a
+USE database1;
+SET DEBUG_SYNC = "ha_innobase_end_of_write_row SIGNAL entered WAIT_FOR continue";
+CALL proc_with_transaction;
+# Node 1
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered";
+# Node 2
+UPDATE database1.t1 SET f2 = "from node2" WHERE f1 < 4;
+# Node 1
+SET DEBUG_SYNC = "now SIGNAL continue";
+# Node 1a
+# Node 1
+include/assert.inc [wsrep_local_bf_aborts has been incremented once]
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from sp
+3	from sp
+4	from sp
+10	from sp
+SET DEBUG_SYNC = "RESET";
+# Node 2
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from sp
+3	from sp
+4	from sp
+10	from sp
+DROP TABLE t1;
+# Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 1;
+# Node 1
+USE database1;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 TEXT) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'initial');
+INSERT INTO t1 VALUES (2, 'initial');
+INSERT INTO t1 VALUES (3, 'initial');
+INSERT INTO t1 VALUES (4, 'initial');
+# Node 1a
+USE database1;
+SET DEBUG_SYNC = "ha_innobase_end_of_write_row SIGNAL entered WAIT_FOR continue";
+CALL proc_with_transaction_exit_handler;
+# Node 1
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered";
+# Node 2
+UPDATE database1.t1 SET f2 = "from node2" WHERE f1 < 4;
+# Node 1
+SET DEBUG_SYNC = "now SIGNAL continue";
+# Node 1a
+# Node 1
+include/assert.inc [wsrep_local_bf_aborts has been incremented once]
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from sp
+3	from sp
+4	from sp
+10	from sp exit
+SET DEBUG_SYNC = "RESET";
+# Node 2
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from sp
+3	from sp
+4	from sp
+10	from sp exit
+DROP TABLE t1;
+# Node 1a
+USE database1;
+SET SESSION wsrep_retry_autocommit = 1;
+# Node 1
+USE database1;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 TEXT) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, 'initial');
+INSERT INTO t1 VALUES (2, 'initial');
+INSERT INTO t1 VALUES (3, 'initial');
+INSERT INTO t1 VALUES (4, 'initial');
+# Node 1a
+USE database1;
+SET DEBUG_SYNC = "ha_innobase_end_of_write_row SIGNAL entered WAIT_FOR continue";
+CALL proc_with_transaction_continue_handler;
+# Node 1
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered";
+# Node 2
+UPDATE database1.t1 SET f2 = "from node2" WHERE f1 < 4;
+# Node 1
+SET DEBUG_SYNC = "now SIGNAL continue";
+# Node 1a
+# Node 1
+include/assert.inc [wsrep_local_bf_aborts has been incremented once]
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from sp
+3	from sp
+4	from sp
+10	from sp continue
+SET DEBUG_SYNC = "RESET";
+# Node 2
+SELECT * FROM database1.t1;
+f1	f2
+1	from node2
+2	from sp
+3	from sp
+4	from sp
+10	from sp continue
+DROP TABLE t1;
+DROP DATABASE database1;

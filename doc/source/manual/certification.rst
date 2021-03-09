@@ -60,7 +60,7 @@ for each change (an update or a new addition).
 
 Changes made to database objects are bin-logged.
 This is similar to how |MySQL| does it for replication
-with its Master-Slave ecosystem,
+with its Source-Replica ecosystem,
 except that a packet of changes from a given transaction
 is created and named as a write-set.
 
@@ -103,7 +103,7 @@ and only in primary state (skip messages while in state exchange). ::
    rcvd->id = ++group->act_id_;
 
 .. note:: This is an amazing way to solve the problem
-   of the id coordination in multi-master systems.
+   of the id coordination in multi-source systems.
    Otherwise a node will have to first get an id from central system
    or through a separate agreed protocol,
    and then use it for the packet, thereby doubling the round-trip time.

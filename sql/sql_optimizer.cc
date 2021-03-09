@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -1424,6 +1424,36 @@ static Item_func_match *test_if_ft_index_order(ORDER *order)
   return NULL;
 }
 
+/**
+  Test if this is a prefix index.
+
+  @param   table     table
+  @param   idx       index to check
+
+  @return TRUE if this is a prefix index
+*/
+bool is_prefix_index(TABLE* table, uint idx)
+{
+  if (!table || !table->key_info)
+  {
+    return false;
+  }
+  KEY* key_info = table->key_info;
+  uint key_parts = key_info[idx].user_defined_key_parts;
+  KEY_PART_INFO* key_part = key_info[idx].key_part;
+
+  for (uint i = 0; i < key_parts; i++, key_part++)
+  {
+    if (key_part->field &&
+      (key_part->length !=
+        table->field[key_part->fieldnr - 1]->key_length() &&
+        !(key_info->flags & (HA_FULLTEXT | HA_SPATIAL))))
+    {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
   Test if one can use the key to resolve ordering. 
@@ -1482,6 +1512,11 @@ int test_if_order_by_key(ORDER *order, TABLE *table, uint idx,
     for (; const_key_parts & 1 && key_part < key_part_end ;
          const_key_parts>>= 1)
       key_part++;
+
+    /* Avoid usage of prefix index for sorting a partition table */
+    if (table->part_info && key_part != table->key_info[idx].key_part &&
+        key_part != key_part_end && is_prefix_index(table, idx))
+     DBUG_RETURN(0);
 
     if (key_part == key_part_end)
     {
@@ -2109,20 +2144,6 @@ test_if_skip_sort_order(JOIN_TAB *tab, ORDER *order, ha_rows select_limit,
     const int ref_key_hint= (order_direction == 0 &&
                              tab->type() == JT_INDEX_SCAN) ? -1 : ref_key;
 
-    test_if_cheaper_ordering(tab, order, table, usable_keys,
-                             ref_key_hint,
-                             select_limit,
-                             &best_key, &best_key_direction,
-                             &select_limit, &best_key_parts,
-                             &saved_best_key_parts);
-
-    if (best_key < 0)
-    {
-      // No usable key has been found
-      can_skip_sorting= false;
-      goto fix_ICP;
-    }
-
     /*
       Does the query have a "FORCE INDEX [FOR GROUP BY] (idx)" (if
       clause is group by) or a "FORCE INDEX [FOR ORDER BY] (idx)" (if
@@ -2131,6 +2152,27 @@ test_if_skip_sort_order(JOIN_TAB *tab, ORDER *order, ha_rows select_limit,
     const bool is_group_by= join && join->grouped && order == join->group_list;
     const bool is_force_index= table->force_index ||
       (is_group_by ? table->force_index_group : table->force_index_order);
+
+    /*
+      Find an ordering index alternative over the chosen plan iff
+      prefer_ordering_index switch is on. This switch is overridden only when
+      force index for order/group is specified.
+    */
+    if (thd->optimizer_switch_flag(OPTIMIZER_SWITCH_PREFER_ORDERING_INDEX) ||
+        is_force_index)
+      test_if_cheaper_ordering(tab, order, table, usable_keys,
+                               ref_key_hint,
+                               select_limit,
+                               &best_key, &best_key_direction,
+                               &select_limit, &best_key_parts,
+                               &saved_best_key_parts);
+
+    if (best_key < 0)
+    {
+      // No usable key has been found
+      can_skip_sorting= false;
+      goto fix_ICP;
+    }
 
     /*
       filesort() and join cache are usually faster than reading in
@@ -4996,7 +5038,13 @@ void JOIN::set_prefix_tables()
 
       if (!(sjm_inner_tables & ~current_tables_map))
       {
-        // At the end of a semi-join materialization nest, restore previous map
+        /*
+          At the end of a semi-join materialization nest,
+          add non-deterministic expressions to the last table of the nest:
+        */
+        tab->add_prefix_tables(RAND_TABLE_BIT);
+
+        // Restore the previous map:
         current_tables_map= saved_tables_map;
         prev_tables_map= last_non_sjm_tab ?
                          last_non_sjm_tab->prefix_tables() : (table_map) 0;
@@ -5011,7 +5059,7 @@ void JOIN::set_prefix_tables()
     }
   }
   /*
-    Random expressions must be added to the last table's condition.
+    Non-deterministic expressions must be added to the last table's condition.
     It solves problem with queries like SELECT * FROM t1 WHERE rand() > 0.5
   */
   if (last_non_sjm_tab != NULL)
@@ -5552,6 +5600,7 @@ bool JOIN::extract_func_dependent_tables()
               keyuse->val->is_null() && keyuse->null_rejecting)
           {
             table->set_null_row();
+            table->const_table= true;
             found_const_table_map|= tl->map();
             mark_const_table(tab, keyuse);
             goto more_const_tables_found;
@@ -9452,7 +9501,15 @@ static bool make_join_select(JOIN *join, Item *cond)
                   recheck_reason= DONT_RECHECK;
                 }
               }
-              if (recheck_reason != DONT_RECHECK)
+              /*
+                We do a cost based search for an ordering index here. Do this
+                only if prefer_ordering_index switch is on or an index is
+                forced for order by
+              */
+              if (recheck_reason != DONT_RECHECK &&
+                  (tab->table()->force_index_order ||
+                   thd->optimizer_switch_flag(
+                       OPTIMIZER_SWITCH_PREFER_ORDERING_INDEX)))
               {
                 int best_key= -1;
                 ha_rows select_limit= join->unit->select_limit_cnt;
@@ -10730,7 +10787,7 @@ void JOIN::optimize_keyuse()
     */
     keyuse->ref_table_rows= ~(ha_rows) 0;	// If no ref
     if (keyuse->used_tables &
-	(map= (keyuse->used_tables & ~const_table_map & ~OUTER_REF_TABLE_BIT)))
+       (map= (keyuse->used_tables & ~const_table_map & ~PSEUDO_TABLE_BITS)))
     {
       uint tableno;
       for (tableno= 0; ! (map & 1) ; map>>=1, tableno++)

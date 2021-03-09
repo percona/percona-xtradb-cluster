@@ -27,45 +27,50 @@ Configuration examples assume there are three |PXC| nodes:
 
 If you are running Debian or Ubuntu,
 add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
-on the first node::
+on the first node:
 
- wsrep_provider=/usr/lib/libgalera_smm.so
+.. code-block:: text
 
- wsrep_cluster_name=pxc-cluster
- wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
+   wsrep_provider=/usr/lib/libgalera_smm.so
 
- wsrep_node_name=pxc1
- wsrep_node_address=192.168.70.61
+   wsrep_cluster_name=pxc-cluster
+   wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
- wsrep_sst_method=xtrabackup-v2
- wsrep_sst_auth=sstuser:passw0rd
+   wsrep_node_name=pxc1
+   wsrep_node_address=192.168.70.61
 
- pxc_strict_mode=ENFORCING
+   wsrep_sst_method=xtrabackup-v2
+   wsrep_sst_auth=sstuser:passw0rd
 
- binlog_format=ROW
- default_storage_engine=InnoDB
- innodb_autoinc_lock_mode=2
+   pxc_strict_mode=ENFORCING
+
+   binlog_format=ROW
+   default_storage_engine=InnoDB
+   innodb_autoinc_lock_mode=2
 
 If you are running Red Hat or CentOS,
 add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
-on the first node::
+on the first node:
 
- wsrep_provider=/usr/lib64/galera3/libgalera_smm.so
+.. code-block:: text
 
- wsrep_cluster_name=pxc-cluster
- wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
- wsrep_node_name=pxc1
- wsrep_node_address=192.168.70.61
+  [mysqld]
+   wsrep_provider=/usr/lib64/galera3/libgalera_smm.so
+   wsrep_cluster_name=pxc-cluster
+   wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
- wsrep_sst_method=xtrabackup-v2
- wsrep_sst_auth=sstuser:passw0rd
+   wsrep_node_name=pxc1
+   wsrep_node_address=192.168.70.61
 
- pxc_strict_mode=ENFORCING
+   wsrep_sst_method=xtrabackup-v2
+   wsrep_sst_auth=sstuser:passw0rd
 
- binlog_format=ROW
- default_storage_engine=InnoDB
- innodb_autoinc_lock_mode=2
+   pxc_strict_mode=ENFORCING
+
+   binlog_format=ROW
+   default_storage_engine=InnoDB
+   innodb_autoinc_lock_mode=2
 
 Use the same configuration for the second and third nodes,
 except the ``wsrep_node_name`` and ``wsrep_node_address`` variables:
@@ -131,7 +136,7 @@ Configuration Reference
 :variable:`wsrep_sst_auth`
 
   Specify authentication credentials for :term:`SST`
-  as ``<sst_user>:<sst_pass>``.
+  as ``<sstuser>:<sst_pass>``.
   You must create this user when :ref:`bootstrap`
   and provide necessary privileges for it:
 
