@@ -3587,7 +3587,11 @@ public:
   /* DDL statement. skip registering wsrep_hton handler.
   This is normally blocked by checking wsrep_exec_state != TOTAL_ORDER
   but if sql_log_bin = 0 then the state is not set and DDL should is expected
-  not be replicated. This variable helps identify situation like these. */
+  not be replicated. This variable helps identify situation like these.
+
+  As a side-effect, this variable is used to determine if the thread is
+  in TO isolation (see wsrep_is_in_to_isolation()).
+  While this is set to true, the thread cannot be interrupted/killed. */
   bool                      wsrep_skip_wsrep_hton;
 
   /* This field is set when wsrep try to do an intermediate special

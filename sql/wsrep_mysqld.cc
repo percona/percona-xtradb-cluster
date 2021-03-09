@@ -2019,7 +2019,25 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   size_t buf_len(0);
   int buf_err;
 
+  DEBUG_SYNC(thd, "wsrep_TOI_begin_before_wsrep_skip_wsrep_hton");
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+
+  /*
+    Setting wsrep_skip_wsrep_hton=true has a side-effect that this
+    query/thread cannot be killed.
+  */
   thd->wsrep_skip_wsrep_hton= true;
+  bool is_thd_killed = thd->is_killed();
+
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+  DEBUG_SYNC(thd, "wsrep_TOI_begin_after_wsrep_skip_wsrep_hton");
+
+  if (is_thd_killed) {
+    WSREP_DEBUG("Can't execute %s in TOI mode because the query has been killed",
+                WSREP_QUERY(thd));
+    return -1;
+  }
+
   if (wsrep_can_run_in_toi(thd, db_, table_, table_list) == false)
   {
     WSREP_DEBUG("Can't execute %s in TOI mode", WSREP_QUERY(thd));
@@ -2396,6 +2414,20 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   return ret;
 }
 
+bool wsrep_thd_is_in_to_isolation(THD *thd, bool flock)
+{
+  bool status = false;
+  if (thd)
+  {
+    if (flock) mysql_mutex_lock(&thd->LOCK_thd_data);
+
+    status = thd->wsrep_skip_wsrep_hton;
+
+    if (flock) mysql_mutex_unlock(&thd->LOCK_thd_data);
+  }
+  return status;
+}
+
 void wsrep_to_isolation_end(THD *thd)
 {
   if (thd->wsrep_exec_mode == TOTAL_ORDER)
@@ -2412,8 +2444,13 @@ void wsrep_to_isolation_end(THD *thd)
     wsrep_cleanup_transaction(thd);
   }
 
-  if (thd->wsrep_skip_wsrep_hton)
-    thd->wsrep_skip_wsrep_hton= false;
+  DEBUG_SYNC(thd, "wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton");
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+
+  thd->wsrep_skip_wsrep_hton = false;
+
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+  DEBUG_SYNC(thd, "wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton");
 }
 
 #define WSREP_MDL_LOG(severity, msg, schema, schema_len, req, gra)             \

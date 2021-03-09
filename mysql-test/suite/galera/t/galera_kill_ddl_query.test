@@ -1,0 +1,615 @@
+#
+# This test checks what happens to TOI DDL when the thread is killed.
+# (The KILLs should be ignored if PXC is in the middle of an TOI op or
+# after the TOI has ended).
+#
+
+--source include/have_debug_sync.inc
+--source include/have_innodb.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--connection node_1
+CALL mtr.add_suppression("WSREP: TO isolation failed");
+--let $node1_connection_id=`SELECT CONNECTION_ID()`
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--let $node1a_connection_id=`SELECT CONNECTION_ID()`
+
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+
+#
+# Test 1: Block with FTWRL, then KILL
+# (The command will succeed)
+#
+--echo ################ Test 1 ################
+--connection node_1
+--echo [connection node_1]
+FLUSH TABLES WITH READ LOCK;
+
+# Do the CREATE TABLE, this will block due to the FTWRL
+--connection node_1a
+--echo [connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached';
+--send CREATE TABLE t1 (ID INT PRIMARY KEY);
+
+# Kill the CREATE TABLE query
+--connection node_1b
+--echo [connection node_1b]
+
+# Ensure that we have entered TOI (at least)
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+
+# The KILL will fail because we are already in TOI
+--disable_query_log
+--echo # Killing query on node1a
+--error ER_KILL_DENIED_ERROR
+--eval KILL QUERY $node1a_connection_id
+--enable_query_log
+
+# Unblock the CREATE TABLE
+--connection node_1
+--echo [connection node_1]
+UNLOCK TABLES;
+
+# The CREATE TABLE should succeed
+--connection node_1a
+--echo [connection node_1a]
+--reap
+
+# Verify the cluster contents
+--connection node_1
+--echo [connection node_1]
+--let $assert_text= Table t1 should exist on node1
+--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+--connection node_2
+--echo [connection node_2]
+--let $assert_text= Table t1 should exist on node2
+--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+# Cleanup
+--connection node_1
+--echo [connection node_1]
+DROP TABLE t1;
+SET DEBUG_SYNC='RESET';
+
+
+#
+# Test 2: Test killing of the DDL query using KILL QUERY
+#
+# Test 2a: Block in wsrep_TOI_begin_before_wsrep_skip_wsrep_hton, then KILL
+# (The command will be aborted)
+#
+--echo ################ Test 2a ################
+
+# Do the CREATE TABLE, this will block due to the DEBUG_SYNC
+--connection node_1a
+--echo [connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_before_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+
+--send CREATE TABLE t1 (ID INT PRIMARY KEY);
+
+# Kill the CREATE TABLE query
+--connection node_1b
+--echo [connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+
+# The KILL will succeed because we're not in TOI
+--disable_query_log
+--echo # Killing query on node1a
+--eval KILL QUERY $node1a_connection_id
+--enable_query_log
+
+# Unblock the CREATE TABLE
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+# The CREATE TABLE should fail
+--connection node_1a
+--echo [connection node_1a]
+--error ER_QUERY_INTERRUPTED
+--reap
+
+# Verify the cluster contents
+--connection node_1
+--echo [connection node_1]
+--let $assert_text= Table t1 should not exist on node1
+--let $assert_cond= COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+--connection node_2
+--echo [connection node_2]
+--let $assert_text= Table t1 should not exist on node2
+--let $assert_cond= COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+# Cleanup
+--connection node_1
+--echo [connection node_1]
+SET DEBUG_SYNC='RESET';
+
+
+#
+# Test 2b: Block in wsrep_TOI_begin_after_wsrep_skip_wsrep_hton, then KILL
+# (The command will succeed)
+#
+--echo ################ Test 2b ################
+
+# Do the CREATE TABLE, this will block due to the DEBUG_SYNC
+--connection node_1a
+--echo [connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+
+--send CREATE TABLE t1 (ID INT PRIMARY KEY);
+
+# Kill the CREATE TABLE query
+--connection node_1b
+--echo [connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+
+# The KILL will fail because we're already in TOI
+--disable_query_log
+--echo # Killing query on node1a
+--error ER_KILL_DENIED_ERROR
+--eval KILL QUERY $node1a_connection_id
+--enable_query_log
+
+# Unblock the CREATE TABLE
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+# The CREATE TABLE should succeed
+--connection node_1a
+--echo [connection node_1a]
+--reap
+
+# Verify the cluster contents
+--connection node_1
+--echo [connection node_1]
+--let $assert_text= Table t1 should exist on node1
+--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+--connection node_2
+--echo [connection node_2]
+--let $assert_text= Table t1 should exist on node2
+--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+# Cleanup
+--connection node_1
+--echo [connection node_1]
+DROP TABLE t1;
+SET DEBUG_SYNC='RESET';
+
+##
+## Test 2c: Block in wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton, then KILL
+## (The command will succeed)
+##
+#--echo ################ Test 2c ################
+#
+## Do the CREATE TABLE, this will block due to the DEBUG_SYNC
+#--connection node_1a
+#--echo [connection node_1a]
+#SET DEBUG_SYNC = 'wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+#
+#--send CREATE TABLE t1 (ID INT PRIMARY KEY);
+#
+## Kill the CREATE TABLE query
+#--connection node_1b
+#--echo [connection node_1b]
+#SET DEBUG_SYNC = "now WAIT_FOR reached";
+#
+## The KILL will fail because we're still in TOI
+#--disable_query_log
+#--echo # Killing query on node1a
+#--error ER_KILL_DENIED_ERROR
+#--eval KILL QUERY $node1a_connection_id
+#--enable_query_log
+#
+## Unblock the CREATE TABLE
+#SET DEBUG_SYNC= 'now SIGNAL continue';
+#
+## The CREATE TABLE should succeed (because it's already replicated)
+#--connection node_1a
+#--echo [connection node_1a]
+#--reap
+#
+## Verify the cluster contents
+#--connection node_1
+#--echo [connection node_1]
+#--let $assert_text= Table t1 should exist on node1
+#--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+#--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+#--source include/assert.inc
+#
+#--connection node_2
+#--echo [connection node_2]
+#--let $assert_text= Table t1 should exist on node2
+#--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+#--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+#--source include/assert.inc
+#
+## Cleanup
+#--connection node_1
+#--echo [connection node_1]
+#DROP TABLE t1;
+#SET DEBUG_SYNC='RESET';
+#
+
+##
+## Test 2d: Block in wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton, then KILL
+## (The command will succeed)
+#--echo ################ Test 2d ################
+#
+## Do the CREATE TABLE, this will block due to the DEBUG_SYNC
+#--connection node_1a
+#--echo [connection node_1a]
+#SET DEBUG_SYNC = 'wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+#
+#--send CREATE TABLE t1 (ID INT PRIMARY KEY);
+#
+## Kill the CREATE TABLE query
+#--connection node_1b
+#--echo [connection node_1b]
+#SET DEBUG_SYNC = "now WAIT_FOR reached";
+#
+## The KILL will succeed, but it doesn't cancel the operation
+## because the operation has already been replicated.
+#--disable_query_log
+#--echo # Killing query on node1a
+#--eval KILL QUERY $node1a_connection_id
+#--enable_query_log
+#
+## Unblock the CREATE TABLE
+#SET DEBUG_SYNC= 'now SIGNAL continue';
+#
+## The CREATE TABLE should succeed
+#--connection node_1a
+#--echo [connection node_1a]
+#--reap
+#
+## Verify the cluster contents
+#--connection node_1
+#--echo [connection node_1]
+#--let $assert_text= Table t1 should exist on node1
+#--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+#--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+#--source include/assert.inc
+#
+#--connection node_2
+#--echo [connection node_2]
+#--let $assert_text= Table t1 should exist on node2
+#--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+#--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+#--source include/assert.inc
+#
+## Cleanup
+#--connection node_1
+#--echo [connection node_1]
+#DROP TABLE t1;
+#SET DEBUG_SYNC='RESET';
+#
+
+#
+# Test 3: Check that other (DML) queries (while running a DDL) can still
+# be killed.
+--echo ################ Test 3 ################
+
+# Setup the test
+--connection node_1
+--echo [connection node_1]
+CREATE TABLE t2(id INT PRIMARY KEY);
+
+# Perform an INSERT, block the insert
+SET DEBUG_SYNC = 'ha_innobase_write_row SIGNAL write_reached WAIT_FOR write_continue';
+--send INSERT INTO t2 VALUES (1);
+
+# Do the CREATE TABLE, block it while it is in TOI
+--connection node_1a
+--echo [connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+--send CREATE TABLE t1 (ID INT PRIMARY KEY);
+
+# Kill the INSERT
+--connection node_1b
+--echo [connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+SET DEBUG_SYNC = "now WAIT_FOR write_reached";
+
+# The KILL will succeed since it's on a different (non-DDL) thread
+--disable_query_log
+--echo # Killing INSERT on node1
+--eval KILL QUERY $node1_connection_id
+--enable_query_log
+
+# Unblock the CREATE TABLE
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+# Unblock the INSERT
+SET DEBUG_SYNC= 'now SIGNAL write_continue';
+
+# The CREATE TABLE should succeed
+--connection node_1a
+--echo [connection node_1a]
+--reap
+
+# The INSERT should fail
+--connection node_1
+--echo [connection node_1]
+--error ER_QUERY_INTERRUPTED
+--reap
+
+# Verify the cluster contents
+--connection node_1
+--echo [connection node_1]
+--let $assert_text= Table t1 should exist on node1
+--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+--let $assert_text= Table t2 should be empty on node1
+--let $assert_cond= COUNT(*) = 0 FROM t2
+--let $assert_debug= SELECT * FROM t2
+--source include/assert.inc
+
+--connection node_2
+--echo [connection node_2]
+--let $assert_text= Table t1 should exist on node2
+--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+--let $assert_text= Table t2 should be empty on node2
+--let $assert_cond= COUNT(*) = 0 FROM t2
+--let $assert_debug= SELECT * FROM t2
+--source include/assert.inc
+
+# Cleanup
+--connection node_1
+--echo [connection node_1]
+DROP TABLE t1;
+DROP TABLE t2;
+SET DEBUG_SYNC='RESET';
+
+#
+# Test 4: Test killing of the DDL using KILL CONNECTION
+#
+# Test 4a: Block in wsrep_TOI_begin_before_wsrep_skip_wsrep_hton, then KILL the connection
+# (The command will be aborted)
+#
+--echo ################ Test 4a ################
+
+# Do the CREATE TABLE, this will block due to the DEBUG_SYNC
+--connection node_1a
+--echo [connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_before_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+
+--send CREATE TABLE t1 (ID INT PRIMARY KEY);
+
+# Kill the CREATE TABLE query
+--connection node_1b
+--echo [connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+
+# The KILL will succeed because we're not in TOI
+--disable_query_log
+--echo # Killing connection_node1a
+--eval KILL $node1a_connection_id
+--enable_query_log
+
+# Unblock the CREATE TABLE
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+# The CREATE TABLE should fail
+--connection node_1a
+--echo [connection node_1a]
+# Client-side error: 2013 == CR_SERVER_LOST
+--error 2013
+--reap
+
+# Verify the cluster contents
+--connection node_1
+--echo [connection node_1]
+--let $assert_text= Table t1 should not exist on node1
+--let $assert_cond= COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+--connection node_2
+--echo [connection node_2]
+--let $assert_text= Table t1 should not exist on node2
+--let $assert_cond= COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+# Cleanup
+--connection node_1
+--echo [connection node_1]
+SET DEBUG_SYNC='RESET';
+
+--disconnect node_1a
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--let $node1a_connection_id=`SELECT CONNECTION_ID()`
+
+#
+# Test 4b: Block in wsrep_TOI_begin_after_wsrep_skip_wsrep_hton, then KILL the connection
+# (The command will succeed)
+#
+--echo ################ Test 4b ################
+
+# Do the CREATE TABLE, this will block due to the DEBUG_SYNC
+--connection node_1a
+--echo [connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+
+--send CREATE TABLE t1 (ID INT PRIMARY KEY);
+
+# Kill the CREATE TABLE query
+--connection node_1b
+--echo [connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+
+# The KILL will fail because we're already in TOI
+--disable_query_log
+--echo # Killing connection_node1a
+--error ER_KILL_DENIED_ERROR
+--eval KILL $node1a_connection_id
+--enable_query_log
+
+# Unblock the CREATE TABLE
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+# The CREATE TABLE should succeed
+--connection node_1a
+--echo [connection node_1a]
+--reap
+
+# Verify the cluster contents
+--connection node_1
+--echo [connection node_1]
+--let $assert_text= Table t1 should exist on node1
+--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+--connection node_2
+--echo [connection node_2]
+--let $assert_text= Table t1 should exist on node2
+--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+--source include/assert.inc
+
+# Cleanup
+--connection node_1
+--echo [connection node_1]
+DROP TABLE t1;
+SET DEBUG_SYNC='RESET';
+
+
+##
+## Test 4c: Block in wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton, then KILL the connection
+## (The command will succeed)
+##
+#--echo ################ Test 4c ################
+#
+## Do the CREATE TABLE, this will block due to the DEBUG_SYNC
+#--connection node_1a
+#--echo [connection node_1a]
+#SET DEBUG_SYNC = 'wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+#
+#--send CREATE TABLE t1 (ID INT PRIMARY KEY);
+#
+## Kill the CREATE TABLE query
+#--connection node_1b
+#--echo [connection node_1b]
+#SET DEBUG_SYNC = "now WAIT_FOR reached";
+#
+## The KILL will fail because we're still in TOI
+#--disable_query_log
+#--echo # Killing query on node1a
+#--error ER_KILL_DENIED_ERROR
+#--eval KILL $node1a_connection_id
+#--enable_query_log
+#
+## Unblock the CREATE TABLE
+#SET DEBUG_SYNC= 'now SIGNAL continue';
+#
+## The CREATE TABLE should succeed (because it's already replicated)
+#--connection node_1a
+#--echo [connection node_1a]
+#--reap
+#
+## Verify the cluster contents
+#--connection node_1
+#--echo [connection node_1]
+#--let $assert_text= Table t1 should exist on node1
+#--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+#--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+#--source include/assert.inc
+#
+#--connection node_2
+#--echo [connection node_2]
+#--let $assert_text= Table t1 should exist on node2
+#--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+#--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+#--source include/assert.inc
+#
+## Cleanup
+#--connection node_1
+#--echo [connection node_1]
+#DROP TABLE t1;
+#SET DEBUG_SYNC='RESET';
+#
+
+##
+## Test 4d: Block in wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton, then KILL the connection
+## (The command will succeed)
+#--echo ################ Test 4d ################
+#
+## Do the CREATE TABLE, this will block due to the DEBUG_SYNC
+#--connection node_1a
+#--echo [connection node_1a]
+#SET DEBUG_SYNC = 'wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+#
+#--send CREATE TABLE t1 (ID INT PRIMARY KEY);
+#
+## Kill the CREATE TABLE query
+#--connection node_1b
+#--echo [connection node_1b]
+#SET DEBUG_SYNC = "now WAIT_FOR reached";
+#
+## The KILL will succeed, but it doesn't cancel the operation
+## because the operation has already been replicated.
+#--disable_query_log
+#--echo # Killing query on node1a
+#--eval KILL $node1a_connection_id
+#--enable_query_log
+#
+## Unblock the CREATE TABLE
+#SET DEBUG_SYNC= 'now SIGNAL continue';
+#
+## The CREATE TABLE should return an error (but the op will have succeeded)
+#--connection node_1a
+#--echo [connection node_1a]
+# Client-side error: 2013 == CR_SERVER_LOST
+#--error 2013
+#--reap
+#
+## Verify the cluster contents
+#--connection node_1
+#--echo [connection node_1]
+#--let $assert_text= Table t1 should exist on node1
+#--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+#--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+#--source include/assert.inc
+#
+#--connection node_2
+#--echo [connection node_2]
+#--let $assert_text= Table t1 should exist on node2
+#--let $assert_cond= COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = "t1"
+#--let $assert_debug= SELECT * FROM INFORMATION_SCHEMA.TABLES
+#--source include/assert.inc
+#
+## Cleanup
+#--connection node_1
+#--echo [connection node_1]
+#DROP TABLE t1;
+#SET DEBUG_SYNC='RESET';
+#
+
+# Test cleanup
+
+--disconnect node_1b
+--disconnect node_1a
+connection default;
+
+--connection node_1
+--source include/wait_until_count_sessions.inc

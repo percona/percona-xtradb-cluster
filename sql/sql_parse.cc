@@ -7876,9 +7876,18 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query)
                             tmp->m_security_ctx->ip().str);
 
 #ifdef WITH_WSREP
-    if ((((thd->security_context()->check_access(SUPER_ACL)) && !is_utility_connection) ||
-         thd->security_context()->user_matches(tmp->security_context())) &&
-        !wsrep_thd_is_BF((void *)tmp, true))
+    if (wsrep_thd_is_in_to_isolation(tmp, false))
+    {
+      /* There is nothing special about the use of ER_QUERY_INTERRUPTED,
+         I just needed a different error code from ER_KILL_DENIED_ERROR.
+
+         See sql_kill() to see the other half of the error processing.
+      */
+      error= ER_QUERY_INTERRUPTED;
+    }
+    else if ((((thd->security_context()->check_access(SUPER_ACL)) && !is_utility_connection) ||
+             thd->security_context()->user_matches(tmp->security_context())) &&
+             !wsrep_thd_is_BF((void *)tmp, true))
 #else
     if (((thd->security_context()->check_access(SUPER_ACL)) && !is_utility_connection) ||
         thd->security_context()->user_matches(tmp->security_context()))
@@ -8121,6 +8130,14 @@ void sql_kill(THD *thd, my_thread_id id, bool only_kill_query)
     if (! thd->killed)
       my_ok(thd);
   }
+#ifdef WITH_WSREP
+  else if (error == ER_QUERY_INTERRUPTED)
+  {
+    my_printf_error(ER_KILL_DENIED_ERROR,
+                    "The query is in TOI and cannot be killed",
+                    MYF(0));
+  }
+#endif /* WITH_WSREP */
   else
     my_error(error, MYF(0), id);
 }
