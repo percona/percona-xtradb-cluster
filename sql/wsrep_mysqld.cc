@@ -1317,15 +1317,13 @@ bool wsrep_start_replication() {
 bool wsrep_must_sync_wait(THD *thd, uint mask) {
   bool ret;
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  ret = (thd->variables.wsrep_sync_wait & mask) && 
-    thd->wsrep_client_thread &&
-    WSREP_ON && thd->variables.wsrep_on &&
-    !(thd->variables.wsrep_dirty_reads &&
-      !is_update_query(thd->lex->sql_command)) &&
-    !thd->in_active_multi_stmt_transaction() &&
-    thd->wsrep_trx().state() !=  
-    wsrep::transaction::s_replaying &&
-    thd->wsrep_cs().sync_wait_gtid().is_undefined();
+  ret = (thd->variables.wsrep_sync_wait & mask) && thd->wsrep_client_thread &&
+        WSREP_ON && thd->variables.wsrep_on &&
+        !(thd->variables.wsrep_dirty_reads &&
+          !is_update_query(thd->lex->sql_command)) &&
+        !thd->in_active_multi_stmt_transaction() &&
+        thd->wsrep_trx().state() != wsrep::transaction::s_replaying &&
+        thd->wsrep_cs().sync_wait_gtid().is_undefined();
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   return ret;
 }
@@ -1361,7 +1359,8 @@ bool wsrep_sync_wait(THD *thd, uint mask) {
           break;
         default:
           msg = "Synchronous wait failed.";
-          err = ER_LOCK_WAIT_TIMEOUT;  // HERE! NOTE: the above msg won't be displayed
+          err = ER_LOCK_WAIT_TIMEOUT;  // HERE! NOTE: the above msg won't be
+                                       // displayed
                                        //       with ER_LOCK_WAIT_TIMEOUT
       }
       my_error(err, MYF(0), msg);
@@ -1980,6 +1979,9 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   int buf_err;
   int rc;
 
+  DEBUG_SYNC(thd, "wsrep_TOI_begin_before_wsrep_skip_wsrep_hton");
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+
   /*
     If event qualified for TOI replication then it shouldn't go through
     normal replication. It state is updated to reflect TOI that
@@ -1991,7 +1993,23 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
     Flag (wsrep_skip_wsrep_hton) below help in skipping "TOI qualified but
     skipped event" from getting registered for normal replication.
+
+    Setting wsrep_skip_wsrep_hton=true has a side-effect that this
+    query/thread cannot be killed.
   */
+  thd->wsrep_skip_wsrep_hton = true;
+  bool is_thd_killed = thd->is_killed();
+
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+  DEBUG_SYNC(thd, "wsrep_TOI_begin_after_wsrep_skip_wsrep_hton");
+
+  if (is_thd_killed) {
+    WSREP_DEBUG(
+        "Can't execute %s in TOI mode because the query has been killed",
+        WSREP_QUERY(thd));
+    return -1;
+  }
+
   thd->wsrep_skip_wsrep_hton = true;
   if (wsrep_can_run_in_toi(thd, db_, table_, table_list) == false) {
     WSREP_DEBUG("Can't execute %s in TOI mode", WSREP_QUERY(thd));
@@ -2116,11 +2134,10 @@ static void wsrep_TOI_end(THD *thd) {
   if (wsrep_thd_is_local_toi(thd)) {
     wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
     wsrep::mutable_buffer err;
-    if (thd->is_error() && !wsrep_must_ignore_error(thd))
-    {
-        wsrep_store_error(thd, err);
+    if (thd->is_error() && !wsrep_must_ignore_error(thd)) {
+      wsrep_store_error(thd, err);
     }
-    int const ret= client_state.leave_toi_local(err);
+    int const ret = client_state.leave_toi_local(err);
 
     if (!ret) {
       WSREP_DEBUG("TO END: %lld", client_state.toi_meta().seqno().get());
@@ -2266,6 +2283,18 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   return ret;
 }
 
+bool wsrep_thd_is_in_to_isolation(THD *thd, bool flock) {
+  bool status = false;
+  if (thd) {
+    if (flock) mysql_mutex_lock(&thd->LOCK_thd_data);
+
+    status = thd->wsrep_skip_wsrep_hton;
+
+    if (flock) mysql_mutex_unlock(&thd->LOCK_thd_data);
+  }
+  return status;
+}
+
 void wsrep_to_isolation_end(THD *thd) {
   /*
     If plugin native tables are being created/dropped then skip TOI for such
@@ -2285,7 +2314,13 @@ void wsrep_to_isolation_end(THD *thd) {
   }
   if (wsrep_emulate_bin_log) wsrep_thd_binlog_trx_reset(thd);
 
-  if (thd->wsrep_skip_wsrep_hton) thd->wsrep_skip_wsrep_hton = false;
+  DEBUG_SYNC(thd, "wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton");
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+
+  thd->wsrep_skip_wsrep_hton = false;
+
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+  DEBUG_SYNC(thd, "wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton");
 }
 
 #define WSREP_MDL_LOG(severity, msg, schema, schema_len, req, gra)           \

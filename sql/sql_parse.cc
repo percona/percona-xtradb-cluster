@@ -3424,7 +3424,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
         !wsrep_tables_accessible_when_detached(all_tables) &&
         lex->sql_command != SQLCOM_SET_OPTION &&
         lex->sql_command != SQLCOM_SHUTDOWN &&
-        !(lex->sql_command == SQLCOM_SELECT && !all_tables)                &&
+        !(lex->sql_command == SQLCOM_SELECT && !all_tables) &&
         !wsrep_is_show_query(lex->sql_command)) {
       my_message(ER_UNKNOWN_COM_ERROR,
                  "WSREP has not yet prepared node for application use", MYF(0));
@@ -5257,32 +5257,32 @@ int mysql_execute_command(THD *thd, bool first_level) {
     case SQLCOM_RESTART_SERVER:
     case SQLCOM_CREATE_SRS:
     case SQLCOM_DROP_SRS: {
-
 #ifdef WITH_WSREP
       if (lex->sql_command == SQLCOM_SELECT)
         WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ)
 
       static std::vector<enum_sql_command> wait_before_show_commands = {
-          SQLCOM_SHOW_GRANTS, SQLCOM_SHOW_FIELDS, SQLCOM_SHOW_KEYS,
-          SQLCOM_SHOW_TABLES, SQLCOM_SHOW_CREATE_PROC, SQLCOM_SHOW_CREATE_FUNC,
-          SQLCOM_SHOW_PROC_CODE, SQLCOM_SHOW_FUNC_CODE,
+          SQLCOM_SHOW_GRANTS,         SQLCOM_SHOW_FIELDS,
+          SQLCOM_SHOW_KEYS,           SQLCOM_SHOW_TABLES,
+          SQLCOM_SHOW_CREATE_PROC,    SQLCOM_SHOW_CREATE_FUNC,
+          SQLCOM_SHOW_PROC_CODE,      SQLCOM_SHOW_FUNC_CODE,
           SQLCOM_SHOW_CREATE_TRIGGER, SQLCOM_SHOW_STATUS,
-          SQLCOM_SHOW_BINLOG_EVENTS, SQLCOM_SHOW_BINLOGS, SQLCOM_SHOW_CREATE,
-          SQLCOM_SHOW_CREATE_DB, SQLCOM_SHOW_CREATE_EVENT,
-          SQLCOM_SHOW_STATUS_PROC, SQLCOM_SHOW_STATUS_FUNC,
-          SQLCOM_SHOW_DATABASES, SQLCOM_SHOW_TRIGGERS, SQLCOM_SHOW_TABLE_STATUS,
-          SQLCOM_SHOW_OPEN_TABLES, SQLCOM_SHOW_PLUGINS, SQLCOM_SHOW_VARIABLES,
-          SQLCOM_SHOW_CHARSETS, SQLCOM_SHOW_COLLATIONS,
-          SQLCOM_SHOW_STORAGE_ENGINES, SQLCOM_SHOW_PROFILE,
-          SQLCOM_SHOW_USER_STATS, SQLCOM_SHOW_TABLE_STATS,
-          SQLCOM_SHOW_INDEX_STATS, SQLCOM_SHOW_CLIENT_STATS,
-          SQLCOM_SHOW_THREAD_STATS};
-      if(std::find(std::begin(wait_before_show_commands),
-                   std::end(wait_before_show_commands), lex->sql_command) !=
-                   std::end(wait_before_show_commands)){
+          SQLCOM_SHOW_BINLOG_EVENTS,  SQLCOM_SHOW_BINLOGS,
+          SQLCOM_SHOW_CREATE,         SQLCOM_SHOW_CREATE_DB,
+          SQLCOM_SHOW_CREATE_EVENT,   SQLCOM_SHOW_STATUS_PROC,
+          SQLCOM_SHOW_STATUS_FUNC,    SQLCOM_SHOW_DATABASES,
+          SQLCOM_SHOW_TRIGGERS,       SQLCOM_SHOW_TABLE_STATUS,
+          SQLCOM_SHOW_OPEN_TABLES,    SQLCOM_SHOW_PLUGINS,
+          SQLCOM_SHOW_VARIABLES,      SQLCOM_SHOW_CHARSETS,
+          SQLCOM_SHOW_COLLATIONS,     SQLCOM_SHOW_STORAGE_ENGINES,
+          SQLCOM_SHOW_PROFILE,        SQLCOM_SHOW_USER_STATS,
+          SQLCOM_SHOW_TABLE_STATS,    SQLCOM_SHOW_INDEX_STATS,
+          SQLCOM_SHOW_CLIENT_STATS,   SQLCOM_SHOW_THREAD_STATS};
+      if (std::find(std::begin(wait_before_show_commands),
+                    std::end(wait_before_show_commands),
+                    lex->sql_command) != std::end(wait_before_show_commands)) {
         WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
       }
-
 
       if (lex->sql_command == SQLCOM_ALTER_USER_DEFAULT_ROLE ||
           lex->sql_command == SQLCOM_CREATE_SRS ||
@@ -7203,11 +7203,19 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query) {
         tmp->m_security_ctx->user().str, tmp->m_security_ctx->host().str,
         tmp->m_security_ctx->ip().str);
 #ifdef WITH_WSREP
-    if ((((sctx->check_access(SUPER_ACL) ||
-           sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN")).first) &&
-          !is_utility_connection) ||
-         sctx->user_matches(tmp->security_context())) &&
-        !wsrep_thd_is_BF(tmp, true) && !tmp->wsrep_applier) {
+    if (wsrep_thd_is_in_to_isolation(tmp, false)) {
+      /* There is nothing special about the use of ER_QUERY_INTERRUPTED,
+         I just needed a different error code from ER_KILL_DENIED_ERROR.
+
+         See sql_kill() to see the other half of the error processing.
+      */
+      error = ER_QUERY_INTERRUPTED;
+    } else if ((((sctx->check_access(SUPER_ACL) ||
+                  sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN"))
+                      .first) &&
+                 !is_utility_connection) ||
+                sctx->user_matches(tmp->security_context())) &&
+               !wsrep_thd_is_BF(tmp, true) && !tmp->wsrep_applier) {
 #else
     if (((sctx->check_access(SUPER_ACL) ||
           sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN")).first) &&
@@ -7224,23 +7232,21 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query) {
           error = ER_KILL_DENIED_ERROR;
         } else {
 #ifdef WITH_WSREP
-	  DEBUG_SYNC(thd, "before_awake_no_mutex");
-	  if (tmp->wsrep_aborter && tmp->wsrep_aborter != thd->thread_id())
-	  {
-	    /* victim is in hit list already, bail out */
-	    WSREP_DEBUG("victim has wsrep aborter: %u, skipping awake()",
-			tmp->wsrep_aborter);
-	    error = 0;
-	  }
-	  else
-	  {
-	    WSREP_DEBUG("kill_one_thread victim: %u aborter %u kill query %d",
-			id, tmp->wsrep_aborter, only_kill_query);
+          DEBUG_SYNC(thd, "before_awake_no_mutex");
+          if (tmp->wsrep_aborter && tmp->wsrep_aborter != thd->thread_id()) {
+            /* victim is in hit list already, bail out */
+            WSREP_DEBUG("victim has wsrep aborter: %u, skipping awake()",
+                        tmp->wsrep_aborter);
+            error = 0;
+          } else {
+            WSREP_DEBUG("kill_one_thread victim: %u aborter %u kill query %d",
+                        id, tmp->wsrep_aborter, only_kill_query);
 #endif /* WITH_WSREP */
-          tmp->awake(only_kill_query ? THD::KILL_QUERY : THD::KILL_CONNECTION);
-          error = 0;
+            tmp->awake(only_kill_query ? THD::KILL_QUERY
+                                       : THD::KILL_CONNECTION);
+            error = 0;
 #ifdef WITH_WSREP
-	  }
+          }
 #endif /* WITH_WSREP */
         }
       } else
@@ -7403,6 +7409,12 @@ static void sql_kill(THD *thd, my_thread_id id, bool only_kill_query) {
   if (!(error = kill_one_thread(thd, id, only_kill_query))) {
     if (!thd->killed) my_ok(thd);
   } else
+#ifdef WITH_WSREP
+      if (error == ER_QUERY_INTERRUPTED) {
+    my_printf_error(ER_KILL_DENIED_ERROR,
+                    "The query is in TOI and cannot be killed", MYF(0));
+  } else
+#endif /* WITH_WSREP */
     my_error(error, MYF(0), id);
 }
 
