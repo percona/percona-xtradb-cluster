@@ -835,10 +835,19 @@ static std::string wsrep_server_incoming_address() {
        !strcmp(wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO))) {
     bool is_ipv6 = false;
     unsigned int my_bind_ip = INADDR_ANY;  // default if not set
+    char *single_addr = nullptr;
 
     if (my_bind_addr_str && strlen(my_bind_addr_str) &&
         strcmp(my_bind_addr_str, "*") != 0) {
-      my_bind_ip = wsrep_check_ip(my_bind_addr_str, &is_ipv6);
+      size_t single_addr_buf_size = strlen(my_bind_addr_str) + 1;
+      single_addr =
+          (char *)my_malloc(key_memory_wsrep, single_addr_buf_size, MYF(0));
+      if (!single_addr) goto done;
+
+      wsrep_get_single_address(my_bind_addr_str, single_addr,
+                               single_addr_buf_size);
+
+      my_bind_ip = wsrep_check_ip(single_addr, &is_ipv6);
     }
 
     if (INADDR_ANY != my_bind_ip) {
@@ -848,7 +857,8 @@ static std::string wsrep_server_incoming_address() {
       */
       if (INADDR_NONE != my_bind_ip && INADDR_LOOPBACK != my_bind_ip) {
         const char *fmt = (is_ipv6) ? "[%s]:%u" : "%s:%u";
-        snprintf(inc_addr, inc_addr_max, fmt, my_bind_addr_str, mysqld_port);
+        // if we are here, single_addr is not nullptr
+        snprintf(inc_addr, inc_addr_max, fmt, single_addr, mysqld_port);
       }
     } else /* mysqld binds to 0.0.0.0, try taking IP from wsrep_node_address. */
     {
@@ -873,6 +883,7 @@ static std::string wsrep_server_incoming_address() {
         WSREP_INFO("Node addr: %s", node_addr.c_str());
       }
     }
+    if (single_addr) my_free(single_addr);
   } else {
     wsp::Address addr(wsrep_node_incoming_address);
 
