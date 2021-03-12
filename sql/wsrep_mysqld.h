@@ -428,7 +428,7 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const TABLE_LIST *table_list,
                              dd::Tablespace_table_ref_vec *trefs = NULL,
                              Alter_info *alter_info = NULL);
-
+bool wsrep_thd_is_in_to_isolation(THD *thd, bool flock);
 void wsrep_to_isolation_end(THD *thd);
 
 bool wsrep_append_SR_keys(THD *thd);

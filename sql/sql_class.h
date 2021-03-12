@@ -800,7 +800,8 @@ class Global_read_lock {
         provider_paused(false),
 #endif /* WITH_WSREP */
         m_mdl_global_shared_lock(nullptr),
-        m_mdl_blocks_commits_lock(nullptr) {}
+        m_mdl_blocks_commits_lock(nullptr) {
+  }
 
 #ifdef WITH_WSREP
   bool lock_global_read_lock(THD *thd, bool *own_lock);
@@ -2973,13 +2974,17 @@ class THD : public MDL_context_owner,
   bool wsrep_skip_wsrep_GTID;
 
   /* thread who has started kill for this THD */
-  my_thread_id              wsrep_aborter;
+  my_thread_id wsrep_aborter;
 
   /**
     Skip registering wsrep_hton handler for a DDL statement that got skipped
     from TOI replication probably due to sql_log_bin=0.
     Given the mode for the statement is not set to TOI, flow will try to execute
     replication of DDL through DML replication path. This should be blocked.
+
+    As a side-effect, this variable is used to determine if the thread is
+    in TO isolation (see wsrep_is_in_to_isolation()).
+    While this is set to true, the thread cannot be interrupted/killed.
   */
   bool wsrep_skip_wsrep_hton;
 
