@@ -1000,22 +1000,58 @@ unsigned int wsrep_check_ip(const char *const addr, bool *is_ipv6) {
   return ret;
 }
 
+void wsrep_get_single_address(const char *const addr, char *buf,
+                              size_t buf_len) {
+  // For MySQL >= 8.0.13 addr can be comma separated list of addresses
+  // (bind_address system variable). The best we can do in such a case is to
+  // detect it and use the first address specified.
+  // Validity of bind_address value is checked in network_init() at server
+  // startup, so here we can skip detailed sanitization as it is valid for sure.
+  if (!buf || buf_len == 0) return;
+  if (!addr) {
+    *buf = '\0';
+    return;
+  }
+
+  const char *end = strchr(addr, ',');
+
+  size_t addr_len = end ? end - addr : strlen(addr);
+  if (addr_len < buf_len) {
+    memcpy(buf, addr, addr_len);
+    buf[addr_len] = '\0';
+  } else {
+    buf[0] = '\0';
+  }
+}
+
 size_t wsrep_guess_ip(char *buf, size_t buf_len) {
   size_t ip_len = 0;
 
   if (my_bind_addr_str && my_bind_addr_str[0] != '\0') {
     bool unused;
-    unsigned int const ip_type = wsrep_check_ip(my_bind_addr_str, &unused);
+    size_t single_addr_buf_size = strlen(my_bind_addr_str) + 1;
+    char *single_addr =
+        (char *)my_malloc(key_memory_wsrep, single_addr_buf_size, MYF(0));
+
+    if (!single_addr) return 0;
+
+    wsrep_get_single_address(my_bind_addr_str, single_addr,
+                             single_addr_buf_size);
+    unsigned int const ip_type = wsrep_check_ip(single_addr, &unused);
 
     if (INADDR_NONE == ip_type) {
       WSREP_ERROR("Networking not configured, cannot receive state transfer.");
+      my_free(single_addr);
       return 0;
     }
 
     if (INADDR_ANY != ip_type) {
-      strncpy(buf, my_bind_addr_str, buf_len);
+      strncpy(buf, single_addr, buf_len);
+      my_free(single_addr);
       return strlen(buf);
     }
+
+    my_free(single_addr);
   }
 
   // mysqld binds to all interfaces - try IP from wsrep_node_address
