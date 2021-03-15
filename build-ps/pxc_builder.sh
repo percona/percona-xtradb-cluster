@@ -283,7 +283,7 @@ install_deps() {
         yum update -y
         yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
-        percona-release enable tools release
+        percona-release enable tools testing
         add_percona_yum_repo
         if [ "x${RHEL}" = "x8" ]; then
             yum -y install dnf-plugins-core epel-release
@@ -369,8 +369,8 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-24=2.4.21-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.22-15-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-24=2.4.22-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.23-16-1.${DIST}
     fi
     return;
 }
@@ -806,7 +806,7 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
         mkdir pxb-2.4
         pushd pxb-2.4
-        yumdownloader percona-xtrabackup-24-2.4.21
+        yumdownloader percona-xtrabackup-24-2.4.22
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib* ./
@@ -819,7 +819,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.22
+        yumdownloader percona-xtrabackup-80-8.0.23
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
