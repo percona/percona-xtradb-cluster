@@ -270,6 +270,51 @@ interruptable_timeout() {
     echo ${piperesult[@]}
 }
 
+# Monitor progress of SST and kill the process if stalled.
+monitor_sst_progress() {
+  local tmpsstdir=$1
+  shift
+  local pid=$1
+  shift
+  local timeout=$1
+  shift
+  local current_timeout=0
+  local previous_size=0
+  local sleep=5
+  if [[ ${timeout} -eq 0 ]]; then
+    return;
+  fi
+
+  while true; do
+    kill -0 $pid 2> /dev/null
+    if [[ $? -ne 0 ]]; then
+      break;
+    fi
+    if [[ ! -d ${tmpsstdir} ]]; then
+      break;
+    fi
+
+    current_size=$(du --max-depth=1 ${tmpsstdir} | tail -n 1 | awk '{print $1}')
+    if [[ ${current_size} -eq  ${previous_size} ]]; then
+      current_timeout=$((current_timeout + 1))
+      sleep=1
+    else
+      # Reset timeout and set sleep back to 5 seconds.
+      current_timeout=0
+      sleep=5
+      previous_size=${current_size}
+    fi
+
+    if [[ ${current_timeout} -eq  ${timeout} ]]; then
+      wsrep_log_error "Killing SST ($pid) with SIGKILL after stalling for ${current_timeout} seconds"
+      pkill -SIGKILL -P ${pid} 2> /dev/null
+      break;
+    fi
+
+    sleep ${sleep};
+  done
+}
+
 #
 # If the ssl_dhparams variable is already set, uses that as a source
 # of dh parameters for OpenSSL. Otherwise, looks for dhparams.pem in the
@@ -842,6 +887,9 @@ cleanup_joiner()
     if [[ -n $progress && -p $progress ]]; then
         wsrep_log_debug "Cleaning up fifo file $progress"
         rm $progress
+    fi
+    if [[ -n "${JOINER_SST_DIR}" && -z "$WSREP_LOG_DEBUG" ]]; then
+      [[ -d "${JOINER_SST_DIR}" ]] && rm -rf "${JOINER_SST_DIR}" || true
     fi
     if [[ -n "${tmpdirbase}" ]]; then
         [[ -d "${tmpdirbase}" ]] && rm -rf "${tmpdirbase}" || true
@@ -1855,7 +1903,14 @@ then
         fi
 
         set +e
-        timeit "${stagemsg}-SST" "$INNOBACKUP | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+        # With wsrep_sst_donor_skip we never send the backup
+        if [ "$WSREP_SST_OPT_DEBUG" = "wsrep_sst_donor_skip" ]
+        then
+          RC=0
+        else
+          timeit "${stagemsg}-SST" "$INNOBACKUP | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+        fi
+
         set -e
 
         if [ ${RC[0]} -ne 0 ]; then
@@ -1905,6 +1960,7 @@ then
     ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
     ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
     ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
+    ssttimeout=$(parse_cnf sst sst-idle-timeout 120)
 
     stagemsg="Joiner-Recv"
 
@@ -2079,7 +2135,10 @@ then
                     fi
 
                     XB_DONOR_KEYRING_FILE_PATH="${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
-                    recv_data_from_donor_to_joiner "${KEYRING_FILE_DIR}" "${stagemsg}-keyring" 0 2
+                    recv_data_from_donor_to_joiner "${KEYRING_FILE_DIR}" "${stagemsg}-keyring" 0 2 &
+                    jpid=$!
+                    monitor_sst_progress "${KEYRING_FILE_DIR}" $jpid $ssttimeout &
+                    wait $jpid
                     keyringapplyopt=" --keyring-file-data=$XB_DONOR_KEYRING_FILE_PATH "
                     wsrep_log_info "donor keyring received at: '${XB_DONOR_KEYRING_FILE_PATH}'"
                 else
@@ -2160,6 +2219,7 @@ then
 
         XB_GTID_INFO_FILE_PATH="${DATA}/${XB_GTID_INFO_FILE}"
         wsrep_log_info "............Waiting for SST streaming to complete!"
+        monitor_sst_progress "${JOINER_SST_DIR}" $jpid $ssttimeout &
         wait $jpid
 
         get_proc
@@ -2242,8 +2302,12 @@ then
         if [ $? -ne 0 ];
         then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "${XTRABACKUP_BIN} apply finished with errors." \
-                            "Check ${DATA}/innobackup.prepare.log"
+            wsrep_log_error "${XTRABACKUP_BIN} apply finished with errors."
+            if [[ -n "$WSREP_LOG_DEBUG" ]]; then
+              wsrep_log_error "Keeping ${DATA} for further diagnosis. " \
+                        "Check ${DATA}/XXX.log for details. " \
+                        "${DATA} may be removed if not needed for further diagnosis."
+            fi
             wsrep_log_error "Line $LINENO"
             cat_file_to_stderr "${DATA}/innobackup.prepare.log" "ERR" "innobackup.prepare.log"
             wsrep_log_error "****************************************************** "
@@ -2302,8 +2366,12 @@ then
 
         if [[ $errcode -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis" \
-                            "Check ${DATA}/innobackup.move.log for details"
+            wsrep_log_error "Move failed."
+            if [[ -n "$WSREP_LOG_DEBUG" ]]; then
+              wsrep_log_error "Keeping ${DATA} for further diagnosis" \
+                            "Check ${DATA}/innobackup.move.log for details" \
+                            "${DATA} may be removed if not needed for further diagnosis."
+            fi
             wsrep_log_error "Line $LINENO"
             cat_file_to_stderr "${DATA}/innobackup.move.log" "ERR" "innobackup.move.log"
             wsrep_log_error "****************************************************** "
