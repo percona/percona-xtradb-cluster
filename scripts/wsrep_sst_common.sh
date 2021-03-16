@@ -26,6 +26,7 @@ WSREP_SST_OPT_AUTH=${WSREP_SST_OPT_AUTH:-}
 WSREP_SST_OPT_USER=${WSREP_SST_OPT_USER:-}
 WSREP_SST_OPT_PSWD=${WSREP_SST_OPT_PSWD:-}
 WSREP_SST_OPT_VERSION=""
+WSREP_SST_OPT_DEBUG=""
 
 WSREP_LOG_DEBUG=""
 
@@ -108,6 +109,10 @@ case "$1" in
         ;;
     '--binlog')
         WSREP_SST_OPT_BINLOG="$2"
+        shift
+        ;;
+    '--debug')
+        WSREP_SST_OPT_DEBUG="$2"
         shift
         ;;
     *) # must be command

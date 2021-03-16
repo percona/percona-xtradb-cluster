@@ -4,5 +4,10 @@ include/assert.inc [node_1 should be in SYNC state after serving SST to node_2]
 SET GLOBAL debug = "+d,wsrep_sst_donate_cb_fails";
 include/assert.inc [node_1 should go back to SYNC state]
 SET GLOBAL debug = "-d,wsrep_sst_donate_cb_fails";
+SET GLOBAL debug = "+d,wsrep_sst_donor_skip";
+include/assert_grep.inc [Checking node_2 error was due to stale SST]
+include/assert.inc [node_1 should go back to SYNC state]
+include/assert.inc [Cluster should stay as Primary]
+SET GLOBAL debug = "-d,wsrep_sst_donor_skip";
 cleanup
 # restart
