@@ -18893,6 +18893,7 @@ static bool check_engine(THD *thd, const char *db_name, const char *table_name,
       1. for "OPTIMIZE TABLE" statements.
       2. for "ALTER TABLE" statements without explicit "... ENGINE=xxx" part
       3. Transactional data dictionary (DD) tables
+      4. WSREP tables
     */
     bool no_substitution = (!is_engine_substitution_allowed(thd));
 
@@ -18900,7 +18901,13 @@ static bool check_engine(THD *thd, const char *db_name, const char *table_name,
         ((thd->lex->sql_command == SQLCOM_ALTER_TABLE) &&
          (create_info->used_fields & HA_CREATE_USED_ENGINE) == 0) ||
         (thd->lex->sql_command == SQLCOM_OPTIMIZE) ||
+#ifdef WITH_WSREP
+        dd::get_dictionary()->is_dd_table_name(db_name, table_name) ||
+        is_wsrep_system_table(db_name, strlen(db_name), table_name,
+                              strlen(table_name));
+#else
         dd::get_dictionary()->is_dd_table_name(db_name, table_name);
+#endif
 
     if (!enforcement_forbidden) {
       handlerton *enf_engine = ha_enforce_handlerton(thd);
