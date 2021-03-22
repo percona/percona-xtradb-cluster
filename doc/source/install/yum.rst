@@ -28,18 +28,8 @@ Prerequisites
    * 4444
    * 4567
    * 4568
-
-.. note:: The `SELinux <https://selinuxproject.org>`_ security module
-   can constrain access to data for |PXC|.
-   The best solution is to change the mode
-   from ``enforcing``  to ``permissive`` by running the following command::
-
-    setenforce 0
-
-   This only changes the mode at runtime.
-   To run SELinux in permissive mode after a reboot,
-   set ``SELINUX=permissive`` in the :file:`/etc/selinux/config`
-   configuration file.
+   
+   For information on SELinux, see :ref:`selinux`.
 
 Installing from Percona Repository
 ==================================

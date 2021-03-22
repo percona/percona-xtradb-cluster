@@ -34,7 +34,7 @@ several considerations to take into account for securing |PXC|:
 Security Modules
 ================================================================================
 
-Most modern disributions include special security modules
+Most modern distributions include special security modules
 that control access to resources for users and applications.
 By default, these modules will most likely constrain communication
 between |PXC| nodes.
@@ -47,43 +47,36 @@ SELinux
 --------------------------------------------------------------------------------
 
 `SELinux <https://selinuxproject.org>`_ is usually enabled by default
-in Red Hat Enterprise Linux and derivatives (including CentOS).
-During installation and configuration,
-you can set the mode to ``permissive`` by running the following command::
+in Red Hat Enterprise Linux and derivatives (including CentOS). SELinux helps protects the user's home directory data and provides the following:
+
+* Prevents unauthorized users from exploiting the system
+
+* Allows authorized users to access files 
+
+* Used as a role-based access control system
+
+To help with troubleshooting, during installation and configuration,
+you can set the mode to ``permissive``::
 
  setenforce 0
 
-.. note::  This only changes the mode at runtime.
-   To run SELinux in permissive mode after a reboot,
-   set ``SELINUX=permissive`` in the :file:`/etc/selinux/config`
-   configuration file.
+.. note::  This action changes the mode only at runtime.
 
-To use SELinux with |PXC|, you need to create an access policy.
-For more information, see `SELinux and MySQL
-<https://blogs.oracle.com/jsmyth/selinux-and-mysql>`_.
+.. seealso::
+
+    For more information, see :ref:`selinux`
+
+.. apparmor
 
 AppArmor
---------
+-----------
 
 `AppArmor <http://wiki.apparmor.net/index.php/Main_Page>`_ is included
-in Debian and Ubuntu.
-During installation and configuration,
-you can disable AppArmor for ``mysqld``:
+in Debian and Ubuntu. |Percona XtraDB Cluster| contains several AppArmor profiles which allows for easier maintenance.
+To help with troubleshooting, during the installation and configuration,
+you can set the mode to ``complain`` for ``mysqld``.
 
-1. Create the following symbolic link::
 
-    $ sudo ln -s /etc/apparmor.d/usr /etc/apparmor.d/disable/.sbin.mysqld
+.. seealso::
 
-#. Restart AppArmor::
-
-    $ sudo service apparmor restart
-
-   .. note:: If your system uses ``systemd``,
-      run the following command instead::
-
-       $ sudo systemctl restart apparmor
-
-To use AppArmor with |PXC|, you need to create or extend the MySQL profile.
-For more information, see `AppArmor and MySQL
-<https://blogs.oracle.com/jsmyth/apparmor-and-mysq>`_.
-
+    For more information, see :ref:`apparmor`

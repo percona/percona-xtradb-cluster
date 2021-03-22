@@ -102,6 +102,8 @@ PXC Security
    security/index
    security/secure-network
    security/encrypt-traffic
+   security/apparmor
+   security/selinux
 
 User\'s Manual
 ================================================================================
