@@ -6129,14 +6129,37 @@ void innobase_commit_low(trx_t *trx) /*!< in: transaction handle */
   }
 #endif /* WITH_WSREP */
 
+  DEBUG_SYNC_C("innobase_commit_low_begin");
+
   if (trx_is_started(trx)) {
     const dberr_t error MY_ATTRIBUTE((unused)) = trx_commit_for_mysql(trx);
+#ifdef WITH_WSREP
+    // The original comment is not necessarily true for PXC.
+    // We removed check for TRX_FORCE_ROLLBACK_DISABLE from 'if' condition in
+    // lock_make_trx_hit_list(), so now HP transaction can BF other transaction
+    // even if the flag is set.
+    // It is OK in general case if local transaction is not empty (so it is
+    // replicated and certified). If it conflicts with HP transaction it will
+    // not be certified (so will be discarded), and if it was certified, there
+    // is no possibility for other transaction to BF it because that other
+    // transaction should fail certification.
+    // If local transaction is the empty transaction, it is not replicated
+    // and certified as it does not generate any writestes. So it follows the
+    // normal transaction path. But empty transaction can get some locks.
+    // If at the same time there is replicated transaction attempting to get the
+    // same locks, it can BF local transaction at any stage, even if local
+    // transaction is commiting. (note that it can happen only for empty local
+    // transaction)
+    ut_ad(DB_SUCCESS == error ||
+          (DB_FORCED_ABORT == error && thd->wsrep_trx().is_empty()));
+#else
     // This is ut_ad not ut_a, because previously we did not have an assert
     // and nobody has noticed for a long time, so probably there is no much
     // harm in silencing this error. OTOH we believe it should no longer happen
     // after adding `true` as a second argument to TrxInInnoDB constructor call,
     // so we'd like to learn if the error can still happen.
     ut_ad(DB_SUCCESS == error);
+#endif
   }
   trx->will_lock = 0;
 }

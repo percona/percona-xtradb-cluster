@@ -1126,6 +1126,13 @@ bool Sql_cmd_update::update_single_table(THD *thd) {
 
   DBUG_ASSERT(CountHiddenFields(*update_value_list) == 0);
 
+  DBUG_EXECUTE_IF("pause_commit_after_update_single_table", {
+    const char act[] =
+        "innobase_commit_low_begin "
+        "SIGNAL update_commit_waiting WAIT_FOR continue";
+    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+  };);
+
   // Following test is disabled, as we get RQG errors that are hard to debug
   // DBUG_ASSERT((error >= 0) == thd->is_error());
   return error >= 0 || thd->is_error();

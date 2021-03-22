@@ -1,0 +1,45 @@
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+
+--connection node_1
+--echo #node_1
+CREATE TABLE test_table (f1 INTEGER PRIMARY KEY AUTO_INCREMENT, f2 CHAR(255)) ENGINE=InnoDB;
+
+--connection node_2
+--echo #node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.INNODB_TABLES WHERE NAME LIKE 'test/test_table';
+--source include/wait_condition.inc
+
+SET @@GLOBAL.debug = "+d,pause_commit_after_update_single_table";
+
+--send UPDATE test_table SET f2 = 'y' WHERE f1 = 1 OR f1 = 2;
+
+--connection node_2a
+--echo #node_2a
+SET DEBUG_SYNC = "now WAIT_FOR update_commit_waiting";
+# do not pause next time when retry autocommit takes place
+SET @@GLOBAL.debug = "-d,pause_commit_after_update_single_table";
+
+--connection node_1
+--echo #node_1
+INSERT INTO test_table VALUES (1,'y'),(2,'x');
+
+# We do not need to signal innobase_commit_low_begin point to continue, as the
+# thread waiting on it was BF killed, and threads waiting on debug sync points
+# were already continued automatically. 
+
+--connection node_2
+--reap
+
+
+# cleanup
+--connection node_2
+SET DEBUG_SYNC = "RESET";
+
+--disconnect node_2a
+
+--connection node_1
+DROP table test_table;
+--source include/wait_until_count_sessions.inc
