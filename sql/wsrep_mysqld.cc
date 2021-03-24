@@ -1029,6 +1029,7 @@ int wsrep_init() {
   if (strlen(wsrep_provider) == 0 || !strcmp(wsrep_provider, WSREP_NONE)) {
     // enable normal operation in case no provider is specified
     global_system_variables.wsrep_on = 0;
+    wsrep_provider_set = false;
     int err = Wsrep_server_state::instance().load_provider(
         wsrep_provider, wsrep_provider_options ? wsrep_provider_options : "");
     if (err) {

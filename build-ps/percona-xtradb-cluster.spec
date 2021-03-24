@@ -75,7 +75,7 @@ Prefix: %{_sysconfdir}
 
 #Placeholder should be replaced on preparation stage
 %if %{undefined galera_version}
- %define galera_version 4.5
+ %define galera_version 4.6
 %endif
 
 %if %{undefined galera_revision}
@@ -360,10 +360,21 @@ Requires:       %{distro_requires}
 Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Requires:             percona-xtradb-cluster-shared = %{version}-%{release}
 Requires:             selinux-policy
-Requires:		policycoreutils
-Requires(pre):		policycoreutils
-Requires(post):		policycoreutils
-Requires(postun):       policycoreutils
+Requires:             policycoreutils
+Requires(pre):        policycoreutils
+Requires(post):       policycoreutils
+Requires(postun):     policycoreutils
+%if 0%{?rhel} == 8
+Requires:             policycoreutils-python-utils
+Requires(pre):        policycoreutils-python-utils
+Requires(post):       policycoreutils-python-utils
+Requires(postun):     policycoreutils-python-utils
+%else
+Requires:             policycoreutils-python
+Requires(pre):        policycoreutils-python
+Requires(post):       policycoreutils-python
+Requires(postun):     policycoreutils-python
+%endif
 %if 0%{?rhel} == 6
 BuildRequires: 		selinux-policy
 %else
@@ -630,7 +641,7 @@ mkdir pxc_extra
 pushd pxc_extra
 mkdir pxb-2.4
 pushd pxb-2.4
-yumdownloader percona-xtrabackup-24-2.4.21
+yumdownloader percona-xtrabackup-24-2.4.22
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
@@ -644,7 +655,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.14
+yumdownloader percona-xtrabackup-80-8.0.23
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -688,7 +699,7 @@ mkdir debug
 %endif
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
-           -DWITH_ZLIB=system \
+           -DWITH_ZLIB=bundled \
            -DWITH_READLINE=system \
            -DWITHOUT_TOKUDB=ON \
            -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
@@ -703,7 +714,6 @@ mkdir debug
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
-           -DWITH_ZLIB=system \
            -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
@@ -728,7 +738,7 @@ mkdir release
 %endif
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
-           -DWITH_ZLIB=system \
+           -DWITH_ZLIB=bundled \
            -DWITH_READLINE=system \
            -DWITHOUT_TOKUDB=ON \
            -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
@@ -743,7 +753,6 @@ mkdir release
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
-           -DWITH_ZLIB=system \
            -DWITH_ZSTD=bundled \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
@@ -816,6 +825,7 @@ install -d $RBR/var/lib/mysql
 install -d $RBR/var/lib/mysql-files
 install -d $RBR/var/lib/mysql-keyring
 install -d $RBR%{_datadir}/mysql-test
+install -d $RBR/etc/mysql/certs
 # install -d $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
 install -d $RBR%{_includedir}
 install -d $RBR%{_libdir}
@@ -859,8 +869,6 @@ install -d %{buildroot}%{_sysconfdir}/my.cnf.d
 %endif
 
 %if 0%{?systemd}
-install -D -p -m 0644 packaging/rpm-common/mysqlrouter.service %{buildroot}%{_unitdir}/mysqlrouter.service
-install -D -p -m 0644 packaging/rpm-common/mysqlrouter.tmpfiles.d %{buildroot}%{_tmpfilesdir}/mysqlrouter.conf
 %else
 install -D -p -m 0755 packaging/rpm-common/mysqlrouter.init %{buildroot}%{_sysconfdir}/init.d/mysqlrouter
 %endif
@@ -933,8 +941,6 @@ install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README-MySQL \
     $RBR%{galera_docs}/README-MySQL
 install -m 644 $MBD/%{galera_src_dir}/asio/LICENSE_1_0.txt    \
     $RBR%{galera_docs}/LICENSE.asio
-install -m 644 $MBD/%{galera_src_dir}/www.evanjones.ca/LICENSE \
-    $RBR%{galera_docs}/LICENSE.crc32c
 
 install -d $RBR%{galera_docs2}
 install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
@@ -1250,6 +1256,10 @@ fi
 /usr/sbin/semodule -i %{_datadir}/percona-xtradb-cluster/selinux/percona-xtradb-cluster.pp >/dev/null 2>&1 || :
 /usr/sbin/semodule -i %{_datadir}/percona-xtradb-cluster/selinux/wsrep-sst-xtrabackup-v2.pp >/dev/null 2>&1 || :
 semanage port -a -t mysqld_port_t  -p tcp 4568
+# Let's setup mysqld_t in permissive mode, even if SELinux is in enforcing mode.
+# User will switch it back to enforcing if needed after checking audit logs.
+semanage permissive -a  mysqld_t
+
 
 if [ -x sbin/restorecon ] ; then
   sbin/restorecon -R var/lib/mysql
@@ -1528,6 +1538,7 @@ fi
 %dir %attr(751, mysql, mysql) /var/lib/mysql
 %dir %attr(750, mysql, mysql) /var/lib/mysql-files
 %dir %attr(750, mysql, mysql) /var/lib/mysql-keyring
+%dir %attr(755, mysql, mysql) /etc/mysql/certs
 %dir %attr(755, mysql, mysql) /var/run/mysqld
 %if 0%{?systemd}
 %attr(644, root, root) %{_unitdir}/mysql.service
@@ -1546,7 +1557,6 @@ fi
 %doc %attr(0644,root,root) %{galera_docs}/README
 %doc %attr(0644,root,root) %{galera_docs}/README-MySQL
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
-%doc %attr(0644,root,root) %{galera_docs}/LICENSE.crc32c
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d
 
@@ -1728,6 +1738,7 @@ fi
 %doc $RPM_BUILD_DIR/%{src_dir}/router/README.router  $RPM_BUILD_DIR/%{src_dir}/router/LICENSE.router
 %dir %{_sysconfdir}/mysqlrouter
 %config(noreplace) %{_sysconfdir}/mysqlrouter/mysqlrouter.conf
+%attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysqlrouter
 %{_bindir}/mysqlrouter
 %{_bindir}/mysqlrouter_keyring
 %{_bindir}/mysqlrouter_plugin_info
@@ -1736,17 +1747,17 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter_passwd.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlrouter_plugin_info.1*
 %if 0%{?systemd}
-%{_unitdir}/mysqlrouter.service
-%{_tmpfilesdir}/mysqlrouter.conf
 %else
 %{_sysconfdir}/init.d/mysqlrouter
 %endif
 %{_libdir}/mysqlrouter/private/libmysqlharness.so.*
+%{_libdir}/mysqlrouter/private/libmysqlharness_stdx.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_backend.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
 %{_libdir}/mysqlrouter/private/libprotobuf-lite.so.*
+%{_libdir}/mysqlrouter/private/libmysqlrouter_io_component.so.*
 %dir %{_libdir}/mysqlrouter
 %dir %{_libdir}/mysqlrouter/private
 %{_libdir}/mysqlrouter/*.so*

@@ -354,6 +354,19 @@ encryption.innodb-page_encryption-32k                                   : BUG#31
 # auth_sec
 auth_sec.wrong_keyring_file_data                                        : BUG#0 PXC needs keyring_file/keyring_vault to load without errors
 
+
+# Read only wsrep_provider & wsrep_notify_cmd
+galera.galera_ist_try_again: BUG#0 Needs dynamic wsrep_provider
+galera.galera_ist_restart_joiner: BUG#0 Needs dynamic wsrep_provider
+galera.pxc-421: BUG#0 Needs dynamic wsrep_provider
+galera.galera_memcached: BUG#0 Needs dynamic wsrep_provider
+galera.galera_migrate: BUG#0 Needs dynamic wsrep_provider
+galera.galera_wsrep_provider_unset_set: BUG#0 Needs dynamic wsrep_provider
+galera.galera_lock_table: BUG#0 Needs dynamic wsrep_provider
+galera_3nodes.galera_ist_gcache_rollover2: BUG#0 Needs dynamic wsrep_provider
+galera_3nodes.galera_ist_gcache_rollover: BUG#0 Needs dynamic wsrep_provider
+
+
 #--------------------------------------------------
 # Codership disabled tests end here
 #--------------------------------------------------

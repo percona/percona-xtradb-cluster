@@ -7700,7 +7700,7 @@ static Sys_var_charptr Sys_protocol_compression_algorithms(
 static PolyLock_mutex PLock_wsrep_cluster_config(&LOCK_wsrep_cluster_config);
 static Sys_var_charptr Sys_wsrep_provider(
     "wsrep_provider", "Path to replication provider library",
-    PREALLOCATED GLOBAL_VAR(wsrep_provider),
+    READ_ONLY PREALLOCATED GLOBAL_VAR(wsrep_provider),
     CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER), IN_FS_CHARSET,
     DEFAULT(WSREP_NONE), &PLock_wsrep_cluster_config, NOT_IN_BINLOG,
     ON_CHECK(wsrep_provider_check), ON_UPDATE(wsrep_provider_update));
@@ -7887,11 +7887,10 @@ static Sys_var_ulong Sys_wsrep_max_ws_rows("wsrep_max_ws_rows",
                                            VALID_RANGE(0, 1048576), DEFAULT(0),
                                            BLOCK_SIZE(1));
 
-static Sys_var_charptr Sys_wsrep_notify_cmd("wsrep_notify_cmd", "",
-                                            GLOBAL_VAR(wsrep_notify_cmd),
-                                            CMD_LINE(REQUIRED_ARG),
-                                            IN_FS_CHARSET, DEFAULT(""),
-                                            NO_MUTEX_GUARD, NOT_IN_BINLOG);
+static Sys_var_charptr Sys_wsrep_notify_cmd(
+    "wsrep_notify_cmd", "", READ_ONLY GLOBAL_VAR(wsrep_notify_cmd),
+    CMD_LINE(REQUIRED_ARG), IN_FS_CHARSET, DEFAULT(""), NO_MUTEX_GUARD,
+    NOT_IN_BINLOG);
 
 static Sys_var_bool Sys_wsrep_certify_nonPK(
     "wsrep_certify_nonPK", "Certify tables with no primary key",

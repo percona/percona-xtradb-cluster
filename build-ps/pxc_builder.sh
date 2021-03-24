@@ -154,7 +154,14 @@ get_sources(){
     WSREP_REV="$(test -r WSREP-REVISION && cat WSREP-REVISION)"
     REVISION=$(git rev-parse --short HEAD)
     GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
-    source VERSION
+    if [ -f VERSION ]; then
+        source VERSION
+    elif [ -f MYSQL_VERSION ]; then
+        source MYSQL_VERSION
+    else
+        echo "VERSION file does not exist"
+       exit 1
+    fi
     export MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
     export MYSQL_RELEASE="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 
@@ -175,8 +182,8 @@ get_sources(){
     if [ -z "${DESTINATION:-}" ]; then
     export DESTINATION=experimental
     fi
-    DESTINATION="UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${BUILD_NUMBER}/${REVISION}"
-    echo "DESTINATION=UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${BUILD_NUMBER}/${REVISION}" >> ${WORKDIR}/pxc-80.properties
+    DESTINATION="UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${REVISION}/${BUILD_NUMBER}"
+    echo "DESTINATION=UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${REVISION}/${BUILD_NUMBER}" >> ${WORKDIR}/pxc-80.properties
     echo "GALERA_REVNO=${GALERA_REVNO}" >>${WORKDIR}/pxc-80.properties
     DEST=${DESTINATION}
     echo "DEST=${DEST}" >> ${WORKDIR}/pxc-80.properties
@@ -185,12 +192,12 @@ get_sources(){
       RHEL=$(rpm --eval %rhel)
       source /opt/rh/devtoolset-8/enable
       if [ "x${RHEL}" = "x8" ]; then
-          cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1
+          cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1 -DWITH_ZLIB=bundled
       else
-          cmake3 . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1
+          cmake3 . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1 -DWITH_ZLIB=bundled
       fi
     else
-      cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1
+      cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1 -DWITH_ZLIB=bundled
     fi
     make dist
     mv *.tar.gz ${WORKDIR}/
@@ -273,23 +280,40 @@ install_deps() {
     if [ "x$OS" = "xrpm" ]; then
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
+        yum update -y
+        yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
         add_percona_yum_repo
         if [ "x${RHEL}" = "x8" ]; then
-            yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++
+            yum -y install dnf-plugins-core epel-release
+            yum config-manager --set-enabled powertools
+            yum -y install python2-scons || true
+            yum -y install python2-pip python36-devel
+            yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++ make
             yum -y install git gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
             yum -y install libstdc++-devel libtirpc-devel make ncurses-devel numactl-devel
-            yum -y install openldap-devel openssl-devel pam-devel perl perl-Data-Dumper
+            yum -y install openldap-devel openssl-devel pam-devel perl-Data-Dumper
             yum -y install perl-Dig perl-Digest perl-Digest-MD5 perl-Env perl-JSON perl-Time-HiRes
-            yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel
-            wget https://rpmfind.net/linux/fedora/linux/releases/29/Everything/x86_64/os/Packages/r/rpcgen-1.4-1.fc29.x86_64.rpm
-            yum -y install rpcgen-1.4-1.fc29.x86_64.rpm
+            yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel selinux-policy-devel
+            yum -y install bison boost-devel check-devel cmake gcc-c++ glibc-devel libaio-devel libcurl-devel
+            wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/30/Everything/x86_64/os/Packages/r/rpcgen-1.4-2.fc30.x86_64.rpm
+            wget ftp://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora/linux/releases/29/Everything/x86_64/os/Packages/g/gperf-3.1-6.fc29.x86_64.rpm
+            yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+
+            wget https://jenkins.percona.com/yum-repo/percona-dev.repo
+            mv -vf percona-dev.repo /etc/yum.repos.d
+            yum -y clean all
+            yum -y install python2-scons python2-pip python36-devel
+            yum -y install redhat-rpm-config python2-devel
+            /usr/bin/pip3.6 install --user typing pyyaml regex Cheetah3
+            /usr/bin/pip2.7 install --user typing pyyaml regex Cheetah
+            dnf -y module disable mysql
         else
             yum -y install epel-release
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc zstd zstd-devel
-            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel
-            yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static
+            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel make
+            yum -y install perl-Time-HiRes openldap-devel unzip wget libcurl-devel boost-static selinux-policy-devel
             yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
             until yum -y install centos-release-scl; do
                 echo "waiting"
@@ -312,15 +336,16 @@ install_deps() {
         fi
         yum -y install yum-utils patchelf
     else
+        apt-get -y update
+        DEBIAN_FRONTEND=noninteractive apt-get -y install curl lsb-release wget apt-transport-https software-properties-common
         apt-get -y install dirmngr || true
         apt-get update
         apt-get -y install dirmngr || true
-        apt-get -y install lsb-release wget
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools testing
         export DEBIAN_FRONTEND="noninteractive"
         export DIST="$(lsb_release -sc)"
-            until sudo apt-get update; do
+            until apt-get update; do
             sleep 1
             echo "waiting"
         done
@@ -344,8 +369,8 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-24=2.4.21-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.14-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-24=2.4.22-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.23-16-1.${DIST}
     fi
     return;
 }
@@ -619,6 +644,7 @@ build_source_deb(){
     sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" debian/rules
     sed -i "s:@@DEB_RELEASE@@:${DEB_RELEASE}:g" debian/rules
 
+    sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
 
     dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}"
     dpkg-buildpackage -S
@@ -714,7 +740,7 @@ build_deb(){
         sed -i "s:iproute:iproute2:g" debian/control
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
-    sudo chmod 777 debian/rules
+    chmod 777 debian/rules
     dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
@@ -780,7 +806,7 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
         mkdir pxb-2.4
         pushd pxb-2.4
-        yumdownloader percona-xtrabackup-24-2.4.21
+        yumdownloader percona-xtrabackup-24-2.4.22
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib* ./
@@ -793,7 +819,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.14
+        yumdownloader percona-xtrabackup-80-8.0.23
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
@@ -842,10 +868,18 @@ build_tarball(){
     else
         bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
     fi
-    mkdir -p ${WORKDIR}/tarball
-    mkdir -p ${CURDIR}/tarball
-    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/tarball
-    cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/tarball
+
+    DIRNAME="tarball"
+    if [[ ${DEBUG} == 1 ]]; then
+        DIRNAME="debug"
+    fi
+    mkdir -p ${WORKDIR}/../${DIRNAME}
+    mkdir -p ${WORKDIR}/${DIRNAME}
+    mkdir -p ${CURDIR}/${DIRNAME}
+    rm -f $BUILD_NUMBER/percona-xtrabackup* || true
+    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/../${DIRNAME}
+    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/${DIRNAME}
+    cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/${DIRNAME}
 
 }
 
