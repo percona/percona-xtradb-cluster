@@ -1,4 +1,7 @@
 
+.. role:: mysql(code)
+   :language: mysql
+
 .. |cfname| replace:: `cf_name`
 .. |cf-name| replace:: `cf_name`
 

@@ -127,7 +127,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
 
    Change the password for the superuser account and log out. For example:
 
-   .. code-block:: guess
+   .. code-block:: mysql
 
       mysql> ALTER USER 'root'@'localhost' IDENTIFIED BY 'r00tP@$$';
       Query OK, 0 rows affected (0.00 sec)
@@ -135,7 +135,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
 Step 3. Configuring the second node
 ===================================
 
-1. Make sure that the onfiguration file :file:`/etc/my.cnf`
+1. Make sure that the configuration file :file:`/etc/my.cnf`
    on the second node (``percona2``) contains the following::
 
       [mysqld]
@@ -155,7 +155,7 @@ Step 3. Configuring the second node
       # Using the MyISAM storage engine is not recommended
       default_storage_engine=InnoDB
 
-      # This InnoDB autoincrement locking mode is a requirement for Galera
+      # This InnoDB auto_increment locking mode is a requirement for Galera
       innodb_autoinc_lock_mode=2
 
       # Node 2 address
@@ -222,7 +222,7 @@ Step 4. Configuring the third node
       # Using the MyISAM storage engine is not recommended
       default_storage_engine=InnoDB
 
-      # This InnoDB autoincrement locking mode is a requirement for Galera
+      # This InnoDB auto_increment locking mode is a requirement for Galera
       innodb_autoinc_lock_mode=2
 
       # Node #3 address

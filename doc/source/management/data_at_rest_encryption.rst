@@ -4,10 +4,6 @@
 Data at Rest Encryption
 ========================
 
-.. contents::
-
-   :local:
-
 Introduction
 ============
 
@@ -36,8 +32,7 @@ you enable, disable, and apply encryptions to the following objects:
 
 * Doublewrite buffer files
 
- The transit data defines data transmitted to another node or client, and
- is encrypted using an SSL connection.
+The transit data is defined as data that is transmitted to another node or client. Encrypted transit data uses an SSL connection.
 
 |PXC| |version| supports all |data-at-rest| generally-available encryption
 features available from |percona-server| 8.0.
@@ -47,9 +42,8 @@ Configuring PXC to use keyring_file plugin
 keyring_file
 --------------------------------------------------------------------------------
 
-The ``keyring_file`` stores an encryption key to a physical file. The location
-of this
-file is specified by the ``keyring_file_data`` parameter configured during startup.
+The ``keyring_file`` stores an encryption key in a physical file. The location
+of this file is specified by the ``keyring_file_data`` parameter configured during startup.
 
 Configuration
 --------------------------------------------------------------------------------
@@ -64,14 +58,11 @@ plugin. The following options are set in the configuration file:
    early-plugin-load=keyring_file.so
    keyring_file_data=<PATH>/keyring
 
-A ``SHOW PLUGINS`` statement checks if the plugin has been
+The ``SHOW PLUGINS`` statement checks if the plugin has been
 successfully loaded.
 
 .. note:: PXC recommends the same configuration on all cluster nodes,
-   and all nodes should have the keyring
-   configured. A mismatch in the keyring configuration does not allow the JOINER
-   node to
-   join the cluster.
+   and all nodes should have the keyring configured. A mismatch in the keyring configuration does not allow the JOINER node to join the cluster.
 
 If the user has a bootstrapped node with keyring enabled, then upcoming cluster
 nodes inherit the keyring (the encrypted key) from the DONOR node.
@@ -84,7 +75,7 @@ re-encrypts it using a newly generated master-key.
 
 Keyring (or, more generally, the |PXC| SST process) is backward compatible, as
 in higher version JOINER can join from lower version DONOR, but not vice-versa.
-More details are covered in the `Upgrade and compatibility issues`_ section.
+
 
 |PXC| does not allow the combination of nodes with encryption and nodes without
 encryption to maintain data consistency. For
@@ -111,8 +102,6 @@ Compatibility
 
 Keyring (or, more generally, the |PXC| SST process) is backward compatible. A
 higher version JOINER can join from lower version DONOR, but not vice-versa.
-More details are covered below, in
-:ref:`data-at-rest-encryption-upgrade-compatibility-issues` section.
 
 Configuring PXC to use keyring_vault plugin
 ===========================================
@@ -215,7 +204,7 @@ Mixing keyring plugin types
 ============================
 
 With |xtrabackup| introducing transition-key logic, it is now possible to
-mix and match keyring plugins. For example, the user has node-1 configured to use the 
+mix and match keyring plugins. For example, the user has node-1 configured to use the
 ``keyring_file`` plugin and node-2 configured to use ``keyring_vault``.
 
 .. note:: Percona recommends the same configuration for all the nodes of the

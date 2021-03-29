@@ -17,7 +17,7 @@ Unsupported queries:
 Query log cannot be directed to table.
    If you enable query logging, you must forward the log to a file:
 
-   .. code-block:: guess
+   .. code-block:: mysql
 
       log_output = FILE
 

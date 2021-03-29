@@ -19,7 +19,7 @@ The basic syntax is the following:
   *Usage*:
   SELECT ... FROM SEQUENCE_TABLE(n) [AS] alias
 
-    .. code-block:: mysql
+    .. code-block:: text
 
         SEQUENCE_TABLE(
             n

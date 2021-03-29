@@ -37,7 +37,7 @@ should use the same key and certificate files on all nodes.
 Specify the following settings in the :file:`my.cnf` configuration file
 for each node:
 
-.. code-block:: guess
+.. code-block:: text
 
    [mysqld]
    ssl-ca=/etc/mysql/certs/ca.pem

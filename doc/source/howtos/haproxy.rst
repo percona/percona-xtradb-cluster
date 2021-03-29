@@ -201,7 +201,7 @@ The following is an example of the HAProxy configuration file in this case::
    plugin. Create a mysql user using the ``mysql_native_password``
    authentication plugin.
 
-   .. code-block:: guess
+   .. code-block:: mysql
 
       mysql> CREATE USER 'haproxy_user'@'%' IDENTIFIED WITH mysql_native_password by '$3Kr$t';
 

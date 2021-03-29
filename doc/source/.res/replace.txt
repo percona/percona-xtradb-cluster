@@ -10,7 +10,6 @@
 .. |xtradb.product| replace:: Percona XtraDB
 .. |mysql| replace:: MySQL
 .. |ps| replace:: Percona Server for MySQL
-.. |proxysql| replace:: ProxySQL
 .. |percona-server| replace:: Percona Server for MySQL
 
 .. Platforms and rel. products
@@ -46,5 +45,3 @@
 
 .. |term.mysql-pxc-sst-role| replace:: :term:`mysql.pxc.sst.role`
 .. |pxc-sst-role| replace:: :term:`mysql.pxc.sst.role`
-
-

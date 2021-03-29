@@ -57,7 +57,8 @@
    LSN
 
      Log Serial Number. A term used in relation to the :term:`InnoDB` or
-     :term:`XtraDB` storage engines.
+     :term:`XtraDB` storage engines. There are System-level LSNs and Page-level LSNs. The System LSN represents the most recent LSN value assigned to page changes. 
+     Each InnoDB page contains a Page LSN which is the max LSN for that page for changes that reside on the disk. This LSN is updated when the page is flushed to disk.
   
    MariaDB
 
@@ -68,7 +69,9 @@
    MyISAM
 
      A :term:`MySQL` :term:`Storage Engine` that was the default until
-     MySQL 5.5.
+     MySQL 5.5. It
+     doesn't fully support transactions but in some scenarios may be faster
+     than :term:`InnoDB`. Each table is stored on disk in 3 files: :term:`.frm`,i :file:`.MYD`, :file:`.MYI`.
   
    MySQL
 
@@ -111,29 +114,11 @@
      ext3) and a Storage Engine layer allows a database server to access
      tables stored in different engines (e.g. :term:`MyISAM`, InnoDB).
   
-   XtraDB
-
-     Percona's improved version of :term:`InnoDB` providing performance,
-     features and reliability above what is shipped by Oracle in InnoDB.
-  
-   LSN
-
-      Each InnoDB page (usually 16kb in size) contains a log sequence number, or
-      LSN. The LSN is the system version number for the entire database. Each
-      page's LSN shows how recently it was changed.
-  
    InnoDB
 
       Storage engine which provides ACID-compliant transactions and foreign key
       support, among others improvements over :term:`MyISAM`. It is the default
       engine for |MySQL| as of the 5.5 series.
-  
-   MyISAM
-
-      Previous default storage engine for |MySQL| for versions prior to 5.5. It
-      doesn't fully support transactions but in some scenarios may be faster
-      than :term:`InnoDB`. Each table is stored on disk in 3 files: :term:`.frm`,i
-      :file:`.MYD`, :file:`.MYI`.
   
    GTID
 

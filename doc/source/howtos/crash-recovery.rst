@@ -124,7 +124,7 @@ refuses to serve any SQL queries. In this state, the :command:`mysqld` process
 on node C is still running and can be connected to but any statement related to
 data fails with an error
 
-.. code-block:: guess
+.. code-block:: mysql
 
    mysql> select * from test.sbtest1;
    ERROR 1047 (08S01): WSREP has not yet prepared node for application use
@@ -141,7 +141,7 @@ If node A and node B crashed, you need to enable the primary component on
 node C manually, before you can bring up node A and node B. The command to do
 this is:
 
-.. code-block:: guess
+.. code-block:: mysql
 
    mysql> SET GLOBAL wsrep_provider_options='pc.bootstrap=true';
 
@@ -258,7 +258,7 @@ If you want to restore the service even
 before the network link is restored, you can make one of the groups primary
 again using the same command as described in :ref:`pxc-crash-recovery-scenario-5`
 
-.. code-block:: guess
+.. code-block:: mysql
 
    SET GLOBAL wsrep_provider_options='pc.bootstrap=true';
 
