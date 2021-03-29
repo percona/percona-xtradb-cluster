@@ -3935,9 +3935,10 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
 
     /* It's safe to pass space_name in tablename charset because
     filename is already in filename charset. */
-    dberr_t err = fil_ibd_open(
-        validate || is_enc_in_progress, FIL_TYPE_TABLESPACE, space_id, fsp_flags,
-        space_name, nullptr, filename, false, false, keyring_encryption_info);
+    dberr_t err =
+        fil_ibd_open(validate || is_enc_in_progress, FIL_TYPE_TABLESPACE,
+                     space_id, fsp_flags, space_name, nullptr, filename, false,
+                     false, keyring_encryption_info);
 
     switch (err) {
       case DB_SUCCESS:
@@ -4533,10 +4534,12 @@ error_exit:
   return (ret);
 }
 
-bool innobase_fix_default_table_encryption(ulong encryption_option, bool is_server_starting) {
+bool innobase_fix_default_table_encryption(ulong encryption_option,
+                                           bool is_server_starting) {
   if (!srv_read_only_mode) {
     return fil_crypt_set_encrypt_tables(
-        static_cast<enum_default_table_encryption>(encryption_option), is_server_starting);
+        static_cast<enum_default_table_encryption>(encryption_option),
+        is_server_starting);
   }
   return false;
 }
@@ -10317,7 +10320,8 @@ static int wsrep_calc_row_hash(byte *digest, const uchar *row, TABLE *table,
           1 or 2 bytes */
 
           ptr = row_mysql_read_true_varchar(
-              &len, ptr, (ulint)(((Field_varstring *)field)->get_length_bytes()));
+              &len, ptr,
+              (ulint)(((Field_varstring *)field)->get_length_bytes()));
         }
 
         break;
@@ -19867,6 +19871,9 @@ int ha_innobase::check(THD *thd,                /*!< in: user thread handle */
 
   DBUG_TRACE;
   DBUG_ASSERT(thd == ha_thd());
+#ifdef WITH_WSREP
+  DEBUG_SYNC(thd, "ha_innobase_check");
+#endif /* WITH_WSREP */
   ut_a(m_prebuilt->trx->magic_n == TRX_MAGIC_N);
   ut_a(m_prebuilt->trx == thd_to_trx(thd));
 
@@ -24155,8 +24162,8 @@ static int innodb_encryption_threads_validate(
       return 1;
     }
   } else if (requested_threads == 0 && srv_n_fil_crypt_threads_requested >
-                                0) {  // We are disabling encryption
-                                      // threads, unlock the keyrings
+                                           0) {  // We are disabling encryption
+                                                 // threads, unlock the keyrings
     unlock_keyrings(NULL);
   }
 
@@ -24391,9 +24398,8 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
    * lock_sys is held until this vicitm has aborted
    */
   victim_trx->lock.was_chosen_as_wsrep_victim = true;
-  
-  if (wsrep_thd_set_wsrep_aborter(bf_thd, thd))
-  {
+
+  if (wsrep_thd_set_wsrep_aborter(bf_thd, thd)) {
     WSREP_DEBUG("innodb kill transaction skipped due to wsrep_aborter set");
     wsrep_thd_UNLOCK(thd);
     return (false);
@@ -24404,9 +24410,9 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
   if (wsrep_thd_bf_abort(bf_thd, thd, signal)) {
     if (victim_trx->lock.wait_lock) {
       WSREP_DEBUG("victim has wait flag: %lu", thd_get_thread_id(thd));
-      /* lock_cancel_waiting_and_release() requires exclusive global latch, and so
-         does reading the trx->lock.wait_lock to prevent races with B-tree page
-         reorganization
+      /* lock_cancel_waiting_and_release() requires exclusive global latch, and
+         so does reading the trx->lock.wait_lock to prevent races with B-tree
+         page reorganization
       */
       locksys::Global_exclusive_latch_guard guard{};
       lock_t *wait_lock = victim_trx->lock.wait_lock;
@@ -24418,7 +24424,6 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
       }
     }
   } else {
-    
     wsrep_thd_LOCK(thd);
     victim_trx->lock.was_chosen_as_deadlock_victim = false;
     victim_trx->lock.was_chosen_as_wsrep_victim = false;
@@ -24427,7 +24432,6 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
 
     WSREP_DEBUG("wsrep_thd_bf_abort has failed, victim will survive");
     DBUG_RETURN(1);
-
   }
 
   DBUG_RETURN(0);
