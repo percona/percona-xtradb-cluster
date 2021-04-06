@@ -17631,6 +17631,9 @@ ha_innobase::check(
 
 	DBUG_ENTER("ha_innobase::check");
 	DBUG_ASSERT(thd == ha_thd());
+#ifdef WITH_WSREP
+	DEBUG_SYNC(thd, "ha_innobase_check");
+#endif /* WITH_WSREP */
 	ut_a(m_prebuilt->trx->magic_n == TRX_MAGIC_N);
 	ut_a(m_prebuilt->trx == thd_to_trx(thd));
 
