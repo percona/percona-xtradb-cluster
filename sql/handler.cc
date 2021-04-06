@@ -8453,14 +8453,20 @@ static bool check_table_binlog_row_based(THD *thd, TABLE *table)
   DBUG_ASSERT(table->s->cached_row_logging_check == 0 ||
               table->s->cached_row_logging_check == 1);
 
+#ifdef WITH_WSREP
+  return (thd->is_current_stmt_binlog_format_row() &&
+          table->s->cached_row_logging_check &&
+          !(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF) &&
+            (((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV))
+            ||
+            (((WSREP(thd) || thd->variables.option_bits & OPTION_BIN_LOG))
+              &&
+              mysql_bin_log.is_open()))));
+#else
+
   return (thd->is_current_stmt_binlog_format_row() &&
           table->s->cached_row_logging_check &&
           (thd->variables.option_bits & OPTION_BIN_LOG) &&
-#ifdef WITH_WSREP
-	  /* applier and replayer should not binlog */
-          ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) ||
-           mysql_bin_log.is_open()));
-#else
           mysql_bin_log.is_open());
 #endif
 }

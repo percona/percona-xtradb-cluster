@@ -4324,8 +4324,16 @@ void set_slave_thread_options(THD* thd)
   ulonglong options= thd->variables.option_bits | OPTION_BIG_SELECTS;
   if (opt_log_slave_updates)
     options|= OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  else
+  {
+    options&= ~OPTION_BIN_LOG;
+    options|= OPTION_BIN_LOG_INTERNAL_OFF;
+  }
+#else
   else
     options&= ~OPTION_BIN_LOG;
+#endif
   thd->variables.option_bits= options;
   thd->variables.completion_type= 0;
 

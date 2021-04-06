@@ -186,6 +186,9 @@ bool Gtid_table_access_context::init(THD **thd, TABLE **table, bool is_write)
     /* Disable binlog temporarily */
     m_tmp_disable_binlog__save_options= (*thd)->variables.option_bits;
     (*thd)->variables.option_bits&= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+    (*thd)->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
   }
 
   if (!(*thd)->get_transaction()->xid_state()->has_state(XID_STATE::XA_NOTR))

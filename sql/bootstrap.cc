@@ -119,6 +119,9 @@ static void handle_bootstrap_impl(THD *thd)
   Compiled_in_command_iterator comp_iter;
   Query_command_iterator query_iter(bootstrap_query);
   bool has_binlog_option= thd->variables.option_bits & OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  ulonglong option_bits_save = thd->variables.option_bits;
+#endif
   int query_source, last_query_source= -1;
 
   thd->thread_stack= (char*) &thd;
@@ -175,6 +178,9 @@ static void handle_bootstrap_impl(THD *thd)
       {
       case QUERY_SOURCE_COMPILED:
         thd->variables.option_bits&= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+        thd->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
         break;
       case QUERY_SOURCE_FILE:
         /*
@@ -184,6 +190,9 @@ static void handle_bootstrap_impl(THD *thd)
         */
         thd->variables.sql_log_bin= true;
         thd->variables.option_bits|= OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+        thd->variables.option_bits&= ~OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
         break;
       default:
         DBUG_ASSERT(false);
@@ -278,8 +287,12 @@ static void handle_bootstrap_impl(THD *thd)
       we must disable binary logging again.
     */
     if (last_query_source == QUERY_SOURCE_COMPILED &&
-        thd->variables.option_bits & OPTION_BIN_LOG)
+        thd->variables.option_bits & OPTION_BIN_LOG) {
       thd->variables.option_bits&= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+      thd->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
+    }
 
   }
 
@@ -289,6 +302,9 @@ static void handle_bootstrap_impl(THD *thd)
     We should re-enable SQL_LOG_BIN session if it was enabled by default
     but disabled during bootstrap/initialization.
   */
+#ifdef WITH_WSREP
+  thd->variables.option_bits = option_bits_save;
+#endif
   if (has_binlog_option)
   {
     thd->variables.sql_log_bin= true;

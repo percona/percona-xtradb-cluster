@@ -120,4 +120,8 @@
 */
 #define OPTION_ALLOW_BATCH              (1ULL << 36) // THD, intern (slave)
 
+#ifdef WITH_WSREP
+#define OPTION_BIN_LOG_INTERNAL_OFF          (1ULL << 37) // disable binlog, intern
+#endif
+
 #endif  /* QUERY_OPTIONS_INCLUDED */
