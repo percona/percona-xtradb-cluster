@@ -95,7 +95,7 @@ done
 # Undefined means node is shutting down
 if [ "$STATUS" != "Undefined" ]
 then
-    $COM | mysql -B -u$USER -h$HOST -P$PORT
+    $COM | $MYSQL -B -u$USER -h$HOST -P$PORT
 fi
 
 exit 0
