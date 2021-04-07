@@ -6902,6 +6902,22 @@ static int init_server_components() {
     res_grp_mgr->set_unsupport_reason("Thread pool plugin enabled");
   }
 
+#ifdef WITH_WSREP
+  static const LEX_CSTRING keyring_vault_name = {
+      STRING_WITH_LEN("keyring_vault")};
+  static const LEX_CSTRING keyring_name = {STRING_WITH_LEN("keyring_file")};
+  if (!pxc_encrypt_cluster_traffic &&
+      (plugin_is_ready(keyring_vault_name, MYSQL_KEYRING_PLUGIN) ||
+       plugin_is_ready(keyring_name, MYSQL_KEYRING_PLUGIN))) {
+    WSREP_WARN(
+        "You have enabled keyring plugin. SST encryption is mandatory. "
+        "Please enable pxc_encrypt_cluster_traffic. Check "
+        "https://www.percona.com/doc/percona-xtradb-cluster/%u.%u/security/"
+        "encrypt-traffic.html#encrypt-sst for more details.",
+        MYSQL_VERSION_MAJOR, MYSQL_VERSION_MINOR);
+  }
+#endif
+
 #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
   /*
     A value of the variable dd_upgrade_flag is reset after

@@ -13,6 +13,7 @@
 #
 # Reference: WL#10957
 ###############################################################################
+CALL mtr.add_suppression("You have enabled keyring plugin. SST encryption is mandatory.");
 
 # Save initial value
 --let $saved_binlog_encryption= `SELECT @@global.binlog_encryption`
