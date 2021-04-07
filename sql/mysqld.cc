@@ -5078,6 +5078,23 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
 
+#ifdef WITH_WSREP
+  static const LEX_CSTRING keyring_vault_name= {
+      C_STRING_WITH_LEN("keyring_vault")};
+  static const LEX_CSTRING keyring_name= {C_STRING_WITH_LEN("keyring_file")};
+  if (!pxc_encrypt_cluster_traffic &&
+      (plugin_is_ready(keyring_vault_name, MYSQL_KEYRING_PLUGIN) ||
+       plugin_is_ready(keyring_name, MYSQL_KEYRING_PLUGIN)))
+  {
+    WSREP_WARN(
+        "You have enabled keyring plugin. SST encryption is mandatory. "
+        "Please enable pxc_encrypt_cluster_traffic. Check "
+        "https://www.percona.com/doc/percona-xtradb-cluster/%u.%u/security/"
+        "encrypt-traffic.html#encrypt-sst for more details.",
+        MYSQL_VERSION_MAJOR, MYSQL_VERSION_MINOR);
+  }
+#endif
+
   Session_tracker session_track_system_variables_check;
   LEX_STRING var_list;
   char *tmp_str;
