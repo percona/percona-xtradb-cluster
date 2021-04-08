@@ -177,8 +177,11 @@ class Disable_binlog_guard {
   explicit Disable_binlog_guard(THD *thd, bool turn_off_wsrep = false)
       : m_thd(thd),
         m_wsrep_on(thd->variables.wsrep_on),
+        m_binlog_internal_off_at_entry(thd->variables.option_bits &
+                                       OPTION_BIN_LOG_INTERNAL_OFF),
         m_binlog_disabled(thd->variables.option_bits & OPTION_BIN_LOG) {
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
     if (turn_off_wsrep) {
       thd->variables.wsrep_on = false;
     }
@@ -194,6 +197,9 @@ class Disable_binlog_guard {
   ~Disable_binlog_guard() {
     if (m_binlog_disabled) m_thd->variables.option_bits |= OPTION_BIN_LOG;
 #ifdef WITH_WSREP
+    if (!m_binlog_internal_off_at_entry) {
+      m_thd->variables.option_bits &= ~OPTION_BIN_LOG_INTERNAL_OFF;
+    }
     m_thd->variables.wsrep_on = m_wsrep_on;
 #endif /* WITH_WSREP */
   }
@@ -202,6 +208,7 @@ class Disable_binlog_guard {
   THD *const m_thd;
 #ifdef WITH_WSREP
   const bool m_wsrep_on;
+  const bool m_binlog_internal_off_at_entry;
 #endif /* WITH_WSREP */
   const bool m_binlog_disabled;
 };

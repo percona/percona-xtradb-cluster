@@ -20370,20 +20370,22 @@ int ha_innobase::external_lock(THD *thd, /*!< in: handle to the user thread */
 
     if (!skip) {
 #ifdef WITH_WSREP
-      if (!wsrep_on(thd) || wsrep_thd_is_local(m_user_thd)) {
+      bool sql_log_bin_on = thd->variables.option_bits & OPTION_BIN_LOG;
+      if (sql_log_bin_on &&
+          (!wsrep_on(thd) || wsrep_thd_is_local(m_user_thd))) {
         my_error(ER_BINLOG_STMT_MODE_AND_ROW_ENGINE, MYF(0),
                  " InnoDB is limited to row-logging when"
                  " transaction isolation level is"
                  " READ COMMITTED or READ UNCOMMITTED.");
+        return HA_ERR_LOGGING_IMPOSSIBLE;
       }
 #else
       my_error(ER_BINLOG_STMT_MODE_AND_ROW_ENGINE, MYF(0),
                " InnoDB is limited to row-logging when"
                " transaction isolation level is"
                " READ COMMITTED or READ UNCOMMITTED.");
-#endif /* WITH_WSREP */
-
       return HA_ERR_LOGGING_IMPOSSIBLE;
+#endif /* WITH_WSREP */
     }
   }
 

@@ -137,6 +137,9 @@ bool Ndb_local_connection::execute_query_iso(MYSQL_LEX_STRING sql_text,
   ulonglong save_thd_options = m_thd->variables.option_bits;
   assert(sizeof(save_thd_options) == sizeof(m_thd->variables.option_bits));
   m_thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Increment query_id, the query_id is used when generating

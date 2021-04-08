@@ -129,4 +129,12 @@
 */
 #define OPTION_NO_SUBQUERY_DURING_OPTIMIZATION (1ULL << 39)  // intern
 
+#ifdef WITH_WSREP
+/**
+  If this flag is set it means that the server internally disabled binloggin
+  with the intention to pause hold the replication.
+*/
+#define OPTION_BIN_LOG_INTERNAL_OFF (1ULL << 40)  // disable binlog, intern
+#endif
+
 #endif /* QUERY_OPTIONS_INCLUDED */

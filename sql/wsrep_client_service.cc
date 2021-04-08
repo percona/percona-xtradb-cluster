@@ -130,6 +130,12 @@ void Wsrep_client_service::cleanup_transaction() {
     } else {
       m_thd->variables.option_bits &= ~OPTION_BIN_LOG;
     }
+    if (m_thd->variables.wsrep_saved_binlog_internal_off_state) {
+      m_thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+    } else {
+      m_thd->variables.option_bits &= ~OPTION_BIN_LOG_INTERNAL_OFF;
+    }
+    m_thd->variables.wsrep_saved_binlog_internal_off_state = false;
 
     m_thd->variables.wsrep_saved_binlog_state =
         System_variables::wsrep_binlog_state_t::WSREP_BINLOG_NOTSET;

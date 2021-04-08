@@ -8201,14 +8201,24 @@ static bool check_table_binlog_row_based(THD *thd, TABLE *table) {
   DBUG_ASSERT(table->s->cached_row_logging_check == 0 ||
               table->s->cached_row_logging_check == 1);
 
+#ifdef WITH_WSREP
+  /*
+    In addition to above conditions, PXC allows replication if:
+    1. Binlogging was not disabled internally by the server with the
+    explicit intention to not replicate (OPTION_BIN_LOG_INTERNAL_OFF flag)
+    2a. We are in binlog emulation mode and current thread is not applier thread
+    2b. PXC replication for current is enabled (wsrep_on == true)
+  */
+  return (thd->is_current_stmt_binlog_format_row() &&
+          table->s->cached_row_logging_check &&
+          !(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF) &&
+          (((WSREP_EMULATE_BINLOG(thd) && (!wsrep_thd_is_applying(thd))) ||
+            (((WSREP(thd) || thd->variables.option_bits & OPTION_BIN_LOG)) &&
+             mysql_bin_log.is_open()))));
+#else
   return (thd->is_current_stmt_binlog_format_row() &&
           table->s->cached_row_logging_check &&
           (thd->variables.option_bits & OPTION_BIN_LOG) &&
-#ifdef WITH_WSREP
-          /* applier and replayer should not binlog */
-          ((WSREP_EMULATE_BINLOG(thd) && (!wsrep_thd_is_applying(thd))) ||
-           mysql_bin_log.is_open()));
-#else
           mysql_bin_log.is_open());
 #endif
 }

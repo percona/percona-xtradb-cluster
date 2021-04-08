@@ -109,6 +109,7 @@ class binlog_off {
         m_option_bits(thd->variables.option_bits),
         m_sql_log_bin(thd->variables.sql_log_bin) {
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
     thd->variables.sql_log_bin = 0;
   }
   ~binlog_off() {

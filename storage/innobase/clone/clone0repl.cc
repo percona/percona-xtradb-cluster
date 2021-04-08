@@ -501,6 +501,10 @@ void Clone_persist_gtid::periodic_write() {
 
   m_thread_id = thd_get_thread_id(thd);
 
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
+
   /* Allow GTID to be persisted on read only server. */
   thd->set_skip_readonly_check();
 

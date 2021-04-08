@@ -2727,6 +2727,9 @@ bool sp_head::execute_function(THD *thd, Item **argp, uint argcount,
     mysql_bin_log.start_union_events(thd, q + 1);
     binlog_save_options = thd->variables.option_bits;
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
   }
 
   opt_trace_disable_if_no_stored_proc_func_access(thd, this);

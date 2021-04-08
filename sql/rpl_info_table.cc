@@ -120,6 +120,9 @@ int Rpl_info_table::do_init_info(enum_find_method method, uint instance) {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.
@@ -186,6 +189,9 @@ int Rpl_info_table::do_flush_info(const bool force) {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
   thd->is_operating_substatement_implicitly = true;
 
   /*
@@ -286,6 +292,9 @@ int Rpl_info_table::do_clean_info() {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.
@@ -354,6 +363,9 @@ int Rpl_info_table::do_reset_info(uint nparam, const char *param_schema,
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.
@@ -764,6 +776,9 @@ bool Rpl_info_table::do_update_is_transactional() {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.
