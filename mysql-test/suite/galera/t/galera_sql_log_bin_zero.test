@@ -1,6 +1,6 @@
 #
 # Test SET SESSION sql_log_bin = 0 . We expect that even with this settings
-# repliation across PXC nodes will take place.
+# replication across PXC nodes will take place.
 #
 
 --source include/galera_cluster.inc

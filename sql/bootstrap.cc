@@ -120,7 +120,7 @@ static void handle_bootstrap_impl(THD *thd)
   Query_command_iterator query_iter(bootstrap_query);
   bool has_binlog_option= thd->variables.option_bits & OPTION_BIN_LOG;
 #ifdef WITH_WSREP
-  ulonglong option_bits_save = thd->variables.option_bits;
+  ulonglong option_bits_save= thd->variables.option_bits;
 #endif
   int query_source, last_query_source= -1;
 
@@ -286,14 +286,17 @@ static void handle_bootstrap_impl(THD *thd)
       processing queries that are compiled and must not be binary logged,
       we must disable binary logging again.
     */
+#ifdef WITH_WSREP
     if (last_query_source == QUERY_SOURCE_COMPILED &&
         thd->variables.option_bits & OPTION_BIN_LOG) {
       thd->variables.option_bits&= ~OPTION_BIN_LOG;
-#ifdef WITH_WSREP
       thd->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
-#endif
     }
-
+#else
+    if (last_query_source == QUERY_SOURCE_COMPILED &&
+        thd->variables.option_bits & OPTION_BIN_LOG)
+      thd->variables.option_bits&= ~OPTION_BIN_LOG;
+#endif
   }
 
   Command_iterator::current_iterator->end();
@@ -303,7 +306,7 @@ static void handle_bootstrap_impl(THD *thd)
     but disabled during bootstrap/initialization.
   */
 #ifdef WITH_WSREP
-  thd->variables.option_bits = option_bits_save;
+  thd->variables.option_bits= option_bits_save;
 #endif
   if (has_binlog_option)
   {
