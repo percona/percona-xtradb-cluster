@@ -9,9 +9,7 @@ CREATE TABLE t1 (a INT PRIMARY KEY);
 INSERT INTO t1 VALUES (0);
 SET SESSION sql_log_bin = OFF;
 INSERT INTO t1 VALUES (1);
-include/assert.inc [node_2 t1 should have two rows]
 DELETE FROM t1;
-include/assert.inc [node_2 t1 should have zero rows]
 # restart:--skip-log-bin
 include/assert.inc [node_2 log_bin should be OFF]
 include/assert.inc [node_2 sql_log_bin should be ON]
@@ -24,7 +22,5 @@ log_bin	OFF
 INSERT INTO t1 VALUES (0);
 SET SESSION sql_log_bin = OFF;
 INSERT INTO t1 VALUES (1);
-include/assert.inc [node_1 t1 should have two rows]
 DELETE FROM t1;
-include/assert.inc [node_1 t1 should have zero rows]
 DROP TABLE t1;
