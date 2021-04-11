@@ -76,6 +76,9 @@ ssl_dhparams=""
 ssl_cert=""
 ssl_ca=""
 ssl_key=""
+ssl_mode="DISABLED"
+
+readonly SECRET_TAG="secret"
 
 # Required for backup locks
 # For backup locks it is 1 sent by joiner
@@ -325,6 +328,9 @@ get_transfer()
             if check_for_version "$SOCAT_VERSION" "1.7.3"; then
                 donor_extra=',commonname=""'
             fi
+            if [ -n "$WSREP_SST_OPT_REMOTE_USER" ]; then
+                donor_extra=",commonname=$WSREP_SST_OPT_REMOTE_USER"
+            fi
         fi
 
         if [[ $encrypt -eq 2 ]]; then
@@ -440,6 +446,37 @@ adjust_progress()
     fi
 }
 
+check_server_ssl_config()
+{
+    local section=$1
+    local sst_mode=$2
+    ssl_ca=$(parse_cnf $section ssl-ca "")
+    ssl_cert=$(parse_cnf $section ssl-cert "")
+    ssl_key=$(parse_cnf $section ssl-key "")
+    if [ 0 -eq $encrypt -a -n "$ssl_cert" -a -n "$ssl_key" ]
+    then
+        # Enable SSL encryption
+
+        # BACKWARD COMPATIBILITY: avoid CA verification if either ssl-ca or
+        # ssl-mode not set explicitly in [SST] section of config:
+        # nodes may happen to have different CA if self-generated
+        # so zero-up ssl_ca in such case
+        if [[ ${sst_mode} != *VERIFY* ]] && [[ ${section} != "sst" ]]
+        then
+            ssl_ca=
+        fi
+
+        if [ -n "$ssl_ca" ]
+        then
+            encrypt=4
+        else
+            encrypt=3
+            tcert=$ssl_cert
+            tkey=$ssl_key
+        fi
+    fi
+}
+
 read_cnf()
 {
     sfmt=$(parse_cnf sst streamfmt "xbstream")
@@ -452,7 +489,7 @@ read_cnf()
     progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
-     if [ "$OS" = "FreeBSD" ] ; then
+    if [ "$OS" = "FreeBSD" ] ; then
         cpat=$(parse_cnf sst cpat '.*\.pem$|.*init\.ok$|.*galera\.cache$|.*sst_in_progress$|.*\.sst$|.*gvwstate\.dat$|.*grastate\.dat$|.*\.err$|.*\.log$|.*RPM_UPGRADE_MARKER$|.*RPM_UPGRADE_HISTORY$')
     else
         cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
@@ -472,17 +509,18 @@ read_cnf()
     fi
 
     # Pull the parameters needed for encrypt=4
-    ssl_ca=$(parse_cnf sst ssl-ca "")
-    if [[ -z "$ssl_ca" ]]; then
-        ssl_ca=$(parse_cnf mysqld ssl-ca "")
-    fi
-    ssl_cert=$(parse_cnf sst ssl-cert "")
-    if [[ -z "$ssl_cert" ]]; then
-        ssl_cert=$(parse_cnf mysqld ssl-cert "")
-    fi
-    ssl_key=$(parse_cnf sst ssl-key "")
-    if [[ -z "$ssl_key" ]]; then
-        ssl_key=$(parse_cnf mysqld ssl-key "")
+    if [ -z "$tca" -a -z "$tkey" -a -z "$tcert" ]
+    then # check for new configuration
+        ssl_mode=$(parse_cnf sst ssl-mode "DISABLED" | tr [:lower:] [:upper:])
+        check_server_ssl_config "sst" $ssl_mode
+        if [ -z "$ssl_ca" -a -z "$ssl_key" -a -z "$ssl_cert" ]
+        then # no new-style SSL config in [sst], try server-wide SSL config
+            check_server_ssl_config "mysqld.$WSREP_SST_OPT_CONF_SUFFIX" "$ssl_mode"
+            if [ -z "$ssl_ca" -a -z "$ssl_key" -a -z "$ssl_cert" ]
+            then
+               check_server_ssl_config "mysqld" "$ssl_mode"
+            fi
+        fi
     fi
 
     rlimit=$(parse_cnf sst rlimit "")
@@ -731,7 +769,8 @@ recv_joiner()
     popd 1>/dev/null 
 
     if [[ ${RC[0]} -eq 124 ]];then 
-        wsrep_log_error "Possible timeout in receving first data from donor in gtid stage"
+        wsrep_log_error "Possible timeout in receving first data from donor " \
+                        "in gtid stage"
         exit 32
     fi
 
@@ -743,15 +782,29 @@ recv_joiner()
         fi
     done
 
-    if [[ $checkf -eq 1 && ! -r "${MAGIC_FILE}" ]];then
-        # this message should cause joiner to abort
-        wsrep_log_error "xtrabackup process ended without creating '${MAGIC_FILE}'"
-        wsrep_log_info "Contents of datadir" 
-        wsrep_log_info "$(ls -l ${dir}/*)"
-        exit 32
+    if [[ $checkf -eq 1 ]]; then
+        if [[ ! -r "${MAGIC_FILE}" ]];then
+            # this message should cause joiner to abort
+            wsrep_log_error "receiving process ended without creating " \
+                            "'${MAGIC_FILE}'"
+            wsrep_log_info "Contents of datadir" 
+            wsrep_log_info "$(ls -l ${dir}/*)"
+            exit 32
+        fi
+
+        # check donor supplied secret
+        SECRET=$(grep "$SECRET_TAG " ${MAGIC_FILE} 2>/dev/null | cut -d ' ' -f 2)
+        if [[ $SECRET != $MY_SECRET ]]; then
+            wsrep_log_error "Donor does not know my secret!"
+            wsrep_log_info "Donor:'$SECRET', my:'$MY_SECRET'"
+            exit 32
+        fi
+
+        # remove secret from magic file
+        grep -v "$SECRET_TAG " ${MAGIC_FILE} > ${MAGIC_FILE}.new
+        mv ${MAGIC_FILE}.new ${MAGIC_FILE}
     fi
 }
-
 
 send_donor()
 {
@@ -767,7 +820,7 @@ send_donor()
 
     for ecode in "${RC[@]}";do 
         if [[ $ecode -ne 0 ]];then 
-            wsrep_log_error "Error while getting data from donor node: " \
+            wsrep_log_error "Error while sending data to joiner node: " \
                             "exit codes: ${RC[@]}"
             exit 32
         fi
@@ -917,10 +970,10 @@ then
         fi
 
         if [ -n "${WSREP_SST_OPT_PSWD:-}" ]; then
-           INNOEXTRA+=" --password=$WSREP_SST_OPT_PSWD"
+           export MYSQL_PWD="$WSREP_SST_OPT_PSWD"
         elif [[ $usrst -eq 1 ]];then
            # Empty password, used for testing, debugging etc.
-           INNOEXTRA+=" --password="
+           unset MYSQL_PWD
         fi
 
         get_keys
@@ -929,6 +982,11 @@ then
         wsrep_log_info "Streaming GTID file before SST"
 
         echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
+
+        if [[ -n ${WSREP_SST_OPT_REMOTE_PSWD} ]]; then
+            # Let joiner know that we know its secret
+            echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${MAGIC_FILE}
+        fi
 
         ttcmd="$tcmd"
 
@@ -1032,7 +1090,28 @@ then
     # May need xtrabackup_checkpoints later on
     rm -f ${DATA}/xtrabackup_binary ${DATA}/xtrabackup_galera_info  ${DATA}/xtrabackup_logfile
 
-    wait_for_listen ${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} ${MODULE} &
+    if [[ "$ssl_mode" = *"VERIFY"* ]]
+    then # backward-incompatible behavior
+        if [ -n "$ssl_cert" ]
+        then
+            # find out my Common Name
+            wsrep_check_programs openssl
+            CN=$(openssl x509 -noout -subject -in $ssl_cert | \
+                 tr "," "\n" | grep "CN =" | cut -d= -f2 | sed s/^\ // | \
+                 sed s/\ %//)
+        else
+            CN=""
+        fi
+        MY_SECRET=$(wsrep_gen_secret)
+        # Add authentication data to address
+        AUTH="$CN:$MY_SECRET@"
+    else
+        MY_SECRET="" # for check down in recv_joiner()
+        AUTH=""
+    fi # tmode == *VERIFY*
+
+    wait_for_listen ${AUTH}${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} \
+                    ${MODULE} &
 
     trap sig_joiner_cleanup HUP PIPE INT TERM
     trap cleanup_joiner EXIT
