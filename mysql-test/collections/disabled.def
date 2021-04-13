@@ -273,10 +273,6 @@ binlog.binlog_xa_prepared_disconnect : BUG#0 Issue#330 2018-05-16 CODERSHIP mw-3
 
 # Galera 4.5 / 8.0.21 related
 galera.galera_mysqlpump : BUG#0 Wasn't working properly even before inconsistency voting 
-galera.high_prio_trx_1 : BUG#0 Failing after 8.0.21 merge. Also fails in codership sources
-galera.high_prio_trx_2 : BUG#0 Failing after 8.0.21 merge. Also fails in codership sources
-galera.high_prio_trx_3 : BUG#0 Failing after 8.0.21 merge. Also fails in codership sources
-galera.galera_high_prio_trx_fk : BUG#0 Failing after 8.0.21 merge. Also fails in codership sources
 galera.galera-index-online-fk : BUG#0 fk_40 triggers inconsistency voting, as it uses a debug_sync on node1
 galera.MW-284 : BUG#0000 test is incompatible with native mysql8.0 server slave behavior (upstream)
 galera.galera_fk_lock_parent_update_child : BUG#0 Few cases have timing issues(PXC-3431) and few are invalid after PXC-3501

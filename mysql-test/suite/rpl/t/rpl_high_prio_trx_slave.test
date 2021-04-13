@@ -72,6 +72,10 @@ SET DEBUG_SYNC='now SIGNAL waiting1';
 --error ER_ERROR_DURING_COMMIT
 COMMIT;
 
+# With PXC, it is possible that we killed the query before we signaled waiting1
+# this cleans the debug sync point up
+SET DEBUG_SYNC='RESET';
+
 --disconnect sigcon
 
 ####### SLAVE #######

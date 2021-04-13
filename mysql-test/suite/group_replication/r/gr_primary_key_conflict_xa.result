@@ -88,6 +88,7 @@ include/sync_slave_sql_with_master.inc
 [connection server1]
 SET DEBUG_SYNC='now SIGNAL waiting';
 SET @@GLOBAL.DEBUG= @debug_save;
+SET DEBUG_SYNC='RESET';
 
 ########################################################################
 # 5. It will execute without error as the conflicting transactions have

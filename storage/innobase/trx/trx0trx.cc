@@ -3708,13 +3708,6 @@ void trx_kill_blocking(trx_t *trx) {
       trx_mutex_enter(victim_trx);
     }
 
-#ifdef WITH_WSREP
-    victim_trx->in_innodb &= ~TRX_FORCE_ROLLBACK_ASYNC;
-    victim_trx->in_innodb &= ~TRX_FORCE_ROLLBACK;
-    trx_mutex_exit(victim_trx);
-    continue;
-#endif
-
     /* Compare the version to check if the transaction has
     already finished */
     if (victim_trx->version != version) {

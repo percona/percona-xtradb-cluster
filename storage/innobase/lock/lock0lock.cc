@@ -1349,9 +1349,7 @@ static void lock_mark_trx_for_rollback(hit_list_t &hit_list, trx_id_t hp_trx_id,
   flag will be cleared if the transaction is rolled back
   synchronously before we get a chance to do it. */
 
-#ifndef WITH_WSREP
   trx->in_innodb |= TRX_FORCE_ROLLBACK | TRX_FORCE_ROLLBACK_ASYNC;
-#endif /* WITH_WSREP */
 
   bool cas;
   os_thread_id_t thread_id = os_thread_get_curr_id();
