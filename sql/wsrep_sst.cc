@@ -116,6 +116,7 @@ extern const char wsrep_defaults_group_suffix[];
 #define WSREP_SST_OPT_PARENT   "--parent"
 #define WSREP_SST_OPT_BINLOG   "--binlog"
 #define WSREP_SST_OPT_VERSION  "--mysqld-version"
+#define WSREP_SST_OPT_DEBUG    "--debug"
 
 // mysqldump-specific options
 #define WSREP_SST_OPT_USER     "--user"
@@ -1439,6 +1440,10 @@ static int sst_donate_other (const char*   method,
                  binlog_opt, binlog_opt_val,
                  uuid, (long long) seqno,
                  bypass ? " " WSREP_SST_OPT_BYPASS : "");
+  DBUG_EXECUTE_IF("wsrep_sst_donor_skip", {
+    ret= snprintf(cmd_str() + strlen(cmd_str()), cmd_len - strlen(cmd_str()),
+                  WSREP_SST_OPT_DEBUG " '%s'", "wsrep_sst_donor_skip");
+  });
   my_free(binlog_opt_val);
 
   if (ret < 0 || ret >= cmd_len)
