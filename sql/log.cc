@@ -1092,6 +1092,9 @@ bool Log_to_csv_event_handler::log_general(THD *thd, ulonglong event_utime,
 
   ulonglong save_thd_options= thd->variables.option_bits;
   thd->variables.option_bits&= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   TABLE_LIST table_list;
   table_list.init_one_table(MYSQL_SCHEMA_NAME.str, MYSQL_SCHEMA_NAME.length,

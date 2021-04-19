@@ -4550,7 +4550,7 @@ extern "C" int thd_binlog_format(const MYSQL_THD thd)
 {
 #ifdef WITH_WSREP
   if (((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()) &&
-      (thd->variables.option_bits & OPTION_BIN_LOG))
+      !(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF))
 #else
   if (mysql_bin_log.is_open() && (thd->variables.option_bits & OPTION_BIN_LOG))
 #endif
@@ -4779,6 +4779,9 @@ void THD::reset_sub_statement_state(Sub_statement_state *backup,
       !is_current_stmt_binlog_format_row())
   {
     variables.option_bits&= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+    variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
   }
 
   if ((backup->option_bits & OPTION_BIN_LOG) &&

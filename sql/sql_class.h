@@ -5503,9 +5503,19 @@ my_eof(THD *thd)
   }
 }
 
-#define tmp_disable_binlog(A)                                           \
+#ifdef WITH_WSREP
+#define tmp_disable_binlog(A)                                              \
+  {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits; \
+  (A)->variables.option_bits&= ~OPTION_BIN_LOG;                            \
+  (A)->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF
+
+#else
+
+#define tmp_disable_binlog(A)                                              \
   {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits; \
   (A)->variables.option_bits&= ~OPTION_BIN_LOG
+
+#endif
 
 #define reenable_binlog(A)   (A)->variables.option_bits= tmp_disable_binlog__save_options;}
 

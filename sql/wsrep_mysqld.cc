@@ -1924,10 +1924,6 @@ static int wsrep_drop_table_query(THD* thd, uchar** buf, size_t* buf_len)
 static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
                                  const TABLE_LIST *table_list)
 {
-  /* Only if binlog is enabled and user can try to set sql_log_bin=0. */
-  if (mysql_bin_log.is_open() && !(thd->variables.option_bits & OPTION_BIN_LOG))
-    return false;
-
   /* compression dictionary is not table object that has temporary qualifier
   attached to it. Neither it is dependent on other object that needs
   validation. */
