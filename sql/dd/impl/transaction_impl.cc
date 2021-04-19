@@ -164,6 +164,9 @@ Update_dictionary_tables_ctx::Update_dictionary_tables_ctx(THD *thd)
   // Disable bin logging
   m_saved_options = m_thd->variables.option_bits;
   m_thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  m_thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   // Set bit to indicate that the thread is updating the data dictionary tables.
   m_thd->variables.option_bits |= OPTION_DD_UPDATE_CONTEXT;

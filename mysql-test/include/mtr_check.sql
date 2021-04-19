@@ -203,11 +203,11 @@ BEGIN
   -- We do not use DROP USER IF EXISTS because some tests are using
   -- --skip-grant-tables.
   COMMIT;
-  SET SESSION sql_log_bin = OFF;
+  SET SESSION wsrep_on = OFF;
   DELETE FROM mysql.user WHERE user = 'mysql.pxc.sst.user';
   DELETE FROM mysql.global_grants WHERE user = 'mysql.pxc.sst.user';
   COMMIT;
-  SET SESSION sql_log_bin = ON;
+  SET SESSION wsrep_on = ON;
 
   -- Checksum system tables to make sure they have been properly
   -- restored after test.

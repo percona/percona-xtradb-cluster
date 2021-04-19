@@ -238,6 +238,9 @@ THD::Attachable_trx::Attachable_trx(THD *thd, Attachable_trx *prev_trx)
   // the binary log allows skipping some code related to figuring out what
   // log format should be used.
   m_thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   // Possible parent's involvement to multi-statement transaction is masked
 
@@ -2339,6 +2342,9 @@ void THD::reset_sub_statement_state(Sub_statement_state *backup,
   if ((!lex->requires_prelocking() || is_update_query(lex->sql_command)) &&
       !is_current_stmt_binlog_format_row()) {
     variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+    variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
   }
 
   if ((backup->option_bits & OPTION_BIN_LOG) &&

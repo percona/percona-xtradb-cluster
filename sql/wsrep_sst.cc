@@ -655,6 +655,7 @@ static void *sst_joiner_thread(void *a) {
     /* No binlogging */
     thd->variables.sql_log_bin = 0;
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
     /* No general log */
     thd->variables.option_bits |= OPTION_LOG_OFF;
     /* Read committed isolation to avoid gap locking */

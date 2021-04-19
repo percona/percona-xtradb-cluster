@@ -692,7 +692,11 @@ bool Sql_cmd_discard_import_tablespace::execute(THD *thd) {
       thd->variables.wsrep_saved_binlog_state =
           System_variables::wsrep_binlog_state_t::WSREP_BINLOG_DISABLED;
     }
+    thd->variables.wsrep_saved_binlog_internal_off_state =
+        thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF;
+
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
   }
 #endif /* WITH_WSREP */
 

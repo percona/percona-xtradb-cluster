@@ -486,6 +486,8 @@ struct System_variables {
     WSREP_BINLOG_ENABLED,
     WSREP_BINLOG_DISABLED
   } wsrep_saved_binlog_state;
+
+  bool wsrep_saved_binlog_internal_off_state;
 #endif /* WITH_WSREP */
 
   /**

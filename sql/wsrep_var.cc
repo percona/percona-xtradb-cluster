@@ -134,8 +134,11 @@ bool wsrep_on_update(sys_var *, THD *thd, enum_var_type) {
       thd->variables.wsrep_saved_binlog_state =
           System_variables::wsrep_binlog_state_t::WSREP_BINLOG_DISABLED;
     }
+    thd->variables.wsrep_saved_binlog_internal_off_state =
+        thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF;
 
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
 
   } else if (thd->variables.wsrep_on &&
              thd->variables.wsrep_saved_binlog_state !=
@@ -152,6 +155,13 @@ bool wsrep_on_update(sys_var *, THD *thd, enum_var_type) {
                System_variables::wsrep_binlog_state_t::WSREP_BINLOG_DISABLED) {
       thd->variables.option_bits &= ~OPTION_BIN_LOG;
     }
+    if (thd->variables.wsrep_saved_binlog_internal_off_state) {
+      thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+    } else {
+      thd->variables.option_bits &= ~OPTION_BIN_LOG_INTERNAL_OFF;
+    }
+    thd->variables.wsrep_saved_binlog_internal_off_state = false;
+
     thd->variables.wsrep_saved_binlog_state =
         System_variables::wsrep_binlog_state_t::WSREP_BINLOG_NOTSET;
   }
