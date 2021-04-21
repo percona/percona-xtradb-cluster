@@ -888,7 +888,7 @@ cleanup_joiner()
         wsrep_log_debug "Cleaning up fifo file $progress"
         rm $progress
     fi
-    if [[ -n "${JOINER_SST_DIR}" && -z "$WSREP_LOG_DEBUG" ]]; then
+    if [[ -n "${JOINER_SST_DIR:-}" && -z "$WSREP_LOG_DEBUG" ]]; then
       [[ -d "${JOINER_SST_DIR}" ]] && rm -rf "${JOINER_SST_DIR}" || true
     fi
     if [[ -n "${tmpdirbase}" ]]; then
