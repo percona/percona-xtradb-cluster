@@ -7,8 +7,6 @@
 
 --source include/big_test.inc
 --source include/galera_cluster.inc
-CALL mtr.add_suppression("You have enabled keyring plugin. SST encryption is mandatory.");
-
 
 --disable_query_log
 --connection node_1
