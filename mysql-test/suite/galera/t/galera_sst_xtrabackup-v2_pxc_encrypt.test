@@ -2,12 +2,77 @@
 # This test checks the pxc-encrypt-cluster-traffic option (auto SSL config).
 # Initial SST happens via xtrabackup, so there is not much to do in the body of the test
 #
+# Also tests certs that are specified using relative paths (certs are in the datadir)
+#
 
 --source include/big_test.inc
---source include/galera_cluster.inc
 --source include/have_innodb.inc
+--source include/galera_cluster.inc
+--source include/force_restart.inc
+
+# --------------------------------
+# Test 1: Just check that the cluster started correctly.
+# --------------------------------
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
 
 SELECT 1;
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+# --------------------------------
+# Test 2: Test that the server starts up with SSL certs specified
+# using relative paths (place the certs in the datadir)
+# --------------------------------
+
+# Create cnf file with relative paths
+--let $RELATIVE_SSL_CERTS_FILE = $MYSQLTEST_VARDIR/tmp/galera_sst_xtrabackup-v2_pxc_encrypt.test.cnf
+--copy_file $MYSQLTEST_VARDIR/my.cnf $RELATIVE_SSL_CERTS_FILE
+--append_file $RELATIVE_SSL_CERTS_FILE
+	[mysqld]
+	ssl-ca=cacert.pem
+	ssl-key=server-key.pem
+	ssl-cert=server-cert.pem
+
+	[sst]
+	ssl_dhparams=dhparams.pem
+EOF
+
+--connection node_2
+--echo [connection node_2]
+--let $MYSQLD_DATADIR=`SELECT @@datadir`
+
+# copy over the server-side PEM files needed for SSL
+--copy_file $MYSQL_TEST_DIR/std_data/cacert.pem $MYSQLD_DATADIR/cacert.pem
+--copy_file $MYSQL_TEST_DIR/std_data/server-cert.pem $MYSQLD_DATADIR/server-cert.pem
+--copy_file $MYSQL_TEST_DIR/std_data/server-key.pem $MYSQLD_DATADIR/server-key.pem
+--copy_file $MYSQL_TEST_DIR/std_data/dhparams.pem $MYSQLD_DATADIR/dhparams.pem
+
+--echo # Restart node2 using relative paths for SSL certs
+--echo # Shutting down node2
+--source include/shutdown_mysqld.inc
+
+# remove the grastate.dat file to force an SST
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+# restart the server with relative cert paths (SST)
+--echo # restarting node2 (with SST)
+--let $start_mysqld_params = "--defaults-file=$RELATIVE_SSL_CERTS_FILE"
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--replace_result $RELATIVE_SSL_CERTS_FILE RELATIVE_SSL_CERTS_FILE
+--source include/start_mysqld.inc
+
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
+
+SELECT 1;
+
+# cleanup
+--let $restart_hide_args=1
+--let $restart_parameters = "restart:"
+--source include/restart_mysqld.inc
+
+--remove_file $MYSQLD_DATADIR/cacert.pem
+--remove_file $MYSQLD_DATADIR/server-cert.pem
+--remove_file $MYSQLD_DATADIR/server-key.pem
+--remove_file $MYSQLD_DATADIR/dhparams.pem
+--remove_file $RELATIVE_SSL_CERTS_FILE
