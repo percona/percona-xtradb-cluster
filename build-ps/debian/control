@@ -311,7 +311,7 @@ Section: database
 Architecture: any
 Depends: percona-xtradb-cluster-server (>= ${binary:Version}), percona-xtradb-cluster-client (>= ${binary:Version}), percona-xtradb-cluster-test (>= ${binary:Version}), percona-xtradb-cluster-dbg (>= ${binary:Version}),  percona-xtradb-cluster-server-debug, percona-xtradb-cluster-garbd (>= ${binary:Version}), ${misc:Depends}, percona-xtradb-cluster-garbd-debug (>= ${binary:Version})
 Description: Percona XtraDB Cluster with Galera
- This is a meta-package providing PXC57 server, client, test and debug packages.
+ This is a meta-package providing PXC80 server, client, test and debug packages.
 
 Package: percona-xtradb-cluster-test
 Architecture: any
