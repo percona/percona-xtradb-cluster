@@ -40,6 +40,9 @@ my $test_cnf= "$dir/test.cnf";
 open(OUT, ">", $test_cnf) or die;
 
 print OUT <<EOF
+[ENV]
+env_option1=value1
+env_option2= value2
 [mysqld]
 # Comment
 option1=values2
@@ -61,6 +64,7 @@ ok(defined $config && $config->isa("My::Config"), "config is a My::Config");
 
 print $config;
 
+ok ( $config->group("ENV"), "group ENV exists");
 ok ( $config->group("mysqld_2"), "group mysqld_2 exists");
 ok ( $config->group("mysqld_1"), "group mysqld_1 exists");
 ok ( $config->group("mysqld.9"), "group mysqld.9 exists");
@@ -75,9 +79,9 @@ ok ( !defined $config->options_in_group("nonexist") , "group [nonexist] is not d
 
 {
   my @groups= $config->groups();
-  ok(@groups == 5, "5 groups");
+  ok(@groups == 6, "6 groups");
   my $idx= 0;
-  foreach my $name ('mysqld', 'mysqld_1', 'mysqld_2', 'mysqld.9', 'client') {
+  foreach my $name ('ENV','mysqld', 'mysqld_1', 'mysqld_2', 'mysqld.9', 'client') {
     is($groups[$idx++]->name(), $name, "checking groups $idx");
   }
 }
