@@ -3405,6 +3405,15 @@ ibool trx_is_strict(trx_t *trx) /*!< in: transaction */
           (!trx->in_truncate));
 }
 
+#ifdef WITH_WSREP
+/** Determines if the currently running transaction is a wsrep transaction.
+ @return true if transaction is a wsrep transaction */
+ibool trx_is_wsrep_trx(const trx_t *trx) /*!< in: transaction */
+{
+  return (trx && wsrep_on(trx->mysql_thd));
+}
+#endif /* WITH_WSREP */
+
 /** Resets some fields of a m_prebuilt struct. The template is used in fast
  retrieval of just those column values MySQL needs in its processing. */
 void ha_innobase::reset_template(void) {

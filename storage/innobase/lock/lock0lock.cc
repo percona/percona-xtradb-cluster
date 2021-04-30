@@ -2113,7 +2113,8 @@ void lock_make_trx_hit_list(trx_t *hp_trx, hit_list_t &hit_list) {
             (trx->in_innodb & TRX_FORCE_ROLLBACK) != 0 ||
             (trx->in_innodb & TRX_FORCE_ROLLBACK_ASYNC) != 0 ||
 #ifdef WITH_WSREP
-            trx->abort) {
+            (!trx_is_wsrep_trx(trx) &&
+             (trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE) != 0) || trx->abort) {
 #else
             (trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE) != 0 || trx->abort) {
 #endif

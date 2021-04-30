@@ -353,6 +353,12 @@ ibool trx_is_interrupted(const trx_t *trx); /*!< in: transaction */
  @return true if strict */
 ibool trx_is_strict(trx_t *trx); /*!< in: transaction */
 
+#ifdef WITH_WSREP
+/** Determines if the currently running transaction is a wsrep transaction.
+ @return true if transaction is a wsrep transaction */
+ibool trx_is_wsrep_trx(const trx_t *trx); /*!< in: transaction */
+#endif /* WITH_WSREP */
+
 /** Calculates the "weight" of a transaction. The weight of one transaction
  is estimated as the number of altered rows + the number of locked rows.
  @param t transaction

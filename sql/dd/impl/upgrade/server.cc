@@ -367,7 +367,12 @@ class MySQL_check {
   }
 };
 
+#ifdef WITH_WSREP
+bool ignore_error_and_execute(THD *thd, const char *query_ptr,
+                              const bool pxc_upgrade = false) {
+#else
 bool ignore_error_and_execute(THD *thd, const char *query_ptr) {
+#endif /* WITH_WSREP */
   Ed_connection con(thd);
   LEX_STRING str;
   lex_string_strmake(thd->mem_root, &str, query_ptr, strlen(query_ptr));
@@ -376,9 +381,15 @@ bool ignore_error_and_execute(THD *thd, const char *query_ptr) {
   if (con.execute_direct(str) &&
       std::find(ignored_errors.begin(), ignored_errors.end(),
                 con.get_last_errno()) == ignored_errors.end()) {
-    LogErr(ERROR_LEVEL, ER_DD_INITIALIZE_SQL_ERROR, query_ptr,
-           con.get_last_errno(), con.get_last_error());
-    return true;
+#ifdef WITH_WSREP
+    if (!pxc_upgrade) {
+#endif /* WITH_WSREP */
+      LogErr(ERROR_LEVEL, ER_DD_INITIALIZE_SQL_ERROR, query_ptr,
+             con.get_last_errno(), con.get_last_error());
+      return true;
+#ifdef WITH_WSREP
+    }
+#endif /* WITH_WSREP */
   }
   return false;
 }
@@ -504,7 +515,7 @@ bool pxc_fix_mysql_tables(THD *thd) {
     }
 
     if (in_pxc_section) {
-      if (ignore_error_and_execute(thd, *query_ptr)) return true;
+      if (ignore_error_and_execute(thd, *query_ptr, true)) return true;
     }
   }
   return false;
