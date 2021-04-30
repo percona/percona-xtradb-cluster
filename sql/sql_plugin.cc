@@ -3607,7 +3607,8 @@ static int test_plugin_options(MEM_ROOT *tmp_root, st_plugin_int *tmp,
     where-in some node of the cluster operates with plugin enabled
     and some with plugin disabled even though the configuration is same
     on all nodes. */
-  if (!(my_strcasecmp(&my_charset_latin1, tmp->name.str, "keyring_file") &&
+  if (wsrep_provider_set &&
+      !(my_strcasecmp(&my_charset_latin1, tmp->name.str, "keyring_file") &&
         my_strcasecmp(&my_charset_latin1, tmp->name.str, "keyring_vault")))
     plugin_load_option = PLUGIN_FORCE;
 #endif /* WITH_WSREP */
