@@ -1156,13 +1156,13 @@ sub collect_one_test_case {
   my $suite_opts = shift;
 
   # Test file name should consist of only alpha-numeric characters, dash (-)
-  # or underscore (_), but should not start with dash or underscore.
+  # or underscore (_), but should not start with dash or underscore or hash.
   # galera/pxc/wsrep has test-case with # so allowing # as part of the test-case
   if ($tname !~ /^[^_\W][\w-#]*$/) {
     die("Invalid test file name '$suitename.$tname'. Test file " .
         "name should consist of only alpha-numeric characters, " .
-        "dash (-) or underscore (_), but should not start with " .
-        "dash or underscore.");
+        "dash (-), underscore (_) or hash (#), but should not start with " .
+        "dash or underscore or hash.");
   }
 
   # Check --start-from

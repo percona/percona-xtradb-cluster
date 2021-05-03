@@ -2571,7 +2571,7 @@ static void var_query_set(VAR *var, const char *query, const char **query_end) {
   if a --let = `SELECT ...` query is interrupted, the test does not
   fail but the error is communicated to caller */
   if (mysql_real_query_wrapper(mysql, ds_query.str,
-                       static_cast<ulong>(ds_query.length)) ||
+                               static_cast<ulong>(ds_query.length)) ||
       !(res = mysql_store_result_wrapper(mysql))) {
 #else
   if (mysql_real_query_wrapper(mysql, ds_query.str,
@@ -7808,9 +7808,9 @@ static void validate_filename(const char *file_name) {
 
   if (file_name != file_name_end) {
     die("Invalid file name '%s'. Test or result file name should "
-        "consist of only alpha-numeric characters, dash (-) or "
-        "underscore (_), but should not start with dash or "
-        "underscore.",
+        "consist of only alpha-numeric characters, dash (-), "
+        "underscore (_) or hash (#), but should not start with dash or "
+        "underscore or hash.",
         fname);
   }
 }

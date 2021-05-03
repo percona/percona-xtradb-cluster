@@ -1670,11 +1670,13 @@ mysqltest: Invalid file name '-ab.test', first character must be alpha-numeric.
 # Test file name '_ab.test'
 mysqltest: Invalid file name '_ab.test', first character must be alpha-numeric.
 # Test file name 'a=bc.test'
-mysqltest: Invalid file name 'a=bc.test'. Test or result file name should consist of only alpha-numeric characters, dash (-) or underscore (_), but should not start with dash or underscore.
+mysqltest: Invalid file name 'a=bc.test'. Test or result file name should consist of only alpha-numeric characters, dash (-), underscore (_) or hash (#), but should not start with dash or underscore or hash.
 # Test file name 'abc@.test'
-mysqltest: Invalid file name 'abc@.test'. Test or result file name should consist of only alpha-numeric characters, dash (-) or underscore (_), but should not start with dash or underscore.
-# Result file name 'ab#c.result'
-mysqltest: Invalid file name 'ab#c.result'. Test or result file name should consist of only alpha-numeric characters, dash (-) or underscore (_), but should not start with dash or underscore.
+mysqltest: Invalid file name 'abc@.test'. Test or result file name should consist of only alpha-numeric characters, dash (-), underscore (_) or hash (#), but should not start with dash or underscore or hash.
+# Test file name 'ab#c.test'
+SELECT 100;
+100
+100
 # Bug#23280117: 5.7 BUG XXXXX TEST REPLACE NUMBER ROUND+GIS PRECISION
 # DIFFERENCES (CONTRIBUTION)
 #
