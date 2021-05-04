@@ -329,7 +329,7 @@ get_transfer()
                 donor_extra=',commonname=""'
             fi
             if [ -n "$WSREP_SST_OPT_REMOTE_USER" ]; then
-                donor_extra=",commonname=$WSREP_SST_OPT_REMOTE_USER"
+                donor_extra=",commonname='$WSREP_SST_OPT_REMOTE_USER'"
             fi
         fi
 
@@ -1110,7 +1110,7 @@ then
         AUTH=""
     fi # tmode == *VERIFY*
 
-    wait_for_listen ${AUTH}${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} \
+    wait_for_listen "${AUTH}${WSREP_SST_OPT_HOST}" ${WSREP_SST_OPT_PORT:-4444} \
                     ${MODULE} &
 
     trap sig_joiner_cleanup HUP PIPE INT TERM
