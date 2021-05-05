@@ -1767,7 +1767,7 @@ class Item_func_wsrep_last_written_gtid : public Item_str_func {
   String *val_str(String *) override;
   bool itemize(Parse_context *pc, Item **res) override;
   bool resolve_type(THD *) override {
-    set_data_type_string(WSREP_GTID_STR_LEN, &my_charset_bin);
+    set_data_type_string(WSREP_GTID_STR_LEN, &my_charset_latin1);
     maybe_null = true;
     return false;
   }
@@ -1783,7 +1783,7 @@ class Item_func_wsrep_last_seen_gtid : public Item_str_func {
   String *val_str(String *) override;
   bool itemize(Parse_context *pc, Item **res) override;
   bool resolve_type(THD *) override {
-    set_data_type_string((uint32)WSREP_GTID_STR_LEN);
+    set_data_type_string(WSREP_GTID_STR_LEN, &my_charset_latin1);
     maybe_null = true;
     return false;
   }
