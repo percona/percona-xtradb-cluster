@@ -12461,13 +12461,13 @@ bool wsrep_stmt_rollback_is_safe(THD *thd) {
     if (thd->wsrep_sr().fragments_certified() > 0 &&
         (cache_mngr->trx_cache.get_prev_position() == MY_OFF_T_UNDEF ||
          cache_mngr->trx_cache.get_prev_position() <
-             thd->wsrep_sr().bytes_certified())) {
+             thd->wsrep_sr().log_position())) {
       WSREP_DEBUG(
           "statement rollback is not safe for streaming replication"
           " pre-stmt_pos: %llu, frag repl pos: %zu\n"
           "Thread: %u, SQL: %s",
           cache_mngr->trx_cache.get_prev_position(),
-          thd->wsrep_sr().bytes_certified(), thd->thread_id(),
+          thd->wsrep_sr().log_position(), thd->thread_id(),
           thd->query().str);
       ret = false;
     }

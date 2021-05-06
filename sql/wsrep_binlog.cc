@@ -135,7 +135,7 @@ static int wsrep_write_cache_inc(THD *const thd,
   unsigned char *read_pos = NULL;
   my_off_t read_len = 0;
 
-  if (cache->begin(&read_pos, &read_len, thd->wsrep_sr().bytes_certified())) {
+  if (cache->begin(&read_pos, &read_len, thd->wsrep_sr().log_position())) {
     WSREP_ERROR("Failed to initialize io-cache");
     DBUG_RETURN(ER_ERROR_ON_WRITE);
   }

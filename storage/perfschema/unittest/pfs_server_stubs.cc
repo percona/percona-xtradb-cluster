@@ -69,3 +69,4 @@ int log_message(int, ...) {
 bool acl_is_utility_user(const char *, const char *, const char *) {
   return false;
 }
+
