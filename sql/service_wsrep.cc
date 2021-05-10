@@ -185,7 +185,13 @@ extern "C" bool wsrep_thd_skip_locking(const THD *thd) {
 }
 
 extern "C" bool wsrep_thd_order_before(const THD *left, const THD *right) {
-  if (wsrep_thd_trx_seqno(left) < wsrep_thd_trx_seqno(right)) {
+  if (!WSREP(left) && !WSREP(right)) {
+    // we do not care about non wsrep threads, keep original behavior
+    return true;
+  }
+  if (left && right &&
+      wsrep_thd_trx_seqno(left) > 0 &&
+      wsrep_thd_trx_seqno(left) < wsrep_thd_trx_seqno(right)) {
     WSREP_DEBUG("BF conflict, order: %lld %lld\n",
                 (long long)wsrep_thd_trx_seqno(left),
                 (long long)wsrep_thd_trx_seqno(right));
