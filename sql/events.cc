@@ -1184,7 +1184,7 @@ static bool load_events_from_db(THD *thd, Event_queue *event_queue) {
         aren't same. Infact, based on galera use-case it seems like it
         recommends to have each node with different server-id.
       */
-      if (et->m_originator != thd->server_id) {
+      if (wsrep_provider_set && (et->m_originator != thd->server_id)) {
         WSREP_DEBUG("Disabling non-native event (name: %s)",
                     et->m_event_name.str);
 

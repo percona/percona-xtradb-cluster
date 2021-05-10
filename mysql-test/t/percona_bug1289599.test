@@ -10,6 +10,7 @@ connect (con1,localhost,root);
 connect (con2,localhost,root);
 
 call mtr.add_suppression("The plugin 'auth_socket' used to authenticate user .* is not loaded. Nobody can currently login using this account.");
+call mtr.add_suppression("user' entry 'mysql.pxc.sst.role@localhost' has the password ignore flag raised.* The user id will be ignored.");
 
 # Backup mysql.user
 create table mysql_user_bak as select * from mysql.user;

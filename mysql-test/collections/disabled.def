@@ -321,6 +321,7 @@ encryption.innodb-key-rotation                                          : BUG#0 
 encryption.innodb_encryption_aborted_key_rotation_mk_row_compressed     : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 encryption.innodb_encryption_row_compressed_corrupted                   : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 encryption.innodb-redo-nokeys2_debug                                    : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
+encryption.innodb-redo-nokeys2_release                                  : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 encryption.innodb_encryption_aborted_key_rotation_page_compressed       : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 encryption.innodb_encryption_aborted_rotation                           : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
 encryption.innodb_encryption-page-compression                           : BUG#0 PXC does not support KEYRING and ONLINE_TO_KEYRING encyption methods
