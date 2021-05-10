@@ -724,6 +724,12 @@ sub create_test_combinations($$) {
   my @new_cases;
 
   foreach my $comb (@{$combinations}) {
+
+# ---- wsrep
+    # ENV is used in My::Config::ENV to store the environment so is not a true combination
+    next if ($comb->{'name'} eq 'ENV');
+# ---- wsrep
+
     # Skip this combination if the values it provides already are set
     # in master_opt or slave_opt.
     if (My::Options::is_set($test->{master_opt}, $comb->{comb_opt}) ||
@@ -909,10 +915,6 @@ sub collect_one_suite($$$$) {
       mtr_report(" - Adding combinations for $suite");
 
       foreach my $test (@cases) {
-# ---- wsrep
-	# ENV is used in My::Config::ENV to store the environment so is not a true combination
-	next if ( $test->{'name'} eq 'ENV' );
-# ---- wsrep
         next if ($test->{'skip'} or defined $test->{'combination'});
         push(@new_cases, create_test_combinations($test, \@combinations));
       }
