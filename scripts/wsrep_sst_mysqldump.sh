@@ -111,25 +111,34 @@ MYSQL="$MYSQL_CLIENT --defaults-extra-file=$WSREP_SST_OPT_CONF "\
 "$AUTH -h${WSREP_SST_OPT_HOST_UNESCAPED:-$WSREP_SST_OPT_HOST} "\
 "-P$WSREP_SST_OPT_PORT --disable-reconnect --connect_timeout=10"
 
-# need to disable logging when loading the dump
-# reason is that dump contains ALTER TABLE for log tables, and
-# this causes an error if logging is enabled
-GENERAL_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@GENERAL_LOG"`
-SLOW_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@SLOW_QUERY_LOG"`
-$MYSQL -e "$STOP_WSREP SET GLOBAL GENERAL_LOG=OFF"
-$MYSQL -e "$STOP_WSREP SET GLOBAL SLOW_QUERY_LOG=OFF"
+if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
+then
+    # need to disable logging when loading the dump
+    # reason is that dump contains ALTER TABLE for log tables, and
+    # this causes an error if logging is enabled
+    GENERAL_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@GENERAL_LOG"`
+    SLOW_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@SLOW_QUERY_LOG"`
+    $MYSQL -e "$STOP_WSREP SET GLOBAL GENERAL_LOG=OFF"
+    $MYSQL -e "$STOP_WSREP SET GLOBAL SLOW_QUERY_LOG=OFF"
 
-# commands to restore log settings
-RESTORE_GENERAL_LOG="SET GLOBAL GENERAL_LOG=$GENERAL_LOG_OPT;"
-RESTORE_SLOW_QUERY_LOG="SET GLOBAL SLOW_QUERY_LOG=$SLOW_LOG_OPT;"
+    # commands to restore log settings
+    RESTORE_GENERAL_LOG="SET GLOBAL GENERAL_LOG=$GENERAL_LOG_OPT;"
+    RESTORE_SLOW_QUERY_LOG="SET GLOBAL SLOW_QUERY_LOG=$SLOW_LOG_OPT;"
 
-# reset master for 5.6 to clear GTID_EXECUTED
-RESET_MASTER="RESET MASTER;"
+    # reset master for 5.6 to clear GTID_EXECUTED
+    RESET_MASTER="RESET MASTER;"
 
-
+<<<<<<< HEAD
 if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
 then
 # commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
+||||||| merged common ancestors
+if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
+then
+    # commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
+=======
+    # commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
+>>>>>>> wsrep_5.6.51-25.33
     # error is ignored because joiner binlog might be disabled.
     # and if joiner binlog is disabled, 'RESET MASTER' returns error
     # ERROR 1186 (HY000) at line 2: Binlog closed, cannot RESET MASTER

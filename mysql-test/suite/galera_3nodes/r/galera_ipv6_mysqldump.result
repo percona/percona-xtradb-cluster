@@ -1,7 +1,15 @@
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
 SET GLOBAL wsrep_sst_auth = 'sst:';
 SET GLOBAL wsrep_sst_method = 'mysqldump';
+<<<<<<< HEAD
 SET GLOBAL wsrep_cluster_address='';
+||||||| merged common ancestors
+Unloading wsrep provider ...
+SET GLOBAL wsrep_provider = 'none';
+=======
+Unloading wsrep provider ...
+SET GLOBAL wsrep_cluster_address = '';
+>>>>>>> wsrep_5.6.51-25.33
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 SELECT COUNT(*) = 1 FROM t1;
