@@ -20,15 +20,7 @@ INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 COMMIT;
-<<<<<<< HEAD
 SET GLOBAL wsrep_cluster_address='';
-||||||| merged common ancestors
-Unloading wsrep provider ...
-SET GLOBAL wsrep_provider = 'none';
-=======
-Unloading wsrep provider ...
-SET GLOBAL wsrep_cluster_address = '';
->>>>>>> wsrep_5.6.51-25.33
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES ('node1_committed_during');
@@ -105,13 +97,5 @@ CALL mtr.add_suppression("Can't open and lock time zone table");
 CALL mtr.add_suppression("Can't open and lock privilege tables");
 CALL mtr.add_suppression("Info table is not ready to be used");
 CALL mtr.add_suppression("Native table .* has the wrong structure");
-<<<<<<< HEAD
 CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
 CALL mtr.add_suppression("Host name '[0-9a-zA-Z\.\-]+' could not be resolved.*");
-SET GLOBAL general_log = ON;
-SET GLOBAL slow_query_log = ON;
-||||||| merged common ancestors
-SET GLOBAL general_log = ON;
-SET GLOBAL slow_query_log = ON;
-=======
->>>>>>> wsrep_5.6.51-25.33

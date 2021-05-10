@@ -128,17 +128,7 @@ then
     # reset master for 5.6 to clear GTID_EXECUTED
     RESET_MASTER="RESET MASTER;"
 
-<<<<<<< HEAD
-if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
-then
-# commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
-||||||| merged common ancestors
-if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
-then
     # commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
-=======
-    # commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
->>>>>>> wsrep_5.6.51-25.33
     # error is ignored because joiner binlog might be disabled.
     # and if joiner binlog is disabled, 'RESET MASTER' returns error
     # ERROR 1186 (HY000) at line 2: Binlog closed, cannot RESET MASTER
