@@ -1,0 +1,56 @@
+#
+# In this test node2 has binlogging enabled and binlog file expiration is
+# configured so that node2 restart would have pressure to execute binlog
+# file purging.
+# mysqld in node2 is then killed and restarted with -wsrep_recover option
+# If the bug is present, binlog purging will happen during wsrep_recover
+# startup, and this causes wsrep_recover run to crash
+#
+
+
+--source include/have_binlog_format_row.inc
+--source include/galera_cluster.inc
+--source include/big_test.inc
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 0;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, j varchar(4000)) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, REPEAT('z', 4000));
+INSERT INTO t1 VALUES (2, REPEAT('ä', 2000));
+INSERT INTO t1 VALUES (3, REPEAT('ö', 2000));
+
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) > 0 FROM t1;
+--source include/wait_condition.inc
+
+SET SESSION wsrep_sync_wait = 0;
+
+--connection node_2
+--source include/kill_galera.inc
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--connection node_2
+# node2 should now have 5 binlog files, here we change the creation time of
+# the first binlog file to ancient history. With this mysqld has the need to
+# purge first binlog file
+--exec touch -d "1970-01-01"  $MYSQLTEST_VARDIR/mysqld.2/data/mysqld-bin.000001
+
+--let $galera_wsrep_recover_server_id=2
+--source suite/galera/include/galera_wsrep_recover.inc
+
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--source include/start_mysqld.inc
+
+--source include/wait_until_connected_again.inc
+--source include/galera_wait_ready.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+
+
+DROP TABLE t1;
+RESET MASTER;
+
+--connection node_1
+RESET MASTER;

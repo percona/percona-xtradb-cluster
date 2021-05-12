@@ -4656,9 +4656,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     sql_print_error("GTID_MODE = ON requires ENFORCE_GTID_CONSISTENCY = ON.");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
-#ifdef WITH_WSREP
-  }
-#endif /* WITH_WSREP */
 
   if (opt_bin_log)
   {
@@ -4691,6 +4688,9 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       mysql_bin_log.purge_logs_before_date(purge_time, true);
   }
 #endif
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
 
   if (opt_myisam_log)
     (void) mi_log(1);

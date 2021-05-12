@@ -1,0 +1,17 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.1]
+server-id=1
+binlog-format=row
+log-bin=mysqld-bin
+log_slave_updates
+expire_logs_days=1
+max_binlog_size=4k
+
+[mysqld.2]
+server-id=2
+binlog-format=row
+log-bin=mysqld-bin
+log_slave_updates
+expire_logs_days=1
+max_binlog_size=4k
