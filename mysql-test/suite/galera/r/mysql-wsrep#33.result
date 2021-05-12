@@ -24,14 +24,7 @@ INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 COMMIT;
-Unloading wsrep provider ...
-<<<<<<< HEAD
 SET GLOBAL wsrep_cluster_address='';
-||||||| merged common ancestors
-SET GLOBAL wsrep_provider = 'none';
-=======
-SET GLOBAL wsrep_cluster_address = '';
->>>>>>> wsrep_5.7.33-25.25
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES ('node1_committed_during');

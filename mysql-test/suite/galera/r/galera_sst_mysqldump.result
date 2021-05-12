@@ -24,14 +24,7 @@ INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 COMMIT;
-Unloading wsrep provider ...
-<<<<<<< HEAD
 SET GLOBAL wsrep_cluster_address='';
-||||||| merged common ancestors
-SET GLOBAL wsrep_provider = 'none';
-=======
-SET GLOBAL wsrep_cluster_address = '';
->>>>>>> wsrep_5.7.33-25.25
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES ('node1_committed_during');
@@ -479,13 +472,9 @@ CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
 CALL mtr.add_suppression("Gtid table is not ready to be used");
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
 CALL mtr.add_suppression("ib_buffer_pool' for reading: No such file or directory");
-<<<<<<< HEAD
 CALL mtr.add_suppression("WSREP: Process completed with error.*");
 CALL mtr.add_suppression("WSREP: Try 1/3: 'wsrep_sst_mysqldump.*");
 CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
 CALL mtr.add_suppression("InnoDB: Cannot open.*");
 CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
-||||||| merged common ancestors
-=======
 CALL mtr.add_suppression("Recalculation of persistent statistics requested for table");
->>>>>>> wsrep_5.7.33-25.25

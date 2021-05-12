@@ -31,14 +31,7 @@ INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 COMMIT;
-Unloading wsrep provider ...
-<<<<<<< HEAD
 SET GLOBAL wsrep_cluster_address='';
-||||||| merged common ancestors
-SET GLOBAL wsrep_provider = 'none';
-=======
-SET GLOBAL wsrep_cluster_address = '';
->>>>>>> wsrep_5.7.33-25.25
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES ('node1_committed_during');
@@ -125,20 +118,8 @@ CALL mtr.add_suppression("Gtid table is not ready to be used");
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
 CALL mtr.add_suppression("ib_buffer_pool' for reading: No such file or directory");
 DROP USER sslsst;
-<<<<<<< HEAD
 CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_table_stats` not found");
 CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_index_stats` not found");
 CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table.*");
 SET GLOBAL general_log = ON;
 SET GLOBAL slow_query_log = ON;
-||||||| merged common ancestors
-SET GLOBAL general_log = ON;
-SET GLOBAL slow_query_log = ON;
-CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_index_stats` not found");
-CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_table_stats` not found");
-CALL mtr.add_suppression("Fetch of persistent statistics requested for table");
-=======
-CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_index_stats` not found");
-CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_table_stats` not found");
-CALL mtr.add_suppression("Recalculation of persistent statistics requested for table");
->>>>>>> wsrep_5.7.33-25.25

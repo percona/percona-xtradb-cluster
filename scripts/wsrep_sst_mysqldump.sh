@@ -98,7 +98,6 @@ MYSQL="$MYSQL_CLIENT --defaults-extra-file=$WSREP_SST_OPT_CONF "\
 "$AUTH -h${WSREP_SST_OPT_HOST_UNESCAPED:-$WSREP_SST_OPT_HOST} "\
 "-P$WSREP_SST_OPT_PORT --disable-reconnect --connect_timeout=10"
 
-<<<<<<< HEAD
 # need to disable logging when loading the dump
 # reason is that dump contains ALTER TABLE for log tables, and
 # this causes an error if logging is enabled
@@ -116,19 +115,6 @@ RESTORE_SLOW_QUERY_LOG="SET GLOBAL SLOW_QUERY_LOG=$SLOW_LOG_OPT;"
 RESTORE_PXC_STRICT_MODE="SET GLOBAL pxc_strict_mode='$PXC_STRICT_MODE';"
 
 TURNOFF_SQL_LOG_BIN="SET SESSION sql_log_bin=0;"
-||||||| merged common ancestors
-# need to disable logging when loading the dump
-# reason is that dump contains ALTER TABLE for log tables, and
-# this causes an error if logging is enabled
-GENERAL_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@GENERAL_LOG"`
-SLOW_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@SLOW_QUERY_LOG"`
-$MYSQL -e "$STOP_WSREP SET GLOBAL GENERAL_LOG=OFF"
-$MYSQL -e "$STOP_WSREP SET GLOBAL SLOW_QUERY_LOG=OFF"
-
-# commands to restore log settings
-RESTORE_GENERAL_LOG="SET GLOBAL GENERAL_LOG=$GENERAL_LOG_OPT;"
-RESTORE_SLOW_QUERY_LOG="SET GLOBAL SLOW_QUERY_LOG=$SLOW_LOG_OPT;"
-=======
 if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
 then
     # need to disable logging when loading the dump
@@ -138,24 +124,14 @@ then
     SLOW_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@SLOW_QUERY_LOG"`
     $MYSQL -e "$STOP_WSREP SET GLOBAL GENERAL_LOG=OFF"
     $MYSQL -e "$STOP_WSREP SET GLOBAL SLOW_QUERY_LOG=OFF"
->>>>>>> wsrep_5.7.33-25.25
 
     # commands to restore log settings
     RESTORE_GENERAL_LOG="SET GLOBAL GENERAL_LOG=$GENERAL_LOG_OPT;"
     RESTORE_SLOW_QUERY_LOG="SET GLOBAL SLOW_QUERY_LOG=$SLOW_LOG_OPT;"
 
-<<<<<<< HEAD
-if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
-then
-||||||| merged common ancestors
-
-if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
-then
-=======
     # reset master for 5.6 to clear GTID_EXECUTED
     RESET_MASTER="RESET MASTER;"
 
->>>>>>> wsrep_5.7.33-25.25
     # commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
     # error is ignored because joiner binlog might be disabled.
     # and if joiner binlog is disabled, 'RESET MASTER' returns error
