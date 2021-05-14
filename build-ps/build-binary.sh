@@ -57,6 +57,8 @@ CMAKE_BUILD_TYPE='RelWithDebInfo'
 COMMON_FLAGS=''
 #
 TOKUDB_BACKUP_VERSION=''
+# enable asan
+ENABLE_ASAN=0
 #
 # Some programs that may be overriden
 TAR=${TAR:-tar}
@@ -99,6 +101,7 @@ do
     -d | --debug )
         shift
         CMAKE_BUILD_TYPE='Debug'
+<<<<<<< HEAD
         BUILD_COMMENT="debug."
         TARBALL_SUFFIX="-debug"
         DEBUG_EXTRA="-DDEBUG_EXTNAME=ON"
@@ -111,6 +114,18 @@ do
     -a | --asan )
         shift
         ENABLE_ASAN=1
+||||||| 6f7822ffd0f
+        BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
+        DEBUG_EXTRA="-DDEBUG_EXTNAME=OFF"
+=======
+        BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
+        TARBALL_SUFFIX="-debug"
+        DEBUG_EXTRA="-DDEBUG_EXTNAME=OFF -DWITH_DEBUG=ON"
+        ;;
+    -a | --asan )
+        shift
+        ENABLE_ASAN=1
+>>>>>>> Percona-Server-8.0.23-14
         ;;
     -v | --valgrind )
         shift
@@ -276,10 +291,22 @@ then
 else
     REVISION=""
 fi
+<<<<<<< HEAD
 PRODUCT_FULL="Percona-XtraDB-Cluster_${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 PRODUCT_FULL="${PRODUCT_FULL}.${TAG}${BUILD_COMMENT:+_}${BUILD_COMMENT}$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}"
 COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION"
 COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}, WSREP version $WSREP_VERSION"
+||||||| 6f7822ffd0f
+PRODUCT_FULL="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
+PRODUCT_FULL="$PRODUCT_FULL${BUILD_COMMENT:-}-$TAG$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}"
+COMMENT="Percona Server (GPL), Release ${MYSQL_VERSION_EXTRA#-}"
+COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
+=======
+PRODUCT_FULL="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
+PRODUCT_FULL="$PRODUCT_FULL-$TAG$(uname -s)${DIST_NAME:-}.$TARGET${GLIBC_VER:-}${TARBALL_SUFFIX:-}"
+COMMENT="Percona Server (GPL), Release ${MYSQL_VERSION_EXTRA#-}"
+COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
+>>>>>>> Percona-Server-8.0.23-14
 
 #-------------------------------------------------------------------------------
 #
@@ -289,6 +316,7 @@ export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
 
 # If gcc >= 4.8 we can use ASAN in debug build but not if valgrind build also
+<<<<<<< HEAD
 if [[ $ENABLE_ASAN -eq 1 ]]; then
     if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && [[ "${CMAKE_OPTS:-}" != *WITH_VALGRIND=ON* ]]; then
         GCC_VERSION=$(${CC} -dumpversion)
@@ -297,11 +325,109 @@ if [[ $ENABLE_ASAN -eq 1 ]]; then
             DEBUG_EXTRA="${DEBUG_EXTRA} -DWITH_ASAN=ON"
             echo "Build with ASAN on"
         fi
+||||||| 6f7822ffd0f
+if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && [[ "${CMAKE_OPTS:-}" != *WITH_VALGRIND=ON* ]]; then
+  GCC_VERSION=$(${CC} -dumpversion)
+  GT_VERSION=$(echo -e "4.8.0\n${GCC_VERSION}" | sort -t. -k1,1nr -k2,2nr -k3,3nr | head -1)
+  if [ "${GT_VERSION}" = "${GCC_VERSION}" ]; then
+    DEBUG_EXTRA="${DEBUG_EXTRA} -DWITH_ASAN=ON"
+  fi
+fi
+
+# TokuDB cmake flags
+if test -d "$SOURCEDIR/storage/tokudb"
+then
+    CMAKE_OPTS="${CMAKE_OPTS:-} -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF -DTOKUDB_BACKUP_PLUGIN_VERSION=${TOKUDB_BACKUP_VERSION}"
+
+    if test "x$CMAKE_BUILD_TYPE" != "xDebug"
+    then
+        CMAKE_OPTS="${CMAKE_OPTS:-} -DTOKU_DEBUG_PARANOID=OFF"
+    else
+        CMAKE_OPTS="${CMAKE_OPTS:-} -DTOKU_DEBUG_PARANOID=ON"
+    fi
+
+    if [[ $CMAKE_OPTS == *WITH_VALGRIND=ON* ]]
+    then
+        CMAKE_OPTS="${CMAKE_OPTS:-} -DUSE_VALGRIND=ON"
+=======
+if [[ $ENABLE_ASAN -eq 1 ]]; then
+    if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && [[ "${CMAKE_OPTS:-}" != *WITH_VALGRIND=ON* ]]; then
+        GCC_VERSION=$(${CC} -dumpversion)
+        GT_VERSION=$(echo -e "4.8.0\n${GCC_VERSION}" | sort -t. -k1,1nr -k2,2nr -k3,3nr | head -1)
+        if [ "${GT_VERSION}" = "${GCC_VERSION}" ]; then
+            DEBUG_EXTRA="${DEBUG_EXTRA} -DWITH_ASAN=ON"
+        fi
     fi
 fi
+
+# TokuDB cmake flags
+if test -d "$SOURCEDIR/storage/tokudb"
+then
+    CMAKE_OPTS="${CMAKE_OPTS:-} -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF -DTOKUDB_BACKUP_PLUGIN_VERSION=${TOKUDB_BACKUP_VERSION}"
+
+    if test "x$CMAKE_BUILD_TYPE" != "xDebug"
+    then
+        CMAKE_OPTS="${CMAKE_OPTS:-} -DTOKU_DEBUG_PARANOID=OFF"
+    else
+        CMAKE_OPTS="${CMAKE_OPTS:-} -DTOKU_DEBUG_PARANOID=ON"
+    fi
+
+    if [[ $CMAKE_OPTS == *WITH_VALGRIND=ON* ]]
+    then
+        CMAKE_OPTS="${CMAKE_OPTS:-} -DUSE_VALGRIND=ON"
+>>>>>>> Percona-Server-8.0.23-14
+    fi
+fi
+<<<<<<< HEAD
 COMMON_FLAGS="-DPERCONA_INNODB_VERSION=$PERCONA_SERVER_EXTENSION"
 export CFLAGS=" $COMMON_FLAGS -static-libgcc $MACHINE_SPECS_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $MACHINE_SPECS_CFLAGS ${CXXFLAGS:-}"
+||||||| 6f7822ffd0f
+
+#
+# Attempt to remove any optimisation flags from the debug build
+# BLD-238 - bug1408232
+if [ -n "$(which rpm)" ]; then
+  export COMMON_FLAGS=$(rpm --eval %optflags | sed -e "s|march=i386|march=i686|g")
+  if test "x$CMAKE_BUILD_TYPE" = "xDebug"
+  then
+    COMMON_FLAGS=`echo " ${COMMON_FLAGS} " | \
+              sed -e 's/ -O[0-9]* / /' \
+                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
+                  -e 's/ -unroll2 / /' \
+                  -e 's/ -ip / /' \
+                  -e 's/^ //' \
+                  -e 's/ $//'`
+  fi
+fi
+#
+export COMMON_FLAGS="$COMMON_FLAGS -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION"
+export CFLAGS="$COMMON_FLAGS ${CFLAGS:-}"
+export CXXFLAGS="$COMMON_FLAGS ${CXXFLAGS:-}"
+#
+=======
+#
+# Attempt to remove any optimisation flags from the debug build
+# BLD-238 - bug1408232
+if [ -n "$(which rpm)" ]; then
+  export COMMON_FLAGS=$(rpm --eval %optflags | sed -e "s|march=i386|march=i686|g")
+  if test "x$CMAKE_BUILD_TYPE" = "xDebug"
+  then
+    COMMON_FLAGS=`echo " ${COMMON_FLAGS} " | \
+              sed -e 's/ -O[0-9]* / /' \
+                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
+                  -e 's/ -unroll2 / /' \
+                  -e 's/ -ip / /' \
+                  -e 's/^ //' \
+                  -e 's/ $//'`
+  fi
+fi
+#
+export COMMON_FLAGS="$COMMON_FLAGS -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION"
+export CFLAGS="$COMMON_FLAGS ${CFLAGS:-}"
+export CXXFLAGS="$COMMON_FLAGS ${CXXFLAGS:-}"
+#
+>>>>>>> Percona-Server-8.0.23-14
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 #
@@ -324,6 +450,7 @@ fi
 #
 
 (
+<<<<<<< HEAD
     cd "$SOURCEDIR"
 
     # Build/Copy galera as configured
@@ -474,6 +601,67 @@ fi
        echo "Packaging the test files"
        cp -R $SOURCEDIR/percona-xtradb-cluster-tests $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/
     ) || exit 1
+||||||| 6f7822ffd0f
+    rm -rf "$WORKDIR_ABS/bld"
+    mkdir "$WORKDIR_ABS/bld"
+    cd "$WORKDIR_ABS/bld"
+
+    cmake $SOURCEDIR ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
+        $DEBUG_EXTRA \
+        -DFEATURE_SET=community \
+        -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
+        -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
+        -DROUTER_INSTALL_LIBDIR="/usr/local/$PRODUCT_FULL/lib/mysqlrouter/private" \
+        -DROUTER_INSTALL_PLUGINDIR="/usr/local/$PRODUCT_FULL/lib/mysqlrouter/plugin" \
+        -DCOMPILATION_COMMENT="$COMMENT" \
+        -DWITH_PAM=ON \
+        -DWITH_ROCKSDB=ON \
+        -DWITH_INNODB_MEMCACHED=ON \
+        -DWITH_ZLIB=bundled \
+        -DWITH_NUMA=ON \
+        -DWITH_LDAP=system \
+        -DDOWNLOAD_BOOST=1 \
+        -DFORCE_INSOURCE_BUILD=1 \
+        -DWITH_LIBEVENT=bundled \
+        -DWITH_ZSTD=bundled \
+        -DWITH_BOOST="$WORKDIR_ABS/libboost" \
+        $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+
+    make $MAKE_JFLAG $QUIET
+    make DESTDIR="$INSTALLDIR" install
+=======
+    rm -rf "$WORKDIR_ABS/bld"
+    mkdir "$WORKDIR_ABS/bld"
+    cd "$WORKDIR_ABS/bld"
+
+    cmake $SOURCEDIR ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
+        $DEBUG_EXTRA \
+        -DFEATURE_SET=community \
+        -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
+        -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
+        -DROUTER_INSTALL_LIBDIR="/usr/local/$PRODUCT_FULL/lib/mysqlrouter/private" \
+        -DROUTER_INSTALL_PLUGINDIR="/usr/local/$PRODUCT_FULL/lib/mysqlrouter/plugin" \
+        -DCOMPILATION_COMMENT="$COMMENT" \
+        -DWITH_PAM=ON \
+        -DWITH_ROCKSDB=ON \
+        -DROCKSDB_DISABLE_AVX2=1 \
+        -DROCKSDB_DISABLE_MARCH_NATIVE=1 \
+        -DWITH_INNODB_MEMCACHED=ON \
+        -DWITH_ZLIB=bundled \
+        -DWITH_NUMA=ON \
+        -DWITH_LDAP=system \
+        -DDOWNLOAD_BOOST=1 \
+        -DFORCE_INSOURCE_BUILD=1 \
+        -DWITH_LIBEVENT=bundled \
+        -DWITH_ZSTD=bundled \
+        -DWITH_BOOST="$WORKDIR_ABS/libboost" \
+        $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+
+    make $MAKE_JFLAG $QUIET
+    make DESTDIR="$INSTALLDIR" install
+>>>>>>> Percona-Server-8.0.23-14
 
     # Build jemalloc
     if test "x$WITH_JEMALLOC" != x
@@ -570,11 +758,18 @@ fi
 
 # Patch needed libraries
 (
+<<<<<<< HEAD
     LIBLIST="libcrypto.so libssl.so libgcrypt.so libreadline.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so librtmp.so libfreebl3.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplds4.so libplc4.so libnspr4.so libtirpc.so libncurses.so.5"
     DIRLIST="bin bin/pxc_extra/pxb-8.0/bin bin/pxc_extra/pxb-2.4/bin lib bin/pxc_extra/pxb-8.0/lib/plugin bin/pxc_extra/pxb-2.4/lib/plugin lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
+||||||| 6f7822ffd0f
+    LIBLIST="libcrypto.so libssl.so libreadline.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so libgssapi_krb5.so librtmp.so libgssapi.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplc4.so libnspr4.so libssl3.so libplds4.so libncurses.so.5 libtinfo.so.5"
+    DIRLIST="bin lib lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
+=======
+    LIBLIST="libcrypto.so libssl.so libreadline.so libtinfo.so libsasl2.so libbrotlidec.so libbrotlicommon.so librtmp.so libgssapi_krb5.so libkrb5.so libk5crypto.so libssl3.so libsmime3.so libnss3.so libnssutil3.so libplc4.so libnspr4.so libssl3.so libplds4.so libncurses.so.5 libtinfo.so.5"
+    DIRLIST="bin lib lib/private lib/plugin lib/mysqlrouter/plugin lib/mysqlrouter/private"
+>>>>>>> Percona-Server-8.0.23-14
 
     LIBPATH=""
-    OVERRIDE=false
 
     function gather_libs {
         local elf_path=$1
@@ -615,13 +810,21 @@ fi
         # Set proper runpath for bins but check before doing anything
         local elf_path=$1
         local r_path=$2
+        local mode=${3:-}
         for elf in $(find ${elf_path} -maxdepth 1 -exec file {} \; | grep 'ELF ' | cut -d':' -f1); do
             echo "Checking LD_RUNPATH for ${elf}"
             if [[ -z $(patchelf --print-rpath ${elf}) ]]; then
                 echo "Changing RUNPATH for ${elf}"
                 patchelf --set-rpath ${r_path} ${elf}
+<<<<<<< HEAD
             fi
             if [[ ! -z ${override} ]] && [[ ${override} == "true" ]]; then
+||||||| 6f7822ffd0f
+            fi
+            if [[ ! -z "${override}" ]] && [[ "${override}" == "true" ]]; then
+=======
+            elif [[ ! -z ${mode} ]] && [[ ${mode} == "override" ]]; then
+>>>>>>> Percona-Server-8.0.23-14
                 echo "Overriding RUNPATH for ${elf}"
                 patchelf --set-rpath ${r_path} ${elf}
             fi
@@ -662,24 +865,48 @@ fi
         done
 
         # Set proper runpath
-        export override=false
         set_runpath bin '$ORIGIN/../lib/private/'
+<<<<<<< HEAD
         set_runpath bin/pxc_extra/pxb-2.4/bin '$ORIGIN/../../../../lib/private/'
         set_runpath bin/pxc_extra/pxb-8.0/bin '$ORIGIN/../../../../lib/private/'
         set_runpath lib '$ORIGIN/private/'
         set_runpath bin/pxc_extra/pxb-2.4/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath bin/pxc_extra/pxb-8.0/lib/plugin '$ORIGIN/../../../../../lib/private/'
         set_runpath lib/plugin '$ORIGIN/../private/'
+||||||| 6f7822ffd0f
+        set_runpath lib '$ORIGIN/private/'
+        set_runpath lib/plugin '$ORIGIN/../private/'
+=======
+        if [[ ${CMAKE_BUILD_TYPE} == "Debug" ]]; then
+            set_runpath lib '$ORIGIN/private/' override
+            set_runpath lib/plugin '$ORIGIN/../private/' override
+        else
+            set_runpath lib '$ORIGIN/private/'
+            set_runpath lib/plugin '$ORIGIN/../private/'
+        fi
+>>>>>>> Percona-Server-8.0.23-14
         set_runpath lib/private '$ORIGIN'
         # LIBS MYSQLROUTER
-        unset override && export override=true && set_runpath lib/mysqlrouter/plugin '$ORIGIN/:$ORIGIN/../private/:$ORIGIN/../../private/'
-        unset override && export override=true && set_runpath lib/mysqlrouter/private '$ORIGIN/:$ORIGIN/../plugin/:$ORIGIN/../../private/'
+        set_runpath lib/mysqlrouter/plugin '$ORIGIN/:$ORIGIN/../private/:$ORIGIN/../../private/' override
+        set_runpath lib/mysqlrouter/private '$ORIGIN/:$ORIGIN/../plugin/:$ORIGIN/../../private/' override
         #  BINS MYSQLROUTER
+<<<<<<< HEAD
         unset override && export override=true && set_runpath bin/mysqlrouter_passwd '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/mysqlrouter_plugin_info '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/mysqlrouter '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
         unset override && export override=true && set_runpath bin/mysqlrouter_keyring '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
 
+||||||| 6f7822ffd0f
+        unset override && export override=true && set_runpath bin/mysqlrouter_passwd '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/mysqlrouter_plugin_info '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/mysqlrouter '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
+        unset override && export override=true && set_runpath bin/mysqlrouter_keyring '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/'
+=======
+        set_runpath bin/mysqlrouter_passwd '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/' override
+        set_runpath bin/mysqlrouter_plugin_info '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/' override
+        set_runpath bin/mysqlrouter '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/' override
+        set_runpath bin/mysqlrouter_keyring '$ORIGIN/../lib/mysqlrouter/private/:$ORIGIN/../lib/mysqlrouter/plugin/:$ORIGIN/../lib/private/' override
+>>>>>>> Percona-Server-8.0.23-14
         # Replace libs
         for DIR in ${DIRLIST}; do
             replace_libs ${DIR}
@@ -691,14 +918,25 @@ fi
         done
     }
 
+<<<<<<< HEAD
     mkdir -p "$TARGETDIR/usr/local/minimal"
     cp -r "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
+||||||| 6f7822ffd0f
+    mkdir $INSTALLDIR/usr/local/minimal
+    cp -r "$INSTALLDIR/usr/local/$PRODUCT_FULL" "$INSTALLDIR/usr/local/minimal/$PRODUCT_FULL-minimal"
+=======
+    if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
+        mkdir $INSTALLDIR/usr/local/minimal
+        cp -r "$INSTALLDIR/usr/local/$PRODUCT_FULL" "$INSTALLDIR/usr/local/minimal/$PRODUCT_FULL-minimal"
+    fi
+>>>>>>> Percona-Server-8.0.23-14
 
     # NORMAL TARBALL
     cd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME"
     link
 
     # MIN TARBALL
+<<<<<<< HEAD
     if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
         cd "$TARGETDIR/usr/local/minimal/$PRODUCT_FULL_NAME-minimal"
         rm -rf mysql-test 2> /dev/null
@@ -706,6 +944,19 @@ fi
         find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
         link
     fi
+||||||| 6f7822ffd0f
+    cd "$INSTALLDIR/usr/local/minimal/$PRODUCT_FULL-minimal"
+    rm -rf mysql-test 2> /dev/null
+    find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
+    link
+=======
+    if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
+        cd "$INSTALLDIR/usr/local/minimal/$PRODUCT_FULL-minimal"
+        rm -rf mysql-test 2> /dev/null
+        find . -type f -exec file '{}' \; | grep ': ELF ' | cut -d':' -f1 | xargs strip --strip-unneeded
+        link
+    fi
+>>>>>>> Percona-Server-8.0.23-14
 )
 
 # Package the archive
@@ -715,6 +966,7 @@ fi
     find $PRODUCT_FULL -type f -name 'COPYING.AGPLv3' -delete
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
 
+<<<<<<< HEAD
     if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
         cd "$TARGETDIR/usr/local/minimal/"
         # PS-4854 Percona Server for MySQL tarball without AGPLv3 dependency/license
@@ -722,6 +974,19 @@ fi
         $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME-minimal.tar.gz" $PRODUCT_FULL_NAME-minimal
     fi
 ) || exit 1
+||||||| 6f7822ffd0f
+    cd "$INSTALLDIR/usr/local/minimal/"
+    find $PRODUCT_FULL-minimal -type f -name 'COPYING.AGPLv3' -delete
+    $TAR --owner=0 --group=0 -czf "$WORKDIR_ABS/$PRODUCT_FULL-minimal.tar.gz" $PRODUCT_FULL-minimal
+)
+=======
+    if [[ $CMAKE_BUILD_TYPE != "Debug" ]]; then
+        cd "$INSTALLDIR/usr/local/minimal/"
+        find $PRODUCT_FULL-minimal -type f -name 'COPYING.AGPLv3' -delete
+        $TAR --owner=0 --group=0 -czf "$WORKDIR_ABS/$PRODUCT_FULL-minimal.tar.gz" $PRODUCT_FULL-minimal
+    fi
+)
+>>>>>>> Percona-Server-8.0.23-14
 
 if [[ $KEEP_BUILD -eq 0 ]]
 then

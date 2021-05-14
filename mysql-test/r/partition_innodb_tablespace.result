@@ -39,11 +39,27 @@ mtr/global_suppressions	mtr/global_suppressions	33	4	Dynamic	0	Single
 test/t1#p#p0	test/t1#p#p0	97	5	Dynamic	0	Single
 test/t1#p#p1	test/t1#p#p1	97	5	Dynamic	0	Single
 === information_schema.innodb_tablespaces and innodb_datafiles ===
+<<<<<<< HEAD
 Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
 innodb_system	System	DEFAULT	0	Any	ibdata1
 mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
 test/t1#p#p0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0.ibd
 test/t1#p#p1	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1.ibd
+||||||| 6f7822ffd0f
+Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0.ibd
+test/t1#p#p1	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1.ibd
+=======
+Space_Name	Space_Type	Page_Size	Zip_Size	BlockSize!=0	FileSize!=0	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	0	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0.ibd
+test/t1#p#p1	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1.ibd
+>>>>>>> Percona-Server-8.0.23-14
 === information_schema.files ===
 Space_Name	File_Type	Engine	Status	Tablespace_Name	Path
 innodb_system	TABLESPACE	InnoDB	NORMAL	innodb_system	MYSQLD_DATADIR/ibdata1
@@ -83,11 +99,27 @@ mtr/global_suppressions	mtr/global_suppressions	33	4	Dynamic	0	Single
 test/t1#p#p0	test/t1#p#p0	97	5	Dynamic	0	Single
 test/t1#p#p1	test/t1#p#p1	97	5	Dynamic	0	Single
 === information_schema.innodb_tablespaces and innodb_datafiles ===
+<<<<<<< HEAD
 Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
 innodb_system	System	DEFAULT	0	Any	ibdata1
 mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
 test/t1#p#p0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0.ibd
 test/t1#p#p1	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1.ibd
+||||||| 6f7822ffd0f
+Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0.ibd
+test/t1#p#p1	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1.ibd
+=======
+Space_Name	Space_Type	Page_Size	Zip_Size	BlockSize!=0	FileSize!=0	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	0	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0.ibd
+test/t1#p#p1	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1.ibd
+>>>>>>> Percona-Server-8.0.23-14
 === information_schema.files ===
 Space_Name	File_Type	Engine	Status	Tablespace_Name	Path
 innodb_system	TABLESPACE	InnoDB	NORMAL	innodb_system	MYSQLD_DATADIR/ibdata1
@@ -116,11 +148,27 @@ mtr/global_suppressions	mtr/global_suppressions	33	4	Dynamic	0	Single
 test/t11#p#p0	test/t11#p#p0	97	5	Dynamic	0	Single
 test/t11#p#p1	test/t11#p#p1	97	5	Dynamic	0	Single
 === information_schema.innodb_tablespaces and innodb_datafiles ===
+<<<<<<< HEAD
 Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
 innodb_system	System	DEFAULT	0	Any	ibdata1
 mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
 test/t11#p#p0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t11#p#p0.ibd
 test/t11#p#p1	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t11#p#p1.ibd
+||||||| 6f7822ffd0f
+Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t11#p#p0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t11#p#p0.ibd
+test/t11#p#p1	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t11#p#p1.ibd
+=======
+Space_Name	Space_Type	Page_Size	Zip_Size	BlockSize!=0	FileSize!=0	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	0	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t11#p#p0	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t11#p#p0.ibd
+test/t11#p#p1	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t11#p#p1.ibd
+>>>>>>> Percona-Server-8.0.23-14
 === information_schema.files ===
 Space_Name	File_Type	Engine	Status	Tablespace_Name	Path
 innodb_system	TABLESPACE	InnoDB	NORMAL	innodb_system	MYSQLD_DATADIR/ibdata1
@@ -158,11 +206,27 @@ mtr/global_suppressions	mtr/global_suppressions	33	4	Dynamic	0	Single
 test/t1#p#p0	test/t1#p#p0	97	5	Dynamic	0	Single
 test/t1#p#p1	test/t1#p#p1	97	5	Dynamic	0	Single
 === information_schema.innodb_tablespaces and innodb_datafiles ===
+<<<<<<< HEAD
 Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
 innodb_system	System	DEFAULT	0	Any	ibdata1
 mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
 test/t1#p#p0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0.ibd
 test/t1#p#p1	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1.ibd
+||||||| 6f7822ffd0f
+Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0.ibd
+test/t1#p#p1	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1.ibd
+=======
+Space_Name	Space_Type	Page_Size	Zip_Size	BlockSize!=0	FileSize!=0	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	0	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0.ibd
+test/t1#p#p1	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1.ibd
+>>>>>>> Percona-Server-8.0.23-14
 === information_schema.files ===
 Space_Name	File_Type	Engine	Status	Tablespace_Name	Path
 innodb_system	TABLESPACE	InnoDB	NORMAL	innodb_system	MYSQLD_DATADIR/ibdata1
@@ -234,6 +298,7 @@ test/t1#p#p1#sp#s3	test/t1#p#p1#sp#s3	97	5	Dynamic	0	Single
 test/t1#p#p2#sp#s4	test/t1#p#p2#sp#s4	97	5	Dynamic	0	Single
 test/t1#p#p2#sp#s5	test/t1#p#p2#sp#s5	97	5	Dynamic	0	Single
 === information_schema.innodb_tablespaces and innodb_datafiles ===
+<<<<<<< HEAD
 Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
 innodb_system	System	DEFAULT	0	Any	ibdata1
 mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
@@ -243,6 +308,29 @@ test/t1#p#p1#sp#s2	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/tes
 test/t1#p#p1#sp#s3	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1#sp#s3.ibd
 test/t1#p#p2#sp#s4	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p2#sp#s4.ibd
 test/t1#p#p2#sp#s5	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p2#sp#s5.ibd
+||||||| 6f7822ffd0f
+Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0#sp#s0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0#sp#s0.ibd
+test/t1#p#p0#sp#s1	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p0#sp#s1.ibd
+test/t1#p#p1#sp#s2	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p1#sp#s2.ibd
+test/t1#p#p1#sp#s3	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1#sp#s3.ibd
+test/t1#p#p2#sp#s4	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p2#sp#s4.ibd
+test/t1#p#p2#sp#s5	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p2#sp#s5.ibd
+=======
+Space_Name	Space_Type	Page_Size	Zip_Size	BlockSize!=0	FileSize!=0	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	0	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0#sp#s0	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0#sp#s0.ibd
+test/t1#p#p0#sp#s1	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p0#sp#s1.ibd
+test/t1#p#p1#sp#s2	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p1#sp#s2.ibd
+test/t1#p#p1#sp#s3	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1#sp#s3.ibd
+test/t1#p#p2#sp#s4	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p2#sp#s4.ibd
+test/t1#p#p2#sp#s5	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p2#sp#s5.ibd
+>>>>>>> Percona-Server-8.0.23-14
 === information_schema.files ===
 Space_Name	File_Type	Engine	Status	Tablespace_Name	Path
 innodb_system	TABLESPACE	InnoDB	NORMAL	innodb_system	MYSQLD_DATADIR/ibdata1
@@ -320,6 +408,7 @@ test/t1#p#p1#sp#s3	test/t1#p#p1#sp#s3	97	5	Dynamic	0	Single
 test/t1#p#p2#sp#s4	test/t1#p#p2#sp#s4	97	5	Dynamic	0	Single
 test/t1#p#p2#sp#s5	test/t1#p#p2#sp#s5	97	5	Dynamic	0	Single
 === information_schema.innodb_tablespaces and innodb_datafiles ===
+<<<<<<< HEAD
 Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
 innodb_system	System	DEFAULT	0	Any	ibdata1
 mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
@@ -329,6 +418,29 @@ test/t1#p#p1#sp#s2	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/tes
 test/t1#p#p1#sp#s3	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1#sp#s3.ibd
 test/t1#p#p2#sp#s4	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p2#sp#s4.ibd
 test/t1#p#p2#sp#s5	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p2#sp#s5.ibd
+||||||| 6f7822ffd0f
+Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0#sp#s0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0#sp#s0.ibd
+test/t1#p#p0#sp#s1	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p0#sp#s1.ibd
+test/t1#p#p1#sp#s2	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p1#sp#s2.ibd
+test/t1#p#p1#sp#s3	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1#sp#s3.ibd
+test/t1#p#p2#sp#s4	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p2#sp#s4.ibd
+test/t1#p#p2#sp#s5	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p2#sp#s5.ibd
+=======
+Space_Name	Space_Type	Page_Size	Zip_Size	BlockSize!=0	FileSize!=0	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	0	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0#sp#s0	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p0#sp#s0.ibd
+test/t1#p#p0#sp#s1	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p0#sp#s1.ibd
+test/t1#p#p1#sp#s2	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p1#sp#s2.ibd
+test/t1#p#p1#sp#s3	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p1#sp#s3.ibd
+test/t1#p#p2#sp#s4	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data/test/t1#p#p2#sp#s4.ibd
+test/t1#p#p2#sp#s5	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data2/test/t1#p#p2#sp#s5.ibd
+>>>>>>> Percona-Server-8.0.23-14
 === information_schema.files ===
 Space_Name	File_Type	Engine	Status	Tablespace_Name	Path
 innodb_system	TABLESPACE	InnoDB	NORMAL	innodb_system	MYSQLD_DATADIR/ibdata1
@@ -471,11 +583,27 @@ test/t1#p#p0	test/t1#p#p0	97	4	Dynamic	0	Single
 test/t_file_per_table_off	innodb_system	161	5	Dynamic	0	System
 test/t_file_per_table_on	test/t_file_per_table_on	33	5	Dynamic	0	Single
 === information_schema.innodb_tablespaces and innodb_datafiles ===
+<<<<<<< HEAD
 Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
 innodb_system	System	DEFAULT	0	Any	ibdata1
 mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
 test/t1#p#p0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data_part/test/t1#p#p0.ibd
 test/t_file_per_table_on	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/test/t_file_per_table_on.ibd
+||||||| 6f7822ffd0f
+Space_Name	Space_Type	Page_Size	Zip_Size	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0	Single	DEFAULT	0	Dynamic	MYSQL_TMP_DIR/alternate_dir/data_part/test/t1#p#p0.ibd
+test/t_file_per_table_on	Single	DEFAULT	0	Dynamic	MYSQLD_DATADIR/test/t_file_per_table_on.ibd
+=======
+Space_Name	Space_Type	Page_Size	Zip_Size	BlockSize!=0	FileSize!=0	Formats_Permitted	Path
+innodb_system	System	DEFAULT	0	0	0	Any	ibdata1
+mtr/global_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/global_suppressions.ibd
+mtr/test_suppressions	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/mtr/test_suppressions.ibd
+test/t1#p#p0	Single	DEFAULT	0	1	1	Dynamic	MYSQL_TMP_DIR/alternate_dir/data_part/test/t1#p#p0.ibd
+test/t_file_per_table_on	Single	DEFAULT	0	1	1	Dynamic	MYSQLD_DATADIR/test/t_file_per_table_on.ibd
+>>>>>>> Percona-Server-8.0.23-14
 === information_schema.files ===
 Space_Name	File_Type	Engine	Status	Tablespace_Name	Path
 innodb_system	TABLESPACE	InnoDB	NORMAL	innodb_system	MYSQLD_DATADIR/ibdata1

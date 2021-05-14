@@ -110,6 +110,97 @@ User\'s Manual
 
 .. toctree::
    :maxdepth: 1
+<<<<<<< HEAD
+||||||| 6f7822ffd0f
+   :glob:
+
+   management/udf_percona_toolkit
+   management/kill_idle_trx
+   management/changed_page_tracking
+   management/innodb_expanded_fast_index_creation
+   management/backup_locks
+   management/audit_log_plugin
+   management/start_transaction_with_consistent_snapshot
+   management/extended_show_grants
+   management/utility_user
+
+Security Improvements
+================================================================================
+
+.. toctree::
+  :maxdepth: 1
+  :glob:
+
+  security/pam_plugin
+  security/simple-ldap
+  security/simple-ldap-variables
+  security/data-at-rest-encryption
+  security/vault
+  security/using-keyring-plugin
+  security/rotating-master-key
+  security/encrypting-tables
+  security/encrypting-tablespaces
+  security/encrypting-system-tablespace
+  security/encrypting-temporary-files
+  security/encrypting-binlogs
+  security/encrypting-redo-log
+  security/encrypting-undo-tablespace
+  security/encrypting-threads
+  security/encrypting-doublewrite-buffers
+  security/verifying-encryption
+  security/data-scrubbing
+  security/ssl-improvement
+  security/data-masking
+
+Diagnostics Improvements
+================================================================================
+=======
+   :glob:
+
+   management/udf_percona_toolkit
+   management/kill_idle_trx
+   management/changed_page_tracking
+   management/enforce_engine
+   management/pam_plugin
+   management/innodb_expanded_fast_index_creation
+   management/backup_locks
+   management/audit_log_plugin
+   management/start_transaction_with_consistent_snapshot
+   management/extended_show_grants
+   management/utility_user
+
+Security Improvements
+================================================================================
+
+.. toctree::
+  :maxdepth: 1
+  :glob:
+
+  security/pam_plugin
+  security/simple-ldap
+  security/simple-ldap-variables
+  security/selinux
+  security/apparmor
+  security/data-at-rest-encryption
+  security/vault
+  security/using-keyring-plugin
+  security/rotating-master-key
+  security/encrypting-tables
+  security/encrypting-tablespaces
+  security/encrypting-system-tablespace
+  security/encrypting-temporary-files
+  security/encrypting-binlogs
+  security/encrypting-redo-log
+  security/encrypting-undo-tablespace
+  security/encrypting-threads
+  security/encrypting-doublewrite-buffers
+  security/verifying-encryption
+  security/ssl-improvement
+  security/data-masking
+
+Diagnostics Improvements
+================================================================================
+>>>>>>> Percona-Server-8.0.23-14
 
    manual/state_snapshot_transfer
    manual/xtrabackup_sst
@@ -122,8 +213,55 @@ User\'s Manual
    manual/performance_schema_instrumentation
    management/data_at_rest_encryption
 
+<<<<<<< HEAD
 How-tos
 =======
+||||||| 6f7822ffd0f
+.. toctree::
+   :maxdepth: 1
+   :glob:
+
+   tokudb/tokudb_intro
+   tokudb/tokudb_installation
+   tokudb/using_tokudb
+   tokudb/fast_updates
+   tokudb/tokudb_files_and_file_types
+   tokudb/tokudb_file_management
+   tokudb/tokudb_background_analyze_table
+   tokudb/tokudb_variables
+   tokudb/tokudb_status_variables
+   tokudb/tokudb_fractal_tree_indexing
+   tokudb/tokudb_troubleshooting
+   tokudb/tokudb_performance_schema
+   tokudb/toku_backup
+   tokudb/tokudb_faq
+   tokudb/removing_tokudb
+
+Percona MyRocks
+================================================================================
+=======
+.. toctree::
+   :maxdepth: 1
+   :glob:
+
+   tokudb/tokudb_intro
+   tokudb/tokudb_installation
+   tokudb/using_tokudb
+   tokudb/fast_updates
+   tokudb/tokudb_files_and_file_types
+   tokudb/tokudb_file_management
+   tokudb/tokudb_background_analyze_table
+   tokudb/tokudb_variables
+   tokudb/tokudb_status_variables
+   tokudb/tokudb_fractal_tree_indexing
+   tokudb/tokudb_troubleshooting
+   tokudb/tokudb_performance_schema
+   tokudb/tokudb_faq
+   tokudb/removing_tokudb
+
+Percona MyRocks
+================================================================================
+>>>>>>> Percona-Server-8.0.23-14
 
 .. toctree::
    :maxdepth: 1

@@ -72,6 +72,7 @@ pfs_server.h
 pfs_setup_actor.h
 pfs_setup_object.h
 pfs_stat.h
+pfs_stat.cc
 pfs_status.h
 pfs_timer.h
 pfs_tls_channel.h
@@ -190,6 +191,7 @@ table_replication_applier_status.h
 table_replication_applier_status_by_coordinator.h
 table_replication_applier_status_by_worker.h
 table_replication_group_member_stats.h
+table_rpl_async_connection_failover_managed.h
 table_log_status.h
 table_plugin_table.h
 table_replication_applier_filters.h
@@ -355,6 +357,7 @@ table_replication_applier_status.cc
 table_replication_applier_status_by_coordinator.cc
 table_replication_applier_status_by_worker.cc
 table_replication_group_member_stats.cc
+table_rpl_async_connection_failover_managed.cc
 table_log_status.cc
 table_plugin_table.cc
 table_replication_applier_filters.cc

@@ -105,7 +105,16 @@ ERROR HY000: Table storage engine for 'replication_connection_status' doesn't ha
 SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=78;
 HANDLER performance_schema.replication_connection_configuration OPEN;
 ERROR HY000: Table storage engine for 'replication_connection_configuration' doesn't have this option
+<<<<<<< HEAD
 SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=77;
+||||||| 6f7822ffd0f
+SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=76;
+=======
+SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=77;
+HANDLER performance_schema.replication_asynchronous_connection_failover_managed OPEN;
+ERROR HY000: Table storage engine for 'replication_asynchronous_connection_failover_managed' doesn't have this option
+SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=76;
+>>>>>>> Percona-Server-8.0.23-14
 HANDLER performance_schema.replication_asynchronous_connection_failover OPEN;
 ERROR HY000: Table storage engine for 'replication_asynchronous_connection_failover' doesn't have this option
 SELECT TABLE_NAME INTO @table_name FROM table_list WHERE id=76;

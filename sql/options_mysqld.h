@@ -120,6 +120,7 @@ enum options_mysqld {
   OPT_ADMIN_SSL_KEY,
   OPT_ADMIN_SSL_CRL,
   OPT_ADMIN_SSL_CRLPATH,
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   OPT_WSREP_PROVIDER,
   OPT_WSREP_PROVIDER_OPTIONS,
@@ -127,6 +128,11 @@ enum options_mysqld {
   OPT_WSREP_START_POSITION,
   OPT_WSREP_RECOVER
 #endif /* WITH_WSREP */
+||||||| 6f7822ffd0f
+=======
+  OPT_MASTER_INFO_REPOSITORY,
+  OPT_RELAY_LOG_INFO_REPOSITORY
+>>>>>>> Percona-Server-8.0.23-14
 };
 
 #endif  // OPTIONS_MYSQLD_INCLUDED

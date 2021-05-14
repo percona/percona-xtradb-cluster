@@ -2,12 +2,24 @@
 .\"     Title: \fBmysql_upgrade\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
+<<<<<<< HEAD
 .\"      Date: 03/06/2020
+||||||| 6f7822ffd0f
+.\"      Date: 09/04/2020
+=======
+.\"      Date: 11/26/2020
+>>>>>>> Percona-Server-8.0.23-14
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 8.0
 .\"  Language: English
 .\"
+<<<<<<< HEAD
 .TH "\FBMYSQL_UPGRADE\FR" "1" "03/06/2020" "MySQL 8\&.0" "MySQL Database System"
+||||||| 6f7822ffd0f
+.TH "\FBMYSQL_UPGRADE\FR" "1" "09/04/2020" "MySQL 8\&.0" "MySQL Database System"
+=======
+.TH "\FBMYSQL_UPGRADE\FR" "1" "11/26/2020" "MySQL 8\&.0" "MySQL Database System"
+>>>>>>> Percona-Server-8.0.23-14
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -51,7 +63,7 @@ As of MySQL 8\&.0\&.16, the MySQL server performs the upgrade tasks previously h
 (for details, see
 Section\ \&2.11.3, \(lqWhat the MySQL Upgrade Process Upgrades\(rq)\&. Consequently,
 \fBmysql_upgrade\fR
-is unneeded and is deprecated as of that version, and will be removed in a future MySQL version\&. Because
+is unneeded and is deprecated as of that version; expect it to be removed in a future version of MySQL\&. Because
 \fBmysql_upgrade\fR
 no longer performs upgrade tasks, it exits with status 0 unconditionally\&.
 .sp .5v
@@ -210,7 +222,7 @@ root
 user\&. If the
 root
 password is expired when you run
-\fBmysql_upgrade\fR, you will see a message that your password is expired and that
+\fBmysql_upgrade\fR, it displays a message that your password is expired and that
 \fBmysql_upgrade\fR
 failed as a result\&. To correct this, reset the
 root
@@ -337,7 +349,7 @@ option\&.
 .PP
 The
 mysql_upgrade_info
-file is deprecated and will be removed in a future MySQL version\&.
+file is deprecated; expect it to be removed in a future version of MySQL\&.
 .sp .5v
 .RE
 .PP
@@ -352,8 +364,16 @@ if the credentials use a hash format compatible with that plugin\&. Rows with a 
 .PP
 \fBmysql_upgrade\fR
 does not upgrade the contents of the time zone tables or help tables\&. For upgrade instructions, see
+<<<<<<< HEAD
 Section\ \&5.1.13, \(lqMySQL Server Time Zone Support\(rq, and
 Section\ \&5.1.14, \(lqServer-Side Help Support\(rq\&.
+||||||| 6f7822ffd0f
+Section\ \&5.1.14, \(lqMySQL Server Time Zone Support\(rq, and
+Section\ \&5.1.16, \(lqServer-Side Help Support\(rq\&.
+=======
+Section\ \&5.1.15, \(lqMySQL Server Time Zone Support\(rq, and
+Section\ \&5.1.17, \(lqServer-Side Help Support\(rq\&.
+>>>>>>> Percona-Server-8.0.23-14
 .PP
 Unless invoked with the
 \fB\-\-skip\-sys\-schema\fR
@@ -445,8 +465,16 @@ Section\ \&10.15, \(lqCharacter Set Configuration\(rq\&.
 Compress all information sent between the client and the server if possible\&. See
 Section\ \&4.2.6, \(lqConnection Compression Control\(rq\&.
 .sp
+<<<<<<< HEAD
 As of MySQL 8\&.0\&.18, this option is deprecated\&. It will be removed in a future MySQL version\&. See
 the section called \(lqLegacy Connection Compression Configuration\(rq\&.
+||||||| 6f7822ffd0f
+As of MySQL 8\&.0\&.18, this option is deprecated\&. It will be removed in a future MySQL version\&. See
+the section called \(lqConfiguring Legacy Connection Compression\(rq\&.
+=======
+As of MySQL 8\&.0\&.18, this option is deprecated\&. Expect it to be removed in a future version of MySQL\&. See
+the section called \(lqConfiguring Legacy Connection Compression\(rq\&.
+>>>>>>> Percona-Server-8.0.23-14
 .RE
 .sp
 .RS 4

@@ -3,7 +3,13 @@ Upstream-Name: @DEB_COPYRIGHT_UPSTREAMNAME@
 Upstream-Contact: MySQL Release Engineering <mysql-build@oss.oracle.com>
 Source: http://dev.mysql.com/
 
+<<<<<<< HEAD
 Copyright: 2000, 2019, Oracle and/or its affiliates. All rights reserved.
+||||||| 6f7822ffd0f
+Copyright: 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+=======
+Copyright: 2000, 2021, Oracle and/or its affiliates.
+>>>>>>> Percona-Server-8.0.23-14
 License:
  This is a release of MySQL, an SQL database server.
  .
