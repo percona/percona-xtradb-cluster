@@ -15,6 +15,8 @@ INSERT INTO x1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 INSERT INTO t2 (f2) SELECT 1 FROM t1 AS a1, t1 AS a2, t1 AS a3, t1 AS a4;
 INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 FLUSH LOCAL HOSTS;
+Warnings:
+Warning	1287	'FLUSH HOSTS' is deprecated and will be removed in a future release. Please use TRUNCATE TABLE performance_schema.host_cache instead
 FLUSH LOCAL STATUS;
 FLUSH LOCAL PRIVILEGES;
 FLUSH LOCAL USER_RESOURCES;
@@ -87,6 +89,8 @@ INSERT INTO t2 (f2) SELECT 1 FROM t1 AS a1, t1 AS a2, t1 AS a3, t1 AS a4;
 INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 set wsrep_on=0;
 FLUSH HOSTS;
+Warnings:
+Warning	1287	'FLUSH HOSTS' is deprecated and will be removed in a future release. Please use TRUNCATE TABLE performance_schema.host_cache instead
 FLUSH STATUS;
 FLUSH PRIVILEGES;
 FLUSH USER_RESOURCES;

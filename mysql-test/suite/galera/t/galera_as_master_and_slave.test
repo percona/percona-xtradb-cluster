@@ -20,7 +20,7 @@
 --connection node_2
 --echo #node-2 (galera-cluster-node acting as slave to an independent master)
 --disable_query_log
---eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--eval CHANGE REPLICATION SOURCE TO  SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
 START SLAVE USER='root';
 
@@ -28,7 +28,7 @@ START SLAVE USER='root';
 --connection node_4
 --echo #node-4 (independent slave replicating from galera-node-2)
 --disable_query_log
---eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_3;
+--eval CHANGE REPLICATION SOURCE TO  SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_3;
 --enable_query_log
 START SLAVE USER='root';
 

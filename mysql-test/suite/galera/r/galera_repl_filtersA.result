@@ -1744,7 +1744,7 @@ Warnings:
 Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 # connection node_1
 RESET MASTER;
-CHANGE MASTER TO MASTER_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
+CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
 ERROR HY000: CHANGE MASTER with the given parameters cannot be performed on channel 'wsrep'.
 START SLAVE FOR CHANNEL 'wsrep';
 ERROR HY000: START SLAVE FOR CHANNEL cannot be performed on channel 'wsrep'.
@@ -1761,7 +1761,7 @@ ERROR HY000: RESET SLAVE [ALL] FOR CHANNEL cannot be performed on channel 'wsrep
 CHANGE REPLICATION FILTER REPLICATE_DO_DB=(db1) FOR CHANNEL 'wsrep';
 ERROR HY000: CHANGE REPLICATION FILTER cannot be performed on channel 'wsrep'.
 #node-2 (cluster node)
-CHANGE MASTER TO MASTER_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
+CHANGE REPLICATION SOURCE TO SOURCE_HOST='127.0.0.1' FOR CHANNEL 'wsrep';
 ERROR HY000: CHANGE MASTER with the given parameters cannot be performed on channel 'wsrep'.
 START SLAVE FOR CHANNEL 'wsrep';
 ERROR HY000: START SLAVE FOR CHANNEL cannot be performed on channel 'wsrep'.
