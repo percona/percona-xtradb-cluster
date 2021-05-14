@@ -1,13 +1,5 @@
-<<<<<<< HEAD
 Percona XtraDB Cluster 8.0
 --------------------------
-||||||| 6f7822ffd0f
-Percona Server 8.0
-Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
-=======
-Percona Server 8.0
-Copyright (c) 2000, 2021, Oracle and/or its affiliates.
->>>>>>> Percona-Server-8.0.23-14
 
 Percona XtraDB Cluster is based on Percona Server and Codership wsrep API
 using galera replication library that provides Multimaster Cluster based
@@ -19,18 +11,12 @@ Documentation: https://www.percona.com/doc/percona-xtradb-cluster/8.0/index.html
 
 Jira (bugs): https://jira.percona.com/projects/PXC/issues
 
-<<<<<<< HEAD
 Sources: https://github.com/percona/percona-xtradb-cluster
-||||||| 6f7822ffd0f
-Sources: https://github.com/percona/percona-server
 
-Get Technical Forum Help: https://forums.percona.com/categories/mysql-mariadb
-=======
-Sources: https://github.com/percona/percona-server
+Get Technical Forum Help: https://forums.percona.com/c/mysql-mariadb/percona-xtradb-cluster-8-x/
 
-Get Technical Forum Help: https://forums.percona.com/c/mysql-mariadb/percona-server-for-mysql-8-0/
-
-Release Notes: https://www.percona.com/doc/percona-server/LATEST/release-notes/release-notes_index.html
+Release Notes: https://www.percona.com/doc/percona-xtradb-cluster/LATEST/release-notes/release-notes_index.html
 
 Release Announcements:  https://forums.percona.com/c/percona-news/software-new-releases/
->>>>>>> Percona-Server-8.0.23-14
+
+Copyright (c) 2000, 2021, Oracle and/or its affiliates.
