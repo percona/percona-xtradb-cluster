@@ -903,7 +903,7 @@ static int run_sql_command(THD *thd, const char *query,
     return -1;
   }
 
-  mysql_parse(thd, &ps, false);
+  dispatch_sql_command(thd, &ps, false);
   if (thd->is_error()) {
     int const err = thd->get_stmt_da()->mysql_errno();
     if (safe_query) {

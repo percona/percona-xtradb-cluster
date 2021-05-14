@@ -2496,33 +2496,7 @@ const char *print_slave_db_safe(const char *db) {
   return (db ? db : "");
 }
 
-<<<<<<< HEAD
-/*
-  Check if the error is caused by network.
-  @param[in]   errorno   Number of the error.
-  RETURNS:
-  true         network error
-  false        not network error
-*/
-
-static bool is_network_error(uint errorno) {
-#ifdef WITH_WSREP
-  if (errorno == ER_UNKNOWN_COM_ERROR) return true;
-#endif /* WITH_WSREP */
-
-||||||| 6f7822ffd0f
-/*
-  Check if the error is caused by network.
-  @param[in]   errorno   Number of the error.
-  RETURNS:
-  true         network error
-  false        not network error
-*/
-
-static bool is_network_error(uint errorno) {
-=======
 bool is_network_error(uint errorno) {
->>>>>>> Percona-Server-8.0.23-14
   return errorno == CR_CONNECTION_ERROR || errorno == CR_CONN_HOST_ERROR ||
          errorno == CR_SERVER_GONE_ERROR || errorno == CR_SERVER_LOST ||
          errorno == ER_CON_COUNT_ERROR || errorno == ER_SERVER_SHUTDOWN ||
@@ -7271,44 +7245,28 @@ wsrep_restart_point :
   }
   thd->init_query_mem_roots();
 
-<<<<<<< HEAD
   if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()))
     rli->deferred_events = new Deferred_log_events();
   thd->rli_slave = rli;
   DBUG_ASSERT(thd->rli_slave->info_thd == thd);
-||||||| 6f7822ffd0f
-    thd->temporary_tables = rli->save_temporary_tables;  // restore temp tables
-    set_thd_in_use_temporary_tables(
-        rli);  // (re)set sql_thd in use for saved temp tables
-    /* Set applier thread InnoDB priority */
-    set_thd_tx_priority(thd, rli->get_thd_tx_priority());
-    thd->variables.require_row_format = rli->is_row_format_required();
-=======
-    thd->temporary_tables = rli->save_temporary_tables;  // restore temp tables
-    set_thd_in_use_temporary_tables(
-        rli);  // (re)set sql_thd in use for saved temp tables
-    /* Set applier thread InnoDB priority */
-    set_thd_tx_priority(thd, rli->get_thd_tx_priority());
-
-    /* Set write set related options */
-    set_thd_write_set_options(thd, rli->get_ignore_write_set_memory_limit(),
-                              rli->get_allow_drop_write_set());
-
-    thd->variables.require_row_format = rli->is_row_format_required();
->>>>>>> Percona-Server-8.0.23-14
 
   thd->temporary_tables = rli->save_temporary_tables;  // restore temp tables
   set_thd_in_use_temporary_tables(
       rli);  // (re)set sql_thd in use for saved temp tables
   /* Set applier thread InnoDB priority */
   set_thd_tx_priority(thd, rli->get_thd_tx_priority());
+
+  /* Set write set related options */
+  set_thd_write_set_options(thd, rli->get_ignore_write_set_memory_limit(),
+                            rli->get_allow_drop_write_set());
+
   thd->variables.require_row_format = rli->is_row_format_required();
 
   if (Relay_log_info::PK_CHECK_STREAM !=
       rli->get_require_table_primary_key_check())
     thd->variables.sql_require_primary_key =
         (rli->get_require_table_primary_key_check() ==
-          Relay_log_info::PK_CHECK_ON);
+         Relay_log_info::PK_CHECK_ON);
 
   rli->transaction_parser.reset();
 
@@ -7637,7 +7595,6 @@ err:
   rli->cached_charset_invalidate();
   rli->save_temporary_tables = thd->temporary_tables;
 
-<<<<<<< HEAD
   /*
     TODO: see if we can do this conditionally in next_event() instead
     to avoid unneeded position re-init
@@ -7651,44 +7608,9 @@ err:
   mysql_mutex_lock(&rli->info_thd_lock);
   rli->info_thd = nullptr;
   if (commit_order_mngr) {
-    delete commit_order_mngr;
     rli->set_commit_order_manager(nullptr);
+    delete commit_order_mngr;
   }
-||||||| 6f7822ffd0f
-    /*
-      TODO: see if we can do this conditionally in next_event() instead
-      to avoid unneeded position re-init
-    */
-    thd->temporary_tables =
-        nullptr;  // remove tempation from destructor to close them
-    // destructor will not free it, because we are weird
-    thd->get_protocol_classic()->end_net();
-    DBUG_ASSERT(rli->info_thd == thd);
-    THD_CHECK_SENTRY(thd);
-    mysql_mutex_lock(&rli->info_thd_lock);
-    rli->info_thd = nullptr;
-    if (commit_order_mngr) {
-      delete commit_order_mngr;
-      rli->set_commit_order_manager(nullptr);
-    }
-=======
-    /*
-      TODO: see if we can do this conditionally in next_event() instead
-      to avoid unneeded position re-init
-    */
-    thd->temporary_tables =
-        nullptr;  // remove tempation from destructor to close them
-    // destructor will not free it, because we are weird
-    thd->get_protocol_classic()->end_net();
-    DBUG_ASSERT(rli->info_thd == thd);
-    THD_CHECK_SENTRY(thd);
-    mysql_mutex_lock(&rli->info_thd_lock);
-    rli->info_thd = nullptr;
-    if (commit_order_mngr) {
-      rli->set_commit_order_manager(nullptr);
-      delete commit_order_mngr;
-    }
->>>>>>> Percona-Server-8.0.23-14
 
   mysql_mutex_unlock(&rli->info_thd_lock);
   set_thd_in_use_temporary_tables(

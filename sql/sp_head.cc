@@ -2252,7 +2252,7 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success) {
           We skip after_statement hook at this point because
           otherwise it clears the error, and cleans up the
           whole transaction. For now we just return and finish
-          our handling once we are back to mysql_parse.
+          our handling once we are back to dispatch_sql_command().
         */
         WSREP_DEBUG("Skipping after_command hook for killed SP");
       } else {

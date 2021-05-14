@@ -194,8 +194,10 @@
 #include "wsrep_thd.h"
 #include "wsrep_trans_observer.h"
 
-static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
-                              Parser_state *parser_state, bool update_userstat);
+static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf,
+                                       uint length,
+                                       Parser_state *parser_state,
+                                       bool update_userstat);
 #endif /* WITH_WSREP */
 
 namespace resourcegroups {
@@ -2127,17 +2129,13 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 
         mysqld_stmt_execute(thd, stmt, com_data->com_stmt_execute.has_new_types,
                             com_data->com_stmt_execute.open_cursor, parameters);
-<<<<<<< HEAD
 #ifdef WITH_WSREP
         if (WSREP_ON) {
           (void)wsrep_after_statement(thd);
         }
 #endif /* WITH_WSREP */
-||||||| 6f7822ffd0f
-=======
         thd->bind_parameter_values = nullptr;
         thd->bind_parameter_values_count = 0;
->>>>>>> Percona-Server-8.0.23-14
       }
       break;
     }
@@ -2221,7 +2219,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       Parser_state parser_state;
       if (parser_state.init(thd, thd->query().str, thd->query().length)) break;
 
-#ifdef WITH_WSREP
       // Initially, prepare and optimize the statement for the primary
       // storage engine. If an eligible secondary storage engine is
       // found, the statement may be reprepared for the secondary
@@ -2230,9 +2227,12 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       thd->set_secondary_engine_optimization(
           Secondary_engine_optimization::PRIMARY_TENTATIVELY);
 
-<<<<<<< HEAD
+      copy_bind_parameter_values(thd, com_data->com_query.parameters,
+                                 com_data->com_query.parameter_count);
+
+#ifdef WITH_WSREP
       if (WSREP_ON) {
-        if (wsrep_mysql_parse(thd, thd->query().str, thd->query().length,
+        if (wsrep_dispatch_sql_command(thd, thd->query().str, thd->query().length,
                               &parser_state, false)) {
           WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
           mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -2242,28 +2242,18 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
           goto dispatch_end;
         }
       } else {
-        mysql_parse(thd, &parser_state, false);
+        dispatch_sql_command(thd, &parser_state, false);
       }
 #else
-      mysql_parse(thd, &parser_state, false);
-#endif /* WITH_WSREP */
-||||||| 6f7822ffd0f
-      mysql_parse(thd, &parser_state, false);
-=======
-      copy_bind_parameter_values(thd, com_data->com_query.parameters,
-                                 com_data->com_query.parameter_count);
-
       dispatch_sql_command(thd, &parser_state, false);
->>>>>>> Percona-Server-8.0.23-14
+#endif /* WITH_WSREP */
 
       // Check if the statement failed and needs to be restarted in
       // another storage engine.
       check_secondary_engine_statement(thd, &parser_state, orig_query.str,
                                        orig_query.length);
 
-#ifdef WITH_WSREP
       thd->set_secondary_engine_optimization(saved_secondary_engine);
-#endif /* WITH_WSREP */
 
       DBUG_EXECUTE_IF("parser_stmt_to_error_log", {
         LogErr(INFORMATION_LEVEL, ER_PARSER_TRACE, thd->query().str);
@@ -2343,7 +2333,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
             Secondary_engine_optimization::PRIMARY_TENTATIVELY);
 
         if (WSREP_ON) {
-          if (wsrep_mysql_parse(thd, beginning_of_next_stmt, length,
+          if (wsrep_dispatch_sql_command(thd, beginning_of_next_stmt, length,
                                 &parser_state, false)) {
             WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
             mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -2354,7 +2344,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
             goto dispatch_end;
           }
         } else {
-          mysql_parse(thd, &parser_state, false);
+          dispatch_sql_command(thd, &parser_state, false);
         }
 #else
         thd->set_time(); /* Reset the query start time. */
@@ -2362,21 +2352,13 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
         thd->set_secondary_engine_optimization(
             Secondary_engine_optimization::PRIMARY_TENTATIVELY);
         /* TODO: set thd->lex->sql_command to SQLCOM_END here */
-<<<<<<< HEAD
-        mysql_parse(thd, &parser_state, false);
-#endif /* WITH_WSREP */
-||||||| 6f7822ffd0f
-        mysql_parse(thd, &parser_state, false);
-=======
         dispatch_sql_command(thd, &parser_state, false);
->>>>>>> Percona-Server-8.0.23-14
+#endif /* WITH_WSREP */
 
         check_secondary_engine_statement(thd, &parser_state,
                                          beginning_of_next_stmt, length);
 
-#ifdef WITH_WSREP
         thd->set_secondary_engine_optimization(saved_secondary_engine);
-#endif /* WITH_WSREP */
       }
 
       thd->bind_parameter_values = nullptr;
@@ -4911,7 +4893,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
 #ifdef WITH_WSREP
         /* We need to cleanup wsrep state before starting
            new transaction. If 'regular' commit was issued,
-           it would be done in caller function wsrep_mysql_parse()
+           it would be done in caller function wsrep_dispatch_sql_command()
            after returning from here.
            But now we need to do it in between.
          */
@@ -4944,7 +4926,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
 #ifdef WITH_WSREP
         /* We need to cleanup wsrep state before starting
            new transaction. If 'regular' rollback was issued,
-           it would be done in caller function wsrep_mysql_parse()
+           it would be done in caller function wsrep_dispatch_sql_command()
            after returning from here.
            But now we need to do it in between.
          */
@@ -7416,17 +7398,17 @@ static bool wsrep_should_retry_in_autocommit(enum_sql_command &sql_command) {
   }
 }
 
-static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
+static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf, uint length,
                               Parser_state *parser_state,
                               bool update_userstat) {
-  DBUG_ENTER("wsrep_mysql_parse");
+  DBUG_ENTER("wsrep_dispatch_sql_command");
   bool is_autocommit = !thd->in_multi_stmt_transaction_mode() &&
                        wsrep_read_only_option(thd, thd->lex->query_tables);
   bool retry_autocommit;
 
   do {
     retry_autocommit = false;
-    mysql_parse(thd, parser_state, update_userstat);
+    dispatch_sql_command(thd, parser_state, update_userstat);
 
     /*
       Convert all ER_QUERY_INTERRUPTED errors to ER_LOCK_DEADLOCK

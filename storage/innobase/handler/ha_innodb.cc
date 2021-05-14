@@ -6462,7 +6462,6 @@ static int innobase_commit(handlerton *hton, /*!< in: InnoDB handlerton */
       trx->flush_log_later = true;
     }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     /* If the transaction is not run in 2pc, we must assign wsrep
     XID here in order to get it written in rollback segment. */
@@ -6471,14 +6470,11 @@ static int innobase_commit(handlerton *hton, /*!< in: InnoDB handlerton */
     }
 #endif /* WITH_WSREP */
 
-||||||| 6f7822ffd0f
-=======
     /* If SE needs to persist GTID we must have a transaction. */
     if (thd->se_persists_gtid_explicit()) {
       trx_start_if_not_started(trx, true);
     }
 
->>>>>>> Percona-Server-8.0.23-14
     innobase_commit_low(trx);
 
     if (!read_only) {

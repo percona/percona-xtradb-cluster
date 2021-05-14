@@ -1715,19 +1715,13 @@ static const std::pair<const char *, Create_func *> func_array[] = {
     {"CONVERT_INTERVAL_TO_USER_INTERVAL",
      SQL_FN_INTERNAL(Item_func_convert_interval_to_user_interval, 2)},
     {"INTERNAL_GET_DD_COLUMN_EXTRA",
-<<<<<<< HEAD
-     SQL_FN_LIST_INTERNAL(Item_func_internal_get_dd_column_extra, 6)},
+     SQL_FN_LIST_INTERNAL(Item_func_internal_get_dd_column_extra, 8)},
 #ifdef WITH_WSREP
     {"WSREP_LAST_WRITTEN_GTID", SQL_FN(Item_func_wsrep_last_written_gtid, 0)},
     {"WSREP_LAST_SEEN_GTID", SQL_FN(Item_func_wsrep_last_seen_gtid, 0)},
     {"WSREP_SYNC_WAIT_UPTO_GTID",
      SQL_FN_V(Item_func_wsrep_sync_wait_upto_gtid, 1, 2)},
 #endif /* WITH_WSREP */
-||||||| 6f7822ffd0f
-     SQL_FN_LIST_INTERNAL(Item_func_internal_get_dd_column_extra, 6)},
-=======
-     SQL_FN_LIST_INTERNAL(Item_func_internal_get_dd_column_extra, 8)},
->>>>>>> Percona-Server-8.0.23-14
     {"INTERNAL_GET_USERNAME",
      SQL_FN_LIST_INTERNAL_V(Item_func_internal_get_username, 0, 1)},
     {"INTERNAL_GET_HOSTNAME",

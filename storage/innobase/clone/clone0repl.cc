@@ -556,18 +556,10 @@ bool Clone_persist_gtid::check_max_gtid_threshold() {
 void Clone_persist_gtid::periodic_write() {
   auto thd = create_thd(false, true, true, PSI_NOT_INSTRUMENTED);
 
-<<<<<<< HEAD
-  m_thread_id = thd_get_thread_id(thd);
-
 #ifdef WITH_WSREP
   thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
 #endif
 
-||||||| 6f7822ffd0f
-  m_thread_id = thd_get_thread_id(thd);
-
-=======
->>>>>>> Percona-Server-8.0.23-14
   /* Allow GTID to be persisted on read only server. */
   thd->set_skip_readonly_check();
 

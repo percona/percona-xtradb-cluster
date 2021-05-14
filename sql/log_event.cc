@@ -7232,7 +7232,7 @@ int Append_block_log_event::do_apply_event(Relay_log_info const *rli) {
   if (get_create_or_append()) {
     /*
       Usually lex_start() is called by dispatch_sql_command(), but we need it
-      here as the present method does not call mysql_parse().
+      here as the present method does not call dispatch_sql_command().
     */
     lex_start(thd);
     mysql_reset_thd_for_next_command(thd);
