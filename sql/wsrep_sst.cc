@@ -1082,6 +1082,8 @@ static uint server_session_execute(MYSQL_SESSION session, std::string query,
                                    bool ignore_error = false) {
   COM_DATA cmd;
   wsp::Sql_resultset rset;
+
+  memset(&cmd, 0, sizeof(cmd));
   cmd.com_query.query = query.c_str();
   cmd.com_query.length = static_cast<unsigned int>(query.length());
   wsp::Sql_service_context_base *ctx = new wsp::Sql_service_context(&rset);
