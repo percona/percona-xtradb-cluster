@@ -166,13 +166,7 @@ BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 %if 0%{?rhel} > 6
 # For rpm => 4.9 only: https://fedoraproject.org/wiki/Packaging:AutoProvidesAndRequiresFiltering
-<<<<<<< HEAD
-%global _privatelibs libprotobuf.*
-||||||| 6f7822ffd0f
-%global _privatelibs libprotobuf.*|libmysqlharness\.so.*|libmysqlharness_stdx\.so.*|libmysqlrouter\.so\..*|libmysqlrouter_.*\.so\..*%{?ssl_bundled:|libssl\.so\..*|libcrypto\.so\..*}
-=======
 %global _privatelibs libprotobuf.*|libmysqlharness\.so.*|libmysqlharness_stdx\.so.*|libmysqlharness_tls\.so.*|libmysqlrouter\.so\..*|libmysqlrouter_.*\.so\..*%{?ssl_bundled:|libssl\.so\..*|libcrypto\.so\..*}
->>>>>>> Percona-Server-8.0.23-14
 %global _privateperl perl\\((GD|hostnames|lib::mtr|lib::v1|mtr_|My::)
 %global __requires_exclude ^((%{_privatelibs})|(%{_privateperl}))
 %global __provides_exclude_from ^(/usr/share/(mysql|mysql-test)/.*|%{_libdir}/mysql/plugin/.*\\.so|%{_libdir}/mysql/private/.*|%{_libdir}/mysqlrouter/.*)$
@@ -865,22 +859,7 @@ mv %{buildroot}/%{_bindir}/mysql_config %{buildroot}/%{_bindir}/mysql_config-%{_
 install -p -m 0755 packaging/rpm-common/mysql_config.sh %{buildroot}/%{_bindir}/mysql_config
 %endif
 
-<<<<<<< HEAD
-# Fix a cluster script
-%if 0%{?cluster}
-%{?el8:/usr/bin/pathfix.py -i /usr/bin/python2 -n -p %{buildroot}%{_bindir}/ndb_setup.py}
-%endif # cluster
-
-||||||| 6f7822ffd0f
-# Fix a cluster script
-%if 0%{?cluster}
-%{?el8:/usr/bin/pathfix.py -i /usr/bin/python2 -n -p %{buildroot}%{_bindir}/ndb_setup.py}
-%endif # cluster
-
 %if 0%{?with_router}
-=======
-%if 0%{?with_router}
->>>>>>> Percona-Server-8.0.23-14
 %if 0%{?systemd}
 install -D -p -m 0644 packaging/rpm-common/mysqlrouter.service %{buildroot}%{_unitdir}/mysqlrouter.service
 install -D -p -m 0644 packaging/rpm-common/mysqlrouter.tmpfiles.d %{buildroot}%{_tmpfilesdir}/mysqlrouter.conf
@@ -1608,20 +1587,6 @@ fi
 %else
 %{_sysconfdir}/init.d/mysqlrouter
 %endif
-<<<<<<< HEAD
-%{_libdir}/libmysqlharness.so.*
-%{_libdir}/libmysqlrouter.so.*
-%{_libdir}/libmysqlrouter_http.so.*
-||||||| 6f7822ffd0f
-%{_libdir}/mysqlrouter/private/libmysqlharness.so.*
-%{_libdir}/mysqlrouter/private/libmysqlharness_stdx.so.*
-%{_libdir}/mysqlrouter/private/libmysqlrouter.so.*
-%{_libdir}/mysqlrouter/private/libmysqlrouter_http.so.*
-%{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_backend.so.*
-%{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
-%{_libdir}/mysqlrouter/private/libmysqlrouter_io_component.so.*
-%{_libdir}/mysqlrouter/private/libprotobuf-lite.so.3.11.4
-=======
 %{_libdir}/mysqlrouter/private/libmysqlharness.so.*
 %{_libdir}/mysqlrouter/private/libmysqlharness_stdx.so.*
 %{_libdir}/mysqlrouter/private/libmysqlharness_tls.so.*
@@ -1631,25 +1596,12 @@ fi
 %{_libdir}/mysqlrouter/private/libmysqlrouter_http_auth_realm.so.*
 %{_libdir}/mysqlrouter/private/libmysqlrouter_io_component.so.*
 %{_libdir}/mysqlrouter/private/libprotobuf-lite.so.3.11.4
->>>>>>> Percona-Server-8.0.23-14
 %dir %{_libdir}/mysqlrouter
 %{_libdir}/mysqlrouter/*.so*
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/log/mysqlrouter
 %dir %attr(755, mysqlrouter, mysqlrouter) /var/run/mysqlrouter
 
 %changelog
-<<<<<<< HEAD
-||||||| 6f7822ffd0f
-* Sun Jul 12 2020 Sreedhar S <sreedhar.sreedhargadda@oracle.com> - 8.0.22-1
-- Add a new subpackage client-plugins
-
-* Tue Feb 04 2020 Bjorn Munch <bjorn.munch@oracle.com> - 8.0.20-1
-- Again add back support for alternative with_ssl, now with bundled openssl
-
-* Wed Aug 14 2019 Rahul Sisondia <rahul.sisondia@oracle.com> - 8.0.19-1
-- Added component_test_udf_services test component
-
-=======
 * Mon Sep 21 2020 Murthy Sidagam <venkata.sidagam@oracle.com> - 8.0.23-1
 - Added component_reference_cache.so component
 
@@ -1665,7 +1617,6 @@ fi
 * Wed Aug 14 2019 Rahul Sisondia <rahul.sisondia@oracle.com> - 8.0.19-1
 - Added component_test_udf_services test component
 
->>>>>>> Percona-Server-8.0.23-14
 * Fri Jun 28 2019 Ivan Svaljek <ivan.svaljek@oracle.com> - 8.0.18-1
 - Add keyring_hashicorp.so plugin
 - Add component_mysqlbackup component

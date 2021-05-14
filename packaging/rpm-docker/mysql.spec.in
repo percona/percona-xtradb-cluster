@@ -182,13 +182,7 @@ mkdir release
            %{?mecab_option} \
 %if 0%{?cluster}
            -DWITH_NDBCLUSTER=1 \
-<<<<<<< HEAD
-||||||| 6f7822ffd0f
-           -DWITH_MCC=0 \
            -DNDB_UTILS_LINK_DYNAMIC=1 \
-=======
-           -DNDB_UTILS_LINK_DYNAMIC=1 \
->>>>>>> Percona-Server-8.0.23-14
 %endif
 %if 0%{?commercial}
            -DWITH_MEB=1 \
@@ -235,25 +229,10 @@ for f in innochecksum ibd2sdi myisamchk myisam_ftdump myisamlog myisampack \
 done
 
 %if 0%{?cluster}
-<<<<<<< HEAD
-for f in mcc_config.py ndb_blob_tool ndb_config ndb_delete_all ndb_desc ndb_drop_index \
-         ndb_drop_table ndb_error_reporter ndb_import ndb_index_stat ndb_move_data \
-||||||| 6f7822ffd0f
-for f in mcc_config.py ndb_error_reporter ndb_move_data \
-=======
 for f in ndb_error_reporter ndb_move_data \
->>>>>>> Percona-Server-8.0.23-14
          ndb_perror ndb_print_backup_file ndb_print_file ndb_print_frag_file \
-<<<<<<< HEAD
-         ndb_print_schema_file ndb_print_sys_file ndb_redo_log_reader ndb_restore ndb_select_all \
-         ndb_select_count ndb_setup.py ndb_show_tables ndb_size.pl ndbinfo_select_all ndb_waiter ; do
-||||||| 6f7822ffd0f
-         ndb_print_schema_file ndb_print_sys_file \
-         ndb_setup.py ndb_size.pl ; do
-=======
          ndb_print_schema_file ndb_print_sys_file \
          ndb_size.pl ; do
->>>>>>> Percona-Server-8.0.23-14
     rm -f %{buildroot}%{_bindir}/$f
 done
 %endif
@@ -329,30 +308,11 @@ rm -f %{buildroot}%{_datadir}/mysql-*/{mysql.server,mysqld_multi.server,mysql-lo
 
 # Extra files/dirs removed from Cluster build
 %if 0%{?cluster}
-<<<<<<< HEAD
-rm -rf %{buildroot}/usr/share/mysql-*/mcc
-rm -f %{buildroot}/lib/memcached_path.pl
-rm -f %{buildroot}/%{_libdir}/mysql/libndbclient*
-||||||| 6f7822ffd0f
-rm -rf %{buildroot}/usr/share/mysql-*/mcc
-rm -f %{buildroot}/lib/memcached_path.pl
-rm -f %{buildroot}/%{_bindir}/memclient
-=======
->>>>>>> Percona-Server-8.0.23-14
 rm -rf %{buildroot}%{_datadir}/mysql-*/nodejs/
 rm -rf %{buildroot}%{_datadir}/mysql-*/java/
-<<<<<<< HEAD
-||||||| 6f7822ffd0f
-rm -rf %{buildroot}%{_sbindir}/memcached
-rm -rf %{buildroot}%{_libdir}/mysql/ndb_engine.so
-rm -rf %{buildroot}%{_datadir}/mysql-*/memcache-api/
-rm -rf %{buildroot}%{_libdir}/mysql/libndbclient_static.a
-rm -rf %{buildroot}%{_libdir}/mysql/libndbclient.so
-=======
 rm -rf %{buildroot}%{_libdir}/mysql/ndb_engine.so
 rm -rf %{buildroot}%{_libdir}/mysql/libndbclient_static.a
 rm -rf %{buildroot}%{_libdir}/mysql/libndbclient.so
->>>>>>> Percona-Server-8.0.23-14
 %endif
 
 # Remove files pages we explicitly do not want to package
@@ -509,18 +469,6 @@ rm -r $(readlink var) var
 %dir %attr(750, mysql, mysql) /var/lib/mysql-keyring
 
 %changelog
-<<<<<<< HEAD
-||||||| 6f7822ffd0f
-* Wed May 18 2020 Ivo Roylev <ivo.roylev@oracle.com> - 8.0.20-1
-- added keyring_oci plugin
-
-* Wed Jan 8 2020 Piotr Obrzut <piotr.obrzut@oracle.com> - 8.0.20-1
-- Remove Perl dependency for cluster
-
-* Wed Aug 14 2019 Rahul Sisondia <rahul.sisondia@oracle.com> - 8.0.19-1
-- Added component_test_udf_services test component
-
-=======
 * Mon Sep 21 2020 Murthy Sidagam <venkata.sidagam@oracle.com> - 8.0.23-1
 - Added component_reference_cache.so component
 
@@ -536,7 +484,6 @@ rm -r $(readlink var) var
 * Wed Aug 14 2019 Rahul Sisondia <rahul.sisondia@oracle.com> - 8.0.19-1
 - Added component_test_udf_services test component
 
->>>>>>> Percona-Server-8.0.23-14
 * Fri Jun 28 2019 Ivan Svaljek <ivan.svaljek@oracle.com> - 8.0.18-1
 - Add keyring_hashicorp.so plugin
 - Add component_mysqlbackup component
