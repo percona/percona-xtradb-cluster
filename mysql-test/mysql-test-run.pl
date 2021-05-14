@@ -313,17 +313,11 @@ our @DEFAULT_SUITES = qw(
   interactive_utilities
   jp
   stress
-<<<<<<< HEAD
   galera
   galera_3nodes
   galera_sr
   galera_3nodes_sr
   );
-||||||| 6f7822ffd0f
-  );
-=======
-);
->>>>>>> Percona-Server-8.0.23-14
 
 our $DEFAULT_SUITES = join ',', @DEFAULT_SUITES;
 

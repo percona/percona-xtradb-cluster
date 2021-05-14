@@ -200,7 +200,13 @@ encryption.innodb-bad-key-change3 : BUG#5322 Keyring encrypted tablespace import
 encryption.innodb_encryption_discard_import : BUG#5322 Keyring encrypted tablespace import/export is broken
 encryption.innodb-redo-wrongkey : BUG#5635 Intoduce crypt_schema 2 for better error checking in encryption threads
 encryption.create_or_replace : BUG#6987 encryption threads report space unencrypted
-<<<<<<< HEAD
+encryption.innodb_encryption_aborted_rotation : BUG#0 Skip failing keyring encryption related test
+encryption.innodb_encryption_aborted_rotation_mk : BUG#0 Skip failing keyring encryption related test
+encryption.innodb_encryption_aborted_rotation_row_compressed : BUG#0 Skip failing keyring encryption related test
+encryption.innodb_encryption_aborted_rotation_mk_row_compressed : BUG#0 Skip failing keyring encryption related test
+encryption.innodb_encryption_aborted_rotation_page_compressed : BUG#0 Skip failing keyring encryption related test
+encryption.innodb_encryption_aborted_rotation_mk_page_compressed : BUG#0 Skip failing keyring encryption related test
+encryption.percona_parallel_dblwr_encrypt : BUG#0 Skip failing keyring encryption related test
 
 #--------------------------------------------------
 # Codership disabled tests begin here
@@ -365,13 +371,3 @@ galera_3nodes.galera_ist_gcache_rollover: BUG#0 Needs dynamic wsrep_provider
 #--------------------------------------------------
 # Codership disabled tests end here
 #--------------------------------------------------
-||||||| 6f7822ffd0f
-=======
-encryption.innodb_encryption_aborted_rotation : BUG#0 Skip failing keyring encryption related test
-encryption.innodb_encryption_aborted_rotation_mk : BUG#0 Skip failing keyring encryption related test
-encryption.innodb_encryption_aborted_rotation_row_compressed : BUG#0 Skip failing keyring encryption related test
-encryption.innodb_encryption_aborted_rotation_mk_row_compressed : BUG#0 Skip failing keyring encryption related test
-encryption.innodb_encryption_aborted_rotation_page_compressed : BUG#0 Skip failing keyring encryption related test
-encryption.innodb_encryption_aborted_rotation_mk_page_compressed : BUG#0 Skip failing keyring encryption related test
-encryption.percona_parallel_dblwr_encrypt : BUG#0 Skip failing keyring encryption related test
->>>>>>> Percona-Server-8.0.23-14
