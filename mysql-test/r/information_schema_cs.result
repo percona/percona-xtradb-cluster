@@ -921,13 +921,7 @@ AND table_name not like 'ndb%' AND table_name COLLATE utf8_general_ci not like '
 GROUP BY TABLE_SCHEMA;
 TABLE_SCHEMA	count(*)
 information_schema	57
-<<<<<<< HEAD
-mysql	35
-||||||| 6f7822ffd0f
-mysql	32
-=======
-mysql	33
->>>>>>> Percona-Server-8.0.23-14
+mysql	36
 create table t1 (i int, j int);
 create trigger trg1 before insert on t1 for each row
 begin

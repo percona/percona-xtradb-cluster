@@ -43,13 +43,7 @@ call mtr.add_suppression("\\[Warning\\] .*MY-\\d+.* Changing innodb_extend_and_i
 call mtr.add_suppression("Failed to initialize TLS for channel: mysql_main");
 
 let $total_global_vars=`SELECT COUNT(*) FROM performance_schema.global_variables where variable_name NOT LIKE 'ndb_%'`;
-<<<<<<< HEAD
-let $total_persistent_vars=499;
-||||||| 6f7822ffd0f
-let $total_persistent_vars=463;
-=======
-let $total_persistent_vars=468;
->>>>>>> Percona-Server-8.0.23-14
+let $total_persistent_vars=504;
 
 --echo ***************************************************************
 --echo * 0. Verify that variables present in performance_schema.global
