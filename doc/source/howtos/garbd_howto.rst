@@ -47,7 +47,7 @@ Configuration
 =============
 
 To configure *Galera Arbitrator* on *Ubuntu/Debian* you need to edit the
-:file:`/etc/default/garbd` file. On *CentOS/RHEL* configuration can be found in
+:file:`/etc/default/garb` file. On *CentOS/RHEL* configuration can be found in
 :file:`/etc/sysconfig/garb` file.
 
 Configuration file should look like this after installation:
