@@ -8681,8 +8681,9 @@ void handler::unlock_shared_ha_data() {
 int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, bool signal) {
   DBUG_ENTER("ha_wsrep_abort_transaction");
 
-  // do not abort if wsrep_on==0 and this BF thread is not RSU
-  if (!WSREP(bf_thd) && !wsrep_thd_is_in_rsu(bf_thd)) {
+  // Proceed with abort only if wsrep_on=1 or THD in in RSU
+  bool do_abort = WSREP(bf_thd) || wsrep_thd_is_in_rsu(bf_thd);
+  if (!do_abort) {
     DBUG_RETURN(0);
   }
 

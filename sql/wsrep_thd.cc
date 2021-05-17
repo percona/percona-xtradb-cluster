@@ -339,9 +339,8 @@ int wsrep_abort_thd(const THD *bf_thd, THD *victim_thd, bool signal) {
   // )
   // AND
   // 3. victim thread is not aborting or already aborted
-  if (  (WSREP(bf_thd) ||
-        (WSREP_ON && wsrep_thd_is_in_rsu(bf_thd)))
-      &&  victim_thd && !wsrep_thd_is_aborting(victim_thd) ) {
+  if ((WSREP(bf_thd) || (WSREP_ON && wsrep_thd_is_in_rsu(bf_thd))) &&
+      victim_thd && !wsrep_thd_is_aborting(victim_thd)) {
     WSREP_DEBUG("wsrep_abort_thd, by: %llu, victim: %llu",
                 (bf_thd) ? (long long)bf_thd->real_id : 0,
                 (long long)victim_thd->real_id);
