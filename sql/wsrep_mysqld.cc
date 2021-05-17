@@ -2379,7 +2379,8 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
 
   mysql_mutex_lock(&request_thd->LOCK_wsrep_thd);
 
-  if (wsrep_thd_is_toi(request_thd) || wsrep_thd_is_applying(request_thd)) {
+  if (wsrep_thd_is_toi(request_thd) || wsrep_thd_is_in_rsu(request_thd) ||
+      wsrep_thd_is_applying(request_thd)) {
     mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
 
     WSREP_MDL_LOG(DEBUG, "---------- MDL conflict --------", schema, schema_len,

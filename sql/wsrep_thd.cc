@@ -328,9 +328,18 @@ void wsrep_fire_rollbacker(THD *thd) {
 int wsrep_abort_thd(const THD *bf_thd, THD *victim_thd, bool signal) {
   DBUG_ENTER("wsrep_abort_thd");
   mysql_mutex_lock(&victim_thd->LOCK_wsrep_thd);
-  if ((WSREP(bf_thd) ||
-       ((WSREP_ON || bf_thd->variables.wsrep_OSU_method == WSREP_OSU_RSU) &&
-        wsrep_thd_is_toi(bf_thd))) &&
+
+  // TOI => wsrep_on=1
+  // RSU => wsrep_on=0
+  // The transaction will be aborted if:
+  // (
+  //   1. BF-ing thread has wsrep_on=1
+  //   OR
+  //   2. wsrep is globally enabled and we are in RSU
+  // )
+  // AND
+  // 3. victim thread is not aborting or already aborted
+  if ((WSREP(bf_thd) || (WSREP_ON && wsrep_thd_is_in_rsu(bf_thd))) &&
       victim_thd && !wsrep_thd_is_aborting(victim_thd)) {
     WSREP_DEBUG("wsrep_abort_thd, by: %llu, victim: %llu",
                 (bf_thd) ? (long long)bf_thd->real_id : 0,
