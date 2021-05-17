@@ -1,0 +1,16 @@
+--source include/galera_cluster.inc
+
+--connection node_1
+SET SESSION wsrep_osu_method=NBO;
+
+--error ER_NO_SUCH_TABLE
+ALTER TABLE t1 LOCK=SHARED, ADD PRIMARY KEY (f1);
+
+SET SESSION wsrep_osu_method=TOI;
+
+CALL mtr.add_suppression("Table 'test.t1' doesn't exist");
+CALL mtr.add_suppression("Query apply failed");
+
+--connection node_2
+CALL mtr.add_suppression("Table 'test.t1' doesn't exist");
+CALL mtr.add_suppression("Query apply failed");

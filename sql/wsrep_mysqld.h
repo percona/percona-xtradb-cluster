@@ -103,6 +103,7 @@ enum enum_wsrep_reject_types {
 enum enum_wsrep_OSU_method {
   WSREP_OSU_TOI,
   WSREP_OSU_RSU,
+  WSREP_OSU_NBO,
   WSREP_OSU_NONE,
 };
 
@@ -436,6 +437,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              wsrep::key_array *fk_tables = NULL);
 bool wsrep_thd_is_in_to_isolation(THD *thd, bool flock);
 void wsrep_to_isolation_end(THD *thd);
+void wsrep_NBO_end_phase_one(THD *thd);
+int wsrep_NBO_begin_phase_two(THD *thd);
 
 bool wsrep_append_SR_keys(THD *thd);
 int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,

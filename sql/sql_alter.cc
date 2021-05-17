@@ -388,9 +388,10 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
     // append tables that are referencing this table
     wsrep_append_child_tables(thd, first_table, &keys);
 
-    WSREP_TO_ISOLATION_BEGIN_ALTER(((lex->name.str) ? lex->query_block->db : NULL),
-                                   ((lex->name.str) ? lex->name.str : NULL),
-                                   first_table, &alter_info, &keys) {
+    WSREP_TO_ISOLATION_BEGIN_ALTER(
+        ((lex->name.str) ? lex->query_block->db : NULL),
+        ((lex->name.str) ? lex->name.str : NULL), first_table, &alter_info,
+        &keys) {
       WSREP_DEBUG("TOI replication for ALTER failed");
       return true;
     }
@@ -421,7 +422,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
   if (WSREP_ON && !is_temporary_table(first_table)) {
     enum legacy_db_type existing_db_type, new_db_type;
 
-    TABLE_LIST* table = first_table;
+    TABLE_LIST *table = first_table;
 
     // mdl_lock scope begin
     {
@@ -472,7 +473,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
       is modifying existing table. */
       new_db_type =
           ((create_info.db_type != NULL) ? create_info.db_type->db_type
-                                          : existing_db_type);
+                                         : existing_db_type);
 
       /* Existing table is created with non-transactional storage engine
       and so switching it to transactional storage engine is allowed.
@@ -593,6 +594,8 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
   /* This could be looked upon as too restrictive given it is taking
   a global mutex but anyway being TOI if there is alter tablespace
   operation active in parallel TOI would streamline it. */
+  // TODO: the above comment is no longer true with NBO, this could be
+  // too restrictive
   if (create_info.tablespace) {
     mysql_mutex_lock(&LOCK_wsrep_alter_tablespace);
   }
@@ -632,6 +635,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
 
   if (!thd->lex->is_ignore() && thd->is_strict_mode())
     thd->pop_internal_handler();
+
   return result;
 }
 

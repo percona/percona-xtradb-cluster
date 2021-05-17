@@ -1,0 +1,31 @@
+SET SESSION wsrep_sync_wait = 0;
+CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
+INSERT INTO p1 VALUES (1,1);
+CREATE TABLE c1 (pk INTEGER PRIMARY KEY, f2 CHAR(30), fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
+INSERT INTO c1 VALUES (1, 'INITIAL VALUE', 1);
+INSERT INTO c1 VALUES (2, 'INITIAL VALUE', 1);
+SET SESSION wsrep_osu_method=NBO;
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_master_enter_sync';
+ALTER TABLE p1 ADD f1 INT;
+SET SESSION wsrep_sync_wait=0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+START TRANSACTION;
+UPDATE c1 SET f2 = 'changed from node 1' WHERE pk = 1;
+SELECT * FROM c1 WHERE pk = 2 FOR UPDATE;
+pk	f2	fk
+2	INITIAL VALUE	1
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_master_enter_sync';
+COMMIT;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_master_enter_sync';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_master_enter_sync';
+SET GLOBAL wsrep_provider_options = 'dbug=';
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SET SESSION wsrep_osu_method=TOI;
+DROP TABLE c1;
+DROP TABLE p1;

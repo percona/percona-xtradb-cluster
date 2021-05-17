@@ -27,10 +27,12 @@ innodb_autoinc_lock_mode=2
 innodb_flush_log_at_trx_commit=2
 wsrep_node_name=node1
 
+wsrep_debug=0
 [mysqld.2]
 log-bin=mysqld-bin
 binlog-format=row
 
+wsrep_debug=0
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://127.0.0.1:@mysqld.1.#galera_port'
 wsrep_provider_options='repl.causal_read_timeout=PT90S;base_port=@mysqld.2.#galera_port;gmcast.peer_timeout=PT10S;evs.suspect_timeout=PT12S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S'

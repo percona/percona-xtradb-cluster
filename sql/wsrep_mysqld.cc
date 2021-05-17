@@ -598,7 +598,8 @@ void wsrep_pfs_instr_cb(wsrep_pfs_instr_type_t type, wsrep_pfs_instr_ops_t ops,
 }
 #endif /* HAVE_PSI_INTERFACE */
 
-static void wsrep_log_cb(wsrep::log::level level, const char*, const char *msg) {
+static void wsrep_log_cb(wsrep::log::level level, const char *,
+                         const char *msg) {
   switch (level) {
     case wsrep::log::info:
       WSREP_GALERA_LOG(INFORMATION_LEVEL, msg);
@@ -1635,13 +1636,13 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
                                             wsrep::key_array *fk_tables) {
   wsrep::key_array ret;
   if (db || table) {
-    ret.push_back(wsrep_prepare_key_for_toi(db, table, wsrep::key::exclusive));
+    ret.push_back(wsrep_prepare_key_for_toi(db, table, wsrep::key::shared));
   }
   for (const TABLE_LIST *table_it = table_list; table_it;
        table_it = table_it->next_global) {
     ret.push_back(wsrep_prepare_key_for_toi(table_it->get_db_name(),
                                             table_it->get_table_name(),
-                                            wsrep::key::exclusive));
+                                            wsrep::key::shared));
   }
   if (alter_info && (alter_info->flags & Alter_info::ADD_FOREIGN_KEY)) {
     wsrep::key_array fk(wsrep_prepare_keys_for_alter_add_fk(
@@ -1900,6 +1901,30 @@ static int wsrep_drop_table_query(THD *thd, uchar **buf, size_t *buf_len) {
   }
 }
 
+static bool wsrep_can_run_in_nbo(THD *thd, const char *db, const char *table,
+                                 const TABLE_LIST *table_list) {
+  if (thd->lex->sql_command != SQLCOM_ALTER_TABLE &&
+      thd->lex->sql_command != SQLCOM_CREATE_INDEX &&
+      thd->lex->sql_command != SQLCOM_DROP_INDEX)
+    return false;
+
+  if (table && !find_temporary_table(thd, db, table)) {
+    return true;
+  }
+
+  LEX *lex = thd->lex;
+  auto *select_lex = lex->query_block;
+  TABLE_LIST *first_table = (select_lex ? select_lex->table_list.first : NULL);
+  if (table_list && first_table) {
+    for (TABLE_LIST *table_it = first_table; table_it;
+         table_it = table_it->next_global) {
+      if (!find_temporary_table(thd, table_it->db, table_it->table_name)) {
+        return true;
+      }
+    }
+  }
+  return !(table || (table_list && first_table));
+}
 /*
   Decide if statement should run in TOI.
 
@@ -1912,7 +1937,6 @@ static int wsrep_drop_table_query(THD *thd, uchar **buf, size_t *buf_len) {
  */
 static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
                                  const TABLE_LIST *table_list) {
-
   /* compression dictionary is not table object that has temporary qualifier
   attached to it. Neither it is dependent on other object that needs
   validation. */
@@ -2055,6 +2079,35 @@ static void free_gtid_event_buf(THD *thd) {
   thd->wsrep_gtid_event_buf = NULL;
 }
 
+static void wsrep_NBO_begin_failed(THD *thd,
+                                   const wsrep_buf_t * /* const err */) {
+  DBUG_TRACE;
+  if (wsrep_thd_trx_seqno(thd) > 0) {
+    /* GTID was granted and TO acquired - need to log event and release TO */
+    if (wsrep_emulate_bin_log) wsrep_thd_binlog_trx_reset(thd);
+    if (wsrep_write_dummy_event(thd, "NBO begin failed")) {
+      goto fail;
+    }
+    wsrep::client_state &cs(thd->wsrep_cs());
+    std::string const err(wsrep::to_c_string(cs.current_error()));
+    wsrep::mutable_buffer err_buf;
+    err_buf.push_back(err);
+    int const ret = cs.leave_toi_local(err_buf);
+    if (ret) {
+      WSREP_ERROR(
+          "Leaving critical section for failed NBO failed: thd: %lld, "
+          "schema: %s, SQL: %s, rcode: %d wsrep_error: %s",
+          (long long)thd->real_id, thd->db().str, thd->query().str, ret,
+          err.c_str());
+      goto fail;
+    }
+  }
+  return;
+fail:
+  WSREP_ERROR("Failed to release NBO resources. Need to abort.");
+  unireg_abort(1);
+}
+
 /*
   returns:
    0: statement was replicated as TOI
@@ -2146,8 +2199,8 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   thd_proc_info(thd, thd->wsrep_info);
 
   wsrep::client_state &cs(thd->wsrep_cs());
-  int ret = cs.enter_toi_local(
-      key_array, wsrep::const_buffer(buff.ptr, buff.len));
+  int ret =
+      cs.enter_toi_local(key_array, wsrep::const_buffer(buff.ptr, buff.len));
 
   if (ret) {
     assert(cs.current_error());
@@ -2190,7 +2243,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
 
-    /* DDL transaction are now atomic so append wsrep xid.
+    /* DDL transactions are now atomic, so append wsrep xid.
     This will ensure transactions are logged with the given xid. */
     bool atomic_ddl = is_atomic_ddl(thd, true);
     if (atomic_ddl) {
@@ -2212,7 +2265,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 }
 
 static void wsrep_TOI_end(THD *thd) {
-  wsrep_to_isolation--;
+  --wsrep_to_isolation;
 
   wsrep::client_state &client_state(thd->wsrep_cs());
   assert(wsrep_thd_is_local_toi(thd));
@@ -2246,6 +2299,242 @@ static void wsrep_TOI_end(THD *thd) {
                  (thd->db().str ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     }
   }
+}
+
+static int wsrep_NBO_begin_phase_one(THD *thd, const char *db_,
+                                     const char *table_,
+                                     const TABLE_LIST *table_list,
+                                     dd::Tablespace_table_ref_vec *trefs,
+                                     Alter_info *alter_info,
+                                     wsrep::key_array *fk_tables) {
+  uchar *buf(0);
+  size_t buf_len(0);
+  int buf_err;
+  int rc;
+
+  WSREP_DEBUG("Starting NBO phase one");
+
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+
+  bool is_thd_killed = thd->is_killed();
+
+  thd->wsrep_skip_wsrep_hton = true;
+
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+
+  if (is_thd_killed) {
+    WSREP_DEBUG(
+        "Can't execute %s in NBO mode because the query has been killed",
+        WSREP_QUERY(thd));
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    thd->wsrep_skip_wsrep_hton = false;
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
+    return -1;
+  }
+
+  if (wsrep_can_run_in_nbo(thd, db_, table_, table_list) == false) {
+    WSREP_DEBUG("Can't execute %s in NBO mode", WSREP_QUERY(thd));
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0), "Can't execute yet in NBO mode");
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    thd->wsrep_skip_wsrep_hton = false;
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
+    return -1;
+  }
+
+  WSREP_DEBUG(
+      "Executing Query (%s) with write-set (%lld) and exec_mode: %s"
+      " in NBO mode",
+      WSREP_QUERY(thd), (long long)wsrep_thd_trx_seqno(thd),
+      wsrep_thd_client_mode_str(thd));
+
+  buf_err = wsrep_TOI_event_buf(thd, &buf, &buf_len);
+  if (buf_err) {
+    /* Given the existing error handling setup, all errors with write-set
+    are classified under single error code. It would be good to have a proper
+    error code reporting mechanism. */
+    WSREP_WARN(
+        "Append/Write to writeset buffer failed (either due to IO "
+        "issues (including memory allocation) or hitting a configured "
+        "limit viz. write set size, etc.");
+    my_error(ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED,
+             "Failed to append NBO write-set");
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    thd->wsrep_skip_wsrep_hton = false;
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
+    return -1;
+  }
+
+  struct wsrep_buf buff = {buf, buf_len};
+
+  wsrep::key_array key_array = wsrep_prepare_keys_for_toi(
+      db_, table_, table_list, trefs, alter_info, fk_tables);
+
+  THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+           "wsrep: initiating NBO for write set (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
+
+  wsrep::client_state &cs(thd->wsrep_cs());
+
+  int ret = cs.begin_nbo_phase_one(key_array,
+                                   wsrep::const_buffer(buff.ptr, buff.len));
+
+  if (ret) {
+    assert(cs.current_error());
+    WSREP_DEBUG("begin_nbo_phase_one() failed for %u: %s, seqno: %lld",
+                thd->thread_id(), WSREP_QUERY(thd),
+                (long long)wsrep_thd_trx_seqno(thd));
+
+    /* jump to error handler in mysql_execute_command() */
+    switch (cs.current_error()) {
+      default:
+        WSREP_WARN(
+            "NBO failed for: %d, schema: %s, sql: %s. "
+            "Check wsrep connection state and retry the query.",
+            ret, (thd->db().str ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+        if (!thd->is_error()) {
+          WSREP_WARN("Adjusting error to deadlock");
+          my_error(ER_LOCK_DEADLOCK, MYF(0),
+                   "WSREP replication failed. Check "
+                   "your wsrep connection state and retry the query.");
+        }
+    }
+    rc = -1;
+    thd->wsrep_skip_wsrep_hton = false;
+  } else {
+    thd->wsrep_nbo.keys = key_array;
+
+    WSREP_DEBUG(
+        "Query (%s) with write-set (%lld) and exec_mode: %s"
+        " replicated in TO Isolation mode",
+        WSREP_QUERY(thd), (long long)wsrep_thd_trx_seqno(thd),
+        wsrep_thd_client_mode_str(thd));
+
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: NBO initiated for write set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+
+    /* DDL transactions are now atomic, so append wsrep xid.
+    This will ensure transactions are logged with the given xid. */
+    bool atomic_ddl = is_atomic_ddl(thd, true);
+    if (atomic_ddl) {
+      wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
+                     thd->wsrep_cs().toi_meta().gtid());
+    }
+
+    ++wsrep_to_isolation;
+    rc = 0;
+  }
+
+  free_gtid_event_buf(thd);
+
+  if (rc) wsrep_NBO_begin_failed(thd, NULL);
+
+  return rc;
+}
+
+void wsrep_NBO_end_phase_one(THD *thd) {
+  if (!wsrep_thd_is_local_nbo(thd)) return;
+
+  wsrep::mutable_buffer err;
+  WSREP_DEBUG("Ending NBO phase one");
+  int ret = thd->wsrep_cs().end_nbo_phase_one(err);
+  WSREP_DEBUG("NBO phase one ended");
+  if (ret) {
+    assert(thd->wsrep_cs().current_error());
+    WSREP_DEBUG("end_nbo_phase_one() failed for %u: %s, seqno: %lld",
+                thd->thread_id(), WSREP_QUERY(thd),
+                (long long)wsrep_thd_trx_seqno(thd));
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    thd->wsrep_skip_wsrep_hton = false;
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
+  } else {
+  bool atomic_ddl = is_atomic_ddl(thd, true);
+  if (atomic_ddl) {
+    thd->get_transaction()->xid_state()->get_xid()->reset();
+    wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
+                   thd->wsrep_cs().toi_meta().gtid());
+  }
+  }
+}
+
+int wsrep_NBO_begin_phase_two(THD *thd) {
+  wsrep::client_state &client_state(thd->wsrep_cs());
+  if (wsrep_thd_is_in_nbo(thd)) {
+    WSREP_DEBUG("NBO phase two END start: %lld: %s",
+                client_state.toi_meta().seqno().get(), WSREP_QUERY(thd));
+    int ret = client_state.begin_nbo_phase_two(
+        thd->wsrep_nbo.keys,
+        std::chrono::steady_clock::now() +
+            std::chrono::seconds(thd->variables.lock_wait_timeout));
+
+    if (ret) {
+      assert(client_state.current_error());
+      WSREP_DEBUG("begin_nbo_phase_two() failed for %u: %s, seqno: %lld",
+                  thd->thread_id(), WSREP_QUERY(thd),
+                  (long long)wsrep_thd_trx_seqno(thd));
+
+      /* jump to error handler in mysql_execute_command() */
+      switch (client_state.current_error()) {
+        default:
+          WSREP_WARN(
+              "NBO phase two failed for: %d, schema: %s, sql: %s. "
+              "Check wsrep connection state and retry the query.",
+              ret, (thd->db().str ? thd->db().str : "(null)"),
+              WSREP_QUERY(thd));
+      }
+
+      mysql_mutex_lock(&thd->LOCK_thd_data);
+      thd->wsrep_skip_wsrep_hton = false;
+      mysql_mutex_unlock(&thd->LOCK_thd_data);
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+static void wsrep_NBO_end_phase_two(THD *thd) {
+  --wsrep_to_isolation;
+
+  wsrep::client_state &client_state(thd->wsrep_cs());
+  WSREP_DEBUG("NBO phase two END: %lld: %s",
+              client_state.nbo_meta().seqno().get(), WSREP_QUERY(thd));
+
+  if (wsrep_thd_is_in_nbo(thd)) {
+    THD_STAGE_INFO(thd, stage_wsrep_completed_TO_isolation);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: completed NBO write set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+
+    wsrep::mutable_buffer err;
+    if (thd->is_error() && !wsrep_must_ignore_error(thd)) {
+      wsrep_store_error(thd, err);
+    }
+    int ret = client_state.end_nbo_phase_two(err);
+
+    if (!ret) {
+      WSREP_DEBUG("NBO phase two END: %lld", client_state.nbo_meta().seqno().get());
+      /* Reset XID on completion of DDL transactions */
+      bool atomic_ddl = is_atomic_ddl(thd, true);
+      if (atomic_ddl) {
+        thd->get_transaction()->xid_state()->get_xid()->reset();
+      }
+    } else {
+      WSREP_WARN("NBO phase two end failed for: %d, schema: %s, sql: %s", ret,
+                 (thd->db().str ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+    }
+  }
+
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+  thd->wsrep_skip_wsrep_hton = false;
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
 }
 
 static int wsrep_RSU_begin(THD *thd, const char *, const char *) {
@@ -2359,6 +2648,10 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
       case WSREP_OSU_RSU:
         ret = wsrep_RSU_begin(thd, db_, table_);
         break;
+      case WSREP_OSU_NBO:
+        ret = wsrep_NBO_begin_phase_one(thd, db_, table_, table_list, trefs,
+                                        alter_info, fk_tables);
+        break;
       default:
         WSREP_ERROR("Unsupported OSU method: %lu",
                     thd->variables.wsrep_OSU_method);
@@ -2403,6 +2696,9 @@ void wsrep_to_isolation_end(THD *thd) {
   if (wsrep_thd_is_local_toi(thd)) {
     assert(thd->variables.wsrep_OSU_method == WSREP_OSU_TOI);
     wsrep_TOI_end(thd);
+  } else if (wsrep_thd_is_in_nbo(thd)) {
+    assert(thd->variables.wsrep_OSU_method == WSREP_OSU_NBO);
+    wsrep_NBO_end_phase_two(thd);
   } else if (wsrep_thd_is_in_rsu(thd)) {
     assert(thd->variables.wsrep_OSU_method == WSREP_OSU_RSU);
     wsrep_RSU_end(thd);
@@ -2469,7 +2765,7 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
   mysql_mutex_lock(&request_thd->LOCK_wsrep_thd);
 
   if (wsrep_thd_is_toi(request_thd) || wsrep_thd_is_in_rsu(request_thd) ||
-      wsrep_thd_is_applying(request_thd)) {
+      wsrep_thd_is_applying(request_thd) || wsrep_thd_is_in_nbo(request_thd)) {
     mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
 
     WSREP_MDL_LOG(DEBUG, "---------- MDL conflict --------", schema, schema_len,
@@ -2477,7 +2773,8 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
     ticket->wsrep_report(wsrep_debug);
 
     mysql_mutex_lock(&granted_thd->LOCK_wsrep_thd);
-    if (wsrep_thd_is_toi(granted_thd) || wsrep_thd_is_applying(granted_thd)) {
+    if (wsrep_thd_is_toi(granted_thd) || wsrep_thd_is_in_nbo(granted_thd) ||
+        wsrep_thd_is_applying(granted_thd)) {
       if (wsrep_thd_is_SR(granted_thd) && !wsrep_thd_is_SR(request_thd)) {
         WSREP_MDL_LOG(INFO, "MDL conflict, DDL vs SR", schema, schema_len,
                       request_thd, granted_thd);
@@ -2599,7 +2896,7 @@ int wsrep_must_ignore_error(THD *thd) {
   const uint flags = sql_command_flags[thd->lex->sql_command];
 
   assert(error);
-  assert(wsrep_thd_is_toi(thd));
+  assert(wsrep_thd_is_toi(thd) || wsrep_thd_is_in_nbo(thd));
 
   if ((wsrep_ignore_apply_errors & WSREP_IGNORE_ERRORS_ON_DDL))
     goto ignore_error;

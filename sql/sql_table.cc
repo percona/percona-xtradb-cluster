@@ -13274,6 +13274,17 @@ static bool mysql_inplace_alter_table(
           "WAIT_FOR continue_inplace_alter";
       assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
     };);
+#ifdef WITH_WSREP
+
+    WSREP_NBO_1ST_PHASE_END;
+
+    DBUG_EXECUTE_IF("sync.alter_locked_tables_inplace", {
+      const char act[] =
+          "now "
+          "wait_for signal.alter_locked_tables_inplace";
+      assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+    };);
+#endif /* WITH_WSREP */
     DEBUG_SYNC(thd, "alter_table_inplace_after_lock_downgrade");
     THD_STAGE_INFO(thd, stage_alter_inplace);
 
@@ -17121,6 +17132,9 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
     */
     trans_rollback_stmt(thd);
     trans_rollback(thd);
+
+    WSREP_NBO_1ST_PHASE_END;
+
     return true;
   }
 
@@ -17703,6 +17717,18 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
     // It's now safe to take the table level lock.
     if (lock_tables(thd, table_list, alter_ctx.tables_opened, 0))
       goto err_new_table_cleanup;
+
+#ifdef WITH_WSREP
+    WSREP_NBO_1ST_PHASE_END;
+
+    DBUG_EXECUTE_IF("sync.alter_locked_tables", {
+      const char act[] =
+          "now "
+          "wait_for signal.alter_locked_tables";
+      assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+    };);
+
+#endif /* WITH_WSREP */
   }
 
   /*
