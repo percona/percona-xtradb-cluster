@@ -998,3 +998,32 @@ function cat_file_to_stderr()
     cat $file_path >&2
     echo "EOF:" >&2
 }
+
+
+# Returns the absolute path from a path to a file (with a filename)
+#   If a relative path is given as an argument, the absolute path
+#   is generated from the current path.
+#
+# Globals:
+#   None
+#
+# Parameters:
+#   Argument 1: path to a file
+#
+# Returns 0 if successful (path exists) and the absolute path is output.
+# Returns non-zero otherwise
+#
+function get_absolute_path()
+{
+    local path="$1"
+    local abs_path retvalue
+    local filename
+
+    filename=$(basename "${path}")
+    abs_path=$(cd "$(dirname "${path}")" && pwd)
+    retvalue=$?
+    [[ $retvalue -ne 0 ]] && return $retvalue
+
+    printf "%s/%s" "${abs_path}" "${filename}"
+    return 0
+}
