@@ -200,7 +200,10 @@ my $build_thread       = 0;
 my $daemonize_mysqld   = 0;
 my $debug_d            = "d";
 my $exe_ndbmtd_counter = 0;
-my $ports_per_thread   = 30;
+
+# We need at least 63 ports per worker in PXC as every worker needs to support
+# upto 9 servers and each server needs 7 ports.
+my $ports_per_thread   = 70;
 my $source_dist        = 0;
 my $shutdown_report    = 0;
 my $valgrind_reports   = 0;
@@ -779,7 +782,7 @@ sub main {
   }
 
   if ($group_replication) {
-    $ports_per_thread = $ports_per_thread + 40;
+    $ports_per_thread = $ports_per_thread + 10;
   }
 
   if ($secondary_engine_support) {
