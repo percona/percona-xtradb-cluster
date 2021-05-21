@@ -941,10 +941,32 @@ fi
 
 get_stream
 get_transfer
+get_keys
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
     trap cleanup_donor EXIT
+
+    wsrep_log_info "Streaming GTID file before SST"
+
+    echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
+
+    if [[ -n ${WSREP_SST_OPT_REMOTE_PSWD} ]]; then
+        # Let joiner know that we know its secret
+        echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${MAGIC_FILE}
+    fi
+
+    ttcmd="$tcmd"
+
+    if [[ $encrypt -eq 1 ]]; then
+        if [[ -n $scomp ]]; then
+            tcmd=" \$ecmd | $scomp | $tcmd "
+        else
+            tcmd=" \$ecmd | $tcmd "
+        fi
+    elif [[ -n $scomp ]]; then
+        tcmd=" $scomp | $tcmd "
+    fi
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
@@ -976,29 +998,7 @@ then
            unset MYSQL_PWD
         fi
 
-        get_keys
         check_extra
-
-        wsrep_log_info "Streaming GTID file before SST"
-
-        echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
-
-        if [[ -n ${WSREP_SST_OPT_REMOTE_PSWD} ]]; then
-            # Let joiner know that we know its secret
-            echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${MAGIC_FILE}
-        fi
-
-        ttcmd="$tcmd"
-
-        if [[ $encrypt -eq 1 ]];then
-            if [[ -n $scomp ]];then 
-                tcmd=" \$ecmd | $scomp | $tcmd "
-            else 
-                tcmd=" \$ecmd | $tcmd "
-            fi
-        elif [[ -n $scomp ]];then 
-            tcmd=" $scomp | $tcmd "
-        fi
 
         send_donor $DATA "${stagemsg}-gtid"
 
@@ -1046,20 +1046,9 @@ then
 
     else # BYPASS FOR IST
 
-        wsrep_log_info "Bypassing the SST for IST"
+        wsrep_log_info "Bypassing SST for IST"
         echo "continue" # now server can resume updating data
-        echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
         echo "1" > "${DATA}/${IST_FILE}"
-        get_keys
-        if [[ $encrypt -eq 1 ]];then
-            if [[ -n $scomp ]];then 
-                tcmd=" \$ecmd | $scomp | $tcmd "
-            else
-                tcmd=" \$ecmd | $tcmd "
-            fi
-        elif [[ -n $scomp ]];then 
-            tcmd=" $scomp | $tcmd "
-        fi
         strmcmd+=" \${IST_FILE}"
 
         send_donor $DATA "${stagemsg}-IST"
@@ -1121,7 +1110,6 @@ then
         tcmd+=" | $pcmd"
     fi
 
-    get_keys
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
         if [[ -n $sdecomp ]];then 
             strmcmd=" $sdecomp | \$ecmd | $strmcmd"
