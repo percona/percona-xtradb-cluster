@@ -285,9 +285,16 @@ debug = warning
 client = yes
 connect = ${WSREP_SST_OPT_HOST_UNESCAPED}:${WSREP_SST_OPT_PORT}
 TIMEOUTclose = 0
+TIMEOUTconnect=$WSREP_SST_DONOR_TIMEOUT
 ${VERIFY_OPT}
 EOF
-#connect = ${WSREP_SST_OPT_ADDR%/*}
+
+    if [ -z "$STUNNEL" ]
+    then
+        RSYNC_CONN_TIMEOUT="--contimeout $WSREP_SST_DONOR_TIMEOUT"
+    else
+        RSYNC_CONN_TIMEOUT=
+    fi
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
@@ -331,11 +338,14 @@ EOF
             popd &> /dev/null
         fi
 
+        COMMON_RSYNC_OPTS="--owner --group --perms --links --specials\
+                           --ignore-times --inplace --delete --quiet\
+                           $RSYNC_CONN_TIMEOUT"
+
         # first, the normal directories, so that we can detect incompatible protocol
         RC=0
         rsync ${STUNNEL:+--rsh="$STUNNEL"} \
-              --owner --group --perms --links --specials \
-              --ignore-times --inplace --dirs --delete --quiet \
+              $COMMON_RSYNC_OPTS --dirs \
               $WHOLE_FILE_OPT "${FILTER[@]}" "$WSREP_SST_OPT_DATA/" \
               rsync://$WSREP_SST_OPT_ADDR >&2 || RC=$?
 
@@ -358,8 +368,7 @@ EOF
 
         # second, we transfer InnoDB log files
         rsync ${STUNNEL:+--rsh="$STUNNEL"} \
-              --owner --group --perms --links --specials \
-              --ignore-times --inplace --dirs --delete --quiet \
+              $COMMON_RSYNC_OPTS --dirs \
               $WHOLE_FILE_OPT -f '+ /ib_logfile[0-9]*' -f '- **' "$WSREP_LOG_DIR/" \
               rsync://$WSREP_SST_OPT_ADDR-log_dir >&2 || RC=$?
         if [ $RC -ne 0 ]; then
@@ -377,8 +386,7 @@ EOF
         find . -maxdepth 1 -mindepth 1 -type d -not -name "lost+found" \
              -print0 | xargs -I{} -0 -P $count \
              rsync ${STUNNEL:+--rsh="$STUNNEL"} \
-             --owner --group --perms --links --specials \
-             --ignore-times --inplace --recursive --delete --quiet \
+             $COMMON_RSYNC_OPTS --recursive \
              $WHOLE_FILE_OPT --exclude '*/ib_logfile*' "$WSREP_SST_OPT_DATA"/{}/ \
              rsync://$WSREP_SST_OPT_ADDR/{} >&2 || RC=$?
 
@@ -403,7 +411,7 @@ EOF
         echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${MAGIC_FILE}
     fi
 
-    rsync ${STUNNEL:+--rsh="$STUNNEL"} \
+    rsync ${STUNNEL:+--rsh="$STUNNEL"} $RSYNC_CONN_TIMEOUT \
         --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
 
     echo "done $STATE"
@@ -449,7 +457,7 @@ cat << EOF > "$RSYNC_CONF"
 pid file = $RSYNC_PID
 use chroot = no
 read only = no
-timeout = 300
+timeout = $WSREP_SST_JOINER_TIMEOUT
 $SILENT
 [$MODULE]
     path = $WSREP_SST_OPT_DATA

@@ -299,3 +299,8 @@ parse_cnf()
     fi
     echo $reval
 }
+
+# timeout for donor to connect to joiner (seconds)
+readonly WSREP_SST_DONOR_TIMEOUT=$(parse_cnf sst donor-timeout 10)
+# For backward compatiblitiy: joiner timeout waiting for donor connection
+readonly WSREP_SST_JOINER_TIMEOUT=$(parse_cnf sst joiner-timeout $(parse_cnf sst sst-initial-timeout 60) )

@@ -79,6 +79,7 @@ ssl_key=""
 ssl_mode="DISABLED"
 
 readonly SECRET_TAG="secret"
+JOINER_PID_FILE=""
 
 # Required for backup locks
 # For backup locks it is 1 sent by joiner
@@ -293,7 +294,7 @@ get_transfer()
             exit 2
         fi
 
-        donor_extra=""
+        donor_extra=",connect-timeout=$WSREP_SST_DONOR_TIMEOUT"
         joiner_extra=""
         if [[ $encrypt -eq 2 || $encrypt -eq 3 || $encrypt -eq 4 ]]; then
             if ! socat -V | grep -q WITH_OPENSSL; then
@@ -322,14 +323,15 @@ get_transfer()
                 if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
                     # dhparams check (will create ssl_dhparams if needed)
                     check_for_dhparams
-                    joiner_extra=",dhparam=$ssl_dhparams"
+                    joiner_extra+=",dhparam=$ssl_dhparams"
                 fi
             fi
-            if check_for_version "$SOCAT_VERSION" "1.7.3"; then
-                donor_extra=',commonname=""'
-            fi
             if [ -n "$WSREP_SST_OPT_REMOTE_USER" ]; then
-                donor_extra=",commonname='$WSREP_SST_OPT_REMOTE_USER'"
+                donor_extra+=",commonname='$WSREP_SST_OPT_REMOTE_USER'"
+            else
+                if check_for_version "$SOCAT_VERSION" "1.7.3"; then
+                    donor_extra+=',commonname=""'
+                fi
             fi
         fi
 
@@ -528,7 +530,7 @@ read_cnf()
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
-    stimeout=$(parse_cnf sst sst-initial-timeout 100)
+    stimeout=$WSREP_SST_JOINER_TIMEOUT
     ssyslog=$(parse_cnf sst sst-syslog 0)
     ssystag=$(parse_cnf mysqld_safe syslog-tag "${SST_SYSLOG_TAG:-}")
     ssystag+="-"
@@ -593,6 +595,12 @@ cleanup_joiner()
     fi
     if [[ -n ${STATDIR:-} ]];then 
        [[ -d $STATDIR ]] && rm -rf $STATDIR
+    fi
+
+    if [ -n "$JOINER_PID_FILE" -a -r "$JOINER_PID_FILE" ]; then
+        local joiner_pid=$(<$JOINER_PID_FILE)
+        kill -KILL $joiner_pid || :
+        rm -f $JOINER_PID_FILE
     fi
 
     # Final cleanup 
@@ -744,7 +752,7 @@ recv_joiner()
     local msg=$2 
     local tmt=$3
     local checkf=$4
-    local ltcmd
+    local ltcmd=$tcmd
 
     if [[ ! -d ${dir} ]];then
         # This indicates that IST is in progress
@@ -757,26 +765,26 @@ recv_joiner()
     if [[ $tmt -gt 0 && -x `which timeout` ]];then 
         if timeout --help 2>&1 | grep -q -- '-k';then
             ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
-        else 
+        else
             ltcmd="timeout -s9 $tmt $tcmd"
         fi
-        timeit "$msg" "$ltcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
-    else 
-        timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     fi
+
+    JOINER_PID_FILE=`mktemp`
+    timeit "$msg" "($tcmd & echo \$!>$JOINER_PID_FILE) | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
 
     set -e
     popd 1>/dev/null 
 
     if [[ ${RC[0]} -eq 124 ]];then 
-        wsrep_log_error "Possible timeout in receving first data from donor " \
+        wsrep_log_error "Possible timeout in receiving first data from donor "\
                         "in gtid stage"
         exit 32
     fi
 
     for ecode in "${RC[@]}";do 
         if [[ $ecode -ne 0 ]];then 
-            wsrep_log_error "Error while getting data from donor node: " \
+            wsrep_log_error "Error while getting data from donor node: "\
                             "exit codes: ${RC[@]}"
             exit 32
         fi
@@ -785,9 +793,9 @@ recv_joiner()
     if [[ $checkf -eq 1 ]]; then
         if [[ ! -r "${MAGIC_FILE}" ]];then
             # this message should cause joiner to abort
-            wsrep_log_error "receiving process ended without creating " \
+            wsrep_log_error "receiving process ended without creating "\
                             "'${MAGIC_FILE}'"
-            wsrep_log_info "Contents of datadir" 
+            wsrep_log_info "Contents of datadir"
             wsrep_log_info "$(ls -l ${dir}/*)"
             exit 32
         fi
@@ -820,7 +828,7 @@ send_donor()
 
     for ecode in "${RC[@]}";do 
         if [[ $ecode -ne 0 ]];then 
-            wsrep_log_error "Error while sending data to joiner node: " \
+            wsrep_log_error "Error while sending data to joiner node: "\
                             "exit codes: ${RC[@]}"
             exit 32
         fi
