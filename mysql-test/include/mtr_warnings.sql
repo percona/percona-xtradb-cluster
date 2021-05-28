@@ -392,6 +392,7 @@ INSERT INTO global_suppressions VALUES
  ("Clone removing all user data for provisioning: Started"),
  ("Clone removing all user data for provisioning: Finished"),
  ("\\[Warning\\] .*Non innodb table: .* is not cloned and is empty."),
+ ("\\[ERROR\\] .*MY-\\d+.*clone_check_recovery_crashpoint.*"),
 
  /*
    Warnings/errors seen when server is loaded with keyring plugin without
