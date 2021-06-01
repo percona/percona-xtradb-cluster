@@ -3133,13 +3133,13 @@ static bool wsrep_is_show_query(enum enum_sql_command command) {
 */
 
 static bool lock_tables_for_backup(THD *thd) {
-  DBUG_ENTER("lock_tables_for_backup");
+  DBUG_TRACE;
 
-  if (check_backup_admin_privilege(thd)) DBUG_RETURN(true);
+  if (check_backup_admin_privilege(thd)) return true;
 
   if (delay_key_write_options == DELAY_KEY_WRITE_ALL) {
     my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0), "delay_key_write=ALL");
-    DBUG_RETURN(true);
+    return true;
   }
   /*
     Do nothing if the current connection already owns the LOCK TABLES FOR
@@ -3147,7 +3147,7 @@ static bool lock_tables_for_backup(THD *thd) {
   */
   if (thd->backup_tables_lock.is_acquired() ||
       thd->global_read_lock.is_acquired())
-    DBUG_RETURN(false);
+    return false;
 
   /*
     Do not allow backup locks under regular LOCK TABLES, FLUSH TABLES ... FOR
@@ -3155,7 +3155,7 @@ static bool lock_tables_for_backup(THD *thd) {
   */
   if (thd->variables.option_bits & OPTION_TABLE_LOCK) {
     my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
-    DBUG_RETURN(true);
+    return true;
   }
 
   bool res = thd->backup_tables_lock.acquire(thd);
@@ -3165,7 +3165,7 @@ static bool lock_tables_for_backup(THD *thd) {
     res = true;
   }
 
-  DBUG_RETURN(res);
+  return res;
 }
 
 /**
@@ -7401,7 +7401,7 @@ static bool wsrep_should_retry_in_autocommit(enum_sql_command &sql_command) {
 static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf, uint length,
                               Parser_state *parser_state,
                               bool update_userstat) {
-  DBUG_ENTER("wsrep_dispatch_sql_command");
+  DBUG_TRACE;
   bool is_autocommit = !thd->in_multi_stmt_transaction_mode() &&
                        wsrep_read_only_option(thd, thd->lex->query_tables);
   bool retry_autocommit;
@@ -7487,7 +7487,7 @@ static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf, uint length
   DBUG_ASSERT(!thd->mdl_context.has_explicit_locks());
 #endif
 
-  DBUG_RETURN(false);
+  return false;
 }
 #endif /* WITH_WSREP */
 
