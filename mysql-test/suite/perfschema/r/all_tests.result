@@ -26,12 +26,8 @@ select test_name as `MISSING DDL/DML TESTS` from t2;
 MISSING DDL/DML TESTS
 ddl_pxc_cluster_view.test
 ddl_replication_asynchronous_connection_failover.test
-<<<<<<< HEAD
-dml_pxc_cluster_view.test
-||||||| 6f7822ffd0f
-=======
 ddl_replication_asynchronous_connection_failover_managed.test
->>>>>>> Percona-Server-8.0.23-14
+dml_pxc_cluster_view.test
 dml_replication_asynchronous_connection_failover.test
 dml_replication_asynchronous_connection_failover_managed.test
 idx_binary_log_transaction_compression_stats.test

@@ -75,39 +75,21 @@ DROP TABLE t1;
 #      minimum - 1)
 #-----------------------------------------------------
 --let LOG_FILE4 = $MYSQLTEST_VARDIR/tmp/bootstrap1.err
-<<<<<<< HEAD
---let CMD1= $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE4 --log-error-verbosity=-1 --wsrep-min-log-verbosity=1 2>&1
-||||||| 6f7822ffd0f
---let CMD1= $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE4 --log-error-verbosity=-1 2>&1
-=======
---let CMD1= $MYSQLD --no-defaults --plugin-dir=$PLUGIN_DIR --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE4 --log-error-verbosity=-1 2>&1
->>>>>>> Percona-Server-8.0.23-14
+--let CMD1= $MYSQLD --no-defaults --plugin-dir=$PLUGIN_DIR --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE4 --log-error-verbosity=-1 --wsrep-min-log-verbosity=1 2>&1
 --exec $CMD1
 --force-rmdir $MYSQLTEST_VARDIR/tmp/new_datadir
 
 # 2.2. Set verbosity to 1 explicitly with --initialize
 #-----------------------------------------------------
 --let LOG_FILE5 = $MYSQLTEST_VARDIR/tmp/bootstrap3.err
-<<<<<<< HEAD
---let CMD3 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE5 --log-error-verbosity=1 --wsrep-min-log-verbosity=1 2>&1
-||||||| 6f7822ffd0f
---let CMD3 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE5 --log-error-verbosity=1 2>&1
-=======
---let CMD3 = $MYSQLD --no-defaults --plugin-dir=$PLUGIN_DIR --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE5 --log-error-verbosity=1 2>&1
->>>>>>> Percona-Server-8.0.23-14
+--let CMD3 = $MYSQLD --no-defaults --plugin-dir=$PLUGIN_DIR --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE5 --log-error-verbosity=1 --wsrep-min-log-verbosity=1 2>&1
 --exec $CMD3
 --force-rmdir $MYSQLTEST_VARDIR/tmp/new_datadir
 
 # 2.3. Set verbosity to 2 explicitly with --initialize
 #-----------------------------------------------------
 --let LOG_FILE6 = $MYSQLTEST_VARDIR/tmp/bootstrap2.err
-<<<<<<< HEAD
---let CMD2 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE6 --log-error-verbosity=2 --wsrep-min-log-verbosity=1 2>&1
-||||||| 6f7822ffd0f
---let CMD2 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE6 --log-error-verbosity=2 2>&1
-=======
---let CMD2 = $MYSQLD --no-defaults --plugin-dir=$PLUGIN_DIR --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE6 --log-error-verbosity=2 2>&1
->>>>>>> Percona-Server-8.0.23-14
+--let CMD2 = $MYSQLD --no-defaults --plugin-dir=$PLUGIN_DIR --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE6 --log-error-verbosity=2 --wsrep-min-log-verbosity=1 2>&1
 --exec $CMD2
 --force-rmdir $MYSQLTEST_VARDIR/tmp/new_datadir
 
@@ -115,13 +97,7 @@ DROP TABLE t1;
 #      to 3)
 #-----------------------------------------------------
 --let LOG_FILE7 = $MYSQLTEST_VARDIR/tmp/bootstrap4.err
-<<<<<<< HEAD
---let CMD4 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE7 --log-error-verbosity=7 --wsrep-min-log-verbosity=1 2>&1
-||||||| 6f7822ffd0f
---let CMD4 = $MYSQLD --no-defaults --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE7 --log-error-verbosity=7 2>&1
-=======
---let CMD4 = $MYSQLD --no-defaults --plugin-dir=$PLUGIN_DIR --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE7 --log-error-verbosity=7 2>&1
->>>>>>> Percona-Server-8.0.23-14
+--let CMD4 = $MYSQLD --no-defaults --plugin-dir=$PLUGIN_DIR --innodb_dedicated_server=OFF --initialize-insecure --basedir=$MYSQLD_BASEDIR --datadir=$MYSQLTEST_VARDIR/tmp/new_datadir --log-error=$LOG_FILE7 --log-error-verbosity=7 --wsrep-min-log-verbosity=1 2>&1
 --exec $CMD4
 --force-rmdir $MYSQLTEST_VARDIR/tmp/new_datadir
 
