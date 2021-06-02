@@ -103,6 +103,8 @@ ulong   pxc_maint_transition_period   = 30;
 /* enables PXC SSL auto-config */
 my_bool pxc_encrypt_cluster_traffic   = 0;
 
+/* Set of WSREP features that are enabled */
+ulonglong wsrep_mode                  = 0;
 /*
  * End configuration options
  */
@@ -565,6 +567,43 @@ static void wsrep_pfs_instr_cb(
 }
 #endif /* HAVE_PSI_INTERFACE */
 
+void WSREP_LOG(void (*fun)(const char* fmt, ...), const char* fmt, ...)
+{
+  /* Allocate short buffer from stack. If the vsnprintf() return value
+     indicates that the message was truncated, a new buffer will be allocated
+     dynamically and the message will be reprinted. */
+  char msg[128] = {'\0'};
+  va_list arglist;
+  va_start(arglist, fmt);
+  int n= vsnprintf(msg, sizeof(msg) - 1, fmt, arglist);
+  va_end(arglist);
+  if (n < 0)
+  {
+    sql_print_warning("WSREP: Printing message failed");
+  }
+  else if (n < (int)sizeof(msg))
+  {
+    fun("WSREP: %s", msg);
+  }
+  else
+  {
+    try
+    {
+      std::vector<char> dynbuf(std::max(n, 4096));
+      va_start(arglist, fmt);
+      (void)vsnprintf(&dynbuf[0], dynbuf.size() - 1, fmt, arglist);
+      va_end(arglist);
+      dynbuf[dynbuf.size() - 1] = '\0';
+      fun("WSREP: %s", &dynbuf[0]);
+    }
+    catch (const std::bad_alloc&)
+    {
+      /* Memory allocation for vector failed, print truncated message. */
+      fun("WSREP: %s", msg);
+    }
+  }
+}
+
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   switch (level) {
   case WSREP_LOG_INFO:
@@ -743,11 +782,14 @@ wsrep_view_handler_cb (void*                    app_ctx,
     {
       if (wsrep_before_SE())
       {
-        wsrep_SE_init_grab();
         // Signal mysqld init thread to continue
         wsrep_sst_complete (&cluster_uuid, view->state_id.seqno, false);
         // and wait for SE initialization
-        wsrep_SE_init_wait(thd);
+        if (wsrep_SE_init_wait(thd) == WSREP_SE_INIT_RESULT_FAILURE)
+        {
+            WSREP_ERROR("Storage engine initialization failed.");
+            return WSREP_CB_FAILURE;
+        }
       }
       else
       {
@@ -853,12 +895,13 @@ static void wsrep_synced_cb(void* app_ctx)
 
   if (signal_main)
   {
-      wsrep_SE_init_grab();
-      // Signal mysqld init thread to continue
-      wsrep_sst_complete (&local_uuid, local_seqno, false);
-      // and wait for SE initialization
-      /* we don't have recv_ctx (THD*) here */
-      wsrep_SE_init_wait(current_thd);
+    // Signal mysqld init thread to continue
+    wsrep_sst_complete (&local_uuid, local_seqno, false);
+    // And wait for SE initialization. Return immediately in
+    // case of failure, the server is going to shut down.
+    /* we don't have recv_ctx (THD*) here */
+    if (wsrep_SE_init_wait(current_thd) == WSREP_SE_INIT_RESULT_FAILURE)
+      return;
   }
   if (wsrep_restart_slave_activated)
   {
@@ -954,6 +997,7 @@ int wsrep_init()
   {
     // enable normal operation in case no provider is specified
     wsrep_ready_set(TRUE);
+    wsrep_provider_set = false;
     global_system_variables.wsrep_on = 0;
     wsrep_init_args args;
     args.logger_cb = wsrep_log_cb;
@@ -1242,6 +1286,7 @@ void wsrep_init_startup (bool first)
 
 void wsrep_deinit()
 {
+  wsrep_sst_auth_free();
   wsrep_unload(wsrep);
   wsrep= 0;
   provider_name[0]=    '\0';
@@ -1387,6 +1432,11 @@ bool wsrep_start_replication()
   }
 
   return true;
+}
+
+bool wsrep_check_mode (uint mask)
+{
+  return wsrep_mode & (1ULL << mask);
 }
 
 bool wsrep_must_sync_wait (THD* thd, uint mask)
@@ -1874,10 +1924,6 @@ static int wsrep_drop_table_query(THD* thd, uchar** buf, size_t* buf_len)
 static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
                                  const TABLE_LIST *table_list)
 {
-  /* Only if binlog is enabled and user can try to set sql_log_bin=0. */
-  if (mysql_bin_log.is_open() && !(thd->variables.option_bits & OPTION_BIN_LOG))
-    return false;
-
   /* compression dictionary is not table object that has temporary qualifier
   attached to it. Neither it is dependent on other object that needs
   validation. */
@@ -1969,7 +2015,25 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   size_t buf_len(0);
   int buf_err;
 
+  DEBUG_SYNC(thd, "wsrep_TOI_begin_before_wsrep_skip_wsrep_hton");
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+
+  /*
+    Setting wsrep_skip_wsrep_hton=true has a side-effect that this
+    query/thread cannot be killed.
+  */
   thd->wsrep_skip_wsrep_hton= true;
+  bool is_thd_killed = thd->is_killed();
+
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+  DEBUG_SYNC(thd, "wsrep_TOI_begin_after_wsrep_skip_wsrep_hton");
+
+  if (is_thd_killed) {
+    WSREP_DEBUG("Can't execute %s in TOI mode because the query has been killed",
+                WSREP_QUERY(thd));
+    return -1;
+  }
+
   if (wsrep_can_run_in_toi(thd, db_, table_, table_list) == false)
   {
     WSREP_DEBUG("Can't execute %s in TOI mode", WSREP_QUERY(thd));
@@ -2321,6 +2385,7 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
     switch (thd->variables.wsrep_OSU_method) {
     case WSREP_OSU_TOI:
       ret= wsrep_TOI_begin(thd, db_, table_, table_list, alter_info);
+      DEBUG_SYNC(thd, "wsrep_after_toi_begin");
       break;
     case WSREP_OSU_RSU:
       ret= wsrep_RSU_begin(thd, db_, table_);
@@ -2345,6 +2410,20 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   return ret;
 }
 
+bool wsrep_thd_is_in_to_isolation(THD *thd, bool flock)
+{
+  bool status = false;
+  if (thd)
+  {
+    if (flock) mysql_mutex_lock(&thd->LOCK_thd_data);
+
+    status = thd->wsrep_skip_wsrep_hton;
+
+    if (flock) mysql_mutex_unlock(&thd->LOCK_thd_data);
+  }
+  return status;
+}
+
 void wsrep_to_isolation_end(THD *thd)
 {
   if (thd->wsrep_exec_mode == TOTAL_ORDER)
@@ -2361,8 +2440,13 @@ void wsrep_to_isolation_end(THD *thd)
     wsrep_cleanup_transaction(thd);
   }
 
-  if (thd->wsrep_skip_wsrep_hton)
-    thd->wsrep_skip_wsrep_hton= false;
+  DEBUG_SYNC(thd, "wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton");
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+
+  thd->wsrep_skip_wsrep_hton = false;
+
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+  DEBUG_SYNC(thd, "wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton");
 }
 
 #define WSREP_MDL_LOG(severity, msg, schema, schema_len, req, gra)             \
@@ -2379,13 +2463,13 @@ void wsrep_to_isolation_end(THD *thd)
       wsrep_get_query_state(req->wsrep_query_state),                           \
       wsrep_get_conflict_state(req->wsrep_conflict_state),                     \
       req->get_command(), req->lex->sql_command,                               \
-      (req->rewritten_query.length() ? req->rewritten_query.c_ptr_safe() : req->query().str), \
+      (req->rewritten_query().length() ? wsrep_thd_rewritten_query(req).c_ptr_safe() : req->query().str), \
       gra->thread_id(), (long long)wsrep_thd_trx_seqno(gra),                   \
       wsrep_get_exec_mode(gra->wsrep_exec_mode),                               \
       wsrep_get_query_state(gra->wsrep_query_state),                           \
       wsrep_get_conflict_state(gra->wsrep_conflict_state),                     \
       gra->get_command(), gra->lex->sql_command,                               \
-      (gra->rewritten_query.length() ? gra->rewritten_query.c_ptr_safe() : gra->query().str));
+      (gra->rewritten_query().length() ? wsrep_thd_rewritten_query(gra).c_ptr_safe() : gra->query().str))
 
 bool
 wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
@@ -2582,4 +2666,18 @@ const char* wsrep_get_wsrep_status(wsrep_status status)
   }
 
   return "NULL";
+}
+
+/*
+ Returns non-const copy of thd->rewritten_query().
+
+ PXC code uses rewritten_query.c_ptr_safe() in several places.
+ As c_ptr_save() is non const method, it requires non const object.
+ Here we return copy of thd->rewritten_query() instead of const-casting
+ thd->rewritten_query() in place.
+ This is to avoid interference of PXC specific part with generic server part.
+ */
+String wsrep_thd_rewritten_query(THD *thd)
+{
+  return thd->rewritten_query();
 }

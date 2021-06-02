@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2002, 2019, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -794,8 +794,8 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success)
       likely to change in the future, so we'll do it right from the
       start.
     */
-    if (thd->rewritten_query.length())
-      thd->rewritten_query.mem_free();
+    if (thd->rewritten_query().length())
+      thd->reset_rewritten_query();
 
 #ifdef WITH_WSREP
     if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
@@ -1318,6 +1318,9 @@ bool sp_head::execute_function(THD *thd, Item **argp, uint argcount,
     mysql_bin_log.start_union_events(thd, q + 1);
     binlog_save_options= thd->variables.option_bits;
     thd->variables.option_bits&= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+    thd->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
   }
 
   opt_trace_disable_if_no_stored_proc_func_access(thd, this);

@@ -1,3 +1,7 @@
+# innodb_redo_log_encrypt is read only for PXC, 
+# so no way to proceed with this test
+--skip innodb_redo_log_encrypt is read-only for PXC
+
 # WL#9290 InnoDB: Support transparent tablespace data encryption for redo log
 # This test case will test basic redo log encryption support features.
 

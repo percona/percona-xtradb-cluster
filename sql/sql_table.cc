@@ -7945,6 +7945,16 @@ static bool mysql_inplace_alter_table(THD *thd,
     }
   }
 
+#ifdef WITH_WSREP
+  DBUG_EXECUTE_IF("halt_alter_table_after_lock_downgrade",
+                {
+                  const char act[]=
+                    "now SIGNAL alter_table_inplace_after_downgrade "
+                    "WAIT_FOR continue_inplace_alter";
+                  DBUG_ASSERT(!debug_sync_set_action(thd,
+                                                     STRING_WITH_LEN(act)));
+                };);
+#endif /* WITH_WSREP */
   DEBUG_SYNC(thd, "alter_table_inplace_after_lock_downgrade");
   THD_STAGE_INFO(thd, stage_alter_inplace);
 
@@ -10228,11 +10238,6 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
   bool varchar= create_info->varchar;
 
   tmp_disable_binlog(thd);
-#ifdef WITH_WSREP
-  /* Create table should run with wsrep_on = ON that got disabled
-  by tmp_disable_binlog as it takes MDL lock that can force abort. */
-  reenable_wsrep(thd);
-#endif /* WITH_WSREP */
   error= create_table_impl(thd, alter_ctx.new_db, alter_ctx.tmp_name,
                            alter_ctx.table_name,
                            alter_ctx.get_tmp_path(),
@@ -10346,6 +10351,20 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
     enum_alter_inplace_result inplace_supported=
       table->file->check_if_supported_inplace_alter(altered_table,
                                                     &ha_alter_info);
+
+#ifdef WITH_WSREP
+    // Force PXC to use HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE for all inplace ALTERs
+    //
+    // i.e, Upgrade to SHARED LOCK when thread is a WSREP thd, and exec mode is
+    // either TOI or replicated and lock acquisition is a variant of NO_LOCK.
+    if (WSREP(thd) &&
+        (thd->wsrep_exec_mode == TOTAL_ORDER || thd->wsrep_exec_mode == REPL_RECV) &&
+        (inplace_supported == HA_ALTER_INPLACE_NO_LOCK ||
+         inplace_supported == HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE))
+    {
+      inplace_supported = HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE;
+    }
+#endif
 
     switch (inplace_supported) {
     case HA_ALTER_INPLACE_EXCLUSIVE_LOCK:

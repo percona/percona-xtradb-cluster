@@ -19,7 +19,7 @@ SET wsrep_on=0;
 CREATE SCHEMA IF NOT EXISTS $SCHEMA;
 CREATE TABLE IF NOT EXISTS $MEMB_TABLE (
     idx  INT,
-    uuid CHAR(40), /* node UUID */
+    uuid CHAR(40),        /* node UUID */
     name VARCHAR(32),     /* node name */
     addr VARCHAR(256)     /* node address */
 ) ENGINE=MEMORY;
@@ -31,7 +31,10 @@ CREATE TABLE IF NOT EXISTS $STATUS_TABLE (
     prim   BOOLEAN   /* if component is primary */
 ) ENGINE=MEMORY;
 BEGIN;
+DELETE FROM $MEMB_TABLE;
+DELETE FROM $STATUS_TABLE;
 "
+
 END="COMMIT;"
 
 configuration_change()

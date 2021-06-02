@@ -1,0 +1,22 @@
+--source include/have_debug.inc
+--source include/have_innodb.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--source suite/innodb/t/innodb-index-online-fk.test
+
+
+# Test Suppresions
+
+--connection node_2
+CALL mtr.add_suppression("ALGORITHM=INPLACE is not supported. Reason: Adding foreign keys needs foreign_key_checks=OFF");
+CALL mtr.add_suppression("Duplicate foreign key constraint name");
+CALL mtr.add_suppression("Failed to add the foreign key constaint");
+CALL mtr.add_suppression("Key column .* doesn't exist in table");
+CALL mtr.add_suppression("Unknown column");
+CALL mtr.add_suppression("Failed to add the foreign key constraint on table .*");
+CALL mtr.add_suppression("Failed to add the foreign key constraint .* to system tables*");
+CALL mtr.add_suppression("Cannot drop index .*: needed in a foreign key constraint");
+
+--connection node_1
+--source include/wait_until_count_sessions.inc

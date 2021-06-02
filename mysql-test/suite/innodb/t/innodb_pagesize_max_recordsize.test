@@ -1,3 +1,8 @@
+#
+# PXC: PXC requires 16k page. See comment in ha_innodb.cc
+#
+-- skip PXC requires 16k page. See comment in ha_innodb.cc
+
 # ################################################################
 # F3: Keep 16k as the max record length when page-size is 32k & 64k
 # case 1 : start the server with page size 32K

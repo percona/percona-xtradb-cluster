@@ -1133,6 +1133,10 @@ static int check_connection(THD *thd, bool extra_port_connection)
     char ip[NI_MAXHOST];
     LEX_CSTRING main_sctx_ip;
 
+    if (extra_port_connection) {
+      vio_force_skip_proxy(net->vio);
+    }
+
     peer_rc= vio_peer_addr(net->vio, ip, &thd->peer_port, NI_MAXHOST);
 
     /*
@@ -1583,6 +1587,9 @@ void close_connection(THD *thd, uint sql_errno,
   if (MYSQL_CONNECTION_DONE_ENABLED())
   {
     sleep(0); /* Workaround to avoid tailcall optimisation */
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    wsrep_thd_set_query_state(thd, QUERY_EXITING);
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
 
   if (generate_event)
