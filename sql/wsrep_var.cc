@@ -31,6 +31,7 @@
 #define WSREP_CLUSTER_NAME "my_wsrep_cluster"
 
 const  char* wsrep_provider         = 0;
+bool         wsrep_provider_set     = false;
 const  char* wsrep_provider_options = 0;
 const  char* wsrep_cluster_address  = 0;
 const  char* wsrep_cluster_name     = 0;
@@ -43,6 +44,7 @@ ulong   wsrep_reject_queries;
 int wsrep_init_vars()
 {
   wsrep_provider        = my_strdup(key_memory_wsrep, WSREP_NONE, MYF(MY_WME));
+  wsrep_provider_set    = false;
   wsrep_provider_options= my_strdup(key_memory_wsrep, "", MYF(MY_WME));
   wsrep_cluster_address = my_strdup(key_memory_wsrep, "", MYF(MY_WME));
   wsrep_cluster_name    = my_strdup(key_memory_wsrep, WSREP_CLUSTER_NAME, MYF(MY_WME));
@@ -371,6 +373,8 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   }
   free(tmp);
 
+  wsrep_provider_set = (wsrep_provider != NULL) && strcmp(wsrep_provider, WSREP_NONE) != 0;
+
   // we sure don't want to use old address with new provider
   wsrep_cluster_address_init(NULL);
   wsrep_provider_options_init(NULL);
@@ -396,6 +400,7 @@ void wsrep_provider_init (const char* value)
 
   if (wsrep_provider) my_free((void *)wsrep_provider);
   wsrep_provider = my_strdup(key_memory_wsrep, value, MYF(0));
+  wsrep_provider_set = (wsrep_provider != NULL) && strcmp(wsrep_provider, WSREP_NONE) != 0;
 }
 
 bool wsrep_provider_options_check (sys_var *self, THD* thd, set_var* var)

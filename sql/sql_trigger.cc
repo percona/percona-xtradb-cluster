@@ -38,6 +38,7 @@
 #include "sp_head.h"                  // sp_name
 #ifdef WITH_WSREP
 #include "sql_parse.h"                  // create_default_definer
+#include "debug_sync.h"               // DEBUG_SYNC
 #endif /* WITH_WSREP */
 
 #include "mysql/psi/mysql_sp.h"
@@ -285,6 +286,16 @@ bool mysql_create_or_drop_trigger(THD *thd, TABLE_LIST *tables, bool create)
       goto end;
   }
 
+#ifdef WITH_WSREP
+  DBUG_EXECUTE_IF("sync.mdev_20225",
+                  {
+                    const char act[]=
+                      "now "
+                      "wait_for signal.mdev_20225_continue";
+                    DBUG_ASSERT(!debug_sync_set_action(thd,
+                                                       STRING_WITH_LEN(act)));
+                  };);
+#endif /* WITH_WSREP */
   if (create)
   {
     result= table->triggers->create_trigger(thd, &stmt_query);

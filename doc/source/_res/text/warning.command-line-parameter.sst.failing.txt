@@ -1,0 +1,29 @@
+
+.. warning::
+
+   :term:`SST` may fail if you set the following parameters on the
+   command line. The SST script does not have access to command line
+   parameters of ``mysqld``.
+
+   - `innodb_log_group_home_dir via (command line format: --innodb-log-group-home-dir)
+     <https://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_log_group_home_dir>`_
+   - `log_bin (command line format: --log-bin)
+     <https://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#option_mysqld_log-bin>`_
+   - `keyring_file_data (command line format: --keyring-file-data)
+     <https://dev.mysql.com/doc/refman/5.7/en/keyring-system-variables.html#sysvar_keyring_file_data>`_
+
+   Note that, with these parameters set on the command line, the actual data transfering
+   may actually succeed. The operation will fail when :term:`InnoDB` attempts to
+   apply the update.
+
+   Use configuration files to set the parameters related to :term:`InnoDB`.
+
+   .. seealso::
+
+      MySQL documentation:
+         - `InnoDB startup parameters
+	   <https://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_log_group_home_dir>`_
+	 - `Binary Logging Options and Variables
+	   <https://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html>`_
+	 - `Keyring system variables
+	   <https://dev.mysql.com/doc/refman/5.7/en/keyring-system-variables.html>`_

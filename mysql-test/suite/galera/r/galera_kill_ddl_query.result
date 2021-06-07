@@ -1,0 +1,114 @@
+CALL mtr.add_suppression("WSREP: TO isolation failed");
+################ Test 1 ################
+[connection node_1]
+FLUSH TABLES WITH READ LOCK;
+[connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached';
+CREATE TABLE t1 (ID INT PRIMARY KEY);;
+[connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+# Killing query on node1a
+ERROR HY000: The query is in TOI and cannot be killed
+[connection node_1]
+UNLOCK TABLES;
+[connection node_1a]
+[connection node_1]
+include/assert.inc [Table t1 should exist on node1]
+[connection node_2]
+include/assert.inc [Table t1 should exist on node2]
+[connection node_1]
+DROP TABLE t1;
+SET DEBUG_SYNC='RESET';
+################ Test 2a ################
+[connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_before_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+CREATE TABLE t1 (ID INT PRIMARY KEY);;
+[connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+# Killing query on node1a
+SET DEBUG_SYNC= 'now SIGNAL continue';
+[connection node_1a]
+ERROR 70100: Query execution was interrupted
+[connection node_1]
+include/assert.inc [Table t1 should not exist on node1]
+[connection node_2]
+include/assert.inc [Table t1 should not exist on node2]
+[connection node_1]
+SET DEBUG_SYNC='RESET';
+################ Test 2b ################
+[connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+CREATE TABLE t1 (ID INT PRIMARY KEY);;
+[connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+# Killing query on node1a
+ERROR HY000: The query is in TOI and cannot be killed
+SET DEBUG_SYNC= 'now SIGNAL continue';
+[connection node_1a]
+[connection node_1]
+include/assert.inc [Table t1 should exist on node1]
+[connection node_2]
+include/assert.inc [Table t1 should exist on node2]
+[connection node_1]
+DROP TABLE t1;
+SET DEBUG_SYNC='RESET';
+################ Test 3 ################
+[connection node_1]
+CREATE TABLE t2(id INT PRIMARY KEY);
+SET DEBUG_SYNC = 'ha_innobase_write_row SIGNAL write_reached WAIT_FOR write_continue';
+INSERT INTO t2 VALUES (1);;
+[connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+CREATE TABLE t1 (ID INT PRIMARY KEY);;
+[connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+SET DEBUG_SYNC = "now WAIT_FOR write_reached";
+# Killing INSERT on node1
+SET DEBUG_SYNC= 'now SIGNAL continue';
+SET DEBUG_SYNC= 'now SIGNAL write_continue';
+[connection node_1a]
+[connection node_1]
+ERROR 70100: Query execution was interrupted
+[connection node_1]
+include/assert.inc [Table t1 should exist on node1]
+include/assert.inc [Table t2 should be empty on node1]
+[connection node_2]
+include/assert.inc [Table t1 should exist on node2]
+include/assert.inc [Table t2 should be empty on node2]
+[connection node_1]
+DROP TABLE t1;
+DROP TABLE t2;
+SET DEBUG_SYNC='RESET';
+################ Test 4a ################
+[connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_before_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+CREATE TABLE t1 (ID INT PRIMARY KEY);;
+[connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+# Killing connection_node1a
+SET DEBUG_SYNC= 'now SIGNAL continue';
+[connection node_1a]
+ERROR HY000: Lost connection to MySQL server during query
+[connection node_1]
+include/assert.inc [Table t1 should not exist on node1]
+[connection node_2]
+include/assert.inc [Table t1 should not exist on node2]
+[connection node_1]
+SET DEBUG_SYNC='RESET';
+################ Test 4b ################
+[connection node_1a]
+SET DEBUG_SYNC = 'wsrep_TOI_begin_after_wsrep_skip_wsrep_hton SIGNAL reached WAIT_FOR continue';
+CREATE TABLE t1 (ID INT PRIMARY KEY);;
+[connection node_1b]
+SET DEBUG_SYNC = "now WAIT_FOR reached";
+# Killing connection_node1a
+ERROR HY000: The query is in TOI and cannot be killed
+SET DEBUG_SYNC= 'now SIGNAL continue';
+[connection node_1a]
+[connection node_1]
+include/assert.inc [Table t1 should exist on node1]
+[connection node_2]
+include/assert.inc [Table t1 should exist on node2]
+[connection node_1]
+DROP TABLE t1;
+SET DEBUG_SYNC='RESET';

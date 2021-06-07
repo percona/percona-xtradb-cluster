@@ -1,0 +1,4 @@
+!include ../my.cnf
+
+[mysqld.2]
+wsrep-slave-threads=4

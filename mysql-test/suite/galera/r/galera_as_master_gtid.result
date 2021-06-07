@@ -1,3 +1,10 @@
+SET SESSION wsrep_on = OFF;
+RESET MASTER;
+SET SESSION wsrep_on = ON;
+SET SESSION wsrep_on = OFF;
+RESET MASTER;
+SET SESSION wsrep_on = ON;
+RESET MASTER;
 START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.

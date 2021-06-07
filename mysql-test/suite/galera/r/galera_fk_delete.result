@@ -1,0 +1,18 @@
+# [connection node_1]
+CREATE TABLE t1 (
+id int primary key
+);
+CREATE TABLE t2 (
+id int primary key,
+f_id int, FOREIGN KEY(f_id) REFERENCES t1(id)
+);
+INSERT INTO t1 SELECT 1;
+# [connection node_2]
+include/assert.inc [node2 has parallel applier threads configured]
+# [connection node_1]
+# [connection node_2]
+include/assert.inc [t2 on node_2 has 2000 rows]
+# [connection node_1]
+DELETE FROM t2;
+DELETE FROM t1;
+DROP TABLE t2,t1;

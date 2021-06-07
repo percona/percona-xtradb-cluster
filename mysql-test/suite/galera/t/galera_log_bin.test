@@ -8,13 +8,12 @@
 # rather than Galera's own implementation
 #
 
---connection node_1
-RESET MASTER;
-
 --connection node_2
 RESET MASTER;
 
 --connection node_1
+RESET MASTER;
+
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 

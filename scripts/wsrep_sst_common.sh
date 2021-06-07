@@ -26,6 +26,7 @@ WSREP_SST_OPT_AUTH=${WSREP_SST_OPT_AUTH:-}
 WSREP_SST_OPT_USER=${WSREP_SST_OPT_USER:-}
 WSREP_SST_OPT_PSWD=${WSREP_SST_OPT_PSWD:-}
 WSREP_SST_OPT_VERSION=""
+WSREP_SST_OPT_DEBUG=""
 
 WSREP_LOG_DEBUG=""
 
@@ -110,6 +111,10 @@ case "$1" in
         WSREP_SST_OPT_BINLOG="$2"
         shift
         ;;
+    '--debug')
+        WSREP_SST_OPT_DEBUG="$2"
+        shift
+        ;;
     *) # must be command
        # usage
        # exit 1
@@ -145,12 +150,12 @@ parse_cnf()
 
     # look in group+suffix
     if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
-        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | awk -F= '{st=index($0,"="); cur=$0; if ($1 ~ /_/) { gsub(/_/,"-",$1);} if (st != 0) { print $1"="substr(cur,st+1) } else { print cur }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
     fi
 
     # look in group
     if [[ -z $reval ]]; then
-        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}" | awk -F= '{st=index($0,"="); cur=$0; if ($1 ~ /_/) { gsub(/_/,"-",$1);} if (st != 0) { print $1"="substr(cur,st+1) } else { print cur }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
     fi
 
     # use default if we haven't found a value
@@ -329,4 +334,33 @@ wsrep_check_programs()
     done
 
     return $ret
+}
+
+
+# Returns the absolute path from a path to a file (with a filename)
+#   If a relative path is given as an argument, the absolute path
+#   is generated from the current path.
+#
+# Globals:
+#   None
+#
+# Parameters:
+#   Argument 1: path to a file
+#
+# Returns 0 if successful (path exists) and the absolute path is output.
+# Returns non-zero otherwise
+#
+function get_absolute_path()
+{
+    local path="$1"
+    local abs_path retvalue
+    local filename
+
+    filename=$(basename "${path}")
+    abs_path=$(cd "$(dirname "${path}")" && pwd)
+    retvalue=$?
+    [[ $retvalue -ne 0 ]] && return $retvalue
+
+    printf "%s/%s" "${abs_path}" "${filename}"
+    return 0
 }

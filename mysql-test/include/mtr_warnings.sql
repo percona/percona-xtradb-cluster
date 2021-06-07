@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2019, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2020, Oracle and/or its affiliates. All rights reserved.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -224,6 +224,10 @@ INSERT INTO global_suppressions VALUES
  ("==[0-9]*== Warning: invalid file descriptor -1 in syscall write()"),
  ("==[0-9]*== Warning: invalid file descriptor -1 in syscall read()"),
 
+ /* Suppress warnings caused by foreign clients, see Bug#31893901 */
+
+ ("IP address .* could not be resolved.*"),
+
  /*
    Transient network failures that cause warnings on reconnect.
    BUG#47743 and BUG#47983.
@@ -386,6 +390,12 @@ INSERT INTO global_suppressions VALUES
  ("Difficult to find free blocks in the buffer pool.*"),
 
  ("InnoDB High Priority being used"),
+
+ /*
+   Warnings/errors seen when server is loaded with keyring plugin without
+   enabling pxc_encrypt_cluster_traffic.
+ */
+ ("You have enabled keyring plugin. SST encryption is mandatory."),
 
  ("THE_LAST_SUPPRESSION")||
 
