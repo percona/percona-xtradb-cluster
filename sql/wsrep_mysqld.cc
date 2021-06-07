@@ -1270,7 +1270,7 @@ static int wsrep_drop_table_query(THD* thd, uchar** buf, size_t* buf_len)
   TABLE_LIST* first_table= select_lex->table_list.first;
   String buff;
 
-  DBUG_ASSERT(!lex->drop_temporary);
+  assert(!lex->drop_temporary);
 
   bool found_temp_table= false;
   for (TABLE_LIST* table= first_table; table; table= table->next_global)
@@ -1330,8 +1330,8 @@ static int wsrep_drop_table_query(THD* thd, uchar** buf, size_t* buf_len)
 static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
                                  const TABLE_LIST *table_list)
 {
-  DBUG_ASSERT(!table || db);
-  DBUG_ASSERT(table_list || db);
+  assert(!table || db);
+  assert(table_list || db);
 
   LEX* lex= thd->lex;
   SELECT_LEX* select_lex= lex->select_lex;
@@ -1340,7 +1340,7 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
   switch (lex->sql_command)
   {
   case SQLCOM_CREATE_TABLE:
-    DBUG_ASSERT(!table_list);
+    assert(!table_list);
     if (thd->lex->create_info.options & HA_LEX_CREATE_TMP_TABLE)
     {
       return false;
@@ -1349,8 +1349,8 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
   case SQLCOM_CREATE_VIEW:
 
-    DBUG_ASSERT(!table_list);
-    DBUG_ASSERT(first_table); /* First table is view name */
+    assert(!table_list);
+    assert(first_table); /* First table is view name */
     /*
       If any of the remaining tables refer to temporary table error
       is returned to client, so TOI can be skipped
@@ -1367,7 +1367,7 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
   case SQLCOM_CREATE_TRIGGER:
   case SQLCOM_DROP_TRIGGER:
 
-    DBUG_ASSERT(table_list);
+    assert(table_list);
 
     if (find_temporary_table(thd, table_list))
     {
@@ -1636,8 +1636,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   }
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-  DBUG_ASSERT(thd->wsrep_exec_mode == LOCAL_STATE);
-  DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno == WSREP_SEQNO_UNDEFINED);
+  assert(thd->wsrep_exec_mode == LOCAL_STATE);
+  assert(thd->wsrep_trx_meta.gtid.seqno == WSREP_SEQNO_UNDEFINED);
 
   if (thd->global_read_lock.can_acquire_protection())
   {

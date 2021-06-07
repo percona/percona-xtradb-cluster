@@ -163,9 +163,9 @@ void wsrep_replay_sp_transaction(THD* thd)
 {
   DBUG_ENTER("wsrep_replay_sp_transaction");
   mysql_mutex_assert_owner(&thd->LOCK_wsrep_thd);
-  DBUG_ASSERT(thd->wsrep_conflict_state == MUST_REPLAY);
-  DBUG_ASSERT(thd->sp_runtime_ctx);
-  DBUG_ASSERT(wsrep_thd_trx_seqno(thd) > 0);
+  assert(thd->wsrep_conflict_state == MUST_REPLAY);
+  assert(thd->sp_runtime_ctx);
+  assert(wsrep_thd_trx_seqno(thd) > 0);
 
   close_thread_tables(thd);
   if (thd->locked_tables_mode && thd->lock)
@@ -268,7 +268,7 @@ void wsrep_replay_transaction(THD *thd)
   DBUG_ENTER("wsrep_replay_transaction");
   /* checking if BF trx must be replayed */
   if (thd->wsrep_conflict_state== MUST_REPLAY) {
-    DBUG_ASSERT(wsrep_thd_trx_seqno(thd));
+    assert(wsrep_thd_trx_seqno(thd));
     if (thd->wsrep_exec_mode!= REPL_RECV) {
       if (thd->get_stmt_da()->is_sent())
       {
@@ -344,7 +344,7 @@ void wsrep_replay_transaction(THD *thd)
                           "now "
                           "SIGNAL sync.wsrep_replay_cb_reached "
                           "WAIT_FOR signal.wsrep_replay_cb";
-                        DBUG_ASSERT(!debug_sync_set_action(thd,
+                        assert(!debug_sync_set_action(thd,
                                                            STRING_WITH_LEN(act)));
                       };);
       int rcode = wsrep->replay_trx(wsrep,

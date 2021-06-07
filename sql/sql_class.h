@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -236,7 +236,7 @@ public:
   CSET_STRING(const char *str_arg, size_t length_arg, const CHARSET_INFO *cs_arg) :
   cs(cs_arg)
   {
-    DBUG_ASSERT(cs_arg != NULL);
+    assert(cs_arg != NULL);
     string.str= str_arg;
     string.length= length_arg;
   }
@@ -428,7 +428,7 @@ class Time_zone;
 #define THD_SENTRY_MAGIC 0xfeedd1ff
 #define THD_SENTRY_GONE  0xdeadbeef
 
-#define THD_CHECK_SENTRY(thd) DBUG_ASSERT(thd->dbug_sentry == THD_SENTRY_MAGIC)
+#define THD_CHECK_SENTRY(thd) assert(thd->dbug_sentry == THD_SENTRY_MAGIC)
 
 typedef ulonglong sql_mode_t;
 
@@ -739,7 +739,7 @@ mysqld_collation_get_by_name(const char *name,
 #ifdef MYSQL_SERVER
 
 /* The following macro is to make init of Query_arena simpler */
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 #define INIT_ARENA_DBUG_INFO is_backup_arena= 0; is_reprepared= FALSE;
 #else
 #define INIT_ARENA_DBUG_INFO
@@ -754,7 +754,7 @@ public:
   */
   Item *free_list;
   MEM_ROOT *mem_root;                   // Pointer to current memroot
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   bool is_backup_arena; /* True if this arena is used for backup. */
   bool is_reprepared;
 #endif
@@ -817,6 +817,13 @@ public:
   { return strdup_root(mem_root,str); }
   inline char *strmake(const char *str, size_t size)
   { return strmake_root(mem_root,str,size); }
+  inline LEX_CSTRING strmake(LEX_CSTRING str)
+  {
+    LEX_CSTRING ret;
+    ret.str= strmake(str.str, str.length);
+    ret.length= ret.str ? str.length : 0;
+    return ret;
+  }
   inline void *memdup(const void *str, size_t size)
   { return memdup_root(mem_root,str,size); }
 
@@ -927,7 +934,7 @@ enum enum_locked_tables_mode
   LTM_PRELOCKED_UNDER_LOCK_TABLES
 };
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 /**
   Getter for the enum enum_locked_tables_mode
   @param locked_tables_mode enum for types of locked tables mode
@@ -1486,16 +1493,16 @@ class THD :public MDL_context_owner,
 {
 private:
   inline bool is_stmt_prepare() const
-  { DBUG_ASSERT(0); return Query_arena::is_stmt_prepare(); }
+  { assert(0); return Query_arena::is_stmt_prepare(); }
 
   inline bool is_stmt_prepare_or_first_sp_execute() const
-  { DBUG_ASSERT(0); return Query_arena::is_stmt_prepare_or_first_sp_execute(); }
+  { assert(0); return Query_arena::is_stmt_prepare_or_first_sp_execute(); }
 
   inline bool is_stmt_prepare_or_first_stmt_execute() const
-  { DBUG_ASSERT(0); return Query_arena::is_stmt_prepare_or_first_stmt_execute(); }
+  { assert(0); return Query_arena::is_stmt_prepare_or_first_stmt_execute(); }
 
   inline bool is_conventional() const
-  { DBUG_ASSERT(0); return Query_arena::is_conventional(); }
+  { assert(0); return Query_arena::is_conventional(); }
 
 public:
   MDL_context mdl_context;
@@ -1540,7 +1547,7 @@ private:
   */
   LEX_CSTRING m_query_string;
   String m_normalized_query;
-
+  volatile int32 m_safe_to_display;
   /**
     Currently selected catalog.
   */
@@ -1699,7 +1706,7 @@ public:
   */
   void save_current_query_costs()
   {
-    DBUG_ASSERT(!status_var_aggregated);
+    assert(!status_var_aggregated);
     status_var.last_query_cost= m_current_query_cost;
     status_var.last_query_partial_plans= m_current_query_partial_plans;
   }
@@ -1808,7 +1815,7 @@ public:
 
   SSL_handle get_ssl() const
   {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     if (current_thd != this)
     {
       /*
@@ -1829,8 +1836,8 @@ public:
   */
   Protocol_classic *get_protocol_classic() const
   {
-    DBUG_ASSERT(m_protocol->type() == Protocol::PROTOCOL_TEXT ||
-                m_protocol->type() == Protocol::PROTOCOL_BINARY);
+    assert(m_protocol->type() == Protocol::PROTOCOL_TEXT ||
+           m_protocol->type() == Protocol::PROTOCOL_BINARY);
 
     return (Protocol_classic *) m_protocol;
   }
@@ -1878,7 +1885,7 @@ public:
   public:
     /// Asserts that current_thd has locked this plan, if it does not own it.
     void assert_plan_is_locked_if_other() const
-#ifdef DBUG_OFF
+#ifdef NDEBUG
     {}
 #else
     ;
@@ -1963,7 +1970,7 @@ public:
     chapter 'Miscellaneous functions', for functions GET_LOCK, RELEASE_LOCK.
   */
   HASH ull_hash;
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   uint dbug_sentry; // watch out for memory corruption
 #endif
   bool is_killable;
@@ -2106,8 +2113,8 @@ public:
     format.
    */
   int is_current_stmt_binlog_format_row() const {
-    DBUG_ASSERT(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
-                current_stmt_binlog_format == BINLOG_FORMAT_ROW);
+    assert(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
+           current_stmt_binlog_format == BINLOG_FORMAT_ROW);
     return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
             BINLOG_FORMAT_ROW);
   }
@@ -2142,13 +2149,13 @@ public:
 
   inline void clear_binlog_local_stmt_filter()
   {
-    DBUG_ASSERT(m_binlog_filter_state == BINLOG_FILTER_UNKNOWN);
+    assert(m_binlog_filter_state == BINLOG_FILTER_UNKNOWN);
     m_binlog_filter_state= BINLOG_FILTER_CLEAR;
   }
 
   inline void set_binlog_local_stmt_filter()
   {
-    DBUG_ASSERT(m_binlog_filter_state == BINLOG_FILTER_UNKNOWN);
+    assert(m_binlog_filter_state == BINLOG_FILTER_UNKNOWN);
     m_binlog_filter_state= BINLOG_FILTER_SET;
   }
 
@@ -2843,7 +2850,7 @@ public:
   void set_trans_pos(const char *file, my_off_t pos)
   {
     DBUG_ENTER("THD::set_trans_pos");
-    DBUG_ASSERT(((file == 0) && (pos == 0)) || ((file != 0) && (pos != 0)));
+    assert(((file == 0) && (pos == 0)) || ((file != 0) && (pos != 0)));
     if (file)
     {
       DBUG_PRINT("enter", ("file: %s, pos: %llu", file, pos));
@@ -2851,7 +2858,7 @@ public:
       m_trans_log_file= file + dirname_length(file);
       if (!m_trans_fixed_log_file)
         m_trans_fixed_log_file= (char*) alloc_root(&main_mem_root, FN_REFLEN+1);
-      DBUG_ASSERT(strlen(m_trans_log_file) <= FN_REFLEN);
+      assert(strlen(m_trans_log_file) <= FN_REFLEN);
       strcpy(m_trans_fixed_log_file, m_trans_log_file);
     }
     else
@@ -3112,7 +3119,7 @@ public:
    */
   void set_wsrep_next_trx_id(query_id_t query_id)
   {
-    DBUG_ASSERT(wsrep_ws_handle.trx_id == WSREP_UNDEFINED_TRX_ID);
+    assert(wsrep_ws_handle.trx_id == WSREP_UNDEFINED_TRX_ID);
     m_wsrep_next_trx_id = (wsrep_trx_id_t) query_id;
   }
 
@@ -3603,7 +3610,7 @@ public:
   */
   inline void fatal_error()
   {
-    DBUG_ASSERT(get_stmt_da()->is_error() || killed);
+    assert(get_stmt_da()->is_error() || killed);
     is_fatal_error= 1;
     DBUG_PRINT("error",("Fatal error set"));
   }
@@ -3827,7 +3834,7 @@ public:
       statement, remove the big comment below that, and remove the
       in_sub_stmt==0 condition from the following 'if'.
     */
-    /* DBUG_ASSERT(in_sub_stmt == 0); */
+    /* assert(in_sub_stmt == 0); */
     /*
       If in a stored/function trigger, the caller should already have done the
       change. We test in_sub_stmt to prevent introducing bugs where people
@@ -4192,7 +4199,7 @@ public:
 #ifdef HAVE_GTID_NEXT_LIST
       owned_gtid_set.clear();
 #else
-      DBUG_ASSERT(0);
+      assert(0);
 #endif
     }
     owned_gtid.clear();
@@ -4464,7 +4471,7 @@ public:
   */
   const LEX_CSTRING &query() const
   {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     if (current_thd != this)
       mysql_mutex_assert_owner(&LOCK_thd_query);
 #endif
@@ -4491,7 +4498,8 @@ public:
   }
 
   /**
-    Set query to be displayed in performance schema (threads table etc.).
+    Set query to be displayed in performance schema (threads table etc.).Also
+    mark the query safe to display for information_schema.process_list.
   */
   void set_query_for_display(const char *query_arg, size_t query_length_arg) {
     // Set in pfs events statements table
@@ -4500,10 +4508,27 @@ public:
     // Set in pfs threads table
     PSI_THREAD_CALL(set_thread_info)(query_arg, query_length_arg);
 #endif
+    set_safe_display(true);
   }
-  void reset_query_for_display(void) {
+
+  /**
+    Reset query string to be displayed in PFS. Also reset the safety flag
+    for information_schema.process_list for next query.
+  */
+  void reset_query_for_display() {
     set_query_for_display(NULL, 0);
+    my_atomic_store32(&m_safe_to_display, 0);
   }
+
+  /** Set if the query string to be safe to display.
+  @param[in]  safe  if it is safe to display query string */
+  void set_safe_display(bool safe) {
+    int32 value = safe ? 1 : 0;
+    my_atomic_store32(&m_safe_to_display, value);
+  }
+
+  /** @return true, if safe to display the query string. */
+  int32 safe_to_display() { return my_atomic_load32(&m_safe_to_display);}
 
   /**
     Assign a new value to thd->m_query_string.
@@ -4545,7 +4570,7 @@ public:
     is set on), the caller must hold LOCK_thd_query while calling this!
   */
   const String &rewritten_query() const {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     if (current_thd != this)
       mysql_mutex_assert_owner(&LOCK_thd_query);
 #endif
@@ -4603,7 +4628,7 @@ public:
 
   void enter_locked_tables_mode(enum_locked_tables_mode mode_arg)
   {
-    DBUG_ASSERT(locked_tables_mode == LTM_NONE);
+    assert(locked_tables_mode == LTM_NONE);
 
     if (mode_arg == LTM_LOCK_TABLES)
     {
@@ -5485,7 +5510,7 @@ class user_var_entry
   */
   void init(THD *thd, const Simple_cstring &name, const CHARSET_INFO *cs)
   {
-    DBUG_ASSERT(thd != NULL);
+    assert(thd != NULL);
     m_owner= thd;
     copy_name(name);
     reset_value();

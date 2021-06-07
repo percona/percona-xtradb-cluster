@@ -556,7 +556,7 @@ char *audit_log_audit_record(char *buf, size_t buflen,
                               orig_argc - 1, orig_argv + 1));
 
   /* make sure that record is not truncated */
-  DBUG_ASSERT(buf + *outlen <= buf + buflen);
+  assert(buf + *outlen <= buf + buflen);
 
   return buf;
 }
@@ -687,7 +687,7 @@ char *audit_log_general_record(char *buf, size_t buflen,
                     status, query, user, host, external_user, ip, db);
 
   /* make sure that record is not truncated */
-  DBUG_ASSERT(endptr + *outlen <= buf + buflen);
+  assert(endptr + *outlen <= buf + buflen);
 
   return endptr;
 }
@@ -768,7 +768,7 @@ char *audit_log_connection_record(char *buf, size_t buflen,
   database= escape_string(event->database.str, event->database.length,
                           endptr, endbuf - endptr, &endptr, NULL);
 
-  DBUG_ASSERT((endptr - buf) * 2 +
+  assert((endptr - buf) * 2 +
               strlen(format_string[audit_log_format]) +
               strlen(name) +
               MAX_RECORD_ID_SIZE +
@@ -787,7 +787,7 @@ char *audit_log_connection_record(char *buf, size_t buflen,
                     proxy_user, host, ip, database);
 
   /* make sure that record is not truncated */
-  DBUG_ASSERT(endptr + *outlen <= buf + buflen);
+  assert(endptr + *outlen <= buf + buflen);
 
   return endptr;
 }
@@ -803,7 +803,7 @@ size_t audit_log_header(MY_STAT *stat, char *buf, size_t buflen)
                      "",
                      "" };
 
-  DBUG_ASSERT(strcmp(system_charset_info->csname, "utf8") == 0);
+  assert(strcmp(system_charset_info->csname, "utf8") == 0);
 
   log_file_time= stat->st_mtime;
 
@@ -1144,13 +1144,13 @@ my_bool audit_log_update_thd_local(MYSQL_THD thd,
                                    unsigned int event_class,
                                    const void *event)
 {
-  DBUG_ASSERT(audit_log_include_accounts == NULL ||
+  assert(audit_log_include_accounts == NULL ||
               audit_log_exclude_accounts == NULL);
 
-  DBUG_ASSERT(audit_log_include_databases == NULL ||
+  assert(audit_log_include_databases == NULL ||
               audit_log_exclude_databases == NULL);
 
-  DBUG_ASSERT(audit_log_include_commands == NULL ||
+  assert(audit_log_include_commands == NULL ||
               audit_log_exclude_commands == NULL);
 
   if (event_class == MYSQL_AUDIT_CONNECTION_CLASS)
@@ -1194,7 +1194,7 @@ my_bool audit_log_update_thd_local(MYSQL_THD thd,
     if (event_connection->status == 0)
     {
       /* track default DB change */
-      DBUG_ASSERT(event_connection->database.length <= sizeof(local->db));
+      assert(event_connection->database.length <= sizeof(local->db));
       memcpy(local->db, event_connection->database.str,
              event_connection->database.length);
       local->db[event_connection->database.length]= 0;
@@ -1258,7 +1258,7 @@ my_bool audit_log_update_thd_local(MYSQL_THD thd,
       /* Database is about to be changed. Server doesn't provide database
       name in STATUS event, so remember it now. */
 
-      DBUG_ASSERT(event_general->general_query.length <= sizeof(local->db));
+      assert(event_general->general_query.length <= sizeof(local->db));
       memcpy(local->db, event_general->general_query.str,
              event_general->general_query.length);
       local->db[event_general->general_query.length]= 0;
@@ -1379,7 +1379,7 @@ int audit_log_notify(MYSQL_THD thd MY_ATTRIBUTE((unused)),
                                           event_general->general_error_code,
                                           event_general, local->db,
                                           &len);
-        DBUG_ASSERT(log_rec);
+        assert(log_rec);
       }
       if (log_rec)
         audit_log_write(log_rec, len);
@@ -1618,7 +1618,7 @@ void audit_log_exclude_accounts_update(
 {
   const char *new_val= *(const char **)(save);
 
-  DBUG_ASSERT(audit_log_include_accounts == NULL);
+  assert(audit_log_include_accounts == NULL);
 
   my_free(audit_log_exclude_accounts);
   audit_log_exclude_accounts= NULL;
@@ -1673,7 +1673,7 @@ void audit_log_include_accounts_update(
 {
   const char *new_val= *(const char **)(save);
 
-  DBUG_ASSERT(audit_log_exclude_accounts == NULL);
+  assert(audit_log_exclude_accounts == NULL);
 
   my_free(audit_log_include_accounts);
   audit_log_include_accounts= NULL;
@@ -1727,7 +1727,7 @@ void audit_log_exclude_databases_update(
 {
   const char *new_val= *(const char **)(save);
 
-  DBUG_ASSERT(audit_log_include_databases == NULL);
+  assert(audit_log_include_databases == NULL);
 
   my_free(audit_log_exclude_databases);
   audit_log_exclude_databases= NULL;
@@ -1782,7 +1782,7 @@ void audit_log_include_databases_update(
 {
   const char *new_val= *(const char **)(save);
 
-  DBUG_ASSERT(audit_log_exclude_databases == NULL);
+  assert(audit_log_exclude_databases == NULL);
 
   my_free(audit_log_include_databases);
   audit_log_include_databases= NULL;
@@ -1836,7 +1836,7 @@ void audit_log_exclude_commands_update(
 {
   const char *new_val= *(const char **)(save);
 
-  DBUG_ASSERT(audit_log_include_commands == NULL);
+  assert(audit_log_include_commands == NULL);
 
   my_free(audit_log_exclude_commands);
   audit_log_exclude_commands= NULL;
@@ -1891,7 +1891,7 @@ void audit_log_include_commands_update(
 {
   const char *new_val= *(const char **)(save);
 
-  DBUG_ASSERT(audit_log_exclude_commands == NULL);
+  assert(audit_log_exclude_commands == NULL);
 
   my_free(audit_log_include_commands);
   audit_log_include_commands= NULL;

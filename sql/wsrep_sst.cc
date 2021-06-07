@@ -366,7 +366,7 @@ static char* my_fgets (char* buf, size_t buf_len, FILE* stream)
  */
 static int generate_binlog_opt_val(char** ret)
 {
-  DBUG_ASSERT(ret);
+  assert(ret);
   *ret= NULL;
   enum_gtid_mode gtid_mode =   get_gtid_mode(GTID_MODE_LOCK_NONE);
   if (opt_bin_log && gtid_mode > 0)
