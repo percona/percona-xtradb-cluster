@@ -4,7 +4,6 @@
 --disable_query_log
 --error 0,2013
 --eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig'
-
 --enable_query_log
 
 --enable_reconnect

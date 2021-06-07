@@ -104,5 +104,3 @@ CALL mtr.add_suppression("Native table .* has the wrong structure");
 CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
 CALL mtr.add_suppression("Host name '[0-9a-zA-Z\.\-]+' could not be resolved.*");
 DROP USER sslsst;
-SET GLOBAL general_log = ON;
-SET GLOBAL slow_query_log = ON;
