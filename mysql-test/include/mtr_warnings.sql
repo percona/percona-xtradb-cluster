@@ -391,6 +391,12 @@ INSERT INTO global_suppressions VALUES
 
  ("InnoDB High Priority being used"),
 
+ /*
+   Warnings/errors seen when server is loaded with keyring plugin without
+   enabling pxc_encrypt_cluster_traffic.
+ */
+ ("You have enabled keyring plugin. SST encryption is mandatory."),
+
  ("THE_LAST_SUPPRESSION")||
 
 

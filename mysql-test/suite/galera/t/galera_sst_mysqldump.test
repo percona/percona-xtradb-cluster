@@ -45,3 +45,5 @@ CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0
 # this is needed because somehow wsrep_sst_receive_address gets corrupted
 # on repeat run.
 --source include/force_restart.inc
+
+CALL mtr.add_suppression("Recalculation of persistent statistics requested for table");

@@ -8,7 +8,6 @@
 --source include/big_test.inc
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
-CALL mtr.add_suppression("You have enabled keyring plugin. SST encryption is mandatory.");
 
 # Force a restart at the end of the test
 --source include/force_restart.inc

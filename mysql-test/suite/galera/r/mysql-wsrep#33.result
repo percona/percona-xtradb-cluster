@@ -24,7 +24,6 @@ INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 COMMIT;
-Unloading wsrep provider ...
 SET GLOBAL wsrep_cluster_address='';
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
@@ -111,5 +110,3 @@ CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
 CALL mtr.add_suppression("Gtid table is not ready to be used");
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
 CALL mtr.add_suppression("ib_buffer_pool' for reading: No such file or directory");
-SET GLOBAL general_log = ON;
-SET GLOBAL slow_query_log = ON;
