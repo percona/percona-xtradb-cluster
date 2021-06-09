@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2012, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -133,9 +133,9 @@ void Table_cache::check_unused()
     while ((entry= it++))
     {
       /* We must not have TABLEs in the free list that have their file closed. */
-      DBUG_ASSERT(entry->db_stat && entry->file);
+      assert(entry->db_stat && entry->file);
       /* Merge children should be detached from a merge parent */
-      DBUG_ASSERT(! entry->file->extra(HA_EXTRA_IS_ATTACHED_CHILDREN));
+      assert(! entry->file->extra(HA_EXTRA_IS_ATTACHED_CHILDREN));
 
       if (entry->in_use)
         DBUG_PRINT("error",("Used table is in share's list of unused tables"));
@@ -171,7 +171,7 @@ void Table_cache::free_all_unused_tables()
 }
 
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 /**
   Print debug information for the contents of the table cache.
 */
@@ -369,8 +369,9 @@ void Table_cache_manager::free_table(THD *thd,
       Table_cache_element::TABLE_list::Iterator it(cache_el[i]->free_tables);
       TABLE *table;
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
       if (remove_type == TDC_RT_REMOVE_ALL)
+<<<<<<< HEAD
 #ifndef WITH_WSREP
         DBUG_ASSERT(cache_el[i]->used_tables.is_empty());
 #else
@@ -383,6 +384,11 @@ void Table_cache_manager::free_table(THD *thd,
           }
       }
 #endif
+||||||| merged common ancestors
+        DBUG_ASSERT(cache_el[i]->used_tables.is_empty());
+=======
+        assert(cache_el[i]->used_tables.is_empty());
+>>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
       else if (remove_type == TDC_RT_REMOVE_NOT_OWN ||
                remove_type == TDC_RT_REMOVE_NOT_OWN_KEEP_SHARE)
       {
@@ -405,12 +411,18 @@ void Table_cache_manager::free_table(THD *thd,
                         table->in_use->wsrep_conflict_state);
 #else
           if (table->in_use != thd)
+<<<<<<< HEAD
 #endif /* WITH_WSREP */
             DBUG_ASSERT(0);
 #ifdef WITH_WSREP
           }
           mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+            DBUG_ASSERT(0);
+=======
+            assert(0);
+>>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
         }
       }
 #endif
@@ -436,7 +448,7 @@ void Table_cache_manager::free_all_unused_tables()
 }
 
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 /**
   Print debug information for the contents of all table cache instances.
 */

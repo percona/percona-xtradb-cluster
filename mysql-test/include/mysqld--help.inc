@@ -19,7 +19,13 @@ perl;
   @skipvars=qw/basedir open-files-limit general-log-file plugin-dir
                pid-file slow-query-log-file
                datadir slave-load-tmpdir tmpdir socket table-definition-cache table-open-cache
+<<<<<<< HEAD
                tls-version secure-file-priv wsrep-node-name wsrep-data-home-dir/;
+||||||| merged common ancestors
+               tls-version secure-file-priv/;
+=======
+               tls-version secure-file-priv version-suffix/;
+>>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
                
   # Variables which we don't want to display in result file since
   # they depend on type of build

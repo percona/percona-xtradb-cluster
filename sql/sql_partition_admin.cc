@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -60,9 +60,9 @@ bool Sql_cmd_alter_table_exchange_partition::execute(THD *thd)
     DBUG_RETURN(TRUE);
 
   /* Must be set in the parser */
-  DBUG_ASSERT(select_lex->db);
+  assert(select_lex->db);
   /* also check the table to be exchanged with the partition */
-  DBUG_ASSERT(alter_info.flags & Alter_info::ALTER_EXCHANGE_PARTITION);
+  assert(alter_info.flags & Alter_info::ALTER_EXCHANGE_PARTITION);
 
   if (check_access(thd, priv_needed, first_table->db,
                    &first_table->grant.privilege,
@@ -78,8 +78,14 @@ bool Sql_cmd_alter_table_exchange_partition::execute(THD *thd)
     DBUG_RETURN(TRUE);
 
   /* Not allowed with EXCHANGE PARTITION */
+<<<<<<< HEAD
   DBUG_ASSERT(!create_info.data_file_name && !create_info.index_file_name);
   WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
+||||||| merged common ancestors
+  DBUG_ASSERT(!create_info.data_file_name && !create_info.index_file_name);
+=======
+  assert(!create_info.data_file_name && !create_info.index_file_name);
+>>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
 
   thd->set_slow_log_for_admin_command();
   DBUG_RETURN(exchange_partition(thd, first_table, &alter_info));
@@ -233,10 +239,10 @@ static bool compare_table_with_partition(THD *thd, TABLE *table,
     my_error(ER_TABLES_DIFFERENT_METADATA, MYF(0));
     DBUG_RETURN(TRUE);
   }
-  DBUG_ASSERT(table->s->db_create_options ==
-              part_table->s->db_create_options);
-  DBUG_ASSERT(table->s->db_options_in_use ==
-              part_table->s->db_options_in_use);
+  assert(table->s->db_create_options ==
+         part_table->s->db_create_options);
+  assert(table->s->db_options_in_use ==
+         part_table->s->db_options_in_use);
 
   if (table_create_info.avg_row_length != part_create_info.avg_row_length)
   {
@@ -498,7 +504,7 @@ bool Sql_cmd_alter_table_exchange_partition::
   uint table_counter;
   bool error= TRUE;
   DBUG_ENTER("mysql_exchange_partition");
-  DBUG_ASSERT(alter_info->flags & Alter_info::ALTER_EXCHANGE_PARTITION);
+  assert(alter_info->flags & Alter_info::ALTER_EXCHANGE_PARTITION);
 
   /* Don't allow to exchange with log table */
   swap_table_list= table_list->next_local;
@@ -583,7 +589,7 @@ bool Sql_cmd_alter_table_exchange_partition::
 
   if (swap_part_id == NOT_A_PARTITION_ID)
   {
-    DBUG_ASSERT(part_table->part_info->is_sub_partitioned());
+    assert(part_table->part_info->is_sub_partitioned());
     my_error(ER_PARTITION_INSTEAD_OF_SUBPARTITION, MYF(0));
     DBUG_RETURN(TRUE);
   }
@@ -849,7 +855,7 @@ bool Sql_cmd_alter_table_truncate_partition::execute(THD *thd)
     my_ok(thd);
 
   // Invalidate query cache
-  DBUG_ASSERT(!first_table->next_local);
+  assert(!first_table->next_local);
   query_cache.invalidate(thd, first_table, FALSE);
 
   DBUG_RETURN(error);
