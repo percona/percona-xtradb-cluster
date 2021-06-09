@@ -519,24 +519,12 @@ size_t get_table_def_key(const TABLE_LIST *table_list, const char **key)
     is properly initialized, so table definition cache can be produced
     from key used by MDL subsystem.
   */
-<<<<<<< HEAD
-  DBUG_ASSERT(!strcmp(table_list->get_db_name(),
-                      table_list->mdl_request.key.db_name()) &&
-              (!strcmp(table_list->get_table_name(),
-                      table_list->mdl_request.key.name()) ||
-               !strcmp(table_list->get_table_alias(),
-                       table_list->mdl_request.key.name())));
-||||||| merged common ancestors
-  DBUG_ASSERT(!strcmp(table_list->get_db_name(),
-                      table_list->mdl_request.key.db_name()) &&
-              !strcmp(table_list->get_table_name(),
-                      table_list->mdl_request.key.name()));
-=======
   assert(!strcmp(table_list->get_db_name(),
                  table_list->mdl_request.key.db_name()) &&
-         !strcmp(table_list->get_table_name(),
-                 table_list->mdl_request.key.name()));
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
+         (!strcmp(table_list->get_table_name(),
+                  table_list->mdl_request.key.name()) ||
+          !strcmp(table_list->get_table_alias(),
+                  table_list->mdl_request.key.name())));
 
   *key= (const char*)table_list->mdl_request.key.ptr() + 1;
   return table_list->mdl_request.key.length() - 1;
@@ -10259,23 +10247,13 @@ void tdc_remove_table(THD *thd, enum_tdc_remove_table_type remove_type,
   else
     table_cache_manager.assert_owner_all_and_tdc();
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* if thd was BF aborted, exclusive locks are cancelled */
 #else
-  DBUG_ASSERT(remove_type == TDC_RT_REMOVE_UNUSED ||
-              thd->mdl_context.owns_equal_or_stronger_lock(MDL_key::TABLE,
-                                 db, table_name, MDL_EXCLUSIVE));
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  DBUG_ASSERT(remove_type == TDC_RT_REMOVE_UNUSED ||
-              thd->mdl_context.owns_equal_or_stronger_lock(MDL_key::TABLE,
-                                 db, table_name, MDL_EXCLUSIVE));
-=======
   assert(remove_type == TDC_RT_REMOVE_UNUSED ||
          thd->mdl_context.owns_equal_or_stronger_lock(MDL_key::TABLE,
                                                       db, table_name, MDL_EXCLUSIVE));
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
+#endif /* WITH_WSREP */
 
   key_length= create_table_def_key(thd, key, db, table_name, false);
 

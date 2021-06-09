@@ -7178,37 +7178,7 @@ ha_innobase::open(
 	normalize_table_name(norm_name, name);
 
 	m_user_thd = NULL;
-<<<<<<< HEAD
-	ut_ad(m_share == NULL);
-
-	if (!(m_share = get_share(name))) {
-
-		DBUG_RETURN(1);
-	}
-
-	if (UNIV_UNLIKELY(m_share->ib_table && m_share->ib_table->is_corrupt &&
-			  srv_pass_corrupt_table <= 1)) {
-		free_share(m_share);
-		m_share = NULL;
-
-		DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
-	}
-||||||| merged common ancestors
-
-	if (!(m_share = get_share(name))) {
-
-		DBUG_RETURN(1);
-	}
-
-	if (UNIV_UNLIKELY(m_share->ib_table && m_share->ib_table->is_corrupt &&
-			  srv_pass_corrupt_table <= 1)) {
-		free_share(m_share);
-
-		DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
-	}
-=======
 	m_share = NULL;
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
 
 	/* Will be allocated if it is needed in ::update_row() */
 	m_upd_buf = NULL;
@@ -7344,13 +7314,6 @@ ha_innobase::open(
 			" internal data dictionary of InnoDB though the .frm"
 			" file for the table exists. " << TROUBLESHOOTING_MSG;
 
-<<<<<<< HEAD
-		free_share(m_share);
-		m_share = NULL;
-||||||| merged common ancestors
-		free_share(m_share);
-=======
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
 		set_my_errno(ENOENT);
 
 		DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
@@ -7831,15 +7794,6 @@ ha_innobase::close()
 		m_upd_buf_size = 0;
 	}
 
-<<<<<<< HEAD
-	free_share(m_share);
-	m_share = NULL;
-
-||||||| merged common ancestors
-	free_share(m_share);
-
-=======
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
 	MONITOR_INC(MONITOR_TABLE_CLOSE);
 
 	/* Tell InnoDB server that there might be work for
@@ -17680,16 +17634,10 @@ ha_innobase::check(
 	dberr_t		ret;
 
 	DBUG_ENTER("ha_innobase::check");
-<<<<<<< HEAD
-	DBUG_ASSERT(thd == ha_thd());
+	assert(thd == ha_thd());
 #ifdef WITH_WSREP
 	DEBUG_SYNC(thd, "ha_innobase_check");
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-	DBUG_ASSERT(thd == ha_thd());
-=======
-	assert(thd == ha_thd());
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
 	ut_a(m_prebuilt->trx->magic_n == TRX_MAGIC_N);
 	ut_a(m_prebuilt->trx == thd_to_trx(thd));
 

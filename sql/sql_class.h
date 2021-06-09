@@ -2548,20 +2548,10 @@ public:
     format.
    */
   int is_current_stmt_binlog_format_row() const {
-<<<<<<< HEAD
-    DBUG_ASSERT(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
-                current_stmt_binlog_format == BINLOG_FORMAT_ROW);
-    return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
-            BINLOG_FORMAT_ROW);
-||||||| merged common ancestors
-    DBUG_ASSERT(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
-                current_stmt_binlog_format == BINLOG_FORMAT_ROW);
-    return current_stmt_binlog_format == BINLOG_FORMAT_ROW;
-=======
     assert(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
            current_stmt_binlog_format == BINLOG_FORMAT_ROW);
-    return current_stmt_binlog_format == BINLOG_FORMAT_ROW;
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
+    return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
+            BINLOG_FORMAT_ROW);
   }
 
   bool is_current_stmt_binlog_disabled() const;

@@ -1,10 +1,4 @@
-<<<<<<< HEAD
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
-||||||| merged common ancestors
-# Copyright (c) 2016, 2019, Oracle and/or its affiliates. All rights reserved.
-=======
 # Copyright (c) 2016, 2021, Oracle and/or its affiliates.
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,

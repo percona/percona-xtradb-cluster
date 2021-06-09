@@ -5029,7 +5029,16 @@ static bool pre_autocommit(sys_var *self, THD *thd, set_var *var)
   {
     // Autocommit mode is about to be activated.
     if (trans_commit_stmt(thd) || trans_commit(thd))
+#ifdef WITH_WSREP
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("Transaction commit failed while toggling autocommit."
+                  " Release MDL trx lock for thread: %u", thd->thread_id());
       return true;
+    }
+#else
+      return true;
+#endif /* WITH_WSREP */
   }
   return false;
 }
@@ -5048,27 +5057,6 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
   if (thd->variables.option_bits & OPTION_AUTOCOMMIT &&
       thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT)
   { // activating autocommit
-<<<<<<< HEAD
-
-    if (trans_commit_stmt(thd) || trans_commit(thd))
-    {
-      thd->variables.option_bits&= ~OPTION_AUTOCOMMIT;
-      thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
-      WSREP_DEBUG("Transaction commit failed while toggling autocommit."
-                  " Release MDL trx lock for thread: %u", thd->thread_id());
-#endif /* WITH_WSREP */
-      return true;
-    }
-||||||| merged common ancestors
-
-    if (trans_commit_stmt(thd) || trans_commit(thd))
-    {
-      thd->variables.option_bits&= ~OPTION_AUTOCOMMIT;
-      return true;
-    }
-=======
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
     /*
       Don't close thread tables or release metadata locks: if we do so, we
       risk releasing locks/closing tables of expressions used to assign

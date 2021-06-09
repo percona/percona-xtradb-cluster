@@ -159,7 +159,6 @@ public:
 Global_THD_manager::~Global_THD_manager()
 {
   thread_ids.erase_unique(reserved_thread_id);
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (!(thd_list.empty()))
   {
@@ -167,15 +166,8 @@ Global_THD_manager::~Global_THD_manager()
     do_for_all_thd(&print_conn);
   }
 #endif /* WITH_WSREP */
-  DBUG_ASSERT(thd_list.empty());
-  DBUG_ASSERT(thread_ids.empty());
-||||||| merged common ancestors
-  DBUG_ASSERT(thd_list.empty());
-  DBUG_ASSERT(thread_ids.empty());
-=======
   assert(thd_list.empty());
   assert(thread_ids.empty());
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
   mysql_mutex_destroy(&LOCK_thd_list);
   mysql_mutex_destroy(&LOCK_thd_remove);
   mysql_mutex_destroy(&LOCK_thread_ids);
@@ -248,8 +240,7 @@ void Global_THD_manager::remove_thd(THD *thd)
   if (num_erased == 1)
     --global_thd_count;
   // Removing a THD that was never added is an error.
-<<<<<<< HEAD
-  DBUG_ASSERT(1 == num_erased);
+  assert(1 == num_erased);
 #ifdef WITH_WSREP
   if (WSREP_ON && thd->wsrep_applier)
   {
@@ -257,11 +248,6 @@ void Global_THD_manager::remove_thd(THD *thd)
     WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads);
   }
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  DBUG_ASSERT(1 == num_erased);
-=======
-  assert(1 == num_erased);
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
   mysql_mutex_unlock(&LOCK_thd_remove);
   mysql_cond_broadcast(&COND_thd_list);
   mysql_mutex_unlock(&LOCK_thd_list);

@@ -902,7 +902,6 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success)
   assert(thd->change_list.is_empty());
   old_change_list.move_elements_to(&thd->change_list);
   thd->lex= old_lex;
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
   /* Avoid updating wsrep_next_trx_id on completion of Store-Proc.
@@ -912,14 +911,7 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success)
    thd->set_query_id(old_query_id);
 #endif /* WITH_WSREP */
 
-  DBUG_ASSERT(!thd->derived_tables);
-||||||| merged common ancestors
-  thd->set_query_id(old_query_id);
-  DBUG_ASSERT(!thd->derived_tables);
-=======
-  thd->set_query_id(old_query_id);
   assert(!thd->derived_tables);
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
   thd->derived_tables= old_derived_tables;
   thd->variables.sql_mode= save_sql_mode;
   thd->pop_reprepare_observer();

@@ -359,21 +359,11 @@ protected:
   /* Shall calculate how much space is remaining in the join buffer */ 
   virtual ulong rem_space() 
   { 
-<<<<<<< HEAD
-    DBUG_ASSERT(end_pos >= buff);
-    DBUG_ASSERT(buff_size >= ulong(end_pos - buff));
-    return static_cast<ulong>(
-      std::max<long>(buff_size-(end_pos-buff)-aux_buff_size, 0L)
-    );
-||||||| merged common ancestors
-    DBUG_ASSERT(end_pos >= buff);
-    DBUG_ASSERT(buff_size >= ulong(end_pos - buff));
-    return ulong(buff_size - (end_pos - buff) - aux_buff_size);
-=======
     assert(end_pos >= buff);
     assert(buff_size >= ulong(end_pos - buff));
-    return ulong(buff_size - (end_pos - buff) - aux_buff_size);
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
+    return static_cast<ulong>(
+      std::max<long>(buff_size - (end_pos - buff) - aux_buff_size, 0L)
+    );
   }
 
   /* Shall skip record from the join buffer if its match flag is on */
@@ -843,24 +833,12 @@ protected:
   */ 
   ulong rem_space() 
   { 
-<<<<<<< HEAD
-    DBUG_ASSERT(last_key_entry >= end_pos);
-    DBUG_ASSERT(buff_size >= aux_buff_size);
-    DBUG_ASSERT(ulong(last_key_entry - end_pos) >= aux_buff_size);
-    return static_cast<ulong>(
-      std::max<long>(last_key_entry - end_pos-aux_buff_size, 0L)
-    );
-||||||| merged common ancestors
-    DBUG_ASSERT(last_key_entry >= end_pos);
-    DBUG_ASSERT(buff_size >= aux_buff_size);
-    DBUG_ASSERT(ulong(last_key_entry - end_pos) >= aux_buff_size);
-    return ulong(last_key_entry - end_pos - aux_buff_size);
-=======
     assert(last_key_entry >= end_pos);
     assert(buff_size >= aux_buff_size);
     assert(ulong(last_key_entry - end_pos) >= aux_buff_size);
-    return ulong(last_key_entry - end_pos - aux_buff_size);
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
+    return static_cast<ulong>(
+      std::max<long>(last_key_entry - end_pos - aux_buff_size, 0L)
+    );
   }
 
   /* 

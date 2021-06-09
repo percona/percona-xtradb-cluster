@@ -4363,15 +4363,9 @@ end_with_restore_list:
     }
   case SQLCOM_CHECKSUM:
   {
-<<<<<<< HEAD
-    DBUG_ASSERT(first_table == all_tables && first_table != 0);
+    assert(first_table == all_tables && first_table != 0);
     WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ);
 
-||||||| merged common ancestors
-    DBUG_ASSERT(first_table == all_tables && first_table != 0);
-=======
-    assert(first_table == all_tables && first_table != 0);
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
     if (check_table_access(thd, SELECT_ACL, all_tables,
                            FALSE, UINT_MAX, FALSE))
       goto error; /* purecov: inspected */
@@ -4384,19 +4378,11 @@ end_with_restore_list:
   case SQLCOM_REPLACE_SELECT:
   case SQLCOM_INSERT_SELECT:
   {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE);
-#endif /* WITH_WSREP */      
-    DBUG_ASSERT(first_table == all_tables && first_table != 0);
-    DBUG_ASSERT(lex->m_sql_cmd != NULL);
-||||||| merged common ancestors
-    DBUG_ASSERT(first_table == all_tables && first_table != 0);
-    DBUG_ASSERT(lex->m_sql_cmd != NULL);
-=======
+#endif /* WITH_WSREP */
     assert(first_table == all_tables && first_table != 0);
     assert(lex->m_sql_cmd != NULL);
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
     res= lex->m_sql_cmd->execute(thd);
     break;
   }
@@ -4405,17 +4391,9 @@ end_with_restore_list:
   case SQLCOM_UPDATE:
   case SQLCOM_UPDATE_MULTI:
   {
-<<<<<<< HEAD
     WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE);
-    DBUG_ASSERT(first_table == all_tables && first_table != 0);
-    DBUG_ASSERT(lex->m_sql_cmd != NULL);
-||||||| merged common ancestors
-    DBUG_ASSERT(first_table == all_tables && first_table != 0);
-    DBUG_ASSERT(lex->m_sql_cmd != NULL);
-=======
     assert(first_table == all_tables && first_table != 0);
     assert(lex->m_sql_cmd != NULL);
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
     res= lex->m_sql_cmd->execute(thd);
     break;
   }
@@ -6036,7 +6014,6 @@ end_with_restore_list:
   case SQLCOM_UNINSTALL_PLUGIN:
   case SQLCOM_SHUTDOWN:
   case SQLCOM_ALTER_INSTANCE:
-<<<<<<< HEAD
   {
 #ifdef WITH_WSREP
     if (lex->sql_command == SQLCOM_XA_START    ||
@@ -6055,12 +6032,7 @@ end_with_restore_list:
       }
     }
 #endif /* WITH_WSREP */
-    DBUG_ASSERT(lex->m_sql_cmd != NULL);
-||||||| merged common ancestors
-    DBUG_ASSERT(lex->m_sql_cmd != NULL);
-=======
     assert(lex->m_sql_cmd != NULL);
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
     res= lex->m_sql_cmd->execute(thd);
     break;
   }

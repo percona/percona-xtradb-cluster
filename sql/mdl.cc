@@ -1992,8 +1992,7 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket)
     since for such tickets methods accessing this member might be
     called by other threads.
   */
-<<<<<<< HEAD
-  DBUG_ASSERT(ticket->get_lock());
+  assert(ticket->get_lock());
 #ifdef WITH_WSREP
   if ((this == &(ticket->get_lock()->m_waiting)) &&
       wsrep_thd_is_BF((void *)(ticket->get_ctx()->wsrep_get_thd()), false))
@@ -2036,11 +2035,6 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket)
   else
   {
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  DBUG_ASSERT(ticket->get_lock());
-=======
-  assert(ticket->get_lock());
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
   /*
     Add ticket to the *back* of the queue to ensure fairness
     among requests with the same priority.

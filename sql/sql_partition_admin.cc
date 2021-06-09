@@ -78,14 +78,10 @@ bool Sql_cmd_alter_table_exchange_partition::execute(THD *thd)
     DBUG_RETURN(TRUE);
 
   /* Not allowed with EXCHANGE PARTITION */
-<<<<<<< HEAD
-  DBUG_ASSERT(!create_info.data_file_name && !create_info.index_file_name);
-  WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
-||||||| merged common ancestors
-  DBUG_ASSERT(!create_info.data_file_name && !create_info.index_file_name);
-=======
   assert(!create_info.data_file_name && !create_info.index_file_name);
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
+#ifdef WITH_WSREP
+  WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
+#endif /* WITH_WSREP */
 
   thd->set_slow_log_for_admin_command();
   DBUG_RETURN(exchange_partition(thd, first_table, &alter_info));

@@ -13256,8 +13256,7 @@ error:
 int
 Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 {
-<<<<<<< HEAD
-  DBUG_ASSERT(m_table != NULL);
+  assert(m_table != NULL);
 
 #ifdef WITH_WSREP
   if (WSREP(thd))
@@ -13271,11 +13270,6 @@ Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-  DBUG_ASSERT(m_table != NULL);
-=======
-  assert(m_table != NULL);
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
   int error= write_row(rli, rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT);
 
   if (error && !thd->is_error())

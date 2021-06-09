@@ -248,23 +248,14 @@ static int check_slave_sql_config_conflict(const Relay_log_info *rli);
 static void set_thd_tx_priority(THD* thd, int priority)
 {
   DBUG_ENTER("set_thd_tx_priority");
-<<<<<<< HEAD
-  DBUG_ASSERT(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
-              thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
+  assert(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
+         thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
+
 #ifdef WITH_WSREP
   if (priority > 0)
     WSREP_WARN("InnoDB High Priority being used for slave: %d -> %d",
                thd->thd_tx_priority, priority);
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  DBUG_ASSERT(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
-              thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
-
-=======
-  assert(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
-         thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
-
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
   thd->thd_tx_priority= priority;
   DBUG_EXECUTE_IF("dbug_set_high_prio_sql_thread",
   {
@@ -456,19 +447,13 @@ int init_slave()
                                                           &channel_map)))
     sql_print_error("Failed to create or recover replication info repositories.");
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /*
      for only wsrep, create active_mi, for async slave restart purpose
    */
   active_mi= channel_map.get_default_channel_mi();
 #endif /* WITH_WSREP */
-#ifndef DBUG_OFF
-||||||| merged common ancestors
-#ifndef DBUG_OFF
-=======
 #ifndef NDEBUG
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
   /* @todo: Print it for all the channels */
   {
     Master_info *default_mi;

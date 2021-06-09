@@ -1261,7 +1261,6 @@ struct srv_slot_t{
 # define srv_file_per_table			1
 #endif /* !UNIV_HOTBACKUP */
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 void
 wsrep_srv_conc_cancel_wait(
@@ -1270,12 +1269,7 @@ wsrep_srv_conc_cancel_wait(
 			thread */
 #endif /* WITH_WSREP */
 
-#ifndef DBUG_OFF
-||||||| merged common ancestors
-#ifndef DBUG_OFF
-=======
 #ifndef NDEBUG
->>>>>>> 71c56728ba2f45a8dbd077fc1ff4438a504a4364
 /** false before InnoDB monitor has been printed at least once, true
 afterwards */
 extern bool	srv_debug_monitor_printed;
