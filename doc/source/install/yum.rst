@@ -57,7 +57,7 @@ Installing from Percona Repository
       * ``percona-xtradb-cluster-garbd``
       * ``percona-xtradb-cluster-server``
       * ``percona-xtradb-cluster-test``
-      
+
 #. Start the |PXC| server:
 
    .. code-block:: bash
@@ -73,13 +73,13 @@ Installing from Percona Repository
 
 #. Use this password to log in as ``root``:
 
-   .. code-block:: sql
+   .. code-block:: mysql
 
       $ mysql -u root -p
 
 #. Change the password for the superuser account and log out. For example:
 
-   .. code-block:: sql
+   .. code-block:: mysql
 
       mysql> ALTER USER 'root'@'localhost' IDENTIFIED BY 'rootPass';
       Query OK, 0 rows affected (0.00 sec)
@@ -98,4 +98,3 @@ Next Steps
 
 After you install |PXC| and change the superuser account password,
 configure the node according to the procedure described in :ref:`configure`.
-

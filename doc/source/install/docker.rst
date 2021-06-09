@@ -36,7 +36,7 @@ one host:
 2. Create a custom.cnf file with the following contents, and place the
    file in the new directory:
 
-   .. code-block:: guess
+   .. code-block:: text
 
        [mysqld]
        ssl-ca = /cert/ca.pem

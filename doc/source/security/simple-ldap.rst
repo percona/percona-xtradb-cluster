@@ -135,7 +135,7 @@ The installation adds the following variables:
       - bool
     * - authentication_ldap_simple_tls
       - Whether connections by the plugin to the LDAP server are secured with
-        STARTTTLS (ldap://)
+        STARTTLS (ldap://)
       - OFF
       -
       -
@@ -180,8 +180,8 @@ plugin in the ``CREATE USER`` statement or the ``ALTER USER`` statement.
     variables are used.
 
 If a MySQL user `rshimek` has the following entry in the LDAP directory:
-
-.. code-block:: guess
+grastate
+.. code-block:: text
 
     uid=rshimek, ou=users, dc=hr, dc=com
 
