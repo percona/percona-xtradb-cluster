@@ -836,8 +836,8 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success)
           below. Error must have been raised by wsrep hton code before
           entering here.
          */
-        DBUG_ASSERT(err_status);
-        DBUG_ASSERT(thd->get_stmt_da()->is_error());
+        assert(err_status);
+        assert(thd->get_stmt_da()->is_error());
         thd->wsrep_conflict_state= NO_CONFLICT;
         thd->killed= THD::NOT_KILLED;
       }

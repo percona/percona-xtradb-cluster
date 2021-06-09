@@ -3638,7 +3638,7 @@ public:
    */
   void set_wsrep_next_trx_id(query_id_t query_id)
   {
-    DBUG_ASSERT(wsrep_ws_handle.trx_id == WSREP_UNDEFINED_TRX_ID);
+    assert(wsrep_ws_handle.trx_id == WSREP_UNDEFINED_TRX_ID);
     m_wsrep_next_trx_id = (wsrep_trx_id_t) query_id;
   }
 

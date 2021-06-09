@@ -7853,7 +7853,7 @@ wsrep_innobase_mysql_sort(
 	enum_field_types	mysql_tp;
 	int ret_length =	str_length;
 
-	DBUG_ASSERT(str_length != UNIV_SQL_NULL);
+	assert(str_length != UNIV_SQL_NULL);
 
 	mysql_tp = (enum_field_types) mysql_type;
 
@@ -7899,7 +7899,7 @@ wsrep_innobase_mysql_sort(
 			tmp_length = charset->coll->strnxfrm(
 				charset, str, str_length,
 				str_length, tmp_str, tmp_length, 0);
-			DBUG_ASSERT(tmp_length <= str_length);
+			assert(tmp_length <= str_length);
 		} else {
 			/* strnxfrm will expand the destination string,
 			   protocols < 3 truncated the sorted sring
@@ -7908,7 +7908,7 @@ wsrep_innobase_mysql_sort(
 			tmp_length = charset->coll->strnxfrm(
 				charset, str, buf_length,
 				str_length, tmp_str, str_length, 0);
-			DBUG_ASSERT(tmp_length <= buf_length);
+			assert(tmp_length <= buf_length);
 			ret_length = tmp_length;
 		}
  
@@ -23190,8 +23190,8 @@ wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx)
                    const char act[]=
                      "now "
                      "wait_for signal.wsrep_after_BF_victim_lock";
-                   DBUG_ASSERT(!debug_sync_set_action(bf_thd,
-                                                      STRING_WITH_LEN(act)));
+                   assert(!debug_sync_set_action(bf_thd,
+                                                 STRING_WITH_LEN(act)));
                  };);
 
 
@@ -23312,8 +23312,8 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
                    const char act[]=
                      "now "
                      "wait_for signal.wsrep_after_BF_victim_lock";
-                   DBUG_ASSERT(!debug_sync_set_action(bf_thd,
-                                                      STRING_WITH_LEN(act)));
+                   assert(!debug_sync_set_action(bf_thd,
+                                                 STRING_WITH_LEN(act)));
                  };);
 
 
@@ -23578,7 +23578,7 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 
 static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid)
 {
-	DBUG_ASSERT(hton == innodb_hton_ptr);
+	assert(hton == innodb_hton_ptr);
         if (srv_read_only_mode) return 0;
         if (wsrep_is_wsrep_xid(xid)) {
                 mtr_t mtr;
@@ -23595,7 +23595,7 @@ static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid)
 
 static int innobase_wsrep_get_checkpoint(handlerton* hton, XID* xid)
 {
-	DBUG_ASSERT(hton == innodb_hton_ptr);
+	assert(hton == innodb_hton_ptr);
         trx_sys_read_wsrep_checkpoint(xid);
         return 0;
 }

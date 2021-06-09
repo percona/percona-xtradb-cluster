@@ -3160,7 +3160,7 @@ bool Query_result_create::send_eof()
                                          thd->wsrep_next_trx_id());
           WSREP_DEBUG("Assiging trx-id for processing CTAS");
         }
-        DBUG_ASSERT(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
+        assert(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
         WSREP_DEBUG("Initiating append_key for CTAS with trx-id (%lu)",
                     (long unsigned int) thd->wsrep_trx_id());
       

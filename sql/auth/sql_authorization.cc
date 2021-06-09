@@ -1290,7 +1290,7 @@ int mysql_table_grant(THD *thd, TABLE_LIST *table_list,
   if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
   {
       /* Restore the state of binlog format */
-      DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+      assert(!thd->is_current_stmt_binlog_format_row());
       if (save_binlog_row_based)
         thd->set_current_stmt_binlog_format_row();
       DBUG_RETURN(TRUE);
@@ -1655,7 +1655,7 @@ bool mysql_routine_grant(THD *thd, TABLE_LIST *table_list, bool is_proc,
   if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
   {
       /* Restore the state of binlog format */
-      DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+      assert(!thd->is_current_stmt_binlog_format_row());
       if (save_binlog_row_based)
         thd->set_current_stmt_binlog_format_row();
       DBUG_RETURN(TRUE);
@@ -1942,7 +1942,7 @@ bool mysql_grant(THD *thd, const char *db, List <LEX_USER> &list,
   if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
   {
       /* Restore the state of binlog format */
-      DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+      assert(!thd->is_current_stmt_binlog_format_row());
       if (save_binlog_row_based)
         thd->set_current_stmt_binlog_format_row();
       DBUG_RETURN(TRUE);

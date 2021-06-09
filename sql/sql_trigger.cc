@@ -292,8 +292,8 @@ bool mysql_create_or_drop_trigger(THD *thd, TABLE_LIST *tables, bool create)
                     const char act[]=
                       "now "
                       "wait_for signal.mdev_20225_continue";
-                    DBUG_ASSERT(!debug_sync_set_action(thd,
-                                                       STRING_WITH_LEN(act)));
+                    assert(!debug_sync_set_action(thd,
+                                                  STRING_WITH_LEN(act)));
                   };);
 #endif /* WITH_WSREP */
   if (create)

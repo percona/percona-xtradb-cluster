@@ -2317,9 +2317,9 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     {
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-      DBUG_ASSERT(thd->derived_tables == NULL &&
-                  (thd->open_tables == NULL ||
-                   (thd->locked_tables_mode == LTM_LOCK_TABLES)));
+      assert(thd->derived_tables == NULL &&
+             (thd->open_tables == NULL ||
+              (thd->locked_tables_mode == LTM_LOCK_TABLES)));
 
       /* Update user statistics only if at least one timer was initialized */
       if (unlikely(start_busy_usecs > 0.0 || start_cpu_nsecs > 0.0))
@@ -2856,7 +2856,7 @@ err:
 #ifdef WITH_WSREP
 static bool wsrep_is_show_query(enum enum_sql_command command)
 {
-  DBUG_ASSERT(command >= 0 && command <= SQLCOM_END);
+  assert(command >= 0 && command <= SQLCOM_END);
   return (sql_command_flags[command] & CF_STATUS_COMMAND) != 0;
 }
 #endif /* WITH_WSREP */
@@ -8101,7 +8101,7 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                                                       com_statement_info[thd->get_command()].m_key,
                                                       thd->db().str, thd->db().length,
                                                       thd->charset(), NULL);
-          DBUG_ASSERT(thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID);
+          assert(thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID);
 
           thd->set_wsrep_next_trx_id(thd->query_id);
           WSREP_DEBUG("Assigned new trx id to retry auto-commit query: %lu",

@@ -307,7 +307,7 @@ static void wsrep_pfs_instr_cb(
     void**                        alliedvalue __attribute__((unused)),
     const void*                   ts __attribute__((unused)))
 {
-  DBUG_ASSERT(!wsrep_psi_key_vec.empty());
+  assert(!wsrep_psi_key_vec.empty());
 
   if (type == WSREP_PFS_INSTR_TYPE_MUTEX)
   {
@@ -1868,7 +1868,7 @@ static int wsrep_drop_table_query(THD* thd, uchar** buf, size_t* buf_len)
   TABLE_LIST* first_table= select_lex->table_list.first;
   String buff;
 
-  DBUG_ASSERT(!lex->drop_temporary);
+  assert(!lex->drop_temporary);
 
   bool found_temp_table= false;
   for (TABLE_LIST* table= first_table; table; table= table->next_global)
@@ -1935,8 +1935,8 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
       || thd->lex->sql_command == SQLCOM_DROP_COMPRESSION_DICTIONARY)
     return true;
 
-  DBUG_ASSERT(!table || db);
-  DBUG_ASSERT(table_list || db);
+  assert(!table || db);
+  assert(table_list || db);
 
   LEX* lex= thd->lex;
   SELECT_LEX* select_lex= lex->select_lex;
@@ -1945,7 +1945,7 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
   switch (lex->sql_command)
   {
   case SQLCOM_CREATE_TABLE:
-    DBUG_ASSERT(!table_list);
+    assert(!table_list);
     if (thd->lex->create_info.options & HA_LEX_CREATE_TMP_TABLE)
     {
       return false;
@@ -1954,8 +1954,8 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
   case SQLCOM_CREATE_VIEW:
 
-    DBUG_ASSERT(!table_list);
-    DBUG_ASSERT(first_table); /* First table is view name */
+    assert(!table_list);
+    assert(first_table); /* First table is view name */
     /*
       If any of the remaining tables refer to temporary table error
       is returned to client, so TOI can be skipped
@@ -1973,9 +1973,9 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
 #if 0
     /* Trigger statement is invoked with table_list with length = 1 */
-    DBUG_ASSERT(!table_list);
+    assert(!table_list);
 #endif
-    DBUG_ASSERT(first_table);
+    assert(first_table);
 
     if (find_temporary_table(thd, first_table))
     {
@@ -2347,8 +2347,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   }
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-  DBUG_ASSERT(thd->wsrep_exec_mode == LOCAL_STATE);
-  DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno == WSREP_SEQNO_UNDEFINED);
+  assert(thd->wsrep_exec_mode == LOCAL_STATE);
+  assert(thd->wsrep_trx_meta.gtid.seqno == WSREP_SEQNO_UNDEFINED);
 
   if (thd->global_read_lock.can_acquire_protection())
   {

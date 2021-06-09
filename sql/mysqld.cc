@@ -1197,8 +1197,8 @@ public:
       }
       DBUG_EXECUTE_IF("Check_dump_thread_is_alive",
                       {
-                        DBUG_ASSERT(killing_thd->get_command() != COM_BINLOG_DUMP &&
-                                    killing_thd->get_command() != COM_BINLOG_DUMP_GTID);
+                        assert(killing_thd->get_command() != COM_BINLOG_DUMP &&
+                               killing_thd->get_command() != COM_BINLOG_DUMP_GTID);
                       };);
     }
     mysql_mutex_lock(&killing_thd->LOCK_thd_data);
