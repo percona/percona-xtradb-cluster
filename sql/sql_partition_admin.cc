@@ -116,14 +116,16 @@ bool Sql_cmd_alter_table_exchange_partition::execute(THD *thd) {
   DBUG_ASSERT(!create_info.data_file_name && !create_info.index_file_name);
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && !thd->lex->no_write_to_binlog &&
-      wsrep_to_isolation_begin(thd, NULL, NULL, first_table)) {
-    return true;
-  }
+  WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
 #endif /* WITH_WSREP */
 
   thd->set_slow_log_for_admin_command();
   return exchange_partition(thd, first_table, &alter_info);
+#ifdef WITH_WSREP
+wsrep_error_label:
+  /* handle errors in TO_ISOLATION here */
+  return true;
+#endif /* WITH_WSREP */
 }
 
 /**

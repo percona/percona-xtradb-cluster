@@ -4811,6 +4811,22 @@ int mysql_execute_command(THD *thd, bool first_level) {
       */
       if (!handle_reload_request(thd, lex->type, first_table,
                                  &write_to_binlog)) {
+#ifdef WITH_WSREP
+        if ((lex->type & REFRESH_TABLES) &&
+            !(lex->type & (REFRESH_FOR_EXPORT | REFRESH_READ_LOCK))) {
+          /*
+            This is done after reload_acl_and_cache is because
+            LOCK TABLES is not replicated in galera, the upgrade of which
+            is checked in reload_acl_and_cache.
+            Hence, done after/if we are able to upgrade locks.
+          */
+          if (first_table) {
+            WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
+          } else {
+            WSREP_TO_ISOLATION_BEGIN_WRTCHK(WSREP_MYSQL_DB, NULL, NULL);
+          }
+        }
+#endif /* WITH_WSREP */
         /*
           We WANT to write and we CAN write.
           ! we write after unlocking the table.
@@ -5578,6 +5594,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
   goto finish;
 
 error:
+#ifdef WITH_WSREP
+wsrep_error_label:
+#endif /* WITH_WSREP */
   res = true;
 
 finish:

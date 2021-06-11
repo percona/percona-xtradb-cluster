@@ -68,6 +68,7 @@
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
 #include "sql/log.h"
+#include "sql/sql_parse.h"
 #include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
 
@@ -494,19 +495,24 @@ void Sql_cmd_truncate_table::truncate_base(THD *thd, TABLE_LIST *table_ref) {
   dd::Schema_MDL_locker mdl_locker(thd);
   dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
 
-#ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, table_ref->db,
-                                             table_ref->table_name, NULL)) {
-    return;
-  }
-#endif /* WITH_WSREP */
-
   // Actions needed to cleanup before leaving scope.
   auto cleanup_guard = create_scope_guard([&]() {
     end_transaction(thd, binlog_stmt, binlog_is_trans);
     cleanup_base(thd, hton);
   });
   if (mdl_locker.ensure_locked(table_ref->db)) return;
+
+#ifdef WITH_WSREP
+  wsrep::key_array keys;
+  wsrep_append_fk_parent_table(thd, table_ref, &keys);
+  if (keys.empty()) {
+    WSREP_TO_ISOLATION_BEGIN_IF(table_ref->db, table_ref->table_name, NULL) {
+      return;
+    }
+  } else {
+    WSREP_TO_ISOLATION_BEGIN_FK_TABLES(NULL, NULL, table_ref, &keys) { return; }
+  }
+#endif /* WITH_WSREP */
 
   if (lock_table(thd, table_ref)) return;
 

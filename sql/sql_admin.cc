@@ -534,6 +534,51 @@ static Check_result check_for_upgrade(THD *thd, dd::String_type &sname,
   return {false, result_code};
 }
 
+#ifdef WITH_WSREP
+/*
+   OPTIMIZE, REPAIR and ALTER may take MDL locks not only for the affected
+   table, but also for the table referenced by foreign key constraint.
+   ALTER additionally may take MTL lock of the tables that are referencing
+   altered table.
+   This wsrep_toi_replication() function handles TOI replication for OPTIMIZE
+   and REPAIR so that certification keys for potential FK parent tables are
+   also appended in the write set.
+   ALTER TABLE case is handled in alter table execution path.
+*/
+static bool wsrep_toi_replication(THD *thd, TABLE_LIST *tables) {
+  if (!WSREP(thd) || !WSREP_CLIENT(thd)) return false;
+
+  LEX *lex = thd->lex;
+  /* only handle OPTIMIZE and REPAIR here */
+  switch (lex->sql_command) {
+    case SQLCOM_OPTIMIZE:
+    case SQLCOM_REPAIR:
+      break;
+    default:
+      return false;
+  }
+
+  close_thread_tables(thd);
+  wsrep::key_array keys;
+
+  wsrep_append_fk_parent_table(thd, tables, &keys);
+
+  /* now TOI replication, with no locks held */
+  if (keys.empty()) {
+    WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, tables);
+  } else {
+    WSREP_TO_ISOLATION_BEGIN_FK_TABLES(NULL, NULL, tables, &keys) {
+      return true;
+    }
+  }
+  return false;
+
+wsrep_error_label:
+  return true;
+}
+
+#endif /* WITH_WSREP */
+
 /*
   RETURN VALUES
     false Message sent to net (admin operation went ok)
@@ -590,6 +635,13 @@ static bool mysql_admin_table(
   */
   close_thread_tables(thd);
   for (table = tables; table; table = table->next_local) table->table = nullptr;
+
+#ifdef WITH_WSREP
+  if (wsrep_toi_replication(thd, tables)) {
+    WSREP_INFO("wsrep TOI replication has failed, skipping OPTIMIZE");
+    goto err;
+  }
+#endif /* WITH_WSREP */
 
   /*
     This statement will be written to the binary log even if it fails.
@@ -1693,6 +1745,7 @@ bool Sql_cmd_check_table::execute(THD *thd) {
 
   if (check_table_access(thd, SELECT_ACL, first_table, true, UINT_MAX, false))
     goto error; /* purecov: inspected */
+
   thd->enable_slow_log = opt_log_slow_admin_statements;
 
 #ifdef WITH_WSREP
@@ -1732,11 +1785,6 @@ bool Sql_cmd_optimize_table::execute(THD *thd) {
   DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command", {
     sql_print_information("In Sql_cmd_optimize_table::execute()");
   });
-
-  if (WSREP(thd) && !thd->lex->no_write_to_binlog &&
-      wsrep_to_isolation_begin(thd, NULL, NULL, first_table)) {
-    return true;
-  }
 #endif /* WITH_WSREP */
 
   thd->set_slow_log_for_admin_command();
@@ -1774,11 +1822,6 @@ bool Sql_cmd_repair_table::execute(THD *thd) {
   DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command", {
     sql_print_information("In Sql_cmd_repair_table::execute()");
   });
-
-  if (WSREP(thd) && !thd->lex->no_write_to_binlog &&
-      wsrep_to_isolation_begin(thd, NULL, NULL, first_table)) {
-    return true;
-  }
 #endif /* WITH_WSREP */
 
   thd->set_slow_log_for_admin_command();

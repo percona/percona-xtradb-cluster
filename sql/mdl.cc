@@ -5125,7 +5125,7 @@ MDL_ticket *MDL_ticket_store::materialized_front(int di) {
 #ifdef WITH_WSREP
 void MDL_ticket::wsrep_report(bool debug) {
   if (debug) {
-    WSREP_DEBUG(
+    WSREP_INFO(
         "MDL ticket: type: %s, space: %s, db: %s, name: %s",
         (get_type() == MDL_INTENTION_EXCLUSIVE)
             ? "intention exclusive"

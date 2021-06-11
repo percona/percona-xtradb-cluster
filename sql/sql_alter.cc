@@ -54,9 +54,10 @@
 
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
-#include "sql/dd/types/table.h"                // dd::Table
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
 #include "sql/dd/dd_table.h"                 // dd::table_storage_engine
+#include "sql/dd/types/table.h"              // dd::Table
+#include "sql/sql_parse.h"                   // WSREP_TO_ISOLATION_BEGIN_ALTER
 #include "sql_parse.h"
 #include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
@@ -346,6 +347,43 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
   if (check_grant(thd, priv_needed, first_table, false, UINT_MAX, false))
     return true; /* purecov: inspected */
 
+#ifdef WITH_WSREP
+  /* Check if foreign keys are accessible.
+  1. Transaction is replicated first, then is done locally.
+  2. Replicated node applies write sets in context
+  of root user.
+  Above two conditions may cause that even if we have no access to FKs,
+  transactions will replicate with success, but fail locally.
+
+  Here we check only for FK access, not if the engine supports FKs.
+  That's enough, because right now we need only to know if transaction
+  should be rolled back because of lack of access and not replicated,
+  or we can replicate it and let replicated node do the rest of the job. */
+  if (alter_info.flags & Alter_info::ADD_FOREIGN_KEY) {
+    if (check_fk_parent_table_access(thd, &create_info, &alter_info, false)) {
+      return true;
+    }
+  }
+
+  TABLE *find_temporary_table(THD * thd, const TABLE_LIST *tl);
+  if (WSREP(thd) && WSREP_CLIENT(thd) &&
+      (!thd->is_current_stmt_binlog_format_row() ||
+       !find_temporary_table(thd, first_table))) {
+    wsrep::key_array keys;
+    // append tables referenced by this table
+    wsrep_append_fk_parent_table(thd, first_table, &keys);
+    // append tables that are referencing this table
+    wsrep_append_child_tables(thd, first_table, &keys);
+
+    WSREP_TO_ISOLATION_BEGIN_ALTER(((lex->name.str) ? select_lex->db : NULL),
+                                   ((lex->name.str) ? lex->name.str : NULL),
+                                   first_table, &alter_info, &keys) {
+      WSREP_DEBUG("TOI replication for ALTER failed");
+      return true;
+    }
+  }
+#endif /* WITH_WSREP */
+
   if (alter_info.new_table_name.str &&
       !test_all_bits(priv, INSERT_ACL | CREATE_ACL)) {
     // Rename of table
@@ -371,23 +409,6 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
   thd->set_slow_log_for_admin_command();
 
 #ifdef WITH_WSREP
-  /* Check if foreign keys are accessible.
-  1. Transaction is replicated first, then is done locally.
-  2. Replicated node applies write sets in context
-  of root user.
-  Above two conditions may cause that even if we have no access to FKs,
-  transactions will replicate with success, but fail locally.
-
-  Here we check only for FK access, not if the engine supports FKs.
-  That's enough, because right now we need only to know if transaction
-  should be rolled back because of lack of access and not replicated,
-  or we can replicate it and let replicated node do the rest of the job. */
-  if (alter_info.flags & Alter_info::ADD_FOREIGN_KEY) {
-    if (check_fk_parent_table_access(thd, &create_info, &alter_info, false)) {
-      return true;
-    }
-  }
-
   /* PXC doesn't recommend/allow ALTER operation on table created using
   non-transactional storage engine (like MyISAM, HEAP/MEMORY, etc....)
   except ALTER operation to change storage engine to transactional storage
