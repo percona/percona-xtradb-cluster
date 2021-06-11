@@ -157,6 +157,7 @@ const st_command_service_cbs Sql_service_context_base::sql_service_callbacks = {
     &Sql_service_context_base::sql_handle_ok,
     &Sql_service_context_base::sql_handle_error,
     &Sql_service_context_base::sql_shutdown,
+    &Sql_service_context_base::sql_connection_alive,
 };
 
 int Sql_service_context::start_result_metadata(

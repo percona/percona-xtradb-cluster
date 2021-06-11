@@ -45,6 +45,7 @@
 #include "my_macros.h"
 #include "my_sys.h"
 #include "my_thread.h"
+#include "mysql/components/services/bits/psi_bits.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/components/services/log_shared.h"
 #include "mysql/components/services/psi_file_bits.h"
@@ -54,7 +55,6 @@
 #include "mysql/psi/mysql_file.h"
 #include "mysql/psi/mysql_memory.h"
 #include "mysql/psi/mysql_mutex.h"
-#include "mysql/psi/psi_base.h"
 #include "mysql/status_var.h"
 #include "mysql_version.h"
 #include "mysqld_error.h"
@@ -74,6 +74,7 @@
 #include "sql/sql_error.h"
 #include "sql/sql_lex.h"
 #include "sql/sql_list.h"
+#include "sql/sql_plugin_var.h"
 #include "sql/sql_show.h"
 #include "sql/sys_vars_shared.h"
 #include "sql/thr_malloc.h"
@@ -332,17 +333,9 @@ bool Persisted_variables_cache::set_variable(THD *thd, set_var *setvar) {
     uint dummy_err;
     String bool_str;
     if (setvar->value) {
-      res = setvar->value->val_str(&str);
-      if (system_var->get_var_type() == GET_BOOL) {
-        if (res == nullptr ||
-            check_boolean_value(res->c_ptr_quick(), bool_str)) {
-          my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var_name,
-                   (res ? res->c_ptr_quick() : "null"));
-          return true;
-        } else {
-          res = &bool_str;
-        }
-      }
+      setvar->var->persist_only_to_string(thd, setvar, &str);
+      res = &str;
+
       if (res && res->length()) {
         /*
           value held by Item class can be of different charset,
@@ -353,7 +346,10 @@ bool Persisted_variables_cache::set_variable(THD *thd, set_var *setvar) {
         var_value = utf8_str.c_ptr_quick();
       }
     } else {
-      /* persist default value */
+      // Persist default value. Need to use this approach to set default value
+      // for persist_only variable. The save_default() does nothing for
+      // plugin variable. As a result persist_only_to_string()
+      // cannot be used here.
       setvar->var->save_default(thd, setvar);
       setvar->var->saved_value_to_string(thd, setvar, str.ptr());
       res = &str;
@@ -708,7 +704,7 @@ bool Persisted_variables_cache::set_persist_options(bool plugin_options) {
         Grant_temporary_dynamic_privileges(thd, priv_list),
         Grant_temporary_static_privileges(thd, static_priv_list),
         Drop_temporary_dynamic_privileges(priv_list));
-    ctx = default_factory.create(thd->mem_root);
+    ctx = default_factory.create();
     /* attach this auth id to current security_context */
     thd->set_security_context(ctx.get());
     thd->real_id = my_thread_self();

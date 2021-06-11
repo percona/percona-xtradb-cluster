@@ -62,8 +62,15 @@
 #endif
 #ifndef PFS_MAX_COND_CLASS
 #ifdef WITH_WSREP
-/* Max value for PXC builds */
-#define PFS_MAX_COND_CLASS 120
+/**
+   Max value for PXC builds.
+   WSREP patch defines 27 additional PSI_cond_key keys:
+   key_COND_galera_* => 17
+   key_COND_wsrep_* => 10
+   Let's keep PFS_MAX_COND_CLASS always bigger by this number.
+*/
+#define PFS_WSREP_COND_CLASS 27
+#define PFS_MAX_COND_CLASS (100 + PFS_WSREP_COND_CLASS)
 #else
 #define PFS_MAX_COND_CLASS 100
 #endif /* WITH_WSREP */

@@ -187,7 +187,11 @@ INSERT INTO global_suppressions VALUES
  ("==[0-9]*== Massif"),
  ("==[0-9]*== Helgrind"),
 
-/*
+ /* Suppress warnings caused by foreign clients, see Bug#31893901 */
+
+ ("IP address .* could not be resolved.*"),
+
+ /*
    Transient network failures that cause warnings on reconnect.
    BUG#47743 and BUG#47983.
  */
@@ -388,6 +392,7 @@ INSERT INTO global_suppressions VALUES
  ("Clone removing all user data for provisioning: Started"),
  ("Clone removing all user data for provisioning: Finished"),
  ("\\[Warning\\] .*Non innodb table: .* is not cloned and is empty."),
+ ("\\[ERROR\\] .*MY-\\d+.*clone_check_recovery_crashpoint.*"),
 
  /*
    Warnings/errors seen when server is loaded with keyring plugin without

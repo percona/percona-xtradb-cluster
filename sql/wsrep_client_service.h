@@ -43,7 +43,7 @@ class Wsrep_client_service : public wsrep::client_service {
   bool statement_allowed_for_streaming() const;
   size_t bytes_generated() const;
   int prepare_fragment_for_replication(wsrep::mutable_buffer &);
-  int remove_fragments();
+  int remove_fragments(wsrep::unique_lock<wsrep::mutex> &lock);
   void emergency_shutdown() { throw wsrep::not_implemented_error(); }
   void will_replay();
   enum wsrep::provider::status replay();

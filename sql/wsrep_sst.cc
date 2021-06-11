@@ -903,7 +903,7 @@ static int run_sql_command(THD *thd, const char *query,
     return -1;
   }
 
-  mysql_parse(thd, &ps, false);
+  dispatch_sql_command(thd, &ps, false);
   if (thd->is_error()) {
     int const err = thd->get_stmt_da()->mysql_errno();
     if (safe_query) {
@@ -1082,6 +1082,8 @@ static uint server_session_execute(MYSQL_SESSION session, std::string query,
                                    bool ignore_error = false) {
   COM_DATA cmd;
   wsp::Sql_resultset rset;
+
+  memset(&cmd, 0, sizeof(cmd));
   cmd.com_query.query = query.c_str();
   cmd.com_query.length = static_cast<unsigned int>(query.length());
   wsp::Sql_service_context_base *ctx = new wsp::Sql_service_context(&rset);

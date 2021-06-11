@@ -43,6 +43,7 @@
 #include "my_psi_config.h"
 #include "my_thread.h"
 #include "my_thread_local.h"  // my_get_thread_local & my_set_thread_local
+#include "mysql/components/services/bits/psi_bits.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/components/services/mysql_mutex_bits.h"
 #include "mysql/components/services/mysql_rwlock_bits.h"
@@ -52,7 +53,6 @@
 #include "mysql/psi/mysql_mutex.h"
 #include "mysql/psi/mysql_rwlock.h"
 #include "mysql/psi/mysql_statement.h"
-#include "mysql/psi/psi_base.h"
 #include "mysql_time.h"
 #include "mysqld_error.h"
 #include "pfs_thread_provider.h"
@@ -158,7 +158,7 @@ class Thread_to_plugin_map {
       std::map<my_thread_t, const void *>::iterator it =
           collection.find(thread);
       if (it == collection.end()) collection[thread] = plugin;
-    } catch (const std::bad_alloc &e) {
+    } catch (const std::bad_alloc &) {
       return true;
     }
     return false;
@@ -373,7 +373,7 @@ class Mutexed_map_thd_srv_session {
     rwlock_scoped_lock lock(&LOCK_collection, true, __FILE__, __LINE__);
     try {
       collection[key] = std::make_pair(plugin, session);
-    } catch (const std::bad_alloc &e) {
+    } catch (const std::bad_alloc &) {
       return true;
     }
     return false;
@@ -568,6 +568,8 @@ static void err_handle_error(void *ctx, uint err_errno, const char *err_msg,
 
 static void err_shutdown(void *, int) {}
 
+static bool err_alive(void *) { return true; }
+
 const struct st_command_service_cbs error_protocol_callbacks = {
     err_start_result_metadata,
     err_field_metadata,
@@ -587,7 +589,8 @@ const struct st_command_service_cbs error_protocol_callbacks = {
     err_get_string,
     err_handle_ok,
     err_handle_error,
-    err_shutdown};
+    err_shutdown,
+    err_alive};
 
 /**
   Modifies the PSI structures to (de)install a THD
@@ -1130,7 +1133,7 @@ int Srv_session::execute_command(enum enum_server_command command,
 #endif /* WITH_WSREP */
 
   /*
-    The server does it for COM_QUERY in mysql_parse() but not for
+    The server does it for COM_QUERY in dispatch_sql_command() but not for
     COM_INIT_DB, for example
   */
   if (command != COM_QUERY) thd.reset_for_next_command();

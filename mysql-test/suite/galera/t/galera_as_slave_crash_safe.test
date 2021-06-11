@@ -15,7 +15,7 @@
 call mtr.add_suppression("Recovery from master pos");
 call mtr.add_suppression("when attempting to connect");
 --disable_query_log
---eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--eval CHANGE REPLICATION SOURCE TO  SOURCE_HOST='127.0.0.1', SOURCE_PORT=$NODE_MYPORT_1;
 --enable_query_log
 START SLAVE USER='root';
 

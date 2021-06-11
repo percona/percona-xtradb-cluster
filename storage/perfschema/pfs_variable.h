@@ -757,5 +757,4 @@ void sum_account_status(PFS_client *pfs_account,
 void system_variable_warning(void);
 void status_variable_warning(void);
 
-/** @} */
 #endif

@@ -362,4 +362,7 @@
  */
 #define HAVE_GETIFADDRS 1
 
+/* ARM crc32 support */
+#cmakedefine HAVE_ARMV8_CRC32_INTRINSIC @HAVE_ARMV8_CRC32_INTRINSIC@
+
 #endif

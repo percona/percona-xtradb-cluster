@@ -194,11 +194,32 @@ cleanup:
   DBUG_RETURN(ret);
 }
 
-int Wsrep_client_service::remove_fragments() {
+int Wsrep_client_service::remove_fragments(
+    wsrep::unique_lock<wsrep::mutex> &lock) {
   DBUG_ENTER("Wsrep_client_service::remove_fragments");
-  if (wsrep_schema->remove_fragments(m_thd, Wsrep_server_state::instance().id(),
-                                     m_thd->wsrep_trx().id(),
-                                     m_thd->wsrep_sr().fragments())) {
+
+  mysql_mutex_assert_owner(static_cast<mysql_mutex_t *>(lock.mutex().native()));
+
+  // Here we are going to iterate over SR fragments vector and remove them.
+  // At the same time the SR fragments vector can be modified by wsrep applier
+  // thread. So we need to protect it.
+  // remove_fragments() acquires trx->mutex inside InnoDB (lock_table() =>
+  // lock_table_has()).
+  // At the same time trx->mutex may be already acquired by applier thread
+  // during BF abort of trx (row_mysql_handle_errors() => trx_kill_blocking() =>
+  // lock_make_trx_hit_list()). So local transaction thread blocks. Then applier
+  // thread tries to acquire wsrep_thd_LOCK (wsrep_kill_victim() =>
+  // wsrep_innobase_kill_one_trx()), but it is already acquired by local trx
+  // thread.
+  // The solution is to get the snapshot of SR fragments vector under the lock
+  // and then process fragments removal without lock.
+  std::vector<wsrep::seqno> fragments = m_thd->wsrep_sr().fragments();
+  lock.unlock();
+  int res =
+      wsrep_schema->remove_fragments(m_thd, Wsrep_server_state::instance().id(),
+                                     m_thd->wsrep_trx().id(), fragments);
+  lock.lock();
+  if (res) {
     WSREP_DEBUG(
         "Failed to remove fragments from SR storage for transaction "
         "%u, %llu",

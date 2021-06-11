@@ -1971,6 +1971,12 @@ fail:
   unireg_abort(1);
 }
 
+static void free_gtid_event_buf(THD *thd) {
+  if (thd->wsrep_gtid_event_buf) my_free(thd->wsrep_gtid_event_buf);
+  thd->wsrep_gtid_event_buf_len = 0;
+  thd->wsrep_gtid_event_buf = NULL;
+}
+
 /*
   returns:
    0: statement was replicated as TOI
@@ -2012,6 +2018,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   DEBUG_SYNC(thd, "wsrep_TOI_begin_after_wsrep_skip_wsrep_hton");
 
   if (is_thd_killed) {
+    free_gtid_event_buf(thd);
     WSREP_DEBUG(
         "Can't execute %s in TOI mode because the query has been killed",
         WSREP_QUERY(thd));
@@ -2020,6 +2027,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
   thd->wsrep_skip_wsrep_hton = true;
   if (wsrep_can_run_in_toi(thd, db_, table_, table_list) == false) {
+    free_gtid_event_buf(thd);
     WSREP_DEBUG("Can't execute %s in TOI mode", WSREP_QUERY(thd));
     return 1;
   }
@@ -2035,6 +2043,8 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     /* Given the existing error handling setup, all errors with write-set
     are classified under single error code. It would be good to have a proper
     error code reporting mechanism. */
+    free_gtid_event_buf(thd);
+
     WSREP_WARN(
         "Append/Write to writeset buffer failed (either due to IO "
         "issues (including memory allocation) or hitting a configured "
@@ -2114,10 +2124,9 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     rc = 0;
   }
 
-  if (buf) my_free(buf);
-
-  thd->wsrep_gtid_event_buf_len = 0;
-  thd->wsrep_gtid_event_buf = NULL;
+  // at this point buf and thd->wsrep_gtid_event_buf are equall
+  // (see wsrep_to_buf_helper internals), so we will free only once.
+  free_gtid_event_buf(thd);
 
   if (rc) wsrep_TOI_begin_failed(thd, NULL);
 

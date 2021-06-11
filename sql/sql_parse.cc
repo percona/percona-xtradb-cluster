@@ -194,8 +194,10 @@
 #include "wsrep_thd.h"
 #include "wsrep_trans_observer.h"
 
-static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
-                              Parser_state *parser_state, bool update_userstat);
+static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf,
+                                       uint length,
+                                       Parser_state *parser_state,
+                                       bool update_userstat);
 #endif /* WITH_WSREP */
 
 namespace resourcegroups {
@@ -1205,17 +1207,28 @@ void execute_init_command(THD *thd, LEX_STRING *init_command,
   thd->profiling->set_query_source(buf, len);
 #endif
 
+  /*
+    Clear the DA in anticipation of possible failures in anticipation
+    of possible command parsing failures.
+  */
+  thd->get_stmt_da()->reset_diagnostics_area();
+
   THD_STAGE_INFO(thd, stage_execution_of_init_command);
   save_client_capabilities = protocol->get_client_capabilities();
   protocol->add_client_capability(CLIENT_MULTI_QUERIES);
+  /*
+    We do not prepare a COM_QUERY packet with query attributes
+    since the init commands have nobody to supply query attributes.
+  */
+  protocol->remove_client_capability(CLIENT_QUERY_ATTRIBUTES);
   /*
     We don't need return result of execution to client side.
     To forbid this we should set thd->net.vio to 0.
   */
   save_vio = protocol->get_vio();
   protocol->set_vio(nullptr);
-  protocol->create_command(&com_data, COM_QUERY, (uchar *)buf, len);
-  dispatch_command(thd, &com_data, COM_QUERY);
+  if (!protocol->create_command(&com_data, COM_QUERY, (uchar *)buf, len))
+    dispatch_command(thd, &com_data, COM_QUERY);
   protocol->set_client_capabilities(save_client_capabilities);
   protocol->set_vio(save_vio);
 
@@ -1273,6 +1286,36 @@ static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables) {
 */
 void bind_fields(Item *first) {
   for (Item *item = first; item; item = item->next_free) item->bind_fields();
+}
+
+/**
+  Checks if the period net_buffer_shrink_interval is over.
+ */
+static bool net_buffer_shrink_interval_is_over(
+    const THD *const thd, unsigned long long net_buffer_shrink_time) {
+  // N.B. Make a copy to use the same variable during all the function
+  // as it could be modified in another session.
+  auto interval = net_buffer_shrink_interval;
+
+  return interval != 0 &&
+         thd->start_utime / 1000000 > net_buffer_shrink_time + interval;
+}
+
+/**
+  Shrinks the packet buffer if the max size during the last
+  global.net_buffer_shrink_interval is smaller than the current size.
+ */
+static bool shrink_packet_buffer(THD *thd, unsigned long *max_interval_packet,
+                                 unsigned long long *net_buffer_shrink_time) {
+  if (!net_buffer_shrink_interval_is_over(thd, *net_buffer_shrink_time)) {
+    return false;
+  }
+
+  auto net = thd->get_protocol_classic()->get_net();
+  auto was_shrunk = my_net_shrink_buffer(net, thd->variables.net_buffer_length,
+                                         max_interval_packet);
+  *net_buffer_shrink_time = thd->start_utime / 1000000;
+  return was_shrunk;
 }
 
 /**
@@ -1469,9 +1512,21 @@ bool do_command(THD *thd) {
   /* Restore read timeout value */
   my_net_set_read_timeout(net, thd->variables.net_read_timeout);
 
+  thd->status_var.net_buffer_length = net->max_packet;
+
   DEBUG_SYNC(thd, "before_command_dispatch");
 
   return_value = dispatch_command(thd, &com_data, command);
+
+#ifdef MYSQL_SERVER
+  {
+    NET_SERVER *ext = static_cast<NET_SERVER *>(net->extension);
+    if (ext != nullptr)
+      shrink_packet_buffer(thd, &ext->max_interval_packet,
+                           &ext->net_buffer_shrink_time);
+  }
+#endif
+
   thd->get_protocol_classic()->get_output_packet()->shrink(
       thd->variables.net_buffer_length);
 
@@ -1748,7 +1803,7 @@ static void check_secondary_engine_statement(THD *thd,
   thd->variables.option_bits |= OPTION_LOG_OFF;
 
   // Restart the statement.
-  mysql_parse(thd, parser_state, true);
+  dispatch_sql_command(thd, parser_state, true);
 
   // Restore the original option bits.
   thd->variables.option_bits = saved_option_bits;
@@ -1757,6 +1812,39 @@ static void check_secondary_engine_statement(THD *thd,
   // another restart/fallback to the primary storage engine.
   check_secondary_engine_statement(thd, parser_state, query_string,
                                    query_length);
+}
+
+/**
+  Deep copy the name and value of named parameters into the THD memory.
+
+  We need to do this since the packet bytes will go away during query
+  processing.
+  It doesn't need to be done for the unnamed ones since they're being
+  copied by and into Item_param. So we don't want to duplicate this.
+  @sa @ref Item_param
+
+  @param thd the thread to copy the parmeters to.
+  @param parameters the values to copy
+  @param count the number of parameters to copy
+*/
+static void copy_bind_parameter_values(THD *thd, PS_PARAM *parameters,
+                                       unsigned long count) {
+  thd->bind_parameter_values = parameters;
+  thd->bind_parameter_values_count = count;
+  unsigned long inx;
+  PS_PARAM *par;
+  for (inx = 0, par = thd->bind_parameter_values; inx < count; inx++, par++) {
+    if (par->name_length && par->name) {
+      void *newd = thd->alloc(par->name_length);
+      memcpy(newd, par->name, par->name_length);
+      par->name = reinterpret_cast<unsigned char *>(newd);
+    }
+    if (par->length && par->value) {
+      void *newd = thd->alloc(par->length);
+      memcpy(newd, par->value, par->length);
+      par->value = reinterpret_cast<unsigned char *>(newd);
+    }
+  }
 }
 
 /**
@@ -2036,6 +2124,9 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       Prepared_statement *stmt = nullptr;
       if (!mysql_stmt_precheck(thd, com_data, command, &stmt)) {
         PS_PARAM *parameters = com_data->com_stmt_execute.parameters;
+        copy_bind_parameter_values(thd, parameters,
+                                   com_data->com_stmt_execute.parameter_count);
+
         mysqld_stmt_execute(thd, stmt, com_data->com_stmt_execute.has_new_types,
                             com_data->com_stmt_execute.open_cursor, parameters);
 #ifdef WITH_WSREP
@@ -2043,6 +2134,8 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
           (void)wsrep_after_statement(thd);
         }
 #endif /* WITH_WSREP */
+        thd->bind_parameter_values = nullptr;
+        thd->bind_parameter_values_count = 0;
       }
       break;
     }
@@ -2126,7 +2219,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       Parser_state parser_state;
       if (parser_state.init(thd, thd->query().str, thd->query().length)) break;
 
-#ifdef WITH_WSREP
       // Initially, prepare and optimize the statement for the primary
       // storage engine. If an eligible secondary storage engine is
       // found, the statement may be reprepared for the secondary
@@ -2135,8 +2227,12 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       thd->set_secondary_engine_optimization(
           Secondary_engine_optimization::PRIMARY_TENTATIVELY);
 
+      copy_bind_parameter_values(thd, com_data->com_query.parameters,
+                                 com_data->com_query.parameter_count);
+
+#ifdef WITH_WSREP
       if (WSREP_ON) {
-        if (wsrep_mysql_parse(thd, thd->query().str, thd->query().length,
+        if (wsrep_dispatch_sql_command(thd, thd->query().str, thd->query().length,
                               &parser_state, false)) {
           WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
           mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -2146,10 +2242,10 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
           goto dispatch_end;
         }
       } else {
-        mysql_parse(thd, &parser_state, false);
+        dispatch_sql_command(thd, &parser_state, false);
       }
 #else
-      mysql_parse(thd, &parser_state, false);
+      dispatch_sql_command(thd, &parser_state, false);
 #endif /* WITH_WSREP */
 
       // Check if the statement failed and needs to be restarted in
@@ -2157,9 +2253,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       check_secondary_engine_statement(thd, &parser_state, orig_query.str,
                                        orig_query.length);
 
-#ifdef WITH_WSREP
       thd->set_secondary_engine_optimization(saved_secondary_engine);
-#endif /* WITH_WSREP */
 
       DBUG_EXECUTE_IF("parser_stmt_to_error_log", {
         LogErr(INFORMATION_LEVEL, ER_PARSER_TRACE, thd->query().str);
@@ -2239,7 +2333,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
             Secondary_engine_optimization::PRIMARY_TENTATIVELY);
 
         if (WSREP_ON) {
-          if (wsrep_mysql_parse(thd, beginning_of_next_stmt, length,
+          if (wsrep_dispatch_sql_command(thd, beginning_of_next_stmt, length,
                                 &parser_state, false)) {
             WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
             mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -2250,7 +2344,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
             goto dispatch_end;
           }
         } else {
-          mysql_parse(thd, &parser_state, false);
+          dispatch_sql_command(thd, &parser_state, false);
         }
 #else
         thd->set_time(); /* Reset the query start time. */
@@ -2258,16 +2352,17 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
         thd->set_secondary_engine_optimization(
             Secondary_engine_optimization::PRIMARY_TENTATIVELY);
         /* TODO: set thd->lex->sql_command to SQLCOM_END here */
-        mysql_parse(thd, &parser_state, false);
+        dispatch_sql_command(thd, &parser_state, false);
 #endif /* WITH_WSREP */
 
         check_secondary_engine_statement(thd, &parser_state,
                                          beginning_of_next_stmt, length);
 
-#ifdef WITH_WSREP
         thd->set_secondary_engine_optimization(saved_secondary_engine);
-#endif /* WITH_WSREP */
       }
+
+      thd->bind_parameter_values = nullptr;
+      thd->bind_parameter_values_count = 0;
 
       /* Need to set error to true for graceful shutdown */
       if ((thd->lex->sql_command == SQLCOM_SHUTDOWN) &&
@@ -3038,13 +3133,13 @@ static bool wsrep_is_show_query(enum enum_sql_command command) {
 */
 
 static bool lock_tables_for_backup(THD *thd) {
-  DBUG_ENTER("lock_tables_for_backup");
+  DBUG_TRACE;
 
-  if (check_backup_admin_privilege(thd)) DBUG_RETURN(true);
+  if (check_backup_admin_privilege(thd)) return true;
 
   if (delay_key_write_options == DELAY_KEY_WRITE_ALL) {
     my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0), "delay_key_write=ALL");
-    DBUG_RETURN(true);
+    return true;
   }
   /*
     Do nothing if the current connection already owns the LOCK TABLES FOR
@@ -3052,7 +3147,7 @@ static bool lock_tables_for_backup(THD *thd) {
   */
   if (thd->backup_tables_lock.is_acquired() ||
       thd->global_read_lock.is_acquired())
-    DBUG_RETURN(false);
+    return false;
 
   /*
     Do not allow backup locks under regular LOCK TABLES, FLUSH TABLES ... FOR
@@ -3060,7 +3155,7 @@ static bool lock_tables_for_backup(THD *thd) {
   */
   if (thd->variables.option_bits & OPTION_TABLE_LOCK) {
     my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
-    DBUG_RETURN(true);
+    return true;
   }
 
   bool res = thd->backup_tables_lock.acquire(thd);
@@ -3070,7 +3165,7 @@ static bool lock_tables_for_backup(THD *thd) {
     res = true;
   }
 
-  DBUG_RETURN(res);
+  return res;
 }
 
 /**
@@ -3826,6 +3921,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
         case 9:  // GROUP_REPLICATION_SERVICE_MESSAGE_INIT_FAILURE
           my_error(ER_GRP_RPL_MESSAGE_SERVICE_INIT_FAILURE, MYF(0));
           goto error;
+        case 10:  // GROUP_REPLICATION_RECOVERY_CHANNEL_STILL_RUNNING
+          my_error(ER_GRP_RPL_RECOVERY_CHANNEL_STILL_RUNNING, MYF(0));
+          goto error;
       }
       my_ok(thd);
       res = 0;
@@ -3878,6 +3976,11 @@ int mysql_execute_command(THD *thd, bool first_level) {
         }
         goto error;
       }
+      if (res == 11)  // GROUP_REPLICATION_STOP_WITH_RECOVERY_TIMEOUT
+        push_warning(thd, Sql_condition::SL_WARNING,
+                     ER_GRP_RPL_RECOVERY_CHANNEL_STILL_RUNNING,
+                     ER_THD(thd, ER_GRP_RPL_RECOVERY_CHANNEL_STILL_RUNNING));
+
       my_ok(thd);
       res = 0;
       break;
@@ -4614,7 +4717,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
       if (lex->type & REFRESH_FLUSH_PAGE_BITMAPS ||
           lex->type & REFRESH_RESET_PAGE_BITMAPS) {
         if (check_global_access(thd, SUPER_ACL)) goto error;
-      } else if (check_global_access(thd, RELOAD_ACL))
+      } else if (is_reload_request_denied(thd, lex->type))
         goto error;
 
       if (first_table && lex->type & REFRESH_READ_LOCK) {
@@ -4790,7 +4893,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
 #ifdef WITH_WSREP
         /* We need to cleanup wsrep state before starting
            new transaction. If 'regular' commit was issued,
-           it would be done in caller function wsrep_mysql_parse()
+           it would be done in caller function wsrep_dispatch_sql_command()
            after returning from here.
            But now we need to do it in between.
          */
@@ -4823,7 +4926,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
 #ifdef WITH_WSREP
         /* We need to cleanup wsrep state before starting
            new transaction. If 'regular' rollback was issued,
-           it would be done in caller function wsrep_mysql_parse()
+           it would be done in caller function wsrep_dispatch_sql_command()
            after returning from here.
            But now we need to do it in between.
          */
@@ -5687,7 +5790,7 @@ finish:
   @returns false if check is successful, true if error
 */
 
-bool show_precheck(THD *thd, LEX *lex, bool) {
+bool show_precheck(THD *thd, LEX *lex, bool lock MY_ATTRIBUTE((unused))) {
   assert(lex->sql_command == SQLCOM_SHOW_CREATE_USER);
   TABLE_LIST *const tables = lex->query_tables;
   if (tables != nullptr) {
@@ -5853,62 +5956,23 @@ void THD::reset_for_next_command() {
 #endif
 }
 
-/**
-  Create a select to return the same output as 'SELECT @@var_name'.
-
-  Used for SHOW COUNT(*) [ WARNINGS | ERROR].
-
-  This will crash with a core dump if the variable doesn't exists.
-
-  @param pc                     Current parse context
-  @param var_name		Variable name
-
-  @returns false if success, true if error
-
-  @todo - replace this function with one that generates a PT_select node
-          and performs MAKE_CMD on it.
-*/
-
-bool create_select_for_variable(Parse_context *pc, const char *var_name) {
-  LEX_STRING tmp, null_lex_string;
-  char buff[MAX_SYS_VAR_LENGTH * 2 + 4 + 8];
-  DBUG_TRACE;
-
-  THD *thd = pc->thd;
-  LEX *lex = thd->lex;
-  lex->sql_command = SQLCOM_SELECT;
-  tmp.str = const_cast<char *>(var_name);
-  tmp.length = strlen(var_name);
-  memset(&null_lex_string, 0, sizeof(null_lex_string));
-  /*
-    We set the name of Item to @@session.var_name because that then is used
-    as the column name in the output.
-  */
-  Item *var = get_system_var(pc, OPT_SESSION, tmp, null_lex_string);
-  if (var == nullptr) return true; /* purecov: inspected */
-
-  char *end = strxmov(buff, "@@session.", var_name, NullS);
-  var->item_name.copy(buff, end - buff);
-  add_item_to_list(thd, var);
-
-  return false;
-}
-
 /*
-  When you modify mysql_parse(), you may need to mofify
+  When you modify dispatch_sql_command(), you may need to modify
   mysql_test_parse_for_slave() in this same file.
 */
 
 /**
-  Parse a query.
+  Parse an SQL command from a text string and pass the resulting AST to the
+  query executor.
 
   @param thd          Current session.
   @param parser_state Parser state.
 */
 
-void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat) {
+void dispatch_sql_command(THD *thd, Parser_state *parser_state,
+                          bool update_userstat) {
   DBUG_TRACE;
-  DBUG_PRINT("mysql_parse", ("query: '%s'", thd->query().str));
+  DBUG_PRINT("dispatch_sql_command", ("query: '%s'", thd->query().str));
 
   DBUG_EXECUTE_IF("parser_debug", turn_parser_debug_on(););
 
@@ -6159,7 +6223,7 @@ bool mysql_test_parse_for_slave(THD *thd) {
   @param srid                      The SRID for this column (only relevant if
                                    this is a geometry column).
   @param col_check_const_spec_list List of column check constraints.
-  @param hidden                    Whether or not this field shoud be hidden.
+  @param hidden                    Column hidden type.
   @param is_array                  Whether it's a typed array field
 
   @return
@@ -6178,7 +6242,8 @@ bool Alter_info::add_field(
     dd::Column::enum_hidden_type hidden, bool is_array) {
   uint8 datetime_precision = decimals ? atoi(decimals) : 0;
   DBUG_TRACE;
-  DBUG_ASSERT(!is_array || hidden != dd::Column::enum_hidden_type::HT_VISIBLE);
+  DBUG_ASSERT(!is_array ||
+              hidden == dd::Column::enum_hidden_type::HT_HIDDEN_SQL);
 
   LEX_CSTRING field_name_cstr = {field_name->str, field_name->length};
 
@@ -7333,17 +7398,17 @@ static bool wsrep_should_retry_in_autocommit(enum_sql_command &sql_command) {
   }
 }
 
-static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
+static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf, uint length,
                               Parser_state *parser_state,
                               bool update_userstat) {
-  DBUG_ENTER("wsrep_mysql_parse");
+  DBUG_TRACE;
   bool is_autocommit = !thd->in_multi_stmt_transaction_mode() &&
                        wsrep_read_only_option(thd, thd->lex->query_tables);
   bool retry_autocommit;
 
   do {
     retry_autocommit = false;
-    mysql_parse(thd, parser_state, update_userstat);
+    dispatch_sql_command(thd, parser_state, update_userstat);
 
     /*
       Convert all ER_QUERY_INTERRUPTED errors to ER_LOCK_DEADLOCK
@@ -7422,7 +7487,7 @@ static bool wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
   DBUG_ASSERT(!thd->mdl_context.has_explicit_locks());
 #endif
 
-  DBUG_RETURN(false);
+  return false;
 }
 #endif /* WITH_WSREP */
 

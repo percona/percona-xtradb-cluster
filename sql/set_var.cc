@@ -34,12 +34,12 @@
 #include "my_io.h"
 #include "my_loglevel.h"
 #include "my_sys.h"
+#include "mysql/components/services/bits/psi_bits.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/components/services/log_shared.h"
 #include "mysql/plugin_audit.h"
 #include "mysql/psi/mysql_mutex.h"
 #include "mysql/psi/mysql_rwlock.h"
-#include "mysql/psi/psi_base.h"
 #include "mysqld_error.h"
 #include "sql/auth/auth_acls.h"
 #include "sql/auth/auth_common.h"  // SUPER_ACL, generate_password
@@ -347,7 +347,7 @@ uchar *sys_var::global_var_ptr() {
 
 bool sys_var::check(THD *thd, set_var *var) {
   if ((var->value && do_check(thd, var)) ||
-      (on_check && on_check(this, thd, var))) {
+      (var->type != OPT_PERSIST_ONLY && on_check && on_check(this, thd, var))) {
     if (!thd->is_error()) {
       char buff[STRING_BUFFER_USUAL_SIZE];
       String str(buff, sizeof(buff), system_charset_info), *res;
@@ -780,12 +780,14 @@ int sql_set_variables(THD *thd, List<set_var_base> *var_list, bool opened) {
 
   LEX *lex = thd->lex;
   set_var_base *var;
-  {
+  if (!thd->lex->unit->is_prepared()) {
     Prepared_stmt_arena_holder ps_arena_holder(thd);
     while ((var = it++)) {
       if ((error = var->resolve(thd))) goto err;
     }
     if ((error = thd->is_error())) goto err;
+    thd->lex->unit->set_prepared();
+    if (!thd->stmt_arena->is_regular()) thd->lex->save_cmd_properties(thd);
   }
   if (opened && lock_tables(thd, lex->query_tables, lex->table_count, 0)) {
     error = 1;
@@ -1029,7 +1031,7 @@ int set_var::check(THD *thd) {
     my_error(ER_WRONG_TYPE_FOR_VAR, MYF(0), var->name.str);
     return -1;
   }
-  int ret = (type != OPT_PERSIST_ONLY && var->check(thd, this)) ? -1 : 0;
+  int ret = var->check(thd, this) ? -1 : 0;
 
   if (!ret && (is_global_persist())) {
     ret = mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_GLOBAL_VARIABLE_SET),
@@ -1119,10 +1121,13 @@ int set_var::update(THD *thd) {
   int ret = 0;
   /* for persist only syntax do not update the value */
   if (type != OPT_PERSIST_ONLY) {
+    auto saved_var_source = var->get_source();
+    var->set_source(enum_variable_source::DYNAMIC);
     if (value)
       ret = (int)var->update(thd, this);
     else
       ret = (int)var->set_default(thd, this);
+    var->set_source(saved_var_source);
   }
   /*
    For PERSIST_ONLY syntax we dont change the value of the variable
