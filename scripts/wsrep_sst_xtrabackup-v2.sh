@@ -635,6 +635,10 @@ get_transfer()
             if check_for_version "$SOCAT_VERSION" "1.7.3"; then
                 donor_extra=',commonname=""'
             fi
+            # disable SNI if socat supports it
+            if check_for_version "$SOCAT_VERSION" "1.7.4"; then
+                donor_extra+=',no-sni=1'
+            fi
 
             # PXC-3508 : If 'ssl_dhparams' option has been set, then always add it
             # to the socat command (both donor and joiner)
