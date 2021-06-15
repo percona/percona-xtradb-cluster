@@ -849,7 +849,6 @@ extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode)
 extern "C" void wsrep_thd_set_query_state(
 	THD *thd, enum wsrep_query_state state)
 {
-  if (!WSREP(thd)) return;
   /* async slave thread should never flag IDLE state, as it may
      give rollbacker thread chance to interfere and rollback async slave
      transaction.
@@ -867,12 +866,9 @@ extern "C" void wsrep_thd_set_query_state(
 extern "C" void wsrep_thd_set_conflict_state(
          THD *thd, bool lock, enum wsrep_conflict_state state)
 {
-  if (WSREP(thd))
-  {
-    if (lock) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_conflict_state= state;
-    if (lock) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  }
+  if (lock) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  thd->wsrep_conflict_state= state;
+  if (lock) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 }
 extern "C" void wsrep_thd_mark_split_trx(THD *thd, bool split_trx)
 {
