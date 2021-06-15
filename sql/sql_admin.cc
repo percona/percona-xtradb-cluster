@@ -538,7 +538,7 @@ static Check_result check_for_upgrade(THD *thd, dd::String_type &sname,
 /*
    OPTIMIZE, REPAIR and ALTER may take MDL locks not only for the affected
    table, but also for the table referenced by foreign key constraint.
-   ALTER additionally may take MTL lock of the tables that are referencing
+   ALTER additionally may take MDL lock of the tables that are referencing
    altered table.
    This wsrep_toi_replication() function handles TOI replication for OPTIMIZE
    and REPAIR so that certification keys for potential FK parent tables are

@@ -10,7 +10,6 @@ SET SESSION wsrep_sync_wait=0;
 SET SESSION wsrep_on = 0;
 SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'dbug=';
-SET AUTOCOMMIT = ON;
 START TRANSACTION;
 UPDATE c1 SET f2 = 'changed from node 1' WHERE pk = 1;
 SELECT * FROM c1 WHERE pk = 2 FOR UPDATE;

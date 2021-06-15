@@ -1,8 +1,8 @@
 #
 # Test for MDL BF-BF lock conflict
 # There are some DDL statements, which take extensive MDL lock for
-# a table referenced by foreign key constraint from the actual affetec table.
-# This extensive MDL lock may cause MDL BF-BF confclict situations, if the
+# a table referenced by foreign key constraint from the actual affected table.
+# This extensive MDL lock may cause MDL BF-BF conflict situations, if the
 # FK parent table is not listed as certification key in the replication write set.
 # i.e. if replication allows such DDL to apply in parallel with regular DML operating
 # on the FK parent table.
@@ -21,7 +21,7 @@
 # scenario 1, can be used to test if a DDL statement causes such MDL locking vulnerability.
 # call this test script with some table DDL command in $table_admin_command
 # if scenario 1 passes (especially COMMIT does fail for ER_LOCK_DEADLOCK),
-# then this particular DDL is vulnerable. scenraio 2 should fail for this DDL
+# then this particular DDL is vulnerable. scenario 2 should fail for this DDL
 # unless code has not been fixed to append parent table certification keys for it.
 #
 

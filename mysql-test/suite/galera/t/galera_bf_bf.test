@@ -8,8 +8,9 @@
 # with ALTER TABLE certification keys.
 #
 
---source include/galera_cluster.inc
 --source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+--source include/galera_cluster.inc
 --source include/count_sessions.inc
 
 --connect node_1_toi, 127.0.0.1, root, , test, $NODE_MYPORT_1
@@ -37,7 +38,6 @@ SET SESSION wsrep_sync_wait=0;
 ######################################################################
 
 --connection node_1
-SET AUTOCOMMIT = ON;
 START TRANSACTION;
 
 UPDATE c1 SET f2 = 'changed from node 1' WHERE pk = 1;
