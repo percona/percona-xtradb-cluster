@@ -131,9 +131,9 @@ SELECT COUNT(*) AS EXPECT_2 FROM p2 WHERE f2 = 'INITIAL VALUE';
 
 --echo ######################################################################
 --echo #
---echo # Scenario #3: 2 DMLs working on two FK parent tables try to replicate, 
+--echo # Scenario #3: 2 DMLs working on two FK parent tables try to replicate,
 --echo #              but fails in certification for earlier DDL on child table
---echo #              which is child to both FK parents 
+--echo #              which is child to both FK parents
 --echo #
 --echo ######################################################################
 

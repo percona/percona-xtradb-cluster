@@ -77,9 +77,9 @@ EXPECT_2
 2
 ######################################################################
 #
-# Scenario #3: 2 DMLs working on two FK parent tables try to replicate, 
+# Scenario #3: 2 DMLs working on two FK parent tables try to replicate,
 #              but fails in certification for earlier DDL on child table
-#              which is child to both FK parents 
+#              which is child to both FK parents
 #
 ######################################################################
 BEGIN;
@@ -238,9 +238,9 @@ EXPECT_2
 2
 ######################################################################
 #
-# Scenario #3: 2 DMLs working on two FK parent tables try to replicate, 
+# Scenario #3: 2 DMLs working on two FK parent tables try to replicate,
 #              but fails in certification for earlier DDL on child table
-#              which is child to both FK parents 
+#              which is child to both FK parents
 #
 ######################################################################
 BEGIN;
@@ -392,9 +392,9 @@ EXPECT_2
 2
 ######################################################################
 #
-# Scenario #3: 2 DMLs working on two FK parent tables try to replicate, 
+# Scenario #3: 2 DMLs working on two FK parent tables try to replicate,
 #              but fails in certification for earlier DDL on child table
-#              which is child to both FK parents 
+#              which is child to both FK parents
 #
 ######################################################################
 BEGIN;
@@ -502,9 +502,9 @@ EXPECT_2
 2
 ######################################################################
 #
-# Scenario #3: 2 DMLs working on two FK parent tables try to replicate, 
+# Scenario #3: 2 DMLs working on two FK parent tables try to replicate,
 #              but fails in certification for earlier DDL on child table
-#              which is child to both FK parents 
+#              which is child to both FK parents
 #
 ######################################################################
 BEGIN;

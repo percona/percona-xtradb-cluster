@@ -617,7 +617,7 @@ bool Sql_cmd_alter_table_truncate_partition::execute(THD *thd) {
   if (check_one_table_access(thd, DROP_ACL, first_table)) return true;
 
 #ifdef WITH_WSREP
-  TABLE *find_temporary_table(THD * thd, const TABLE_LIST *tl);
+  extern TABLE *find_temporary_table(THD * thd, const TABLE_LIST *tl);
 
   if (WSREP(thd) &&
       (!thd->is_current_stmt_binlog_format_row() ||

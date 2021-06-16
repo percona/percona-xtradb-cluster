@@ -4792,7 +4792,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
       /* FLUSH LOGS OR FLUSH BINARY LOGS are not replicated.
       Check git-hash#8aa97efd935a for more details. */
 
-      /* REFRESH_TABLES is taken care inside reload_acl_and_cache */
+      /* REFRESH_TABLES is taken care inside handle_reload_request */
       if (lex->type &
           (REFRESH_GRANT | REFRESH_HOSTS | REFRESH_STATUS |
            REFRESH_USER_RESOURCES | REFRESH_ERROR_LOG | REFRESH_SLOW_LOG |
@@ -4815,9 +4815,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
         if ((lex->type & REFRESH_TABLES) &&
             !(lex->type & (REFRESH_FOR_EXPORT | REFRESH_READ_LOCK))) {
           /*
-            This is done after reload_acl_and_cache is because
+            This is done after handle_reload_request is because
             LOCK TABLES is not replicated in galera, the upgrade of which
-            is checked in reload_acl_and_cache.
+            is checked in handle_reload_request.
             Hence, done after/if we are able to upgrade locks.
           */
           if (first_table) {

@@ -347,9 +347,22 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
   if (check_grant(thd, priv_needed, first_table, false, UINT_MAX, false))
     return true; /* purecov: inspected */
 
+  if (alter_info.new_table_name.str &&
+      !test_all_bits(priv, INSERT_ACL | CREATE_ACL)) {
+    // Rename of table
+    DBUG_ASSERT(alter_info.flags & Alter_info::ALTER_RENAME);
+    TABLE_LIST tmp_table;
+    tmp_table.table_name = alter_info.new_table_name.str;
+    tmp_table.db = alter_info.new_db_name.str;
+    tmp_table.grant.privilege = priv;
+    if (check_grant(thd, INSERT_ACL | CREATE_ACL, &tmp_table, false, UINT_MAX,
+                    false))
+      return true; /* purecov: inspected */
+  }
+
 #ifdef WITH_WSREP
   /* Check if foreign keys are accessible.
-  1. Transaction is replicated first, then is done locally.
+  1. Transaction is replicated first, then is executed locally.
   2. Replicated node applies write sets in context
   of root user.
   Above two conditions may cause that even if we have no access to FKs,
@@ -383,19 +396,6 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
     }
   }
 #endif /* WITH_WSREP */
-
-  if (alter_info.new_table_name.str &&
-      !test_all_bits(priv, INSERT_ACL | CREATE_ACL)) {
-    // Rename of table
-    DBUG_ASSERT(alter_info.flags & Alter_info::ALTER_RENAME);
-    TABLE_LIST tmp_table;
-    tmp_table.table_name = alter_info.new_table_name.str;
-    tmp_table.db = alter_info.new_db_name.str;
-    tmp_table.grant.privilege = priv;
-    if (check_grant(thd, INSERT_ACL | CREATE_ACL, &tmp_table, false, UINT_MAX,
-                    false))
-      return true; /* purecov: inspected */
-  }
 
   /* Don't yet allow changing of symlinks with ALTER TABLE */
   if (create_info.data_file_name)

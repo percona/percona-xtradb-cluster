@@ -1668,18 +1668,15 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
 static bool collect_fk_children(const dd::Table *table_def,
                                 wsrep::key_array *keys) {
   for (const dd::Foreign_key_parent *fk : table_def->foreign_key_parents()) {
-    WSREP_INFO("(c) appended fkey %s", fk->child_table_name().c_str());
-
     keys->push_back(wsrep_prepare_key_for_toi(fk->child_schema_name().c_str(),
                                               fk->child_table_name().c_str(),
                                               wsrep::key::shared));
   }
-
   return false;
 }
 
 void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
-                                     wsrep::key_array *keys) {
+                               wsrep::key_array *keys) {
   if (!WSREP(thd) || !WSREP_CLIENT(thd)) return;
   TABLE_LIST *table;
 

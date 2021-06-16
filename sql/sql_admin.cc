@@ -558,7 +558,6 @@ static bool wsrep_toi_replication(THD *thd, TABLE_LIST *tables) {
       return false;
   }
 
-  close_thread_tables(thd);
   wsrep::key_array keys;
 
   wsrep_append_fk_parent_table(thd, tables, &keys);

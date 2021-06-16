@@ -129,7 +129,7 @@ extern uint sql_command_flags[];
 extern const LEX_CSTRING command_name[];
 
 #ifdef WITH_WSREP
-#include <service_wsrep.h>
+#include "service_wsrep.h"
 
 #define WSREP_TO_ISOLATION_BEGIN_IF(db_, table_, table_list_)                 \
   if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
@@ -163,8 +163,8 @@ extern const LEX_CSTRING command_name[];
                                            fk_tables)                         \
   if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
       !thd->lex->no_write_to_binlog &&                                        \
-      wsrep_to_isolation_begin(thd, db_, table_, table_list_, nullptr, NULL,  \
-                               fk_tables))
+      wsrep_to_isolation_begin(thd, db_, table_, table_list_, nullptr,        \
+                               nullptr, fk_tables))
 
 #define WSREP_SYNC_WAIT(thd_, before_)                                    \
   {                                                                       \

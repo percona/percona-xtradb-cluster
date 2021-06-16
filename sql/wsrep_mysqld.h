@@ -239,7 +239,7 @@ extern void wsrep_prepend_PATH(const char *path);
 void wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *table,
                                   wsrep::key_array *keys);
 void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
-                                     wsrep::key_array *keys);
+                               wsrep::key_array *keys);
 
 /* some inline functions are defined in wsrep_mysqld_inl.h */
 
