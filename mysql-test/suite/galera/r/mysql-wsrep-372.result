@@ -1,0 +1,108 @@
+RESET MASTER;
+SET wsrep_on=OFF;
+RESET MASTER;
+SET wsrep_on=ON;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	1287	'MASTER_HOST' is deprecated and will be removed in a future release. Please use SOURCE_HOST instead
+Warning	1287	'MASTER_PORT' is deprecated and will be removed in a future release. Please use SOURCE_PORT instead
+START REPLICA USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+CREATE DATABASE master_replicated_db;
+USE master_replicated_db;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+CREATE DATABASE galera_replicated_db;
+USE galera_replicated_db;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (3);
+INSERT INTO galera_replicated_db.t1 VALUES (2);
+CREATE DATABASE master_not_replicated_db;
+USE master_not_replicated_db;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+INSERT INTO master_replicated_db.t1 VALUES (1);
+SELECT COUNT(SCHEMA_NAME) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_not_replicated_db';
+COUNT(SCHEMA_NAME) = 0
+1
+SELECT COUNT(SCHEMA_NAME) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_not_replicated_db';
+COUNT(SCHEMA_NAME) = 0
+1
+DROP TABLE master_not_replicated_db.t1;
+DROP TABLE master_replicated_db.t1;
+DROP DATABASE master_not_replicated_db;
+DROP DATABASE master_replicated_db;
+STOP REPLICA;
+RESET REPLICA ALL;
+INSERT INTO galera_replicated_db.t1 VALUES (4);
+DROP TABLE galera_replicated_db.t1;
+DROP DATABASE galera_replicated_db;
+RESET MASTER;
+SET wsrep_on=OFF;
+RESET MASTER;
+SET wsrep_on=ON;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	1287	'MASTER_HOST' is deprecated and will be removed in a future release. Please use SOURCE_HOST instead
+Warning	1287	'MASTER_PORT' is deprecated and will be removed in a future release. Please use SOURCE_PORT instead
+START REPLICA USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+USE test;
+CREATE TABLE master_replicated_table (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO master_replicated_table VALUES (1);
+USE test;
+CREATE TABLE galera_replicated_table (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO galera_replicated_table VALUES (3);
+INSERT INTO test.galera_replicated_table VALUES (2);
+CREATE TABLE master_not_replicated_table (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO master_not_replicated_table VALUES (1);
+INSERT INTO master_replicated_table VALUES (1);
+SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE (TABLE_SCHEMA = 'test') AND (TABLE_NAME = 'master_not_replicated_table');
+COUNT(*) = 0
+1
+SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE (TABLE_SCHEMA = 'test') AND (TABLE_NAME = 'master_not_replicated_table');
+COUNT(*) = 0
+1
+DROP TABLE test.master_replicated_table;
+DROP TABLE test.master_not_replicated_table;
+STOP REPLICA;
+RESET REPLICA ALL;
+INSERT INTO test.galera_replicated_table VALUES (4);
+DROP TABLE test.galera_replicated_table;
+RESET MASTER;
+SET wsrep_on=OFF;
+RESET MASTER;
+SET wsrep_on=ON;
+Warnings:
+Warning	1287	'CHANGE MASTER' is deprecated and will be removed in a future release. Please use CHANGE REPLICATION SOURCE instead
+Warning	1287	'MASTER_HOST' is deprecated and will be removed in a future release. Please use SOURCE_HOST instead
+Warning	1287	'MASTER_PORT' is deprecated and will be removed in a future release. Please use SOURCE_PORT instead
+START REPLICA USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+CREATE DATABASE master_ignored_db;
+USE master_ignored_db;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+CREATE DATABASE master_replicated_db;
+SELECT COUNT(SCHEMA_NAME) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_ignored_db';
+COUNT(SCHEMA_NAME) = 0
+1
+SELECT COUNT(SCHEMA_NAME) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_ignored_db';
+COUNT(SCHEMA_NAME) = 0
+1
+CREATE DATABASE master_ignored_db;
+USE master_ignored_db;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (3);
+INSERT INTO master_ignored_db.t1 VALUES (2);
+DROP TABLE master_ignored_db.t1;
+DROP DATABASE master_ignored_db;
+DROP DATABASE master_replicated_db;
+STOP REPLICA;
+RESET REPLICA ALL;
+INSERT INTO master_ignored_db.t1 VALUES (4);
+DROP TABLE master_ignored_db.t1;
+DROP DATABASE master_ignored_db;

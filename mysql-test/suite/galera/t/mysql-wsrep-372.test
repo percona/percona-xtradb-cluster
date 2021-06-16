@@ -1,0 +1,315 @@
+#
+# Test the case where a Galera replica to async replication uses replicate-do-db/replicate-do-table.
+# Cluster originating replication should not be affected by this.
+#
+
+--source include/have_log_bin.inc
+--source include/big_test.inc
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--source include/galera_cluster_master_slave3.inc
+--source include/count_sessions.inc
+
+--connection node_1
+--disable_query_log
+call mtr.add_suppression("Pending to replicate MySQL GTID event");
+--enable_query_log
+--connection node_2
+--disable_query_log
+call mtr.add_suppression("Pending to replicate MySQL GTID event");
+--enable_query_log
+--connection node_3
+--disable_query_log
+call mtr.add_suppression("Pending to replicate MySQL GTID event");
+--enable_query_log
+
+--connect node_4, 127.0.0.1, root, , test, $NODE_MYPORT_4
+
+####
+# REPLICATE-DO-DB
+###
+
+--connection node_1
+RESET MASTER;
+
+--connection node_2
+SET wsrep_on=OFF;
+RESET MASTER;
+SET wsrep_on=ON;
+
+--connection node_2
+--disable_query_log
+--eval CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+CHANGE REPLICATION FILTER REPLICATE_DO_DB=(master_replicated_db);
+--enable_query_log
+START REPLICA USER='root';
+
+--connection node_1
+CREATE DATABASE master_replicated_db;
+USE master_replicated_db;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM master_replicated_db.t1
+--source include/wait_condition.inc
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM master_replicated_db.t1
+--source include/wait_condition.inc
+ 
+# Create galera originating database which is not in replicate-do-db filter
+CREATE DATABASE galera_replicated_db;
+USE galera_replicated_db;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (3);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM galera_replicated_db.t1
+--source include/wait_condition.inc
+INSERT INTO galera_replicated_db.t1 VALUES (2);
+
+--connection node_4
+--let $wait_condition = SELECT COUNT(*) = 2 FROM galera_replicated_db.t1
+--source include/wait_condition.inc
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 2 FROM galera_replicated_db.t1
+--source include/wait_condition.inc
+
+--connection node_1
+# Create database on master which is not in replicate filter
+CREATE DATABASE master_not_replicated_db;
+USE master_not_replicated_db;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+
+# Insert so we can wait on galera cluster nodes
+INSERT INTO master_replicated_db.t1 VALUES (1);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 2 FROM master_replicated_db.t1
+--source include/wait_condition.inc
+
+SELECT COUNT(SCHEMA_NAME) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_not_replicated_db';
+
+--connection node_3
+SELECT COUNT(SCHEMA_NAME) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_not_replicated_db';
+
+--connection node_1
+DROP TABLE master_not_replicated_db.t1;
+DROP TABLE master_replicated_db.t1;
+DROP DATABASE master_not_replicated_db;
+DROP DATABASE master_replicated_db;
+
+--connection node_2
+#  Wait till databases/tables are removed
+--let $wait_condition = SELECT COUNT(SCHEMA_NAME) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_replicated_db';
+--source include/wait_condition.inc
+
+# Now close native replication
+STOP REPLICA;
+RESET REPLICA ALL;
+
+--connection node_4
+INSERT INTO galera_replicated_db.t1 VALUES (4);
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 3 FROM galera_replicated_db.t1
+--source include/wait_condition.inc
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 3 FROM galera_replicated_db.t1
+--source include/wait_condition.inc
+
+--connection node_2
+DROP TABLE galera_replicated_db.t1;
+DROP DATABASE galera_replicated_db;
+
+####
+# REPLICATE-DO-TABLE
+###
+
+--connection node_1
+RESET MASTER;
+
+--connection node_2
+SET wsrep_on=OFF;
+RESET MASTER;
+SET wsrep_on=ON;
+
+--connection node_2
+--disable_query_log
+--eval CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+# We need to clear REPLICATE_DO_DB
+CHANGE REPLICATION FILTER REPLICATE_DO_DB=(),
+                          REPLICATE_DO_TABLE=(test.master_replicated_table);
+--enable_query_log
+START REPLICA USER='root';
+
+--connection node_1
+USE test;
+CREATE TABLE master_replicated_table (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO master_replicated_table VALUES (1);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM test.master_replicated_table
+--source include/wait_condition.inc
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM test.master_replicated_table
+--source include/wait_condition.inc
+ 
+# Create table which is not in replicate-do-db filter
+USE test;
+CREATE TABLE galera_replicated_table (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO galera_replicated_table VALUES (3);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM test.galera_replicated_table
+--source include/wait_condition.inc
+
+INSERT INTO test.galera_replicated_table VALUES (2);
+
+--connection node_4
+--let $wait_condition = SELECT COUNT(*) = 2 FROM test.galera_replicated_table
+--source include/wait_condition.inc
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 2 FROM test.galera_replicated_table
+--source include/wait_condition.inc
+
+--connection node_1
+# Create table on master which is not in replicate filter
+CREATE TABLE master_not_replicated_table (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO master_not_replicated_table VALUES (1);
+
+# Insert so we can wait on galera cluster nodes
+INSERT INTO master_replicated_table VALUES (1);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 2 FROM test.master_replicated_table
+--source include/wait_condition.inc
+
+SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE (TABLE_SCHEMA = 'test') AND (TABLE_NAME = 'master_not_replicated_table');
+
+--connection node_3
+SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE (TABLE_SCHEMA = 'test') AND (TABLE_NAME = 'master_not_replicated_table');
+
+--connection node_1
+DROP TABLE test.master_replicated_table;
+DROP TABLE test.master_not_replicated_table;
+
+--connection node_2
+#  Wait till  databases are removed
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE (TABLE_SCHEMA = 'test') AND (TABLE_NAME = 'master_replicated_table');
+--source include/wait_condition.inc
+
+# Now close native replication
+STOP REPLICA;
+RESET REPLICA ALL;
+
+--connection node_4
+INSERT INTO test.galera_replicated_table VALUES (4);
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 3 FROM test.galera_replicated_table
+--source include/wait_condition.inc
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 3 FROM test.galera_replicated_table
+--source include/wait_condition.inc
+
+--connection node_2
+DROP TABLE test.galera_replicated_table;
+
+####
+# REPLICATE-IGNORE-DB
+###
+
+--connection node_1
+RESET MASTER;
+
+--connection node_2
+SET wsrep_on=OFF;
+RESET MASTER;
+SET wsrep_on=ON;
+
+--connection node_2
+--disable_query_log
+--eval CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+CHANGE REPLICATION FILTER REPLICATE_DO_DB=(), REPLICATE_DO_TABLE=();
+--enable_query_log
+START REPLICA USER='root';
+
+--connection node_1
+CREATE DATABASE master_ignored_db;
+USE master_ignored_db;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+
+# Database for wait on galera replica nodes (pivot)
+CREATE DATABASE master_replicated_db;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(SCHEMA_NAME) = 1 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_replicated_db';
+--source include/wait_condition.inc
+
+SELECT COUNT(SCHEMA_NAME) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_ignored_db';
+
+--connection node_3
+SELECT COUNT(SCHEMA_NAME) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_ignored_db';
+
+--connection node_3
+# Create database from galera cluster that is in replicate-ignore-db
+CREATE DATABASE master_ignored_db;
+USE master_ignored_db;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (3);
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM master_ignored_db.t1
+--source include/wait_condition.inc
+INSERT INTO master_ignored_db.t1 VALUES (2);
+
+--connection node_4
+--let $wait_condition = SELECT COUNT(*) = 2 FROM master_ignored_db.t1
+--source include/wait_condition.inc
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 2 FROM master_ignored_db.t1
+--source include/wait_condition.inc
+
+--connection node_1
+DROP TABLE master_ignored_db.t1;
+DROP DATABASE master_ignored_db;
+DROP DATABASE master_replicated_db;
+
+--connection node_2
+#  Wait till databases/tables are dropped
+--let $wait_condition = SELECT COUNT(SCHEMA_NAME) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'master_replicated_db';
+--source include/wait_condition.inc
+
+# Now close native replication
+STOP REPLICA;
+RESET REPLICA ALL;
+
+--connection node_4
+INSERT INTO master_ignored_db.t1 VALUES (4);
+
+--connection node_3
+--let $wait_condition = SELECT COUNT(*) = 3 FROM master_ignored_db.t1
+--source include/wait_condition.inc
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 3 FROM master_ignored_db.t1
+--source include/wait_condition.inc
+
+--connection node_2
+DROP TABLE master_ignored_db.t1;
+DROP DATABASE master_ignored_db;
+
+--connection node_2a
+--source include/wait_until_count_sessions.inc
+
+--disconnect node_2a

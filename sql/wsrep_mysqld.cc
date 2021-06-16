@@ -119,6 +119,7 @@ bool wsrep_restart_slave_activated = 0;  // node has dropped, and slave
                                          // restart will be needed
 bool wsrep_slave_UK_checks = 0;          // slave thread does UK checks
 bool wsrep_slave_FK_checks = 0;          // slave thread does FK checks
+ulonglong wsrep_mode = 0;
 
 /* wait for x micro-secs to allow active connection to commit before
 starting RSU */
@@ -1440,6 +1441,8 @@ bool wsrep_start_replication() {
 
   return true;
 }
+
+bool wsrep_check_mode(uint mask) { return wsrep_mode & (1ULL << mask); }
 
 bool wsrep_must_sync_wait(THD *thd, uint mask) {
   bool ret;

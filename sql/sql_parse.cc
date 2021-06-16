@@ -302,6 +302,12 @@ bool command_satisfy_acl_cache_requirement(unsigned command) {
 bool all_tables_not_ok(THD *thd, TABLE_LIST *tables) {
   Rpl_filter *rpl_filter = thd->rli_slave->rpl_filter;
 
+#ifdef WITH_WSREP
+  if (WSREP(thd) && thd->wsrep_applier &&
+      wsrep_check_mode(WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES))
+    return false;
+#endif
+
   return rpl_filter->is_on() && tables && !thd->sp_runtime_ctx &&
          !rpl_filter->tables_ok(thd->db().str, tables);
 }
@@ -362,6 +368,12 @@ inline bool check_database_filters(THD *thd, const char *db,
   if (!db || is_normal_transaction_boundary_stmt(sql_cmd) ||
       is_xa_transaction_boundary_stmt(sql_cmd))
     return true;
+
+#ifdef WITH_WSREP
+  if (WSREP(thd) && thd->wsrep_applier &&
+      wsrep_check_mode(WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES))
+    return true;
+#endif
 
   Rpl_filter *rpl_filter = thd->rli_slave->rpl_filter;
   auto db_ok{rpl_filter->db_ok(db)};

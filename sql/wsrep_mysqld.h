@@ -90,6 +90,7 @@ extern bool wsrep_slave_UK_checks;
 extern ulong wsrep_trx_fragment_unit;
 extern ulong wsrep_SR_store_type;
 extern uint wsrep_ignore_apply_errors;
+extern ulonglong wsrep_mode;
 extern std::atomic<ulong> wsrep_running_threads;
 extern ulong wsrep_certification_rules;
 extern ulong wsrep_RSU_commit_timeout;
@@ -137,6 +138,7 @@ enum enum_wsrep_ignore_apply_error {
 
 extern const char *wsrep_fragment_units[];
 extern const char *wsrep_SR_store_types[];
+enum enum_wsrep_mode { WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0 };
 
 enum enum_pxc_strict_modes {
   PXC_STRICT_MODE_DISABLED = 0,
@@ -242,6 +244,7 @@ extern void wsrep_shutdown_replication();
 extern bool wsrep_must_sync_wait(THD *thd,
                                  uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
 extern bool wsrep_sync_wait(THD *thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
+extern bool wsrep_check_mode(uint mask);
 extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(
     THD *thd, wsrep_gtid_t *upto, int timeout);
 extern void wsrep_last_committed_id(wsrep_gtid_t *gtid);
