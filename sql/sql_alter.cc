@@ -54,9 +54,10 @@
 
 #ifdef WITH_WSREP
 #include "mysql/components/services/log_builtins.h"
-#include "sql/dd/types/table.h"                // dd::Table
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
 #include "sql/dd/dd_table.h"                 // dd::table_storage_engine
+#include "sql/dd/types/table.h"              // dd::Table
+#include "sql/sql_parse.h"                   // WSREP_TO_ISOLATION_BEGIN_ALTER
 #include "sql_parse.h"
 #include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
@@ -359,20 +360,9 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
       return true; /* purecov: inspected */
   }
 
-  /* Don't yet allow changing of symlinks with ALTER TABLE */
-  if (create_info.data_file_name)
-    push_warning_printf(thd, Sql_condition::SL_WARNING, WARN_OPTION_IGNORED,
-                        ER_THD(thd, WARN_OPTION_IGNORED), "DATA DIRECTORY");
-  if (create_info.index_file_name)
-    push_warning_printf(thd, Sql_condition::SL_WARNING, WARN_OPTION_IGNORED,
-                        ER_THD(thd, WARN_OPTION_IGNORED), "INDEX DIRECTORY");
-  create_info.data_file_name = create_info.index_file_name = nullptr;
-
-  thd->set_slow_log_for_admin_command();
-
 #ifdef WITH_WSREP
   /* Check if foreign keys are accessible.
-  1. Transaction is replicated first, then is done locally.
+  1. Transaction is replicated first, then is executed locally.
   2. Replicated node applies write sets in context
   of root user.
   Above two conditions may cause that even if we have no access to FKs,
@@ -388,6 +378,37 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
     }
   }
 
+  TABLE *find_temporary_table(THD * thd, const TABLE_LIST *tl);
+  if (WSREP(thd) && WSREP_CLIENT(thd) &&
+      (!thd->is_current_stmt_binlog_format_row() ||
+       !find_temporary_table(thd, first_table))) {
+    wsrep::key_array keys;
+    // append tables referenced by this table
+    wsrep_append_fk_parent_table(thd, first_table, &keys);
+    // append tables that are referencing this table
+    wsrep_append_child_tables(thd, first_table, &keys);
+
+    WSREP_TO_ISOLATION_BEGIN_ALTER(((lex->name.str) ? select_lex->db : NULL),
+                                   ((lex->name.str) ? lex->name.str : NULL),
+                                   first_table, &alter_info, &keys) {
+      WSREP_DEBUG("TOI replication for ALTER failed");
+      return true;
+    }
+  }
+#endif /* WITH_WSREP */
+
+  /* Don't yet allow changing of symlinks with ALTER TABLE */
+  if (create_info.data_file_name)
+    push_warning_printf(thd, Sql_condition::SL_WARNING, WARN_OPTION_IGNORED,
+                        ER_THD(thd, WARN_OPTION_IGNORED), "DATA DIRECTORY");
+  if (create_info.index_file_name)
+    push_warning_printf(thd, Sql_condition::SL_WARNING, WARN_OPTION_IGNORED,
+                        ER_THD(thd, WARN_OPTION_IGNORED), "INDEX DIRECTORY");
+  create_info.data_file_name = create_info.index_file_name = nullptr;
+
+  thd->set_slow_log_for_admin_command();
+
+#ifdef WITH_WSREP
   /* PXC doesn't recommend/allow ALTER operation on table created using
   non-transactional storage engine (like MyISAM, HEAP/MEMORY, etc....)
   except ALTER operation to change storage engine to transactional storage

@@ -11,6 +11,7 @@ test.nonexestint2	analyze	status	Operation failed
 OPTIMIZE TABLE nonexstent1;
 Table	Op	Msg_type	Msg_text
 test.nonexstent1	optimize	Error	Table 'test.nonexstent1' doesn't exist
+test.nonexstent1	optimize	Error	Table 'test.nonexstent1' doesn't exist
 test.nonexstent1	optimize	status	Operation failed
 INSERT INTO t1 VALUES (1);
 ANALYZE TABLE t1, nonexistent3;

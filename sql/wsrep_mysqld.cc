@@ -17,6 +17,8 @@
 #include "mysql/plugin.h"
 #include "mysqld.h"
 #include "rpl_slave.h"
+#include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
+#include "sql/dd/types/table.h"
 #include "sql/key_spec.h"
 #include "sql/sql_alter.h"
 #include "sql/sql_lex.h"
@@ -1628,7 +1630,8 @@ wsrep::key_array wsrep_prepare_keys_for_alter_add_fk(const char *child_table_db,
 wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
                                             const TABLE_LIST *table_list,
                                             dd::Tablespace_table_ref_vec *trefs,
-                                            Alter_info *alter_info) {
+                                            Alter_info *alter_info,
+                                            wsrep::key_array *fk_tables) {
   wsrep::key_array ret;
   if (db || table) {
     ret.push_back(wsrep_prepare_key_for_toi(db, table, wsrep::key::exclusive));
@@ -1653,7 +1656,95 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
                                               wsrep::key::exclusive));
     }
   }
+  if (fk_tables && !fk_tables->empty()) {
+    ret.insert(ret.end(), fk_tables->begin(), fk_tables->end());
+  }
   return ret;
+}
+
+/*
+ * Collect wsrep keys corresponding to tables that are referencing given table
+ */
+static bool collect_fk_children(const dd::Table *table_def,
+                                wsrep::key_array *keys) {
+  for (const dd::Foreign_key_parent *fk : table_def->foreign_key_parents()) {
+    keys->push_back(wsrep_prepare_key_for_toi(fk->child_schema_name().c_str(),
+                                              fk->child_table_name().c_str(),
+                                              wsrep::key::shared));
+  }
+  return false;
+}
+
+void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
+                               wsrep::key_array *keys) {
+  if (!WSREP(thd) || !WSREP_CLIENT(thd)) return;
+  TABLE_LIST *table;
+
+  thd->mdl_context.release_transactional_locks();
+  MDL_savepoint mdl_savepoint = thd->mdl_context.mdl_savepoint();
+
+  uint counter;
+  if (open_temporary_tables(thd, tables) ||
+      open_tables(thd, &tables, &counter,
+                  MYSQL_OPEN_FORCE_SHARED_HIGH_PRIO_MDL)) {
+    WSREP_DEBUG("unable to open table for FK checks for %s", thd->query().str);
+  }
+
+  for (table = tables; table; table = table->next_local) {
+    if (!is_temporary_table(table) && table->table) {
+      const dd::Table *table_obj = nullptr;
+      dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+      if (thd->dd_client()->acquire(
+              dd::String_type(table->table->s->db.str),
+              dd::String_type(table->table->s->table_name.str), &table_obj)) {
+        assert(0);
+      }
+      collect_fk_children(table_obj, keys);
+    }
+  }
+
+  /* close the table and release MDL locks */
+  close_thread_tables(thd);
+  thd->mdl_context.rollback_to_savepoint(mdl_savepoint);
+  for (table = tables; table; table = table->next_local) {
+    table->table = NULL;
+    table->mdl_request.ticket = NULL;
+  }
+}
+
+void wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *tables,
+                                  wsrep::key_array *keys) {
+  if (!WSREP(thd) || !WSREP_CLIENT(thd)) return;
+  TABLE_LIST *table;
+
+  thd->mdl_context.release_transactional_locks();
+  MDL_savepoint mdl_savepoint = thd->mdl_context.mdl_savepoint();
+
+  uint counter;
+  if (open_temporary_tables(thd, tables) ||
+      open_tables(thd, &tables, &counter,
+                  MYSQL_OPEN_FORCE_SHARED_HIGH_PRIO_MDL)) {
+    WSREP_DEBUG("unable to open table for FK checks for %s", thd->query().str);
+  }
+  for (table = tables; table; table = table->next_local) {
+    if (!is_temporary_table(table) && table->table) {
+      for (TABLE_SHARE_FOREIGN_KEY_INFO *fk = table->table->s->foreign_key;
+           fk < table->table->s->foreign_key + table->table->s->foreign_keys;
+           ++fk) {
+        WSREP_INFO("(p) appended fkey %s", fk->referenced_table_name.str);
+        keys->push_back(wsrep_prepare_key_for_toi(fk->referenced_table_db.str,
+                                                  fk->referenced_table_name.str,
+                                                  wsrep::key::shared));
+      }
+    }
+  }
+  /* close the table and release MDL locks */
+  close_thread_tables(thd);
+  thd->mdl_context.rollback_to_savepoint(mdl_savepoint);
+  for (table = tables; table; table = table->next_local) {
+    table->table = NULL;
+    table->mdl_request.ticket = NULL;
+  }
 }
 
 /*
@@ -1987,7 +2078,8 @@ static void free_gtid_event_buf(THD *thd) {
 static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
                            const TABLE_LIST *table_list,
                            dd::Tablespace_table_ref_vec *trefs,
-                           Alter_info *alter_info) {
+                           Alter_info *alter_info,
+                           wsrep::key_array *fk_tables) {
   uchar *buf(0);
   size_t buf_len(0);
   int buf_err;
@@ -2056,8 +2148,8 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
   struct wsrep_buf buff = {buf, buf_len};
 
-  wsrep::key_array key_array =
-      wsrep_prepare_keys_for_toi(db_, table_, table_list, trefs, alter_info);
+  wsrep::key_array key_array = wsrep_prepare_keys_for_toi(
+      db_, table_, table_list, trefs, alter_info, fk_tables);
 
   THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
@@ -2192,7 +2284,8 @@ static void wsrep_RSU_end(THD *thd) {
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const TABLE_LIST *table_list,
                              dd::Tablespace_table_ref_vec *trefs,
-                             Alter_info *alter_info) {
+                             Alter_info *alter_info,
+                             wsrep::key_array *fk_tables) {
   /*
     No isolation for applier or replaying threads.
    */
@@ -2274,7 +2367,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   if (thd->variables.wsrep_on && wsrep_thd_is_local(thd)) {
     switch (thd->variables.wsrep_OSU_method) {
       case WSREP_OSU_TOI:
-        ret = wsrep_TOI_begin(thd, db_, table_, table_list, trefs, alter_info);
+        ret = wsrep_TOI_begin(thd, db_, table_, table_list, trefs, alter_info,
+                              fk_tables);
         break;
       case WSREP_OSU_RSU:
         ret = wsrep_RSU_begin(thd, db_, table_);

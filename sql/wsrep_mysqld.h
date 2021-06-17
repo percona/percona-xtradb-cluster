@@ -236,6 +236,11 @@ extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(
 extern void wsrep_last_committed_id(wsrep_gtid_t *gtid);
 extern int wsrep_check_opts(int argc, char *const *argv);
 extern void wsrep_prepend_PATH(const char *path);
+void wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *table,
+                                  wsrep::key_array *keys);
+void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
+                               wsrep::key_array *keys);
+
 /* some inline functions are defined in wsrep_mysqld_inl.h */
 
 /* Provide a wrapper of the WSREP_ON macro for plugins to use */
@@ -427,7 +432,8 @@ class Alter_info;
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const TABLE_LIST *table_list,
                              dd::Tablespace_table_ref_vec *trefs = NULL,
-                             Alter_info *alter_info = NULL);
+                             Alter_info *alter_info = NULL,
+                             wsrep::key_array *fk_tables = NULL);
 bool wsrep_thd_is_in_to_isolation(THD *thd, bool flock);
 void wsrep_to_isolation_end(THD *thd);
 
