@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -195,7 +195,7 @@ static void handle_bootstrap_impl(THD *thd)
 #endif
         break;
       default:
-        DBUG_ASSERT(false);
+        assert(false);
         break;
       }
     }
@@ -233,7 +233,7 @@ static void handle_bootstrap_impl(THD *thd)
         break;
 
       default:
-        DBUG_ASSERT(false);
+        assert(false);
         break;
       }
 
