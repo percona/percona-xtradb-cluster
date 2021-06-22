@@ -1846,6 +1846,11 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock) {
 
     xid_state->set_state(XID_STATE::XA_PREPARED);
   }
+
+#ifdef WITH_WSREP
+  DEBUG_SYNC(thd, "wsrep_before_commit");
+#endif
+
   if (error || (error = tc_log->commit(thd, all))) {
     ha_rollback_trans(thd, all);
     error = 1;
