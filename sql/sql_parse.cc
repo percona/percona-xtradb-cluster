@@ -1008,14 +1008,25 @@ bool do_command(THD *thd)
   if wsrep_query_state = QUERY_EXEC then thd is not added to rollback thread
   instead it is left out for do_command and dispatch_command to do an explicit
   rollback. */
-  if (WSREP(thd))
+  if (WSREP_ON)
   {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     wsrep_thd_set_query_state(thd, QUERY_IDLE);
-    if (thd->wsrep_conflict_state==MUST_ABORT)
+    if (thd->wsrep_conflict_state == MUST_ABORT)
     {
       wsrep_client_rollback(thd);
+      thd->killed= THD::NOT_KILLED;
+      thd->wsrep_conflict_state= NO_CONFLICT;
+      if(thd->in_multi_stmt_transaction_mode()) {
+        mysql_reset_thd_for_next_command(thd);
+        my_message(ER_LOCK_DEADLOCK,
+                   "WSREP detected deadlock/conflict and aborted the"
+                   " transaction. Try restarting the transaction", MYF(0));
+        WSREP_DEBUG("WSREP detected deadlock/conflict for SQL: %s",
+                    WSREP_QUERY(thd));
+      }
     }
+
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
 #endif /* WITH_WSREP */
@@ -1831,7 +1842,8 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 
 #ifdef WITH_WSREP
 
-  if (WSREP(thd)) {
+  if (WSREP_ON)
+  {
     if (!thd->in_multi_stmt_transaction_mode())
     {
       thd->wsrep_PA_safe= true;
@@ -1848,17 +1860,20 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     {
       wsrep_client_rollback(thd);
     }
-    if (thd->wsrep_conflict_state== ABORTED) 
+    if (thd->wsrep_conflict_state== ABORTED)
     {
-      my_message(ER_LOCK_DEADLOCK,
-                 "WSREP detected deadlock/conflict and aborted the"
-                 " transaction. Try restarting the transaction", MYF(0));
-      WSREP_DEBUG("WSREP detected deadlock/conflict for SQL: %s",
-                   WSREP_QUERY(thd));
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      thd->killed= THD::NOT_KILLED;
-      thd->wsrep_conflict_state= NO_CONFLICT;
-      goto dispatch_end;
+      /* We let COM_QUIT and COM_STMT_CLOSE to execute even if wsrep aborted. */
+      if (command != COM_STMT_CLOSE && command != COM_QUIT) {
+        my_message(ER_LOCK_DEADLOCK,
+                    "WSREP detected deadlock/conflict and aborted the"
+                    " transaction. Try restarting the transaction", MYF(0));
+        WSREP_DEBUG("WSREP detected deadlock/conflict for SQL: %s",
+                    WSREP_QUERY(thd));
+        thd->killed= THD::NOT_KILLED;
+        thd->wsrep_conflict_state= NO_CONFLICT;
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+        goto dispatch_end;
+      }
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
@@ -1872,8 +1887,15 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       break;
 
 #ifdef WITH_WSREP
-    wsrep_mysql_parse(thd, thd->query().str, thd->query().length,
-                      &parser_state, false);
+    if (WSREP_ON)
+    {
+      wsrep_mysql_parse(thd, thd->query().str, thd->query().length,
+                        &parser_state, false);
+    }
+    else
+    {
+      mysql_parse(thd, &parser_state, false);
+    }
 #else
     mysql_parse(thd, &parser_state, false);
 #endif /* WITH_WSREP */
@@ -1964,10 +1986,17 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       parser_state.reset(beginning_of_next_stmt, length);
       /* TODO: set thd->lex->sql_command to SQLCOM_END here */
 #ifdef WITH_WSREP
+    if (WSREP_ON)
+    {
       wsrep_mysql_parse(thd, beginning_of_next_stmt, length,
                         &parser_state, false);
-#else
+    }
+    else
+    {
       mysql_parse(thd, &parser_state, false);
+    }
+#else
+    mysql_parse(thd, &parser_state, false);
 #endif /* WITH_WSREP */
     }
 
@@ -8136,6 +8165,16 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     }
   }  while (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT);
+
+  if (!WSREP(thd) &&
+      !thd->get_stmt_da()->is_error() &&
+      thd->killed &&
+      thd->wsrep_conflict_state == MUST_ABORT)
+  {
+      thd->get_stmt_da()->set_overwrite_status(true);
+      thd->get_stmt_da()->set_error_status(ER_QUERY_INTERRUPTED);
+      thd->get_stmt_da()->set_overwrite_status(false);
+  }
 
   if (thd->wsrep_retry_query)
   {

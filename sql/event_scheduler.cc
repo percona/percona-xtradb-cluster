@@ -363,7 +363,7 @@ Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event)
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
 
     thd->wsrep_exec_mode= LOCAL_STATE;
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
 
     thd->variables.wsrep_on= TRUE;
 
