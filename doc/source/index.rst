@@ -92,6 +92,8 @@ Features
    features/highavailability
    features/multisource-replication
    features/pxc-strict-mode
+   features/online-schema-upgrade
+   features/nbo
 
 PXC Security
 ============
