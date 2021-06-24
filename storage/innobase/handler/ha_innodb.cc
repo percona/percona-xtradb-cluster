@@ -132,9 +132,9 @@ enum_tx_isolation thd_get_trx_isolation(const THD* thd);
 #include "sync0sync.h"
 #include "xtradb_i_s.h"
 
+#ifdef WITH_WSREP
 /* for ha_innopart, Native InnoDB Partitioning. */
 #include "ha_innopart.h"
-#ifdef WITH_WSREP
 #include "../storage/innobase/include/ut0byte.h"
 #include "wsrep_api.h"
 #include <wsrep_mysqld.h>
@@ -1851,6 +1851,10 @@ ulong
 innodb_page_size_validate(
 	ulong	page_size)
 {
+#ifndef WITH_WSREP
+	ulong		n;
+#endif
+
 	DBUG_ENTER("innodb_page_size_validate");
 
 #ifdef WITH_WSREP
@@ -1861,7 +1865,6 @@ innodb_page_size_validate(
 		DBUG_RETURN(UNIV_PAGE_SIZE_SHIFT_ORIG);
 	}
 #else
-	ulong		n;
 
 	for (n = UNIV_PAGE_SIZE_SHIFT_MIN;
 	     n <= UNIV_PAGE_SIZE_SHIFT_MAX;
@@ -1931,11 +1934,6 @@ thd_trx_arbitrate(THD* requestor, THD* holder)
 	THD*	victim = thd_tx_arbitrate(requestor, holder);
 
 	ut_a(victim == NULL || victim == requestor || victim == holder);
-#if 0
-#ifdef WITH_WSREP
-        return (NULL);
-#endif /* WITH_WSREP */
-#endif /* 0 */
 	return(victim);
 }
 
@@ -3477,7 +3475,7 @@ ha_innobase::ha_innobase(
 	m_user_thd(),
 #ifdef WITH_WSREP
 	m_share(),
-#endif
+#endif /* WITH_WSREP */
 	m_int_table_flags(HA_REC_NOT_IN_SEQ
 			  | HA_NULL_IN_KEY
 			  | HA_CAN_INDEX_BLOBS
@@ -7276,7 +7274,7 @@ ha_innobase::open(
 		}
 #else
 		free_share(m_share);
-#endif
+#endif /* WITH_WSREP */
 		DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
 	}
 
@@ -7388,7 +7386,7 @@ ha_innobase::open(
 		free_share(m_share);
 #ifdef WITH_WSREP
 		m_share = NULL;
-#endif
+#endif /* WITH_WSREP */
 		set_my_errno(ENOENT);
 		int ret_err = HA_ERR_TABLESPACE_MISSING;
 
@@ -9306,7 +9304,9 @@ ha_innobase::write_row(
 #endif
 
 	DBUG_ENTER("ha_innobase::write_row");
+#ifdef WITH_WSREP
 	DEBUG_SYNC(m_user_thd, "ha_innobase_write_row");
+#endif
 
 	if (dict_table_is_intrinsic(m_prebuilt->table)) {
 		DBUG_RETURN(intrinsic_table_write_row(record));
@@ -9536,10 +9536,12 @@ no_commit:
 		build_template(true);
 	}
 
+#ifdef WITH_WSREP
 	/* debug sync point has a special significance given the location
 	where-in auto-inc value is generated but row insert action is not yet
 	started. */
 	DEBUG_SYNC(m_user_thd, "pxc_autoinc_val_generated");
+#endif /* WITH_WSREP */
 
 	innobase_srv_conc_enter_innodb(m_prebuilt);
 
@@ -10366,7 +10368,9 @@ ha_innobase::update_row(
 	trx_t*		trx = thd_to_trx(m_user_thd);
 
 	DBUG_ENTER("ha_innobase::update_row");
+#ifdef WITH_WSREP
 	DEBUG_SYNC(m_user_thd, "ha_innobase_update_row");
+#endif /* WITH_WSREP */
 
 	ut_a(m_prebuilt->trx == trx);
 
@@ -19542,7 +19546,7 @@ get_share(
 	INNOBASE_SHARE*	share = NULL;
 #else
 	INNOBASE_SHARE*	share;
-#endif
+#endif /* WITH_WSREP */
 
 	mysql_mutex_lock(&innobase_share_mutex);
 

@@ -39,7 +39,9 @@
 #include "binlog.h"
 #include "item_cmpfunc.h" // Item_func_eq
 #include "debug_sync.h"   // DEBUG_SYNC
+#ifdef WITH_WSREP
 #include "sql_audit.h"
+#endif /* WITH_WSREP */
 
 #include <algorithm>
 #include <functional>

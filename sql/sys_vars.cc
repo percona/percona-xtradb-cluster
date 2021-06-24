@@ -1357,6 +1357,7 @@ static Sys_var_mybool Sys_binlog_rows_query(
        SESSION_VAR(binlog_rows_query_log_events),
        CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
+#ifdef WITH_WSREP
 static bool binlog_order_commits_check(sys_var *self, THD *thd, set_var *var)
 {
   if (WSREP(thd))
@@ -1370,14 +1371,19 @@ static bool binlog_order_commits_check(sys_var *self, THD *thd, set_var *var)
   }
   return false;
 }
+#endif /* WITH_WSREP */
 
 static Sys_var_mybool Sys_binlog_order_commits(
        "binlog_order_commits",
        "Issue internal commit calls in the same order as transactions are"
        " written to the binary log. Default is to order commits.",
        GLOBAL_VAR(opt_binlog_order_commits),
+#ifdef WITH_WSREP
        CMD_LINE(OPT_ARG), DEFAULT(TRUE), NO_MUTEX_GUARD,
        NOT_IN_BINLOG, ON_CHECK(binlog_order_commits_check), ON_UPDATE(0));
+#else
+       CMD_LINE(OPT_ARG), DEFAULT(TRUE));
+#endif /* WITH_WSREP */
 
 static Sys_var_ulong Sys_bulk_insert_buff_size(
        "bulk_insert_buffer_size", "Size of tree cache used in bulk "
@@ -3334,7 +3340,9 @@ static bool check_require_secure_transport(sys_var *self, THD *thd, set_var *var
 static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 {
   bool result= true;
+#ifdef WITH_WSREP
   bool own_lock= false;
+#endif /* WITH_WSREP */
 
   my_bool new_read_only= read_only; // make a copy before releasing a mutex
   DBUG_ENTER("sys_var_opt_readonly::update");
@@ -3385,7 +3393,11 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
   read_only= opt_readonly;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
+#ifdef WITH_WSREP
   if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
+  if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif /* WITH_WSREP */
     goto end_with_mutex_unlock;
 
   if ((result= thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -3398,10 +3410,14 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 
  end_with_read_lock:
   /* Release the lock */
+#ifdef WITH_WSREP
   if (own_lock)
   {
+#endif /* WITH_WSREP */
     thd->global_read_lock.unlock_global_read_lock(thd);
+#ifdef WITH_WSREP
   }
+#endif /* WITH_WSREP */
  end_with_mutex_unlock:
   mysql_mutex_lock(&LOCK_global_system_variables);
  end:
@@ -3411,7 +3427,9 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 
 static bool fix_super_read_only(sys_var *self, THD *thd, enum_var_type type)
 {
+#ifdef WITH_WSREP
   bool own_lock= false;
+#endif /* WITH_WSREP */
   DBUG_ENTER("sys_var_opt_super_readonly::update");
 
   /* return if no changes: */
@@ -3450,7 +3468,11 @@ static bool fix_super_read_only(sys_var *self, THD *thd, enum_var_type type)
   super_read_only = opt_super_readonly;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
+#ifdef WITH_WSREP
   if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
+  if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif /* WITH_WSREP */
     goto end_with_mutex_unlock;
 
   if ((result = thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -3460,7 +3482,9 @@ static bool fix_super_read_only(sys_var *self, THD *thd, enum_var_type type)
 
   end_with_read_lock:
     /* Release the lock */
+#ifdef WITH_WSREP
     if (own_lock)
+#endif /* WITH_WSREP */
       thd->global_read_lock.unlock_global_read_lock(thd);
   end_with_mutex_unlock:
     mysql_mutex_lock(&LOCK_global_system_variables);
@@ -6199,7 +6223,11 @@ static Sys_var_uint Sys_sync_binlog_period(
        " every #th write to the file. Use 0 to disable synchronous"
        " flushing",
        GLOBAL_VAR(sync_binlog_period), CMD_LINE(REQUIRED_ARG),
+#ifdef WITH_WSREP
        VALID_RANGE(0, UINT_MAX), DEFAULT(0), BLOCK_SIZE(1));
+#else
+       VALID_RANGE(0, UINT_MAX), DEFAULT(1), BLOCK_SIZE(1));
+#endif /* WITH_WSREP */
 
 static Sys_var_uint Sys_sync_masterinfo_period(
        "sync_master_info", "Synchronously flush master info to disk "

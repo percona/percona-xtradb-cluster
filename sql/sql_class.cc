@@ -1988,7 +1988,6 @@ void THD::init(void)
   wsrep_skip_SE_checkpoint = false;
   wsrep_skip_wsrep_hton   = false;
 #endif /* WITH_WSREP */
-  status_var_aggregated= false;
   binlog_row_event_extra_data= 0;
 
   if (variables.sql_log_bin)
@@ -4548,10 +4547,11 @@ extern "C" int thd_binlog_format(const MYSQL_THD thd)
 #ifdef WITH_WSREP
   if (((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()) &&
       !(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF))
+    return (int) WSREP_BINLOG_FORMAT(thd->variables.binlog_format);
 #else
   if (mysql_bin_log.is_open() && (thd->variables.option_bits & OPTION_BIN_LOG))
-#endif
-    return (int) WSREP_BINLOG_FORMAT(thd->variables.binlog_format);
+    return (int) thd->variables.binlog_format;
+#endif /* WITH_WSREP */
   else
     return BINLOG_FORMAT_UNSPEC;
 }

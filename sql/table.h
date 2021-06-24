@@ -2216,6 +2216,7 @@ struct TABLE_LIST
     return view != NULL ? view_name.str : table_name;
   }
 
+#ifdef WITH_WSREP
   /**
      @brief Returns the table alias that this TABLE_LIST represents.
      This is needed to get the real name of the temporary table as the normal
@@ -2225,6 +2226,7 @@ struct TABLE_LIST
      @details The unqualified table alias
    */
   const char *get_table_alias() const { return alias; }
+#endif /* WITH_WSREP */
 
   int fetch_number_of_rows();
   bool update_derived_keys(Field*, Item**, uint);

@@ -3592,9 +3592,8 @@ Kill all transactions that are blocking this transaction from acquiring locks.
 void
 trx_kill_blocking(trx_t* trx)
 {
-	DBUG_ENTER("trx_kill_blocking");
 	if (trx->hit_list.empty()) {
-		DBUG_VOID_RETURN;
+		return;
 	}
 
 	DEBUG_SYNC_C("trx_kill_blocking_enter");
@@ -3754,5 +3753,4 @@ trx_kill_blocking(trx_t* trx)
 
 		row_mysql_freeze_data_dictionary(trx);
 	}
-	DBUG_VOID_RETURN;
 }

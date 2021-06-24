@@ -27,7 +27,10 @@
 #include "sql_class.h"             // THD
 #include "debug_sync.h"            // DEBUG_SYNC
 #include "binlog.h"
+
+#ifdef WITH_WSREP
 #include "rpl_group_replication.h" // is_group_replication_plugin_loaded()
+#endif /* WITH_WSREP */
 
 #include <vector>
 

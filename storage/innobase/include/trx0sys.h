@@ -311,6 +311,7 @@ trx_sys_read_wsrep_checkpoint(
         XID* xid); /*!< out: WSREP XID */
 #endif /* WITH_WSREP */
 
+/*===================================*/
 /*****************************************************************//**
 Initializes the tablespace tag system. */
 void
