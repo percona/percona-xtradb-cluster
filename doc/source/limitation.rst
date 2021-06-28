@@ -83,3 +83,16 @@ The following limitations apply to |PXC|:
 
      Galera Documentation: Tables without Primary Keys
         http://galeracluster.com/documentation-webpages/limitations.html#tables-without-primary-keys
+
+* Avoid reusing the names of a persistent table for a temporary table. Although MySQL allows a temporary table and a persistent table to have the same name, this approach is not recommended. If a persistent table name matches a temporary table name, Galera Cluster blocks the replication to that table.
+
+    With wsrep_debug set to *1*, the error log may contain the following message:
+
+  .. code-block:: text
+
+    ... [Note] WSREP: TO BEGIN: -1, 0 : create table t (i int) engine=innodb
+    ... [Note] WSREP: TO isolation skipped for: 1, sql: create table t (i int) engine=innodb.Only temporary tables affected.
+
+  .. seealso:: `MySQL Documentation: Problems with temporary tables
+		<https://dev.mysql.com/doc/refman/5.7/en/temporary-table-problems.html>`_
+
