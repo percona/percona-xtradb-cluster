@@ -131,11 +131,11 @@ Total time spent in a paused state measured in nanoseconds.
 
 .. variable:: wsrep_flow_control_recv
 
-Number of ``FC_PAUSE`` events received since the last status query.
+The number of ``FC_PAUSE`` events received since the last status query. Unlike most status variables, this counter does not reset each time you run the query. This counter is reset when the server restarts.
 
 .. variable:: wsrep_flow_control_sent
 
-Number of ``FC_PAUSE`` events sent since the last status query.
+The number of ``FC_PAUSE`` events sent since the last status query. Unlike most status variables, this counter does not reset each time you run the query. This counter is reset when the server restarts.
 
 .. variable:: wsrep_flow_control_status
 
