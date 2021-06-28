@@ -16,6 +16,14 @@ select * from e1;
 id	text
 1	aaaaa
 2	bbbbb
+Killing server ...
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+Restarting node 2 ...
+# restart
+select * from e1;
+id	text
+1	aaaaa
+2	bbbbb
 #shutting down node-2
 #node-1
 INSERT INTO e1(text) VALUES('aaaaa2');
