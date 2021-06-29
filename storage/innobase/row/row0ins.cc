@@ -1269,22 +1269,23 @@ static NO_INLINE MY_ATTRIBUTE((warn_unused_result)) dberr_t
     btr_pcur_store_position(cascade->pcur, mtr);
   }
 
-  mtr_commit(mtr);
-
   ut_a(cascade->pcur->m_rel_pos == BTR_PCUR_ON);
 
   cascade->state = UPD_NODE_UPDATE_CLUSTERED;
 
 #ifdef WITH_WSREP
-  err = wsrep_append_foreign_key(thr_get_trx(thr), foreign,
-                                 cascade->pcur->m_old_rec, clust_index, false,
-                                 WSREP_SERVICE_KEY_EXCLUSIVE);
+  err =
+      wsrep_append_foreign_key(thr_get_trx(thr), foreign, clust_rec,
+                               clust_index, false, WSREP_SERVICE_KEY_EXCLUSIVE);
   if (err != DB_SUCCESS) {
     ib::warn() << "WSREP: foreign key append failed: " << err;
+    mtr_commit(mtr);
   } else
 #endif /* WITH_WSREP */
-
+  {
+    mtr_commit(mtr);
     err = row_update_cascade_for_mysql(thr, cascade, foreign->foreign_table);
+  }
 
   /* Release the data dictionary latch for a while, so that we do not
   starve other threads from doing CREATE TABLE etc. if we have a huge
