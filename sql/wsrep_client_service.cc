@@ -271,6 +271,7 @@ enum wsrep::provider::status Wsrep_client_service::replay() {
   replayer_thd->set_time();
   replayer_thd->set_command(COM_SLEEP);
   replayer_thd->reset_for_next_command();
+  replayer_thd->set_new_thread_id();
 
   enum wsrep::provider::status ret;
   {
