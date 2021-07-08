@@ -510,7 +510,9 @@ void Sql_cmd_truncate_table::truncate_base(THD *thd, TABLE_LIST *table_ref) {
       return;
     }
   } else {
-    WSREP_TO_ISOLATION_BEGIN_FK_TABLES(NULL, NULL, table_ref, &keys) { return; }
+    WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(NULL, NULL, table_ref, &keys) {
+      return;
+    }
   }
 #endif /* WITH_WSREP */
 

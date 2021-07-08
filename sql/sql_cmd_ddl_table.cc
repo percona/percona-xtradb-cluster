@@ -481,9 +481,9 @@ bool Sql_cmd_create_table::execute(THD *thd) {
 
         /* Note we are explictly opening the macro as we need to perform
         cleanup action on TOI failure. */
-        if (WSREP(thd) &&
-            wsrep_to_isolation_begin(thd, create_table->db,
-                                     create_table->table_name, NULL)) {
+        if (WSREP(thd) && wsrep_to_isolation_begin(thd, create_table->db,
+                                                   create_table->table_name,
+                                                   NULL, NULL, &alter_info)) {
           if (!thd->lex->is_ignore() && thd->is_strict_mode())
             thd->pop_internal_handler();
           if (create_info.tablespace) {

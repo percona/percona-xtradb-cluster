@@ -566,7 +566,7 @@ static bool wsrep_toi_replication(THD *thd, TABLE_LIST *tables) {
   if (keys.empty()) {
     WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, tables);
   } else {
-    WSREP_TO_ISOLATION_BEGIN_FK_TABLES(NULL, NULL, tables, &keys) {
+    WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(NULL, NULL, tables, &keys) {
       return true;
     }
   }

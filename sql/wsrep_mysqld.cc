@@ -18,6 +18,7 @@
 #include "mysqld.h"
 #include "rpl_slave.h"
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
+#include "sql/dd/dictionary.h"
 #include "sql/dd/types/table.h"
 #include "sql/key_spec.h"
 #include "sql/sql_alter.h"
@@ -1644,7 +1645,7 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
   }
   if (alter_info && (alter_info->flags & Alter_info::ADD_FOREIGN_KEY)) {
     wsrep::key_array fk(wsrep_prepare_keys_for_alter_add_fk(
-        table_list->get_db_name(), alter_info));
+        (table_list ? table_list->get_db_name() : db), alter_info));
     if (!fk.empty()) {
       ret.insert(ret.end(), fk.begin(), fk.end());
     }
@@ -1663,88 +1664,68 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
 }
 
 /*
- * Collect wsrep keys corresponding to tables that are referencing given table
+ * Iterate over the list of tables and for each non-temporary invoke the
+ * action function.
  */
-static bool collect_fk_children(const dd::Table *table_def,
-                                wsrep::key_array *keys) {
-  for (const dd::Foreign_key_parent *fk : table_def->foreign_key_parents()) {
-    keys->push_back(wsrep_prepare_key_for_toi(fk->child_schema_name().c_str(),
-                                              fk->child_table_name().c_str(),
-                                              wsrep::key::shared));
-  }
-  return false;
-}
-
-void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
-                               wsrep::key_array *keys) {
+using action_fn = std::function<void(const dd::Table *)>;
+static void wsrep_do_action_for_tables(THD *thd, TABLE_LIST *tables,
+                                       action_fn action) {
   if (!WSREP(thd) || !WSREP_CLIENT(thd)) return;
-  TABLE_LIST *table;
 
-  thd->mdl_context.release_transactional_locks();
-  MDL_savepoint mdl_savepoint = thd->mdl_context.mdl_savepoint();
+  for (auto table = tables; table; table = table->next_local) {
+    if (!is_temporary_table(table)) {
+      MDL_ticket *mdl_ticket = nullptr;
+      if (dd::acquire_shared_table_mdl(thd, table->db, table->table_name, false,
+                                       &mdl_ticket)) {
+        assert(0);
+        continue;
+      }
 
-  uint counter;
-  if (open_temporary_tables(thd, tables) ||
-      open_tables(thd, &tables, &counter,
-                  MYSQL_OPEN_FORCE_SHARED_HIGH_PRIO_MDL)) {
-    WSREP_DEBUG("unable to open table for FK checks for %s", thd->query().str);
-  }
-
-  for (table = tables; table; table = table->next_local) {
-    if (!is_temporary_table(table) && table->table) {
       const dd::Table *table_obj = nullptr;
       dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
-      if (thd->dd_client()->acquire(
-              dd::String_type(table->table->s->db.str),
-              dd::String_type(table->table->s->table_name.str), &table_obj)) {
+      if (thd->dd_client()->acquire(dd::String_type(table->db),
+                                    dd::String_type(table->table_name),
+                                    &table_obj)) {
         assert(0);
+        dd::release_mdl(thd, mdl_ticket);
+        continue;
       }
-      collect_fk_children(table_obj, keys);
-    }
-  }
 
-  /* close the table and release MDL locks */
-  close_thread_tables(thd);
-  thd->mdl_context.rollback_to_savepoint(mdl_savepoint);
-  for (table = tables; table; table = table->next_local) {
-    table->table = NULL;
-    table->mdl_request.ticket = NULL;
+      if (table_obj != nullptr) {
+        action(table_obj);
+      }
+
+      dd::release_mdl(thd, mdl_ticket);
+    }
   }
 }
 
+/*
+ * Collect wsrep keys corresponding to child tables
+ */
+void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
+                               wsrep::key_array *keys) {
+  wsrep_do_action_for_tables(thd, tables, [keys](const dd::Table *table_def) {
+    for (const auto fk : table_def->foreign_key_parents()) {
+      keys->push_back(wsrep_prepare_key_for_toi(fk->child_schema_name().c_str(),
+                                                fk->child_table_name().c_str(),
+                                                wsrep::key::shared));
+    }
+  });
+}
+
+/*
+ * Collect wsrep keys corresponding to parent tables
+ */
 void wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *tables,
                                   wsrep::key_array *keys) {
-  if (!WSREP(thd) || !WSREP_CLIENT(thd)) return;
-  TABLE_LIST *table;
-
-  thd->mdl_context.release_transactional_locks();
-  MDL_savepoint mdl_savepoint = thd->mdl_context.mdl_savepoint();
-
-  uint counter;
-  if (open_temporary_tables(thd, tables) ||
-      open_tables(thd, &tables, &counter,
-                  MYSQL_OPEN_FORCE_SHARED_HIGH_PRIO_MDL)) {
-    WSREP_DEBUG("unable to open table for FK checks for %s", thd->query().str);
-  }
-  for (table = tables; table; table = table->next_local) {
-    if (!is_temporary_table(table) && table->table) {
-      for (TABLE_SHARE_FOREIGN_KEY_INFO *fk = table->table->s->foreign_key;
-           fk < table->table->s->foreign_key + table->table->s->foreign_keys;
-           ++fk) {
-        WSREP_INFO("(p) appended fkey %s", fk->referenced_table_name.str);
-        keys->push_back(wsrep_prepare_key_for_toi(fk->referenced_table_db.str,
-                                                  fk->referenced_table_name.str,
-                                                  wsrep::key::shared));
-      }
+  wsrep_do_action_for_tables(thd, tables, [keys](const dd::Table *table_def) {
+    for (const auto fk : table_def->foreign_keys()) {
+      keys->push_back(wsrep_prepare_key_for_toi(
+          fk->referenced_table_schema_name().c_str(),
+          fk->referenced_table_name().c_str(), wsrep::key::shared));
     }
-  }
-  /* close the table and release MDL locks */
-  close_thread_tables(thd);
-  thd->mdl_context.rollback_to_savepoint(mdl_savepoint);
-  for (table = tables; table; table = table->next_local) {
-    table->table = NULL;
-    table->mdl_request.ticket = NULL;
-  }
+  });
 }
 
 /*
