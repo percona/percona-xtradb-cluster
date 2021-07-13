@@ -153,7 +153,9 @@ get_sources(){
     WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep-lib/wsrep-API/v26/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep-lib.cmake" | cut -d '"' -f2)"
     WSREP_REV="$(test -r WSREP-REVISION && cat WSREP-REVISION)"
     REVISION=$(git rev-parse --short HEAD)
-    GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
+    pushd $SOURCEDIR/percona-xtradb-cluster-galera
+    GALERA_REVNO=$(git rev-parse --short HEAD)
+    popd
     if [ -f VERSION ]; then
         source VERSION
     elif [ -f MYSQL_VERSION ]; then

@@ -257,7 +257,15 @@ PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep-lib/wsrep-API/v26/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep-lib.cmake" | cut -d '"' -f2)"
 
 if [[ $COPYGALERA -eq 0 ]];then
-    GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
+	if [[ -n "$(which git)" ]] && [[ -f "$SOURCEDIR/percona-xtradb-cluster-galera/.git" ]]; then
+		pushd $SOURCEDIR/percona-xtradb-cluster-galera
+		GALERA_REVISION=$(git rev-parse --short HEAD)
+		popd
+	else
+		# When in troubles while getting Galera commit hash, fall back to well known
+		# and distinguishable value.
+		GALERA_REVISION="0000000"
+	fi
 fi
 TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
