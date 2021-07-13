@@ -3,7 +3,6 @@ Table	Op	Msg_type	Msg_text
 test.t0	optimize	Warning	Truncated incorrect sort_buffer_size value: '0'
 test.t0	optimize	Warning	Truncated incorrect myisam_repair_threads value: '0'
 test.t0	optimize	Error	Table 'test.t0' doesn't exist
-test.t0	optimize	Error	Table 'test.t0' doesn't exist
 test.t0	optimize	status	Operation failed
 DROP TABLE IF EXISTS t1, t2, x1, x2;
 CREATE TABLE t1 (f1 INTEGER);

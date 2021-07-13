@@ -159,8 +159,8 @@ extern const LEX_CSTRING command_name[];
       wsrep_to_isolation_begin(thd, db_, table_, table_list_))                \
     goto wsrep_error_label;
 
-#define WSREP_TO_ISOLATION_BEGIN_FK_TABLES(db_, table_, table_list_,          \
-                                           fk_tables)                         \
+#define WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(db_, table_, table_list_,       \
+                                              fk_tables)                      \
   if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
       !thd->lex->no_write_to_binlog &&                                        \
       wsrep_to_isolation_begin(thd, db_, table_, table_list_, nullptr,        \
@@ -175,7 +175,8 @@ extern const LEX_CSTRING command_name[];
 
 #define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)
 #define WSREP_TO_ISOLATION_BEGIN_ALTER(db_, table_, table_list_, alter_info_)
-#define WSREP_TO_ISOLATION_BEGIN_FK_TABLES(db_, table_, table_list_, fk_tables_)
+#define WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(db_, table_, table_list_, \
+                                              fk_tables_)
 #define WSREP_TO_ISOLATION_END
 #define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)
 #define WSREP_SYNC_WAIT(thd_, before_)
