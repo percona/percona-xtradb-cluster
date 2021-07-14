@@ -288,6 +288,7 @@ extern "C" bool wsrep_thd_set_wsrep_aborter(THD *bf_thd, THD *victim_thd)
     return true;
   }
   victim_thd->wsrep_aborter = bf_thd->thread_id();
+  assert(bf_thd->thread_id() != 0);
   WSREP_DEBUG("wsrep_thd_set_wsrep_aborter setting wsrep_aborter %u",
               victim_thd->wsrep_aborter);
   return false;
