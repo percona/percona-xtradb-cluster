@@ -1127,34 +1127,8 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
     "CREATE USER 'mysql.pxc.sst.user'@localhost "
     " IDENTIFIED BY '%s' ACCOUNT LOCK;",
     "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
-  /*
-    This is the code that uses the mysql.pxc.sst.role
-    However there is a bug in 8.0.15 where the "GRANT CREATE ON DBNAME.*" when
-    used in a role, does not allow the user with the role to create a database.
-    So we have to explicitly grant the privileges.
-  */
-#if 0
     "GRANT 'mysql.pxc.sst.role'@localhost TO 'mysql.pxc.sst.user'@localhost;", nullptr,
     "SET DEFAULT ROLE 'mysql.pxc.sst.role'@localhost to 'mysql.pxc.sst.user'@localhost;", nullptr,
-#else
-    /*
-      Explicit privileges needed to run XtraBackup.  This is only used due
-      to the bug in 8.0.15 described above.
-    */
-    "GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, "
-    "SUPER ON *.* TO 'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-    "GRANT CREATE, INSERT, SELECT ON PERCONA_SCHEMA.xtrabackup_history TO "
-    "'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-    "GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-    "GRANT CREATE USER ON *.* to 'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-    "GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-#endif
-
     "ALTER USER 'mysql.pxc.sst.user'@localhost ACCOUNT UNLOCK;",
     nullptr,
     nullptr,
