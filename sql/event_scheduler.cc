@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -31,7 +31,9 @@
 #include "mysqld_thd_manager.h"      // Global_THD_manager
 #include "sql_error.h"               // Sql_condition
 #include "sql_class.h"               // THD
+#ifdef WITH_WSREP
 #include "debug_sync.h"
+#endif /* WITH_WSREP */
 
 /**
   @addtogroup Event_Scheduler
@@ -117,7 +119,7 @@ Event_worker_thread::print_warnings(THD *thd, Event_job_data *et)
       sql_print_information("%*s", static_cast<int>(err_msg.length()), err_msg.c_ptr());
       break;
     default:
-      DBUG_ASSERT(false);
+      assert(false);
     }
   }
   DBUG_VOID_RETURN;
@@ -313,11 +315,11 @@ Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event)
   Event_job_data job_data;
   bool res;
 
-  DBUG_ASSERT(thd->m_digest == NULL);
+  assert(thd->m_digest == NULL);
 
 #ifdef HAVE_PSI_STATEMENT_INTERFACE
   PSI_statement_locker_state state;
-  DBUG_ASSERT(thd->m_statement_psi == NULL);
+  assert(thd->m_statement_psi == NULL);
   thd->m_statement_psi= MYSQL_START_STATEMENT(& state,
                                               event->get_psi_info()->m_key,
                                               event->dbname.str,
@@ -363,7 +365,7 @@ Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event)
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
 
     thd->wsrep_exec_mode= LOCAL_STATE;
-    thd->wsrep_query_state= QUERY_EXEC;
+    wsrep_thd_set_query_state(thd, QUERY_EXEC);
 
     thd->variables.wsrep_on= TRUE;
 
@@ -381,9 +383,9 @@ Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event)
                           job_data.definer.str,
                           job_data.dbname.str, job_data.name.str);
 
+#ifdef WITH_WSREP
   DEBUG_SYNC(thd, "event_worker_thread_end");
 
-#ifdef WITH_WSREP
   if (WSREP(thd))
   {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -401,7 +403,7 @@ end:
   thd->m_statement_psi= NULL;
 #endif
 
-  DBUG_ASSERT(thd->m_digest == NULL);
+  assert(thd->m_digest == NULL);
 
   DBUG_PRINT("info", ("Done with Event %s.%s", event->dbname.str,
              event->name.str));
@@ -584,7 +586,7 @@ Event_scheduler::run(THD *thd)
     }
     else
     {
-      DBUG_ASSERT(thd->killed);
+      assert(thd->killed);
       DBUG_PRINT("info", ("job_data is NULL, the thread was killed"));
     }
     DBUG_PRINT("info", ("state=%s", scheduler_states_names[state].str));

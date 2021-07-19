@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -195,10 +195,11 @@ trx_sys_flush_max_trx_id(void)
 	mtr_t		mtr;
 	trx_sysf_t*	sys_header;
 
-#ifndef WITH_WSREP
+#ifdef WITH_WSREP
 	/* wsrep_fake_trx_id  violates this assert
 	 * Copied from trx_sys_get_new_trx_id
 	 */
+#else
 	ut_ad(trx_sys_mutex_own());
 #endif /* !WITH_WSREP */
 

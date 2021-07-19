@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2020, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2021, Oracle and/or its affiliates.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -390,6 +390,12 @@ INSERT INTO global_suppressions VALUES
  ("Difficult to find free blocks in the buffer pool.*"),
 
  ("InnoDB High Priority being used"),
+
+ /*
+   Warnings/errors seen when server is loaded with keyring plugin without
+   enabling pxc_encrypt_cluster_traffic.
+ */
+ ("You have enabled keyring plugin. SST encryption is mandatory."),
 
  ("THE_LAST_SUPPRESSION")||
 

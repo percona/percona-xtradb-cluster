@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -119,5 +119,9 @@
   Note! Reserved for use in MySQL Cluster
 */
 #define OPTION_ALLOW_BATCH              (1ULL << 36) // THD, intern (slave)
+
+#ifdef WITH_WSREP
+#define OPTION_BIN_LOG_INTERNAL_OFF          (1ULL << 37) // disable binlog, intern
+#endif
 
 #endif  /* QUERY_OPTIONS_INCLUDED */

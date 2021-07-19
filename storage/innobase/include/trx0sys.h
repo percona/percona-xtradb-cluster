@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2016, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -311,6 +311,7 @@ trx_sys_read_wsrep_checkpoint(
         XID* xid); /*!< out: WSREP XID */
 #endif /* WITH_WSREP */
 
+/*===================================*/
 /*****************************************************************//**
 Initializes the tablespace tag system. */
 void

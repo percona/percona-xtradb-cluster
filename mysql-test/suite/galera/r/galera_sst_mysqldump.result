@@ -24,7 +24,6 @@ INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 INSERT INTO t1 VALUES ('node2_committed_before');
 COMMIT;
-Unloading wsrep provider ...
 SET GLOBAL wsrep_cluster_address='';
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
@@ -478,3 +477,4 @@ CALL mtr.add_suppression("WSREP: Try 1/3: 'wsrep_sst_mysqldump.*");
 CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
 CALL mtr.add_suppression("InnoDB: Cannot open.*");
 CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
+CALL mtr.add_suppression("Recalculation of persistent statistics requested for table");

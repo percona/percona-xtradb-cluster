@@ -84,9 +84,12 @@ IF (NOT HAVE_THREAD_LOCAL)
   MESSAGE(FATAL_ERROR "No '__thread' support found. Not building MyRocks")
 ENDIF()
 
-IF (HAVE_SSE42 AND HAVE_PCLMUL)
-  add_compile_flags(${ROCKSDB_ROOT}/util/crc32c.cc COMPILE_FLAGS "-msse4.2 -mpclmul")
+IF (HAVE_SSE42)
   MESSAGE(STATUS "MyRocks: SSE42 support found")
+  add_compile_flags(${ROCKSDB_ROOT}/util/crc32c.cc COMPILE_FLAGS "-msse4.2") # use Fast_CRC32
+  IF (HAVE_PCLMUL)
+    add_compile_flags(${ROCKSDB_ROOT}/util/crc32c.cc COMPILE_FLAGS "-mpclmul") # use crc32c_3way instead of Fast_CRC32
+  ENDIF()
 ELSE()
   IF (ALLOW_NO_SSE42)
     MESSAGE(WARNING "No SSE42 support found and ALLOW_NO_SSE42 specified, building MyRocks but without SSE42/FastCRC32 support")
@@ -95,7 +98,7 @@ ELSE()
   ENDIF()
 ENDIF()
 
-IF (HAVE_AVX2)
+IF (HAVE_AVX2 AND NOT ROCKSDB_DISABLE_AVX2)
   add_compile_flags(${ROCKSDB_ROOT}/table/block_based/filter_policy.cc COMPILE_FLAGS "-mavx2")
 ENDIF()
 
@@ -115,7 +118,7 @@ IF (CMAKE_COMPILER_IS_GNUCXX)
   add_compile_options(-fno-builtin-memcmp)
 ENDIF()
 
-IF (CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
+IF (CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT ROCKSDB_DISABLE_MARCH_NATIVE)
   add_compile_options(-march=native)
 ENDIF()
 

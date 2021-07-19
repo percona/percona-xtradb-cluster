@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -205,7 +205,7 @@ skip:
 			&os_total_large_mem_allocated, size);
 		UNIV_MEM_ALLOC(ptr, size);
 	}
-#endif /* _WIN32 */
+#endif
 
 #if defined(WITH_WSREP) && defined(UNIV_LINUX)
 	/* Do not make the pages from this block available to the child after a

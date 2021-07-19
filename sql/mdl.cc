@@ -1,4 +1,4 @@
-/* Copyright (c) 2007, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2007, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -368,7 +368,7 @@ bool Deadlock_detection_visitor::enter_node(MDL_context *node)
   m_found_deadlock= ++m_current_search_depth >= MAX_SEARCH_DEPTH;
   if (m_found_deadlock)
   {
-    DBUG_ASSERT(! m_victim);
+    assert(! m_victim);
     opt_change_victim_to(node);
   }
   return m_found_deadlock;
@@ -943,7 +943,7 @@ public:
       If HAS_SLOW_PATH flag is set all changes to m_fast_path_state
       should happen under protection of MDL_lock::m_rwlock ([INV1]).
     */
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
     if (((*old_state & (IS_DESTROYED | HAS_OBTRUSIVE | HAS_SLOW_PATH)) !=
          (new_state & (IS_DESTROYED | HAS_OBTRUSIVE | HAS_SLOW_PATH))) ||
         *old_state & HAS_OBTRUSIVE)
@@ -955,7 +955,7 @@ public:
       We should not change state of destroyed object
       (fast_path_state_reset() being exception).
     */
-    DBUG_ASSERT(! (*old_state & IS_DESTROYED));
+    assert(! (*old_state & IS_DESTROYED));
 
     return my_atomic_cas64(&m_fast_path_state, old_state, new_state);
   }
@@ -980,7 +980,7 @@ public:
       We should not change state of destroyed object
       (fast_path_state_reset() being exception).
     */
-    DBUG_ASSERT(! (old_state & IS_DESTROYED));
+    assert(! (old_state & IS_DESTROYED));
     return old_state;
   }
 
@@ -1104,7 +1104,7 @@ mdl_locks_key(const uchar *record, size_t *length,
 
 void mdl_init()
 {
-  DBUG_ASSERT(! mdl_initialized);
+  assert(! mdl_initialized);
   mdl_initialized= TRUE;
 
 #ifdef HAVE_PSI_INTERFACE
@@ -1244,8 +1244,7 @@ MDL_lock* MDL_map::find(LF_PINS *pins, const MDL_key *mdl_key, bool *pinned)
       It works since these namespaces contain only one element so keys
       for them look like '<namespace-id>\0\0'.
     */
-
-    DBUG_ASSERT(mdl_key->length() == 3);
+    assert(mdl_key->length() == 3);
 
     switch (mdl_key->mdl_namespace())
     {
@@ -1458,7 +1457,7 @@ void MDL_map::remove_random_unused(MDL_context *ctx, LF_PINS *pins,
     int rc= lf_hash_delete(&m_locks, pins, lock->key.ptr(), lock->key.length());
 
     /* The MDL_lock object must be present in the hash. */
-    DBUG_ASSERT(rc != 1);
+    assert(rc != 1);
 
     if (rc == -1)
     {
@@ -1492,7 +1491,7 @@ void MDL_map::remove_random_unused(MDL_context *ctx, LF_PINS *pins,
       Assert that compare-and-swap operation is of strong kind and can't
       fail spuriously.
     */
-    DBUG_ASSERT(old_state != 0);
+    assert(old_state != 0);
     mysql_prlock_unlock(&lock->m_rwlock);
     *unused_locks= m_unused_lock_objects;
   }
@@ -1532,9 +1531,9 @@ MDL_context::MDL_context()
 
 void MDL_context::destroy()
 {
-  DBUG_ASSERT(m_tickets[MDL_STATEMENT].is_empty());
-  DBUG_ASSERT(m_tickets[MDL_TRANSACTION].is_empty());
-  DBUG_ASSERT(m_tickets[MDL_EXPLICIT].is_empty());
+  assert(m_tickets[MDL_STATEMENT].is_empty());
+  assert(m_tickets[MDL_TRANSACTION].is_empty());
+  assert(m_tickets[MDL_EXPLICIT].is_empty());
 
   mysql_prlock_destroy(&m_LOCK_waiting_for);
   if (m_pins)
@@ -1675,9 +1674,9 @@ inline void MDL_lock::reinit(const MDL_key *mdl_key)
     Check that we have clean "m_granted" and "m_waiting" sets/lists in both
     cases when we have fresh and re-used object.
   */
-  DBUG_ASSERT(m_granted.is_empty() && m_waiting.is_empty());
+  assert(m_granted.is_empty() && m_waiting.is_empty());
   /* The same should be true for "m_obtrusive_locks_granted_waiting_count". */
-  DBUG_ASSERT(m_obtrusive_locks_granted_waiting_count == 0);
+  assert(m_obtrusive_locks_granted_waiting_count == 0);
 }
 
 
@@ -1739,14 +1738,14 @@ MDL_lock::needs_hton_notification(MDL_key::enum_mdl_namespace mdl_namespace)
 */
 
 MDL_ticket *MDL_ticket::create(MDL_context *ctx_arg, enum_mdl_type type_arg
-#ifndef DBUG_OFF
+#ifndef NDEBUG
                                , enum_mdl_duration duration_arg
 #endif
                                )
 {
   return new (std::nothrow)
              MDL_ticket(ctx_arg, type_arg
-#ifndef DBUG_OFF
+#ifndef NDEBUG
                         , duration_arg
 #endif
                         );
@@ -1919,8 +1918,8 @@ MDL_wait::timed_wait(MDL_context_owner *owner, struct timespec *abs_timeout,
                    const char act[]=
                      "now "
                      "wait_for signal.wsrep_before_mdl_wait";
-                   DBUG_ASSERT(!debug_sync_set_action((owner->get_thd()),
-                                                      STRING_WITH_LEN(act)));
+                   assert(!debug_sync_set_action((owner->get_thd()),
+                                                  STRING_WITH_LEN(act)));
                  };);
     if (wsrep_thd_is_BF(owner->get_thd(), false))
     {
@@ -1993,7 +1992,7 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket)
     since for such tickets methods accessing this member might be
     called by other threads.
   */
-  DBUG_ASSERT(ticket->get_lock());
+  assert(ticket->get_lock());
 #ifdef WITH_WSREP
   if ((this == &(ticket->get_lock()->m_waiting)) &&
       wsrep_thd_is_BF((void *)(ticket->get_ctx()->wsrep_get_thd()), false))
@@ -2722,7 +2721,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
                         wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
             can_grant = true;
       }
-#ifdef WITH_WSREP_TODO
+#ifdef WSREP_TODO
       /* victim unobstrusive lock holder is hard to find.
          Skipping here to allow high priority thread to continue,
          it will have earlier seqno and victims will die at certification stage
@@ -2740,7 +2739,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
                      );
         }
       }
-#endif /* WITH_WSREP_TODO */
+#endif /* WSREP_TODO */
       else if (WSREP(requestor_ctx->wsrep_get_thd()))
       {
         WSREP_DEBUG("Granting MDL to applier/TOI action processor over unobstrusive locks");
@@ -3170,7 +3169,7 @@ MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
   bool force_slow;
   bool pinned;
 
-  DBUG_ASSERT(mdl_request->ticket == NULL);
+  assert(mdl_request->ticket == NULL);
 
   /* Don't take chances in production. */
   mdl_request->ticket= NULL;
@@ -3182,8 +3181,8 @@ MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
   */
   if ((ticket= find_ticket(mdl_request, &found_duration)))
   {
-    DBUG_ASSERT(ticket->m_lock);
-    DBUG_ASSERT(ticket->has_stronger_or_equal_type(mdl_request->type));
+    assert(ticket->m_lock);
+    assert(ticket->has_stronger_or_equal_type(mdl_request->type));
     /*
       If the request is for a transactional lock, and we found
       a transactional lock, just reuse the found ticket.
@@ -3223,7 +3222,7 @@ MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
     return TRUE;
 
   if (!(ticket= MDL_ticket::create(this, mdl_request->type
-#ifndef DBUG_OFF
+#ifndef NDEBUG
                                    , mdl_request->duration
 #endif
                                    )))
@@ -3261,7 +3260,7 @@ MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
   if (! unobtrusive_lock_increment)
     materialize_fast_path_locks();
 
-  DBUG_ASSERT(ticket->m_psi == NULL);
+  assert(ticket->m_psi == NULL);
   ticket->m_psi= mysql_mdl_create(ticket, key,
                                   mdl_request->type,
                                   mdl_request->duration,
@@ -3314,7 +3313,7 @@ retry:
     Code counting unused MDL_lock objects below assumes that object is not
     pinned iff it is a singleton.
   */
-  DBUG_ASSERT(mdl_locks.is_lock_object_singleton(key) == !pinned);
+  assert(mdl_locks.is_lock_object_singleton(key) == !pinned);
 
   if (! force_slow)
   {
@@ -3586,13 +3585,13 @@ MDL_context::clone_ticket(MDL_request *mdl_request)
     the request.
   */
   if (!(ticket= MDL_ticket::create(this, mdl_request->type
-#ifndef DBUG_OFF
+#ifndef NDEBUG
                                    , mdl_request->duration
 #endif
                                    )))
     return TRUE;
 
-  DBUG_ASSERT(ticket->m_psi == NULL);
+  assert(ticket->m_psi == NULL);
   ticket->m_psi= mysql_mdl_create(ticket,
                                   &mdl_request->key,
                                   mdl_request->type,
@@ -3602,7 +3601,7 @@ MDL_context::clone_ticket(MDL_request *mdl_request)
                                   mdl_request->m_src_line);
 
   /* clone() is not supposed to be used to get a stronger lock. */
-  DBUG_ASSERT(mdl_request->ticket->has_stronger_or_equal_type(ticket->m_type));
+  assert(mdl_request->ticket->has_stronger_or_equal_type(ticket->m_type));
 
 
   /*
@@ -3613,7 +3612,7 @@ MDL_context::clone_ticket(MDL_request *mdl_request)
   if (mdl_request->type == MDL_EXCLUSIVE &&
       MDL_lock::needs_hton_notification(mdl_request->key.mdl_namespace()))
   {
-    DBUG_ASSERT(mdl_request->ticket->m_hton_notified);
+    assert(mdl_request->ticket->m_hton_notified);
 
     mysql_mdl_set_status(ticket->m_psi, MDL_ticket::PRE_ACQUIRE_NOTIFY);
 
@@ -3644,7 +3643,7 @@ MDL_context::clone_ticket(MDL_request *mdl_request)
       "Obtrusive" type of lock can't be cloned from weaker, "unobtrusive"
       type of lock.
     */
-    DBUG_ASSERT(unobtrusive_lock_increment != 0);
+    assert(unobtrusive_lock_increment != 0);
 
     /*
       Increment of counter in MDL_lock::m_fast_path_state needs to happen here
@@ -3674,7 +3673,7 @@ MDL_context::clone_ticket(MDL_request *mdl_request)
         here as it is already set since the ticket being cloned already
         represents "obtrusive" lock for this MDL_lock object.
       */
-      DBUG_ASSERT(ticket->m_lock->m_obtrusive_locks_granted_waiting_count != 0);
+      assert(ticket->m_lock->m_obtrusive_locks_granted_waiting_count != 0);
       ++ticket->m_lock->m_obtrusive_locks_granted_waiting_count;
     }
     mysql_prlock_unlock(&ticket->m_lock->m_rwlock);
@@ -3947,7 +3946,7 @@ MDL_context::acquire_lock(MDL_request *mdl_request, ulong lock_wait_timeout)
         my_error(ER_QUERY_INTERRUPTED, MYF(0));
       break;
     default:
-      DBUG_ASSERT(0);
+      assert(0);
       break;
     }
     return TRUE;
@@ -3959,7 +3958,7 @@ MDL_context::acquire_lock(MDL_request *mdl_request, ulong lock_wait_timeout)
     concurrent thread (@sa MDL_lock:reschedule_waiters()).
     So all we need to do is to update MDL_context and MDL_request objects.
   */
-  DBUG_ASSERT(wait_status == MDL_wait::GRANTED);
+  assert(wait_status == MDL_wait::GRANTED);
 
   m_tickets[mdl_request->duration].push_front(ticket);
 
@@ -4139,7 +4138,7 @@ MDL_context::upgrade_shared_lock(MDL_ticket *mdl_ticket,
   lock= mdl_ticket->m_lock;
 
   /* Code below assumes that we were upgrading to "obtrusive" type of lock. */
-  DBUG_ASSERT(lock->is_obtrusive_lock(new_type));
+  assert(lock->is_obtrusive_lock(new_type));
 
   /* Merge the acquired and the original lock. @todo: move to a method. */
   mysql_prlock_wrlock(&lock->m_rwlock);
@@ -4200,7 +4199,7 @@ MDL_context::upgrade_shared_lock(MDL_ticket *mdl_ticket,
     HAS_OBTRUSIVE flag has been already set by acquire_lock()
     and should not have been cleared since then.
   */
-  DBUG_ASSERT(lock->m_fast_path_state & MDL_lock::HAS_OBTRUSIVE);
+  assert(lock->m_fast_path_state & MDL_lock::HAS_OBTRUSIVE);
   ++lock->m_obtrusive_locks_granted_waiting_count;
 
   mysql_prlock_unlock(&lock->m_rwlock);
@@ -4210,7 +4209,7 @@ MDL_context::upgrade_shared_lock(MDL_ticket *mdl_ticket,
     SE notification and it turns out that we already have lock of this type
     associated with different ticket.
   */
-  DBUG_ASSERT(is_new_ticket || ! mdl_new_lock_request.ticket->m_hton_notified);
+  assert(is_new_ticket || ! mdl_new_lock_request.ticket->m_hton_notified);
 
   mdl_ticket->m_hton_notified= mdl_new_lock_request.ticket->m_hton_notified;
 
@@ -4497,7 +4496,7 @@ void MDL_context::release_lock(enum_mdl_duration duration, MDL_ticket *ticket)
   DBUG_PRINT("enter", ("db=%s name=%s", lock->key.db_name(),
                                         lock->key.name()));
 
-  DBUG_ASSERT(this == ticket->get_ctx());
+  assert(this == ticket->get_ctx());
   mysql_mutex_assert_not_owner(&LOCK_open);
 
 
@@ -4522,7 +4521,7 @@ void MDL_context::release_lock(enum_mdl_duration duration, MDL_ticket *ticket)
     bool is_singleton= mdl_locks.is_lock_object_singleton(&lock->key);
 
     /* We should not have "fast path" tickets for "obtrusive" lock types. */
-    DBUG_ASSERT(unobtrusive_lock_increment != 0);
+    assert(unobtrusive_lock_increment != 0);
 
     /*
       We need decrement part of m_fast_path_state which holds number of
@@ -4622,7 +4621,7 @@ end_fast_path:
 
 void MDL_context::release_lock(MDL_ticket *ticket)
 {
-  DBUG_ASSERT(ticket->m_duration == MDL_EXPLICIT);
+  assert(ticket->m_duration == MDL_EXPLICIT);
 
   release_lock(MDL_EXPLICIT, ticket);
 }
@@ -4686,7 +4685,7 @@ void MDL_context::release_all_locks_for_name(MDL_ticket *name)
 
   while ((ticket= it_ticket++))
   {
-    DBUG_ASSERT(ticket->m_lock);
+    assert(ticket->m_lock);
     if (ticket->m_lock == lock)
       release_lock(MDL_EXPLICIT, ticket);
   }
@@ -4708,7 +4707,7 @@ void MDL_context::release_locks(MDL_release_locks_visitor *visitor)
 
   while ((ticket= it_ticket++))
   {
-    DBUG_ASSERT(ticket->m_lock);
+    assert(ticket->m_lock);
     if (visitor->release(ticket))
       release_lock(MDL_EXPLICIT, ticket);
   }
@@ -4737,11 +4736,11 @@ void MDL_ticket::downgrade_lock(enum_mdl_type new_type)
     return;
 
   /* Only allow downgrade from EXCLUSIVE and SHARED_NO_WRITE. */
-  DBUG_ASSERT(m_type == MDL_EXCLUSIVE ||
-              m_type == MDL_SHARED_NO_WRITE);
+  assert(m_type == MDL_EXCLUSIVE ||
+         m_type == MDL_SHARED_NO_WRITE);
 
   /* Below we assume that we always downgrade "obtrusive" locks. */
-  DBUG_ASSERT(m_lock->is_obtrusive_lock(m_type));
+  assert(m_lock->is_obtrusive_lock(m_type));
 
   new_type_is_unobtrusive= ! m_lock->is_obtrusive_lock(new_type);
 
@@ -4822,7 +4821,7 @@ MDL_context::owns_equal_or_stronger_lock(
                    mdl_namespace, db, name, mdl_type, MDL_TRANSACTION);
   MDL_ticket *ticket= find_ticket(&mdl_request, &not_unused);
 
-  DBUG_ASSERT(ticket == NULL || ticket->m_lock);
+  assert(ticket == NULL || ticket->m_lock);
 
   return ticket;
 }
@@ -5054,12 +5053,12 @@ bool MDL_context::has_locks_waited_for() const
 void MDL_context::set_lock_duration(MDL_ticket *mdl_ticket,
                                     enum_mdl_duration duration)
 {
-  DBUG_ASSERT(mdl_ticket->m_duration == MDL_TRANSACTION &&
-              duration != MDL_TRANSACTION);
+  assert(mdl_ticket->m_duration == MDL_TRANSACTION &&
+         duration != MDL_TRANSACTION);
 
   m_tickets[MDL_TRANSACTION].remove(mdl_ticket);
   m_tickets[duration].push_front(mdl_ticket);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   mdl_ticket->m_duration= duration;
 #endif
 }
@@ -5096,7 +5095,7 @@ void MDL_context::set_explicit_duration_for_all_locks()
     }
   }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   Ticket_iterator exp_it(m_tickets[MDL_EXPLICIT]);
 
   while ((ticket= exp_it++))
@@ -5122,7 +5121,7 @@ void MDL_context::set_transaction_duration_for_all_locks()
     locks with transactional duration.
   */
 
-  DBUG_ASSERT(m_tickets[MDL_STATEMENT].is_empty());
+  assert(m_tickets[MDL_STATEMENT].is_empty());
 
   m_tickets[MDL_TRANSACTION].swap(m_tickets[MDL_EXPLICIT]);
 
@@ -5134,7 +5133,7 @@ void MDL_context::set_transaction_duration_for_all_locks()
     m_tickets[MDL_TRANSACTION].push_front(ticket);
   }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   Ticket_iterator trans_it(m_tickets[MDL_TRANSACTION]);
 
   while ((ticket= trans_it++))

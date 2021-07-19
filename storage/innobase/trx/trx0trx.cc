@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -2272,7 +2272,7 @@ trx_commit_low(
 	} else {
 		serialised = false;
 	}
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 	/* In case of this function is called from a stack executing
 	   THD::release_resources -> ...
               innobase_connection_close() ->
@@ -3592,9 +3592,8 @@ Kill all transactions that are blocking this transaction from acquiring locks.
 void
 trx_kill_blocking(trx_t* trx)
 {
-	DBUG_ENTER("trx_kill_blocking");
 	if (trx->hit_list.empty()) {
-		DBUG_VOID_RETURN;
+		return;
 	}
 
 	DEBUG_SYNC_C("trx_kill_blocking_enter");
@@ -3754,5 +3753,4 @@ trx_kill_blocking(trx_t* trx)
 
 		row_mysql_freeze_data_dictionary(trx);
 	}
-	DBUG_VOID_RETURN;
 }

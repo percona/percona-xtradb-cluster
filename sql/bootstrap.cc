@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -119,6 +119,9 @@ static void handle_bootstrap_impl(THD *thd)
   Compiled_in_command_iterator comp_iter;
   Query_command_iterator query_iter(bootstrap_query);
   bool has_binlog_option= thd->variables.option_bits & OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  ulonglong option_bits_save= thd->variables.option_bits;
+#endif
   int query_source, last_query_source= -1;
 
   thd->thread_stack= (char*) &thd;
@@ -175,6 +178,9 @@ static void handle_bootstrap_impl(THD *thd)
       {
       case QUERY_SOURCE_COMPILED:
         thd->variables.option_bits&= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+        thd->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
         break;
       case QUERY_SOURCE_FILE:
         /*
@@ -184,9 +190,12 @@ static void handle_bootstrap_impl(THD *thd)
         */
         thd->variables.sql_log_bin= true;
         thd->variables.option_bits|= OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+        thd->variables.option_bits&= ~OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
         break;
       default:
-        DBUG_ASSERT(false);
+        assert(false);
         break;
       }
     }
@@ -224,7 +233,7 @@ static void handle_bootstrap_impl(THD *thd)
         break;
 
       default:
-        DBUG_ASSERT(false);
+        assert(false);
         break;
       }
 
@@ -277,10 +286,17 @@ static void handle_bootstrap_impl(THD *thd)
       processing queries that are compiled and must not be binary logged,
       we must disable binary logging again.
     */
+#ifdef WITH_WSREP
+    if (last_query_source == QUERY_SOURCE_COMPILED &&
+        thd->variables.option_bits & OPTION_BIN_LOG) {
+      thd->variables.option_bits&= ~OPTION_BIN_LOG;
+      thd->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+    }
+#else
     if (last_query_source == QUERY_SOURCE_COMPILED &&
         thd->variables.option_bits & OPTION_BIN_LOG)
       thd->variables.option_bits&= ~OPTION_BIN_LOG;
-
+#endif
   }
 
   Command_iterator::current_iterator->end();
@@ -289,6 +305,9 @@ static void handle_bootstrap_impl(THD *thd)
     We should re-enable SQL_LOG_BIN session if it was enabled by default
     but disabled during bootstrap/initialization.
   */
+#ifdef WITH_WSREP
+  thd->variables.option_bits= option_bits_save;
+#endif
   if (has_binlog_option)
   {
     thd->variables.sql_log_bin= true;

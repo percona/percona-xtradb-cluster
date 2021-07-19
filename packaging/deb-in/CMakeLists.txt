@@ -1,4 +1,4 @@
-# Copyright (c) 2016, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -441,6 +441,9 @@ IF(DEB_PRODUCTNAME STREQUAL "wsrep")
     LIST(REMOVE_ITEM SOURCEFILES "mysql-common.dirs.in")
     LIST(REMOVE_ITEM SOURCEFILES "mysql-common.postinst.in")
     LIST(REMOVE_ITEM SOURCEFILES "mysql-common.postrm.in")
+    LIST(REMOVE_ITEM SOURCEFILES "mysql-packagesource-source-SERIES.install.in")
+    LIST(REMOVE_ITEM SOURCEFILES "mysql-packagesource-source-SERIES.lintian-overrides.in")
+
 ENDIF()
 IF(DEB_STARTUP MATCHES ".*SYSV.*")
   SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})

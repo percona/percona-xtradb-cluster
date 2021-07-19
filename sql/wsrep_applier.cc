@@ -44,7 +44,7 @@ static Log_event* wsrep_read_log_event(
 
   if (!res)
   {
-    DBUG_ASSERT(error != 0);
+    assert(error != 0);
     sql_print_error("Error in Log_event::read_log_event(): "
                     "'%s', data_len: %d, event_type: %d",
                     error,data_len,head[EVENT_TYPE_OFFSET]);
@@ -277,8 +277,8 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
                      "now "
                      "SIGNAL sync.wsrep_apply_cb_reached "
                      "WAIT_FOR signal.wsrep_apply_cb";
-                   DBUG_ASSERT(!debug_sync_set_action(thd,
-                                                      STRING_WITH_LEN(act)));
+                   assert(!debug_sync_set_action(thd,
+                                                 STRING_WITH_LEN(act)));
                  };);
 
   thd->wsrep_trx_meta = *meta;
