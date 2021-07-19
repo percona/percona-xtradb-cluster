@@ -34,6 +34,11 @@ After you :ref:`add other nodes <add-node>` to the cluster,
 you can then restart this node as normal,
 and it will use standard configuration again.
 
+.. note::
+
+   A service started with ``mysql@bootstrap`` must be stopped using the same name. For example, the ``systemctl stop mysql`` command
+   does not stop an instance started with the ``mysql@bootstrap`` command.
+
 To make sure that the cluster has been initialized, run the following:
 
 .. code-block:: sql
