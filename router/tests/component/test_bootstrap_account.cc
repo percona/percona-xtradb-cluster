@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2017, 2020, Oracle and/or its affiliates.
+  Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -3971,7 +3971,7 @@ TEST_F(UndoCreateUserTest, failure_after_account_creation) {
   // induce failure at config-write step (should result in error analogous to:
   // "Could not create file '.../router-sBHJGw/mysqlrouter.conf.bak': Permission
   // denied"
-  for (const std::string &file : {"mysqlrouter.conf", "mysqlrouter.conf.bak"}) {
+  for (const std::string file : {"mysqlrouter.conf", "mysqlrouter.conf.bak"}) {
     std::string path = bootstrap_directory.name() + "/" + file;
     std::ofstream f(path.c_str());
     f << "[DEFAULT]\n";
@@ -4082,7 +4082,7 @@ TEST_F(UndoCreateUserTest,
   // induce failure at config-write step (should result in error analogous to:
   // "Could not create file '.../router-sBHJGw/mysqlrouter.conf.bak': Permission
   // denied"
-  for (const std::string &file : {"mysqlrouter.conf", "mysqlrouter.conf.bak"}) {
+  for (const std::string file : {"mysqlrouter.conf", "mysqlrouter.conf.bak"}) {
     std::string path = bootstrap_directory.name() + "/" + file;
     std::ofstream f(path.c_str());
     f << "[DEFAULT]\n";

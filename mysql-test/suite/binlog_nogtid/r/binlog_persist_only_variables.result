@@ -21,7 +21,13 @@ VARIABLE_NAME LIKE '%slave%') AND
 (VARIABLE_NAME NOT LIKE 'innodb%')
 ORDER BY VARIABLE_NAME;
 
+<<<<<<< HEAD
 include/assert.inc ['Expect 92 variables in the table.']
+||||||| 35582423e36
+include/assert.inc ['Expect 88 variables in the table.']
+=======
+include/assert.inc ['Expect 89 variables in the table.']
+>>>>>>> Percona-Server-8.0.25-15
 
 # Test SET PERSIST_ONLY
 SET PERSIST_ONLY binlog_cache_size = @@GLOBAL.binlog_cache_size;
@@ -110,6 +116,7 @@ SET PERSIST_ONLY rpl_semi_sync_slave_enabled = @@GLOBAL.rpl_semi_sync_slave_enab
 SET PERSIST_ONLY rpl_semi_sync_slave_trace_level = @@GLOBAL.rpl_semi_sync_slave_trace_level;
 SET PERSIST_ONLY rpl_stop_slave_timeout = @@GLOBAL.rpl_stop_slave_timeout;
 SET PERSIST_ONLY session_track_gtids = @@GLOBAL.session_track_gtids;
+SET PERSIST_ONLY skip_slave_start = @@GLOBAL.skip_slave_start;
 SET PERSIST_ONLY slave_allow_batching = @@GLOBAL.slave_allow_batching;
 SET PERSIST_ONLY slave_checkpoint_group = @@GLOBAL.slave_checkpoint_group;
 SET PERSIST_ONLY slave_checkpoint_period = @@GLOBAL.slave_checkpoint_period;
@@ -141,16 +148,32 @@ SET PERSIST_ONLY wsrep_slave_FK_checks = @@GLOBAL.wsrep_slave_FK_checks;
 SET PERSIST_ONLY wsrep_slave_threads = @@GLOBAL.wsrep_slave_threads;
 SET PERSIST_ONLY wsrep_slave_UK_checks = @@GLOBAL.wsrep_slave_UK_checks;
 
+<<<<<<< HEAD
 include/assert.inc ['Expect 80 persisted variables in persisted_variables table.']
+||||||| 35582423e36
+include/assert.inc ['Expect 76 persisted variables in persisted_variables table.']
+=======
+include/assert.inc ['Expect 77 persisted variables in persisted_variables table.']
+>>>>>>> Percona-Server-8.0.25-15
 
 ############################################################
 # 2. Restart server, it must preserve the persisted variable
 #    settings. Verify persisted configuration.
 # restart
 
+<<<<<<< HEAD
 include/assert.inc ['Expect 80 persisted variables in persisted_variables table.']
 include/assert.inc ['Expect 80 persisted variables shown as PERSISTED in variables_info table.']
 include/assert.inc ['Expect 80 persisted variables with matching persisted and global values.']
+||||||| 35582423e36
+include/assert.inc ['Expect 76 persisted variables in persisted_variables table.']
+include/assert.inc ['Expect 76 persisted variables shown as PERSISTED in variables_info table.']
+include/assert.inc ['Expect 76 persisted variables with matching persisted and global values.']
+=======
+include/assert.inc ['Expect 77 persisted variables in persisted_variables table.']
+include/assert.inc ['Expect 76 persisted variables shown as PERSISTED in variables_info table.']
+include/assert.inc ['Expect 76 persisted variables with matching persisted and global values.']
+>>>>>>> Percona-Server-8.0.25-15
 
 ############################################################
 # 3. Test RESET PERSIST. Verify persisted variable settings
@@ -232,6 +255,7 @@ RESET PERSIST rpl_semi_sync_slave_enabled;
 RESET PERSIST rpl_semi_sync_slave_trace_level;
 RESET PERSIST rpl_stop_slave_timeout;
 RESET PERSIST session_track_gtids;
+RESET PERSIST skip_slave_start;
 RESET PERSIST slave_allow_batching;
 RESET PERSIST slave_checkpoint_group;
 RESET PERSIST slave_checkpoint_period;

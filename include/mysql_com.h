@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -249,6 +249,7 @@
 #define REFRESH_THREAD_STATS 0x8000000L   /** Refresh thread stats */
 #define REFRESH_FLUSH_PAGE_BITMAPS 0x10000000L
 #define REFRESH_RESET_PAGE_BITMAPS 0x20000000L
+#define DUMP_MEMORY_PROFILE 0x40000000L
 
 static const int PURGE_BITMAPS_TO_LSN = 1;
 
@@ -887,6 +888,12 @@ struct Vio;
 #define MAX_CHAR_WIDTH 255
 /// Default width for blob in bytes @todo - align this with sizes from field.h
 #define MAX_BLOB_WIDTH 16777216
+
+#define NET_ERROR_UNSET 0               /**< No error has occurred yet */
+#define NET_ERROR_SOCKET_RECOVERABLE 1  /**< Socket still usable */
+#define NET_ERROR_SOCKET_UNUSABLE 2     /**< Do not use the socket */
+#define NET_ERROR_SOCKET_NOT_READABLE 3 /**< Try write and close socket */
+#define NET_ERROR_SOCKET_NOT_WRITABLE 4 /**< Try read and close socket */
 
 typedef struct NET {
   MYSQL_VIO vio;
