@@ -13272,7 +13272,7 @@ static bool mysql_inplace_alter_table(
       const char act[] =
           "now SIGNAL alter_table_inplace_after_downgrade "
           "WAIT_FOR continue_inplace_alter";
-      DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+      assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
     };);
     DEBUG_SYNC(thd, "alter_table_inplace_after_lock_downgrade");
     THD_STAGE_INFO(thd, stage_alter_inplace);
@@ -16349,7 +16349,7 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
     const char act[] =
         "now "
         "wait_for signal.alter_opened_table";
-    DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
   };);
 #endif /* WITH_WSREP */
 

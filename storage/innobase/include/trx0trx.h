@@ -1683,19 +1683,13 @@ class TrxInInnoDB {
       trx_mutex_enter(trx);
       if (!is_forced_rollback(trx) && is_started(trx) &&
           !trx_is_autocommit_non_locking(trx)) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 	if (!trx->abort) {
 #endif /* WITH_WSREP */
-        ut_ad(trx->killed_by == 0);
+        ut_ad(trx->killed_by == std::thread::id{});
 #ifdef WITH_WSREP
 	}
 #endif /* WITH_WSREP */
-||||||| 35582423e36
-        ut_ad(trx->killed_by == 0);
-=======
-        ut_ad(trx->killed_by == std::thread::id{});
->>>>>>> Percona-Server-8.0.25-15
 
         /* This transaction has crossed the point of
         no return and cannot be rolled back

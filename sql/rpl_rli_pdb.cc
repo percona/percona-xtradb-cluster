@@ -73,17 +73,11 @@
 #include "sql/transaction_info.h"
 #include "thr_mutex.h"
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "wsrep_trans_observer.h"
 #endif /* WITH_WSREP */
 
-#ifndef DBUG_OFF
-||||||| 35582423e36
-#ifndef DBUG_OFF
-=======
 #ifndef NDEBUG
->>>>>>> Percona-Server-8.0.25-15
 ulong w_rr = 0;
 uint mts_debug_concurrent_access = 0;
 #endif

@@ -1736,7 +1736,7 @@ class THD : public MDL_context_owner,
       while (main_trx->get_prev_attachable_trx() != NULL) {
         main_trx = main_trx->get_prev_attachable_trx();
       }
-      DBUG_ASSERT(main_trx->get_prev_attachable_trx() == NULL);
+      assert(main_trx->get_prev_attachable_trx() == NULL);
       return main_trx->wsrep_get_main_trx_ha_data(slot);
     }
     return &ha_data[slot];

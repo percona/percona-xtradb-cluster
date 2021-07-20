@@ -106,7 +106,6 @@ class Worker_thread_context {
   Attach/associate the connection with the OS thread,
 */
 static bool thread_attach(THD *thd) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* Wait until possible background rollback has finished before
      attaching the thd. */
@@ -115,12 +114,7 @@ static bool thread_attach(THD *thd) {
   DEBUG_SYNC(thd, "thread_attach_after_acquire_ownership");
 
 #endif /* WITH_WSREP */
-#ifndef DBUG_OFF
-||||||| 35582423e36
-#ifndef DBUG_OFF
-=======
 #ifndef NDEBUG
->>>>>>> Percona-Server-8.0.25-15
   set_my_thread_var_id(thd->thread_id());
 #endif
   thd->thread_stack = (char *)&thd;

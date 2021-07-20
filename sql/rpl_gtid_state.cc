@@ -878,23 +878,17 @@ void Gtid_state::update_gtids_impl_own_gtid(THD *thd, bool is_commit) {
     In Group Replication the GTID may additionally be owned by another
     thread, and we won't remove that ownership (it will be rolled back later)
   */
-<<<<<<< HEAD
 #ifdef WSREP
   /* Check comment associated with wsrep_replayer for more details. */
   if (WSREP(thd)) {
-    DBUG_ASSERT(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()) ||
+    assert(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()) ||
                 thd->wsrep_replayer);
   } else {
-    DBUG_ASSERT(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()));
+    assert(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()));
   }
 #else
-  DBUG_ASSERT(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()));
-#endif /* WSREP */
-||||||| 35582423e36
-  DBUG_ASSERT(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()));
-=======
   assert(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()));
->>>>>>> Percona-Server-8.0.25-15
+#endif /* WSREP */
   owned_gtids.remove_gtid(thd->owned_gtid, thd->thread_id());
 
   if (is_commit) {

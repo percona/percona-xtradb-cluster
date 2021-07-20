@@ -194,34 +194,22 @@ Global_THD_manager::~Global_THD_manager() {
 #endif /* WITH_WSREP */
 
   for (int i = 0; i < NUM_PARTITIONS; i++) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     /* TODO: If sst fails then there could be left over thread.
     Information of this applier thread is printed above. */
 #else
-    DBUG_ASSERT(thd_list[i].empty());
-#endif /* WITH_WSREP */
-||||||| 35582423e36
-    DBUG_ASSERT(thd_list[i].empty());
-=======
     assert(thd_list[i].empty());
->>>>>>> Percona-Server-8.0.25-15
+#endif /* WITH_WSREP */
     mysql_mutex_destroy(&LOCK_thd_list[i]);
     mysql_mutex_destroy(&LOCK_thd_remove[i]);
     mysql_cond_destroy(&COND_thd_list[i]);
   }
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* TODO: If sst fails then there could be left over thread.
   Information of this applier thread is printed above. */
 #else
-  DBUG_ASSERT(thread_ids.empty());
-#endif /* WITH_WSREP */
-||||||| 35582423e36
-  DBUG_ASSERT(thread_ids.empty());
-=======
   assert(thread_ids.empty());
->>>>>>> Percona-Server-8.0.25-15
+#endif /* WITH_WSREP */
   mysql_mutex_destroy(&LOCK_thread_ids);
 }
 

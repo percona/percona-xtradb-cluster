@@ -1770,7 +1770,7 @@ class Item_func_wsrep_last_written_gtid : public Item_str_func {
   bool itemize(Parse_context *pc, Item **res) override;
   bool resolve_type(THD *) override {
     set_data_type_string(WSREP_GTID_STR_LEN, &my_charset_latin1);
-    maybe_null = true;
+    set_nullable(true);
     return false;
   }
   const char *func_name() const override { return "wsrep_last_written_gtid"; }
@@ -1786,7 +1786,7 @@ class Item_func_wsrep_last_seen_gtid : public Item_str_func {
   bool itemize(Parse_context *pc, Item **res) override;
   bool resolve_type(THD *) override {
     set_data_type_string(WSREP_GTID_STR_LEN, &my_charset_latin1);
-    maybe_null = true;
+    set_nullable(true);
     return false;
   }
   const char *func_name() const override { return "wsrep_last_seen_gtid"; }
@@ -1807,7 +1807,7 @@ class Item_func_wsrep_sync_wait_upto_gtid : public Item_bool_func {
   const char *func_name() const override { return "wsrep_sync_wait_upto_gtid"; }
   bool resolve_type(THD *thd) override {
     bool res = super::resolve_type(thd);
-    maybe_null = true;
+    set_nullable(true);
     return res;
   }
 };

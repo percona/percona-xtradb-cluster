@@ -119,7 +119,7 @@ bool Commit_stage_manager::Mutex_queue::append(THD *first) {
           "now "
           "SIGNAL sync.wsrep_ordered_commit_reached "
           "WAIT_FOR signal.wsrep_ordered_commit_continue";
-      DBUG_ASSERT(!debug_sync_set_action(thd_to_append, STRING_WITH_LEN(act)));
+      assert(!debug_sync_set_action(thd_to_append, STRING_WITH_LEN(act)));
     };);
   }
 #endif /* WITH_WSREP */

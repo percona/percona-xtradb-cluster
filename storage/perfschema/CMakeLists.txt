@@ -365,15 +365,10 @@ table_plugin_table.cc
 table_replication_applier_filters.cc
 table_replication_applier_global_filters.cc
 table_binary_log_transaction_compression_stats.cc
-<<<<<<< HEAD
-# -- WITH_WSREP
-table_pxc_cluster_view.cc
-# -- WITH_WSREP
-||||||| 35582423e36
-=======
 table_malloc_stats.cc
 table_malloc_stats.h
->>>>>>> Percona-Server-8.0.25-15
+# -- WITH_WSREP
+table_pxc_cluster_view.cc
 )
 MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES}
   STORAGE_ENGINE MANDATORY STATIC_ONLY)

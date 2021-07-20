@@ -2454,7 +2454,6 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv) {
                my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
       error = 1;
     }
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
     if (WSREP(thd) && (ht->flags & HTON_WSREP_REPLICATION)) {
@@ -2466,12 +2465,7 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv) {
     }
 #endif /* WITH_WSREP */
 
-    DBUG_ASSERT(!thd->status_var_aggregated);
-||||||| 35582423e36
-    DBUG_ASSERT(!thd->status_var_aggregated);
-=======
     assert(!thd->status_var_aggregated);
->>>>>>> Percona-Server-8.0.25-15
     thd->status_var.ha_rollback_count++;
     ha_info_next = ha_info->next();
     ha_info->reset(); /* keep it conveniently zero-filled */
@@ -2544,7 +2538,6 @@ int ha_prepare_low(THD *thd, bool all) {
                  my_strerror(errbuf, MYSQL_ERRMSG_SIZE, err));
         error = 1;
       }
-<<<<<<< HEAD
 
       if (run_wsrep_hooks && !error && (ht->flags & HTON_WSREP_REPLICATION) &&
           wsrep_after_prepare(thd, all)) {
@@ -2564,12 +2557,7 @@ int ha_prepare_low(THD *thd, bool all) {
         error = 1;
       }
 #endif /* WITH_WSREP */
-      DBUG_ASSERT(!thd->status_var_aggregated);
-||||||| 35582423e36
-      DBUG_ASSERT(!thd->status_var_aggregated);
-=======
       assert(!thd->status_var_aggregated);
->>>>>>> Percona-Server-8.0.25-15
       thd->status_var.ha_prepare_count++;
     }
     DBUG_EXECUTE_IF("crash_commit_after_prepare", DBUG_SUICIDE(););

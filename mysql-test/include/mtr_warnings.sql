@@ -377,7 +377,11 @@ INSERT INTO global_suppressions VALUES
  ("NOTIFY_SOCKET not set in environment. sd_notify messages will not be sent!"),
  ("Invalid systemd notify socket, cannot send: "),
 
-<<<<<<< HEAD
+ /*
+   Manifest file processing
+ */
+ ("Manifest file '.*' is not read-only. For better security, please make sure that the file is read-only."),
+
  /*
    Warnings/errors seen while using group replication with Percona XtraDB Cluster
  */
@@ -400,15 +404,9 @@ INSERT INTO global_suppressions VALUES
    enabling pxc_encrypt_cluster_traffic.
  */
  ("You have enabled keyring plugin. SST encryption is mandatory."),
+ ("No suitable 'keyring_component_metadata_query' service"),
 
-||||||| 35582423e36
-=======
- /*
-   Manifest file processing
- */
- ("Manifest file '.*' is not read-only. For better security, please make sure that the file is read-only."),
 
->>>>>>> Percona-Server-8.0.25-15
  ("THE_LAST_SUPPRESSION");
 
 

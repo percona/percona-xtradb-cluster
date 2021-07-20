@@ -898,17 +898,13 @@ extern SERVICE_TYPE_NO_CONST(registry) * srv_registry;
    mysql_server component */
 extern SERVICE_TYPE(dynamic_loader_scheme_file) * scheme_file_srv;
 extern SERVICE_TYPE(dynamic_loader) * dynamic_loader_srv;
-<<<<<<< HEAD
 
 #ifdef WITH_WSREP
 extern "C" void *start_wsrep_THD(void *);
 void unireg_abort(int exit_code);
 #endif /* WITH_WSREP */
 
-||||||| 35582423e36
-=======
 
 class Deployed_components;
 extern Deployed_components *g_deployed_components;
->>>>>>> Percona-Server-8.0.25-15
 #endif /* MYSQLD_INCLUDED */

@@ -113,7 +113,7 @@ extern "C" bool wsrep_thd_is_SR(const THD *thd) {
 }
 
 extern "C" void wsrep_handle_SR_rollback(THD *bf_thd, THD *victim_thd) {
-  DBUG_ASSERT(victim_thd);
+  assert(victim_thd);
   // if (!victim_thd || !wsrep_on(bf_thd)) return;
   if (!victim_thd) return;
 
@@ -242,7 +242,7 @@ extern "C" int wsrep_thd_append_key(THD *thd, const struct wsrep_key *key,
                                     int n_keys,
                                     enum Wsrep_service_key_type key_type) {
   Wsrep_client_state &client_state(thd->wsrep_cs());
-  DBUG_ASSERT(client_state.transaction().active());
+  assert(client_state.transaction().active());
   int ret = 0;
   for (int i = 0; i < n_keys && ret == 0; ++i) {
     wsrep::key wsrep_key(map_key_type(key_type));

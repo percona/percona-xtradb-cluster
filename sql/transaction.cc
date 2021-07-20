@@ -186,19 +186,13 @@ bool trans_begin(THD *thd, uint flags) {
   }
 
   DBUG_EXECUTE_IF("dbug_set_high_prio_trx", {
-<<<<<<< HEAD
-    DBUG_ASSERT(thd->tx_priority == 0);
+    assert(thd->tx_priority == 0);
 
 #ifdef WITH_WSREP
     WSREP_WARN("InnoDB High Priority being used: %d -> %d", thd->tx_priority,
                1);
 #endif /* WITH_WSREP */
 
-||||||| 35582423e36
-    DBUG_ASSERT(thd->tx_priority == 0);
-=======
-    assert(thd->tx_priority == 0);
->>>>>>> Percona-Server-8.0.25-15
     thd->tx_priority = 1;
   });
 
@@ -582,17 +576,9 @@ bool trans_commit_stmt(THD *thd, bool ignore_global_read_lock) {
   - sub-commit: to register commit of streaming table entries removal.
   This could be avoided by using a new THD for sub-commit purpose. */
   /* In autocommit=1 mode the transaction should be marked as complete in P_S */
-<<<<<<< HEAD
-  DBUG_ASSERT(thd->in_active_multi_stmt_transaction() ||
+  assert(thd->in_active_multi_stmt_transaction() ||
               thd->m_transaction_psi == nullptr);
 #endif
-||||||| 35582423e36
-  DBUG_ASSERT(thd->in_active_multi_stmt_transaction() ||
-              thd->m_transaction_psi == nullptr);
-=======
-  assert(thd->in_active_multi_stmt_transaction() ||
-         thd->m_transaction_psi == nullptr);
->>>>>>> Percona-Server-8.0.25-15
 
   thd->get_transaction()->reset(Transaction_ctx::STMT);
 

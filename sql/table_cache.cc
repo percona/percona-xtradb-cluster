@@ -313,7 +313,6 @@ void Table_cache_manager::free_table(THD *thd MY_ATTRIBUTE((unused)),
 
 #ifndef NDEBUG
       if (remove_type == TDC_RT_REMOVE_ALL)
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       {
         if (!cache_el[i]->used_tables.is_empty()) {
@@ -323,18 +322,12 @@ void Table_cache_manager::free_table(THD *thd MY_ATTRIBUTE((unused)),
         }
       }
 #else
-        DBUG_ASSERT(cache_el[i]->used_tables.is_empty());
-#endif /* WITH_WSREP */
-||||||| 35582423e36
-        DBUG_ASSERT(cache_el[i]->used_tables.is_empty());
-=======
         assert(cache_el[i]->used_tables.is_empty());
->>>>>>> Percona-Server-8.0.25-15
+#endif /* WITH_WSREP */
       else if (remove_type == TDC_RT_REMOVE_NOT_OWN ||
                remove_type == TDC_RT_REMOVE_NOT_OWN_KEEP_SHARE) {
         Table_cache_element::TABLE_list::Iterator it2(cache_el[i]->used_tables);
         while ((table = it2++)) {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
           mysql_mutex_lock(&thd->LOCK_wsrep_thd);
           if (table->in_use != thd && !((table->in_use->wsrep_trx().state() ==
@@ -352,17 +345,12 @@ void Table_cache_manager::free_table(THD *thd MY_ATTRIBUTE((unused)),
                         wsrep_thd_is_BF(thd, false),
                         wsrep_thd_is_BF(table->in_use, false),
                         wsrep_thd_transaction_state_str(table->in_use));
-            DBUG_ASSERT(0);
+            assert(0);
           }
           mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #else
-          if (table->in_use != thd) DBUG_ASSERT(0);
-#endif /* WITH_WSREP */
-||||||| 35582423e36
-          if (table->in_use != thd) DBUG_ASSERT(0);
-=======
           if (table->in_use != thd) assert(0);
->>>>>>> Percona-Server-8.0.25-15
+#endif /* WITH_WSREP */
         }
       }
 #endif

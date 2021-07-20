@@ -5461,7 +5461,17 @@ static bool pre_autocommit(sys_var *self, THD *thd, set_var *var) {
       (thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT) &&
       var->save_result.ulonglong_value) {
     // Autocommit mode is about to be activated.
-    if (trans_commit_stmt(thd) || trans_commit(thd)) return true;
+    if (trans_commit_stmt(thd) || trans_commit(thd)) {
+#ifdef WITH_WSREP
+      // TODO: check if this release is needed ?
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG(
+          "Transaction commit failed while toggling autocommit."
+          " Release MDL trx lock for thread: %u",
+          thd->thread_id());
+#endif /* WITH_WSREP */
+      return true;
+    }
   }
   return false;
 }
@@ -5478,28 +5488,6 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type) {
   if (thd->variables.option_bits & OPTION_AUTOCOMMIT &&
       thd->variables.option_bits &
           OPTION_NOT_AUTOCOMMIT) {  // activating autocommit
-<<<<<<< HEAD
-
-    if (trans_commit_stmt(thd) || trans_commit(thd)) {
-      thd->variables.option_bits &= ~OPTION_AUTOCOMMIT;
-#ifdef WITH_WSREP
-      // TODO: check if this release is needed ?
-      thd->mdl_context.release_transactional_locks();
-      WSREP_DEBUG(
-          "Transaction commit failed while toggling autocommit."
-          " Release MDL trx lock for thread: %u",
-          thd->thread_id());
-#endif /* WITH_WSREP */
-      return true;
-    }
-||||||| 35582423e36
-
-    if (trans_commit_stmt(thd) || trans_commit(thd)) {
-      thd->variables.option_bits &= ~OPTION_AUTOCOMMIT;
-      return true;
-    }
-=======
->>>>>>> Percona-Server-8.0.25-15
     /*
       Don't close thread tables or release metadata locks: if we do so, we
       risk releasing locks/closing tables of expressions used to assign

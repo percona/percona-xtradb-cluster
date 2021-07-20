@@ -77,17 +77,11 @@ performance_schema.global_variables WHERE variable_name NOT IN
 'innodb_monitor_reset',
 'innodb_monitor_reset_all',
 'innodb_default_encryption_key_id',
-<<<<<<< HEAD
 'rbr_exec_mode',
+'jemalloc_profiling',
 'pxc_maint_mode',
 'pxc_strict_mode',
 'wsrep_trx_fragment_size');
-||||||| 35582423e36
-'rbr_exec_mode');
-=======
-'rbr_exec_mode',
-'jemalloc_profiling');
->>>>>>> Percona-Server-8.0.25-15
 
 --let $count_vars= `SELECT COUNT(*) FROM global_vars;`
 --let $var_id=1

@@ -5979,14 +5979,8 @@ bool check_fk_parent_table_access(THD *thd, HA_CREATE_INFO *create_info,
 #else
 bool check_fk_parent_table_access(THD *thd, HA_CREATE_INFO *create_info,
                                   Alter_info *alter_info) {
-<<<<<<< HEAD
 #endif
-  DBUG_ASSERT(alter_info != nullptr);
-||||||| 35582423e36
-  DBUG_ASSERT(alter_info != nullptr);
-=======
   assert(alter_info != nullptr);
->>>>>>> Percona-Server-8.0.25-15
 
 #ifdef WITH_WSREP
   if (check_fk_support) {

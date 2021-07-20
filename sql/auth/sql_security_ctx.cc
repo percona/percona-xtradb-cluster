@@ -677,7 +677,7 @@ std::pair<bool, bool> Security_context::has_global_grant(const char *priv,
       const char act[] =
           "now signal has_global_grant.got_lock wait_for"
           " has_global_grant.release_lock";
-      DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+      assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
     });
 #endif /* WITH_WSREP */
 

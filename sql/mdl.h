@@ -1115,14 +1115,8 @@ class MDL_ticket : public MDL_wait_for_subgraph {
              bool wsrep_non_preemptable
 #else
   MDL_ticket(MDL_context *ctx_arg, enum_mdl_type type_arg
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-#ifndef DBUG_OFF
-||||||| 35582423e36
-#ifndef DBUG_OFF
-=======
 #ifndef NDEBUG
->>>>>>> Percona-Server-8.0.25-15
              ,
              enum_mdl_duration duration_arg
 #endif
@@ -1146,7 +1140,7 @@ class MDL_ticket : public MDL_wait_for_subgraph {
 #ifdef WITH_WSREP
   static MDL_ticket *create(MDL_context *ctx_arg, enum_mdl_type type_arg,
                             bool wsrep_non_preemptable
-#ifndef DBUG_OFF
+#ifndef NDEBUG
                             ,
                             enum_mdl_duration duration_arg
 #endif

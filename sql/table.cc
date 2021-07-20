@@ -5728,25 +5728,17 @@ void TABLE::mark_columns_needed_for_delete(THD *thd) {
         in mark_columns_per_binlog_row_image, if not, then use
         the hidden primary key
       */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       /* this does not affect wsrep patch as long as we use RBR only,
          but this condition is just preparing for possible future STATEMENT
          format support
       */
       if (!((WSREP_EMULATE_BINLOG(current_thd) || mysql_bin_log.is_open()) &&
-            in_use && in_use->is_current_stmt_binlog_format_row()))
+            thd->is_current_stmt_binlog_format_row()))
 #else
-      if (!(mysql_bin_log.is_open() && in_use &&
-            in_use->is_current_stmt_binlog_format_row()))
-#endif /* WITH_WSREP */
-||||||| 35582423e36
-      if (!(mysql_bin_log.is_open() && in_use &&
-            in_use->is_current_stmt_binlog_format_row()))
-=======
       if (!(mysql_bin_log.is_open() &&
             thd->is_current_stmt_binlog_format_row()))
->>>>>>> Percona-Server-8.0.25-15
+#endif /* WITH_WSREP */
         file->use_hidden_primary_key();
     } else
       mark_columns_used_by_index_no_reset(s->primary_key, read_set);
@@ -5823,25 +5815,17 @@ void TABLE::mark_columns_needed_for_update(THD *thd, bool mark_binlog_columns) {
         in mark_columns_per_binlog_row_image, if not, then use
         the hidden primary key
       */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       /* this does not affect wsrep patch as long as we use RBR only,
          but this condition is just preparing for possible future STATEMENT
          format support
       */
       if (!((WSREP_EMULATE_BINLOG(current_thd) || mysql_bin_log.is_open()) &&
-            in_use && in_use->is_current_stmt_binlog_format_row()))
+            thd->is_current_stmt_binlog_format_row()))
 #else
-      if (!(mysql_bin_log.is_open() && in_use &&
-            in_use->is_current_stmt_binlog_format_row()))
-#endif /* WITH_WSREP */
-||||||| 35582423e36
-      if (!(mysql_bin_log.is_open() && in_use &&
-            in_use->is_current_stmt_binlog_format_row()))
-=======
       if (!(mysql_bin_log.is_open() &&
             thd->is_current_stmt_binlog_format_row()))
->>>>>>> Percona-Server-8.0.25-15
+#endif /* WITH_WSREP */
         file->use_hidden_primary_key();
     } else
       mark_columns_used_by_index_no_reset(s->primary_key, read_set);
@@ -5895,20 +5879,13 @@ void TABLE::mark_columns_per_binlog_row_image(THD *thd) {
     If in RBR we may need to mark some extra columns,
     depending on the binlog-row-image command line argument.
    */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (((WSREP_EMULATE_BINLOG(current_thd) || mysql_bin_log.is_open()) &&
-       in_use->is_current_stmt_binlog_format_row() &&
+       thd->is_current_stmt_binlog_format_row() &&
        !ha_check_storage_engine_flag(s->db_type(), HTON_NO_BINLOG_ROW_OPT))) {
 #else
-  if ((mysql_bin_log.is_open() && in_use &&
-       in_use->is_current_stmt_binlog_format_row() &&
-||||||| 35582423e36
-  if ((mysql_bin_log.is_open() && in_use &&
-       in_use->is_current_stmt_binlog_format_row() &&
-=======
-  if ((mysql_bin_log.is_open() && thd->is_current_stmt_binlog_format_row() &&
->>>>>>> Percona-Server-8.0.25-15
+  if ((mysql_bin_log.is_open() &&
+       thd->is_current_stmt_binlog_format_row() &&
        !ha_check_storage_engine_flag(s->db_type(), HTON_NO_BINLOG_ROW_OPT))) {
 #endif /* WITH_WSREP */
     /* if there is no PK, then mark all columns for the BI. */
@@ -7697,40 +7674,24 @@ bool TABLE::setup_partial_update(bool logical_diffs) {
 }
 
 bool TABLE::setup_partial_update() {
-<<<<<<< HEAD
+  THD *thd = current_thd;
 #ifdef WITH_WSREP
   bool logical_diffs =
-      (in_use->variables.binlog_row_value_options & PARTIAL_JSON_UPDATES) !=
+      (thd->variables.binlog_row_value_options & PARTIAL_JSON_UPDATES) !=
           0 &&
-      (WSREP_EMULATE_BINLOG(in_use) || mysql_bin_log.is_open()) &&
-      (in_use->variables.option_bits & OPTION_BIN_LOG) != 0 &&
-      log_bin_use_v1_row_events == 0 &&
-      in_use->is_current_stmt_binlog_format_row();
-#else
-  bool logical_diffs = (in_use->variables.binlog_row_value_options &
-                        PARTIAL_JSON_UPDATES) != 0 &&
-                       mysql_bin_log.is_open() &&
-                       (in_use->variables.option_bits & OPTION_BIN_LOG) != 0 &&
-                       log_bin_use_v1_row_events == 0 &&
-                       in_use->is_current_stmt_binlog_format_row();
-#endif /* WITH_WSREP */
-||||||| 35582423e36
-  bool logical_diffs = (in_use->variables.binlog_row_value_options &
-                        PARTIAL_JSON_UPDATES) != 0 &&
-                       mysql_bin_log.is_open() &&
-                       (in_use->variables.option_bits & OPTION_BIN_LOG) != 0 &&
-                       log_bin_use_v1_row_events == 0 &&
-                       in_use->is_current_stmt_binlog_format_row();
-=======
-  THD *thd = current_thd;
-
-  bool logical_diffs =
-      (thd->variables.binlog_row_value_options & PARTIAL_JSON_UPDATES) != 0 &&
-      mysql_bin_log.is_open() &&
+      (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) &&
       (thd->variables.option_bits & OPTION_BIN_LOG) != 0 &&
       log_bin_use_v1_row_events == 0 &&
       thd->is_current_stmt_binlog_format_row();
->>>>>>> Percona-Server-8.0.25-15
+#else
+  bool logical_diffs = (thd->variables.binlog_row_value_options &
+                        PARTIAL_JSON_UPDATES) != 0 &&
+                       mysql_bin_log.is_open() &&
+                       (thd->variables.option_bits & OPTION_BIN_LOG) != 0 &&
+                       log_bin_use_v1_row_events == 0 &&
+                       thd->is_current_stmt_binlog_format_row();
+#endif /* WITH_WSREP */
+
   DBUG_PRINT(
       "info",
       ("TABLE::setup_partial_update(): logical_diffs=%d "

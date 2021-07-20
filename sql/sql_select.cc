@@ -363,7 +363,7 @@ bool Sql_cmd_dml::prepare(THD *thd) {
   if (lex->sql_command == SQLCOM_INSERT_SELECT) {
     if (thd->wsrep_consistency_check == CONSISTENCY_CHECK_DECLARED) {
       thd->wsrep_consistency_check = CONSISTENCY_CHECK_RUNNING;
-      TABLE_LIST *const first_table = lex->select_lex->get_table_list();
+      TABLE_LIST *const first_table = lex->query_block->get_table_list();
       if (WSREP(thd) &&
           wsrep_to_isolation_begin(thd, first_table->db,
                                    first_table->table_name, NULL)) {

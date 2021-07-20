@@ -1138,7 +1138,7 @@ bool Sql_cmd_update::update_single_table(THD *thd) {
     const char act[] =
         "innobase_commit_low_begin "
         "SIGNAL update_commit_waiting WAIT_FOR continue";
-    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
   };);
 
   // Following test is disabled, as we get RQG errors that are hard to debug

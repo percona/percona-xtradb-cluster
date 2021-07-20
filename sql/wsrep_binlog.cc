@@ -395,7 +395,7 @@ void wsrep_register_for_group_commit(THD *thd) {
     DBUG_VOID_RETURN;
   }
 
-  DBUG_ASSERT(thd->wsrep_trx().state() == wsrep::transaction::s_committing);
+  assert(thd->wsrep_trx().state() == wsrep::transaction::s_committing);
   mysql_mutex_lock(&LOCK_wsrep_group_commit);
   wsrep_group_commit_queue.push(thd);
   thd->wsrep_enforce_group_commit = true;

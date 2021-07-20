@@ -3822,7 +3822,6 @@ bool is_atomic_ddl(THD *thd, bool using_trans_arg) {
     case SQLCOM_CREATE_VIEW:
     case SQLCOM_DROP_VIEW:
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       /*
         MySQL-8.0 enabled atomic DDL but to PXC still needs time to adapt to
@@ -3832,16 +3831,11 @@ bool is_atomic_ddl(THD *thd, bool using_trans_arg) {
         atomic ddl supporting statement. Use of wsrep_skip_wsrep_hton is really
         a hack or short-cut to avoid introducing another variable for this
       */
-      DBUG_ASSERT(using_trans_arg || thd->slave_thread || lex->drop_if_exists ||
+      assert(using_trans_arg || thd->slave_thread || lex->drop_if_exists ||
                   thd->wsrep_skip_wsrep_hton);
 #else
-      DBUG_ASSERT(using_trans_arg || thd->slave_thread || lex->drop_if_exists);
-#endif /* WITH_WSREP */
-||||||| 35582423e36
-      DBUG_ASSERT(using_trans_arg || thd->slave_thread || lex->drop_if_exists);
-=======
       assert(using_trans_arg || thd->slave_thread || lex->drop_if_exists);
->>>>>>> Percona-Server-8.0.25-15
+#endif /* WITH_WSREP */
 
       break;
 
@@ -3850,22 +3844,14 @@ bool is_atomic_ddl(THD *thd, bool using_trans_arg) {
         trx cache is *not* used if event already exists and IF NOT EXISTS clause
         is used in the statement or if call is from the slave applier.
       */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-      DBUG_ASSERT(using_trans_arg || thd->slave_thread ||
+      assert(using_trans_arg || thd->slave_thread ||
                   (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS) ||
                   thd->wsrep_skip_wsrep_hton);
 #else
-      DBUG_ASSERT(using_trans_arg || thd->slave_thread ||
+      assert(using_trans_arg || thd->slave_thread ||
                   (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS));
 #endif /* WITH_WSREP */
-||||||| 35582423e36
-      DBUG_ASSERT(using_trans_arg || thd->slave_thread ||
-                  (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS));
-=======
-      assert(using_trans_arg || thd->slave_thread ||
-             (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS));
->>>>>>> Percona-Server-8.0.25-15
       break;
 
     default:
@@ -12393,8 +12379,7 @@ error:
 }
 
 int Write_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
-<<<<<<< HEAD
-  DBUG_ASSERT(m_table != nullptr);
+  assert(m_table != nullptr);
 
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
@@ -12407,11 +12392,6 @@ int Write_rows_log_event::do_exec_row(const Relay_log_info *const rli) {
   }
 #endif /* WITH_WSREP */
 
-||||||| 35582423e36
-  DBUG_ASSERT(m_table != nullptr);
-=======
-  assert(m_table != nullptr);
->>>>>>> Percona-Server-8.0.25-15
   int error = write_row(rli, rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT);
 
   if (error && !thd->is_error()) {

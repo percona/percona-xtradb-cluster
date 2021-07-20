@@ -3421,14 +3421,8 @@ void Item_func_rand::seed_random(Item *arg) {
   }
 #else
   uint32 tmp = (uint32)arg->val_int();
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-  randominit(rand, (uint32)(tmp * 0x10001L + 55555555L),
-||||||| 35582423e36
-  randominit(rand, (uint32)(tmp * 0x10001L + 55555555L),
-=======
   randominit(m_rand, (uint32)(tmp * 0x10001L + 55555555L),
->>>>>>> Percona-Server-8.0.25-15
              (uint32)(tmp * 0x10000001L));
 }
 

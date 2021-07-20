@@ -2229,7 +2229,7 @@ trx_t *&thd_to_trx(THD *thd) {
 @return reference to private handler */
 MY_ATTRIBUTE((warn_unused_result))
 innodb_session_t *&wsrep_thd_to_innodb_session(THD *thd) {
-  DBUG_ASSERT(innodb_hton_ptr->slot != HA_SLOT_UNDEF);
+  assert(innodb_hton_ptr->slot != HA_SLOT_UNDEF);
   innodb_session_t *&innodb_session =
       *(innodb_session_t **)wsrep_thd_ha_data(thd, innodb_hton_ptr);
 
@@ -4094,21 +4094,11 @@ void Validate_files::check(const Const_iter &begin, const Const_iter &end,
 
     /* It's safe to pass space_name in tablename charset because
     filename is already in filename charset. */
-<<<<<<< HEAD
+    bool validate = recv_needed_recovery && srv_force_recovery == 0;
     dberr_t err =
         fil_ibd_open(validate || is_enc_in_progress, FIL_TYPE_TABLESPACE,
-                     space_id, fsp_flags, space_name, nullptr, filename, false,
+                     space_id, fsp_flags, space_name, filename, false,
                      false, keyring_encryption_info);
-||||||| 35582423e36
-    dberr_t err = fil_ibd_open(
-        validate || is_enc_in_progress, FIL_TYPE_TABLESPACE, space_id, fsp_flags,
-        space_name, nullptr, filename, false, false, keyring_encryption_info);
-=======
-    bool validate = recv_needed_recovery && srv_force_recovery == 0;
-    dberr_t err = fil_ibd_open(
-        validate || is_enc_in_progress, FIL_TYPE_TABLESPACE, space_id, fsp_flags,
-        space_name, filename, false, false, keyring_encryption_info);
->>>>>>> Percona-Server-8.0.25-15
 
     switch (err) {
       case DB_SUCCESS: {
@@ -8524,7 +8514,7 @@ int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
   enum_field_types mysql_tp;
   int ret_length = str_length;
 
-  DBUG_ASSERT(str_length != UNIV_SQL_NULL);
+  assert(str_length != UNIV_SQL_NULL);
 
   mysql_tp = (enum_field_types)mysql_type;
 
@@ -8568,14 +8558,14 @@ int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
       if (wsrep_protocol_version < 3) {
         tmp_length = charset->coll->strnxfrm(
             charset, str, str_length, str_length, tmp_str, tmp_length, 0);
-        DBUG_ASSERT(tmp_length <= str_length);
+        assert(tmp_length <= str_length);
       } else {
         /* strnxfrm will expand the destination string,
         protocols < 3 truncated the sorted sring
         protocols >= 3 gets full sorted sring */
         tmp_length = charset->coll->strnxfrm(
             charset, str, buf_length, str_length, tmp_str, str_length, 0);
-        DBUG_ASSERT(tmp_length <= buf_length);
+        assert(tmp_length <= buf_length);
         ret_length = tmp_length;
       }
       break;
@@ -20233,16 +20223,10 @@ int ha_innobase::check(THD *thd,                /*!< in: user thread handle */
   dberr_t ret;
 
   DBUG_TRACE;
-<<<<<<< HEAD
-  DBUG_ASSERT(thd == ha_thd());
+  assert(thd == ha_thd());
 #ifdef WITH_WSREP
   DEBUG_SYNC(thd, "ha_innobase_check");
 #endif /* WITH_WSREP */
-||||||| 35582423e36
-  DBUG_ASSERT(thd == ha_thd());
-=======
-  assert(thd == ha_thd());
->>>>>>> Percona-Server-8.0.25-15
   ut_a(m_prebuilt->trx->magic_n == TRX_MAGIC_N);
   ut_a(m_prebuilt->trx == thd_to_trx(thd));
 
@@ -24774,7 +24758,7 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
     const char act[] =
         "now "
         "wait_for signal.wsrep_after_BF_victim_lock";
-    DBUG_ASSERT(!debug_sync_set_action(bf_thd, STRING_WITH_LEN(act)));
+    assert(!debug_sync_set_action(bf_thd, STRING_WITH_LEN(act)));
   };);
 
   /*
@@ -24799,7 +24783,7 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
          so does reading the trx->lock.wait_lock to prevent races with B-tree
          page reorganization
       */
-      locksys::Global_exclusive_latch_guard guard{};
+      locksys::Global_exclusive_latch_guard guard{UT_LOCATION_HERE};
       lock_t *wait_lock = victim_trx->lock.wait_lock;
 
       if (wait_lock) {
@@ -24872,7 +24856,7 @@ static int wsrep_abort_transaction_func(handlerton *hton, THD *bf_thd,
 }
 
 static int innobase_wsrep_set_checkpoint(handlerton *hton, const XID *xid) {
-  DBUG_ASSERT(hton == innodb_hton_ptr);
+  assert(hton == innodb_hton_ptr);
   if (srv_read_only_mode) return 0;
   if (wsrep_is_wsrep_xid(xid)) {
     mtr_t mtr;
@@ -24888,7 +24872,7 @@ static int innobase_wsrep_set_checkpoint(handlerton *hton, const XID *xid) {
 }
 
 static int innobase_wsrep_get_checkpoint(handlerton *hton, XID *xid) {
-  DBUG_ASSERT(hton == innodb_hton_ptr);
+  assert(hton == innodb_hton_ptr);
   trx_sys_read_wsrep_checkpoint(xid);
   return 0;
 }

@@ -241,7 +241,7 @@ void Wsrep_server_service::log_view(
         std::ostringstream os2;
         os2 << "Storing cluster view:\n" << view;
         WSREP_INFO("%s", os2.str().c_str());
-        DBUG_ASSERT(prev_view.state_id().id() != view.state_id().id() ||
+        assert(prev_view.state_id().id() != view.state_id().id() ||
                     view.state_id().seqno().get() >=
                         prev_view.state_id().seqno().get());
       }
@@ -279,7 +279,7 @@ void Wsrep_server_service::log_view(
       if (checkpoint_was_reset || last_committed != view.state_id().seqno()) {
         wsrep_set_SE_checkpoint(view.state_id());
       }
-      DBUG_ASSERT(wsrep_get_SE_checkpoint().id() == view.state_id().id());
+      assert(wsrep_get_SE_checkpoint().id() == view.state_id().id());
     } else {
       WSREP_DEBUG(
           "No applier in Wsrep_server_service::log_view(), "

@@ -806,7 +806,6 @@ Sql_condition *THD::raise_condition(uint sql_errno, const char *sqlstate,
       (level == Sql_condition::SL_NOTE))
     return nullptr;
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /*
     Suppress warnings/errors if the wsrep THD is going to replay. The
@@ -816,12 +815,7 @@ Sql_condition *THD::raise_condition(uint sql_errno, const char *sqlstate,
   if (wsrep_must_replay(this)) return NULL;
 #endif /* WITH_WSREP */
 
-  DBUG_ASSERT(sql_errno != 0);
-||||||| 35582423e36
-  DBUG_ASSERT(sql_errno != 0);
-=======
   assert(sql_errno != 0);
->>>>>>> Percona-Server-8.0.25-15
   if (sql_errno == 0) /* Safety in release build */
     sql_errno = ER_UNKNOWN_ERROR;
   if (msg == nullptr) msg = ER_THD_NONCONST(this, sql_errno);
@@ -1626,20 +1620,14 @@ void THD::notify_shared_lock(MDL_context_owner *ctx_in_use,
         about views which are dependent on table being ALTERed. Calling
         mysql_lock_abort_for_thread() for such tables is not safe.
       */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-      if (!thd_table->needs_reopen()) {
+      if (!thd_table->has_invalid_dict()) {
         mysql_lock_abort_for_thread(this, thd_table);
         if (WSREP_NNULL(this) && wsrep_thd_is_BF(this, false))
           wsrep_abort_thd(this, in_use, false);
       }
 #else
-      if (!thd_table->needs_reopen())
-||||||| 35582423e36
-      if (!thd_table->needs_reopen())
-=======
       if (!thd_table->has_invalid_dict())
->>>>>>> Percona-Server-8.0.25-15
         mysql_lock_abort_for_thread(this, thd_table);
 #endif /* WITH_WSREP */
     }
@@ -1738,16 +1726,10 @@ void THD::update_stats(bool ran_command) noexcept {
 
   if (ran_command) {
     // The replication thread has the COM_CONNECT command.
-<<<<<<< HEAD
 #ifndef WITH_WSREP
     // TODO: add why this needs to be skipped
-    DBUG_ASSERT(get_command() != COM_SLEEP);
-#endif /* !WITH_WSREP */
-||||||| 35582423e36
-    DBUG_ASSERT(get_command() != COM_SLEEP);
-=======
     assert(get_command() != COM_SLEEP);
->>>>>>> Percona-Server-8.0.25-15
+#endif /* !WITH_WSREP */
     if ((get_command() == COM_QUERY || get_command() == COM_CONNECT) &&
         (lex->sql_command >= 0 && lex->sql_command < SQLCOM_END)) {
       // A SQL query.
@@ -2293,22 +2275,16 @@ void THD::end_attachable_transaction() {
 }
 
 void THD::begin_attachable_rw_transaction() {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* In PXC flow, bf_thd may be reading the main transaction data
   from attachable transaction so this sync is needed. */
   mysql_mutex_lock(&LOCK_wsrep_thd_attachable_trx);
-  DBUG_ASSERT(!m_attachable_trx);
-||||||| 35582423e36
-  DBUG_ASSERT(!m_attachable_trx);
-=======
   assert(!m_attachable_trx);
->>>>>>> Percona-Server-8.0.25-15
 
   m_attachable_trx = new Attachable_trx_rw(this);
   mysql_mutex_unlock(&LOCK_wsrep_thd_attachable_trx);
 #else
-  DBUG_ASSERT(!m_attachable_trx);
+  assert(!m_attachable_trx);
 
   m_attachable_trx = new Attachable_trx_rw(this);
 #endif /* WITH_WSREP */
@@ -3087,7 +3063,7 @@ void THD::send_statement_status() {
   /*
     sanity check, don't send end statement while replaying
   */
-  DBUG_ASSERT(wsrep_trx().state() != wsrep::transaction::s_replaying);
+  assert(wsrep_trx().state() != wsrep::transaction::s_replaying);
   if (WSREP(this) && wsrep_trx().state() == wsrep::transaction::s_replaying) {
     WSREP_ERROR("attempting net_end_statement while replaying");
     return;

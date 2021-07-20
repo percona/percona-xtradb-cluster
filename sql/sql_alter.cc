@@ -388,7 +388,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
     // append tables that are referencing this table
     wsrep_append_child_tables(thd, first_table, &keys);
 
-    WSREP_TO_ISOLATION_BEGIN_ALTER(((lex->name.str) ? select_lex->db : NULL),
+    WSREP_TO_ISOLATION_BEGIN_ALTER(((lex->name.str) ? lex->query_block->db : NULL),
                                    ((lex->name.str) ? lex->name.str : NULL),
                                    first_table, &alter_info, &keys) {
       WSREP_DEBUG("TOI replication for ALTER failed");
@@ -604,7 +604,7 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
          !find_temporary_table(thd, first_table))) {
       if (WSREP(thd) &&
           wsrep_to_isolation_begin(
-              thd, ((thd->lex->name.str) ? thd->lex->select_lex->db : NULL),
+              thd, ((thd->lex->name.str) ? thd->lex->query_block->db : NULL),
               ((thd->lex->name.str) ? thd->lex->name.str : NULL), first_table,
               NULL, &alter_info)) {
         WSREP_WARN("ALTER TABLE isolation failure");

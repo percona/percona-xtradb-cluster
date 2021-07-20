@@ -529,7 +529,6 @@ int init_slave() {
 
   group_replication_cleanup_after_clone();
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /*
      for only wsrep, create active_mi, for async slave restart purpose
@@ -537,12 +536,7 @@ int init_slave() {
   active_mi = channel_map.get_default_channel_mi();
 #endif /* WITH_WSREP */
 
-#ifndef DBUG_OFF
-||||||| 35582423e36
-#ifndef DBUG_OFF
-=======
 #ifndef NDEBUG
->>>>>>> Percona-Server-8.0.25-15
   /* @todo: Print it for all the channels */
   {
     Master_info *default_mi;
@@ -5315,34 +5309,14 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
                       rli->trans_retries);
                 }
               }
-<<<<<<< HEAD
 
               rli->retried_trans++;
               mysql_mutex_unlock(&rli->data_lock);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
               if (rli->trans_retries == 2 || rli->trans_retries == 6)
                 DBUG_EXECUTE_IF("rpl_ps_tables_worker_retry", {
                   rpl_slave_debug_point(DBUG_RPL_S_PS_TABLE_WORKER_RETRY);
                 };);
-||||||| 35582423e36
-            }
-            rli->retried_trans++;
-            mysql_mutex_unlock(&rli->data_lock);
-#ifndef DBUG_OFF
-            if (rli->trans_retries == 2 || rli->trans_retries == 6)
-              DBUG_EXECUTE_IF("rpl_ps_tables_worker_retry", {
-                rpl_slave_debug_point(DBUG_RPL_S_PS_TABLE_WORKER_RETRY);
-              };);
-=======
-            }
-            rli->retried_trans++;
-            mysql_mutex_unlock(&rli->data_lock);
-#ifndef NDEBUG
-            if (rli->trans_retries == 2 || rli->trans_retries == 6)
-              DBUG_EXECUTE_IF("rpl_ps_tables_worker_retry", {
-                rpl_slave_debug_point(DBUG_RPL_S_PS_TABLE_WORKER_RETRY);
-              };);
->>>>>>> Percona-Server-8.0.25-15
 
 #endif
               DBUG_PRINT("info", ("Slave retries transaction "
@@ -7194,28 +7168,12 @@ wsrep_restart_point :
 {
   DBUG_TRACE;
 
-<<<<<<< HEAD
-  DBUG_ASSERT(rli->inited);
+  assert(rli->inited);
   mysql_mutex_lock(&rli->run_lock);
-  DBUG_ASSERT(!rli->slave_running);
+  assert(!rli->slave_running);
   errmsg = nullptr;
-#ifndef DBUG_OFF
-  rli->events_until_exit = abort_slave_event_count;
-||||||| 35582423e36
-    DBUG_ASSERT(rli->inited);
-    mysql_mutex_lock(&rli->run_lock);
-    DBUG_ASSERT(!rli->slave_running);
-    errmsg = nullptr;
-#ifndef DBUG_OFF
-    rli->events_until_exit = abort_slave_event_count;
-=======
-    assert(rli->inited);
-    mysql_mutex_lock(&rli->run_lock);
-    assert(!rli->slave_running);
-    errmsg = nullptr;
 #ifndef NDEBUG
-    rli->events_until_exit = abort_slave_event_count;
->>>>>>> Percona-Server-8.0.25-15
+  rli->events_until_exit = abort_slave_event_count;
 #endif
 
   thd = new THD;                     // note that contructor of THD uses DBUG_ !
@@ -7260,7 +7218,6 @@ wsrep_restart_point :
   rli->reported_unsafe_warning = false;
   rli->sql_thread_kill_accepted = false;
 
-<<<<<<< HEAD
   if (init_slave_thread(thd, SLAVE_THD_SQL)) {
     /*
       TODO: this is currently broken - slave start and change master
@@ -7274,50 +7231,11 @@ wsrep_restart_point :
     goto err;
   }
   thd->init_query_mem_roots();
-||||||| 35582423e36
-    if (init_slave_thread(thd, SLAVE_THD_SQL)) {
-      /*
-        TODO: this is currently broken - slave start and change master
-        will be stuck if we fail here
-      */
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                  ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                  "Failed during slave thread initialization");
-      goto err;
-    }
-    thd->init_query_mem_roots();
-
-    if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()))
-      rli->deferred_events = new Deferred_log_events();
-    thd->rli_slave = rli;
-    DBUG_ASSERT(thd->rli_slave->info_thd == thd);
-=======
-    if (init_slave_thread(thd, SLAVE_THD_SQL)) {
-      /*
-        TODO: this is currently broken - slave start and change master
-        will be stuck if we fail here
-      */
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                  ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                  "Failed during slave thread initialization");
-      goto err;
-    }
-    thd->init_query_mem_roots();
-
-    if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()))
-      rli->deferred_events = new Deferred_log_events();
-    thd->rli_slave = rli;
-    assert(thd->rli_slave->info_thd == thd);
->>>>>>> Percona-Server-8.0.25-15
 
   if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()))
     rli->deferred_events = new Deferred_log_events();
   thd->rli_slave = rli;
-  DBUG_ASSERT(thd->rli_slave->info_thd == thd);
+  assert(thd->rli_slave->info_thd == thd);
 
   thd->temporary_tables = rli->save_temporary_tables;  // restore temp tables
   set_thd_in_use_temporary_tables(
@@ -7413,7 +7331,6 @@ wsrep_restart_point :
 
   DEBUG_SYNC(thd, "after_start_slave");
 
-<<<<<<< HEAD
   // tell the I/O thread to take relay_log_space_limit into account from now
   // on
   mysql_mutex_lock(&rli->log_space_lock);
@@ -7421,13 +7338,6 @@ wsrep_restart_point :
   mysql_mutex_unlock(&rli->log_space_lock);
   rli->trans_retries = 0;  // start from "no error"
   DBUG_PRINT("info", ("rli->trans_retries: %lu", rli->trans_retries));
-||||||| 35582423e36
-    THD_CHECK_SENTRY(thd);
-    DBUG_ASSERT(rli->info_thd == thd);
-=======
-    THD_CHECK_SENTRY(thd);
-    assert(rli->info_thd == thd);
->>>>>>> Percona-Server-8.0.25-15
 
   if (applier_reader.open(&errmsg)) {
     rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR, "%s", errmsg);
@@ -7435,7 +7345,7 @@ wsrep_restart_point :
   }
 
   THD_CHECK_SENTRY(thd);
-  DBUG_ASSERT(rli->info_thd == thd);
+  assert(rli->info_thd == thd);
 
   DBUG_PRINT("master_info", ("log_file_name: %s  position: %s",
                              rli->get_group_master_log_name(),
@@ -7526,7 +7436,7 @@ wsrep_restart_point :
   while (!main_loop_error && !sql_slave_killed(thd, rli)) {
     Log_event *ev = nullptr;
     THD_STAGE_INFO(thd, stage_reading_event_from_the_relay_log);
-    DBUG_ASSERT(rli->info_thd == thd);
+    assert(rli->info_thd == thd);
     THD_CHECK_SENTRY(thd);
     if (saved_skip && rli->slave_skip_counter == 0) {
       LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SKIP_COUNTER_EXECUTED,
@@ -7563,7 +7473,6 @@ wsrep_restart_point :
             Next iteration reads the same event. */
         break;
 
-<<<<<<< HEAD
       case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR:
         /** fall through */
       case SLAVE_APPLY_EVENT_AND_UPDATE_POS_UPDATE_POS_ERROR:
@@ -7571,49 +7480,15 @@ wsrep_restart_point :
       case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPEND_JOB_ERROR:
         main_loop_error = true;
         break;
-||||||| 35582423e36
-    while (!main_loop_error && !sql_slave_killed(thd, rli)) {
-      Log_event *ev = nullptr;
-      THD_STAGE_INFO(thd, stage_reading_event_from_the_relay_log);
-      DBUG_ASSERT(rli->info_thd == thd);
-      THD_CHECK_SENTRY(thd);
-      if (saved_skip && rli->slave_skip_counter == 0) {
-        LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SKIP_COUNTER_EXECUTED,
-               (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
-               saved_master_log_name, (ulong)saved_master_log_pos,
-               rli->get_group_relay_log_name(),
-               (ulong)rli->get_group_relay_log_pos(),
-               rli->get_group_master_log_name(),
-               (ulong)rli->get_group_master_log_pos());
-        saved_skip = 0;
-      }
-=======
-    while (!main_loop_error && !sql_slave_killed(thd, rli)) {
-      Log_event *ev = nullptr;
-      THD_STAGE_INFO(thd, stage_reading_event_from_the_relay_log);
-      assert(rli->info_thd == thd);
-      THD_CHECK_SENTRY(thd);
-      if (saved_skip && rli->slave_skip_counter == 0) {
-        LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SKIP_COUNTER_EXECUTED,
-               (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
-               saved_master_log_name, (ulong)saved_master_log_pos,
-               rli->get_group_relay_log_name(),
-               (ulong)rli->get_group_relay_log_pos(),
-               rli->get_group_master_log_name(),
-               (ulong)rli->get_group_master_log_pos());
-        saved_skip = 0;
-      }
->>>>>>> Percona-Server-8.0.25-15
 
       default:
         /* This shall never happen. */
-        DBUG_ASSERT(0); /* purecov: inspected */
+        assert(0); /* purecov: inspected */
         break;
     }
   }
 err:
 
-<<<<<<< HEAD
   // report error
 
 #ifdef WITH_WSREP
@@ -7622,73 +7497,6 @@ err:
     if (thd->wsrep_cs().current_error()) {
       wsrep_node_dropped = true;
       rli->abort_slave = true;
-||||||| 35582423e36
-      // set additional context as needed by the scheduler before execution
-      // takes place
-      if (ev != nullptr && rli->is_parallel_exec() &&
-          rli->current_mts_submode != nullptr)
-        rli->current_mts_submode->set_multi_threaded_applier_context(*rli, *ev);
-
-      // try to execute the event
-      switch (exec_relay_log_event(thd, rli, &applier_reader, ev)) {
-        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK:
-          /** success, we read the next event. */
-          /** fall through */
-        case SLAVE_APPLY_EVENT_UNTIL_REACHED:
-          /** this will make the main loop abort in the next iteration */
-          /** fall through */
-        case SLAVE_APPLY_EVENT_RETRY:
-          /** single threaded applier has to retry.
-              Next iteration reads the same event. */
-          break;
-
-        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR:
-          /** fall through */
-        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_UPDATE_POS_ERROR:
-          /** fall through */
-        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPEND_JOB_ERROR:
-          main_loop_error = true;
-          break;
-
-        default:
-          /* This shall never happen. */
-          DBUG_ASSERT(0); /* purecov: inspected */
-          break;
-      }
-=======
-      // set additional context as needed by the scheduler before execution
-      // takes place
-      if (ev != nullptr && rli->is_parallel_exec() &&
-          rli->current_mts_submode != nullptr)
-        rli->current_mts_submode->set_multi_threaded_applier_context(*rli, *ev);
-
-      // try to execute the event
-      switch (exec_relay_log_event(thd, rli, &applier_reader, ev)) {
-        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK:
-          /** success, we read the next event. */
-          /** fall through */
-        case SLAVE_APPLY_EVENT_UNTIL_REACHED:
-          /** this will make the main loop abort in the next iteration */
-          /** fall through */
-        case SLAVE_APPLY_EVENT_RETRY:
-          /** single threaded applier has to retry.
-              Next iteration reads the same event. */
-          break;
-
-        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR:
-          /** fall through */
-        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_UPDATE_POS_ERROR:
-          /** fall through */
-        case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPEND_JOB_ERROR:
-          main_loop_error = true;
-          break;
-
-        default:
-          /* This shall never happen. */
-          assert(0); /* purecov: inspected */
-          break;
-      }
->>>>>>> Percona-Server-8.0.25-15
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
@@ -7719,7 +7527,6 @@ err:
   wsrep_close(thd);
 #endif /* WITH_WSREP */
 
-<<<<<<< HEAD
   delete rli->current_mts_submode;
   rli->current_mts_submode = 0;
   rli->clear_mts_recovery_groups();
@@ -7753,46 +7560,16 @@ err:
   /* We need data_lock, at least to wake up any waiting master_pos_wait() */
   mysql_mutex_lock(&rli->data_lock);
   applier_reader.close();
-  DBUG_ASSERT(rli->slave_running == 1);  // tracking buffer overrun
+  assert(rli->slave_running == 1);  // tracking buffer overrun
   /* When master_pos_wait() wakes up it will check this and terminate */
   rli->slave_running = 0;
   rli->atomic_is_stopping = false;
   /* Forget the relay log's format */
   if (rli->set_rli_description_event(nullptr)) {
-#ifndef DBUG_OFF
-    bool set_rli_description_event_failed = false;
-||||||| 35582423e36
-    THD_STAGE_INFO(thd, stage_waiting_for_slave_mutex_on_exit);
-    mysql_mutex_lock(&rli->run_lock);
-    /* We need data_lock, at least to wake up any waiting master_pos_wait() */
-    mysql_mutex_lock(&rli->data_lock);
-    applier_reader.close();
-    DBUG_ASSERT(rli->slave_running == 1);  // tracking buffer overrun
-    /* When master_pos_wait() wakes up it will check this and terminate */
-    rli->slave_running = 0;
-    rli->atomic_is_stopping = false;
-    /* Forget the relay log's format */
-    if (rli->set_rli_description_event(nullptr)) {
-#ifndef DBUG_OFF
-      bool set_rli_description_event_failed = false;
-=======
-    THD_STAGE_INFO(thd, stage_waiting_for_slave_mutex_on_exit);
-    mysql_mutex_lock(&rli->run_lock);
-    /* We need data_lock, at least to wake up any waiting master_pos_wait() */
-    mysql_mutex_lock(&rli->data_lock);
-    applier_reader.close();
-    assert(rli->slave_running == 1);  // tracking buffer overrun
-    /* When master_pos_wait() wakes up it will check this and terminate */
-    rli->slave_running = 0;
-    rli->atomic_is_stopping = false;
-    /* Forget the relay log's format */
-    if (rli->set_rli_description_event(nullptr)) {
 #ifndef NDEBUG
-      bool set_rli_description_event_failed = false;
->>>>>>> Percona-Server-8.0.25-15
+    bool set_rli_description_event_failed = false;
 #endif
-<<<<<<< HEAD
-    DBUG_ASSERT(set_rli_description_event_failed);
+    assert(set_rli_description_event_failed);
   }
   /* Wake up master_pos_wait() */
   DBUG_PRINT("info",
@@ -7804,35 +7581,7 @@ err:
   /* we die so won't remember charset - re-update them on next thread start */
   rli->cached_charset_invalidate();
   rli->save_temporary_tables = thd->temporary_tables;
-||||||| 35582423e36
-      DBUG_ASSERT(set_rli_description_event_failed);
-    }
-    /* Wake up master_pos_wait() */
-    DBUG_PRINT("info",
-               ("Signaling possibly waiting master_pos_wait() functions"));
-    mysql_cond_broadcast(&rli->data_cond);
-    mysql_mutex_unlock(&rli->data_lock);
-    rli->ignore_log_space_limit = false; /* don't need any lock */
-    rli->sql_force_rotate_relay = false;
-    /* we die so won't remember charset - re-update them on next thread start */
-    rli->cached_charset_invalidate();
-    rli->save_temporary_tables = thd->temporary_tables;
-=======
-      assert(set_rli_description_event_failed);
-    }
-    /* Wake up master_pos_wait() */
-    DBUG_PRINT("info",
-               ("Signaling possibly waiting master_pos_wait() functions"));
-    mysql_cond_broadcast(&rli->data_cond);
-    mysql_mutex_unlock(&rli->data_lock);
-    rli->ignore_log_space_limit = false; /* don't need any lock */
-    rli->sql_force_rotate_relay = false;
-    /* we die so won't remember charset - re-update them on next thread start */
-    rli->cached_charset_invalidate();
-    rli->save_temporary_tables = thd->temporary_tables;
->>>>>>> Percona-Server-8.0.25-15
 
-<<<<<<< HEAD
   /*
     TODO: see if we can do this conditionally in next_event() instead
     to avoid unneeded position re-init
@@ -7841,7 +7590,7 @@ err:
       nullptr;  // remove tempation from destructor to close them
   // destructor will not free it, because we are weird
   thd->get_protocol_classic()->end_net();
-  DBUG_ASSERT(rli->info_thd == thd);
+  assert(rli->info_thd == thd);
   THD_CHECK_SENTRY(thd);
   mysql_mutex_lock(&rli->info_thd_lock);
   rli->info_thd = nullptr;
@@ -7849,41 +7598,6 @@ err:
     rli->set_commit_order_manager(nullptr);
     delete commit_order_mngr;
   }
-||||||| 35582423e36
-    /*
-      TODO: see if we can do this conditionally in next_event() instead
-      to avoid unneeded position re-init
-    */
-    thd->temporary_tables =
-        nullptr;  // remove tempation from destructor to close them
-    // destructor will not free it, because we are weird
-    thd->get_protocol_classic()->end_net();
-    DBUG_ASSERT(rli->info_thd == thd);
-    THD_CHECK_SENTRY(thd);
-    mysql_mutex_lock(&rli->info_thd_lock);
-    rli->info_thd = nullptr;
-    if (commit_order_mngr) {
-      rli->set_commit_order_manager(nullptr);
-      delete commit_order_mngr;
-    }
-=======
-    /*
-      TODO: see if we can do this conditionally in next_event() instead
-      to avoid unneeded position re-init
-    */
-    thd->temporary_tables =
-        nullptr;  // remove tempation from destructor to close them
-    // destructor will not free it, because we are weird
-    thd->get_protocol_classic()->end_net();
-    assert(rli->info_thd == thd);
-    THD_CHECK_SENTRY(thd);
-    mysql_mutex_lock(&rli->info_thd_lock);
-    rli->info_thd = nullptr;
-    if (commit_order_mngr) {
-      rli->set_commit_order_manager(nullptr);
-      delete commit_order_mngr;
-    }
->>>>>>> Percona-Server-8.0.25-15
 
   mysql_mutex_unlock(&rli->info_thd_lock);
   set_thd_in_use_temporary_tables(
@@ -7897,29 +7611,13 @@ err:
     The thd can only be destructed after indirect references
     through mi->rli->info_thd are cleared: mi->rli->info_thd= NULL.
 
-<<<<<<< HEAD
     For instance, user thread might be issuing show_slave_status
     and attempting to read mi->rli->info_thd->get_proc_info().
     Therefore thd must only be deleted after info_thd is set
     to NULL.
   */
+  mysql_thread_set_psi_THD(nullptr);
   delete thd;
-||||||| 35582423e36
-      For instance, user thread might be issuing show_slave_status
-      and attempting to read mi->rli->info_thd->get_proc_info().
-      Therefore thd must only be deleted after info_thd is set
-      to NULL.
-    */
-    delete thd;
-=======
-      For instance, user thread might be issuing show_slave_status
-      and attempting to read mi->rli->info_thd->get_proc_info().
-      Therefore thd must only be deleted after info_thd is set
-      to NULL.
-    */
-    mysql_thread_set_psi_THD(nullptr);
-    delete thd;
->>>>>>> Percona-Server-8.0.25-15
 
 #ifdef WITH_WSREP
   /* if slave stopped due to node going non primary, we set global flag to

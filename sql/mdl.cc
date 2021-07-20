@@ -1711,13 +1711,13 @@ bool MDL_lock::needs_hton_notification(
 #ifdef WITH_WSREP
 MDL_ticket *MDL_ticket::create(MDL_context *ctx_arg, enum_mdl_type type_arg,
                                bool wsrep_non_preemptable
-#ifndef DBUG_OFF
+#ifndef NDEBUG
                                ,
                                enum_mdl_duration duration_arg
 #endif
 ) {
   return new (std::nothrow) MDL_ticket(ctx_arg, type_arg, wsrep_non_preemptable
-#ifndef DBUG_OFF
+#ifndef NDEBUG
                                        ,
                                        duration_arg
 #endif
@@ -1884,7 +1884,7 @@ MDL_wait::enum_wait_status MDL_wait::timed_wait(
       const char act[] =
           "now "
           "wait_for signal.wsrep_before_mdl_wait";
-      DBUG_ASSERT(
+      assert(
           !debug_sync_set_action((owner->get_thd()), STRING_WITH_LEN(act)));
     };);
     if (wsrep_thd_is_BF(owner->get_thd(), false))
@@ -1952,8 +1952,7 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
     since for such tickets methods accessing this member might be
     called by other threads.
   */
-<<<<<<< HEAD
-  DBUG_ASSERT(ticket->get_lock());
+  assert(ticket->get_lock());
 #ifdef WITH_WSREP
   /* Flow below check if the requesting thread is BF thread (applier or DDL
   executor thread). Such thread get priority in PXC and so if the thread
@@ -1989,11 +1988,6 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket) {
     m_list.push_back(ticket);
   }
 #else
-||||||| 35582423e36
-  DBUG_ASSERT(ticket->get_lock());
-=======
-  assert(ticket->get_lock());
->>>>>>> Percona-Server-8.0.25-15
   /*
     Add ticket to the *back* of the queue to ensure fairness
     among requests with the same priority.
@@ -3050,17 +3044,11 @@ bool MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
   if (fix_pins()) return true;
 
   if (!(ticket = MDL_ticket::create(this, mdl_request->type
-<<<<<<< HEAD
 #ifdef WITH_WSREP
                                     ,
                                     mdl_request->m_wsrep_non_preemptable
 #endif /* WITH_WSREP */
-#ifndef DBUG_OFF
-||||||| 35582423e36
-#ifndef DBUG_OFF
-=======
 #ifndef NDEBUG
->>>>>>> Percona-Server-8.0.25-15
                                     ,
                                     mdl_request->duration
 #endif
@@ -3393,17 +3381,11 @@ bool MDL_context::clone_ticket(MDL_request *mdl_request) {
     the request.
   */
   if (!(ticket = MDL_ticket::create(this, mdl_request->type
-<<<<<<< HEAD
 #ifdef WITH_WSREP
                                     ,
                                     mdl_request->m_wsrep_non_preemptable
 #endif /* WITH_WSREP */
-#ifndef DBUG_OFF
-||||||| 35582423e36
-#ifndef DBUG_OFF
-=======
 #ifndef NDEBUG
->>>>>>> Percona-Server-8.0.25-15
                                     ,
                                     mdl_request->duration
 #endif
@@ -5077,17 +5059,11 @@ void MDL_ticket_store::move_all_to_explicit_duration() {
     }
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   mysql_mutex_unlock(&m_LOCK_ticket_store_ops);
 #endif /* WITH_WSREP */
 
-#ifndef DBUG_OFF
-||||||| 35582423e36
-#ifndef DBUG_OFF
-=======
 #ifndef NDEBUG
->>>>>>> Percona-Server-8.0.25-15
   List_iterator exp_it(m_durations[MDL_EXPLICIT].m_ticket_list);
 
   while ((ticket = exp_it++)) {

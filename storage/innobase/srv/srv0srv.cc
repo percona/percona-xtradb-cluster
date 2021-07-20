@@ -2080,8 +2080,8 @@ loop:
   sync_arr_wake_threads_if_sema_free();
 
   if (sync_array_print_long_waits(&waiter, &sema) && sema == old_sema &&
-<<<<<<< HEAD
-      os_thread_eq(waiter, old_waiter)) {
+      waiter == old_waiter) {
+    fatal_cnt++;
 #if defined(WITH_WSREP)
     if (os_event_is_set(srv_allow_writes_event)) {
 #endif /* WITH_WSREP */
@@ -2097,13 +2097,6 @@ loop:
                  << fatal_cnt;
     }
 #endif /* WITH_WSREP */
-||||||| 35582423e36
-      os_thread_eq(waiter, old_waiter)) {
-    fatal_cnt++;
-=======
-      waiter == old_waiter) {
-    fatal_cnt++;
->>>>>>> Percona-Server-8.0.25-15
     if (fatal_cnt > 10) {
       ib::fatal(ER_IB_MSG_1047, ulonglong{srv_fatal_semaphore_wait_threshold});
     }

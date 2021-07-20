@@ -858,38 +858,20 @@ static bool validate_password_require_current(THD *thd, LEX_USER *Str,
     if (Str->uses_replace_clause) {
       int is_error = 0;
       Security_context *sctx = thd->security_context();
-<<<<<<< HEAD
-      DBUG_ASSERT(sctx);
+      assert(sctx);
 #ifdef WITH_WSREP
       // System threads do not have user and have
       // m_is_skip_grants_user set.
       if (thd->system_thread == NON_SYSTEM_THREAD) {
 #endif /* WITH_WSREP */
-        // If trying to set password for other user
-        if (strcmp(sctx->user().str, Str->user.str) ||
-            my_strcasecmp(system_charset_info, sctx->priv_host().str,
-                          Str->host.str)) {
-          my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
-          return (true);
-        }
+      // If trying to set password for other user
+      if (strcmp(sctx->user().str, Str->user.str) ||
+          my_strcasecmp(system_charset_info, sctx->priv_host().str,
+                        Str->host.str)) {
+        my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
+        return (true);
+      }
 #ifdef WITH_WSREP
-||||||| 35582423e36
-      DBUG_ASSERT(sctx);
-      // If trying to set password for other user
-      if (strcmp(sctx->user().str, Str->user.str) ||
-          my_strcasecmp(system_charset_info, sctx->priv_host().str,
-                        Str->host.str)) {
-        my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
-        return (true);
-=======
-      assert(sctx);
-      // If trying to set password for other user
-      if (strcmp(sctx->user().str, Str->user.str) ||
-          my_strcasecmp(system_charset_info, sctx->priv_host().str,
-                        Str->host.str)) {
-        my_error(ER_CURRENT_PASSWORD_NOT_REQUIRED, MYF(0));
-        return (true);
->>>>>>> Percona-Server-8.0.25-15
       }
 #endif /* WITH_WSREP */
 
