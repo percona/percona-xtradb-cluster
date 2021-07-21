@@ -246,6 +246,12 @@ void System_tables::add_remaining_dd_tables() {
   register_table("time_zone_transition_type", system);
   register_table("user", system);
 
+#ifdef WITH_WSREP
+  register_table("wsrep_cluster", system);
+  register_table("wsrep_cluster_members", system);
+  register_table("wsrep_streaming_log", system);
+#endif /* WITH_WSREP */
+
   /*
     MTR tests expects following tables to be created in the 'mysql' tablespace.
     So tables are listed here.

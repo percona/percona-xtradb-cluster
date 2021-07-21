@@ -283,9 +283,7 @@ galera.galera_fk_lock_parent_update_child : BUG#0 Few cases have timing issues(P
 galera.galera_toi_ddl_fk_insert : BUG#0 CODERSHIP qa#39 test fails sporadically (PXC-3431)
 
 # Bugs failing due to PXC-3548
-main.system_tables_myisam                           : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
 binlog.binlog_stm_unsafe_read_acl_tables_in_dml_ddl : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
-main.system_tables_myisam_lctn_1                    : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
 main.mysql_upgrade_grant                            : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
 main.ps_sys_upgrade                                 : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
 sysschema.mysqldump                                 : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
