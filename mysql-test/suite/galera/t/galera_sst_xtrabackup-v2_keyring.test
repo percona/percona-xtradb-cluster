@@ -57,6 +57,29 @@ INSERT INTO e1(text) VALUES('bbbbb');
 select * from e1;
 
 #
+# PXC-3611 - Test SST with presence of .backup keyring file
+#
+
+# Kill node 2 to force an SST
+--connection node_2
+--source include/kill_galera.inc
+
+# Generate a new master key that will be missing on node_2 and simulate a .backup without the new key
+--exec mv $MYSQL_TMP_DIR/mysqld.2/keyring.2 $MYSQL_TMP_DIR/mysqld.2/keyring.2.backup
+--connection node_1
+
+ALTER INSTANCE ROTATE INNODB MASTER KEY;
+
+# Restart the server
+--connection node_2
+--echo Restarting node 2 ...
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+select * from e1;
+
+#
 # test IST with keyring enabled.
 #
 --connection node_2

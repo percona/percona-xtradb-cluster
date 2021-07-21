@@ -2183,6 +2183,12 @@ then
         # with ever increasing number of files and achieve nothing.
         find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
 
+        if [[ -r "$keyring_file_data" ]] || [[ -r "${keyring_file_data}.backup" ]];
+        then
+          wsrep_log_info "Cleaning the existing keyring file"
+          rm -f "$keyring_file_data" "${keyring_file_data}.backup"
+        fi
+
         # Clean the binlog dir (if it's explicitly specified)
         # By default it'll be in the datadir
         tempdir=$(parse_cnf mysqld log-bin "")
