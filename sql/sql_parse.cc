@@ -195,8 +195,7 @@
 #include "wsrep_trans_observer.h"
 
 static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf,
-                                       uint length,
-                                       Parser_state *parser_state,
+                                       uint length, Parser_state *parser_state,
                                        bool update_userstat);
 #endif /* WITH_WSREP */
 
@@ -2232,8 +2231,9 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 
 #ifdef WITH_WSREP
       if (WSREP_ON) {
-        if (wsrep_dispatch_sql_command(thd, thd->query().str, thd->query().length,
-                              &parser_state, false)) {
+        if (wsrep_dispatch_sql_command(thd, thd->query().str,
+                                       thd->query().length, &parser_state,
+                                       false)) {
           WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
           mysql_mutex_lock(&thd->LOCK_wsrep_thd);
           thd->killed = THD::NOT_KILLED;
@@ -2334,7 +2334,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 
         if (WSREP_ON) {
           if (wsrep_dispatch_sql_command(thd, beginning_of_next_stmt, length,
-                                &parser_state, false)) {
+                                         &parser_state, false)) {
             WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
             mysql_mutex_lock(&thd->LOCK_wsrep_thd);
             thd->killed = THD::NOT_KILLED;
@@ -7394,7 +7394,7 @@ static void wsrep_prepare_for_autocommit_retry(THD *thd, const char *rawbuf,
   thd->set_query_id(next_query_id());
 }
 
-static bool wsrep_should_retry_in_autocommit(enum_sql_command &sql_command) {
+static bool wsrep_should_retry_in_autocommit(const THD *thd) {
   /*
     We are here could mean that the query resulted in a cluster-wide
     conflict and had to be aborted. While it happened, it is possible that
@@ -7416,18 +7416,23 @@ static bool wsrep_should_retry_in_autocommit(enum_sql_command &sql_command) {
     same symptom is found for other commands, then please add it to the
     below list.
   */
-  switch (sql_command) {
+  switch (thd->lex->sql_command) {
     case SQLCOM_CHECK:
     case SQLCOM_SELECT:
       return false;
+    case SQLCOM_ALTER_TABLE: {
+      return (thd->lex->alter_info->flags & Alter_info::ALTER_ADMIN_PARTITION
+                  ? false
+                  : true);
+    }
     default:
       return true;
   }
 }
 
-static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf, uint length,
-                              Parser_state *parser_state,
-                              bool update_userstat) {
+static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf,
+                                       uint length, Parser_state *parser_state,
+                                       bool update_userstat) {
   DBUG_TRACE;
   bool is_autocommit = !thd->in_multi_stmt_transaction_mode() &&
                        wsrep_read_only_option(thd, thd->lex->query_tables);
@@ -7462,8 +7467,7 @@ static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf, uint length
     if (wsrep_after_statement(thd) && is_autocommit) {
       thd->reset_for_next_command();
       thd->killed = THD::NOT_KILLED;
-      if (is_autocommit &&
-          wsrep_should_retry_in_autocommit(thd->lex->sql_command) &&
+      if (is_autocommit && wsrep_should_retry_in_autocommit(thd) &&
           thd->wsrep_retry_counter < thd->variables.wsrep_retry_autocommit) {
         DBUG_EXECUTE_IF("sync.wsrep_retry_autocommit", {
           const char act[] =
