@@ -2022,8 +2022,14 @@ CREATE USER u1@h;
 let $date_to_restore=`SELECT password_last_changed from mysql.user where user='mysql.session'`;
 let $sess_user_account_priv=`SELECT timestamp from mysql.tables_priv where user='mysql.session'`;
 DELETE FROM mysql.tables_priv WHERE user='mysql.session';
+DELETE FROM mysql.tables_priv WHERE user='mysql.pxc.sst.role';
+
 DELETE FROM mysql.user WHERE user='mysql.session';
+DELETE FROM mysql.user WHERE user='mysql.pxc.internal.session';
+DELETE FROM mysql.user WHERE user='mysql.pxc.sst.role';
+
 DELETE FROM mysql.db WHERE user='mysql.session';
+DELETE FROM mysql.db WHERE user='mysql.pxc.sst.role';
 
 --echo
 --echo # Backup privilege tables and drop original ones

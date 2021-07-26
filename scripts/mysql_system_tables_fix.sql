@@ -790,9 +790,9 @@ COMMIT;
 
 -- Add the privilege SHOW_ROUTINE for every user who has global SELECT privilege
 -- provided that there isn't a user who already has the privilege SHOW_ROUTINE
-SET @hadShowRoutinePriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SHOW_ROUTINE');
+SET @hadShowRoutinePriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'SHOW_ROUTINE' AND user NOT IN ('mysql.infoschema','mysql.session','mysql.sys','mysql.pxc.internal.session'));
 INSERT INTO global_grants SELECT user, host, 'SHOW_ROUTINE', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE select_priv = 'Y' AND @hadShowRoutinePriv = 0 AND user NOT IN ('mysql.infoschema','mysql.session','mysql.sys');
+FROM mysql.user WHERE select_priv = 'Y' AND @hadShowRoutinePriv = 0 AND user NOT IN ('mysql.infoschema','mysql.session','mysql.sys','mysql.pxc.internal.session');
 COMMIT;
 
 # Activate the new, possible modified privilege tables
@@ -1336,6 +1336,7 @@ INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.internal.session', 'lo
 #  GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;
 #  GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.role'@localhost;
 INSERT IGNORE INTO mysql.user VALUES ('localhost','mysql.pxc.sst.role','N','N','N','N','N','N','Y','N','Y','N','N','N','N','N','N','Y','N','Y','N','N','Y','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'caching_sha2_password','','Y',CURRENT_TIMESTAMP,NULL,'Y','N','N',NULL,NULL,NULL,NULL);
+
 INSERT IGNORE INTO mysql.global_grants VALUES ('mysql.pxc.sst.role', 'localhost', 'BACKUP_ADMIN', 'N');
 INSERT IGNORE INTO mysql.tables_priv VALUES ('localhost', 'PERCONA_SCHEMA', 'mysql.pxc.sst.role', 'xtrabackup_history', 'root\@localhost', CURRENT_TIMESTAMP, 'Alter,Select,Insert,Create', '');
 INSERT IGNORE INTO mysql.db VALUES ('localhost', 'performance_schema', 'mysql.pxc.sst.role','Y','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N');
@@ -1632,29 +1633,33 @@ INSERT IGNORE INTO global_grants (USER,HOST,PRIV,WITH_GRANT_OPTION)
 -- Add the privilege FLUSH_OPTIMIZER_COSTS for every user who has the
 -- privilege RELOAD provided that there isn't a user who already has
 -- privilege FLUSH_OPTIMIZER_COSTS
-INSERT IGNORE INTO global_grants SELECT user, host, 'FLUSH_OPTIMIZER_COSTS', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Reload_priv = 'Y' AND USER != 'mysql.pxc.sst.role';
+SET @hadFlushOptimizerCostsPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FLUSH_OPTIMIZER_COSTS' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
+INSERT INTO global_grants SELECT user, host, 'FLUSH_OPTIMIZER_COSTS', IF(grant_priv = 'Y', 'Y', 'N')
+FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushOptimizerCostsPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege FLUSH_STATUS for every user who has the
 -- privilege RELOAD provided that there isn't a user who already has
 -- privilege FLUSH_STATUS
-INSERT IGNORE INTO global_grants SELECT user, host, 'FLUSH_STATUS', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Reload_priv = 'Y' AND USER != 'mysql.pxc.sst.role';
+SET @hadFlushStatusPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FLUSH_STATUS' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
+INSERT INTO global_grants SELECT user, host, 'FLUSH_STATUS', IF(grant_priv = 'Y', 'Y', 'N')
+FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushStatusPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege FLUSH_USER_RESOURCES for every user who has the
 -- privilege RELOAD provided that there isn't a user who already has
 -- privilege FLUSH_USER_RESOURCES
-INSERT IGNORE INTO global_grants SELECT user, host, 'FLUSH_USER_RESOURCES', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Reload_priv = 'Y' AND USER != 'mysql.pxc.sst.role';
+SET @hadFlushUserResourcesPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FLUSH_USER_RESOURCES' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
+INSERT INTO global_grants SELECT user, host, 'FLUSH_USER_RESOURCES', IF(grant_priv = 'Y', 'Y', 'N')
+FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushUserResourcesPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 -- Add the privilege FLUSH_TABLES for every user who has the
 -- privilege RELOAD provided that there isn't a user who already has
 -- privilege FLUSH_TABLES
-INSERT IGNORE INTO global_grants SELECT user, host, 'FLUSH_TABLES', IF(grant_priv = 'Y', 'Y', 'N')
-FROM mysql.user WHERE Reload_priv = 'Y' AND USER != 'mysql.pxc.sst.role';
+SET @hadFlushTablesPriv = (SELECT COUNT(*) FROM global_grants WHERE priv = 'FLUSH_TABLES' AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role'));
+INSERT INTO global_grants SELECT user, host, 'FLUSH_TABLES', IF(grant_priv = 'Y', 'Y', 'N')
+FROM mysql.user WHERE Reload_priv = 'Y' AND @hadFlushTablesPriv = 0 AND user NOT IN ('mysql.pxc.internal.session','mysql.pxc.sst.role');
 COMMIT;
 
 SET @@session.sql_mode = @old_sql_mode;

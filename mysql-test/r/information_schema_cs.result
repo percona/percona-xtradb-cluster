@@ -550,6 +550,7 @@ GRANTEE	TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	PRIVILEGE_TYPE	IS_GRANTABLE
 'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	SELECT	NO
 'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	INSERT	NO
 'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	CREATE	NO
+'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	ALTER	NO
 drop view v1, v2, v3;
 drop table t1;
 delete from mysql.user where user='joe';

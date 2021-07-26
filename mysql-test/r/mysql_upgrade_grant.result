@@ -286,6 +286,8 @@ Warning	1287	The SUPER privilege identifier is deprecated
 # mysql server without support for XA_RECOVER_ADMIN.
 REVOKE XA_RECOVER_ADMIN ON *.* FROM root@localhost;
 REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.sst.role`@localhost;
 # We show here that the users root@localhost and u1 have the privilege
 # SUPER and don't have the privilege XA_RECOVER_ADMIN
 SHOW GRANTS FOR root@localhost;
@@ -321,6 +323,8 @@ GRANT XA_RECOVER_ADMIN ON *.* TO `u1`@`%`
 # mysql.session@localhost
 REVOKE XA_RECOVER_ADMIN ON *.* FROM u1;
 REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.sst.role`@localhost;
 # Start upgrade
 # restart:--upgrade=FORCE --log-error=test_error_log
 # It is expected that after upgrade be finished the privilege
@@ -348,6 +352,10 @@ REVOKE BACKUP_ADMIN ON *.* FROM root@localhost;
 REVOKE XA_RECOVER_ADMIN ON *.* FROM root@localhost;
 REVOKE BACKUP_ADMIN ON *.* FROM `mysql.session`@localhost;
 REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE BACKUP_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
+REVOKE BACKUP_ADMIN ON *.* FROM `mysql.pxc.sst.role`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.sst.role`@localhost;
 CREATE USER u1;
 CREATE USER u2;
 GRANT RELOAD ON *.* TO u1;
@@ -380,11 +388,13 @@ GRANT BACKUP_ADMIN,XA_RECOVER_ADMIN ON *.* TO `u2`@`%` WITH GRANT OPTION
 DROP USER u1;
 DROP USER u2;
 REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE XA_RECOVER_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
 #
 # Bug#26948662 - REMOVE SUPER_ACL CHECK IN RESOURCE GROUPS.
 #
 REVOKE RESOURCE_GROUP_ADMIN ON *.* FROM root@localhost;
 REVOKE RESOURCE_GROUP_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE RESOURCE_GROUP_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
 CREATE USER user1;
 GRANT SUPER ON *.* TO user1;
 Warnings:
@@ -412,6 +422,7 @@ GRANT SUPER ON *.* TO `user1`@`%`
 GRANT RESOURCE_GROUP_ADMIN ON *.* TO `user1`@`%`
 DROP USER user1;
 REVOKE RESOURCE_GROUP_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE RESOURCE_GROUP_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
 #
 # Tests for WL#12138
 # Check that users with SUPER privilege (root@localhost and
@@ -433,6 +444,7 @@ Warning	1287	The SUPER privilege identifier is deprecated
 # mysql server without support for SERVICE_CONNECTION_ADMIN.
 REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM root@localhost;
 REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
 # We show here that the users root@localhost and u1 have the privilege
 # SUPER and don't have the privilege SERVICE_CONNECTION_ADMIN
 SHOW GRANTS FOR root@localhost;
@@ -467,6 +479,7 @@ GRANT SERVICE_CONNECTION_ADMIN ON *.* TO `u1`@`%`
 # mysql.session@localhost
 REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM u1;
 REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM `mysql.session`@localhost;
+REVOKE SERVICE_CONNECTION_ADMIN ON *.* FROM `mysql.pxc.internal.session`@localhost;
 # Start upgrade
 # restart:--upgrade=FORCE --log-error=test_error_log
 # It is expected that after upgrade be finished the privilege
@@ -505,6 +518,8 @@ Warning	1287	The SUPER privilege identifier is deprecated
 # mysql server without support for them.
 REVOKE AUDIT_ADMIN, BINLOG_ADMIN, BINLOG_ENCRYPTION_ADMIN, CONNECTION_ADMIN, ENCRYPTION_KEY_ADMIN, GROUP_REPLICATION_ADMIN, PERSIST_RO_VARIABLES_ADMIN, REPLICATION_SLAVE_ADMIN, RESOURCE_GROUP_USER, ROLE_ADMIN, SESSION_VARIABLES_ADMIN, SET_USER_ID, SYSTEM_VARIABLES_ADMIN, REPLICATION_APPLIER ON *.* FROM root@localhost;;
 REVOKE AUDIT_ADMIN, BINLOG_ADMIN, BINLOG_ENCRYPTION_ADMIN, CONNECTION_ADMIN, ENCRYPTION_KEY_ADMIN, GROUP_REPLICATION_ADMIN, PERSIST_RO_VARIABLES_ADMIN, REPLICATION_SLAVE_ADMIN, RESOURCE_GROUP_USER, ROLE_ADMIN, SESSION_VARIABLES_ADMIN, SET_USER_ID, SYSTEM_VARIABLES_ADMIN, REPLICATION_APPLIER ON *.* FROM `mysql.session`@localhost;;
+REVOKE AUDIT_ADMIN, BINLOG_ADMIN, BINLOG_ENCRYPTION_ADMIN, CONNECTION_ADMIN, ENCRYPTION_KEY_ADMIN, GROUP_REPLICATION_ADMIN, PERSIST_RO_VARIABLES_ADMIN, REPLICATION_SLAVE_ADMIN, RESOURCE_GROUP_USER, ROLE_ADMIN, SESSION_VARIABLES_ADMIN, SET_USER_ID, SYSTEM_VARIABLES_ADMIN, REPLICATION_APPLIER ON *.* FROM `mysql.pxc.internal.session`@localhost;
+REVOKE AUDIT_ADMIN, BINLOG_ADMIN, BINLOG_ENCRYPTION_ADMIN, CONNECTION_ADMIN, ENCRYPTION_KEY_ADMIN, GROUP_REPLICATION_ADMIN, PERSIST_RO_VARIABLES_ADMIN, REPLICATION_SLAVE_ADMIN, RESOURCE_GROUP_USER, ROLE_ADMIN, SESSION_VARIABLES_ADMIN, SET_USER_ID, SYSTEM_VARIABLES_ADMIN, REPLICATION_APPLIER ON *.* FROM `mysql.pxc.sst.role`@localhost;
 # Show here that the users root@localhost and u1 have the privilege
 # SUPER and don't have the @privileges
 SHOW GRANTS FOR root@localhost;
@@ -534,6 +549,8 @@ GRANT AUDIT_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CONNECTION_ADMIN,ENCRYPTI
 # Revoke the @privileges from the user u1 and mysql.session@localhost
 REVOKE AUDIT_ADMIN, BINLOG_ADMIN, BINLOG_ENCRYPTION_ADMIN, CONNECTION_ADMIN, ENCRYPTION_KEY_ADMIN, GROUP_REPLICATION_ADMIN, PERSIST_RO_VARIABLES_ADMIN, REPLICATION_SLAVE_ADMIN, RESOURCE_GROUP_USER, ROLE_ADMIN, SESSION_VARIABLES_ADMIN, SET_USER_ID, SYSTEM_VARIABLES_ADMIN, REPLICATION_APPLIER ON *.* FROM u1;;
 REVOKE AUDIT_ADMIN, BINLOG_ADMIN, BINLOG_ENCRYPTION_ADMIN, CONNECTION_ADMIN, ENCRYPTION_KEY_ADMIN, GROUP_REPLICATION_ADMIN, PERSIST_RO_VARIABLES_ADMIN, REPLICATION_SLAVE_ADMIN, RESOURCE_GROUP_USER, ROLE_ADMIN, SESSION_VARIABLES_ADMIN, SET_USER_ID, SYSTEM_VARIABLES_ADMIN, REPLICATION_APPLIER ON *.* FROM `mysql.session`@localhost;;
+REVOKE AUDIT_ADMIN, BINLOG_ADMIN, BINLOG_ENCRYPTION_ADMIN, CONNECTION_ADMIN, ENCRYPTION_KEY_ADMIN, GROUP_REPLICATION_ADMIN, PERSIST_RO_VARIABLES_ADMIN, REPLICATION_SLAVE_ADMIN, RESOURCE_GROUP_USER, ROLE_ADMIN, SESSION_VARIABLES_ADMIN, SET_USER_ID, SYSTEM_VARIABLES_ADMIN, REPLICATION_APPLIER ON *.* FROM `mysql.pxc.internal.session`@localhost;
+REVOKE AUDIT_ADMIN, BINLOG_ADMIN, BINLOG_ENCRYPTION_ADMIN, CONNECTION_ADMIN, ENCRYPTION_KEY_ADMIN, GROUP_REPLICATION_ADMIN, PERSIST_RO_VARIABLES_ADMIN, REPLICATION_SLAVE_ADMIN, RESOURCE_GROUP_USER, ROLE_ADMIN, SESSION_VARIABLES_ADMIN, SET_USER_ID, SYSTEM_VARIABLES_ADMIN, REPLICATION_APPLIER ON *.* FROM `mysql.pxc.sst.role`@localhost;
 # Start upgrade
 # restart:--upgrade=FORCE --log-error=test_error_log
 # It is expected that after upgrade be finished the @privileges won't be
@@ -559,6 +576,7 @@ DROP USER u1;
 ######################################################################
 # Revoke SHOW_ROUTINE from root user (since the upgrade scenario takes place only if no user had this privilege before)
 REVOKE SHOW_ROUTINE ON *.* FROM root@localhost;
+REVOKE SHOW_ROUTINE ON *.* FROM `mysql.pxc.internal.session`@localhost;
 # Create new user
 CREATE USER sheldon;
 # Grant global select privilege to new user
