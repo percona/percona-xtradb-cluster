@@ -55,6 +55,7 @@ IS_GRANTABLE	varchar(3)	NO
 SELECT table_catalog, table_schema, table_name, privilege_type
 FROM information_schema.table_privileges WHERE table_catalog IS NOT NULL;
 table_catalog	table_schema	table_name	privilege_type
+def	PERCONA_SCHEMA	xtrabackup_history	ALTER
 def	PERCONA_SCHEMA	xtrabackup_history	CREATE
 def	PERCONA_SCHEMA	xtrabackup_history	INSERT
 def	PERCONA_SCHEMA	xtrabackup_history	SELECT
