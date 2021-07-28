@@ -16,7 +16,7 @@ but the same logic is applied with any number of nodes in the cluster:
 
 .. figure:: ../_static/certificationbasedreplication.png
 
-   *Image source:* `Galera documentation - HOW CERTIFICATION-BASED REPLICATION WORKS <http://galeracluster.com/documentation-webpages/certificationbasedreplication.html#how-certification-based-replication-works>`_
+   *Image source:* `Galera documentation - HOW CERTIFICATION-BASED REPLICATION WORKS <https://galeracluster.com/library/documentation/certification-based-replication.html>`_
 
 All queries are executed locally on the node,
 and there is special handling only on ``COMMIT``.
@@ -37,7 +37,7 @@ Response time of ``COMMIT`` includes the following:
 There are two important consequences of this architecture:
 
 * Several appliers can be used in parallel.
-  This enables truely parallel replication.
+  This enables truly parallel replication.
   A replica can have many parallel threads configured
   using the :option:`wsrep_slave_threads` variable.
 

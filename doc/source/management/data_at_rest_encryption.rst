@@ -184,7 +184,7 @@ Configuration
 
 Configuration options are the same as
 `upstream
-<https://www.percona.com/doc/percona-server/5.7/management/data_at_rest_encryption.html#keyring-vault-plugin>`_.
+<https://www.percona.com/doc/percona-server/5.7/security/data-at-rest-encryption.html#keyring-plugins-and-settings>`_.
 The ``my.cnf`` configuration file should contain
 the following options:
 
@@ -203,7 +203,7 @@ Also ``keyring_vault_n1.conf`` file contents should be :
    token = e0345eb4-35dd-3ddd-3b1e-e42bb9f2525d
    vault_ca = /data/keyring_vault_confs/vault_ca.crt
 
-The detailed description of these options can be found in the `upstream documentation <https://www.percona.com/doc/percona-server/5.7/management/data_at_rest_encryption.html#keyring-vault-plugin>`_.
+The detailed description of these options can be found in the `upstream documentation <https://www.percona.com/doc/percona-server/5.7/security/data-at-rest-encryption.html#keyring-plugins-and-settings>`__.
 
 Vault-server is an external server, so make sure PXC node can reach the
 server.
