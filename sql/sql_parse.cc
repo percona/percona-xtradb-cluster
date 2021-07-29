@@ -5568,13 +5568,16 @@ finish:
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   if (thd->wsrep_conflict_state != REPLAYED)
   {
+     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
   lex->unit->cleanup(true);
 #ifdef WITH_WSREP
   }
   else
+  {
     thd->wsrep_conflict_state= NO_CONFLICT;
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  }
 #endif /* WITH_WSREP */
 
   /* Free tables */
