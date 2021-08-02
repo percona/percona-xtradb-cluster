@@ -87,7 +87,7 @@ To upgrade the cluster, follow these steps for each node:
       is not required.
 
    .. note:: To prevent any users from accessing this node while performing
-      work on it, you may add `--skip-networking <https://dev.mysql.com/doc/refman/5.7/en/server-options.html#option_mysqld_skip-networking>`_
+      work on it, you may add `--skip-networking <https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_skip_networking>`_
       to the startup options and use a local socket to connect, or
       alternatively you may want to divert any incoming traffic from your
       application to other operational nodes.
@@ -205,7 +205,7 @@ To upgrade the cluster, follow these steps for each node:
       is not required.
 
    .. note:: To prevent any users from accessing this node while performing
-      work on it, you may add `--skip-networking <https://dev.mysql.com/doc/refman/5.7/en/server-options.html#option_mysqld_skip-networking>`_
+      work on it, you may add `--skip-networking <https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_skip_networking>`_
       to the startup options and use a local socket to connect, or
       alternatively you may want to divert any incoming traffic from your
       application to other operational nodes.
