@@ -62,7 +62,7 @@ All tables must have a primary key.
   .. seealso::
 
      Galera Documentation: Tables without Primary Keys
-        http://galeracluster.com/documentation-webpages/limitations.html#tables-without-primary-keys
+        https://galeracluster.com/library/training/tutorials/differences.html#tables-without-primary-keys
 
 Avoid reusing the names of persistent tables for temporary tables
    Although MySQL does allow having temporary tables named the same as
