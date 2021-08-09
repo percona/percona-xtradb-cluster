@@ -65,7 +65,7 @@ INSERT INTO rplvars (varname, varvalue)
 # 3. wsrep_slave_threads
 # 4. wsrep_slave_UK_checks
 --echo
---let $expected= 92
+--let $expected= 93
 --let $assert_text= 'Expect $expected variables in the table.'
 --let $assert_cond= [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc
@@ -97,7 +97,7 @@ while ( $varid <= $countvars )
 }
 
 --echo
---let $expected=80
+--let $expected=81
 --let $assert_text= 'Expect $expected persisted variables in persisted_variables table.'
 --let $assert_cond= [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
 --source include/assert.inc
@@ -115,6 +115,7 @@ while ( $varid <= $countvars )
 --let $assert_cond= [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
 --source include/assert.inc
 
+--let $expected=80
 --let $assert_text= 'Expect $expected persisted variables shown as PERSISTED in variables_info table.'
 --let $assert_cond= [SELECT COUNT(*) as count FROM performance_schema.variables_info WHERE variable_source="PERSISTED", count, 1] = $expected
 --source include/assert.inc

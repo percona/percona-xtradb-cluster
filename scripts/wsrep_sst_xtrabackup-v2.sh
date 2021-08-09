@@ -561,6 +561,11 @@ get_transfer()
             if compare_versions "$SOCAT_VERSION" ">=" "1.7.3"; then
                 donor_extra=',commonname=""'
             fi
+            # disable SNI if socat supports it
+            if compare_versions "$SOCAT_VERSION" ">=" "1.7.4"; then
+                donor_extra+=',no-sni=1'
+            fi
+
 
             # PXC-3508 : If 'ssl_dhparams' option has been set, then always add it
             # to the socat command (both donor and joiner)
@@ -1637,7 +1642,7 @@ fi
 # 2.4.20  Transition-key fixes
 #
 
-XB_2x_REQUIRED_VERSION="2.4.20"
+XB_2x_REQUIRED_VERSION="2.4.23"
 
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -2222,6 +2227,12 @@ then
         # Avoid emitting the find command output to log file. It just fill the
         # with ever increasing number of files and achieve nothing.
         find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
+
+        if [[ -r "$keyring_file_data" ]] || [[ -r "${keyring_file_data}.backup" ]];
+        then
+          wsrep_log_info "Cleaning the existing keyring file"
+          rm -f "$keyring_file_data" "${keyring_file_data}.backup"
+        fi
 
         # Clean the binlog dir (if it's explicitly specified)
         # By default it'll be in the datadir

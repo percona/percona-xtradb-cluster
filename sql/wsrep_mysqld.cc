@@ -17,6 +17,9 @@
 #include "mysql/plugin.h"
 #include "mysqld.h"
 #include "rpl_slave.h"
+#include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
+#include "sql/dd/dictionary.h"
+#include "sql/dd/types/table.h"
 #include "sql/key_spec.h"
 #include "sql/sql_alter.h"
 #include "sql/sql_lex.h"
@@ -366,7 +369,7 @@ void wsrep_pfs_instr_cb(wsrep_pfs_instr_type_t type, wsrep_pfs_instr_ops_t ops,
                         void **value __attribute__((unused)),
                         void **alliedvalue __attribute__((unused)),
                         const void *ts __attribute__((unused))) {
-  DBUG_ASSERT(!wsrep_psi_key_vec.empty());
+  assert(!wsrep_psi_key_vec.empty());
 
   if (type == WSREP_PFS_INSTR_TYPE_MUTEX) {
     switch (ops) {
@@ -641,7 +644,7 @@ void wsrep_init_sidno(const wsrep::id &uuid) {
 }
 
 bool wsrep_init_schema(THD *thd) {
-  DBUG_ASSERT(!wsrep_schema);
+  assert(!wsrep_schema);
 
   /*
    PXC upgrade requires modifications to some InnoDB tables.
@@ -1387,7 +1390,7 @@ enum wsrep::provider::status wsrep_sync_wait_upto_gtid(THD *thd
                                                        __attribute__((unused)),
                                                        wsrep_gtid_t *upto,
                                                        int timeout) {
-  DBUG_ASSERT(upto);
+  assert(upto);
   enum wsrep::provider::status ret;
   if (upto) {
     wsrep::gtid upto_gtid(wsrep::id(upto->uuid.data, sizeof(upto->uuid.data)),
@@ -1597,7 +1600,7 @@ bool wsrep_prepare_key_for_innodb(const uchar *cache_key, size_t cache_key_len,
 wsrep::key wsrep_prepare_key_for_toi(const char *db, const char *table,
                                      enum wsrep::key::type type) {
   wsrep::key ret(type);
-  DBUG_ASSERT(db);
+  assert(db);
   ret.append_key_part(db, strlen(db));
   if (table) ret.append_key_part(table, strlen(table));
   return ret;
@@ -1628,7 +1631,8 @@ wsrep::key_array wsrep_prepare_keys_for_alter_add_fk(const char *child_table_db,
 wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
                                             const TABLE_LIST *table_list,
                                             dd::Tablespace_table_ref_vec *trefs,
-                                            Alter_info *alter_info) {
+                                            Alter_info *alter_info,
+                                            wsrep::key_array *fk_tables) {
   wsrep::key_array ret;
   if (db || table) {
     ret.push_back(wsrep_prepare_key_for_toi(db, table, wsrep::key::exclusive));
@@ -1641,7 +1645,7 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
   }
   if (alter_info && (alter_info->flags & Alter_info::ADD_FOREIGN_KEY)) {
     wsrep::key_array fk(wsrep_prepare_keys_for_alter_add_fk(
-        table_list->get_db_name(), alter_info));
+        (table_list ? table_list->get_db_name() : db), alter_info));
     if (!fk.empty()) {
       ret.insert(ret.end(), fk.begin(), fk.end());
     }
@@ -1653,7 +1657,75 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
                                               wsrep::key::exclusive));
     }
   }
+  if (fk_tables && !fk_tables->empty()) {
+    ret.insert(ret.end(), fk_tables->begin(), fk_tables->end());
+  }
   return ret;
+}
+
+/*
+ * Iterate over the list of tables and for each non-temporary invoke the
+ * action function.
+ */
+using action_fn = std::function<void(const dd::Table *)>;
+static void wsrep_do_action_for_tables(THD *thd, TABLE_LIST *tables,
+                                       action_fn action) {
+  if (!WSREP(thd) || !WSREP_CLIENT(thd)) return;
+
+  for (auto table = tables; table; table = table->next_local) {
+    if (!is_temporary_table(table)) {
+      MDL_ticket *mdl_ticket = nullptr;
+      if (dd::acquire_shared_table_mdl(thd, table->db, table->table_name, false,
+                                       &mdl_ticket)) {
+        assert(0);
+        continue;
+      }
+
+      const dd::Table *table_obj = nullptr;
+      dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+      if (thd->dd_client()->acquire(dd::String_type(table->db),
+                                    dd::String_type(table->table_name),
+                                    &table_obj)) {
+        assert(0);
+        dd::release_mdl(thd, mdl_ticket);
+        continue;
+      }
+
+      if (table_obj != nullptr) {
+        action(table_obj);
+      }
+
+      dd::release_mdl(thd, mdl_ticket);
+    }
+  }
+}
+
+/*
+ * Collect wsrep keys corresponding to child tables
+ */
+void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
+                               wsrep::key_array *keys) {
+  wsrep_do_action_for_tables(thd, tables, [keys](const dd::Table *table_def) {
+    for (const auto fk : table_def->foreign_key_parents()) {
+      keys->push_back(wsrep_prepare_key_for_toi(fk->child_schema_name().c_str(),
+                                                fk->child_table_name().c_str(),
+                                                wsrep::key::shared));
+    }
+  });
+}
+
+/*
+ * Collect wsrep keys corresponding to parent tables
+ */
+void wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *tables,
+                                  wsrep::key_array *keys) {
+  wsrep_do_action_for_tables(thd, tables, [keys](const dd::Table *table_def) {
+    for (const auto fk : table_def->foreign_keys()) {
+      keys->push_back(wsrep_prepare_key_for_toi(
+          fk->referenced_table_schema_name().c_str(),
+          fk->referenced_table_name().c_str(), wsrep::key::shared));
+    }
+  });
 }
 
 /*
@@ -1711,7 +1783,7 @@ int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,
 
 static int create_view_query(THD *thd, uchar **buf, size_t *buf_len) {
   LEX *lex = thd->lex;
-  SELECT_LEX *select_lex = lex->select_lex;
+  auto *select_lex = lex->query_block;
   TABLE_LIST *first_table = select_lex->table_list.first;
   TABLE_LIST *views = first_table;
 
@@ -1762,8 +1834,8 @@ static int create_view_query(THD *thd, uchar **buf, size_t *buf_len) {
   }
   buff.append(STRING_WITH_LEN(" AS "));
   // buff.append(views->source.str, views->source.length);
-  buff.append(thd->lex->create_view_select.str,
-              thd->lex->create_view_select.length);
+  buff.append(thd->lex->create_view_query_block.str,
+              thd->lex->create_view_query_block.length);
   // int errcode= query_error_code(thd, true);
   // if (thd->binlog_query(THD::STMT_QUERY_TYPE,
   //                      buff.ptr(), buff.length(), false, false, false, errcod
@@ -1779,11 +1851,11 @@ static int create_view_query(THD *thd, uchar **buf, size_t *buf_len) {
  */
 static int wsrep_drop_table_query(THD *thd, uchar **buf, size_t *buf_len) {
   LEX *lex = thd->lex;
-  SELECT_LEX *select_lex = lex->select_lex;
+  auto *select_lex = lex->query_block;
   TABLE_LIST *first_table = select_lex->table_list.first;
   String buff;
 
-  DBUG_ASSERT(!lex->drop_temporary);
+  assert(!lex->drop_temporary);
 
   bool found_temp_table = false;
   for (TABLE_LIST *table = first_table; table; table = table->next_global) {
@@ -1842,16 +1914,16 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
       thd->lex->sql_command == SQLCOM_DROP_COMPRESSION_DICTIONARY)
     return true;
 
-  DBUG_ASSERT(!table || db);
-  DBUG_ASSERT(table_list || db);
+  assert(!table || db);
+  assert(table_list || db);
 
   LEX *lex = thd->lex;
-  SELECT_LEX *select_lex = lex->select_lex;
+  auto *select_lex = lex->query_block;
   TABLE_LIST *first_table = (select_lex ? select_lex->table_list.first : NULL);
 
   switch (lex->sql_command) {
     case SQLCOM_CREATE_TABLE:
-      DBUG_ASSERT(!table_list);
+      assert(!table_list);
       if (thd->lex->create_info->options & HA_LEX_CREATE_TMP_TABLE) {
         return false;
       }
@@ -1859,8 +1931,8 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
     case SQLCOM_CREATE_VIEW:
 
-      DBUG_ASSERT(!table_list);
-      DBUG_ASSERT(first_table); /* First table is view name */
+      assert(!table_list);
+      assert(first_table); /* First table is view name */
       /*
         If any of the remaining tables refer to temporary table error
         is returned to client, so TOI can be skipped
@@ -1877,9 +1949,9 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
 #if 0
     /* Trigger statement is invoked with table_list with length = 1 */
-    DBUG_ASSERT(!table_list);
+    assert(!table_list);
 #endif
-      DBUG_ASSERT(first_table);
+      assert(first_table);
 
       if (find_temporary_table(thd, first_table)) {
         return false;
@@ -1987,7 +2059,8 @@ static void free_gtid_event_buf(THD *thd) {
 static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
                            const TABLE_LIST *table_list,
                            dd::Tablespace_table_ref_vec *trefs,
-                           Alter_info *alter_info) {
+                           Alter_info *alter_info,
+                           wsrep::key_array *fk_tables) {
   uchar *buf(0);
   size_t buf_len(0);
   int buf_err;
@@ -2056,8 +2129,8 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
   struct wsrep_buf buff = {buf, buf_len};
 
-  wsrep::key_array key_array =
-      wsrep_prepare_keys_for_toi(db_, table_, table_list, trefs, alter_info);
+  wsrep::key_array key_array = wsrep_prepare_keys_for_toi(
+      db_, table_, table_list, trefs, alter_info, fk_tables);
 
   THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
@@ -2072,7 +2145,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
       wsrep::provider::flag::start_transaction | wsrep::provider::flag::commit);
 
   if (ret) {
-    DBUG_ASSERT(cs.current_error());
+    assert(cs.current_error());
     WSREP_DEBUG("to_execute_start() failed for %u: %s, seqno: %lld",
                 thd->thread_id(), WSREP_QUERY(thd),
                 (long long)wsrep_thd_trx_seqno(thd));
@@ -2137,7 +2210,7 @@ static void wsrep_TOI_end(THD *thd) {
   wsrep_to_isolation--;
 
   wsrep::client_state &client_state(thd->wsrep_cs());
-  DBUG_ASSERT(wsrep_thd_is_local_toi(thd));
+  assert(wsrep_thd_is_local_toi(thd));
   WSREP_DEBUG("TO END: %lld: %s", client_state.toi_meta().seqno().get(),
               WSREP_QUERY(thd));
 
@@ -2192,7 +2265,8 @@ static void wsrep_RSU_end(THD *thd) {
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const TABLE_LIST *table_list,
                              dd::Tablespace_table_ref_vec *trefs,
-                             Alter_info *alter_info) {
+                             Alter_info *alter_info,
+                             wsrep::key_array *fk_tables) {
   /*
     No isolation for applier or replaying threads.
    */
@@ -2235,8 +2309,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   }
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-  DBUG_ASSERT(wsrep_thd_is_local(thd));
-  DBUG_ASSERT(thd->wsrep_trx().ws_meta().seqno().is_undefined());
+  assert(wsrep_thd_is_local(thd));
+  assert(thd->wsrep_trx().ws_meta().seqno().is_undefined());
 
   /* TOI protection against FTWRL */
   if (thd->global_read_lock.can_acquire_protection()) {
@@ -2274,7 +2348,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   if (thd->variables.wsrep_on && wsrep_thd_is_local(thd)) {
     switch (thd->variables.wsrep_OSU_method) {
       case WSREP_OSU_TOI:
-        ret = wsrep_TOI_begin(thd, db_, table_, table_list, trefs, alter_info);
+        ret = wsrep_TOI_begin(thd, db_, table_, table_list, trefs, alter_info,
+                              fk_tables);
         break;
       case WSREP_OSU_RSU:
         ret = wsrep_RSU_begin(thd, db_, table_);
@@ -2321,13 +2396,13 @@ void wsrep_to_isolation_end(THD *thd) {
   if (thd->is_plugin_fake_ddl()) return;
 
   if (wsrep_thd_is_local_toi(thd)) {
-    DBUG_ASSERT(thd->variables.wsrep_OSU_method == WSREP_OSU_TOI);
+    assert(thd->variables.wsrep_OSU_method == WSREP_OSU_TOI);
     wsrep_TOI_end(thd);
   } else if (wsrep_thd_is_in_rsu(thd)) {
-    DBUG_ASSERT(thd->variables.wsrep_OSU_method == WSREP_OSU_RSU);
+    assert(thd->variables.wsrep_OSU_method == WSREP_OSU_RSU);
     wsrep_RSU_end(thd);
   } else {
-    DBUG_ASSERT(0);
+    assert(0);
   }
   if (wsrep_emulate_bin_log) wsrep_thd_binlog_trx_reset(thd);
 
@@ -2518,8 +2593,8 @@ int wsrep_must_ignore_error(THD *thd) {
   const int error = thd->get_stmt_da()->mysql_errno();
   const uint flags = sql_command_flags[thd->lex->sql_command];
 
-  DBUG_ASSERT(error);
-  DBUG_ASSERT(wsrep_thd_is_toi(thd));
+  assert(error);
+  assert(wsrep_thd_is_toi(thd));
 
   if ((wsrep_ignore_apply_errors & WSREP_IGNORE_ERRORS_ON_DDL))
     goto ignore_error;
@@ -2548,8 +2623,8 @@ ignore_error:
 int wsrep_ignored_error_code(Log_event *ev, int error) {
   const THD *thd = ev->thd;
 
-  DBUG_ASSERT(error);
-  DBUG_ASSERT(wsrep_thd_is_applying(thd) && !wsrep_thd_is_local_toi(thd));
+  assert(error);
+  assert(wsrep_thd_is_applying(thd) && !wsrep_thd_is_local_toi(thd));
 
   if ((wsrep_ignore_apply_errors & WSREP_IGNORE_ERRORS_ON_RECONCILING_DML)) {
     const int ev_type = ev->get_type_code();
@@ -2583,7 +2658,7 @@ enum wsrep::streaming_context::fragment_unit wsrep_fragment_unit(ulong unit) {
     case WSREP_FRAG_STATEMENTS:
       return wsrep::streaming_context::statement;
     default:
-      DBUG_ASSERT(0);
+      assert(0);
       return wsrep::streaming_context::bytes;
   }
 }

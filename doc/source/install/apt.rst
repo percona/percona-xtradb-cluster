@@ -35,37 +35,68 @@ Prerequisites
 Installing from Repository
 ==========================
 
-1. Configure Percona repositories as described in
-   `Percona Software Repositories Documentation
-   <https://www.percona.com/doc/percona-repo-config/index.html>`_.
+1. Update the sytem:
 
-#. Install the |PXC| server package:
+   .. sourcecode:: bash
 
-   .. code-block:: bash
+      sudo apt update
 
-      $ sudo apt-get install percona-xtradb-cluster
+#. Install the necessary packages:
 
-   .. note:: Alternatively, you can install
-      the ``percona-xtradb-cluster-full`` meta package,
-      which contains the following additional packages:
+   .. sourcecode:: bash
 
-      * ``libperconaserverclient21-dev``
-      * ``libperconaserverclient21``
-      * ``percona-xtradb-cluster-client``
-      * ``percona-xtradb-cluster-common``
-      * ``percona-xtradb-cluster-dbg``
-      * ``percona-xtradb-cluster-full``
-      * ``percona-xtradb-cluster-garbd-debug``
-      * ``percona-xtradb-cluster-garbd``
-      * ``percona-xtradb-cluster-server-debug``
-      * ``percona-xtradb-cluster-server``
-      * ``percona-xtradb-cluster-source``
-      * ``percona-xtradb-cluster-test``
-      * ``percona-xtradb-cluster``
+      sudo apt install -y wget gnupg2 lsb-release curl
+
+#. Download the repository package
+
+   .. sourcecode:: bash
+
+       wget https://repo.percona.com/apt/percona-release_latest.generic_all.deb
+
+#. Install the package with ``dpkg``:
+
+   .. sourcecode:: bash
+
+      sudo dpkg -i percona-release_latest.generic_all.deb
+
+#. Refresh the local cache to update the package information:
+
+   .. sourcecode:: bash
+
+      sudo apt update
+
+#. Enable the ``release`` repository for |Percona XtraDB Cluster|:
+
+   .. sourcecode:: bash
+
+      sudo percona-release setup pxc80
+
+#. Install the cluster:
+
+   .. sourcecode:: bash
+
+      sudo apt install -y percona-xtradb-cluster
 
 
-   During the installation, you are requested to provide a password
-   for the ``root`` user on the database node.
+During the installation, you are requested to provide a password for the ``root`` user on the database node.
+
+.. note::
+
+   If needed, you could also install the ``percona-xtradb-cluster-full`` meta-package, which includes the following additional packages:
+
+   * ``libperconaserverclient21``
+   * ``libperconaserverclient21-dev``
+   * ``percona-xtradb-cluster``
+   * ``percona-xtradb-cluster-client``
+   * ``percona-xtradb-cluster-common``
+   * ``percona-xtradb-cluster-dbg``
+   * ``percona-xtradb-cluster-full``
+   * ``percona-xtradb-cluster-garbd``
+   * ``percona-xtradb-cluster-garbd-debug``
+   * ``percona-xtradb-cluster-server``
+   * ``percona-xtradb-cluster-server-debug``
+   * ``percona-xtradb-cluster-source``
+   * ``percona-xtradb-cluster-test``
 
 Next Steps
 ==========

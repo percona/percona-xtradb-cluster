@@ -59,7 +59,7 @@ void Wsrep_client_service::reset_globals() { wsrep_reset_threadvars(m_thd); }
 
 bool Wsrep_client_service::interrupted(
     wsrep::unique_lock<wsrep::mutex> &lock WSREP_UNUSED) const {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   /* Underlying mutex in lock object points to LOCK_wsrep_thd, which
      protects m_thd->wsrep_trx()
   */
@@ -73,7 +73,7 @@ bool Wsrep_client_service::interrupted(
 }
 
 int Wsrep_client_service::prepare_data_for_replication() {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_ENTER("Wsrep_client_service::prepare_data_for_replication");
   size_t data_len = 0;
   IO_CACHE_binlog_cache_storage *cache = wsrep_get_trans_cache(m_thd, true);
@@ -109,7 +109,7 @@ int Wsrep_client_service::prepare_data_for_replication() {
 }
 
 void Wsrep_client_service::cleanup_transaction() {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   if (WSREP_EMULATE_BINLOG(m_thd)) wsrep_thd_binlog_trx_reset(m_thd);
   m_thd->wsrep_affected_rows = 0;
 
@@ -145,7 +145,7 @@ void Wsrep_client_service::cleanup_transaction() {
 
 int Wsrep_client_service::prepare_fragment_for_replication(
     wsrep::mutable_buffer &buffer) {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   THD *thd = m_thd;
   DBUG_ENTER("Wsrep_client_service::prepare_fragment_for_replication");
   IO_CACHE_binlog_cache_storage *cache = wsrep_get_trans_cache(thd, true);
@@ -185,7 +185,7 @@ int Wsrep_client_service::prepare_fragment_for_replication(
       cache->next(&read_pos, &read_len);
     }
   }
-  DBUG_ASSERT(total_length == buffer.size());
+  assert(total_length == buffer.size());
 cleanup:
   if (cache->truncate(saved_pos)) {
     WSREP_WARN("Failed to reinitialize IO cache");
@@ -251,14 +251,14 @@ size_t Wsrep_client_service::bytes_generated() const {
 }
 
 void Wsrep_client_service::will_replay() {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   ++wsrep_replaying;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
 }
 
 enum wsrep::provider::status Wsrep_client_service::replay() {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_ENTER("Wsrep_client_service::replay");
 
   /*
@@ -271,6 +271,7 @@ enum wsrep::provider::status Wsrep_client_service::replay() {
   replayer_thd->set_time();
   replayer_thd->set_command(COM_SLEEP);
   replayer_thd->reset_for_next_command();
+  replayer_thd->set_new_thread_id();
 
   enum wsrep::provider::status ret;
   {
@@ -292,7 +293,7 @@ enum wsrep::provider::status Wsrep_client_service::replay() {
 
 void Wsrep_client_service::wait_for_replayers(
     wsrep::unique_lock<wsrep::mutex> &lock) {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   lock.unlock();
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   /* We need to check if the THD is BF aborted during condition wait.
@@ -323,7 +324,7 @@ void Wsrep_client_service::debug_crash(const char *crash_point
 }
 
 int Wsrep_client_service::bf_rollback() {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_ENTER("Wsrep_client_service::rollback");
 
   /* If local transaction is aborted while it is executing rollback

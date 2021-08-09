@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -198,7 +198,7 @@ Global_THD_manager::~Global_THD_manager() {
     /* TODO: If sst fails then there could be left over thread.
     Information of this applier thread is printed above. */
 #else
-    DBUG_ASSERT(thd_list[i].empty());
+    assert(thd_list[i].empty());
 #endif /* WITH_WSREP */
     mysql_mutex_destroy(&LOCK_thd_list[i]);
     mysql_mutex_destroy(&LOCK_thd_remove[i]);
@@ -208,7 +208,7 @@ Global_THD_manager::~Global_THD_manager() {
   /* TODO: If sst fails then there could be left over thread.
   Information of this applier thread is printed above. */
 #else
-  DBUG_ASSERT(thread_ids.empty());
+  assert(thread_ids.empty());
 #endif /* WITH_WSREP */
   mysql_mutex_destroy(&LOCK_thread_ids);
 }
@@ -231,7 +231,7 @@ void Global_THD_manager::destroy_instance() {
 void Global_THD_manager::add_thd(THD *thd) {
   DBUG_PRINT("info", ("Global_THD_manager::add_thd %p", thd));
   // Should have an assigned ID before adding to the list.
-  DBUG_ASSERT(thd->thread_id() != reserved_thread_id);
+  assert(thd->thread_id() != reserved_thread_id);
   const int partition = thd_partition(thd->thread_id());
   MUTEX_LOCK(lock_list, &LOCK_thd_list[partition]);
   // Technically it is not supported to compare pointers, but it works.
@@ -245,7 +245,7 @@ void Global_THD_manager::add_thd(THD *thd) {
   }
 #endif /* WITH_WSREP */
   // Adding the same THD twice is an error.
-  DBUG_ASSERT(insert_result.second);
+  assert(insert_result.second);
 }
 
 void Global_THD_manager::remove_thd(THD *thd) {
@@ -254,7 +254,7 @@ void Global_THD_manager::remove_thd(THD *thd) {
   MUTEX_LOCK(lock_remove, &LOCK_thd_remove[partition]);
   MUTEX_LOCK(lock_list, &LOCK_thd_list[partition]);
 
-  DBUG_ASSERT(unit_test || thd->release_resources_done());
+  assert(unit_test || thd->release_resources_done());
 
   /*
     Used by binlog_reset_master.  It would be cleaner to use
@@ -272,7 +272,7 @@ void Global_THD_manager::remove_thd(THD *thd) {
   }
 #endif /* WITH_WSREP */
   // Removing a THD that was never added is an error.
-  DBUG_ASSERT(1 == num_erased);
+  assert(1 == num_erased);
   mysql_cond_broadcast(&COND_thd_list[partition]);
 }
 
@@ -292,11 +292,11 @@ void Global_THD_manager::release_thread_id(my_thread_id thread_id) {
   const size_t num_erased MY_ATTRIBUTE((unused)) =
       thread_ids.erase_unique(thread_id);
   // Assert if the ID was not found in the list.
-  DBUG_ASSERT(1 == num_erased);
+  assert(1 == num_erased);
 }
 
 void Global_THD_manager::set_thread_id_counter(my_thread_id new_id) {
-  DBUG_ASSERT(unit_test == true);
+  assert(unit_test == true);
   MUTEX_LOCK(lock, &LOCK_thread_ids);
   thread_id_counter = new_id;
 }

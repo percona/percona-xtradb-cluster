@@ -84,7 +84,7 @@ CREATE ROLE 'mysql.pxc.sst.role'@localhost;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'mysql.pxc.sst.role'@localhost;
 GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, SUPER ON *.*
  TO 'mysql.pxc.sst.role'@localhost;
-GRANT CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history
+GRANT ALTER, CREATE, SELECT, INSERT ON PERCONA_SCHEMA.xtrabackup_history
  TO 'mysql.pxc.sst.role'@localhost;
 -- For some reason this is also needed, although the docs say BACKUP_ADMIN is enough
 GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.role'@localhost;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -72,7 +72,7 @@ bool Commit_stage_manager::Mutex_queue::append(THD *first) {
   DBUG_PRINT("info",
              ("m_first: 0x%llx, &m_first: 0x%llx, m_last: 0x%llx",
               (ulonglong)m_first, (ulonglong)&m_first, (ulonglong)m_last));
-  DBUG_ASSERT(m_first || m_last == &m_first);
+  assert(m_first || m_last == &m_first);
   DBUG_PRINT("return", ("empty: %s", YESNO(empty)));
 #ifdef WITH_WSREP
   /* What is interim_commit ?
@@ -119,7 +119,7 @@ bool Commit_stage_manager::Mutex_queue::append(THD *first) {
           "now "
           "SIGNAL sync.wsrep_ordered_commit_reached "
           "WAIT_FOR signal.wsrep_ordered_commit_continue";
-      DBUG_ASSERT(!debug_sync_set_action(thd_to_append, STRING_WITH_LEN(act)));
+      assert(!debug_sync_set_action(thd_to_append, STRING_WITH_LEN(act)));
     };);
   }
 #endif /* WITH_WSREP */
@@ -142,9 +142,9 @@ std::pair<bool, THD *> Commit_stage_manager::Mutex_queue::pop_front() {
     more = false;
     m_last = &m_first;
   }
-  DBUG_ASSERT(m_size.load() > 0);
+  assert(m_size.load() > 0);
   --m_size;
-  DBUG_ASSERT(m_first || m_last == &m_first);
+  assert(m_first || m_last == &m_first);
   unlock();
   DBUG_PRINT("return",
              ("result: 0x%llx, more: %s", (ulonglong)result, YESNO(more)));
@@ -155,19 +155,20 @@ void Commit_stage_manager::init(PSI_mutex_key key_LOCK_flush_queue,
                                 PSI_mutex_key key_LOCK_sync_queue,
                                 PSI_mutex_key key_LOCK_commit_queue,
                                 PSI_mutex_key key_LOCK_done,
-                                PSI_cond_key key_COND_done) {
+                                PSI_cond_key key_COND_done,
+                                PSI_cond_key key_COND_flush_queue) {
   if (m_is_initialized) return;
   m_is_initialized = true;
 
   mysql_mutex_init(key_LOCK_done, &m_lock_done, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_done, &m_stage_cond_binlog);
   mysql_cond_init(key_COND_done, &m_stage_cond_commit_order);
-  mysql_cond_init(key_COND_done, &m_stage_cond_leader);
-#ifndef DBUG_OFF
+  mysql_cond_init(key_COND_flush_queue, &m_stage_cond_leader);
+#ifndef NDEBUG
   leader_thd = nullptr;
 
   /**
-    reuse key_COND_done 'cos a new PSI object would be wasteful in !DBUG_OFF
+    reuse key_COND_done 'cos a new PSI object would be wasteful in !NDEBUG
   */
   mysql_cond_init(key_COND_done, &m_cond_preempt);
 #endif
@@ -285,7 +286,7 @@ bool Commit_stage_manager::enroll_for(StageID stage, THD *thd,
   */
   if (stage_mutex && need_unlock_stage_mutex) mysql_mutex_unlock(stage_mutex);
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   DBUG_PRINT("info", ("This is a leader thread: %d (0=n 1=y)", leader));
 
   DEBUG_SYNC(thd, "after_enrolling_for_stage");
@@ -304,11 +305,11 @@ bool Commit_stage_manager::enroll_for(StageID stage, THD *thd,
       break;
     default:
       // not reached
-      DBUG_ASSERT(0);
+      assert(0);
   }
 
-  DBUG_EXECUTE_IF("assert_leader", DBUG_ASSERT(leader););
-  DBUG_EXECUTE_IF("assert_follower", DBUG_ASSERT(!leader););
+  DBUG_EXECUTE_IF("assert_leader", assert(leader););
+  DBUG_EXECUTE_IF("assert_follower", assert(!leader););
 #endif
 
   /*
@@ -319,7 +320,7 @@ bool Commit_stage_manager::enroll_for(StageID stage, THD *thd,
   if (!leader) {
     CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("before_follower_wait");
     mysql_mutex_lock(&m_lock_done);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     /*
       Leader can be awaiting all-clear to preempt follower's execution.
       With setting the status the follower ensures it won't execute anything
@@ -340,7 +341,7 @@ bool Commit_stage_manager::enroll_for(StageID stage, THD *thd,
     return false;
   }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   if (stage == Commit_stage_manager::SYNC_STAGE)
     DEBUG_SYNC(thd, "bgc_between_flush_and_sync");
 #endif
@@ -415,7 +416,7 @@ THD *Commit_stage_manager::Mutex_queue::fetch_and_empty() {
               (ulonglong)m_first, (ulonglong)&m_first, (ulonglong)m_last));
   DBUG_PRINT("info", ("fetched queue of %d transactions", m_size.load()));
   DBUG_PRINT("return", ("result: 0x%llx", (ulonglong)result));
-  DBUG_ASSERT(m_size.load() >= 0);
+  assert(m_size.load() >= 0);
   m_size.store(0);
   return result;
 }
@@ -435,7 +436,7 @@ void Commit_stage_manager::wait_count_or_timeout(ulong count, long usec,
   while (
       to_wait > 0 &&
       (count == 0 || static_cast<ulong>(m_queue[stage].get_size()) < count)) {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     if (current_thd) DEBUG_SYNC(current_thd, "bgc_wait_count_or_timeout");
 #endif
     my_sleep(delta);
@@ -477,9 +478,9 @@ void Commit_stage_manager::signal_done(THD *queue, StageID stage) {
   mysql_mutex_unlock(&m_lock_done);
 }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 void Commit_stage_manager::clear_preempt_status(THD *head) {
-  DBUG_ASSERT(head);
+  assert(head);
 
   mysql_mutex_lock(&m_lock_done);
   while (!head->get_transaction()->m_flags.ready_preempt) {

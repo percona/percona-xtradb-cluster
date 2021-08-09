@@ -126,8 +126,8 @@ static inline int wsrep_start_transaction(THD *thd, wsrep_trx_id_t trx_id) {
 /**/
 static inline int wsrep_start_trx_if_not_started(THD *thd) {
   int ret = 0;
-  DBUG_ASSERT(thd->wsrep_next_trx_id() != WSREP_UNDEFINED_TRX_ID);
-  DBUG_ASSERT(thd->wsrep_cs().mode() == Wsrep_client_state::m_local);
+  assert(thd->wsrep_next_trx_id() != WSREP_UNDEFINED_TRX_ID);
+  assert(thd->wsrep_cs().mode() == Wsrep_client_state::m_local);
   if (thd->wsrep_trx().active() == false) {
     ret = wsrep_start_transaction(thd, thd->wsrep_next_trx_id());
   }
@@ -218,7 +218,7 @@ static inline int wsrep_before_prepare(THD *thd, bool all) {
   DBUG_ENTER("wsrep_before_prepare");
   WSREP_DEBUG("wsrep_before_prepare: %d", wsrep_is_real(thd, all));
   int ret = 0;
-  DBUG_ASSERT(wsrep_run_commit_hook(thd, all));
+  assert(wsrep_run_commit_hook(thd, all));
 
   /* applier too use this routine but before prepare doesn't invoke
   galera replication action. */
@@ -239,7 +239,7 @@ static inline int wsrep_before_prepare(THD *thd, bool all) {
   }
 
   if ((ret = thd->wsrep_cs().before_prepare()) == 0) {
-    DBUG_ASSERT(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
+    assert(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
     thd->wsrep_xid.reset();
 #if 0
     wsrep_xid_init(&thd->wsrep_xid, thd->wsrep_trx().ws_meta().gtid());
@@ -267,9 +267,9 @@ static inline int wsrep_before_prepare(THD *thd, bool all) {
 static inline int wsrep_after_prepare(THD *thd, bool all) {
   DBUG_ENTER("wsrep_after_prepare");
   WSREP_DEBUG("wsrep_after_prepare: %d", wsrep_is_real(thd, all));
-  DBUG_ASSERT(wsrep_run_commit_hook(thd, all));
+  assert(wsrep_run_commit_hook(thd, all));
   int ret = thd->wsrep_cs().after_prepare();
-  DBUG_ASSERT(ret == 0 || thd->wsrep_cs().current_error() ||
+  assert(ret == 0 || thd->wsrep_cs().current_error() ||
               thd->wsrep_cs().transaction().state() ==
                   wsrep::transaction::s_must_replay);
   DBUG_RETURN(ret);
@@ -288,9 +288,9 @@ static inline int wsrep_before_commit(THD *thd, bool all) {
   WSREP_DEBUG("wsrep_before_commit: %d, %lld", wsrep_is_real(thd, all),
               (long long)wsrep_thd_trx_seqno(thd));
   int ret = 0;
-  DBUG_ASSERT(wsrep_run_commit_hook(thd, all));
+  assert(wsrep_run_commit_hook(thd, all));
   if ((ret = thd->wsrep_cs().before_commit()) == 0) {
-    DBUG_ASSERT(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
+    assert(!thd->wsrep_trx().ws_meta().gtid().is_undefined());
 #if 0
     wsrep_xid_init(&thd->wsrep_xid, thd->wsrep_trx().ws_meta().gtid());
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
@@ -339,7 +339,7 @@ static inline int wsrep_ordered_commit(THD *thd, bool all) {
 
   DBUG_ENTER("wsrep_ordered_commit");
   WSREP_DEBUG("wsrep_ordered_commit: %d", wsrep_is_real(thd, all));
-  DBUG_ASSERT(wsrep_run_commit_hook(thd, all));
+  assert(wsrep_run_commit_hook(thd, all));
 
   /* Register thread handler in wsrep group commit queue.
   Note: thread handler executing 2 phase commit transaction is registered
@@ -360,7 +360,7 @@ static inline int wsrep_after_commit(THD *thd, bool all) {
   WSREP_DEBUG("wsrep_after_commit: %d, %d, %lld, %d", wsrep_is_real(thd, all),
               wsrep_is_active(thd), (long long)wsrep_thd_trx_seqno(thd),
               wsrep_has_changes(thd));
-  DBUG_ASSERT(wsrep_run_commit_hook(thd, all));
+  assert(wsrep_run_commit_hook(thd, all));
 
   if (thd->wsrep_enforce_group_commit) {
     /* Ideally, for one-phase (with binlog=off) or two-phase (with binlog=on)
@@ -376,7 +376,7 @@ static inline int wsrep_after_commit(THD *thd, bool all) {
     wsrep_unregister_from_group_commit(thd);
   }
 
-  DBUG_ASSERT(!thd->wsrep_enforce_group_commit);
+  assert(!thd->wsrep_enforce_group_commit);
 
   int ret = 0;
   if (thd->wsrep_trx().state() == wsrep::transaction::s_committing) {
@@ -456,7 +456,7 @@ static inline int wsrep_after_statement(THD *thd) {
 }
 
 static inline void wsrep_after_apply(THD *thd) {
-  DBUG_ASSERT(wsrep_thd_is_applying(thd));
+  assert(wsrep_thd_is_applying(thd));
   WSREP_DEBUG("wsrep_after_apply %u", thd->thread_id());
   thd->wsrep_cs().after_applying();
 }
@@ -516,7 +516,7 @@ static inline void wsrep_after_command_after_result(THD *thd) {
 
 static inline void wsrep_after_command_ignore_result(THD *thd) {
   wsrep_after_command_before_result(thd);
-  DBUG_ASSERT(!thd->wsrep_cs().current_error());
+  assert(!thd->wsrep_cs().current_error());
   wsrep_after_command_after_result(thd);
 }
 
@@ -547,7 +547,7 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
     /* @todo CTAS with STATEMENT binlog format and empty result set
        seems to be committing empty. Figure out why and try to fix
        elsewhere. */
-    DBUG_ASSERT(!wsrep_has_changes(thd) ||
+    assert(!wsrep_has_changes(thd) ||
                 thd->wsrep_stmt_transaction_rolled_back ||
                 (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
                  !thd->is_current_stmt_binlog_format_row()) ||
@@ -560,7 +560,7 @@ static inline void wsrep_commit_empty(THD *thd, bool all) {
        data, we ignore the deadlock error and rely on error reporting
        by storage engine/server. */
     if (!ret && !have_error && wsrep_current_error(thd)) {
-      DBUG_ASSERT(wsrep_current_error(thd) == wsrep::e_deadlock_error);
+      assert(wsrep_current_error(thd) == wsrep::e_deadlock_error);
       thd->wsrep_cs().reset_error();
     }
     if (ret) {

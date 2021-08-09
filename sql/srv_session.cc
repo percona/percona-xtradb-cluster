@@ -1,4 +1,4 @@
-/*  Copyright (c) 2015, 2020, Oracle and/or its affiliates.
+/*  Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -479,7 +479,7 @@ Srv_session::Session_backup_and_attach::Session_backup_and_attach(
       (old_session = server_session_list.find(c_thd))) {
     old_session->detach();
   } else if (is_plugin) {
-    DBUG_ASSERT(session->is_attached());
+    assert(session->is_attached());
   }
 
   attach_error = session->attach();
@@ -682,7 +682,7 @@ void Srv_session::deinit_thread() {
 
   THR_srv_session_thread = nullptr;
 
-  DBUG_ASSERT(THR_stack_start_address);
+  assert(THR_stack_start_address);
   THR_stack_start_address = nullptr;
   my_thread_end();
 }
@@ -762,15 +762,15 @@ bool Srv_session::module_deinit() {
     false not valid
 */
 bool Srv_session::is_valid(const Srv_session *session) {
-  DBUG_ASSERT(session != nullptr);
+  assert(session != nullptr);
   const bool is_valid_session = ((session->state > SRV_SESSION_CREATED) &&
                                  (session->state < SRV_SESSION_CLOSED));
   /*
     Make sure valid session exists and invalid sessions doesn't exists in the
     list of opened sessions.
   */
-  DBUG_ASSERT((is_valid_session && server_session_list.find(&session->thd)) ||
-              (!is_valid_session && !server_session_list.find(&session->thd)));
+  assert((is_valid_session && server_session_list.find(&session->thd)) ||
+         (!is_valid_session && !server_session_list.find(&session->thd)));
 
   return is_valid_session;
 }
@@ -805,7 +805,7 @@ bool Srv_session::open() {
   DBUG_TRACE;
 
   DBUG_PRINT("info", ("Session=%p  THD=%p  DA=%p", this, &thd, &da));
-  DBUG_ASSERT(state == SRV_SESSION_CREATED || state == SRV_SESSION_CLOSED);
+  assert(state == SRV_SESSION_CREATED || state == SRV_SESSION_CLOSED);
 
   thd.push_protocol(&protocol_error);
   thd.push_diagnostics_area(&da);
@@ -877,7 +877,7 @@ bool Srv_session::attach() {
   const bool first_attach = (state == SRV_SESSION_OPENED);
   DBUG_TRACE;
   DBUG_PRINT("info", ("current_thd=%p", current_thd));
-  DBUG_ASSERT(state > SRV_SESSION_CREATED && state < SRV_SESSION_CLOSED);
+  assert(state > SRV_SESSION_CREATED && state < SRV_SESSION_CLOSED);
 
   if (is_attached()) {
     if (!my_thread_equal(thd.real_id, my_thread_self())) {
@@ -961,7 +961,7 @@ bool Srv_session::detach() {
   DBUG_PRINT("info",
              ("Session=%p THD=%p current_thd=%p", this, &thd, current_thd));
 
-  DBUG_ASSERT(&thd == current_thd);
+  assert(&thd == current_thd);
   thd.restore_globals();
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
@@ -999,7 +999,7 @@ bool Srv_session::close() {
   DBUG_PRINT("info",
              ("Session=%p THD=%p current_thd=%p", this, &thd, current_thd));
 
-  DBUG_ASSERT(state < SRV_SESSION_CLOSED);
+  assert(state < SRV_SESSION_CLOSED);
 
   /*
     RAII
@@ -1110,7 +1110,7 @@ int Srv_session::execute_command(enum enum_server_command command,
     return 1;
   }
 
-  DBUG_ASSERT(thd.get_protocol() == &protocol_error);
+  assert(thd.get_protocol() == &protocol_error);
 
   // RAII:the destructor restores the state
   Srv_session::Session_backup_and_attach backup(this, false);
@@ -1138,7 +1138,7 @@ int Srv_session::execute_command(enum enum_server_command command,
   */
   if (command != COM_QUERY) thd.reset_for_next_command();
 
-  DBUG_ASSERT(thd.m_statement_psi == nullptr);
+  assert(thd.m_statement_psi == nullptr);
   thd.m_statement_psi = MYSQL_START_STATEMENT(
       &thd.m_statement_state, stmt_info_new_packet.m_key, thd.db().str,
       thd.db().length, thd.charset(), nullptr);
@@ -1152,7 +1152,7 @@ int Srv_session::execute_command(enum enum_server_command command,
 #endif /* WITH_WSREP */
 
   thd.pop_protocol();
-  DBUG_ASSERT(thd.get_protocol() == &protocol_error);
+  assert(thd.get_protocol() == &protocol_error);
   return ret;
 }
 

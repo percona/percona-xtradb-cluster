@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2006, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -59,7 +59,7 @@ extern "C" int test_if_data_home_dir(const char *dir);
 
 bool stmt_causes_implicit_commit(const THD *thd, uint mask);
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 extern void turn_parser_debug_on();
 #endif
 
@@ -129,16 +129,22 @@ extern uint sql_command_flags[];
 extern const LEX_CSTRING command_name[];
 
 #ifdef WITH_WSREP
+#include "service_wsrep.h"
 
-// #define WSREP_MYSQL_DB (char *)"mysql"
+#define WSREP_TO_ISOLATION_BEGIN_IF(db_, table_, table_list_)                 \
+  if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
+      wsrep_to_isolation_begin(thd, db_, table_, table_list_))
+
 #define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)                   \
   if (WSREP(thd) && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) \
     goto error;
 
-#define WSREP_TO_ISOLATION_BEGIN_ALTER(db_, table_, table_list_, alter_info_) \
-  if (WSREP(thd) && wsrep_thd_is_local(thd) &&                                \
-      wsrep_to_isolation_begin(thd, db_, table_, table_list_, alter_info_))   \
-    goto error;
+#define WSREP_TO_ISOLATION_BEGIN_ALTER(db_, table_, table_list_, alter_info_, \
+                                       fk_tables_)                            \
+  if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
+      wsrep_thd_is_local(thd) &&                                              \
+      wsrep_to_isolation_begin(thd, db_, table_, table_list_, nullptr,        \
+                               alter_info_, fk_tables_))
 
 #define WSREP_TO_ISOLATION_END                                                 \
   if ((WSREP(thd) && wsrep_thd_is_local_toi(thd)) || wsrep_thd_is_in_rsu(thd)) \
@@ -147,10 +153,18 @@ extern const LEX_CSTRING command_name[];
 /* Checks if lex->no_write_to_binlog is set for statements that use
   LOCAL or NO_WRITE_TO_BINLOG
 */
-#define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_) \
-  if (WSREP(thd) && !thd->lex->no_write_to_binlog &&              \
-      wsrep_to_isolation_begin(thd, db_, table_, table_list_))    \
-    goto error;
+#define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)             \
+  if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
+      !thd->lex->no_write_to_binlog &&                                        \
+      wsrep_to_isolation_begin(thd, db_, table_, table_list_))                \
+    goto wsrep_error_label;
+
+#define WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(db_, table_, table_list_,       \
+                                              fk_tables)                      \
+  if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
+      !thd->lex->no_write_to_binlog &&                                        \
+      wsrep_to_isolation_begin(thd, db_, table_, table_list_, nullptr,        \
+                               nullptr, fk_tables))
 
 #define WSREP_SYNC_WAIT(thd_, before_)                                    \
   {                                                                       \
@@ -160,11 +174,16 @@ extern const LEX_CSTRING command_name[];
 #else
 
 #define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)
+#define WSREP_TO_ISOLATION_BEGIN_ALTER(db_, table_, table_list_, alter_info_)
+#define WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(db_, table_, table_list_, \
+                                              fk_tables_)
 #define WSREP_TO_ISOLATION_END
 #define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)
 #define WSREP_SYNC_WAIT(thd_, before_)
 
 #endif /* WITH_WSREP */
+
+size_t get_command_name_len(void);
 
 bool sqlcom_can_generate_row_events(enum enum_sql_command command);
 

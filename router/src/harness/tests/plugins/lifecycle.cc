@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2016, 2020, Oracle and/or its affiliates.
+  Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -195,7 +195,7 @@ void init_exit_strategies(const mysql_harness::ConfigSection *section) {
   // clang-format on
 
   // process configuration
-  for (const std::string &func : {"init", "start", "stop", "deinit"}) {
+  for (const std::string func : {"init", "start", "stop", "deinit"}) {
     if (section->has(func)) {
       const std::string &line = section->get(func);
 
@@ -449,7 +449,7 @@ LIFECYCLE_API void lifecycle_init(int flags) {
     std::lock_guard<std::mutex> lock(g_strategies_mtx);
     g_strategies.clear();
 
-    for (const std::string &key : {"instance1", "instance2", "instance3"}) {
+    for (const std::string key : {"instance1", "instance2", "instance3"}) {
       g_strategies[key].strategy_set = false;  // optimisation,
     }                                          // doesn't affect behavior
   }

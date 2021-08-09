@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 #
 #
 # This program is free software; you can redistribute it and/or modify
@@ -126,6 +126,7 @@ table_global_variables.h
 table_helper.h
 table_host_cache.h
 table_hosts.h
+table_keyring_component_status.h
 table_log_status.h
 table_md_locks.h
 table_mems_by_account_by_event_name.h
@@ -291,6 +292,7 @@ table_global_variables.cc
 table_helper.cc
 table_host_cache.cc
 table_hosts.cc
+table_keyring_component_status.cc
 table_keyring_keys.cc
 table_log_status.cc
 table_md_locks.cc
@@ -363,9 +365,10 @@ table_plugin_table.cc
 table_replication_applier_filters.cc
 table_replication_applier_global_filters.cc
 table_binary_log_transaction_compression_stats.cc
+table_malloc_stats.cc
+table_malloc_stats.h
 # -- WITH_WSREP
 table_pxc_cluster_view.cc
-# -- WITH_WSREP
 )
 MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES}
   STORAGE_ENGINE MANDATORY STATIC_ONLY)

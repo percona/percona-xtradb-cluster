@@ -186,7 +186,7 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
                      thd->wsrep_trx().ws_meta().gtid());
     }
 
-    thd->lex->set_current_select(NULL);
+    thd->lex->set_current_query_block(NULL);
     if (!ev->common_header->when.tv_sec)
       my_micro_time_to_timeval(my_micro_time(), &ev->common_header->when);
     ev->thd = thd;  // because up to this point, ev->thd == 0

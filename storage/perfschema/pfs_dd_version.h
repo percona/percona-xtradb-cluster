@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -173,8 +173,19 @@
   performance_schema tables changed in Percona Server 8.0.23-14
   - add time_ms, rows_sent and rows_examined columns to
   performance_schema.processlist
+
+  80024:
+
+  performance_schema tables changed in MySQL 8.0.24
+  - WL#13446 added performance_schema.keyring_component_status
+
+  80025:
+
+  performance_schema tables changed in Percona Server 8.0.25-15
+  - malloc_stats
+  - malloc_stats_totals
 */
 
-static const uint PFS_DD_VERSION = 80023;
+static const uint PFS_DD_VERSION = 80025;
 
 #endif /* PFS_DD_VERSION_H */

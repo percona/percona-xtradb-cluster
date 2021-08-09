@@ -849,7 +849,7 @@ int Wsrep_schema::update_fragment_meta(THD *thd,
   WSREP_DEBUG("update_frag_seqno(%u) %s, %llu, seqno %lld", thd->thread_id(),
               os.str().c_str(), ws_meta.transaction_id().get(),
               ws_meta.seqno().get());
-  DBUG_ASSERT(ws_meta.seqno().is_undefined() == false);
+  assert(ws_meta.seqno().is_undefined() == false);
 
   Wsrep_schema_impl::binlog_off binlog_off(thd);
   int error;
@@ -909,9 +909,9 @@ static int remove_fragment(THD *thd, TABLE *frag_table,
   uchar key[MAX_KEY_LENGTH];
   key_part_map key_map = 0;
 
-  DBUG_ASSERT(server_id.is_undefined() == false);
-  DBUG_ASSERT(transaction_id.is_undefined() == false);
-  DBUG_ASSERT(seqno.is_undefined() == false);
+  assert(server_id.is_undefined() == false);
+  assert(transaction_id.is_undefined() == false);
+  assert(seqno.is_undefined() == false);
 
   /*
     Remove record with the given uuid, trx id, and seqno.
@@ -1006,7 +1006,7 @@ int Wsrep_schema::replay_transaction(
     THD *orig_thd, Relay_log_info *rli, const wsrep::ws_meta &ws_meta,
     const std::vector<wsrep::seqno> &fragments) {
   DBUG_ENTER("Wsrep_schema::replay_transaction");
-  DBUG_ASSERT(!fragments.empty());
+  assert(!fragments.empty());
 
   THD thd;
   thd.set_new_thread_id();
@@ -1202,7 +1202,7 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd) {
       wsrep::high_priority_service *applier;
       if (!(applier = server_state.find_streaming_applier(server_id,
                                                           transaction_id))) {
-        DBUG_ASSERT(wsrep::starts_transaction(flags));
+        assert(wsrep::starts_transaction(flags));
         applier = wsrep_create_streaming_applier(&storage_thd, "recovery");
         server_state.start_streaming_applier(server_id, transaction_id,
                                              applier);
