@@ -13,7 +13,6 @@
 MW-286 : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 galera#500 : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 galera_as_slave_replication_bundle : GCF-912 0000-00-00 CODERSHIP feature no longer works in 5.7
-galera_fk_multitable : Bug#80821 0000-00-00 CODERSHIP fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
 galera_kill_nochanges : mysql-wsrep#24 0000-00-00 CODERSHIP Galera server does not restart properly if killed
 galera_sst_xtrabackup-v2-options : N/A 0000-00-00 CODERSHIP fails in multiple ways, including xtrabackup crash
 galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically

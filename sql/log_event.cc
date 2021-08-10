@@ -10145,6 +10145,30 @@ int Rows_log_event::handle_idempotent_and_ignored_errors(Relay_log_info const *r
                            (rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT));
     bool ignored_error= (idempotent_error == 0 ?
                          ignored_error_code(actual_error) : 0);
+#if defined(WITH_WSREP)
+    /*
+     * Work around mysql Bug#80821. With cascading deletes, when both parent and
+     * child tables are involved in a multi table query, a delete rows event for
+     * the child may be added to the binlog after the parent (cascading) delete.
+     * This will cause the delete to fail on slaves. A new wsrep_mode value has
+     * been added for ignoring such delete errors.
+     */
+    if (WSREP(thd) && thd->wsrep_applier &&
+        wsrep_check_mode(WSREP_MODE_IGNORE_CASCADING_FK_DELETE_MISSING_ROW_ERROR) &&
+        error == HA_ERR_KEY_NOT_FOUND &&
+        (get_type_code() == binary_log::DELETE_ROWS_EVENT ||
+         get_type_code() == binary_log::DELETE_ROWS_EVENT_V1)) {
+      List<st_handler_tablename> fk_table_list;
+      if (!m_table->file->get_cascade_foreign_key_table_list(thd, &fk_table_list) &&
+          !fk_table_list.is_empty()) {
+        WSREP_WARN("Ignoring error '%s' on %s event "
+                   "when deleting from table with a cascading foreign key. "
+                   "Error_code: %d",
+                   thd->get_stmt_da()->message_text(), get_type_str(), error);
+        ignored_error= true;
+      }
+    }
+#endif /* WITH_WSREP */
 
     if (idempotent_error || ignored_error)
     {

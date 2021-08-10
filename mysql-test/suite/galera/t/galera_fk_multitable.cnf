@@ -1,0 +1,5 @@
+!include ../galera_2nodes.cnf
+
+[mysqld.2]
+# enable Bug#80821 workaround
+wsrep_mode='IGNORE_CASCADING_FK_DELETE_MISSING_ROW_ERROR'

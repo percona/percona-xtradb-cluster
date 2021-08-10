@@ -5715,6 +5715,7 @@ static Sys_var_uint Sys_wsrep_sync_wait(
 
 static const char *wsrep_mode_names[]= 
 { "IGNORE_NATIVE_REPLICATION_FILTER_RULES",
+  "IGNORE_CASCADING_FK_DELETE_MISSING_ROW_ERROR",
   NullS
 };
 
