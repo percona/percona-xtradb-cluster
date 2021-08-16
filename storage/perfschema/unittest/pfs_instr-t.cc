@@ -30,6 +30,7 @@
 #include "storage/perfschema/pfs_instr_class.h"
 #include "storage/perfschema/pfs_stat.h"
 #include "storage/perfschema/unittest/stub_pfs_plugin_table.h"
+#include "storage/perfschema/unittest/stub_pfs_defaults.h"
 #include "unittest/mytap/tap.h"
 
 static void test_no_instruments() {

@@ -598,7 +598,7 @@ void wsrep_pfs_instr_cb(wsrep_pfs_instr_type_t type, wsrep_pfs_instr_ops_t ops,
 }
 #endif /* HAVE_PSI_INTERFACE */
 
-static void wsrep_log_cb(wsrep::log::level level, const char *msg) {
+static void wsrep_log_cb(wsrep::log::level level, const char*, const char *msg) {
   switch (level) {
     case wsrep::log::info:
       WSREP_GALERA_LOG(INFORMATION_LEVEL, msg);
@@ -2141,8 +2141,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
   wsrep::client_state &cs(thd->wsrep_cs());
   int ret = cs.enter_toi_local(
-      key_array, wsrep::const_buffer(buff.ptr, buff.len),
-      wsrep::provider::flag::start_transaction | wsrep::provider::flag::commit);
+      key_array, wsrep::const_buffer(buff.ptr, buff.len));
 
   if (ret) {
     assert(cs.current_error());
