@@ -976,11 +976,11 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
                (long long)wsrep_thd_trx_seqno(thd));
       WSREP_DEBUG("%s", thd->wsrep_info);
       thd_proc_info(thd, thd->wsrep_info);
-
+      uint32_t binlog_flag = (thd->variables.option_bits & OPTION_BIN_LOG) ? 0 : WSREP_FLAG_SKIP_BINLOG;
       rcode = wsrep->replicate(wsrep,
                                (wsrep_conn_id_t)thd->thread_id(),
                                &thd->wsrep_ws_handle,
-                               WSREP_FLAG_COMMIT |
+                               binlog_flag | WSREP_FLAG_COMMIT |
                                ((thd->wsrep_PA_safe) ?
                                 0ULL : WSREP_FLAG_PA_UNSAFE),
                                &thd->wsrep_trx_meta);

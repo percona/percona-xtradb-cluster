@@ -270,6 +270,10 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 
   assert(thd->wsrep_apply_toi == false);
 
+  ulonglong option_bits_save = thd->variables.option_bits;
+  if(flags & WSREP_FLAG_SKIP_BINLOG) {
+      thd->variables.option_bits&= ~(OPTION_BIN_LOG);
+  }
 // Allow tests to block the applier thread using the DBUG facilities
   DBUG_EXECUTE_IF("sync.wsrep_apply_cb",
                  {
@@ -335,6 +339,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
     close_temporary_table(thd, tmp, 1, 1);    
   }
 
+  thd->variables.option_bits = option_bits_save;
   return rcode;
 }
 
@@ -423,6 +428,11 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
 {
   THD* const thd((THD*)ctx);
 
+  ulonglong option_bits_save = thd->variables.option_bits;
+  if(flags & WSREP_FLAG_SKIP_BINLOG) {
+      thd->variables.option_bits&= ~(OPTION_BIN_LOG);
+  }
+
   /* Applier transaction delays entering CommitMonitor so
   cache the needed params that can aid entering CommitMonitor
   post prepare stage.
@@ -483,6 +493,7 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
     thd->wsrep_apply_toi= false;
   }
 
+  thd->variables.option_bits = option_bits_save;
   return rcode;
 }
 

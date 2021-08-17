@@ -2090,6 +2090,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
   wsrep_key_arr_t key_arr= {0, 0};
   struct wsrep_buf buff = { buf, buf_len };
+  uint32_t binlog_flag = (thd->variables.option_bits & OPTION_BIN_LOG) ? 0 : WSREP_FLAG_SKIP_BINLOG;
 
   if (!buf_err                                                                &&
       !wsrep_prepare_keys_for_isolation(thd, db_, table_,
@@ -2098,6 +2099,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
       WSREP_OK == (ret = wsrep->to_execute_start(wsrep, (ulong)thd->thread_id(),
                                                  key_arr.keys, key_arr.keys_len,
                                                  &buff, 1,
+                                                 binlog_flag,
                                                  &thd->wsrep_trx_meta)))
   {
     thd->wsrep_exec_mode= TOTAL_ORDER;
