@@ -1795,6 +1795,15 @@ binlog_cache_data::flush(THD *thd, my_off_t *bytes_written, bool *wrote_xid)
   DBUG_ENTER("binlog_cache_data::flush");
   DBUG_PRINT("debug", ("flags.finalized: %s", YESNO(flags.finalized)));
   int error= 0;
+#ifdef WITH_WSREP
+    // If binlog is disabled for this session, skip actual writing to the file.
+    // Just reset the cache.
+    if(!(thd->variables.option_bits & OPTION_BIN_LOG)) {
+        reset();
+        if (bytes_written)
+          *bytes_written= 0;
+    }
+#endif
   if (flags.finalized)
   {
     my_off_t bytes_in_cache= my_b_tell(&cache_log);
@@ -10601,7 +10610,13 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd)
     executed before the before/after_send_hooks on the dump thread
     preventing race conditions among these plug-ins.
   */
+#if WITH_WSREP
+  // We can end up with flush_end_pos == 0 if total_bytes == 0, and this happens
+  // if we skipped flushing cached binlog events because of sql_log_bin = 0
+  if (flush_error == 0 && total_bytes > 0)
+#else
   if (flush_error == 0)
+#endif
   {
     const char *file_name_ptr= log_file_name + dirname_length(log_file_name);
     assert(flush_end_pos != 0);

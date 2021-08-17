@@ -115,10 +115,15 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->variables.option_bits |= OPTION_LOG_OFF;
   // Enable binlogging if opt_log_slave_updates is set
   if (opt_log_slave_updates)
+  {
     thd->variables.option_bits|= OPTION_BIN_LOG;
+    thd->variables.option_bits&= ~(OPTION_BIN_LOG_INTERNAL_OFF);
+  }
   else
+  {
     thd->variables.option_bits&= ~(OPTION_BIN_LOG);
-
+    thd->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+  }
 #ifdef GALERA
   /*
     in 5.7, we declare applying to happen as with slave threads
