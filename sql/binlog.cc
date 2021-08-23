@@ -1795,15 +1795,7 @@ binlog_cache_data::flush(THD *thd, my_off_t *bytes_written, bool *wrote_xid)
   DBUG_ENTER("binlog_cache_data::flush");
   DBUG_PRINT("debug", ("flags.finalized: %s", YESNO(flags.finalized)));
   int error= 0;
-#ifdef WITH_WSREP
-    // If binlog is disabled for this session, skip actual writing to the file.
-    // Just reset the cache.
-    if(!(thd->variables.option_bits & OPTION_BIN_LOG)) {
-        reset();
-        if (bytes_written)
-          *bytes_written= 0;
-    }
-#endif
+
   if (flags.finalized)
   {
     my_off_t bytes_in_cache= my_b_tell(&cache_log);
@@ -8836,6 +8828,10 @@ bool MYSQL_BIN_LOG::write_cache(THD *thd, binlog_cache_data *cache_data,
   DBUG_ENTER("MYSQL_BIN_LOG::write_cache(THD *, binlog_cache_data *, bool)");
 #ifdef WITH_WSREP
   if (WSREP_EMULATE_BINLOG(thd)) DBUG_RETURN(0);
+
+  // If binlog is disabled for this session, skip actual writing to the file.
+  if(!(thd->variables.option_bits & OPTION_BIN_LOG))
+    DBUG_RETURN(0);
 #endif /* WITH_WSREP */
 
   IO_CACHE *cache= &cache_data->cache_log;
