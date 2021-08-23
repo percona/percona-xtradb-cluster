@@ -10606,13 +10606,7 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd)
     executed before the before/after_send_hooks on the dump thread
     preventing race conditions among these plug-ins.
   */
-#if WITH_WSREP
-  // We can end up with flush_end_pos == 0 if total_bytes == 0, and this happens
-  // if we skipped flushing cached binlog events because of sql_log_bin = 0
-  if (flush_error == 0 && total_bytes > 0)
-#else
   if (flush_error == 0)
-#endif
   {
     const char *file_name_ptr= log_file_name + dirname_length(log_file_name);
     assert(flush_end_pos != 0);
