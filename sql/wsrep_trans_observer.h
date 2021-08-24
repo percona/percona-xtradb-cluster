@@ -373,6 +373,7 @@ static inline int wsrep_after_commit(THD *thd, bool all) {
     thread handler to register in wsrep group commit queue but since storage
     engine commit is not done it would fail to unregister the said thread
     handler as part of storage engine commit. Handle unregistration here. */
+    wsrep_wait_for_turn_in_group_commit(thd);
     wsrep_unregister_from_group_commit(thd);
   }
 
