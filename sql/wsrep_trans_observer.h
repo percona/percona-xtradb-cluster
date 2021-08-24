@@ -118,8 +118,9 @@ static inline size_t wsrep_fragments_certified_for_stmt(THD *thd) {
 }
 
 static inline int wsrep_start_transaction(THD *thd, wsrep_trx_id_t trx_id) {
+  int binlog_flag = (thd->variables.option_bits & OPTION_BIN_LOG) ? 0 : wsrep::provider::flag::skip_binlog;
   return (thd->wsrep_cs().state() != wsrep::client_state::s_none
-              ? thd->wsrep_cs().start_transaction(wsrep::transaction_id(trx_id))
+              ? thd->wsrep_cs().start_transaction(wsrep::transaction_id(trx_id), binlog_flag)
               : 0);
 }
 

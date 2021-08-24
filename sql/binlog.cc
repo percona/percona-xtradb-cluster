@@ -7959,6 +7959,14 @@ bool MYSQL_BIN_LOG::write_cache(THD *thd, binlog_cache_data *cache_data,
   DBUG_TRACE;
 #ifdef WITH_WSREP
   if (WSREP_EMULATE_BINLOG(thd)) return 0;
+
+  /*
+    If binlog is disabled for this session, skip actual writing to the file.
+    But do not skip if it was disabled internally, and we still got here.
+   */
+  if(!(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF)
+     && !(thd->variables.option_bits & OPTION_BIN_LOG))
+    return 0;
 #endif /* WITH_WSREP */
 
   Binlog_cache_storage *cache = cache_data->get_cache();

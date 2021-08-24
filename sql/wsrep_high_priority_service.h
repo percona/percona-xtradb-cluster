@@ -71,6 +71,7 @@ class Wsrep_high_priority_service : public wsrep::high_priority_service,
     bool wsrep_applier;
     int  thd_tx_priority;
   } m_shadow;
+  ulonglong m_option_bits_save = (ulonglong)-1;
 };
 
 class Wsrep_applier_service : public Wsrep_high_priority_service {
