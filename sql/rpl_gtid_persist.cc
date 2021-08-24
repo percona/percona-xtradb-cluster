@@ -223,22 +223,6 @@ bool Gtid_table_access_context::deinit(THD *thd, TABLE *table,
 
   bool err;
 
-#if WITH_WSREP
-  /* Reenable binlog */
-  /* Why it was moved before close_table()?
-     It was done because at this point binlog is disabled internally
-     (see Gtid_table_access_context::init()). The following close_table() will
-     cause commit and the attepmt to write cached binlog events of from
-     stmt_cache and trx_cache. However, in case of incident, the incident event
-     was added to the stmt_cache just before disabling binlog.
-     So here we restore original settings and let the transaction commit. What
-     was executed when the binlog was internally disabled is not in the cache
-     anyway.
-  */
-  if (m_is_write){
-    thd->variables.option_bits= m_tmp_disable_binlog__save_options;
-  }
-#endif  /* WITH_WSREP */
   err= this->close_table(thd, table, &m_backup, 0 != error, need_commit);
 
   /*
@@ -264,12 +248,12 @@ bool Gtid_table_access_context::deinit(THD *thd, TABLE *table,
     thd->end_attachable_transaction();
 
   thd->is_operating_gtid_table_implicitly= false;
-#ifndef WITH_WSREP
+
   /* Reenable binlog */
   if (m_is_write) {
     thd->variables.option_bits= m_tmp_disable_binlog__save_options;
   }
-#endif  /* !WITH_WSREP */
+
   if (m_drop_thd_object)
     this->drop_thd(m_drop_thd_object);
 
