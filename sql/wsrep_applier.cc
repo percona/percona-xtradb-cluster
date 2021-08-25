@@ -270,7 +270,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 
   assert(thd->wsrep_apply_toi == false);
 
-  ulonglong option_bits_save = thd->variables.option_bits;
+  ulonglong option_bin_log_save = thd->variables.option_bits & OPTION_BIN_LOG;
   if(flags & WSREP_FLAG_SKIP_BINLOG) {
       thd->variables.option_bits&= ~(OPTION_BIN_LOG);
   }
@@ -339,7 +339,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
     close_temporary_table(thd, tmp, 1, 1);    
   }
 
-  thd->variables.option_bits = option_bits_save;
+  thd->variables.option_bits|= option_bin_log_save;
   return rcode;
 }
 
@@ -428,7 +428,7 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
 {
   THD* const thd((THD*)ctx);
 
-  ulonglong option_bits_save = thd->variables.option_bits;
+  ulonglong option_bin_log_save = thd->variables.option_bits & OPTION_BIN_LOG;
   if(flags & WSREP_FLAG_SKIP_BINLOG) {
       thd->variables.option_bits&= ~(OPTION_BIN_LOG);
   }
@@ -493,7 +493,7 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
     thd->wsrep_apply_toi= false;
   }
 
-  thd->variables.option_bits = option_bits_save;
+  thd->variables.option_bits|= option_bin_log_save;
   return rcode;
 }
 
