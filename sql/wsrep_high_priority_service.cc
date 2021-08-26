@@ -206,8 +206,8 @@ int Wsrep_high_priority_service::start_transaction(
   DBUG_RETURN(m_thd->wsrep_cs().start_transaction(ws_handle, ws_meta) ||
               trans_begin(m_thd));
 #endif
-  assert(m_option_bits_save == (ulonglong)-1);
-  m_option_bits_save = m_thd->variables.option_bits;
+  assert(m_option_bin_log_save == (ulonglong)-1);
+  m_option_bin_log_save = m_thd->variables.option_bits & OPTION_BIN_LOG;
   if(wsrep::skips_binlog(ws_meta.flags())) {
       m_thd->variables.option_bits&= ~(OPTION_BIN_LOG);
   }
@@ -287,8 +287,8 @@ int Wsrep_high_priority_service::append_fragment_and_commit(
     wsrep_schema->append_fragment() manages binlog disabling internally anyway,
     so it makes no difference, but for the sanity let's restore them here.
   */
-  m_thd->variables.option_bits = m_option_bits_save;
-  m_option_bits_save = -1;
+  m_thd->variables.option_bits |= m_option_bin_log_save;
+  m_option_bin_log_save = -1;
   DBUG_RETURN(ret);
 }
 
@@ -356,8 +356,8 @@ int Wsrep_high_priority_service::commit(const wsrep::ws_handle &ws_handle,
 
   must_exit_ = check_exit_status();
 
-  m_thd->variables.option_bits = m_option_bits_save;
-  m_option_bits_save = -1;
+  m_thd->variables.option_bits |= m_option_bin_log_save;
+  m_option_bin_log_save = -1;
 
   DBUG_RETURN(ret);
 }
@@ -413,8 +413,8 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
   m_thd->mdl_context.release_transactional_locks();
   mysql_ull_cleanup(m_thd);
   m_thd->mdl_context.release_explicit_locks();
-  m_thd->variables.option_bits = m_option_bits_save;
-  m_option_bits_save = -1;
+  m_thd->variables.option_bits |= m_option_bin_log_save;
+  m_option_bin_log_save = -1;
   DBUG_RETURN(ret);
 }
 
@@ -442,7 +442,7 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   DBUG_ENTER("Wsrep_high_priority_service::apply_toi");
   THD *thd = m_thd;
 
-  ulonglong option_bits_save = thd->variables.option_bits;
+  ulonglong option_bin_log_save = thd->variables.option_bits & OPTION_BIN_LOG;
   if(wsrep::skips_binlog(ws_meta.flags())) {
       thd->variables.option_bits&= ~(OPTION_BIN_LOG);
   }
@@ -522,7 +522,7 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
 
   must_exit_ = check_exit_status();
 
-  thd->variables.option_bits = option_bits_save;
+  thd->variables.option_bits |= option_bin_log_save;
   DBUG_RETURN(ret);
 }
 
