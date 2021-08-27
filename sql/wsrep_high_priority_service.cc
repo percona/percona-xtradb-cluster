@@ -442,13 +442,14 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   DBUG_ENTER("Wsrep_high_priority_service::apply_toi");
   THD *thd = m_thd;
 
+  Wsrep_non_trans_mode non_trans_mode(thd, ws_meta);
+
+  // Do it after creation of Wsrep_non_trans_mode which is RAII object
+  // and manages option_bits as well.
   ulonglong option_bin_log_save = thd->variables.option_bits & OPTION_BIN_LOG;
   if(wsrep::skips_binlog(ws_meta.flags())) {
       thd->variables.option_bits&= ~(OPTION_BIN_LOG);
   }
-
-  Wsrep_non_trans_mode non_trans_mode(thd, ws_meta);
-
   wsrep::client_state &client_state(thd->wsrep_cs());
   DBUG_ASSERT(client_state.in_toi());
 
