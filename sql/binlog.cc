@@ -1599,7 +1599,17 @@ bool MYSQL_BIN_LOG::write_gtid(THD *thd, binlog_cache_data *cache_data,
   */
   thd->get_transaction()->last_committed= SEQ_UNINIT;
 
-
+#if WITH_WSREP
+  /*
+    If binlog is disabled for this session, skip actual writing to the file.
+    But do not skip if it was disabled internally, and we still got here.
+   */
+  if(!(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF)
+     && !(thd->variables.option_bits & OPTION_BIN_LOG))
+  {
+      DBUG_RETURN(0);
+  }
+#endif
   /*
     Generate and write the Gtid_log_event.
   */
