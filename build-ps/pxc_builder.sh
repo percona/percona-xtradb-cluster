@@ -343,6 +343,8 @@ install_deps() {
         apt-get -y install dirmngr || true
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools testing
+        percona-release enable pxb-80 testing
+        percona-release enable pxb-24 testing
         export DEBIAN_FRONTEND="noninteractive"
         export DIST="$(lsb_release -sc)"
             until apt-get update; do
@@ -358,7 +360,7 @@ install_deps() {
         apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-gnutls-dev
         apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libeatmydata libc6-dbg valgrind libjson-perl libsasl2-dev
         apt-get -y install patchelf
-        if [ x"${DIST}" = xfocal ]; then
+        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye ]; then
             apt-get -y install python3-mysqldb
         else
             apt-get -y install python-mysqldb
@@ -369,8 +371,8 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-24=2.4.22-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.23-16-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-24=2.4.23-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.25-17-1.${DIST}
     fi
     return;
 }
@@ -726,7 +728,7 @@ build_deb(){
         rm -rf usr *.deb DEBIAN
     cd ../ || exit
 
-    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" ]]; then
         sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
         sed -i 's/gnu++11/gnu++11 -Wno-virtual-move-assign/' cmake/build_configurations/compiler_options.cmake
     fi
@@ -736,7 +738,7 @@ build_deb(){
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
     export MYSQL_BUILD_CXXFLAGS="$CXXFLAGS"
 
-    if [[ "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xfocal" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xbullseye" ]]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
