@@ -40,7 +40,7 @@ Build-Depends: libtool (>= 1.4.2-7),
                libwrap0-dev,
                libcurl4-openssl-dev,
                libldap2-dev,
-	       stunnel
+               stunnel
 Standards-Version: 7.0.0
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/
 Vcs-Git: https://github.com/percona/percona-xtradb-cluster
@@ -200,7 +200,7 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          socat,
          qpress,
          iproute,
-	 stunnel
+         stunnel
 Provides: mysql-server,
           virtual-mysql-server, virtual-mysql-server-core,
           mysql-server-8.0, mysql-server-core-8.0, mysql-community-server-core
