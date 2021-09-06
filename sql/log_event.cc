@@ -6012,6 +6012,12 @@ void Intvar_log_event::print(FILE *, PRINT_EVENT_INFO *print_event_info) const {
     case INSERT_ID_EVENT:
       msg = "INSERT_ID";
       break;
+#ifdef WITH_WSREP
+    case BINLOG_CONTROL_EVENT:
+      msg = "BINLOG_CONTROL";
+      assert(0);
+      break;
+#endif
     case INVALID_INT_EVENT:
     default:  // cannot happen
       msg = "INVALID_INT";
@@ -6044,6 +6050,13 @@ int Intvar_log_event::do_apply_event(Relay_log_info const *rli) {
     case INSERT_ID_EVENT:
       thd->force_one_auto_inc_interval(val);
       break;
+#ifdef WITH_WSREP
+    case BINLOG_CONTROL_EVENT:
+      if (val == 0) {
+        thd->variables.option_bits &= ~(OPTION_BIN_LOG);
+      }
+      break;
+#endif /* WITH_WSREP */
   }
   return 0;
 }
@@ -6065,11 +6078,12 @@ Log_event::enum_skip_reason Intvar_log_event::do_shall_skip(
   */
   return continue_group(rli);
 }
+#endif  // MYSQL_SERVER
 
 /**************************************************************************
   Rand_log_event methods
 **************************************************************************/
-
+#ifdef MYSQL_SERVER
 int Rand_log_event::pack_info(Protocol *protocol) {
   char buf1[256], *pos;
   pos = my_stpcpy(buf1, "rand_seed1=");

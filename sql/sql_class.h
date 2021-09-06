@@ -2937,6 +2937,7 @@ class THD : public MDL_context_owner,
   } binlog_evt_union;
 
 #ifdef WITH_WSREP
+  ulonglong wsrep_bin_log_flag_save;
   bool wsrep_applier;         /* dedicated slave applier thread */
   bool wsrep_applier_closing; /* applier marked to close */
   bool wsrep_client_thread;   /* to identify client threads */

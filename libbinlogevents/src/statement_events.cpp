@@ -480,6 +480,12 @@ User_var_event::~User_var_event() { bapi_free(const_cast<char *>(name)); }
   * LAST_INSERT_ID_EVENT indicates the value to use for the LAST_INSERT_ID()
     function in the next statement.
 */
+#ifdef WITH_WSREP
+/**
+  * BINLOG_CONTROL_EVENT indicates that for the replication writeset containing
+    this event, binlogging should be set accordingly to the passed value.
+*/
+#endif
 Intvar_event::Intvar_event(const char *buf, const Format_description_event *fde)
     : Binary_log_event(&buf, fde) {
   BAPI_ENTER("Intvar_event::Intvar_event(const char*, ...)");

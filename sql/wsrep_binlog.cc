@@ -22,8 +22,10 @@
 #include "binlog.h"
 #include "log.h"
 #include "log_event.h"  // Log_event_writer
+#include "mutex_lock.h"
 #include "mysql/psi/mysql_file.h"
 #include "service_wsrep.h"
+#include "sql_base.h"
 #include "transaction.h"
 #include "wsrep_applier.h"
 
@@ -220,6 +222,9 @@ cleanup:
 int wsrep_write_cache(THD *const thd,
                       IO_CACHE_binlog_cache_storage *const cache,
                       size_t *const len) {
+  if (int res = prepend_binlog_control_event(thd)) {
+    return res;
+  }
   return wsrep_write_cache_inc(thd, cache, len);
 }
 

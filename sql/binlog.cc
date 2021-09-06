@@ -1734,7 +1734,17 @@ bool MYSQL_BIN_LOG::write_transaction(THD *thd, binlog_cache_data *cache_data,
   DBUG_PRINT("info",
              ("transaction_length= %llu", gtid_event.transaction_length));
 
+#ifdef WITH_WSREP
+  bool ret = 0;
+
+  if (!(thd->variables.option_bits & OPTION_BIN_LOG_INTERNAL_OFF) &&
+      !(thd->variables.option_bits & OPTION_BIN_LOG))
+    goto end;
+
+  ret = gtid_event.write(writer);
+#else
   bool ret = gtid_event.write(writer);
+#endif
   if (ret) goto end;
 
   /*
@@ -12382,6 +12392,44 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, const char *query_arg,
 }
 
 #ifdef WITH_WSREP
+int prepend_binlog_control_event(THD *const thd) {
+  unsigned char *read_pos = NULL;
+  my_off_t read_len = 0;
+
+  if ((thd->variables.option_bits & OPTION_BIN_LOG) != 0) return 0;
+
+  IO_CACHE_binlog_cache_storage tmp_io_cache;
+  if (tmp_io_cache.open(mysql_tmpdir, TEMP_PREFIX, 128, 128))
+    return ER_ERROR_ON_WRITE;
+
+  int ret = 0;
+  Intvar_log_event ev((uchar)binary_log::Intvar_event::BINLOG_CONTROL_EVENT, 0);
+  if (ev.write(&tmp_io_cache)) {
+    ret = ER_ERROR_ON_WRITE;
+    goto cleanup;
+  }
+
+  if (tmp_io_cache.begin(&read_pos, &read_len)) {
+    WSREP_ERROR("Failed to initialize io-cache");
+    ret = ER_ERROR_ON_WRITE;
+    goto cleanup;
+  }
+
+  if (read_len == 0 && tmp_io_cache.next(&read_pos, &read_len)) {
+    WSREP_ERROR("Failed to read from io-cache");
+    ret = ER_ERROR_ON_WRITE;
+    goto cleanup;
+  }
+
+  if (thd->wsrep_cs().append_data(wsrep::const_buffer(read_pos, read_len))) {
+    WSREP_ERROR("Failed to append writeset data");
+    ret = ER_ERROR_ON_WRITE;
+  }
+
+cleanup:
+  tmp_io_cache.close();
+  return ret;
+}
 
 IO_CACHE_binlog_cache_storage *wsrep_get_trans_cache(THD *thd,
                                                      bool transaction) {

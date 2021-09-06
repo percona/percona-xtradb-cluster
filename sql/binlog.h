@@ -1018,6 +1018,7 @@ extern ulong rpl_read_size;
 bool normalize_binlog_name(char *to, const char *from, bool is_relay_log);
 
 #ifdef WITH_WSREP
+int prepend_binlog_control_event(THD *const thd);
 IO_CACHE_binlog_cache_storage *wsrep_get_trans_cache(THD *thd,
                                                      bool transaction);
 bool wsrep_trans_cache_is_empty(THD *thd);

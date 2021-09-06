@@ -120,10 +120,13 @@ Wsrep_high_priority_service::Wsrep_high_priority_service(THD *thd)
   /* Disable general logging on applier threads */
   thd->variables.option_bits |= OPTION_LOG_OFF;
   /* Enable binlogging if opt_log_slave_updates is set */
-  if (opt_log_slave_updates)
+  if (opt_log_slave_updates) {
     thd->variables.option_bits |= OPTION_BIN_LOG;
-  else
+    thd->variables.option_bits &= ~(OPTION_BIN_LOG_INTERNAL_OFF);
+  } else {
     thd->variables.option_bits &= ~(OPTION_BIN_LOG);
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+  }
 
   thd->set_active_vio(0);
   thd->reset_db(db_str);
@@ -342,6 +345,10 @@ int Wsrep_high_priority_service::commit(const wsrep::ws_handle &ws_handle,
   thd->lex->sql_command = SQLCOM_END;
 
   must_exit_ = check_exit_status();
+
+  thd->variables.option_bits |= thd->wsrep_bin_log_flag_save;
+  thd->wsrep_bin_log_flag_save = 0;
+
   return ret;
 }
 
@@ -395,6 +402,10 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
   m_thd->mdl_context.release_transactional_locks();
   mysql_ull_cleanup(m_thd);
   m_thd->mdl_context.release_explicit_locks();
+
+  m_thd->variables.option_bits |= m_thd->wsrep_bin_log_flag_save;
+  m_thd->wsrep_bin_log_flag_save = 0;
+
   return ret;
 }
 
@@ -416,6 +427,9 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
                                            wsrep::mutable_buffer &err) {
   DBUG_TRACE;
   THD *thd = m_thd;
+
+  ulonglong option_bin_log_save = thd->variables.option_bits & OPTION_BIN_LOG;
+
   Wsrep_non_trans_mode non_trans_mode(thd, ws_meta);
 
   wsrep::client_state &client_state(thd->wsrep_cs());
@@ -490,7 +504,7 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   thd->get_transaction()->xid_state()->get_xid()->reset();
 
   must_exit_ = check_exit_status();
-
+  thd->variables.option_bits |= option_bin_log_save;
   return ret;
 }
 
