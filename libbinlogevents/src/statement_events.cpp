@@ -596,6 +596,12 @@ err:
   * LAST_INSERT_ID_EVENT indicates the value to use for the LAST_INSERT_ID()
     function in the next statement.
 */
+#ifdef WITH_WSREP
+/**
+  * BINLOG_CONTROL_EVENT indicates that for the replication writeset containing
+    this event, binlogging should be set accordingly to the passed value.
+*/
+#endif
 Intvar_event::Intvar_event(const char* buf,
                            const Format_description_event* description_event)
 : Binary_log_event(&buf, description_event->binlog_version,

@@ -1430,6 +1430,7 @@ THD::THD(bool enable_plugins)
    derived_tables_processing(FALSE),
    sp_runtime_ctx(NULL),
 #ifdef WITH_WSREP
+   wsrep_bin_log_flag_save(0),
    wsrep_applier(is_applier),
    wsrep_applier_closing(FALSE),
    wsrep_client_thread(0),

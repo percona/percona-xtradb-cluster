@@ -1727,7 +1727,7 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
 int wsrep_to_buf_helper(
     THD* thd, const char *query, uint query_len, uchar** buf, size_t* buf_len)
 {
-  IO_CACHE tmp_io_cache;
+  IO_CACHE tmp_io_cache = {};
   if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
                        65536, MYF(MY_WME)))
     return 1;
@@ -1752,6 +1752,12 @@ int wsrep_to_buf_helper(
   {
     *buf     = (uchar *)thd->wsrep_gtid_event_buf;
     *buf_len = thd->wsrep_gtid_event_buf_len;
+  }
+
+  if ((thd->variables.option_bits & OPTION_BIN_LOG) == 0)
+  {
+    Intvar_log_event ev((uchar)binary_log::Intvar_event::BINLOG_CONTROL_EVENT, 0);
+    if (ev.write(&tmp_io_cache)) ret= 1;
   }
 
   /* if there is prepare query, add event for it */

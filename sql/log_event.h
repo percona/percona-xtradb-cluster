@@ -1953,6 +1953,14 @@ public:
   {
     is_valid_param= true;
   }
+#ifdef WITH_WSREP
+  Intvar_log_event(uchar type_arg, ulonglong val_arg)
+  : binary_log::Intvar_event(type_arg, val_arg),
+    Log_event(header(), footer())
+  {
+    is_valid_param= true;
+  }
+#endif  /* WITH_WSREP */
 #ifdef HAVE_REPLICATION
   int pack_info(Protocol* protocol);
 #endif /* HAVE_REPLICATION */

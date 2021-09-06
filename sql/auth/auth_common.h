@@ -714,7 +714,7 @@ bool delete_precheck(THD *thd, TABLE_LIST *tables);
 bool lock_tables_precheck(THD *thd, TABLE_LIST *tables);
 bool create_table_precheck(THD *thd, TABLE_LIST *tables,
                            TABLE_LIST *create_table);
-#if WITH_WSREP
+#ifdef WITH_WSREP
 bool check_fk_parent_table_access(THD *thd,
                                   const char *child_table_db,
                                   HA_CREATE_INFO *create_info,
