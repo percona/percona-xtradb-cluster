@@ -8,7 +8,8 @@
 
 [Unit]
 Description=Percona XtraDB Cluster
-After=network.target syslog.target
+After=network.target syslog.target local-fs.target remote-fs.target
+Require=local-fs.target remote-fs.target
 
 [Install]
 WantedBy=multi-user.target
