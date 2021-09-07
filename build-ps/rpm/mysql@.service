@@ -33,7 +33,7 @@
 
 [Unit]
 Description=Percona XtraDB Cluster with config /etc/sysconfig/mysql.%i
-After=network.target syslog.target  remote-fs.target
+After=network.target syslog.target local-fs.target remote-fs.target
 Require=local-fs.target remote-fs.target
 
 [Install]
