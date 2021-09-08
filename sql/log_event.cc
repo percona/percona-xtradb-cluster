@@ -60,7 +60,7 @@
 #include "sql_class.h"
 #include "mysql/psi/mysql_transaction.h"
 #include "sql_plugin.h" // plugin_foreach
-#if WITH_WSREP
+#ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #endif
 #define window_size Log_throttle::LOG_THROTTLE_WINDOW_SIZE
@@ -7187,6 +7187,12 @@ void Intvar_log_event::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
   case INSERT_ID_EVENT:
     msg="INSERT_ID";
     break;
+#ifdef WITH_WSREP
+  case BINLOG_CONTROL_EVENT:
+    msg="BINLOG_CONTROL";
+    assert(0);
+    break;
+#endif
   case INVALID_INT_EVENT:
   default: // cannot happen
     msg="INVALID_INT";
@@ -7223,6 +7229,14 @@ int Intvar_log_event::do_apply_event(Relay_log_info const *rli)
   case INSERT_ID_EVENT:
     thd->force_one_auto_inc_interval(val);
     break;
+#ifdef WITH_WSREP
+  case BINLOG_CONTROL_EVENT:
+   if (val == 0)
+   {
+     thd->variables.option_bits &= ~(OPTION_BIN_LOG);
+   }
+   break;
+#endif  /* WITH_WSREP */
   }
   return 0;
 }

@@ -117,6 +117,7 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
     WSREP_DEBUG("Empty apply event found while processing write-set: %lld",
                 (long long) wsrep_thd_trx_seqno(thd));
 
+  thd->wsrep_bin_log_flag_save = thd->variables.option_bits & OPTION_BIN_LOG;
   while(buf_len)
   {
     int exec_res;
@@ -439,6 +440,9 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
     rcode = wsrep_commit(thd);
   else
     rcode = wsrep_rollback(thd);
+
+  thd->variables.option_bits |= thd->wsrep_bin_log_flag_save;
+  thd->wsrep_bin_log_flag_save = 0;
 
   wsrep_set_apply_format(thd, NULL);
   thd->mdl_context.release_transactional_locks();

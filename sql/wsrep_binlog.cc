@@ -16,6 +16,7 @@
 #include "wsrep_binlog.h"
 #include "wsrep_priv.h"
 #include "log_event.h"
+#include "sql_base.h"  // TEMP_PREFIX
 
 /*
   Write the contents of a cache to a memory buffer.
@@ -380,6 +381,40 @@ cleanup:
     return err;
 }
 
+static int prepend_binlog_control_event(wsrep_t* const wsrep, THD* const thd)
+{
+    if ((thd->variables.option_bits & OPTION_BIN_LOG) != 0)
+      return 0;
+
+    IO_CACHE tmp_io_cache = {};
+    if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
+                        128, MYF(MY_WME)))
+        return ER_ERROR_ON_WRITE;
+
+    size_t length= 0;
+    int ret= 0;
+    Intvar_log_event ev((uchar)binary_log::Intvar_event::BINLOG_CONTROL_EVENT, 0);
+    if (ev.write(&tmp_io_cache))
+    {
+        ret= ER_ERROR_ON_WRITE;
+        goto cleanup;
+    }
+    if (reinit_io_cache(&tmp_io_cache, READ_CACHE, 0, 0, 0))
+    {
+        WSREP_ERROR("Failed to initialize io-cache");
+        ret= ER_ERROR_ON_WRITE;
+        goto cleanup;
+    }
+
+    length= my_b_bytes_in_cache(&tmp_io_cache);
+    if (unlikely(0 == length)) length = my_b_fill(&tmp_io_cache);
+    assert(length != 0);
+    ret= wsrep_append_data(wsrep, &thd->wsrep_ws_handle, tmp_io_cache.read_pos, length);
+
+cleanup:
+    close_cached_file(&tmp_io_cache);
+    return ret;
+}
 /*
   Write the contents of a cache to wsrep provider.
 
@@ -391,10 +426,16 @@ int wsrep_write_cache(wsrep_t*  const wsrep,
                       IO_CACHE* const cache,
                       size_t*   const len)
 {
-    if (wsrep_incremental_data_collection) {
+    if (int res = prepend_binlog_control_event(wsrep, thd))
+    {
+        return res;
+    }
+    if (wsrep_incremental_data_collection)
+    {
         return wsrep_write_cache_inc(wsrep, thd, cache, len);
     }
-    else {
+    else
+    {
         return wsrep_write_cache_once(wsrep, thd, cache, len);
     }
 }

@@ -930,6 +930,9 @@ public:
     INVALID_INT_EVENT,
     LAST_INSERT_ID_EVENT,
     INSERT_ID_EVENT
+#ifdef WITH_WSREP
+    , BINLOG_CONTROL_EVENT
+#endif
   };
 
   /**
@@ -958,6 +961,10 @@ public:
       return "LAST_INSERT_ID";
     case INSERT_ID_EVENT:
       return "INSERT_ID";
+#ifdef WITH_WSREP
+    case BINLOG_CONTROL_EVENT:
+      return "BINLOG_CONTROL";
+#endif
     default: /* impossible */
       return "UNKNOWN";
     }
