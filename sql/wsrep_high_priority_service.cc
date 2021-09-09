@@ -428,8 +428,6 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   DBUG_TRACE;
   THD *thd = m_thd;
 
-  ulonglong option_bin_log_save = thd->variables.option_bits & OPTION_BIN_LOG;
-
   Wsrep_non_trans_mode non_trans_mode(thd, ws_meta);
 
   wsrep::client_state &client_state(thd->wsrep_cs());
@@ -504,7 +502,20 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   thd->get_transaction()->xid_state()->get_xid()->reset();
 
   must_exit_ = check_exit_status();
-  thd->variables.option_bits |= option_bin_log_save;
+
+  /* non_trans_mode object created at the beginning of this method restores
+  thd->variables.option_bits to the state as they were at the beginning of this
+  method.
+  wsrep_apply_events() is used for TOI and non-TOI writesets.
+  Inside wsrep_apply_events() we save the state of OPTION_BIN_LOG bit as it
+  may be cleared by and BINLOG_CONTROL_EVENT which is injected at the beginning
+  of the writeset if sql_log_bin=0 on the source server side.
+  We restore it after the transaction is committed or rolled back.
+  Please note, that for TOI, there is no
+  commit()/rollback() called, so we take advantage of non_trans_mode object
+  behavior, but for sanity, still have to clear thd->wsrep_bin_log_flag_save
+  captured inside wsrep_apply_events() */
+  thd->wsrep_bin_log_flag_save = 0;
   return ret;
 }
 

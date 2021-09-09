@@ -22,10 +22,8 @@
 #include "binlog.h"
 #include "log.h"
 #include "log_event.h"  // Log_event_writer
-#include "mutex_lock.h"
 #include "mysql/psi/mysql_file.h"
 #include "service_wsrep.h"
-#include "sql_base.h"
 #include "transaction.h"
 #include "wsrep_applier.h"
 

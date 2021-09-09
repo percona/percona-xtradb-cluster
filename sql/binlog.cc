@@ -12393,7 +12393,7 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, const char *query_arg,
 
 #ifdef WITH_WSREP
 int prepend_binlog_control_event(THD *const thd) {
-  unsigned char *read_pos = NULL;
+  unsigned char *read_pos = nullptr;
   my_off_t read_len = 0;
 
   if ((thd->variables.option_bits & OPTION_BIN_LOG) != 0) return 0;

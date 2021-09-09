@@ -6078,12 +6078,11 @@ Log_event::enum_skip_reason Intvar_log_event::do_shall_skip(
   */
   return continue_group(rli);
 }
-#endif  // MYSQL_SERVER
 
 /**************************************************************************
   Rand_log_event methods
 **************************************************************************/
-#ifdef MYSQL_SERVER
+
 int Rand_log_event::pack_info(Protocol *protocol) {
   char buf1[256], *pos;
   pos = my_stpcpy(buf1, "rand_seed1=");
