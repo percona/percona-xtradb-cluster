@@ -7264,19 +7264,8 @@ ha_innobase::open(
 		if (UNIV_UNLIKELY(m_share->ib_table &&
 				  m_share->ib_table->is_corrupt &&
 				  srv_pass_corrupt_table <= 1)) {
-<<<<<<< HEAD
-			free_share(m_share);
-#ifdef WITH_WSREP
-			m_share = NULL;
-#endif
-
-||||||| f57eec2247e
-			free_share(m_share);
-
-=======
 			free_share_and_nullify(&m_share);
 			dict_table_close(ib_table, FALSE, FALSE);
->>>>>>> 24570214f49f170ec92b8439614c742b3d14d2bf
 			DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
 		}
 	}
@@ -7301,16 +7290,7 @@ ha_innobase::open(
 		or force recovery can still use it, but not others. */
 		ib_table->set_file_unreadable();
 		ib_table->corrupted = true;
-<<<<<<< HEAD
-		free_share(m_share);
-#ifdef WITH_WSREP
-		m_share = NULL;
-#endif
-||||||| f57eec2247e
-		free_share(m_share);
-=======
 		free_share_and_nullify(&m_share);
->>>>>>> 24570214f49f170ec92b8439614c742b3d14d2bf
 		dict_table_close(ib_table, FALSE, FALSE);
 		ib_table = NULL;
 		is_part = NULL;
@@ -7318,24 +7298,8 @@ ha_innobase::open(
 
 	if (UNIV_UNLIKELY(ib_table && ib_table->is_corrupt &&
 			  srv_pass_corrupt_table <= 1)) {
-<<<<<<< HEAD
-
-#ifdef WITH_WSREP
-		/* Avoid the potential double call to 'free_share()' */
-		if (m_share != NULL) {
-			free_share(m_share);
-			m_share = NULL;
-		}
-#else
-		free_share(m_share);
-#endif /* WITH_WSREP */
-||||||| f57eec2247e
-
-		free_share(m_share);
-=======
 		free_share_and_nullify(&m_share);
 		dict_table_close(ib_table, FALSE, FALSE);
->>>>>>> 24570214f49f170ec92b8439614c742b3d14d2bf
 		DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
 	}
 
@@ -7368,16 +7332,7 @@ ha_innobase::open(
 			else
 				my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
 
-<<<<<<< HEAD
-			free_share(m_share);
-#ifdef WITH_WSREP
-			m_share = NULL;
-#endif
-||||||| f57eec2247e
-			free_share(m_share);
-=======
 			free_share_and_nullify(&m_share);
->>>>>>> 24570214f49f170ec92b8439614c742b3d14d2bf
 			dict_table_close(ib_table, FALSE, FALSE);
 			ib_table = NULL;
 			is_part = NULL;
@@ -7450,16 +7405,7 @@ ha_innobase::open(
 	}
         
 	if (!thd_tablespace_op(thd) && no_tablespace) {
-<<<<<<< HEAD
-		free_share(m_share);
-#ifdef WITH_WSREP
-		m_share = NULL;
-#endif /* WITH_WSREP */
-||||||| f57eec2247e
-		free_share(m_share);
-=======
 		free_share_and_nullify(&m_share);
->>>>>>> 24570214f49f170ec92b8439614c742b3d14d2bf
 		set_my_errno(ENOENT);
 		int ret_err = HA_ERR_TABLESPACE_MISSING;
 
