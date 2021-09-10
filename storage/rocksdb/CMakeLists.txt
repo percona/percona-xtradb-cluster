@@ -86,10 +86,23 @@ ENDIF()
 
 IF (HAVE_SSE42)
   MESSAGE(STATUS "MyRocks: SSE42 support found")
+<<<<<<< HEAD
   add_compile_flags(${ROCKSDB_ROOT}/util/crc32c.cc COMPILE_FLAGS "-msse4.2") # use Fast_CRC32
   IF (HAVE_PCLMUL)
     add_compile_flags(${ROCKSDB_ROOT}/util/crc32c.cc COMPILE_FLAGS "-mpclmul") # use crc32c_3way instead of Fast_CRC32
   ENDIF()
+||||||| f57eec2247e
+=======
+  IF (CMAKE_COMPILER_IS_GNUCXX AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9)
+    # Suppress the '#error "AES/PCLMUL instructions not enabled"' bug in gcc-4.8.x or lower at https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56298
+    add_compile_flags(${ROCKSDB_ROOT}/util/crc32c.cc COMPILE_FLAGS "-msse4.2 -mpclmul") # use Fast_CRC32
+  ELSE()
+    add_compile_flags(${ROCKSDB_ROOT}/util/crc32c.cc COMPILE_FLAGS "-msse4.2") # use Fast_CRC32
+  ENDIF()
+  IF (HAVE_PCLMUL)
+    add_compile_flags(${ROCKSDB_ROOT}/util/crc32c.cc COMPILE_FLAGS "-mpclmul") # use crc32c_3way instead of Fast_CRC32
+  ENDIF()
+>>>>>>> 24570214f49f170ec92b8439614c742b3d14d2bf
 ELSE()
   IF (ALLOW_NO_SSE42)
     MESSAGE(WARNING "No SSE42 support found and ALLOW_NO_SSE42 specified, building MyRocks but without SSE42/FastCRC32 support")
@@ -141,7 +154,7 @@ ENDIF()
 # Suppress warnings for gcc-9 or newer
 IF(CMAKE_COMPILER_IS_GNUCXX AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-deprecated-copy FILES rocksdb/db/db_impl/db_impl.cc)
-  ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-maybe-uninitialized FILES rocksdb/table/block_based/block_based_table_builder.cc)
+  ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-maybe-uninitialized FILES rocksdb/env/env.cc rocksdb/table/block_based/block_based_table_builder.cc)
 ENDIF()
 
 # Suppress warnings for gcc-4.8.x

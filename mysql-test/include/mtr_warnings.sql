@@ -322,6 +322,7 @@ INSERT INTO global_suppressions VALUES
  ("RSA private key file not found"),
  ("RSA public key file not found"),
 
+<<<<<<< HEAD
  /*
    Galera suppressions
  */
@@ -397,6 +398,13 @@ INSERT INTO global_suppressions VALUES
  */
  ("You have enabled keyring plugin. SST encryption is mandatory."),
 
+||||||| f57eec2247e
+=======
+ /* TLS v1.0 and v1.1 deprecated */
+ ("A deprecated TLS version TLSv1 is enabled"),
+ ("A deprecated TLS version TLSv1.1 is enabled"),
+
+>>>>>>> 24570214f49f170ec92b8439614c742b3d14d2bf
  ("THE_LAST_SUPPRESSION")||
 
 
