@@ -120,10 +120,13 @@ Wsrep_high_priority_service::Wsrep_high_priority_service(THD *thd)
   /* Disable general logging on applier threads */
   thd->variables.option_bits |= OPTION_LOG_OFF;
   /* Enable binlogging if opt_log_slave_updates is set */
-  if (opt_log_slave_updates)
+  if (opt_log_slave_updates) {
     thd->variables.option_bits |= OPTION_BIN_LOG;
-  else
+    thd->variables.option_bits &= ~(OPTION_BIN_LOG_INTERNAL_OFF);
+  } else {
     thd->variables.option_bits &= ~(OPTION_BIN_LOG);
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+  }
 
   thd->set_active_vio(0);
   thd->reset_db(db_str);
@@ -342,6 +345,10 @@ int Wsrep_high_priority_service::commit(const wsrep::ws_handle &ws_handle,
   thd->lex->sql_command = SQLCOM_END;
 
   must_exit_ = check_exit_status();
+
+  thd->variables.option_bits |= thd->wsrep_bin_log_flag_save;
+  thd->wsrep_bin_log_flag_save = 0;
+
   return ret;
 }
 
@@ -395,6 +402,10 @@ int Wsrep_high_priority_service::rollback(const wsrep::ws_handle &ws_handle,
   m_thd->mdl_context.release_transactional_locks();
   mysql_ull_cleanup(m_thd);
   m_thd->mdl_context.release_explicit_locks();
+
+  m_thd->variables.option_bits |= m_thd->wsrep_bin_log_flag_save;
+  m_thd->wsrep_bin_log_flag_save = 0;
+
   return ret;
 }
 
@@ -416,6 +427,7 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
                                            wsrep::mutable_buffer &err) {
   DBUG_TRACE;
   THD *thd = m_thd;
+
   Wsrep_non_trans_mode non_trans_mode(thd, ws_meta);
 
   wsrep::client_state &client_state(thd->wsrep_cs());
@@ -491,6 +503,19 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
 
   must_exit_ = check_exit_status();
 
+  /* non_trans_mode object created at the beginning of this method restores
+  thd->variables.option_bits to the state as they were at the beginning of this
+  method.
+  wsrep_apply_events() is used for TOI and non-TOI writesets.
+  Inside wsrep_apply_events() we save the state of OPTION_BIN_LOG bit as it
+  may be cleared by and BINLOG_CONTROL_EVENT which is injected at the beginning
+  of the writeset if sql_log_bin=0 on the source server side.
+  We restore it after the transaction is committed or rolled back.
+  Please note, that for TOI, there is no
+  commit()/rollback() called, so we take advantage of non_trans_mode object
+  behavior, but for sanity, still have to clear thd->wsrep_bin_log_flag_save
+  captured inside wsrep_apply_events() */
+  thd->wsrep_bin_log_flag_save = 0;
   return ret;
 }
 

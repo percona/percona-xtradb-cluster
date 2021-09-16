@@ -220,6 +220,9 @@ cleanup:
 int wsrep_write_cache(THD *const thd,
                       IO_CACHE_binlog_cache_storage *const cache,
                       size_t *const len) {
+  if (int res = prepend_binlog_control_event(thd)) {
+    return res;
+  }
   return wsrep_write_cache_inc(thd, cache, len);
 }
 

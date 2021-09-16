@@ -133,6 +133,9 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
     WSREP_DEBUG("Empty apply event found while processing write-set: %lld",
                 (long long)wsrep_thd_trx_seqno(thd));
 
+  if (thd->wsrep_bin_log_flag_save == 0) {
+    thd->wsrep_bin_log_flag_save = thd->variables.option_bits & OPTION_BIN_LOG;
+  }
   while (buf_len) {
     int exec_res;
     Log_event *ev =

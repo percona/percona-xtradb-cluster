@@ -1754,6 +1754,12 @@ int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,
     *buf_len = thd->wsrep_gtid_event_buf_len;
   }
 
+  if ((thd->variables.option_bits & OPTION_BIN_LOG) == 0) {
+    Intvar_log_event ev((uchar)binary_log::Intvar_event::BINLOG_CONTROL_EVENT,
+                        0);
+    if (ev.write(&tmp_io_cache)) ret = 1;
+  }
+
   /* if there is prepare query, add event for it */
   if (!ret && thd->wsrep_TOI_pre_query) {
     Query_log_event ev(thd, thd->wsrep_TOI_pre_query,

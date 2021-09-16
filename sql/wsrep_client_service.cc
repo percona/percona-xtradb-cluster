@@ -192,6 +192,12 @@ cleanup:
     WSREP_WARN("Failed to reinitialize IO cache");
     ret = 1;
   }
+
+  // Prepend it here, as we know thd and we can avoid wsrep-lib modifications
+  if (buffer.size() > 0) {
+    ret = prepend_binlog_control_event(thd);
+  }
+
   DBUG_RETURN(ret);
 }
 

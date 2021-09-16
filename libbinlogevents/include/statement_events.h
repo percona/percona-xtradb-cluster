@@ -932,6 +932,10 @@ class Intvar_event : public Binary_log_event {
     INVALID_INT_EVENT,
     LAST_INSERT_ID_EVENT,
     INSERT_ID_EVENT
+#ifdef WITH_WSREP
+    ,
+    BINLOG_CONTROL_EVENT
+#endif
   };
 
   /**
@@ -954,6 +958,10 @@ class Intvar_event : public Binary_log_event {
         return "LAST_INSERT_ID";
       case INSERT_ID_EVENT:
         return "INSERT_ID";
+#ifdef WITH_WSREP
+      case BINLOG_CONTROL_EVENT:
+        return "BINLOG_CONTROL";
+#endif
       default: /* impossible */
         return "UNKNOWN";
     }
