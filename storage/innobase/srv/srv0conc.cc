@@ -324,13 +324,6 @@ srv_conc_force_exit_innodb(
 
 		return;
 	}
-#ifdef WITH_WSREP
-	if (wsrep_on(trx->mysql_thd) && 
-	    wsrep_trx_is_aborting(trx->mysql_thd)) {
-		srv_conc_force_enter_innodb(trx);
-		return;
-	}
-#endif
 
 	srv_conc_exit_innodb_with_atomics(trx);
 

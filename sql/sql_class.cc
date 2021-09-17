@@ -1013,13 +1013,16 @@ wsrep_trx_order_before(void *thd1, void *thd2)
 extern "C" int
 wsrep_trx_is_aborting(void *thd_ptr)
 {
-	if (thd_ptr) {
-		if ((((THD *)thd_ptr)->wsrep_conflict_state == MUST_ABORT) ||
-		    (((THD *)thd_ptr)->wsrep_conflict_state == ABORTING)) {
-		  return 1;
-		}
-	}
-	return 0;
+  mysql_mutex_lock(&((THD*)thd_ptr)->LOCK_wsrep_thd);
+  if (thd_ptr) {
+    if ((((THD *)thd_ptr)->wsrep_conflict_state == MUST_ABORT) ||
+        (((THD *)thd_ptr)->wsrep_conflict_state == ABORTING)) {
+      mysql_mutex_unlock(&((THD*)thd_ptr)->LOCK_wsrep_thd);
+      return 1;
+    }
+  }
+  mysql_mutex_unlock(&((THD*)thd_ptr)->LOCK_wsrep_thd);
+  return 0;
 }
 #endif
 
