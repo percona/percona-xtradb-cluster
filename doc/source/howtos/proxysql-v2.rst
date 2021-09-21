@@ -72,7 +72,7 @@ software, run the corresponding command:
 
 .. code-block:: bash
 
-   $ sudo apt-get install proxysql2
+   $ sudo apt install proxysql2
 
 * Installing on Red Hat Enterprise Linux or CentOS:
 
