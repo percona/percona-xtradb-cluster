@@ -4543,6 +4543,16 @@ extern "C" int thd_non_transactional_update(const MYSQL_THD thd)
     Transaction_ctx::SESSION);
 }
 
+extern "C" int thd_has_active_attachable_trx(const MYSQL_THD thd)
+{
+  return thd->is_attachable_transaction_active();
+}
+
+extern "C" int thd_is_operating_gtid_table_implicitly(const MYSQL_THD thd)
+{
+  return thd->is_operating_gtid_table_implicitly;
+}
+
 extern "C" int thd_binlog_format(const MYSQL_THD thd)
 {
 #ifdef WITH_WSREP

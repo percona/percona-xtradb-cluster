@@ -1437,8 +1437,8 @@ static bool check_storage_engine(sys_var *self, THD *thd, set_var *var)
     {
       // Use the default value defined by sys_var.
       lex_string_set(&se_name,
-        reinterpret_cast<const char*>(
-        dynamic_cast<Sys_var_plugin*>(self)->global_value_ptr(thd, NULL)));
+        pointer_cast<const char*>(
+          down_cast<Sys_var_plugin*>(self)->global_value_ptr(thd, NULL)));
     }
 
     plugin_ref plugin;
@@ -5780,7 +5780,9 @@ void init_slow_query_log_use_global_control()
 static Sys_var_set Sys_log_slow_verbosity(
         "log_slow_verbosity",
         "Choose how verbose the messages to your slow log will be. "
-        "Multiple flags allowed in a comma-separated string. [microtime, query_plan, innodb, profiling, profiling_use_getrusage]",
+        "Multiple flags allowed in a comma-separated string. "
+        "[microtime, query_plan, innodb, profiling, profiling_use_getrusage, "
+        "minimal, standard, full]",
         SESSION_VAR(log_slow_verbosity), CMD_LINE(REQUIRED_ARG),
         log_slow_verbosity_name, DEFAULT(SLOG_V_MICROTIME),
         NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
