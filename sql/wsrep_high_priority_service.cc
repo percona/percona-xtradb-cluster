@@ -748,6 +748,13 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
 
     wsrep::client_state &client_state(thd->wsrep_cs());
 
+    // It seems like wsrep-lib might free data after we
+    // return from the original function, and only the worker
+    // thread remain
+    // so we'll copy it to make sure we still have it
+    std::vector<std::uint8_t> our_data(data.data(), data.data()+data.size());
+    wsrep::const_buffer our_buffer(our_data.data(), our_data.size());
+
     client_state.before_command();
     client_state.before_statement();
     int ret = client_state.enter_nbo_mode(ws_meta);
@@ -771,7 +778,7 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
     thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(true);
 
     wsrep::mutable_buffer err2;
-    ret = apply_events(thd, m_rli, data, err2);
+    ret = apply_events(thd, m_rli, our_buffer, err2);
     wsrep_thd_set_ignored_error(thd, false);
 
     THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
