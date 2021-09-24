@@ -17430,7 +17430,8 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
     //
     // i.e, Upgrade to SHARED LOCK when thread is a WSREP thd, and exec mode is
     // either TOI or replicated and lock acquisition is a variant of NO_LOCK.
-    if ((wsrep_thd_is_toi(thd) || wsrep_thd_is_in_rsu(thd)) &&
+    if ((wsrep_thd_is_toi(thd) || wsrep_thd_is_in_rsu(thd) ||
+         wsrep_thd_is_in_nbo(thd)) &&
         (inplace_supported == HA_ALTER_INPLACE_NO_LOCK ||
          inplace_supported == HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE)) {
       inplace_supported = HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE;

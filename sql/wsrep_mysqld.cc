@@ -2309,6 +2309,7 @@ static int wsrep_NBO_begin_phase_one(THD *thd, const char *db_,
                                      dd::Tablespace_table_ref_vec *trefs,
                                      Alter_info *alter_info,
                                      wsrep::key_array *fk_tables) {
+  DBUG_TRACE;
   uchar *buf(0);
   size_t buf_len(0);
   int buf_err;
@@ -2410,7 +2411,7 @@ static int wsrep_NBO_begin_phase_one(THD *thd, const char *db_,
 
     WSREP_DEBUG(
         "Query (%s) with write-set (%lld) and exec_mode: %s"
-        " replicated in TO Isolation mode",
+        " replicated in NBO mode",
         WSREP_QUERY(thd), (long long)wsrep_thd_trx_seqno(thd),
         wsrep_thd_client_mode_str(thd));
 
@@ -2419,14 +2420,6 @@ static int wsrep_NBO_begin_phase_one(THD *thd, const char *db_,
              (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
-
-    /* DDL transactions are now atomic, so append wsrep xid.
-    This will ensure transactions are logged with the given xid. */
-    bool atomic_ddl = is_atomic_ddl(thd, true);
-    if (atomic_ddl) {
-      wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
-                     thd->wsrep_cs().toi_meta().gtid());
-    }
 
     ++wsrep_to_isolation;
     rc = 0;
@@ -2442,6 +2435,8 @@ static int wsrep_NBO_begin_phase_one(THD *thd, const char *db_,
 void wsrep_NBO_end_phase_one(THD *thd) {
   if (!wsrep_thd_is_local_nbo(thd)) return;
 
+  DBUG_TRACE;
+
   wsrep::mutable_buffer err;
   WSREP_DEBUG("Ending NBO phase one");
   int ret = thd->wsrep_cs().end_nbo_phase_one(err);
@@ -2455,18 +2450,29 @@ void wsrep_NBO_end_phase_one(THD *thd) {
     thd->wsrep_skip_wsrep_hton = false;
     mysql_mutex_unlock(&thd->LOCK_thd_data);
   } else {
-  bool atomic_ddl = is_atomic_ddl(thd, true);
-  if (atomic_ddl) {
-    thd->get_transaction()->xid_state()->get_xid()->reset();
-    wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
-                   thd->wsrep_cs().toi_meta().gtid());
+    bool atomic_ddl = is_atomic_ddl(thd, true);
+    if (atomic_ddl) {
+      wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
+                     thd->wsrep_cs().toi_meta().gtid());
+    }
+    if (wsrep_thd_is_local_nbo(thd)) {
+      wsrep_set_SE_checkpoint(thd->wsrep_cs().nbo_meta().gtid());
+    }
   }
-  }
+
+    DBUG_EXECUTE_IF("sync.after_nbo_phase_one_begin", {
+      const char act[] =
+          "now "
+          "wait_for signal.after_nbo_phase_one_begin";
+      assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+    };);
+
 }
 
 int wsrep_NBO_begin_phase_two(THD *thd) {
-  wsrep::client_state &client_state(thd->wsrep_cs());
   if (wsrep_thd_is_in_nbo(thd)) {
+    DBUG_TRACE;
+    wsrep::client_state &client_state(thd->wsrep_cs());
     WSREP_DEBUG("NBO phase two END start: %lld: %s",
                 client_state.toi_meta().seqno().get(), WSREP_QUERY(thd));
     int ret = client_state.begin_nbo_phase_two(
@@ -2501,6 +2507,7 @@ int wsrep_NBO_begin_phase_two(THD *thd) {
 }
 
 static void wsrep_NBO_end_phase_two(THD *thd) {
+  DBUG_TRACE;
   --wsrep_to_isolation;
 
   wsrep::client_state &client_state(thd->wsrep_cs());
