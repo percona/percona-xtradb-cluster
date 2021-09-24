@@ -1669,17 +1669,17 @@ wsrep::key_array wsrep_prepare_keys_for_toi(const char *db, const char *table,
  * action function.
  */
 using action_fn = std::function<void(const dd::Table *)>;
-static void wsrep_do_action_for_tables(THD *thd, TABLE_LIST *tables,
+static bool wsrep_do_action_for_tables(THD *thd, TABLE_LIST *tables,
                                        action_fn action) {
-  if (!WSREP(thd) || !WSREP_CLIENT(thd)) return;
+  if (!WSREP(thd) || !WSREP_CLIENT(thd)) return false;
 
   for (auto table = tables; table; table = table->next_local) {
     if (!is_temporary_table(table)) {
       MDL_ticket *mdl_ticket = nullptr;
       if (dd::acquire_shared_table_mdl(thd, table->db, table->table_name, false,
                                        &mdl_ticket)) {
-        assert(0);
-        continue;
+        WSREP_WARN("Failed to take MDL for table, can't do action.");
+        return true;
       }
 
       const dd::Table *table_obj = nullptr;
@@ -1699,14 +1699,16 @@ static void wsrep_do_action_for_tables(THD *thd, TABLE_LIST *tables,
       dd::release_mdl(thd, mdl_ticket);
     }
   }
+
+  return false;
 }
 
 /*
  * Collect wsrep keys corresponding to child tables
  */
-void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
+bool wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
                                wsrep::key_array *keys) {
-  wsrep_do_action_for_tables(thd, tables, [keys](const dd::Table *table_def) {
+  return wsrep_do_action_for_tables(thd, tables, [keys](const dd::Table *table_def) {
     for (const auto fk : table_def->foreign_key_parents()) {
       keys->push_back(wsrep_prepare_key_for_toi(fk->child_schema_name().c_str(),
                                                 fk->child_table_name().c_str(),
@@ -1718,9 +1720,9 @@ void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
 /*
  * Collect wsrep keys corresponding to parent tables
  */
-void wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *tables,
+bool wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *tables,
                                   wsrep::key_array *keys) {
-  wsrep_do_action_for_tables(thd, tables, [keys](const dd::Table *table_def) {
+  return wsrep_do_action_for_tables(thd, tables, [keys](const dd::Table *table_def) {
     for (const auto fk : table_def->foreign_keys()) {
       keys->push_back(wsrep_prepare_key_for_toi(
           fk->referenced_table_schema_name().c_str(),

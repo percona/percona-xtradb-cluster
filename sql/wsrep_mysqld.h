@@ -237,9 +237,9 @@ extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(
 extern void wsrep_last_committed_id(wsrep_gtid_t *gtid);
 extern int wsrep_check_opts(int argc, char *const *argv);
 extern void wsrep_prepend_PATH(const char *path);
-void wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *table,
+bool wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *table,
                                   wsrep::key_array *keys);
-void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
+bool wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
                                wsrep::key_array *keys);
 
 /* some inline functions are defined in wsrep_mysqld_inl.h */

@@ -384,9 +384,15 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
        !find_temporary_table(thd, first_table))) {
     wsrep::key_array keys;
     // append tables referenced by this table
-    wsrep_append_fk_parent_table(thd, first_table, &keys);
+    if(wsrep_append_fk_parent_table(thd, first_table, &keys)) {
+      WSREP_DEBUG("TOI replication for ALTER failed");
+      return true;
+    }
     // append tables that are referencing this table
-    wsrep_append_child_tables(thd, first_table, &keys);
+    if(wsrep_append_child_tables(thd, first_table, &keys)) {
+      WSREP_DEBUG("TOI replication for ALTER failed");
+      return true;
+    }
 
     WSREP_TO_ISOLATION_BEGIN_ALTER(
         ((lex->name.str) ? lex->query_block->db : NULL),
