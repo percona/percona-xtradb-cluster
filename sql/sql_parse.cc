@@ -2351,7 +2351,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     {
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-<<<<<<< HEAD
       assert(thd->derived_tables == NULL &&
              (thd->open_tables == NULL ||
               (thd->locked_tables_mode == LTM_LOCK_TABLES)));
@@ -2367,15 +2366,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
         update_global_user_stats(thd, true, time(NULL));
 #endif
       }
-||||||| merged common ancestors
-      DBUG_ASSERT(thd->derived_tables == NULL &&
-                  (thd->open_tables == NULL ||
-                   (thd->locked_tables_mode == LTM_LOCK_TABLES)));
-=======
-      assert(thd->derived_tables == NULL &&
-                  (thd->open_tables == NULL ||
-                   (thd->locked_tables_mode == LTM_LOCK_TABLES)));
->>>>>>> wsrep_5.7.34-25.26
 
       /* Finalize server status flags after executing a command. */
       thd->update_server_status();
@@ -4414,24 +4404,9 @@ end_with_restore_list:
     }
   case SQLCOM_CHECKSUM:
   {
-<<<<<<< HEAD
     assert(first_table == all_tables && first_table != 0);
     WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ);
 
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-    DBUG_ASSERT(first_table == all_tables && first_table != 0);
-    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ);
-
-||||||||| merged common ancestors
-    DBUG_ASSERT(first_table == all_tables && first_table != 0);
-=========
-    assert(first_table == all_tables && first_table != 0);
->>>>>>>>> Temporary merge branch 2
-=======
-    assert(first_table == all_tables && first_table != 0);
-    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ);
->>>>>>> wsrep_5.7.34-25.26
     if (check_table_access(thd, SELECT_ACL, all_tables,
                            FALSE, UINT_MAX, FALSE))
       goto error; /* purecov: inspected */
@@ -4444,22 +4419,9 @@ end_with_restore_list:
   case SQLCOM_REPLACE_SELECT:
   case SQLCOM_INSERT_SELECT:
   {
-<<<<<<< HEAD
 #ifdef WITH_WSREP
       WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE);
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE);
-    DBUG_ASSERT(first_table == all_tables && first_table != 0);
-    DBUG_ASSERT(lex->m_sql_cmd != NULL);
-||||||||| merged common ancestors
-    DBUG_ASSERT(first_table == all_tables && first_table != 0);
-    DBUG_ASSERT(lex->m_sql_cmd != NULL);
-=========
-=======
-    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE);
->>>>>>> wsrep_5.7.34-25.26
     assert(first_table == all_tables && first_table != 0);
     assert(lex->m_sql_cmd != NULL);
     res= lex->m_sql_cmd->execute(thd);
@@ -8208,14 +8170,8 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                                                       com_statement_info[thd->get_command()].m_key,
                                                       thd->db().str, thd->db().length,
                                                       thd->charset(), NULL);
-<<<<<<< HEAD
           assert(thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID);
 
-||||||| merged common ancestors
-          DBUG_ASSERT(thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID);
-=======
-          assert(thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID);
->>>>>>> wsrep_5.7.34-25.26
           thd->set_wsrep_next_trx_id(thd->query_id);
           WSREP_DEBUG("Assigned new trx id to retry auto-commit query: %lu",
                       (long unsigned int) thd->wsrep_next_trx_id());

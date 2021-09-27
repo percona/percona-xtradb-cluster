@@ -371,18 +371,7 @@ void Table_cache_manager::free_table(THD *thd,
 
 #ifndef NDEBUG
       if (remove_type == TDC_RT_REMOVE_ALL)
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-#ifndef WITH_WSREP
-        DBUG_ASSERT(cache_el[i]->used_tables.is_empty());
-#else
-=======
-#ifndef WITH_WSREP
-        assert(cache_el[i]->used_tables.is_empty());
-#else
->>>>>>> wsrep_5.7.34-25.26
       {
         if (!cache_el[i]->used_tables.is_empty())
           {
@@ -391,20 +380,9 @@ void Table_cache_manager::free_table(THD *thd,
                         thd->wsrep_conflict_state, thd->query().str);
           }
       }
-<<<<<<< HEAD
 #else
         assert(cache_el[i]->used_tables.is_empty());
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-#endif
-||||||||| merged common ancestors
-        DBUG_ASSERT(cache_el[i]->used_tables.is_empty());
-=========
-        assert(cache_el[i]->used_tables.is_empty());
->>>>>>>>> Temporary merge branch 2
-=======
-#endif
->>>>>>> wsrep_5.7.34-25.26
       else if (remove_type == TDC_RT_REMOVE_NOT_OWN ||
                remove_type == TDC_RT_REMOVE_NOT_OWN_KEEP_SHARE)
       {

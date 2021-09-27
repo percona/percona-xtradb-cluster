@@ -1934,7 +1934,6 @@ static int wsrep_drop_table_query(THD* thd, uchar** buf, size_t* buf_len)
 static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
                                  const TABLE_LIST *table_list)
 {
-<<<<<<< HEAD
   /* compression dictionary is not table object that has temporary qualifier
   attached to it. Neither it is dependent on other object that needs
   validation. */
@@ -1944,13 +1943,6 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
   assert(!table || db);
   assert(table_list || db);
-||||||| merged common ancestors
-  DBUG_ASSERT(!table || db);
-  DBUG_ASSERT(table_list || db);
-=======
-  assert(!table || db);
-  assert(table_list || db);
->>>>>>> wsrep_5.7.34-25.26
 
   LEX* lex= thd->lex;
   SELECT_LEX* select_lex= lex->select_lex;
@@ -1985,17 +1977,11 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
   case SQLCOM_CREATE_TRIGGER:
 
-<<<<<<< HEAD
 #if 0
     /* Trigger statement is invoked with table_list with length = 1 */
     assert(!table_list);
 #endif
     assert(first_table);
-||||||| merged common ancestors
-    DBUG_ASSERT(table_list);
-=======
-    assert(table_list);
->>>>>>> wsrep_5.7.34-25.26
 
     if (find_temporary_table(thd, first_table))
     {

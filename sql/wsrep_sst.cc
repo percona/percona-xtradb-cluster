@@ -89,18 +89,21 @@ static Regex sst_allowed_methods_regex;
    characters and the ways they could be used to inject the command to
    the OS. However this approach seems to be too error prone.
    Instead of this we will just allow alpha-num + a few special characters
-   (colon, slash, dot, underscore, square brackets, hyphen).
+   (colon, slash, dot, underscore, square brackets, hyphen, '@' symbol).
 
-   It is the same as ^[\w:/.[\]-]+$    */
+   Note: '@' symbol is possible with encrypted rsync SST, where data can be
+         "localhost:0141b8fc9fa853ac9d1d48a383de2382@127.0.0.1:13009/rsync_sst"
+
+   It is the same as ^[\w:/.[\]-@]+$    */
 
    /* For some reason regex engine is not able to handle the following pattern
    allowing square brackets:
-   "^[[:alnum:]:/._[\\]-]+$"
+   "^[[:alnum:]:/._[\\]-@]+$"
    We will substitute square brackets with lt/gt for validation.
    Because of another regex engine problem, hyphen literal has to be located
    at the end of matching set (cannot be escaped when in the middle). */
 static const char *sst_method_allowed_chars_regex_pattern=
-    "^[[:alnum:]:/._<>-]+$";
+    "^[[:alnum:]:/._<>-@]+$";
 static Regex sst_method_allowed_chars_regex;
 
 
@@ -1038,17 +1041,11 @@ ssize_t wsrep_sst_prepare (void** msg, THD* thd)
     char* const addr_ptr(method_ptr + method_len + 1);
     strcpy (addr_ptr, addr_out);
 
-<<<<<<< HEAD
     WSREP_INFO ("Prepared SST/IST request: %s|%s", method_ptr, addr_ptr);
 
     if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
     sst_awaiting_callback = true;
     mysql_mutex_unlock (&LOCK_wsrep_sst);
-||||||| merged common ancestors
-    WSREP_INFO ("Prepared SST request: %s|%s", method_ptr, addr_ptr);
-=======
-    WSREP_DEBUG("Prepared SST request: %s|%s", method_ptr, addr_ptr);
->>>>>>> wsrep_5.7.34-25.26
   }
   else {
     WSREP_ERROR("Failed to allocate SST request of size %zu. Can't continue.",
@@ -1576,15 +1573,6 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
   size_t method_len  = strlen (method);
   const char* data   = method + method_len + 1;
 
-<<<<<<< HEAD
-||||||| merged common ancestors
-  if (check_request_str(data, address_char))
-  {
-    WSREP_ERROR("Bad SST address string. SST canceled.");
-    return WSREP_CB_FAILURE;
-  }
-
-=======
   /* check for auth@addr separator */
   const char* addr= strrchr(data, '@');
   wsp::string remote_auth;
@@ -1599,13 +1587,6 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
     addr= data;
   }
 
-  if (check_request_str(addr, address_char))
-  {
-    WSREP_ERROR("Bad SST address string. SST canceled.");
-    return WSREP_CB_FAILURE;
-  }
-
->>>>>>> wsrep_5.7.34-25.26
   char uuid_str[37];
   wsrep_uuid_print (&current_gtid->uuid, uuid_str, sizeof(uuid_str));
 
@@ -1656,16 +1637,10 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
 
   if (!strcmp (WSREP_SST_MYSQLDUMP, method))
   {
-<<<<<<< HEAD
     WSREP_WARN("Percona-XtraDB-Cluster has deprecated SST through mysqldump."
                " Percona-XtraDB-Cluster recommends using xtrabackup."
                " Please switch to use xtrabackup or rsync.");
-    ret = sst_donate_mysqldump(data, &current_gtid->uuid, uuid_str,
-||||||| merged common ancestors
-    ret = sst_donate_mysqldump(data, &current_gtid->uuid, uuid_str,
-=======
     ret = sst_donate_mysqldump(addr, &current_gtid->uuid, uuid_str,
->>>>>>> wsrep_5.7.34-25.26
                                current_gtid->seqno, bypass, env());
   }
   else

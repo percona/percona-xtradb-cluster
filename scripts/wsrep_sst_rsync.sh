@@ -33,7 +33,6 @@ export PATH="/usr/sbin:/sbin:$PATH"
 
 wsrep_check_programs rsync
 
-<<<<<<< HEAD
 keyring_plugin=0
 keyring_file_data=""
 keyring_vault_config=""
@@ -58,48 +57,25 @@ if [[ $keyring_plugin -eq 1 ]]; then
                       " (using keyring) with rsync. Please use SST with xtrabackup."
 fi
 
-||||||| merged common ancestors
-=======
 RSYNC_REAL_PID=
 
->>>>>>> wsrep_5.7.34-25.26
 cleanup_joiner()
 {
-<<<<<<< HEAD
-    local PID=$(cat "$RSYNC_PID" 2>/dev/null || echo 0)
-    wsrep_log_debug "Joiner cleanup. rsync PID: $PID"
-    [ "0" != "$PID" ] && kill $PID && sleep 0.5 && kill -9 $PID >/dev/null 2>&1 \
-    || :
-    rm -f "$RSYNC_CONF"
-    rm -f "$MAGIC_FILE"
-    rm -f "$RSYNC_LOG_FILE"
-    rm -f "$RSYNC_PID"
-    rm -f "$KEYRING_FILE"
-    wsrep_log_debug "Joiner cleanup done."
-||||||| merged common ancestors
-    local PID=$(cat "$RSYNC_PID" 2>/dev/null || echo 0)
-    wsrep_log_info "Joiner cleanup. rsync PID: $PID"
-    [ "0" != "$PID" ] && kill $PID && sleep 0.5 && kill -9 $PID >/dev/null 2>&1 \
-    || :
-    rm -rf "$RSYNC_CONF"
-    rm -rf "$MAGIC_FILE"
-    rm -rf "$RSYNC_PID"
-    wsrep_log_info "Joiner cleanup done."
-=======
-    wsrep_log_info "Joiner cleanup. rsync PID: $RSYNC_REAL_PID"
+    wsrep_log_debug "Joiner cleanup. rsync PID: $RSYNC_REAL_PID"
     [ "0" != "$RSYNC_REAL_PID" ]            && \
     kill $RSYNC_REAL_PID                    && \
     sleep 0.5                               && \
     kill -9 $RSYNC_REAL_PID >/dev/null 2>&1 || \
     :
+    rm -f "$RSYNC_CONF"
+    rm -f "$MAGIC_FILE"
+    rm -f "$RSYNC_LOG_FILE"
+    rm -f "$RSYNC_PID"
+    rm -f "$KEYRING_FILE"
+    rm -f "$STUNNEL_CONF"
+    rm -f "$STUNNEL_PID"
+    wsrep_log_debug "Joiner cleanup done."
 
-    rm -rf "$RSYNC_CONF"
-    rm -rf "$STUNNEL_CONF"
-    rm -rf "$STUNNEL_PID"
-    rm -rf "$MAGIC_FILE"
-    rm -rf "$RSYNC_PID"
-    wsrep_log_info "Joiner cleanup done."
->>>>>>> wsrep_5.7.34-25.26
     if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
         wsrep_cleanup_progress_file
     fi
@@ -434,7 +410,8 @@ EOF
 
         # third, transfer the keyring file (this requires SSL, check for encryption)
         if [[ -r $keyring_file_data ]]; then
-            rsync --owner --group --perms --links --specials \
+            rsync ${STUNNEL:+--rsh="$STUNNEL"} \
+                  --owner --group --perms --links --specials \
                   --ignore-times --inplace --quiet \
                   $WHOLE_FILE_OPT "$keyring_file_data" \
                   rsync://$WSREP_SST_OPT_ADDR/keyring-sst >&2 || RC=$?
@@ -476,21 +453,10 @@ EOF
         STATE="$WSREP_SST_OPT_GTID"
     fi
 
-<<<<<<< HEAD
     # This is the very last piece of data to send
     # After receiving the MAGIC_FILE, the joiner knows that it has
     # received all the data.
     printf "$STATE\n" > "$MAGIC_FILE"
-    rsync --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
-||||||| merged common ancestors
-    echo "continue" # now server can resume updating data
-
-    echo "$STATE" > "$MAGIC_FILE"
-    rsync --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
-=======
-    echo "continue" # now server can resume updating data
-
-    echo "$STATE" > "$MAGIC_FILE"
 
     if [ -n "$WSREP_SST_OPT_REMOTE_PSWD" ]; then
         # Let joiner know that we know its secret
@@ -499,7 +465,6 @@ EOF
 
     rsync ${STUNNEL:+--rsh="$STUNNEL"} \
         --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
->>>>>>> wsrep_5.7.34-25.26
 
     echo "continue" # now server can resume updating data
     echo "done $STATE"
@@ -678,7 +643,6 @@ EOF
         fi
         popd &> /dev/null
     fi
-<<<<<<< HEAD
 
     # We need to determine the transfer_type
     # Do this by looking at the rsync transfer logs
@@ -728,23 +692,7 @@ EOF
         fi
     fi
 
-    if [[ -r $MAGIC_FILE ]]; then
-        cat "$MAGIC_FILE" # output UUID:seqno
-    else
-        # this message should cause joiner to abort
-        echo "rsync process ended without creating '$MAGIC_FILE'"
-    fi
 
-||||||| merged common ancestors
-    if [ -r "$MAGIC_FILE" ]
-    then
-        cat "$MAGIC_FILE" # output UUID:seqno
-    else
-        # this message should cause joiner to abort
-        echo "rsync process ended without creating '$MAGIC_FILE'"
-    fi
-=======
->>>>>>> wsrep_5.7.34-25.26
     wsrep_cleanup_progress_file
     wsrep_log_info "..............rsync completed"
 else

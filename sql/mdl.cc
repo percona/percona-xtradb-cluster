@@ -1918,16 +1918,8 @@ MDL_wait::timed_wait(MDL_context_owner *owner, struct timespec *abs_timeout,
                    const char act[]=
                      "now "
                      "wait_for signal.wsrep_before_mdl_wait";
-<<<<<<< HEAD
                    assert(!debug_sync_set_action((owner->get_thd()),
                                                   STRING_WITH_LEN(act)));
-||||||| merged common ancestors
-                   DBUG_ASSERT(!debug_sync_set_action((owner->get_thd()),
-                                                      STRING_WITH_LEN(act)));
-=======
-                   assert(!debug_sync_set_action((owner->get_thd()),
-                                                      STRING_WITH_LEN(act)));
->>>>>>> wsrep_5.7.34-25.26
                  };);
     if (wsrep_thd_is_BF(owner->get_thd(), false))
     {

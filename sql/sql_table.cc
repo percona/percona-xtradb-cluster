@@ -9758,16 +9758,8 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
                     const char act[]=
                       "now "
                       "wait_for signal.alter_opened_table";
-<<<<<<< HEAD
                     assert(!debug_sync_set_action(thd,
                                                   STRING_WITH_LEN(act)));
-||||||| merged common ancestors
-                    DBUG_ASSERT(!debug_sync_set_action(thd,
-                                                       STRING_WITH_LEN(act)));
-=======
-                    assert(!debug_sync_set_action(thd,
-                                                       STRING_WITH_LEN(act)));
->>>>>>> wsrep_5.7.34-25.26
                   };);
 #endif /* WITH_WSREP */
 

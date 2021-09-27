@@ -13272,45 +13272,7 @@ error:
 int
 Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 {
-<<<<<<< HEAD
   assert(m_table != NULL);
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-  DBUG_ASSERT(m_table != NULL);
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  char info[64];
-  info[sizeof(info) - 1] = '\0';
-  snprintf(info, sizeof(info) - 1, "Write_rows_log_event::write_row(%lld)",
-           (long long) wsrep_thd_trx_seqno(thd));
-  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
-#else
-  const char* tmp = (WSREP(thd)) ?
-    thd_proc_info(thd,"Write_rows_log_event::write_row()") :  NULL;
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
-||||||||| merged common ancestors
-  DBUG_ASSERT(m_table != NULL);
-=========
-  assert(m_table != NULL);
->>>>>>>>> Temporary merge branch 2
-  int error= write_row(rli, rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT);
-=======
-  assert(m_table != NULL);
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  char info[64];
-  info[sizeof(info) - 1] = '\0';
-  snprintf(info, sizeof(info) - 1, "Write_rows_log_event::write_row(%lld)",
-           (long long) wsrep_thd_trx_seqno(thd));
-  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
-#else
-  const char* tmp = (WSREP(thd)) ?
-    thd_proc_info(thd,"Write_rows_log_event::write_row()") :  NULL;
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
-  int error= write_row(rli, rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT);
->>>>>>> wsrep_5.7.34-25.26
 
 #ifdef WITH_WSREP
   if (WSREP(thd))

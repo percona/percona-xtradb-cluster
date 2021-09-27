@@ -1100,19 +1100,7 @@ extern "C"
 THD* thd_tx_arbitrate(THD *requestor, THD* holder)
 {
  /* Should be different sessions. */
-<<<<<<< HEAD
  assert(holder != requestor);
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
- DBUG_ASSERT(holder != requestor);
-||||||||| merged common ancestors
- DBUG_ASSERT(holder != requestor);
-
-=========
-  assert(holder != requestor);
-=======
-  assert(holder != requestor);
->>>>>>> wsrep_5.7.34-25.26
 
  return(thd_tx_priority(requestor) == thd_tx_priority(holder)
 	? requestor

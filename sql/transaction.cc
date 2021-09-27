@@ -184,14 +184,7 @@ bool trans_begin(THD *thd, uint flags)
   }
 
   DBUG_EXECUTE_IF("dbug_set_high_prio_trx", {
-<<<<<<< HEAD
     assert(thd->tx_priority==0);
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-    DBUG_ASSERT(thd->tx_priority==0);
-=======
-      assert(thd->tx_priority==0);
->>>>>>> wsrep_5.7.34-25.26
 #ifdef WITH_WSREP
     WSREP_WARN("InnoDB High Priority being used: %d -> %d", thd->tx_priority, 1);
 #endif /* WITH_WSREP */

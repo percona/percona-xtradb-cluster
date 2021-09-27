@@ -263,14 +263,6 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
             allocated = new_size;
 
             if (used <= STACK_SIZE && used > 0) // there's data in stack_buf
-<<<<<<< HEAD
-||||||| merged common ancestors
-            {
-                DBUG_ASSERT(buf == stack_buf);
-=======
-            {
-                assert(buf == stack_buf);
->>>>>>> wsrep_5.7.34-25.26
                 memcpy(heap_buf, stack_buf, used);
         }
 

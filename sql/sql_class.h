@@ -2556,20 +2556,12 @@ public:
   int is_current_stmt_binlog_format_row() const {
     assert(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
            current_stmt_binlog_format == BINLOG_FORMAT_ROW);
-<<<<<<< HEAD
 #ifdef WITH_WSREP
     return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
             BINLOG_FORMAT_ROW);
 #else
     return current_stmt_binlog_format == BINLOG_FORMAT_ROW;
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-    return current_stmt_binlog_format == BINLOG_FORMAT_ROW;
->>>>>>>>> Temporary merge branch 2
-=======
-    return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
-            BINLOG_FORMAT_ROW);
->>>>>>> wsrep_5.7.34-25.26
   }
 
   bool is_current_stmt_binlog_disabled() const;
