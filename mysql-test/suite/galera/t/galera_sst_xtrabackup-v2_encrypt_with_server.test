@@ -1,7 +1,7 @@
 #
-# This test checks that if SST SSL is not explicitly donfigured mariabackup SST
+# This test checks that if SST SSL is not explicitly configured xtrabackup SST
 # uses server SSL configuration if present.
-# Initial SST happens via mariabackup, so there is not much to do in the body
+# Initial SST happens via xtrabackup, so there is not much to do in the body
 # of the test
 #
 

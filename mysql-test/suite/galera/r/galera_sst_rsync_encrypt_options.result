@@ -1,0 +1,27 @@
+[connection node_1]
+SELECT 1;
+1
+1
+# Restart node2 using relative paths for SSL certs
+[connection node_2]
+# Shutting down node2
+# restarting node2 (with SST)
+# restart: --defaults-file=RELATIVE_SSL_CERTS_FILE --log-error=ERROR_LOG
+SET SESSION wsrep_sync_wait = 0;
+include/assert_grep.inc [Using encrypt=0]
+# restart
+include/assert_grep.inc [rsync server on the other end has incompatible protocol]
+[connection node_1]
+CALL mtr.add_suppression("rsync returned code 12");
+CALL mtr.add_suppression("rsync server on the other end has incompatible protocol");
+CALL mtr.add_suppression("WSREP: Command did not run: wsrep_sst_rsync");
+CALL mtr.add_suppression("WSREP: Process completed with error.*");
+CALL mtr.add_suppression("State transfer to .* failed: .*Protocol error");
+[connection node_2]
+[connection node_1]
+# restarting node1
+# restart: --defaults-file=RELATIVE_SSL_CERTS_FILE 
+[connection node_2]
+# restart: --defaults-file=RELATIVE_SSL_CERTS_FILE 
+include/assert_grep.inc [Using encrypt=4]
+include/assert_grep.inc [Using stunnel for SSL encryption]

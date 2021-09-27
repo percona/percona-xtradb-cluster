@@ -10,4 +10,4 @@ ssl-key=@ENV.MYSQL_TEST_DIR/std_data/client-key.pem
 ssl-ca=@ENV.MYSQL_TEST_DIR/std_data/cacert.pem
 
 [sst]
-ssl-mode=VERIFY_CA
+encrypt=4
