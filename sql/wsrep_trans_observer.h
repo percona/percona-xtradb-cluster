@@ -162,12 +162,18 @@ static inline int wsrep_after_row(THD *thd, bool) {
     applier or storage access.
  */
 static inline bool wsrep_run_commit_hook(THD *thd, bool all) {
-  DBUG_ENTER("wsrep_run_commit_hook");
+  DBUG_TRACE;
   DBUG_PRINT("wsrep", ("Is_active: %d is_real %d has_changes %d is_applying %d "
-                       "is_ordered: %d",
+                       "is_ordered: %d is_substatement: %d",
                        wsrep_is_active(thd), wsrep_is_real(thd, all),
                        wsrep_has_changes(thd), wsrep_thd_is_applying(thd),
-                       wsrep_is_ordered(thd)));
+                       wsrep_is_ordered(thd),
+                       thd->is_operating_substatement_implicitly));
+  /* Avoid running commit hooks if a sub-statement is being operated implicitly
+   * within current transaction (if it is an internal transaction) */
+  if (thd->is_operating_substatement_implicitly) {
+    return false;
+  }
   /* Is MST commit or autocommit? */
   bool ret = wsrep_is_active(thd) && wsrep_is_real(thd, all);
   /* Do not commit if we are aborting */
@@ -187,7 +193,7 @@ static inline bool wsrep_run_commit_hook(THD *thd, bool all) {
     internal replication to keep GTID sequence consistent across
     the cluster. */
   if (ret && thd->wsrep_replicate_GTID) {
-    DBUG_RETURN(true);
+    return true;
   }
 
   if (ret && !(wsrep_has_changes(thd) || /* Has generated write set */
@@ -206,7 +212,7 @@ static inline bool wsrep_run_commit_hook(THD *thd, bool all) {
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
   DBUG_PRINT("wsrep", ("return: %d", ret));
-  DBUG_RETURN(ret);
+  return ret;
 }
 
 /*
