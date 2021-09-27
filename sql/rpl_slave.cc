@@ -248,14 +248,43 @@ static int check_slave_sql_config_conflict(const Relay_log_info *rli);
 static void set_thd_tx_priority(THD* thd, int priority)
 {
   DBUG_ENTER("set_thd_tx_priority");
+<<<<<<< HEAD
   assert(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
          thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+  DBUG_ASSERT(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
+              thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
+#ifdef WITH_WSREP
+  if (priority > 0)
+    WSREP_WARN("InnoDB High Priority being used for slave: %d -> %d", thd->thd_tx_priority, priority);
+#endif /* WITH_WSREP */
+||||||||| merged common ancestors
+  DBUG_ASSERT(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
+              thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
 
+=========
+  assert(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
+         thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
+=======
+  assert(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
+         thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
+#ifdef WITH_WSREP
+  if (priority > 0)
+    WSREP_WARN("InnoDB High Priority being used for slave: %d -> %d", thd->thd_tx_priority, priority);
+#endif /* WITH_WSREP */
+>>>>>>> wsrep_5.7.34-25.26
+
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (priority > 0)
     WSREP_WARN("InnoDB High Priority being used for slave: %d -> %d",
                thd->thd_tx_priority, priority);
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> wsrep_5.7.34-25.26
   thd->thd_tx_priority= priority;
   DBUG_EXECUTE_IF("dbug_set_high_prio_sql_thread",
   {

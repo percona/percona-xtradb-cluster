@@ -1053,7 +1053,13 @@ static binlog_cache_mngr *thd_get_cache_mngr(const THD *thd)
   */
 #ifndef WITH_WSREP
   assert(opt_bin_log);
+<<<<<<< HEAD
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+#endif
+>>>>>>> wsrep_5.7.34-25.26
   return (binlog_cache_mngr *)thd_get_ha_data(thd, binlog_hton);
 }
 
@@ -1407,7 +1413,12 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
 {
   DBUG_ENTER("binlog_close_connection");
   binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+<<<<<<< HEAD
 
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+=======
+>>>>>>> wsrep_5.7.34-25.26
 #ifdef WITH_WSREP
   if (!cache_mngr->is_binlog_empty()) {
     IO_CACHE* cache= wsrep_get_trans_log(thd, true);
@@ -1425,7 +1436,15 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
   }
 #endif /* WITH_WSREP */
+<<<<<<< HEAD
 
+||||||| merged common ancestors
+  DBUG_ASSERT(cache_mngr->is_binlog_empty());
+||||||||| merged common ancestors
+  DBUG_ASSERT(cache_mngr->is_binlog_empty());
+=========
+=======
+>>>>>>> wsrep_5.7.34-25.26
   assert(cache_mngr->is_binlog_empty());
   DBUG_PRINT("debug", ("Set ha_data slot %d to 0x%llx", binlog_hton->slot, (ulonglong) NULL));
   thd_set_ha_data(thd, binlog_hton, NULL);
@@ -9356,10 +9375,27 @@ int MYSQL_BIN_LOG::prepare(THD *thd, bool all)
   assert(thd->wsrep_applier || (thd->slave_thread ?
          opt_log_slave_updates : true));
 #else
+<<<<<<< HEAD
   assert((thd->slave_thread ?
          opt_log_slave_updates : thd->variables.sql_log_bin) ||
          total_ha_2pc > 1);
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+  DBUG_ASSERT(thd->slave_thread ?
+              opt_log_slave_updates : thd->variables.sql_log_bin);
+#endif /* WITH_WSREP */
+||||||||| merged common ancestors
+  DBUG_ASSERT(thd->slave_thread ?
+              opt_log_slave_updates : thd->variables.sql_log_bin);
+=========
+  assert(thd->slave_thread ?
+         opt_log_slave_updates : thd->variables.sql_log_bin);
+>>>>>>>>> Temporary merge branch 2
+=======
+  assert(thd->slave_thread ?
+         opt_log_slave_updates : thd->variables.sql_log_bin);
+#endif /* WITH_WSREP */
+>>>>>>> wsrep_5.7.34-25.26
 
   /*
     Set HA_IGNORE_DURABILITY to not flush the prepared record of the
@@ -11282,7 +11318,13 @@ bool THD::is_binlog_cache_empty(bool is_transactional)
   // because binlog_hton has not been completely set up.
 #ifndef WITH_WSREP
   assert(opt_bin_log);
+<<<<<<< HEAD
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+#endif
+>>>>>>> wsrep_5.7.34-25.26
   binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(this);
 
   // cache_mngr is NULL until we call thd->binlog_setup_trx_data, so
@@ -11514,8 +11556,16 @@ int THD::binlog_write_table_map(TABLE *table, bool is_transactional,
 
   /* Pre-conditions */
 #ifdef WITH_WSREP
+<<<<<<< HEAD
   assert(is_current_stmt_binlog_format_row() &&
          (WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open()));
+||||||| merged common ancestors
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+              (WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open()));
+=======
+  assert(is_current_stmt_binlog_format_row() && 
+         (WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open()));
+>>>>>>> wsrep_5.7.34-25.26
 #else
   assert(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
 #endif /* WITH_WSREP */
@@ -12987,8 +13037,16 @@ int THD::binlog_write_row(TABLE* table, bool is_trans,
                           const uchar* extra_row_info)
 { 
 #ifdef WITH_WSREP
+<<<<<<< HEAD
   assert(is_current_stmt_binlog_format_row() &&
          ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
+||||||| merged common ancestors
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+	      ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
+=======
+  assert(is_current_stmt_binlog_format_row() && 
+	 ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
+>>>>>>> wsrep_5.7.34-25.26
 #else
   assert(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
 #endif /* WITH_WSREP */
@@ -13022,8 +13080,16 @@ int THD::binlog_update_row(TABLE* table, bool is_trans,
                            const uchar* extra_row_info)
 { 
 #ifdef WITH_WSREP
+<<<<<<< HEAD
   assert(is_current_stmt_binlog_format_row() &&
          ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
+||||||| merged common ancestors
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+              ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
+=======
+  assert(is_current_stmt_binlog_format_row() && 
+         ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
+>>>>>>> wsrep_5.7.34-25.26
 #else
   assert(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
 #endif /* WITH_WSREP */
@@ -13090,8 +13156,16 @@ int THD::binlog_delete_row(TABLE* table, bool is_trans,
                            const uchar* extra_row_info)
 { 
 #ifdef WITH_WSREP
+<<<<<<< HEAD
   assert(is_current_stmt_binlog_format_row() &&
          ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
+||||||| merged common ancestors
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+              ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
+=======
+  assert(is_current_stmt_binlog_format_row() && 
+         ((WSREP_EMULATE_BINLOG_NNULL(this) || mysql_bin_log.is_open())));
+>>>>>>> wsrep_5.7.34-25.26
 #else
   assert(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
 #endif /* WITH_WSREP */
@@ -13514,8 +13588,16 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, const char *query_arg,
   DBUG_PRINT("enter", ("qtype: %s  query: '%s'",
                        show_query_type(qtype), query_arg));
 #ifdef WITH_WSREP
+<<<<<<< HEAD
   assert(query_arg && (WSREP_EMULATE_BINLOG_NNULL(this)
          || mysql_bin_log.is_open()));
+||||||| merged common ancestors
+  DBUG_ASSERT(query_arg && (WSREP_EMULATE_BINLOG_NNULL(this)
+                            || mysql_bin_log.is_open()));
+=======
+  assert(query_arg && (WSREP_EMULATE_BINLOG_NNULL(this)
+                            || mysql_bin_log.is_open()));
+>>>>>>> wsrep_5.7.34-25.26
 #else
   assert(query_arg && mysql_bin_log.is_open());
 #endif /* WITH_WSREP */

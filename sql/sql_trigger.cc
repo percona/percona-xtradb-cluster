@@ -292,8 +292,16 @@ bool mysql_create_or_drop_trigger(THD *thd, TABLE_LIST *tables, bool create)
                     const char act[]=
                       "now "
                       "wait_for signal.mdev_20225_continue";
+<<<<<<< HEAD
                     assert(!debug_sync_set_action(thd,
                                                   STRING_WITH_LEN(act)));
+||||||| merged common ancestors
+                    DBUG_ASSERT(!debug_sync_set_action(thd,
+                                                       STRING_WITH_LEN(act)));
+=======
+                    assert(!debug_sync_set_action(thd,
+                                                       STRING_WITH_LEN(act)));
+>>>>>>> wsrep_5.7.34-25.26
                   };);
 #endif /* WITH_WSREP */
   if (create)

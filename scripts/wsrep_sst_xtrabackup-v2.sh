@@ -127,6 +127,9 @@ pxc_encrypt_cluster_traffic=""
 ssl_cert=""
 ssl_ca=""
 ssl_key=""
+ssl_mode="DISABLED"
+
+readonly SECRET_TAG="secret"
 
 # thread options
 backup_threads=-1
@@ -635,6 +638,7 @@ get_transfer()
             if check_for_version "$SOCAT_VERSION" "1.7.3"; then
                 donor_extra=',commonname=""'
             fi
+<<<<<<< HEAD
             # disable SNI if socat supports it
             if check_for_version "$SOCAT_VERSION" "1.7.4"; then
                 donor_extra+=',no-sni=1'
@@ -656,6 +660,12 @@ get_transfer()
         # prepend a comma if it's not already there
         if [[ -n "${sockopt}" ]] && [[ "${sockopt}" != ","* ]]; then
             sockopt=",${sockopt}"
+||||||| merged common ancestors
+=======
+            if [ -n "$WSREP_SST_OPT_REMOTE_USER" ]; then
+                donor_extra=",commonname='$WSREP_SST_OPT_REMOTE_USER'"
+            fi
+>>>>>>> wsrep_5.7.34-25.26
         fi
 
         if [[ $encrypt -eq 2 ]]; then
@@ -756,8 +766,129 @@ get_transfer()
     fi
 }
 
+<<<<<<< HEAD
 #
 # read the sst specific options.
+||||||| merged common ancestors
+get_footprint()
+{
+    pushd $WSREP_SST_OPT_DATA 1>/dev/null
+    payload=$(find . -regex '.*\.ibd$\|.*\.MYI$\|.*\.MYD$\|.*ibdata1$' -type f -print0 | xargs -0 du --block-size=1 -c | awk 'END { print $1 }')
+    if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF xtrabackup | grep -q -- "--compress";then 
+        # QuickLZ has around 50% compression ratio
+        # When compression/compaction used, the progress is only an approximate.
+        payload=$(( payload*1/2 ))
+    fi
+    popd 1>/dev/null
+    pcmd+=" -s $payload"
+    adjust_progress
+}
+
+adjust_progress()
+{
+
+    if [[ ! -x `which pv` ]];then 
+        wsrep_log_error "pv not found in path: $PATH"
+        wsrep_log_error "Disabling all progress/rate-limiting"
+        pcmd=""
+        rlimit=""
+        progress=""
+        return
+    fi
+
+    if [[ -n $progress && $progress != '1' ]];then 
+        if [[ -e $progress ]];then 
+            pcmd+=" 2>>$progress"
+        else 
+            pcmd+=" 2>$progress"
+        fi
+    elif [[ -z $progress && -n $rlimit  ]];then 
+            # When rlimit is non-zero
+            pcmd="pv -q"
+    fi 
+
+    if [[ -n $rlimit && "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
+        wsrep_log_info "Rate-limiting SST to $rlimit"
+        pcmd+=" -L \$rlimit"
+    fi
+}
+
+=======
+get_footprint()
+{
+    pushd $WSREP_SST_OPT_DATA 1>/dev/null
+    payload=$(find . -regex '.*\.ibd$\|.*\.MYI$\|.*\.MYD$\|.*ibdata1$' -type f -print0 | xargs -0 du --block-size=1 -c | awk 'END { print $1 }')
+    if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF xtrabackup | grep -q -- "--compress";then 
+        # QuickLZ has around 50% compression ratio
+        # When compression/compaction used, the progress is only an approximate.
+        payload=$(( payload*1/2 ))
+    fi
+    popd 1>/dev/null
+    pcmd+=" -s $payload"
+    adjust_progress
+}
+
+adjust_progress()
+{
+
+    if [[ ! -x `which pv` ]];then 
+        wsrep_log_error "pv not found in path: $PATH"
+        wsrep_log_error "Disabling all progress/rate-limiting"
+        pcmd=""
+        rlimit=""
+        progress=""
+        return
+    fi
+
+    if [[ -n $progress && $progress != '1' ]];then 
+        if [[ -e $progress ]];then 
+            pcmd+=" 2>>$progress"
+        else 
+            pcmd+=" 2>$progress"
+        fi
+    elif [[ -z $progress && -n $rlimit  ]];then 
+            # When rlimit is non-zero
+            pcmd="pv -q"
+    fi 
+
+    if [[ -n $rlimit && "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
+        wsrep_log_info "Rate-limiting SST to $rlimit"
+        pcmd+=" -L \$rlimit"
+    fi
+}
+
+check_server_ssl_config()
+{
+    local section=$1
+    local sst_mode=$2
+    ssl_ca=$(parse_cnf $section ssl-ca "")
+    ssl_cert=$(parse_cnf $section ssl-cert "")
+    ssl_key=$(parse_cnf $section ssl-key "")
+    if [ 0 -eq $encrypt -a -n "$ssl_cert" -a -n "$ssl_key" ]
+    then
+        # Enable SSL encryption
+
+        # BACKWARD COMPATIBILITY: avoid CA verification if either ssl-ca or
+        # ssl-mode not set explicitly in [SST] section of config:
+        # nodes may happen to have different CA if self-generated
+        # so zero-up ssl_ca in such case
+        if [[ ${sst_mode} != *VERIFY* ]] && [[ ${section} != "sst" ]]
+        then
+            ssl_ca=
+        fi
+
+        if [ -n "$ssl_ca" ]
+        then
+            encrypt=4
+        else
+            encrypt=3
+            tcert=$ssl_cert
+            tkey=$ssl_key
+        fi
+    fi
+}
+
+>>>>>>> wsrep_5.7.34-25.26
 read_cnf()
 {
     sfmt=$(parse_cnf sst streamfmt "xbstream")
@@ -770,6 +901,26 @@ read_cnf()
     ncsockopt=$(parse_cnf sst ncsockopt "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
+<<<<<<< HEAD
+||||||| merged common ancestors
+     if [ "$OS" = "FreeBSD" ] ; then
+        cpat=$(parse_cnf sst cpat '.*\.pem$|.*init\.ok$|.*galera\.cache$|.*sst_in_progress$|.*\.sst$|.*gvwstate\.dat$|.*grastate\.dat$|.*\.err$|.*\.log$|.*RPM_UPGRADE_MARKER$|.*RPM_UPGRADE_HISTORY$')
+    else
+        cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+    fi
+    ealgo=$(parse_cnf xtrabackup encrypt "")
+    ekey=$(parse_cnf xtrabackup encrypt-key "")
+    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
+=======
+    if [ "$OS" = "FreeBSD" ] ; then
+        cpat=$(parse_cnf sst cpat '.*\.pem$|.*init\.ok$|.*galera\.cache$|.*sst_in_progress$|.*\.sst$|.*gvwstate\.dat$|.*grastate\.dat$|.*\.err$|.*\.log$|.*RPM_UPGRADE_MARKER$|.*RPM_UPGRADE_HISTORY$')
+    else
+        cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+    fi
+    ealgo=$(parse_cnf xtrabackup encrypt "")
+    ekey=$(parse_cnf xtrabackup encrypt-key "")
+    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
+>>>>>>> wsrep_5.7.34-25.26
     scomp=$(parse_cnf sst compressor "")
     sdecomp=$(parse_cnf sst decompressor "")
 
@@ -845,17 +996,18 @@ read_cnf()
     fi
 
     # Pull the parameters needed for encrypt=4
-    ssl_ca=$(parse_cnf sst ssl-ca "")
-    if [[ -z "$ssl_ca" ]]; then
-        ssl_ca=$(parse_cnf mysqld ssl-ca "")
-    fi
-    ssl_cert=$(parse_cnf sst ssl-cert "")
-    if [[ -z "$ssl_cert" ]]; then
-        ssl_cert=$(parse_cnf mysqld ssl-cert "")
-    fi
-    ssl_key=$(parse_cnf sst ssl-key "")
-    if [[ -z "$ssl_key" ]]; then
-        ssl_key=$(parse_cnf mysqld ssl-key "")
+    if [ -z "$tca" -a -z "$tkey" -a -z "$tcert" ]
+    then # check for new configuration
+        ssl_mode=$(parse_cnf sst ssl-mode "DISABLED" | tr [:lower:] [:upper:])
+        check_server_ssl_config "sst" $ssl_mode
+        if [ -z "$ssl_ca" -a -z "$ssl_key" -a -z "$ssl_cert" ]
+        then # no new-style SSL config in [sst], try server-wide SSL config
+            check_server_ssl_config "mysqld.$WSREP_SST_OPT_CONF_SUFFIX" "$ssl_mode"
+            if [ -z "$ssl_ca" -a -z "$ssl_key" -a -z "$ssl_cert" ]
+            then
+               check_server_ssl_config "mysqld" "$ssl_mode"
+            fi
+        fi
     fi
 
     pxc_encrypt_cluster_traffic=$(parse_cnf mysqld pxc-encrypt-cluster-traffic "")
@@ -1399,10 +1551,19 @@ recv_data_from_donor_to_joiner()
         exit 32
     fi
 
+<<<<<<< HEAD
     if [[ ${RC[0]} -eq 124 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Possible timeout in receving first data from donor in gtid/keyring stage"
         wsrep_log_error "****************************************************** "
+||||||| merged common ancestors
+    if [[ ${RC[0]} -eq 124 ]];then 
+        wsrep_log_error "Possible timeout in receving first data from donor in gtid stage"
+=======
+    if [[ ${RC[0]} -eq 124 ]];then 
+        wsrep_log_error "Possible timeout in receving first data from donor " \
+                        "in gtid stage"
+>>>>>>> wsrep_5.7.34-25.26
         exit 32
     fi
 
@@ -1416,6 +1577,7 @@ recv_data_from_donor_to_joiner()
         fi
     done
 
+<<<<<<< HEAD
     if [[ $checkf -eq -2 ]]; then
         # no file checking
         return
@@ -1429,8 +1591,39 @@ recv_data_from_donor_to_joiner()
         wsrep_log_debug "Contents of datadir"
         wsrep_log_debug "$(ls -l ${dir}/*)"
         exit 32
+||||||| merged common ancestors
+    if [[ $checkf -eq 1 && ! -r "${MAGIC_FILE}" ]];then
+        # this message should cause joiner to abort
+        wsrep_log_error "xtrabackup process ended without creating '${MAGIC_FILE}'"
+        wsrep_log_info "Contents of datadir" 
+        wsrep_log_info "$(ls -l ${dir}/*)"
+        exit 32
+=======
+    if [[ $checkf -eq 1 ]]; then
+        if [[ ! -r "${MAGIC_FILE}" ]];then
+            # this message should cause joiner to abort
+            wsrep_log_error "receiving process ended without creating " \
+                            "'${MAGIC_FILE}'"
+            wsrep_log_info "Contents of datadir" 
+            wsrep_log_info "$(ls -l ${dir}/*)"
+            exit 32
+        fi
+
+        # check donor supplied secret
+        SECRET=$(grep "$SECRET_TAG " ${MAGIC_FILE} 2>/dev/null | cut -d ' ' -f 2)
+        if [[ $SECRET != $MY_SECRET ]]; then
+            wsrep_log_error "Donor does not know my secret!"
+            wsrep_log_info "Donor:'$SECRET', my:'$MY_SECRET'"
+            exit 32
+        fi
+
+        # remove secret from magic file
+        grep -v "$SECRET_TAG " ${MAGIC_FILE} > ${MAGIC_FILE}.new
+        mv ${MAGIC_FILE}.new ${MAGIC_FILE}
+>>>>>>> wsrep_5.7.34-25.26
     fi
 
+<<<<<<< HEAD
     if [[ $checkf -eq 2 && ! -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "FATAL: xtrabackup could not find '${XB_DONOR_KEYRING_FILE_PATH}'"
@@ -1450,6 +1643,12 @@ recv_data_from_donor_to_joiner()
 #   2 : msg - descriptive message
 #
 send_data_from_donor_to_joiner()
+||||||| merged common ancestors
+
+send_donor()
+=======
+send_donor()
+>>>>>>> wsrep_5.7.34-25.26
 {
     local dir=$1
     local msg=$2
@@ -1461,10 +1660,20 @@ send_data_from_donor_to_joiner()
     popd 1>/dev/null
 
 
+<<<<<<< HEAD
     for ecode in "${RC[@]}";do
         if [[ $ecode -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Error while sending data to joiner node: " \
+||||||| merged common ancestors
+    for ecode in "${RC[@]}";do 
+        if [[ $ecode -ne 0 ]];then 
+            wsrep_log_error "Error while getting data from donor node: " \
+=======
+    for ecode in "${RC[@]}";do 
+        if [[ $ecode -ne 0 ]];then 
+            wsrep_log_error "Error while sending data to joiner node: " \
+>>>>>>> wsrep_5.7.34-25.26
                             "exit codes: ${RC[@]}"
             wsrep_log_error "****************************************************** "
             exit 32
@@ -1834,15 +2043,40 @@ then
         fi
 
         if [ -n "${WSREP_SST_OPT_PSWD:-}" ]; then
+<<<<<<< HEAD
            INNOEXTRA+=" --password=$WSREP_SST_OPT_PSWD"
         elif [[ $usrst -eq 1 ]]; then
+||||||| merged common ancestors
+           INNOEXTRA+=" --password=$WSREP_SST_OPT_PSWD"
+        elif [[ $usrst -eq 1 ]];then
+=======
+           export MYSQL_PWD="$WSREP_SST_OPT_PSWD"
+        elif [[ $usrst -eq 1 ]];then
+>>>>>>> wsrep_5.7.34-25.26
            # Empty password, used for testing, debugging etc.
-           INNOEXTRA+=" --password="
+           unset MYSQL_PWD
         fi
 
         get_keys
         check_extra
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+        wsrep_log_info "Streaming GTID file before SST"
+
+        echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
+
+=======
+        wsrep_log_info "Streaming GTID file before SST"
+
+        echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
+
+        if [[ -n ${WSREP_SST_OPT_REMOTE_PSWD} ]]; then
+            # Let joiner know that we know its secret
+            echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${MAGIC_FILE}
+        fi
+
+>>>>>>> wsrep_5.7.34-25.26
         ttcmd="$tcmd"
 
         # Add compression to the head of the stream (if specified)
@@ -1970,9 +2204,36 @@ then
         rm -f "${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
     fi
 
+<<<<<<< HEAD
     # Note: this is started as a background process
     # So it has to wait for processes that are started by THIS process
     wait_for_listen $$ ${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} ${MODULE} &
+||||||| merged common ancestors
+    wait_for_listen ${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} ${MODULE} &
+=======
+    if [[ "$ssl_mode" = *"VERIFY"* ]]
+    then # backward-incompatible behavior
+        if [ -n "$ssl_cert" ]
+        then
+            # find out my Common Name
+            wsrep_check_programs openssl
+            CN=$(openssl x509 -noout -subject -in $ssl_cert | \
+                 tr "," "\n" | grep "CN =" | cut -d= -f2 | sed s/^\ // | \
+                 sed s/\ %//)
+        else
+            CN=""
+        fi
+        MY_SECRET=$(wsrep_gen_secret)
+        # Add authentication data to address
+        AUTH="$CN:$MY_SECRET@"
+    else
+        MY_SECRET="" # for check down in recv_joiner()
+        AUTH=""
+    fi # tmode == *VERIFY*
+
+    wait_for_listen "${AUTH}${WSREP_SST_OPT_HOST}" ${WSREP_SST_OPT_PORT:-4444} \
+                    ${MODULE} &
+>>>>>>> wsrep_5.7.34-25.26
 
     trap sig_joiner_cleanup HUP PIPE INT TERM
     trap cleanup_joiner EXIT

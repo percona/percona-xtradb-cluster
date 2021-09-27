@@ -278,8 +278,16 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
                      "now "
                      "SIGNAL sync.wsrep_apply_cb_reached "
                      "WAIT_FOR signal.wsrep_apply_cb";
+<<<<<<< HEAD
                    assert(!debug_sync_set_action(thd,
                                                  STRING_WITH_LEN(act)));
+||||||| merged common ancestors
+                   DBUG_ASSERT(!debug_sync_set_action(thd,
+                                                      STRING_WITH_LEN(act)));
+=======
+                   assert(!debug_sync_set_action(thd,
+                                                      STRING_WITH_LEN(act)));
+>>>>>>> wsrep_5.7.34-25.26
                  };);
 
   thd->wsrep_trx_meta = *meta;

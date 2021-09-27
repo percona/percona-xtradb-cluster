@@ -3160,10 +3160,20 @@ bool Query_result_create::send_eof()
                                          thd->wsrep_next_trx_id());
           WSREP_DEBUG("Assiging trx-id for processing CTAS");
         }
+<<<<<<< HEAD
         assert(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
         WSREP_DEBUG("Initiating append_key for CTAS with trx-id (%lu)",
                     (long unsigned int) thd->wsrep_trx_id());
       
+||||||| merged common ancestors
+        DBUG_ASSERT(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
+        WSREP_DEBUG("CTAS key append for trx: %lu ", thd->wsrep_trx_id());
+
+=======
+        assert(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
+        WSREP_DEBUG("CTAS key append for trx: %lu ", thd->wsrep_trx_id());
+
+>>>>>>> wsrep_5.7.34-25.26
         /*
            append table level exclusive key for CTAS
         */

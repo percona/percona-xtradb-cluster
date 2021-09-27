@@ -1197,8 +1197,16 @@ public:
       }
       DBUG_EXECUTE_IF("Check_dump_thread_is_alive",
                       {
+<<<<<<< HEAD
                         assert(killing_thd->get_command() != COM_BINLOG_DUMP &&
                                killing_thd->get_command() != COM_BINLOG_DUMP_GTID);
+||||||| merged common ancestors
+                        DBUG_ASSERT(killing_thd->get_command() != COM_BINLOG_DUMP &&
+                                    killing_thd->get_command() != COM_BINLOG_DUMP_GTID);
+=======
+                        assert(killing_thd->get_command() != COM_BINLOG_DUMP &&
+                                    killing_thd->get_command() != COM_BINLOG_DUMP_GTID);
+>>>>>>> wsrep_5.7.34-25.26
                       };);
     }
     mysql_mutex_lock(&killing_thd->LOCK_thd_data);
@@ -5377,9 +5385,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     sql_print_error("GTID_MODE = ON requires ENFORCE_GTID_CONSISTENCY = ON.");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
-#ifdef WITH_WSREP
-  }
-#endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP
   /* Don't spawn a new binlog file during wsrep-recovery. Why ?
@@ -5416,6 +5421,9 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     mysql_mutex_unlock(log_lock);
   }
 
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
   if (opt_myisam_log)
     (void) mi_log(1);
 

@@ -79,9 +79,15 @@ bool Sql_cmd_alter_table_exchange_partition::execute(THD *thd)
 
   /* Not allowed with EXCHANGE PARTITION */
   assert(!create_info.data_file_name && !create_info.index_file_name);
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+  WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
+>>>>>>> wsrep_5.7.34-25.26
 
   thd->set_slow_log_for_admin_command();
   DBUG_RETURN(exchange_partition(thd, first_table, &alter_info));

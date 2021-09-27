@@ -25,10 +25,16 @@ WSREP_SST_OPT_DATA=""
 WSREP_SST_OPT_AUTH=${WSREP_SST_OPT_AUTH:-}
 WSREP_SST_OPT_USER=${WSREP_SST_OPT_USER:-}
 WSREP_SST_OPT_PSWD=${WSREP_SST_OPT_PSWD:-}
+<<<<<<< HEAD
 WSREP_SST_OPT_VERSION=""
 WSREP_SST_OPT_DEBUG=""
 
 WSREP_LOG_DEBUG=""
+||||||| merged common ancestors
+=======
+WSREP_SST_OPT_REMOTE_AUTH=${WSREP_SST_OPT_REMOTE_AUTH:-}
+readonly WSREP_SST_OPT_REMOTE_AUTH
+>>>>>>> wsrep_5.7.34-25.26
 
 while [ $# -gt 0 ]; do
 case "$1" in
@@ -46,6 +52,7 @@ case "$1" in
         else
             # "traditional" notation
             readonly WSREP_SST_OPT_HOST=${WSREP_SST_OPT_ADDR%%[:/]*}
+            readonly WSREP_SST_OPT_HOST_UNESCAPED=${WSREP_SST_OPT_HOST}
         fi
         readonly WSREP_SST_OPT_PORT=$(echo $WSREP_SST_OPT_ADDR | \
                 cut -d ']' -f 2 | cut -s -d ':' -f 2 | cut -d '/' -f 1)
@@ -56,7 +63,8 @@ case "$1" in
         WSREP_SST_OPT_BYPASS=1
         ;;
     '--datadir')
-        readonly WSREP_SST_OPT_DATA="$2"
+        # strip trailing '/'
+        readonly WSREP_SST_OPT_DATA="${2%/}"
         shift
         ;;
     '--defaults-file')
@@ -240,12 +248,21 @@ readonly WSREP_SST_OPT_AUTH
 # Splitting AUTH into potential user:password pair
 if ! wsrep_auth_not_set
 then
-    readonly AUTH_VEC=(${WSREP_SST_OPT_AUTH//:/ })
-    WSREP_SST_OPT_USER="${AUTH_VEC[0]:-}"
-    WSREP_SST_OPT_PSWD="${AUTH_VEC[1]:-}"
+    WSREP_SST_OPT_USER="${WSREP_SST_OPT_AUTH%:*}"
+    WSREP_SST_OPT_PSWD="${WSREP_SST_OPT_AUTH##*:}"
 fi
 readonly WSREP_SST_OPT_USER
 readonly WSREP_SST_OPT_PSWD
+
+if [ -n "$WSREP_SST_OPT_REMOTE_AUTH" ]
+then
+    # Split auth string at the last ':'
+    readonly WSREP_SST_OPT_REMOTE_USER="${WSREP_SST_OPT_REMOTE_AUTH%:*}"
+    readonly WSREP_SST_OPT_REMOTE_PSWD="${WSREP_SST_OPT_REMOTE_AUTH##*:}"
+else
+    readonly WSREP_SST_OPT_REMOTE_USER=
+    readonly WSREP_SST_OPT_REMOTE_PSWD=
+fi
 
 if [ -n "${WSREP_SST_OPT_DATA:-}" ]
 then
@@ -336,10 +353,27 @@ wsrep_check_programs()
     return $ret
 }
 
+<<<<<<< HEAD
 
 # Returns the absolute path from a path to a file (with a filename)
 #   If a relative path is given as an argument, the absolute path
 #   is generated from the current path.
+||||||| merged common ancestors
+=======
+# Generate a string equivalent to 16 random bytes
+wsrep_gen_secret()
+{
+    if [ -x /usr/bin/openssl ]
+    then
+        echo `/usr/bin/openssl rand -hex 16`
+    else
+        printf "%04x%04x%04x%04x%04x%04x%04x%04x" \
+                $RANDOM $RANDOM $RANDOM $RANDOM   \
+                $RANDOM $RANDOM $RANDOM $RANDOM
+    fi
+}
+
+>>>>>>> wsrep_5.7.34-25.26
 #
 # Globals:
 #   None
@@ -352,15 +386,85 @@ wsrep_check_programs()
 #
 function get_absolute_path()
 {
+<<<<<<< HEAD
     local path="$1"
     local abs_path retvalue
     local filename
+||||||| merged common ancestors
+    local group=$1
+    local var=$2
+    local reval=""
+=======
+    local group=$1
+    local var=${2//_/-} # normalize variable name by replacing all '_' with '-'
+    local reval=""
+>>>>>>> wsrep_5.7.34-25.26
 
+<<<<<<< HEAD
     filename=$(basename "${path}")
     abs_path=$(cd "$(dirname "${path}")" && pwd)
     retvalue=$?
     [[ $retvalue -ne 0 ]] && return $retvalue
+||||||| merged common ancestors
+    # print the default settings for given group using my_print_default.
+    # normalize the variable names specified in cnf file (user can use _ or - for example log-bin or log_bin)
+    # then grep for needed variable
+    # finally get the variable value (if variables has been specified multiple time use the last value only)
+=======
+    # first normalize output variable names specified in cnf file:
+    # user can use _ or - (for example log-bin or log_bin) and/or prefix
+    # variable with --loose-
+    # then search for needed variable
+    # finally get the variable value (if variables has been specified multiple
+    # time use the last value only)
+>>>>>>> wsrep_5.7.34-25.26
 
+<<<<<<< HEAD
     printf "%s/%s" "${abs_path}" "${filename}"
     return 0
+||||||| merged common ancestors
+    # look in group+suffix
+    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+    fi
+
+    # look in group
+    if [[ -z $reval ]]; then
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+    fi
+
+    # use default if we haven't found a value
+    if [[ -z $reval ]]; then
+        [[ -n $3 ]] && reval=$3
+    fi
+    echo $reval
+=======
+    # look in group+suffix
+    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | \
+                awk -F= '{ sub(/^--loose/,"-",$0); \
+                           if ($1 ~ /_/) \
+                               { gsub(/_/,"-",$1); print $1"="$2 } \
+                           else \
+                              { print $0 } \
+                         }' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+    fi
+
+    # look in group
+    if [[ -z $reval ]]; then
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF $group | \
+                awk -F= '{ sub(/^--loose/,"-",$0); \
+                           if ($1 ~ /_/) \
+                               { gsub(/_/,"-",$1); print $1"="$2 } \
+                           else \
+                              { print $0 } \
+                         }' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+    fi
+
+    # use default if we haven't found a value
+    if [[ -z $reval ]]; then
+        [[ -n $3 ]] && reval=$3
+    fi
+    echo $reval
+>>>>>>> wsrep_5.7.34-25.26
 }

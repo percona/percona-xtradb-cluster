@@ -23241,8 +23241,16 @@ wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx)
                    const char act[]=
                      "now "
                      "wait_for signal.wsrep_after_BF_victim_lock";
+<<<<<<< HEAD
                    assert(!debug_sync_set_action(bf_thd,
                                                  STRING_WITH_LEN(act)));
+||||||| merged common ancestors
+                   DBUG_ASSERT(!debug_sync_set_action(bf_thd,
+                                                      STRING_WITH_LEN(act)));
+=======
+                   assert(!debug_sync_set_action(bf_thd,
+                                                      STRING_WITH_LEN(act)));
+>>>>>>> wsrep_5.7.34-25.26
                  };);
 
 
@@ -23363,8 +23371,16 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
                    const char act[]=
                      "now "
                      "wait_for signal.wsrep_after_BF_victim_lock";
+<<<<<<< HEAD
                    assert(!debug_sync_set_action(bf_thd,
                                                  STRING_WITH_LEN(act)));
+||||||| merged common ancestors
+                   DBUG_ASSERT(!debug_sync_set_action(bf_thd,
+                                                      STRING_WITH_LEN(act)));
+=======
+                   assert(!debug_sync_set_action(bf_thd,
+                                                      STRING_WITH_LEN(act)));
+>>>>>>> wsrep_5.7.34-25.26
                  };);
 
 
