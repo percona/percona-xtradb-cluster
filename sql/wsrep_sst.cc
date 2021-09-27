@@ -94,16 +94,16 @@ static Regex sst_allowed_methods_regex;
    Note: '@' symbol is possible with encrypted rsync SST, where data can be
          "localhost:0141b8fc9fa853ac9d1d48a383de2382@127.0.0.1:13009/rsync_sst"
 
-   It is the same as ^[\w:/.[\]-@]+$    */
+   It is the same as ^[\w:/.[\]@-]+$    */
 
    /* For some reason regex engine is not able to handle the following pattern
    allowing square brackets:
-   "^[[:alnum:]:/._[\\]-@]+$"
+   "^[[:alnum:]:/._[\\]@-]+$"
    We will substitute square brackets with lt/gt for validation.
    Because of another regex engine problem, hyphen literal has to be located
    at the end of matching set (cannot be escaped when in the middle). */
 static const char *sst_method_allowed_chars_regex_pattern=
-    "^[[:alnum:]:/._<>-@]+$";
+    "^[[:alnum:]:/._<>@-]+$";
 static Regex sst_method_allowed_chars_regex;
 
 

@@ -7,5 +7,5 @@ SET GLOBAL wsrep_provider_options = 'dbug=';
 CREATE TABLE t1 as SELECT SLEEP(0.2);;
 SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
 SET GLOBAL wsrep_provider_options = 'dbug=';
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
 DROP TABLE t1;

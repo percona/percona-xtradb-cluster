@@ -1527,43 +1527,6 @@ send_data_from_donor_to_joiner()
     done
 }
 
-# Returns the version string in a standardized format
-# Input
-#   "1.2.3" => echoes "010203"
-# Wrongly formatted values => echoes "000000"
-normalize_version()
-{
-    local major=0
-    local minor=0
-    local patch=0
-
-    # Only parses purely numeric version numbers, 1.2.3
-    # Everything after the first three values are ignored
-    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([^ ])* ]]; then
-        major=${BASH_REMATCH[1]}
-        minor=${BASH_REMATCH[2]}
-        patch=${BASH_REMATCH[3]}
-    fi
-
-    printf %02d%02d%02d $major $minor $patch
-}
-
-# Compares two version strings
-# The first parameter is the version to be checked
-# The second parameter is the minimum version required
-# Returns 0 (success) if $1 >= $2, 1 (failure) otherwise
-check_for_version()
-{
-    local local_version_str="$( normalize_version $1 )"
-    local required_version_str="$( normalize_version $2 )"
-
-    if [[ "$local_version_str" < "$required_version_str" ]]; then
-        return 1
-    else
-        return 0
-    fi
-}
-
 #
 # Initiailizes the tmpdir
 # Reads the info from the config file and creates the tmpdir as needed.

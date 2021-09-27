@@ -53,13 +53,7 @@ SELECT COUNT(*) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters';
 COUNT(*)
-<<<<<<< HEAD
-74
-||||||| merged common ancestors
-63
-=======
-64
->>>>>>> wsrep_5.7.34-25.26
+75
 SELECT UPPER(VARIABLE_NAME) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters'

@@ -253,7 +253,7 @@ then
         # prefer SSL by default if SSL key and cert are present in [mysqld]
         if [ -n "$SSTKEY" -a -n "$SSTCERT" -a -z "$SSLMODE" ]
         then
-            SSLMODE="PREFFERED"
+            SSLMODE="PREFERRED"
         fi
     fi
 fi
@@ -265,14 +265,44 @@ else
     CAFILE_OPT=""
 fi
 
+STUNNEL=""
+STUNNEL_VERSION=""
+if [ -n "$SSLMODE" -a "$SSLMODE" != "DISABLED" ]
+then
+    if wsrep_check_programs stunnel > /dev/null
+    then
+        wsrep_log_info "Using stunnel for SSL encryption: CAfile: $SSTCA, SSLMODE: $SSLMODE"
+        STUNNEL="stunnel ${STUNNEL_CONF}"
+        STUNNEL_VERSION=`stunnel -version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
+    else
+        if [ $SSLMODE = "PREFERRED" ]
+        then
+            wsrep_log_info "stunnel was not found in PATH, SSL encryption won't be used."
+        else
+            wsrep_log_error "stunnel program required for SSL encryption was not found in PATH. Can't continue"
+            exit 2 # ENOENT
+        fi
+    fi
+fi
+
 if [[ ${SSLMODE} = *VERIFY* ]]
 then
     case $SSLMODE in
     "VERIFY_IDENTITY")
-        VERIFY_OPT="verifyPeer = yes"
+        # verifyPeer and verifyChain were introduced in stunnel 5.34.
+        # For older versions, use verify = level instead
+        if ! check_for_version "$STUNNEL_VERSION" "5.34"; then
+          VERIFY_OPT="verify = 4"
+        else
+          VERIFY_OPT="verifyPeer = yes"
+        fi
         ;;
     "VERIFY_CA")
-        VERIFY_OPT="verifyChain = yes"
+        if ! check_for_version "$STUNNEL_VERSION" "5.34"; then
+          VERIFY_OPT="verify = 2"
+        else
+          VERIFY_OPT="verifyChain = yes"
+        fi
         ;;
     *)
         wsrep_log_error "Unrecognized ssl-mode option: '$SSLMODE'"
@@ -286,24 +316,6 @@ then
     fi
 else
     VERIFY_OPT=""
-fi
-
-STUNNEL=""
-if [ -n "$SSLMODE" -a "$SSLMODE" != "DISABLED" ]
-then
-    if wsrep_check_programs stunnel > /dev/null
-    then
-        wsrep_log_info "Using stunnel for SSL encryption: CAfile: $SSTCA, SSLMODE: $SSLMODE"
-        STUNNEL="stunnel ${STUNNEL_CONF}"
-    else
-        if [ $SSLMODE = "PREFFERED" ]
-        then
-            wsrep_log_info "stunnel was not found in PATH, SSL encryption won't be used."
-        else
-            wsrep_log_error "stunnel program required for SSL encryption was not found in PATH. Can't continue"
-            exit 2 # ENOENT
-        fi
-    fi
 fi
 
 readonly SECRET_TAG="secret"

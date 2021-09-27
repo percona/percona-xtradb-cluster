@@ -1433,6 +1433,9 @@ row_ins_foreign_check_on_constraint(
 		btr_pcur_store_position(cascade->pcur, mtr);
 	}
 
+#ifndef WITH_WSREP
+	mtr_commit(mtr);
+#endif /* !WITH_WSREP */
 	ut_a(cascade->pcur->rel_pos == BTR_PCUR_ON);
 
 	cascade->state = UPD_NODE_UPDATE_CLUSTERED;
@@ -1448,12 +1451,15 @@ row_ins_foreign_check_on_constraint(
 		ib::warn() << "WSREP: foreign key append failed: " << err;
 		mtr_commit(mtr);
 	} else
-#endif /* WITH_WSREP */
 	{
 		mtr_commit(mtr);
 		err = row_update_cascade_for_mysql(thr, cascade,
 						   foreign->foreign_table);
 	}
+#else
+	err = row_update_cascade_for_mysql(thr, cascade,
+					foreign->foreign_table);
+#endif /* WITH_WSREP */
 
 	/* Release the data dictionary latch for a while, so that we do not
 	starve other threads from doing CREATE TABLE etc. if we have a huge
