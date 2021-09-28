@@ -128,6 +128,8 @@ ssl_cert=""
 ssl_ca=""
 ssl_key=""
 
+readonly SECRET_TAG="secret"
+
 # thread options
 backup_threads=-1
 encrypt_threads=-1
@@ -425,113 +427,6 @@ get_keys()
 }
 
 #
-# If the ssl_dhparams variable is already set, uses that as a source
-# of dh parameters for OpenSSL. Otherwise, looks for dhparams.pem in the
-# datadir, and creates it there if it can't find the file.
-# No input parameters
-#
-check_for_dhparams()
-{
-    if [[ -z "$ssl_dhparams" ]]; then
-        if ! [[ -r "$DATA/dhparams.pem" ]]; then
-            wsrep_check_programs openssl
-            wsrep_log_info "Could not find dhparams file, creating $DATA/dhparams.pem"
-
-            if ! openssl dhparam -out "$DATA/dhparams.pem" 2048 >/dev/null 2>&1
-            then
-                wsrep_log_error "******************* FATAL ERROR ********************** "
-                wsrep_log_error "* Could not create the dhparams.pem file with OpenSSL. "
-                wsrep_log_error "****************************************************** "
-                exit 22
-            fi
-        fi
-        ssl_dhparams="$DATA/dhparams.pem"
-    fi
-}
-
-#
-# verifies that the certificate matches the private key
-# doing this will save us having to wait for a timeout that would
-# otherwise occur.
-#
-# 1st param: path to the cert
-# 2nd param: path to the private key
-#
-verify_cert_matches_key()
-{
-    local cert_path=$1
-    local key_path=$2
-
-    wsrep_check_programs openssl diff
-
-    # generate the public key from the cert and the key
-    # they should match (otherwise we can't create an SSL connection)
-    if ! diff <(openssl x509 -in "$cert_path" -pubkey -noout) <(openssl pkey -in "$key_path" -pubout 2>/dev/null) >/dev/null 2>&1
-    then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "* The certifcate and private key do not match. "
-        wsrep_log_error "* Please check your certificate and key files. "
-        wsrep_log_error "****************************************************** "
-        exit 22
-    fi
-}
-
-#
-# verifies that the CA file verifies the certificate
-# doing this here lets us generate better error messages
-#
-# 1st param: path to the CA file
-# 2nd param: path to the cert
-#
-verify_ca_matches_cert()
-{
-    local ca_path=$1
-    local cert_path=$2
-
-    wsrep_check_programs openssl
-
-    if ! openssl verify -verbose -CAfile "$ca_path" "$cert_path" >/dev/null  2>&1
-    then
-        wsrep_log_error "******** FATAL ERROR ****************************************** "
-        wsrep_log_error "* The certifcate and CA (certificate authority) do not match.   "
-        wsrep_log_error "* It does not appear that the certificate was issued by the CA. "
-        wsrep_log_error "* Please check your certificate and CA files.                   "
-        wsrep_log_error "*************************************************************** "
-        exit 22
-    fi
-
-}
-
-#
-# Checks to see if the file exists
-# If the file does not exist (or cannot be read), issues an error
-# and exits
-#
-# 1st param: file name to be checked (for read access)
-# 2nd param: 1st error message (header)
-# 3rd param: 2nd error message (footer, optional)
-#
-verify_file_exists()
-{
-    local file_path=$1
-    local error_message1=$2
-    local error_message2=$3
-
-    if ! [[ -r "$file_path" ]]; then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "* $error_message1 "
-        wsrep_log_error "* Could not find/access : $file_path "
-
-        if ! [[ -z "$error_message2" ]]; then
-            wsrep_log_error "* $error_message2 "
-        fi
-
-        wsrep_log_error "****************************************************** "
-        exit 22
-    fi
-}
-
-#
 # Setup stream to transfer. (Alternative: nc or socat)
 get_transfer()
 {
@@ -635,6 +530,11 @@ get_transfer()
             if check_for_version "$SOCAT_VERSION" "1.7.3"; then
                 donor_extra=',commonname=""'
             fi
+
+            if [ -n "$WSREP_SST_OPT_REMOTE_USER" ]; then
+                donor_extra=",commonname='$WSREP_SST_OPT_REMOTE_USER'"
+            fi
+
             # disable SNI if socat supports it
             if check_for_version "$SOCAT_VERSION" "1.7.4"; then
                 donor_extra+=',no-sni=1'
@@ -713,25 +613,7 @@ get_transfer()
         elif [[ $encrypt -eq 4 ]]; then
             wsrep_log_debug "Using openssl based encryption with socat: with key, crt, and ca"
 
-            pushd "$DATA" &>/dev/null
-            ssl_ca=$(get_absolute_path "$ssl_ca")
-            ssl_cert=$(get_absolute_path "$ssl_cert")
-            ssl_key=$(get_absolute_path "$ssl_key")
-            popd &>/dev/null
-
-            wsrep_log_debug "ssl_ca (absolute) : $ssl_ca"
-            wsrep_log_debug "ssl_cert (absolute) : $ssl_cert"
-            wsrep_log_debug "ssl_key (absolute) : $ssl_key"
-
-            verify_file_exists "$ssl_ca" "CA, certificate, and key files are required." \
-                                         "Please check the 'ssl-ca' option.           "
-            verify_file_exists "$ssl_cert" "CA, certificate, and key files are required." \
-                                           "Please check the 'ssl-cert' option.         "
-            verify_file_exists "$ssl_key" "CA, certificate, and key files are required." \
-                                          "Please check the 'ssl-key' option.          "
-
-            verify_cert_matches_key $ssl_cert $ssl_key
-            verify_ca_matches_cert $ssl_ca $ssl_cert
+            verify_and_match_all_ssl_files "$DATA" "$ssl_ca" "$ssl_cert" "$ssl_key"
 
             stagemsg+="-OpenSSL-Encrypted-4"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
@@ -756,8 +638,17 @@ get_transfer()
     fi
 }
 
+check_server_ssl_config()
+{
+    local section=$1
+    ssl_ca=$(parse_cnf $section ssl-ca "")
+    ssl_cert=$(parse_cnf $section ssl-cert "")
+    ssl_key=$(parse_cnf $section ssl-key "")
+}
+
 #
 # read the sst specific options.
+
 read_cnf()
 {
     sfmt=$(parse_cnf sst streamfmt "xbstream")
@@ -845,17 +736,17 @@ read_cnf()
     fi
 
     # Pull the parameters needed for encrypt=4
-    ssl_ca=$(parse_cnf sst ssl-ca "")
-    if [[ -z "$ssl_ca" ]]; then
-        ssl_ca=$(parse_cnf mysqld ssl-ca "")
-    fi
-    ssl_cert=$(parse_cnf sst ssl-cert "")
-    if [[ -z "$ssl_cert" ]]; then
-        ssl_cert=$(parse_cnf mysqld ssl-cert "")
-    fi
-    ssl_key=$(parse_cnf sst ssl-key "")
-    if [[ -z "$ssl_key" ]]; then
-        ssl_key=$(parse_cnf mysqld ssl-key "")
+    if [ -z "$tca" -a -z "$tkey" -a -z "$tcert" ]
+    then # check for new configuration
+        check_server_ssl_config "sst"
+        if [ -z "$ssl_ca" -a -z "$ssl_key" -a -z "$ssl_cert" ]
+        then # no new-style SSL config in [sst], try server-wide SSL config
+            check_server_ssl_config "mysqld.$WSREP_SST_OPT_CONF_SUFFIX"
+            if [ -z "$ssl_ca" -a -z "$ssl_key" -a -z "$ssl_cert" ]
+            then
+               check_server_ssl_config "mysqld"
+            fi
+        fi
     fi
 
     pxc_encrypt_cluster_traffic=$(parse_cnf mysqld pxc-encrypt-cluster-traffic "")
@@ -1401,7 +1292,7 @@ recv_data_from_donor_to_joiner()
 
     if [[ ${RC[0]} -eq 124 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Possible timeout in receving first data from donor in gtid/keyring stage"
+        wsrep_log_error "Possible timeout in receiving first data from donor in gtid/keyring stage"
         wsrep_log_error "****************************************************** "
         exit 32
     fi
@@ -1421,14 +1312,28 @@ recv_data_from_donor_to_joiner()
         return
     fi
 
-    if [[ $checkf -eq 1 && ! -r "${XB_GTID_INFO_FILE_PATH}" ]]; then
-        # this message should cause joiner to abort
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "xtrabackup process ended without creating '${XB_GTID_INFO_FILE_PATH}'"
-        wsrep_log_error "****************************************************** "
-        wsrep_log_debug "Contents of datadir"
-        wsrep_log_debug "$(ls -l ${dir}/*)"
-        exit 32
+    if [[ $checkf -eq 1 ]]; then
+        if [[ ! -r "${XB_GTID_INFO_FILE_PATH}" ]];then
+            # this message should cause joiner to abort
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "xtrabackup process ended without creating '${XB_GTID_INFO_FILE_PATH}'"
+            wsrep_log_error "****************************************************** "
+            wsrep_log_debug "Contents of datadir"
+            wsrep_log_debug "$(ls -l ${dir}/*)"
+            exit 32
+        fi
+
+        # check donor supplied secret
+        SECRET=$(grep "$SECRET_TAG " ${XB_GTID_INFO_FILE_PATH} 2>/dev/null | cut -d ' ' -f 2)
+        if [[ $SECRET != $MY_SECRET ]]; then
+            wsrep_log_error "Donor does not know my secret!"
+            wsrep_log_info "Donor:'$SECRET', my:'$MY_SECRET'"
+            exit 32
+        fi
+
+        # remove secret from magic file
+        grep -v "$SECRET_TAG " ${XB_GTID_INFO_FILE_PATH} > ${XB_GTID_INFO_FILE_PATH}.new
+        mv ${XB_GTID_INFO_FILE_PATH}.new ${XB_GTID_INFO_FILE_PATH}
     fi
 
     if [[ $checkf -eq 2 && ! -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
@@ -1470,43 +1375,6 @@ send_data_from_donor_to_joiner()
             exit 32
         fi
     done
-}
-
-# Returns the version string in a standardized format
-# Input
-#   "1.2.3" => echoes "010203"
-# Wrongly formatted values => echoes "000000"
-normalize_version()
-{
-    local major=0
-    local minor=0
-    local patch=0
-
-    # Only parses purely numeric version numbers, 1.2.3
-    # Everything after the first three values are ignored
-    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([^ ])* ]]; then
-        major=${BASH_REMATCH[1]}
-        minor=${BASH_REMATCH[2]}
-        patch=${BASH_REMATCH[3]}
-    fi
-
-    printf %02d%02d%02d $major $minor $patch
-}
-
-# Compares two version strings
-# The first parameter is the version to be checked
-# The second parameter is the minimum version required
-# Returns 0 (success) if $1 >= $2, 1 (failure) otherwise
-check_for_version()
-{
-    local local_version_str="$( normalize_version $1 )"
-    local required_version_str="$( normalize_version $2 )"
-
-    if [[ "$local_version_str" < "$required_version_str" ]]; then
-        return 1
-    else
-        return 0
-    fi
 }
 
 #
@@ -1837,11 +1705,16 @@ then
            INNOEXTRA+=" --password=$WSREP_SST_OPT_PSWD"
         elif [[ $usrst -eq 1 ]]; then
            # Empty password, used for testing, debugging etc.
-           INNOEXTRA+=" --password="
+           unset MYSQL_PWD
         fi
 
         get_keys
         check_extra
+
+        if [[ -n ${WSREP_SST_OPT_REMOTE_PSWD} ]]; then
+            # Let joiner know that we know its secret
+            echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${XB_GTID_INFO_FILE_PATH}
+        fi
 
         ttcmd="$tcmd"
 
@@ -1970,9 +1843,25 @@ then
         rm -f "${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
     fi
 
+    if [ $encrypt -eq 4 ]
+    then
+        # find out my Common Name
+        wsrep_check_programs openssl
+        CN=$(openssl x509 -noout -subject -in $ssl_cert | \
+             tr "," "\n" | grep "CN =" | cut -d= -f2 | sed s/^\ // | \
+             sed s/\ %//)
+        MY_SECRET=$(wsrep_gen_secret)
+        # Add authentication data to address
+        AUTH="$CN:$MY_SECRET@"
+    else
+        MY_SECRET="" # for check down in recv_joiner()
+        AUTH=""
+    fi
+
     # Note: this is started as a background process
     # So it has to wait for processes that are started by THIS process
-    wait_for_listen $$ ${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} ${MODULE} &
+    wait_for_listen $$ "${AUTH}${WSREP_SST_OPT_HOST}" ${WSREP_SST_OPT_PORT:-4444} \
+                        ${MODULE} &
 
     trap sig_joiner_cleanup HUP PIPE INT TERM
     trap cleanup_joiner EXIT

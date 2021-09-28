@@ -88,7 +88,7 @@ static int limit_unsafe_warning_count= 0;
 static handlerton *binlog_hton;
 #else
 handlerton *binlog_hton; // we need it in wsrep_binlog.cc
-#endif /* WITH_WSREP */
+#endif /* !WITH_WSREP */
 bool opt_binlog_order_commits= true;
 
 const char *log_bin_index= 0;
@@ -1053,7 +1053,7 @@ static binlog_cache_mngr *thd_get_cache_mngr(const THD *thd)
   */
 #ifndef WITH_WSREP
   assert(opt_bin_log);
-#endif /* WITH_WSREP */
+#endif /* !WITH_WSREP */
   return (binlog_cache_mngr *)thd_get_ha_data(thd, binlog_hton);
 }
 
@@ -9773,7 +9773,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
       }
 
       if (lock)
-#endif /* WITH_WSREP */
+#endif /* !WITH_WSREP */
       {
         cache_mngr->stmt_cache.reset();
         cache_mngr->trx_cache.reset();
@@ -11282,7 +11282,7 @@ bool THD::is_binlog_cache_empty(bool is_transactional)
   // because binlog_hton has not been completely set up.
 #ifndef WITH_WSREP
   assert(opt_bin_log);
-#endif /* WITH_WSREP */
+#endif /* !WITH_WSREP */
   binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(this);
 
   // cache_mngr is NULL until we call thd->binlog_setup_trx_data, so

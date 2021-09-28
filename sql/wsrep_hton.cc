@@ -43,7 +43,7 @@ void wsrep_cleanup_transaction(THD *thd)
   // Enabling it can cause password to appear in log.
   // WSREP_DEBUG("wsrep_cleanup_transaction %s", thd->query().str);
   assert(thd->wsrep_conflict_state != MUST_REPLAY &&
-              thd->wsrep_conflict_state != REPLAYING);
+         thd->wsrep_conflict_state != REPLAYING);
 
   if (wsrep_emulate_bin_log) wsrep_thd_binlog_trx_reset(thd);
   thd->wsrep_ws_handle.trx_id= WSREP_UNDEFINED_TRX_ID;

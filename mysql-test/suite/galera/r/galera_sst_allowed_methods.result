@@ -16,6 +16,8 @@ Starting garbd with --sst xtrabackup-v2:<2001:db8::1:0>:123/xtrabackup_sst//1
 Starting garbd with --sst :
 # restart:<hidden args>
 Starting garbd with --sst :proper_data
+# restart:<hidden args>
+Starting garbd with --sst rsync:some_data@some_ip
 #
 # Sending proper sst requests
 #
@@ -33,6 +35,12 @@ Starting garbd with --sst xtrabackup-v2:[2001:db8::1:0]/xtrabackup_sst//1
 Starting garbd with --sst xtrabackup-v2:2001:db8::1:0/xtrabackup_sst//1
 # restart:<hidden args>
 Starting garbd with --sst xtrabackup-v2:some-domain-1.098-abc-def/xtrabackup_sst//1
+# restart:<hidden args>
+Starting garbd with --sst rsync:127.0.0.1:4444/rsync_sst
+# restart:<hidden args>
+Starting garbd with --sst rsync:some_data@some_ip/rsync_sst
+# restart:<hidden args>
+Starting garbd with --sst rsync:12364798421@some-domain-1.098-abc-def/rsync_sst
 #
 # Sending custom sst request
 #
