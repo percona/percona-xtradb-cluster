@@ -4,82 +4,67 @@
 Data at Rest Encryption
 =======================
 
-.. contents::
-
-    :local:
-
 .. _innodb_general_tablespace_encryption:
 
 Introduction
 ============
 
-"Data-at-rest" term refers to all the data stored on disk by a server within
-system tablespace, general tablespace, redo-logs, undo-logs, etc. As the
-opposite, "data-in-transit" means data transmitted to another node or client.
+The "Data-at-rest" enables data at rest encryption of the InnoDB
+(file-per-table) tablespace by encrypting the physical database files.
+The data is automatically encrypted prior to writing to storage and
+automatically decrypted when read. If unauthorized users access the data files,
+they cannot read the contents.
 Data-in-transit can be encrypted using an SSL connection (details are available in
 the `encrypt traffic documentation
-<https://www.percona.com/doc/percona-xtradb-cluster/LATEST/security/encrypt-traffic.html>`_)
-and
-therefore supposed to be safe.
-
-Currently, a data-at-rest encryption is supported in |PXC| for
+<https://www.percona.com/doc/percona-xtradb-cluster/5.7/security/encrypt-traffic.html>`_).
+Data-at-rest encryption is supported in Percona XtraDB Cluster for
 file-per-table tablespace and temporary files.
 
-InnoDB tablespace encryption
-============================
+.. note::
 
-|MySQL| supports tablespace encryption, but only for the file-per-table tablespace.
-The user should create a table with a dedicated tablespace, making this
-tablespace encrypted by specifying the appropriate option.
+   The Percona Server for MySQL 5.7 data at rest encryption is similar to
+   the `MySQL 5.7 data-at-rest encryption
+   <https://dev.mysql.com/doc/refman/5.7/en/innodb-data-encryption.html>`_.
+   First, review the available encryption features for `Percona Server for
+   MySQL 5.7
+   <https://www.percona.com/doc/percona-server/5.7/security/data-at-rest-encryption.html>`__.
+   Percona Server for MySQL 8.0 provides encryption features and options
+   not available in the 5.7 version.
 
-|PXC| already supported data-at-rest encryption starting from ``5.7``.
-File-per-tablespace encryption is a table/tablespace
-specific feature and is enabled on object level through DDL:
+   .. list-table::
+       :widths: 20 20 20
+       :header-rows: 1
 
-.. code-block:: guess
+       * - Feature
+         - Status
+         - GA Version
+       * - keyring_plugin
+         - Generally Available, supported
+         - :rn:`5.7.21-21`
+       * - File-Per_Table Tablespace
+         - Generally Available, supported
+         - :rn:`5.7.21-21`
+       * - Temporary Files
+         - Generally Available, supported
+         - :rn:`5.7.22-22`
 
-   CREATE TABLE t1 (c1 INT, PRIMARY KEY pk(c1)) ENCRYPTION=’Y’;
-   CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
-
-DDL statements are replicated in the PXC cluster and creates the encrypted table or
-tablespace on all the nodes of the cluster.
-
-This feature requires a keyring plugin to be loaded before it can be used.
-Currently, Percona Server (and in turn |PXC|) supports two types of keyring
-plugin: ``keyring_file`` and ``keyring_vault``.
-
-Temporary file encryption
-=========================
-
-Percona Server 5.7.22 added support for encrypting temporary file storage
-enabled using ``encrypt-tmp-files``. This storage or files are local to the
-node and has no direct effect on |PXC| replication. |PXC| recommends enabling
-it on all the cluster nodes, though the action is not mandatory. The parameter
-is the same as in Percona Server:
-
-.. code-block:: text
-
-   [mysqld]
-   encrypt-tmp-files=ON
-
-Configuring PXC to use keyring_file plugin
+Using the keyring_file plugin
 ==========================================
 
-keyring_file
-------------
+About the keyring_file
+-----------------------
 
-Support for the keyring file was added when |PXC| 5.7 achieved General
-Availability (GA) status. The following subsection covers some of the essential
-procedures of ``keyring_file`` plugin.
+The ``keyring_file`` stores an encryption key in a physical file. Specify
+the location of the file with the ``keyring_file_data`` parameter during startup. The following subsections cover
+some of the essential procedures for the ``keyring_file`` plugin.
 
-The ``keyring_file`` stores an encryption key to a physical file. The location of this
-file is specified by ``keyring_file_data`` parameter configured during startup.
 
 Configuration
 *************
 
-|PXC| inherits upstream (Percona Server) behavior to configure ``keyring_file``
-plugin. The following options are set in the configuration file:
+Percona XtraDB Cluster inherits the Percona Server for MySQL behavior to
+configure the ``keyring_file``
+plugin. `Install the plugin <https://dev.mysql.com/doc/refman/5.7/en/install-plugin.html>`__ and add the following options in the configuration file:
 
 .. code-block:: text
 
@@ -87,84 +72,88 @@ plugin. The following options are set in the configuration file:
    early-plugin-load=keyring_file.so
    keyring_file_data=<PATH>/keyring
 
+The ``keyring_file`` must be loaded using the ``--early-plugin-load`` option.
+
 A ``SHOW PLUGINS`` statement can be used to check if the plugin has been
 successfully loaded.
 
 .. note:: PXC recommends the same configuration on all cluster nodes,
-   and all nodes should have the keyring
-   configured. A mismatch in the keyring configuration does not allow the JOINER node to
-   join the cluster.
+   and all nodes should have the keyring configured. A JOINER node
+   cannot join the cluster if there is a mismatch in the keyring configuration.
 
 If the user has bootstrapped node with keyring enabled, then upcoming cluster nodes
-inherit the keyring (the encrypted key) from the DONOR node
-(in |PXC| prior to 5.7.22) or generate the keyring (starting from |PXC| 5.7.22).
+inherit the keyring (the encrypted key) from the DONOR node, in Percona XtraDB
+Cluster prior to 5.7.22, or generate the keyring, implemented in Percona XtraDB
+Cluster 5.7.22.
 
 Usage
 *****
 
-Prior to |PXC| :rn:`5.7.22-29.26` DONOR node had to send keyring to JOINER,
-because |xtrabackup| backs up encrypted tablespaces as encrypted and for the
-JOINER to read these encrypted tablespaces it must have the same
-encryption key used for the table's encryption on DONOR. This restriction has
-been relaxed in |PXC| 5.7.22 and now |xtrabackup| re-encrypts the data using
-transition-key and JOINER re-encrypts it using a newly generated master-key.
+The operations for a keyring are transactional. During write operations, the ``keyring_file`` plugin creates a backup file to ensure the operation can be rolled back if needed.
 
-A keyring is sent from DONOR to JOINER as part of SST process (prior to |PXC|
-5.7.22) or generated on JOINER. SST can be done
-using xtrabackup (the recommended way), rsync, or mysqldump. In *xtrabackup*
-case, the keyring is sent over explicitly before the data backup/streaming
-starts. The other two SST variants behave differently: mysqldump uses logical
-backup so it doesn’t need to send keyring, while rsync will sync the keys when
-it syncs data directories. 
+Prior to Percona XtraDB Cluster :rn:`5.7.22-29.26` the DONOR node had to send the
+keyring to the JOINER,
+because Percona XtraBackup backs up encrypted tablespaces. The JOINER must have
+the encryption key used by the DONOR to encrypt the tables to read these encrypted
+tablespaces. This restriction has
+been relaxed in Percona XtraDB Cluster 5.7.22 and now Percona XtraBackup
+re-encrypts the data using a
+transition-key and the JOINER re-encrypts the table using a generated master-key.
 
-.. warning:: rsync doesn’t provide a secure channel. This lack of a
-   secure channel means a keyring sent
-   using rsync SST could be vulnerable to attack. The
-   recommended SST way with xtrabackup user can configure a secure channel and the
-   keyring is fully secured (in fact, xtrabackup will not allow a user to send
-   the keyring if the SST channel is not secured). 
+A keyring is sent from the DONOR to the JOINER as part of SST process (prior to Percona XtraDB Cluster
+5.7.22) or is generated on the JOINER.
+
+The SST process can be done
+using xtrabackup (the recommended way), mysqldump or the rsync tool. In *xtrabackup*
+case, the keyring is sent before the data backup/streaming
+begins. The mysqldump utility uses a logical
+backup so it does not need to send keyring. The rsync tool syncs the keys when the data directories are synced.
+
+.. warning:: The rsync tool does not provide a secure channel. A keyring sent
+   using the rsync SST could be vulnerable to attack.
+
+The recommended SST process uses xtrabackup. The user can configure a secure channel and the keyring is fully secured. In fact, xtrabackup does not allow a user to send the keyring if the SST channel is not secured.
 
 .. warning Percona does not recommend rsync-based SST for data-at-rest
    encryption using keyring.
 
-To maintain data consistency, |PXC| does not allow a combination of nodes
+To maintain data consistency, Percona XtraDB Cluster does not allow a combination of nodes
 with encryption and nodes without encryption. For
 example, a user creates node-1 with encryption (keyring) enabled and node-2
 with encryption (keyring) disabled. A table created with
 encryption on node-1 fails on node-2, causing data inconsistency.
 
-With |PXC| :rn:`5.7.22-29.26`, a node will fail to start if it fails to load
-keyring plugin. 
+With Percona XtraDB Cluster :rn:`5.7.22-29.26`, a node will fail to start if it fails to load keyring plugin.
 
 .. note:: If you do not specify the keyring parameters, the node does not know
    that it must load keyring. A JOINER node may start but eventually
-   shutdown when DML-level inconsistency with encrypted tablespace is
+   shutdown when a DML-level inconsistency with encrypted tablespace is
    detected.
 
-If a node doesn’t have an encrypted tablespace, the keyring is not generated and
-the keyring file is empty. The keyring is generated only when node starts
-using an encrypted tablespace.
+If a node does not have an encrypted tablespace, the keyring is not generated and
+the keyring file is empty. The keyring is generated only when node uses an
+encrypted tablespace.
 
-A user can rotate the key when needed.
-``ALTER INSTANCE ROTATE INNODB MASTER KEY`` statement is not replicated on
-cluster, so it is a local operation for the selected node.
+A user can rotate the key when needed. The ``ALTER INSTANCE ROTATE INNODB MASTER KEY`` statement is local to the node and is not replicated on
+cluster.
 
-Starting from |PXC| 5.7.22 JOINER generates its keyring. In |PXC| before
-5.7.22 when JOINER joined the cluster, its keyring was the same as DONOR’s keyring.
+Starting from Percona XtraDB Cluster 5.7.22, the JOINER generates its keyring. In Percona XtraDB Cluster before
+5.7.22 when JOINER joined the cluster, its keyring was the same as DONOR's keyring.
 The user could rotate the key if different keys for each node is part
-of the user’s requirements (internal rules). Using different keys for each
+of the user's requirements (internal rules). Using different keys for each
 node is not necessary from the technical side, since all cluster nodes can
 continue operating with the same MASTER-key.
 
 Compatibility
 *************
 
-Keyring (or, more generally, the |PXC| SST process) is backward compatible, as
-in higher version JOINER can join from lower version DONOR, but not vice-versa.
+The keyring and the Percona XtraDB Cluster SST process is backward compatible.  A higher-version JOINER can join from lower-version DONOR, but not vice-versa.
 More details are covered in the `Upgrade and compatibility issues`_ section.
 
-.. note:: Since |PXC| 5.6 does not have encrypted tablespaces, no major
-   upgrade scenario for data-at-rest encryption is possible.
+.. note::
+
+    Percona XtraDB Cluster 5.6 does not have encrypted tablespaces. No major
+    upgrade scenario for data-at-rest encryption is possible.
 
 Configuring PXC to use keyring_vault plugin
 ===========================================
@@ -173,18 +162,17 @@ keyring_vault
 -------------
 
 The ``keyring_vault`` plugin is supported starting from PXC 5.7.22. This plugin
-allows storing the master-key in vault-server (vs. local file as in the
-``keyring_file``).
+allows storing the master-key in vault-server.
 
-.. warning:: rsync does not support ``keyring_vault``, and SST on a joiner is
-   aborted if rsync is used on the node with ``keyring_vault`` configured.
+.. warning:: The rsync tool does not support the ``keyring_vault``. Any rysnc-SST on a joiner is
+   aborted if the ``keyring_vault`` is configured.
 
 Configuration
 *************
 
 Configuration options are the same as
 `upstream
-<https://www.percona.com/doc/percona-server/5.7/management/data_at_rest_encryption.html#keyring-vault-plugin>`_.
+<https://www.percona.com/doc/percona-server/5.7/security/data-at-rest-encryption.html>`__.
 The ``my.cnf`` configuration file should contain
 the following options:
 
@@ -203,14 +191,14 @@ Also ``keyring_vault_n1.conf`` file contents should be :
    token = e0345eb4-35dd-3ddd-3b1e-e42bb9f2525d
    vault_ca = /data/keyring_vault_confs/vault_ca.crt
 
-The detailed description of these options can be found in the `upstream documentation <https://www.percona.com/doc/percona-server/5.7/management/data_at_rest_encryption.html#keyring-vault-plugin>`_.
+The detailed description of these options can be found in the `upstream documentation <https://www.percona.com/doc/percona-server/5.7/security/data-at-rest-encryption.html>`_.
 
-Vault-server is an external server, so make sure PXC node can reach the
+Vault-server is an external server, so make sure a PXC node can reach the
 server.
 
-.. note:: |PXC| recommends using the same keyring_plugin on all
+.. note:: Percona XtraDB Cluster recommends using the same keyring_plugin on all
    cluster nodes. Mixing keyring plugins is recommended only while transitioning from
-   ``keyring_file`` -> ``keyring_vault`` or vice-versa.
+   ``keyring_file`` to ``keyring_vault`` or vice-versa.
 
 All nodes do not need to refer to same vault server. Whatever
 vault server is used, it should be accessible from the respective node. Also
@@ -248,7 +236,7 @@ the consequences are the same, and the corresponding error looks like the follow
    'Could not retrieve list of keys from Vault. Vault has returned the
    following error(s): ["permission denied"]'
 
-In case of accessible vault-server with the wrong mount point, there is no
+In case of an accessible vault-server with the wrong mount point, there is no
 error during server boot, but the node still refuses to start:
 
 .. code-block:: text
@@ -266,73 +254,83 @@ error during server boot, but the node still refuses to start:
 Mixing keyring plugins
 =========================
 
-With |xtrabackup| introducing transition-key logic, it is now possible to
+With Percona XtraBackup introducing transition-key logic, it is now possible to
 mix and match keyring plugins. For example, the user has node-1 configured to use
 ``keyring_file`` plugin and node-2 configured to use ``keyring_vault``.
 
-.. note:: Percona recommends the same configuration for all the nodes of the
-   cluster. A mix and match (in keyring plugins) is recommended only during
-   transition from one type of keying to another.
+.. note::
+
+    Percona recommends the same configuration for all the nodes of the
+    cluster. A mix and match (in keyring plugins) is recommended only during
+    transition from one type of keying to another.
 
 Upgrade and compatibility issues
 --------------------------------
 
-
-|PXC| server before ``5.7.22`` only supported ``keyring_file`` and the
-dependent |xtrabackup| did not have the concept of transition-key. This makes the
-mix and match of old |PXC| server (pre-5.7.21) using ``keyring_file`` with new
-|PXC| server (post-5.7.22) using ``keyring_vault`` not possible. A user should
-first upgrade |PXC| server to version 5.7.22 or newer using ``keyring_file``
-plugin and then let it act as DONOR to a new booting ``keyring_vault`` running
+Percona XtraDB Cluster server before ``5.7.22`` only supported the ``keyring_file`` and the
+dependent Percona XtraBackup did not have the concept of transition-key. This makes the
+mix and match of old Percona XtraDB Cluster server (pre-5.7.21) using ``keyring_file`` with new
+Percona XtraDB Cluster server (post-5.7.22) using ``keyring_vault`` not possible. A user should
+first upgrade Percona XtraDB Cluster server to version 5.7.22 or newer using ``keyring_file``
+plugin and then let it act as a DONOR to a new booting ``keyring_vault`` running the
 JOINER.
 
-If all the nodes use |PXC| 5.7.22, then the user can freely
-configure some nodes to use ``keyring_file`` and other to use
+If all the nodes use Percona XtraDB Cluster 5.7.22, then the user can configure
+some nodes to use the ``keyring_file`` and other to use the
 ``keyring_vault``, but this setup is not recommended and should be used
-during transitioning to vault only.
+during only during the transition to vault.
 
-If all the nodes are using |PXC| 5.7.21 and the user would like to use
-``keyring_vault`` plugin, all the nodes should be upgraded to use |PXC| 5.7.22
+If all the nodes are using Percona XtraDB Cluster 5.7.21 and the user would like to use
+``keyring_vault`` plugin, all the nodes should be upgraded to use Percona XtraDB Cluster 5.7.22
 (that is where vault plugin support was introduced in PXC) or newer. Once all nodes are
-configured to use |PXC| 5.7.22, users can switch one node to use
+configured to use Percona XtraDB Cluster 5.7.22, users can switch one node to use
 ``vault-plugin``.
 
-.. note:: |MySQL| 5.7.21 supports `migration between keystores
-<https://dev.mysql.com/doc/mysql-security-excerpt/5.7/en/keyring-key-migration.html>`_.
-Migration requires a restart.
-=======
-.. note:: |MySQL| 5.7.21 has support for `migration between keystores <https://dev.mysql.com/doc/mysql-security-excerpt/5.7/en/keyring-key-migration.html>`_. Although a restart is required.
+.. note::
 
-|PXC| currently supports data-at-rest encryption for file-per-tablespace and temporary files.
+    MySQL 5.7.21 supports `migration between keystores <https://dev.mysql.com/doc/mysql-security-excerpt/5.7/en/keyring-key-migration.html>`_. Migration requires a restart.
+
+
 
 InnoDB tablespace encryption
 ============================
 
-|MySQL| supports tablespace encryption, but only for the file-per-table tablespace.
-The user should create a table with a dedicated tablespace, making this
-tablespace encrypted by specifying the appropriate option.
+Percona XtraDB Cluster supports tablespace encryption for the file-per-table tablespace.
+File-per-tablespace encryption is a table or tablespace-specific feature and
+is enabled through DDL:
 
-Percona Server starting from :rn:`5.7.21-20` is extending support for
-encrypting `other tablespaces <https://www.percona.com/doc/percona-server/LATEST/management/data_at_rest_encryption.html>`_ too.
+.. code-block:: mysql
 
-|PXC| already supported data-at-rest encryption starting from ``5.7``.
-File-per-tablespace and general tablespace encryption are table/tablespace
-specific features and are enabled on the object level through DDL:
-
-.. code-block:: guess
-
-   CREATE TABLE t1 (c1 INT, PRIMARY KEY pk(c1)) ENCRYPTION=’Y’;
+   CREATE TABLE t1 (c1 INT, PRIMARY KEY pk(c1)) ENCRYPTION='Y';
    CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
 
-DDL statements are replicated in PXC cluster, thus creating an encrypted table or
-tablespace on all the nodes of the cluster.
+The PXC cluster replicates the DDL statements and creates the encrypted table or
+tablespace on all cluster nodes.
+
+This feature requires a keyring plugin to be loaded before it can be used.
+Percona XtraDB Cluster supports two types of keyring
+plugin: ``keyring_file`` and ``keyring_vault``.
 
 Temporary file encryption
+=========================
+
+Percona Server for MySQL 5.7.22 added support for encrypting temporary file storage
+enabled using ``encrypt-tmp-files``. This storage or files are local to the
+node and has no direct effect on Percona XtraDB Cluster replication. Percona XtraDB Cluster recommends enabling
+it on all the cluster nodes, though the action is not mandatory. The parameter
+is the same as in Percona Server:
+
+.. code-block:: text
+
+   [mysqld]
+   encrypt-tmp-files=ON
+
+
 
 Migrating Keys Between Keyring Keystores
 ========================================
 
-|PXC| supports key migration between keystores. The migration can be performed
+Percona XtraDB Cluster supports key migration between keystores. The migration can be performed
 offline or online.
 
 Offline Migration
@@ -343,7 +341,7 @@ takes care of migrating keys for the said server to a new keystore.
 
 Following example illustrates this scenario:
 
-1. Three |PXC| nodes n1, n2, n3 - all using ``keyring_file``, 
+1. Three Percona XtraDB Cluster nodes n1, n2, n3 - all using ``keyring_file``,
    and n2 should be migrated to use ``keyring_vault``
 2. The user shuts down n2 node.
 3. The user starts the Migration Server (``mysqld`` with a special option).
@@ -381,7 +379,7 @@ Here is how the migration server output should look like:
    2018-05-30T03:44:11.946166Z 0 [Note] Shutting down plugin 'keyring_file'
    2018-05-30T03:44:11.947334Z 0 [Note] /dev/shm/pxc57/bin/mysqld: Shutdown complete
 
-The destination keystore recieves additional migrated keys
+The destination keystore receives additional migrated keys
 (pre-existing keys in destination keystore are not touched or removed) on successful
 migration. The source
 keystore continues to retain the keys as migration performs copy operation and
@@ -398,7 +396,7 @@ the node.
 
 The following example illustrates this scenario:
 
-1. Three |PXC| nodes n1, n2, n3 - all using ``keyring_file``, 
+1. Three Percona XtraDB Cluster nodes n1, n2, n3 - all using ``keyring_file``,
    and n3 should be migrated to use ``keyring_vault``
 2. User starts the Migration Server (``mysqld`` with a special option).
 3. Migration Server copies keys from the n3 keyring file and adds them to the vault
@@ -438,7 +436,7 @@ On a successful migration, the destination keystore has the additional migrated 
 (the pre-existing keys in the destination keystore are not touched or removed).
 The source
 keystore continues to retain the keys as the migration performs copy operation and
-not move operation. 
+not move operation.
 
 If the migration fails, then the destination keystore is left untouched.
 
@@ -450,9 +448,9 @@ Migration server options
 
 * ``--keyring-migration-destination``: The destination keyring plugin to which
   the migrated keys are to be copied
-  
+
   .. note:: For offline migration, no additional key migration options are
-     needed. 
+     needed.
 
 * ``--keyring-migration-host``: The host where the running server is located.
   This host is always the local host.

@@ -26,9 +26,9 @@ Added Features
 - The ``--enable`` and ``--update-cluster`` options used simultaneously have special meaning. If the cluster has not been enabled, then ``--enable`` is run.  If the cluster has already been enabled, then ``--update-cluster`` is run.
 - New command ``--is-enabled`` to see if a cluster has been enabled. This command checks for the existence of a row in the mysql_galera_hostgroups table.  The ``--writer-hg`` option may be used to specify the writer hostgroup used to search the mysql_galera_hostgroups table.
 - New command ``--status`` to display galera hostgroup information. This command lists all rows in the current ``mysql_galera_hostgroups`` table as well as all servers that belong to these hostgroups.  With the ``--writer-hg`` option, only the information for the galera hostgroup with that writer hostgroup is displayed.
-- New option ``--login-file`` reads login credentials from an encrypted file. If the ``--login-password`` or ``login-password-file`` options are not specified, the user is prompted for the password. 
+- New option ``--login-file`` reads login credentials from an encrypted file. If the ``--login-password`` or ``login-password-file`` options are not specified, the user is prompted for the password.
 - New option ``--login-password`` is the key used to decrypt the encrypted login-file. You cannot use the option with the ``--login-password-file``.
-- New option ``--login-password-file`` reads the key from a file using the specified path. You cannot use the option with ``login-password``. 
+- New option ``--login-password-file`` reads the key from a file using the specified path. You cannot use the option with ``login-password``.
 
 Changed Features
 --------------------------------------------------------------------------------
@@ -81,7 +81,7 @@ software, run the corresponding command:
    $ sudo yum install proxysql2
 
 Alternatively, you can download the packages from
-https://www.percona.com/downloads/proxysql2/, if you cannot use either an apt or yum package. 
+https://www.percona.com/downloads/proxysql2/, if you cannot use either an apt or yum package.
 
  As of ProxySQL 2.0.15 and later, the multiple tarball files are combined into the following files:
 
@@ -95,7 +95,7 @@ https://www.percona.com/downloads/proxysql2/, if you cannot use either an apt or
           * - proxysql-2.0.XX-Linux-x86_64.glibc2.12.tar.gz
             - For every supported operating system but ``xenial``
 
-              For CentOS 7, install OpenSSL 1.1.1, if needed. 
+              For CentOS 7, install OpenSSL 1.1.1, if needed.
           * - proxysql-2.0.XX-Linux-x86_64.glibc2.23.xenial.tar.gz
             - For Ubuntu 16.04 ``xenial`` only
 
@@ -104,7 +104,7 @@ The password-based file encryption requires OpenSSL 1.1.1, but Ubuntu 16.04 does
 For versions 2.0.13 or lower, extract the files from the archive and change to the directory that contains the extracted files:
 
    .. code-block:: bash
-      
+
       $ # Extract the files (assuming you have changed to the download destination directory)
       $ tar xzf proxysql-VERSION-Linux-PLATFORM-ARCHITECTURE*.tar.gz
       $ # Change to the directory that contains the extracted files
@@ -158,13 +158,13 @@ To view the usage information, run ``proxysql-admin`` without any options:
    --config-file=<config-file>        Read login credentials from a configuration file
                                       (command line and login-file options override any configuration file values)
 
-   --login-file=<login-file-path>     Read login credentials from an encrypted 
+   --login-file=<login-file-path>     Read login credentials from an encrypted
                                       file. If the --login-password or --login-password-file options are not specified, the user is prompted for the password. Command line options override any login login file values.
 
-   --login-password=<password>        The key used to decrypt the encrypted 
+   --login-password=<password>        The key used to decrypt the encrypted
                                       login-file. This option cannot be used with --login-password-file.
 
-   --login-password-file=<path>       Reads the key from a file using the 
+   --login-password-file=<path>       Reads the key from a file using the
                                       <path>. This option cannot be used with --login-password.
 
    --writer-hg=<number>               The hostgroup that all traffic will be sent to
@@ -178,26 +178,26 @@ To view the usage information, run ``proxysql-admin`` without any options:
                                       to this hostgroup.
    --offline-hg=<number>              Nodes that are determined to be OFFLINE will
                                       assigned to this hostgroup.
- 
+
    --proxysql-datadir=<datadir>       Specify the proxysql data directory location
    --proxysql-username=<user_name>    ProxySQL service username
    --proxysql-password[=<password>]   ProxySQL service password
    --proxysql-port=<port_num>         ProxySQL service port number
    --proxysql-hostname=<host_name>    ProxySQL service hostname
- 
+
    --cluster-username=<user_name>     Percona XtraDB Cluster node username
    --cluster-password[=<password>]    Percona XtraDB Cluster node password
    --cluster-port=<port_num>          Percona XtraDB Cluster node port number
    --cluster-hostname=<host_name>     Percona XtraDB Cluster node hostname
- 
+
    --cluster-app-username=<user_name> Percona XtraDB Cluster node application username
    --cluster-app-password[=<password>] Percona XtraDB Cluster node application password
    --without-cluster-app-user         Configure Percona XtraDB Cluster without application user
- 
+
    --monitor-username=<user_name>     Username for monitoring Percona XtraDB Cluster nodes through ProxySQL
    --monitor-password[=<password>]    Password for monitoring Percona XtraDB Cluster nodes through ProxySQL
    --use-existing-monitor-password    Do not prompt for a new monitor password if one is provided.
- 
+
    --node-check-interval=<NUMBER>     The interval at which the proxy should connect
                                       to the backend servers in order to monitor the
                                       Galera staus of a node (in milliseconds).
@@ -233,7 +233,7 @@ To view the usage information, run ``proxysql-admin`` without any options:
                                       updating the list.
    --debug                            Enables additional debug logging.
    --help                             Displays this help text.
- 
+
    These options are the possible operations for proxysql-admin.
    One of the options below must be provided.
    --adduser                          Adds the Percona XtraDB Cluster application user to the ProxySQL database
@@ -259,8 +259,8 @@ To view the usage information, run ``proxysql-admin`` without any options:
                                       data corresponding to the galera cluster with that
                                       writer hostgroup is displayed. Otherwise, information
                                       for all clusters will be displayed.
-   --force                            This option will skip existing configuration checks in mysql_servers, 
-                                      mysql_users and mysql_galera_hostgroups tables. This option will only 
+   --force                            This option will skip existing configuration checks in mysql_servers,
+                                      mysql_users and mysql_galera_hostgroups tables. This option will only
 				      work with ``proxysql-admin --enable``.
    --disable-updates                  Disable admin updates for ProxySQL cluster for the
                                       current operation. The default is to not change the
@@ -268,7 +268,7 @@ To view the usage information, run ``proxysql-admin`` without any options:
                                       these options will be set to false.
                                       (default: updates are not disabled)
    --version, -v                      Prints the version info
- 
+
 Preparing Configuration File
 ================================================================================
 
@@ -296,11 +296,11 @@ By default, the configuration file contains the following:
    # proxysql monitoring user. proxysql admin script will create this user in pxc to monitor pxc-nodes.
    export MONITOR_USERNAME="monitor"
    export MONITOR_PASSWORD="monit0r"
-   
+
    # Application user to connect to pxc-node through proxysql
    export CLUSTER_APP_USERNAME="proxysql_user"
    export CLUSTER_APP_PASSWORD="passw0rd"
-   
+
    # ProxySQL hostgroup IDs
    export WRITER_HOSTGROUP_ID='10'
    export READER_HOSTGROUP_ID='11'
@@ -329,7 +329,7 @@ By default, the configuration file contains the following:
    # the read hostgroup.
    export WRITERS_ARE_READERS="backup"
 
-.. _pxc.admin-login
+.. _pxc.admin-login:
 
 Configuring the ProxySQL Admin Login
 ===============================================
@@ -342,7 +342,7 @@ If no credentials are specified, either on the command line or in the login-file
 
 * If the default MySQL client credentials either do not exist or do not connect to a ProxySQL instance, then the credentials in etc/proxysql-admin.cnf are used.
 
-.. _pxc.admin-file
+.. _pxc.admin-file:
 
 .. rubric:: Example of the ProxySQL Admin File
 
@@ -406,7 +406,7 @@ The credential information is used in the following order:
 
 The following steps encrypt the login:
 
-1. Create the unencrypted data 
+1. Create the unencrypted data
 
 #. Encrypt the data with the proxysql-login-file script
 
@@ -490,12 +490,12 @@ Provide superuser credentials for one of the |PXC| nodes.  The
 
 This option creates the entry for the Galera hostgroups and adds the |PXC| nodes
 to ProxySQL.
-  
+
 It will also add two new users into the Percona XtraDB Cluster with the USAGE
 privilege; one is for monitoring the cluster nodes through ProxySQL, and another
 is for connecting to the PXC Cluster node via the ProxySQL console.
 
-.. code-block:: bash  
+.. code-block:: bash
 
    $ sudo proxysql-admin --config-file=/etc/proxysql-admin.cnf --enable
 
@@ -506,35 +506,35 @@ is for connecting to the PXC Cluster node via the ProxySQL console.
       This script will assist with configuring ProxySQL for use with
       Percona XtraDB Cluster (currently only PXC in combination
       with ProxySQL is supported)
-      
+
       ProxySQL read/write configuration mode is singlewrite
-      
+
       Configuring the ProxySQL monitoring user.
       ProxySQL monitor user name as per command line/config-file is monitor
-      
+
       User 'monitor'@'127.%' has been added with USAGE privileges
-      
+
       Configuring the Percona XtraDB Cluster application user to connect through ProxySQL
       Percona XtraDB Cluster application user name as per command line/config-file is proxysql_user
-      
+
       Percona XtraDB Cluster application user 'proxysql_user'@'127.%' has been added with ALL privileges, this user is created for testing purposes
       Adding the Percona XtraDB Cluster server nodes to ProxySQL
-      
+
       Write node info
       +-----------+--------------+-------+--------+
       | hostname  | hostgroup_id | port  | weight |
       +-----------+--------------+-------+--------+
       | 127.0.0.1 | 10           | 26100 | 1000   |
       +-----------+--------------+-------+--------+
-      
+
       ProxySQL configuration completed!
-      
+
       ProxySQL has been successfully configured to use with Percona XtraDB Cluster
-      
+
       You can use the following login credentials to connect your application through ProxySQL
-      
+
       mysql --user=proxysql_user -p --host=localhost --port=6033 --protocol=tcp
-   
+
 You can use the following login credentials to connect your application through
 ProxySQL:
 
@@ -559,9 +559,9 @@ ProxySQL:
       5 rows in set (0.00 sec)
 
 
-.. code-block:: mysql
+.. code-block:: text
 
-   mysql> select * from mysql_galera_hostgroups\G
+    > select * from mysql_galera_hostgroups\G
 
 .. admonition:: Output
 
@@ -603,7 +603,7 @@ the ProxySQL monitoring daemon.
       Removing query rules from the ProxySQL database if any.
       Removing the cluster from the ProxySQL database.
       ProxySQL configuration removed!
- 
+
 A specific galera cluster can be disabled by using the --writer-hg option with
 ``--disable``.
 
@@ -624,8 +624,8 @@ database for you
    .. code-block:: text
 
       Adding Percona XtraDB Cluster application user to ProxySQL database
-      Enter Percona XtraDB Cluster application user name: root   
-      Enter Percona XtraDB Cluster application user password: 
+      Enter Percona XtraDB Cluster application user name: root
+      Enter Percona XtraDB Cluster application user password:
       Added Percona XtraDB Cluster application user to ProxySQL database!
 
 .. _pxc.proxysql.v2.admin-tool.syncusers:
@@ -741,14 +741,14 @@ This option is used to setup a dummy proxysql configuration.
       Do you want to use the default Percona XtraDB Cluster credentials (root::3306:127.0.0.1) [y/n] ? n
 
       Enter the Percona XtraDB Cluster username (super user): root
-      Enter the Percona XtraDB Cluster user password: 
+      Enter the Percona XtraDB Cluster user password:
       Enter the Percona XtraDB Cluster port: 25100
       Enter the Percona XtraDB Cluster hostname: localhost
 
       ProxySQL read/write configuration mode is singlewrite
 
       Configuring ProxySQL monitoring user..
-      
+
       User 'monitor'@'127.%' has been added with USAGE privilege
       Configuring the Percona XtraDB Cluster application user to connect through ProxySQL
       Percona XtraDB Cluster application user 'pxc_test_user'@'127.%' has been added with ALL privileges, this user is created for testing purposes
@@ -760,7 +760,7 @@ This option is used to setup a dummy proxysql configuration.
 
       You can use the following login credentials to connect your application through ProxySQL
 
-      mysql --user=pxc_test_user  --host=127.0.0.1 --port=6033 --protocol=tcp 
+      mysql --user=pxc_test_user  --host=127.0.0.1 --port=6033 --protocol=tcp
 
 .. code-block:: mysql
 
@@ -1044,7 +1044,7 @@ The |proxysql-status| script
 ================================================================================
 
 |proxysql-status| is a simple script to dump |proxysql| configuration
-and statistics. 
+and statistics.
 
 .. code-block:: bash
 
