@@ -77,6 +77,10 @@
 #include "sql/trigger_def.h"
 #include "unsafe_string_append.h"
 
+#ifdef WITH_WSREP
+#include "sql/wsrep_trans_observer.h"
+#endif
+
 class Cmp_splocal_locations {
  public:
   bool operator()(const Item_splocal *a, const Item_splocal *b) {
@@ -770,6 +774,15 @@ bool sp_lex_instr::validate_lex_and_execute_core(THD *thd, uint *nextp,
 
     thd->clear_error();
     invalidate();
+#ifdef WITH_WSREP
+    /*
+      The regular flow is that wsrep_after_statement is called afer the SP
+      has been executed. However, here we are in the loop that services
+      ER_NEED_REPREPARE retries, so in case of reprepare request, we need to
+      clean the transaction state right away.
+    */
+    wsrep_after_statement(thd);
+#endif
   }
 }
 
