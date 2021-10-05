@@ -821,8 +821,6 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
 
     thd->lex->sql_command = SQLCOM_END;
 
-    wsrep_set_SE_checkpoint(ws_meta.gtid());
-
     thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(false);
     /* Reset the xid once the transaction has been committed.
     This being TOI transaction it will not pass through wsrep_xxx hooks.
