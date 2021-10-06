@@ -52,11 +52,11 @@ Next Steps
   for efficient workload management
   across the cluster without any changes
   to the applications that generate queries.
-  This is the recommended high-availability solution for |PXC|.
+  This is the recommended high-availability solution for Percona XtraDB Cluster.
 
   For more information, see :ref:`load_balancing_with_proxysql`.
 
-* |PMM|_ is the best choice for managing and monitoring |PXC| performance.
+* Percona Monitoring and Management_ is the best choice for managing and monitoring Percona XtraDB Cluster performance.
   It provides visibility for the cluster
   and enables efficient troubleshooting.
 

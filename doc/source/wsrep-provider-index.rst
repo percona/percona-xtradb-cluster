@@ -6,8 +6,8 @@ Index of :variable:`wsrep_provider` options
 
 The following variables can be set and checked in the
 :variable:`wsrep_provider_options` variable. The value of the variable can be
-changed in the |MySQL| configuration file, :file:`my.cnf`, or by setting the
-variable value in the |MySQL| client.
+changed in the MySQL configuration file, :file:`my.cnf`, or by setting the
+variable value in the MySQL client.
 
 To change the value in :file:`my.cnf`, the following syntax should be used: ::
 
@@ -18,7 +18,7 @@ following in :file:`my.cnf`: ::
 
   wsrep_provider_options="gcache.size=512M"
 
-Dynamic variables can be changed from the |MySQL| client using the ``SET
+Dynamic variables can be changed from the MySQL client using the ``SET
 GLOBAL`` command. For example, to change the value of the
 :variable:`pc.ignore_sb`, use the following command:
 
@@ -90,7 +90,7 @@ Disabled
    :scope: Global
    :dyn: Yes
    :default: NO
-   
+
    .. seealso::
 
       |galera-cluster| Documentation:
@@ -457,9 +457,9 @@ size of the disk. Pages are prefixed by gcache.page.
 
 .. seealso::
 
-   |galera-cluster| Documentation: gcache.page_size
+   Galera Documentation: gcache.page_size
       https://galeracluster.com/library/documentation/galera-parameters.html#gcache-page-size
-   |percona| Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
+   Percona Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
       https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/
 
 
@@ -472,14 +472,14 @@ size of the disk. Pages are prefixed by gcache.page.
    :default: 128M
 
 Size of the transaction cache for Galera replication. This defines the size of
-the :file:`galera.cache` file which is used as source for |IST|. The bigger the
+the :file:`galera.cache` file which is used as source for IST. The bigger the
 value of this variable, the better are chances that the re-joining node will
-get IST instead of |SST|.
+get IST instead of SST.
 
 .. variable:: gcomm.thread_prio
 
 Using this option, you can raise the priority of the gcomm thread to a higher
-level than it normally uses. 
+level than it normally uses.
 
 The format for this option is: <policy>:<priority>. The priority value is an
 integer. The policy value supports the following options:
@@ -532,6 +532,7 @@ the replica queue drops below :variable:`gcs.fc_factor` *
 
 .. variable:: gcs.fc_limit
 
+   :version: :rn:`5.7.17-29.20`: Default value changed from ``16`` to ``100``
    :cli: Yes
    :conf: Yes
    :scope: Global
@@ -543,7 +544,7 @@ the replica queue exceeds this limit. In the default operation mode, flow contro
 limit is dynamically recalculated based on the amount of nodes in the
 cluster, but this recalculation can be turned off with use of the
 :variable:`gcs.fc_master_slave` variable to make manual setting of the :variable:`gcs.fc_limit` having an effect  (e.g. for configurations
-when writing is done to a single node in |PXC|).
+when writing is done to a single node in Percona XtraDB Cluster).
 
 .. variable:: gcs.fc_master_slave
 
@@ -698,7 +699,7 @@ This variable shows which gmcast protocol version is being used.
    :default: value of :variable:`wsrep_node_address`
 
 This variable specifies the address on which the node listens for Incremental
-State Transfer (|IST|).
+State Transfer (IST).
 
 .. variable:: pc.announce_timeout
 
@@ -932,11 +933,11 @@ The ``CRC32-C`` option is optimized and may be hardware accelerated on Intel CPU
  * ``0`` - disable checksum
  * ``1`` - ``CRC32``
  * ``2`` - ``CRC32-C``
- 
+
  The following is an example of the variable use:
- 
+
  .. code-block:: bash
- 
+
      wsrep_provider_options="socket.checksum=2"
 
 .. variable::  socket.ssl

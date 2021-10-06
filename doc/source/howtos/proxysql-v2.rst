@@ -4,9 +4,9 @@
 The |proxysql-admin| Tool with ProxySQL v2
 ================================================================================
 
-With |proxysql| 2.0.3, the |proxysql-admin| tool now uses the native |proxysql|
-support for |PXC| and does not require custom bash scripts to keep track of
-|PXC| status. As a result, ``proxysql_galera_checker`` and
+With ProxySQL 2.0.3, the |proxysql-admin| tool now uses the native ProxySQL
+support for Percona XtraDB Cluster and does not require custom bash scripts to keep track of
+Percona XtraDB Cluster status. As a result, ``proxysql_galera_checker`` and
 ``proxysql_node_monitor`` have been removed.
 
 Summary of Changes in |proxysql-admin| Tool with ProxySQL v2
@@ -63,7 +63,7 @@ Removed Features
 
 - Asynchronous replica reader support has been removed: the ``--include-slaves``
   option is not supported.
-- A list of nodes in the priority order is not supported in |proxysql| v2. Only
+- A list of nodes in the priority order is not supported in ProxySQL v2. Only
   a single node is supported at this time.
 - Since the galera_proxysql_checker and galera_node_monitor scripts are no
   longer run in the scheduler, automatic cluster membership updates are not
@@ -137,7 +137,7 @@ To start ProxySQL, run the following command:
 
 .. warning::
 
-   **Do not run |proxysql| with default credentials in production.**
+   **Do not run ProxySQL with default credentials in production.**
 
    Before starting the ``proxysql`` service, you can change the
    defaults in the :file:`/etc/proxysql.cnf` file by changing the
@@ -149,9 +149,9 @@ Automatic Configuration
 ================================================================================
 
 The ``proxysql2`` package from Percona includes the ``proxysql-admin`` tool for
-configuring |PXC| nodes with ProxySQL.
+configuring Percona XtraDB Cluster nodes with ProxySQL.
 
-Before using the ``proxysql-admin`` tool, ensure that ProxySQL and |PXC| nodes
+Before using the ``proxysql-admin`` tool, ensure that ProxySQL and Percona XtraDB Cluster nodes
 you want to add are running. For security purposes, please ensure to change the
 default user settings in the ProxySQL configuration file.
 
@@ -496,7 +496,7 @@ It is recommended to :ref:`change default ProxySQL credentials
 <default-credentials>` before running ProxySQL in production.  Make sure that
 you provide ProxySQL location and credentials in the configuration file.
 
-Provide superuser credentials for one of the |PXC| nodes.  The
+Provide superuser credentials for one of the Percona XtraDB Cluster nodes.  The
 ``proxysql-admin`` script will detect other nodes in the cluster automatically.
 
 .. contents::
@@ -507,7 +507,7 @@ Provide superuser credentials for one of the |PXC| nodes.  The
 --enable
 --------------------------------------------------------------------------------
 
-This option creates the entry for the Galera hostgroups and adds the |PXC| nodes
+This option creates the entry for the Galera hostgroups and adds the Percona XtraDB Cluster nodes
 to ProxySQL.
 
 It will also add two new users into the Percona XtraDB Cluster with the USAGE
@@ -652,13 +652,13 @@ database for you
 --syncusers
 --------------------------------------------------------------------------------
 
-This option synchronizes user accounts currently configured in |PXC| with the
+This option synchronizes user accounts currently configured in Percona XtraDB Cluster with the
 ProxySQL database except password-less users and admin users.
 
 .. important::
 
-   This option does not work if the |PXC| user is created using the
-   ``caching_sha2_password`` plugin (used by default in |PXC| |version|). Create
+   This option does not work if the Percona XtraDB Cluster user is created using the
+   ``caching_sha2_password`` plugin (used by default in Percona XtraDB Cluster |version|). Create
    a mysql user using the ``mysql_native_password`` authentication plugin.
 
    .. code-block:: mysql
@@ -667,7 +667,7 @@ ProxySQL database except password-less users and admin users.
 
    .. seealso::
 
-      |MySQL| Documentation: CREATE USER statement
+      MySQL Documentation: CREATE USER statement
          https://dev.mysql.com/doc/refman/8.0/en/create-user.html
 
 
@@ -1108,7 +1108,7 @@ Option                  Use to display
    ``/etc/proxysql-admin.cnf`` are used.
 
 
-.. |proxysql| replace:: ProxySQL
+.. ProxySQL replace:: ProxySQL
 .. |proxysql-admin| replace:: ``proxysql-admin``
 .. |proxysql-status| replace:: ``proxysql-status``
 .. include:: ../.res/replace.txt

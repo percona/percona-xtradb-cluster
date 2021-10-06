@@ -1,10 +1,10 @@
 .. _pxc.docker-container.running:
 
 ===================================
-Running |PXC| in a Docker Container
+Running Percona XtraDB Cluster in a Docker Container
 ===================================
 
-Docker images of |PXC| are hosted publicly on Docker Hub at
+Docker images of Percona XtraDB Cluster are hosted publicly on Docker Hub at
 https://hub.docker.com/r/percona/percona-xtradb-cluster/.
 
 For more information about using Docker, see the `Docker Docs`_. Make
@@ -18,9 +18,9 @@ provided via ``apt`` and ``yum`` may be outdated and cause errors.
    By default, Docker pulls the image from Docker Hub if the image is not
    available locally.
 
-   The image contains only the most essential binaries for |PXC| to
-   run. Some utilities included in a |PS| or |MySQL|
-   installation might be missing from the |PXC| Docker image.
+   The image contains only the most essential binaries for Percona XtraDB Cluster to
+   run. Some utilities included in a Percona Server for MySQL or MySQL
+   installation might be missing from the Percona XtraDB Cluster Docker image.
 
 The following procedure describes how to set up a simple 3-node cluster
 for evaluation and testing purposes. Do not use these instructions in a
@@ -28,7 +28,7 @@ production environment because the MySQL certificates generated in this
 procedure are self-signed. For a
 production environment, you should generate and store the certificates to be used by Docker.
 
-In this procedure, all of the nodes run |PXC| 8.0 in separate containers on
+In this procedure, all of the nodes run Percona XtraDB Cluster 8.0 in separate containers on
 one host:
 
 1. Create a ~/pxc-docker-test/config directory.

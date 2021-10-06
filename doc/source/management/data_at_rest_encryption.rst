@@ -34,23 +34,18 @@ you enable, disable, and apply encryptions to the following objects:
 
 The transit data is defined as data that is transmitted to another node or client. Encrypted transit data uses an SSL connection.
 
-|PXC| |version| supports all |data-at-rest| generally-available encryption
+Percona XtraDB Cluster |version| supports all |data-at-rest| generally-available encryption
 features available from |percona-server| 8.0.
 
 Configuring PXC to use keyring_file plugin
 ==========================================
-keyring_file
---------------------------------------------------------------------------------
-
-The ``keyring_file`` stores an encryption key in a physical file. The location
-of this file is specified by the ``keyring_file_data`` parameter configured during startup.
 
 Configuration
 --------------------------------------------------------------------------------
 
-|PXC| inherits upstream (Percona Server) behavior to configure the
-``keyring_file``
-plugin. The following options are set in the configuration file:
+Percona XtraDB Cluster inherits the Percona Server for MySQL behavior to
+configure the ``keyring_file``
+plugin. `Install the plugin <https://dev.mysql.com/doc/refman/5.7/en/install-plugin.html>`__ and add the following options in the configuration file:
 
 .. code-block:: text
 
@@ -70,14 +65,14 @@ nodes inherit the keyring (the encrypted key) from the DONOR node.
 Usage
 *****
 
-|xtrabackup| re-encrypts the data using a transition-key and the JOINER node
+XtraBackup re-encrypts the data using a transition-key and the JOINER node
 re-encrypts it using a newly generated master-key.
 
-Keyring (or, more generally, the |PXC| SST process) is backward compatible, as
+Keyring (or, more generally, the Percona XtraDB Cluster SST process) is backward compatible, as
 in higher version JOINER can join from lower version DONOR, but not vice-versa.
 
 
-|PXC| does not allow the combination of nodes with encryption and nodes without
+Percona XtraDB Cluster does not allow the combination of nodes with encryption and nodes without
 encryption to maintain data consistency. For
 example, the user creates node-1 with encryption (keyring) enabled and node-2
 with encryption (keyring) disabled. If the user attempts to create a table with
@@ -100,7 +95,7 @@ The JOINER node generates its keyring.
 Compatibility
 --------------------------------------------------------------------------------
 
-Keyring (or, more generally, the |PXC| SST process) is backward compatible. A
+Keyring (or, more generally, the Percona XtraDB Cluster SST process) is backward compatible. A
 higher version JOINER can join from lower version DONOR, but not vice-versa.
 
 Configuring PXC to use keyring_vault plugin
@@ -112,8 +107,8 @@ keyring_vault
 The ``keyring_vault`` plugin allows storing the master-key in vault-server
 (vs. local file as in case of ``keyring_file``).
 
-.. warning:: rsync does not support ``keyring_vault``, and SST on a joiner is
-   aborted if rsync is used on the node with ``keyring_vault`` configured.
+.. warning:: The rsync tool does not support the ``keyring_vault``. Any rysnc-SST on a joiner is
+   aborted if the ``keyring_vault`` is configured.
 
 Configuration
 --------------------------------------------------------------------------------
@@ -146,7 +141,7 @@ documentation
 Vault-server is an external server, so make sure the PXC node can reach the
 server.
 
-.. note:: |PXC| recommends using the same keyring_plugin type on all
+.. note:: Percona XtraDB Cluster recommends using the same keyring_plugin type on all
    cluster nodes. Mixing the keyring plugin types is recommended only while
    transitioning
    from
@@ -188,7 +183,7 @@ the consequences are the same, and the corresponding error looks like the follow
    'Could not retrieve list of keys from Vault. Vault has returned the
    following error(s): ["permission denied"]'
 
-In case of accessible vault-server with the wrong mount point, there is no
+In case of an accessible vault-server with the wrong mount point, there is no
 error during server boot, but the node still refuses to start:
 
 .. code-block:: text
@@ -203,7 +198,7 @@ error during server boot, but the node still refuses to start:
 Mixing keyring plugin types
 ============================
 
-With |xtrabackup| introducing transition-key logic, it is now possible to
+With XtraBackup introducing transition-key logic, it is now possible to
 mix and match keyring plugins. For example, the user has node-1 configured to use the
 ``keyring_file`` plugin and node-2 configured to use ``keyring_vault``.
 
@@ -214,21 +209,10 @@ mix and match keyring plugins. For example, the user has node-1 configured to us
 Temporary file encryption
 =========================
 
-Percona Server supports the encryption of temporary file storage which is
-enabled using ``encrypt-tmp-files``. The storage or files are local to the node
-and do not affect |PXC| replication. |PXC| recommends enabling the variable
-on all cluster nodes, although this action is not mandatory. The
-parameter to enable this option is the same as Percona Server:
-
-.. code-block:: text
-
-    [mysqld]
-    encrypt-tmp-files=ON
-
 Migrating Keys Between Keyring Keystores
 ========================================
 
-|PXC| supports key migration between keystores. The migration can be performed
+Percona XtraDB Cluster supports key migration between keystores. The migration can be performed
 offline or online.
 
 Offline Migration
@@ -237,7 +221,7 @@ Offline Migration
 In offline migration, the node to migrate is shut down, and the migration server
 takes care of migrating keys for the said server to a new keystore.
 
-For example, a cluster has three |PXC| nodes, n1, n2, and n3. The nodes use the
+For example, a cluster has three Percona XtraDB Cluster nodes, n1, n2, and n3. The nodes use the
 ``keyring_file``. To migrate the n2 node to use ``keyring_vault``, use the following procedure:
 
 1. Shut down the n2 node.
@@ -279,7 +263,7 @@ server takes
 care of migrating keys for the said server to a new keystore by connecting to
 the node.
 
-For example, a cluster has three |PXC| nodes, n1, n2, and n3. The nodes use the
+For example, a cluster has three Percona XtraDB Cluster nodes, n1, n2, and n3. The nodes use the
 ``keyring_file``. Migrate the n3 node to use ``keyring_vault`` using the following procedure:
 
 1. Start the Migration Server (``mysqld`` with a special option).

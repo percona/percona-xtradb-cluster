@@ -118,7 +118,7 @@
 
       Storage engine which provides ACID-compliant transactions and foreign key
       support, among others improvements over :term:`MyISAM`. It is the default
-      engine for |MySQL| as of the 5.5 series.
+      engine for MySQL as of the 5.5 series.
   
    GTID
 
@@ -154,13 +154,13 @@
       Cluster|: uses the :program:`xtrabackup` program for this
       purpose.  :program:`xtrabackup` does not require :command:`READ
       LOCK` for the entire syncing process - only for syncing the
-      |MySQL| system tables and writing the information about the
+      MySQL system tables and writing the information about the
       binlog, galera and replica information (same as the regular
       |Percona XtraBackup| backup).
 
       The SST method is configured with the :variable:`wsrep_sst_method` variable.
   
-      In |pxc| |version|, the |mysql-upgrade| command is now run
+      In PXC |version|, the |mysql-upgrade| command is now run
       automatically as part of :term:`SST`. You do not have to run it
       manually when upgrading your system from an older version.
 
@@ -211,7 +211,7 @@
   
    XtraBackup
 
-      *Percona XtraBackup* is an open-source hot backup utility for |MySQL| -
+      *Percona XtraBackup* is an open-source hot backup utility for MySQL -
       based servers that doesn't lock your database during the backup.
   
    XtraDB
@@ -258,7 +258,7 @@
    ibdata
 
       Default prefix for tablespace files, e.g. :file:`ibdata1` is a 10MB
-      autoextendable file that |MySQL| creates for the shared tablespace by
+      autoextendable file that MySQL creates for the shared tablespace by
       default.
   
    joiner node
@@ -310,7 +310,7 @@
    mysql.pxc.sst.user
 
       This user (set up on the donor node) is assigned the |pxc-sst-role| and
-      runs the |xtrabackup| to make backups. The password for this is randomly
+      runs the XtraBackup to make backups. The password for this is randomly
       generated for each SST. The password is generated automatically for each
       :term:`SST`.
 

@@ -4,24 +4,24 @@
 Security Basics
 ================================================================================
 
-By default, |PXC| does not provide any protection for stored data. There are
-several considerations to take into account for securing |PXC|:
+By default, Percona XtraDB Cluster does not provide any protection for stored data. There are
+several considerations to take into account for securing Percona XtraDB Cluster:
 
 * :ref:`secure-network`
 
-  Anyone with access to your network can connect to any |PXC| node
+  Anyone with access to your network can connect to any Percona XtraDB Cluster node
   either as a client or as another node joining the cluster.
   You should consider restricting access using VPN
-  and filter traffic on ports used by |PXC|.
+  and filter traffic on ports used by Percona XtraDB Cluster.
 
 * :ref:`encrypt-traffic`
 
   Unencrypted traffic can potentially be viewed by anyone monitoring your
-  network. In |PXC| |version| traffic encryption is enabled by default.
+  network. In Percona XtraDB Cluster |version| traffic encryption is enabled by default.
 
 * Data-at-rest encryption
 
-  |PXC| supports `tablespace encryption
+  Percona XtraDB Cluster supports `tablespace encryption
   <https://dev.mysql.com/doc/refman/8.0/en/innodb-tablespace-encryption.html>`_
   to provide at-rest encryption for physical tablespace data files.
 
@@ -37,11 +37,11 @@ Security Modules
 Most modern distributions include special security modules
 that control access to resources for users and applications.
 By default, these modules will most likely constrain communication
-between |PXC| nodes.
+between Percona XtraDB Cluster nodes.
 
 The easiest solution is to disable or remove such programs,
 however, this is not recommended for production environments.
-You should instead create necessary security policies for |PXC|.
+You should instead create necessary security policies for Percona XtraDB Cluster.
 
 SELinux
 --------------------------------------------------------------------------------
