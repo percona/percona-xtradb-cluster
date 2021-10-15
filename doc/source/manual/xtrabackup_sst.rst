@@ -122,7 +122,7 @@ Used to enable and specify SST encryption mode:
 
 * Set ``encrypt=3`` to perform SST encryption based on SSL for just the key
   and certificate files as implemented in
-  `Galeracluster <http://galeracluster.com/documentation-webpages/ssl.html>`_
+  `Galera cluster <https://galeracluster.com/library/documentation/ssl-config.html>`__
 
   It does not provide certificate validation.
   In order to work correctly,

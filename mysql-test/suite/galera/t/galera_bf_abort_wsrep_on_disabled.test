@@ -1,0 +1,11 @@
+#
+# Test a transaction within session with wsrep_on=0 being aborted
+# by TOI transaction.
+# For wsrep disabled sessions we expect that transactions interrupted while
+# executing will not be retried (wsrep_retry_autocommit),
+# and ER_QUERY_INTERRUPTED will be returned.
+#
+
+--let $wsrep_on_value = OFF
+--let $expected_error = ER_QUERY_INTERRUPTED
+--source galera_bf_abort_wsrep_on.inc

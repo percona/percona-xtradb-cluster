@@ -79,7 +79,17 @@ The following limitations apply to |PXC|:
   in the same order on different :term:`nodes <Node>`. The ``DELETE`` statement is not supported on
   tables without a primary key.
 
+*    |Percona Server| 5.7 data at rest encryption is similar to the `MySQL 5.7 data-at-rest encryption <https://dev.mysql.com/doc/refman/5.7/en/innodb-data-encryption.html>`_. Review the available encryption features for `Percona Server for MySQL 5.7 <https://www.percona.com/doc/percona-server/5.7/security/data-at-rest-encryption.html>`__. |Percona Server| 8.0 provides more encryption features and options which are not available in this version. 
+
   .. seealso::
 
      Galera Documentation: Tables without Primary Keys
         http://galeracluster.com/documentation-webpages/limitations.html#tables-without-primary-keys
+
+* As of version 5.7.32-13.47, an INPLACE `ALTER TABLE <https://dev.mysql.com/doc/refman/5.7/en/alter-table.html>`__  query takes an internal shared lock on the table during the execution of the query. The ``LOCK=NONE`` clause is no longer allowed for all of the INPLACE ALTER TABLE queries due to this change.
+
+  This change addresses a deadlock, which could cause a cluster node to hang in the following scenario:
+
+  * An INPLACE ``ALTER TABLE`` query in one session or being applied as Total Order Isolation (TOI) 
+
+  * A DML on the same table from another session

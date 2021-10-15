@@ -6,8 +6,9 @@ wsrep_ist_receive_status
 wsrep_ist_receive_seqno_start	0
 wsrep_ist_receive_seqno_current	0
 wsrep_ist_receive_seqno_end	0
-Unloading wsrep provider ...
-SET GLOBAL wsrep_provider = 'none';
+SET SESSION wsrep_sync_wait=0;
+SET SESSION wsrep_dirty_reads=ON;
+SET GLOBAL wsrep_cluster_address='';
 UPDATE t1 SET f2 = 'b' WHERE f1 > 1;
 UPDATE t1 SET f2 = 'c' WHERE f1 > 2;
 Loading wsrep_provider ...

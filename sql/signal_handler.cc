@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -74,11 +74,11 @@ extern "C" void handle_fatal_signal(int sig)
 
   segfaulted = 1;
 
+#ifdef WITH_WSREP
 /*
   The wsrep subsystem has their its own actions
   which need be performed before exiting:
 */
-#ifdef WITH_WSREP
   wsrep_handle_fatal_signal(sig);
 #endif /* WITH_WSREP */
 

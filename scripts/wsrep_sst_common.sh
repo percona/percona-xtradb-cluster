@@ -26,8 +26,11 @@ WSREP_SST_OPT_AUTH=${WSREP_SST_OPT_AUTH:-}
 WSREP_SST_OPT_USER=${WSREP_SST_OPT_USER:-}
 WSREP_SST_OPT_PSWD=${WSREP_SST_OPT_PSWD:-}
 WSREP_SST_OPT_VERSION=""
+WSREP_SST_OPT_DEBUG=""
 
 WSREP_LOG_DEBUG=""
+WSREP_SST_OPT_REMOTE_AUTH=${WSREP_SST_OPT_REMOTE_AUTH:-}
+readonly WSREP_SST_OPT_REMOTE_AUTH
 
 while [ $# -gt 0 ]; do
 case "$1" in
@@ -45,6 +48,7 @@ case "$1" in
         else
             # "traditional" notation
             readonly WSREP_SST_OPT_HOST=${WSREP_SST_OPT_ADDR%%[:/]*}
+            readonly WSREP_SST_OPT_HOST_UNESCAPED=${WSREP_SST_OPT_HOST}
         fi
         readonly WSREP_SST_OPT_PORT=$(echo $WSREP_SST_OPT_ADDR | \
                 cut -d ']' -f 2 | cut -s -d ':' -f 2 | cut -d '/' -f 1)
@@ -55,7 +59,8 @@ case "$1" in
         WSREP_SST_OPT_BYPASS=1
         ;;
     '--datadir')
-        readonly WSREP_SST_OPT_DATA="$2"
+        # strip trailing '/'
+        readonly WSREP_SST_OPT_DATA="${2%/}"
         shift
         ;;
     '--defaults-file')
@@ -110,6 +115,10 @@ case "$1" in
         WSREP_SST_OPT_BINLOG="$2"
         shift
         ;;
+    '--debug')
+        WSREP_SST_OPT_DEBUG="$2"
+        shift
+        ;;
     *) # must be command
        # usage
        # exit 1
@@ -138,19 +147,41 @@ parse_cnf()
     # normalize the variable name by replacing all '_' with '-'
     var=${var//_/-}
 
-    # print the default settings for given group using my_print_default.
-    # normalize the variable names specified in cnf file (user can use _ or - for example log-bin or log_bin)
-    # then grep for needed variable
-    # finally get the variable value (if variables has been specified multiple time use the last value only)
+    # first normalize output variable names specified in cnf file:
+    # user can use _ or - (for example log-bin or log_bin) and/or prefix
+    # variable with --loose-
+    # then search for needed variable
+    # finally get the variable value (if variables has been specified multiple
+    # time use the last value only)
 
     # look in group+suffix
     if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
-        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | awk -F= '{st=index($0,"="); cur=$0; if ($1 ~ /_/) { gsub(/_/,"-",$1);} if (st != 0) { print $1"="substr(cur,st+1) } else { print cur }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | \
+                awk -F= '{
+                           sub(/^--loose/,"-",$0);
+                           st=index($0,"="); \
+                           cur=$0; \
+                           if ($1 ~ /_/) \
+                               { gsub(/_/,"-",$1);} \
+                           if (st != 0) \
+                               { print $1"="substr(cur,st+1) } \
+                           else { print cur }
+                         }' | grep -- "--$var=" | cut -d= -f2- | tail -1)
     fi
 
     # look in group
     if [[ -z $reval ]]; then
-        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}" | awk -F= '{st=index($0,"="); cur=$0; if ($1 ~ /_/) { gsub(/_/,"-",$1);} if (st != 0) { print $1"="substr(cur,st+1) } else { print cur }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}" | \
+                awk -F= '{
+                           sub(/^--loose/,"-",$0);
+                           st=index($0,"="); \
+                           cur=$0; \
+                           if ($1 ~ /_/) \
+                               { gsub(/_/,"-",$1);} \
+                           if (st != 0) \
+                               { print $1"="substr(cur,st+1) } \
+                           else { print cur }
+                         }' | grep -- "--$var=" | cut -d= -f2- | tail -1)
     fi
 
     # use default if we haven't found a value
@@ -235,12 +266,21 @@ readonly WSREP_SST_OPT_AUTH
 # Splitting AUTH into potential user:password pair
 if ! wsrep_auth_not_set
 then
-    readonly AUTH_VEC=(${WSREP_SST_OPT_AUTH//:/ })
-    WSREP_SST_OPT_USER="${AUTH_VEC[0]:-}"
-    WSREP_SST_OPT_PSWD="${AUTH_VEC[1]:-}"
+    WSREP_SST_OPT_USER="${WSREP_SST_OPT_AUTH%:*}"
+    WSREP_SST_OPT_PSWD="${WSREP_SST_OPT_AUTH##*:}"
 fi
 readonly WSREP_SST_OPT_USER
 readonly WSREP_SST_OPT_PSWD
+
+if [ -n "$WSREP_SST_OPT_REMOTE_AUTH" ]
+then
+    # Split auth string at the last ':'
+    readonly WSREP_SST_OPT_REMOTE_USER="${WSREP_SST_OPT_REMOTE_AUTH%:*}"
+    readonly WSREP_SST_OPT_REMOTE_PSWD="${WSREP_SST_OPT_REMOTE_AUTH##*:}"
+else
+    readonly WSREP_SST_OPT_REMOTE_USER=
+    readonly WSREP_SST_OPT_REMOTE_PSWD=
+fi
 
 if [ -n "${WSREP_SST_OPT_DATA:-}" ]
 then
@@ -329,4 +369,220 @@ wsrep_check_programs()
     done
 
     return $ret
+}
+
+# Generate a string equivalent to 16 random bytes
+wsrep_gen_secret()
+{
+    if [ -x /usr/bin/openssl ]
+    then
+        echo `/usr/bin/openssl rand -hex 16`
+    else
+        printf "%04x%04x%04x%04x%04x%04x%04x%04x" \
+                $RANDOM $RANDOM $RANDOM $RANDOM   \
+                $RANDOM $RANDOM $RANDOM $RANDOM
+    fi
+}
+
+# Prints the absolute path from a path to a file (with a filename)
+# If a relative path is given as an argument, the absolute path
+# is generated from the current path.
+#
+# Globals:
+#   None
+#
+# Parameters:
+#   Argument 1: path to a file
+#
+# Returns 0 if successful (path exists) and the absolute path is output.
+# Returns non-zero otherwise
+#
+function get_absolute_path()
+{
+    local path="$1"
+    local abs_path retvalue
+    local filename
+
+    filename=$(basename "${path}")
+    abs_path=$(cd "$(dirname "${path}")" && pwd)
+    retvalue=$?
+    [[ $retvalue -ne 0 ]] && return $retvalue
+
+    printf "%s/%s" "${abs_path}" "${filename}"
+    return 0
+}
+
+# Prints the version string in a standardized format
+# Input
+#   "1.2.3" => echoes "010203"
+# Wrongly formatted values => echoes "000000"
+normalize_version()
+{
+    local major=0
+    local minor=0
+    local patch=0
+
+    # Only parses purely numeric version numbers, 1.2.3
+    # Everything after the first three values are ignored
+    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([^ ])* ]]; then
+        major=${BASH_REMATCH[1]}
+        minor=${BASH_REMATCH[2]}
+        patch=${BASH_REMATCH[3]}
+    fi
+
+    printf %02d%02d%02d $major $minor $patch
+}
+
+# Compares two version strings
+# The first parameter is the version to be checked
+# The second parameter is the minimum version required
+# Returns 0 (success) if $1 >= $2, 1 (failure) otherwise
+check_for_version()
+{
+    local local_version_str="$( normalize_version $1 )"
+    local required_version_str="$( normalize_version $2 )"
+
+    if [[ "$local_version_str" < "$required_version_str" ]]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+#
+# If the ssl_dhparams variable is already set, uses that as a source
+# of dh parameters for OpenSSL. Otherwise, looks for dhparams.pem in the
+# datadir, and creates it there if it can't find the file.
+# No input parameters
+#
+check_for_dhparams()
+{
+    if [[ -z "$ssl_dhparams" ]]; then
+        if ! [[ -r "$DATA/dhparams.pem" ]]; then
+            wsrep_check_programs openssl
+            wsrep_log_info "Could not find dhparams file, creating $DATA/dhparams.pem"
+
+            if ! openssl dhparam -out "$DATA/dhparams.pem" 2048 >/dev/null 2>&1
+            then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "* Could not create the dhparams.pem file with OpenSSL. "
+                wsrep_log_error "****************************************************** "
+                exit 22
+            fi
+        fi
+        ssl_dhparams="$DATA/dhparams.pem"
+    fi
+}
+
+#
+# Checks to see if the file exists
+# If the file does not exist (or cannot be read), issues an error
+# and exits
+#
+# 1st param: file name to be checked (for read access)
+# 2nd param: 1st error message (header)
+# 3rd param: 2nd error message (footer, optional)
+#
+verify_file_exists()
+{
+    local file_path=$1
+    local error_message1=$2
+    local error_message2=$3
+
+    if ! [[ -r "$file_path" ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "* $error_message1 "
+        wsrep_log_error "* Could not find/access : $file_path "
+
+        if ! [[ -z "$error_message2" ]]; then
+            wsrep_log_error "* $error_message2 "
+        fi
+
+        wsrep_log_error "****************************************************** "
+        exit 22
+    fi
+}
+
+#
+# verifies that the certificate matches the private key
+# doing this will save us having to wait for a timeout that would
+# otherwise occur.
+#
+# 1st param: path to the cert
+# 2nd param: path to the private key
+#
+verify_cert_matches_key()
+{
+    local cert_path=$1
+    local key_path=$2
+
+    wsrep_check_programs openssl diff
+
+    # generate the public key from the cert and the key
+    # they should match (otherwise we can't create an SSL connection)
+    if ! diff <(openssl x509 -in "$cert_path" -pubkey -noout) <(openssl pkey -in "$key_path" -pubout 2>/dev/null) >/dev/null 2>&1
+    then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "* The certifcate and private key do not match. "
+        wsrep_log_error "* Please check your certificate and key files. "
+        wsrep_log_error "****************************************************** "
+        exit 22
+    fi
+}
+
+#
+# verifies that the CA file verifies the certificate
+# doing this here lets us generate better error messages
+#
+# 1st param: path to the CA file
+# 2nd param: path to the cert
+#
+verify_ca_matches_cert()
+{
+    local ca_path=$1
+    local cert_path=$2
+
+    wsrep_check_programs openssl
+
+    if ! openssl verify -verbose -CAfile "$ca_path" "$cert_path" >/dev/null  2>&1
+    then
+        wsrep_log_error "******** FATAL ERROR ****************************************** "
+        wsrep_log_error "* The certifcate and CA (certificate authority) do not match.   "
+        wsrep_log_error "* It does not appear that the certificate was issued by the CA. "
+        wsrep_log_error "* Please check your certificate and CA files.                   "
+        wsrep_log_error "*************************************************************** "
+        exit 22
+    fi
+}
+
+#
+# Verify whether all ssl files are present and check whether they are matching
+# with their respective certificates. To be used only when encrypt=4, where we
+# expect cert, ca and key files to be present.
+#
+verify_and_match_all_ssl_files() {
+    DATA=$1
+    CA=$2
+    CERT=$3
+    KEY=$4
+
+    pushd "$DATA" &>/dev/null
+    ssl_ca=$(get_absolute_path "$CA")
+    ssl_cert=$(get_absolute_path "$CERT")
+    ssl_key=$(get_absolute_path "$KEY")
+    popd &>/dev/null
+
+    wsrep_log_debug "ssl_ca (absolute) : $ssl_ca"
+    wsrep_log_debug "ssl_cert (absolute) : $ssl_cert"
+    wsrep_log_debug "ssl_key (absolute) : $ssl_key"
+
+    verify_file_exists "$ssl_ca" "CA, certificate, and key files are required." \
+                                 "Please check the 'ssl-ca' option.           "
+    verify_file_exists "$ssl_cert" "CA, certificate, and key files are required." \
+                                   "Please check the 'ssl-cert' option.         "
+    verify_file_exists "$ssl_key" "CA, certificate, and key files are required." \
+                                  "Please check the 'ssl-key' option.          "
+
+    verify_cert_matches_key $ssl_cert $ssl_key
+    verify_ca_matches_cert $ssl_ca $ssl_cert
 }

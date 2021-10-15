@@ -1,0 +1,44 @@
+CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT, k INT);
+INSERT INTO t1(k) VALUES (1),(2),(3),(101),(102),(103);
+CREATE TABLE sync(id INT PRIMARY KEY);
+SET SESSION wsrep_on = OFF;;
+BEGIN;
+UPDATE t1 SET k=k+1 WHERE id<100;
+ALTER TABLE t1 ADD KEY k1 (k);
+COMMIT;
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ALTER TABLE t1 DROP KEY k1;
+SET DEBUG_SYNC="open_tables_after_open_and_process_table SIGNAL open_tables_after_open_and_process_table.reached WAIT_FOR open_tables_after_open_and_process_table.continue";
+UPDATE t1 SET k=k+1 WHERE id<100;
+SET DEBUG_SYNC="NOW WAIT_FOR open_tables_after_open_and_process_table.reached";
+ALTER TABLE t1 ADD KEY k1 (k);
+ERROR 70100: Query execution was interrupted
+ALTER TABLE t1 DROP KEY k1;
+SET DEBUG_SYNC="wsrep_before_commit SIGNAL wsrep_before_commit.reached WAIT_FOR wsrep_before_commit.continue";
+UPDATE t1 SET k=k+1 WHERE id<100;
+SET DEBUG_SYNC="now WAIT_FOR wsrep_before_commit.reached";
+ALTER TABLE t1 ADD KEY k1 (k);
+SET DEBUG_SYNC="now SIGNAL wsrep_before_commit.continue";
+ALTER TABLE t1 DROP KEY k1;
+BEGIN;
+UPDATE t1 SET k=k+1 WHERE id<100;
+ALTER TABLE t1 ADD KEY k1 (k);
+COMMIT;
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ALTER TABLE t1 DROP KEY k1;
+SET DEBUG_SYNC="open_tables_after_open_and_process_table SIGNAL open_tables_after_open_and_process_table.reached WAIT_FOR open_tables_after_open_and_process_table.continue";
+UPDATE t1 SET k=k+1 WHERE id<100;
+SET DEBUG_SYNC="NOW WAIT_FOR open_tables_after_open_and_process_table.reached";
+ALTER TABLE t1 ADD KEY k1 (k);
+ERROR 70100: Query execution was interrupted
+ALTER TABLE t1 DROP KEY k1;
+SET DEBUG_SYNC="wsrep_before_commit SIGNAL wsrep_before_commit.reached WAIT_FOR wsrep_before_commit.continue";
+UPDATE t1 SET k=k+1 WHERE id<100;
+SET DEBUG_SYNC="now WAIT_FOR wsrep_before_commit.reached";
+ALTER TABLE t1 ADD KEY k1 (k);
+SET DEBUG_SYNC="now SIGNAL wsrep_before_commit.continue";
+ALTER TABLE t1 DROP KEY k1;
+SET SESSION wsrep_on = ON;
+DROP TABLE t1;
+DROP TABLE sync;
+SET DEBUG_SYNC="RESET";

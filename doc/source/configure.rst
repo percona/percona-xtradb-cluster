@@ -26,8 +26,8 @@ Configuration examples assume there are three |PXC| nodes:
 +--------+-----------+---------------+
 
 If you are running Debian or Ubuntu,
-add the following configuration variables to :file:`/etc/percona-xtradb-cluster.conf.d/wsrep.cnf`
-on the first node:
+add the following configuration variables to :file:`/etc/mysql/percona-xtradb-cluster.conf.d/wsrep.cnf`
+on the first node::
 
 .. code-block:: text
 

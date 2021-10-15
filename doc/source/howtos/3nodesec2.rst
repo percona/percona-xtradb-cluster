@@ -1,21 +1,38 @@
 .. _3nodec2:
 
-====================================================
-How to set up a three-node cluster in EC2 enviroment
-====================================================
+=====================================================
+How to set up a three-node cluster in EC2 environment
+=====================================================
 
-This manual assumes you are running *m1.xlarge* instances
-with Red Hat Enterprise Linux 6.1 64-bit.
+This manual assumes you are running three EC2 instances
+with Red Hat Enterprise Linux 7 64-bit.
 
 * ``node1``: ``10.93.46.58``
 * ``node2``: ``10.93.46.59``
 * ``node3``: ``10.93.46.60``
 
+.. rubric:: Recommendations on launching EC2 instances
+
+1. Select `instance types <https://aws.amazon.com/ec2/instance-types/>`_ that support Enhanced Networking functionality. Good network performance critical for synchronous replication used in |PXC|.
+#. When adding instance storage volumes, choose the ones with good I/O performance:
+
+   * instances with NVMe are preferred
+   * GP2 SSD are preferred to GP3 SSD volume types due to I/O latency
+   * over sized GP2 SSD are preferred to IO1 volume types due to cost
+     
+#. Attach Elastic network interfaces with static IPs or assign Elastic IP addresses to your instances. Thereby private IP addresses are preserved on instances in case of reboot or restart. This is required as each |PXC| member includes the ``wsrep_cluster_address`` option in its configuration which points to other cluster members.
+#. Launch instances in different availability zones to avoid cluster downtime in case one of the zones experiences power loss or network connectivity issues.
+   
+.. seealso::
+
+   Amazon EC2 Documentation:
+       https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html
+
 To set up |PXC|:
 
 1. Remove any |PXC| 5.5, |PS| 5.5, and |PS| 5.6 packages.
 
-#. nstall |PXC| as described in :ref:`yum`.
+#. Install |PXC| as described in :ref:`yum`.
 
 #. Create data directories:
 

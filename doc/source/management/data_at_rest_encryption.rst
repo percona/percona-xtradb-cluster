@@ -4,6 +4,8 @@
 Data at Rest Encryption
 =======================
 
+This feature is considered **tech preview** quality.
+
 .. _innodb_general_tablespace_encryption:
 
 Introduction
@@ -47,9 +49,6 @@ file-per-table tablespace and temporary files.
        * - Temporary Files
          - Generally Available, supported
          - :rn:`5.7.22-22`
-
-Using the keyring_file plugin
-==========================================
 
 About the keyring_file
 -----------------------
@@ -171,8 +170,8 @@ Configuration
 *************
 
 Configuration options are the same as
-`upstream
-<https://www.percona.com/doc/percona-server/5.7/security/data-at-rest-encryption.html>`__.
+`upstream <https://www.percona.com/doc/percona-server/5.7/security/data-at-rest-encryption.html>`__.
+
 The ``my.cnf`` configuration file should contain
 the following options:
 
@@ -190,6 +189,7 @@ Also ``keyring_vault_n1.conf`` file contents should be :
    secret_mount_point = secret1
    token = e0345eb4-35dd-3ddd-3b1e-e42bb9f2525d
    vault_ca = /data/keyring_vault_confs/vault_ca.crt
+
 
 The detailed description of these options can be found in the `upstream documentation <https://www.percona.com/doc/percona-server/5.7/security/data-at-rest-encryption.html>`_.
 

@@ -10,7 +10,7 @@ call mtr.add_suppression("\\[Error\\] InnoDB: Encryption can't find master key, 
 
 # we need restart to make sure keyring settings are picked up
 let $restart_hide_args = 1;
-let $restart_parameters = $KEYRING_RESTART_PARAM --innodb_max_dirty_pages_pct=0;
+let $restart_parameters = $keyring_restart_param --innodb_max_dirty_pages_pct=0;
 --source include/restart_mysqld.inc
 
 CREATE TEMPORARY TABLE t01 (a TEXT) ENGINE=InnoDB;
@@ -148,7 +148,7 @@ DROP INDEX t10_b ON t10 ALGORITHM=COPY;
 
 # test restarting
 let $restart_hide_args = 1;
-let $restart_parameters = $KEYRING_RESTART_PARAM --innodb-temp-tablespace-encrypt --innodb_max_dirty_pages_pct=0;
+let $restart_parameters = $keyring_restart_param --innodb-temp-tablespace-encrypt --innodb_max_dirty_pages_pct=0;
 --source include/restart_mysqld.inc
 
 CREATE TEMPORARY TABLE t01 (a INT) ENGINE=InnoDB ENCRYPTION='Y';
@@ -156,7 +156,7 @@ INSERT INTO t01 VALUES (1), (2), (3);
 
 # test crashing
 let $restart_hide_args = 1;
-let $restart_parameters = $KEYRING_RESTART_PARAM --innodb-temp-tablespace-encrypt --innodb_max_dirty_pages_pct=0;
+let $restart_parameters = $keyring_restart_param --innodb-temp-tablespace-encrypt --innodb_max_dirty_pages_pct=0;
 --source include/kill_and_restart_mysqld.inc
 
 CREATE TEMPORARY TABLE t01 (a INT) ENGINE=InnoDB ENCRYPTION='Y';
@@ -171,7 +171,7 @@ CREATE TEMPORARY TABLE t01 (a INT) ENGINE=InnoDB;
 INSERT INTO t01 VALUES (1), (2), (3);
 
 let $restart_hide_args = 1;
-let $restart_parameters = $KEYRING_RESTART_PARAM --innodb-temp-tablespace-encrypt --innodb_max_dirty_pages_pct=0;
+let $restart_parameters = $keyring_restart_param --innodb-temp-tablespace-encrypt --innodb_max_dirty_pages_pct=0;
 --source include/restart_mysqld.inc
 
 CREATE TEMPORARY TABLE t01 (a INT) ENGINE=InnoDB ENCRYPTION='Y';
@@ -189,7 +189,7 @@ DROP TABLE t10;
 #
 
 let $restart_hide_args = 1;
-let $restart_parameters = $KEYRING_RESTART_PARAM --innodb-temp-tablespace-encrypt;
+let $restart_parameters = $keyring_restart_param --innodb-temp-tablespace-encrypt;
 --source include/restart_mysqld.inc
 
 CREATE TABLE t1(a INT key) ENGINE = MEMORY;
