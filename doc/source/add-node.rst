@@ -4,18 +4,18 @@
 Adding Nodes to Cluster
 =======================
 
-New :term:`nodes <Node>` that are :ref:`properly configured <configure>`
+New `nodes <Node>` that are :ref:`properly configured <configure>`
 are provisioned automatically.
-When you start a node with the address of at least one other running :term:`node`
+When you start a node with the address of at least one other running `node`
 in the :variable:`wsrep_cluster_address` variable,
 it automatically joins the cluster and synchronizes with it.
 
 .. note:: Any existing data and configuration will be overwritten
-   to match the data and configuration of the :term:`DONOR node`.
+   to match the data and configuration of the `DONOR node`.
    Do not join several nodes at the same time
    to avoid overhead due to large amounts of traffic when a new node joins.
 
-By default, |PXC| uses |PXB|_ for *State Snapshot Transfer* (:term:`SST`).
+By default, |PXC| uses |PXB|_ for *State Snapshot Transfer* (`SST`).
 This requires the following:
 
 * Set the :variable:`wsrep_sst_method`` variable to ``xtrabackup-v2`` and
@@ -23,7 +23,7 @@ This requires the following:
 
   For more information, see :ref:`configure`.
 
-* Create a user for SST on the initial :term:`node`.
+* Create a user for SST on the initial `node`.
 
   For more information, see :ref:`bootstrap`.
 
@@ -42,7 +42,7 @@ or
 
        [root@pxc2 ~]# systemctl start mysql
 
-After the server starts, it should receive :term:`SST` automatically.
+After the server starts, it should receive `SST` automatically.
 
 To check the status of the second node, run the following:
 
@@ -86,7 +86,7 @@ To add the third node, start the node using either command:
 .. code-block:: bash
 
    [root@pxc3 ~]# /etc/init.d/mysql start
-   
+
 or
 
 .. code-block:: bash
@@ -127,4 +127,3 @@ When you add all nodes to the cluster,
 you can :ref:`verify replication <verify>`
 by running queries and manipulating data on nodes
 to see if these changes are synchronized accross the cluster.
-

@@ -66,7 +66,7 @@ file and start the `mysql` service:
 
 .. seealso::
 
-   |galera| Documentation: wsrep_sst_donor option
+   Galera Documentation: wsrep_sst_donor option
       https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-sst-donor
 
 .. _pxc-crash-recovery-scenario-3:
@@ -88,7 +88,7 @@ first node, invoke the startup script like this:
 .. code-block:: bash
 
    $ systemctl start mysql@bootstrap.service
-    
+
 .. note::
 
    Even though you bootstrap from the most advanced node, the other
@@ -124,9 +124,9 @@ refuses to serve any SQL queries. In this state, the :command:`mysqld` process
 on node C is still running and can be connected to but any statement related to
 data fails with an error
 
-.. code-block:: guess
+.. code-block:: mysql
 
-   mysql> select * from test.sbtest1;
+   > SELECT * FROM test.sbtest1;
    ERROR 1047 (08S01): WSREP has not yet prepared node for application use
 
 Reads are possible until node C decides that it cannot access node A and
@@ -141,9 +141,9 @@ If node A and node B crashed, you need to enable the primary component on
 node C manually, before you can bring up node A and node B. The command to do
 this is:
 
-.. code-block:: guess
+.. code-block:: mysql
 
-   mysql> SET GLOBAL wsrep_provider_options='pc.bootstrap=true';
+   > SET GLOBAL wsrep_provider_options='pc.bootstrap=true';
 
 This approach only works if the other nodes are down before doing that!
 Otherwise, you end up with two clusters having different data.
@@ -209,11 +209,11 @@ best bootstrap candidate. In its :file:`grastate.dat` file, set the
 
 .. seealso::
 
-   |galera| Documentation
+   Galera Documentation
       `Introducing the Safe-To-Bootstrap feature in Galera Cluster
       <https://galeracluster.com/2016/11/introducing-the-safe-to-bootstrap-feature-in-galera-cluster/>`_
 
------      
+-----
 
 In recent Galera versions, the option :variable:`pc.recovery` (enabled by
 default) saves the cluster state into a file named :file:`gvwstate.dat` on each
@@ -258,9 +258,9 @@ If you want to restore the service even
 before the network link is restored, you can make one of the groups primary
 again using the same command as described in :ref:`pxc-crash-recovery-scenario-5`
 
-.. code-block:: guess
+.. code-block:: mysql
 
-   SET GLOBAL wsrep_provider_options='pc.bootstrap=true';
+    > SET GLOBAL wsrep_provider_options='pc.bootstrap=true';
 
 After this, you are able to work on the manually restored part of the cluster,
 and the other half should be able to automatically re-join using :term:`IST` as
