@@ -28,7 +28,7 @@ Prerequisites
    * 4567
    * 4568
 
-.. seealso:: 
+.. seealso::
 
       For more information, see :ref:`apparmor`.
 
@@ -103,4 +103,3 @@ Next Steps
 
 After you install |PXC| and stop the ``mysql`` service,
 configure the node according to the procedure described in :ref:`configure`.
-

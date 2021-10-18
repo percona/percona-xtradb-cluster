@@ -30,7 +30,7 @@ and variables mentioned in these documents when upgrading to |PXC| 8.0.
 Important changes in |pxc| |version|
 ================================================================================
 
-.. contents:: 
+.. contents::
    :local:
 
 .. _upgrade-guide-changed-traffic-encryption:
@@ -39,7 +39,7 @@ Traffic encryption is enabled by default
 --------------------------------------------------------------------------------
 
 The :variable:`pxc_encrypt_cluster_traffic` variable, which enables traffic
-encryption, is set to ``ON`` by default in |pxc| |version|. 
+encryption, is set to ``ON`` by default in |pxc| |version|.
 
 Unless you configure a node accordingly (each node in your cluster must use the
 same SSL certificates) or try to join a cluster running |pxc| 5.7 which
@@ -48,7 +48,7 @@ error.
 
 .. code-block:: text
 
-   ... [ERROR] ... [Galera] handshake with remote endpoint ... 
+   ... [ERROR] ... [Galera] handshake with remote endpoint ...
    This error is often caused by SSL issues. ...
 
 .. seealso:: sections :ref:`encrypt-traffic`, :ref:`configure`
@@ -86,7 +86,7 @@ any unsupported operations and may halt the server if :ref:`a strict mode
 validation fails <validations>`. It is recommended to first start the node with
 the :variable:`pxc_strict_mode` variable set to ``PERMISSIVE`` in the |MySQL|
 configuration file (on Debian and Ubuntu |file.debian-conf|; on CentOS and Red
-Hat |file.centos-conf|).
+Hat `/etc/my.cnf`).
 
 After you check the log for any tech preview features or unsupported features
 and you have fixed any of the encountered incompatibilities, set the variable
@@ -98,7 +98,7 @@ back to ``ENFORCING`` at run time:
 
 Also, switching back to ``ENFORCING`` may be done by restarting the node with
 the updated configuration file (on Debian and Ubuntu |file.debian-conf|; on
-CentOS and Red Hat |file.centos-conf|).
+CentOS and Red Hat `/etc/my.cnf`).
 
 
 The configuration file layout has changed in |pxc| |version|
@@ -107,7 +107,7 @@ The configuration file layout has changed in |pxc| |version|
 All configuration settings are stored in the default |MySQL| configuration file:
 
 * Path on Debian and Ubuntu: |file.debian-conf|
-* Path on Red Hat and CentOS: |file.centos-conf|
+* Path on Red Hat and CentOS: `/etc/my.cnf`
 
 Before you start the upgrade, move your custom settings from
 :file:`/etc/mysql/percona-xtradb-cluster.conf.d/wsrep.cnf` (on Debian and
@@ -183,8 +183,8 @@ to run it manually when upgrading your system from an older version.
 
    .. note:
 
-      On CentOS, the |file.centos-conf| configuration file is renamed to
-      :file:`my.cnf.rpmsave`.  Make sure to rename it back before
+      On CentOS, the `/etc/my.cnf` configuration file is renamed to
+      `my.cnf.rpmsave`.  Make sure to rename it back before
       joining the upgraded node back to the cluster.
 
    |strict-mode| is enabled by default, which may result in denying any unsupported operations and may halt the server. For more information, see    :ref:`upgrade-guide-changed-strict-mode`.
@@ -193,7 +193,7 @@ to run it manually when upgrading your system from an older version.
    each node accordingly and avoid joining a cluster with unencrypted cluster
    traffic: all nodes in your cluster must have traffic encryption enabled. For
    more information, see :ref:`upgrade-guide-changed-traffic-encryption`.
-      
+
 .. #. Repeat this procedure for the next node in the cluster until you upgrade all nodes.
 
 Major Upgrade Scenarios
@@ -373,7 +373,7 @@ To upgrade the cluster, follow these steps for each node:
 
    .. note::
 
-      On CentOS, the |file.centos-conf| configuration file is renamed to
+      On CentOS, the `/etc/my.cnf` configuration file is renamed to
       :file:`my.cnf.rpmsave`.  Make sure to rename it back before
       joining the upgraded node back to the cluster.
 
@@ -385,7 +385,7 @@ To upgrade the cluster, follow these steps for each node:
    each node accordingly and avoid joining a cluster with unencrypted cluster
    traffic. For more information, see
    :ref:`upgrade-guide-changed-traffic-encryption`.
-   
+
 #. Repeat this procedure for the next node in the cluster
    until you upgrade all nodes.
 
