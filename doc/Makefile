@@ -43,11 +43,11 @@ ext:
 	@echo "Downloading Percona documentation utils from repository..."
 	@mkdir -p $(BUILDDIR) && wget -O - $(UTILS_REPO) | tar xz -C $(BUILDDIR) && cp -r $(BUILDDIR)/$(UTILS_DIR)/sphinx/ext source
 
-netlify:
+netlify: ext
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) -c source/conf-netlify $(BUILDDIR)/html
 	@echo
 	@echo "Netlify build finished. The HTML pages are in $(BUILDDIR)/html."
-	
+
 html:   ext
 	@echo "Downloading percona-theme ..."
 	@wget -O percona-theme.tar.gz https://www.percona.com/docs/theme-1-4/percona-server/5.6
@@ -165,5 +165,3 @@ livehtml:
 
 livethtml:
 	sphinx-autobuild -D html_theme=alabaster -D html_theme_path='' $(ALLSPHINXOPTS) $(BUILDDIR) $(O)
-
-
