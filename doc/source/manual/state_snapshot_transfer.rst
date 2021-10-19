@@ -11,7 +11,7 @@ In order to be synchronized with the cluster,
 the new node has to receive data from a node
 that is already part of the cluster.
 
-|PXC| enables :abbr:`SST (State Snapshot Transfer)` via :program:`xtrabackup`.
+Percona XtraDB Cluster enables :abbr:`SST (State Snapshot Transfer)` via :program:`xtrabackup`.
 
 Xtrabackup SST uses `backup locks
 <http://www.percona.com/doc/percona-server/8.0/management/backup_locks.html>`_,
@@ -28,16 +28,16 @@ Choosing the SST Donor
 ======================
 
 If there are no nodes available
-that can safely perform incremental state transfer (|IST|),
-the cluster defaults to |SST|.
+that can safely perform incremental state transfer (IST),
+the cluster defaults to SST.
 
-If there are nodes available that can perform |IST|,
+If there are nodes available that can perform IST,
 the cluster prefers a local node over remote nodes to serve as the donor.
 
-If there are no local nodes available that can perform |IST|,
+If there are no local nodes available that can perform IST,
 the cluster chooses a remote node to serve as the donor.
 
-If there are several local and remote nodes that can perform |IST|,
+If there are several local and remote nodes that can perform IST,
 the cluster chooses the node with the highest ``seqno`` to serve as the donor.
 
 Using Percona Xtrabackup

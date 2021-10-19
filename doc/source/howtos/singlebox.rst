@@ -10,7 +10,7 @@ on a single physical box.
 For the purposes of this tutorial, assume the following:
 
 * The local IP address is ``192.168.2.21``.
-* |PXC| is extracted from binary tarball into
+* Percona XtraDB Cluster is extracted from binary tarball into
   :file:`/usr/local/Percona-XtraDB-Cluster-8.0.x86_64`
 
 To set up the cluster:
@@ -93,7 +93,7 @@ To set up the cluster:
    * :file:`/data/bench/d3`
 
 #. Start the first node using the following command
-   (from the |PXC| install directory):
+   (from the Percona XtraDB Cluster install directory):
 
    .. code-block:: bash
 

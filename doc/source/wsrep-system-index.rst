@@ -4,7 +4,7 @@
 Index of wsrep system variables
 ===============================
 
-|PXC| introduces a number of MySQL system variables
+Percona XtraDB Cluster introduces a number of MySQL system variables
 related to write-set replication.
 
 .. variable:: pxc_encrypt_cluster_traffic
@@ -16,7 +16,7 @@ related to write-set replication.
    :default: ``ON``
 
 Enables automatic configuration of SSL encryption.
-When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
+When disabled, you need to configure SSL manually to encrypt Percona XtraDB Cluster traffic.
 
 Possible values:
 
@@ -73,7 +73,7 @@ For more information, see :ref:`pxc-maint-mode`.
    :default: ``ENFORCING`` or ``DISABLED``
 
 Controls :ref:`pxc-strict-mode`, which runs validations
-to avoid the use of tech preview features and unsupported features in |PXC|.
+to avoid the use of tech preview features and unsupported features in Percona XtraDB Cluster.
 
 Depending on the actual mode you select,
 upon encountering a failed validation,
@@ -190,7 +190,7 @@ OPTIMIZED
 
 .. seealso::
 
-   |galera-cluster| Documentation: |MySQL| wsrep options
+   |galera-cluster| Documentation: MySQL wsrep options
       https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-certification-rules
 
 .. variable:: wsrep_certify_nonPK
@@ -443,7 +443,7 @@ when inserting the ``DEFAULT`` value into an ``AUTO_INCREMENT`` column.
    :default: ``NONE``
 
 Defines a binary log format that will always be effective,
-regardless of the client session |binlog_format|_ variable value.
+regardless of the client session binlog_format_ variable value.
 
 Possible values for this variable are:
 
@@ -451,9 +451,9 @@ Possible values for this variable are:
   * ``STATEMENT``: Force statement-based logging format
   * ``MIXED``: Force mixed logging format
   * ``NONE``: Do not force the binary log format
-    and use whatever is set by the |binlog_format| variable (default)
+    and use whatever is set by the binlog_format variable (default)
 
-.. |binlog_format| replace:: ``binlog_format``
+.. binlog_format replace:: ``binlog_format``
 .. _binlog_format: https://dev.mysql.com/doc/refman/8.0/en/binary-log-setting.html
 
 .. seealso:: `MySQL wsrep option: wsrep_forced_binlog_format
@@ -471,7 +471,7 @@ Defines the rules of wsrep applier behavior on errors. You can change the settin
 
 .. note::
 
-    In |PXC| version 8.0.19-10, the default value has changed from ``7`` to ``0``. If you have been working with an earlier version of the PXC 8.0 series, you may see different behavior when upgrading to this version or later.
+    In Percona XtraDB Cluster version 8.0.19-10, the default value has changed from ``7`` to ``0``. If you have been working with an earlier version of the PXC 8.0 series, you may see different behavior when upgrading to this version or later.
 
 The variable has the following options:
 
@@ -541,7 +541,7 @@ A few examples:
 
    * - log_error_verbosity
      - wsrep_min_log_verbosity
-     - |MySQL| Logs Verbosity
+     - MySQL Logs Verbosity
      - wsrep Logs Verbosity
    * - 2
      - 3
@@ -566,7 +566,7 @@ Note the case where ``log_error_verbosity=3`` and
 
 .. seealso::
 
-   |MySQL| Documentation: log_error_verbosity
+   MySQL Documentation: log_error_verbosity
       https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_log_error_verbosity
    |galera-cluster| Documentation: Database Server Logs
       https://galeracluster.com/library/documentation/log.html
@@ -603,7 +603,7 @@ and whatever gets committed stays committed.
 
 Defines whether the node should log additional information about conflicts.
 By default, this variable is disabled
-and |PXC| uses standard logging features in MySQL.
+and Percona XtraDB Cluster uses standard logging features in MySQL.
 
 If you enable this variable, it will also log table and schema
 where the conflict occurred, as well as the actual values for keys

@@ -4,8 +4,8 @@
 Percona XtraDB Cluster threading model
 ======================================
 
-|PXC| creates a set of threads to service its operations,
-which are not related to existing |MySQL| threads.
+Percona XtraDB Cluster creates a set of threads to service its operations,
+which are not related to existing MySQL threads.
 There are three main groups of threads:
 
 .. contents::

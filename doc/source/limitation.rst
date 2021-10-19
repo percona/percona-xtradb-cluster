@@ -4,9 +4,9 @@
 Percona XtraDB Cluster Limitations
 ==================================
 
-The following limitations apply to |PXC|:
+The following limitations apply to Percona XtraDB Cluster:
 
-Replication works only with |InnoDB| storage engine.
+Replication works only with InnoDB storage engine.
    Any writes to tables of other types are not replicated.
 
 Unsupported queries:
@@ -31,9 +31,9 @@ Maximum allowed transaction size is defined by the |max-ws-rows| and |max-ws-siz
 
 Transaction issuing ``COMMIT`` may still be aborted at that stage.
    Due to cluster-level optimistic concurrency control,  there can be two
-   transactions writing to the same rows and committing in separate |PXC| nodes,
+   transactions writing to the same rows and committing in separate Percona XtraDB Cluster nodes,
    and only one of the them can successfully commit. The failing one will be
-   aborted. For cluster-level aborts, |PXC| gives back deadlock error code: ::
+   aborted. For cluster-level aborts, Percona XtraDB Cluster gives back deadlock error code: ::
 
    (Error: 1213 SQLSTATE: 40001  (ER_LOCK_DEADLOCK)).
 
@@ -51,7 +51,7 @@ Minimal recommended size of cluster is 3 nodes.
 ``enforce_storage_engine=InnoDB`` is not compatible with ``wsrep_replicate_myisam=OFF``
    :variable:`wsrep_replicate_myisam` is set to ``OFF`` by default.
 
-Avoid ``ALTER TABLE ... IMPORT/EXPORT`` workloads when running |PXC| in cluster mode.
+Avoid ``ALTER TABLE ... IMPORT/EXPORT`` workloads when running Percona XtraDB Cluster in cluster mode.
    It can lead to node inconsistency if not executed in sync on all nodes.
 
 All tables must have a primary key.

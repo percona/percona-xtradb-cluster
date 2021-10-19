@@ -1,13 +1,13 @@
 .. _haproxy:
 
 ================================================================================
-Load balancing with |haproxy|
+Load balancing with HAProxy
 ================================================================================
 
-This manual describes how to configure HAProxy to work with |PXC|.
+This manual describes how to configure HAProxy to work with Percona XtraDB Cluster.
 
-Start by installing |haproxy| on a :term:`node` that you intend to use
-for load balancing. The operating systems that support |PXC| provide
+Start by installing HAProxy on a :term:`node` that you intend to use
+for load balancing. The operating systems that support Percona XtraDB Cluster provide
 the |pkg.haproxy| package and you can install it using the package manager.
 
 Debian or Ubuntu
@@ -22,11 +22,11 @@ Red Hat or CentOS:
       $ sudo yum update
       $ sudo yum install haproxy
 
-.. admonition:: Supported versions of |haproxy|
+.. admonition:: Supported versions of HAProxy
 
-   The lowest supported version of |haproxy| is 1.4.20. 
+   The lowest supported version of HAProxy is 1.4.20. 
 
-To start |haproxy|, use the |app.haproxy| command. You may pass any
+To start HAProxy, use the |app.haproxy| command. You may pass any
 number of configuration parameters on the command line. To use a
 configuration file, use the |opt.f| option.
 
@@ -44,19 +44,19 @@ configuration file, use the |opt.f| option.
    $ sudo haproxy -f conf-dir
 
 You can pass the name of an existing configuration file or a
-directory. |haproxy| includes all files with the *.cfg* extension in the the
+directory. HAProxy includes all files with the *.cfg* extension in the the
 supplied directory. Another way to pass multiple files is to use |opt.f|
 multiple times.
 
 .. seealso::
 
-   |haproxy| Documentation:
+   HAProxy Documentation:
       - `Managing HAProxy (including available options)
 	<http://cbonte.github.io/haproxy-dconv/2.0/management.html>`_
       - `More information about how to configure HAProxy
 	<http://cbonte.github.io/haproxy-dconv/2.0/configuration.html#2>`_
 
-.. admonition:: Example of the configuration file for |haproxy|:
+.. admonition:: Example of the configuration file for HAProxy:
 
    .. code-block:: text
 		   
@@ -95,7 +95,7 @@ multiple times.
       :header-rows: 1
       :widths: 15 85
 
-      * - |haproxy| option (with links to |haproxy| documentation)
+      * - HAProxy option (with links to HAProxy documentation)
 	- Description
       * - global
 	- A section in the configuration file for process-wide parameters
@@ -152,7 +152,7 @@ To implement this setup, you will need two scripts:
      and a config for ``xinetd``
   *  **mysqlchk** (located in :file:`/etc/xinetd.d`) on each node
 
-Both scripts are available in binaries and source distributions of |PXC|.
+Both scripts are available in binaries and source distributions of Percona XtraDB Cluster.
 
 Change the :file:`/etc/services` file
 by adding the following line on each node::
@@ -196,7 +196,7 @@ The following is an example of the HAProxy configuration file in this case::
 
 .. important::
 
-   In |PXC| |version|, the default authentication plugin is
+   In Percona XtraDB Cluster |version|, the default authentication plugin is
    ``caching_sha2_password``. HAProxy does not support this authentication
    plugin. Create a mysql user using the ``mysql_native_password``
    authentication plugin.
@@ -207,10 +207,10 @@ The following is an example of the HAProxy configuration file in this case::
 
    .. seealso::
 
-      |MySQL| Documentation: CREATE USER statement
+      MySQL Documentation: CREATE USER statement
          https://dev.mysql.com/doc/refman/8.0/en/create-user.html
 
-.. |haproxy| replace:: HAProxy
+.. HAProxy replace:: HAProxy
 .. |pkg.haproxy| replace:: `haproxy`
 .. |app.haproxy| replace:: ``haproxy``
 .. |opt.f| replace:: ``-f``

@@ -4,7 +4,7 @@
 Configuring Nodes for Write-Set Replication
 ===========================================
 
-After installing |PXC| on each node, you need to configure the cluster.
+After installing Percona XtraDB Cluster on each node, you need to configure the cluster.
 In this section, we will demonstrate how to configure a three node cluster:
 
 +--------+-----------+---------------+
@@ -17,7 +17,7 @@ In this section, we will demonstrate how to configure a three node cluster:
 | Node 3 | pxc3      | 192.168.70.63 |
 +--------+-----------+---------------+
 
-1. Stop the |PXC| server. After the installation completes the server is not
+1. Stop the Percona XtraDB Cluster server. After the installation completes the server is not
    started. You need this step if you have started the server manually.
 
    .. code-block:: bash
@@ -77,7 +77,7 @@ In this section, we will demonstrate how to configure a three node cluster:
 
 .. important::
 
-   In |PXC| |version|, the :ref:`encrypt-replication-traffic` is
+   In Percona XtraDB Cluster |version|, the :ref:`encrypt-replication-traffic` is
    enabled by default (via the |pxc-encrypt-cluster-traffic|
    variable).
 
@@ -88,7 +88,7 @@ In this section, we will demonstrate how to configure a three node cluster:
 
    .. seealso::
 
-      More information about the security settings in |PXC|
+      More information about the security settings in Percona XtraDB Cluster
          - :ref:`security`
 	 - :ref:`encrypt-traffic`
 	 - :ref:`ssl-auto-conf`
@@ -104,7 +104,7 @@ Here is an example of a full configuration file installed on CentOS to
 Next Steps: Bootstrap the first node 
 ================================================================================
 
-After you configure all your nodes, initialize |PXC| by bootstrapping the first
+After you configure all your nodes, initialize Percona XtraDB Cluster by bootstrapping the first
 node according to the procedure described in :ref:`bootstrap`.
 
 
@@ -148,40 +148,40 @@ Essential configuration variables
 
 :variable:`wsrep_sst_method`
 
-  By default, |PXC| uses |PXB|_ for :term:`State Snapshot Transfer <SST>`.
+  By default, Percona XtraDB Cluster uses Percona XtraBackup_ for :term:`State Snapshot Transfer <SST>`.
   ``xtrabackup-v2`` is the only supported option for this variable.
   This method requires a user for SST to be set up on the initial node.
 
 :variable:`pxc_strict_mode`
 
   :ref:`pxc-strict-mode` is enabled by default and set to ``ENFORCING``,
-  which blocks the use of tech preview features and unsupported features in |PXC|.
+  which blocks the use of tech preview features and unsupported features in Percona XtraDB Cluster.
 
-|binlog_format|_
+binlog_format_
 
   Galera supports only row-level replication, so set ``binlog_format=ROW``.
 
-.. |binlog_format| replace:: ``binlog_format``
+.. binlog_format replace:: ``binlog_format``
 .. _binlog_format: http://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_binlog_format
 
-|default_storage_engine|_
+default_storage_engine_
 
   Galera fully supports only the InnoDB storage engine.
   It will not work correctly with MyISAM
   or any other non-transactional storage engines.
   Set this variable to ``default_storage_engine=InnoDB``.
 
-.. |default_storage_engine| replace:: ``default_storage_engine``
+.. default_storage_engine replace:: ``default_storage_engine``
 .. _default_storage_engine: http://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_default_storage_engine
 
-|innodb_autoinc_lock_mode|_
+innodb_autoinc_lock_mode_
 
   Galera supports only interleaved (``2``) lock mode for InnoDB.
   Setting the traditional (``0``) or consecutive (``1``) lock mode
   can cause replication to fail due to unresolved deadlocks.
   Set this variable to ``innodb_autoinc_lock_mode=2``.
 
-.. |innodb_autoinc_lock_mode| replace:: ``innodb_autoinc_lock_mode``
+.. innodb_autoinc_lock_mode replace:: ``innodb_autoinc_lock_mode``
 .. _innodb_autoinc_lock_mode: http://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_autoinc_lock_mode
 
 .. include:: .res/replace.file.txt

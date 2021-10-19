@@ -28,7 +28,7 @@ Alerting
 ========
 
 Besides standard MySQL alerting,
-you should use at least the following triggers specific to |PXC|:
+you should use at least the following triggers specific to Percona XtraDB Cluster:
 
  * Cluster state of each node
 
@@ -73,7 +73,7 @@ at least for the following:
  * Replication conflicts:
    :variable:`wsrep_local_cert_failures` and :variable:`wsrep_local_bf_aborts`
 
-Using |PMM|
+Using Percona Monitoring and Management
 ===========
 
 `Percona Monitoring and Management <https://www.percona.com/doc/percona-monitoring-and-management/index.html>`_ includes two dashboards to monitor PXC: 
@@ -90,7 +90,7 @@ These dashboards are available from the menu:
 
 .. image:: pmm.menu.ha.png
 
-Please refer to the `official documentation <https://www.percona.com/doc/percona-monitoring-and-management/index.html>`_ for details on |PMM| installation and setup.
+Please refer to the `official documentation <https://www.percona.com/doc/percona-monitoring-and-management/index.html>`_ for details on Percona Monitoring and Management installation and setup.
 
 Other Reading
 =============

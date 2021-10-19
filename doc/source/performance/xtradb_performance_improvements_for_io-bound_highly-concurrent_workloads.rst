@@ -42,7 +42,7 @@ a new system variable :variable:`innodb_empty_free_list_algorithm`.
    :default: legacy
 
 When ``legacy`` option is set, server will use the upstream algorithm and when
-the ``backoff`` is selected, |Percona| implementation will be used.
+the ``backoff`` is selected, Percona implementation will be used.
 
 .. _lru_manager_threads:
 
@@ -65,13 +65,13 @@ flushing and is tasked with flush list flushing only.
   instance, introducing the risk that the right flushing mode will not happen
   for a particular instance because it is being flushed in the other mode.
 
-The following |InnoDB| metrics are no longer accounted, as their semantics do
+The following InnoDB metrics are no longer accounted, as their semantics do
 not make sense under the current LRU flushing design:
 ``buffer_LRU_batch_flush_avg_time_slot``, ``buffer_LRU_batch_flush_avg_pass``,
 ``buffer_LRU_batch_flush_avg_time_thread``,
 ``buffer_LRU_batch_flush_avg_time_est``.
 
-The need for |InnoDB| recovery thread writer threads is also removed,
+The need for InnoDB recovery thread writer threads is also removed,
 consequently all associated code is deleted.
 
 .. _doublewrite_buffer:

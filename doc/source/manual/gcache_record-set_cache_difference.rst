@@ -4,7 +4,7 @@
 Understanding GCache and Record-Set Cache
 =========================================
 
-In |PXC|, there is a concept of GCache and Record-Set cache
+In Percona XtraDB Cluster, there is a concept of GCache and Record-Set cache
 (which can also be called transaction write-set cache).
 The use of these two caches is often confusing
 if you are running long transactions,
