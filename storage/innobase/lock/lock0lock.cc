@@ -611,8 +611,8 @@ request is really for a 'gap' type lock */
                      << " - " << lock2->index->table_name << "n_uniq "
                      << lock2->index->n_uniq << " n_user "
                      << lock2->index->n_user_defined_cols;
-          return false;
         }
+        return false;
       }
     }
 #endif /* WITH_WSREP */
