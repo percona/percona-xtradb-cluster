@@ -2,32 +2,24 @@
 """
     The Percona Server domain.
 
-    :copyright: Copyright 2011-2020 by Percona Inc.
+    :copyright: Copyright 2011 by Percona Inc.
     :license: GPL3, see LICENSE for details.
-
-    For Sphinx 3.1
 """
 
 import re
 import string
 
-from typing import Any, Dict, Iterator, List, Tuple
-
 from docutils import nodes
-from docutils.nodes import Element
-
-from docutils.parsers.rst import directives, Directive
+from docutils.parsers.rst import directives
 
 from sphinx import addnodes
 from sphinx.roles import XRefRole
-from sphinx.locale import _
+from sphinx.locale import l_, _
 from sphinx.domains import Domain, ObjType, Index
-from sphinx.builders import Builder
-from sphinx.environment import BuildEnvironment
 from sphinx.directives import ObjectDescription
 from sphinx.util.nodes import make_refnode
+from sphinx.util.compat import Directive
 from sphinx.util.docfields import Field, GroupedField, TypedField
-from sphinx.addnodes import desc_signature, pending_xref
 
 
 # RE to split at word boundaries
@@ -69,7 +61,7 @@ class PSschemaObject(ObjectDescription):
         #         modname=None, classname=None)
         #     pnode = tnode
         #     signode += pnode
-
+        
         if len(ws) > 2:
             dbname, tablename, columnname = ws
             name = columnname
@@ -82,7 +74,7 @@ class PSschemaObject(ObjectDescription):
                 signode['table'] = tablename
                 signode += addnodes.desc_addname(dbname, dbname)
                 signode += addnodes.desc_name(tablename, tablename)
-                # fullname = dbname + "." + tablename
+                # fullname = dbname + "." + tablename 
                 fullname = tablename
             if ot == 'column':
                 tablename, columnname = ws
@@ -181,6 +173,8 @@ class PSconfigObject(ObjectDescription):
             return _('%s (option)') % name
         elif self.objtype == 'variable':
             return _('%s (variable)') % name
+        elif self.objtype == 'command':
+            return _('%s (command)') % name
         else:
             return ''
 
@@ -208,12 +202,12 @@ class PSconfigObject(ObjectDescription):
 class PSTable(PSschemaObject):
 
     doc_field_types = [
-        TypedField('column', label=_('Columns'), rolename='obj',
+        TypedField('column', label=l_('Columns'), rolename='obj',
                    names=('col', 'column', 'cols'),
                    typerolename='obj', typenames=('paramtype', 'type')),
-        Field('inpatch', label=_('Included in Patch'), has_arg=False,
+        Field('inpatch', label=l_('Included in Patch'), has_arg=False,
               names=('inpatch')),
-        TypedField('versioninfo', label=_('Version Info'), rolename='obj',
+        TypedField('versioninfo', label=l_('Version Info'), rolename='obj',
                    names=('version', 'versioninfo'),
                    typerolename='obj', typenames=('paramtype', 'type')),
     ]
@@ -221,49 +215,49 @@ class PSTable(PSschemaObject):
 class PSDatabase(PSschemaObject):
 
     doc_field_types = [
-        TypedField('tbl', label=_('Tables'),
+        TypedField('tbl', label=l_('Tables'),
                    names=('tbl', 'table',),
                    typerolename='obj', typenames=('paramtype', 'type')),
-        Field('engine', label=_('Storage Engine'), has_arg=False,
+        Field('engine', label=l_('Storage Engine'), has_arg=False,
               names=('engine')),
-        Field('inpatch', label=_('Included in Patch'), has_arg=False,
+        Field('inpatch', label=l_('Included in Patch'), has_arg=False,
               names=('inpatch')),
     ]
 
 class PSColumn(PSschemaObject):
 
     doc_field_types = [
-        TypedField('coltype', label=_('Type'), rolename='obj',
+        TypedField('coltype', label=l_('Type'), rolename='obj',
                    names=('coltype', 'type'),
                    typerolename='obj', typenames=('paramtype', 'type')),
-        Field('inpatch', label=_('Included in Patch'), has_arg=False,
+        Field('inpatch', label=l_('Included in Patch'), has_arg=False,
               names=('inpatch')),
     ]
 
 class PSVariable(PSconfigObject):
 
     doc_field_types = [
-        Field('scope', label=_('Scope'), has_arg=False,
+        Field('scope', label=l_('Scope'), has_arg=False,
               names=('scope', 'varscope')),
-        Field('cmdline', label=_('Command Line'), has_arg=False,
+        Field('cmdline', label=l_('Command Line'), has_arg=False,
               names=('cmdline', 'cline', 'cli')),
-        Field('configfile', label=_('Config File'), has_arg=False,
+        Field('configfile', label=l_('Config File'), has_arg=False,
               names=('conffile', 'configfile', 'conf', 'cfile')),
-        Field('dynamic', label=_('Dynamic'), has_arg=False,
+        Field('dynamic', label=l_('Dynamic'), has_arg=False,
               names=('dynvar', 'dyn')),
-        Field('vartype', label=_('Variable Type'), has_arg=False,
+        Field('vartype', label=l_('Variable Type'), has_arg=False,
               names=('vartype', 'vtype')),
-        Field('default', label=_('Default Value'), has_arg=False,
+        Field('default', label=l_('Default Value'), has_arg=False,
               names=('default', 'df')),
-        Field('range', label=_('Range'), has_arg=False,
+        Field('range', label=l_('Range'), has_arg=False,
               names=('range', 'range')),
-        Field('allowed', label=_('Allowed Values'), has_arg=False,
+        Field('allowed', label=l_('Allowed Values'), has_arg=False,
               names=('allowed', 'av')),
-        Field('unit', label=_('Units'), has_arg=False,
+        Field('unit', label=l_('Units'), has_arg=False,
               names=('unit', 'un')),
-        Field('inpatch', label=_('Included in Patch'), has_arg=False,
+        Field('inpatch', label=l_('Included in Patch'), has_arg=False,
               names=('inpatch')),
-        TypedField('versioninfo', label=_('Version Info'), rolename='obj',
+        TypedField('versioninfo', label=l_('Version Info'), rolename='obj',
                    names=('version', 'versioninfo'),
                    typerolename='obj', typenames=('paramtype', 'type')),
     ]
@@ -278,8 +272,8 @@ class PSReleaseNotes(Directive):
 
     has_content = False
     required_arguments = 1
-    optiona_arguments = 0
-    fina_argument_whitespace = False
+    optional_arguments = 0
+    final_argument_whitespace = False
     option_spec = {
         'platform': lambda x: x,
         'noindex': directives.flag,
@@ -327,11 +321,12 @@ class PerconaServerDomain(Domain):
     name = 'psdom'
     label = 'Percona Server'
     object_types = {
-        'db':        ObjType(_('db'),       'db'),
-        'table':     ObjType(_('table'),    'table'),
-        'column':    ObjType(_('column'),   'column'),
-        'option':    ObjType(_('option'),   'option'),
-        'variable':  ObjType(_('variable'), 'data'),
+        'db':        ObjType(l_('db'),       'db'),
+        'table':     ObjType(l_('table'),    'table'),
+        'column':    ObjType(l_('column'),   'column'),
+        'option':    ObjType(l_('option'),   'option'),
+        'variable':  ObjType(l_('variable'), 'data'),
+        'command':  ObjType(l_('command'), 'command'),
     }
 
     directives = {
@@ -340,6 +335,7 @@ class PerconaServerDomain(Domain):
         'column':   PSColumn,
         'option':   PSVariable,
         'variable': PSVariable,
+        'command':  PSVariable,
         'rn':       PSReleaseNotes
     }
     roles = {
@@ -348,26 +344,20 @@ class PerconaServerDomain(Domain):
         'column':   PSXRefRole(),
         'option':   PSXRefRole(),
         'variable': PSXRefRole(),
+        'command':  PSXRefRole(),
         'rn': PSXRefRole(),
     }
     initial_data = {
         'objects': {},  # fullname -> docname, objtype
     }
 
-    @property
-    def objects(self) -> Dict[Tuple[str, str], Tuple[str, str]]:
-        return self.data.setdefault('objects', {})  # (objtype, fullname) -> (docname, node_id)
-
-    def clear_doc(self, docname: str) -> None:
-        for fullname, (fn, _) in list(self.objects.items()):
+    def clear_doc(self, docname):
+        for fullname, (fn, _) in self.data['objects'].items():
             if fn == docname:
                 del self.data['objects'][fullname]
 
-
-
-    def resolve_xref(self, env: BuildEnvironment, fromdocname: str, builder: Builder,
-                     typ: str, target: str, node: pending_xref, contnode: Element
-                     ) -> Element:
+    def resolve_xref(self, env, fromdocname, builder,
+                     typ, target, node, contnode):
         # strip pointer asterisk
         target = target.rstrip(' *')
         if target not in self.data['objects']:
@@ -377,7 +367,7 @@ class PerconaServerDomain(Domain):
                             contnode, target)
 
     def get_objects(self):
-        for refname, (docname, type) in self.data['objects'].items():
+        for refname, (docname, type) in self.data['objects'].iteritems():
             yield (refname, refname, type, docname, refname, 1)
 
     def find_obj(self, env, obj, name, typ, searchorder=0):
