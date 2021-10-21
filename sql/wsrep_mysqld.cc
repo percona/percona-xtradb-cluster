@@ -21,6 +21,7 @@
 #include "sql/dd/dictionary.h"
 #include "sql/dd/types/table.h"
 #include "sql/key_spec.h"
+#include "sql/raii/sentry.h"
 #include "sql/sql_alter.h"
 #include "sql/sql_lex.h"
 #include "sql/ssl_init_callback.h"
@@ -1673,30 +1674,68 @@ static bool wsrep_do_action_for_tables(THD *thd, TABLE_LIST *tables,
                                        action_fn action) {
   if (!WSREP(thd) || !WSREP_CLIENT(thd)) return false;
 
+  // If we fail to collect FK meta data, we set the error and return true.
+  // That will trigger retry logic inside wsrep_dispatch_sql_command()
   for (auto table = tables; table; table = table->next_local) {
     if (!is_temporary_table(table)) {
+      DBUG_EXECUTE_IF("wsrep_do_action_for_tables_lock_fail", {
+        my_error(ER_LOCK_DEADLOCK, MYF(0));
+        return true;
+      });
+
       MDL_ticket *mdl_ticket = nullptr;
       if (dd::acquire_shared_table_mdl(thd, table->db, table->table_name, false,
                                        &mdl_ticket)) {
-        WSREP_WARN("Failed to take MDL for table, can't do action.");
+        WSREP_WARN(
+            "Unable to acquire shared lock on db: %s, table: %s for FKs "
+            "collection",
+            table->db, table->table_name);
+        my_error(ER_LOCK_DEADLOCK, MYF(0));
         return true;
       }
 
-      const dd::Table *table_obj = nullptr;
-      dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
-      if (thd->dd_client()->acquire(dd::String_type(table->db),
-                                    dd::String_type(table->table_name),
-                                    &table_obj)) {
-        assert(0);
-        dd::release_mdl(thd, mdl_ticket);
-        continue;
-      }
+      DEBUG_SYNC(thd, "wsrep_do_action_for_tables_after_lock");
 
-      if (table_obj != nullptr) {
-        action(table_obj);
-      }
+      {
+        /*
+          Dictionary_client does aggressive validation against MDLs locked
+          during the time when DD objects are acquired.
+          Keep the MDL lock as long as the Auto_releaser is alive
+          and unlock just after Auto_releaser destruction.
+        */
+        raii::Sentry<> mdl_release_guard{
+            [thd, mdl_ticket]() -> void { dd::release_mdl(thd, mdl_ticket); }};
 
-      dd::release_mdl(thd, mdl_ticket);
+        {
+          const dd::Table *table_obj = nullptr;
+          dd::cache::Dictionary_client::Auto_releaser releaser(
+              thd->dd_client());
+          if (thd->dd_client()->acquire(dd::String_type(table->db),
+                                        dd::String_type(table->table_name),
+                                        &table_obj)) {
+            WSREP_WARN(
+                "Unable to acquire dd_client for db: %s, table: %s for FKs "
+                "collection",
+                table->db, table->table_name);
+            my_error(ER_LOCK_DEADLOCK, MYF(0));
+            return true;
+          }
+
+          if (table_obj != nullptr) {
+            action(table_obj);
+          }
+        }  // The end of Dictionary_client::Auto_releaser scope
+      }    // The end of mdl_release_guard scope
+
+      // We might have been aborted in the meantime by some other TOI
+      if (thd->killed == THD::KILL_QUERY) {
+        WSREP_WARN(
+            "Unable to collect FKs metadata for db: %s, table: %s for FKs "
+            "collection",
+            table->db, table->table_name);
+        my_error(ER_LOCK_DEADLOCK, MYF(0));
+        return true;
+      }
     }
   }
 
@@ -1708,13 +1747,14 @@ static bool wsrep_do_action_for_tables(THD *thd, TABLE_LIST *tables,
  */
 bool wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
                                wsrep::key_array *keys) {
-  return wsrep_do_action_for_tables(thd, tables, [keys](const dd::Table *table_def) {
-    for (const auto fk : table_def->foreign_key_parents()) {
-      keys->push_back(wsrep_prepare_key_for_toi(fk->child_schema_name().c_str(),
-                                                fk->child_table_name().c_str(),
-                                                wsrep::key::shared));
-    }
-  });
+  return wsrep_do_action_for_tables(
+      thd, tables, [keys](const dd::Table *table_def) {
+        for (const auto fk : table_def->foreign_key_parents()) {
+          keys->push_back(wsrep_prepare_key_for_toi(
+              fk->child_schema_name().c_str(), fk->child_table_name().c_str(),
+              wsrep::key::shared));
+        }
+      });
 }
 
 /*
@@ -1722,13 +1762,14 @@ bool wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
  */
 bool wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *tables,
                                   wsrep::key_array *keys) {
-  return wsrep_do_action_for_tables(thd, tables, [keys](const dd::Table *table_def) {
-    for (const auto fk : table_def->foreign_keys()) {
-      keys->push_back(wsrep_prepare_key_for_toi(
-          fk->referenced_table_schema_name().c_str(),
-          fk->referenced_table_name().c_str(), wsrep::key::shared));
-    }
-  });
+  return wsrep_do_action_for_tables(
+      thd, tables, [keys](const dd::Table *table_def) {
+        for (const auto fk : table_def->foreign_keys()) {
+          keys->push_back(wsrep_prepare_key_for_toi(
+              fk->referenced_table_schema_name().c_str(),
+              fk->referenced_table_name().c_str(), wsrep::key::shared));
+        }
+      });
 }
 
 /*

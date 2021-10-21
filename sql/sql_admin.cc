@@ -560,7 +560,9 @@ static bool wsrep_toi_replication(THD *thd, TABLE_LIST *tables) {
 
   wsrep::key_array keys;
 
-  wsrep_append_fk_parent_table(thd, tables, &keys);
+  if (wsrep_append_fk_parent_table(thd, tables, &keys)) {
+    return true;
+  }
 
   /* now TOI replication, with no locks held */
   if (keys.empty()) {
@@ -1435,6 +1437,7 @@ err:
   if (thd->sp_runtime_ctx) thd->sp_runtime_ctx->end_partial_result_set = true;
 
   /* Make sure this table instance is not reused after the operation. */
+  /* table can be nullptr if we failed with wsrep_toi_replication() */
   if (table && table->table) table->table->invalidate_dict();
   close_thread_tables(thd);  // Shouldn't be needed
   thd->mdl_context.release_transactional_locks();

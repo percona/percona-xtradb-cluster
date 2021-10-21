@@ -4130,7 +4130,9 @@ int mysql_execute_command(THD *thd, bool first_level) {
           // We cannot use WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF, because here
           // lex->no_write_to_binlog is uninitialized
           wsrep::key_array keys;
-          wsrep_append_fk_parent_table(thd, all_tables, &keys);
+          if (wsrep_append_fk_parent_table(thd, all_tables, &keys)) {
+            return true;
+          }
           if (WSREP(thd) &&
               wsrep_to_isolation_begin(thd, NULL, NULL, all_tables, NULL, NULL,
                                        &keys)) {
