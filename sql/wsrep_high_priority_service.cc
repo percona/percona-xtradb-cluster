@@ -718,6 +718,17 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
     replayer_thd->binlog_setup_trx_data();
     replayer_thd->set_current_stmt_binlog_format_row();
 
+    /* Disable general logging on applier threads */
+    replayer_thd->variables.option_bits |= OPTION_LOG_OFF;
+    /* Enable binlogging if opt_log_slave_updates is set */
+    if (opt_log_slave_updates) {
+      replayer_thd->variables.option_bits |= OPTION_BIN_LOG;
+      replayer_thd->variables.option_bits &= ~(OPTION_BIN_LOG_INTERNAL_OFF);
+    } else {
+      replayer_thd->variables.option_bits &= ~(OPTION_BIN_LOG);
+      replayer_thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+    }
+
     // Mark it as a system thread so it shows up in show processlist for wait
     // condition
     replayer_thd->system_thread = SYSTEM_THREAD_BACKGROUND;
@@ -752,7 +763,7 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
     // return from the original function, and only the worker
     // thread remain
     // so we'll copy it to make sure we still have it
-    std::vector<std::uint8_t> our_data(data.data(), data.data()+data.size());
+    std::vector<std::uint8_t> our_data(data.data(), data.data() + data.size());
     wsrep::const_buffer our_buffer(our_data.data(), our_data.size());
 
     client_state.before_command();

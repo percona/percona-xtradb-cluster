@@ -308,9 +308,7 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
                             : (new Format_description_log_event());
 
   // if (writer.write(ev) || my_b_write(&cache, (uchar *)rbr_buf, buf_len) ||
-  // TODO? this crashes the applier thread in NBO
-  if (thd->variables.wsrep_OSU_method != WSREP_OSU_NBO &&
-      ((ev->write(&cache) ||
+  if (((ev->write(&cache) ||
         cache.write(static_cast<uchar *>(const_cast<void *>(rbr_buf)),
                     buf_len) ||
         cache.flush()))) {
