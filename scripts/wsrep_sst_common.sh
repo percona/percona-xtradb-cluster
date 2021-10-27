@@ -188,7 +188,7 @@ parse_cnf()
 #
 # Converts an input string into a boolean "on", "off"
 # Converts:
-#   "on", "true", "1" -> "on" (case insensitive)
+#   "on", "true", positive number -> "on" (case insensitive)
 #   "off", "false", "0" -> "off" (case insensitive)
 # All other values : -> default_value
 #
@@ -199,7 +199,7 @@ normalize_boolean()
     local input_value=$1
     local default_value=$2
 
-    [[ "$input_value" == "1" ]]                 && echo "on"    && return 0
+    [[ "$input_value" =~ ^[1-9][0-9]*$ ]]       && echo "on"    && return 0
     [[ "$input_value" =~ ^[Oo][Nn]$ ]]          && echo "on"    && return 0
     [[ "$input_value" =~ ^[Tt][Rr][Uu][Ee]$ ]]  && echo "on"    && return 0
     [[ "$input_value" == "0" ]]                 && echo "off"   && return 0
