@@ -149,6 +149,16 @@ How-tos
    howtos/proxysql
    howtos/virt_sandbox
 
+Release notes
+===================
+
+.. toctree::
+   :maxdepth: 1
+   :glob:
+
+   release-notes/release-notes_index
+
+
 Reference
 =========
 
@@ -156,7 +166,6 @@ Reference
    :maxdepth: 1
    :glob:
 
-   release-notes/release-notes_index
    wsrep-status-index
    wsrep-system-index
    wsrep-provider-index
