@@ -4,7 +4,7 @@ import sys, os
 sys.path.append(os.path.abspath("../"))
 from conf import *
 #extensions.remove('psdom')
-extensions.append('sphinx_gitstamp')
+#extensions.append('sphinx_gitstamp')
 extensions.append('sphinx_copybutton')
 #sys.path.append(os.path.abspath('ext'))
 #extensions.append('psdom')
