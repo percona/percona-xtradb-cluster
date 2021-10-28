@@ -195,8 +195,7 @@
 #include "wsrep_trans_observer.h"
 
 static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf,
-                                       uint length,
-                                       Parser_state *parser_state,
+                                       uint length, Parser_state *parser_state,
                                        bool update_userstat);
 #endif /* WITH_WSREP */
 
@@ -2241,8 +2240,9 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 
 #ifdef WITH_WSREP
       if (WSREP_ON) {
-        if (wsrep_dispatch_sql_command(thd, thd->query().str, thd->query().length,
-                              &parser_state, false)) {
+        if (wsrep_dispatch_sql_command(thd, thd->query().str,
+                                       thd->query().length, &parser_state,
+                                       false)) {
           WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
           mysql_mutex_lock(&thd->LOCK_wsrep_thd);
           thd->killed = THD::NOT_KILLED;
@@ -2343,7 +2343,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 
         if (WSREP_ON) {
           if (wsrep_dispatch_sql_command(thd, beginning_of_next_stmt, length,
-                                &parser_state, false)) {
+                                         &parser_state, false)) {
             WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
             mysql_mutex_lock(&thd->LOCK_wsrep_thd);
             thd->killed = THD::NOT_KILLED;
@@ -5684,6 +5684,8 @@ finish:
     DEBUG_SYNC(thd, "execute_command_after_close_tables");
 #endif
 
+  WSREP_NBO_2ND_PHASE_BEGIN;
+
   if (!thd->in_sub_stmt && thd->transaction_rollback_request) {
     /*
       We are not in sub-statement and transaction rollback was requested by
@@ -7437,9 +7439,9 @@ static bool wsrep_should_retry_in_autocommit(enum_sql_command &sql_command) {
   }
 }
 
-static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf, uint length,
-                              Parser_state *parser_state,
-                              bool update_userstat) {
+static bool wsrep_dispatch_sql_command(THD *thd, const char *rawbuf,
+                                       uint length, Parser_state *parser_state,
+                                       bool update_userstat) {
   DBUG_TRACE;
   bool is_autocommit = !thd->in_multi_stmt_transaction_mode() &&
                        wsrep_read_only_option(thd, thd->lex->query_tables);
@@ -7548,7 +7550,7 @@ static void sql_kill(THD *thd, my_thread_id id, bool only_kill_query) {
 #ifdef WITH_WSREP
       if (error == ER_QUERY_INTERRUPTED) {
     my_printf_error(ER_KILL_DENIED_ERROR,
-                    "The query is in TOI and cannot be killed", MYF(0));
+                    "The query is in TOI/NBO and cannot be killed", MYF(0));
   } else
 #endif /* WITH_WSREP */
     my_error(error, MYF(0), id);

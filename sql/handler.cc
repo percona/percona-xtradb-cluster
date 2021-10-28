@@ -2197,6 +2197,7 @@ int ha_rollback_low(THD *thd, bool all) {
     WSREP_DEBUG("ha_rollback_trans(%u, %s) rolled back: %s: XX%s;",
                 thd->thread_id(), all ? "TRUE" : "FALSE", WSREP_QUERY(thd),
                 thd->get_stmt_da()->message_text());
+    WSREP_NBO_1ST_PHASE_END;
   }
   (void)wsrep_after_rollback(thd, all);
 #endif /* WITH_WSREP */

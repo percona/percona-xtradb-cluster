@@ -1435,7 +1435,7 @@ err:
   if (thd->sp_runtime_ctx) thd->sp_runtime_ctx->end_partial_result_set = true;
 
   /* Make sure this table instance is not reused after the operation. */
-  if (table->table) table->table->invalidate_dict();
+  if (table && table->table) table->table->invalidate_dict();
   close_thread_tables(thd);  // Shouldn't be needed
   thd->mdl_context.release_transactional_locks();
   return true;
@@ -1608,18 +1608,37 @@ static bool pxc_strict_mode_admin_check(THD *thd, TABLE_LIST *tables) {
 
     // mdl_lock scope begin
     {
+      bool mdl_acquired = false;
       // Acquire lock on the table as it is needed to get the instance from DD
       MDL_request mdl_request;
       MDL_REQUEST_INIT(&mdl_request, MDL_key::TABLE, table->db,
                        table->table_name, MDL_SHARED, MDL_EXPLICIT);
       wsrep_scope_guard mdl_lock(
-          [thd, &mdl_request]() {
-            thd->mdl_context.acquire_lock(&mdl_request,
+          [thd, &mdl_request, &mdl_acquired]() {
+            mdl_acquired = !thd->mdl_context.acquire_lock(&mdl_request,
                                           thd->variables.lock_wait_timeout);
           },
-          [thd, &mdl_request]() {
-            thd->mdl_context.release_lock(mdl_request.ticket);
+          [thd, &mdl_request, &mdl_acquired]() {
+            if(mdl_acquired) thd->mdl_context.release_lock(mdl_request.ticket);
           });
+
+      if (!mdl_acquired) {
+        switch (pxc_strict_mode) {
+          case PXC_STRICT_MODE_DISABLED:
+            return false;
+          default:
+            WSREP_WARN(
+                "Failed to acquire MDL locks for strict mode checks for "
+                "table (%s.%s), skipping checks",
+                table->db, table->table_name);
+            push_warning_printf(
+                thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+                "Failed to acquire MDL locks for strict mode checks for "
+                "table (%s.%s), skipping checks",
+                table->db, table->table_name);
+            return false;
+        }
+      }
 
       const char *schema_name = table->db;
       const char *table_name = table->table_name;
@@ -1734,6 +1753,8 @@ bool Sql_cmd_analyze_table::execute(THD *thd) {
                             lock_type, true, false, 0, nullptr,
                             &handler::ha_analyze, 0, m_alter_info, true);
   }
+
+  WSREP_NBO_1ST_PHASE_END;
 
   /* ! we write after unlocking the table */
   if (!res && !thd->lex->no_write_to_binlog) {

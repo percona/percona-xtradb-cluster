@@ -125,8 +125,8 @@
 #include "sql/sp_head.h"          // SP_PSI_STATEMENT_INFO_COUNT
 #include "sql/sql_backup_lock.h"  // is_instance_backup_locked
 #include "sql/sql_lex.h"
-#include "sql/sql_locale.h"     // my_locale_by_number
-#include "sql/sql_parse.h"      // killall_non_super_threads
+#include "sql/sql_locale.h"  // my_locale_by_number
+#include "sql/sql_parse.h"   // killall_non_super_threads
 #include "sql/sql_profile.h"
 #include "sql/sql_tmp_table.h"  // internal_tmp_mem_storage_engine_names
 #include "sql/ssl_acceptor_context_operator.h"
@@ -7835,9 +7835,10 @@ static Sys_var_charptr Sys_wsrep_data_home_dir(
 
 static Sys_var_charptr Sys_wsrep_cluster_name(
     "wsrep_cluster_name", "Name for the cluster",
-    PREALLOCATED READ_ONLY GLOBAL_VAR(wsrep_cluster_name), CMD_LINE(REQUIRED_ARG),
-    IN_FS_CHARSET, DEFAULT(WSREP_CLUSTER_NAME), NO_MUTEX_GUARD, NOT_IN_BINLOG,
-    ON_CHECK(wsrep_cluster_name_check), ON_UPDATE(wsrep_cluster_name_update));
+    PREALLOCATED READ_ONLY GLOBAL_VAR(wsrep_cluster_name),
+    CMD_LINE(REQUIRED_ARG), IN_FS_CHARSET, DEFAULT(WSREP_CLUSTER_NAME),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(wsrep_cluster_name_check),
+    ON_UPDATE(wsrep_cluster_name_update));
 
 static Sys_var_charptr Sys_wsrep_cluster_address(
     "wsrep_cluster_address", "Address to initially connect to cluster",
@@ -8041,7 +8042,7 @@ static Sys_var_uint Sys_wsrep_sync_wait(
     DEFAULT(WSREP_SYNC_WAIT_NONE), BLOCK_SIZE(1), NO_MUTEX_GUARD, NOT_IN_BINLOG,
     ON_CHECK(0), ON_UPDATE(wsrep_sync_wait_update));
 
-static const char *wsrep_OSU_method_names[] = {"TOI", "RSU", NullS};
+static const char *wsrep_OSU_method_names[] = {"TOI", "RSU", "NBO", NullS};
 static Sys_var_enum Sys_wsrep_OSU_method(
     "wsrep_OSU_method", "Method for Online Schema Upgrade",
     SESSION_VAR(wsrep_OSU_method), CMD_LINE(OPT_ARG), wsrep_OSU_method_names,

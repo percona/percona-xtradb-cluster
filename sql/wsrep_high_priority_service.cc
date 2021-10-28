@@ -15,6 +15,8 @@
 
 #include "wsrep_high_priority_service.h"
 #include "mysql/components/services/log_builtins.h"
+#include "sql/mysqld_thd_manager.h"  // Global_THD_manager
+#include "sql/protocol_classic.h"
 #include "sql/rpl_info_factory.h"
 #include "wsrep_applier.h"
 #include "wsrep_binlog.h"
@@ -27,6 +29,7 @@
 #include "sql_class.h" /* THD */
 #include "transaction.h"
 
+#include <condition_variable>
 #include "sql_base.h"  // close_temporary_table()
 
 extern handlerton *binlog_hton;
@@ -428,6 +431,11 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   DBUG_TRACE;
   THD *thd = m_thd;
 
+  if (ws_meta.flags() & wsrep::provider::flag::rollback) {
+    WSREP_DEBUG("%s", "Certification failed, ignoring...");
+    return 0;
+  }
+
   Wsrep_non_trans_mode non_trans_mode(thd, ws_meta);
 
   wsrep::client_state &client_state(thd->wsrep_cs());
@@ -476,6 +484,9 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   WSREP_DEBUG("%s", m_thd->wsrep_info);
   thd_proc_info(thd, m_thd->wsrep_info);
 
+  wsrep_wait_rollback_complete_and_acquire_ownership(m_thd);
+  wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
+
   if (ret == 0) {
     m_rli->cleanup_context(m_thd, 0);
     m_thd->variables.gtid_next.set_automatic();
@@ -490,8 +501,6 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta &ws_meta,
   }
 
   thd->lex->sql_command = SQLCOM_END;
-
-  wsrep_set_SE_checkpoint(client_state.toi_meta().gtid());
 
   thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(false);
   /* Reset the xid once the transaction has been committed.
@@ -661,10 +670,192 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
   return ret;
 }
 
-int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &,
-                                           const wsrep::const_buffer &,
-                                           wsrep::mutable_buffer &) {
+PSI_thread_key key_nbo_thread;
+
+static PSI_thread_info nbo_threads[] = {
+    {&key_nbo_thread, "NBO update thread", 0, 0, PSI_DOCUMENT_ME}};
+
+int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
+                                           const wsrep::const_buffer &data,
+                                           wsrep::mutable_buffer & /*err*/) {
   DBUG_TRACE;
+
+  static std::mutex mtx;
+  static std::condition_variable cv;
+  std::unique_lock<std::mutex> lk{mtx};
+  bool entered_nbo_mode = false;
+
+  if (ws_meta.flags() & wsrep::provider::flag::rollback) {
+    WSREP_DEBUG("%s", "Certification failed, ignoring...");
+    return 0;
+  }
+
+  Wsrep_non_trans_mode non_trans_mode(m_thd, ws_meta);
+
+  const char *category = "sql";
+  mysql_thread_register(category, nbo_threads, 1);
+
+  snprintf(m_thd->wsrep_info, sizeof(m_thd->wsrep_info),
+           "wsrep: applying NBO write-set (%lld)",
+           (long long)wsrep_thd_trx_seqno(m_thd));
+
+  std::thread th([&] {
+    wsp::thd wthd(true);
+    THD *replayer_thd = wthd.ptr;
+    replayer_thd->get_protocol_classic()->init_net((Vio *)0);
+    replayer_thd->security_context()->set_host_ptr(my_localhost,
+                                                   strlen(my_localhost));
+    replayer_thd->set_new_thread_id();
+#ifdef HAVE_PSI_THREAD_INTERFACE
+    PSI_thread *psi = PSI_THREAD_CALL(new_thread)(key_nbo_thread, replayer_thd,
+                                                  replayer_thd->thread_id());
+    replayer_thd->set_psi(psi);
+    PSI_THREAD_CALL(set_thread)(psi);
+    PSI_THREAD_CALL(set_thread_os_id)(psi);
+    assert(psi != nullptr);
+#endif
+    replayer_thd->store_globals();
+    replayer_thd->binlog_setup_trx_data();
+    replayer_thd->set_current_stmt_binlog_format_row();
+
+    /* Disable general logging on applier threads */
+    replayer_thd->variables.option_bits |= OPTION_LOG_OFF;
+    /* Enable binlogging if opt_log_slave_updates is set */
+    if (opt_log_slave_updates) {
+      replayer_thd->variables.option_bits |= OPTION_BIN_LOG;
+      replayer_thd->variables.option_bits &= ~(OPTION_BIN_LOG_INTERNAL_OFF);
+    } else {
+      replayer_thd->variables.option_bits &= ~(OPTION_BIN_LOG);
+      replayer_thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+    }
+
+    // Mark it as a system thread so it shows up in show processlist for wait
+    // condition
+    replayer_thd->system_thread = SYSTEM_THREAD_BACKGROUND;
+
+    // Applier threads can't be killed and are required for IST applying
+    replayer_thd->wsrep_applier = true;
+
+    THD *thd = replayer_thd;
+#ifdef HAVE_PSI_THREAD_INTERFACE
+    // Attach thread instrumentation
+    mysql_thread_set_psi_id(thd->thread_id());
+    mysql_thread_set_psi_THD(thd);
+    Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
+    thd_manager->add_thd(thd);
+#endif /* HAVE_PSI_THREAD_INTERFACE */
+
+    thd->wsrep_rli = wsrep_relay_log_init("wsrep_relay");
+    assert(!thd->rli_slave);
+    thd->rli_slave = thd->wsrep_rli;
+    thd->wsrep_rli->info_thd = thd;
+
+    thd->variables.wsrep_OSU_method = WSREP_OSU_NBO;
+
+    wsrep_open(thd);
+    wsrep_wait_rollback_complete_and_acquire_ownership(thd);
+
+    wsrep_set_SE_checkpoint(ws_meta.gtid());
+
+    wsrep::client_state &client_state(thd->wsrep_cs());
+
+    // It seems like wsrep-lib might free data after we
+    // return from the original function, and only the worker
+    // thread remain
+    // so we'll copy it to make sure we still have it
+    std::vector<std::uint8_t> our_data(data.data(), data.data() + data.size());
+    wsrep::const_buffer our_buffer(our_data.data(), our_data.size());
+
+    client_state.before_command();
+    client_state.before_statement();
+    int ret = client_state.enter_nbo_mode(ws_meta);
+
+    entered_nbo_mode = true;
+    cv.notify_one();
+
+    assert(ret == 0);
+
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: applying NBO write-set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+
+    WSREP_DEBUG("Wsrep_high_priority_service::apply_nbo_begin: %lld",
+                client_state.nbo_meta().seqno().get());
+
+    /* DDL are atomic so flow (in wsrep_apply_events) will assign XID.
+    Avoid over-writting of this XID by MySQL XID */
+    thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(true);
+
+    wsrep::mutable_buffer err2;
+    ret = apply_events(thd, m_rli, our_buffer, err2);
+    wsrep_thd_set_ignored_error(thd, false);
+
+    THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: %s NBO write set (%lld)",
+             !ret ? "applied" : "failed to apply",
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+
+    THD_STAGE_INFO(thd, stage_wsrep_toi_committing);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: committing NBO write set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+
+    ret = trans_commit(thd);
+
+    THD_STAGE_INFO(thd, stage_wsrep_committed);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: %s NBO write set (%lld)",
+             (!ret ? "committed" : "failed to commit"),
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+
+    if (ret == 0) {
+      thd->wsrep_rli->cleanup_context(thd, 0);
+      thd->variables.gtid_next.set_automatic();
+    }
+
+    TABLE *tmp;
+    while ((tmp = thd->temporary_tables)) {
+      WSREP_DEBUG("Applier %u, has temporary tables: %s.%s", thd->thread_id(),
+                  (tmp->s) ? tmp->s->db.str : "void",
+                  (tmp->s) ? tmp->s->table_name.str : "void");
+      close_temporary_table(thd, tmp, true, true);
+    }
+
+    thd->lex->sql_command = SQLCOM_END;
+
+    thd->get_transaction()->xid_state()->get_xid()->set_keep_wsrep_xid(false);
+    /* Reset the xid once the transaction has been committed.
+    This being TOI transaction it will not pass through wsrep_xxx hooks.
+    Resetting is important to ensure that the applier xid state is restored
+    so if node rejoins and applier thread is re-use for logging view or local
+    activity like rolling back of SR transaction then stale state is not used.
+  */
+    thd->get_transaction()->xid_state()->get_xid()->reset();
+
+    // must_exit_ = check_exit_status();
+
+    thd->wsrep_cs().after_command_before_result();
+    thd->wsrep_cs().after_command_after_result();
+    thd->wsrep_cs().close();
+    thd->wsrep_cs().cleanup();
+
+    thd->release_resources();
+    thd_manager->remove_thd(thd);
+  });
+
+  cv.wait(lk, [&] { return entered_nbo_mode; });
+
+  th.detach();
+
   return 0;
 }
 
@@ -754,9 +945,6 @@ Wsrep_replayer_service::~Wsrep_replayer_service() {
   wsrep_close(replayer_thd);
   wsrep_reset_threadvars(replayer_thd);
   wsrep_store_threadvars(orig_thd);
-
-  //assert(!orig_thd->get_stmt_da()->is_sent());
-  //assert(!orig_thd->get_stmt_da()->is_set());
 
   if (m_replay_status == wsrep::provider::success) {
     assert(replayer_thd->wsrep_cs().current_error() == wsrep::e_success);

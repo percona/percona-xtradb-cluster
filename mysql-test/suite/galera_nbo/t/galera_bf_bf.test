@@ -1,0 +1,92 @@
+#
+# Test that ALTER TABLE on parent table is properly ordered with simultaneous
+# transactions that perform DML on child table.
+#
+# UPDATE should fail certification as its certification keys conflict
+# with ALTER TABLE certification keys.
+#
+# Without the fix, UPDATE is certified, then aborted by already replicated TOI
+# transaction which causes its replay. When replaying it conflicts with TOI
+# causing BF-BF conflict.
+#
+# This test checks if child table is included into the certification keys
+# of the writeset related to TOI done on parent table
+# (currently only ALTER TABLE is affected).
+#
+
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--connect node_1_toi, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1_toi
+SET SESSION wsrep_sync_wait = 0;
+
+CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
+INSERT INTO p1 VALUES (1,1);
+
+CREATE TABLE c1 (pk INTEGER PRIMARY KEY, f2 CHAR(30), fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
+INSERT INTO c1 VALUES (1, 'INITIAL VALUE', 1);
+INSERT INTO c1 VALUES (2, 'INITIAL VALUE', 1);
+
+SET SESSION wsrep_osu_method=NBO;
+
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+
+--send ALTER TABLE p1 ADD f1 INT
+
+--connection node_1
+SET SESSION wsrep_sync_wait=0;
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+######################################################################
+
+--connection node_1
+START TRANSACTION;
+UPDATE c1 SET f2 = 'changed from node 1' WHERE pk = 1;
+SELECT * FROM c1 WHERE pk = 2 FOR UPDATE;
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+SET SESSION wsrep_sync_wait = 0;
+
+# Block the commit, send the COMMIT and wait until it gets blocked
+--let $galera_sync_point = commit_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_1
+--send COMMIT
+
+--connection node_1a
+--let $galera_sync_point = apply_monitor_master_enter_sync commit_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# Let the transactions proceed
+--let $galera_sync_point = commit_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+--reap
+--connection node_1_toi
+--reap
+SET SESSION wsrep_osu_method=TOI;
+
+DROP TABLE c1;
+DROP TABLE p1;
+
+
+# cleanup
+--disconnect node_1_toi
+--disconnect node_1a
+--connection node_1
+
+--source include/wait_until_count_sessions.inc

@@ -1,0 +1,52 @@
+#
+# Test that wsrep can process two ALTERs on the same table that are not conflicting
+#
+# PXC note: these alters are conflicting in PXC, and will error out with ER_LOCK_DEADLOCK
+
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source include/have_debug.inc
+
+--connection node_2
+SET GLOBAL wsrep_slave_threads=4;
+SET @@global.wsrep_log_conflicts=ON;
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER NOT NULL, f2 INTEGER NOT NULL) ENGINE=InnoDB;
+SET GLOBAL debug = 'd,sync.alter_locked_tables_inplace';
+SET SESSION wsrep_osu_method=NBO;
+--send ALTER TABLE t1 LOCK=SHARED, ADD PRIMARY KEY (f1);
+
+--sleep 5
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+
+# Wait for the ALTER to block in sync point
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: now';
+--source include/wait_condition.inc
+
+--let $alter_session_id = `SELECT ID FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: now'`
+
+--echo # Trying to kill the ALTER query
+--disable_query_log
+--error ER_KILL_DENIED_ERROR
+--eval KILL $alter_session_id
+--enable_query_log
+
+SET DEBUG_SYNC= 'now SIGNAL signal.alter_locked_tables_inplace';
+SET GLOBAL debug = '';
+--sleep 1
+
+#--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE INFO LIKE 'ALTER%';
+#--source include/wait_condition.inc
+
+--connection node_1
+--reap
+
+--connection node_2
+SET @@global.wsrep_log_conflicts=OFF;
+SET GLOBAL wsrep_slave_threads=1;
+
+SET SESSION wsrep_OSU_method=TOI;
+DROP TABLE t1;

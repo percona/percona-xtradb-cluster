@@ -2951,6 +2951,12 @@ class THD : public MDL_context_owner,
   */
   bool wsrep_skip_locking;
 
+  struct nbo_context {
+    wsrep::key_array keys;
+  };
+
+  nbo_context wsrep_nbo;
+
   mysql_mutex_t LOCK_wsrep_thd;
   mysql_cond_t COND_wsrep_thd;
 
