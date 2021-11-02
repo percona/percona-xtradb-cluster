@@ -6,6 +6,8 @@ SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
 PAPER         =
 BUILDDIR      = build
+UTILS_REPO    = https://github.com/Percona-Lab/percona-doc-utils/archive/master.tar.gz
+UTILS_DIR     = percona-doc-utils-master
 
 # Internal variables.
 PAPEROPT_a4     = -D latex_paper_size=a4
@@ -36,22 +38,26 @@ help:
 
 clean:
 	-rm -rf $(BUILDDIR)/*
-	-rm -f source/percona-theme/built
 
-source/percona-theme/built:
+# ext:
+# 	@echo "Downloading Percona documentation utils from repository..."
+# 	@mkdir -p $(BUILDDIR) && wget -O - $(UTILS_REPO) | tar xz -C $(BUILDDIR) && cp -r $(BUILDDIR)/$(UTILS_DIR)/sphinx/ext source
+
+ netlify:
+	$(SPHINXBUILD) -b html -d sphinx-build/doctrees source -c source/conf-netlify build/html
+	@echo
+	@echo "Netlify build finished. The HTML pages are in $(BUILDDIR)/html."
+
+html:
 	@echo "Downloading percona-theme ..."
-	@wget -O percona-theme.tar.gz https://www.percona.com/docs/theme-1-4/percona-xtradb-cluster/5.6/
+	@wget -O percona-theme.tar.gz https://www.percona.com/docs/theme-1-4/percona-server/5.6
 	@echo "Extracting theme."
-	@tar -zxf percona-theme.tar.gz
+	@tar -mzxf percona-theme.tar.gz
 	@rm -rf source/percona-theme
 	@mv percona-theme-1-4 source/percona-theme
 	@rm percona-theme.tar.gz
-	@touch source/percona-theme/built
-
-theme:  source/percona-theme/built
-
-html:   theme
 	@echo "Building html doc"
+
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
@@ -138,7 +144,7 @@ changes:
 	@echo
 	@echo "The overview file is in $(BUILDDIR)/changes."
 
-linkcheck:
+linkcheck: 
 	$(SPHINXBUILD) -b linkcheck $(ALLSPHINXOPTS) $(BUILDDIR)/linkcheck
 	@echo
 	@echo "Link check complete; look for any errors in the above output " \
@@ -148,3 +154,15 @@ doctest:
 	$(SPHINXBUILD) -b doctest $(ALLSPHINXOPTS) $(BUILDDIR)/doctest
 	@echo "Testing of doctests in the sources finished, look at the " \
 	      "results in $(BUILDDIR)/doctest/output.txt."
+
+thtml:
+	@echo "Building themed html doc"
+	$(SPHINXBUILD) -D html_theme=alabaster -D html_theme_path='' -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+
+livehtml:
+	sphinx-autobuild $(ALLSPHINXOPTS) $(BUILDDIR) $(O)
+
+livethtml:
+	sphinx-autobuild -D html_theme=alabaster -D html_theme_path='' $(ALLSPHINXOPTS) $(BUILDDIR) $(O)

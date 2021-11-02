@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -42,10 +42,9 @@
 /*
   MySQL can survive with 32K, but some glibc libraries require > 128K stack
   To resolve hostnames. Also recursive stored procedures needs stack.
-
-  ASAN requires more stack space.
 */
-#if defined(HAVE_ASAN)
+#if defined(WITH_WSREP) && defined(HAVE_ASAN)
+/* ASAN requires more stack space. */
 #define STACK_MULTIPLIER 8UL
 #elif defined(__sparc) && (defined(__SUNPRO_CC) || defined(__SUNPRO_C))
 #define STACK_MULTIPLIER 2UL

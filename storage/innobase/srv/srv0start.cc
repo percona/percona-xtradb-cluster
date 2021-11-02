@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2017, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 1996, 2021, Oracle and/or its affiliates.
 Copyright (c) 2008, Google Inc.
 Copyright (c) 2009, 2016, Percona Inc.
 
@@ -217,13 +217,12 @@ mysql_pfs_key_t	srv_worker_thread_key;
 
 #ifdef WITH_WSREP
 extern my_bool wsrep_recovery;
+#endif /* WITH_WSREP */
 
 #ifdef WITH_INNODB_DISALLOW_WRITES
 /* Must always init to FALSE. */
 static my_bool	innobase_disallow_writes	= FALSE;
 #endif /* WITH_INNODB_DISALLOW_WRITES */
-
-#endif /* WITH_WSREP */
 
 int unlock_keyrings(THD *thd);
 

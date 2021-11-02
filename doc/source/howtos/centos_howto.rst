@@ -126,7 +126,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
       mysql@percona1> FLUSH PRIVILEGES;
 
 To perform :ref:`state_snapshot_transfer` using |XtraBackup|,
-set up a new user with proper `privileges <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_:
+set up a new user with proper `privileges <https://www.percona.com/doc/percona-xtrabackup/2.2/innobackupex/privileges.html>`__:
 
 .. code-block:: mysql
 
@@ -140,7 +140,7 @@ set up a new user with proper `privileges <http://www.percona.com/doc/percona-xt
 Step 3. Configuring the second node
 ===================================
 
-1. Make sure that the onfiguration file :file:`/etc/my.cnf`
+1. Make sure that the configuration file :file:`/etc/my.cnf`
    on the second node (``percona2``) contains the following::
 
       [mysqld]

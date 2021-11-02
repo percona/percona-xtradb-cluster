@@ -307,7 +307,7 @@ static void wsrep_pfs_instr_cb(
     void**                        alliedvalue __attribute__((unused)),
     const void*                   ts __attribute__((unused)))
 {
-  DBUG_ASSERT(!wsrep_psi_key_vec.empty());
+  assert(!wsrep_psi_key_vec.empty());
 
   if (type == WSREP_PFS_INSTR_TYPE_MUTEX)
   {
@@ -1262,6 +1262,10 @@ extern int wsrep_on(void *);
 
 void wsrep_init_startup (bool first)
 {
+  /* if server is started with --help (--verbose) options, there is no need
+     to start replication, skipping wsrep initialization
+  */
+  if (opt_help) return;
   if (wsrep_init()) unireg_abort(1);
 
   wsrep_thr_lock_init(wsrep_thd_is_BF, wsrep_abort_thd,
@@ -1723,7 +1727,7 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
 int wsrep_to_buf_helper(
     THD* thd, const char *query, uint query_len, uchar** buf, size_t* buf_len)
 {
-  IO_CACHE tmp_io_cache;
+  IO_CACHE tmp_io_cache = {};
   if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
                        65536, MYF(MY_WME)))
     return 1;
@@ -1748,6 +1752,12 @@ int wsrep_to_buf_helper(
   {
     *buf     = (uchar *)thd->wsrep_gtid_event_buf;
     *buf_len = thd->wsrep_gtid_event_buf_len;
+  }
+
+  if ((thd->variables.option_bits & OPTION_BIN_LOG) == 0)
+  {
+    Intvar_log_event ev((uchar)binary_log::Intvar_event::BINLOG_CONTROL_EVENT, 0);
+    if (ev.write(&tmp_io_cache)) ret= 1;
   }
 
   /* if there is prepare query, add event for it */
@@ -1864,7 +1874,7 @@ static int wsrep_drop_table_query(THD* thd, uchar** buf, size_t* buf_len)
   TABLE_LIST* first_table= select_lex->table_list.first;
   String buff;
 
-  DBUG_ASSERT(!lex->drop_temporary);
+  assert(!lex->drop_temporary);
 
   bool found_temp_table= false;
   for (TABLE_LIST* table= first_table; table; table= table->next_global)
@@ -1924,10 +1934,6 @@ static int wsrep_drop_table_query(THD* thd, uchar** buf, size_t* buf_len)
 static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
                                  const TABLE_LIST *table_list)
 {
-  /* Only if binlog is enabled and user can try to set sql_log_bin=0. */
-  if (mysql_bin_log.is_open() && !(thd->variables.option_bits & OPTION_BIN_LOG))
-    return false;
-
   /* compression dictionary is not table object that has temporary qualifier
   attached to it. Neither it is dependent on other object that needs
   validation. */
@@ -1935,8 +1941,8 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
       || thd->lex->sql_command == SQLCOM_DROP_COMPRESSION_DICTIONARY)
     return true;
 
-  DBUG_ASSERT(!table || db);
-  DBUG_ASSERT(table_list || db);
+  assert(!table || db);
+  assert(table_list || db);
 
   LEX* lex= thd->lex;
   SELECT_LEX* select_lex= lex->select_lex;
@@ -1945,7 +1951,7 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
   switch (lex->sql_command)
   {
   case SQLCOM_CREATE_TABLE:
-    DBUG_ASSERT(!table_list);
+    assert(!table_list);
     if (thd->lex->create_info.options & HA_LEX_CREATE_TMP_TABLE)
     {
       return false;
@@ -1954,8 +1960,8 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
   case SQLCOM_CREATE_VIEW:
 
-    DBUG_ASSERT(!table_list);
-    DBUG_ASSERT(first_table); /* First table is view name */
+    assert(!table_list);
+    assert(first_table); /* First table is view name */
     /*
       If any of the remaining tables refer to temporary table error
       is returned to client, so TOI can be skipped
@@ -1973,9 +1979,9 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 
 #if 0
     /* Trigger statement is invoked with table_list with length = 1 */
-    DBUG_ASSERT(!table_list);
+    assert(!table_list);
 #endif
-    DBUG_ASSERT(first_table);
+    assert(first_table);
 
     if (find_temporary_table(thd, first_table))
     {
@@ -2019,7 +2025,25 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   size_t buf_len(0);
   int buf_err;
 
+  DEBUG_SYNC(thd, "wsrep_TOI_begin_before_wsrep_skip_wsrep_hton");
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+
+  /*
+    Setting wsrep_skip_wsrep_hton=true has a side-effect that this
+    query/thread cannot be killed.
+  */
   thd->wsrep_skip_wsrep_hton= true;
+  bool is_thd_killed = thd->is_killed();
+
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+  DEBUG_SYNC(thd, "wsrep_TOI_begin_after_wsrep_skip_wsrep_hton");
+
+  if (is_thd_killed) {
+    WSREP_DEBUG("Can't execute %s in TOI mode because the query has been killed",
+                WSREP_QUERY(thd));
+    return -1;
+  }
+
   if (wsrep_can_run_in_toi(thd, db_, table_, table_list) == false)
   {
     WSREP_DEBUG("Can't execute %s in TOI mode", WSREP_QUERY(thd));
@@ -2329,8 +2353,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   }
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-  DBUG_ASSERT(thd->wsrep_exec_mode == LOCAL_STATE);
-  DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno == WSREP_SEQNO_UNDEFINED);
+  assert(thd->wsrep_exec_mode == LOCAL_STATE);
+  assert(thd->wsrep_trx_meta.gtid.seqno == WSREP_SEQNO_UNDEFINED);
 
   if (thd->global_read_lock.can_acquire_protection())
   {
@@ -2396,6 +2420,20 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   return ret;
 }
 
+bool wsrep_thd_is_in_to_isolation(THD *thd, bool flock)
+{
+  bool status = false;
+  if (thd)
+  {
+    if (flock) mysql_mutex_lock(&thd->LOCK_thd_data);
+
+    status = thd->wsrep_skip_wsrep_hton;
+
+    if (flock) mysql_mutex_unlock(&thd->LOCK_thd_data);
+  }
+  return status;
+}
+
 void wsrep_to_isolation_end(THD *thd)
 {
   if (thd->wsrep_exec_mode == TOTAL_ORDER)
@@ -2412,8 +2450,13 @@ void wsrep_to_isolation_end(THD *thd)
     wsrep_cleanup_transaction(thd);
   }
 
-  if (thd->wsrep_skip_wsrep_hton)
-    thd->wsrep_skip_wsrep_hton= false;
+  DEBUG_SYNC(thd, "wsrep_to_isolation_end_before_wsrep_skip_wsrep_hton");
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+
+  thd->wsrep_skip_wsrep_hton = false;
+
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+  DEBUG_SYNC(thd, "wsrep_to_isolation_end_after_wsrep_skip_wsrep_hton");
 }
 
 #define WSREP_MDL_LOG(severity, msg, schema, schema_len, req, gra)             \

@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2020, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2021, Oracle and/or its affiliates.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -322,6 +322,10 @@ INSERT INTO global_suppressions VALUES
  ("RSA private key file not found"),
  ("RSA public key file not found"),
 
+ /* TLS v1.0 and v1.1 deprecated */
+ ("A deprecated TLS version TLSv1 is enabled"),
+ ("A deprecated TLS version TLSv1.1 is enabled"),
+
  /*
    Galera suppressions
  */
@@ -391,6 +395,16 @@ INSERT INTO global_suppressions VALUES
 
  ("InnoDB High Priority being used"),
 
+ /*
+   Warnings/errors seen when server is loaded with keyring plugin without
+   enabling pxc_encrypt_cluster_traffic.
+ */
+ ("You have enabled keyring plugin. SST encryption is mandatory."),
+
+  /*
+   Warnings/errors seen when there is a failure during SST.
+  */
+ ("WSREP_SST:.*ERROR.*"),
  ("THE_LAST_SUPPRESSION")||
 
 

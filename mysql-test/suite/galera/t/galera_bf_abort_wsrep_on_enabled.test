@@ -1,0 +1,10 @@
+#
+# Test a transaction within session with wsrep_on=1 being aborted
+# by TOI transaction.
+# For wsrep enabled sessions we expect that transactions interrupted while
+# executing will be retried (wsrep_retry_autocommit)
+#
+
+--let $wsrep_on_value = ON
+--let $expected_error = 0
+--source galera_bf_abort_wsrep_on.inc

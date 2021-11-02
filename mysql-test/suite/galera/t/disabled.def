@@ -26,9 +26,8 @@ pxc_encrypt_rest_fpt_vault : Vault server availability is unreliable
 galera_fk_lock_parent_update_child : 2021-01-04 Disabled by Percona as few cases fail due to timing issue (PXC-3431) and few are invalid after PXC-3501
 galera_toi_ddl_fk_insert : qa#39 2021-01-04 CODERSHIP galera_toi_ddl_fk_insert fails sporadically / PXC-3431
 
-galera_ist_restart_joiner: Needs dynamic wsrep_provider
-galera_ist_try_again: Needs dynamic wsrep_provider
-pxc-421: Needs dynamic wsrep_provider
-galera_memcached: Needs dynamic wsrep_provider
-galera_migrate: Needs dynamic wsrep_provider
-galera_wsrep_provider_unset_set: Needs dynamic wsrep_provider
+galera_ist_try_again: BUG#3592 Needs dynamic wsrep_provider
+pxc-421: BUG#3592 Needs dynamic wsrep_provider
+galera_memcached: BUG#3592 Needs dynamic wsrep_provider
+galera_migrate: BUG#3592 Needs dynamic wsrep_provider
+galera_wsrep_provider_unset_set: BUG#3592 Needs dynamic wsrep_provider
