@@ -1847,9 +1847,8 @@ then
     then
         # find out my Common Name
         wsrep_check_programs openssl
-        CN=$(openssl x509 -noout -subject -in $ssl_cert | \
-             tr "," "\n" | grep "CN =" | cut -d= -f2,3 | cut -d= -f2 | sed s/^\ // | \
-             sed s/\ %//)
+        CN=$(openssl x509 -noout -subject -nameopt multiline -in $ssl_cert | \
+             grep commonName | cut -d= -f2- | sed s/^\ // | sed s/\ %//)
         MY_SECRET=$(wsrep_gen_secret)
         # Add authentication data to address
         AUTH="$CN:$MY_SECRET@"
