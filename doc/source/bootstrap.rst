@@ -11,19 +11,18 @@ which you want to be replicated to other nodes.
 
 Bootstrapping implies starting the node without any known cluster addresses.
 If the :variable:`wsrep_cluster_address` variable is empty,
-|PXC| assumes that this is the first node and initializes the cluster.
+*Percona XtraDB Cluster* assumes that this is the first node and initializes the cluster.
 
 Instead of changing the configuration,
-start the first node and use either of the following commands:
+start the first node with the following command on Debian or Ubuntu:
 
 .. code-block:: bash
 
    [root@pxc1 ~]# /etc/init.d/mysql bootstrap-pxc
-
-or
+   
+Start the first node with the following command on RedHat or CentOS:
 
 .. code-block:: bash
-
     [root@pxc1 ~]# systemctl start mysql@bootstrap.service
 
 When you start the node using the ``bootstrap.server`` command,

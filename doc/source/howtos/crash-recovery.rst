@@ -83,7 +83,13 @@ advanced node (most likely the last stopped). The cluster must be bootstrapped
 using this node, otherwise nodes that had a more advanced position will have to
 perform the full :term:`SST` to join the cluster initialized from the less
 advanced one. As a result, some transactions will be lost). To bootstrap the
-first node, invoke the startup script like this:
+first node, invoke the startup script like this on Debian or Ubuntu:
+
+.. code-block:: bash
+
+   $ /etc/init.d/mysql bootstrap-pxc
+   
+If you are using RedHat or CentOS, use the following script:
 
 .. code-block:: bash
 
