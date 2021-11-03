@@ -213,6 +213,74 @@ SHOW TABLES;
 DROP TABLE p1;
 
 
+#
+# The fix involves querying Data Dictionary to obtain parent and child foreign
+# keys. We need to acquire table MDL lock to be able to access DD.
+# As we do it before entering into TOI, another thread executing TOI in paralel
+# may abort the current thread.
+# In such a case we rely on wsrep_retry_autocommit functionality.
+#
+--connection node_1
+--let $wsrep_retry_autocommit_saved = `SELECT @@wsrep_retry_autocommit`
+CALL mtr.add_suppression(".*Unable to collect FKs metadata.*");
+
+SET wsrep_retry_autocommit = 1;
+
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET DEBUG_SYNC='wsrep_do_action_for_tables_after_lock SIGNAL reached WAIT_FOR continue';
+--send ALTER TABLE t1 ADD (b INT)
+
+--connection node_1a
+SET DEBUG_SYNC='now WAIT_FOR reached';
+ALTER TABLE t1 ADD (c INT);
+
+--connection node_1
+--reap
+
+SHOW CREATE TABLE t1;
+DROP TABLE t1;
+
+#
+# Now the same, but with wsrep_retry_autocommit = 0
+#
+SET wsrep_retry_autocommit = 0;
+
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET DEBUG_SYNC='wsrep_do_action_for_tables_after_lock SIGNAL reached WAIT_FOR continue';
+--send ALTER TABLE t1 ADD (b INT)
+
+--connection node_1a
+SET DEBUG_SYNC='now WAIT_FOR reached';
+ALTER TABLE t1 ADD (c INT);
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+--reap
+
+SHOW CREATE TABLE t1;
+DROP TABLE t1;
+
+--disable_query_log
+--eval set @@wsrep_retry_autocommit = $wsrep_retry_autocommit_saved
+--enable_query_log
+
+#
+# Simulate permanent MDL lock failure
+#
+SET wsrep_retry_autocommit = 2;
+
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET GLOBAL debug="+d,wsrep_do_action_for_tables_lock_fail";
+
+--error ER_LOCK_DEADLOCK
+ALTER TABLE t1 ADD (b INT);
+
+SET GLOBAL debug="-d,wsrep_do_action_for_tables_lock_fail";
+
+SHOW CREATE TABLE t1;
+DROP TABLE t1;
+
+
 # cleanup
 --disconnect node_1_toi
 --disconnect node_1a

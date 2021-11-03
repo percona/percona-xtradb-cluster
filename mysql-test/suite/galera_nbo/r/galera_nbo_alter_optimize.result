@@ -38,4 +38,4 @@ COUNT(*) = 2
 SET SESSION wsrep_OSU_method=TOI;
 DROP TABLE t1;
 DROP TABLE t2;
-CALL mtr.add_suppression("Failed to take MDL for table");
+CALL mtr.add_suppression(".*Unable to acquire shared lock on db.*");

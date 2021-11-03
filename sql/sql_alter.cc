@@ -384,12 +384,9 @@ bool Sql_cmd_alter_table::execute(THD *thd) {
        !find_temporary_table(thd, first_table))) {
     wsrep::key_array keys;
     // append tables referenced by this table
-    if(wsrep_append_fk_parent_table(thd, first_table, &keys)) {
-      WSREP_DEBUG("TOI replication for ALTER failed");
-      return true;
-    }
     // append tables that are referencing this table
-    if(wsrep_append_child_tables(thd, first_table, &keys)) {
+    if (wsrep_append_fk_parent_table(thd, first_table, &keys) ||
+        wsrep_append_child_tables(thd, first_table, &keys)) {
       WSREP_DEBUG("TOI replication for ALTER failed");
       return true;
     }

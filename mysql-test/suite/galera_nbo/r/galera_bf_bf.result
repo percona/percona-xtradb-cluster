@@ -29,3 +29,53 @@ ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SET SESSION wsrep_osu_method=TOI;
 DROP TABLE c1;
 DROP TABLE p1;
+CALL mtr.add_suppression(".*Unable to collect FKs metadata.*");
+SET wsrep_retry_autocommit = 1;
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET SESSION wsrep_osu_method=NBO;
+SET DEBUG_SYNC='wsrep_do_action_for_tables_after_lock SIGNAL reached WAIT_FOR continue';
+ALTER TABLE t1 ADD (b INT);
+SET DEBUG_SYNC='now WAIT_FOR reached';
+ALTER TABLE t1 ADD (c INT);
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int NOT NULL,
+  `c` int DEFAULT NULL,
+  `b` int DEFAULT NULL,
+  PRIMARY KEY (`a`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SET SESSION wsrep_osu_method=TOI;
+DROP TABLE t1;
+SET wsrep_retry_autocommit = 0;
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET SESSION wsrep_osu_method=NBO;
+SET DEBUG_SYNC='wsrep_do_action_for_tables_after_lock SIGNAL reached WAIT_FOR continue';
+ALTER TABLE t1 ADD (b INT);
+SET DEBUG_SYNC='now WAIT_FOR reached';
+ALTER TABLE t1 ADD (c INT);
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int NOT NULL,
+  `c` int DEFAULT NULL,
+  PRIMARY KEY (`a`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SET SESSION wsrep_osu_method=TOI;
+DROP TABLE t1;
+SET wsrep_retry_autocommit = 2;
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET SESSION wsrep_osu_method=NBO;
+SET GLOBAL debug="+d,wsrep_do_action_for_tables_lock_fail";
+ALTER TABLE t1 ADD (b INT);
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SET GLOBAL debug="-d,wsrep_do_action_for_tables_lock_fail";
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int NOT NULL,
+  PRIMARY KEY (`a`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SET SESSION wsrep_osu_method=TOI;
+DROP TABLE t1;
