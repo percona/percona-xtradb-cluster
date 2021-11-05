@@ -127,6 +127,7 @@ pxc_encrypt_cluster_traffic=""
 ssl_cert=""
 ssl_ca=""
 ssl_key=""
+ssl_mode="DISABLED"
 
 readonly SECRET_TAG="secret"
 
@@ -427,6 +428,113 @@ get_keys()
 }
 
 #
+# If the ssl_dhparams variable is already set, uses that as a source
+# of dh parameters for OpenSSL. Otherwise, looks for dhparams.pem in the
+# datadir, and creates it there if it can't find the file.
+# No input parameters
+#
+check_for_dhparams()
+{
+    if [[ -z "$ssl_dhparams" ]]; then
+        if ! [[ -r "$DATA/dhparams.pem" ]]; then
+            wsrep_check_programs openssl
+            wsrep_log_info "Could not find dhparams file, creating $DATA/dhparams.pem"
+
+            if ! openssl dhparam -out "$DATA/dhparams.pem" 2048 >/dev/null 2>&1
+            then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "* Could not create the dhparams.pem file with OpenSSL. "
+                wsrep_log_error "****************************************************** "
+                exit 22
+            fi
+        fi
+        ssl_dhparams="$DATA/dhparams.pem"
+    fi
+}
+
+#
+# verifies that the certificate matches the private key
+# doing this will save us having to wait for a timeout that would
+# otherwise occur.
+#
+# 1st param: path to the cert
+# 2nd param: path to the private key
+#
+verify_cert_matches_key()
+{
+    local cert_path=$1
+    local key_path=$2
+
+    wsrep_check_programs openssl diff
+
+    # generate the public key from the cert and the key
+    # they should match (otherwise we can't create an SSL connection)
+    if ! diff <(openssl x509 -in "$cert_path" -pubkey -noout) <(openssl pkey -in "$key_path" -pubout 2>/dev/null) >/dev/null 2>&1
+    then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "* The certifcate and private key do not match. "
+        wsrep_log_error "* Please check your certificate and key files. "
+        wsrep_log_error "****************************************************** "
+        exit 22
+    fi
+}
+
+#
+# verifies that the CA file verifies the certificate
+# doing this here lets us generate better error messages
+#
+# 1st param: path to the CA file
+# 2nd param: path to the cert
+#
+verify_ca_matches_cert()
+{
+    local ca_path=$1
+    local cert_path=$2
+
+    wsrep_check_programs openssl
+
+    if ! openssl verify -verbose -CAfile "$ca_path" "$cert_path" >/dev/null  2>&1
+    then
+        wsrep_log_error "******** FATAL ERROR ****************************************** "
+        wsrep_log_error "* The certifcate and CA (certificate authority) do not match.   "
+        wsrep_log_error "* It does not appear that the certificate was issued by the CA. "
+        wsrep_log_error "* Please check your certificate and CA files.                   "
+        wsrep_log_error "*************************************************************** "
+        exit 22
+    fi
+
+}
+
+#
+# Checks to see if the file exists
+# If the file does not exist (or cannot be read), issues an error
+# and exits
+#
+# 1st param: file name to be checked (for read access)
+# 2nd param: 1st error message (header)
+# 3rd param: 2nd error message (footer, optional)
+#
+verify_file_exists()
+{
+    local file_path=$1
+    local error_message1=$2
+    local error_message2=$3
+
+    if ! [[ -r "$file_path" ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "* $error_message1 "
+        wsrep_log_error "* Could not find/access : $file_path "
+
+        if ! [[ -z "$error_message2" ]]; then
+            wsrep_log_error "* $error_message2 "
+        fi
+
+        wsrep_log_error "****************************************************** "
+        exit 22
+    fi
+}
+
+#
 # Setup stream to transfer. (Alternative: nc or socat)
 get_transfer()
 {
@@ -613,7 +721,25 @@ get_transfer()
         elif [[ $encrypt -eq 4 ]]; then
             wsrep_log_debug "Using openssl based encryption with socat: with key, crt, and ca"
 
-            verify_and_match_all_ssl_files "$DATA" "$ssl_ca" "$ssl_cert" "$ssl_key"
+            pushd "$DATA" &>/dev/null
+            ssl_ca=$(get_absolute_path "$ssl_ca")
+            ssl_cert=$(get_absolute_path "$ssl_cert")
+            ssl_key=$(get_absolute_path "$ssl_key")
+            popd &>/dev/null
+
+            wsrep_log_debug "ssl_ca (absolute) : $ssl_ca"
+            wsrep_log_debug "ssl_cert (absolute) : $ssl_cert"
+            wsrep_log_debug "ssl_key (absolute) : $ssl_key"
+
+            verify_file_exists "$ssl_ca" "CA, certificate, and key files are required." \
+                                         "Please check the 'ssl-ca' option.           "
+            verify_file_exists "$ssl_cert" "CA, certificate, and key files are required." \
+                                           "Please check the 'ssl-cert' option.         "
+            verify_file_exists "$ssl_key" "CA, certificate, and key files are required." \
+                                          "Please check the 'ssl-key' option.          "
+
+            verify_cert_matches_key $ssl_cert $ssl_key
+            verify_ca_matches_cert $ssl_ca $ssl_cert
 
             stagemsg+="-OpenSSL-Encrypted-4"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
@@ -641,9 +767,32 @@ get_transfer()
 check_server_ssl_config()
 {
     local section=$1
+    local sst_mode=$2
     ssl_ca=$(parse_cnf $section ssl-ca "")
     ssl_cert=$(parse_cnf $section ssl-cert "")
     ssl_key=$(parse_cnf $section ssl-key "")
+    if [ 0 -eq $encrypt -a -n "$ssl_cert" -a -n "$ssl_key" ]
+    then
+        # Enable SSL encryption
+
+        # BACKWARD COMPATIBILITY: avoid CA verification if either ssl-ca or
+        # ssl-mode not set explicitly in [SST] section of config:
+        # nodes may happen to have different CA if self-generated
+        # so zero-up ssl_ca in such case
+        if [[ ${sst_mode} != *VERIFY* ]] && [[ ${section} != "sst" ]]
+        then
+            ssl_ca=
+        fi
+
+        if [ -n "$ssl_ca" ]
+        then
+            encrypt=4
+        else
+            encrypt=3
+            tcert=$ssl_cert
+            tkey=$ssl_key
+        fi
+    fi
 }
 
 #
@@ -738,13 +887,14 @@ read_cnf()
     # Pull the parameters needed for encrypt=4
     if [ -z "$tca" -a -z "$tkey" -a -z "$tcert" ]
     then # check for new configuration
-        check_server_ssl_config "sst"
+        ssl_mode=$(parse_cnf sst ssl-mode "DISABLED" | tr [:lower:] [:upper:])
+        check_server_ssl_config "sst" $ssl_mode
         if [ -z "$ssl_ca" -a -z "$ssl_key" -a -z "$ssl_cert" ]
         then # no new-style SSL config in [sst], try server-wide SSL config
-            check_server_ssl_config "mysqld.$WSREP_SST_OPT_CONF_SUFFIX"
+            check_server_ssl_config "mysqld.$WSREP_SST_OPT_CONF_SUFFIX" "$ssl_mode"
             if [ -z "$ssl_ca" -a -z "$ssl_key" -a -z "$ssl_cert" ]
             then
-               check_server_ssl_config "mysqld"
+               check_server_ssl_config "mysqld" "$ssl_mode"
             fi
         fi
     fi
@@ -1843,19 +1993,25 @@ then
         rm -f "${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
     fi
 
-    if [ $encrypt -eq 4 ]
-    then
-        # find out my Common Name
-        wsrep_check_programs openssl
-        CN=$(openssl x509 -noout -subject -nameopt multiline -in $ssl_cert | \
-             grep commonName | cut -d= -f2- | sed s/^\ // | sed s/\ %//)
+    if [[ "$ssl_mode" = *"VERIFY"* ]]
+    then # backward-incompatible behavior
+        if [ -n "$ssl_cert" ]
+        then
+            # find out my Common Name
+            wsrep_check_programs openssl
+            CN=$(openssl x509 -noout -subject -in $ssl_cert | \
+                 tr "," "\n" | grep "CN =" | cut -d= -f2 | sed s/^\ // | \
+                 sed s/\ %//)
+        else
+            CN=""
+        fi
         MY_SECRET=$(wsrep_gen_secret)
         # Add authentication data to address
         AUTH="$CN:$MY_SECRET@"
     else
         MY_SECRET="" # for check down in recv_joiner()
         AUTH=""
-    fi
+    fi # tmode == *VERIFY*
 
     # Note: this is started as a background process
     # So it has to wait for processes that are started by THIS process

@@ -33,7 +33,6 @@ export PATH="/usr/sbin:/sbin:$PATH"
 
 wsrep_check_programs rsync
 
-encrypt=0
 keyring_plugin=0
 keyring_file_data=""
 keyring_vault_config=""
@@ -209,83 +208,124 @@ FILTER=(-f '- /lost+found'
         -f '+ /*/'
         -f '- /*')
 
-# Fetch the encrypt option from cnf file.
-encrypt=$(parse_cnf sst encrypt 0)
+# old-style SSL config
+SSTKEY=$(parse_cnf sst tkey "")
+SSTCERT=$(parse_cnf sst tcert "")
+SSTCA=$(parse_cnf sst tca "")
+SSLMODE=$(parse_cnf sst ssl-mode "")
 
-if [[ $encrypt -eq 1 || $encrypt -eq 2 || $encrypt -eq 3 || $encrypt -ge 5 ]]
+if [ -z $SSLMODE ]
 then
-    wsrep_log_error "********************* FATAL ERROR ************************ "
-    wsrep_log_error "* encrypt=$encrypt is not supported with rsync based SST.  "
-    wsrep_log_error "********************************************************** "
-    return 2
+    [ -n "$SSTKEY" -a -n "$SSTCERT" ] && SSLMODE="REQUIRED"
+    # verify only if it was explicitly required in SST section or tca is set
+    [ -n "$SSTCA" ] && SSLMODE="VERIFY_CA"
 fi
 
-#
-# Pull the parameters needed for encrypt=4.
-#
-if [ $encrypt -eq 4 ]
+check_server_ssl_config()
+{
+    local section=$1
+    SSTKEY=$(parse_cnf $section ssl-key "")
+    SSTCERT=$(parse_cnf $section ssl-cert "")
+    SSTCA=$(parse_cnf $section ssl-ca "")
+}
+
+if [ -z "$SSTKEY" -a -z "$SSTCERT" ]
 then
-
-    # First look for the files specified in [sst] section, if not present then
-    # search in [mysqld] section.
-    ssl_ca=$(parse_cnf sst ssl-ca "")
-    if [[ -z "$ssl_ca" ]]; then
-        ssl_ca=$(parse_cnf mysqld ssl-ca "")
-    fi
-    ssl_cert=$(parse_cnf sst ssl-cert "")
-    if [[ -z "$ssl_cert" ]]; then
-        ssl_cert=$(parse_cnf mysqld ssl-cert "")
-    fi
-    ssl_key=$(parse_cnf sst ssl-key "")
-    if [[ -z "$ssl_key" ]]; then
-        ssl_key=$(parse_cnf mysqld ssl-key "")
+    # no old-style SSL config in [sst] check for new one
+    check_server_ssl_config "sst"
+    if [ -z "$SSLMODE" -a -n "$SSTKEY" -a -n "$SSTCERT" ]
+    then
+        if [ -n "$SSTCA" ]
+        then
+            SSLMODE="VERIFY_CA"
+        else
+            SSLMODE="REQUIRED"
+        fi
     fi
 
-    # Check that we have all the files
-    verify_and_match_all_ssl_files "$WSREP_LOG_DIR" "$ssl_ca" "$ssl_cert" "$ssl_key"
+    if [ -z "$SSTKEY" -a -z "$SSTCERT" ]
+    then
+        check_server_ssl_config "mysqld.$WSREP_SST_OPT_CONF_SUFFIX"
+        if [ -z "$SSTKEY" -a -z "$SSTCERT" ]
+        then
+            check_server_ssl_config "mysqld"
+        fi
+        # prefer SSL by default if SSL key and cert are present in [mysqld]
+        if [ -n "$SSTKEY" -a -n "$SSTCERT" -a -z "$SSLMODE" ]
+        then
+            SSLMODE="PREFERRED"
+        fi
+    fi
+fi
 
-    wsrep_log_debug "Using encrypt=4 ssl_ca=$ssl_ca  ssl_cert=$ssl_cert  ssl_key=$ssl_key"
+if [ -f "$SSTCA" ]
+then
+    CAFILE_OPT="CAfile = $SSTCA"
 else
-    wsrep_log_debug "Using encrypt=0"
+    CAFILE_OPT=""
 fi
 
-
-#
-# Setup stunnel parameters for encryption
-#
-if [ $encrypt -eq 4 ]
+STUNNEL=""
+STUNNEL_VERSION=""
+if [ -n "$SSLMODE" -a "$SSLMODE" != "DISABLED" ]
 then
-
-    STUNNEL=""
-    STUNNEL_VERSION=""
     if wsrep_check_programs stunnel > /dev/null
     then
-        wsrep_log_info "Using stunnel for SSL encryption: ssl_ca=$ssl_ca  ssl_cert=$ssl_cert  ssl_key=$ssl_key"
+        wsrep_log_info "Using stunnel for SSL encryption: CAfile: $SSTCA, SSLMODE: $SSLMODE"
         STUNNEL="stunnel ${STUNNEL_CONF}"
         STUNNEL_VERSION=`stunnel -version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
     else
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "stunnel program required for SSL encryption was not found in PATH. Can't continue"
-        wsrep_log_error "****************************************************** "
-        exit 2 # ENOENT
+        if [ $SSLMODE = "PREFERRED" ]
+        then
+            wsrep_log_info "stunnel was not found in PATH, SSL encryption won't be used."
+        else
+            wsrep_log_error "stunnel program required for SSL encryption was not found in PATH. Can't continue"
+            exit 2 # ENOENT
+        fi
     fi
+fi
 
-    # Step-1: Setup VERIFY_OPT
-    # verifyPeer and verifyChain were introduced in stunnel 5.34.
-    # For older versions, use verify = level instead
-    if ! check_for_version "$STUNNEL_VERSION" "5.34"; then
-      VERIFY_OPT="verify = 2"
-    else
-      VERIFY_OPT="verifyChain = yes"
+if [[ ${SSLMODE} = *VERIFY* ]]
+then
+    case $SSLMODE in
+    "VERIFY_IDENTITY")
+        # verifyPeer and verifyChain were introduced in stunnel 5.34.
+        # For older versions, use verify = level instead
+        if ! check_for_version "$STUNNEL_VERSION" "5.34"; then
+          VERIFY_OPT="verify = 4"
+        else
+          VERIFY_OPT="verifyPeer = yes"
+        fi
+        ;;
+    "VERIFY_CA")
+        if ! check_for_version "$STUNNEL_VERSION" "5.34"; then
+          VERIFY_OPT="verify = 2"
+        else
+          VERIFY_OPT="verifyChain = yes"
+        fi
+        ;;
+    *)
+        wsrep_log_error "Unrecognized ssl-mode option: '$SSLMODE'"
+        exit 22 # EINVAL
+    esac
+
+    if [ -z "$CAFILE_OPT" ]
+    then
+        wsrep_log_error "Can't have ssl-mode=$SSLMODE without CA file"
+        exit 22 # EINVAL
     fi
+else
+    VERIFY_OPT=""
+fi
 
-    # Step-2: Setup CAFILE_OPT
-    CAFILE_OPT="CAfile = $ssl_ca"
+readonly SECRET_TAG="secret"
 
-    # Step-3: Create stunnel.conf
+if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
+then
+
 cat << EOF > "$STUNNEL_CONF"
-key = $ssl_key
-cert = $ssl_cert
+key = $SSTKEY
+cert = $SSTCERT
 ${CAFILE_OPT}
 foreground = yes
 pid = $STUNNEL_PID
@@ -296,21 +336,6 @@ TIMEOUTclose = 0
 ${VERIFY_OPT}
 EOF
 #connect = ${WSREP_SST_OPT_ADDR%/*}
-
-else
-    # Handle encrypt = 0 cases here
-
-    # Step-1: Setup VERIFY_OPT
-    VERIFY_OPT=""
-
-    # Step-2: Setup CAFILE_OPT
-    CAFILE_OPT=""
-fi
-
-readonly SECRET_TAG="secret"
-
-if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
-then
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
@@ -527,15 +552,15 @@ EOF
       fi
     fi
 
-    if [ $encrypt -eq 0 ]
+    if [ -z "$STUNNEL" ]
     then
       rsync --daemon --no-detach --port "$RSYNC_PORT" --config "$RSYNC_CONF" \
             ${RSYNC_EXTRA_ARGS} &
       RSYNC_REAL_PID=$!
     else
       cat << EOF > "$STUNNEL_CONF"
-key = $ssl_key
-cert = $ssl_cert
+key = $SSTKEY
+cert = $SSTCERT
 ${CAFILE_OPT}
 foreground = yes
 pid = $STUNNEL_PID
@@ -556,20 +581,25 @@ EOF
         sleep 0.2
     done
 
-    if [ $encrypt -eq 4 ]
-    then
-        # find out my Common Name
-        wsrep_check_programs openssl
-        CN=$(openssl x509 -noout -subject -in "$ssl_cert" | \
-             tr "," "\n" | grep "CN =" | cut -d= -f2 | sed s/^\ // | \
-             sed s/\ %//)
+    if [[ "${SSLMODE}" = *"VERIFY"* ]]
+    then # backward-incompatible behavior
+        if [ -n "$SSTCERT" ]
+        then
+            # find out my Common Name
+            wsrep_check_programs openssl
+            CN=$(openssl x509 -noout -subject -in "$SSTCERT" | \
+                 tr "," "\n" | grep "CN =" | cut -d= -f2 | sed s/^\ // | \
+                 sed s/\ %//)
+        else
+            CN=""
+        fi
         MY_SECRET=$(wsrep_gen_secret)
         # Add authentication data to address
         ADDR="$CN:$MY_SECRET@$WSREP_SST_OPT_HOST"
     else
         MY_SECRET="" # for check down in recv_joiner()
         ADDR=$WSREP_SST_OPT_HOST
-    fi
+    fi # SSLMODE = VERIFY
 
     echo "ready $ADDR:$RSYNC_PORT/$MODULE"
 
