@@ -648,7 +648,7 @@ mkdir pxc_extra
 pushd pxc_extra
 mkdir pxb-2.4
 pushd pxb-2.4
-yumdownloader percona-xtrabackup-24-2.4.22
+yumdownloader percona-xtrabackup-24-2.4.24
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib* ./
@@ -662,7 +662,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.23
+yumdownloader percona-xtrabackup-80-8.0.26
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -1500,6 +1500,8 @@ fi
 %attr(755, root, root) %{_bindir}/mysqldumpslow
 %attr(755, root, root) %{_bindir}/mysqltest
 %attr(755, root, root) %{_bindir}/perror
+%attr(755, root, root) %{_bindir}/mysql_migrate_keyring
+%attr(755, root, root) %{_bindir}/mysql_keyring_encryption_test
 #%attr(755, root, root) %{_bindir}/resolve_stack_dump
 #%attr(755, root, root) %{_bindir}/resolveip
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
