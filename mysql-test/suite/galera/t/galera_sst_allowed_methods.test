@@ -54,9 +54,6 @@
 --let $sst_request_data = proper_data
 --source galera_sst_allowed_methods_garbd.inc
 
---let $sst_request_method = rsync
---let $sst_request_data = some_data@some_ip
---source galera_sst_allowed_methods_garbd.inc
 
 --echo #
 --echo # Sending proper sst requests
@@ -95,17 +92,6 @@
 --let $sst_request_data = some-domain-1.098-abc-def/xtrabackup_sst//1
 --source galera_sst_allowed_methods_garbd.inc
 
---let $sst_request_method = rsync
---let $sst_request_data = 127.0.0.1:4444/rsync_sst
---source galera_sst_allowed_methods_garbd.inc
-
---let $sst_request_method = rsync
---let $sst_request_data = some_data@some_ip/rsync_sst
---source galera_sst_allowed_methods_garbd.inc
-
---let $sst_request_method = rsync
---let $sst_request_data = 12364798421@some-domain-1.098-abc-def/rsync_sst
---source galera_sst_allowed_methods_garbd.inc
 
 --echo #
 --echo # Sending custom sst request
