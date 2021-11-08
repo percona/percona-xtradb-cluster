@@ -127,9 +127,6 @@ pxc_encrypt_cluster_traffic=""
 ssl_cert=""
 ssl_ca=""
 ssl_key=""
-ssl_mode="DISABLED"
-
-readonly SECRET_TAG="secret"
 
 # thread options
 backup_threads=-1
@@ -638,11 +635,6 @@ get_transfer()
             if check_for_version "$SOCAT_VERSION" "1.7.3"; then
                 donor_extra=',commonname=""'
             fi
-
-            if [ -n "$WSREP_SST_OPT_REMOTE_USER" ]; then
-                donor_extra=",commonname='$WSREP_SST_OPT_REMOTE_USER'"
-            fi
-
             # disable SNI if socat supports it
             if check_for_version "$SOCAT_VERSION" "1.7.4"; then
                 donor_extra+=',no-sni=1'
@@ -764,40 +756,8 @@ get_transfer()
     fi
 }
 
-check_server_ssl_config()
-{
-    local section=$1
-    local sst_mode=$2
-    ssl_ca=$(parse_cnf $section ssl-ca "")
-    ssl_cert=$(parse_cnf $section ssl-cert "")
-    ssl_key=$(parse_cnf $section ssl-key "")
-    if [ 0 -eq $encrypt -a -n "$ssl_cert" -a -n "$ssl_key" ]
-    then
-        # Enable SSL encryption
-
-        # BACKWARD COMPATIBILITY: avoid CA verification if either ssl-ca or
-        # ssl-mode not set explicitly in [SST] section of config:
-        # nodes may happen to have different CA if self-generated
-        # so zero-up ssl_ca in such case
-        if [[ ${sst_mode} != *VERIFY* ]] && [[ ${section} != "sst" ]]
-        then
-            ssl_ca=
-        fi
-
-        if [ -n "$ssl_ca" ]
-        then
-            encrypt=4
-        else
-            encrypt=3
-            tcert=$ssl_cert
-            tkey=$ssl_key
-        fi
-    fi
-}
-
 #
 # read the sst specific options.
-
 read_cnf()
 {
     sfmt=$(parse_cnf sst streamfmt "xbstream")
@@ -885,18 +845,17 @@ read_cnf()
     fi
 
     # Pull the parameters needed for encrypt=4
-    if [ -z "$tca" -a -z "$tkey" -a -z "$tcert" ]
-    then # check for new configuration
-        ssl_mode=$(parse_cnf sst ssl-mode "DISABLED" | tr [:lower:] [:upper:])
-        check_server_ssl_config "sst" $ssl_mode
-        if [ -z "$ssl_ca" -a -z "$ssl_key" -a -z "$ssl_cert" ]
-        then # no new-style SSL config in [sst], try server-wide SSL config
-            check_server_ssl_config "mysqld.$WSREP_SST_OPT_CONF_SUFFIX" "$ssl_mode"
-            if [ -z "$ssl_ca" -a -z "$ssl_key" -a -z "$ssl_cert" ]
-            then
-               check_server_ssl_config "mysqld" "$ssl_mode"
-            fi
-        fi
+    ssl_ca=$(parse_cnf sst ssl-ca "")
+    if [[ -z "$ssl_ca" ]]; then
+        ssl_ca=$(parse_cnf mysqld ssl-ca "")
+    fi
+    ssl_cert=$(parse_cnf sst ssl-cert "")
+    if [[ -z "$ssl_cert" ]]; then
+        ssl_cert=$(parse_cnf mysqld ssl-cert "")
+    fi
+    ssl_key=$(parse_cnf sst ssl-key "")
+    if [[ -z "$ssl_key" ]]; then
+        ssl_key=$(parse_cnf mysqld ssl-key "")
     fi
 
     pxc_encrypt_cluster_traffic=$(parse_cnf mysqld pxc-encrypt-cluster-traffic "")
@@ -1442,7 +1401,7 @@ recv_data_from_donor_to_joiner()
 
     if [[ ${RC[0]} -eq 124 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Possible timeout in receiving first data from donor in gtid/keyring stage"
+        wsrep_log_error "Possible timeout in receving first data from donor in gtid/keyring stage"
         wsrep_log_error "****************************************************** "
         exit 32
     fi
@@ -1462,28 +1421,14 @@ recv_data_from_donor_to_joiner()
         return
     fi
 
-    if [[ $checkf -eq 1 ]]; then
-        if [[ ! -r "${XB_GTID_INFO_FILE_PATH}" ]];then
-            # this message should cause joiner to abort
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "xtrabackup process ended without creating '${XB_GTID_INFO_FILE_PATH}'"
-            wsrep_log_error "****************************************************** "
-            wsrep_log_debug "Contents of datadir"
-            wsrep_log_debug "$(ls -l ${dir}/*)"
-            exit 32
-        fi
-
-        # check donor supplied secret
-        SECRET=$(grep "$SECRET_TAG " ${XB_GTID_INFO_FILE_PATH} 2>/dev/null | cut -d ' ' -f 2)
-        if [[ $SECRET != $MY_SECRET ]]; then
-            wsrep_log_error "Donor does not know my secret!"
-            wsrep_log_info "Donor:'$SECRET', my:'$MY_SECRET'"
-            exit 32
-        fi
-
-        # remove secret from magic file
-        grep -v "$SECRET_TAG " ${XB_GTID_INFO_FILE_PATH} > ${XB_GTID_INFO_FILE_PATH}.new
-        mv ${XB_GTID_INFO_FILE_PATH}.new ${XB_GTID_INFO_FILE_PATH}
+    if [[ $checkf -eq 1 && ! -r "${XB_GTID_INFO_FILE_PATH}" ]]; then
+        # this message should cause joiner to abort
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "xtrabackup process ended without creating '${XB_GTID_INFO_FILE_PATH}'"
+        wsrep_log_error "****************************************************** "
+        wsrep_log_debug "Contents of datadir"
+        wsrep_log_debug "$(ls -l ${dir}/*)"
+        exit 32
     fi
 
     if [[ $checkf -eq 2 && ! -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
@@ -1892,16 +1837,11 @@ then
            INNOEXTRA+=" --password=$WSREP_SST_OPT_PSWD"
         elif [[ $usrst -eq 1 ]]; then
            # Empty password, used for testing, debugging etc.
-           unset MYSQL_PWD
+           INNOEXTRA+=" --password="
         fi
 
         get_keys
         check_extra
-
-        if [[ -n ${WSREP_SST_OPT_REMOTE_PSWD} ]]; then
-            # Let joiner know that we know its secret
-            echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${XB_GTID_INFO_FILE_PATH}
-        fi
 
         ttcmd="$tcmd"
 
@@ -2030,30 +1970,9 @@ then
         rm -f "${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
     fi
 
-    if [[ "$ssl_mode" = *"VERIFY"* ]]
-    then # backward-incompatible behavior
-        if [ -n "$ssl_cert" ]
-        then
-            # find out my Common Name
-            wsrep_check_programs openssl
-            CN=$(openssl x509 -noout -subject -in $ssl_cert | \
-                 tr "," "\n" | grep "CN =" | cut -d= -f2 | sed s/^\ // | \
-                 sed s/\ %//)
-        else
-            CN=""
-        fi
-        MY_SECRET=$(wsrep_gen_secret)
-        # Add authentication data to address
-        AUTH="$CN:$MY_SECRET@"
-    else
-        MY_SECRET="" # for check down in recv_joiner()
-        AUTH=""
-    fi # tmode == *VERIFY*
-
     # Note: this is started as a background process
     # So it has to wait for processes that are started by THIS process
-    wait_for_listen $$ "${AUTH}${WSREP_SST_OPT_HOST}" ${WSREP_SST_OPT_PORT:-4444} \
-                        ${MODULE} &
+    wait_for_listen $$ ${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} ${MODULE} &
 
     trap sig_joiner_cleanup HUP PIPE INT TERM
     trap cleanup_joiner EXIT

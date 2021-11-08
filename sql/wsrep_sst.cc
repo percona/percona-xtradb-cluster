@@ -89,21 +89,18 @@ static Regex sst_allowed_methods_regex;
    characters and the ways they could be used to inject the command to
    the OS. However this approach seems to be too error prone.
    Instead of this we will just allow alpha-num + a few special characters
-   (colon, slash, dot, underscore, square brackets, hyphen, '@' symbol).
+   (colon, slash, dot, underscore, square brackets, hyphen).
 
-   Note: '@' symbol is possible with encrypted rsync SST, where data can be
-         "localhost:0141b8fc9fa853ac9d1d48a383de2382@127.0.0.1:13009/rsync_sst"
-
-   It is the same as ^[\w:/.[\]-@]+$    */
+   It is the same as ^[\w:/.[\]-]+$    */
 
    /* For some reason regex engine is not able to handle the following pattern
    allowing square brackets:
-   "^[[:alnum:]:/._[\\]-@]+$"
+   "^[[:alnum:]:/._[\\]-]+$"
    We will substitute square brackets with lt/gt for validation.
    Because of another regex engine problem, hyphen literal has to be located
    at the end of matching set (cannot be escaped when in the middle). */
 static const char *sst_method_allowed_chars_regex_pattern=
-    "^[[:alnum:]:/._<>-@]+$";
+    "^[[:alnum:]:/._<>-]+$";
 static Regex sst_method_allowed_chars_regex;
 
 
@@ -780,30 +777,26 @@ static void* sst_joiner_thread (void* a)
   return NULL;
 }
 
-#define WSREP_SST_AUTH_ENV        "WSREP_SST_OPT_AUTH"
-#define WSREP_SST_REMOTE_AUTH_ENV "WSREP_SST_OPT_REMOTE_AUTH"
-#define DATA_HOME_DIR_ENV         "INNODB_DATA_HOME_DIR"
+#define WSREP_SST_AUTH_ENV "WSREP_SST_OPT_AUTH"
 
-static int sst_append_env_var(wsp::env&   env,
-                              const char* const var,
-                              const char* const val)
+static int sst_append_auth_env(wsp::env& env, const char* sst_auth)
 {
-  int const env_str_size= strlen(var) + 1 /* = */
-                          + (val ? strlen(val) : 0) + 1 /* \0 */;
+  int const sst_auth_size= strlen(WSREP_SST_AUTH_ENV) + 1 /* = */
+    + (sst_auth ? strlen(sst_auth) : 0) + 1 /* \0 */;
 
-  wsp::string env_str(env_str_size); // for automatic cleanup on return
-  if (!env_str()) return -ENOMEM;
+  wsp::string sst_auth_str(sst_auth_size); // for automatic cleanup on return
+  if (!sst_auth_str()) return -ENOMEM;
 
-  int ret= snprintf(env_str(), env_str_size, "%s=%s", var, val ? val : "");
+  int ret= snprintf(sst_auth_str(), sst_auth_size, "%s=%s",
+                    WSREP_SST_AUTH_ENV, sst_auth ? sst_auth : "");
 
-  if (ret < 0 || ret >= env_str_size)
+  if (ret < 0 || ret >= sst_auth_size)
   {
-    WSREP_ERROR("sst_append_env_var(): snprintf(%s=%s) failed: %d",
-                var, val, ret);
+    WSREP_ERROR("sst_append_auth_env(): snprintf() failed: %d", ret);
     return (ret < 0 ? ret : -EMSGSIZE);
   }
 
-  env.append(env_str());
+  env.append(sst_auth_str());
   return -env.error();
 }
 
@@ -863,7 +856,7 @@ static ssize_t sst_prepare_other (const char*  method,
     return -env.error();
   }
 
-  if ((ret= sst_append_env_var(env, WSREP_SST_AUTH_ENV, sst_auth)))
+  if ((ret= sst_append_auth_env(env, sst_auth)))
   {
     WSREP_ERROR("sst_prepare_other(): appending auth failed: %d", ret);
     return ret;
@@ -1036,7 +1029,7 @@ ssize_t wsrep_sst_prepare (void** msg, THD* thd)
 
   *msg = malloc (msg_len);
   if (NULL != *msg) {
-    char* const method_ptr(static_cast<char*>(*msg));
+    char* const method_ptr(reinterpret_cast<char*>(*msg));
     strcpy (method_ptr, wsrep_sst_method);
     char* const addr_ptr(method_ptr + method_len + 1);
     strcpy (addr_ptr, addr_out);
@@ -1433,7 +1426,6 @@ static int sst_donate_other (const char*   method,
                  "wsrep_sst_%s "
                  WSREP_SST_OPT_ROLE" 'donor' "
                  WSREP_SST_OPT_ADDR" '%s' "
-                 WSREP_SST_OPT_LPORT " '%u' "
                  WSREP_SST_OPT_SOCKET" '%s' "
                  WSREP_SST_OPT_DATA" '%s' "
                  WSREP_SST_OPT_CONF" '%s' "
@@ -1442,8 +1434,7 @@ static int sst_donate_other (const char*   method,
                  " %s '%s' "
                  WSREP_SST_OPT_GTID" '%s:%lld' "
                  "%s",
-                 method, addr, mysqld_port, mysqld_unix_port,
-                 mysql_real_data_home,
+                 method, addr, mysqld_unix_port, mysql_real_data_home,
                  wsrep_defaults_file, wsrep_defaults_group_suffix,
                  MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
                  binlog_opt, binlog_opt_val,
@@ -1573,20 +1564,6 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
   size_t method_len  = strlen (method);
   const char* data   = method + method_len + 1;
 
-  /* check for auth@addr separator */
-  const char* addr= strrchr(data, '@');
-  wsp::string remote_auth;
-  if (addr)
-  {
-    remote_auth.set(strndup(data, addr - data));
-    addr++;
-  }
-  else
-  {
-    // no auth part
-    addr= data;
-  }
-
   char uuid_str[37];
   wsrep_uuid_print (&current_gtid->uuid, uuid_str, sizeof(uuid_str));
 
@@ -1619,20 +1596,10 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
   }
 
   int ret;
-  if ((ret= sst_append_env_var(env, WSREP_SST_AUTH_ENV, sst_auth_real)))
+  if ((ret= sst_append_auth_env(env, sst_auth_real)))
   {
     WSREP_ERROR("wsrep_sst_donate_cb(): appending auth env failed: %d", ret);
     return WSREP_CB_FAILURE;
-  }
-
-  if (remote_auth())
-  {
-    if ((ret= sst_append_env_var(env, WSREP_SST_REMOTE_AUTH_ENV,remote_auth())))
-    {
-      WSREP_ERROR("wsrep_sst_donate_cb(): appending remote auth env failed: "
-                  "%d", ret);
-      return WSREP_CB_FAILURE;
-    }
   }
 
   if (!strcmp (WSREP_SST_MYSQLDUMP, method))
@@ -1640,12 +1607,12 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
     WSREP_WARN("Percona-XtraDB-Cluster has deprecated SST through mysqldump."
                " Percona-XtraDB-Cluster recommends using xtrabackup."
                " Please switch to use xtrabackup or rsync.");
-    ret = sst_donate_mysqldump(addr, &current_gtid->uuid, uuid_str,
+    ret = sst_donate_mysqldump(data, &current_gtid->uuid, uuid_str,
                                current_gtid->seqno, bypass, env());
   }
   else
   {
-    ret = sst_donate_other(method, addr, uuid_str,
+    ret = sst_donate_other(method, data, uuid_str,
                            current_gtid->seqno, bypass, env());
   }
 
