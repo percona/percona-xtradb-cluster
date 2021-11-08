@@ -23,6 +23,8 @@ usr/bin/perror
 usr/bin/pxc_extra
 usr/bin/wsrep_sst_common
 usr/bin/wsrep_sst_xtrabackup-v2
+usr/bin/mysql_keyring_encryption_test
+usr/bin/mysql_migrate_keyring
 # usr/bin/wsrep_sst_rsync
 #usr/bin/wsrep_sst_upgrade
 usr/sbin/mysqld
