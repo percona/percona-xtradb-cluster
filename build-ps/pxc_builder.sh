@@ -154,6 +154,13 @@ get_sources(){
     WSREP_REV="$(test -r WSREP-REVISION && cat WSREP-REVISION)"
     REVISION=$(git rev-parse --short HEAD)
     GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
+    if [ -z ${GALERA_REVNO} ]; then
+        pushd percona-xtradb-cluster-galera
+           GALERA_REVISION=$(git rev-parse --short HEAD)
+           echo ${GALERA_REVISION} > GALERA-REVISION
+        popd
+        GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
+    fi
     if [ -f VERSION ]; then
         source VERSION
     elif [ -f MYSQL_VERSION ]; then
@@ -414,7 +421,7 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         apt-get -y install --download-only percona-xtrabackup-24=2.4.24-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.26-18-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.25-17-1.${DIST}
     fi
     return;
 }
@@ -902,7 +909,6 @@ build_tarball(){
         popd
         tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        rm -rf pxb-8.0 pxb-2.4
     else
         mkdir pxb-2.4
         mkdir pxb-8.0
@@ -919,11 +925,11 @@ build_tarball(){
         cd ../ || exit
         tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        rm -rf pxb-8.0 pxb-2.4
     fi
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
+    rm -rf pxb-8.0 pxb-2.4
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2
