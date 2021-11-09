@@ -1,15 +1,15 @@
 CREATE TABLE t1 (f1 INTEGER NOT NULL) ENGINE=InnoDB;
 SET SESSION wsrep_osu_method='NBO';
 CREATE TABLE t2 (f1 INTEGER);
-ERROR 42000: This version of MySQL doesn't yet support 'Can't execute yet in NBO mode'
+ERROR 42000: This version of MySQL doesn't yet support 'this query in wsrep_OSU_method NBO'
 RENAME TABLE t1 TO t2;
-ERROR 42000: This version of MySQL doesn't yet support 'Can't execute yet in NBO mode'
+ERROR 42000: This version of MySQL doesn't yet support 'this query in wsrep_OSU_method NBO'
 DROP TABLE t1;
-ERROR 42000: This version of MySQL doesn't yet support 'Can't execute yet in NBO mode'
+ERROR 42000: This version of MySQL doesn't yet support 'this query in wsrep_OSU_method NBO'
 CREATE USER u1 IDENTIFIED BY 'p1';
-ERROR 42000: This version of MySQL doesn't yet support 'Can't execute yet in NBO mode'
+ERROR 42000: This version of MySQL doesn't yet support 'this query in wsrep_OSU_method NBO'
 DROP USER u1;
-ERROR 42000: This version of MySQL doesn't yet support 'Can't execute yet in NBO mode'
+ERROR 42000: This version of MySQL doesn't yet support 'this query in wsrep_OSU_method NBO'
 SET SESSION wsrep_osu_method=TOI;
 SHOW CREATE TABLE t1;
 Table	Create Table
