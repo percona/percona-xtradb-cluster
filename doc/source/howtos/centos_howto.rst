@@ -85,7 +85,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
    .. note:: In case you're running CentOS 7,
       the bootstrap service should be used instead: ::
 
-         [root@percona1 ~]#  systemctl start mysql@bootstrap.service
+         [root@percona1 ~]# systemctl start mysql@bootstrap.service
 
    The previous command will start the cluster
    with initial :variable:`wsrep_cluster_address` variable
