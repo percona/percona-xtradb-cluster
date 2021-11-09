@@ -225,7 +225,7 @@ SET($ENV{GZIP} "--best")
 
 IF(GNUTAR)
   SET(PACK_COMMAND 
-  ${GNUTAR} --exclude-vcs --exclude-vcs-ignores --owner=0 --group=0 -czf 
+  ${GNUTAR} --exclude-vcs --owner=0 --group=0 -czf 
   ${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz 
   ${CPACK_SOURCE_PACKAGE_FILE_NAME}
   )
