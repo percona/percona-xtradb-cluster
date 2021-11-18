@@ -9,9 +9,9 @@ wsrep_debug=ON
 xtrabackup-plugin-dir=@ENV.XB_PLUGIN_DIR
 
 [sst]
-encrypt=3
-tkey=@ENV.MYSQL_TEST_DIR/std_data/galera-key.pem
-tcert=@ENV.MYSQL_TEST_DIR/std_data/galera-cert.pem
+encrypt=2
+tca=@ENV.MYSQL_TEST_DIR/std_data/galera-cert.pem
+tcert=@ENV.MYSQL_TEST_DIR/std_data/galera-server.pem
 ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
 
 [mysqld.1]

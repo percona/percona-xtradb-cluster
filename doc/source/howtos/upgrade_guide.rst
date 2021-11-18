@@ -61,8 +61,8 @@ To upgrade the cluster, follow these steps for each node:
 
      .. code-block:: bash
 
-        $ sudo apt-get remove percona-xtrabackup* percona-xtradb-cluster*
-        $ sudo apt-get install percona-xtradb-cluster-57
+        $ sudo apt remove percona-xtrabackup* percona-xtradb-cluster*
+        $ sudo apt install percona-xtradb-cluster-57
 
 #. In case of Debian or Ubuntu,
    the ``mysql`` service starts automatically after install.
@@ -87,7 +87,7 @@ To upgrade the cluster, follow these steps for each node:
       is not required.
 
    .. note:: To prevent any users from accessing this node while performing
-      work on it, you may add `--skip-networking <https://dev.mysql.com/doc/refman/5.7/en/server-options.html#option_mysqld_skip-networking>`_
+      work on it, you may add `--skip-networking <https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_skip_networking>`_
       to the startup options and use a local socket to connect, or
       alternatively you may want to divert any incoming traffic from your
       application to other operational nodes.
@@ -180,7 +180,7 @@ To upgrade the cluster, follow these steps for each node:
 
      .. code-block:: bash
 
-        $ sudo apt-get install --only-upgrade percona-xtradb-cluster-57
+        $ sudo apt install --only-upgrade percona-xtradb-cluster-57
 
 #. In case of Debian or Ubuntu,
    the ``mysql`` service starts automatically after install.
@@ -205,7 +205,7 @@ To upgrade the cluster, follow these steps for each node:
       is not required.
 
    .. note:: To prevent any users from accessing this node while performing
-      work on it, you may add `--skip-networking <https://dev.mysql.com/doc/refman/5.7/en/server-options.html#option_mysqld_skip-networking>`_
+      work on it, you may add `--skip-networking <https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_skip_networking>`_
       to the startup options and use a local socket to connect, or
       alternatively you may want to divert any incoming traffic from your
       application to other operational nodes.

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2007, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2007, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -751,8 +751,6 @@ public:
 	@param[in, out] wait_for	The lock that the the joining
 					transaction is waiting for
 	@param[in] prdt			Predicate [optional]
-	@param[in,out] c_lock		conflicting lock
-	@param[in,out] thr		query thread handler
 	@return DB_LOCK_WAIT, DB_DEADLOCK, or DB_QUE_THR_SUSPENDED, or
 		DB_SUCCESS_LOCKED_REC; DB_SUCCESS_LOCKED_REC means that
 		there was a deadlock, but another transaction was chosen
@@ -884,12 +882,12 @@ private:
 	@param[in] add_to_hash	If the lock should be added to the hash table
 	@param[in,out] c_lock	conflicting lock
 	@param[in,out] thr	query thread handler */
-	void lock_add(lock_t* lock, bool add_to_hash
 #ifdef WITH_WSREP
-		,lock_t* const	c_lock,
-		que_thr_t*	thr
+	void lock_add(lock_t* lock, bool add_to_hash, lock_t* const	c_lock,
+                que_thr_t* thr);
+#else
+	 void lock_add(lock_t* lock, bool add_to_hash);
 #endif /* WITH_WSREP */
-		     );
 
 	/**
 	Check and resolve any deadlocks

@@ -72,7 +72,7 @@ dependencies:
 
 .. code-block:: bash
 
-   $ sudo apt-get install -y git scons gcc g++ openssl check cmake bison \
+   $ sudo apt install -y git scons gcc g++ openssl check cmake bison \
    libboost-all-dev libasio-dev libaio-dev libncurses5-dev libreadline-dev \
    libpam-dev socat libcurl-dev
    

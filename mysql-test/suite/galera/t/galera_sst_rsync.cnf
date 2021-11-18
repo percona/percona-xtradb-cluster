@@ -3,6 +3,9 @@
 [mysqld]
 wsrep_sst_method=rsync
 
+[sst]
+encrypt=0
+
 [mysqld.1]
 wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.size=1;pc.ignore_sb=true'
 

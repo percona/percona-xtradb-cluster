@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -86,7 +86,7 @@ static bool update_buffer_size(THD *thd, KEY_CACHE *key_cache,
                                ptrdiff_t offset, ulonglong new_value)
 {
   bool error= false;
-  DBUG_ASSERT(offset == offsetof(KEY_CACHE, param_buff_size));
+  assert(offset == offsetof(KEY_CACHE, param_buff_size));
 
   if (new_value == 0)
   {
@@ -138,7 +138,7 @@ static bool update_keycache_param(THD *thd, KEY_CACHE *key_cache,
                                   ptrdiff_t offset, ulonglong new_value)
 {
   bool error= false;
-  DBUG_ASSERT(offset != offsetof(KEY_CACHE, param_buff_size));
+  assert(offset != offsetof(KEY_CACHE, param_buff_size));
 
   keycache_var(key_cache, offset)= new_value;
 
@@ -843,7 +843,7 @@ static Sys_var_ulong Sys_binlog_group_commit_sync_no_delay_count(
 
 static bool check_has_super(sys_var *self, THD *thd, set_var *var)
 {
-  DBUG_ASSERT(self->scope() != sys_var::GLOBAL);// don't abuse check_has_super()
+  assert(self->scope() != sys_var::GLOBAL);// don't abuse check_has_super()
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
   if (!(thd->security_context()->check_access(SUPER_ACL)))
   {
@@ -1326,7 +1326,7 @@ static bool master_info_repository_check(sys_var *self, THD *thd, set_var *var)
 static const char *repository_names[]=
 {
   "FILE", "TABLE",
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   "DUMMY",
 #endif
   0
@@ -1357,6 +1357,7 @@ static Sys_var_mybool Sys_binlog_rows_query(
        SESSION_VAR(binlog_rows_query_log_events),
        CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
+#ifdef WITH_WSREP
 static bool binlog_order_commits_check(sys_var *self, THD *thd, set_var *var)
 {
   if (WSREP(thd))
@@ -1370,14 +1371,19 @@ static bool binlog_order_commits_check(sys_var *self, THD *thd, set_var *var)
   }
   return false;
 }
+#endif /* WITH_WSREP */
 
 static Sys_var_mybool Sys_binlog_order_commits(
        "binlog_order_commits",
        "Issue internal commit calls in the same order as transactions are"
        " written to the binary log. Default is to order commits.",
        GLOBAL_VAR(opt_binlog_order_commits),
+#ifdef WITH_WSREP
        CMD_LINE(OPT_ARG), DEFAULT(TRUE), NO_MUTEX_GUARD,
        NOT_IN_BINLOG, ON_CHECK(binlog_order_commits_check), ON_UPDATE(0));
+#else
+       CMD_LINE(OPT_ARG), DEFAULT(TRUE));
+#endif /* WITH_WSREP */
 
 static Sys_var_ulong Sys_bulk_insert_buff_size(
        "bulk_insert_buffer_size", "Size of tree cache used in bulk "
@@ -1431,8 +1437,8 @@ static bool check_storage_engine(sys_var *self, THD *thd, set_var *var)
     {
       // Use the default value defined by sys_var.
       lex_string_set(&se_name,
-        reinterpret_cast<const char*>(
-        dynamic_cast<Sys_var_plugin*>(self)->global_value_ptr(thd, NULL)));
+        pointer_cast<const char*>(
+          down_cast<Sys_var_plugin*>(self)->global_value_ptr(thd, NULL)));
     }
 
     plugin_ref plugin;
@@ -1659,7 +1665,7 @@ static Sys_var_charptr Sys_datadir(
        READ_ONLY GLOBAL_VAR(mysql_real_data_home_ptr),
        CMD_LINE(REQUIRED_ARG, 'h'), IN_FS_CHARSET, DEFAULT(mysql_real_data_home));
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 static Sys_var_dbug Sys_dbug(
        "debug", "Debug log", sys_var::SESSION,
        CMD_LINE(OPT_ARG, '#'), DEFAULT(""), NO_MUTEX_GUARD, NOT_IN_BINLOG,
@@ -1695,7 +1701,7 @@ export bool fix_delay_key_write(sys_var *self, THD *thd, enum_var_type type)
 */
 static bool check_delay_key_write(sys_var *self, THD *thd, set_var *var)
 {
-  DBUG_ASSERT(delay_key_write_options != DELAY_KEY_WRITE_ALL ||
+  assert(delay_key_write_options != DELAY_KEY_WRITE_ALL ||
               !thd->backup_tables_lock.is_acquired());
 
   if (var->save_result.ulonglong_value == DELAY_KEY_WRITE_ALL)
@@ -2422,7 +2428,7 @@ static Sys_var_double Sys_long_query_time(
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(update_cached_long_query_time));
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 static bool update_cached_query_exec_time(sys_var *self, THD *thd,
                                           enum_var_type type)
 {
@@ -2689,7 +2695,7 @@ static Sys_var_ulong Sys_metadata_locks_hash_instances(
        VALID_RANGE(1, 1024), DEFAULT(8), BLOCK_SIZE(1), NO_MUTEX_GUARD,
        NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0), DEPRECATED_VAR(""));
 
-// relies on DBUG_ASSERT(sizeof(my_thread_id) == 4);
+// relies on assert(sizeof(my_thread_id) == 4);
 static Sys_var_uint Sys_pseudo_thread_id(
        "pseudo_thread_id",
        "This variable is for internal server use",
@@ -3334,7 +3340,9 @@ static bool check_require_secure_transport(sys_var *self, THD *thd, set_var *var
 static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 {
   bool result= true;
+#ifdef WITH_WSREP
   bool own_lock= false;
+#endif /* WITH_WSREP */
 
   my_bool new_read_only= read_only; // make a copy before releasing a mutex
   DBUG_ENTER("sys_var_opt_readonly::update");
@@ -3385,7 +3393,11 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
   read_only= opt_readonly;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
+#ifdef WITH_WSREP
   if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
+  if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif /* WITH_WSREP */
     goto end_with_mutex_unlock;
 
   if ((result= thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -3398,10 +3410,14 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 
  end_with_read_lock:
   /* Release the lock */
+#ifdef WITH_WSREP
   if (own_lock)
   {
+#endif /* WITH_WSREP */
     thd->global_read_lock.unlock_global_read_lock(thd);
+#ifdef WITH_WSREP
   }
+#endif /* WITH_WSREP */
  end_with_mutex_unlock:
   mysql_mutex_lock(&LOCK_global_system_variables);
  end:
@@ -3411,7 +3427,9 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 
 static bool fix_super_read_only(sys_var *self, THD *thd, enum_var_type type)
 {
+#ifdef WITH_WSREP
   bool own_lock= false;
+#endif /* WITH_WSREP */
   DBUG_ENTER("sys_var_opt_super_readonly::update");
 
   /* return if no changes: */
@@ -3450,7 +3468,11 @@ static bool fix_super_read_only(sys_var *self, THD *thd, enum_var_type type)
   super_read_only = opt_super_readonly;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
+#ifdef WITH_WSREP
   if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
+  if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif /* WITH_WSREP */
     goto end_with_mutex_unlock;
 
   if ((result = thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -3460,7 +3482,9 @@ static bool fix_super_read_only(sys_var *self, THD *thd, enum_var_type type)
 
   end_with_read_lock:
     /* Release the lock */
+#ifdef WITH_WSREP
     if (own_lock)
+#endif /* WITH_WSREP */
       thd->global_read_lock.unlock_global_read_lock(thd);
   end_with_mutex_unlock:
     mysql_mutex_lock(&LOCK_global_system_variables);
@@ -4005,6 +4029,15 @@ static bool update_binlog_transaction_dependency_tracking(sys_var* var, THD* thd
     return false;
 }
 
+static bool update_binlog_transaction_dependency_history_size(sys_var* var, THD* thd, enum_var_type v)
+{
+  my_atomic_store64(&mysql_bin_log.m_dependency_tracker.get_writeset()->m_opt_max_history_size,
+                    static_cast<int64>(mysql_bin_log.m_dependency_tracker.get_writeset()->
+                        m_opt_max_history_size_base_var));
+  return false;
+}
+
+
 static PolyLock_mutex
 PLock_slave_trans_dep_tracker(&LOCK_slave_trans_dep_tracker);
 static const char *opt_binlog_transaction_dependency_tracking_names[]=
@@ -4024,10 +4057,10 @@ static Sys_var_enum Binlog_transaction_dependency_tracking(
 static Sys_var_ulong Binlog_transaction_dependency_history_size(
        "binlog_transaction_dependency_history_size",
        "Maximum number of rows to keep in the writeset history.",
-       GLOBAL_VAR(mysql_bin_log.m_dependency_tracker.get_writeset()->m_opt_max_history_size),
+       GLOBAL_VAR(mysql_bin_log.m_dependency_tracker.get_writeset()->m_opt_max_history_size_base_var),
        CMD_LINE(REQUIRED_ARG, 0), VALID_RANGE(1, 1000000), DEFAULT(25000),
        BLOCK_SIZE(1), &PLock_slave_trans_dep_tracker, NOT_IN_BINLOG, ON_CHECK(NULL),
-       ON_UPDATE(NULL));
+       ON_UPDATE(update_binlog_transaction_dependency_history_size));
 
 static Sys_var_mybool Sys_slave_preserve_commit_order(
        "slave_preserve_commit_order",
@@ -4065,9 +4098,9 @@ bool Sys_var_enum_binlog_checksum::global_update(THD *thd, set_var *var)
     binlog_checksum_options=
       static_cast<ulong>(var->save_result.ulonglong_value);
   }
-  DBUG_ASSERT(binlog_checksum_options == var->save_result.ulonglong_value);
-  DBUG_ASSERT(mysql_bin_log.checksum_alg_reset ==
-              binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
+  assert(binlog_checksum_options == var->save_result.ulonglong_value);
+  assert(mysql_bin_log.checksum_alg_reset ==
+         binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
   mysql_mutex_unlock(mysql_bin_log.get_log_lock());
   
   if (check_purge)
@@ -4628,7 +4661,7 @@ static bool check_transaction_isolation(sys_var *self, THD *thd, set_var *var)
   if (var->type == OPT_DEFAULT && (thd->in_active_multi_stmt_transaction() ||
                                    thd->in_sub_stmt))
   {
-    DBUG_ASSERT(thd->in_multi_stmt_transaction_mode() || thd->in_sub_stmt);
+    assert(thd->in_multi_stmt_transaction_mode() || thd->in_sub_stmt);
     my_error(ER_CANT_CHANGE_TX_CHARACTERISTICS, MYF(0));
     return true;
   }
@@ -4767,7 +4800,7 @@ static bool check_transaction_read_only(sys_var *self, THD *thd, set_var *var)
   if (var->type == OPT_DEFAULT && (thd->in_active_multi_stmt_transaction() ||
                                    thd->in_sub_stmt))
   {
-    DBUG_ASSERT(thd->in_multi_stmt_transaction_mode() || thd->in_sub_stmt);
+    assert(thd->in_multi_stmt_transaction_mode() || thd->in_sub_stmt);
     my_error(ER_CANT_CHANGE_TX_CHARACTERISTICS, MYF(0));
     return true;
   }
@@ -4889,7 +4922,7 @@ static Sys_var_version Sys_version(
 static char *server_version_suffix_ptr;
 static Sys_var_charptr Sys_version_suffix(
        "version_suffix", "version_suffix",
-       GLOBAL_VAR(server_version_suffix_ptr), NO_CMD_LINE,
+       GLOBAL_VAR(server_version_suffix_ptr), CMD_LINE(REQUIRED_ARG),
        IN_SYSTEM_CHARSET, DEFAULT(server_version_suffix));
 
 static char *server_version_comment_ptr;
@@ -4996,6 +5029,44 @@ static Sys_var_charptr Sys_time_format(
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0),
        DEPRECATED_VAR(""));
 
+/**
+  Pre-update function to commit connection's active transactions when autocommit
+  is enabled.
+
+  @note This hook relies on the fact that it is called while not holding any
+        locks. Breaking this assumption might result in deadlocks as commit
+        acquires many different locks in its process (e.g. to open GTID-related
+        tables).
+
+  @param[in] self   A pointer to the sys_var, i.e. Sys_autocommit.
+  @param[in] thd    A reference to THD object.
+  @param[in] var    A pointer to the set_var created by the parser.
+
+  @retval true   Error during commit
+  @retval false  Otherwise
+*/
+static bool pre_autocommit(sys_var *self, THD *thd, set_var *var)
+{
+  if (!(var->type == OPT_GLOBAL) &&
+      (thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT) &&
+       var->save_result.ulonglong_value)
+  {
+    // Autocommit mode is about to be activated.
+    if (trans_commit_stmt(thd) || trans_commit(thd))
+#ifdef WITH_WSREP
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("Transaction commit failed while toggling autocommit."
+                  " Release MDL trx lock for thread: %u", thd->thread_id());
+      return true;
+    }
+#else
+      return true;
+#endif /* WITH_WSREP */
+  }
+  return false;
+}
+
 static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
 {
   if (type == OPT_GLOBAL)
@@ -5010,17 +5081,6 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
   if (thd->variables.option_bits & OPTION_AUTOCOMMIT &&
       thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT)
   { // activating autocommit
-
-    if (trans_commit_stmt(thd) || trans_commit(thd))
-    {
-      thd->variables.option_bits&= ~OPTION_AUTOCOMMIT;
-      thd->mdl_context.release_transactional_locks();
-#ifdef WITH_WSREP
-      WSREP_DEBUG("Transaction commit failed while toggling autocommit."
-                  " Release MDL trx lock for thread: %u", thd->thread_id());
-#endif /* WITH_WSREP */
-      return true;
-    }
     /*
       Don't close thread tables or release metadata locks: if we do so, we
       risk releasing locks/closing tables of expressions used to assign
@@ -5055,7 +5115,8 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
 static Sys_var_bit Sys_autocommit(
        "autocommit", "autocommit",
        SESSION_VAR(option_bits), NO_CMD_LINE, OPTION_AUTOCOMMIT, DEFAULT(TRUE),
-       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(fix_autocommit));
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       PRE_UPDATE(pre_autocommit), ON_UPDATE(fix_autocommit));
 export sys_var *Sys_autocommit_ptr= &Sys_autocommit; // for sql_yacc.yy
 
 static Sys_var_mybool Sys_big_tables(
@@ -5085,7 +5146,7 @@ static Sys_var_bit Sys_log_off(
 static bool fix_sql_log_bin_after_update(sys_var *self, THD *thd,
                                          enum_var_type type)
 {
-  DBUG_ASSERT(type == OPT_SESSION);
+  assert(type == OPT_SESSION);
 
   if (thd->variables.sql_log_bin)
     thd->variables.option_bits |= OPTION_BIN_LOG;
@@ -5189,7 +5250,7 @@ static Sys_var_bit Sys_profiling(
        "profiling", "profiling",
        SESSION_VAR(option_bits), NO_CMD_LINE, OPTION_PROFILING,
        DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
-       ON_UPDATE(0), DEPRECATED_VAR(""));
+       PRE_UPDATE(0), ON_UPDATE(0), DEPRECATED_VAR(""));
 
 static Sys_var_ulong Sys_profiling_history_size(
        "profiling_history_size", "Limit of query profiling memory",
@@ -5719,7 +5780,9 @@ void init_slow_query_log_use_global_control()
 static Sys_var_set Sys_log_slow_verbosity(
         "log_slow_verbosity",
         "Choose how verbose the messages to your slow log will be. "
-        "Multiple flags allowed in a comma-separated string. [microtime, query_plan, innodb, profiling, profiling_use_getrusage]",
+        "Multiple flags allowed in a comma-separated string. "
+        "[microtime, query_plan, innodb, profiling, profiling_use_getrusage, "
+        "minimal, standard, full]",
         SESSION_VAR(log_slow_verbosity), CMD_LINE(REQUIRED_ARG),
         log_slow_verbosity_name, DEFAULT(SLOG_V_MICROTIME),
         NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
@@ -6139,22 +6202,22 @@ static Sys_var_uint Sys_checkpoint_mts_period(
        "Update progress status of Multi-threaded slave and flush "
        "the relay log info to disk after every #th milli-seconds.",
        GLOBAL_VAR(opt_mts_checkpoint_period), CMD_LINE(REQUIRED_ARG),
-#ifndef DBUG_OFF
+#ifndef NDEBUG
        VALID_RANGE(0, UINT_MAX), DEFAULT(300), BLOCK_SIZE(1));
 #else
        VALID_RANGE(1, UINT_MAX), DEFAULT(300), BLOCK_SIZE(1));
-#endif /* DBUG_OFF */
+#endif /* NDEBUG */
 
 static Sys_var_uint Sys_checkpoint_mts_group(
        "slave_checkpoint_group",
        "Maximum number of processed transactions by Multi-threaded slave "
        "before a checkpoint operation is called to update progress status.",
        GLOBAL_VAR(opt_mts_checkpoint_group), CMD_LINE(REQUIRED_ARG),
-#ifndef DBUG_OFF
+#ifndef NDEBUG
        VALID_RANGE(1, MTS_MAX_BITS_IN_GROUP), DEFAULT(512), BLOCK_SIZE(1));
 #else
        VALID_RANGE(32, MTS_MAX_BITS_IN_GROUP), DEFAULT(512), BLOCK_SIZE(8));
-#endif /* DBUG_OFF */
+#endif /* NDEBUG */
 #endif /* HAVE_REPLICATION */
 
 static Sys_var_uint Sys_sync_binlog_period(
@@ -6162,7 +6225,11 @@ static Sys_var_uint Sys_sync_binlog_period(
        " every #th write to the file. Use 0 to disable synchronous"
        " flushing",
        GLOBAL_VAR(sync_binlog_period), CMD_LINE(REQUIRED_ARG),
+#ifdef WITH_WSREP
        VALID_RANGE(0, UINT_MAX), DEFAULT(0), BLOCK_SIZE(1));
+#else
+       VALID_RANGE(0, UINT_MAX), DEFAULT(1), BLOCK_SIZE(1));
+#endif /* WITH_WSREP */
 
 static Sys_var_uint Sys_sync_masterinfo_period(
        "sync_master_info", "Synchronously flush master info to disk "
@@ -6268,7 +6335,8 @@ static Sys_var_tz Sys_time_zone(
 static PolyLock_mutex PLock_wsrep_slave_threads(&LOCK_wsrep_slave_threads);
 static Sys_var_charptr Sys_wsrep_provider(
        "wsrep_provider", "Path to replication provider library",
-       READ_ONLY PREALLOCATED GLOBAL_VAR(wsrep_provider), CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER),
+       READ_ONLY PREALLOCATED GLOBAL_VAR(wsrep_provider),
+       CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER),
        IN_FS_CHARSET, DEFAULT(WSREP_NONE),
        &PLock_wsrep_slave_threads, NOT_IN_BINLOG,
        ON_CHECK(wsrep_provider_check), ON_UPDATE(wsrep_provider_update));
@@ -6488,7 +6556,7 @@ static Sys_var_ulong Sys_wsrep_max_ws_rows (
 
 static Sys_var_charptr Sys_wsrep_notify_cmd(
        "wsrep_notify_cmd", "",
-       READ_ONLY GLOBAL_VAR(wsrep_notify_cmd),CMD_LINE(REQUIRED_ARG),
+       READ_ONLY GLOBAL_VAR(wsrep_notify_cmd), CMD_LINE(REQUIRED_ARG),
        IN_FS_CHARSET, DEFAULT(""), NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
 static Sys_var_mybool Sys_wsrep_certify_nonPK(
@@ -6828,7 +6896,7 @@ static bool check_gtid_next_list(sys_var *self, THD *thd, set_var *var)
 
 static bool update_gtid_next_list(sys_var *self, THD *thd, enum_var_type type)
 {
-  DBUG_ASSERT(type == OPT_SESSION);
+  assert(type == OPT_SESSION);
   if (thd->get_gtid_next_list() != NULL)
     return gtid_acquire_ownership_multiple(thd) != 0 ? true : false;
   return false;
@@ -7244,6 +7312,6 @@ static Sys_var_mybool Sys_replication_sender_observe_commit_only(
        ON_CHECK(0),
        ON_UPDATE(handle_sender_observe_commit_change));
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 Debug_shutdown_actions Debug_shutdown_actions::instance;
 #endif

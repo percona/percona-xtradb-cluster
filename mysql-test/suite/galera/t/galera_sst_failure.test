@@ -40,6 +40,55 @@ SET GLOBAL debug = "+d,wsrep_sst_donate_cb_fails";
 # cleanup
 SET GLOBAL debug = "-d,wsrep_sst_donate_cb_fails";
 
+# Setup node1 to skip sending backup on next SST
+SET GLOBAL debug = "+d,wsrep_sst_donor_skip";
+
+# Restart node 2 forcing SST
+--connection node_2
+
+# Remove the grastate.dat file to force an SST
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+# Adjust SST timeout
+--exec cp $MYSQLTEST_VARDIR/my.cnf $MYSQLTEST_VARDIR/my_sst.cnf
+append_file $MYSQLTEST_VARDIR/my_sst.cnf;
+[sst]
+sst-idle-timeout=20
+EOF
+
+# Start node_2
+--let $error_log= $MYSQLTEST_VARDIR/tmp/test_error_log.err
+--let $mysqld2=$MYSQLD --defaults-group-suffix=.2 --defaults-file=$MYSQLTEST_VARDIR/my_sst.cnf --wsrep-provider-options='base_port=$NODE_GALERAPORT_2' --console > $error_log 2>&1
+--error 1
+--exec $mysqld2
+
+--connection node_1
+
+# Check node_2 error was due to stale SST
+--let $assert_text= Checking node_2 error was due to stale SST
+--let $assert_file= $MYSQLTEST_VARDIR/tmp/test_error_log.err
+--let $assert_select= Killing SST \([0-9]*\) with SIGKILL after stalling for [0-9]* seconds
+--let $assert_only_after=CURRENT_TEST: galera.galera_sst_failure2
+--let $assert_count=1
+--source include/assert_grep.inc
+
+# node_1 should go back to SYNC state
+--let $assert_text=node_1 should go back to SYNC state
+--let $wsrep_local_state_comment = query_get_value(SHOW STATUS LIKE 'wsrep_local_state_comment', Value, 1)
+--let $assert_cond= "$wsrep_local_state_comment" = "Synced"
+--source include/assert.inc
+
+# cluster should stay as Primary
+--let $assert_text=Cluster should stay as Primary
+--let $wsrep_local_state_comment = query_get_value(SHOW STATUS LIKE 'wsrep_cluster_status', Value, 1)
+--let $assert_cond= "$wsrep_local_state_comment" = "Primary"
+--source include/assert.inc
+
+# cleanup
+SET GLOBAL debug = "-d,wsrep_sst_donor_skip";
+
 --connection node_2
 --echo cleanup
+--remove_file $error_log
+--remove_file $MYSQLTEST_VARDIR/my_sst.cnf
 --source include/start_mysqld.inc

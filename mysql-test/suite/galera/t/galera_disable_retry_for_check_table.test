@@ -1,0 +1,100 @@
+# ==== Purpose ====
+#
+# This test verifies that the no retries are performed when CHECK TABLE query
+# gets BF-aborted by a TOI running on the same table.
+#
+# ==== Implementation ====
+#
+# 1. Create a table on node_1.
+# 2. Execute CHECK TABLE query on node_1 and halt the query in
+#    ha_innobase::check() function.
+# 3. Execute an ALTER TABLE query on node_2 and wait for it to be replicated to
+#    node_1.
+# 4. ALTER TABLE, being replicated as TOI, aborts the CHECK TABLE query. Verify
+#    that CHECK TABLE query fails with ER_LOCK_DEADLOCK error.
+# 5. Repeat steps 1-4 with partitioned table, but using ALTER TABLE .. CHECK
+#    PARTITION instead
+# 6. Cleanup
+#
+# ==== References ====
+#
+# PXC-3226: Results from CHECK, ANALYZE from PXC server is causing the client
+#           libraries to crash
+
+--source include/have_debug_sync.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+# Create auxiliary connections
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+
+--let $i = 0
+while ($i < 2) {
+
+  --echo #
+  --echo # 1. Create a table on node_1.
+  --echo [node_1a]
+  --connection node_1a
+  if ($i == 0) {
+    CREATE TABLE t1(i INT PRIMARY KEY);
+  }
+  if ($i == 1) {
+    CREATE TABLE t1(i INT PRIMARY KEY)
+    PARTITION BY RANGE (i)
+    (
+      PARTITION p0 VALUES LESS THAN (2),
+      PARTITION p1 VALUES LESS THAN (4)
+    );
+  }
+
+  --echo #
+  --echo # 2. Execute CHECK TABLE query on node_1 and halt the query in
+  --echo #    ha_innobase::check() function.
+  SET DEBUG_SYNC="ha_innobase_check SIGNAL reached WAIT_FOR continue";
+  if ($i == 0) {
+    --send CHECK TABLE t1
+  }
+  if ($i == 1) {
+    --send ALTER TABLE t1 CHECK PARTITION p0
+  }
+
+  --echo [node_1b]
+  --connection node_1b
+  SET DEBUG_SYNC="now WAIT_FOR reached";
+
+  --echo #
+  --echo # 3. Execute an ALTER TABLE query on node_2 and wait for it to be
+  --echo #    replicated to node_1.
+  --echo [node_2]
+  --connection node_2
+  ALTER TABLE t1 ENGINE=InnoDB;
+  INSERT INTO t1 VALUES (1);
+
+  --connection node_1
+  --let $wait_condition = SELECT COUNT(*) = 1 FROM t1
+  --source include/wait_condition.inc
+
+  # Clear the DEBUG_SYNC variable.
+  SET DEBUG_SYNC="now SIGNAL continue";
+  SET DEBUG_SYNC="RESET";
+
+  --echo #
+  --echo # 4. ALTER TABLE, being replicated as TOI, aborts the CHECK TABLE
+  --echo #    query. Verify that CHECK TABLE query fails with ER_LOCK_DEADLOCK error.
+  --connection node_1a
+  --error ER_LOCK_DEADLOCK
+  --reap
+
+  --echo #
+  --echo # 5. Cleanup
+  DROP TABLE t1;
+  --inc $i
+}
+
+# Disconnect auxiliary connections
+--disconnect node_1a
+--disconnect node_1b
+
+--connection node_1
+--source include/wait_until_count_sessions.inc

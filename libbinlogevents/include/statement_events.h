@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -930,6 +930,9 @@ public:
     INVALID_INT_EVENT,
     LAST_INSERT_ID_EVENT,
     INSERT_ID_EVENT
+#ifdef WITH_WSREP
+    , BINLOG_CONTROL_EVENT
+#endif
   };
 
   /**
@@ -958,6 +961,10 @@ public:
       return "LAST_INSERT_ID";
     case INSERT_ID_EVENT:
       return "INSERT_ID";
+#ifdef WITH_WSREP
+    case BINLOG_CONTROL_EVENT:
+      return "BINLOG_CONTROL";
+#endif
     default: /* impossible */
       return "UNKNOWN";
     }

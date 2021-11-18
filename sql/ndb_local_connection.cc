@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2011, 2014, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -170,6 +170,9 @@ Ndb_local_connection::execute_query_iso(MYSQL_LEX_STRING sql_text,
   ulonglong save_thd_options= m_thd->variables.option_bits;
   assert(sizeof(save_thd_options) == sizeof(m_thd->variables.option_bits));
   m_thd->variables.option_bits&= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  m_thd->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   bool result = execute_query(sql_text,
                               ignore_mysql_errors,

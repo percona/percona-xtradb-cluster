@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2019, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 1995, 2021, Oracle and/or its affiliates.
 Copyright (c) 2008, 2009, Google Inc.
 Copyright (c) 2009, 2016, Percona Inc.
 
@@ -480,9 +480,9 @@ extern ulong	srv_adaptive_flushing_lwm;
 extern ulong	srv_flushing_avg_loops;
 
 extern ulong	srv_force_recovery;
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 extern ulong	srv_force_recovery_crash;
-#endif /* !DBUG_OFF */
+#endif /* !NDEBUG */
 
 extern ulint	srv_fast_shutdown;	/*!< If this is 1, do not do a
 					purge and index buffer merge.
@@ -1269,7 +1269,7 @@ wsrep_srv_conc_cancel_wait(
 			thread */
 #endif /* WITH_WSREP */
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 /** false before InnoDB monitor has been printed at least once, true
 afterwards */
 extern bool	srv_debug_monitor_printed;

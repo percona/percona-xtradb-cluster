@@ -64,3 +64,4 @@ innodb-log-file-size-1 : Process exit code mismatch on SE init failure.
 innodb-log-file-size : Process exit code mismatch on SE init failure.
 innodb_bug70867 : Process exit code mismatch on SE init failure.
 innodb_page_size_func : Process exit code mismatch on SE init failure.
+innodb_row_log_read : Mixed DDL/DML, DML fails in certification

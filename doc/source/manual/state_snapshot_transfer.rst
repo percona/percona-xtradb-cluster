@@ -63,7 +63,7 @@ in the server configuration file :file:`my.cnf`,
 otherwise the transfer process will fail.
 
 For more information about the required credentials,
-see the `XtraBackup manual <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_.
+see the `XtraBackup manual <https://www.percona.com/doc/percona-xtrabackup/2.4/using_xtrabackup/privileges.html#permissions-and-privileges-needed>`_.
 
 To test if the credentials will work,
 run |innobackupex| on the donor node with the username and password
@@ -143,5 +143,5 @@ The result depends on the SST method:
 Other Reading
 =============
 
-* `SST Methods for MySQL <http://galeracluster.com/documentation-webpages/statetransfer.html#state-snapshot-transfer-sst>`_
+* `SST Methods for MySQL <https://galeracluster.com/library/documentation/sst.html#state-snapshot-transfers>`__
 * :ref:`Xtrabackup SST configuration<xtrabackup_sst>`

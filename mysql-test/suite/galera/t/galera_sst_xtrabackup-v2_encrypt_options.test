@@ -1,0 +1,101 @@
+#
+# This test verifies that encrypt=4 works properly in an xtrabackup based SST.
+# Also tests certs that are specified using relative paths (certs are in the datadir)
+#
+
+--source include/galera_cluster.inc
+--source include/force_restart.inc
+
+# Check that the cluster started correctly.
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+SELECT 1;
+
+# Save the datadirs
+--let $NODE1_DATADIR=`SELECT @@datadir`
+--connection node_2
+--let $NODE2_DATADIR=`SELECT @@datadir`
+--connection node_1
+--echo [connection node_1]
+
+# copy over the server-side PEM files needed for SSL to node1 datadir
+--copy_file $MYSQL_TEST_DIR/std_data/cacert.pem $NODE1_DATADIR/cacert.pem
+--copy_file $MYSQL_TEST_DIR/std_data/server-cert.pem $NODE1_DATADIR/server-cert.pem
+--copy_file $MYSQL_TEST_DIR/std_data/server-key.pem $NODE1_DATADIR/server-key.pem
+
+# copy over the server-side PEM files needed for SSL to node2 datadir
+--copy_file $MYSQL_TEST_DIR/std_data/cacert.pem $NODE2_DATADIR/cacert.pem
+--copy_file $MYSQL_TEST_DIR/std_data/server-cert.pem $NODE2_DATADIR/server-cert.pem
+--copy_file $MYSQL_TEST_DIR/std_data/server-key.pem $NODE2_DATADIR/server-key.pem
+
+# --------------------------------
+# Test 1: Test with encrypt=4
+# Expectation: SST should be successful.
+# --------------------------------
+
+# Create a temporary cnf file for testing with encrypt=4
+--let $RELATIVE_SSL_CERTS_FILE = $MYSQLTEST_VARDIR/tmp/galera_sst_xtrabackup-v2_encrypt_options.cnf
+--copy_file $MYSQLTEST_VARDIR/my.cnf $RELATIVE_SSL_CERTS_FILE
+--append_file $RELATIVE_SSL_CERTS_FILE
+[sst]
+ssl-ca=cacert.pem
+ssl-key=server-key.pem
+ssl-cert=server-cert.pem
+
+encrypt=4
+wsrep-debug=1
+EOF
+
+--connection node_2
+--echo [connection node_2]
+--echo # Shutting down node2
+--source include/shutdown_mysqld.inc
+
+# Create a temporary cnf file for testing with encrypt=4
+--let $RELATIVE_SSL_CERTS_FILE = $MYSQLTEST_VARDIR/tmp/galera_sst_xtrabackup-v2_encrypt.cnf
+--copy_file $MYSQLTEST_VARDIR/my.cnf $RELATIVE_SSL_CERTS_FILE
+--append_file $RELATIVE_SSL_CERTS_FILE
+[sst]
+ssl-ca=cacert.pem
+ssl-key=server-key.pem
+ssl-cert=server-cert.pem
+encrypt=4
+wsrep-debug=1
+EOF
+
+--connection node_1
+--echo [connection node_1]
+# restart node_1 with relative cert paths
+--echo # restarting node1
+--let $restart_parameters = "restart: --defaults-file=$RELATIVE_SSL_CERTS_FILE "
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--exec echo "wait" > $_expect_file_name
+--replace_result $RELATIVE_SSL_CERTS_FILE RELATIVE_SSL_CERTS_FILE
+--source include/restart_mysqld.inc
+
+# remove the grastate.dat file to force an SST
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+# Restart node_2 normally
+--connection node_2
+--echo [connection node_2]
+--let $restart_parameters = "restart: --defaults-file=$RELATIVE_SSL_CERTS_FILE "
+--let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
+--replace_result $RELATIVE_SSL_CERTS_FILE RELATIVE_SSL_CERTS_FILE
+--source include/start_mysqld.inc
+
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+# Confirm that transfer was not SSL-encrypted
+--let $assert_text = Using openssl based encryption with socat: with key, crt, and ca
+--let $assert_select = Using openssl based encryption with socat: with key, crt, and ca
+--let $assert_count = 1
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+# cleanup
+--remove_file $RELATIVE_SSL_CERTS_FILE

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -1351,7 +1351,7 @@ lock_rec_other_has_conflicting(
                         }
 #else
 		if (lock_rec_has_to_wait(trx, mode, lock, is_supremum)) {
-#endif /* WITH_WSREP */
+#endif
 			return(lock);
 		}
 	}
@@ -1411,7 +1411,8 @@ lock_sec_rec_some_has_impl(
 	return(trx);
 }
 
-#if defined(UNIV_DEBUG) && !defined(WITH_WSREP)
+#ifndef WITH_WSREP
+#ifdef UNIV_DEBUG
 /*********************************************************************//**
 Checks if some transaction, other than given trx_id, has an explicit
 lock on the given rec, in the given precise_mode.
@@ -1460,7 +1461,8 @@ lock_rec_other_trx_holds_expl(
 
 	return(holds);
 }
-#endif /* UNIV_DEBUG && !WITH_WSREP */
+#endif /* UNIV_DEBUG */
+#endif /* !WITH_WSREP */
 
 /*********************************************************************//**
 Return approximate number or record locks (bits set in the bitmap) for
@@ -1656,14 +1658,16 @@ Add the lock to the record lock hash and the transaction's lock list
 @param[in,out] c_lock	conflicting lock
 @param[in,out] thr	query thread handler */
 void
+#ifdef WITH_WSREP
 RecLock::lock_add(
 	lock_t*			lock,
 	bool			add_to_hash
-#ifdef WITH_WSREP
 	,lock_t* const		c_lock,
 	que_thr_t*		thr
-#endif /* WITH_WSREP */
 	)
+#else
+RecLock::lock_add(lock_t* lock, bool add_to_hash)
+#endif /* WITH_WSREP */
 {
 	ut_ad(lock_mutex_own());
 	ut_ad(trx_mutex_own(lock->trx));
@@ -1776,12 +1780,14 @@ RecLock::create(
 	trx_t*			trx,
 	bool			owns_trx_mutex,
 	bool			add_to_hash,
+#ifndef WITH_WSREP
+	const lock_prdt_t*	prdt)
+#else
 	const lock_prdt_t*	prdt
-#ifdef WITH_WSREP
 	,lock_t* const		c_lock,
 	que_thr_t*		thr
+  )
 #endif /* WITH_WSREP */
-	)
 {
 	ut_ad(lock_mutex_own());
 	ut_ad(owns_trx_mutex == trx_mutex_own(trx));
@@ -1803,11 +1809,11 @@ RecLock::create(
 		trx_mutex_enter(trx);
 	}
 
-	lock_add(lock, add_to_hash
-#ifdef WITH_WSREP
-		 , c_lock, thr
+#ifndef WITH_WSREP
+	lock_add(lock, add_to_hash);
+#else
+	lock_add(lock, add_to_hash, c_lock, thr);
 #endif /* WITH_WSREP */
-		);
 
 	if (!owns_trx_mutex) {
 		trx_mutex_exit(trx);
@@ -1977,14 +1983,14 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 
 	prepare();
 
+	bool	high_priority = trx_is_high_priority(m_trx);
+#ifdef WITH_WSREP
 	lock_t*		lock;
 
 	/* We don't rollback internal (basically background statistics
 	gathering) transactions. The problem is that we don't currently
 	block them using the TrxInInnoDB() mechanism. */
 
-	bool	high_priority = trx_is_high_priority(m_trx);
-#ifdef WITH_WSREP
 	if (wsrep_on(m_trx->mysql_thd) &&
 	    m_trx->lock.was_chosen_as_deadlock_victim) {
 		return(DB_DEADLOCK);

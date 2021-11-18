@@ -1,0 +1,57 @@
+#
+# 1. Create a table on node_1.
+[node_1a]
+CREATE TABLE t1(i INT PRIMARY KEY);
+#
+# 2. Execute CHECK TABLE query on node_1 and halt the query in
+#    ha_innobase::check() function.
+SET DEBUG_SYNC="ha_innobase_check SIGNAL reached WAIT_FOR continue";
+CHECK TABLE t1;
+[node_1b]
+SET DEBUG_SYNC="now WAIT_FOR reached";
+#
+# 3. Execute an ALTER TABLE query on node_2 and wait for it to be
+#    replicated to node_1.
+[node_2]
+ALTER TABLE t1 ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+SET DEBUG_SYNC="now SIGNAL continue";
+SET DEBUG_SYNC="RESET";
+#
+# 4. ALTER TABLE, being replicated as TOI, aborts the CHECK TABLE
+#    query. Verify that CHECK TABLE query fails with ER_LOCK_DEADLOCK error.
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+#
+# 5. Cleanup
+DROP TABLE t1;
+#
+# 1. Create a table on node_1.
+[node_1a]
+CREATE TABLE t1(i INT PRIMARY KEY)
+PARTITION BY RANGE (i)
+(
+PARTITION p0 VALUES LESS THAN (2),
+PARTITION p1 VALUES LESS THAN (4)
+);
+#
+# 2. Execute CHECK TABLE query on node_1 and halt the query in
+#    ha_innobase::check() function.
+SET DEBUG_SYNC="ha_innobase_check SIGNAL reached WAIT_FOR continue";
+ALTER TABLE t1 CHECK PARTITION p0;
+[node_1b]
+SET DEBUG_SYNC="now WAIT_FOR reached";
+#
+# 3. Execute an ALTER TABLE query on node_2 and wait for it to be
+#    replicated to node_1.
+[node_2]
+ALTER TABLE t1 ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+SET DEBUG_SYNC="now SIGNAL continue";
+SET DEBUG_SYNC="RESET";
+#
+# 4. ALTER TABLE, being replicated as TOI, aborts the CHECK TABLE
+#    query. Verify that CHECK TABLE query fails with ER_LOCK_DEADLOCK error.
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+#
+# 5. Cleanup
+DROP TABLE t1;
