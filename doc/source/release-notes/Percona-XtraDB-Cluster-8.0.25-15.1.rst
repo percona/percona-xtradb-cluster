@@ -18,12 +18,12 @@ A Non-Blocking Operation method for online schema changes in Percona XtraDB Clus
 
 Note that the NBO mode is a **Tech Preview** feature. We do not recommend that you use this mode in a production environment. For more information, see :ref:`nbo`.
 
-The following list are some of the notable fixes for MySQL 8.0.26, provided by Oracle, and included in this release:
+The following list are some of the notable fixes for MySQL 8.0.25, provided by Oracle, and included in this release:
 
 * :mysqlbug:`103980`: Fixes the allocation of too much memory when dropping a database with many partitioned tables.
 * :mysqlbug:`103743`: Fixes a slow startup when the tables are encrypted.
 
-For more information, see the `MySQL 8.0.26 Release Notes <https://dev.mysql.com/doc/relnotes/mysql/8.0/en/news-8-0-26.html>`__.
+For more information, see the `MySQL 8.0.25 Release Notes <https://dev.mysql.com/doc/relnotes/mysql/8.0/en/news-8-0-25.html>`__.
 
 
 
