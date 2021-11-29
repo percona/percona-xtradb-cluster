@@ -103,6 +103,7 @@ enum enum_wsrep_reject_types {
 enum enum_wsrep_OSU_method {
   WSREP_OSU_TOI,
   WSREP_OSU_RSU,
+  WSREP_OSU_NBO,
   WSREP_OSU_NONE,
 };
 
@@ -236,9 +237,9 @@ extern enum wsrep::provider::status wsrep_sync_wait_upto_gtid(
 extern void wsrep_last_committed_id(wsrep_gtid_t *gtid);
 extern int wsrep_check_opts(int argc, char *const *argv);
 extern void wsrep_prepend_PATH(const char *path);
-void wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *table,
+bool wsrep_append_fk_parent_table(THD *thd, TABLE_LIST *table,
                                   wsrep::key_array *keys);
-void wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
+bool wsrep_append_child_tables(THD *thd, TABLE_LIST *tables,
                                wsrep::key_array *keys);
 
 /* some inline functions are defined in wsrep_mysqld_inl.h */
@@ -436,6 +437,8 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              wsrep::key_array *fk_tables = NULL);
 bool wsrep_thd_is_in_to_isolation(THD *thd, bool flock);
 void wsrep_to_isolation_end(THD *thd);
+void wsrep_NBO_end_phase_one(THD *thd);
+int wsrep_NBO_begin_phase_two(THD *thd);
 
 bool wsrep_append_SR_keys(THD *thd);
 int wsrep_to_buf_helper(THD *thd, const char *query, uint query_len,

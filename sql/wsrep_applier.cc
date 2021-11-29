@@ -78,7 +78,7 @@ Format_description_log_event *wsrep_get_apply_format(THD *thd) {
   return thd->wsrep_rli->get_rli_description_event();
 }
 
-void wsrep_store_error(const THD *const thd, wsrep::mutable_buffer& dst) {
+void wsrep_store_error(const THD *const thd, wsrep::mutable_buffer &dst) {
   Diagnostics_area::Sql_condition_iterator it =
       thd->get_stmt_da()->sql_conditions();
   const Sql_condition *cond;
@@ -86,18 +86,17 @@ void wsrep_store_error(const THD *const thd, wsrep::mutable_buffer& dst) {
   static size_t const max_len =
       2 * MAX_SLAVE_ERRMSG;  // 2x so that we have enough
 
-
   dst.resize(max_len);
 
   char *slider = dst.data();
-  const char *const buf_end = slider + max_len - 1; // -1: leave space for \0
+  const char *const buf_end = slider + max_len - 1;  // -1: leave space for \0
 
   auto da = thd->get_stmt_da();
-  if(da->cond_count() == 0) {
+  if (da->cond_count() == 0 && da->is_set()) {
     slider += snprintf(slider, buf_end - slider, " %s, Error_code: %d;",
                        da->message_text(), da->mysql_errno());
   }
-  
+
   for (cond = it++; cond && slider < buf_end; cond = it++) {
     uint const err_code = cond->mysql_errno();
     const char *const err_str = cond->message_text();
@@ -133,6 +132,9 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
     WSREP_DEBUG("Empty apply event found while processing write-set: %lld",
                 (long long)wsrep_thd_trx_seqno(thd));
 
+  if (thd->wsrep_bin_log_flag_save == 0) {
+    thd->wsrep_bin_log_flag_save = thd->variables.option_bits & OPTION_BIN_LOG;
+  }
   while (buf_len) {
     int exec_res;
     Log_event *ev =
@@ -178,7 +180,7 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
     thd->unmasked_server_id = ev->common_header->unmasked_server_id;
     thd->set_time();  // time the query
 
-    if (wsrep_thd_is_toi(thd)) {
+    if (wsrep_thd_is_toi(thd) || wsrep_thd_is_in_nbo(thd)) {
       wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                      thd->wsrep_cs().toi_meta().gtid());
     } else {
@@ -186,7 +188,7 @@ int wsrep_apply_events(THD *thd, Relay_log_info *rli __attribute__((unused)),
                      thd->wsrep_trx().ws_meta().gtid());
     }
 
-    thd->lex->set_current_select(NULL);
+    thd->lex->set_current_query_block(NULL);
     if (!ev->common_header->when.tv_sec)
       my_micro_time_to_timeval(my_micro_time(), &ev->common_header->when);
     ev->thd = thd;  // because up to this point, ev->thd == 0

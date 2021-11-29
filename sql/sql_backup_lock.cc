@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -95,7 +95,7 @@ static bool acquire_mdl_for_backup(THD *thd, enum_mdl_type mdl_type,
                                    ulong lock_wait_timeout) {
   MDL_request mdl_request;
 
-  DBUG_ASSERT(mdl_type == MDL_SHARED || mdl_type == MDL_INTENTION_EXCLUSIVE);
+  assert(mdl_type == MDL_SHARED || mdl_type == MDL_INTENTION_EXCLUSIVE);
 
 #ifdef WITH_WSREP
   if (mdl_duration == MDL_EXPLICIT) {

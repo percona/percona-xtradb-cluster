@@ -153,9 +153,14 @@ get_sources(){
     WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep-lib/wsrep-API/v26/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep-lib.cmake" | cut -d '"' -f2)"
     WSREP_REV="$(test -r WSREP-REVISION && cat WSREP-REVISION)"
     REVISION=$(git rev-parse --short HEAD)
-    pushd $SOURCEDIR/percona-xtradb-cluster-galera
-    GALERA_REVNO=$(git rev-parse --short HEAD)
-    popd
+    GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
+    if [ -z ${GALERA_REVNO} ]; then
+        pushd percona-xtradb-cluster-galera
+           GALERA_REVISION=$(git rev-parse --short HEAD)
+           echo ${GALERA_REVISION} > GALERA-REVISION
+        popd
+        GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
+    fi
     if [ -f VERSION ]; then
         source VERSION
     elif [ -f MYSQL_VERSION ]; then
@@ -192,7 +197,16 @@ get_sources(){
     if [ -f /etc/redhat-release ]; then
       export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
       RHEL=$(rpm --eval %rhel)
-      source /opt/rh/devtoolset-8/enable
+    if [ "x${RHEL}" = "x6" ]; then
+        source /opt/rh/devtoolset-8/enable
+    fi
+    if [ "x${RHEL}" = "x7" ]; then
+        source /opt/rh/devtoolset-10/enable
+    fi
+    if [ "x${RHEL}" = "x8" ]; then
+        source /opt/rh/gcc-toolset-10/enable
+    fi
+
       if [ "x${RHEL}" = "x8" ]; then
           cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1 -DWITH_ZLIB=bundled
       else
@@ -336,6 +350,39 @@ install_deps() {
 --slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake3 \
 --family cmake
         fi
+        if [ "x${RHEL}" = "x8" ]; then
+            yum -y install centos-release-stream
+            yum -y install git gcc-toolset-10-gcc gcc-toolset-10-gcc-c++ gcc-toolset-10-annobin
+            source /opt/rh/gcc-toolset-10/enable
+        fi
+        if [ "x${RHEL}" = "x7" ]; then
+            yum -y install devtoolset-10
+            source /opt/rh/devtoolset-10/enable
+        fi
+         if [ "x${RHEL}" = "x6" ]; then
+            source /opt/rh/devtoolset-8/enable
+        fi
+        if [ "x$RHEL" = "x6" ]; then
+            rm -f /usr/bin/cmake
+            cp -p /usr/bin/cmake3 /usr/bin/cmake
+            yum -y install Percona-Server-shared-56
+                  yum -y install libevent2-devel
+              else
+            yum -y install libevent-devel
+        fi
+        if [ "x$RHEL" = "x7" ]; then
+            yum -y --enablerepo=centos-sclo-rh-testing install devtoolset-10-gcc-c++ devtoolset-10-binutils devtoolset-10-valgrind devtoolset-10-valgrind-devel devtoolset-10-libatomic-devel
+            yum -y --enablerepo=centos-sclo-rh-testing install devtoolset-10-libasan-devel devtoolset-10-libubsan-devel
+            rm -f /usr/bin/cmake
+            cp -p /usr/bin/cmake3 /usr/bin/cmake
+        fi
+        if [ "x$RHEL" = "x8" ]; then
+            yum -y install centos-release-stream
+            yum -y install gcc-toolset-10-gcc-c++ gcc-toolset-10-binutils
+            yum -y install gcc-toolset-10-valgrind gcc-toolset-10-valgrind-devel gcc-toolset-10-libatomic-devel
+            yum -y install gcc-toolset-10-libasan-devel gcc-toolset-10-libubsan-devel
+            yum -y remove centos-release-stream
+        fi
         yum -y install yum-utils patchelf
     else
         apt-get -y update
@@ -373,7 +420,7 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-24=2.4.23-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-24=2.4.24-1.${DIST}
         apt-get -y install --download-only percona-xtrabackup-80=8.0.25-17-1.${DIST}
     fi
     return;
@@ -580,12 +627,30 @@ build_rpm(){
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
     #
     mv *.src.rpm rpmbuild/SRPMS
-    source /opt/rh/devtoolset-8/enable
+    if [ "x${RHEL}" = "x6" ]; then
+        source /opt/rh/devtoolset-8/enable
+    fi
+    if [ "x${RHEL}" = "x7" ]; then
+        source /opt/rh/devtoolset-10/enable
+    fi
+    if [ "x${RHEL}" = "x8" ]; then
+        source /opt/rh/gcc-toolset-10/enable
+    fi
+
     build_mecab_lib
     build_mecab_dict
 
     cd ${WORKDIR}  || exit
-    source /opt/rh/devtoolset-8/enable
+    if [ "x${RHEL}" = "x6" ]; then
+        source /opt/rh/devtoolset-8/enable
+    fi
+    if [ "x${RHEL}" = "x7" ]; then
+        source /opt/rh/devtoolset-10/enable
+    fi
+    if [ "x${RHEL}" = "x8" ]; then
+        source /opt/rh/gcc-toolset-10/enable
+    fi
+
     source ${WORKDIR}/pxc-80.properties
     source ${CURDIR}/srpm/pxc-80.properties
     #
@@ -779,7 +844,16 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
         export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
         RHEL=$(rpm --eval %rhel)
+    if [ "x${RHEL}" = "x6" ]; then
         source /opt/rh/devtoolset-8/enable
+    fi
+    if [ "x${RHEL}" = "x7" ]; then
+        source /opt/rh/devtoolset-10/enable
+    fi
+    if [ "x${RHEL}" = "x8" ]; then
+        source /opt/rh/gcc-toolset-10/enable
+    fi
+
     fi
     #
 
@@ -810,7 +884,7 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
         mkdir pxb-2.4
         pushd pxb-2.4
-        yumdownloader percona-xtrabackup-24-2.4.22
+        yumdownloader percona-xtrabackup-24-2.4.24
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib* ./
@@ -823,7 +897,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.23
+        yumdownloader percona-xtrabackup-80-8.0.25
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
@@ -835,7 +909,6 @@ build_tarball(){
         popd
         tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        rm -rf pxb-8.0 pxb-2.4
     else
         mkdir pxb-2.4
         mkdir pxb-8.0
@@ -852,11 +925,11 @@ build_tarball(){
         cd ../ || exit
         tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        rm -rf pxb-8.0 pxb-2.4
     fi
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
+    rm -rf pxb-8.0 pxb-2.4
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2
@@ -929,3 +1002,4 @@ build_srpm
 build_source_deb
 build_rpm
 build_deb
+

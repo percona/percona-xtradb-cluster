@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2012, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -104,7 +104,7 @@ void Table_cache::check_unused() {
     while ((entry = it++)) {
       /* We must not have TABLEs in the free list that have their file closed.
        */
-      DBUG_ASSERT(entry->db_stat && entry->file);
+      assert(entry->db_stat && entry->file);
 
       if (entry->in_use)
         DBUG_PRINT("error", ("Used table is in share's list of unused tables"));
@@ -135,7 +135,7 @@ void Table_cache::free_all_unused_tables() {
   }
 }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 /**
   Print debug information for the contents of the table cache.
 */
@@ -248,6 +248,16 @@ void Table_cache_manager::unlock_all_and_tdc() {
 }
 
 /**
+  Assert that caller owns lock on the table cache.
+
+  @param thd Thread handle
+*/
+void Table_cache_manager::assert_owner(THD *thd) {
+  Table_cache *tc = get_cache(thd);
+  tc->assert_owner();
+}
+
+/**
   Assert that caller owns locks on all instances of table cache.
 */
 
@@ -301,7 +311,7 @@ void Table_cache_manager::free_table(THD *thd MY_ATTRIBUTE((unused)),
       Table_cache_element::TABLE_list::Iterator it(cache_el[i]->free_tables);
       TABLE *table;
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
       if (remove_type == TDC_RT_REMOVE_ALL)
 #ifdef WITH_WSREP
       {
@@ -312,7 +322,7 @@ void Table_cache_manager::free_table(THD *thd MY_ATTRIBUTE((unused)),
         }
       }
 #else
-        DBUG_ASSERT(cache_el[i]->used_tables.is_empty());
+        assert(cache_el[i]->used_tables.is_empty());
 #endif /* WITH_WSREP */
       else if (remove_type == TDC_RT_REMOVE_NOT_OWN ||
                remove_type == TDC_RT_REMOVE_NOT_OWN_KEEP_SHARE) {
@@ -335,15 +345,21 @@ void Table_cache_manager::free_table(THD *thd MY_ATTRIBUTE((unused)),
                         wsrep_thd_is_BF(thd, false),
                         wsrep_thd_is_BF(table->in_use, false),
                         wsrep_thd_transaction_state_str(table->in_use));
-            DBUG_ASSERT(0);
+            assert(0);
           }
           mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #else
-          if (table->in_use != thd) DBUG_ASSERT(0);
+          if (table->in_use != thd) assert(0);
 #endif /* WITH_WSREP */
         }
       }
 #endif
+      if (remove_type == TDC_RT_MARK_FOR_REOPEN) {
+        Table_cache_element::TABLE_list::Iterator it2(cache_el[i]->used_tables);
+        while ((table = it2++)) {
+          table->invalidate_stats();
+        }
+      }
 
       while ((table = it++)) {
         m_table_cache[i].remove_table(table);
@@ -362,7 +378,7 @@ void Table_cache_manager::free_all_unused_tables() {
     m_table_cache[i].free_all_unused_tables();
 }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 /**
   Print debug information for the contents of all table cache instances.
 */

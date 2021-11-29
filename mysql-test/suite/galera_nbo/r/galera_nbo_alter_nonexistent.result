@@ -1,0 +1,8 @@
+SET SESSION wsrep_osu_method=NBO;
+ALTER TABLE t1 LOCK=SHARED, ADD PRIMARY KEY (f1);
+ERROR 42S02: Table 'test.t1' doesn't exist
+SET SESSION wsrep_osu_method=TOI;
+CALL mtr.add_suppression("Table 'test.t1' doesn't exist");
+CALL mtr.add_suppression("Query apply failed");
+CALL mtr.add_suppression("Table 'test.t1' doesn't exist");
+CALL mtr.add_suppression("Query apply failed");

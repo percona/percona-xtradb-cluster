@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -52,6 +52,7 @@
 #include "sql/sql_class.h"    // THD
 #include "sql/sql_connect.h"  // reset_mqh
 #include "sql/sql_const.h"
+#include "sql/sql_profile.h"
 #include "sql/sql_servers.h"  // servers_reload
 #include "sql/system_variables.h"
 #include "sql/table.h"
@@ -150,7 +151,7 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
   select_errors = 0; /* Write if more errors */
   int tmp_write_to_binlog = *write_to_binlog = 1;
 
-  DBUG_ASSERT(!thd || !thd->in_sub_stmt);
+  assert(!thd || !thd->in_sub_stmt);
 
   if (options & REFRESH_GRANT) {
     THD *tmp_thd = nullptr;
@@ -250,14 +251,14 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
     }
   }
 
-  DBUG_ASSERT(!thd || thd->locked_tables_mode ||
-              !thd->mdl_context.has_locks() ||
-              !thd->handler_tables_hash.empty() ||
-              thd->mdl_context.has_locks(MDL_key::USER_LEVEL_LOCK) ||
-              thd->mdl_context.has_locks(MDL_key::LOCKING_SERVICE) ||
-              thd->mdl_context.has_locks(MDL_key::BACKUP_LOCK) ||
-              thd->global_read_lock.is_acquired() ||
-              thd->backup_tables_lock.is_acquired());
+  assert(!thd || thd->locked_tables_mode ||
+         !thd->mdl_context.has_locks() ||
+         !thd->handler_tables_hash.empty() ||
+         thd->mdl_context.has_locks(MDL_key::USER_LEVEL_LOCK) ||
+         thd->mdl_context.has_locks(MDL_key::LOCKING_SERVICE) ||
+         thd->mdl_context.has_locks(MDL_key::BACKUP_LOCK) ||
+         thd->global_read_lock.is_acquired() ||
+         thd->backup_tables_lock.is_acquired());
 
   /*
     Note that if REFRESH_READ_LOCK bit is set then REFRESH_TABLES is set too
@@ -433,7 +434,7 @@ cleanup:
   if (options & REFRESH_THREADS)
     Per_thread_connection_handler::kill_blocked_pthreads();
   if (options & REFRESH_MASTER) {
-    DBUG_ASSERT(thd);
+    assert(thd);
     tmp_write_to_binlog = 0;
     /*
       RESET MASTER acquired global read lock (if the thread is not acquired
@@ -449,6 +450,12 @@ cleanup:
     }
   }
   if (options & REFRESH_OPTIMIZER_COSTS) reload_optimizer_cost_constants();
+
+  if (options & DUMP_MEMORY_PROFILE) {
+    tmp_write_to_binlog = 0;
+    if (opt_jemalloc_profiling_enabled) jemalloc_profiling_dump();
+  }
+
   if (options & REFRESH_REPLICA) {
     tmp_write_to_binlog = 0;
     if (reset_slave_cmd(thd)) {

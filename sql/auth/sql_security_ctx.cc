@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2014, 2021, Oracle and/or its affiliates.
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
    as published by the Free Software Foundation.
@@ -283,7 +283,7 @@ bool Security_context::change_security_context(
 
   DBUG_TRACE;
 
-  DBUG_ASSERT(definer_user.str && definer_host.str);
+  assert(definer_user.str && definer_host.str);
 
   *backup = nullptr;
   needs_change =
@@ -677,7 +677,7 @@ std::pair<bool, bool> Security_context::has_global_grant(const char *priv,
       const char act[] =
           "now signal has_global_grant.got_lock wait_for"
           " has_global_grant.release_lock";
-      DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+      assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
     });
 #endif /* WITH_WSREP */
 
@@ -888,7 +888,7 @@ void Security_context::set_host_ptr(const char *host_arg,
                                     const size_t host_arg_length) {
   DBUG_TRACE;
 
-  DBUG_ASSERT(host_arg != nullptr);
+  assert(host_arg != nullptr);
 
   if (host_arg == m_host.ptr()) return;
 
@@ -1172,7 +1172,7 @@ ulong Security_context::filter_access(const ulong access,
 std::pair<bool, bool> Security_context::fetch_global_grant(
     const ACL_USER &acl_user, const std::string &privilege,
     bool cumulative /*= false */) {
-  DBUG_ASSERT(assert_acl_cache_read_lock(current_thd));
+  assert(assert_acl_cache_read_lock(current_thd));
   std::pair<bool, bool> has_privilege{false, false};
   Security_context sctx;
 
@@ -1205,7 +1205,7 @@ std::pair<bool, bool> Security_context::fetch_global_grant(
  */
 bool Security_context::has_table_access(ulong priv, TABLE_LIST *tables) {
   DBUG_TRACE;
-  DBUG_ASSERT(tables != nullptr);
+  assert(tables != nullptr);
   TABLE const *table = tables->table;
   LEX_CSTRING db, table_name;
   db.str = table->s->db.str;
@@ -1249,7 +1249,7 @@ bool Security_context::has_table_access(ulong priv, TABLE_LIST *tables) {
  */
 bool Security_context::is_table_blocked(ulong priv, TABLE const *table) {
   DBUG_TRACE;
-  DBUG_ASSERT(table != nullptr);
+  assert(table != nullptr);
   LEX_CSTRING db, table_name;
   db.str = table->s->db.str;
   db.length = table->s->db.length;
@@ -1283,7 +1283,7 @@ bool Security_context::is_table_blocked(ulong priv, TABLE const *table) {
 bool Security_context::has_column_access(ulong priv, TABLE const *table,
                                          std::vector<std::string> columns) {
   DBUG_TRACE;
-  DBUG_ASSERT(table != nullptr);
+  assert(table != nullptr);
   LEX_CSTRING db, table_name;
   db.str = table->s->db.str;
   db.length = table->s->db.length;

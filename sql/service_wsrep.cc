@@ -59,6 +59,8 @@ extern "C" long long wsrep_thd_trx_seqno(const THD *thd) {
   const wsrep::client_state &cs = thd->wsrep_cs();
   if (cs.mode() == wsrep::client_state::m_toi) {
     return cs.toi_meta().seqno().get();
+  } else if (cs.mode() == wsrep::client_state::m_nbo) {
+    return cs.nbo_meta().seqno().get();
   } else {
     return cs.transaction().ws_meta().seqno().get();
   }
@@ -95,6 +97,15 @@ extern "C" bool wsrep_thd_is_in_rsu(const THD *thd) {
   return thd->wsrep_cs().mode() == wsrep::client_state::m_rsu;
 }
 
+extern "C" bool wsrep_thd_is_in_nbo(const THD *thd) {
+  return thd->wsrep_cs().mode() == wsrep::client_state::m_nbo;
+}
+
+extern "C" bool wsrep_thd_is_local_nbo(const THD *thd) {
+  return thd->wsrep_cs().mode() == wsrep::client_state::m_nbo &&
+         thd->wsrep_cs().toi_mode() == wsrep::client_state::m_local;
+}
+
 extern "C" bool wsrep_thd_is_BF(const THD *thd, bool sync) {
   bool status = false;
   if (thd && (WSREP(thd) || wsrep_thd_is_in_rsu(thd))) {
@@ -113,7 +124,7 @@ extern "C" bool wsrep_thd_is_SR(const THD *thd) {
 }
 
 extern "C" void wsrep_handle_SR_rollback(THD *bf_thd, THD *victim_thd) {
-  DBUG_ASSERT(victim_thd);
+  assert(victim_thd);
   // if (!victim_thd || !wsrep_on(bf_thd)) return;
   if (!victim_thd) return;
 
@@ -166,8 +177,8 @@ extern "C" bool wsrep_thd_bf_abort(const THD *bf_thd, THD *victim_thd,
   if ((ret || !wsrep_on(victim_thd)) && signal) {
     mysql_mutex_lock(&victim_thd->LOCK_thd_data);
 
-    if (victim_thd->wsrep_aborter && victim_thd->wsrep_aborter != bf_thd->thread_id())
-    {
+    if (victim_thd->wsrep_aborter &&
+        victim_thd->wsrep_aborter != bf_thd->thread_id()) {
       WSREP_DEBUG("victim is killed already by %u, skipping awake",
                   victim_thd->wsrep_aborter);
       mysql_mutex_unlock(&victim_thd->LOCK_thd_data);
@@ -190,8 +201,7 @@ extern "C" bool wsrep_thd_order_before(const THD *left, const THD *right) {
     // we do not care about non wsrep threads, keep original behavior
     return true;
   }
-  if (left && right &&
-      wsrep_thd_trx_seqno(left) > 0 &&
+  if (left && right && wsrep_thd_trx_seqno(left) > 0 &&
       wsrep_thd_trx_seqno(left) < wsrep_thd_trx_seqno(right)) {
     WSREP_DEBUG("BF conflict, order: %lld %lld\n",
                 (long long)wsrep_thd_trx_seqno(left),
@@ -242,7 +252,7 @@ extern "C" int wsrep_thd_append_key(THD *thd, const struct wsrep_key *key,
                                     int n_keys,
                                     enum Wsrep_service_key_type key_type) {
   Wsrep_client_state &client_state(thd->wsrep_cs());
-  DBUG_ASSERT(client_state.transaction().active());
+  assert(client_state.transaction().active());
   int ret = 0;
   for (int i = 0; i < n_keys && ret == 0; ++i) {
     wsrep::key wsrep_key(map_key_type(key_type));
@@ -265,26 +275,22 @@ extern "C" void wsrep_commit_ordered(THD *thd) {
   }
 }
 
-extern "C" bool wsrep_thd_has_ignored_error(const THD *thd)
-{
+extern "C" bool wsrep_thd_has_ignored_error(const THD *thd) {
   return thd->wsrep_has_ignored_error;
 }
 
-extern "C" void wsrep_thd_set_ignored_error(THD *thd, bool val)
-{
-  thd->wsrep_has_ignored_error= val;
+extern "C" void wsrep_thd_set_ignored_error(THD *thd, bool val) {
+  thd->wsrep_has_ignored_error = val;
 }
 
-extern "C" bool wsrep_thd_set_wsrep_aborter(THD *bf_thd, THD *victim_thd)
-{
-  if (!bf_thd)
-  {
+extern "C" bool wsrep_thd_set_wsrep_aborter(THD *bf_thd, THD *victim_thd) {
+  if (!bf_thd) {
     victim_thd->wsrep_aborter = 0;
     WSREP_DEBUG("wsrep_thd_set_wsrep_aborter resetting wsrep_aborter");
     return false;
   }
-  if (victim_thd->wsrep_aborter && victim_thd->wsrep_aborter != bf_thd->thread_id())
-  {
+  if (victim_thd->wsrep_aborter &&
+      victim_thd->wsrep_aborter != bf_thd->thread_id()) {
     return true;
   }
   victim_thd->wsrep_aborter = bf_thd->thread_id();

@@ -8,7 +8,7 @@ CREATE TABLE t1 (ID INT PRIMARY KEY);;
 [connection node_1b]
 SET DEBUG_SYNC = "now WAIT_FOR reached";
 # Killing query on node1a
-ERROR HY000: The query is in TOI and cannot be killed
+ERROR HY000: The query is in TOI/NBO and cannot be killed
 [connection node_1]
 UNLOCK TABLES;
 [connection node_1a]
@@ -42,7 +42,7 @@ CREATE TABLE t1 (ID INT PRIMARY KEY);;
 [connection node_1b]
 SET DEBUG_SYNC = "now WAIT_FOR reached";
 # Killing query on node1a
-ERROR HY000: The query is in TOI and cannot be killed
+ERROR HY000: The query is in TOI/NBO and cannot be killed
 SET DEBUG_SYNC= 'now SIGNAL continue';
 [connection node_1a]
 [connection node_1]
@@ -59,7 +59,7 @@ CREATE TABLE t1 (ID INT PRIMARY KEY);;
 [connection node_1b]
 SET DEBUG_SYNC = "now WAIT_FOR reached";
 # Killing query on node1a
-ERROR HY000: The query is in TOI and cannot be killed
+ERROR HY000: The query is in TOI/NBO and cannot be killed
 SET DEBUG_SYNC= 'now SIGNAL continue';
 [connection node_1a]
 [connection node_1]
@@ -135,7 +135,7 @@ CREATE TABLE t1 (ID INT PRIMARY KEY);;
 [connection node_1b]
 SET DEBUG_SYNC = "now WAIT_FOR reached";
 # Killing connection_node1a
-ERROR HY000: The query is in TOI and cannot be killed
+ERROR HY000: The query is in TOI/NBO and cannot be killed
 SET DEBUG_SYNC= 'now SIGNAL continue';
 [connection node_1a]
 [connection node_1]
@@ -152,7 +152,7 @@ CREATE TABLE t1 (ID INT PRIMARY KEY);;
 [connection node_1b]
 SET DEBUG_SYNC = "now WAIT_FOR reached";
 # Killing query on node1a
-ERROR HY000: The query is in TOI and cannot be killed
+ERROR HY000: The query is in TOI/NBO and cannot be killed
 SET DEBUG_SYNC= 'now SIGNAL continue';
 [connection node_1a]
 [connection node_1]

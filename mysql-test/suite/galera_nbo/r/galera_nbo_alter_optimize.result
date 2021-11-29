@@ -1,0 +1,41 @@
+CREATE TABLE t1 (f1 INTEGER NOT NULL) ENGINE=InnoDB;
+CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+SET GLOBAL debug = 'd,sync.alter_locked_tables';
+SET SESSION wsrep_osu_method=NBO;
+ALTER TABLE t1 ALGORITHM=COPY, LOCK=SHARED, ADD PRIMARY KEY (f1);;
+SET SESSION wsrep_sync_wait=0;
+SET SESSION wsrep_osu_method=NBO;
+SET SESSION lock_wait_timeout=1;
+OPTIMIZE TABLE t1;
+ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+SET DEBUG_SYNC= 'now SIGNAL signal.alter_locked_tables';
+SET GLOBAL debug = '';
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 2 FROM t2;
+COUNT(*) = 2
+0
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 2 FROM t2;
+COUNT(*) = 2
+0
+SET SESSION wsrep_OSU_method=TOI;
+DROP TABLE t1;
+DROP TABLE t2;
+CALL mtr.add_suppression(".*Unable to acquire shared lock on db.*");

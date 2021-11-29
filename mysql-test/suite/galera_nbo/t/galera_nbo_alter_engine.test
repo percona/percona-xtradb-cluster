@@ -1,0 +1,34 @@
+#
+# Test NBO and ALTER ENGINE 
+#
+
+--source include/galera_cluster.inc
+
+--connection node_1
+SET GLOBAL wsrep_replicate_myisam=ON;
+
+CREATE TABLE t1 (f1 INTEGER) ENGINE=MyISAM;
+INSERT INTO t1 VALUES (1);
+
+SET SESSION wsrep_OSU_method=NBO;
+
+# Upstream test shows that this should replicate both values, but we only replicate new values even with TOI
+ALTER TABLE t1 LOCK=SHARED, ENGINE=InnoDB;
+INSERT INTO t1 VALUES (2);
+
+SHOW CREATE TABLE t1;
+
+--connection node_2
+SHOW CREATE TABLE t1;
+
+--sleep 10
+
+SELECT * FROM t1;
+
+SET SESSION wsrep_OSU_method=TOI;
+
+DROP TABLE t1;
+
+--connection node_1
+SET GLOBAL wsrep_replicate_myisam=FALSE;
+
