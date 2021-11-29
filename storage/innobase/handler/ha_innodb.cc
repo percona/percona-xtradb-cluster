@@ -6728,6 +6728,13 @@ static int innobase_rollback(handlerton *hton, /*!< in: InnoDB handlerton */
       !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) {
     error = trx_rollback_for_mysql(trx);
 
+#ifdef WITH_WSREP
+    /* If the transaction was aborted at prepare phase, it does not get
+    into commit phase, so we need to clean this flag here.
+    The new transaction will start with the clean state. */
+    trx->lock.was_chosen_as_wsrep_victim = false;
+#endif /* WITH_WSREP */
+
     if (trx->state == TRX_STATE_FORCED_ROLLBACK) {
 #ifdef UNIV_DEBUG
       char buffer[1024];
