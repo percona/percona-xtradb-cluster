@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -22,5 +22,14 @@
 
 #include "storage/perfschema/pfs.h"
 #include "storage/perfschema/pfs_defaults.h"
+#include "wsrep-lib/wsrep-API/v26/wsrep_api.h"
 
 void install_default_setup(PSI_thread_bootstrap *) {}
+
+void wsrep_sst_cancel(bool) { }
+
+void wsrep_pfs_instr_cb(wsrep_pfs_instr_type_t, wsrep_pfs_instr_ops_t,
+                        wsrep_pfs_instr_tag_t, void **, void **,
+                        const void *) {}
+
+

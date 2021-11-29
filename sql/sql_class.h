@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -275,7 +275,7 @@ typedef struct rpl_event_coordinates {
 #define THD_SENTRY_MAGIC 0xfeedd1ff
 #define THD_SENTRY_GONE 0xdeadbeef
 
-#define THD_CHECK_SENTRY(thd) DBUG_ASSERT(thd->dbug_sentry == THD_SENTRY_MAGIC)
+#define THD_CHECK_SENTRY(thd) assert(thd->dbug_sentry == THD_SENTRY_MAGIC)
 
 int lock_keyrings(THD *thd);
 int unlock_keyrings(THD *thd);
@@ -381,6 +381,12 @@ class Query_arena {
   char *mem_strdup(const char *str) { return strdup_root(mem_root, str); }
   char *strmake(const char *str, size_t size) const {
     return strmake_root(mem_root, str, size);
+  }
+  LEX_CSTRING strmake(LEX_CSTRING str) {
+    LEX_CSTRING ret;
+    ret.str = strmake(str.str, str.length);
+    ret.length = ret.str ? str.length : 0;
+    return ret;
   }
   void *memdup(const void *str, size_t size) {
     return memdup_root(mem_root, str, size);
@@ -964,7 +970,7 @@ class Bloom_filter final {
     }
     // Duplicating ut_hash_ulint calculation
     const ulong pos = (key ^ 1653893711) % SIZE;
-    DBUG_ASSERT(pos < SIZE);
+    assert(pos < SIZE);
     if (bit_set->test(pos)) return false;
     bit_set->set(pos);
     return true;
@@ -978,11 +984,11 @@ class Bloom_filter final {
 class Transactional_ddl_context {
  public:
   explicit Transactional_ddl_context(THD *thd) : m_thd(thd) {
-    DBUG_ASSERT(m_thd != nullptr);
+    assert(m_thd != nullptr);
   }
 
   ~Transactional_ddl_context() {
-    DBUG_ASSERT(!m_hton);
+    assert(!m_hton);
     post_ddl();
   }
 
@@ -1020,22 +1026,22 @@ class THD : public MDL_context_owner,
             public Open_tables_state {
  private:
   inline bool is_stmt_prepare() const {
-    DBUG_ASSERT(0);
+    assert(0);
     return Query_arena::is_stmt_prepare();
   }
 
   inline bool is_stmt_prepare_or_first_sp_execute() const {
-    DBUG_ASSERT(0);
+    assert(0);
     return Query_arena::is_stmt_prepare_or_first_sp_execute();
   }
 
   inline bool is_stmt_prepare_or_first_stmt_execute() const {
-    DBUG_ASSERT(0);
+    assert(0);
     return Query_arena::is_stmt_prepare_or_first_stmt_execute();
   }
 
   inline bool is_regular() const {
-    DBUG_ASSERT(0);
+    assert(0);
     return Query_arena::is_regular();
   }
 
@@ -1089,6 +1095,7 @@ class THD : public MDL_context_owner,
   */
   LEX_CSTRING m_query_string;
   String m_normalized_query;
+  std::atomic<bool> m_safe_to_display;
 
   /**
     Currently selected catalog.
@@ -1248,7 +1255,7 @@ class THD : public MDL_context_owner,
     actually reports the previous query, not itself.
   */
   void save_current_query_costs() {
-    DBUG_ASSERT(!status_var_aggregated);
+    assert(!status_var_aggregated);
     status_var.last_query_cost = m_current_query_cost;
     status_var.last_query_partial_plans = m_current_query_partial_plans;
   }
@@ -1291,9 +1298,9 @@ class THD : public MDL_context_owner,
     this mutex:
       THD::Query_plan
       Modification_plan
-      SELECT_LEX::join
+      Query_block::join
       JOIN::plan_state
-      Tree of SELECT_LEX_UNIT after THD::Query_plan was set till
+      Tree of Query_expression after THD::Query_plan was set till
         THD::Query_plan cleanup
       JOIN_TAB::select->quick
     Code that changes objects above should take this mutex.
@@ -1379,7 +1386,7 @@ class THD : public MDL_context_owner,
   Protocol *get_protocol() { return m_protocol; }
 
   SSL_handle get_ssl() const {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     if (current_thd != this) {
       /*
         When inspecting this thread from monitoring,
@@ -1400,12 +1407,12 @@ class THD : public MDL_context_owner,
     is needed to prevent misuse of pluggable protocols by legacy code
   */
   const Protocol_classic *get_protocol_classic() const {
-    DBUG_ASSERT(is_classic_protocol());
+    assert(is_classic_protocol());
     return pointer_cast<const Protocol_classic *>(m_protocol);
   }
 
   Protocol_classic *get_protocol_classic() {
-    DBUG_ASSERT(is_classic_protocol());
+    assert(is_classic_protocol());
     return pointer_cast<Protocol_classic *>(m_protocol);
   }
 
@@ -1446,7 +1453,7 @@ class THD : public MDL_context_owner,
    public:
     /// Asserts that current_thd has locked this plan, if it does not own it.
     void assert_plan_is_locked_if_other() const
-#ifdef DBUG_OFF
+#ifdef NDEBUG
     {
     }
 #else
@@ -1525,7 +1532,7 @@ class THD : public MDL_context_owner,
   */
   malloc_unordered_map<std::string, User_level_lock *> ull_hash{
       key_memory_User_level_lock};
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   uint dbug_sentry;  // watch out for memory corruption
 #endif
   bool is_killable;
@@ -1624,7 +1631,7 @@ class THD : public MDL_context_owner,
   ulong innodb_page_access;
 
   void mark_innodb_used(ulonglong trx_id) noexcept {
-    DBUG_ASSERT(innodb_slow_log_enabled());
+    assert(innodb_slow_log_enabled());
     if (trx_id && !is_attachable_transaction_active()) innodb_trx_id = trx_id;
     innodb_was_used = true;
   }
@@ -1729,7 +1736,7 @@ class THD : public MDL_context_owner,
       while (main_trx->get_prev_attachable_trx() != NULL) {
         main_trx = main_trx->get_prev_attachable_trx();
       }
-      DBUG_ASSERT(main_trx->get_prev_attachable_trx() == NULL);
+      assert(main_trx->get_prev_attachable_trx() == NULL);
       return main_trx->wsrep_get_main_trx_ha_data(slot);
     }
     return &ha_data[slot];
@@ -1823,8 +1830,8 @@ class THD : public MDL_context_owner,
     format.
    */
   int is_current_stmt_binlog_format_row() const {
-    DBUG_ASSERT(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
-                current_stmt_binlog_format == BINLOG_FORMAT_ROW);
+    assert(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
+           current_stmt_binlog_format == BINLOG_FORMAT_ROW);
     return current_stmt_binlog_format == BINLOG_FORMAT_ROW;
   }
 
@@ -1896,12 +1903,12 @@ class THD : public MDL_context_owner,
   }
 
   inline void clear_binlog_local_stmt_filter() {
-    DBUG_ASSERT(m_binlog_filter_state == BINLOG_FILTER_UNKNOWN);
+    assert(m_binlog_filter_state == BINLOG_FILTER_UNKNOWN);
     m_binlog_filter_state = BINLOG_FILTER_CLEAR;
   }
 
   inline void set_binlog_local_stmt_filter() {
-    DBUG_ASSERT(m_binlog_filter_state == BINLOG_FILTER_UNKNOWN);
+    assert(m_binlog_filter_state == BINLOG_FILTER_UNKNOWN);
     m_binlog_filter_state = BINLOG_FILTER_SET;
   }
 
@@ -2543,7 +2550,6 @@ class THD : public MDL_context_owner,
     update auto-updatable fields (like auto_increment and timestamp).
   */
   query_id_t query_id;
-  ulong col_access;
 
   /* Statement id is thread-wide. This counter is used to generate ids */
   ulong statement_id_counter;
@@ -2681,15 +2687,15 @@ class THD : public MDL_context_owner,
   /**@{*/
   void set_trans_pos(const char *file, my_off_t pos) {
     DBUG_TRACE;
-    DBUG_ASSERT(((file == nullptr) && (pos == 0)) ||
-                ((file != nullptr) && (pos != 0)));
+    assert(((file == nullptr) && (pos == 0)) ||
+           ((file != nullptr) && (pos != 0)));
     if (file) {
       DBUG_PRINT("enter", ("file: %s, pos: %llu", file, pos));
       // Only the file name should be used, not the full path
       m_trans_log_file = file + dirname_length(file);
       if (!m_trans_fixed_log_file)
         m_trans_fixed_log_file = (char *)main_mem_root.Alloc(FN_REFLEN + 1);
-      DBUG_ASSERT(strlen(m_trans_log_file) <= FN_REFLEN);
+      assert(strlen(m_trans_log_file) <= FN_REFLEN);
       strcpy(m_trans_fixed_log_file, m_trans_log_file);
     } else {
       m_trans_log_file = nullptr;
@@ -2931,6 +2937,7 @@ class THD : public MDL_context_owner,
   } binlog_evt_union;
 
 #ifdef WITH_WSREP
+  ulonglong wsrep_bin_log_flag_save;
   bool wsrep_applier;         /* dedicated slave applier thread */
   bool wsrep_applier_closing; /* applier marked to close */
   bool wsrep_client_thread;   /* to identify client threads */
@@ -2943,6 +2950,12 @@ class THD : public MDL_context_owner,
     that only modifies the wsrep_schema.SR table.
   */
   bool wsrep_skip_locking;
+
+  struct nbo_context {
+    wsrep::key_array keys;
+  };
+
+  nbo_context wsrep_nbo;
 
   mysql_mutex_t LOCK_wsrep_thd;
   mysql_cond_t COND_wsrep_thd;
@@ -3351,6 +3364,17 @@ class THD : public MDL_context_owner,
   }
 
   int is_killed() const final { return killed; }
+  bool might_have_commit_order_waiters() const final {
+    /*
+      We need to return if this thread can have any commit order waiters
+      which are still accounted by MDL deadlock detector (even in absence
+      of any MDL locks). We approximate this check by testing whether
+      this thread is replication applier. Doing more precise check is going
+      to be more expensive and possibly racy.
+    */
+    return slave_thread;
+  }
+
   THD *get_thd() override { return this; }
 
   /**
@@ -3743,7 +3767,7 @@ class THD : public MDL_context_owner,
       statement, remove the big comment below that, and remove the
       in_sub_stmt==0 condition from the following 'if'.
     */
-    /* DBUG_ASSERT(in_sub_stmt == 0); */
+    /* assert(in_sub_stmt == 0); */
     /*
       If in a stored/function trigger, the caller should already have done the
       change. We test in_sub_stmt to prevent introducing bugs where people
@@ -4171,7 +4195,7 @@ class THD : public MDL_context_owner,
 #ifdef HAVE_GTID_NEXT_LIST
       owned_gtid_set.clear();
 #else
-      DBUG_ASSERT(0);
+      assert(0);
 #endif
     }
     owned_gtid.clear();
@@ -4436,7 +4460,7 @@ class THD : public MDL_context_owner,
   */
   void debug_assert_query_locked() const;
   const LEX_CSTRING &query() const {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     debug_assert_query_locked();
 #endif
     return m_query_string;
@@ -4457,7 +4481,8 @@ class THD : public MDL_context_owner,
   const String normalized_query();
 
   /**
-    Set query to be displayed in performance schema (threads table etc.).
+    Set query to be displayed in performance schema (threads table etc.). Also
+    mark the query safe to display for information_schema.process_list.
   */
   void set_query_for_display(const char *query_arg MY_ATTRIBUTE((unused)),
                              size_t query_length_arg MY_ATTRIBUTE((unused))) {
@@ -4469,8 +4494,24 @@ class THD : public MDL_context_owner,
     PSI_THREAD_CALL(set_thread_info)
     (query_arg, static_cast<uint>(query_length_arg));
 #endif
+    set_safe_display(true);
   }
-  void reset_query_for_display(void) { set_query_for_display(nullptr, 0); }
+
+  /**
+    Reset query string to be displayed in PFS. Also reset the safety flag
+    for information_schema.process_list for next query.
+  */
+  void reset_query_for_display() {
+    set_query_for_display(nullptr, 0);
+    m_safe_to_display.store(false);
+  }
+
+  /** @return true, if safe to display the query string. */
+  bool safe_to_display() const { return m_safe_to_display.load(); }
+
+  /** Set if the query string to be safe to display.
+  @param[in]  safe  if it is safe to display query string */
+  void set_safe_display(bool safe) { m_safe_to_display.store(safe); }
 
   /**
     Assign a new value to thd->m_query_string.
@@ -4509,7 +4550,7 @@ class THD : public MDL_context_owner,
     is set on), the caller must hold LOCK_thd_query while calling this!
   */
   const String &rewritten_query() const {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     if (current_thd != this) mysql_mutex_assert_owner(&LOCK_thd_query);
 #endif
     return m_rewritten_query;
@@ -4573,7 +4614,7 @@ class THD : public MDL_context_owner,
   }
 
   void enter_locked_tables_mode(enum_locked_tables_mode mode_arg) {
-    DBUG_ASSERT(locked_tables_mode == LTM_NONE);
+    assert(locked_tables_mode == LTM_NONE);
 
     if (mode_arg == LTM_LOCK_TABLES) {
       /*
@@ -4862,7 +4903,7 @@ class THD : public MDL_context_owner,
     @param plugin the id of the plugin the thd belongs to
    */
   void set_plugin(const st_plugin_int *plugin) { m_plugin = plugin; }
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   uint get_tmp_table_seq_id() { return tmp_table_seq_id++; }
   void set_tmp_table_seq_id(uint arg) { tmp_table_seq_id = arg; }
 #endif
@@ -4888,7 +4929,7 @@ class THD : public MDL_context_owner,
   */
   bool m_is_plugin_fake_ddl;
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   /**
     Sequential number of internal tmp table created in the statement. Useful for
     tracking tmp tables when number of them is involved in a query.

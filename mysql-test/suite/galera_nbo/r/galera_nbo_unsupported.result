@@ -1,0 +1,20 @@
+CREATE TABLE t1 (f1 INTEGER NOT NULL) ENGINE=InnoDB;
+SET SESSION wsrep_osu_method='NBO';
+CREATE TABLE t2 (f1 INTEGER);
+ERROR 42000: This version of MySQL doesn't yet support 'Can't execute yet in NBO mode'
+RENAME TABLE t1 TO t2;
+ERROR 42000: This version of MySQL doesn't yet support 'Can't execute yet in NBO mode'
+DROP TABLE t1;
+ERROR 42000: This version of MySQL doesn't yet support 'Can't execute yet in NBO mode'
+CREATE USER u1 IDENTIFIED BY 'p1';
+ERROR 42000: This version of MySQL doesn't yet support 'Can't execute yet in NBO mode'
+DROP USER u1;
+ERROR 42000: This version of MySQL doesn't yet support 'Can't execute yet in NBO mode'
+SET SESSION wsrep_osu_method=TOI;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+DROP TABLE t1;
+CALL mtr.add_suppression("Fail to replicate");

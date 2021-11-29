@@ -136,7 +136,7 @@ static int wsrep_write_cache_inc(THD *const thd,
   unsigned char *read_pos = NULL;
   my_off_t read_len = 0;
 
-  if (cache->begin(&read_pos, &read_len, thd->wsrep_sr().bytes_certified())) {
+  if (cache->begin(&read_pos, &read_len, thd->wsrep_sr().log_position())) {
     WSREP_ERROR("Failed to initialize io-cache");
     DBUG_RETURN(ER_ERROR_ON_WRITE);
   }
@@ -165,7 +165,8 @@ static int wsrep_write_cache_inc(THD *const thd,
       goto cleanup;
     }
 
-    if (thd->wsrep_cs().append_data(wsrep::const_buffer(ostream.c_ptr(), ostream.length())))
+    if (thd->wsrep_cs().append_data(
+            wsrep::const_buffer(ostream.c_ptr(), ostream.length())))
       goto cleanup;
     total_length += ostream.length();
   }
@@ -221,6 +222,9 @@ cleanup:
 int wsrep_write_cache(THD *const thd,
                       IO_CACHE_binlog_cache_storage *const cache,
                       size_t *const len) {
+  if (int res = prepend_binlog_control_event(thd)) {
+    return res;
+  }
   return wsrep_write_cache_inc(thd, cache, len);
 }
 
@@ -253,8 +257,8 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
 
   File file;
   Binlog_cache_storage cache;
-  //IO_CACHE cache;
-  //assert(0);
+  // IO_CACHE cache;
+  // assert(0);
   // TODO: need to find way to persist event (Format_description_log_event to
   // cache) Log_event_writer writer(&cache, 0);
   Format_description_log_event *ev = 0;
@@ -293,8 +297,7 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
     goto cleanup2;
   }
 
-  if (cache.write((const uchar *)BINLOG_MAGIC,
-                      BIN_LOG_HEADER_SIZE)) {
+  if (cache.write((const uchar *)BINLOG_MAGIC, BIN_LOG_HEADER_SIZE)) {
     goto cleanup2;
   }
 
@@ -306,15 +309,16 @@ void wsrep_dump_rbr_buf_with_header(THD *thd, const void *rbr_buf,
                             : (new Format_description_log_event());
 
   // if (writer.write(ev) || my_b_write(&cache, (uchar *)rbr_buf, buf_len) ||
-  if (ev->write(&cache) || cache.write(static_cast<uchar *>(const_cast<void *>(rbr_buf)),
-                 buf_len) ||
-      cache.flush()) {
+  if (((ev->write(&cache) ||
+        cache.write(static_cast<uchar *>(const_cast<void *>(rbr_buf)),
+                    buf_len) ||
+        cache.flush()))) {
     WSREP_ERROR("Failed to write to '%s'.", filename);
     goto cleanup2;
   }
 
 cleanup2:
-  //end_io_cache(&cache);
+  // end_io_cache(&cache);
 
 cleanup1:
   free(filename);
@@ -396,7 +400,7 @@ void wsrep_register_for_group_commit(THD *thd) {
     return;
   }
 
-  DBUG_ASSERT(thd->wsrep_trx().state() == wsrep::transaction::s_committing);
+  assert(thd->wsrep_trx().state() == wsrep::transaction::s_committing);
   MUTEX_LOCK(guard, &LOCK_wsrep_group_commit);
   wsrep_group_commit_queue.push(thd);
   thd->wsrep_enforce_group_commit = true;

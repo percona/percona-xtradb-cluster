@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2006, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -59,7 +59,7 @@ extern "C" int test_if_data_home_dir(const char *dir);
 
 bool stmt_causes_implicit_commit(const THD *thd, uint mask);
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 extern void turn_parser_debug_on();
 #endif
 
@@ -146,9 +146,16 @@ extern const LEX_CSTRING command_name[];
       wsrep_to_isolation_begin(thd, db_, table_, table_list_, nullptr,        \
                                alter_info_, fk_tables_))
 
-#define WSREP_TO_ISOLATION_END                                                 \
-  if ((WSREP(thd) && wsrep_thd_is_local_toi(thd)) || wsrep_thd_is_in_rsu(thd)) \
+#define WSREP_TO_ISOLATION_END                                 \
+  if ((WSREP(thd) && wsrep_thd_is_local_toi(thd)) ||           \
+      wsrep_thd_is_in_rsu(thd) || wsrep_thd_is_local_nbo(thd)) \
     wsrep_to_isolation_end(thd);
+
+#define WSREP_NBO_2ND_PHASE_BEGIN \
+  if (WSREP(thd) && wsrep_NBO_begin_phase_two(thd)) goto error;
+
+#define WSREP_NBO_1ST_PHASE_END \
+  if (WSREP(thd)) wsrep_NBO_end_phase_one(thd);
 
 /* Checks if lex->no_write_to_binlog is set for statements that use
   LOCAL or NO_WRITE_TO_BINLOG
@@ -182,6 +189,8 @@ extern const LEX_CSTRING command_name[];
 #define WSREP_SYNC_WAIT(thd_, before_)
 
 #endif /* WITH_WSREP */
+
+size_t get_command_name_len(void);
 
 bool sqlcom_can_generate_row_events(enum enum_sql_command command);
 
@@ -332,7 +341,6 @@ bool set_default_collation(HA_CREATE_INFO *create_info,
   --skip-grant-tables server option.
 */
 #define CF_REQUIRE_ACL_CACHE (1U << 20)
-
 
 /**
   Identifies statements as SHOW commands using INFORMATION_SCHEMA system views.

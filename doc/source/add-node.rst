@@ -6,7 +6,7 @@ Adding Nodes to Cluster
 
 New nodes that are :ref:`properly configured <configure>` are provisioned
 automatically.  When you start a node with the address of at least one other
-running node in the |wsrep_cluster_address| variable, this node automatically
+running node in the wsrep_cluster_address variable, this node automatically
 joins and synchronizes with the cluster.
 
 .. note::
@@ -16,8 +16,8 @@ joins and synchronizes with the cluster.
    nodes at the same time to avoid overhead due to large amounts of
    traffic when a new node joins.
 
-|PXC| uses |PXB|_ for :term:`State Snapshot Transfer <SST>` and the
-|wsrep_sst_method| variable is always set to ``xtrabackup-v2``.
+Percona XtraDB Cluster uses Percona XtraBackup_ for :term:`State Snapshot Transfer <SST>` and the
+wsrep_sst_method variable is always set to ``xtrabackup-v2``.
 
 
 Starting the Second Node
@@ -89,5 +89,5 @@ When you add all nodes to the cluster, you can :ref:`verify replication
 <verify>` by running queries and manipulating data on nodes to see if these
 changes are synchronized accross the cluster.
 
-.. |wsrep_sst_method| replace:: :variable:`wsrep_sst_method`
-.. |wsrep_cluster_address| replace:: :variable:`wsrep_cluster_address`
+.. wsrep_sst_method replace:: :variable:`wsrep_sst_method`
+.. wsrep_cluster_address replace:: :variable:`wsrep_cluster_address`

@@ -149,8 +149,8 @@ static void wsrep_rollback_streaming_aborted_by_toi(THD *thd) {
   auto saved_esd = thd->event_scheduler.data;
   thd->event_scheduler.data = 0;
   if (thd->wsrep_cs().mode() == wsrep::client_state::m_high_priority) {
-    DBUG_ASSERT(!saved_esd);
-    DBUG_ASSERT(thd->wsrep_applier_service);
+    assert(!saved_esd);
+    assert(thd->wsrep_applier_service);
     thd->wsrep_applier_service->rollback(wsrep::ws_handle(), wsrep::ws_meta());
     thd->wsrep_applier_service->after_apply();
     /* Will free THD */
@@ -178,13 +178,13 @@ static void wsrep_rollback_streaming_aborted_by_toi(THD *thd) {
 static void wsrep_rollback_high_priority(THD *thd) {
   WSREP_INFO("rollbacker aborting SR thd: (%u %llu)", thd->thread_id(),
              (long long)thd->real_id);
-  DBUG_ASSERT(thd->wsrep_cs().mode() == Wsrep_client_state::m_high_priority);
+  assert(thd->wsrep_cs().mode() == Wsrep_client_state::m_high_priority);
   /* Must be streaming and must have been removed from the
      server state streaming appliers map. */
-  DBUG_ASSERT(thd->wsrep_trx().is_streaming());
-  DBUG_ASSERT(!Wsrep_server_state::instance().find_streaming_applier(
+  assert(thd->wsrep_trx().is_streaming());
+  assert(!Wsrep_server_state::instance().find_streaming_applier(
       thd->wsrep_trx().server_id(), thd->wsrep_trx().id()));
-  DBUG_ASSERT(thd->wsrep_applier_service);
+  assert(thd->wsrep_applier_service);
 
   /* Fragment removal should happen before rollback to make
      the transaction non-observable in SR table after the rollback
@@ -254,7 +254,7 @@ static void wsrep_rollback_process(THD *rollbacker,
   DBUG_ENTER("wsrep_rollback_process");
 
   THD *thd = NULL;
-  DBUG_ASSERT(!wsrep_rollback_queue);
+  assert(!wsrep_rollback_queue);
   wsrep_rollback_queue = new Wsrep_thd_queue(rollbacker);
   WSREP_INFO("Starting rollbacker thread %u", rollbacker->thread_id());
 
@@ -297,7 +297,7 @@ static void wsrep_rollback_process(THD *rollbacker,
 
   WSREP_INFO("rollbacker thread exiting %u", rollbacker->thread_id());
 
-  DBUG_ASSERT(rollbacker->killed != THD::NOT_KILLED);
+  assert(rollbacker->killed != THD::NOT_KILLED);
   DBUG_PRINT("wsrep", ("wsrep rollbacker thread exiting"));
   DBUG_VOID_RETURN;
 }
@@ -317,7 +317,7 @@ void wsrep_create_rollbacker() {
   Asserts thd->LOCK_wsrep_thd ownership
  */
 void wsrep_fire_rollbacker(THD *thd) {
-  DBUG_ASSERT(thd->wsrep_trx().state() == wsrep::transaction::s_aborting);
+  assert(thd->wsrep_trx().state() == wsrep::transaction::s_aborting);
   DBUG_PRINT("wsrep", ("enqueuing trx abort for %u", thd->thread_id()));
   WSREP_DEBUG("enqueuing trx abort for (%u)", thd->thread_id());
   if (wsrep_rollback_queue->push_back(thd)) {
@@ -416,7 +416,7 @@ int wsrep_create_threadvars() {
   if (thread_handling == SCHEDULER_TYPES_COUNT) {
     /* Caller should have called wsrep_reset_threadvars() before this
        method. */
-    DBUG_ASSERT(!pthread_getspecific(THR_KEY_mysys));
+    assert(!pthread_getspecific(THR_KEY_mysys));
     pthread_setspecific(THR_KEY_mysys, 0);
     ret = my_thread_init();
   }
@@ -429,7 +429,7 @@ void wsrep_delete_threadvars() {
   if (thread_handling == SCHEDULER_TYPES_COUNT) {
     /* The caller should have called wsrep_store_threadvars() before
        this method. */
-    DBUG_ASSERT(pthread_getspecific(THR_KEY_mysys));
+    assert(pthread_getspecific(THR_KEY_mysys));
     /* Reset psi state to avoid deallocating applier thread
        psi_thread. */
     PSI_thread *psi_thread = PSI_CALL_get_thread();
@@ -450,7 +450,7 @@ void wsrep_assign_from_threadvars(THD *) {
   if (thread_handling == SCHEDULER_TYPES_COUNT) {
     st_my_thread_var *mysys_var =
         (st_my_thread_var *)pthread_getspecific(THR_KEY_mysys);
-    DBUG_ASSERT(mysys_var);
+    assert(mysys_var);
     thd->set_mysys_var(mysys_var);
   }
 #endif

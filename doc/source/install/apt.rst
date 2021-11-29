@@ -1,7 +1,7 @@
 .. _apt:
 
 ====================================
-Installing |PXC| on Debian or Ubuntu
+Installing Percona XtraDB Cluster on Debian or Ubuntu
 ====================================
 
 Specific information on the supported platforms, products, and versions
@@ -10,18 +10,18 @@ is described in `Percona Software and Platform Lifecycle <https://www.percona.co
 The packages are available in the official Percona software repository
 and on the `download page
 <http://www.percona.com/downloads/Percona-XtraDB-Cluster-80/LATEST/>`_.
-It is recommended to install |PXC| from the official repository
+It is recommended to install Percona XtraDB Cluster from the official repository
 using :command:`apt`.
 
 Prerequisites
 =============
 
-- You need to have root access on the node where you will be installing |PXC|
+- You need to have root access on the node where you will be installing Percona XtraDB Cluster
   (either logged in as a user with root privileges or be able to run commands
   with :command:`sudo`).
 
 - Make sure that the following ports are not blocked by firewall
-  or used by other software. |PXC| requires them for communication.
+  or used by other software. Percona XtraDB Cluster requires them for communication.
 
    * 3306
    * 4444
@@ -101,5 +101,5 @@ During the installation, you are requested to provide a password for the ``root`
 Next Steps
 ==========
 
-After you install |PXC| and stop the ``mysql`` service,
+After you install Percona XtraDB Cluster and stop the ``mysql`` service,
 configure the node according to the procedure described in :ref:`configure`.

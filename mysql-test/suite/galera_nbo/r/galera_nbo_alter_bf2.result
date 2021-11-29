@@ -1,0 +1,11 @@
+CREATE TABLE t1 (f1 INTEGER NOT NULL, f2 INTEGER NOT NULL) ENGINE=InnoDB;
+SET @@global.wsrep_log_conflicts=ON;
+BEGIN;
+INSERT INTO t1 VALUES  (1, 1);
+SET SESSION wsrep_osu_method=NBO;
+alter table t1 add column j int default 0;;
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SET SESSION wsrep_osu_method=TOI;
+DROP TABLE t1;
+SET @@global.wsrep_log_conflicts=OFF;

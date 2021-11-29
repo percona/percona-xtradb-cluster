@@ -1,0 +1,11 @@
+
+--source include/galera_cluster.inc
+
+--connection node_1
+CREATE TABLE t1 (a INT PRIMARY KEY);
+CREATE TABLE t2 (a INT);
+INSERT INTO t1 VALUES (0);
+
+--connection node_2
+INSERT INTO t2 SELECT /*!99997*/ * FROM t1;
+INSERT INTO t2 SELECT /*!99997*/ * FROM t1;

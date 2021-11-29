@@ -1642,7 +1642,7 @@ fi
 # 2.4.20  Transition-key fixes
 #
 
-XB_2x_REQUIRED_VERSION="2.4.20"
+XB_2x_REQUIRED_VERSION="2.4.23"
 
 if [[ ! -x $XTRABACKUP_24_PATH/bin/$XTRABACKUP_BIN ]]; then
     wsrep_log_error "******************* FATAL ERROR ********************** "

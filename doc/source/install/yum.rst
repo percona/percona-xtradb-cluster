@@ -1,7 +1,7 @@
 .. _yum:
 
 =======================================================
-Installing |PXC| on Red Hat Enterprise Linux and CentOS
+Installing Percona XtraDB Cluster on Red Hat Enterprise Linux and CentOS
 =======================================================
 
 Specific information on the supported platforms, products, and versions
@@ -10,19 +10,19 @@ is described in `Percona Software and Platform Lifecycle <https://www.percona.co
 The packages are available in the official Percona software repository
 and on the `download page
 <http://www.percona.com/downloads/Percona-XtraDB-Cluster-80/LATEST/>`_.
-It is recommended to install |PXC| from the official repository
+It is recommended to install Percona XtraDB Cluster from the official repository
 using :command:`yum`.
 
 Prerequisites
 =============
 
 .. note:: You need to have root access on the node
-   where you will be installing |PXC|
+   where you will be installing Percona XtraDB Cluster
    (either logged in as a user with root privileges
    or be able to run commands with :command:`sudo`).
 
 .. note:: Make sure that the following ports are not blocked by firewall
-   or used by other software. |PXC| requires them for communication.
+   or used by other software. Percona XtraDB Cluster requires them for communication.
 
    * 3306
    * 4444
@@ -38,7 +38,7 @@ Installing from Percona Repository
    `Percona Software Repositories Documentation
    <https://www.percona.com/doc/percona-repo-config/index.html>`_.
 
-#. Install the |PXC| packages:
+#. Install the Percona XtraDB Cluster packages:
 
    .. code-block:: bash
 
@@ -58,7 +58,7 @@ Installing from Percona Repository
       * ``percona-xtradb-cluster-server``
       * ``percona-xtradb-cluster-test``
 
-#. Start the |PXC| server:
+#. Start the Percona XtraDB Cluster server:
 
    .. code-block:: bash
 
@@ -96,5 +96,5 @@ Installing from Percona Repository
 Next Steps
 ==========
 
-After you install |PXC| and change the superuser account password,
+After you install Percona XtraDB Cluster and change the superuser account password,
 configure the node according to the procedure described in :ref:`configure`.

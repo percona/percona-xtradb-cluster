@@ -1,0 +1,14 @@
+SET GLOBAL wsrep_slave_threads=4;
+SET @@global.wsrep_log_conflicts=ON;
+CREATE TABLE t1 (f1 INTEGER NOT NULL, f2 INTEGER NOT NULL) ENGINE=InnoDB;
+SET GLOBAL debug = 'd,sync.alter_locked_tables_inplace';
+SET SESSION wsrep_osu_method=NBO;
+ALTER TABLE t1 LOCK=SHARED, ADD PRIMARY KEY (f1);;
+# Trying to kill the ALTER query
+ERROR HY000: The query is in TOI/NBO and cannot be killed
+SET DEBUG_SYNC= 'now SIGNAL signal.alter_locked_tables_inplace';
+SET GLOBAL debug = '';
+SET @@global.wsrep_log_conflicts=OFF;
+SET GLOBAL wsrep_slave_threads=1;
+SET SESSION wsrep_OSU_method=TOI;
+DROP TABLE t1;
