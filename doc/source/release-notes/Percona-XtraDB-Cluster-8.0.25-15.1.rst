@@ -18,12 +18,14 @@ A Non-Blocking Operation method for online schema changes in Percona XtraDB Clus
 
 Note that the NBO mode is a **Tech Preview** feature. We do not recommend that you use this mode in a production environment. For more information, see :ref:`nbo`.
 
-The following list are some of the notable fixes for MySQL 8.0.25, provided by Oracle, and included in this release:
+The notable changes and bug fixes introduced by Oracle MySQL include the following:
 
-* :mysqlbug:`103980`: Fixes the allocation of too much memory when dropping a database with many partitioned tables.
-* :mysqlbug:`103743`: Fixes a slow startup when the tables are encrypted.
+* The ``sql_slave_skip_counter`` variable only counts the events in the uncompressed transaction payloads.
+* A possible deadlock occurred when system variables, read by different clients, were being updated and the binary log file was rotated.
+* Sometimes the aggregate function results could return values from a previous statement when using a prepared ``SELECT`` statement with a ``WHERE`` clause that is always false.
 
-For more information, see the `MySQL 8.0.25 Release Notes <https://dev.mysql.com/doc/relnotes/mysql/8.0/en/news-8-0-25.html>`__.
+For more information, see the `MySQL 8.0.24 Release Notes <https://dev.mysql.com/doc/relnotes/mysql/8.0/en/news-8-0-24.html>`__ and the
+ `MySQL 8.0.25 Release Notes <https://dev.mysql.com/doc/relnotes/mysql/8.0/en/news-8-0-25.html>`__.
 
 
 

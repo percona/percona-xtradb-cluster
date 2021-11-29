@@ -39,9 +39,9 @@ help:
 clean:
 	-rm -rf $(BUILDDIR)/*
 
-# ext:
-# 	@echo "Downloading Percona documentation utils from repository..."
-# 	@mkdir -p $(BUILDDIR) && wget -O - $(UTILS_REPO) | tar xz -C $(BUILDDIR) && cp -r $(BUILDDIR)/$(UTILS_DIR)/sphinx/ext source
+ext:
+	@echo "Downloading Percona documentation utils from repository..."
+	@mkdir -p $(BUILDDIR) && wget -O - $(UTILS_REPO) | tar xz -C $(BUILDDIR) && cp -r $(BUILDDIR)/$(UTILS_DIR)/sphinx/ext source
 
  netlify:
 	$(SPHINXBUILD) -b html -d sphinx-build/doctrees source -c source/conf-netlify build/html
