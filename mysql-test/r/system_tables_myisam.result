@@ -178,6 +178,18 @@ Storage engine 'MyISAM' does not support system tables. [mysql.time_zone_transit
 mysql.user
 ERROR
 Storage engine 'MyISAM' does not support system tables. [mysql.user]
+@table_name
+mysql.wsrep_cluster
+ERROR
+Storage engine 'MyISAM' does not support system tables. [mysql.wsrep_cluster]
+@table_name
+mysql.wsrep_cluster_members
+ERROR
+Storage engine 'MyISAM' does not support system tables. [mysql.wsrep_cluster_members]
+@table_name
+mysql.wsrep_streaming_log
+ERROR
+Storage engine 'MyISAM' does not support system tables. [mysql.wsrep_streaming_log]
 DROP PROCEDURE test_system_table_alter_engine;
 #-----------------------------------------------------------------------
 # Test case to verify system table creation in MyISAM engine. Creating
@@ -298,6 +310,12 @@ SEVERITY	ERRNO	MESSAGE
 Warning	1726	Storage engine 'MyISAM' does not support system tables. [mysql.time_zone_transition_type]
 SEVERITY	ERRNO	MESSAGE
 Warning	1726	Storage engine 'MyISAM' does not support system tables. [mysql.user]
+SEVERITY	ERRNO	MESSAGE
+Warning	1726	Storage engine 'MyISAM' does not support system tables. [mysql.wsrep_cluster]
+SEVERITY	ERRNO	MESSAGE
+Warning	1726	Storage engine 'MyISAM' does not support system tables. [mysql.wsrep_cluster_members]
+SEVERITY	ERRNO	MESSAGE
+Warning	1726	Storage engine 'MyISAM' does not support system tables. [mysql.wsrep_streaming_log]
 DROP PROCEDURE test_create_system_table;
 DROP PROCEDURE execute_stmt;
 DROP TABLE system_tables;

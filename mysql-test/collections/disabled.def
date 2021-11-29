@@ -285,16 +285,6 @@ galera.MW-284 : BUG#0000 test is incompatible with native mysql8.0 server slave 
 galera.galera_fk_lock_parent_update_child : BUG#0 Few cases have timing issues(PXC-3431) and few are invalid after PXC-3501
 galera.galera_toi_ddl_fk_insert : BUG#0 CODERSHIP qa#39 test fails sporadically (PXC-3431)
 
-# Bugs failing due to PXC-3548
-main.system_tables_myisam                           : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
-binlog.binlog_stm_unsafe_read_acl_tables_in_dml_ddl : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
-main.system_tables_myisam_lctn_1                    : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
-main.mysql_upgrade_grant                            : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
-main.ps_sys_upgrade                                 : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
-sysschema.mysqldump                                 : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
-main.transactional_acl_tables                       : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
-main.schema_read_only_cs                            : BUG#3548 / PS-6837 Timestamp is not set to CURRENT_TIMESTAMP in mysql.tables_priv
-
 # encryption
 # Probably we should use upstream version of encryption tests for PXC
 # https://jira.percona.com/browse/PXC-3557

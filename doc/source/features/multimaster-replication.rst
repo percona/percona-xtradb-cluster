@@ -64,7 +64,7 @@ during the individual queries, but rather on the ``COMMIT`` stage,
 and you may get ``ERROR`` response on ``COMMIT``.
 
 This is mentioned because it is one of the incompatibilities
-with regular |InnoDB| that you might experience.
+with regular InnoDB that you might experience.
 With InnoDB, ``DEADLOCK`` and ``LOCK TIMEOUT`` errors usually happen
 in response to a particular query, but not on ``COMMIT``.
 It is good practice to check the error codes after a ``COMMIT`` query,

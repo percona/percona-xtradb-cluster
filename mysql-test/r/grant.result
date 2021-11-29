@@ -822,6 +822,7 @@ GRANT USAGE ON *.* TO `mysqltest_8`@`%`
 GRANT UPDATE ON `test`.`t1` TO `mysqltest_8`@`%`
 select * from  information_schema.table_privileges where table_schema NOT IN ('sys','mysql');
 GRANTEE	TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	PRIVILEGE_TYPE	IS_GRANTABLE
+'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	ALTER	NO
 'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	CREATE	NO
 'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	INSERT	NO
 'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	SELECT	NO
@@ -839,6 +840,7 @@ Grants for mysqltest_8@%
 GRANT USAGE ON *.* TO `mysqltest_8`@`%`
 select * from  information_schema.table_privileges where table_schema NOT IN ('sys','mysql');
 GRANTEE	TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	PRIVILEGE_TYPE	IS_GRANTABLE
+'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	ALTER	NO
 'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	CREATE	NO
 'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	INSERT	NO
 'mysql.pxc.sst.role'@'localhost'	def	PERCONA_SCHEMA	xtrabackup_history	SELECT	NO

@@ -7,6 +7,8 @@
 :Date: December 28, 2020
 :Installation: `Installing Percona XtraDB Cluster <https://www.percona.com/doc/percona-xtradb-cluster/8.0/install/index.html>`_
 
+Percona XtraDB Cluster 8.0.21-12.1 includes all of the features and bug fixes available in Percona Server for MySQL. See the corresponding `release notes for Percona Server for MySQL 8.0.21-12 <https://www.percona.com/doc/percona-server/LATEST/release-notes/Percona-Server-8.0.21-12.html>`__ for more details on these changes.
+
 Implement an inconsistency voting policy. In the best case scenario, the node with the inconsistent data is aborted and the cluster continues to operate. 
 
 Improvements

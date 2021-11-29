@@ -12,7 +12,7 @@ explicit storage engine that is not the specified enforced engine, the user
 will get either an error if the ``NO_ENGINE_SUBSTITUTION`` SQL mode is enabled
 or a warning if ``NO_ENGINE_SUBSTITUTION`` is disabled and the table
 will be created anyway using the enforced engine (this is consistent with the
-default |MySQL| way of creating the default storage engine if other engines
+default MySQL way of creating the default storage engine if other engines
 are not available unless ``NO_ENGINE_SUBSTITUTION`` is set).
 
 In case user tries to enable :variable:`enforce_storage_engine` with engine

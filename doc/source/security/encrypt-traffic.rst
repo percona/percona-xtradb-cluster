@@ -4,7 +4,7 @@
 Encrypting PXC Traffic
 ======================
 
-There are two kinds of traffic in |PXC|:
+There are two kinds of traffic in Percona XtraDB Cluster:
 
 1. Client-Server traffic (the one between client applications and cluster
    nodes),
@@ -12,7 +12,7 @@ There are two kinds of traffic in |PXC|:
 2. Replication traffic, that includes :term:`SST`, :term:`IST`, write-set
    replication, and various service messages.
 
-|PXC| supports encryption for all types of traffic. Replication traffic
+Percona XtraDB Cluster supports encryption for all types of traffic. Replication traffic
 encryption can be configured either automatically or manually.
 
 .. contents::
@@ -24,10 +24,10 @@ encryption can be configured either automatically or manually.
 Encrypting Client-Server Communication
 ======================================
 
-|PXC| uses the underlying MySQL encryption mechanism
+Percona XtraDB Cluster uses the underlying MySQL encryption mechanism
 to secure communication between client applications and cluster nodes.
 
-|MySQL| generates default key and certificate files and places them in the data
+MySQL generates default key and certificate files and places them in the data
 directory. You can override auto-generated files with manually created ones, as
 described in the section :ref:`generate-keys-certs`.
 
@@ -43,7 +43,7 @@ for each node:
    ssl-ca=/etc/mysql/certs/ca.pem
    ssl-cert=/etc/mysql/certs/server-cert.pem
    ssl-key=/etc/mysql/certs/server-key.pem
-  
+
    [client]
    ssl-ca=/etc/mysql/certs/ca.pem
    ssl-cert=/etc/mysql/certs/client-cert.pem
@@ -53,7 +53,7 @@ After it is restarted, the node uses these files to encrypt communication with
 clients. MySQL clients require only the second part of the configuration
 to communicate with cluster nodes.
 
-|MySQL| generates the default key and certificate
+MySQL generates the default key and certificate
 files and places them in the data directory. You can either use them or generate
 new certificates. For generation of new certificate please refer to
 :ref:`generate-keys-certs` section.
@@ -70,7 +70,7 @@ The traffic of each type is transferred via a different channel, and so it
 is important to configure secure channels for all 3 variants to
 completely secure the replication traffic.
 
-|PXC| supports a single configuration option which helps to secure the complete
+Percona XtraDB Cluster supports a single configuration option which helps to secure the complete
 replication traffic, and is often referred to as :ref:`ssl-auto-conf`. You can
 also configure the security of each channel by specifying independent
 parameters.
@@ -87,13 +87,13 @@ the data directory.
 .. important::
 
    It is important that your cluster use the same SSL certificates on all nodes.
- 
+
 .. _enabling_encrypt-cluster-traffic:
 
 Enabling :variable:`pxc-encrypt-cluster-traffic`
 ------------------------------------------------
 
-|PXC| includes the |pxc-encrypt-cluster-traffic| variable that
+Percona XtraDB Cluster includes the |pxc-encrypt-cluster-traffic| variable that
 enables the configuration of the SSL encryption thereby encrypting
 :term:`SST`, :term:`IST`, and replication traffic.
 
@@ -128,7 +128,7 @@ are affected (``socket.ssl_key``, ``socket,ssl_cert``, and
    of your system.
 
    When |pxc-encrypt-cluster-traffic| is not enabled, anyone with the
-   access to your network can connect to any |pxc| node either as a
+   access to your network can connect to any PXC node either as a
    client or as another node joining the cluster. This potentially
    lets them query your data or get a complete copy of it.
 
@@ -137,7 +137,7 @@ are affected (``socket.ssl_key``, ``socket,ssl_cert``, and
    ``pxc-encrypt-cluster-traffic=OFF`` of each node. Then, restart the cluster.
 
 The automatic configuration of the SSL encryption needs key and certificate files.
-|MySQL| generates default key and certificate
+MySQL generates default key and certificate
 files and places them in data directory. These auto-generated files are
 suitable for automatic SSL configuration, but *you should use the same key and
 certificate files on all nodes*. Also you can override auto-generated files with
@@ -163,13 +163,13 @@ use different certificates or other mix-match, then user can opt for
 manual configuration. This helps to provide more flexibility to end-users.
 
 To enable encryption manually, the location of the required key and certificate
-files shoud be specified in the |PXC| configuration. If you do not have the
+files shoud be specified in the Percona XtraDB Cluster configuration. If you do not have the
 necessary files, see :ref:`generate-keys-certs`.
 
 .. note:: Encryption settings are not dynamic.
    To enable it on a running cluster, you need to restart the entire cluster.
 
-There are three aspects of |PXC| operation, where you can enable encryption:
+There are three aspects of Percona XtraDB Cluster operation, where you can enable encryption:
 
 * :ref:`encrypt-sst`
 
@@ -179,7 +179,7 @@ There are three aspects of |PXC| operation, where you can enable encryption:
 * :ref:`Encrypting Replication Traffic <encrypt-replication>`
 * :ref:`Encrypting IST Traffic <encrypt-replication>`
 
-  This refers to all internal |PXC| communication,
+  This refers to all internal Percona XtraDB Cluster communication,
   such as, write-set replication, :term:`IST`, and various service messages.
 
 .. _encrypt-sst:
@@ -214,7 +214,7 @@ xtrabackup
 ---------------
 
 This is the only available SST method (the :variable:`wsrep_sst_method` is always set
-to ``xtrabackup-v2``), which uses |PXB|_ to perform non-blocking transfer
+to ``xtrabackup-v2``), which uses Percona XtraBackup_ to perform non-blocking transfer
 of files. For more information, see :ref:`xtrabackup_sst`.
 
 Encryption mode for this method is selected using the :option:`encrypt` option:
@@ -258,7 +258,7 @@ Encrypting Replication/IST Traffic
 
 Replication traffic refers to the following:
 
-* Write-set replication which is the main workload of |PXC|
+* Write-set replication which is the main workload of Percona XtraDB Cluster
   (replicating transactions that execute on one node to all other nodes).
 * Incremental State Transfer (:term:`IST`) which
   is copying only missing transactions from DONOR to JOINER node.
@@ -293,7 +293,7 @@ Check :upgrade-certificate: section on how to upgrade existing certificates.
 Generating Keys and Certificates Manually
 =========================================
 
-As mentioned above, |MySQL| generates default key and certificate
+As mentioned above, MySQL generates default key and certificate
 files and places them in the data directory. If you want to override these
 certificates, the following new sets of files can be generated:
 
@@ -488,4 +488,4 @@ used for securing replication traffic when there are two nodes in the cluster.
 
 #. You can remove the old certificate files.
 
-.. include:: ../.res/replace.opt.txt 
+.. include:: ../.res/replace.opt.txt

@@ -4,7 +4,7 @@
 Configuring Percona XtraDB Cluster on CentOS
 ============================================
 
-This tutorial describes how to install and configure three |PXC| nodes
+This tutorial describes how to install and configure three Percona XtraDB Cluster nodes
 on CentOS 7 servers, using the packages from Percona repositories.
 
 * Node 1
@@ -37,7 +37,7 @@ The procedure described in this tutorial requires the following:
 Step 1. Installing PXC
 ======================
 
-Install |PXC| on all three nodes as described in :ref:`yum`.
+Install Percona XtraDB Cluster on all three nodes as described in :ref:`yum`.
 
 Step 2. Configuring the first node
 ==================================
@@ -86,7 +86,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
    The previous command will start the cluster
    with initial :variable:`wsrep_cluster_address` variable
    set to ``gcomm://``.
-   If the node or |MySQL| are restarted later,
+   If the node or MySQL are restarted later,
    there will be no need to change the configuration file.
 
 #. After the first node has been started,
@@ -174,7 +174,7 @@ Step 3. Configuring the second node
       [root@percona2 ~]# systemctl start mysql
 
 #. After the server has been started,
-   it should receive |SST| automatically.
+   it should receive SST automatically.
    Cluster status can be checked on both nodes.
    The following is an example of status from the second node (``percona2``):
 

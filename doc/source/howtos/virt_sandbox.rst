@@ -2,28 +2,28 @@
 .. _sandbox:
 
 ================================================================================
-Setting up a testing environment with |proxysql|
+Setting up a testing environment with ProxySQL
 ================================================================================
 
-This section describes how to set up |PXC| in a virtualized testing environment
-based on |proxysql|. To test the cluster, we will use the `sysbench` benchmark
+This section describes how to set up Percona XtraDB Cluster in a virtualized testing environment
+based on ProxySQL. To test the cluster, we will use the `sysbench` benchmark
 tool.
 
-It is assumed that each |pxc| node is installed on Amazon EC2 micro instances
+It is assumed that each PXC node is installed on Amazon EC2 micro instances
 running CentOS 7.  However, the information in this section should apply if you
 used another virtualization technology (for example, VirtualBox) with any Linux
 distribution.
 
-Each of the tree |PXC| nodes is installed on a separate virtual machine. One
-more virtual machine has |proxysql|, which redirects requests to the nodes.
+Each of the tree Percona XtraDB Cluster nodes is installed on a separate virtual machine. One
+more virtual machine has ProxySQL, which redirects requests to the nodes.
 
 .. tip::
 
-   Running |proxysql| on an application server, instead of having it as a
+   Running ProxySQL on an application server, instead of having it as a
    dedicated entity, removes the unnecessary extra network roundtrip, because the
-   load balancing layer in |PXC| scales well with application servers.
+   load balancing layer in Percona XtraDB Cluster scales well with application servers.
 
-1. Install |PXC| on three cluster nodes, as described in :ref:`centos_howto`.
+1. Install Percona XtraDB Cluster on three cluster nodes, as described in :ref:`centos_howto`.
 
 #. On the client node, install :ref:`ProxySQL <load_balancing_with_proxysql>`
    and ``sysbench``:
@@ -32,13 +32,13 @@ more virtual machine has |proxysql|, which redirects requests to the nodes.
 
       $ yum -y install proxysql2 sysbench
 
-#. When all cluster nodes are started, configure |proxysql| using the admin
+#. When all cluster nodes are started, configure ProxySQL using the admin
    interface.
 
    .. tip::
 
-      To connect to the |proxysql| admin interface, you need a ``mysql`` client.
-      You can either connect to the admin interface from |PXC| nodes
+      To connect to the ProxySQL admin interface, you need a ``mysql`` client.
+      You can either connect to the admin interface from Percona XtraDB Cluster nodes
       that already have the ``mysql`` client installed (Node 1, Node 2, Node 3)
       or install the client on Node 4 and connect locally.
 
@@ -50,8 +50,8 @@ more virtual machine has |proxysql|, which redirects requests to the nodes.
 
       Do not use default credentials in production!
 
-   The following example shows how to connect to the |proxysql| admin interface
-   with default credentials (assuming that |proxysql| IP is 192.168.70.74):
+   The following example shows how to connect to the ProxySQL admin interface
+   with default credentials (assuming that ProxySQL IP is 192.168.70.74):
 
    .. code-block:: bash
 
@@ -72,7 +72,7 @@ more virtual machine has |proxysql|, which redirects requests to the nodes.
 
       mysql>
 
-   To see the |proxysql| databases and tables use the ``SHOW DATABASES`` and
+   To see the ProxySQL databases and tables use the ``SHOW DATABASES`` and
    ``SHOW TABLES`` commands:
 
    .. code-block:: text
@@ -135,7 +135,7 @@ more virtual machine has |proxysql|, which redirects requests to the nodes.
 
    .. note::
 
-      |proxysql| has 3 areas where the configuration can reside:
+      ProxySQL has 3 areas where the configuration can reside:
 
       * MEMORY (your current working place)
       * RUNTIME (the production settings)
@@ -145,9 +145,9 @@ more virtual machine has |proxysql|, which redirects requests to the nodes.
       That is done by design to allow you to test the changes
       before pushing to production (RUNTIME), or saving them to disk.
 
-.. rubric:: Adding cluster nodes to |proxysql|
+.. rubric:: Adding cluster nodes to ProxySQL
 
-To configure the backend |PXC| nodes in |proxysql|, insert corresponding
+To configure the backend Percona XtraDB Cluster nodes in ProxySQL, insert corresponding
 records into the `mysql_servers` table.
 
 .. code-block:: sql
@@ -156,7 +156,7 @@ records into the `mysql_servers` table.
    INSERT INTO mysql_servers (hostname,hostgroup_id,port,weight) VALUES ('192.168.70.72',10,3306,1000);
    INSERT INTO mysql_servers (hostname,hostgroup_id,port,weight) VALUES ('192.168.70.73',10,3306,1000);
 
-|proxysql| v2.0 supports |pxc| natlively. It uses the concept of *hostgroups*
+ProxySQL v2.0 supports PXC natlively. It uses the concept of *hostgroups*
 (see the value of `hostgroup_id` in the `mysql_servers` table) to group cluster
 nodes to balance the load in a cluster by routing different types of traffic to
 different groups.
@@ -199,7 +199,7 @@ This information is stored in the `[runtime_]mysql_galera_hostgroups` table.
 	- Helpful extra information about the given node
 
 Make sure that the variable `mysql-server_version` refers to the correct
-version. For |PXC| 8.0, set it to `8.0` accordingly:
+version. For Percona XtraDB Cluster 8.0, set it to `8.0` accordingly:
 
 .. code-block:: mysql
 
@@ -213,7 +213,7 @@ version. For |PXC| 8.0, set it to `8.0` accordingly:
 
 .. seealso::
 
-   |Percona| Blogpost: ProxySQL Native Support for Percona XtraDB Cluster (PXC)
+   Percona Blogpost: ProxySQL Native Support for Percona XtraDB Cluster (PXC)
       https://www.percona.com/blog/2019/02/20/proxysql-native-support-for-percona-xtradb-cluster-pxc/
    
 Given the nodes from the `mysql_servers` table, you may set up the hostgroups as
@@ -227,7 +227,7 @@ follows:
    max_transactions_behind)
    VALUES (10, 12, 11, 13, 1, 1, 2, 100);
 
-This command configures |proxysql| as follows:
+This command configures ProxySQL as follows:
 
 WRITER hostgroup
    hostgroup `10`
@@ -238,7 +238,7 @@ BACKUP WRITER hostgroup
 OFFLINE hostgroup
    hostgroup `13`
 
-Set up |proxysql| query rules for read/write split using the `mysql_query_rules`
+Set up ProxySQL query rules for read/write split using the `mysql_query_rules`
 table:
 
 .. code-block:: mysql
@@ -268,12 +268,12 @@ table:
 
 .. seealso::
 
-   |proxysql| Blog: |MySQL| read/write split with |proxysql|
+   ProxySQL Blog: MySQL read/write split with ProxySQL
       https://proxysql.com/blog/configure-read-write-split/
-   |proxysql| Documentation: `mysql_query_rules` table
+   ProxySQL Documentation: `mysql_query_rules` table
       https://github.com/sysown/proxysql/wiki/Main-(runtime)#mysql_query_rules
 
-.. rubric:: |proxysql| failover behavior
+.. rubric:: ProxySQL failover behavior
 
 Notice that all servers were inserted into the `mysql_servers` table with the
 READER hostgroup set to `10` (see the value of the `hostgroup_id` column):
@@ -291,10 +291,10 @@ READER hostgroup set to `10` (see the value of the `hostgroup_id` column):
    +--------------+---------------+------+--------+     +---------+
    3 rows in set (0.00 sec)
 
-This configuration implies that |proxysql| elects the writer automatically. If
-the elected writer goes offline, |proxysql| assigns another (failover). You
+This configuration implies that ProxySQL elects the writer automatically. If
+the elected writer goes offline, ProxySQL assigns another (failover). You
 might tweak this mechanism by assigning a higher weight to a selected
-node. |proxysql| directs all write requests to this node. However, it also
+node. ProxySQL directs all write requests to this node. However, it also
 becomes the mostly utilized node for reading requests. In case of a failback (a
 node is put back online), the node with the highest weight is automatically
 elected for write requests.
@@ -302,9 +302,9 @@ elected for write requests.
 .. seealso: :ref:`proxysql.automatic-failover`
 
 
-.. rubric:: Creating a |proxysql| monitoring user
+.. rubric:: Creating a ProxySQL monitoring user
 
-To enable monitoring of |PXC| nodes in |proxysql|, create a user with ``USAGE``
+To enable monitoring of Percona XtraDB Cluster nodes in ProxySQL, create a user with ``USAGE``
 privilege on any node in the cluster and configure the user in ProxySQL.
 
 The following example shows how to add a monitoring user on Node 2:
@@ -327,7 +327,7 @@ The following example shows how to configure this user on the ProxySQL node:
 .. rubric:: Saving and loading the configuration
 
 To load this configuration at runtime, issue the ``LOAD`` command.  To save these
-changes to disk (ensuring that they persist after |proxysql| shuts down), issue
+changes to disk (ensuring that they persist after ProxySQL shuts down), issue
 the ``SAVE`` command.
 
 .. code-block:: text
@@ -367,7 +367,7 @@ To ensure that monitoring is enabled, check the monitoring logs:
    +---------------+------+------------------+-------------------+------------+
    6 rows in set (0.00 sec)
 
-The previous examples show that |proxysql| is able to connect and ping the nodes
+The previous examples show that ProxySQL is able to connect and ping the nodes
 you added.
 
 To enable monitoring of these nodes, load them at runtime:
@@ -423,8 +423,8 @@ To confirm that the user has been set up correctly, you can try to log in:
 
    Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-To provide read/write access to the cluster for |proxysql|, add this user on one
-of the |PXC| nodes:
+To provide read/write access to the cluster for ProxySQL, add this user on one
+of the Percona XtraDB Cluster nodes:
 
 .. code-block:: mysql
 
@@ -437,7 +437,7 @@ of the |PXC| nodes:
 Testing the cluster with the `sysbench` benchmark tool
 ================================================================================
 
-After you set up |PXC| in your testing environment, you can test it using
+After you set up Percona XtraDB Cluster in your testing environment, you can test it using
 the ``sysbench`` benchmarking tool.
 
 1. Create a database (`sysbenchdb` in this example; you can use a
@@ -480,4 +480,4 @@ the ``sysbench`` benchmarking tool.
      <https://www.percona.com/blog/2019/02/20/proxysql-native-support-for-percona-xtradb-cluster-pxc/>`_
    - `Github repository for the sysbench benchmarking tool <https://github.com/akopytov/sysbench/>`_
 
-.. |proxysql| replace:: ProxySQL
+.. ProxySQL replace:: ProxySQL

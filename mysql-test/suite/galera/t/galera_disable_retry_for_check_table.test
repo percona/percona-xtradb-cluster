@@ -12,7 +12,8 @@
 #    node_1.
 # 4. ALTER TABLE, being replicated as TOI, aborts the CHECK TABLE query. Verify
 #    that CHECK TABLE query fails with ER_LOCK_DEADLOCK error.
-# 5. Repeat steps 1-4 with partitioned table.
+# 5. Repeat steps 1-4 with partitioned table, but using ALTER TABLE .. CHECK
+#    PARTITION instead
 # 6. Cleanup
 #
 # ==== References ====
@@ -51,7 +52,12 @@ while ($i < 2) {
   --echo # 2. Execute CHECK TABLE query on node_1 and halt the query in
   --echo #    ha_innobase::check() function.
   SET DEBUG_SYNC="ha_innobase_check SIGNAL reached WAIT_FOR continue";
-  --send CHECK TABLE t1
+  if ($i == 0) {
+    --send CHECK TABLE t1
+  }
+  if ($i == 1) {
+    --send ALTER TABLE t1 CHECK PARTITION p0
+  }
 
   --echo [node_1b]
   --connection node_1b

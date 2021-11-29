@@ -1364,6 +1364,7 @@ SELECT host, db, user, table_name, grantor, table_priv, column_priv FROM mysql.t
 host	db	user	table_name	grantor	table_priv	column_priv
 h	test	u1	t1	root@localhost		Select,Insert,Update,References
 h	test	u1	t2	root@localhost		Insert
+localhost	PERCONA_SCHEMA	mysql.pxc.sst.role	xtrabackup_history	boot@	Select,Insert,Create,Alter	
 localhost	mysql	mysql.session	user	root@localhost	Select	
 localhost	sys	mysql.sys	sys_config	root@localhost	Select	
 DELETE FROM mysql.columns_priv WHERE host = 'h' AND user = 'u1'
@@ -1374,6 +1375,7 @@ SELECT host, db, user, table_name, column_name, column_priv FROM mysql.columns_p
 host	db	user	table_name	column_name	column_priv
 SELECT host, db, user, table_name, grantor, table_priv, column_priv FROM mysql.tables_priv;
 host	db	user	table_name	grantor	table_priv	column_priv
+localhost	PERCONA_SCHEMA	mysql.pxc.sst.role	xtrabackup_history	boot@	Select,Insert,Create,Alter	
 localhost	mysql	mysql.session	user	root@localhost	Select	
 localhost	sys	mysql.sys	sys_config	root@localhost	Select	
 SHOW GRANTS FOR u1@h;
@@ -1544,8 +1546,12 @@ CREATE USER u1@h;
 
 # Remove the session user
 DELETE FROM mysql.tables_priv WHERE user='mysql.session';
+DELETE FROM mysql.tables_priv WHERE user='mysql.pxc.sst.role';
 DELETE FROM mysql.user WHERE user='mysql.session';
+DELETE FROM mysql.user WHERE user='mysql.pxc.internal.session';
+DELETE FROM mysql.user WHERE user='mysql.pxc.sst.role';
 DELETE FROM mysql.db WHERE user='mysql.session';
+DELETE FROM mysql.db WHERE user='mysql.pxc.sst.role';
 
 # Backup privilege tables and drop original ones
 RENAME TABLE mysql.user TO mysql.user_bak;
