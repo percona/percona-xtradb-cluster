@@ -64,8 +64,8 @@ For this tutorial, install Percona XtraDB Cluster on Node 4:
 
   .. code-block:: bash
 
-     root@proxysql:~# apt-get install percona-xtradb-cluster-client
-     root@proxysql:~# apt-get install proxysql2
+     root@proxysql:~# apt install percona-xtradb-cluster-client
+     root@proxysql:~# apt install proxysql2
 
 * On Red Hat Enterprise Linux or CentOS:
 
@@ -332,7 +332,7 @@ You can install ``sysbench`` from Percona software repositories:
 
   .. code-block:: bash
 
-     root@proxysql:~# apt-get install sysbench
+     root@proxysql:~# apt install sysbench
 
 * For Red Hat Enterprise Linux or CentOS
 
@@ -555,7 +555,7 @@ but the user can still open conenctions to monitor status.
 
    - :ref:`testing-env-proxysql.setting-up`
 
-   
+
 
 
 .. ProxySQL replace:: ProxySQL
