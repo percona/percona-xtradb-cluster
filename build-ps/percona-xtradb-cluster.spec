@@ -213,7 +213,7 @@ Prefix: %{_sysconfdir}
             %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
             %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
           else
-            %if 0%{?rhel} < 7
+            %if 0%{?rhel} < 8
               %define distro_description    Red Hat Enterprise Linux 7
               %define distro_releasetag     rhel7
               %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
