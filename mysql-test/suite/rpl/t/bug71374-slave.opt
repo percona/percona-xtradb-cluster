@@ -1,1 +1,7 @@
+<<<<<<< HEAD
  --log-error=$MYSQLTEST_VARDIR/tmp/rpl_bug71374.mysqld.2.err
+||||||| a558ec2ebf5
+--log-error=../../tmp/rpl_bug71374.mysqld.2.err
+=======
+--log-error=$MYSQL_TMP_DIR/rpl_bug71374.mysqld.2.err
+>>>>>>> Percona-Server-8.0.26-16

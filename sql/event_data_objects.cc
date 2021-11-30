@@ -269,7 +269,7 @@ Event_queue_element::Event_queue_element()
   SYNOPSIS
     Event_queue_element::Event_queue_element()
 */
-Event_queue_element::~Event_queue_element() {}
+Event_queue_element::~Event_queue_element() = default;
 
 /*
   Constructor
@@ -290,7 +290,7 @@ Event_timed::Event_timed() : m_created(0), m_modified(0), m_sql_mode(0) {
     Event_timed::~Event_timed()
 */
 
-Event_timed::~Event_timed() {}
+Event_timed::~Event_timed() = default;
 
 /*
   Constructor

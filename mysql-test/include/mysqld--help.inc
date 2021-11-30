@@ -22,8 +22,16 @@ perl;
   @skipvars=qw/basedir open-files-limit general-log-file plugin-dir
                pid-file slow-query-log-file
                language lc-messages-dir
+<<<<<<< HEAD
                datadir slave-load-tmpdir tmpdir socket table-definition-cache table-open-cache
                tls-version admin-tls-version secure-file-priv wsrep-node-name wsrep-data-home-dir/;
+||||||| a558ec2ebf5
+               datadir slave-load-tmpdir tmpdir socket table-definition-cache table-open-cache
+               tls-version admin-tls-version secure-file-priv/;
+=======
+               datadir replica-load-tmpdir slave-load-tmpdir tmpdir socket table-definition-cache table-open-cache
+               tls-version admin-tls-version secure-file-priv/;
+>>>>>>> Percona-Server-8.0.26-16
 
   # Variables which we don't want to display in result file since
   # they depend on type of build

@@ -25,10 +25,16 @@
 #include "sql/binlog.h"
 #include "sql/debug_sync.h"  // DEBUG_SYNC
 #include "sql/rpl_commit_stage_manager.h"
+#include "sql/rpl_replica_commit_order_manager.h"  // Commit_order_manager
 #include "sql/rpl_rli_pdb.h"  // Slave_worker                    // Slave_worker
+<<<<<<< HEAD
 #include "sql/rpl_slave_commit_order_manager.h"  // Commit_order_manager
 #include "sql/wsrep_applier.h"
 #include "sql/wsrep_trans_observer.h"
+||||||| a558ec2ebf5
+#include "sql/rpl_slave_commit_order_manager.h"  // Commit_order_manager
+=======
+>>>>>>> Percona-Server-8.0.26-16
 
 class Slave_worker;
 class Commit_order_manager;
@@ -326,7 +332,7 @@ bool Commit_stage_manager::enroll_for(StageID stage, THD *thd,
       With setting the status the follower ensures it won't execute anything
       including thread-specific code.
     */
-    thd->get_transaction()->m_flags.ready_preempt = 1;
+    thd->get_transaction()->m_flags.ready_preempt = true;
     if (leader_await_preempt_status) mysql_cond_signal(&m_cond_preempt);
 #endif
     while (thd->tx_commit_pending) {

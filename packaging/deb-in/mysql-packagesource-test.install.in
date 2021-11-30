@@ -108,6 +108,14 @@ usr/lib/mysql/plugin/test_services_plugin_registry.so
 usr/lib/mysql/plugin/test_services_host_application_signal.so
 usr/lib/mysql/plugin/component_mysqlx_global_reset.so
 usr/lib/mysql/plugin/component_test_audit_api_message.so
+<<<<<<< HEAD
+||||||| a558ec2ebf5
+usr/lib/mysql/plugin/component_test_udf_services.so
+=======
+usr/lib/mysql/plugin/component_test_udf_services.so
+usr/lib/mysql/plugin/component_test_mysql_system_variable_set.so
+usr/lib/mysql/plugin/component_test_table_access.so
+>>>>>>> Percona-Server-8.0.26-16
 # test suite
 usr/lib/mysql-test/*
 # legal

@@ -202,11 +202,25 @@ to run and administer a MySQL server.
 
 %package        server-debug
 Summary:        The debug version of MySQL server
+Requires:       %{name}-server = %{version}-%{release}
 %if 0%{?commercial}
+<<<<<<< HEAD
 Requires:       mysql-commercial-server = %{version}-%{release}
+||||||| a558ec2ebf5
+Requires:       mysql-commercial-server = %{version}-%{release}
+Obsoletes:      mysql-community-server-debug < %{version}-%{release}
+=======
+Obsoletes:      mysql-community-server-debug < %{version}-%{release}
+%if 0%{?cluster}
+Obsoletes:      mysql-commercial-server-debug < %{version}-%{release}
+Obsoletes:      mysql-cluster-community-server-debug < %{version}-%{release}
+%endif # cluster
+>>>>>>> Percona-Server-8.0.26-16
 %else
-Requires:       mysql-community-server = %{version}-%{release}
-%endif
+%if 0%{?cluster}
+Obsoletes:      mysql-community-server-debug < %{version}-%{release}
+%endif # cluster
+%endif # commercial
 %description    server-debug
 This packages contains the special debug build of MySQL server.
 
@@ -694,6 +708,8 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/plugin/rewriter.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/semisync_master.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/semisync_slave.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/semisync_source.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/semisync_replica.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/validate_password.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/version_token.so
 
@@ -743,6 +759,8 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/rewriter.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_master.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_slave.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_source.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_replica.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/validate_password.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/version_token.so
 
@@ -828,7 +846,6 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_bindir}/ndbinfo_select_all
 %attr(755, root, root) %{_bindir}/ndbxfrm
 
-%attr(644, root, root) %{_mandir}/man1/ndb-common-options.1*
 %attr(644, root, root) %{_mandir}/man1/ndb_blob_tool.1*
 %attr(644, root, root) %{_mandir}/man1/ndb_config.1*
 %attr(644, root, root) %{_mandir}/man1/ndb_cpcd.1*
@@ -874,6 +891,21 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(644, root, root) %{_sysconfdir}/ld.so.conf.d/mysql-%{_arch}.conf
 %{_libdir}/mysql/libmysqlclient.so.21*
 
+<<<<<<< HEAD
+||||||| a558ec2ebf5
+%files client-plugins
+%defattr(-, root, root, -)
+%doc %{?license_files_server}
+%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_sasl_client.so
+
+=======
+%files client-plugins
+%defattr(-, root, root, -)
+%doc %{?license_files_server}
+%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_sasl_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_kerberos_client.so
+
+>>>>>>> Percona-Server-8.0.26-16
 %files test
 %doc %{?license_files_server}
 %attr(-, root, root) %{_datadir}/mysql-test
@@ -903,6 +935,14 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_test_host_application_signal.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_test_mysql_current_thread_reader.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_test_mysql_runtime_error.so
+<<<<<<< HEAD
+||||||| a558ec2ebf5
+%attr(755, root, root) %{_libdir}/mysql/plugin/component_test_component_deinit.so
+=======
+%attr(755, root, root) %{_libdir}/mysql/plugin/component_test_mysql_system_variable_set.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/component_test_table_access.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/component_test_component_deinit.so
+>>>>>>> Percona-Server-8.0.26-16
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_udf_reg_3_func.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_udf_reg_avg_func.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_udf_reg_int_func.so
@@ -962,6 +1002,13 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_mysqlx_global_reset.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_test_plugin.so
+<<<<<<< HEAD
+||||||| a558ec2ebf5
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_ldap_sasl_client.so
+=======
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_ldap_sasl_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_kerberos_client.so
+>>>>>>> Percona-Server-8.0.26-16
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_example_component1.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_example_component2.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_example_component3.so
@@ -979,6 +1026,14 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_host_application_signal.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_mysql_current_thread_reader.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_mysql_runtime_error.so
+<<<<<<< HEAD
+||||||| a558ec2ebf5
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_component_deinit.so
+=======
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_mysql_system_variable_set.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_table_access.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_component_deinit.so
+>>>>>>> Percona-Server-8.0.26-16
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_udf_reg_3_func.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_udf_reg_avg_func.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_udf_reg_int_func.so
@@ -1800,7 +1855,7 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 - Save the perror binary built during Max build so it supports the NDB
   error codes (BUG#13740)
 - added a separate macro "mysqld_group" to be able to define the
-  user group of the mysql user seperately, if desired.
+  user group of the mysql user separately, if desired.
 
 * Thu Sep 29 2005 Lenz Grimmer <lenz@mysql.com>
 
@@ -1856,7 +1911,7 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 * Wed Apr 13 2005 Lenz Grimmer <lenz@mysql.com>
 
 - removed the MySQL manual files (html/ps/texi) - they have been removed
-  from the MySQL sources and are now available seperately.
+  from the MySQL sources and are now available separately.
 
 * Mon Apr 4 2005 Petr Chardin <petr@mysql.com>
 

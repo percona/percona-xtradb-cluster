@@ -3,11 +3,26 @@ if (!$restart_parameters)
   let $restart_parameters = restart;
 }
 
+<<<<<<< HEAD
 if ($galera_wsrep_start_position != '') {
    --echo Using --wsrep-start-position when starting mysqld ...
    --let $restart_parameters = restart:$start_mysqld_params --wsrep-start-position=$galera_wsrep_start_position
    --let $galera_wsrep_start_position = 0
+||||||| a558ec2ebf5
+# We use --exec echo instead of simple "--echo" because
+# replace_result works on --exec
+if (!$restart_hide_args)
+{
+  --exec echo "# $restart_parameters"
+=======
+# We use --exec echo instead of simple "--echo" because
+# replace_result works on --exec
+if (!$do_not_echo_parameters)
+{
+  --exec echo "# $restart_parameters"
+>>>>>>> Percona-Server-8.0.26-16
 }
+<<<<<<< HEAD
 
 if ($galera_wsrep_start_position == '') {
    if ($start_mysqld_params != '') {
@@ -25,6 +40,17 @@ if ($suppress_print_params == '') {
   if ($restart_hide_args) {
     --echo # restart:<hidden args>
   }
+||||||| a558ec2ebf5
+if ($restart_hide_args)
+{
+  --echo # restart:<hidden args>
+  let $restart_hide_args=;
+=======
+if ($do_not_echo_parameters)
+{
+  --echo # restart:<hidden args>
+  let $do_not_echo_parameters=;
+>>>>>>> Percona-Server-8.0.26-16
 }
 
 # Include this script only after using shutdown_mysqld.inc

@@ -69,6 +69,7 @@ usr/lib/mysql/plugin/audit_log.so
 usr/lib/mysql/plugin/authentication_pam.so
 usr/lib/mysql/plugin/authentication_ldap_sasl.so
 usr/lib/mysql/plugin/authentication_ldap_simple.so
+usr/lib/mysql/plugin/authentication_kerberos.so
 usr/lib/mysql/plugin/data_masking.so
 usr/lib/mysql/plugin/keyring_okv.so
 usr/lib/mysql/plugin/keyring_encrypted_file.so
@@ -172,6 +173,7 @@ Depends: mysql-${DEB_PRODUCTNAME}-client (= \${binary:Version}), \${misc:Depends
 Description: Debugging symbols for client
 ")
 
+<<<<<<< HEAD
 # Platform specifics. The differences are generally only distro version
 # and whether or not systemd and/or apparmor are available
 IF(DEB_CODENAME STREQUAL "stretch")
@@ -228,6 +230,73 @@ ELSEIF(DEB_CODENAME STREQUAL "xenial")
 	dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld
 	dh_apparmor -pmysql-router-${DEB_PRODUCTNAME} --profile-name=usr.bin.mysqlrouter
   ")
+||||||| a558ec2ebf5
+# lsb_release on Debian reports the full version number, e.g. 9.9, and we just want the major version
+IF(DEB_ID STREQUAL "debian")
+  string(REGEX REPLACE "\\..*" "" DEB_RELEASE "${DEB_RELEASE}")
+ENDIF()
+
+
+# ubuntu18.04, debian9, etc
+SET (DEB_PLATFORMRELEASE "${DEB_ID}${DEB_RELEASE}")
+
+# Only used on Ubuntu
+SET (DEB_CONTROL_BDEPS "")
+SET (DEB_RULES_INSTALL_APPARMOR "")
+SET (DEB_RULES_APPARMOR_LOAD "")
+SET (DEB_INSTALL_SERVER_APPARMOR "")
+SET (DEB_INIT_SERVER_APPARMOR "")
+SET (DEB_INIT_ROUTER_APPARMOR "")
+# Only used on Ubuntu 16.04 for manually created debug symbol packages
+SET (DEB_CONTROL_DBGSYM "")
+SET (DEB_RULES_STRIP "")
+
+# Used for testing unreleased gcc versions on e.g. Debian unstable
+IF (DEFINED DEB_GCC_SNAPSHOT)
+  SET (DEB_CMAKE_EXTRAS "${DEB_CMAKE_EXTRAS} -DCMAKE_C_COMPILER=/usr/lib/gcc-snapshot/bin/gcc -DCMAKE_CXX_COMPILER=/usr/lib/gcc-snapshot/bin/g++ -DMYSQL_MAINTAINER_MODE=0 -DCMAKE_CXX_COMPILER_LAUNCHER=ccache")
+ENDIF()
+
+# Enable various apparmor systems for Ubuntu
+IF(DEB_ID STREQUAL "ubuntu")
+  SET (DEB_CONTROL_BDEPS ", dh-apparmor")
+  SET (DEB_RULES_INSTALL_APPARMOR "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
+  SET (DEB_RULES_APPARMOR_LOAD "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
+=======
+# lsb_release on Debian reports the full version number, e.g. 9.9, and we just want the major version
+IF(DEB_ID STREQUAL "debian")
+  string(REGEX REPLACE "\\..*" "" DEB_RELEASE "${DEB_RELEASE}")
+ENDIF()
+
+
+# ubuntu18.04, debian9, etc
+SET (DEB_PLATFORMRELEASE "${DEB_ID}${DEB_RELEASE}")
+
+# Only used on Ubuntu
+SET (DEB_CONTROL_BDEPS "")
+SET (DEB_RULES_INSTALL_APPARMOR "")
+SET (DEB_RULES_APPARMOR_LOAD "")
+SET (DEB_INSTALL_SERVER_APPARMOR "")
+SET (DEB_INIT_SERVER_APPARMOR "")
+SET (DEB_INIT_ROUTER_APPARMOR "")
+# Only used on Ubuntu 16.04 for manually created debug symbol packages
+SET (DEB_CONTROL_DBGSYM "")
+SET (DEB_RULES_STRIP "")
+
+# Used for testing unreleased gcc versions on e.g. Debian unstable
+IF (DEFINED DEB_GCC_SNAPSHOT)
+  SET (DEB_CMAKE_EXTRAS "${DEB_CMAKE_EXTRAS} -DCMAKE_C_COMPILER=/usr/lib/gcc-snapshot/bin/gcc -DCMAKE_CXX_COMPILER=/usr/lib/gcc-snapshot/bin/g++ -DMYSQL_MAINTAINER_MODE=0 -DCMAKE_CXX_COMPILER_LAUNCHER=ccache")
+ENDIF()
+
+# Enable various apparmor systems for Ubuntu
+IF(DEB_ID STREQUAL "ubuntu")
+  IF(DEB_CODENAME STREQUAL "bionic")
+    SET (DEB_CONTROL_BDEPS ", dh-apparmor, gcc-8, g++-8")
+  ELSE()
+    SET (DEB_CONTROL_BDEPS ", dh-apparmor")
+  ENDIF()
+  SET (DEB_RULES_INSTALL_APPARMOR "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
+  SET (DEB_RULES_APPARMOR_LOAD "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
+>>>>>>> Percona-Server-8.0.26-16
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_INSTALL_ROUTER_APPARMOR "etc/apparmor.d/usr.bin.mysqlrouter")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
