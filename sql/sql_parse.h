@@ -130,7 +130,6 @@ bool show_precheck(THD *thd, LEX *lex, bool lock);
 
 extern uint sql_command_flags[];
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "service_wsrep.h"
 
@@ -193,10 +192,6 @@ extern uint sql_command_flags[];
 
 #endif /* WITH_WSREP */
 
-size_t get_command_name_len(void);
-||||||| a558ec2ebf5
-size_t get_command_name_len(void);
-=======
 /**
   Map from enumeration values of type enum_server_command to
   descriptions of type std::string.
@@ -340,7 +335,6 @@ class Command_names {
     return COM_END;
   }
 };
->>>>>>> Percona-Server-8.0.26-16
 
 bool sqlcom_can_generate_row_events(enum enum_sql_command command);
 

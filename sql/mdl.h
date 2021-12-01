@@ -900,7 +900,6 @@ class MDL_request {
       Locked_tables_list::rename_locked_table(), a move assignment is actually
       what is intended.
   */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   MDL_request() : m_wsrep_non_preemptable(false) {}
 
@@ -915,12 +914,7 @@ class MDL_request {
 
   MDL_request &operator=(MDL_request &&) = default;
 #else
-  MDL_request() {}
-||||||| a558ec2ebf5
-  MDL_request() {}
-=======
   MDL_request() = default;
->>>>>>> Percona-Server-8.0.26-16
 
   MDL_request(const MDL_request &rhs)
       : type(rhs.type), duration(rhs.duration), ticket(nullptr), key(rhs.key) {}

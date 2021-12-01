@@ -27,14 +27,8 @@
 #include "sql/rpl_commit_stage_manager.h"
 #include "sql/rpl_replica_commit_order_manager.h"  // Commit_order_manager
 #include "sql/rpl_rli_pdb.h"  // Slave_worker                    // Slave_worker
-<<<<<<< HEAD
-#include "sql/rpl_slave_commit_order_manager.h"  // Commit_order_manager
 #include "sql/wsrep_applier.h"
 #include "sql/wsrep_trans_observer.h"
-||||||| a558ec2ebf5
-#include "sql/rpl_slave_commit_order_manager.h"  // Commit_order_manager
-=======
->>>>>>> Percona-Server-8.0.26-16
 
 class Slave_worker;
 class Commit_order_manager;

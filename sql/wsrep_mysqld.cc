@@ -16,7 +16,7 @@
 #include "binlog.h"
 #include "mysql/plugin.h"
 #include "mysqld.h"
-#include "rpl_slave.h"
+#include "rpl_replica.h"
 #include "sql/dd/cache/dictionary_client.h"  // dd::cache::Dictionary_client
 #include "sql/dd/dictionary.h"
 #include "sql/dd/types/table.h"

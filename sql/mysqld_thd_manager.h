@@ -46,7 +46,6 @@ void thd_unlock_thread_count();
 
 class Do_THD_Impl {
  public:
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* We add this empty constructor and defne it in .cc file
   just to avoid gcc-4.4.7 to overoptimize this class in release
@@ -55,12 +54,7 @@ class Do_THD_Impl {
   only with Red-Hat shipped compiler and is fixed in gcc-4.8+ for sure. */
   Do_THD_Impl();
 #endif /* WITH_WSREP */
-  virtual ~Do_THD_Impl() {}
-||||||| a558ec2ebf5
-  virtual ~Do_THD_Impl() {}
-=======
   virtual ~Do_THD_Impl() = default;
->>>>>>> Percona-Server-8.0.26-16
   virtual void operator()(THD *) = 0;
 #ifdef WITH_WSREP
   virtual void reset() {}

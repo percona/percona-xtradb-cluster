@@ -4141,31 +4141,6 @@ int mysql_execute_command(THD *thd, bool first_level) {
                                false))
           goto error; /* purecov: inspected */
       }
-<<<<<<< HEAD
-
-#ifdef WITH_WSREP
-      for (TABLE_LIST *table = all_tables; table; table = table->next_global) {
-        if (!lex->drop_temporary &&
-            (!thd->is_current_stmt_binlog_format_row() ||
-             !find_temporary_table(thd, table))) {
-          // We cannot use WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF, because here
-          // lex->no_write_to_binlog is uninitialized
-          wsrep::key_array keys;
-          if (wsrep_append_fk_parent_table(thd, all_tables, &keys)) {
-            return true;
-          }
-          if (WSREP(thd) &&
-              wsrep_to_isolation_begin(thd, NULL, NULL, all_tables, NULL, NULL,
-                                       &keys)) {
-            goto error;
-          }
-          break;
-        }
-      }
-#endif /* WITH_WSREP */
-
-||||||| a558ec2ebf5
-=======
 
       if (thd->variables.binlog_ddl_skip_rewrite) {
         size_t table_count = 0;
@@ -4189,7 +4164,28 @@ int mysql_execute_command(THD *thd, bool first_level) {
           }
         }
       }
->>>>>>> Percona-Server-8.0.26-16
+
+#ifdef WITH_WSREP
+      for (TABLE_LIST *table = all_tables; table; table = table->next_global) {
+        if (!lex->drop_temporary &&
+            (!thd->is_current_stmt_binlog_format_row() ||
+             !find_temporary_table(thd, table))) {
+          // We cannot use WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF, because here
+          // lex->no_write_to_binlog is uninitialized
+          wsrep::key_array keys;
+          if (wsrep_append_fk_parent_table(thd, all_tables, &keys)) {
+            return true;
+          }
+          if (WSREP(thd) &&
+              wsrep_to_isolation_begin(thd, NULL, NULL, all_tables, NULL, NULL,
+                                       &keys)) {
+            goto error;
+          }
+          break;
+        }
+      }
+#endif /* WITH_WSREP */
+
       /* DDL and binlog write order are protected by metadata locks. */
       res = mysql_rm_table(thd, first_table, lex->drop_if_exists,
                            lex->drop_temporary);

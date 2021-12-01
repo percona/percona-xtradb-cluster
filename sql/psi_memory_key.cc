@@ -405,25 +405,18 @@ static PSI_memory_info all_server_memory[] = {
     {&key_memory_userstat_client_stats, "userstat_client_stats",
      PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME},
     {&key_memory_thread_pool_connection, "thread_pool_connection", 0, 0,
-<<<<<<< HEAD
-     PSI_DOCUMENT_ME}
-
-#ifdef WITH_WSREP
-    ,
-    {&key_memory_wsrep, "wsrep", PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME}
-#endif /* WITH_WSREP */
-};
-||||||| a558ec2ebf5
-     PSI_DOCUMENT_ME}};
-=======
      PSI_DOCUMENT_ME},
     {&key_memory_rm_table_foreach_root, "rm_table::foreach_root",
      PSI_FLAG_THREAD, 0,
      "Mem root for temporary objects allocated while dropping tables or the "
      "whole database."},
     {&key_memory_rm_db_mdl_reqs_root, "rm_db::mdl_reqs_root", PSI_FLAG_THREAD,
+#ifdef WITH_WSREP
+     0, "Mem root for allocating MDL requests while dropping datbase."} ,
+    {&key_memory_wsrep, "wsrep", PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME}};
+#else
      0, "Mem root for allocating MDL requests while dropping datbase."}};
->>>>>>> Percona-Server-8.0.26-16
+#endif /* WITH_WSREP */
 
 void register_server_memory_keys() {
   const char *category = "sql";

@@ -25,7 +25,7 @@
 #include "mysql_version.h"
 #include "mysqld.h"
 #include "rpl_msr.h"  // channel_map
-#include "rpl_slave.h"
+#include "rpl_replica.h"
 #include "sql/auth/auth_common.h"
 #include "sql/sql_lex.h"
 #include "sql_base.h"  // TEMP_PREFIX

@@ -8369,19 +8369,13 @@ int MYSQL_BIN_LOG::prepare(THD *thd, bool all) {
     active transactional storage engines, such as is the case if this is a
     replication applier and log_replica_updates=0.
   */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   assert(thd->wsrep_applier ||
-         (thd->slave_thread ? opt_log_slave_updates
+         (thd->slave_thread ? opt_log_replica_updates
                             : thd->variables.sql_log_bin) ||
          total_ha_2pc > 1);
 #else
-  assert((thd->slave_thread ? opt_log_slave_updates
-||||||| a558ec2ebf5
-  assert((thd->slave_thread ? opt_log_slave_updates
-=======
   assert((thd->slave_thread ? opt_log_replica_updates
->>>>>>> Percona-Server-8.0.26-16
                             : thd->variables.sql_log_bin) ||
          total_ha_2pc > 1);
 #endif /* WITH_WSREP */
@@ -12510,8 +12504,7 @@ bool wsrep_stmt_rollback_is_safe(THD *thd) {
           " pre-stmt_pos: %llu, frag repl pos: %zu\n"
           "Thread: %u, SQL: %s",
           cache_mngr->trx_cache.get_prev_position(),
-          thd->wsrep_sr().log_position(), thd->thread_id(),
-          thd->query().str);
+          thd->wsrep_sr().log_position(), thd->thread_id(), thd->query().str);
       ret = false;
     }
   }

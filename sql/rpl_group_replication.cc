@@ -54,16 +54,13 @@
 #include "sql/sql_plugin_ref.h"
 #include "sql/ssl_init_callback.h"
 #include "sql/system_variables.h"  // System_variables
-
-<<<<<<< HEAD
+#ifdef WITH_WSREP
 #include "sql/wsrep_mysqld.h"
+#endif
 
-||||||| a558ec2ebf5
-=======
 REQUIRES_SERVICE_PLACEHOLDER(component_sys_variable_register);
 REQUIRES_SERVICE_PLACEHOLDER(component_sys_variable_unregister);
 
->>>>>>> Percona-Server-8.0.26-16
 class THD;
 
 extern ulong opt_mi_repository_id;

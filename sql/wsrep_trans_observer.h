@@ -339,7 +339,7 @@ static inline int wsrep_ordered_commit(THD *thd, bool all) {
   commit optimization will not work.
   Interim commit optimization rely on ordered commit of MySQL.
   If this feature is turned-off then skip this optimization. */
-  if (!opt_log_slave_updates || !opt_binlog_order_commits) {
+  if (!opt_log_replica_updates || !opt_binlog_order_commits) {
     return 0;
   }
 

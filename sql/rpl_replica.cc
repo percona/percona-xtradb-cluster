@@ -836,7 +836,7 @@ bool start_slave_cmd(THD *thd) {
     goto err;
   }
 #ifdef WITH_WSREP
-  if (WSREP_ON && !opt_log_slave_updates) {
+  if (WSREP_ON && !opt_log_replica_updates) {
     /*
        bad configuration, mysql replication would not be forwarded to wsrep
        cluster which would lead to immediate inconsistency
@@ -2162,7 +2162,7 @@ bool start_slave_threads(bool need_lock_slave, bool wait_for_start,
     return true;
   }
 #ifdef WITH_WSREP
-  if (WSREP_ON && !opt_log_slave_updates) {
+  if (WSREP_ON && !opt_log_replica_updates) {
     /*
        bad configuration, mysql replication would not be forwarded to wsrep
        cluster which would lead to immediate inconsistency
@@ -4669,7 +4669,6 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
 
     exec_res = ev->apply_event(rli);
 
-<<<<<<< HEAD:sql/rpl_slave.cc
 #ifdef WITH_WSREP
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     if (exec_res &&
@@ -4683,12 +4682,7 @@ apply_event_and_update_pos(Log_event **ptr_ev, THD *thd, Relay_log_info *rli) {
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
 
-    DBUG_EXECUTE_IF("simulate_stop_when_mts_in_group",
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-    DBUG_EXECUTE_IF("simulate_stop_when_mts_in_group",
-=======
     DBUG_EXECUTE_IF("simulate_stop_when_mta_in_group",
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
                     if (rli->mts_group_status == Relay_log_info::MTS_IN_GROUP &&
                         rli->curr_group_seen_begin)
                         DBUG_SET("+d,stop_when_mta_in_group"););
@@ -5381,22 +5375,10 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
               rli->retried_trans++;
               mysql_mutex_unlock(&rli->data_lock);
 #ifndef NDEBUG
-<<<<<<< HEAD:sql/rpl_slave.cc
               if (rli->trans_retries == 2 || rli->trans_retries == 6)
                 DBUG_EXECUTE_IF("rpl_ps_tables_worker_retry", {
-                  rpl_slave_debug_point(DBUG_RPL_S_PS_TABLE_WORKER_RETRY);
+                  rpl_replica_debug_point(DBUG_RPL_S_PS_TABLE_WORKER_RETRY);
                 };);
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-            if (rli->trans_retries == 2 || rli->trans_retries == 6)
-              DBUG_EXECUTE_IF("rpl_ps_tables_worker_retry", {
-                rpl_slave_debug_point(DBUG_RPL_S_PS_TABLE_WORKER_RETRY);
-              };);
-=======
-            if (rli->trans_retries == 2 || rli->trans_retries == 6)
-              DBUG_EXECUTE_IF("rpl_ps_tables_worker_retry", {
-                rpl_replica_debug_point(DBUG_RPL_S_PS_TABLE_WORKER_RETRY);
-              };);
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
 
 #endif
               DBUG_PRINT("info", ("Slave retries transaction "
@@ -5408,10 +5390,9 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
             rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
                         "Slave SQL thread retried transaction %lu time(s) "
                         "in vain, giving up. Consider raising the value of "
-                        "the slave_transaction_retries variable.",
+                        "the replica_transaction_retries variable.",
                         rli->trans_retries);
           }
-<<<<<<< HEAD:sql/rpl_slave.cc
         } else if ((exec_res && !temp_err) ||
                    (opt_using_transactions &&
                     rli->get_group_relay_log_pos() ==
@@ -5426,23 +5407,6 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
           DBUG_PRINT("info",
                      ("Resetting retry counter, rli->trans_retries: %lu",
                       rli->trans_retries));
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-        } else {
-          thd->fatal_error();
-          rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                      "Slave SQL thread retried transaction %lu time(s) "
-                      "in vain, giving up. Consider raising the value of "
-                      "the slave_transaction_retries variable.",
-                      rli->trans_retries);
-=======
-        } else {
-          thd->fatal_error();
-          rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                      "Slave SQL thread retried transaction %lu time(s) "
-                      "in vain, giving up. Consider raising the value of "
-                      "the replica_transaction_retries variable.",
-                      rli->trans_retries);
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
         }
       }
 #ifdef WITH_WSREP
@@ -5817,25 +5781,11 @@ extern "C" void *handle_slave_io(void *arg) {
           switch (mysql_error_number) {
             case CR_NET_PACKET_TOO_LARGE:
               LogErr(ERROR_LEVEL,
-<<<<<<< HEAD:sql/rpl_slave.cc
-                     ER_RPL_LOG_ENTRY_EXCEEDS_SLAVE_MAX_ALLOWED_PACKET,
-                     slave_max_allowed_packet);
-              mi->report(ERROR_LEVEL, ER_SERVER_NET_PACKET_TOO_LARGE, "%s",
-                         "Got a packet bigger than "
-                         "'slave_max_allowed_packet' bytes");
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-                     ER_RPL_LOG_ENTRY_EXCEEDS_SLAVE_MAX_ALLOWED_PACKET,
-                     slave_max_allowed_packet);
-              mi->report(
-                  ERROR_LEVEL, ER_SERVER_NET_PACKET_TOO_LARGE, "%s",
-                  "Got a packet bigger than 'slave_max_allowed_packet' bytes");
-=======
                      ER_RPL_LOG_ENTRY_EXCEEDS_REPLICA_MAX_ALLOWED_PACKET,
                      replica_max_allowed_packet);
               mi->report(ERROR_LEVEL, ER_SERVER_NET_PACKET_TOO_LARGE, "%s",
                          "Got a packet bigger than "
                          "'replica_max_allowed_packet' bytes");
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
               goto err;
             case ER_MASTER_FATAL_ERROR_READING_BINLOG:
               mi->report(ERROR_LEVEL,
@@ -7273,26 +7223,16 @@ wsrep_restart_point :
   struct PSI_thread *psi = PSI_THREAD_CALL(get_thread)();
   thd_set_psi(rli->info_thd, psi);
 #endif
-    mysql_thread_set_psi_THD(thd);
+  mysql_thread_set_psi_THD(thd);
 
   if (rli->channel_mts_submode != MTS_PARALLEL_TYPE_DB_NAME)
     rli->current_mts_submode = new Mts_submode_logical_clock();
   else
     rli->current_mts_submode = new Mts_submode_database();
 
-<<<<<<< HEAD:sql/rpl_slave.cc
-  if (opt_slave_preserve_commit_order && !rli->is_parallel_exec())
+  if (opt_replica_preserve_commit_order && !rli->is_parallel_exec())
     commit_order_mngr =
-        new Commit_order_manager(rli->opt_slave_parallel_workers);
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-    if (opt_slave_preserve_commit_order && !rli->is_parallel_exec())
-      commit_order_mngr =
-          new Commit_order_manager(rli->opt_slave_parallel_workers);
-=======
-    if (opt_replica_preserve_commit_order && !rli->is_parallel_exec())
-      commit_order_mngr =
-          new Commit_order_manager(rli->opt_replica_parallel_workers);
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
+        new Commit_order_manager(rli->opt_replica_parallel_workers);
 
   rli->set_commit_order_manager(commit_order_mngr);
 
@@ -7315,8 +7255,7 @@ wsrep_restart_point :
   rli->reported_unsafe_warning = false;
   rli->sql_thread_kill_accepted = false;
 
-<<<<<<< HEAD:sql/rpl_slave.cc
-  if (init_slave_thread(thd, SLAVE_THD_SQL)) {
+  if (init_replica_thread(thd, SLAVE_THD_SQL)) {
     /*
       TODO: this is currently broken - slave start and change master
       will be stuck if we fail here
@@ -7329,45 +7268,6 @@ wsrep_restart_point :
     goto err;
   }
   thd->init_query_mem_roots();
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-    if (init_slave_thread(thd, SLAVE_THD_SQL)) {
-      /*
-        TODO: this is currently broken - slave start and change master
-        will be stuck if we fail here
-      */
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                  ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                  "Failed during slave thread initialization");
-      goto err;
-    }
-    thd->init_query_mem_roots();
-
-    if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()))
-      rli->deferred_events = new Deferred_log_events();
-    thd->rli_slave = rli;
-    assert(thd->rli_slave->info_thd == thd);
-=======
-    if (init_replica_thread(thd, SLAVE_THD_SQL)) {
-      /*
-        TODO: this is currently broken - slave start and change master
-        will be stuck if we fail here
-      */
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                  ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                  "Failed during slave thread initialization");
-      goto err;
-    }
-    thd->init_query_mem_roots();
-
-    if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()))
-      rli->deferred_events = new Deferred_log_events();
-    thd->rli_slave = rli;
-    assert(thd->rli_slave->info_thd == thd);
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
 
   if ((rli->deferred_events_collecting = rli->rpl_filter->is_on()))
     rli->deferred_events = new Deferred_log_events();
@@ -7402,7 +7302,6 @@ wsrep_restart_point :
   set_timespec_nsec(&rli->ts_exec[1], 0);
   set_timespec_nsec(&rli->stats_begin, 0);
 
-<<<<<<< HEAD:sql/rpl_slave.cc
   if (RUN_HOOK(binlog_relay_io, applier_start, (thd, rli->mi))) {
     mysql_cond_broadcast(&rli->start_cond);
     mysql_mutex_unlock(&rli->run_lock);
@@ -7411,51 +7310,10 @@ wsrep_restart_point :
                 "Failed to run 'applier_start' hook");
     goto err;
   }
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-    /* MTS: starting the worker pool */
-    if (slave_start_workers(rli, rli->opt_slave_parallel_workers,
-                            &mts_inited) != 0) {
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                  ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                  "Failed during slave workers initialization");
-      goto err;
-    }
-    /*
-      We are going to set slave_running to 1. Assuming slave I/O thread is
-      alive and connected, this is going to make Seconds_Behind_Master be 0
-      i.e. "caught up". Even if we're just at start of thread. Well it's ok, at
-      the moment we start we can think we are caught up, and the next second we
-      start receiving data so we realize we are not caught up and
-      Seconds_Behind_Master grows. No big deal.
-    */
-    rli->abort_slave = false;
-=======
-    /* MTS: starting the worker pool */
-    if (slave_start_workers(rli, rli->opt_replica_parallel_workers,
-                            &mts_inited) != 0) {
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
-                  ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-                  "Failed during slave workers initialization");
-      goto err;
-    }
-    /*
-      We are going to set slave_running to 1. Assuming slave I/O thread is
-      alive and connected, this is going to make Seconds_Behind_Master be 0
-      i.e. "caught up". Even if we're just at start of thread. Well it's ok, at
-      the moment we start we can think we are caught up, and the next second we
-      start receiving data so we realize we are not caught up and
-      Seconds_Behind_Master grows. No big deal.
-    */
-    rli->abort_slave = false;
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
 
   /* MTS: starting the worker pool */
-  if (slave_start_workers(rli, rli->opt_slave_parallel_workers, &mts_inited) !=
-      0) {
+  if (slave_start_workers(rli, rli->opt_replica_parallel_workers,
+                          &mts_inited) != 0) {
     mysql_cond_broadcast(&rli->start_cond);
     mysql_mutex_unlock(&rli->run_lock);
     rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
@@ -7499,22 +7357,16 @@ wsrep_restart_point :
     goto err;
   }
 
-<<<<<<< HEAD:sql/rpl_slave.cc
   if (!rli->is_transactional())
     rli->report(WARNING_LEVEL, 0,
                 "If a crash happens this configuration does not guarantee that "
                 "the relay "
                 "log info will be consistent");
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-    DEBUG_SYNC(thd, "after_start_slave");
-=======
-    DEBUG_SYNC(thd, "after_start_replica");
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
 
   mysql_cond_broadcast(&rli->start_cond);
   mysql_mutex_unlock(&rli->run_lock);
 
-  DEBUG_SYNC(thd, "after_start_slave");
+  DEBUG_SYNC(thd, "after_start_replica");
 
   // tell the I/O thread to take relay_log_space_limit into account from now
   // on
@@ -7529,24 +7381,8 @@ wsrep_restart_point :
     goto err;
   }
 
-<<<<<<< HEAD:sql/rpl_slave.cc
   THD_CHECK_SENTRY(thd);
   assert(rli->info_thd == thd);
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-    if (check_temp_dir(rli->slave_patternload_file, rli->get_channel())) {
-      rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                  "Unable to use slave's temporary directory %s - %s",
-                  slave_load_tmpdir, thd->get_stmt_da()->message_text());
-      goto err;
-    }
-=======
-    if (check_temp_dir(rli->slave_patternload_file, rli->get_channel())) {
-      rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
-                  "Unable to use slave's temporary directory %s - %s",
-                  replica_load_tmpdir, thd->get_stmt_da()->message_text());
-      goto err;
-    }
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
 
   DBUG_PRINT("master_info", ("log_file_name: %s  position: %s",
                              rli->get_group_master_log_name(),
@@ -7555,7 +7391,7 @@ wsrep_restart_point :
   if (check_temp_dir(rli->slave_patternload_file, rli->get_channel())) {
     rli->report(ERROR_LEVEL, thd->get_stmt_da()->mysql_errno(),
                 "Unable to use slave's temporary directory %s - %s",
-                slave_load_tmpdir, thd->get_stmt_da()->message_text());
+                replica_load_tmpdir, thd->get_stmt_da()->message_text());
     goto err;
   }
 
@@ -7593,9 +7429,9 @@ wsrep_restart_point :
            rli->get_privilege_checks_hostname().c_str(),
            opt_always_activate_granted_roles == 0 ? "DEFAULT" : "ALL");
 
-  /* execute init_slave variable */
-  if (opt_init_slave.length) {
-    execute_init_command(thd, &opt_init_slave, &LOCK_sys_init_slave);
+  /* execute init_replica variable */
+  if (opt_init_replica.length) {
+    execute_init_command(thd, &opt_init_replica, &LOCK_sys_init_replica);
     if (thd->is_slave_error) {
       rli->report(ERROR_LEVEL, ER_SERVER_SLAVE_INIT_QUERY_FAILED,
                   ER_THD(current_thd, ER_SERVER_SLAVE_INIT_QUERY_FAILED),
@@ -7644,44 +7480,10 @@ wsrep_restart_point :
              (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
              saved_master_log_name, (ulong)saved_master_log_pos,
              rli->get_group_relay_log_name(),
-<<<<<<< HEAD:sql/rpl_slave.cc
              (ulong)rli->get_group_relay_log_pos(),
              rli->get_group_master_log_name(),
              (ulong)rli->get_group_master_log_pos());
       saved_skip = 0;
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-             llstr(rli->get_group_relay_log_pos(), llbuff1),
-             rli->get_privilege_checks_username().c_str(),
-             rli->get_privilege_checks_hostname().c_str(),
-             opt_always_activate_granted_roles == 0 ? "DEFAULT" : "ALL");
-
-    /* execute init_slave variable */
-    if (opt_init_slave.length) {
-      execute_init_command(thd, &opt_init_slave, &LOCK_sys_init_slave);
-      if (thd->is_slave_error) {
-        rli->report(ERROR_LEVEL, ER_SERVER_SLAVE_INIT_QUERY_FAILED,
-                    ER_THD(current_thd, ER_SERVER_SLAVE_INIT_QUERY_FAILED),
-                    thd->get_stmt_da()->mysql_errno(),
-                    thd->get_stmt_da()->message_text());
-        goto err;
-      }
-=======
-             llstr(rli->get_group_relay_log_pos(), llbuff1),
-             rli->get_privilege_checks_username().c_str(),
-             rli->get_privilege_checks_hostname().c_str(),
-             opt_always_activate_granted_roles == 0 ? "DEFAULT" : "ALL");
-
-    /* execute init_replica variable */
-    if (opt_init_replica.length) {
-      execute_init_command(thd, &opt_init_replica, &LOCK_sys_init_replica);
-      if (thd->is_slave_error) {
-        rli->report(ERROR_LEVEL, ER_SERVER_SLAVE_INIT_QUERY_FAILED,
-                    ER_THD(current_thd, ER_SERVER_SLAVE_INIT_QUERY_FAILED),
-                    thd->get_stmt_da()->mysql_errno(),
-                    thd->get_stmt_da()->message_text());
-        goto err;
-      }
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
     }
 
     // read next event
@@ -7756,31 +7558,12 @@ err:
            rli->get_for_channel_str(), rli->get_rpl_log_name(),
            llstr(rli->get_group_master_log_pos(), llbuff));
 
-<<<<<<< HEAD:sql/rpl_slave.cc
 #ifdef WITH_WSREP
   wsrep_after_command_before_result(thd);
   wsrep_after_command_after_result(thd);
   wsrep_close(thd);
 #endif /* WITH_WSREP */
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-    /*
-      Pause the SQL thread and wait for 'continue_to_stop_sql_thread'
-      signal to continue to shutdown the SQL thread.
-    */
-    DBUG_EXECUTE_IF("pause_after_sql_thread_stop_hook", {
-      rpl_slave_debug_point(DBUG_RPL_S_AFTER_SQL_STOP, thd);
-    };);
-=======
-    /*
-      Pause the SQL thread and wait for 'continue_to_stop_sql_thread'
-      signal to continue to shutdown the SQL thread.
-    */
-    DBUG_EXECUTE_IF("pause_after_sql_thread_stop_hook", {
-      rpl_replica_debug_point(DBUG_RPL_S_AFTER_SQL_STOP, thd);
-    };);
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
 
-<<<<<<< HEAD:sql/rpl_slave.cc
   delete rli->current_mts_submode;
   rli->current_mts_submode = 0;
   rli->clear_mts_recovery_groups();
@@ -7806,54 +7589,29 @@ err:
     Pause the SQL thread and wait for 'continue_to_stop_sql_thread'
     signal to continue to shutdown the SQL thread.
   */
-  DBUG_EXECUTE_IF("pause_after_sql_thread_stop_hook",
-                  { rpl_slave_debug_point(DBUG_RPL_S_AFTER_SQL_STOP, thd); };);
+  DBUG_EXECUTE_IF("pause_after_sql_thread_stop_hook", {
+    rpl_replica_debug_point(DBUG_RPL_S_AFTER_SQL_STOP, thd);
+  };);
 
-  THD_STAGE_INFO(thd, stage_waiting_for_slave_mutex_on_exit);
+  THD_STAGE_INFO(thd, stage_waiting_for_replica_mutex_on_exit);
   mysql_mutex_lock(&rli->run_lock);
-  /* We need data_lock, at least to wake up any waiting master_pos_wait() */
+  /* We need data_lock, at least to wake up any waiting source_pos_wait() */
   mysql_mutex_lock(&rli->data_lock);
   applier_reader.close();
   assert(rli->slave_running == 1);  // tracking buffer overrun
-  /* When master_pos_wait() wakes up it will check this and terminate */
+  /* When source_pos_wait() wakes up it will check this and terminate */
   rli->slave_running = 0;
   rli->atomic_is_stopping = false;
   /* Forget the relay log's format */
   if (rli->set_rli_description_event(nullptr)) {
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-    THD_STAGE_INFO(thd, stage_waiting_for_slave_mutex_on_exit);
-    mysql_mutex_lock(&rli->run_lock);
-    /* We need data_lock, at least to wake up any waiting master_pos_wait() */
-    mysql_mutex_lock(&rli->data_lock);
-    applier_reader.close();
-    assert(rli->slave_running == 1);  // tracking buffer overrun
-    /* When master_pos_wait() wakes up it will check this and terminate */
-    rli->slave_running = 0;
-    rli->atomic_is_stopping = false;
-    /* Forget the relay log's format */
-    if (rli->set_rli_description_event(nullptr)) {
-=======
-    THD_STAGE_INFO(thd, stage_waiting_for_replica_mutex_on_exit);
-    mysql_mutex_lock(&rli->run_lock);
-    /* We need data_lock, at least to wake up any waiting source_pos_wait() */
-    mysql_mutex_lock(&rli->data_lock);
-    applier_reader.close();
-    assert(rli->slave_running == 1);  // tracking buffer overrun
-    /* When source_pos_wait() wakes up it will check this and terminate */
-    rli->slave_running = 0;
-    rli->atomic_is_stopping = false;
-    /* Forget the relay log's format */
-    if (rli->set_rli_description_event(nullptr)) {
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
 #ifndef NDEBUG
     bool set_rli_description_event_failed = false;
 #endif
-<<<<<<< HEAD:sql/rpl_slave.cc
-    assert(set_rli_description_event_failed);
+      assert(set_rli_description_event_failed);
   }
-  /* Wake up master_pos_wait() */
+  /* Wake up source_pos_wait() */
   DBUG_PRINT("info",
-             ("Signaling possibly waiting master_pos_wait() functions"));
+             ("Signaling possibly waiting source_pos_wait() functions"));
   mysql_cond_broadcast(&rli->data_cond);
   mysql_mutex_unlock(&rli->data_lock);
   rli->ignore_log_space_limit = false; /* don't need any lock */
@@ -7861,33 +7619,6 @@ err:
   /* we die so won't remember charset - re-update them on next thread start */
   rli->cached_charset_invalidate();
   rli->save_temporary_tables = thd->temporary_tables;
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-      assert(set_rli_description_event_failed);
-    }
-    /* Wake up master_pos_wait() */
-    DBUG_PRINT("info",
-               ("Signaling possibly waiting master_pos_wait() functions"));
-    mysql_cond_broadcast(&rli->data_cond);
-    mysql_mutex_unlock(&rli->data_lock);
-    rli->ignore_log_space_limit = false; /* don't need any lock */
-    rli->sql_force_rotate_relay = false;
-    /* we die so won't remember charset - re-update them on next thread start */
-    rli->cached_charset_invalidate();
-    rli->save_temporary_tables = thd->temporary_tables;
-=======
-      assert(set_rli_description_event_failed);
-    }
-    /* Wake up source_pos_wait() */
-    DBUG_PRINT("info",
-               ("Signaling possibly waiting source_pos_wait() functions"));
-    mysql_cond_broadcast(&rli->data_cond);
-    mysql_mutex_unlock(&rli->data_lock);
-    rli->ignore_log_space_limit = false; /* don't need any lock */
-    rli->sql_force_rotate_relay = false;
-    /* we die so won't remember charset - re-update them on next thread start */
-    rli->cached_charset_invalidate();
-    rli->save_temporary_tables = thd->temporary_tables;
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
 
   /*
     TODO: see if we can do this conditionally in next_event() instead
@@ -7918,33 +7649,14 @@ err:
     The thd can only be destructed after indirect references
     through mi->rli->info_thd are cleared: mi->rli->info_thd= NULL.
 
-<<<<<<< HEAD:sql/rpl_slave.cc
     For instance, user thread might be issuing show_slave_status
-    and attempting to read mi->rli->info_thd->get_proc_info().
+    and attempting to read mi->rli->info_thd->proc_info().
     Therefore thd must only be deleted after info_thd is set
     to NULL.
   */
   mysql_thread_set_psi_THD(nullptr);
   delete thd;
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-      For instance, user thread might be issuing show_slave_status
-      and attempting to read mi->rli->info_thd->get_proc_info().
-      Therefore thd must only be deleted after info_thd is set
-      to NULL.
-    */
-    mysql_thread_set_psi_THD(nullptr);
-    delete thd;
-=======
-      For instance, user thread might be issuing show_slave_status
-      and attempting to read mi->rli->info_thd->proc_info().
-      Therefore thd must only be deleted after info_thd is set
-      to NULL.
-    */
-    mysql_thread_set_psi_THD(nullptr);
-    delete thd;
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
 
-<<<<<<< HEAD:sql/rpl_slave.cc
 #ifdef WITH_WSREP
   /* if slave stopped due to node going non primary, we set global flag to
      trigger automatic restart of slave when node joins back to cluster
@@ -7966,27 +7678,6 @@ err:
           " restart when node joins back the cluster");
       wsrep_restart_slave_activated = true;
     }
-||||||| a558ec2ebf5:sql/rpl_slave.cc
-    /*
-     Note: the order of the broadcast and unlock calls below (first broadcast,
-     then unlock) is important. Otherwise a killer_thread can execute between
-     the calls and delete the mi structure leading to a crash! (see BUG#25306
-     for details)
-    */
-    mysql_cond_broadcast(&rli->stop_cond);
-    DBUG_EXECUTE_IF("simulate_slave_delay_at_terminate_bug38694", sleep(5););
-    mysql_mutex_unlock(&rli->run_lock);  // tell the world we are done
-=======
-    /*
-     Note: the order of the broadcast and unlock calls below (first broadcast,
-     then unlock) is important. Otherwise a killer_thread can execute between
-     the calls and delete the mi structure leading to a crash! (see BUG#25306
-     for details)
-    */
-    mysql_cond_broadcast(&rli->stop_cond);
-    DBUG_EXECUTE_IF("simulate_replica_delay_at_terminate_bug38694", sleep(5););
-    mysql_mutex_unlock(&rli->run_lock);  // tell the world we are done
->>>>>>> Percona-Server-8.0.26-16:sql/rpl_replica.cc
   }
   // wsrep_close(thd);
 #endif /* WITH_WSREP */
@@ -7998,9 +7689,10 @@ err:
    for details)
   */
   mysql_cond_broadcast(&rli->stop_cond);
-  DBUG_EXECUTE_IF("simulate_slave_delay_at_terminate_bug38694", sleep(5););
+  DBUG_EXECUTE_IF("simulate_replica_delay_at_terminate_bug38694",
+                  sleep(5););
   mysql_mutex_unlock(&rli->run_lock);  // tell the world we are done
-}
+ }
   my_thread_end();
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
   ERR_remove_thread_state(0);
