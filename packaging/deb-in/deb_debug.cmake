@@ -100,13 +100,8 @@ SET (DEB_INSTALL_DEBUG_TEST_PLUGINS
 "
 usr/lib/mysql/plugin/debug/auth.so
 usr/lib/mysql/plugin/debug/auth_test_plugin.so
-<<<<<<< HEAD
-||||||| a558ec2ebf5
-usr/lib/mysql/plugin/debug/authentication_ldap_sasl_client.so
-=======
 usr/lib/mysql/plugin/debug/authentication_ldap_sasl_client.so
 usr/lib/mysql/plugin/debug/authentication_kerberos_client.so
->>>>>>> Percona-Server-8.0.26-16
 usr/lib/mysql/plugin/debug/component_example_component1.so
 usr/lib/mysql/plugin/debug/component_example_component2.so
 usr/lib/mysql/plugin/debug/component_example_component3.so
@@ -184,14 +179,9 @@ usr/lib/mysql/plugin/debug/pfs_example_plugin_employee.so
 usr/lib/mysql/plugin/debug/component_pfs_example.so
 usr/lib/mysql/plugin/debug/component_mysqlx_global_reset.so
 usr/lib/mysql/plugin/debug/component_test_audit_api_message.so
-<<<<<<< HEAD
-||||||| a558ec2ebf5
-usr/lib/mysql/plugin/debug/component_test_udf_services.so
-=======
 usr/lib/mysql/plugin/debug/component_test_udf_services.so
 usr/lib/mysql/plugin/debug/component_test_mysql_system_variable_set.so
 usr/lib/mysql/plugin/debug/component_test_table_access.so
->>>>>>> Percona-Server-8.0.26-16
 ")
 
 IF (DEB_PRODUCT STREQUAL "commercial")

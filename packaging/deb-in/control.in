@@ -18,14 +18,7 @@ Build-Depends: debhelper (>= 9.0.0),
  cmake,
  fakeroot,
  libnuma-dev,
-<<<<<<< HEAD
- libmecab-dev
-||||||| a558ec2ebf5
  libmecab-dev,
- dh-systemd
-=======
- libmecab-dev,
->>>>>>> Percona-Server-8.0.26-16
  @DEB_CONTROL_BDEPS@ @DEB_CONTROL_BDEPS_COMMERCIAL@ @DEB_CONTROL_BDEPS_SSL@
 
 

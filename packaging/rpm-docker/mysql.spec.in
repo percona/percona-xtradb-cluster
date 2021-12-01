@@ -258,13 +258,8 @@ for p in \
          component_test_host_application_signal.so \
          component_test_mysql_current_thread_reader.so \
          component_test_mysql_runtime_error.so \
-<<<<<<< HEAD
-||||||| a558ec2ebf5
-         component_test_component_deinit.so \
-=======
          component_test_mysql_system_variable_set.so \
          component_test_component_deinit.so \
->>>>>>> Percona-Server-8.0.26-16
          component_test_page_track_component.so \
          component_test_pfs_notification.so \
          component_test_pfs_resource_group.so \
@@ -364,24 +359,6 @@ rm -r $(readlink var) var
 %dir %{_sysconfdir}/my.cnf.d
 
 %if 0%{?cluster}
-<<<<<<< HEAD
-||||||| a558ec2ebf5
-%attr(755, root, root) %{_bindir}/ndb_blob_tool
-%attr(755, root, root) %{_bindir}/ndb_config
-%attr(755, root, root) %{_bindir}/ndb_delete_all
-%attr(755, root, root) %{_bindir}/ndb_desc
-%attr(755, root, root) %{_bindir}/ndb_drop_index
-%attr(755, root, root) %{_bindir}/ndb_drop_table
-%attr(755, root, root) %{_bindir}/ndb_import
-%attr(755, root, root) %{_bindir}/ndb_index_stat
-%attr(755, root, root) %{_bindir}/ndb_redo_log_reader
-%attr(755, root, root) %{_bindir}/ndb_restore
-%attr(755, root, root) %{_bindir}/ndb_select_all
-%attr(755, root, root) %{_bindir}/ndb_select_count
-%attr(755, root, root) %{_bindir}/ndb_show_tables
-%attr(755, root, root) %{_bindir}/ndbinfo_select_all
-%attr(755, root, root) %{_bindir}/ndb_waiter
-=======
 %attr(755, root, root) %{_bindir}/mysqlbinlog
 %attr(755, root, root) %{_bindir}/ndb_blob_tool
 %attr(755, root, root) %{_bindir}/ndb_config
@@ -398,7 +375,6 @@ rm -r $(readlink var) var
 %attr(755, root, root) %{_bindir}/ndb_show_tables
 %attr(755, root, root) %{_bindir}/ndbinfo_select_all
 %attr(755, root, root) %{_bindir}/ndb_waiter
->>>>>>> Percona-Server-8.0.26-16
 %attr(755, root, root) %{_bindir}/ndb_mgm
 %attr(755, root, root) %{_bindir}/ndb_top
 %attr(755, root, root) %{_sbindir}/ndb_mgmd
@@ -497,15 +473,9 @@ rm -r $(readlink var) var
 %attr(755, root, root) %{_bindir}/mysqlbackup
 %attr(755, root, root) %{_libdir}/mysql/plugin/audit_log.so
 %attr(644, root, root) %{_datadir}/mysql-*/audit_log_filter_linux_install.sql
-<<<<<<< HEAD
-||||||| a558ec2ebf5
-%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_sasl.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_simple.so
-=======
 %attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_sasl.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_simple.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/authentication_kerberos.so
->>>>>>> Percona-Server-8.0.26-16
 %attr(755, root, root) %{_libdir}/mysql/plugin/authentication_pam.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/data_masking.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/keyring_okv.so

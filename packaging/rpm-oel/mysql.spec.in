@@ -1320,20 +1320,6 @@ fi
 %dir %attr(755, root, root) %{_libdir}/mysql
 %attr(644, root, root) %{_sysconfdir}/ld.so.conf.d/mysql-%{_arch}.conf
 %{_libdir}/mysql/libmysqlclient.so.21*
-<<<<<<< HEAD
-||||||| a558ec2ebf5
-%if 0%{?ssl_bundled}
-%attr(755, root, root) %{_libdir}/mysql/private/libssl.so
-%attr(755, root, root) %{_libdir}/mysql/private/libssl.so.1.1
-%attr(755, root, root) %{_libdir}/mysql/private/libcrypto.so
-%attr(755, root, root) %{_libdir}/mysql/private/libcrypto.so.1.1
-%endif # ssl_bundled
-
-%files client-plugins
-%defattr(-, root, root, -)
-%doc %{?license_files_server}
-%attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_sasl_client.so
-=======
 %if 0%{?ssl_bundled}
 %attr(755, root, root) %{_libdir}/mysql/private/libssl.so
 %attr(755, root, root) %{_libdir}/mysql/private/libssl.so.1.1
@@ -1346,7 +1332,6 @@ fi
 %doc %{?license_files_server}
 %attr(755, root, root) %{_libdir}/mysql/plugin/authentication_ldap_sasl_client.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/authentication_kerberos_client.so
->>>>>>> Percona-Server-8.0.26-16
 
 %if 0%{?compatlib}
 %files libs-compat
@@ -1391,14 +1376,9 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_test_host_application_signal.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_test_mysql_current_thread_reader.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_test_mysql_runtime_error.so
-<<<<<<< HEAD
-||||||| a558ec2ebf5
-%attr(755, root, root) %{_libdir}/mysql/plugin/component_test_component_deinit.so
-=======
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_test_mysql_system_variable_set.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_test_table_access.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_test_component_deinit.so
->>>>>>> Percona-Server-8.0.26-16
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_udf_reg_3_func.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_udf_reg_avg_func.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_udf_reg_int_func.so
@@ -1458,13 +1438,8 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_mysqlx_global_reset.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_test_plugin.so
-<<<<<<< HEAD
-||||||| a558ec2ebf5
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_ldap_sasl_client.so
-=======
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_ldap_sasl_client.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/authentication_kerberos_client.so
->>>>>>> Percona-Server-8.0.26-16
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_example_component1.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_example_component2.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_example_component3.so
@@ -1485,14 +1460,9 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_host_application_signal.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_mysql_current_thread_reader.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_mysql_runtime_error.so
-<<<<<<< HEAD
-||||||| a558ec2ebf5
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_component_deinit.so
-=======
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_mysql_system_variable_set.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_table_access.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_test_component_deinit.so
->>>>>>> Percona-Server-8.0.26-16
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_udf_reg_3_func.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_udf_reg_avg_func.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/component_udf_reg_int_func.so

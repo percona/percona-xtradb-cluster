@@ -5,23 +5,9 @@ Percona XtraDB Cluster is based on Percona Server and Codership wsrep API
 using galera replication library that provides Multimaster Cluster based
 on synchronous replication.
 
-<<<<<<< HEAD
 https://www.percona.com/software/mysql-database/percona-xtradb-cluster
-||||||| a558ec2ebf5
-http://www.percona.com/software/percona-server/
-=======
-https://www.percona.com/software/percona-server/
->>>>>>> Percona-Server-8.0.26-16
 
-<<<<<<< HEAD
 Documentation: https://www.percona.com/doc/percona-xtradb-cluster/8.0/index.html
-||||||| a558ec2ebf5
-Documentation: http://www.percona.com/doc/percona-server/8.0
-=======
-Documentation: https://www.percona.com/doc/percona-server/8.0
-
-Contributing Guide for Documentation: https://github.com/percona/percona-server/blob/8.0/doc/source/contributing.md
->>>>>>> Percona-Server-8.0.26-16
 
 Jira (bugs): https://jira.percona.com/projects/PXC/issues
 
