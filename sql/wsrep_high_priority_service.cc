@@ -943,6 +943,15 @@ Wsrep_replayer_service::~Wsrep_replayer_service() {
   wsrep_after_apply(replayer_thd);
   wsrep_after_command_ignore_result(replayer_thd);
   wsrep_close(replayer_thd);
+
+  /*
+    It is expected that both creation and destruction of trx object in InnoDB
+    should be done by the same thread except for the case of BF abort by a HP
+    trx (See call to TrxInInnoDB::enter() from innobase_close_connection()).
+    So, any trx object opened by the replayer_thd must be destroyed before the
+    current_thd is updated.
+  */
+  replayer_thd->release_resources();
   wsrep_reset_threadvars(replayer_thd);
   wsrep_store_threadvars(orig_thd);
 

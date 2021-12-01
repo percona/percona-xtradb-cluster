@@ -17,6 +17,7 @@
 #include "key.h"
 #include "my_sys.h"
 #include "mysql/components/services/log_builtins.h"
+#include "sql/raii/sentry.h"  // raii::Sentry
 #include "sql/sql_lex.h"
 #include "sql_base.h"
 #include "sql_parse.h"
@@ -29,7 +30,6 @@
 #include "wsrep_binlog.h"
 #include "wsrep_high_priority_service.h"
 #include "wsrep_schema.h"
-#include "wsrep_storage_service.h"
 #include "wsrep_thd.h"
 #include "wsrep_xid.h"
 
@@ -1017,6 +1017,20 @@ int Wsrep_schema::replay_transaction(
   Wsrep_schema_impl::binlog_off binlog_off(&thd);
   Wsrep_schema_impl::thd_context_switch thd_context_switch(orig_thd, &thd);
 
+  /*
+    It is expected that both creation and destruction of trx object in InnoDB
+    should be done by the same thread except for the case of BF abort by a HP
+    trx (See call to TrxInInnoDB::enter() from innobase_close_connection()).
+    So, any trx object opened by the THD object must be destroyed before the
+    current_thd is updated.
+
+    As current_thd is updated in the destructor of
+    `Wsrep_schema_impl::thd_context_switch`, we delegate this cleanup task to a
+    Sentry object.
+  */
+  raii::Sentry<> thd_release_resources_guard{
+      [&thd]() { thd.release_resources(); }};
+
   int ret = 1;
   int error;
   TABLE *frag_table = 0;
@@ -1113,12 +1127,25 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd) {
 
   TABLE *frag_table = 0;
   TABLE *cluster_table = 0;
-  Wsrep_storage_service storage_service(&storage_thd);
   Wsrep_schema_impl::binlog_off binlog_off(&storage_thd);
   Wsrep_schema_impl::wsrep_off wsrep_off(&storage_thd);
   Wsrep_schema_impl::thd_context_switch thd_context_switch(orig_thd,
                                                            &storage_thd);
   Wsrep_server_state &server_state(Wsrep_server_state::instance());
+
+  /*
+    It is expected that both creation and destruction of trx object in InnoDB
+    should be done by the same thread except for the case of BF abort by a HP
+    trx (See call to TrxInInnoDB::enter() from innobase_close_connection()).
+    So, any trx object opened by the THD object must be destroyed before the
+    current_thd is updated.
+
+    As current_thd is updated in the destructor of
+    `Wsrep_schema_impl::thd_context_switch`, we delegate this cleanup task to a
+    Sentry object.
+  */
+  raii::Sentry<> thd_release_resources_guard{
+      [&storage_thd]() { storage_thd.release_resources(); }};
 
   int ret = 1;
   int error;
@@ -1211,12 +1238,13 @@ int Wsrep_schema::recover_sr_transactions(THD *orig_thd) {
       }
       applier->store_globals();
       wsrep::mutable_buffer unused;
-      if((ret= applier->apply_write_set(ws_meta, data, unused)) != 0) {
+      if ((ret = applier->apply_write_set(ws_meta, data, unused)) != 0) {
         WSREP_ERROR("SR trx recovery applying returned %d", ret);
       } else {
         applier->after_apply();
       }
-      storage_service.store_globals();
+      applier->reset_globals();
+      wsrep_store_threadvars(&storage_thd);
     } else if (error == HA_ERR_END_OF_FILE) {
       ret = 0;
     } else {
