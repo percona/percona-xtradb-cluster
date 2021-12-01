@@ -33,7 +33,7 @@ EOF
 --echo [connection node_2]
 
 --echo "# restarting node2 (no SST)"
---let $restart_hide_args=1
+--let $do_not_echo_parameters=1
 --let $restart_parameters = "restart: --defaults-file=$SUPER_READ_ONLY_CONFIG_FILE"
 --source include/restart_mysqld.inc
 
@@ -64,7 +64,7 @@ SET SESSION wsrep_sync_wait = 0;
 
 # restart the server with super-read-only=ON (SST)
 --echo "# restarting node2 (with SST)"
---let $restart_hide_args=1
+--let $do_not_echo_parameters=1
 --let $start_mysqld_params = "--defaults-file=$SUPER_READ_ONLY_CONFIG_FILE"
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --source include/start_mysqld.inc
@@ -107,7 +107,7 @@ SET SESSION wsrep_sync_wait = 0;
 
 # restart node1 with super-read-only=ON (SST)
 --echo "# restarting node1 (bootstrapped with super-read-only)"
---let $restart_hide_args=1
+--let $do_not_echo_parameters=1
 --let $start_mysqld_params = "--defaults-file=$SUPER_READ_ONLY_CONFIG_FILE --wsrep-new-cluster"
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --source include/start_mysqld.inc
@@ -138,7 +138,7 @@ SELECT 1;
 --connection node_2
 --echo [connection node_2]
 --echo "# starting node2 (no SST)"
---let $restart_hide_args=1
+--let $do_not_echo_parameters=1
 --let $start_mysqld_params = "--defaults-file=$SUPER_READ_ONLY_CONFIG_FILE"
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --source include/start_mysqld.inc
@@ -180,7 +180,7 @@ SET SESSION wsrep_sync_wait = 0;
 
 # restart node2 with super-read-only=ON (SST)
 --echo "# restarting node2 (with SST)"
---let $restart_hide_args=1
+--let $do_not_echo_parameters=1
 --let $start_mysqld_params = "--defaults-file=$SUPER_READ_ONLY_CONFIG_FILE"
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --source include/start_mysqld.inc
@@ -219,7 +219,7 @@ SET SESSION wsrep_sync_wait = 0;
 --exec $SED -i "s/safe_to_bootstrap:[ \t]*0/safe_to_bootstrap: 1/" $MYSQLTEST_VARDIR/mysqld.1/data/grastate.dat
 
 # restart node1
---let $restart_hide_args=1
+--let $do_not_echo_parameters=1
 --let $start_mysqld_params = ""
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --source include/start_mysqld.inc
@@ -228,7 +228,7 @@ SET SESSION wsrep_sync_wait = 0;
 --echo "# restarting node2"
 --connection node_2
 --echo [connection node_2]
---let $restart_hide_args=1
+--let $do_not_echo_parameters=1
 --let $restart_parameters = "restart:"
 --source include/restart_mysqld.inc
 

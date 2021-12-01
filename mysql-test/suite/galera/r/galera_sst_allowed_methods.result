@@ -54,37 +54,46 @@ Starting server with --wsrep-sst-allowed-methods=''
 # Starting node_1 with proper params
 #
 Starting server with --wsrep-sst-allowed-methods='test_method'
+# restart:<hidden args>
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
 wsrep_sst_allowed_methods	test_method
 Starting server with --wsrep-sst-allowed-methods='test_method-1,test-method_2,testmethod-3'
+# restart:<hidden args>
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
 wsrep_sst_allowed_methods	test_method-1,test-method_2,testmethod-3
 Starting server with --wsrep-sst-allowed-methods='1'
+# restart:<hidden args>
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
 wsrep_sst_allowed_methods	1
 Starting server with --wsrep-sst-allowed-methods='02'
+# restart:<hidden args>
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
 wsrep_sst_allowed_methods	02
 Starting server with --wsrep-sst-allowed-methods='_method'
+# restart:<hidden args>
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
 wsrep_sst_allowed_methods	_method
 Starting server with --wsrep-sst-allowed-methods='method_'
+# restart:<hidden args>
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
 wsrep_sst_allowed_methods	method_
 Starting server with --wsrep-sst-allowed-methods='method_1.py,method-2.sh'
+# restart:<hidden args>
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
 wsrep_sst_allowed_methods	method_1.py,method-2.sh
 Restarting nodes to satisfy MTR's end-of-test checks
+# restart
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
 wsrep_sst_allowed_methods	xtrabackup-v2
+# restart
 SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';
 Variable_name	Value
 wsrep_sst_allowed_methods	xtrabackup-v2

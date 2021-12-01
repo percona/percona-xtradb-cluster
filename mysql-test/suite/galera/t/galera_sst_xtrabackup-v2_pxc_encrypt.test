@@ -65,7 +65,7 @@ SET SESSION wsrep_sync_wait = 0;
 SELECT 1;
 
 # cleanup
---let $restart_hide_args=1
+--let $do_not_echo_parameters=1
 --let $restart_parameters = "restart:"
 --source include/restart_mysqld.inc
 

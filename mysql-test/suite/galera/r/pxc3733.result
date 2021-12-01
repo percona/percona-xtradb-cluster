@@ -1,13 +1,9 @@
---source include/galera_cluster.inc
-
 CREATE TABLE t1 (id int primary key, text varchar(255));
 CREATE TABLE t2 (id int primary key, text varchar(255));
 INSERT INTO t1 VALUES (1, 'test1');
 INSERT INTO t1 VALUES (2, 'test2');
 INSERT INTO t2 VALUES (1, 'test1');
 INSERT INTO t2 VALUES (2, 'test2');
-
-delimiter III;
 CREATE PROCEDURE `test_deadlock`(IN text varchar(255))
 BEGIN
 DROP TABLE IF EXISTS t1_temp;
@@ -15,11 +11,7 @@ CREATE TEMPORARY TABLE t1_temp (id int primary key) AS (SELECT id FROM t1 WHERE 
 DELETE t2 FROM t2 inner join t1_temp on t2.id=t1_temp.id;
 END;
 III
-delimiter ;III
-
-CALL test_deadlock('test1'); 
-CALL test_deadlock('test2'); 
-
+CALL test_deadlock('test1');
+CALL test_deadlock('test2');
 DROP PROCEDURE test_deadlock;
-
 DROP TABLE t1,t2;

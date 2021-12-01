@@ -52,18 +52,26 @@ while ($count)
 SELECT VARIABLE_VALUE AS expect_4 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 CALL mtr.add_suppression("Slave SQL: Error 'Unknown table");
 CALL mtr.add_suppression("Query apply failed");
+# We may see this warning when applier thread kills the ongoing local DDL.
+CALL mtr.add_suppression("Unable to collect FKs metadata");
 
 --connection node_2
 SELECT VARIABLE_VALUE AS expect_4 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 CALL mtr.add_suppression("Slave SQL: Error 'Unknown table");
 CALL mtr.add_suppression("Query apply failed");
+# We may see this warning when applier thread kills the ongoing local DDL.
+CALL mtr.add_suppression("Unable to collect FKs metadata");
 
 --connection node_3
 SELECT VARIABLE_VALUE AS expect_4 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 CALL mtr.add_suppression("Slave SQL: Error 'Unknown table");
 CALL mtr.add_suppression("Query apply failed");
+# We may see this warning when applier thread kills the ongoing local DDL.
+CALL mtr.add_suppression("Unable to collect FKs metadata");
 
 --connection node_4
 SELECT VARIABLE_VALUE AS expect_4 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 CALL mtr.add_suppression("Slave SQL: Error 'Unknown table");
 CALL mtr.add_suppression("Query apply failed");
+# We may see this warning when applier thread kills the ongoing local DDL.
+CALL mtr.add_suppression("Unable to collect FKs metadata");
