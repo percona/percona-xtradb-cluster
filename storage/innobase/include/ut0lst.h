@@ -391,27 +391,26 @@ template <typename List, typename Functor>
 void ut_list_insert2(List &list, typename List::elem_type *elem1,
                      typename List::elem_type *elem2, Functor get_node) {
   ut_ad(elem1 != elem2);
-  UT_LIST_IS_INITIALISED(list);
+  ut_ad(elem1 != nullptr);
+  ut_ad(elem2 != nullptr);
+  ut_ad(UT_LIST_IS_INITIALISED(list));
 
-  typename List::node_type &elem1_node = get_node(*elem1);
-  typename List::node_type &elem2_node = get_node(*elem2);
+  auto &elem1_node = List::get_node(*elem1);
+  auto &elem2_node = List::get_node(*elem2);
 
   elem2_node.prev = elem1;
   elem2_node.next = elem1_node.next;
 
-  if (elem1_node.next != NULL) {
-    typename List::node_type &next_node = get_node(*elem1_node.next);
-
-    next_node.prev = elem2;
+  ut_ad((elem2_node.next == nullptr) == (list.last_element == elem1));
+  if (elem2_node.next != nullptr) {
+    List::get_node(*elem2_node.next).prev = elem2;
+  } else {
+    list.last_element = elem2;
   }
 
   elem1_node.next = elem2;
 
-  if (list.end == elem1) {
-    list.end = elem2;
-  }
-
-  ++list.count;
+  list.update_length(1);
 }
 #endif /* WITH_WSREP */
 

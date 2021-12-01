@@ -432,21 +432,14 @@ Check if the transaction is being referenced. */
 @param[in] holder	Transaction holding the lock
 @return the transaction that will be rolled back, null don't care */
 
-<<<<<<< HEAD
-UNIV_INLINE
 #ifdef WITH_WSREP
-const trx_t *trx_arbitrate(const trx_t *requestor, const trx_t *holder,
-                           bool sync = false);
+static inline const trx_t *trx_arbitrate(const trx_t *requestor,
+                                         const trx_t *holder,
+                                         bool sync = false);
 #else
-const trx_t *trx_arbitrate(const trx_t *requestor, const trx_t *holder);
-#endif /* WITH_WSREP */
-||||||| a558ec2ebf5
-UNIV_INLINE
-const trx_t *trx_arbitrate(const trx_t *requestor, const trx_t *holder);
-=======
 static inline const trx_t *trx_arbitrate(const trx_t *requestor,
                                          const trx_t *holder);
->>>>>>> Percona-Server-8.0.26-16
+#endif /* WITH_WSREP */
 
 /**
 @param[in] trx		Transaction to check

@@ -490,18 +490,10 @@ static inline ulint lock_rec_get_insert_intention(
 
 /** Checks if a lock request for a new lock has to wait for request lock2.
  @return true if new lock has to wait for lock2 to be removed */
-<<<<<<< HEAD
-UNIV_INLINE
-bool lock_rec_has_to_wait(
+static inline bool lock_rec_has_to_wait(
 #ifdef WITH_WSREP
     ibool for_locking,   /*!< is caller locking or releasing */
 #endif                   /* WITH_WSREP */
-||||||| a558ec2ebf5
-UNIV_INLINE
-bool lock_rec_has_to_wait(
-=======
-static inline bool lock_rec_has_to_wait(
->>>>>>> Percona-Server-8.0.26-16
     const trx_t *trx,    /*!< in: trx of new lock */
     ulint type_mode,     /*!< in: precise mode of the new lock
                        to set: LOCK_S or LOCK_X, possibly
@@ -1339,16 +1331,10 @@ static void lock_mark_trx_for_rollback(hit_list_t &hit_list, trx_id_t hp_trx_id,
   ut_ad(!trx->read_only);
   ut_ad(trx_mutex_own(trx));
   ut_ad(!(trx->in_innodb & TRX_FORCE_ROLLBACK));
-<<<<<<< HEAD
-  ut_ad(!(trx->in_innodb & TRX_FORCE_ROLLBACK_ASYNC));
 #ifdef WITH_WSREP
   /* only background threads may not be BF aborted in commit phase */
   if (!trx->mysql_thd) {
 #endif /* WITH_WSREP */
-||||||| a558ec2ebf5
-  ut_ad(!(trx->in_innodb & TRX_FORCE_ROLLBACK_ASYNC));
-=======
->>>>>>> Percona-Server-8.0.26-16
   ut_ad(!(trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE));
 #ifdef WITH_WSREP
   }
@@ -2146,20 +2132,12 @@ void lock_make_trx_hit_list(trx_t *hp_trx, hit_list_t &hit_list) {
 #ifdef WITH_WSREP
         if ((trx_is_high_priority(trx) && // !wsrep_thd_is_async_slave(trx->mysql_thd) &&
              wsrep_thd_order_before(trx->mysql_thd, hp_trx->mysql_thd)) ||
-#else
-        if (trx_is_high_priority(trx) ||
-#endif
             (trx->in_innodb & TRX_FORCE_ROLLBACK) != 0 ||
-<<<<<<< HEAD
-            (trx->in_innodb & TRX_FORCE_ROLLBACK_ASYNC) != 0 ||
-#ifdef WITH_WSREP
             (!trx_is_wsrep_trx(trx) &&
              (trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE) != 0) || trx->abort) {
 #else
-||||||| a558ec2ebf5
-            (trx->in_innodb & TRX_FORCE_ROLLBACK_ASYNC) != 0 ||
-=======
->>>>>>> Percona-Server-8.0.26-16
+        if (trx_is_high_priority(trx) ||
+            (trx->in_innodb & TRX_FORCE_ROLLBACK) != 0 ||
             (trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE) != 0 || trx->abort) {
 #endif
           trx_mutex_exit(trx);
@@ -3512,32 +3490,15 @@ struct TableLockGetNode {
 /** Creates a table lock object and adds it as the last in the lock queue
  of the table. Does NOT check for deadlocks or lock compatibility.
  @return own: new lock object */
-<<<<<<< HEAD
-UNIV_INLINE
-#ifdef WITH_WSREP
-lock_t *lock_table_create(lock_t *c_lock, dict_table_t *table,
-#else
-lock_t *lock_table_create(dict_table_t *table, /*!< in/out: database table
-                                               in dictionary cache */
-#endif                                     /* WITH_WSREP */
-                          ulint type_mode, /*!< in: lock mode possibly ORed with
-                                         LOCK_WAIT */
-                          trx_t *trx)      /*!< in: trx */
-||||||| a558ec2ebf5
-UNIV_INLINE
-lock_t *lock_table_create(dict_table_t *table, /*!< in/out: database table
-                                               in dictionary cache */
-                          ulint type_mode, /*!< in: lock mode possibly ORed with
-                                         LOCK_WAIT */
-                          trx_t *trx)      /*!< in: trx */
-=======
 static inline lock_t *lock_table_create(
+#ifdef WITH_WSREP
+    lock_t *c_lock, /* < in: conflicting lock */
+#endif /* WITH_WSREP */
     dict_table_t *table, /*!< in/out: database table
                          in dictionary cache */
     ulint type_mode,     /*!< in: lock mode possibly ORed with
                        LOCK_WAIT */
     trx_t *trx)          /*!< in: trx */
->>>>>>> Percona-Server-8.0.26-16
 {
   lock_t *lock;
 
@@ -3583,7 +3544,6 @@ static inline lock_t *lock_table_create(
 
   locksys::add_to_trx_locks(lock);
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (wsrep_on(trx->mysql_thd)) {
     if (c_lock && wsrep_thd_is_BF(trx->mysql_thd, false)) {
@@ -3591,7 +3551,7 @@ static inline lock_t *lock_table_create(
       if (wsrep_debug)
         ib::info() << "table lock BF conflict for " << c_lock->trx->id;
     } else {
-      ut_list_append(table->locks, lock, TableLockGetNode());
+      ut_list_append(table->locks, lock);
     }
 
     if (c_lock) trx_mutex_enter(c_lock->trx);
@@ -3623,16 +3583,11 @@ static inline lock_t *lock_table_create(
     if (c_lock) trx_mutex_exit(c_lock->trx);
 
   } else {
-    ut_list_append(table->locks, lock, TableLockGetNode());
+    ut_list_append(table->locks, lock);
   }
 #else
-  ut_list_append(table->locks, lock, TableLockGetNode());
-#endif /* WITH_WSREP */
-||||||| a558ec2ebf5
-  ut_list_append(table->locks, lock, TableLockGetNode());
-=======
   ut_list_append(table->locks, lock);
->>>>>>> Percona-Server-8.0.26-16
+#endif /* WITH_WSREP */
 
   if (type_mode & LOCK_WAIT) {
     lock_set_lock_and_trx_wait(lock);
@@ -3765,33 +3720,15 @@ static inline void lock_table_remove_low(
 
 /** Enqueues a waiting request for a table lock which cannot be granted
  immediately. Checks for deadlocks.
+ @param[in] c_lock         conflicting lock
  @param[in] mode           lock mode this transaction is requesting
  @param[in] table          the table to be locked
  @param[in] thr            the query thread requesting the lock
  @param[in] blocking_lock  the lock which is the reason this request has to wait
  @return DB_LOCK_WAIT or DB_DEADLOCK */
-<<<<<<< HEAD
-static dberr_t lock_table_enqueue_waiting(
-#ifdef WITH_WSREP
-    lock_t *c_lock,      /* conflicting lock */
-#endif                   /* WITH_WSREP */
-    ulint mode,          /*!< in: lock mode this transaction is
-                         requesting */
-    dict_table_t *table, /*!< in/out: table */
-    que_thr_t *thr)      /*!< in: query thread */
-{
-||||||| a558ec2ebf5
-static dberr_t lock_table_enqueue_waiting(
-    ulint mode,          /*!< in: lock mode this transaction is
-                         requesting */
-    dict_table_t *table, /*!< in/out: table */
-    que_thr_t *thr)      /*!< in: query thread */
-{
-=======
 static dberr_t lock_table_enqueue_waiting(ulint mode, dict_table_t *table,
                                           que_thr_t *thr,
                                           const lock_t *blocking_lock) {
->>>>>>> Percona-Server-8.0.26-16
   trx_t *trx;
 
   ut_ad(locksys::owns_table_shard(*table));
@@ -3824,20 +3761,14 @@ static dberr_t lock_table_enqueue_waiting(ulint mode, dict_table_t *table,
   }
 
   /* Enqueue the lock request that will wait to be granted */
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   if (trx->lock.was_chosen_as_deadlock_victim) {
     return (DB_DEADLOCK);
   }
-  lock_table_create(c_lock, table, mode | LOCK_WAIT, trx);
+  lock_t *lock = lock_table_create(const_cast<ib_lock_t*>(blocking_lock), table, mode | LOCK_WAIT, trx);
 #else
-  lock_table_create(table, mode | LOCK_WAIT, trx);
-#endif /* WITH_WSREP */
-||||||| a558ec2ebf5
-  lock_table_create(table, mode | LOCK_WAIT, trx);
-=======
   lock_t *lock = lock_table_create(table, mode | LOCK_WAIT, trx);
->>>>>>> Percona-Server-8.0.26-16
+#endif /* WITH_WSREP */
 
   trx->lock.que_state = TRX_QUE_LOCK_WAIT;
 
@@ -3984,24 +3915,7 @@ dberr_t lock_table(ulint flags, /*!< in: if BTR_NO_LOCKING_FLAG bit is set,
   mode: this trx may have to wait */
 
   if (wait_for != nullptr) {
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-    err = lock_table_enqueue_waiting((lock_t *)wait_for, mode | flags, table,
-                                     thr);
-#else
-    err = lock_table_enqueue_waiting(mode | flags, table, thr);
-#endif /* WITH_WSREP */
-    if (err == DB_LOCK_WAIT) {
-      lock_create_wait_for_edge(trx, wait_for->trx);
-    }
-||||||| a558ec2ebf5
-    err = lock_table_enqueue_waiting(mode | flags, table, thr);
-    if (err == DB_LOCK_WAIT) {
-      lock_create_wait_for_edge(trx, wait_for->trx);
-    }
-=======
     err = lock_table_enqueue_waiting(mode | flags, table, thr, wait_for);
->>>>>>> Percona-Server-8.0.26-16
   } else {
 #ifdef WITH_WSREP
     lock_table_create((lock_t *)wait_for, table, mode | flags, trx);

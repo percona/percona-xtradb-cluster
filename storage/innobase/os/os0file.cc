@@ -1700,16 +1700,10 @@ void AIO::release_with_mutex(Slot *slot) {
 #ifndef UNIV_HOTBACKUP
 FILE *os_file_create_tmpfile() {
   FILE *file = nullptr;
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   WAIT_ALLOW_WRITES();
 #endif /* WITH_WSREP */
-  int fd = innobase_mysql_tmpfile(path);
-||||||| a558ec2ebf5
-  int fd = innobase_mysql_tmpfile(path);
-=======
   int fd = innobase_mysql_tmpfile(mysql_tmpdir);
->>>>>>> Percona-Server-8.0.26-16
 
   if (fd >= 0) {
     file = fdopen(fd, "w+b");
