@@ -35,16 +35,8 @@ use mtr;
 -- with PXC we keep this table in MyISAM to avoid replication
 -- of suppression added to one node to other nodes of the cluster.
 CREATE TABLE test_suppressions (
-<<<<<<< HEAD
-  pattern VARCHAR(255)
-) engine=MyISAM;
-||||||| a558ec2ebf5
-  pattern VARCHAR(255)
-);
-=======
   pattern VARCHAR(255) NOT NULL
-);
->>>>>>> Percona-Server-8.0.26-16
+) engine=MyISAM;
 
 --
 -- Table of full messages (not patterns), suppressed by a test while it
@@ -52,10 +44,12 @@ CREATE TABLE test_suppressions (
 -- Primary key is guaranteed to be unique because the prefix includes the
 -- timestamp, which the server guarantees (!) is unique.
 --
+-- with PXC we keep this table in MyISAM to avoid replication
+-- of suppression added to one node to other nodes of the cluster.
 CREATE TABLE asserted_test_suppressions (
   message TEXT NOT NULL,
   PRIMARY KEY(message(100))
-);
+) engine=MyISAM;
 
 --
 -- Table of patterns for messages that should be excluded from global
@@ -68,10 +62,12 @@ CREATE TABLE asserted_test_suppressions (
 -- global suppression pattern. Instead, the pattern should match the
 -- error messages for which global suppression should be ignored.
 --
+-- with PXC we keep this table in MyISAM to avoid replication
+-- of suppression added to one node to other nodes of the cluster.
 CREATE TABLE test_ignored_global_suppressions (
   pattern VARCHAR(255) NOT NULL,
   PRIMARY KEY(pattern(255))
-);
+) engine=MyISAM;
 
 --
 -- Declare a trigger that makes sure
@@ -437,7 +433,10 @@ INSERT INTO global_suppressions VALUES
  */
  ("Manifest file '.*' is not read-only. For better security, please make sure that the file is read-only."),
 
-<<<<<<< HEAD
+ /* TLS v1.0 and v1.1 deprecated */
+ ("A deprecated TLS version TLSv1 is enabled for channel"),
+ ("A deprecated TLS version TLSv1.1 is enabled for channel"),
+
  /*
    Warnings/errors seen while using group replication with Percona XtraDB Cluster
  */
@@ -463,13 +462,6 @@ INSERT INTO global_suppressions VALUES
  ("No suitable 'keyring_component_metadata_query' service"),
 
 
-||||||| a558ec2ebf5
-=======
- /* TLS v1.0 and v1.1 deprecated */
- ("A deprecated TLS version TLSv1 is enabled for channel"),
- ("A deprecated TLS version TLSv1.1 is enabled for channel"),
-
->>>>>>> Percona-Server-8.0.26-16
  ("THE_LAST_SUPPRESSION");
 
 
@@ -553,25 +545,21 @@ BEGIN
   END IF;
 
   -- Cleanup for next test
-<<<<<<< HEAD
   IF @@wsrep_on = 1 THEN
     -- The TRUNCATE should not be replicated under Galera
     -- as it causes the custom suppressions on the other
     -- nodes to be deleted as well
     SET wsrep_on = 0;
     TRUNCATE test_suppressions;
+    TRUNCATE test_ignored_global_suppressions;
+    TRUNCATE asserted_test_suppressions;
     SET wsrep_on = 1;
   ELSE 
     TRUNCATE test_suppressions;
+    TRUNCATE test_ignored_global_suppressions;
+    TRUNCATE asserted_test_suppressions;
   END IF;    
 
-||||||| a558ec2ebf5
-  TRUNCATE test_suppressions;
-=======
-  TRUNCATE test_suppressions;
-  TRUNCATE test_ignored_global_suppressions;
-  TRUNCATE asserted_test_suppressions;
->>>>>>> Percona-Server-8.0.26-16
   DROP TABLE error_log;
 
 END$$

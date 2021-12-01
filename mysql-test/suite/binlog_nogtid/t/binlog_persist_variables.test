@@ -61,7 +61,7 @@ INSERT INTO rplvars (varname, varvalue)
 # If this count differs, it means a variable has been added or removed.
 # In that case, this testcase needs to be updated accordingly.
 
-# While Percona Server has 88 persisted variables, PXC has 92 persisted
+# While Percona Server has 117 persisted variables, PXC has 122 persisted
 # variables.
 #
 # This is beacause of the following variables.
@@ -69,21 +69,12 @@ INSERT INTO rplvars (varname, varvalue)
 # 2. wsrep_slave_FK_checks
 # 3. wsrep_slave_threads
 # 4. wsrep_slave_UK_checks
+# 5. wsrep_replicate_myisam
 
 --echo
-<<<<<<< HEAD
---let $expected=92
---let $assert_text= 'Expect $expected variables in the table.'
---let $assert_cond= [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
-||||||| a558ec2ebf5
---let $expected=88
---let $assert_text= 'Expect $expected variables in the table.'
---let $assert_cond= [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
-=======
---let $expected = 117
+--let $expected = 122
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
->>>>>>> Percona-Server-8.0.26-16
 --source include/assert.inc
 
 --echo
@@ -104,19 +95,9 @@ while ( $varid <= $countvars )
 }
 
 --echo
-<<<<<<< HEAD
---let $expected=72
---let $assert_text= 'Expect $expected persisted variables in persisted_variables table.'
---let $assert_cond= [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
-||||||| a558ec2ebf5
---let $expected=68
---let $assert_text= 'Expect $expected persisted variables in persisted_variables table.'
---let $assert_cond= [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
-=======
---let $expected = 92
+--let $expected = 97
 --let $assert_text = Expect $expected persisted variables in persisted_variables table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
->>>>>>> Percona-Server-8.0.26-16
 --source include/assert.inc
 
 --echo

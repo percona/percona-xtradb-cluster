@@ -25,13 +25,7 @@ VARIABLE_NAME LIKE '%source%') AND
 (VARIABLE_NAME NOT LIKE 'innodb%')
 ORDER BY VARIABLE_NAME;
 
-<<<<<<< HEAD
-include/assert.inc ['Expect 92 variables in the table.']
-||||||| a558ec2ebf5
-include/assert.inc ['Expect 88 variables in the table.']
-=======
-include/assert.inc [Expect 117 variables in the table.]
->>>>>>> Percona-Server-8.0.26-16
+include/assert.inc [Expect 122 variables in the table.]
 
 # Test SET PERSIST
 SET PERSIST binlog_cache_size = @@GLOBAL.binlog_cache_size;
@@ -247,42 +241,23 @@ Warning	1287	'@@sync_master_info' is deprecated and will be removed in a future 
 Warning	1287	'@@sync_master_info' is deprecated and will be removed in a future release. Please use sync_source_info instead.
 SET PERSIST sync_relay_log = @@GLOBAL.sync_relay_log;
 SET PERSIST sync_relay_log_info = @@GLOBAL.sync_relay_log_info;
-<<<<<<< HEAD
+SET PERSIST sync_source_info = @@GLOBAL.sync_source_info;
+SET PERSIST wsrep_replicate_myisam = @@GLOBAL.wsrep_replicate_myisam;
 SET PERSIST wsrep_restart_slave = @@GLOBAL.wsrep_restart_slave;
 SET PERSIST wsrep_slave_FK_checks = @@GLOBAL.wsrep_slave_FK_checks;
 SET PERSIST wsrep_slave_threads = @@GLOBAL.wsrep_slave_threads;
 SET PERSIST wsrep_slave_UK_checks = @@GLOBAL.wsrep_slave_UK_checks;
-||||||| a558ec2ebf5
-=======
-SET PERSIST sync_source_info = @@GLOBAL.sync_source_info;
->>>>>>> Percona-Server-8.0.26-16
 
-<<<<<<< HEAD
-include/assert.inc ['Expect 72 persisted variables in persisted_variables table.']
-||||||| a558ec2ebf5
-include/assert.inc ['Expect 68 persisted variables in persisted_variables table.']
-=======
-include/assert.inc [Expect 92 persisted variables in persisted_variables table.]
->>>>>>> Percona-Server-8.0.26-16
+include/assert.inc [Expect 97 persisted variables in persisted_variables table.]
 
 ############################################################
 # 2. Restart server, it must preserve the persisted variable
 #    settings. Verify persisted configuration.
 # restart
 
-<<<<<<< HEAD
-include/assert.inc ['Expect 72 persisted variables in persisted_variables table.']
-include/assert.inc ['Expect 72 persisted variables shown as PERSISTED in variables_info table.']
-include/assert.inc ['Expect 72 persisted variables with matching persisted and global values.']
-||||||| a558ec2ebf5
-include/assert.inc ['Expect 68 persisted variables in persisted_variables table.']
-include/assert.inc ['Expect 68 persisted variables shown as PERSISTED in variables_info table.']
-include/assert.inc ['Expect 68 persisted variables with matching persisted and global values.']
-=======
-include/assert.inc [Expect 92 persisted variables in persisted_variables table.']
-include/assert.inc [Expect 92 persisted variables shown as PERSISTED in variables_info table.']
-include/assert.inc [Expect 92 persisted variables with matching persisted and global values.]
->>>>>>> Percona-Server-8.0.26-16
+include/assert.inc [Expect 97 persisted variables in persisted_variables table.']
+include/assert.inc [Expect 97 persisted variables shown as PERSISTED in variables_info table.']
+include/assert.inc [Expect 97 persisted variables with matching persisted and global values.]
 
 ############################################################
 # 3. Test RESET PERSIST IF EXISTS. Verify persisted variable
@@ -491,17 +466,14 @@ RESET PERSIST IF EXISTS sync_binlog;
 RESET PERSIST IF EXISTS sync_master_info;
 RESET PERSIST IF EXISTS sync_relay_log;
 RESET PERSIST IF EXISTS sync_relay_log_info;
-<<<<<<< HEAD
+RESET PERSIST IF EXISTS sync_source_info;
+Warnings:
+Warning	3615	Variable sync_source_info does not exist in persisted config file
+RESET PERSIST IF EXISTS wsrep_replicate_myisam;
 RESET PERSIST IF EXISTS wsrep_restart_slave;
 RESET PERSIST IF EXISTS wsrep_slave_FK_checks;
 RESET PERSIST IF EXISTS wsrep_slave_threads;
 RESET PERSIST IF EXISTS wsrep_slave_UK_checks;
-||||||| a558ec2ebf5
-=======
-RESET PERSIST IF EXISTS sync_source_info;
-Warnings:
-Warning	3615	Variable sync_source_info does not exist in persisted config file
->>>>>>> Percona-Server-8.0.26-16
 
 include/assert.inc [Expect 0 persisted variables.]
 

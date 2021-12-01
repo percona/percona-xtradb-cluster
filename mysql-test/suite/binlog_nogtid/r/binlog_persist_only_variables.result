@@ -47,13 +47,7 @@ INSERT INTO aliases(name) VALUES
 ('slave_parallel_workers'), ('slave_pending_jobs_size_max'),
 ('pseudo_slave_mode'), ('skip_slave_start');
 
-<<<<<<< HEAD
-include/assert.inc ['Expect 93 variables in the table.']
-||||||| a558ec2ebf5
-include/assert.inc ['Expect 89 variables in the table.']
-=======
-include/assert.inc [Expect 117 variables in the table.]
->>>>>>> Percona-Server-8.0.26-16
+include/assert.inc [Expect 122 variables in the table.]
 
 # Test SET PERSIST_ONLY
 SET PERSIST_ONLY binlog_cache_size = @@GLOBAL.binlog_cache_size;
@@ -266,42 +260,23 @@ Warning	1287	'@@sync_master_info' is deprecated and will be removed in a future 
 Warning	1287	'@@sync_master_info' is deprecated and will be removed in a future release. Please use sync_source_info instead.
 SET PERSIST_ONLY sync_relay_log = @@GLOBAL.sync_relay_log;
 SET PERSIST_ONLY sync_relay_log_info = @@GLOBAL.sync_relay_log_info;
-<<<<<<< HEAD
+SET PERSIST_ONLY sync_source_info = @@GLOBAL.sync_source_info;
+SET PERSIST_ONLY wsrep_replicate_myisam = @@GLOBAL.wsrep_replicate_myisam;
 SET PERSIST_ONLY wsrep_restart_slave = @@GLOBAL.wsrep_restart_slave;
 SET PERSIST_ONLY wsrep_slave_FK_checks = @@GLOBAL.wsrep_slave_FK_checks;
 SET PERSIST_ONLY wsrep_slave_threads = @@GLOBAL.wsrep_slave_threads;
 SET PERSIST_ONLY wsrep_slave_UK_checks = @@GLOBAL.wsrep_slave_UK_checks;
-||||||| a558ec2ebf5
-=======
-SET PERSIST_ONLY sync_source_info = @@GLOBAL.sync_source_info;
->>>>>>> Percona-Server-8.0.26-16
 
-<<<<<<< HEAD
-include/assert.inc ['Expect 81 persisted variables in persisted_variables table.']
-||||||| a558ec2ebf5
-include/assert.inc ['Expect 77 persisted variables in persisted_variables table.']
-=======
-include/assert.inc [Expect 104 persisted variables in persisted_variables table.]
->>>>>>> Percona-Server-8.0.26-16
+include/assert.inc [Expect 109 persisted variables in persisted_variables table.]
 
 ############################################################
 # 2. Restart server, it must preserve the persisted variable
 #    settings. Verify persisted configuration.
 # restart
 
-<<<<<<< HEAD
-include/assert.inc ['Expect 81 persisted variables in persisted_variables table.']
-include/assert.inc ['Expect 80 persisted variables shown as PERSISTED in variables_info table.']
-include/assert.inc ['Expect 80 persisted variables with matching persisted and global values.']
-||||||| a558ec2ebf5
-include/assert.inc ['Expect 77 persisted variables in persisted_variables table.']
-include/assert.inc ['Expect 76 persisted variables shown as PERSISTED in variables_info table.']
-include/assert.inc ['Expect 76 persisted variables with matching persisted and global values.']
-=======
-include/assert.inc [Expect 104 persisted variables in persisted_variables table.]
-include/assert.inc [Expect 104 persisted variables shown as PERSISTED in variables_info table.]
-include/assert.inc [Expect 104 persisted variables with matching persisted and global values.]
->>>>>>> Percona-Server-8.0.26-16
+include/assert.inc [Expect 109 persisted variables in persisted_variables table.]
+include/assert.inc [Expect 109 persisted variables shown as PERSISTED in variables_info table.]
+include/assert.inc [Expect 109 persisted variables with matching persisted and global values.]
 
 ############################################################
 # 3. Test RESET PERSIST. Verify persisted variable settings
@@ -410,15 +385,12 @@ RESET PERSIST sql_replica_skip_counter;
 RESET PERSIST sync_binlog;
 RESET PERSIST sync_relay_log;
 RESET PERSIST sync_relay_log_info;
-<<<<<<< HEAD
+RESET PERSIST sync_source_info;
+RESET PERSIST wsrep_replicate_myisam;
 RESET PERSIST wsrep_restart_slave;
 RESET PERSIST wsrep_slave_FK_checks;
 RESET PERSIST wsrep_slave_threads;
 RESET PERSIST wsrep_slave_UK_checks;
-||||||| a558ec2ebf5
-=======
-RESET PERSIST sync_source_info;
->>>>>>> Percona-Server-8.0.26-16
 
 include/assert.inc [Expect 0 persisted variables.]
 
