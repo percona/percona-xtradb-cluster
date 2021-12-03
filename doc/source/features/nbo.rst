@@ -38,6 +38,8 @@ The `NBO` method supports the following DDL statements:
 Limitations
 -----------------
 
-The ``NBO`` method does not support running two DDL statements with conflicting locks on the same table. For example, you cannot run two ``ALTER TABLE`` statements for an ``employees`` table.
+The ``NBO`` method does not support running two DDL statements with conflicting locks on the same table. For example, you cannot run two ``ALTER TABLE`` statements for an ``employees`` table. 
+
+The ``NBO`` method does not support modifying a table changed during the NBO operation. However, you can modify other tables and execute NBO queries on other tables. 
 
 See the :ref:`PXC-8.0.25-15.1` Release notes for the latest information.
