@@ -46,16 +46,10 @@ CREATE TABLE `mysql`.`time_zone_leap_second` (
 CREATE TABLE `mysql`.`time_zone_name` (
 CREATE TABLE `mysql`.`time_zone_transition` (
 CREATE TABLE `mysql`.`time_zone_transition_type` (
-<<<<<<< HEAD
 CREATE TABLE `mysql`.`wsrep_cluster` (
 CREATE TABLE `mysql`.`wsrep_cluster_members` (
 CREATE TABLE `mysql`.`wsrep_streaming_log` (
-Occurrences of 'CREATE TABLE' in the input file: 22
-||||||| a558ec2ebf5
-Occurrences of 'CREATE TABLE' in the input file: 19
-=======
-Occurrences of 'CREATE TABLE' in the input file: 21
->>>>>>> Percona-Server-8.0.26-16
+Occurrences of 'CREATE TABLE' in the input file: 24
 #
 # Bug #83144: mysqlpump reads mysql_dump group, not mysqlpump in config-group
 #
