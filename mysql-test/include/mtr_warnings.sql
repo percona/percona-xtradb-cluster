@@ -401,10 +401,6 @@ INSERT INTO global_suppressions VALUES
  */
  ("You have enabled keyring plugin. SST encryption is mandatory."),
 
-  /*
-   Warnings/errors seen when there is a failure during SST.
-  */
- ("WSREP_SST:.*ERROR.*"),
  ("THE_LAST_SUPPRESSION")||
 
 
