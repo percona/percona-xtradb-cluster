@@ -24778,19 +24778,14 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
 
   if (wsrep_thd_bf_abort(bf_thd, thd, signal)) {
     if (victim_trx->lock.wait_lock) {
-      WSREP_DEBUG("victim has wait flag: %lu", thd_get_thread_id(thd));
-      /* lock_cancel_waiting_and_release() requires exclusive global latch, and
-         so does reading the trx->lock.wait_lock to prevent races with B-tree
-         page reorganization
-      */
-      locksys::Global_exclusive_latch_guard guard{UT_LOCATION_HERE};
-      lock_t *wait_lock = victim_trx->lock.wait_lock;
-
-      if (wait_lock) {
-        WSREP_DEBUG("canceling wait lock");
-        victim_trx->lock.was_chosen_as_deadlock_victim = TRUE;
-        lock_cancel_waiting_and_release(wait_lock);
-      }
+      WSREP_DEBUG(
+          "victim: %lu has wait flag(suspended) and will be aborted by"
+          " lock wait timeout thread",
+          thd_get_thread_id(thd));
+      /* Victim is already marked as interrupted but currently in suspended
+      state (waiting for lock). The lock wait timeout thread releases the
+      locks for transactions in interrupted state and wakes up the suspended
+      thread. See lock_wait_check_and_cancel() */
     }
   } else {
     wsrep_thd_LOCK(thd);
