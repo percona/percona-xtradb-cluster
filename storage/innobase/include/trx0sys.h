@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2016, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -311,6 +311,7 @@ trx_sys_read_wsrep_checkpoint(
         XID* xid); /*!< out: WSREP XID */
 #endif /* WITH_WSREP */
 
+/*===================================*/
 /*****************************************************************//**
 Initializes the tablespace tag system. */
 void
@@ -663,7 +664,7 @@ struct trx_sys_t {
 					transactions), protected by
 					rseg->mutex */
 
-	trx_rseg_t*	const pending_purge_rseg_array[TRX_SYS_N_RSEGS];
+	trx_rseg_t*	pending_purge_rseg_array[TRX_SYS_N_RSEGS];
 					/*!< Pointer array to rollback segments
 					between slot-1..slot-srv_tmp_undo_logs
 					that are now replaced by non-redo

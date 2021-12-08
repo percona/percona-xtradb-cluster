@@ -40,5 +40,8 @@ SET GLOBAL wsrep_provider_options = 'signal=process_primary_configuration';
 SET GLOBAL wsrep_provider_options = 'dbug=';
 DROP TABLE t1;
 call mtr.add_suppression("WSREP: Rejecting JOIN message from \(.*\): new State Transfer required.");
+call mtr.add_suppression("AsyncSender seems to be disconnected");
 call mtr.add_suppression("WSREP: Rejecting JOIN message from \(.*\): new State Transfer required.");
+call mtr.add_suppression("AsyncSender seems to be disconnected");
 call mtr.add_suppression("WSREP: Rejecting JOIN message from \(.*\): new State Transfer required.");
+call mtr.add_suppression("AsyncSender seems to be disconnected");

@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -195,6 +195,7 @@ Requires:       net-tools
 Requires:       perl-base
 Requires:       lsof
 Requires:       socat
+Requires:       stunnel
 # Requires:       %{name}-client >= %{min}
 # Requires:       %{name}-common = %{version}-%{release}
 %if 0%{?commercial}
@@ -1314,6 +1315,10 @@ fi
 %endif # cluster
 
 %changelog
+* Tue May 18 2021 Alexey Yurchenko <alexey.yurchenko@galeracluster.com> - 5.7.33
+- Add "Requires:" for "stunnel" to "mysql-wsrep-server",
+  this tool is needed for Galera SST.
+
 * Thu Sep 05 2019 Bjorn Munch <bjorn.munch@oracle.com> - 5.7.28-1
 - Add License Book, remove COPYING
 

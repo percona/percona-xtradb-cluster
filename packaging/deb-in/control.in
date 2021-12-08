@@ -40,6 +40,7 @@ Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version})
          perl,
          psmisc,
          rsync,
+         stunnel,
          socat,
          ${misc:Depends},
          ${shlibs:Depends}

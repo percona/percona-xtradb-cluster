@@ -23,7 +23,7 @@ There are several considerations to take into account for securing |PXC|:
 * Data-at-rest encryption
 
   |PXC| supports `tablespace encryption
-  <https://dev.mysql.com/doc/refman/5.7/en/innodb-tablespace-encryption.html>`_
+  <https://dev.mysql.com/doc/refman/5.7/en/innodb-data-encryption.html#innodb-data-encryption-enabling-disabling>`_
   to provide at-rest encryption for physical tablespace data files.
 
   For more information, see the following blog post:
@@ -35,7 +35,7 @@ There are several considerations to take into account for securing |PXC|:
 Security Modules
 ================
 
-Most modern disributions include special security modules
+Most modern distributions include special security modules
 that control access to resources for users and applications.
 By default, these modules will most likely constrain communication
 between |PXC| nodes.
@@ -86,5 +86,5 @@ you can disable AppArmor for ``mysqld``:
 
 To use AppArmor with |PXC|, you need to create or extend the MySQL profile.
 For more information, see `AppArmor and MySQL
-<https://blogs.oracle.com/jsmyth/apparmor-and-mysq>`_.
+<https://blogs.oracle.com/mysql/apparmor-and-mysql-v2>`__.
 

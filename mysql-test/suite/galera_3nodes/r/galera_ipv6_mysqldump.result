@@ -4,7 +4,6 @@ SET GLOBAL wsrep_sst_auth = 'sst:';
 SET GLOBAL wsrep_sst_method = 'mysqldump';
 Warnings:
 Warning	1105	Percona-XtraDB-Cluster has deprecated SST through mysqldump. Percona-XtraDB-Cluster recommends using xtrabackup. Please switch to use xtrabackup or rsync.
-Unloading wsrep provider ...
 SET GLOBAL wsrep_cluster_address='';
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);

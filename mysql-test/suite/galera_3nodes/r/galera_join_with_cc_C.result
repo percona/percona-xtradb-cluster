@@ -47,5 +47,8 @@ SET GLOBAL wsrep_provider_options = 'signal=after_shift_to_joining';
 DROP TABLE t1;
 call mtr.add_suppression("WSREP: Send action {\(.*\), STATE_REQUEST} returned -107 \\(Transport endpoint is not connected\\)");
 call mtr.add_suppression("WSREP: Rejecting JOIN message from \(.*\): new State Transfer required.");
+call mtr.add_suppression("AsyncSender seems to be disconnected");
 call mtr.add_suppression("WSREP: Rejecting JOIN message from \(.*\): new State Transfer required.");
+call mtr.add_suppression("AsyncSender seems to be disconnected");
 call mtr.add_suppression("WSREP: Rejecting JOIN message from \(.*\): new State Transfer required.");
+call mtr.add_suppression("AsyncSender seems to be disconnected");

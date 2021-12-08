@@ -1,0 +1,13 @@
+SET SESSION wsrep_sync_wait = 0;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, j varchar(4000)) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1, REPEAT('z', 4000));
+INSERT INTO t1 VALUES (2, REPEAT('ä', 2000));
+INSERT INTO t1 VALUES (3, REPEAT('ö', 2000));
+SET SESSION wsrep_sync_wait = 0;
+Killing server ...
+Performing --wsrep-recover ...
+Using --wsrep-start-position when starting mysqld ...
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
+DROP TABLE t1;
+RESET MASTER;
+RESET MASTER;

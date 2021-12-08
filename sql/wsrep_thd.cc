@@ -21,6 +21,7 @@
 #include "sql_parse.h"
 #include "sql_base.h" // close_thread_tables()
 #include "mysqld.h"   // start_wsrep_THD();
+#include "debug_sync.h"
 
 static long long wsrep_bf_aborts_counter = 0;
 
@@ -114,9 +115,15 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->variables.option_bits |= OPTION_LOG_OFF;
   // Enable binlogging if opt_log_slave_updates is set
   if (opt_log_slave_updates)
+  {
     thd->variables.option_bits|= OPTION_BIN_LOG;
+    thd->variables.option_bits&= ~(OPTION_BIN_LOG_INTERNAL_OFF);
+  }
   else
+  {
     thd->variables.option_bits&= ~(OPTION_BIN_LOG);
+    thd->variables.option_bits|= OPTION_BIN_LOG_INTERNAL_OFF;
+  }
 
 #ifdef GALERA
   /*
@@ -176,9 +183,9 @@ void wsrep_replay_sp_transaction(THD* thd)
 {
   DBUG_ENTER("wsrep_replay_sp_transaction");
   mysql_mutex_assert_owner(&thd->LOCK_wsrep_thd);
-  DBUG_ASSERT(thd->wsrep_conflict_state == MUST_REPLAY);
-  DBUG_ASSERT(thd->sp_runtime_ctx);
-  DBUG_ASSERT(wsrep_thd_trx_seqno(thd) > 0);
+  assert(thd->wsrep_conflict_state == MUST_REPLAY);
+  assert(thd->sp_runtime_ctx);
+  assert(wsrep_thd_trx_seqno(thd) > 0);
 
   close_thread_tables(thd);
   if (thd->locked_tables_mode && thd->lock)
@@ -281,7 +288,7 @@ void wsrep_replay_transaction(THD *thd)
   DBUG_ENTER("wsrep_replay_transaction");
   /* checking if BF trx must be replayed */
   if (thd->wsrep_conflict_state== MUST_REPLAY) {
-    DBUG_ASSERT(wsrep_thd_trx_seqno(thd));
+    assert(wsrep_thd_trx_seqno(thd));
     if (thd->wsrep_exec_mode!= REPL_RECV) {
       if (thd->get_stmt_da()->is_sent())
       {
@@ -360,6 +367,16 @@ void wsrep_replay_transaction(THD *thd)
       thd->variables.option_bits|= OPTION_BEGIN;
       thd->server_status|= SERVER_STATUS_IN_TRANS;
 
+      // Allow tests to block the applier thread using the DBUG facilities.
+      DBUG_EXECUTE_IF("sync.wsrep_replay_cb",
+                      {
+                        const char act[]=
+                          "now "
+                          "SIGNAL sync.wsrep_replay_cb_reached "
+                          "WAIT_FOR signal.wsrep_replay_cb";
+                        assert(!debug_sync_set_action(thd,
+                                                      STRING_WITH_LEN(act)));
+                      };);
       int rcode = wsrep->replay_trx(wsrep,
                                     &thd->wsrep_ws_handle,
                                     (void *)thd);

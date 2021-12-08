@@ -4,45 +4,45 @@
 Percona XtraDB Cluster |version| Documentation
 ==============================================
 
-|PXC|_ is a database clustering solution for MySQL.
+Percona XtraDB Cluster is a database clustering solution for MySQL.
 It ensures high availability, prevents downtime and data loss,
 and provides linear scalability for a growing environment.
 
-Features of |PXC| include:
+Features of Percona XtraDB Cluster include:
 
-:term:`Synchronous replication <Database replication>`
+`Synchronous replication <Database replication>`
    Data is written to all nodes simultaneously,
    or not written at all if it fails even on a single node.
 
-:term:`Multi-source replication`
+`Multi-source replication`
    Any node can trigger a data update.
 
-:term:`True parallel replication <Database replication>`
+`True parallel replication <Database replication>`
    Multiple threads on slave performing replication on row level.
 
 Automatic node provisioning**
-   You simply add a :term:`node` and it automatically syncs.
+   You simply add a `node` and it automatically syncs.
 
 Data consistency
-   |PXC| ensures that data is automatically synchronized on all
-   :term:`nodes <Node>` in your cluster.
+   Percona XtraDB Cluster ensures that data is automatically synchronized on all
+   `nodes <Node>` in your cluster.
 
 :ref:`pxc-strict-mode`
    Avoids the use of experimental and unsupported features.
 
 
 Configuration script for ProxySQL
-  |Percona| provides a ProxySQL package with the ``proxysql-admin``
-  tool that automatically configures |PXC| nodes.
+  Percona provides a ProxySQL package with the ``proxysql-admin``
+  tool that automatically configures Percona XtraDB Cluster nodes.
 
   .. seealso:: :ref:`load_balancing_with_proxysql`
 
 Automatic configuration of SSL encryption
-  |PXC| includes the ``pxc-encrypt-cluster-traffic`` variable
+  Percona XtraDB Cluster includes the ``pxc-encrypt-cluster-traffic`` variable
   that enables automatic configuration of SSL encryption.
 
 Optimized Performance
-  |PXC| performance is optimized to scale with a growing production workload.
+  Percona XtraDB Cluster performance is optimized to scale with a growing production workload.
 
   For more information, see the following blog posts:
 
@@ -52,7 +52,7 @@ Optimized Performance
   * `Performance improvements in Percona XtraDB Cluster 5.7.17-29.20
     <https://www.percona.com/blog/2017/04/19/performance-improvements-percona-xtradb-cluster-5-7-17/>`_
 
-|PXC| is fully compatible with `MySQL Server Community Edition
+Percona XtraDB Cluster is fully compatible with `MySQL Server Community Edition
 <MySQL>`_, |PS|_, and MariaDB_. It provides a robust application
 compatibility: there is no or minimal application changes required.
 
@@ -125,11 +125,21 @@ Flexibility
 
 .. toctree::
    :maxdepth: 1
-   
+
    flexibility/binlogging_replication_improvements
    flexibility/innodb_fts_improvements
-   diagnostics/innodb_fragmentation_count
    performance/aio_page_requests
+
+Diagnostics
+============================================================================
+
+.. toctree::
+   :maxdepth: 1
+
+   diagnostics/innodb_fragmentation_count
+   diagnostics/libcoredumper
+   diagnostics/stacktrace
+   
 
 How-tos
 =======
@@ -166,4 +176,3 @@ Reference
 
 * :ref:`genindex`
 * :ref:`search`
-

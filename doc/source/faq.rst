@@ -125,7 +125,7 @@ of the preceding Primary Component,
 minus the nodes which left gracefully.
 
 The mechanism is described in detail in `Galera documentation
-<http://galeracluster.com/documentation-webpages/weightedquorum.html>`_.
+<https://galeracluster.com/library/documentation/weighted-quorum.html>`_.
 
 How would the quorum mechanism handle split brain?
 ==================================================
@@ -134,7 +134,7 @@ The quorum mechanism cannot handle split brain.
 If there is no way to decide on the primary component,
 |PXC| has no way to resolve a |split brain|.
 The minimal recommendation is to have 3 nodes.
-However, it is possibile to allow a node to handle traffic
+However, it is possible to allow a node to handle traffic
 with the following option: ::
 
   wsrep_provider_options="pc.ignore_sb = yes"
@@ -144,7 +144,7 @@ Why a node stops accepting commands if the other one fails in a 2-node setup?
 
 This is expected behavior to prevent |split brain|.
 For more information, see previous question or `Galera documentation
-<http://galeracluster.com/documentation-webpages/weightedquorum.html>`_.
+<https://galeracluster.com/library/documentation/weighted-quorum.html>`__.
 
 Is it possible to set up a cluster without state transfer?
 ==========================================================
@@ -171,7 +171,7 @@ You may need to open up to four ports if you are using a firewall:
 
      wsrep_provider_options ="gmcast.listen_addr=tcp://0.0.0.0:4010; "
 
-3. Port for State Snaphot Transfer (default is 4444).
+3. Port for State Snapshot Transfer (default is 4444).
    It can be changed using the following option: ::
 
      wsrep_sst_receive_address=10.11.12.205:5555

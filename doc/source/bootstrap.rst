@@ -4,13 +4,14 @@
 Bootstrapping the First Node
 ============================
 
-
 After you :ref:`configure all PXC nodes <configure>`, initialize the cluster by
 bootstrapping the first node.  The initial node must contain all the data that
 you want to be replicated to other nodes.
 
 Bootstrapping implies starting the first node without any known cluster
-addresses: if the ``wsrep_cluster_address`` variable is empty, *Percona XtraDB Cluster* assumes that this is the first node and initializes the cluster.
+addresses: if the ``wsrep_cluster_address`` variable is empty, 
+*Percona XtraDB Cluster* assumes that this is the first 
+node and initializes the cluster.
 
 Instead of changing the configuration,
 start the first node with the following command on Debian or Ubuntu:
@@ -34,6 +35,7 @@ you can then restart this node as normal,
 and it will use standard configuration again.
 
 .. note::
+
 
    A service started with ``mysql@bootstrap`` must be stopped using the same command. For example, the ``systemctl stop mysql`` command
    does not stop an instance started with the ``mysql@bootstrap`` command.
