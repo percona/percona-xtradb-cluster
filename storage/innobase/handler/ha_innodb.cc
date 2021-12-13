@@ -24861,7 +24861,7 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
   ut_ad(bf_thd_ptr);
   ut_ad(victim_trx);
 
-  DBUG_ENTER("wsrep_innobase_kill_one_trx");
+  DBUG_TRACE;
   THD *bf_thd = bf_thd_ptr ? (THD *)bf_thd_ptr : NULL;
   THD *thd = (THD *)victim_trx->mysql_thd;
   int64_t bf_seqno = (bf_thd) ? wsrep_thd_trx_seqno(bf_thd) : 0;
@@ -24869,12 +24869,12 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
   if (!thd) {
     DBUG_PRINT("wsrep", ("no thd for conflicting lock"));
     WSREP_WARN("no THD for victim trx: %llu", (long long)victim_trx->id);
-    DBUG_RETURN(1);
+    return 1;
   }
   if (!bf_thd) {
     DBUG_PRINT("wsrep", ("no BF thd for conflicting lock"));
     WSREP_WARN("no THD for BF trx: %llu", (bf_trx) ? (long long)bf_trx->id : 0);
-    DBUG_RETURN(1);
+    return 1;
   }
 
   WSREP_LOG_CONFLICT(bf_thd, thd, true);
@@ -24906,7 +24906,7 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
   if (wsrep_thd_set_wsrep_aborter(bf_thd, thd)) {
     WSREP_DEBUG("innodb kill transaction skipped due to wsrep_aborter set");
     wsrep_thd_UNLOCK(thd);
-    return (false);
+    return 0;
   }
 
   wsrep_thd_UNLOCK(thd);
@@ -24935,10 +24935,10 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
     wsrep_thd_UNLOCK(thd);
 
     WSREP_DEBUG("wsrep_thd_bf_abort has failed, victim will survive");
-    DBUG_RETURN(1);
+    return 1;
   }
 
-  DBUG_RETURN(0);
+  return 0;
 }
 
 static int wsrep_abort_transaction_func(handlerton *hton, THD *bf_thd,
