@@ -42,15 +42,15 @@
 #include <string>
 
 #include "lex_string.h"
-#include "m_string.h"  // native_strncasecmp
-#include "my_aes.h"
 #include "libbinlogevents/include/binlog_event.h"
 #include "libbinlogevents/include/control_events.h"
 #include "libbinlogevents/include/load_data_events.h"
 #include "libbinlogevents/include/rows_event.h"
 #include "libbinlogevents/include/statement_events.h"
 #include "libbinlogevents/include/uuid.h"
-#include "m_string.h"     // native_strncasecmp
+#include "m_string.h"  // native_strncasecmp
+#include "m_string.h"  // native_strncasecmp
+#include "my_aes.h"
 #include "my_bitmap.h"    // MY_BITMAP
 #include "my_checksum.h"  // ha_checksum
 #include "my_dbug.h"
@@ -501,6 +501,7 @@ struct PRINT_EVENT_INFO {
     It omits the SET @@session.pseudo_thread_id printed on Query events
   */
   bool require_row_format;
+  bool ddl_skip_rewrite;
 };
 #endif
 

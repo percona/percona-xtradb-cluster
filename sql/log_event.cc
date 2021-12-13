@@ -1247,38 +1247,37 @@ bool Log_event::need_checksum() {
             static_cast<enum_binlog_checksum_alg>(binlog_checksum_options)
             : binary_log::BINLOG_CHECKSUM_ALG_OFF;
 
-  assert(
-      !ret ||
-      ((common_footer->checksum_alg ==
-            static_cast<enum_binlog_checksum_alg>(binlog_checksum_options) ||
-        /*
-           Stop event closes the relay-log and its checksum alg
-           preference is set by the caller can be different
-           from the server's binlog_checksum_options.
-        */
-        get_type_code() == binary_log::STOP_EVENT ||
-        /*
-           Rotate:s can be checksummed regardless of the server's
-           binlog_checksum_options. That applies to both
-           the local RL's Rotate and the master's Rotate
-           which IO thread instantiates via queue_binlog_ver_3_event.
-        */
-        get_type_code() == binary_log::ROTATE_EVENT ||
-        get_type_code() == binary_log::START_5_7_ENCRYPTION_EVENT ||
-        /*
-           The previous event has its checksum option defined
-           according to the format description event.
-        */
-        get_type_code() == binary_log::PREVIOUS_GTIDS_LOG_EVENT ||
-        /* FD is always checksummed */
-        get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT ||
-        /*
-           View_change_log_event is queued into relay log by the
-           local member, which may have a different checksum algorithm
-           than the one of the event source.
-        */
-        get_type_code() == binary_log::VIEW_CHANGE_EVENT) &&
-       common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF));
+  assert(!ret ||
+         ((common_footer->checksum_alg ==
+               static_cast<enum_binlog_checksum_alg>(binlog_checksum_options) ||
+           /*
+              Stop event closes the relay-log and its checksum alg
+              preference is set by the caller can be different
+              from the server's binlog_checksum_options.
+           */
+           get_type_code() == binary_log::STOP_EVENT ||
+           /*
+              Rotate:s can be checksummed regardless of the server's
+              binlog_checksum_options. That applies to both
+              the local RL's Rotate and the master's Rotate
+              which IO thread instantiates via queue_binlog_ver_3_event.
+           */
+           get_type_code() == binary_log::ROTATE_EVENT ||
+           get_type_code() == binary_log::START_5_7_ENCRYPTION_EVENT ||
+           /*
+              The previous event has its checksum option defined
+              according to the format description event.
+           */
+           get_type_code() == binary_log::PREVIOUS_GTIDS_LOG_EVENT ||
+           /* FD is always checksummed */
+           get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT ||
+           /*
+              View_change_log_event is queued into relay log by the
+              local member, which may have a different checksum algorithm
+              than the one of the event source.
+           */
+           get_type_code() == binary_log::VIEW_CHANGE_EVENT) &&
+          common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF));
 
   assert(common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
   assert(((get_type_code() != binary_log::ROTATE_EVENT &&
@@ -3669,6 +3668,11 @@ bool Query_log_event::write(Basic_ostream *ostream) {
     *start++ = thd->variables.default_table_encryption;
   }
 
+  if (thd && thd->variables.binlog_ddl_skip_rewrite) {
+    *start++ = Q_DDL_SKIP_REWRITE;
+    *start++ = thd->variables.binlog_ddl_skip_rewrite;
+  }
+
   /*
     NOTE: When adding new status vars, please don't forget to update
     the MAX_SIZE_LOG_EVENT_STATUS in log_event.h
@@ -3832,7 +3836,7 @@ bool is_atomic_ddl(THD *thd, bool using_trans_arg) {
         a hack or short-cut to avoid introducing another variable for this
       */
       assert(using_trans_arg || thd->slave_thread || lex->drop_if_exists ||
-                  thd->wsrep_skip_wsrep_hton);
+             thd->wsrep_skip_wsrep_hton);
 #else
       assert(using_trans_arg || thd->slave_thread || lex->drop_if_exists);
 #endif /* WITH_WSREP */
@@ -3846,11 +3850,11 @@ bool is_atomic_ddl(THD *thd, bool using_trans_arg) {
       */
 #ifdef WITH_WSREP
       assert(using_trans_arg || thd->slave_thread ||
-                  (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS) ||
-                  thd->wsrep_skip_wsrep_hton);
+             (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS) ||
+             thd->wsrep_skip_wsrep_hton);
 #else
       assert(using_trans_arg || thd->slave_thread ||
-                  (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS));
+             (lex->create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS));
 #endif /* WITH_WSREP */
       break;
 
@@ -4458,6 +4462,11 @@ void Query_log_event::print_query_header(
                 "/*!80016 SET @@session.default_table_encryption=%d*/%s\n",
                 default_table_encryption, print_event_info->delimiter);
   }
+  if (ddl_skip_rewrite != print_event_info->ddl_skip_rewrite) {
+    my_b_printf(file, "/*!80026 SET @@session.binlog_ddl_skip_rewrite=%d*/%s\n",
+                ddl_skip_rewrite, print_event_info->delimiter);
+    print_event_info->ddl_skip_rewrite = ddl_skip_rewrite;
+  }
 }
 
 void Query_log_event::print(FILE *, PRINT_EVENT_INFO *print_event_info) const {
@@ -4845,6 +4854,8 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
         }
         thd->variables.default_table_encryption = default_table_encryption;
       }
+
+      thd->variables.binlog_ddl_skip_rewrite = (ddl_skip_rewrite != 0)? true : false;
 
       thd->table_map_for_update = (table_map)table_map_for_update;
 
@@ -14364,7 +14375,8 @@ PRINT_EVENT_INFO::PRINT_EVENT_INFO()
       base64_output_mode(BASE64_OUTPUT_UNSPEC),
       printed_fd_event(false),
       have_unflushed_events(false),
-      skipped_event_in_transaction(false) {
+      skipped_event_in_transaction(false),
+      ddl_skip_rewrite(false) {
   /*
     Currently we only use static PRINT_EVENT_INFO objects, so zeroed at
     program's startup, but these explicit memset() is for the day someone

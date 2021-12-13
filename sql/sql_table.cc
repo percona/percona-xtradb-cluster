@@ -3248,10 +3248,7 @@ bool mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables, bool if_exists,
 
           built_query.add_table(table);
 
-          if (thd->variables.binlog_ddl_skip_rewrite ||
-              thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
-              thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER ||
-              thd->is_binlog_applier()) {
+          if (thd->variables.binlog_ddl_skip_rewrite) {
             if (write_bin_log(thd, true, thd->query().str, thd->query().length,
                               false)) {
               goto err_with_rollback;
@@ -3420,10 +3417,7 @@ bool mysql_rm_table_no_locks(THD *thd, TABLE_LIST *tables, bool if_exists,
 
       thd->thread_specific_used = true;
 
-      if (thd->variables.binlog_ddl_skip_rewrite ||
-          thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
-          thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER ||
-          thd->is_binlog_applier()) {
+      if (thd->variables.binlog_ddl_skip_rewrite) {
         if (write_bin_log(thd, true, thd->query().str, thd->query().length,
                           drop_ctx.has_base_atomic_tables())) {
           goto err_with_rollback;
