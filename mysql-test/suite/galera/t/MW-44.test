@@ -17,7 +17,8 @@ SET SESSION wsrep_osu_method=RSU;
 ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 SET SESSION wsrep_osu_method=TOI;
 
-SELECT COUNT(*) = 2 FROM mysql.general_log WHERE argument LIKE 'CREATE%' OR argument LIKE 'ALTER%';
+SELECT COUNT(*) = 1 FROM mysql.general_log WHERE argument LIKE 'CREATE%' AND command_type != 'Prepare';
+SELECT COUNT(*) = 1 FROM mysql.general_log WHERE argument LIKE 'ALTER%' AND command_type != 'Prepare';
 
 --connection node_2
 SELECT COUNT(*) = 0 FROM mysql.general_log WHERE argument NOT LIKE 'SELECT%';
