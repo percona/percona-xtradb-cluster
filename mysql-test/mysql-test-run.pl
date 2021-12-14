@@ -324,6 +324,7 @@ our @DEFAULT_SUITES = qw(
   galera_3nodes_sr
   galera_nbo
   galera_3nodes_nbo
+  wsrep
   );
 
 our $DEFAULT_SUITES = join ',', @DEFAULT_SUITES;

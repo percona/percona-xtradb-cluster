@@ -8037,7 +8037,7 @@ static Sys_var_uint Sys_wsrep_sync_wait(
     "Ensure \"synchronous\" read view before executing an operation of the "
     "type specified by bitmask: 1 - READ(includes SELECT, SHOW and BEGIN/START "
     "TRANSACTION); 2 - UPDATE and DELETE; 4 - INSERT and REPLACE",
-    SESSION_VAR(wsrep_sync_wait), CMD_LINE(OPT_ARG),
+    HINT_UPDATEABLE SESSION_VAR(wsrep_sync_wait), CMD_LINE(OPT_ARG),
     VALID_RANGE(WSREP_SYNC_WAIT_NONE, WSREP_SYNC_WAIT_MAX),
     DEFAULT(WSREP_SYNC_WAIT_NONE), BLOCK_SIZE(1), NO_MUTEX_GUARD, NOT_IN_BINLOG,
     ON_CHECK(0), ON_UPDATE(wsrep_sync_wait_update));
@@ -8118,7 +8118,7 @@ static Sys_var_ulonglong Sys_wsrep_trx_fragment_size(
     "wsrep_trx_fragment_size",
     "Size of transaction fragments for streaming replication (measured in "
     "units of 'wsrep_trx_fragment_unit')",
-    SESSION_VAR(wsrep_trx_fragment_size), CMD_LINE(REQUIRED_ARG),
+    HINT_UPDATEABLE SESSION_VAR(wsrep_trx_fragment_size), CMD_LINE(REQUIRED_ARG),
     VALID_RANGE(0, WSREP_MAX_WS_SIZE), DEFAULT(0), BLOCK_SIZE(1),
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(wsrep_trx_fragment_size_check),
     ON_UPDATE(wsrep_trx_fragment_size_update));
@@ -8129,7 +8129,7 @@ static Sys_var_enum Sys_wsrep_trx_fragment_unit(
     "wsrep_trx_fragment_unit",
     "Unit for streaming replication transaction fragments' size: bytes, "
     "rows, statements",
-    SESSION_VAR(wsrep_trx_fragment_unit), CMD_LINE(REQUIRED_ARG),
+    HINT_UPDATEABLE SESSION_VAR(wsrep_trx_fragment_unit), CMD_LINE(REQUIRED_ARG),
     wsrep_fragment_units, DEFAULT(WSREP_FRAG_BYTES), NO_MUTEX_GUARD,
     NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(wsrep_trx_fragment_unit_update));
 
@@ -8141,7 +8141,7 @@ static Sys_var_enum Sys_wsrep_SR_store(
 
 static Sys_var_bool Sys_wsrep_dirty_reads(
     "wsrep_dirty_reads", "Allow reads from a node is not in primary component",
-    SESSION_VAR(wsrep_dirty_reads), CMD_LINE(OPT_ARG), DEFAULT(false),
+    HINT_UPDATEABLE SESSION_VAR(wsrep_dirty_reads), CMD_LINE(OPT_ARG), DEFAULT(false),
     NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
 static Sys_var_uint Sys_wsrep_ignore_apply_errors(
