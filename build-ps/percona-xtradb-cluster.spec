@@ -310,6 +310,7 @@ Requires:             percona-xtradb-cluster-client = %{version}-%{release}
 Provides:       mysql-server galera-57 galera-57-debuginfo
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
 BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
+BuildRequires:  cyrus-sasl-devel cyrus-sasl-scram
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
