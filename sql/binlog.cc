@@ -11118,17 +11118,8 @@ void MYSQL_BIN_LOG::xunlock(void)
   mysql_mutex_unlock(&LOCK_log);
 }
 
-<<<<<<< HEAD
-void MYSQL_BIN_LOG::report_missing_purged_gtids(const Gtid_set* slave_executed_gtid_set,
-                                         const char** errmsg)
-||||||| 3692a61c4c9
-
-void MYSQL_BIN_LOG::report_missing_purged_gtids(const Gtid_set* slave_executed_gtid_set,
-                                         const char** errmsg)
-=======
 void MYSQL_BIN_LOG::report_missing_purged_gtids(
     const Gtid_set *slave_executed_gtid_set, std::string &errmsg)
->>>>>>> fe7b7ad2d9b1528759af5fec3f5b9e25dfdef772
 {
   DBUG_ENTER("MYSQL_BIN_LOG::report_missing_purged_gtids");
   THD *thd= current_thd;

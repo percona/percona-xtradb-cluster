@@ -1891,7 +1891,8 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     if (parser_state.init(thd, thd->query().str, thd->query().length))
       break;
 
-<<<<<<< HEAD
+    parser_state.m_input.m_has_digest = true;
+
 #ifdef WITH_WSREP
     if (WSREP_ON)
     {
@@ -1903,11 +1904,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       mysql_parse(thd, &parser_state, false);
     }
 #else
-||||||| 3692a61c4c9
-=======
-    parser_state.m_input.m_has_digest = true;
-
->>>>>>> fe7b7ad2d9b1528759af5fec3f5b9e25dfdef772
     mysql_parse(thd, &parser_state, false);
 #endif /* WITH_WSREP */
 

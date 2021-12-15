@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 jobs:
 - job: BiDiScan
   pool:
@@ -17,20 +16,6 @@ jobs:
       else
           python $(Build.SourcesDirectory)/scripts/find_unicode_control.py -p bidi -v ${CHANGED_FILES}
       fi
-||||||| 3692a61c4c9
-=======
-jobs:
-- job: BiDiScan
-  pool:
-    vmImage: 'ubuntu-18.04'
-
-  steps:
-  - checkout: self
-    fetchDepth: 32
-
-  - script: |
-      git fetch origin 5.7
-      python $(Build.SourcesDirectory)/scripts/find_unicode_control.py -p bidi -v $(git diff --name-only --relative --diff-filter AMR origin/5.7 -- . | tr '\n' ' ')
 
 - job:
   timeoutInMinutes: 240
@@ -490,4 +475,3 @@ jobs:
       df -Th
 
     displayName: '*** Compile'
->>>>>>> fe7b7ad2d9b1528759af5fec3f5b9e25dfdef772
