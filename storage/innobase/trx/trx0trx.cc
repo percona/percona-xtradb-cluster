@@ -474,6 +474,9 @@ static trx_t *trx_create_low() {
 
   /* We just got trx from pool, it should be non locking */
   ut_ad(trx->will_lock == 0);
+#ifdef WITH_WSREP
+  ut_ad(!trx->lock.was_chosen_as_wsrep_victim);
+#endif /* WITH_WSREP */
 
   trx->persists_gtid = false;
 
@@ -2477,6 +2480,9 @@ dberr_t trx_commit_for_mysql(trx_t *trx) /*!< in/out: transaction */
       }
 
       trx_commit(trx);
+#ifdef WITH_WSREP
+      ut_ad(!trx->lock.was_chosen_as_wsrep_victim);
+#endif /* WITH_WSREP */
 
       MONITOR_DEC(MONITOR_TRX_ACTIVE);
       trx->op_info = "";
@@ -3579,7 +3585,9 @@ int wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx) {
               (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
 
   wsrep_thd_LOCK(thd);
-  victim_trx->lock.was_chosen_as_wsrep_victim = true;
+  if (victim_trx->state != TRX_STATE_NOT_STARTED) {
+    victim_trx->lock.was_chosen_as_wsrep_victim = true;
+  }
   wsrep_thd_UNLOCK(thd);
 
   if (wsrep_thd_bf_abort(bf_thd, thd, true)) {

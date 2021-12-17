@@ -24766,7 +24766,10 @@ int wsrep_innobase_kill_one_trx(void *const bf_thd_ptr,
    * which is already marked as BF victim
    * lock_sys is held until this vicitm has aborted
    */
-  victim_trx->lock.was_chosen_as_wsrep_victim = true;
+  if (victim_trx->state != TRX_STATE_NOT_STARTED) {
+    victim_trx->lock.was_chosen_as_wsrep_victim = true;
+  }
+
 
   if (wsrep_thd_set_wsrep_aborter(bf_thd, thd)) {
     WSREP_DEBUG("innodb kill transaction skipped due to wsrep_aborter set");
