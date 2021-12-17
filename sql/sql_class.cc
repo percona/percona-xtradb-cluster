@@ -2265,6 +2265,18 @@ void THD::cleanup(void)
   if (global_read_lock.is_acquired())
     global_read_lock.unlock_global_read_lock(this);
 
+#ifdef WITH_WSREP
+  /*
+    Resume the provider if it was paused by this session during FLUSH TABLE(S)
+    FOR EXPORT and the session got disconnected.
+  */
+  if (WSREP(this) && !global_read_lock.provider_resumed())
+  {
+    global_read_lock.wsrep_resume_once();
+    global_read_lock.pause_provider(false);
+  }
+#endif /* WITH_WSREP */
+
   mysql_ull_cleanup(this);
   /*
     All locking service locks must be released on disconnect.
