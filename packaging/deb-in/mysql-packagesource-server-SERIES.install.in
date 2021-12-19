@@ -28,7 +28,7 @@ debian/extra/mysql.cnf etc/mysql/
 etc/mysql/debian-start
 # binaries
 usr/bin/innochecksum
-usr/bin/lz4_decompress usr/lib/mysql/
+usr/bin/lz4_decompress
 usr/bin/myisamchk
 usr/bin/myisamlog
 usr/bin/myisampack
@@ -43,13 +43,13 @@ usr/bin/mysqlbinlog
 usr/bin/perror
 usr/bin/replace
 usr/bin/resolveip
-usr/bin/resolve_stack_dump usr/lib/mysql/
+usr/bin/resolve_stack_dump 
 usr/bin/wsrep_sst_common
 usr/bin/wsrep_sst_mysqldump
 usr/bin/wsrep_sst_rsync
 usr/bin/wsrep_sst_xtrabackup
 usr/bin/wsrep_sst_xtrabackup-v2
-usr/bin/zlib_decompress usr/lib/mysql/
+usr/bin/zlib_decompress 
 # plugins
 usr/lib/mysql/plugin/adt_null.so
 usr/lib/mysql/plugin/audit_log.so

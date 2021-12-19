@@ -213,9 +213,9 @@ Description: MySQL Testsuite meta package depending on latest version
 
 Package: mysql-@DEB_PRODUCTNAME@-test@DEB_PRODUCTSERIES@
 Architecture: any
-Depends: mysql-@DEB_PRODUCTNAME@-server (= ${binary:Version}),
- mysql-@DEB_PRODUCTNAME@-client (= ${binary:Version}), python,
- libmysqlclient-dev, libjson-perl, ${shlibs:Depends}, ${misc:Depends}
+Depends: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+ mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@ (= ${binary:Version}), python,
+ libmysqlclient-dev, libjson-perl, libxml-simple-perl, ${shlibs:Depends}, ${misc:Depends}
 Breaks: mysql-@DEB_PRODUCTNAME@-server (<< 5.7.14),
  mysql-@DEB_PRODUCTNAME@-client (<< 5.7.14)
 Conflicts: mysql,
