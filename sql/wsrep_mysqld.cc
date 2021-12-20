@@ -2378,7 +2378,7 @@ static int wsrep_NBO_begin_phase_one(THD *thd, const char *db_,
 
   if (wsrep_can_run_in_nbo(thd, db_, table_, table_list) == false) {
     WSREP_DEBUG("Can't execute %s in NBO mode", WSREP_QUERY(thd));
-    my_error(ER_NOT_SUPPORTED_YET, MYF(0), "Can't execute yet in NBO mode");
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0), "this query in wsrep_OSU_method NBO");
     mysql_mutex_lock(&thd->LOCK_thd_data);
     thd->wsrep_skip_wsrep_hton = false;
     mysql_mutex_unlock(&thd->LOCK_thd_data);
