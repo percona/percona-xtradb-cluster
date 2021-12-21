@@ -384,6 +384,7 @@ install_deps() {
             yum -y remove centos-release-stream
         fi
         yum -y install yum-utils patchelf
+        yum -y install cyrus-sasl-devel cyrus-sasl-scram
     else
         apt-get -y update
         DEBIAN_FRONTEND=noninteractive apt-get -y install curl lsb-release wget apt-transport-https software-properties-common
@@ -409,6 +410,7 @@ install_deps() {
         apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-gnutls-dev
         apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libeatmydata libc6-dbg valgrind libjson-perl libsasl2-dev
         apt-get -y install patchelf
+        apt-get -y install libsasl2-dev libsasl2-modules-gssapi-mit
         if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye ]; then
             apt-get -y install python3-mysqldb
         else
