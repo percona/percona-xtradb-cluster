@@ -411,6 +411,7 @@ install_deps() {
         apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libeatmydata libc6-dbg valgrind libjson-perl libsasl2-dev
         apt-get -y install patchelf
         apt-get -y install libsasl2-dev libsasl2-modules-gssapi-mit
+        apt-get -y install stunnel
         if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye ]; then
             apt-get -y install python3-mysqldb
         else
