@@ -417,6 +417,9 @@ install_deps() {
         else
             apt-get -y install python-mysqldb
         fi
+        if [ x"${DIST}" = xbionic ]; then
+            apt-get -y install gcc-8 g++-8
+        fi
         apt-get -y install libmecab2 mecab mecab-ipadic
         apt-get -y install build-essential devscripts
         apt-get -y install cmake autotools-dev autoconf automake build-essential devscripts debconf debhelper fakeroot
@@ -424,7 +427,7 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         apt-get -y install --download-only percona-xtrabackup-24=2.4.24-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.25-17-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.26-18-1.${DIST}
     fi
     return;
 }
@@ -900,7 +903,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.25
+        yumdownloader percona-xtrabackup-80-8.0.26
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
