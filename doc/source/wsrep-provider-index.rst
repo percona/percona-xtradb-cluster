@@ -451,6 +451,47 @@ the :file:`galera.cache` file which is used as source for |IST|. The bigger the
 value of this variable, the better are chances that the re-joining node will
 get IST instead of |SST|.
 
+.. variable:: gcomm.thread_prio
+
+Raises the gcomm thread priority to a higher level. Use this variable when the gcomm thread does not receive enough CPU time due to other competing threads. For example, if the gcomm threads are not frequently run, a node may drop from the cluster because of the timeout.
+
+The format for this variable is: <policy>:<priority>. The policy value supports the following options: ``other``, ``fifo``, and ``rr``. The priority value is an
+integer. 
+
+.. note::
+
+   Setting a priority value of 99 is not recommended. This value blocks system threads. 
+
+An example of the variable:
+
+.. sourcecode:: text
+
+   wsrep_provider_options="gcomm.thread_prio=fifo:3"
+
+The description of the ``policy`` parameter follows:
+
+.. list-table::
+   :widths: 15 60
+   :header-rows: 1
+
+   * - Option
+     - Description
+   * - other
+     - This policy is the default Linux time-sharing scheduling. Threads run until one of the following events occur:
+
+         * Thread exit
+
+         * I/O request blocks the thread 
+
+         * Higher priority thread preempts the thread
+   * - fifo
+     - The policy uses a First-in First-out (FIFO) scheduling. These threads always immediately preempt any currently running other, batch or idle threads. The threads are run in a FIFO manner until completion, unless a higher priority thread preempts or blocks them. This policy does not use time slicing.
+   * - rr
+     -    The threads use round-robin scheduling. This thread always preempts a currently running other, batch or idle thread. The scheduler runs threads with the same priority for a fixed time in a round-robin style. When this time period is exceeded, the scheduler stops the thread and moves it to the end of the list, and runs another round-robin thread with the same priority.
+
+.. seealso:: For information, see the `Galera Cluster documentation <https://galeracluster.com/library/documentation/galera-parameters.html#gcomm-thread-prio>`__
+
+
 .. variable:: gcs.fc_debug
 
    :cli: Yes
