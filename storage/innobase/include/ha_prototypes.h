@@ -252,7 +252,7 @@ wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx);
 int
 wsrep_innobase_kill_one_trx(void *thd_ptr,
                             const trx_t *bf_trx, trx_t *victim_trx, ibool signal);
-my_bool wsrep_thd_set_PA_safe(void *thd_ptr, my_bool safe);
+my_bool wsrep_thd_set_PA_unsafe(void *thd_ptr);
 int wsrep_thd_conflict_state(void *thd_ptr, my_bool sync);
 my_bool wsrep_thd_is_BF(void *thd_ptr, my_bool sync);
 int wsrep_trx_order_before(void *thd1, void *thd2);

@@ -1472,6 +1472,7 @@ row_ins_foreign_check_on_constraint(
 	if (err != DB_SUCCESS) {
 		ib::warn() << "WSREP: foreign key append failed: " << err;
 	} else
+	wsrep_thd_set_PA_unsafe(trx->mysql_thd);
 #endif
 	err = row_update_cascade_for_mysql(thr, cascade,
                                            foreign->foreign_table);

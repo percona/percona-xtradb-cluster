@@ -630,12 +630,12 @@ void wsrep_create_rollbacker()
   }
 }
 
-void wsrep_thd_set_PA_safe(void *thd_ptr, my_bool safe)
+void wsrep_thd_set_PA_unsafe(void *thd_ptr)
 { 
   if (thd_ptr) 
   {
     THD* thd = (THD*)thd_ptr;
-    thd->wsrep_PA_safe = safe;
+    thd->wsrep_PA_safe = false;
   }
 }
 
