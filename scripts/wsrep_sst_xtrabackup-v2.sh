@@ -748,7 +748,13 @@ get_transfer()
             fi
 
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-                tcmd="socat -u TCP-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
+                # PXC-3767 - IPv6 support in PXC (wsrep_sst_xtrabackup-v2)
+                # socat require TCP6-LISTEN to work with ip version6 addresses
+                if [[ "$WSREP_SST_OPT_HOST" =~ .*:.* ]]; then
+                    tcmd="socat -u TCP6-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
+                else
+                    tcmd="socat -u TCP-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
+                fi
             else
                 tcmd="socat -u stdio TCP:${REMOTEIP}:${TSST_PORT}${sockopt}"
             fi
