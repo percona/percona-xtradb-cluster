@@ -662,7 +662,7 @@ popd
 
 mkdir pxb-8.0
 pushd pxb-8.0
-yumdownloader percona-xtrabackup-80-8.0.25
+yumdownloader percona-xtrabackup-80-8.0.26
 rpm2cpio *.rpm | cpio --extract --make-directories --verbose
 mv usr/bin ./
 mv usr/lib64 ./
@@ -722,6 +722,7 @@ mkdir debug
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
+           -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
            %{?mecab_option} \
@@ -761,6 +762,7 @@ mkdir release
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZSTD=bundled \
+           -DWITH_UNIT_TESTS=0 \
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
            -DMYSQL_SERVER_SUFFIX=".%{rel}" \
