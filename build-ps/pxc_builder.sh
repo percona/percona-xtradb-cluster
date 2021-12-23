@@ -304,6 +304,7 @@ install_deps() {
         if [ "x${RHEL}" = "x8" ]; then
             yum -y install dnf-plugins-core epel-release
             yum config-manager --set-enabled powertools
+	    yum -y install git
             yum -y install python2-scons || true
             yum -y install python2-pip python36-devel
             yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++ make
@@ -403,6 +404,7 @@ install_deps() {
         done
         apt-get -y purge eatmydata || true
         apt-get update
+        apt-get -y install git || true
         apt-get -y install psmisc
         apt-get -y install libsasl2-modules:amd64 || apt-get -y install libsasl2-modules
         apt-get -y install dh-systemd || true
