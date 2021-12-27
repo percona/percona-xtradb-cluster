@@ -1614,7 +1614,7 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
     wsrep_log_debug "with encrypt=4  ssl_ca=$ssl_ca  ssl_cert=$ssl_cert  ssl_key=$ssl_key"
 fi
 
-if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then
+if ${INNOBACKUPEX_BIN} --help 2>/dev/null | grep -q -- '--version-check'; then
     disver="--no-version-check"
 fi
 
