@@ -414,6 +414,25 @@ To avoid deadlock errors,
 set the :variable:`wsrep_sync_wait` variable to ``0``
 if you enable ``wsrep_dirty_reads``.
 
+As of Percona XtraDB Cluster 8.0.26-16, you can update the variable with a `set_var hint <https://dev.mysql.com/doc/refman/8.0/en/optimizer-hints.html#optimizer-hints-set-var>`__.
+
+.. code-block:: mysql
+
+   mysql> SELECT @@wsrep_dirty_reads;
+   +-----------------------+
+   | @@wsrep_dirty_reads   |
+   +=======================+
+   | OFF                   |
+   +-----------------------+
+
+   mysql> SELECT /*+ SET_VAR(wsrep_dirty_reads=ON) */ @@wsrep_dirty_reads;
+   +-----------------------+
+   | @@wsrep_dirty_reads   |
+   +=======================+
+   | ON                    |
+   +-----------------------+
+
+
 .. seealso:: `MySQL wsrep option: wsrep_dirty_reads
              <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-dirty-reads>`_
 
@@ -1207,6 +1226,24 @@ Controls cluster-wide causality checks on certain statements.
 Checks ensure that the statement is executed on a node
 that is fully synced with the cluster.
 
+As of Percona XtraDB Cluster 8.0.26-16, you are able to update the variable with a `set_var hint <https://dev.mysql.com/doc/refman/8.0/en/optimizer-hints.html#optimizer-hints-set-var>`__.
+
+.. code-block:: mysql
+
+   mysql> SELECT @@wsrep_sync_wait;
+   +---------------------+
+   | @@wsrep_sync_wait   |
+   +=====================+
+   | 3                   |
+   +---------------------+
+
+   mysql> SELECT /*+ SET_VAR(wsrep_sync_wait=7) */ @@wsrep_sync_wait;
+   +---------------------+
+   | @@wsrep_sync_wait   |
+   +=====================+
+   | 7                   |
+   +---------------------+
+
 .. note:: Causality checks of any type can result in increased latency.
 
 The type of statements to undergo checks
@@ -1237,6 +1274,105 @@ is determined by bitmask:
 
 .. seealso:: `MySQL wsrep option: wsrep_sync_wait
              <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-sync-wait>`_
+
+.. variable:: wsrep_trx_fragment_size
+
+   :cli: ``--wsrep-trx-fragment-size``
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: 0
+
+Defines the the streaming replication fragment size. This variable is measured in the value defined by ``wsrep_trx_fragment_unit``. The minimum value is 0 and the maximum value is 2147483647.
+
+As of *Percona XtraDB Cluster for MySQL* 8.0.26-16, you can update the variable with a `set_var hint <https://dev.mysql.com/doc/refman/8.0/en/optimizer-hints.html#optimizer-hints-set-var>`__.
+
+.. code-block:: mysql
+
+   mysql> SELECT @@@wsrep_trx_fragment_unit; SELECT @@wsrep_trx_fragment_size; 
+   +------------------------------+
+   | @@wsrep_trx_fragment_unit    |
+   +==============================+
+   | statements                   |
+   +------------------------------+
+   | @@wsrep_trx_fragment_size    |
+   +------------------------------+
+   | 3                            |
+   +------------------------------+
+   mysql> SELECT /*+ SET_VAR(wsrep_trx_fragment_size=5) */ @@wsrep_trx_fragment_size;
+   +------------------------------+
+   | @@wsrep_trx_fragment_size    |
+   +==============================+
+   | 5                            |
+   +------------------------------+
+
+You can also use set_var() in a data manipulation language (DML) statement. This ability is useful when streaming large statements within a transaction. 
+
+.. code-block:: mysql
+
+   node1> BEGIN;
+   Query OK, 0 rows affected (0.00 sec)
+
+   node1> INSERT /*+SET_VAR(wsrep_trx_fragment_size = 100)*/ INTO t1 SELECT * FROM t1; 
+   Query OK, 65536 rows affected (15.15 sec)
+   Records: 65536 Duplicates: 0 Warnings: 0
+
+   node1> UPDATE /*+SET_VAR(wsrep_trx_fragment_size = 100)*/ t1 SET i=2;
+   Query OK, 131072 rows affected (1 min 35.93 sec)
+   Rows matched: 131072 Changed: 131072 Warnings: 0
+
+   node2> SET SESSION TRANSACTION_ISOLATION = 'READ-UNCOMMITTED';
+   Query OK, 0 rows affected (0.00 sec)
+
+   node2> SELECT * FROM t1 LIMIT 5;
+   +---+
+   | i |
+   +===+
+   | 2 |
+   +---+
+   | 2 |
+   +---+
+   | 2 |
+   +---+
+   | 2 |
+   +---+
+   | 2 |
+   +---+
+   node1> DELETE  /*+SET_VAR(wsrep_trx_fragment_size = 10000)*/ FROM t1;
+   Query OK, 131072 rows affected (15.09 sec)
+
+.. variable:: wsrep_trx_fragment_unit
+
+   :cli: ``--wsrep-trx-fragment-unit``
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: "bytes"
+
+Defines the type of measure for the ``wsrep_trx_fragment_size``. The possible values are: bytes, rows, statements. 
+
+As of *Percona XtraDB Cluster for MySQL* 8.0.26-16, you can update the variable with a `set_var hint <https://dev.mysql.com/doc/refman/8.0/en/optimizer-hints.html#optimizer-hints-set-var>`__.
+
+.. code-block:: mysql
+
+   mysql> SELECT @@wsrep_trx_fragment_unit; SELECT @@wsrep_trx_fragment_size; 
+   +------------------------------+
+   | @@wsrep_trx_fragment_unit    |
+   +==============================+
+   | statements                   |
+   +------------------------------+
+   | @@wsrep_trx_fragment_size    |
+   +------------------------------+
+   | 3                            |
+   +------------------------------+
+   mysql> SELECT /*+ SET_VAR(wsrep_trx_fragment_unit=rows) */ @@wsrep_trx_fragment_unit;
+   +------------------------------+
+   | @@wsrep_trx_fragment_unit    |
+   +==============================+
+   | rows                         |
+   +------------------------------+
+
+
 
 .. |abbr-mdl| replace:: :abbr:`MDL (Metadata Locking)`
 .. include:: .res/replace.txt
