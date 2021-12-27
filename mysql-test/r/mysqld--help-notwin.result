@@ -1692,6 +1692,14 @@ The following options may be given as the first argument:
  starting RSU
  --wsrep-SR-store=name 
  Storage for streaming replication fragments
+ --wsrep-applier-FK-checks 
+ Should applier thread do foreign key constraint checks
+ (Defaults to on; use --skip-wsrep-applier-FK-checks to disable.)
+ --wsrep-applier-UK-checks 
+ Should applier thread do secondary index uniqueness
+ chesks
+ --wsrep-applier-threads=# 
+ Number of applier threads to launch
  --wsrep-auto-increment-control 
  To automatically control the assignment of autoincrement
  variables
@@ -1751,19 +1759,25 @@ The following options may be given as the first argument:
  Variable to set to reject queries
  --wsrep-replicate-myisam 
  To enable myisam replication
+ --wsrep-restart-replica 
+ Should MySQL replica be restarted automatically, when
+ node joins back to cluster
  --wsrep-restart-slave 
- Should MySQL slave be restarted automatically, when node
- joins back to cluster
+ This option is deprecated. Use wsrep_restart_replica
+ instead.
  --wsrep-retry-autocommit=# 
  Max number of times to retry a failed autocommit
  statement
  --wsrep-slave-FK-checks 
- Should slave thread do foreign key constraint checks
+ This option is deprecated. Use wsrep_applier_FK_checks
+ instead.
  (Defaults to on; use --skip-wsrep-slave-FK-checks to disable.)
  --wsrep-slave-UK-checks 
- Should slave thread do secondary index uniqueness chesks
+ This option is deprecated. Use wsrep_applier_UK_checks
+ instead.
  --wsrep-slave-threads=# 
- Number of slave appliers to launch
+ This option is deprecated. Use wsrep_applier_threads
+ instead.
  --wsrep-sst-allowed-methods=name 
  SST methods accepted by server
  --wsrep-sst-donor=name 
@@ -2073,7 +2087,7 @@ performance-schema-max-rwlock-instances -1
 performance-schema-max-socket-classes 10
 performance-schema-max-socket-instances -1
 performance-schema-max-sql-text-length 1024
-performance-schema-max-stage-classes 175
+performance-schema-max-stage-classes 199
 performance-schema-max-statement-classes 226
 performance-schema-max-statement-stack 10
 performance-schema-max-table-handles -1
@@ -2236,6 +2250,9 @@ windowing-use-high-precision TRUE
 wsrep-OSU-method TOI
 wsrep-RSU-commit-timeout 5000
 wsrep-SR-store table
+wsrep-applier-FK-checks TRUE
+wsrep-applier-UK-checks FALSE
+wsrep-applier-threads 1
 wsrep-auto-increment-control TRUE
 wsrep-causal-reads FALSE
 wsrep-certification-rules strict
@@ -2261,6 +2278,7 @@ wsrep-provider-options
 wsrep-recover FALSE
 wsrep-reject-queries NONE
 wsrep-replicate-myisam FALSE
+wsrep-restart-replica FALSE
 wsrep-restart-slave FALSE
 wsrep-retry-autocommit 1
 wsrep-slave-FK-checks TRUE

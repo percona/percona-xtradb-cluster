@@ -169,7 +169,15 @@ tls_ciphersuites
 tls_version
 tls_version
 use_secondary_engine
+wsrep_applier_FK_checks
+wsrep_applier_FK_checks
+wsrep_applier_UK_checks
+wsrep_applier_UK_checks
+wsrep_applier_threads
+wsrep_applier_threads
 wsrep_min_log_verbosity
 wsrep_min_log_verbosity
+wsrep_restart_replica
+wsrep_restart_replica
 drop table t1;
 drop table t2;

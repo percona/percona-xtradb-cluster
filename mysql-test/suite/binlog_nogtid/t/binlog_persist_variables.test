@@ -52,7 +52,8 @@ INSERT INTO rplvars (varname, varvalue)
         VARIABLE_NAME LIKE '%rpl%' OR
         VARIABLE_NAME LIKE '%semi_sync%' OR
         VARIABLE_NAME LIKE '%slave%' OR
-        VARIABLE_NAME LIKE '%source%') AND
+        VARIABLE_NAME LIKE '%source%' OR
+        VARIABLE_NAME LIKE '%applier%') AND
        (VARIABLE_NAME NOT LIKE 'innodb%')
        ORDER BY VARIABLE_NAME;
 --enable_warnings
@@ -61,18 +62,18 @@ INSERT INTO rplvars (varname, varvalue)
 # If this count differs, it means a variable has been added or removed.
 # In that case, this testcase needs to be updated accordingly.
 
-# While Percona Server has 117 persisted variables, PXC has 122 persisted
+# While Percona Server has 117 persisted variables, PXC has 126 persisted
 # variables.
 #
 # This is beacause of the following variables.
-# 1. wsrep_restart_slave
-# 2. wsrep_slave_FK_checks
-# 3. wsrep_slave_threads
-# 4. wsrep_slave_UK_checks
-# 5. wsrep_replicate_myisam
+# 1. wsrep_restart_slave      2. wsrep_restart_replica
+# 3. wsrep_slave_FK_checks    4. wsrep_applier_FK_checks
+# 5. wsrep_slave_threads      6. wsrep_applier_threads
+# 7. wsrep_slave_UK_checks    8. wsrep_applier_UK_checks
+# 9. wsrep_replicate_myisam
 
 --echo
---let $expected = 122
+--let $expected = 126
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc
@@ -95,7 +96,7 @@ while ( $varid <= $countvars )
 }
 
 --echo
---let $expected = 97
+--let $expected = 101
 --let $assert_text = Expect $expected persisted variables in persisted_variables table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
 --source include/assert.inc

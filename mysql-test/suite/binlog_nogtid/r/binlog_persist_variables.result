@@ -21,11 +21,12 @@ VARIABLE_NAME LIKE '%replica%' OR
 VARIABLE_NAME LIKE '%rpl%' OR
 VARIABLE_NAME LIKE '%semi_sync%' OR
 VARIABLE_NAME LIKE '%slave%' OR
-VARIABLE_NAME LIKE '%source%') AND
+VARIABLE_NAME LIKE '%source%' OR
+VARIABLE_NAME LIKE '%applier%') AND
 (VARIABLE_NAME NOT LIKE 'innodb%')
 ORDER BY VARIABLE_NAME;
 
-include/assert.inc [Expect 122 variables in the table.]
+include/assert.inc [Expect 126 variables in the table.]
 
 # Test SET PERSIST
 SET PERSIST binlog_cache_size = @@GLOBAL.binlog_cache_size;
@@ -242,22 +243,38 @@ Warning	1287	'@@sync_master_info' is deprecated and will be removed in a future 
 SET PERSIST sync_relay_log = @@GLOBAL.sync_relay_log;
 SET PERSIST sync_relay_log_info = @@GLOBAL.sync_relay_log_info;
 SET PERSIST sync_source_info = @@GLOBAL.sync_source_info;
+SET PERSIST wsrep_applier_FK_checks = @@GLOBAL.wsrep_applier_FK_checks;
+SET PERSIST wsrep_applier_threads = @@GLOBAL.wsrep_applier_threads;
+SET PERSIST wsrep_applier_UK_checks = @@GLOBAL.wsrep_applier_UK_checks;
 SET PERSIST wsrep_replicate_myisam = @@GLOBAL.wsrep_replicate_myisam;
+SET PERSIST wsrep_restart_replica = @@GLOBAL.wsrep_restart_replica;
 SET PERSIST wsrep_restart_slave = @@GLOBAL.wsrep_restart_slave;
+Warnings:
+Warning	1287	'@@wsrep_restart_slave' is deprecated and will be removed in a future release. Please use wsrep_restart_replica instead.
+Warning	1287	'@@wsrep_restart_slave' is deprecated and will be removed in a future release. Please use wsrep_restart_replica instead.
 SET PERSIST wsrep_slave_FK_checks = @@GLOBAL.wsrep_slave_FK_checks;
+Warnings:
+Warning	1287	'@@wsrep_slave_FK_checks' is deprecated and will be removed in a future release. Please use wsrep_applier_FK_checks instead.
+Warning	1287	'@@wsrep_slave_FK_checks' is deprecated and will be removed in a future release. Please use wsrep_applier_FK_checks instead.
 SET PERSIST wsrep_slave_threads = @@GLOBAL.wsrep_slave_threads;
+Warnings:
+Warning	1287	'@@wsrep_slave_threads' is deprecated and will be removed in a future release. Please use wsrep_applier_threads instead.
+Warning	1287	'@@wsrep_slave_threads' is deprecated and will be removed in a future release. Please use wsrep_applier_threads instead.
 SET PERSIST wsrep_slave_UK_checks = @@GLOBAL.wsrep_slave_UK_checks;
+Warnings:
+Warning	1287	'@@wsrep_slave_UK_checks' is deprecated and will be removed in a future release. Please use wsrep_applier_UK_checks instead.
+Warning	1287	'@@wsrep_slave_UK_checks' is deprecated and will be removed in a future release. Please use wsrep_applier_UK_checks instead.
 
-include/assert.inc [Expect 97 persisted variables in persisted_variables table.]
+include/assert.inc [Expect 101 persisted variables in persisted_variables table.]
 
 ############################################################
 # 2. Restart server, it must preserve the persisted variable
 #    settings. Verify persisted configuration.
 # restart
 
-include/assert.inc [Expect 97 persisted variables in persisted_variables table.']
-include/assert.inc [Expect 97 persisted variables shown as PERSISTED in variables_info table.']
-include/assert.inc [Expect 97 persisted variables with matching persisted and global values.]
+include/assert.inc [Expect 101 persisted variables in persisted_variables table.']
+include/assert.inc [Expect 101 persisted variables shown as PERSISTED in variables_info table.']
+include/assert.inc [Expect 101 persisted variables with matching persisted and global values.]
 
 ############################################################
 # 3. Test RESET PERSIST IF EXISTS. Verify persisted variable
@@ -469,11 +486,23 @@ RESET PERSIST IF EXISTS sync_relay_log_info;
 RESET PERSIST IF EXISTS sync_source_info;
 Warnings:
 Warning	3615	Variable sync_source_info does not exist in persisted config file
+RESET PERSIST IF EXISTS wsrep_applier_FK_checks;
+RESET PERSIST IF EXISTS wsrep_applier_threads;
+RESET PERSIST IF EXISTS wsrep_applier_UK_checks;
 RESET PERSIST IF EXISTS wsrep_replicate_myisam;
+RESET PERSIST IF EXISTS wsrep_restart_replica;
 RESET PERSIST IF EXISTS wsrep_restart_slave;
+Warnings:
+Warning	3615	Variable wsrep_restart_slave does not exist in persisted config file
 RESET PERSIST IF EXISTS wsrep_slave_FK_checks;
+Warnings:
+Warning	3615	Variable wsrep_slave_FK_checks does not exist in persisted config file
 RESET PERSIST IF EXISTS wsrep_slave_threads;
+Warnings:
+Warning	3615	Variable wsrep_slave_threads does not exist in persisted config file
 RESET PERSIST IF EXISTS wsrep_slave_UK_checks;
+Warnings:
+Warning	3615	Variable wsrep_slave_UK_checks does not exist in persisted config file
 
 include/assert.inc [Expect 0 persisted variables.]
 
