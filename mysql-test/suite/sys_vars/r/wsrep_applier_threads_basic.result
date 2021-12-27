@@ -1,0 +1,49 @@
+#
+# wsrep_applier_threads
+#
+# save the initial value
+SET @wsrep_applier_threads_global_saved = @@global.wsrep_applier_threads;
+# default
+SELECT @@global.wsrep_applier_threads;
+@@global.wsrep_applier_threads
+1
+
+# scope
+SELECT @@session.wsrep_applier_threads;
+ERROR HY000: Variable 'wsrep_applier_threads' is a GLOBAL variable
+SET @@global.wsrep_applier_threads=1;
+SELECT @@global.wsrep_applier_threads;
+@@global.wsrep_applier_threads
+1
+
+# valid values
+SET @@global.wsrep_applier_threads=10;
+SELECT @@global.wsrep_applier_threads;
+@@global.wsrep_applier_threads
+10
+SET @@global.wsrep_applier_threads=0;
+Warnings:
+Warning	1292	Truncated incorrect wsrep_applier_threads value: '0'
+SELECT @@global.wsrep_applier_threads;
+@@global.wsrep_applier_threads
+1
+SET @@global.wsrep_applier_threads=default;
+SELECT @global.wsrep_applier_threads;
+@global.wsrep_applier_threads
+NULL
+
+# invalid values
+SET @@global.wsrep_applier_threads=NULL;
+ERROR 42000: Incorrect argument type to variable 'wsrep_applier_threads'
+SET @@global.wsrep_applier_threads='junk';
+ERROR 42000: Incorrect argument type to variable 'wsrep_applier_threads'
+SET @@global.wsrep_applier_threads=-1;
+Warnings:
+Warning	1292	Truncated incorrect wsrep_applier_threads value: '-1'
+SELECT @global.wsrep_applier_threads;
+@global.wsrep_applier_threads
+NULL
+
+# restore the initial value
+SET @@global.wsrep_applier_threads = @wsrep_applier_threads_global_saved;
+# End of test

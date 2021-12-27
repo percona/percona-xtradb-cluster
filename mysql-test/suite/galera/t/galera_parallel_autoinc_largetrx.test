@@ -17,9 +17,9 @@ INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoDB;
 
 --connection node_2
---let $wsrep_slave_threads_orig = `SELECT @@wsrep_slave_threads`
-SET GLOBAL wsrep_slave_threads = 4;
---let $wait_condition = SELECT VARIABLE_VALUE = @@wsrep_slave_threads + 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_thread_count';
+--let $wsrep_applier_threads_orig = `SELECT @@wsrep_applier_threads`
+SET GLOBAL wsrep_applier_threads = 4;
+--let $wait_condition = SELECT VARIABLE_VALUE = @@wsrep_applier_threads + 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_thread_count';
 --source include/wait_condition.inc
 
 --connection node_1
@@ -47,7 +47,7 @@ SELECT COUNT(*) FROM t1;
 SELECT COUNT(DISTINCT f1) FROM t1;
 
 --disable_query_log
---eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;
+--eval SET GLOBAL wsrep_applier_threads = $wsrep_applier_threads_orig;
 --enable_query_log
 
 --connection default

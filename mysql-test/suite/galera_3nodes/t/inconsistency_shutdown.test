@@ -13,7 +13,7 @@
 --source ../../galera/include/auto_increment_offset_save.inc
 
 --connection node_2
-SELECT @@wsrep_slave_threads = 8;
+SELECT @@wsrep_applier_threads = 8;
 
 #
 # 1. Inconsistency on slave

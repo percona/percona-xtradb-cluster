@@ -7,8 +7,8 @@
 
 --connection node_2
 --echo #node-2
---let $wsrep_slave_threads_orig = `SELECT @@wsrep_slave_threads`
-SET GLOBAL wsrep_slave_threads = 5;
+--let $wsrep_applier_threads_orig = `SELECT @@wsrep_applier_threads`
+SET GLOBAL wsrep_applier_threads = 5;
 
 --connection node_1
 --echo #node-1
@@ -64,5 +64,5 @@ DROP TABLE t1;
 --connection node_2
 --echo #node-2
 --disable_query_log
---eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;
+--eval SET GLOBAL wsrep_applier_threads = $wsrep_applier_threads_orig;
 --enable_query_log
