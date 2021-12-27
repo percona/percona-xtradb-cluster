@@ -1407,7 +1407,6 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
   switch (lex->sql_command)
   {
   case SQLCOM_CREATE_TABLE:
-    assert(!table_list);
     if (thd->lex->create_info.options & HA_LEX_CREATE_TMP_TABLE)
     {
       return false;
