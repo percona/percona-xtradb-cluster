@@ -284,8 +284,8 @@ void wsrep_start_position_init(const char *val) {
   wsrep_set_local_position(NULL, val, strlen(val), false);
 }
 
-static int get_provider_option_value(const char *opts, const char *opt_name,
-                                     ulong *opt_value) {
+int get_provider_option_value(const char *opts, const char *opt_name,
+                              ulong *opt_value) {
   int ret = 1;
   ulong opt_value_tmp;
   char *opt_value_str, *s,
@@ -309,19 +309,21 @@ end:
 }
 
 static bool refresh_provider_options() {
-  WSREP_DEBUG("refresh_provider_options: %s",
-              (wsrep_provider_options) ? wsrep_provider_options : "null");
-
+  bool ret{false};
   try {
     std::string opts = Wsrep_server_state::instance().provider().options();
     wsrep_provider_options_init(opts.c_str());
     get_provider_option_value(wsrep_provider_options, "repl.max_ws_size",
                               &wsrep_max_ws_size);
-    return false;
+    ret = false;
   } catch (...) {
     WSREP_ERROR("Failed to get provider options");
-    return true;
+    ret = true;
   }
+
+  WSREP_DEBUG("refresh_provider_options: %s",
+              (wsrep_provider_options) ? wsrep_provider_options : "null");
+  return ret;
 }
 
 static int wsrep_provider_verify(const char *provider_str) {
