@@ -73,5 +73,5 @@ tablespaces not in the data directory.
 Other Reading
 =============
 
-* `SST Methods for MySQL <http://galeracluster.com/documentation-webpages/statetransfer.html#state-snapshot-transfer-sst>`_
+* `State Snapshot Transfer Methods for MySQL <https://galeracluster.com/library/documentation/sst.html>`__
 * :ref:`Xtrabackup SST configuration<xtrabackup_sst>`
