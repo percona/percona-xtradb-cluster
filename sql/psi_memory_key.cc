@@ -411,12 +411,12 @@ static PSI_memory_info all_server_memory[] = {
      "Mem root for temporary objects allocated while dropping tables or the "
      "whole database."},
     {&key_memory_rm_db_mdl_reqs_root, "rm_db::mdl_reqs_root", PSI_FLAG_THREAD,
+     0, "Mem root for allocating MDL requests while dropping datbase."}
 #ifdef WITH_WSREP
-     0, "Mem root for allocating MDL requests while dropping datbase."} ,
-    {&key_memory_wsrep, "wsrep", PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME}};
-#else
-     0, "Mem root for allocating MDL requests while dropping datbase."}};
+    ,
+    {&key_memory_wsrep, "wsrep", PSI_FLAG_ONLY_GLOBAL_STAT, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
+};
 
 void register_server_memory_keys() {
   const char *category = "sql";
