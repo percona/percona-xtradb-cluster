@@ -5785,7 +5785,8 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table, TABLE_LIST* src_table,
     } 
     else if (!is_tmp_table)
     {
-      /* this is straight CREATE TABLE LIKE... eith no tmp tables */
+      /* this is straight CREATE TABLE LIKE... with no tmp tables */
+      thd->wsrep_PA_safe= false;
       WSREP_TO_ISOLATION_BEGIN(table->db, table->table_name, NULL);
     }
     else
