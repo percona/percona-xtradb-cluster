@@ -3,9 +3,15 @@
 
 --connection node_1
 CREATE TABLE t1 (a INT PRIMARY KEY);
-CREATE TABLE t2 (a INT);
+CREATE TABLE t2 (a INT PRIMARY KEY);
 INSERT INTO t1 VALUES (0);
 
 --connection node_2
 INSERT INTO t2 SELECT /*!99997*/ * FROM t1;
+--error ER_DUP_ENTRY
 INSERT INTO t2 SELECT /*!99997*/ * FROM t1;
+
+--connection node_1
+CALL mtr.add_suppression("Event 1 Query apply failed");
+
+DROP TABLE t1,t2;

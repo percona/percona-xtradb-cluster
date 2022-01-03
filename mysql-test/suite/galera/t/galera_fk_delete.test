@@ -1,7 +1,7 @@
 #
 # This test verifies that, in a foreign key relationship, child table DELETE
 # followed by parent table DELETE are not parallelized and are handled
-# sequentially by the applier threads when wsrep_slave_threads > 1.
+# sequentially by the applier threads when wsrep_applier_threads > 1.
 #
 --source include/galera_cluster.inc
 
@@ -18,11 +18,11 @@ CREATE TABLE t2 (
 
 INSERT INTO t1 SELECT 1;
 
-# Ensure that node_2 is configured with wsrep_slave_threads > 1.
+# Ensure that node_2 is configured with wsrep_applier_threads > 1.
 --echo # [connection node_2]
 --connection node_2
 --let $assert_text = node2 has parallel applier threads configured
---let $assert_cond = [SELECT @@GLOBAL.wsrep_slave_threads > 1] = 1
+--let $assert_cond = [SELECT @@GLOBAL.wsrep_applier_threads > 1] = 1
 --source include/assert.inc
 
 # Insert 2000 rows on node_1.
@@ -49,7 +49,7 @@ while($count)
 # Here we try delete rows from both the tables. If foreign key dependencies
 # are not included in the writesets, then the below DELETE statements would
 # allow parent table DELETE to be executed in parallel with the child table
-# DELETE when wsrep-slave-threads > 1, thus making the wsrep applier thread
+# DELETE when wsrep-applier-threads > 1, thus making the wsrep applier thread
 # to error out with HA_ERR_ROW_IS_REFERENCED when it tries to delete the
 # parent row while some of the rows in the child table are still referring
 # to the same row.

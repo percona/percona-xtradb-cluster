@@ -1,7 +1,7 @@
 --source include/galera_cluster.inc
 
 --connection node_2
-SET GLOBAL wsrep_slave_threads=4;
+SET GLOBAL wsrep_applier_threads=4;
 SET @@global.wsrep_log_conflicts=ON;
 
 --connection node_1
@@ -28,7 +28,7 @@ SET SESSION wsrep_osu_method=TOI;
 DROP TABLE t1;
 
 --connection node_2
-SET GLOBAL wsrep_slave_threads=1;
+SET GLOBAL wsrep_applier_threads=1;
 SET @@global.wsrep_log_conflicts=OFF;
 
 --connection node_1
