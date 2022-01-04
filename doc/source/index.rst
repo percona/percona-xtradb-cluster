@@ -4,9 +4,7 @@
 Percona XtraDB Cluster |version| Documentation
 ==============================================
 
-Percona XtraDB Cluster_ is a database clustering solution for MySQL.  It ensures high
-availability, prevents downtime and data loss, and provides linear scalability
-for a growing environment.
+Percona XtraDB Cluster_ is a database clustering solution for MySQL. It ensures high availability, prevents downtime and data loss, and provides linear scalability for a growing environment.
 
 .. rubric:: Features of Percona XtraDB Cluster
 
@@ -142,13 +140,22 @@ How-tos
    howtos/proxysql-v2
    howtos/virt_sandbox
 
+Release notes
+===================
+
+.. toctree::
+   :maxdepth: 1
+   :glob:
+
+   release-notes/release-notes_index
+
+
 Reference
 =========
 
 .. toctree::
    :maxdepth: 1
 
-   release-notes/release-notes_index
    wsrep-status-index
    wsrep-system-index
    wsrep-provider-index
