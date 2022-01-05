@@ -1567,7 +1567,7 @@ function initialize_pxb_commands()
             }
 
             # prepare doesn't look at my.cnf instead it has its own generated backup-my.cnf
-            INNOPREPARE="${pxb_bin_path} $disver $iapts --prepare --binlog-info=ON \
+            INNOPREPARE="${pxb_bin_path} $disver $iapts --prepare \
                 \$rebuildcmd \$keyringapplyopt \$encrypt_prepare_options \
                 --rollback-prepared-trx \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
@@ -1575,19 +1575,19 @@ function initialize_pxb_commands()
             INNOMOVE="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
                 --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} \
                 --datadir=\${TDATA} $disver $impts \
-                --move-back --binlog-info=ON --force-non-empty-directories \$encrypt_move_options \
+                --move-back --force-non-empty-directories \$encrypt_move_options \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
                 --target-dir=\${DATA} 2>&1 | logger -p daemon.err -t ${ssystag}innobackupex-move "
             INNOBACKUP="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
                 --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \
                 \$INNOEXTRA \$keyringbackupopt --lock-ddl --backup --galera-info \
-                --binlog-info=ON \$encrypt_backup_options --stream=\$sfmt \
+                \$encrypt_backup_options --stream=\$sfmt \
                 --xtrabackup-plugin-dir="$pxb_plugin_dir" \
                 --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
         fi
     else
         # prepare doesn't look at my.cnf instead it has its own generated backup-my.cnf
-        INNOPREPARE="${pxb_bin_path} $disver $iapts --prepare --binlog-info=ON \
+        INNOPREPARE="${pxb_bin_path} $disver $iapts --prepare \
             \$rebuildcmd \$keyringapplyopt \$encrypt_prepare_options \
             --rollback-prepared-trx \
             --xtrabackup-plugin-dir="$pxb_plugin_dir" \
@@ -1595,13 +1595,13 @@ function initialize_pxb_commands()
         INNOMOVE="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
             --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} \
             --datadir=\${TDATA} $disver $impts \
-            --move-back --binlog-info=ON --force-non-empty-directories \$encrypt_move_options \
+            --move-back --force-non-empty-directories \$encrypt_move_options \
             --xtrabackup-plugin-dir="$pxb_plugin_dir" \
             --target-dir=\${DATA} &>\${DATA}/innobackup.move.log"
         INNOBACKUP="${pxb_bin_path} --defaults-file=${WSREP_SST_OPT_CONF} \
             --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \
             \$INNOEXTRA \$keyringbackupopt --lock-ddl --backup --galera-info \
-            --binlog-info=ON \$encrypt_backup_options --stream=\$sfmt \
+            \$encrypt_backup_options --stream=\$sfmt \
             --xtrabackup-plugin-dir="$pxb_plugin_dir" \
             --target-dir=\$itmpdir 2>\${DATA}/innobackup.backup.log"
     fi
