@@ -1523,7 +1523,7 @@ function initialize_pxb_commands()
         exit 2
     fi
 
-    if ${pxb_bin_path} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then
+    if ${pxb_bin_path} --help 2>/dev/null | grep -q -- '--version-check'; then
         disver="--no-version-check"
     fi
 
