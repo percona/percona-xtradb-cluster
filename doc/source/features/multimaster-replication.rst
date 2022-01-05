@@ -37,9 +37,9 @@ Response time of ``COMMIT`` includes the following:
 There are two important consequences of this architecture:
 
 * Several appliers can be used in parallel.
-  This enables truely parallel replication.
+  This enables truly parallel replication.
   A replica can have many parallel threads configured
-  using the :option:`wsrep_slave_threads` variable.
+  using the `wsrep_slave_threads` variable or the ``wsrep_applier_threads`` variable. The ``wsrep_slave_threads`` variable was deprecated in the Percona XtraDB Cluster 8.0.26-16 release.
 
 * There might be a small period of time when a replica is out of sync.
   This happens because the source may apply events faster than the replica.

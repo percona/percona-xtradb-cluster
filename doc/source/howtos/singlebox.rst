@@ -33,7 +33,6 @@ To set up the cluster:
         wsrep_provider=/usr/local/Percona-XtraDB-Cluster-8.0.x86_64/lib/libgalera_smm.so
         wsrep_sst_receive_address=192.168.2.21:4020
         wsrep_node_incoming_address=192.168.2.21
-        wsrep_slave_threads=2
         wsrep_cluster_name=trimethylxanthine
         wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:4030;"
         wsrep_sst_method=xtrabackup-v2
@@ -56,7 +55,7 @@ To set up the cluster:
         wsrep_provider=/usr/local/Percona-XtraDB-Cluster-8.0.x86_64/lib/libgalera_smm.so
         wsrep_sst_receive_address=192.168.2.21:5020
         wsrep_node_incoming_address=192.168.2.21
-        wsrep_slave_threads=2
+
         wsrep_cluster_name=trimethylxanthine
         wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:5030;"
         wsrep_sst_method=xtrabackup-v2
@@ -79,7 +78,6 @@ To set up the cluster:
         wsrep_provider=/usr/local/Percona-XtraDB-Cluster-8.0.x86_64/lib/libgalera_smm.so
         wsrep_sst_receive_address=192.168.2.21:6020
         wsrep_node_incoming_address=192.168.2.21
-        wsrep_slave_threads=2
         wsrep_cluster_name=trimethylxanthine
         wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:6030;"
         wsrep_sst_method=xtrabackup-v2
