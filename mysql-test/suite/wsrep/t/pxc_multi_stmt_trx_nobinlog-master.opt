@@ -1,0 +1,1 @@
+--skip-log-bin --max-binlog-cache-size=4096
