@@ -101,7 +101,7 @@ add_test_file(${CMAKE_CURRENT_SOURCE_DIR}/plugin/test_plugin.cc
   )
 
 FOREACH(test_file
-    # KH: test_bug21873666.cc
+    test_bug21873666.cc
     test_bug21962350.cc
     test_bug22062859.cc
     )
