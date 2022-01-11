@@ -2281,7 +2281,6 @@ const char *thd_innodb_tmpdir(THD *thd) {
   return (innodb_session->m_trx);
 }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 
 /** Obtain the private handler of InnoDB session specific data.
@@ -2319,15 +2318,6 @@ trx_t *&wsrep_thd_to_trx(THD *thd) {
 
 #endif /* WITH_WSREP */
 
-/** Return the number of read threads for this session.
-@param[in]      thd       Session instance, or nullptr to query the global
-                          innodb_parallel_read_threads value. */
-||||||| 3d64165d466
-/** Return the number of read threads for this session.
-@param[in]      thd       Session instance, or nullptr to query the global
-                          innodb_parallel_read_threads value. */
-=======
->>>>>>> ps/release-8.0.27-18
 ulong thd_parallel_read_threads(THD *thd) {
   return THDVAR(thd, parallel_read_threads);
 }
@@ -2770,32 +2760,12 @@ ulint innobase_get_lower_case_table_names(void) {
 
 char *innobase_mysql_tmpdir() { return (mysql_tmpdir); }
 
-<<<<<<< HEAD
-/** Creates a temporary file in the location specified by the parameter
-path. If the path is NULL, then it will be created in --tmpdir.
-@param[in]	path	location for creating temporary file
-@return temporary file descriptor, or < 0 on error */
-int innobase_mysql_tmpfile(const char *path) {
+os_fd_t innobase_mysql_tmpfile(const char *path) {
+  DBUG_EXECUTE_IF("innobase_tmpfile_creation_failure", return (-1););
+
 #ifdef WITH_WSREP
   os_event_wait(srv_allow_writes_event);
 #endif /* WITH_WSREP */
-
-  int fd2 = -1;
-  File fd;
-
-||||||| 3d64165d466
-/** Creates a temporary file in the location specified by the parameter
-path. If the path is NULL, then it will be created in --tmpdir.
-@param[in]	path	location for creating temporary file
-@return temporary file descriptor, or < 0 on error */
-int innobase_mysql_tmpfile(const char *path) {
-  int fd2 = -1;
-  File fd;
-
-=======
-os_fd_t innobase_mysql_tmpfile(const char *path) {
->>>>>>> ps/release-8.0.27-18
-  DBUG_EXECUTE_IF("innobase_tmpfile_creation_failure", return (-1););
 
   auto fd =
       (path == nullptr) ? mysql_tmpfile("ib") : mysql_tmpfile_path(path, "ib");
@@ -6488,8 +6458,7 @@ void innobase_commit_low(trx_t *trx) /*!< in: transaction handle */
   DEBUG_SYNC_C("innobase_commit_low_begin");
 
   if (trx_is_started(trx)) {
-<<<<<<< HEAD
-    const dberr_t error MY_ATTRIBUTE((unused)) = trx_commit_for_mysql(trx);
+    const dberr_t error [[maybe_unused]] = trx_commit_for_mysql(trx);
 #ifdef WITH_WSREP
     // The original comment is not necessarily true for PXC.
     // We removed check for TRX_FORCE_ROLLBACK_DISABLE from 'if' condition in
@@ -6509,12 +6478,6 @@ void innobase_commit_low(trx_t *trx) /*!< in: transaction handle */
     // transaction)
     ut_ad(DB_SUCCESS == error ||
           (DB_FORCED_ABORT == error && thd->wsrep_trx().is_empty()));
-#else
-||||||| 3d64165d466
-    const dberr_t error MY_ATTRIBUTE((unused)) = trx_commit_for_mysql(trx);
-=======
-    const dberr_t error [[maybe_unused]] = trx_commit_for_mysql(trx);
->>>>>>> ps/release-8.0.27-18
     // This is ut_ad not ut_a, because previously we did not have an assert
     // and nobody has noticed for a long time, so probably there is no much
     // harm in silencing this error. OTOH we believe it should no longer happen

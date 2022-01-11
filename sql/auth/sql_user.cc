@@ -1640,8 +1640,7 @@ bool set_and_validate_user_attributes(
     inbuf = Str->first_factor_auth_info.auth.str;
     inbuflen = (unsigned)Str->first_factor_auth_info.auth.length;
     std::string gen_password;
-<<<<<<< HEAD
-    if (Str->has_password_generator) {
+    if (Str->first_factor_auth_info.has_password_generator) {
 #ifdef WITH_WSREP
       if (WSREP(thd)) {
         const char *msg =
@@ -1655,11 +1654,6 @@ bool set_and_validate_user_attributes(
         return true;
       }
 #endif /* WITH_WSREP */
-||||||| 3d64165d466
-    if (Str->has_password_generator) {
-=======
-    if (Str->first_factor_auth_info.has_password_generator) {
->>>>>>> ps/release-8.0.27-18
       thd->m_disable_password_validation = true;
       generate_random_password(&gen_password,
                                thd->variables.generated_random_password_length);
@@ -3451,15 +3445,6 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
       bool dummy_row_existed = false;
       I_multi_factor_auth *mfa = nullptr;
 
-<<<<<<< HEAD
-      if (acl_is_utility_user(tmp_user_from->user.str, tmp_user_from->host.str,
-                              nullptr)) {
-        log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0);
-||||||| 3d64165d466
-    if (acl_is_utility_user(tmp_user_from->user.str, tmp_user_from->host.str,
-                            nullptr)) {
-      log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0);
-=======
       LEX_MFA *tmp_lex_mfa;
       List_iterator<LEX_MFA> mfa_list_it(tmp_user_from->mfa_list);
       while ((tmp_lex_mfa = mfa_list_it++)) {
@@ -3470,7 +3455,6 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
       if (acl_is_utility_user(tmp_user_from->user.str, tmp_user_from->host.str,
                               nullptr)) {
         log_user(thd, &wrong_users, tmp_user_from, wrong_users.length() > 0);
->>>>>>> ps/release-8.0.27-18
         result = 1;
         continue;
       }

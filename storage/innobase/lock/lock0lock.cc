@@ -5238,85 +5238,6 @@ static void rec_queue_validate_latched(const buf_block_t *block,
 
     trx_id = lock_clust_rec_some_has_impl(rec, index, offsets);
 
-<<<<<<< HEAD
-    Trx_shard_latch_guard guard{trx_id, UT_LOCATION_HERE};
-
-    const trx_t *impl_trx = trx_rw_is_active_low(trx_id);
-    if (impl_trx != nullptr) {
-      ut_ad(owns_page_shard(block->get_page_id()));
-      /* impl_trx cannot become TRX_STATE_COMMITTED_IN_MEMORY nor removed from
-      rw_trx_set until we release Trx_shard's mutex, which means that currently
-      all other threads in the system consider this impl_trx active and thus
-      should respect implicit locks held by impl_trx*/
-
-      const lock_t *other_lock =
-          lock_rec_other_has_expl_req(LOCK_S, block, true, heap_no, impl_trx);
-
-      /* The impl_trx is holding an implicit lock on the
-      given record 'rec'. So there cannot be another
-      explicit granted lock.  Also, there can be another
-      explicit waiting lock only if the impl_trx has an
-      explicit granted lock. */
-
-      if (other_lock != nullptr) {
-#ifdef WITH_WSREP
-        if (!lock_get_wait(other_lock)) {
-          ib::info() << "WSREP impl BF lock conflict for my impl lock:\n BF:"
-                     << ((wsrep_thd_is_BF(impl_trx->mysql_thd, false))
-                             ? "BF"
-                             : "normal")
-                     << " exec: "
-                     << wsrep_thd_client_mode_str(impl_trx->mysql_thd)
-                     << " conflict: "
-                     << wsrep_thd_client_state_str(impl_trx->mysql_thd)
-                     << " seqno: " << wsrep_thd_trx_seqno(impl_trx->mysql_thd)
-                     << " SQL: " << wsrep_thd_query(impl_trx->mysql_thd);
-          trx_t *otrx = other_lock->trx;
-          ib::info() << "WSREP other lock:\n BF:"
-                     << ((wsrep_thd_is_BF(otrx->mysql_thd, false)) ? "BF"
-                                                                   : "normal")
-                     << " exec: " << wsrep_thd_client_mode_str(otrx->mysql_thd)
-                     << " conflict: "
-                     << wsrep_thd_client_state_str(otrx->mysql_thd)
-                     << " seqno: " << wsrep_thd_trx_seqno(otrx->mysql_thd)
-                     << " SQL: " << wsrep_thd_query(otrx->mysql_thd);
-        }
-        if (!lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
-                               impl_trx)) {
-          ib::info() << "WSREP impl BF lock conflict";
-        }
-        ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
-                               impl_trx));
-#endif /* WITH_WSREP */
-      }
-    }
-||||||| 3d64165d466
-    Trx_shard_latch_guard guard{trx_id, UT_LOCATION_HERE};
-
-    const trx_t *impl_trx = trx_rw_is_active_low(trx_id);
-    if (impl_trx != nullptr) {
-      ut_ad(owns_page_shard(block->get_page_id()));
-      /* impl_trx cannot become TRX_STATE_COMMITTED_IN_MEMORY nor removed from
-      rw_trx_set until we release Trx_shard's mutex, which means that currently
-      all other threads in the system consider this impl_trx active and thus
-      should respect implicit locks held by impl_trx*/
-
-      const lock_t *other_lock =
-          lock_rec_other_has_expl_req(LOCK_S, block, true, heap_no, impl_trx);
-
-      /* The impl_trx is holding an implicit lock on the
-      given record 'rec'. So there cannot be another
-      explicit granted lock.  Also, there can be another
-      explicit waiting lock only if the impl_trx has an
-      explicit granted lock. */
-
-      if (other_lock != nullptr) {
-        ut_a(lock_get_wait(other_lock));
-        ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
-                               impl_trx));
-      }
-    }
-=======
     trx_sys->latch_and_execute_with_active_trx(
         trx_id,
         [&](const trx_t *impl_trx) {
@@ -5338,13 +5259,39 @@ static void rec_queue_validate_latched(const buf_block_t *block,
 
             if (other_lock != nullptr) {
               ut_a(lock_get_wait(other_lock));
+#ifdef WITH_WSREP
+            if (!lock_get_wait(other_lock)) {
+            ib::info() << "WSREP impl BF lock conflict for my impl lock:\n BF:"
+                        << ((wsrep_thd_is_BF(impl_trx->mysql_thd, false))
+                                ? "BF"
+                                : "normal")
+                        << " exec: "
+                        << wsrep_thd_client_mode_str(impl_trx->mysql_thd)
+                        << " conflict: "
+                        << wsrep_thd_client_state_str(impl_trx->mysql_thd)
+                        << " seqno: " << wsrep_thd_trx_seqno(impl_trx->mysql_thd)
+                        << " SQL: " << wsrep_thd_query(impl_trx->mysql_thd);
+            trx_t *otrx = other_lock->trx;
+            ib::info() << "WSREP other lock:\n BF:"
+                        << ((wsrep_thd_is_BF(otrx->mysql_thd, false)) ? "BF"
+                                                                    : "normal")
+                        << " exec: " << wsrep_thd_client_mode_str(otrx->mysql_thd)
+                        << " conflict: "
+                        << wsrep_thd_client_state_str(otrx->mysql_thd)
+                        << " seqno: " << wsrep_thd_trx_seqno(otrx->mysql_thd)
+                        << " SQL: " << wsrep_thd_query(otrx->mysql_thd);
+            }
+            if (!lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
+                                impl_trx)) {
+            ib::info() << "WSREP impl BF lock conflict";
+            }
+#endif /* WITH_WSREP */
               ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
                                      impl_trx));
             }
           }
         },
         UT_LOCATION_HERE);
->>>>>>> ps/release-8.0.27-18
   }
 
   Lock_iter::for_each(rec_id, [&](lock_t *lock) {

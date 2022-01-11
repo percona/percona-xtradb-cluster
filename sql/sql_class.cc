@@ -1328,8 +1328,8 @@ void THD::release_resources() {
 
   mysql_mutex_unlock(&LOCK_status);
 
-<<<<<<< HEAD
   m_release_resources_done = true;
+  m_thd_life_cycle_stage = enum_thd_life_cycle_stages::RESOURCES_RELEASED;
 
 #ifdef WITH_WSREP
   mysql_mutex_lock(&LOCK_wsrep_thd);
@@ -1354,11 +1354,6 @@ void THD::release_resources() {
   }
   wsrep_free_status(this);
 #endif /* WITH_WSREP */
-||||||| 3d64165d466
-  m_release_resources_done = true;
-=======
-  m_thd_life_cycle_stage = enum_thd_life_cycle_stages::RESOURCES_RELEASED;
->>>>>>> ps/release-8.0.27-18
 }
 
 THD::~THD() {

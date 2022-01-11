@@ -2789,17 +2789,6 @@ done:
     error = clone_cmd->execute_server(thd);
   }
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-  if (do_end_of_statement) {
-#endif /* WITH_WSREP */
-    thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
-#ifdef WITH_WSREP
-  }
-#endif /* WITH_WSREP */
-||||||| 3d64165d466
-  thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
-=======
   if (command == COM_SUBSCRIBE_GROUP_REPLICATION_STREAM && !error) {
     call_gr_incoming_connection_cb(
         thd, thd->active_vio->mysql_socket.fd,
@@ -2807,8 +2796,13 @@ done:
                                  : nullptr);
   }
 
-  thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
->>>>>>> ps/release-8.0.27-18
+#ifdef WITH_WSREP
+  if (do_end_of_statement) {
+#endif /* WITH_WSREP */
+    thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
 
   if (!thd->is_error() && !thd->killed)
     mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_GENERAL_RESULT), 0, nullptr,

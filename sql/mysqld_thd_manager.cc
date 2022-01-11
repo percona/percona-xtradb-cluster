@@ -100,14 +100,11 @@ class Find_THD {
   Find_THD_Impl *m_impl;
 };
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 Do_THD_Impl::Do_THD_Impl() { /* Empty constructor */
 }
 #endif /* WITH_WSREP */
 
-||||||| 3d64165d466
-=======
 THD_ptr::THD_ptr(THD *thd) : m_underlying(thd) {
   if (m_underlying != nullptr) {
     mysql_mutex_assert_not_owner(&m_underlying->LOCK_thd_data);
@@ -137,7 +134,6 @@ THD *THD_ptr::release() {
   return tmp;
 }
 
->>>>>>> ps/release-8.0.27-18
 #ifdef HAVE_PSI_INTERFACE
 static PSI_mutex_key key_LOCK_thd_list;
 static PSI_mutex_key key_LOCK_thd_remove;
