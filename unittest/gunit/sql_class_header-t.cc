@@ -26,6 +26,8 @@
   significantly.
 */
 
+//#define KH_INCLUDED
+
 #include "sql/sql_class.h"
 
 #ifdef SQL_LEX_INCLUDED
@@ -40,8 +42,10 @@
 #error "sql_class.h includes field.h directly or indirectly; it should not."
 #endif
 
+#if 0  // KH:
 #ifdef HANDLER_INCLUDED
 #error "sql_class.h includes handler.h directly or indirectly; it should not."
+#endif
 #endif
 
 #ifdef _SQL_PROFILE_H

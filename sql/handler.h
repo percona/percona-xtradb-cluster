@@ -1,6 +1,10 @@
 #ifndef HANDLER_INCLUDED
 #define HANDLER_INCLUDED
 
+#ifdef KH_INCLUDED
+#error "KH_INCLUDED"
+#endif
+
 /*
    Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 

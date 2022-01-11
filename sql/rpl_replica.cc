@@ -5194,7 +5194,7 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
                                         ER_THD_NONCONST(thd, temp_trans_errno),
                                         rli->trans_retries);
               }
-
+            }
               rli->retried_trans++;
               mysql_mutex_unlock(&rli->data_lock);
 #ifndef NDEBUG
@@ -7056,11 +7056,11 @@ wsrep_restart_point :
   else
     rli->current_mts_submode = new Mts_submode_database();
 
-    // Only use replica preserve commit order if more than 1 worker exists
-    if (opt_replica_preserve_commit_order && !rli->is_parallel_exec() &&
-        rli->opt_replica_parallel_workers > 1)
-      commit_order_mngr =
-          new Commit_order_manager(rli->opt_replica_parallel_workers);
+  // Only use replica preserve commit order if more than 1 worker exists
+  if (opt_replica_preserve_commit_order && !rli->is_parallel_exec() &&
+    rli->opt_replica_parallel_workers > 1)
+    commit_order_mngr =
+        new Commit_order_manager(rli->opt_replica_parallel_workers);
 
   rli->set_commit_order_manager(commit_order_mngr);
 

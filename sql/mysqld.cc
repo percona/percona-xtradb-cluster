@@ -10264,8 +10264,8 @@ static bool have_committing_connections() {
   // Find_thd_committing find_thd_committing();
   Find_wsrep_thd find_thd_committing(COMMITTING);
 
-  THD *tmp = Global_THD_manager::get_instance()->find_thd(&find_thd_committing);
-  if (tmp) return true;
+  THD_ptr tmp = Global_THD_manager::get_instance()->find_thd(&find_thd_committing);
+  if (tmp.get()) return true;
   return false;
 }
 
@@ -13161,6 +13161,7 @@ static PSI_cond_info all_server_conds[]=
 
   { &key_COND_wsrep_thd_queue, "COND_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
   { &key_COND_wsrep_group_commit, "COND_wsrep_group_commit", 0, 0, PSI_DOCUMENT_ME}
+#endif /* WITH_WSREP */
 };
 /* clang-format on */
 
@@ -13199,12 +13200,12 @@ PSI_FLAG_USER | PSI_FLAG_NO_SEQNUM, 0, PSI_DOCUMENT_ME},
   { &key_thread_parser_service, "parser_service", "parser_srv", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_thread_handle_con_admin_sockets, "admin_interface", "con_admin", PSI_FLAG_USER, 0, PSI_DOCUMENT_ME},
 #ifdef WITH_WSREP
-  { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_sst_logger, "THREAD_wsrep_sst_logger", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_post_rollbacker, "THREAD_wsrep_post_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
+  { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", "sst_joiner", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", "sst_donor", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_sst_logger, "THREAD_wsrep_sst_logger", "sst_logger", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", "applier", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", "rlb", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_post_rollbacker, "THREAD_wsrep_post_rollbacker", "postrlb", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
 };
 /* clang-format on */

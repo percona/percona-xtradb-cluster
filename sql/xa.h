@@ -40,9 +40,11 @@
 #include "sql/sql_plugin_ref.h"    // plugin_ref
 #include "sql/xa_aux.h"            // serialize_xid
 
+#if 1  // KH:
 #ifdef WITH_WSREP
 #include "sql/wsrep_xid.h"
 #endif /* WITH_WSREP */
+#endif
 
 class Protocol;
 class THD;

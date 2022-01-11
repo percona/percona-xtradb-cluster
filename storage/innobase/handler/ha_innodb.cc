@@ -2301,7 +2301,7 @@ innodb_session_t *&wsrep_thd_to_innodb_session(THD *thd) {
   stats update thread that too takes MDL lock creating potential conflict.
   Given this is background thread it doesn't have an active transaction
   associated with it. */
-  innodb_session = UT_NEW_NOKEY(innodb_session_t());
+  innodb_session = ut::new_withkey<innodb_session_t>(UT_NEW_THIS_FILE_PSI_KEY);
   return (innodb_session);
 }
 
@@ -8865,7 +8865,7 @@ uint wsrep_store_key_val_for_row(THD *thd, TABLE *table, uint keynr, char *buff,
 
       blob_data = row_mysql_read_blob_ref(
           &blob_len, (byte *)(record + (ulint)get_field_offset(table, field)),
-          (ulint)field->pack_length(), false, 0, 0, prebuilt);
+          (ulint)field->pack_length(), false, 0, 0, &prebuilt->compress_heap);
 
       true_len = blob_len;
 
@@ -10639,7 +10639,7 @@ static int wsrep_calc_row_hash(byte *digest, const uchar *row, TABLE *table,
 
     switch (col_type) {
       case DATA_BLOB:
-        ptr = row_mysql_read_blob_ref(&len, ptr, len, false, 0, 0, prebuilt);
+        ptr = row_mysql_read_blob_ref(&len, ptr, len, false, 0, 0, &prebuilt->compress_heap);
         break;
 
       case DATA_VARCHAR:
