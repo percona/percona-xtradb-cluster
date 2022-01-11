@@ -249,9 +249,12 @@ struct handle_option_ctx {
 static int search_default_file(Process_option_func func, void *func_ctx,
                                const char *dir, const char *config_file,
                                bool is_login_file);
-static int search_default_file_with_ext(
-    Process_option_func func, void *func_ctx, const char *dir, const char *ext,
-    const char *config_file, int recursion_level, bool is_login_file);
+static int search_default_file_with_ext(Process_option_func func,
+                                        void *func_ctx, const char *dir,
+                                        const char *ext,
+                                        const char *config_file,
+                                        int recursion_level, bool is_login_file,
+                                        bool report_os_error_on_open);
 using mysql_file_getline_ret = std::unique_ptr<char, decltype(std::free) *>;
 static mysql_file_getline_ret mysql_file_getline(char *str, int size,
                                                  MYSQL_FILE *file,
@@ -471,8 +474,9 @@ int my_search_option_files(const char *conf_file, int *argc, char ***argv,
   // If my defaults file is set (from a previous run), we read it
   else if (my_defaults_file) {
     int error;
-    if ((error = search_default_file_with_ext(
-             func, func_ctx, "", "", my_defaults_file, 0, is_login_file)) < 0)
+    if ((error = search_default_file_with_ext(func, func_ctx, "", "",
+                                              my_defaults_file, 0,
+                                              is_login_file, false)) < 0)
       goto err;
     if (error > 0) {
       my_message_local(ERROR_LEVEL, EE_FAILED_TO_OPEN_DEFAULTS_FILE,
@@ -489,7 +493,7 @@ int my_search_option_files(const char *conf_file, int *argc, char ***argv,
         int error;
         if ((error = search_default_file_with_ext(func, func_ctx, "", "",
                                                   my_defaults_extra_file, 0,
-                                                  is_login_file)) < 0)
+                                                  is_login_file, false)) < 0)
           goto err; /* Fatal error */
         if (error > 0) {
           my_message_local(ERROR_LEVEL, EE_FAILED_TO_OPEN_DEFAULTS_FILE,
@@ -736,7 +740,7 @@ int my_load_defaults(const char *conf_file, const char **groups, int *argc,
         (error = my_search_option_files(my_login_file, argc, argv, &args_used,
                                         handle_default_option, (void *)&ctx,
                                         dirs, true, found_no_defaults))) {
-      free_root(alloc, MYF(0));
+      alloc->Clear();
       return error;
     }
   }
@@ -820,9 +824,9 @@ static int search_default_file(Process_option_func opt_handler,
 
   for (ext = exts_to_use; *ext; ext++) {
     int error;
-    if ((error =
-             search_default_file_with_ext(opt_handler, handler_ctx, dir, *ext,
-                                          config_file, 0, is_login_file)) < 0)
+    if ((error = search_default_file_with_ext(opt_handler, handler_ctx, dir,
+                                              *ext, config_file, 0,
+                                              is_login_file, false)) < 0)
       return error;
   }
   return 0;
@@ -887,6 +891,7 @@ static char *get_argument(const char *keyword, size_t kwlen, char *ptr,
     recursion_level             the level of recursion, got while processing
                                 "!include" or "!includedir"
     is_login_file               TRUE, when login file is being processed.
+    report_os_error_on_open     true when OS error is to be reported
 
   RETURN
     0   Success
@@ -898,8 +903,8 @@ static int search_default_file_with_ext(Process_option_func opt_handler,
                                         void *handler_ctx, const char *dir,
                                         const char *ext,
                                         const char *config_file,
-                                        int recursion_level,
-                                        bool is_login_file) {
+                                        int recursion_level, bool is_login_file,
+                                        bool report_os_error_on_open) {
   char name[FN_REFLEN + 10], buff[4096], curr_gr[4096], *ptr, *end;
   const char **tmp_ext;
   char *value, tmp[FN_REFLEN];
@@ -912,6 +917,7 @@ static int search_default_file_with_ext(Process_option_func opt_handler,
   uint i, rc;
   MY_DIR *search_dir;
   FILEINFO *search_file;
+  myf flags = MYF(report_os_error_on_open ? MY_WME : 0);
 
   if ((dir ? strlen(dir) : 0) + strlen(config_file) >= FN_REFLEN - 3)
     return 0; /* Ignore wrong paths */
@@ -925,14 +931,15 @@ static int search_default_file_with_ext(Process_option_func opt_handler,
   }
   fn_format(name, name, "", "", MY_UNPACK_FILENAME);
 
-  if ((rc = check_file_permissions(name, is_login_file)) < 2) return (int)rc;
+  if ((rc = check_file_permissions(name, is_login_file, flags)) < 2)
+    return (int)rc;
 
   if (is_login_file) {
     if (!(fp = mysql_file_fopen(key_file_cnf, name, O_RDONLY | MY_FOPEN_BINARY,
-                                MYF(0))))
+                                flags)))
       return 1; /* Ignore wrong files. */
   } else {
-    if (!(fp = mysql_file_fopen(key_file_cnf, name, O_RDONLY, MYF(0))))
+    if (!(fp = mysql_file_fopen(key_file_cnf, name, O_RDONLY, flags)))
       return 1; /* Ignore wrong files */
   }
 #ifdef WITH_WSREP
@@ -976,7 +983,11 @@ static int search_default_file_with_ext(Process_option_func opt_handler,
                                  ptr, name, line)))
           goto err;
 
-        if (!(search_dir = my_dir(ptr, MYF(MY_WME)))) goto err;
+        if (!(search_dir = my_dir(ptr, MYF(MY_WME)))) {
+          my_message_local(ERROR_LEVEL, EE_FAILED_PROCESSING_DIRECTIVE,
+                           includedir_keyword, name, line);
+          goto err;
+        }
 
         for (i = 0; i < search_dir->number_off_files; i++) {
           search_file = search_dir->dir_entry + i;
@@ -1003,9 +1014,11 @@ static int search_default_file_with_ext(Process_option_func opt_handler,
             */
             if (it != default_paths.end()) default_paths[tmp] = it->second;
 
-            search_default_file_with_ext(opt_handler, handler_ctx, nullptr,
-                                         nullptr, tmp, recursion_level + 1,
-                                         is_login_file);
+            if (search_default_file_with_ext(opt_handler, handler_ctx, nullptr,
+                                             nullptr, tmp, recursion_level + 1,
+                                             is_login_file, true))
+              my_message_local(ERROR_LEVEL, EE_FAILED_PROCESSING_DIRECTIVE,
+                               includedir_keyword, name, line);
           }
         }
 
@@ -1032,8 +1045,11 @@ static int search_default_file_with_ext(Process_option_func opt_handler,
             fn_format(tmp, ptr, "", "", MY_UNPACK_FILENAME | MY_SAFE_PATH))
           default_paths[tmp] = it->second;
 
-        search_default_file_with_ext(opt_handler, handler_ctx, nullptr, nullptr,
-                                     ptr, recursion_level + 1, is_login_file);
+        if (search_default_file_with_ext(opt_handler, handler_ctx, nullptr,
+                                         nullptr, ptr, recursion_level + 1,
+                                         is_login_file, true))
+          my_message_local(ERROR_LEVEL, EE_FAILED_PROCESSING_DIRECTIVE,
+                           include_keyword, name, line);
       }
 
       continue;
@@ -1206,7 +1222,7 @@ static mysql_file_getline_ret mysql_file_getline(char *buff, int size,
 
   /* If the supplied buff/size is enough to store the line, then we return the
    * buff itself. In this case, we use this noop deleter */
-  static auto noop_free = [](void *) {};
+  static auto noop_free = [](void *) noexcept {};
 
   if (is_login_file) {
     if (mysql_file_ftell(file) == 0) {
@@ -1302,8 +1318,7 @@ void my_print_default_files(const char *conf_file) {
     fputs(conf_file, stdout);
   else {
     const char **dirs;
-    MEM_ROOT alloc;
-    init_alloc_root(key_memory_defaults, &alloc, 512, 0);
+    MEM_ROOT alloc(key_memory_defaults, 512);
 
     if ((dirs = init_default_directories(&alloc)) == nullptr) {
       fputs("Internal error initializing default directories list", stdout);
@@ -1331,7 +1346,7 @@ void my_print_default_files(const char *conf_file) {
       }
     }
 
-    free_root(&alloc, MYF(0));
+    alloc.Clear();
   }
   puts("");
 }
@@ -1495,9 +1510,9 @@ void update_variable_source(const char *opt_name, const char *value) {
       /* check if variables are prefixed with skip_ */
       if (id == 4) {
         bool skip_variable = false;
-        string skip_variables[] = {"skip_name_resolve", "skip_networking",
-                                   "skip_show_database",
-                                   "skip_external_locking"};
+        string skip_variables[] = {
+            "skip_name_resolve",     "skip_networking",  "skip_show_database",
+            "skip_external_locking", "skip_slave_start", "skip_replica_start"};
         for (uint skip_index = 0;
              skip_index < sizeof(skip_variables) / sizeof(skip_variables[0]);
              ++skip_index) {
@@ -1571,7 +1586,7 @@ static int add_directory(MEM_ROOT *alloc, const char *dir, const char **dirs) {
   char buf[FN_REFLEN];
   size_t len;
   char *p;
-  bool err MY_ATTRIBUTE((unused));
+  bool err [[maybe_unused]];
 
   len = normalize_dirname(buf, dir);
   if (!(p = strmake_root(alloc, buf, len))) return 1; /* Failure */
@@ -1727,16 +1742,18 @@ int my_default_get_login_file(char *file_name, size_t file_name_size) {
 
   @param [in] file_name        Name of the option file.
   @param [in] is_login_file    TRUE, when login file is being processed.
+  @param [in] flags            error handling flags
 
   @return  0 - Non-allowable file permissions.
            1 - Failed to stat.
            2 - Success.
 */
-int check_file_permissions(const char *file_name, bool is_login_file) {
+int check_file_permissions(const char *file_name, bool is_login_file,
+                           myf flags) {
 #if !defined(_WIN32)
   MY_STAT stat_info;
 
-  if (!my_stat(file_name, &stat_info, MYF(0))) return 1;
+  if (!my_stat(file_name, &stat_info, flags)) return 1;
   /*
     Ignore .mylogin.cnf file if not exclusively readable/writable
     by current user.

@@ -735,20 +735,23 @@ bool File_query_log::write_slow(THD *thd, ulonglong current_utime,
     available, we generate the now, "long" line (with "extra" information).
   */
   if (!query_start) {
-    if (my_b_printf(&log_file,
-                    "# Schema: %s  Last_errno: %u  Killed: %u\n"
-                    "# Query_time: %s  Lock_time: %s"
-                    "  Rows_sent: %llu  Rows_examined: %llu"
-                    "  Rows_affected: %llu  Bytes_sent: %lu\n",
-                    (thd->db().str ? thd->db().str : ""), thd->last_errno,
-                    (uint)thd->killed, query_time_buff, lock_time_buff,
-                    (ulonglong)thd->get_sent_row_count(),
-                    (ulonglong)thd->get_examined_row_count(),
-                    (thd->get_row_count_func() > 0)
-                        ? (ulonglong)thd->get_row_count_func()
-                        : 0,
-                    (ulong)(thd->status_var.bytes_sent -
-                            thd->bytes_sent_old)) == (uint)-1)
+    if (my_b_printf(
+            &log_file,
+            "# Schema: %s  Last_errno: %lu  Killed: %u\n"
+            "# Query_time: %s  Lock_time: %s"
+            "  Rows_sent: %llu  Rows_examined: %llu"
+            "  Rows_affected: %llu  Bytes_sent: %lu\n",
+            (thd->db().str ? thd->db().str : ""),
+            static_cast<ulong>(
+                thd->is_error() ? thd->get_stmt_da()->mysql_errno() : 0),
+            (uint)thd->killed, query_time_buff, lock_time_buff,
+            (ulonglong)thd->get_sent_row_count(),
+            (ulonglong)thd->get_examined_row_count(),
+            (thd->get_row_count_func() > 0)
+                ? (ulonglong)thd->get_row_count_func()
+                : 0,
+            (ulong)(thd->status_var.bytes_sent - thd->bytes_sent_old)) ==
+        (uint)-1)
       goto err; /* purecov: inspected */
   } else {
     char start_time_buff[iso8601_size];
@@ -2270,7 +2273,7 @@ my_thread_id log_get_thread_id(THD *thd) { return thd->thread_id(); }
                                         LOG_ITEM_* tag, [[key], value]
   @retval          int                  return value of log_line_submit()
 */
-int log_vmessage(int log_type MY_ATTRIBUTE((unused)), va_list fili) {
+int log_vmessage(int log_type [[maybe_unused]], va_list fili) {
   char buff[LOG_BUFF_MAX];
   log_item_class lic;
   log_line ll;

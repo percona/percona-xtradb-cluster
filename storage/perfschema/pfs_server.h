@@ -55,12 +55,13 @@
 #define PFS_AUTOSIZE_VALUE (-1)
 
 #ifndef PFS_MAX_MUTEX_CLASS
-#define PFS_MAX_MUTEX_CLASS 340
+#define PFS_MAX_MUTEX_CLASS 350
 #endif
 #ifndef PFS_MAX_RWLOCK_CLASS
 #define PFS_MAX_RWLOCK_CLASS 70
 #endif
 #ifndef PFS_MAX_COND_CLASS
+<<<<<<< HEAD
 #ifdef WITH_WSREP
 /**
    Max value for PXC builds.
@@ -74,6 +75,11 @@
 #else
 #define PFS_MAX_COND_CLASS 100
 #endif /* WITH_WSREP */
+||||||| 3d64165d466
+#define PFS_MAX_COND_CLASS 100
+=======
+#define PFS_MAX_COND_CLASS 150
+>>>>>>> ps/release-8.0.27-18
 #endif
 #ifndef PFS_MAX_THREAD_CLASS
 #define PFS_MAX_THREAD_CLASS 100
