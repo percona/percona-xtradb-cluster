@@ -5577,13 +5577,19 @@ void MYSQL_BIN_LOG::report_cache_write_error(THD *thd, bool is_transactional) {
   }
 
 #ifdef WITH_WSREP
-  /* If wsrep transaction is active and binlog emulation is on,
-     binlog write error may leave transaction without any registered
-     htons. This makes wsrep rollback hooks to be skipped and the
-     transaction will remain alive in wsrep world after rollback.
-     Register binlog hton here to ensure that rollback happens in full. */
+  /*
+     If wsrep transaction is active and binlog emulation is on, binlog
+     write error may leave transaction without any registered htons.
+     This makes wsrep rollback hooks to be skipped and the transaction
+     will remain alive in wsrep world after rollback.  Register binlog
+     hton here to ensure that rollback happens in full only when the
+     session is in multi stmt transaction mode (i.e, either
+     autocommit=OFF or when the transaction is started with explicit
+     BEGIN).
+  */
   if (WSREP_EMULATE_BINLOG(thd)) {
-    if (is_transactional) trans_register_ha(thd, true, binlog_hton, NULL);
+    if (is_transactional && thd->in_multi_stmt_transaction_mode())
+      trans_register_ha(thd, true, binlog_hton, NULL);
     trans_register_ha(thd, false, binlog_hton, NULL);
   }
 #endif /* WITH_WSREP */
@@ -12515,8 +12521,7 @@ bool wsrep_stmt_rollback_is_safe(THD *thd) {
           " pre-stmt_pos: %llu, frag repl pos: %zu\n"
           "Thread: %u, SQL: %s",
           cache_mngr->trx_cache.get_prev_position(),
-          thd->wsrep_sr().log_position(), thd->thread_id(),
-          thd->query().str);
+          thd->wsrep_sr().log_position(), thd->thread_id(), thd->query().str);
       ret = false;
     }
   }

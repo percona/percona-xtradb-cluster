@@ -26,7 +26,7 @@ CALL test_hint("SET_VAR(wsrep_sync_wait=4)", "wsrep_sync_wait");
 hint_str
 SET_VAR(wsrep_sync_wait=4)
 @before_val	@hint_val	@after_val
-15	4	15
+0	4	0
 SET wsrep_sync_wait=2;
 CALL test_hint("SET_VAR(wsrep_sync_wait=4)", "wsrep_sync_wait");
 hint_str

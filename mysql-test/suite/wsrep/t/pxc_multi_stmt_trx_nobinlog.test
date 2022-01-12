@@ -1,0 +1,113 @@
+# === Purpose ===
+#
+# This test verifies that binlog cache errors are handled properly in all
+# combinations of AUTOCOMMIT when binlog is disabled and in wsrep emulation
+# mode.
+#
+# === References ===
+#
+# PXC-3855: Assertion `!thd->in_active_multi_stmt_transaction() ||
+#           thd->in_multi_stmt_transaction_mode()' failed.
+
+--source include/have_wsrep_provider.inc
+
+# Create a table with LONGTEXT as one of the columns.
+CREATE TABLE `t1` (
+ `i` INT NOT NULL AUTO_INCREMENT,
+ `s` LONGTEXT DEFAULT NULL,
+ PRIMARY KEY (`i`)
+) ENGINE=InnoDB;
+
+--echo
+--echo # Case 1: AUTOCOMMIT = ON and without explicit BEGIN statement.
+
+SET AUTOCOMMIT = ON;
+--error ER_TRANS_CACHE_FULL
+INSERT INTO t1 VALUES (NULL, REPEAT('1', 8192));
+
+# Check once again for the ER_TRANS_CACHE_FULL.
+--error ER_TRANS_CACHE_FULL
+INSERT INTO t1 VALUES (NULL, REPEAT('1', 8192));
+
+# This statement should not cause any error.
+INSERT INTO t1 VALUES (NULL, REPEAT('1', 10));
+
+# Assert that table has one row.
+--assert (`SELECT COUNT(*) = 1 FROM t1`)
+
+--echo
+--echo # Case 2: AUTOCOMMIT = ON with explicit BEGIN statement and ROLLBACK
+
+BEGIN;
+--error ER_TRANS_CACHE_FULL
+INSERT INTO t1 VALUES (NULL, REPEAT('2', 8192));
+INSERT INTO t1 VALUES (NULL, REPEAT('2', 10)); # This statement should not cause any error.
+ROLLBACK;
+
+# Assert that table has one row.
+--assert (`SELECT COUNT(*) = 1 FROM t1`)
+
+--echo
+--echo # Case 3: AUTOCOMMIT = ON with explicit BEGIN statement and COMMIT
+BEGIN;
+--error ER_TRANS_CACHE_FULL
+INSERT INTO t1 VALUES (NULL, REPEAT('3', 8192));
+INSERT INTO t1 VALUES (NULL, REPEAT('3', 10)); # This statement should not cause any error.
+COMMIT;
+
+# Assert that table has two rows.
+--assert (`SELECT COUNT(*) = 2 FROM t1`)
+
+--echo
+--echo # Case 4: AUTOCOMMIT = OFF without explicit BEGIN and ROLLBACK
+SET AUTOCOMMIT = OFF;
+--error ER_TRANS_CACHE_FULL
+INSERT INTO t1 VALUES (NULL, REPEAT('4', 8192));
+INSERT INTO t1 VALUES (NULL, REPEAT('4', 10)); # This statement should not cause any error.
+ROLLBACK;
+
+# Assert that table has two rows.
+--assert (`SELECT COUNT(*) = 2 FROM t1`)
+
+--echo
+--echo # Case 5: AUTOCOMMIT = OFF without explicit BEGIN and COMMIT
+SET AUTOCOMMIT = OFF;
+--error ER_TRANS_CACHE_FULL
+INSERT INTO t1 VALUES (NULL, REPEAT('5', 8192));
+INSERT INTO t1 VALUES (NULL, REPEAT('5', 10)); # This statement should not cause any error.
+COMMIT;
+
+# Assert that table has three rows.
+--assert (`SELECT COUNT(*) = 3 FROM t1`)
+
+--echo
+--echo # Case 6: AUTOCOMMIT = OFF with explicit BEGIN and ROLLBACK
+SET AUTOCOMMIT = OFF;
+BEGIN;
+--error ER_TRANS_CACHE_FULL
+INSERT INTO t1 VALUES (NULL, REPEAT('6', 8192));
+INSERT INTO t1 VALUES (NULL, REPEAT('6', 10)); # This statement should not cause any error.
+ROLLBACK;
+
+# Assert that table has three rows.
+--assert (`SELECT COUNT(*) = 3 FROM t1`)
+
+--echo
+--echo # Case 7: AUTOCOMMIT = OFF with explicit BEGIN and COMMIT
+SET AUTOCOMMIT = OFF;
+BEGIN;
+--error ER_TRANS_CACHE_FULL
+INSERT INTO t1 VALUES (NULL, REPEAT('7', 8192));
+INSERT INTO t1 VALUES (NULL, REPEAT('7', 10)); # This statement should not cause any error.
+COMMIT;
+
+# Assert that table has four rows.
+--assert (`SELECT COUNT(*) = 4 FROM t1`)
+
+SELECT * FROM t1;
+
+# Cleanup
+DROP TABLE t1;
+
+# Test Suppressions
+CALL mtr.add_suppression("Option binlog_cache_size .* is greater than max_binlog_cache_size .* setting binlog_cache_size equal to max_binlog_cache_size");

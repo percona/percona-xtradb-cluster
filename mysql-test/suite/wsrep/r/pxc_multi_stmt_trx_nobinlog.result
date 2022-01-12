@@ -1,0 +1,65 @@
+CREATE TABLE `t1` (
+`i` INT NOT NULL AUTO_INCREMENT,
+`s` LONGTEXT DEFAULT NULL,
+PRIMARY KEY (`i`)
+) ENGINE=InnoDB;
+
+# Case 1: AUTOCOMMIT = ON and without explicit BEGIN statement.
+SET AUTOCOMMIT = ON;
+INSERT INTO t1 VALUES (NULL, REPEAT('1', 8192));
+ERROR HY000: Multi-statement transaction required more than 'max_binlog_cache_size' bytes of storage; increase this mysqld variable and try again
+INSERT INTO t1 VALUES (NULL, REPEAT('1', 8192));
+ERROR HY000: Multi-statement transaction required more than 'max_binlog_cache_size' bytes of storage; increase this mysqld variable and try again
+INSERT INTO t1 VALUES (NULL, REPEAT('1', 10));
+
+# Case 2: AUTOCOMMIT = ON with explicit BEGIN statement and ROLLBACK
+BEGIN;
+INSERT INTO t1 VALUES (NULL, REPEAT('2', 8192));
+ERROR HY000: Multi-statement transaction required more than 'max_binlog_cache_size' bytes of storage; increase this mysqld variable and try again
+INSERT INTO t1 VALUES (NULL, REPEAT('2', 10));
+ROLLBACK;
+
+# Case 3: AUTOCOMMIT = ON with explicit BEGIN statement and COMMIT
+BEGIN;
+INSERT INTO t1 VALUES (NULL, REPEAT('3', 8192));
+ERROR HY000: Multi-statement transaction required more than 'max_binlog_cache_size' bytes of storage; increase this mysqld variable and try again
+INSERT INTO t1 VALUES (NULL, REPEAT('3', 10));
+COMMIT;
+
+# Case 4: AUTOCOMMIT = OFF without explicit BEGIN and ROLLBACK
+SET AUTOCOMMIT = OFF;
+INSERT INTO t1 VALUES (NULL, REPEAT('4', 8192));
+ERROR HY000: Multi-statement transaction required more than 'max_binlog_cache_size' bytes of storage; increase this mysqld variable and try again
+INSERT INTO t1 VALUES (NULL, REPEAT('4', 10));
+ROLLBACK;
+
+# Case 5: AUTOCOMMIT = OFF without explicit BEGIN and COMMIT
+SET AUTOCOMMIT = OFF;
+INSERT INTO t1 VALUES (NULL, REPEAT('5', 8192));
+ERROR HY000: Multi-statement transaction required more than 'max_binlog_cache_size' bytes of storage; increase this mysqld variable and try again
+INSERT INTO t1 VALUES (NULL, REPEAT('5', 10));
+COMMIT;
+
+# Case 6: AUTOCOMMIT = OFF with explicit BEGIN and ROLLBACK
+SET AUTOCOMMIT = OFF;
+BEGIN;
+INSERT INTO t1 VALUES (NULL, REPEAT('6', 8192));
+ERROR HY000: Multi-statement transaction required more than 'max_binlog_cache_size' bytes of storage; increase this mysqld variable and try again
+INSERT INTO t1 VALUES (NULL, REPEAT('6', 10));
+ROLLBACK;
+
+# Case 7: AUTOCOMMIT = OFF with explicit BEGIN and COMMIT
+SET AUTOCOMMIT = OFF;
+BEGIN;
+INSERT INTO t1 VALUES (NULL, REPEAT('7', 8192));
+ERROR HY000: Multi-statement transaction required more than 'max_binlog_cache_size' bytes of storage; increase this mysqld variable and try again
+INSERT INTO t1 VALUES (NULL, REPEAT('7', 10));
+COMMIT;
+SELECT * FROM t1;
+i	s
+3	1111111111
+7	3333333333
+11	5555555555
+15	7777777777
+DROP TABLE t1;
+CALL mtr.add_suppression("Option binlog_cache_size .* is greater than max_binlog_cache_size .* setting binlog_cache_size equal to max_binlog_cache_size");
