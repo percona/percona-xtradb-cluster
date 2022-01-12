@@ -104,6 +104,7 @@ SELECT * FROM mysql.gtid_executed;
 --source include/assert.inc
 
 CALL mtr.add_suppression(".*InnoDB: Table `mysql`.`innodb_table_stats` not found.*");
+CALL mtr.add_suppression(".*InnoDB: Table `mysql`.`innodb_index_stats` not found.*");
 
 SHOW CREATE TABLE `mysql`.`innodb_table_stats`;
 

@@ -55,6 +55,7 @@ MASTER_UUID	1	7
 MASTER_UUID	8	10
 include/assert.inc [GTID_EXECUTED is correct after the restart]
 CALL mtr.add_suppression(".*InnoDB: Table `mysql`.`innodb_table_stats` not found.*");
+CALL mtr.add_suppression(".*InnoDB: Table `mysql`.`innodb_index_stats` not found.*");
 SHOW CREATE TABLE `mysql`.`innodb_table_stats`;
 Table	Create Table
 innodb_table_stats	CREATE TABLE `innodb_table_stats` (
