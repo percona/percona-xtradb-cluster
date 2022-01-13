@@ -4270,6 +4270,22 @@ static Sys_var_set Slave_rows_search_algorithms(
 
 static const char *mts_parallel_type_names[] = {"DATABASE", "LOGICAL_CLOCK",
                                                 nullptr};
+#ifdef WITH_WSREP
+static Sys_var_enum Sys_replica_parallel_type(
+    "replica_parallel_type",
+    "The method used by the replication applier to parallelize "
+    "transactions. DATABASE, indicates that it "
+    "may apply transactions in parallel in case they update different "
+    "databases. LOGICAL_CLOCK, which is the default, indicates that it decides "
+    "whether two "
+    "transactions can be applied in parallel using the logical timestamps "
+    "computed by the source, according to "
+    "binlog_transaction_dependency_tracking.",
+    PERSIST_AS_READONLY GLOBAL_VAR(mts_parallel_option), CMD_LINE(REQUIRED_ARG),
+    mts_parallel_type_names, DEFAULT(MTS_PARALLEL_TYPE_DB_NAME),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_slave_stopped),
+    ON_UPDATE(nullptr));
+#else
 static Sys_var_enum Sys_replica_parallel_type(
     "replica_parallel_type",
     "The method used by the replication applier to parallelize "
@@ -4284,6 +4300,7 @@ static Sys_var_enum Sys_replica_parallel_type(
     mts_parallel_type_names, DEFAULT(MTS_PARALLEL_TYPE_LOGICAL_CLOCK),
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_slave_stopped),
     ON_UPDATE(nullptr));
+#endif
 
 static Sys_var_deprecated_alias Sys_slave_parallel_type(
     "slave_parallel_type", Sys_replica_parallel_type);
@@ -4338,6 +4355,16 @@ static Sys_var_ulong Binlog_transaction_dependency_history_size(
     BLOCK_SIZE(1), &PLock_slave_trans_dep_tracker, NOT_IN_BINLOG,
     ON_CHECK(nullptr), ON_UPDATE(nullptr));
 
+#ifdef WITH_WSREP
+static Sys_var_bool Sys_replica_preserve_commit_order(
+    "replica_preserve_commit_order",
+    "Force replication worker threads to commit in the same order as on the "
+    "source. Enabled by default",
+    PERSIST_AS_READONLY GLOBAL_VAR(opt_replica_preserve_commit_order),
+    CMD_LINE(OPT_ARG, OPT_REPLICA_PRESERVE_COMMIT_ORDER), DEFAULT(false),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_slave_stopped),
+    ON_UPDATE(nullptr));
+#else
 static Sys_var_bool Sys_replica_preserve_commit_order(
     "replica_preserve_commit_order",
     "Force replication worker threads to commit in the same order as on the "
@@ -4346,6 +4373,7 @@ static Sys_var_bool Sys_replica_preserve_commit_order(
     CMD_LINE(OPT_ARG, OPT_REPLICA_PRESERVE_COMMIT_ORDER), DEFAULT(true),
     NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_slave_stopped),
     ON_UPDATE(nullptr));
+#endif
 
 static Sys_var_deprecated_alias Sys_slave_preserve_commit_order(
     "slave_preserve_commit_order", Sys_replica_preserve_commit_order);
@@ -6925,12 +6953,24 @@ static Sys_var_ulong Sys_replica_transaction_retries(
 static Sys_var_deprecated_alias Sys_slave_transaction_retries(
     "slave_transaction_retries", Sys_replica_transaction_retries);
 
+// KH: this is temporary patch, to have back the old behavior
+// 8.0.27 commit 7a74dceb300ed7d68a627ad50053bea9acdbb83e changed the
+// default behavior which triggers using commit order manager and logic
+#ifdef WITH_WSREP
+static Sys_var_ulong Sys_replica_parallel_workers(
+    "replica_parallel_workers",
+    "Number of worker threads for executing events in parallel ",
+    PERSIST_AS_READONLY GLOBAL_VAR(opt_mts_replica_parallel_workers),
+    CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, MTS_MAX_WORKERS), DEFAULT(0),
+    BLOCK_SIZE(1));
+#else
 static Sys_var_ulong Sys_replica_parallel_workers(
     "replica_parallel_workers",
     "Number of worker threads for executing events in parallel ",
     PERSIST_AS_READONLY GLOBAL_VAR(opt_mts_replica_parallel_workers),
     CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, MTS_MAX_WORKERS), DEFAULT(4),
     BLOCK_SIZE(1));
+#endif
 
 static Sys_var_deprecated_alias Sys_slave_parallel_workers(
     "slave_parallel_workers", Sys_replica_parallel_workers);
