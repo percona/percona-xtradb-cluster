@@ -76,15 +76,16 @@ innodb_gis.gis_split_nan                          : BUG#3129 PXC requires 16k In
 keyring_encrypted_file.keyring_migration_bugs @darwin : Bug#31041633
 
 # main suite tests
-main.ds_mrr-big @solaris : BUG#14168107 Test leads to timeout on Solaris on slow sparc servers.
-main.mysql_config_editor @windows : Bug#32654416 THE MYSQL CLIENT LIBRARY DOES NOT HANDLE INVALID .MYLOGIN.CNF FILES WELL
-main.percona_changed_pages_big : BUG#7435 percona https://jira.percona.com/browse/PS-7435
-main.bug100352 : BUG#100352 https://bugs.mysql.com/bug.php?id=100352
+main.initialize                                   : BUG#3129 PXC requires 16k InnoDB page size (https://jira.percona.com/browse/PXC-3129)
+main.ds_mrr-big @solaris                          : BUG#14168107 Test leads to timeout on Solaris on slow sparc servers.
+main.mysql_config_editor @windows                 : Bug#32654416 THE MYSQL CLIENT LIBRARY DOES NOT HANDLE INVALID .MYLOGIN.CNF FILES WELL
+main.percona_changed_pages_big                    : BUG#7435 percona https://jira.percona.com/browse/PS-7435
+main.bug100352                                    : BUG#100352 https://bugs.mysql.com/bug.php?id=100352
 
 # Disabled due to InnoDB issues
-main.internal_tmp_disk_storage_engine : BUG#26917416 Disabled it since it's failing on pb2.
+main.internal_tmp_disk_storage_engine             : BUG#26917416 Disabled it since it's failing on pb2.
 
-main.events_time_zone         : BUG#2179 percona https://jira.percona.com/browse/PS-2179
+main.events_time_zone                             : BUG#2179 percona https://jira.percona.com/browse/PS-2179
 
 # max_parts suite tests
 max_parts.innodb-import-partition-1                         : BUG#27413612 Fails consistently on hudson jobs. Disabled until bug is fixed.

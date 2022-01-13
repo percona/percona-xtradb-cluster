@@ -17,6 +17,7 @@ USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
@@ -28,8 +29,10 @@ mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
+mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
 mysql.pxc.internal.session	localhost	REPLICATION_SLAVE_ADMIN	Y
@@ -98,6 +101,7 @@ USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
@@ -109,8 +113,10 @@ mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
+mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
 mysql.pxc.internal.session	localhost	REPLICATION_SLAVE_ADMIN	Y
@@ -178,6 +184,7 @@ USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
@@ -189,8 +196,10 @@ mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
+mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
 mysql.pxc.internal.session	localhost	REPLICATION_SLAVE_ADMIN	Y
@@ -271,6 +280,7 @@ USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
@@ -282,8 +292,10 @@ mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
+mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
 mysql.pxc.internal.session	localhost	REPLICATION_SLAVE_ADMIN	Y
@@ -356,6 +368,7 @@ USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
@@ -367,8 +380,10 @@ mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
+mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
 mysql.pxc.internal.session	localhost	REPLICATION_SLAVE_ADMIN	Y
@@ -436,6 +451,7 @@ USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
@@ -447,8 +463,10 @@ mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
+mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
 mysql.pxc.internal.session	localhost	REPLICATION_SLAVE_ADMIN	Y
@@ -539,6 +557,7 @@ USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
@@ -550,8 +569,10 @@ mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
+mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
 mysql.pxc.internal.session	localhost	REPLICATION_SLAVE_ADMIN	Y
@@ -633,6 +654,7 @@ USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
@@ -644,8 +666,10 @@ mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
+mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
 mysql.pxc.internal.session	localhost	REPLICATION_SLAVE_ADMIN	Y
@@ -735,6 +759,7 @@ USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	SYSTEM_USER	N
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
+mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
 mysql.pxc.internal.session	localhost	BACKUP_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ADMIN	Y
 mysql.pxc.internal.session	localhost	BINLOG_ENCRYPTION_ADMIN	Y
@@ -746,8 +771,10 @@ mysql.pxc.internal.session	localhost	FLUSH_STATUS	Y
 mysql.pxc.internal.session	localhost	FLUSH_TABLES	Y
 mysql.pxc.internal.session	localhost	FLUSH_USER_RESOURCES	Y
 mysql.pxc.internal.session	localhost	GROUP_REPLICATION_ADMIN	Y
+mysql.pxc.internal.session	localhost	GROUP_REPLICATION_STREAM	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ARCHIVE	Y
 mysql.pxc.internal.session	localhost	INNODB_REDO_LOG_ENABLE	Y
+mysql.pxc.internal.session	localhost	PASSWORDLESS_USER_ADMIN	Y
 mysql.pxc.internal.session	localhost	PERSIST_RO_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	REPLICATION_APPLIER	Y
 mysql.pxc.internal.session	localhost	REPLICATION_SLAVE_ADMIN	Y
