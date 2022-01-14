@@ -219,6 +219,8 @@ SHOW SESSION VARIABLES LIKE "%_checks";
 Variable_name	Value
 foreign_key_checks	ON
 unique_checks	ON
+wsrep_applier_FK_checks	ON
+wsrep_applier_UK_checks	OFF
 wsrep_slave_FK_checks	ON
 wsrep_slave_UK_checks	OFF
 
@@ -239,6 +241,8 @@ SHOW SESSION VARIABLES LIKE "%_checks";
 Variable_name	Value
 foreign_key_checks	OFF
 unique_checks	OFF
+wsrep_applier_FK_checks	ON
+wsrep_applier_UK_checks	OFF
 wsrep_slave_FK_checks	ON
 wsrep_slave_UK_checks	OFF
 # INSERT INTO t1 VALUES(2)
@@ -259,6 +263,8 @@ SHOW SESSION VARIABLES LIKE "%_checks";
 Variable_name	Value
 foreign_key_checks	OFF
 unique_checks	OFF
+wsrep_applier_FK_checks	ON
+wsrep_applier_UK_checks	OFF
 wsrep_slave_FK_checks	ON
 wsrep_slave_UK_checks	OFF
 DROP TABLE t1;
