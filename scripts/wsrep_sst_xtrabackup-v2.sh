@@ -1527,6 +1527,8 @@ function initialize_pxb_commands()
         disver="--no-version-check"
     fi
 
+    disver="--no-server-version-check"
+
     local xb_version=$(${pxb_bin_path} --version 2>&1 | grep -oe ' [0-9]\.[0-9][\.0-9]*' | head -n1)
     xb_version=${xb_version# }
     wsrep_log_debug "pxb-version:$xb_version"
