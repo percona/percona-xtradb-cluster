@@ -116,6 +116,81 @@ or the node is bootstrapping, then :variable:`pxc_strict_mode` defaults to
 
 For more information, see :ref:`pxc-strict-mode`.
 
+.. variable:: wsrep_applier_FK_checks
+
+   :cli: ``--wsrep-applier-FK-checks``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ``ON``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, the ``wsrep_slave_FK_checks`` variable is deprecated in favor of this variable.
+
+Defines whether foreign key checking is done for applier threads.
+This is enabled by default.
+
+.. seealso:: `MySQL wsrep option: wsrep_applier_FK_checks
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-applier-fk-checks>`_
+
+
+.. variable:: wsrep_applier_threads
+
+   :cli: ``--wsrep-applier-threads``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ``1``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, the ``wsrep_slave_threads`` variable is deprecated and may be removed in a later version. Use the ``wsrep_applier_threads`` variable.
+
+Specifies the number of threads
+that can apply replication transactions in parallel.
+Galera supports true parallel replication
+that applies transactions in parallel only when it is safe to do so.
+This variable is dynamic.
+You can increase/decrease it at any time.
+
+.. note:: When you decrease the number of threads,
+   it won't kill the threads immediately,
+   but stop them after they are done applying current transaction
+   (the effect with an increase is immediate though).
+
+If any replication consistency problems are encountered,
+it's recommended to set this back to ``1`` to see if that resolves the issue.
+The default value can be increased for better throughput.
+
+You may want to increase it as suggested
+`in Codership documentation for flow control
+<http://galeracluster.com/documentation-webpages/nodestates.html#flow-control>`_:
+when the node is in ``JOINED`` state,
+increasing the number of replica threads can speed up the catchup to ``SYNCED``.
+
+You can also estimate the optimal value for this from
+:variable:`wsrep_cert_deps_distance` as suggested `on this page
+<http://galeracluster.com/documentation-webpages/monitoringthecluster.html#checking-the-replication-health>`_.
+
+For more configuration tips, see `this document
+<http://galeracluster.com/documentation-webpages/configurationtips.html#setting-parallel-slave-threads>`_.
+
+.. seealso:: `MySQL wsrep option: wsrep_applier_threads
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-applier-threads>`_
+
+.. variable:: wsrep_applier_UK_checks
+
+   :cli: ``--wsrep-applier-UK-checks``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ``OFF``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, the ``wsrep_slave_UK_checks`` variable is deprecated and may be removed in a later version. Use the ``wsrep_applier_UK_checks`` variable.
+
+Defines whether unique key checking is done for applier threads.
+This is disabled by default.
+
+.. seealso:: `MySQL wsrep option: wsrep_applier_UK_checks
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-applier-uk-checks>`_
+
 .. variable:: wsrep_auto_increment_control
 
    :cli: ``--wsrep-auto-increment-control``
@@ -947,13 +1022,15 @@ the whole DDL statement is not put under TOI.
     replication. MyISAM tables are created and loaded even if
     :variable:`wsrep_replicate_myisam` is set to **ON**.
 
-.. variable:: wsrep_restart_slave
+.. variable:: wsrep_restart_replica
 
-   :cli: ``--wsrep-restart-slave``
+   :cli: ``--wsrep-restart-replica``
    :conf: Yes
    :scope: Global
    :dyn: Yes
    :default: ``OFF``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, the ``wsrep_restart_slave`` variable is deprecated in favor of this variable.
 
 Defines whether replication replica should be restarted
 when the node joins back to the cluster.
@@ -962,7 +1039,24 @@ is stopped when the node tries to apply the next replication event
 while the node is in non-primary state.
 
 .. seealso:: `MySQL wsrep option: wsrep_restart_slave
-             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-restart-slave>`_
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-restart-replica>`_
+
+.. variable:: wsrep_restart_slave
+
+   :cli: ``--wsrep-restart-slave``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ``OFF``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, the ``wsrep_restart_slave`` variable is deprecated and may be removed in later versions. Use ``wsrep_restart_replica``.
+
+Defines whether replication replica should be restarted
+when the node joins back to the cluster.
+Enabling this can be useful because asynchronous replication replica thread
+is stopped when the node tries to apply the next replication event
+while the node is in non-primary state.
+
 
 .. variable:: wsrep_retry_autocommit
 
@@ -1019,11 +1113,10 @@ microseconds. Unit of variable is in micro-secs so set accordingly.
    :dyn: Yes
    :default: ``ON``
 
+As of *Percona XtraDB Cluster* 8.0.26-16, this variable is deprecated and may be removed in a later version. Use the ``wsrep_applier_FK_checks`` variable.
+
 Defines whether foreign key checking is done for applier threads.
 This is enabled by default.
-
-.. seealso:: `MySQL wsrep option: wsrep_slave_FK_checks
-             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-slave-fk-checks>`_
 
 .. variable:: wsrep_slave_threads
 
@@ -1032,6 +1125,8 @@ This is enabled by default.
    :scope: Global
    :dyn: Yes
    :default: ``1``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, this variable is deprecated and may be removed in a later version. Use the ``wsrep_applier_threads`` variable.
 
 Specifies the number of threads
 that can apply replication transactions in parallel.
@@ -1062,9 +1157,6 @@ You can also estimate the optimal value for this from
 For more configuration tips, see `this document
 <http://galeracluster.com/documentation-webpages/configurationtips.html#setting-parallel-slave-threads>`_.
 
-.. seealso:: `MySQL wsrep option: wsrep_slave_threads
-             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-slave-threads>`_
-
 .. variable:: wsrep_slave_UK_checks
 
    :cli: ``--wsrep-slave-UK-checks``
@@ -1073,11 +1165,11 @@ For more configuration tips, see `this document
    :dyn: Yes
    :default: ``OFF``
 
+As of *Percona XtraDB Cluster* 8.0.26-16, this variable is deprecated and may be removed in a later version. Use the ``wsrep_applier_UK_checks`` variable.
+
 Defines whether unique key checking is done for applier threads.
 This is disabled by default.
 
-.. seealso:: `MySQL wsrep option: wsrep_slave_UK_checks
-             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-slave-uk-checks>`_
 
 .. variable:: wsrep_sst_donor
 

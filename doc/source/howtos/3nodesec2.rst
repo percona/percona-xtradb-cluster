@@ -71,7 +71,6 @@ To set up Percona XtraDB Cluster:
     wsrep_provider=/usr/lib64/libgalera_smm.so
     wsrep_cluster_address=gcomm://10.93.46.58,10.93.46.59,10.93.46.60
 
-    wsrep_slave_threads=2
     wsrep_cluster_name=trimethylxanthine
     wsrep_sst_method=xtrabackup-v2
     wsrep_node_name=node1
