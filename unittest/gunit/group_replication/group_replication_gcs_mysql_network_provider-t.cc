@@ -427,6 +427,13 @@ TEST_F(MySQLNetworkProviderTest, NewServerConnectionTest) {
 
   constexpr int socket_to_use = 42;
 
+#ifdef WITH_WSREP
+  wsrep::gtid gtid;
+  Wsrep_server_state::init_once(std::string(), std::string(), std::string(),
+                            std::string(), gtid,
+                            0);
+#endif
+
   THD fake_thd(false);
   // Vio *active_vio = (Vio *)malloc(sizeof(Vio));
   MYSQL_VIO active_vio = vio_new(socket_to_use, VIO_TYPE_TCPIP, 0);

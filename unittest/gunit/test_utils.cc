@@ -140,6 +140,14 @@ void Server_initializer::set_expected_error(uint val) { expected_error = val; }
 
 void Server_initializer::SetUp() {
   expected_error = 0;
+
+#ifdef WITH_WSREP
+  wsrep::gtid gtid;
+  Wsrep_server_state::init_once(std::string(), std::string(), std::string(),
+                            std::string(), gtid,
+                            0);
+#endif
+
   m_thd = new THD(false);
   THD *stack_thd = m_thd;
 
