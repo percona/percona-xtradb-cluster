@@ -6478,12 +6478,13 @@ void innobase_commit_low(trx_t *trx) /*!< in: transaction handle */
     // transaction)
     ut_ad(DB_SUCCESS == error ||
           (DB_FORCED_ABORT == error && thd->wsrep_trx().is_empty()));
+#else
     // This is ut_ad not ut_a, because previously we did not have an assert
     // and nobody has noticed for a long time, so probably there is no much
     // harm in silencing this error. OTOH we believe it should no longer happen
     // after adding `true` as a second argument to TrxInInnoDB constructor call,
     // so we'd like to learn if the error can still happen.
-    ut_ad(DB_SUCCESS == error);
+    ut_ad(DB_SUCCESS == error); 
 #endif
   }
   trx->will_lock = 0;

@@ -113,6 +113,7 @@ SHOW GRANTS FOR u2;
 
 # remove these privielges
 REVOKE PASSWORDLESS_USER_ADMIN, AUTHENTICATION_POLICY_ADMIN ON *.* FROM root@localhost;
+REVOKE PASSWORDLESS_USER_ADMIN, AUTHENTICATION_POLICY_ADMIN ON *.* FROM 'mysql.pxc.internal.session'@'localhost';
 
 --let $restart_parameters = restart:--upgrade=FORCE
 --let $wait_counter= 10000
