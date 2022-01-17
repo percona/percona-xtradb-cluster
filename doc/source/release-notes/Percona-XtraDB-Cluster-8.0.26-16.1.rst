@@ -4,7 +4,7 @@
 *Percona XtraDB Cluster* 8.0.26-16.1
 ================================================================================
 
-:Date: January, 17 2022
+:Date: January 17, 2022
 :Installation: `Installing Percona XtraDB Cluster <https://www.percona.com/doc/percona-xtradb-cluster/8.0/install/index.html>`_
 
 Percona XtraDB Cluster (PXC) supports critical business applications in your public, private, or hybrid cloud environment. Our free, open source, enterprise-grade solution includes the high availability and security features your business requires to meet your customer expectations and business goals.
