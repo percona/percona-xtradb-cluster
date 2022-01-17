@@ -34,16 +34,13 @@ under ``[sst]``.
 
 .. option:: streamfmt
 
-     :Values: xbstream, tar
+     :Values: xbstream
      :Default: xbstream
      :Match: Yes
 
-Used to specify the Percona XtraBackup streaming format.
-The recommended value is ``streamfmt=xbstream``.
-Certain features are not available with ``tar``, for instance:
-encryption, compression, parallel streaming, streaming incremental backups.
+Used to specify the Percona XtraBackup streaming format. The default value is ``streamfmt=xbstream``.
 For more information about the ``xbstream`` format, see `The xbstream Binary
-<https://www.percona.com/doc/percona-xtrabackup/2.4/xbstream/xbstream.html>`_.
+<https://www.percona.com/doc/percona-xtrabackup/8.0/xbstream/xbstream.html>`_.
 
 .. option:: transferfmt
 
