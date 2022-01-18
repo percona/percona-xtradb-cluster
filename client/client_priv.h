@@ -125,6 +125,7 @@ enum options_client
 #endif /* WITH_WSREP */
   OPT_START_SQL_FILE,
   OPT_FINISH_SQL_FILE,
+  OPT_SKIP_MYSQL_SCHEMA,
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };
