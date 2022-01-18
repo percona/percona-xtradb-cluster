@@ -4270,7 +4270,8 @@ static Sys_var_set Slave_rows_search_algorithms(
 
 static const char *mts_parallel_type_names[] = {"DATABASE", "LOGICAL_CLOCK",
                                                 nullptr};
-#ifdef WITH_WSREP
+#if 0
+//#ifdef WITH_WSREP
 static Sys_var_enum Sys_replica_parallel_type(
     "replica_parallel_type",
     "The method used by the replication applier to parallelize "
@@ -4355,7 +4356,8 @@ static Sys_var_ulong Binlog_transaction_dependency_history_size(
     BLOCK_SIZE(1), &PLock_slave_trans_dep_tracker, NOT_IN_BINLOG,
     ON_CHECK(nullptr), ON_UPDATE(nullptr));
 
-#ifdef WITH_WSREP
+#if 0
+//#ifdef WITH_WSREP
 static Sys_var_bool Sys_replica_preserve_commit_order(
     "replica_preserve_commit_order",
     "Force replication worker threads to commit in the same order as on the "
@@ -6956,7 +6958,8 @@ static Sys_var_deprecated_alias Sys_slave_transaction_retries(
 // KH: this is temporary patch, to have back the old behavior
 // 8.0.27 commit 7a74dceb300ed7d68a627ad50053bea9acdbb83e changed the
 // default behavior which triggers using commit order manager and logic
-#ifdef WITH_WSREP
+#if 0
+//#ifdef WITH_WSREP
 static Sys_var_ulong Sys_replica_parallel_workers(
     "replica_parallel_workers",
     "Number of worker threads for executing events in parallel ",
