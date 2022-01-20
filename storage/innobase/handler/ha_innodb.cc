@@ -2024,6 +2024,24 @@ innobase_srv_conc_enter_innodb(
 	}
 
 	trx_t*  trx     = prebuilt->trx;
+<<<<<<< HEAD
+||||||| merged common ancestors
+||||||||| a9b0c712de3
+	trx_t*	trx	= prebuilt->trx;
+=========
+	trx_t*	trx	= prebuilt->trx;
+#ifdef WITH_WSREP
+	if (wsrep_on(trx->mysql_thd) && 
+	    wsrep_thd_is_BF(trx->mysql_thd, FALSE)) return;
+#endif /* WITH_WSREP */
+>>>>>>>>> Temporary merge branch 2
+=======
+#ifdef WITH_WSREP
+	if (WSREP_ON && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
+		return;
+	}
+#endif /* WITH_WSREP */
+>>>>>>> wsrep_5.7.35-25.27
 	if (srv_thread_concurrency) {
 		if (trx->n_tickets_to_enter_innodb > 0) {
 
@@ -2075,8 +2093,9 @@ innobase_srv_conc_exit_innodb(
 	ut_ad(!sync_check_iterate(check));
 #endif /* UNIV_DEBUG */
 #ifdef WITH_WSREP
-	if (wsrep_on(trx->mysql_thd) && 
-	    wsrep_thd_is_BF(trx->mysql_thd, FALSE)) return;
+	if (WSREP_ON && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
+		return;
+	}
 #endif /* WITH_WSREP */
 
 	/* This is to avoid making an unnecessary function call. */

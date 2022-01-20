@@ -30,10 +30,16 @@ INCLUDE_DIRECTORIES(
   ${SSL_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}/sql
   ${WSREP_INCLUDES}
+<<<<<<< HEAD
 )
 INCLUDE_DIRECTORIES(SYSTEM
   ${BOOST_PATCHES_DIR}
   ${BOOST_INCLUDE_DIR}
+||||||| merged common ancestors
+  ${LZ4_INCLUDE_DIR}
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> wsrep_5.7.35-25.27
 )
 
 SET(CONF_SOURCES

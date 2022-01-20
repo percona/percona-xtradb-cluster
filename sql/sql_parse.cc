@@ -3291,7 +3291,7 @@ mysql_execute_command(THD *thd, bool first_level)
 
     /*
      * bail out if DB snapshot has not been installed. We however,
-     * allow SET and SHOW queries and reads from information schema
+     * allow SET/FLUSH/SHOW queries and reads from information schema
      * and dirty reads (if configured)
      */
     if (!thd->wsrep_applier                                                &&
@@ -3300,7 +3300,12 @@ mysql_execute_command(THD *thd, bool first_level)
           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
         !wsrep_tables_accessible_when_detached(all_tables)                 &&
         lex->sql_command != SQLCOM_SET_OPTION                              &&
+<<<<<<< HEAD
         lex->sql_command != SQLCOM_SHUTDOWN                                &&
+||||||| merged common ancestors
+=======
+        lex->sql_command != SQLCOM_FLUSH                                   &&
+>>>>>>> wsrep_5.7.35-25.27
         !wsrep_is_show_query(lex->sql_command))
     {
       my_message(ER_UNKNOWN_COM_ERROR,
@@ -6379,6 +6384,7 @@ finish:
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   if (thd->wsrep_conflict_state != REPLAYED)
   {
+<<<<<<< HEAD
   /* Hold this lock only for duration of wsrep_conflict_state state check.
   Release it before entering unit-cleanup. Unit-cleanup will cause
   external_unlock at InnoDB level that will need transaction lock.
@@ -6386,6 +6392,10 @@ finish:
   other high-priority thread that needs transaction lock and
   LOCK_wsrep_thd too. */
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+||||||| merged common ancestors
+=======
+     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+>>>>>>> wsrep_5.7.35-25.27
 #endif /* WITH_WSREP */
   lex->unit->cleanup(true);
 #ifdef WITH_WSREP

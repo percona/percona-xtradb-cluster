@@ -128,9 +128,16 @@ ssl_cert=""
 ssl_ca=""
 ssl_key=""
 
+<<<<<<< HEAD
 # thread options
 backup_threads=-1
 encrypt_threads=-1
+||||||| merged common ancestors
+readonly SECRET_TAG="secret"
+=======
+readonly SECRET_TAG="secret"
+JOINER_PID_FILE=""
+>>>>>>> wsrep_5.7.35-25.27
 
 # Required for backup locks
 # For backup locks it is 1 sent by joiner
@@ -591,7 +598,7 @@ get_transfer()
             exit 2
         fi
 
-        donor_extra=""
+        donor_extra=",connect-timeout=$WSREP_SST_DONOR_TIMEOUT"
         joiner_extra=""
         if [[ $encrypt -eq 2 || $encrypt -eq 3 || $encrypt -eq 4 ]]; then
             if ! socat -V | grep -q WITH_OPENSSL; then
@@ -629,9 +636,10 @@ get_transfer()
                 if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
                     # dhparams check (will create ssl_dhparams if needed)
                     check_for_dhparams
-                    joiner_extra=",dhparam=$ssl_dhparams"
+                    joiner_extra+=",dhparam=$ssl_dhparams"
                 fi
             fi
+<<<<<<< HEAD
             if check_for_version "$SOCAT_VERSION" "1.7.3"; then
                 donor_extra=',commonname=""'
             fi
@@ -649,6 +657,20 @@ get_transfer()
                 if [[ ! $joiner_extra =~ dhparam= ]]; then
                     joiner_extra+=",dhparam=$ssl_dhparams"
                 fi
+||||||| merged common ancestors
+            if check_for_version "$SOCAT_VERSION" "1.7.3"; then
+                donor_extra=',commonname=""'
+            fi
+            if [ -n "$WSREP_SST_OPT_REMOTE_USER" ]; then
+                donor_extra=",commonname='$WSREP_SST_OPT_REMOTE_USER'"
+=======
+            if [ -n "$WSREP_SST_OPT_REMOTE_USER" ]; then
+                donor_extra+=",commonname='$WSREP_SST_OPT_REMOTE_USER'"
+            else
+                if check_for_version "$SOCAT_VERSION" "1.7.3"; then
+                    donor_extra+=',commonname=""'
+                fi
+>>>>>>> wsrep_5.7.35-25.27
             fi
 
         fi
@@ -867,7 +889,7 @@ read_cnf()
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
-    stimeout=$(parse_cnf sst sst-initial-timeout 100)
+    stimeout=$WSREP_SST_JOINER_TIMEOUT
     ssyslog=$(parse_cnf sst sst-syslog 0)
     ssystag=$(parse_cnf mysqld_safe syslog-tag "${SST_SYSLOG_TAG:-}")
     ssystag+="-"
@@ -1046,11 +1068,23 @@ cleanup_joiner()
         [[ -d "${tmpdirbase}" ]] && rm -rf "${tmpdirbase}" || true
     fi
 
+<<<<<<< HEAD
     if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
         rm -f "${XB_DONOR_KEYRING_FILE_PATH}"
     fi
 
     # Final cleanup
+||||||| merged common ancestors
+    # Final cleanup 
+=======
+    if [ -n "$JOINER_PID_FILE" -a -r "$JOINER_PID_FILE" ]; then
+        local joiner_pid=$(<$JOINER_PID_FILE)
+        kill -KILL $joiner_pid || :
+        rm -f $JOINER_PID_FILE
+    fi
+
+    # Final cleanup 
+>>>>>>> wsrep_5.7.35-25.27
     pgid=$(ps -o pgid= $$ | grep -o '[0-9]*')
 
     # This means no setsid done in mysqld.
@@ -1366,7 +1400,7 @@ recv_data_from_donor_to_joiner()
     local msg=$2
     local tmt=$3
     local checkf=$4
-    local ltcmd
+    local ltcmd=$tcmd
 
     if [[ ! -d ${dir} ]]; then
         # This indicates that IST is in progress
@@ -1376,11 +1410,33 @@ recv_data_from_donor_to_joiner()
     pushd ${dir} 1>/dev/null
     set +e
 
+<<<<<<< HEAD
     if [[ $tmt -gt 0 ]];then 
          RC=(`interruptable_timeout $tmt "$msg" "$tcmd | $strmcmd"`)
     else
         timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+||||||| merged common ancestors
+    if [[ $tmt -gt 0 && -x `which timeout` ]];then 
+        if timeout --help 2>&1 | grep -q -- '-k';then
+            ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
+        else 
+            ltcmd="timeout -s9 $tmt $tcmd"
+        fi
+        timeit "$msg" "$ltcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+    else 
+        timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+=======
+    if [[ $tmt -gt 0 && -x `which timeout` ]];then 
+        if timeout --help 2>&1 | grep -q -- '-k';then
+            ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
+        else
+            ltcmd="timeout -s9 $tmt $tcmd"
+        fi
+>>>>>>> wsrep_5.7.35-25.27
     fi
+
+    JOINER_PID_FILE=`mktemp`
+    timeit "$msg" "($tcmd & echo \$!>$JOINER_PID_FILE) | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
 
     set -e
     popd 1>/dev/null
@@ -1391,14 +1447,25 @@ recv_data_from_donor_to_joiner()
         return
     fi
 
+<<<<<<< HEAD
     # In case of SIGTERM, RC is not valid
     if [[ ${#RC[@]} -lt 1 ]];then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "SST script interrupted"
         wsrep_log_error "******************* FATAL ERROR ********************** "
+||||||| merged common ancestors
+    if [[ ${RC[0]} -eq 124 ]];then 
+        wsrep_log_error "Possible timeout in receving first data from donor " \
+                        "in gtid stage"
+=======
+    if [[ ${RC[0]} -eq 124 ]];then 
+        wsrep_log_error "Possible timeout in receiving first data from donor "\
+                        "in gtid stage"
+>>>>>>> wsrep_5.7.35-25.27
         exit 32
     fi
 
+<<<<<<< HEAD
     if [[ ${RC[0]} -eq 124 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Possible timeout in receving first data from donor in gtid/keyring stage"
@@ -1410,16 +1477,47 @@ recv_data_from_donor_to_joiner()
         if [[ $ecode -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Error while getting data from donor node: " \
+||||||| merged common ancestors
+    for ecode in "${RC[@]}";do 
+        if [[ $ecode -ne 0 ]];then 
+            wsrep_log_error "Error while getting data from donor node: " \
+=======
+    for ecode in "${RC[@]}";do 
+        if [[ $ecode -ne 0 ]];then 
+            wsrep_log_error "Error while getting data from donor node: "\
+>>>>>>> wsrep_5.7.35-25.27
                             "exit codes: ${RC[@]}"
             wsrep_log_error "****************************************************** "
             exit 32
         fi
     done
 
+<<<<<<< HEAD
     if [[ $checkf -eq -2 ]]; then
         # no file checking
         return
     fi
+||||||| merged common ancestors
+    if [[ $checkf -eq 1 ]]; then
+        if [[ ! -r "${MAGIC_FILE}" ]];then
+            # this message should cause joiner to abort
+            wsrep_log_error "receiving process ended without creating " \
+                            "'${MAGIC_FILE}'"
+            wsrep_log_info "Contents of datadir" 
+            wsrep_log_info "$(ls -l ${dir}/*)"
+            exit 32
+        fi
+=======
+    if [[ $checkf -eq 1 ]]; then
+        if [[ ! -r "${MAGIC_FILE}" ]];then
+            # this message should cause joiner to abort
+            wsrep_log_error "receiving process ended without creating "\
+                            "'${MAGIC_FILE}'"
+            wsrep_log_info "Contents of datadir"
+            wsrep_log_info "$(ls -l ${dir}/*)"
+            exit 32
+        fi
+>>>>>>> wsrep_5.7.35-25.27
 
     if [[ $checkf -eq 1 && ! -r "${XB_GTID_INFO_FILE_PATH}" ]]; then
         # this message should cause joiner to abort
@@ -1461,10 +1559,20 @@ send_data_from_donor_to_joiner()
     popd 1>/dev/null
 
 
+<<<<<<< HEAD
     for ecode in "${RC[@]}";do
         if [[ $ecode -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Error while sending data to joiner node: " \
+||||||| merged common ancestors
+    for ecode in "${RC[@]}";do 
+        if [[ $ecode -ne 0 ]];then 
+            wsrep_log_error "Error while sending data to joiner node: " \
+=======
+    for ecode in "${RC[@]}";do 
+        if [[ $ecode -ne 0 ]];then 
+            wsrep_log_error "Error while sending data to joiner node: "\
+>>>>>>> wsrep_5.7.35-25.27
                             "exit codes: ${RC[@]}"
             wsrep_log_error "****************************************************** "
             exit 32
@@ -1772,6 +1880,7 @@ fi
 # Setup stream for transfering and streaming.
 get_stream
 get_transfer
+get_keys
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -1779,6 +1888,7 @@ then
     # signal handler for cleanup-based-exit.
     trap cleanup_donor EXIT
 
+<<<<<<< HEAD
     initialize_tmpdir
 
     # main temp directory for SST (non-XB) related files
@@ -1814,6 +1924,30 @@ then
 
     #
     # SST is not needed. IST would suffice. By-pass SST.
+||||||| merged common ancestors
+=======
+    wsrep_log_info "Streaming GTID file before SST"
+
+    echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
+
+    if [[ -n ${WSREP_SST_OPT_REMOTE_PSWD} ]]; then
+        # Let joiner know that we know its secret
+        echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${MAGIC_FILE}
+    fi
+
+    ttcmd="$tcmd"
+
+    if [[ $encrypt -eq 1 ]]; then
+        if [[ -n $scomp ]]; then
+            tcmd=" \$ecmd | $scomp | $tcmd "
+        else
+            tcmd=" \$ecmd | $tcmd "
+        fi
+    elif [[ -n $scomp ]]; then
+        tcmd=" $scomp | $tcmd "
+    fi
+
+>>>>>>> wsrep_5.7.35-25.27
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
         usrst=0
@@ -1840,9 +1974,9 @@ then
            INNOEXTRA+=" --password="
         fi
 
-        get_keys
         check_extra
 
+<<<<<<< HEAD
         ttcmd="$tcmd"
 
         # Add compression to the head of the stream (if specified)
@@ -1862,6 +1996,32 @@ then
 
         FILE_TO_STREAM=$SST_INFO_FILE
         send_data_from_donor_to_joiner "$donor_tmpdir" "${stagemsg}-sst-info"
+||||||| merged common ancestors
+        wsrep_log_info "Streaming GTID file before SST"
+
+        echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
+
+        if [[ -n ${WSREP_SST_OPT_REMOTE_PSWD} ]]; then
+            # Let joiner know that we know its secret
+            echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${MAGIC_FILE}
+        fi
+
+        ttcmd="$tcmd"
+
+        if [[ $encrypt -eq 1 ]];then
+            if [[ -n $scomp ]];then 
+                tcmd=" \$ecmd | $scomp | $tcmd "
+            else 
+                tcmd=" \$ecmd | $tcmd "
+            fi
+        elif [[ -n $scomp ]];then 
+            tcmd=" $scomp | $tcmd "
+        fi
+
+        send_donor $DATA "${stagemsg}-gtid"
+=======
+        send_donor $DATA "${stagemsg}-gtid"
+>>>>>>> wsrep_5.7.35-25.27
 
         # Restore the transport commmand to its original state
         tcmd="$ttcmd"
@@ -1920,8 +2080,15 @@ then
 
     else # BYPASS FOR IST
 
+<<<<<<< HEAD
         wsrep_log_info "Bypassing SST. Can work it through IST"
+||||||| merged common ancestors
+        wsrep_log_info "Bypassing the SST for IST"
+=======
+        wsrep_log_info "Bypassing SST for IST"
+>>>>>>> wsrep_5.7.35-25.27
         echo "continue" # now server can resume updating data
+<<<<<<< HEAD
         echo "1" > "${donor_tmpdir}/${IST_FILE}"
         get_keys
         # Add compression to the head of the stream (if specified)
@@ -1935,6 +2102,24 @@ then
         if [[ $encrypt -eq 1 ]]; then
             xbstream_eopts=$xbstream_eopts_other
         fi
+||||||| merged common ancestors
+        echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
+        echo "1" > "${DATA}/${IST_FILE}"
+        get_keys
+        if [[ $encrypt -eq 1 ]];then
+            if [[ -n $scomp ]];then 
+                tcmd=" \$ecmd | $scomp | $tcmd "
+            else
+                tcmd=" \$ecmd | $tcmd "
+            fi
+        elif [[ -n $scomp ]];then 
+            tcmd=" $scomp | $tcmd "
+        fi
+        strmcmd+=" \${IST_FILE}"
+=======
+        echo "1" > "${DATA}/${IST_FILE}"
+        strmcmd+=" \${IST_FILE}"
+>>>>>>> wsrep_5.7.35-25.27
 
         strmcmd+=" \${IST_FILE}"
 
@@ -1982,6 +2167,7 @@ then
         tcmd+=" | $pcmd"
     fi
 
+<<<<<<< HEAD
     get_keys
     if [[ $encrypt -eq 1 && -n "$ecmd_other" ]]; then
         strmcmd=" \$ecmd_other | $strmcmd"
@@ -1991,6 +2177,26 @@ then
     fi
     if [[ $encrypt -eq 1 ]]; then
         xbstream_eopts=$xbstream_eopts_other
+||||||| merged common ancestors
+    get_keys
+    if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
+        if [[ -n $sdecomp ]];then 
+            strmcmd=" $sdecomp | \$ecmd | $strmcmd"
+        else 
+            strmcmd=" \$ecmd | $strmcmd"
+        fi
+    elif [[ -n $sdecomp ]];then 
+            strmcmd=" $sdecomp | $strmcmd"
+=======
+    if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
+        if [[ -n $sdecomp ]];then 
+            strmcmd=" $sdecomp | \$ecmd | $strmcmd"
+        else 
+            strmcmd=" \$ecmd | $strmcmd"
+        fi
+    elif [[ -n $sdecomp ]];then 
+            strmcmd=" $sdecomp | $strmcmd"
+>>>>>>> wsrep_5.7.35-25.27
     fi
 
     initialize_tmpdir
