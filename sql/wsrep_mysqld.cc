@@ -945,6 +945,40 @@ static void wsrep_init_provider_status_variables() {
           sizeof(provider_vendor) - 1);
 }
 
+/**
+   Updates provider params for variables which have an one to one mapping from
+   server variable to provider params.
+
+   Currently, we only have one such mapping. i.e,
+
+        wsrep_max_ws_size => repl.max_ws_size
+
+   If it is found that other server variables also have a corresponding param
+   in provider, then add them in the end of the function.
+
+   @return true if error, false otherwise
+*/
+bool wsrep_update_provider_params() {
+  /*
+     Check if repl.max_ws_size has been specified in the wsrep_provider_options
+     in the cnf file.
+  */
+  ulong provider_max_ws_size;
+  if (get_provider_option_value(wsrep_provider_options, "repl.max_ws_size",
+                                &provider_max_ws_size) == 0) {
+    /*
+       If repl.max_ws_size is not defined in cnf file (or through command
+       line), then set the repl.max_ws_size provider parameter from
+       wsrep_max_ws_size.
+    */
+    wsrep_max_ws_size = provider_max_ws_size;
+  }
+  if (wsrep_max_ws_size_update(nullptr, nullptr, OPT_GLOBAL)) {
+    return true;
+  }
+  return false;
+}
+
 int wsrep_init_server() {
   wsrep::log::logger_fn(wsrep_log_cb);
   try {
@@ -1120,6 +1154,13 @@ int wsrep_init() {
   }
 
   wsrep_init_provider_status_variables();
+
+  if (wsrep_update_provider_params()) {
+    WSREP_ERROR("Unable to update provider parameters.");
+    Wsrep_server_state::instance().unload_provider();
+    return 1;
+  };
+
   wsrep_capabilities_export(
       Wsrep_server_state::instance().provider().capabilities(),
       &wsrep_provider_capabilities);
@@ -2378,7 +2419,8 @@ static int wsrep_NBO_begin_phase_one(THD *thd, const char *db_,
 
   if (wsrep_can_run_in_nbo(thd, db_, table_, table_list) == false) {
     WSREP_DEBUG("Can't execute %s in NBO mode", WSREP_QUERY(thd));
-    my_error(ER_NOT_SUPPORTED_YET, MYF(0), "this query in wsrep_OSU_method NBO");
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+             "this query in wsrep_OSU_method NBO");
     mysql_mutex_lock(&thd->LOCK_thd_data);
     thd->wsrep_skip_wsrep_hton = false;
     mysql_mutex_unlock(&thd->LOCK_thd_data);
@@ -2501,13 +2543,12 @@ void wsrep_NBO_end_phase_one(THD *thd) {
     }
   }
 
-    DBUG_EXECUTE_IF("sync.after_nbo_phase_one_begin", {
-      const char act[] =
-          "now "
-          "wait_for signal.after_nbo_phase_one_begin";
-      assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
-    };);
-
+  DBUG_EXECUTE_IF("sync.after_nbo_phase_one_begin", {
+    const char act[] =
+        "now "
+        "wait_for signal.after_nbo_phase_one_begin";
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+  };);
 }
 
 int wsrep_NBO_begin_phase_two(THD *thd) {
@@ -2570,7 +2611,8 @@ static void wsrep_NBO_end_phase_two(THD *thd) {
     int ret = client_state.end_nbo_phase_two(err);
 
     if (!ret) {
-      WSREP_DEBUG("NBO phase two END: %lld", client_state.nbo_meta().seqno().get());
+      WSREP_DEBUG("NBO phase two END: %lld",
+                  client_state.nbo_meta().seqno().get());
       /* Reset XID on completion of DDL transactions */
       bool atomic_ddl = is_atomic_ddl(thd, true);
       if (atomic_ddl) {
