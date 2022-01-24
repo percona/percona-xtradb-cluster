@@ -54,7 +54,7 @@ class Do_THD_Impl {
   only with Red-Hat shipped compiler and is fixed in gcc-4.8+ for sure. */
   Do_THD_Impl();
 #endif /* WITH_WSREP */
-  virtual ~Do_THD_Impl() {}
+  virtual ~Do_THD_Impl() = default;
   virtual void operator()(THD *) = 0;
 #ifdef WITH_WSREP
   virtual void reset() {}
@@ -70,7 +70,7 @@ class Do_THD_Impl {
 
 class Find_THD_Impl {
  public:
-  virtual ~Find_THD_Impl() {}
+  virtual ~Find_THD_Impl() = default;
   /**
     Override this operator to provide implementation to find specific thd.
 

@@ -88,7 +88,16 @@
 #define PFS_MAX_SOCKET_CLASS 10
 #endif
 #ifndef PFS_MAX_STAGE_CLASS
+#ifdef WITH_WSREP
+/*
+   PXC patch defines 24 additional PSI_stage_info keys.
+   Let's keep PFS_MAX_STAGE_CLASS always bigger by this number.
+*/
+#define PFS_WSREP_STAGE_CLASS 24
+#define PFS_MAX_STAGE_CLASS (175 + PFS_WSREP_STAGE_CLASS)
+#else
 #define PFS_MAX_STAGE_CLASS 175
+#endif /* WITH_WSREP */
 #endif
 #ifndef PFS_STATEMENTS_STACK_SIZE
 #define PFS_STATEMENTS_STACK_SIZE 10

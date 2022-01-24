@@ -1,4 +1,4 @@
-SET GLOBAL wsrep_slave_threads=4;
+SET GLOBAL wsrep_applier_threads=4;
 SET @@global.wsrep_log_conflicts=ON;
 CREATE TABLE t1 (f1 INTEGER NOT NULL, f2 INTEGER NOT NULL) ENGINE=InnoDB;
 SET @@global.wsrep_log_conflicts=ON;
@@ -10,6 +10,6 @@ COMMIT;
 ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SET SESSION wsrep_osu_method=TOI;
 DROP TABLE t1;
-SET GLOBAL wsrep_slave_threads=1;
+SET GLOBAL wsrep_applier_threads=1;
 SET @@global.wsrep_log_conflicts=OFF;
 SET @@global.wsrep_log_conflicts=OFF;

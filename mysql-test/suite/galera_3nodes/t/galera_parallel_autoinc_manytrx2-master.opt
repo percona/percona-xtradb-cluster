@@ -1,1 +1,1 @@
---wsrep-slave-threads=4
+--wsrep-applier-threads=4

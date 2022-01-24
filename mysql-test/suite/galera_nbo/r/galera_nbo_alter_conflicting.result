@@ -1,4 +1,4 @@
-SET GLOBAL wsrep_slave_threads=2;
+SET GLOBAL wsrep_applier_threads=2;
 CREATE TABLE t1 (f1 INTEGER NOT NULL, f2 INTEGER NOT NULL) ENGINE=InnoDB;
 SET GLOBAL debug = 'd,sync.alter_locked_tables_inplace';
 SET SESSION wsrep_osu_method=NBO;
@@ -12,4 +12,4 @@ SET SESSION wsrep_OSU_method=TOI;
 DROP TABLE t1;
 CALL mtr.add_suppression("Slave SQL: Error 'Multiple primary key defined' on query");
 CALL mtr.add_suppression("Query apply failed");
-SET GLOBAL wsrep_slave_threads = 1;
+SET GLOBAL wsrep_applier_threads = 1;

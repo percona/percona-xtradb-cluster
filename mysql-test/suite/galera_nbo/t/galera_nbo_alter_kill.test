@@ -8,7 +8,7 @@
 --source include/have_debug.inc
 
 --connection node_2
-SET GLOBAL wsrep_slave_threads=4;
+SET GLOBAL wsrep_applier_threads=4;
 SET @@global.wsrep_log_conflicts=ON;
 
 --connection node_1
@@ -46,7 +46,7 @@ SET GLOBAL debug = '';
 
 --connection node_2
 SET @@global.wsrep_log_conflicts=OFF;
-SET GLOBAL wsrep_slave_threads=1;
+SET GLOBAL wsrep_applier_threads=1;
 
 SET SESSION wsrep_OSU_method=TOI;
 DROP TABLE t1;

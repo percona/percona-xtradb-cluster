@@ -7,7 +7,7 @@
 --source include/have_debug.inc
 
 --connection node_2
-SET GLOBAL wsrep_slave_threads=2;
+SET GLOBAL wsrep_applier_threads=2;
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER NOT NULL) ENGINE=InnoDB;
@@ -59,4 +59,4 @@ SHOW CREATE TABLE t2;
 DROP TABLE t1;
 DROP TABLE t2;
 
-SET GLOBAL wsrep_slave_threads=1;
+SET GLOBAL wsrep_applier_threads=1;

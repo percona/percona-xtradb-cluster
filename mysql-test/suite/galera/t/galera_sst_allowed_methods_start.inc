@@ -27,7 +27,7 @@ if ($expect_abort == 'yes')
 
 if ($expect_abort != 'yes')
 {
-  --let $suppress_print_params = 1
+  --let $do_not_echo_parameters = 1
   --let $restart_parameters = "restart:$start_params --log-error=$error_log"
   --source include/start_mysqld.inc
   SHOW VARIABLES LIKE 'wsrep_sst_allowed_methods';

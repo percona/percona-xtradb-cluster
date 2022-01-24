@@ -1,7 +1,7 @@
 SET GLOBAL pxc_strict_mode = 0;
 INSTALL PLUGIN group_replication SONAME 'group_replication.so';
 Warnings:
-Warning	7030	Using group replication with Percona XtraDB Cluster is only supported for migration. Please make sure that group replication is turned off once all data is migrated to Percona XtraDB Cluster.
+Warning	7031	Using group replication with Percona XtraDB Cluster is only supported for migration. Please make sure that group replication is turned off once all data is migrated to Percona XtraDB Cluster.
 UNINSTALL PLUGIN group_replication;
 SET GLOBAL pxc_strict_mode = 2;
 SET GLOBAL pxc_strict_mode = 2;

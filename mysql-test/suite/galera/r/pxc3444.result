@@ -1,5 +1,8 @@
 CREATE TABLE t1 (a INT PRIMARY KEY);
-CREATE TABLE t2 (a INT);
+CREATE TABLE t2 (a INT PRIMARY KEY);
 INSERT INTO t1 VALUES (0);
 INSERT INTO t2 SELECT /*!99997*/ * FROM t1;
 INSERT INTO t2 SELECT /*!99997*/ * FROM t1;
+ERROR 23000: Duplicate entry '0' for key 't2.PRIMARY'
+CALL mtr.add_suppression("Event 1 Query apply failed");
+DROP TABLE t1,t2;

@@ -7,7 +7,7 @@
 --source include/have_debug.inc
 
 --connection node_2
-SET GLOBAL wsrep_slave_threads=2;
+SET GLOBAL wsrep_applier_threads=2;
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER NOT NULL, f2 INTEGER NOT NULL) ENGINE=InnoDB;
@@ -55,4 +55,4 @@ DROP TABLE t1;
 CALL mtr.add_suppression("Slave SQL: Error 'Multiple primary key defined' on query");
 CALL mtr.add_suppression("Query apply failed");
 
-SET GLOBAL wsrep_slave_threads = 1;
+SET GLOBAL wsrep_applier_threads = 1;

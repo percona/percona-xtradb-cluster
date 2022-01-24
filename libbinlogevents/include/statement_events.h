@@ -426,6 +426,12 @@ const uint64_t INVALID_XID = 0xffffffffffffffffULL;
     <td>2 byte integer</td>
     <td>Value of the config variable default_table_encryption</td>
   </tr>
+  <tr>
+    <td>ddl_skip_rewrite</td>
+    <td>Q_DDL_SKIP_REWRITE</td>
+    <td>2 byte integer</td>
+    <td>Value of the config variable ddl_skip_rewrite</td>
+  </tr>
   </table>
 
   @subsection Query_event_notes_on_previous_versions Notes on Previous Versions
@@ -528,7 +534,12 @@ class Query_event : public Binary_log_event {
     /*
       Replicate default_table_encryption.
     */
-    Q_DEFAULT_TABLE_ENCRYPTION
+    Q_DEFAULT_TABLE_ENCRYPTION,
+
+    /*
+      Replicate ddl_skip_rewrite.
+    */
+    Q_DDL_SKIP_REWRITE
   };
   const char *query;
   const char *db;
@@ -645,6 +656,7 @@ class Query_event : public Binary_log_event {
   uint8_t sql_require_primary_key;
 
   uint8_t default_table_encryption;
+  uint8_t ddl_skip_rewrite;
 
   /**
     The constructor will be used while creating a Query_event, to be
@@ -688,7 +700,7 @@ class Query_event : public Binary_log_event {
     to the log.
   */
   Query_event(Log_event_type type_arg = QUERY_EVENT);
-  ~Query_event() override {}
+  ~Query_event() override = default;
 
 #ifndef HAVE_MYSYS
   void print_event_info(std::ostream &info) override;
@@ -991,7 +1003,7 @@ class Intvar_event : public Binary_log_event {
   Intvar_event(uint8_t type_arg, uint64_t val_arg)
       : Binary_log_event(INTVAR_EVENT), type(type_arg), val(val_arg) {}
 
-  ~Intvar_event() override {}
+  ~Intvar_event() override = default;
 
 #ifndef HAVE_MYSYS
   void print_event_info(std::ostream &info) override;

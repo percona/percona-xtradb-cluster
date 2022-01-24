@@ -1,4 +1,4 @@
-SET GLOBAL wsrep_slave_threads=4;
+SET GLOBAL wsrep_applier_threads=4;
 SET @@global.wsrep_log_conflicts=ON;
 CREATE TABLE t1 (f1 INTEGER NOT NULL, f2 INTEGER NOT NULL) ENGINE=InnoDB;
 SET @@global.wsrep_log_conflicts=ON;
@@ -28,6 +28,6 @@ t1	CREATE TABLE `t1` (
   KEY `f2` (`f2`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 SET @@global.wsrep_log_conflicts=OFF;
-SET GLOBAL wsrep_slave_threads=1;
+SET GLOBAL wsrep_applier_threads=1;
 SET SESSION wsrep_OSU_method=TOI;
 DROP TABLE t1;
