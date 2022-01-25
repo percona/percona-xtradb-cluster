@@ -148,7 +148,7 @@ Essential configuration variables
 
 :variable:`wsrep_sst_method`
 
-  By default, Percona XtraDB Cluster uses Percona XtraBackup_ for :term:`State Snapshot Transfer <SST>`.
+  By default, Percona XtraDB Cluster uses Percona `XtraBackup <https://www.percona.com/software/mysql-database/percona-xtrabackup>`__ for :term:`State Snapshot Transfer <SST>`.
   ``xtrabackup-v2`` is the only supported option for this variable.
   This method requires a user for SST to be set up on the initial node.
 

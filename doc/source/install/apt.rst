@@ -1,8 +1,8 @@
 .. _apt:
 
-====================================
+=====================================================
 Installing Percona XtraDB Cluster on Debian or Ubuntu
-====================================
+=====================================================
 
 Specific information on the supported platforms, products, and versions
 is described in `Percona Software and Platform Lifecycle <https://www.percona.com/services/policies/percona-software-platform-lifecycle#mysql>`_.

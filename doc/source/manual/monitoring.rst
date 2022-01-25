@@ -74,7 +74,7 @@ at least for the following:
    :variable:`wsrep_local_cert_failures` and :variable:`wsrep_local_bf_aborts`
 
 Using Percona Monitoring and Management
-===========
+========================================
 
 `Percona Monitoring and Management <https://www.percona.com/doc/percona-monitoring-and-management/index.html>`_ includes two dashboards to monitor PXC: 
 

@@ -1,8 +1,8 @@
 .. _apparmor:
 
-=====================================================================
+==================
 Enabling AppArmor 
-=====================================================================
+==================
 
 |Percona XtraDB Cluster| contains several AppArmor profiles. Multiple profiles allow for easier maintenance because the ``mysqld`` profile is decoupled from the SST script profile. This separation allows the introduction of other SST methods or scripts with their own profiles. 
 

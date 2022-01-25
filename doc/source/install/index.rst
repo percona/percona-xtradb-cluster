@@ -34,7 +34,7 @@ for manual installation:
 
 If you want to build Percona XtraDB Cluster from source, see :ref:`compile`.
 
-If you want to run Percona XtraDB Cluster using Docker, see :ref:`pxc.docker-container.running`.
+If you want to run Percona XtraDB Cluster using Docker, see :ref:`docker`.
 
 .. _pxc-install-version-numbering-conventions:
 

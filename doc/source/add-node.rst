@@ -16,7 +16,7 @@ joins and synchronizes with the cluster.
    nodes at the same time to avoid overhead due to large amounts of
    traffic when a new node joins.
 
-Percona XtraDB Cluster uses Percona XtraBackup_ for :term:`State Snapshot Transfer <SST>` and the
+Percona XtraDB Cluster uses Percona `XtraBackup <https://www.percona.com/software/mysql-database/percona-xtrabackup>`__ for :term:`State Snapshot Transfer <SST>` and the
 wsrep_sst_method variable is always set to ``xtrabackup-v2``.
 
 
