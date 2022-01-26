@@ -178,45 +178,7 @@ FILTER=(-f '- /lost+found'
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
 
-<<<<<<< HEAD
-||||||| merged common ancestors
-cat << EOF > "$STUNNEL_CONF"
-key = $SSTKEY
-cert = $SSTCERT
-${CAFILE_OPT}
-foreground = yes
-pid = $STUNNEL_PID
-debug = warning
-client = yes
-connect = ${WSREP_SST_OPT_HOST_UNESCAPED}:${WSREP_SST_OPT_PORT}
-TIMEOUTclose = 0
-${VERIFY_OPT}
-EOF
-#connect = ${WSREP_SST_OPT_ADDR%/*}
-
-=======
-cat << EOF > "$STUNNEL_CONF"
-key = $SSTKEY
-cert = $SSTCERT
-${CAFILE_OPT}
-foreground = yes
-pid = $STUNNEL_PID
-debug = warning
-client = yes
-connect = ${WSREP_SST_OPT_HOST_UNESCAPED}:${WSREP_SST_OPT_PORT}
-TIMEOUTclose = 0
-TIMEOUTconnect=$WSREP_SST_DONOR_TIMEOUT
-${VERIFY_OPT}
-EOF
-
-    if [ -z "$STUNNEL" ]
-    then
-        RSYNC_CONN_TIMEOUT="--contimeout $WSREP_SST_DONOR_TIMEOUT"
-    else
-        RSYNC_CONN_TIMEOUT=
-    fi
-
->>>>>>> wsrep_5.7.35-25.27
+    RSYNC_CONN_TIMEOUT="--contimeout $WSREP_SST_DONOR_TIMEOUT"
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
 
@@ -259,28 +221,14 @@ EOF
             popd &> /dev/null
         fi
 
-<<<<<<< HEAD
         wsrep_log_info "Starting rsync of data-dir............"
-||||||| merged common ancestors
-=======
         COMMON_RSYNC_OPTS="--owner --group --perms --links --specials\
-                           --ignore-times --inplace --delete --quiet\
+                           --ignore-times --inplace --delete --quiet \
                            $RSYNC_CONN_TIMEOUT"
 
->>>>>>> wsrep_5.7.35-25.27
         # first, the normal directories, so that we can detect incompatible protocol
         RC=0
-<<<<<<< HEAD
-        rsync --owner --group --perms --links --specials \
-              --ignore-times --inplace --dirs --delete --quiet \
-||||||| merged common ancestors
-        rsync ${STUNNEL:+--rsh="$STUNNEL"} \
-              --owner --group --perms --links --specials \
-              --ignore-times --inplace --dirs --delete --quiet \
-=======
-        rsync ${STUNNEL:+--rsh="$STUNNEL"} \
-              $COMMON_RSYNC_OPTS --dirs \
->>>>>>> wsrep_5.7.35-25.27
+        rsync $COMMON_RSYNC_OPTS --dirs \
               $WHOLE_FILE_OPT "${FILTER[@]}" "$WSREP_SST_OPT_DATA/" \
               rsync://$WSREP_SST_OPT_ADDR >&2 || RC=$?
 
@@ -304,17 +252,7 @@ EOF
         fi
 
         # second, we transfer InnoDB log files
-<<<<<<< HEAD
-        rsync --owner --group --perms --links --specials \
-              --ignore-times --inplace --dirs --delete --quiet \
-||||||| merged common ancestors
-        rsync ${STUNNEL:+--rsh="$STUNNEL"} \
-              --owner --group --perms --links --specials \
-              --ignore-times --inplace --dirs --delete --quiet \
-=======
-        rsync ${STUNNEL:+--rsh="$STUNNEL"} \
-              $COMMON_RSYNC_OPTS --dirs \
->>>>>>> wsrep_5.7.35-25.27
+        rsync $COMMON_RSYNC_OPTS --dirs \
               $WHOLE_FILE_OPT -f '+ /ib_logfile[0-9]*' -f '- **' "$WSREP_LOG_DIR/" \
               rsync://$WSREP_SST_OPT_ADDR-log_dir >&2 || RC=$?
 
@@ -349,17 +287,7 @@ EOF
 
         find . -maxdepth 1 -mindepth 1 -type d -not -name "lost+found" \
              -print0 | xargs -I{} -0 -P $count \
-<<<<<<< HEAD
-             rsync --owner --group --perms --links --specials \
-             --ignore-times --inplace --recursive --delete --quiet \
-||||||| merged common ancestors
-             rsync ${STUNNEL:+--rsh="$STUNNEL"} \
-             --owner --group --perms --links --specials \
-             --ignore-times --inplace --recursive --delete --quiet \
-=======
-             rsync ${STUNNEL:+--rsh="$STUNNEL"} \
-             $COMMON_RSYNC_OPTS --recursive \
->>>>>>> wsrep_5.7.35-25.27
+             rsync $COMMON_RSYNC_OPTS --recursive \
              $WHOLE_FILE_OPT --exclude '*/ib_logfile*' "$WSREP_SST_OPT_DATA"/{}/ \
              rsync://$WSREP_SST_OPT_ADDR/{} >&2 || RC=$?
 
@@ -377,37 +305,11 @@ EOF
         STATE="$WSREP_SST_OPT_GTID"
     fi
 
-<<<<<<< HEAD
     # This is the very last piece of data to send
     # After receiving the MAGIC_FILE, the joiner knows that it has
     # received all the data.
     printf "$STATE\n" > "$MAGIC_FILE"
     rsync --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
-||||||| merged common ancestors
-    echo "continue" # now server can resume updating data
-
-    echo "$STATE" > "$MAGIC_FILE"
-
-    if [ -n "$WSREP_SST_OPT_REMOTE_PSWD" ]; then
-        # Let joiner know that we know its secret
-        echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${MAGIC_FILE}
-    fi
-
-    rsync ${STUNNEL:+--rsh="$STUNNEL"} \
-        --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
-=======
-    echo "continue" # now server can resume updating data
-
-    echo "$STATE" > "$MAGIC_FILE"
-
-    if [ -n "$WSREP_SST_OPT_REMOTE_PSWD" ]; then
-        # Let joiner know that we know its secret
-        echo "$SECRET_TAG ${WSREP_SST_OPT_REMOTE_PSWD}" >> ${MAGIC_FILE}
-    fi
-
-    rsync ${STUNNEL:+--rsh="$STUNNEL"} $RSYNC_CONN_TIMEOUT \
-        --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
->>>>>>> wsrep_5.7.35-25.27
 
     echo "continue" # now server can resume updating data
     echo "done $STATE"
@@ -449,18 +351,10 @@ cat << EOF > "$RSYNC_CONF"
 pid file = $RSYNC_PID
 use chroot = no
 read only = no
-<<<<<<< HEAD
-timeout = 300
+timeout = $WSREP_SST_JOINER_TIMEOUT
 transfer logging = true
 log file = $RSYNC_LOG_FILE
 log format = %o %a file:%f %l
-||||||| merged common ancestors
-timeout = 300
-$SILENT
-=======
-timeout = $WSREP_SST_JOINER_TIMEOUT
-$SILENT
->>>>>>> wsrep_5.7.35-25.27
 [$MODULE]
     path = $WSREP_SST_OPT_DATA
 [$MODULE-log_dir]

@@ -10500,7 +10500,7 @@ int Rows_log_event::handle_idempotent_and_ignored_errors(Relay_log_info const *r
                            (rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT));
     bool ignored_error= (idempotent_error == 0 ?
                          ignored_error_code(actual_error) : 0);
-#if defined(WITH_WSREP)
+#ifdef WITH_WSREP
     /*
      * Work around mysql Bug#80821. With cascading deletes, when both parent and
      * child tables are involved in a multi table query, a delete rows event for
