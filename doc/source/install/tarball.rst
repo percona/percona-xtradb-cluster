@@ -1,8 +1,8 @@
 .. _tarball:
 
-====================================
+======================================================
 Installing Percona XtraDB Cluster from Binary Tarball
-====================================
+======================================================
 
 Percona provides generic tarballs with all required files and binaries
 for manual installation.
