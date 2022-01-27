@@ -738,6 +738,40 @@ You can set it to any value between ``1024`` and the default ``2147483647``.
 .. seealso:: `MySQL wsrep option: wsrep_max_ws_size
              <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-max-ws-size>`_
 
+.. variable:: wsrep_mode
+
+   :cli: ``--wsrep-mode``
+   :conf: Yes
+   :scope: Global
+   :dyn: No
+   :default: 
+
+Ability to extend the node behavior with the following values:
+
+.. tabularcolumns:: |p{0.15\linewidth}|p{0.40\linewidth}|
+
+.. list table::
+   :widths: auto
+   :header-row: 1
+
+   * - Value Name
+     - Description
+   * - IGNORE_NATIVE_REPLICATION_FILTER_RULES
+     - Ignore the replication filter rules
+   * - IGNORE_CASCADING_FK_DELETE_MISSING_ROW_ERROR
+     - When applying a cascading delete write set ignore any missing row errors.
+
+.. code-block:: mysql
+
+   mysql> SET GLOBAL wsrep_mode = IGNORE_CASCADING_FK_DELETE_MISSING_ROW_ERROR;
+
+   mysql> SHOW VARIABLES LIKE 'wsrep_mode'; 
+   +----------------+----------------------------------------------------+
+   | Variable_name  | Value                                              |
+   +================+====================================================+
+   | wsrep_mode     | IGNORE_CASCADING_FK_DELETE_MISSING_ROW_ERROR       |
+   +----------------+----------------------------------------------------+
+
 .. variable:: wsrep_node_address
 
    :cli: ``--wsrep-node-address``
