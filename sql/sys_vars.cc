@@ -1,4 +1,5 @@
 /* Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2021, Percona and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -3730,6 +3731,35 @@ static Sys_var_charptr Sys_time_format(
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0),
        DEPRECATED(""));
 
+/**
+  Pre-update function to commit connection's active transactions when autocommit
+  is enabled.
+
+  @note This hook relies on the fact that it is called while not holding any
+        locks. Breaking this assumption might result in deadlocks as commit
+        acquires many different locks in its process (e.g. to open GTID-related
+        tables).
+
+  @param[in] self   A pointer to the sys_var, i.e. Sys_autocommit.
+  @param[in] thd    A reference to THD object.
+  @param[in] var    A pointer to the set_var created by the parser.
+
+  @retval true   Error during commit
+  @retval false  Otherwise
+*/
+static bool pre_autocommit(sys_var *self, THD *thd, set_var *var)
+{
+  if (!(var->type == OPT_GLOBAL) &&
+      (thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT) &&
+       var->save_result.ulonglong_value)
+  {
+    // Autocommit mode is about to be activated.
+    if (trans_commit_stmt(thd) || trans_commit(thd))
+      return true;
+  }
+  return false;
+}
+
 static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
 {
   if (type == OPT_GLOBAL)
@@ -3744,6 +3774,7 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
   if (thd->variables.option_bits & OPTION_AUTOCOMMIT &&
       thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT)
   { // activating autocommit
+<<<<<<< HEAD
 
     if (trans_commit_stmt(thd) || trans_commit(thd))
     {
@@ -3754,6 +3785,15 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
 #endif /* WITH_WSREP */
       return true;
     }
+||||||| b59139e1f57
+
+    if (trans_commit_stmt(thd) || trans_commit(thd))
+    {
+      thd->variables.option_bits&= ~OPTION_AUTOCOMMIT;
+      return true;
+    }
+=======
+>>>>>>> percona/percona-server/5.6
     /*
       Don't close thread tables or release metadata locks: if we do so, we
       risk releasing locks/closing tables of expressions used to assign
@@ -3786,7 +3826,8 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
 static Sys_var_bit Sys_autocommit(
        "autocommit", "autocommit",
        SESSION_VAR(option_bits), NO_CMD_LINE, OPTION_AUTOCOMMIT, DEFAULT(TRUE),
-       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(fix_autocommit));
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       PRE_UPDATE(pre_autocommit), ON_UPDATE(fix_autocommit));
 export sys_var *Sys_autocommit_ptr= &Sys_autocommit; // for sql_yacc.yy
 
 static Sys_var_mybool Sys_big_tables(
@@ -3920,7 +3961,7 @@ static Sys_var_bit Sys_profiling(
        "profiling", "profiling",
        SESSION_VAR(option_bits), NO_CMD_LINE, OPTION_PROFILING,
        DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
-       ON_UPDATE(0), DEPRECATED(""));
+       PRE_UPDATE(0), ON_UPDATE(0), DEPRECATED(""));
 
 static Sys_var_ulong Sys_profiling_history_size(
        "profiling_history_size", "Limit of query profiling memory",
