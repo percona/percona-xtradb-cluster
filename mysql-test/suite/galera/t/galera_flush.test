@@ -36,6 +36,8 @@ FLUSH HOSTS;
 SET GLOBAL wsrep_replicate_myisam = TRUE;
 INSERT INTO mysql.user VALUES ('%','user1','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*22A99BA288DB55E8E230679259740873101CD636','N','2016-04-06 08:53:54',NULL,'N');
 FLUSH PRIVILEGES;
+--connection node_2
+SELECT User FROM mysql.user WHERE User = 'user1';
 --connect node_2a, 127.0.0.1, user1, pass1, test, $NODE_MYPORT_2
 --connection node_1
 DELETE FROM mysql.user WHERE user = 'user1';
