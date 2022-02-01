@@ -158,7 +158,8 @@ extern ulong       pxc_maint_transition_period;
 extern my_bool     pxc_encrypt_cluster_traffic;
 
 enum enum_wsrep_mode {
-    WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0
+    WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0,
+    WSREP_MODE_IGNORE_CASCADING_FK_DELETE_MISSING_ROW_ERROR = 1,
 };
 
 // MySQL status variables

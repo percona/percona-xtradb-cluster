@@ -2024,6 +2024,7 @@ innobase_srv_conc_enter_innodb(
 	}
 
 	trx_t*  trx     = prebuilt->trx;
+
 	if (srv_thread_concurrency) {
 		if (trx->n_tickets_to_enter_innodb > 0) {
 
@@ -2075,8 +2076,9 @@ innobase_srv_conc_exit_innodb(
 	ut_ad(!sync_check_iterate(check));
 #endif /* UNIV_DEBUG */
 #ifdef WITH_WSREP
-	if (wsrep_on(trx->mysql_thd) && 
-	    wsrep_thd_is_BF(trx->mysql_thd, FALSE)) return;
+	if (WSREP_ON && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
+		return;
+	}
 #endif /* WITH_WSREP */
 
 	/* This is to avoid making an unnecessary function call. */
