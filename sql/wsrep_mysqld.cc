@@ -2934,7 +2934,7 @@ bool wsrep_is_wsrep_channel_name(const char *channel_name) {
 }
 
 void wsrep_last_committed_id(wsrep_gtid_t *gtid) {
-  wsrep::gtid ret = Wsrep_server_state::instance().last_committed_gtid();
+  wsrep::gtid ret = Wsrep_server_state::instance().provider().last_committed_gtid();
   memcpy(gtid->uuid.data, ret.id().data(), sizeof(gtid->uuid.data));
   gtid->seqno = ret.seqno().get();
 }
