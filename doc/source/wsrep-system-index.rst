@@ -215,12 +215,12 @@ you should pass the ``--wsrep-new-cluster`` option when starting.
    :cli: ``--wsrep-cluster-name``
    :conf: Yes
    :scope: Global
-   :dyn: Yes
+   :dyn: No
    :default: ``my_wsrep_cluster``
 
 Specifies the name of the cluster and should be identical on all nodes.
 
-.. note:: It should not exceed 32 characters.
+.. note:: It should not exceed 32 characters. A node cannot join the cluster if the cluster names do not match. You must re-bootstrap the cluster after a name change.
 
 .. variable:: wsrep_convert_lock_to_trx
 
