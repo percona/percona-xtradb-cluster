@@ -437,6 +437,24 @@ size of the disk. Pages are prefixed by gcache.page.
    Percona Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
       https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/
 
+.. variable:: gcache.recover
+
+   :cli: No
+   :conf: Yes
+   :scope: Global
+   :dyn: No
+   :default: No
+
+Attempts to recover a node's gcache file to a usable state on startup. If the node can successfully
+recover the gcache file, the node can provide IST to the remaining nodes. This ability can 
+reduce the time needed to bring up the cluster. 
+
+An example of setting the value to yes in the configuration file:
+
+.. code-block:: text
+
+   wsrep_provider_options="gcache.recover=yes"
+
 
 .. variable:: gcache.size
 
