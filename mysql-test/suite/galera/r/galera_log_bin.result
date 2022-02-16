@@ -45,4 +45,95 @@ mysqld-bin.000001	1267	Anonymous_Gtid	1	1332	SET @@SESSION.GTID_NEXT= 'ANONYMOUS
 mysqld-bin.000001	1332	Query	1	1442	use `test`; ALTER TABLE t1 ADD COLUMN f2 INTEGER
 DROP TABLE t1;
 DROP TABLE t2;
+#
+# Test that disabling binlog does not prevent Galera replication,
+# but events are not recorded in the binlog
+#
+RESET MASTER;
+RESET MASTER;
+SET SESSION sql_log_bin = OFF;
+CREATE TABLE t1 (a int primary key);
+INSERT INTO t1 VALUES (1);
+BEGIN;
+INSERT INTO t1 VALUES (10);
+INSERT INTO t1 VALUES (11);
+INSERT INTO t1 VALUES (12);
+COMMIT;
+include/assert.inc [assert that the above events are not written to binlog]
+SET SESSION sql_log_bin = ON;
+CREATE TABLE t2 (a int primary key);
+INSERT INTO t2 VALUES (1);
+BEGIN;
+INSERT INTO t2 VALUES (10);
+INSERT INTO t2 VALUES (11);
+INSERT INTO t2 VALUES (12);
+COMMIT;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Previous_gtids	1	154	
+mysqld-bin.000001	154	Anonymous_Gtid	1	219	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	219	Query	1	328	use `test`; CREATE TABLE t2 (a int primary key)
+mysqld-bin.000001	328	Anonymous_Gtid	1	393	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	393	Query	1	470	BEGIN
+mysqld-bin.000001	470	Table_map	1	515	table_id: # (test.t2)
+mysqld-bin.000001	515	Write_rows	1	555	table_id: # flags: STMT_END_F
+mysqld-bin.000001	555	Xid	1	586	COMMIT /* xid=# */
+mysqld-bin.000001	586	Anonymous_Gtid	1	651	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	651	Query	1	728	BEGIN
+mysqld-bin.000001	728	Table_map	1	773	table_id: # (test.t2)
+mysqld-bin.000001	773	Write_rows	1	813	table_id: # flags: STMT_END_F
+mysqld-bin.000001	813	Table_map	1	858	table_id: # (test.t2)
+mysqld-bin.000001	858	Write_rows	1	898	table_id: # flags: STMT_END_F
+mysqld-bin.000001	898	Table_map	1	943	table_id: # (test.t2)
+mysqld-bin.000001	943	Write_rows	1	983	table_id: # flags: STMT_END_F
+mysqld-bin.000001	983	Xid	1	1014	COMMIT /* xid=# */
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Previous_gtids	2	154	
+mysqld-bin.000001	154	Anonymous_Gtid	1	219	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	219	Query	1	328	use `test`; CREATE TABLE t2 (a int primary key)
+mysqld-bin.000001	328	Anonymous_Gtid	1	393	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	393	Query	1	461	BEGIN
+mysqld-bin.000001	461	Table_map	1	506	table_id: # (test.t2)
+mysqld-bin.000001	506	Write_rows	1	546	table_id: # flags: STMT_END_F
+mysqld-bin.000001	546	Xid	1	577	COMMIT /* xid=# */
+mysqld-bin.000001	577	Anonymous_Gtid	1	642	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	642	Query	1	710	BEGIN
+mysqld-bin.000001	710	Table_map	1	755	table_id: # (test.t2)
+mysqld-bin.000001	755	Write_rows	1	795	table_id: # flags: STMT_END_F
+mysqld-bin.000001	795	Table_map	1	840	table_id: # (test.t2)
+mysqld-bin.000001	840	Write_rows	1	880	table_id: # flags: STMT_END_F
+mysqld-bin.000001	880	Table_map	1	925	table_id: # (test.t2)
+mysqld-bin.000001	925	Write_rows	1	965	table_id: # flags: STMT_END_F
+mysqld-bin.000001	965	Xid	1	996	COMMIT /* xid=# */
+DROP TABLE t1;
+DROP TABLE t2;
+#
+# Check that log-slave-updates=OFF block all PXC replicated binlogging on node_2
+#
+# restart:--log-slave-updates=OFF --log-bin
+RESET MASTER;
+RESET MASTER;
+SET SESSION sql_log_bin = OFF;
+CREATE TABLE t1 (a int primary key);
+INSERT INTO t1 VALUES (1);
+SET SESSION sql_log_bin = ON;
+CREATE TABLE t2 (a int primary key);
+INSERT INTO t2 VALUES (1);
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Previous_gtids	1	154	
+mysqld-bin.000001	154	Anonymous_Gtid	1	219	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	219	Query	1	328	use `test`; CREATE TABLE t2 (a int primary key)
+mysqld-bin.000001	328	Anonymous_Gtid	1	393	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+mysqld-bin.000001	393	Query	1	470	BEGIN
+mysqld-bin.000001	470	Table_map	1	515	table_id: # (test.t2)
+mysqld-bin.000001	515	Write_rows	1	555	table_id: # flags: STMT_END_F
+mysqld-bin.000001	555	Xid	1	586	COMMIT /* xid=# */
+include/assert.inc [assert that the above events are not written to binlog]
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Previous_gtids	2	154	
+DROP TABLE t1;
+DROP TABLE t2;
 RESET MASTER;

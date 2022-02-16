@@ -44,7 +44,7 @@ The best solution is to remove the ``apparmor`` package entirely:
 
 .. code-block:: bash
 		
-   $ sudo apt-get remove apparmor
+   $ sudo apt remove apparmor
 
 If you need to have AppArmor enabled due to security policies or for
 other reasons, it is possible to disable or extend the MySQL profile.
@@ -69,7 +69,7 @@ Installing from Repository
 
    .. code-block:: bash
 
-      $ sudo apt-get install percona-xtradb-cluster-57
+      $ sudo apt install percona-xtradb-cluster-57
 
    .. note:: Alternatively, you can install
       the ``percona-xtradb-cluster-full-57`` meta package,

@@ -50,5 +50,116 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
 DROP TABLE t1;
 DROP TABLE t2;
 
+--echo #
+--echo # Test that disabling binlog does not prevent Galera replication,
+--echo # but events are not recorded in the binlog
+--echo #
+--connection node_2
+RESET MASTER;
+
+--connection node_1
+RESET MASTER;
+
+--let $master_pos_before= query_get_value(SHOW MASTER STATUS,Position,1)
+SET SESSION sql_log_bin = OFF;
+CREATE TABLE t1 (a int primary key);
+INSERT INTO t1 VALUES (1);
+BEGIN;
+INSERT INTO t1 VALUES (10);
+INSERT INTO t1 VALUES (11);
+INSERT INTO t1 VALUES (12);
+COMMIT;
+
+# Assert that the above statements are not written to binlog.
+--let $master_pos_after= query_get_value(SHOW MASTER STATUS,Position,1)
+--let $assert_text= assert that the above events are not written to binlog
+--let $assert_cond= $master_pos_before = $master_pos_after
+--source include/assert.inc
+
+# check that turning it back to ON works
+SET SESSION sql_log_bin = ON;
+CREATE TABLE t2 (a int primary key);
+INSERT INTO t2 VALUES (1);
+BEGIN;
+INSERT INTO t2 VALUES (10);
+INSERT INTO t2 VALUES (11);
+INSERT INTO t2 VALUES (12);
+COMMIT;
+
+# we expect only t2 operations to be logged
+--replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+
+# Check node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2'
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 4 FROM t1
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 4 FROM t2
+--source include/wait_condition.inc
+
+# # we expect only t2 operations to be logged
+--replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+
+DROP TABLE t1;
+DROP TABLE t2;
+
+--echo #
+--echo # Check that log-slave-updates=OFF block all PXC replicated binlogging on node_2
+--echo #
+--let $restart_parameters = "restart:--log-slave-updates=OFF --log-bin"
+--source include/restart_mysqld.inc
+
+--connection node_2
+RESET MASTER;
+--let $master_pos_before= query_get_value(SHOW MASTER STATUS,Position,1)
+
+--connection node_1
+RESET MASTER;
+
+SET SESSION sql_log_bin = OFF;
+CREATE TABLE t1 (a int primary key);
+INSERT INTO t1 VALUES (1);
+
+# check that turning it back to ON works
+SET SESSION sql_log_bin = ON;
+CREATE TABLE t2 (a int primary key);
+INSERT INTO t2 VALUES (1);
+
+# we expect only t2 operations to be logged
+--replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+
+# Check node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1'
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2'
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t2
+--source include/wait_condition.inc
+
+# Assert that the above statements are not written to binlog.
+--let $master_pos_after= query_get_value(SHOW MASTER STATUS,Position,1)
+--let $assert_text= assert that the above events are not written to binlog
+--let $assert_cond= $master_pos_before = $master_pos_after
+--source include/assert.inc
+
+# we expect nothing in binlog
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+
+DROP TABLE t1;
+DROP TABLE t2;
+
 --connection node_1
 RESET MASTER;

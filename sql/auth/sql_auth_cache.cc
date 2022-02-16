@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -122,7 +122,7 @@ static bool is_localhost_string(const char *hostname)
 void ACL_internal_schema_registry::register_schema
   (const LEX_STRING &name, const ACL_internal_schema_access *access)
 {
-  DBUG_ASSERT(m_registry_array_size < array_elements(registry_array));
+  assert(m_registry_array_size < array_elements(registry_array));
 
   /* Not thread safe, and does not need to be. */
   registry_array[m_registry_array_size].m_name= &name;
@@ -139,7 +139,7 @@ void ACL_internal_schema_registry::register_schema
 const ACL_internal_schema_access *
 ACL_internal_schema_registry::lookup(const char *name)
 {
-  DBUG_ASSERT(name != NULL);
+  assert(name != NULL);
 
   uint i;
 
@@ -359,21 +359,22 @@ ACL_PROXY_USER::pk_equals(ACL_PROXY_USER *grant)
 }
 
 void
-ACL_PROXY_USER::print_grant(String *str)
+ACL_PROXY_USER::print_grant(THD *thd, String *str)
 {
-  str->append(STRING_WITH_LEN("GRANT PROXY ON '"));
-  if (proxied_user)
-    str->append(proxied_user, strlen(proxied_user));
-  str->append(STRING_WITH_LEN("'@'"));
-  if (!proxied_host.is_null())
-    str->append(proxied_host.get_host(), proxied_host.get_host_len());
-  str->append(STRING_WITH_LEN("' TO '"));
-  if (user)
-    str->append(user, strlen(user));
-  str->append(STRING_WITH_LEN("'@'"));
-  if (!host.is_null())
-    str->append(host.get_host(), host.get_host_len());
-  str->append(STRING_WITH_LEN("'"));
+  str->append(STRING_WITH_LEN("GRANT PROXY ON "));
+  String proxied_user_str(proxied_user, get_proxied_user_length(),
+                          system_charset_info);
+  append_query_string(thd, system_charset_info, &proxied_user_str, str);
+  str->append(STRING_WITH_LEN("@"));
+  String proxied_host_str(proxied_host.get_host(), proxied_host.get_host_len(),
+                          system_charset_info);
+  append_query_string(thd, system_charset_info, &proxied_host_str, str);
+  str->append(STRING_WITH_LEN(" TO "));
+  String user_str(user, get_user_length(), system_charset_info);
+  append_query_string(thd, system_charset_info, &user_str, str);
+  str->append(STRING_WITH_LEN("@"));
+  String host_str(host.get_host(), host.get_host_len(), system_charset_info);
+  append_query_string(thd, system_charset_info, &host_str, str);
   if (with_grant)
     str->append(STRING_WITH_LEN(" WITH GRANT OPTION"));
 }
@@ -506,7 +507,7 @@ ulong get_sort(uint count,...)
   ulong sort=0;
 
   /* Should not use this function with more than 4 arguments for compare. */
-  DBUG_ASSERT(count <= 4);
+  assert(count <= 4);
 
   while (count--)
   {
@@ -576,7 +577,7 @@ bool hostname_requires_resolving(const char *hostname)
 {
 
   /* called only for --skip-name-resolve */
-  DBUG_ASSERT(specialflag & SPECIAL_NO_RESOLVE);
+  assert(specialflag & SPECIAL_NO_RESOLVE);
 
   if (!hostname)
     return FALSE;
@@ -1584,7 +1585,7 @@ acl_init_utility_user(bool check_no_resolve)
     goto cleanup;
   }
 
-  DBUG_ASSERT(utility_user_privileges <= UINT_MAX32);
+  assert(utility_user_privileges <= UINT_MAX32);
   acl_utility_user.access= utility_user_privileges & UINT_MAX32;
   if (acl_utility_user.access)
   {

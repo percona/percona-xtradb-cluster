@@ -158,7 +158,8 @@ extern ulong       pxc_maint_transition_period;
 extern my_bool     pxc_encrypt_cluster_traffic;
 
 enum enum_wsrep_mode {
-    WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0
+    WSREP_MODE_IGNORE_NATIVE_REPLICATION_FILTER_RULES = 0,
+    WSREP_MODE_IGNORE_CASCADING_FK_DELETE_MISSING_ROW_ERROR = 1,
 };
 
 // MySQL status variables
@@ -406,6 +407,7 @@ class Alter_info;
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const TABLE_LIST* table_list,
                              Alter_info* alter_info = NULL);
+bool wsrep_thd_is_in_to_isolation(THD *thd, bool flock);
 void wsrep_to_isolation_end(THD *thd);
 void wsrep_cleanup_transaction(THD *thd);
 int wsrep_to_buf_helper(

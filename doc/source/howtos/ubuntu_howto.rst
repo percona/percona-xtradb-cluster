@@ -63,7 +63,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
     # Cluster connection URL contains the IPs of node#1, node#2 and node#3
     wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
-    # In order for Galera to work correctly binlog format should be ROW
+    # In order for Galera to work correctly, the binary log format should be ROW
     binlog_format=ROW
 
     # MyISAM storage engine has only experimental support
@@ -116,7 +116,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
 
 To perform :ref:`state_snapshot_transfer` using |XtraBackup|,
 set up a new user with proper `privileges
-<http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_:
+<https://www.percona.com/doc/percona-xtrabackup/2.2/innobackupex/privileges.html>`__:
 
 .. code-block:: mysql
 

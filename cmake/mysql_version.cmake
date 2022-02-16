@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2020, Oracle and/or its affiliates.
+# Copyright (c) 2009, 2021, Oracle and/or its affiliates.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -65,7 +65,11 @@ MACRO(GET_MYSQL_VERSION)
 
   SET(VERSION
     "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}${EXTRA_VERSION}")
-  MESSAGE(STATUS "MySQL ${VERSION}")
+  IF(WITH_WSREP)
+    MESSAGE(STATUS "MySQL-WSREP ${VERSION}")
+  ELSE()
+    MESSAGE(STATUS "MySQL ${VERSION}")
+  ENDIF()
   SET(MYSQL_BASE_VERSION
     "${MAJOR_VERSION}.${MINOR_VERSION}" CACHE INTERNAL "MySQL Base version")
   SET(MYSQL_NO_DASH_VERSION

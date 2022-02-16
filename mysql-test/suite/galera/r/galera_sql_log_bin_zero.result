@@ -8,45 +8,45 @@ INSERT INTO t1 VALUES (2);
 SELECT @@global.gtid_executed;
 @@global.gtid_executed
 
-CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t2'' on query");
-SELECT COUNT(*) = 1 FROM t1;
-COUNT(*) = 1
+SELECT COUNT(*) = 2 FROM t1;
+COUNT(*) = 2
 1
-SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 1;
-COUNT(*) = 0
+SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 1;
+COUNT(*) = 1
 1
 SHOW TABLES;
 Tables_in_test
 t1
+t2
 DROP USER 'demo'@'localhost';
-ERROR HY000: Operation DROP USER failed for 'demo'@'localhost'
 DROP TABLE t1;
 DROP TABLE t2;
-use test;
-create table t (i int, primary key pk(i)) engine=innodb;
-insert into t values (1);
-set sql_log_bin=0;
-alter table t add column j int;
-optimize table t;
+USE test;
+CREATE TABLE t (i INT, PRIMARY KEY pk(i)) ENGINE=InnoDB;
+INSERT INTO t VALUES (1);
+SET sql_log_bin=0;
+ALTER TABLE t ADD COLUMN j int;
+OPTIMIZE TABLE t;
 Table	Op	Msg_type	Msg_text
 test.t	optimize	note	Table does not support optimize, doing recreate + analyze instead
 test.t	optimize	status	OK
-analyze table t;
+ANALYZE TABLE t;
 Table	Op	Msg_type	Msg_text
 test.t	analyze	status	OK
-repair table t;
+REPAIR TABLE t;
 Table	Op	Msg_type	Msg_text
 test.t	repair	note	The storage engine for the table doesn't support repair
-set sql_log_bin=1;
-set sql_log_bin=0;
-insert into t values (2, 2);
-set sql_log_bin=1;
-select * from t;
+SET sql_log_bin=1;
+SET sql_log_bin=0;
+INSERT INTO t VALUES (2, 2);
+SET sql_log_bin=1;
+SELECT * FROM t;
 i	j
 1	NULL
 2	2
-use test;
-select * from t;
-i
-1
-drop table t;
+USE test;
+SELECT * FROM t;
+i	j
+1	NULL
+2	2
+DROP TABLE t;

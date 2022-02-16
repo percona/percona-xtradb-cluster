@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -190,11 +190,13 @@ enum enum_sql_command {
   SQLCOM_CREATE_COMPRESSION_DICTIONARY,
   SQLCOM_DROP_COMPRESSION_DICTIONARY,
 
+#ifdef WITH_WSREP
   /*
     Also for PXC, if the command is replicated to other nodes as a
     DDL (no-writeset replication), add a testcase to
     galera_wsrep_ddl_access_checking.test
   */
+#endif /* WITH_WSREP */
   /* This should be the last !!! */
   SQLCOM_END
 };

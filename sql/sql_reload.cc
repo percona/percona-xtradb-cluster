@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -74,7 +74,7 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
   select_errors=0;				/* Write if more errors */
   int tmp_write_to_binlog= *write_to_binlog= 1;
 
-  DBUG_ASSERT(!thd || !thd->in_sub_stmt);
+  assert(!thd || !thd->in_sub_stmt);
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
   if (options & REFRESH_GRANT)
@@ -199,14 +199,14 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
     query_cache.flush();			// RESET QUERY CACHE
   }
 
-  DBUG_ASSERT(!thd || thd->locked_tables_mode ||
-              !thd->mdl_context.has_locks() ||
-              thd->handler_tables_hash.records ||
-              thd->mdl_context.has_locks(MDL_key::USER_LEVEL_LOCK) ||
-              thd->mdl_context.has_locks(MDL_key::LOCKING_SERVICE) ||
-              thd->global_read_lock.is_acquired() ||
-              thd->backup_tables_lock.is_acquired() ||
-              thd->backup_binlog_lock.is_acquired());
+  assert(!thd || thd->locked_tables_mode ||
+         !thd->mdl_context.has_locks() ||
+         thd->handler_tables_hash.records ||
+         thd->mdl_context.has_locks(MDL_key::USER_LEVEL_LOCK) ||
+         thd->mdl_context.has_locks(MDL_key::LOCKING_SERVICE) ||
+         thd->global_read_lock.is_acquired() ||
+         thd->backup_tables_lock.is_acquired() ||
+         thd->backup_binlog_lock.is_acquired());
 
   /*
     Note that if REFRESH_READ_LOCK bit is set then REFRESH_TABLES is set too
@@ -216,7 +216,9 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
   {
     if ((options & REFRESH_READ_LOCK) && thd)
     {
+#ifdef WITH_WSREP
       bool own_lock;
+#endif
       /*
         On the first hand we need write lock on the tables to be flushed,
         on the other hand we must not try to aspire a global read lock
@@ -233,7 +235,11 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
 	UNLOCK TABLES
       */
       tmp_write_to_binlog= 0;
+#ifdef WITH_WSREP
       if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
+#else
+      if (thd->global_read_lock.lock_global_read_lock(thd))
+#endif /* WITH_WSREP */
         return 1; // Killed
       if (close_cached_tables(thd, tables,
                               ((options & REFRESH_FAST) ?  FALSE : TRUE),
@@ -249,10 +255,14 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
       if (thd->global_read_lock.make_global_read_lock_block_commit(thd)) // Killed
       {
         /* Don't leave things in a half-locked state */
+#ifdef WITH_WSREP
         if (own_lock)
         {
+#endif /* WITH_WSREP */
           thd->global_read_lock.unlock_global_read_lock(thd);
+#ifdef WITH_WSREP
         }
+#endif /* WITH_WSREP */
         return 1;
       }
 #ifdef WITH_WSREP
@@ -397,7 +407,7 @@ cleanup:
 #ifdef HAVE_REPLICATION
   if (options & REFRESH_MASTER)
   {
-    DBUG_ASSERT(thd);
+    assert(thd);
     tmp_write_to_binlog= 0;
     if (reset_master(thd))
     {

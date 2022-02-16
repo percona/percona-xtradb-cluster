@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2019, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -463,9 +463,10 @@ lock_wait_suspend_thread(
 	if (lock_wait_timeout < 100000000
 	    && wait_time > (double) lock_wait_timeout
 #ifndef WITH_WSREP
-	    && !trx_is_high_priority(trx)
-#endif /* WITH_WSREP */
+	    && !trx_is_high_priority(trx)) {
+#else
 	) {
+#endif /* WITH_WSREP */
 #ifdef WITH_WSREP
                 if (!wsrep_on(trx->mysql_thd) ||
                     (!wsrep_is_BF_lock_timeout(trx) &&
