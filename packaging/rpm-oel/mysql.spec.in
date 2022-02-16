@@ -256,6 +256,7 @@ Requires:       net-tools
 Requires:       lsof
 %if 0%{?el7} || 0%{?el8}
 Requires:       socat
+Requires:       stunnel
 %endif
 # ??? Requires:       %{name}-client%{?_isa} >= %{min}
 # ??? Requires:       %{name}-common%{?_isa} = %{version}-%{release}
@@ -1577,6 +1578,10 @@ fi
 %endif # cluster
 
 %changelog
+* Tue May 18 2021 Alexey Yurchenko <alexey.yurchenko@galeracluster.com> - 5.7.33
+- Add "Requires:" for "stunnel" to "mysql-wsrep-server",
+  this tool is needed for Galera SST.
+
 * Thu Sep 05 2019 Bjorn Munch <bjorn.munch@oracle.com> - 5.7.28-1
 - Add License Book, remove COPYING
 

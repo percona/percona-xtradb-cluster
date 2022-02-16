@@ -591,7 +591,7 @@ get_transfer()
             exit 2
         fi
 
-        donor_extra=""
+        donor_extra=",connect-timeout=$WSREP_SST_DONOR_TIMEOUT"
         joiner_extra=""
         if [[ $encrypt -eq 2 || $encrypt -eq 3 || $encrypt -eq 4 ]]; then
             if ! socat -V | grep -q WITH_OPENSSL; then
@@ -629,7 +629,7 @@ get_transfer()
                 if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
                     # dhparams check (will create ssl_dhparams if needed)
                     check_for_dhparams
-                    joiner_extra=",dhparam=$ssl_dhparams"
+                    joiner_extra+=",dhparam=$ssl_dhparams"
                 fi
             fi
             if check_for_version "$SOCAT_VERSION" "1.7.3"; then
@@ -748,7 +748,13 @@ get_transfer()
             fi
 
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-                tcmd="socat -u TCP-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
+                # PXC-3767 - IPv6 support in PXC (wsrep_sst_xtrabackup-v2)
+                # socat require TCP6-LISTEN to work with ip version6 addresses
+                if [[ "$WSREP_SST_OPT_HOST" =~ .*:.* ]]; then
+                    tcmd="socat -u TCP6-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
+                else
+                    tcmd="socat -u TCP-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
+                fi
             else
                 tcmd="socat -u stdio TCP:${REMOTEIP}:${TSST_PORT}${sockopt}"
             fi
@@ -867,7 +873,7 @@ read_cnf()
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
-    stimeout=$(parse_cnf sst sst-initial-timeout 100)
+    stimeout=$WSREP_SST_JOINER_TIMEOUT
     ssyslog=$(parse_cnf sst sst-syslog 0)
     ssystag=$(parse_cnf mysqld_safe syslog-tag "${SST_SYSLOG_TAG:-}")
     ssystag+="-"
@@ -1050,7 +1056,8 @@ cleanup_joiner()
         rm -f "${XB_DONOR_KEYRING_FILE_PATH}"
     fi
 
-    # Final cleanup
+
+    # Final cleanup 
     pgid=$(ps -o pgid= $$ | grep -o '[0-9]*')
 
     # This means no setsid done in mysqld.
@@ -1366,7 +1373,7 @@ recv_data_from_donor_to_joiner()
     local msg=$2
     local tmt=$3
     local checkf=$4
-    local ltcmd
+    local ltcmd=$tcmd
 
     if [[ ! -d ${dir} ]]; then
         # This indicates that IST is in progress
@@ -1381,6 +1388,7 @@ recv_data_from_donor_to_joiner()
     else
         timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     fi
+
 
     set -e
     popd 1>/dev/null
@@ -1401,7 +1409,7 @@ recv_data_from_donor_to_joiner()
 
     if [[ ${RC[0]} -eq 124 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Possible timeout in receving first data from donor in gtid/keyring stage"
+        wsrep_log_error "Possible timeout in receiving first data from donor in gtid/keyring stage"
         wsrep_log_error "****************************************************** "
         exit 32
     fi
@@ -1409,7 +1417,7 @@ recv_data_from_donor_to_joiner()
     for ecode in "${RC[@]}";do
         if [[ $ecode -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "Error while getting data from donor node: " \
+            wsrep_log_error "Error while getting data from donor node: "\
                             "exit codes: ${RC[@]}"
             wsrep_log_error "****************************************************** "
             exit 32
@@ -1464,7 +1472,7 @@ send_data_from_donor_to_joiner()
     for ecode in "${RC[@]}";do
         if [[ $ecode -ne 0 ]]; then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "Error while sending data to joiner node: " \
+            wsrep_log_error "Error while sending data to joiner node: "\
                             "exit codes: ${RC[@]}"
             wsrep_log_error "****************************************************** "
             exit 32
@@ -1710,7 +1718,7 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
     wsrep_log_debug "with encrypt=4  ssl_ca=$ssl_ca  ssl_cert=$ssl_cert  ssl_key=$ssl_key"
 fi
 
-if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then
+if ${INNOBACKUPEX_BIN} --help 2>/dev/null | grep -q -- '--version-check'; then
     disver="--no-version-check"
 fi
 
@@ -1772,6 +1780,7 @@ fi
 # Setup stream for transfering and streaming.
 get_stream
 get_transfer
+get_keys
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -1812,8 +1821,21 @@ then
         encrypt_backup_options="--transition-key=$transition_key"
     fi
 
-    #
-    # SST is not needed. IST would suffice. By-pass SST.
+    # Save the transfer command (will be restored later)
+    ttcmd="$tcmd"
+
+    # Add compression to the head of the stream (if specified)
+    if [[ -n "$scomp" ]]; then
+        tcmd=" $scomp | $tcmd "
+    fi
+    # Add encryption to the head of the stream (if specified)
+    if [[ $encrypt -eq 1 && -n "$ecmd_other" ]]; then
+        tcmd=" \$ecmd_other | $tcmd "
+    fi
+    if [[ $encrypt -eq 1 ]]; then
+        xbstream_eopts=$xbstream_eopts_other
+    fi
+
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
         usrst=0
@@ -1840,22 +1862,7 @@ then
            INNOEXTRA+=" --password="
         fi
 
-        get_keys
         check_extra
-
-        ttcmd="$tcmd"
-
-        # Add compression to the head of the stream (if specified)
-        if [[ -n "$scomp" ]]; then
-            tcmd=" $scomp | $tcmd "
-        fi
-        # Add encryption to the head of the stream (if specified)
-        if [[ $encrypt -eq 1 && -n "$ecmd_other" ]]; then
-            tcmd=" \$ecmd_other | $tcmd "
-        fi
-        if [[ $encrypt -eq 1 ]]; then
-            xbstream_eopts=$xbstream_eopts_other
-        fi
 
         # Before the real SST,send the sst-info
         wsrep_log_debug "Streaming SST meta-info file before SST"
@@ -1923,18 +1930,6 @@ then
         wsrep_log_info "Bypassing SST. Can work it through IST"
         echo "continue" # now server can resume updating data
         echo "1" > "${donor_tmpdir}/${IST_FILE}"
-        get_keys
-        # Add compression to the head of the stream (if specified)
-        if [[ -n "$scomp" ]]; then
-            tcmd=" $scomp | $tcmd "
-        fi
-        # Add encryption to the head of the stream (if specified)
-        if [[ $encrypt -eq 1 && -n "$ecmd_other" ]]; then
-            tcmd=" \$ecmd_other | $tcmd "
-        fi
-        if [[ $encrypt -eq 1 ]]; then
-            xbstream_eopts=$xbstream_eopts_other
-        fi
 
         strmcmd+=" \${IST_FILE}"
 
@@ -1982,7 +1977,6 @@ then
         tcmd+=" | $pcmd"
     fi
 
-    get_keys
     if [[ $encrypt -eq 1 && -n "$ecmd_other" ]]; then
         strmcmd=" \$ecmd_other | $strmcmd"
     fi

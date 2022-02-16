@@ -1,0 +1,24 @@
+{# Import the theme's layout. #}
+{% extends "!layout.html" %}
+
+{# Adds Google Analytics events on button click. #}
+{%- block extrahead %}
+<script>
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', 'UA-48498312-1']);
+_gaq.push(['_trackPageview']);
+</script>
+{{ super() }}
+{%- endblock %}
+
+
+{%- block relbar2 %}
+<div class="md-content">
+  <div class="md-main__inner md-typeset" role="main">
+<h4>Contact Us </h4>
+<p>For free technical help, visit the Percona <a class="md-nav__link--active" href="https://forums.percona.com/c/mongodb/percona-backup-for-mongodb/22?utm_campaign=Doc%20pages" target="_blank">Community Forum</a>.<br>
+<p>To report bugs or submit feature requests, open a <a class="md-nav__link--active" href="https://jira.percona.com/projects/PSMDB/issues/" target="_blank">JIRA</a> ticket.<br>
+<p>For paid support and managed or professional services, contact Percona <a class="md-nav__link--active" href="/about-percona/contact" target="_blank">Sales</a>.</p>
+</div>
+</div>
+{%- endblock %}

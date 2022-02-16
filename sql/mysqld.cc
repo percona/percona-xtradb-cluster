@@ -5224,10 +5224,12 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   query_logger.set_handlers(log_output_options);
 
   // Open slow log file if enabled.
+  query_logger.set_log_file(QUERY_LOG_SLOW);
   if (opt_slow_log && query_logger.reopen_log_file(QUERY_LOG_SLOW))
     opt_slow_log= false;
 
   // Open general log file if enabled.
+  query_logger.set_log_file(QUERY_LOG_GENERAL);
   if (opt_general_log && query_logger.reopen_log_file(QUERY_LOG_GENERAL))
     opt_general_log= false;
 
@@ -5377,9 +5379,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     sql_print_error("GTID_MODE = ON requires ENFORCE_GTID_CONSISTENCY = ON.");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
-#ifdef WITH_WSREP
-  }
-#endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP
   /* Don't spawn a new binlog file during wsrep-recovery. Why ?
@@ -5416,6 +5415,9 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     mysql_mutex_unlock(log_lock);
   }
 
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
   if (opt_myisam_log)
     (void) mi_log(1);
 

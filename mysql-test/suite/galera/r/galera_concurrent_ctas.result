@@ -1,0 +1,11 @@
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+CREATE TABLE t1 as SELECT SLEEP(0.1);
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+CREATE TABLE t1 as SELECT SLEEP(0.2);;
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+SET GLOBAL wsrep_provider_options = 'dbug=';
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+DROP TABLE t1;

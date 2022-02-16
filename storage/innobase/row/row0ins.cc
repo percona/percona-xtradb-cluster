@@ -1030,8 +1030,35 @@ row_ins_foreign_fill_virtual(
 		if (node->is_delete
 		    ? (foreign->type & DICT_FOREIGN_ON_DELETE_SET_NULL)
 		    : (foreign->type & DICT_FOREIGN_ON_UPDATE_SET_NULL)) {
+			uint32_t col_match_count =
+			    dict_vcol_base_is_foreign_key(col, foreign);
+			if (col_match_count == col->num_base) {
+				/* If all base columns of virtual col are
+				in FK */
+				dfield_set_null(&upd_field->new_val);
+			} else if (col_match_count == 0) {
+				/* If no base column of virtual col is in FK */
+				dfield_copy(&(upd_field->new_val), vfield);
+			} else {
+				/* If at least one base column of virtual col
+				is in FK */
+				for (uint32_t j = 0; j < col->num_base; j++) {
+					dict_col_t *base_col = col->base_col[j];
+					uint32_t col_no = base_col->ind;
+					dfield_t *row_field =
+					  innobase_get_field_from_update_vector(
+					  foreign, node->update, col_no);
+					if (row_field != NULL) {
+						dfield_set_null(row_field);
+					}
+				}
+				dfield_t *new_vfield = innobase_get_computed_value(
+				    update->old_vrow, col, index, &v_heap,
+				    update->heap, NULL, thd, NULL,
+				    NULL, node->update, foreign, prebuilt);
+				dfield_copy(&(upd_field->new_val), new_vfield);
+			}
 
-			dfield_set_null(&upd_field->new_val);
 		}
 
 		if (!node->is_delete
@@ -1291,8 +1318,13 @@ row_ins_foreign_check_on_constraint(
 						 clust_index, tmp_heap);
 	}
 
-	if (cascade->is_delete && foreign->v_cols != NULL
-	    && foreign->v_cols->size() > 0
+	/* A cascade delete from the parent table triggers delete on the child
+	table. Before a clustered index record is deleted in the child table,
+	a copy of row is built to remove secondary index records. This copy of
+	the row requires virtual columns to be materialized. Hence, if child
+	table has any virtual columns, we have to initialize virtual column
+	template */
+	if (cascade->is_delete && dict_table_get_n_v_cols(table) > 0
 	    && table->vc_templ == NULL) {
 		innobase_init_vc_templ(table);
 	}
@@ -1433,6 +1465,9 @@ row_ins_foreign_check_on_constraint(
 		btr_pcur_store_position(cascade->pcur, mtr);
 	}
 
+#ifndef WITH_WSREP
+	mtr_commit(mtr);
+#endif /* !WITH_WSREP */
 	ut_a(cascade->pcur->rel_pos == BTR_PCUR_ON);
 
 	cascade->state = UPD_NODE_UPDATE_CLUSTERED;
@@ -1448,12 +1483,15 @@ row_ins_foreign_check_on_constraint(
 		ib::warn() << "WSREP: foreign key append failed: " << err;
 		mtr_commit(mtr);
 	} else
-#endif /* WITH_WSREP */
 	{
 		mtr_commit(mtr);
 		err = row_update_cascade_for_mysql(thr, cascade,
 						   foreign->foreign_table);
 	}
+#else
+	err = row_update_cascade_for_mysql(thr, cascade,
+					foreign->foreign_table);
+#endif /* WITH_WSREP */
 
 	/* Release the data dictionary latch for a while, so that we do not
 	starve other threads from doing CREATE TABLE etc. if we have a huge

@@ -1891,6 +1891,8 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     if (parser_state.init(thd, thd->query().str, thd->query().length))
       break;
 
+    parser_state.m_input.m_has_digest = true;
+
 #ifdef WITH_WSREP
     if (WSREP_ON)
     {
@@ -3289,7 +3291,7 @@ mysql_execute_command(THD *thd, bool first_level)
 
     /*
      * bail out if DB snapshot has not been installed. We however,
-     * allow SET and SHOW queries and reads from information schema
+     * allow SET/FLUSH/SHOW queries and reads from information schema
      * and dirty reads (if configured)
      */
     if (!thd->wsrep_applier                                                &&
@@ -3299,6 +3301,7 @@ mysql_execute_command(THD *thd, bool first_level)
         !wsrep_tables_accessible_when_detached(all_tables)                 &&
         lex->sql_command != SQLCOM_SET_OPTION                              &&
         lex->sql_command != SQLCOM_SHUTDOWN                                &&
+        lex->sql_command != SQLCOM_FLUSH                                   &&
         !wsrep_is_show_query(lex->sql_command))
     {
       my_message(ER_UNKNOWN_COM_ERROR,
@@ -6377,13 +6380,13 @@ finish:
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   if (thd->wsrep_conflict_state != REPLAYED)
   {
-  /* Hold this lock only for duration of wsrep_conflict_state state check.
-  Release it before entering unit-cleanup. Unit-cleanup will cause
-  external_unlock at InnoDB level that will need transaction lock.
-  This could conflict if this thread has conflicting lock with
-  other high-priority thread that needs transaction lock and
-  LOCK_wsrep_thd too. */
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    /* Hold this lock only for duration of wsrep_conflict_state state check.
+    Release it before entering unit-cleanup. Unit-cleanup will cause
+    external_unlock at InnoDB level that will need transaction lock.
+    This could conflict if this thread has conflicting lock with
+    other high-priority thread that needs transaction lock and
+    LOCK_wsrep_thd too. */
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
   lex->unit->cleanup(true);
 #ifdef WITH_WSREP
@@ -8815,6 +8818,7 @@ extern int MYSQLparse(class THD *thd); // from sql_yacc.cc
       ... handle error
     }
 
+    parser_state.m_input.m_has_digest= true;
     parser_state.m_input.m_compute_digest= true;
     
     rc= parse_sql(the, &parser_state, ctx);
@@ -8864,22 +8868,32 @@ bool parse_sql(THD *thd,
   parser_state->m_digest_psi= NULL;
   parser_state->m_lip.m_digest= NULL;
 
-  if (thd->m_digest != NULL)
-  {
-    /* Start Digest */
-    parser_state->m_digest_psi= MYSQL_DIGEST_START(thd->m_statement_psi);
-
-    if (parser_state->m_input.m_compute_digest ||
-       (parser_state->m_digest_psi != NULL))
+  /*
+    Only consider statements that are supposed to have a digest,
+    like top level queries.
+  */
+  if (parser_state->m_input.m_has_digest) {
+    /*
+      For these statements,
+      see if the digest computation is required.
+    */
+    if (thd->m_digest != NULL)
     {
-      /*
-        If either:
-        - the caller wants to compute a digest
-        - the performance schema wants to compute a digest
-        set the digest listener in the lexer.
-      */
-      parser_state->m_lip.m_digest= thd->m_digest;
-      parser_state->m_lip.m_digest->m_digest_storage.m_charset_number= thd->charset()->number;
+      /* Start Digest */
+      parser_state->m_digest_psi= MYSQL_DIGEST_START(thd->m_statement_psi);
+
+      if (parser_state->m_input.m_compute_digest ||
+         (parser_state->m_digest_psi != NULL))
+      {
+        /*
+          If either:
+          - the caller wants to compute a digest
+          - the performance schema wants to compute a digest
+          set the digest listener in the lexer.
+        */
+        parser_state->m_lip.m_digest= thd->m_digest;
+        parser_state->m_lip.m_digest->m_digest_storage.m_charset_number= thd->charset()->number;
+      }
     }
   }
 

@@ -1021,13 +1021,16 @@ wsrep_trx_order_before(void *thd1, void *thd2)
 extern "C" int
 wsrep_trx_is_aborting(void *thd_ptr)
 {
-	if (thd_ptr) {
-		if ((((THD *)thd_ptr)->wsrep_conflict_state == MUST_ABORT) ||
-		    (((THD *)thd_ptr)->wsrep_conflict_state == ABORTING)) {
-		  return 1;
-		}
-	}
-	return 0;
+  mysql_mutex_lock(&((THD*)thd_ptr)->LOCK_wsrep_thd);
+  if (thd_ptr) {
+    if ((((THD *)thd_ptr)->wsrep_conflict_state == MUST_ABORT) ||
+        (((THD *)thd_ptr)->wsrep_conflict_state == ABORTING)) {
+      mysql_mutex_unlock(&((THD*)thd_ptr)->LOCK_wsrep_thd);
+      return 1;
+    }
+  }
+  mysql_mutex_unlock(&((THD*)thd_ptr)->LOCK_wsrep_thd);
+  return 0;
 }
 
 extern "C" void
@@ -2261,6 +2264,18 @@ void THD::cleanup(void)
   /* Release the global read lock, if acquired. */
   if (global_read_lock.is_acquired())
     global_read_lock.unlock_global_read_lock(this);
+
+#ifdef WITH_WSREP
+  /*
+    Resume the provider if it was paused by this session during FLUSH TABLE(S)
+    FOR EXPORT and the session got disconnected.
+  */
+  if (WSREP(this) && !global_read_lock.provider_resumed())
+  {
+    global_read_lock.wsrep_resume_once();
+    global_read_lock.pause_provider(false);
+  }
+#endif /* WITH_WSREP */
 
   mysql_ull_cleanup(this);
   /*

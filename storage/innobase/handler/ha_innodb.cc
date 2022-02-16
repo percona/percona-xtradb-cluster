@@ -2024,6 +2024,7 @@ innobase_srv_conc_enter_innodb(
 	}
 
 	trx_t*  trx     = prebuilt->trx;
+
 	if (srv_thread_concurrency) {
 		if (trx->n_tickets_to_enter_innodb > 0) {
 
@@ -2075,8 +2076,9 @@ innobase_srv_conc_exit_innodb(
 	ut_ad(!sync_check_iterate(check));
 #endif /* UNIV_DEBUG */
 #ifdef WITH_WSREP
-	if (wsrep_on(trx->mysql_thd) && 
-	    wsrep_thd_is_BF(trx->mysql_thd, FALSE)) return;
+	if (WSREP_ON && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
+		return;
+	}
 #endif /* WITH_WSREP */
 
 	/* This is to avoid making an unnecessary function call. */
@@ -25496,20 +25498,19 @@ given col_no.
 @param[in]	update		updated parent vector.
 @param[in]	col_no		base column position of the child table to check
 @return updated field from the parent update vector, else NULL */
-static
 dfield_t*
 innobase_get_field_from_update_vector(
 	dict_foreign_t*	foreign,
 	upd_t*		update,
-	ulint		col_no)
+	uint32_t	col_no)
 {
 	dict_table_t*	parent_table = foreign->referenced_table;
 	dict_index_t*	parent_index = foreign->referenced_index;
-	ulint		parent_field_no;
-	ulint		parent_col_no;
-	ulint		child_col_no;
+	uint32_t	parent_field_no;
+	uint32_t	parent_col_no;
+	uint32_t	child_col_no;
 
-	for (ulint i = 0; i < foreign->n_fields; i++) {
+	for (uint32_t i = 0; i < foreign->n_fields; i++) {
 		child_col_no = dict_index_get_nth_col_no(
 			foreign->foreign_index, i);
 		if (child_col_no != col_no) {
@@ -25519,7 +25520,7 @@ innobase_get_field_from_update_vector(
 		parent_field_no = dict_table_get_nth_col_pos(
 			parent_table, parent_col_no);
 
-		for (ulint j = 0; j < update->n_fields; j++) {
+		for (uint32_t j = 0; j < update->n_fields; j++) {
 			upd_field_t*	parent_ufield
 				= &update->fields[j];
 
@@ -25601,7 +25602,7 @@ innobase_get_computed_value(
 	for (ulint i = 0; i < col->num_base; i++) {
 		dict_col_t*			base_col = col->base_col[i];
 		const dfield_t*			row_field = NULL;
-		ulint				col_no = base_col->ind;
+		uint32_t			col_no = base_col->ind;
 		const mysql_row_templ_t*	templ
 			= index->table->vc_templ->vtempl[col_no];
 		const byte*			data;

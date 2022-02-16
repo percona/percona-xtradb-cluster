@@ -20,7 +20,7 @@ SHOW STATUS LIKE 'wsrep_ist_%';
 
 SET SESSION wsrep_sync_wait=0;
 SET SESSION wsrep_dirty_reads=ON;
---source suite/galera/include/galera_unload_provider.inc
+--source suite/galera/include/galera_stop_replication.inc
 
 --connection node_1
 UPDATE t1 SET f2 = 'b' WHERE f1 > 1;

@@ -176,7 +176,9 @@ extlinks = {
   'mysqlbug': ('http://bugs.mysql.com/bug.php?id=%s', '#'),
   'githubbug': ('https://github.com/codership/galera/issues/%s', '#'),
   'wsrepbug': ('https://github.com/codership/mysql-wsrep/issues/%s', '#'),
-  'jirabug': ('https://jira.percona.com/browse/%s', '')}
+  'jirabug': ('https://jira.percona.com/browse/%s', ''),
+  'mdevbug': ('https://jira.mariadb.org/browse/MDEV-%s', '#')
+}
 
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
@@ -285,7 +287,7 @@ latex_documents = [
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
-latex_logo = 'percona-logo.jpg'
+latex_logo = 'percona-logo-color.png'
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
