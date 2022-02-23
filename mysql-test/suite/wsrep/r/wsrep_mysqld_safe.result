@@ -13,3 +13,4 @@ seqno_diff
 Shutdown mysqld using mysqladmin
 Restart mysqld from MTR
 DROP TABLE t1;
+CALL mtr.add_suppression("One can only use the --user switch if running as root");

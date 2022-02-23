@@ -3851,6 +3851,29 @@ sub check_wsrep_support() {
         $ENV{'WSREP_PROVIDER'}= "none";
       }
     }
+    # Check if garbd executable exists in system.
+    if (defined $ENV{'MTR_GARBD_EXE'}) {
+      if (mtr_file_exists($ENV{'MTR_GARBD_EXE'}) eq "") {
+        mtr_error("MTR_GARBD_EXE env set to an invalid path");
+      }
+    } elsif (defined $ENV{'WSREP_PROVIDER'}) {
+      my $garbd_file = dirname($ENV{'WSREP_PROVIDER'})."/garb/garbd";
+      my $mtr_garbd_exe = mtr_file_exists($garbd_file);
+      if ($mtr_garbd_exe ne "") {
+        $ENV{'MTR_GARBD_EXE'} = $mtr_garbd_exe
+      }
+    }
+    # Garbd not defined by caller or not found from WSREP_PROVIDER
+    # path. Try from system instead.
+    if (not defined $ENV{'MTR_GARBD_EXE'}) {
+      my $mtr_garbd_exe = mtr_file_exists("/usr/bin/garbd");
+      if ($mtr_garbd_exe ne "") {
+        $ENV{'MTR_GARBD_EXE'} = $mtr_garbd_exe;
+      }
+    }
+    if (defined $ENV{'MTR_GARBD_EXE'}) {
+      mtr_verbose("MTR_GARBD_EXE env set to $ENV{MTR_GARBD_EXE}");
+    }
   }
 }
 

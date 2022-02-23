@@ -1,16 +1,16 @@
 CREATE DATABASE database1;
 USE database1;
-CREATE TABLE ten (f1 INTEGER) ENGINE=InnoDB;
-INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
-SET SESSION wsrep_retry_autocommit = 0;
-INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;;
+START TRANSACTION;
+INSERT INTO t1 (f1) VALUES (1);
 USE database1;
-SET SESSION wsrep_retry_autocommit = 0;
-INSERT INTO t2 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;;
-DROP DATABASE database1;;
+START TRANSACTION;
+INSERT INTO t2 (f1) VALUES (1);
+DROP DATABASE database1;
+COMMIT;
 ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+COMMIT;
 ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'database1';
 COUNT(*) = 0

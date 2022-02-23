@@ -1,6 +1,11 @@
 #
 # Test the operation of DDLs that affect multiple database objects
 #
+# The test starts transactions for tables database1.t1 and
+# database1.t2 on node_1 and runs DROP DATABASE database1 on
+# node_2. It is expected that both transactions fail with
+# deadlock error on COMMIT.
+#
 
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
@@ -13,37 +18,27 @@
 CREATE DATABASE database1;
 USE database1;
 
-CREATE TABLE ten (f1 INTEGER) ENGINE=InnoDB;
-INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
-
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
 
-# Make sure autocommit retrying does not kick in as this will mask the error we expect to get
-SET SESSION wsrep_retry_autocommit = 0;
-# Attemp to insert 1M rows
---send INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;
+START TRANSACTION;
+INSERT INTO t1 (f1) VALUES (1);
 
 --connection node_1a
 USE database1;
-SET SESSION wsrep_retry_autocommit = 0;
---send INSERT INTO t2 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;
+START TRANSACTION;
+INSERT INTO t2 (f1) VALUES (1);
 
 --connection node_2
---sleep 1
---send DROP DATABASE database1;
+DROP DATABASE database1;
 
 --connection node_1
---sleep 1
 --error ER_LOCK_DEADLOCK
---reap
+COMMIT;
 
 --connection node_1a
 --error ER_LOCK_DEADLOCK
---reap
-
---connection node_2
---reap
+COMMIT;
 
 --connection node_1
 SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'database1';

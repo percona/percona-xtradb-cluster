@@ -4,8 +4,8 @@
 #
 
 --source include/galera_cluster.inc
---source include/have_innodb.inc
 --source include/big_test.inc
+--source suite/galera_3nodes/include/have_garbd.inc
 
 --echo Killing node #3 to free ports for garbd ...
 --let $galera_connection_name = node_3
@@ -14,15 +14,15 @@
 --source include/shutdown_mysqld.inc
 
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 --echo Starting garbd ...
---exec `dirname $WSREP_PROVIDER`/garb/garbd --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'base_port=$NODE_GALERAPORT_3' > $MYSQL_TMP_DIR/garbd.log 2>&1 &
+--exec $MTR_GARBD_EXE --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd.log 2>&1 &
 
 --sleep 5
 
---let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 CREATE TABLE t1 (f1 INTEGER);
@@ -40,7 +40,7 @@ SELECT COUNT(*) = 1 FROM t1;
 --sleep 5
 
 --connection node_1
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 INSERT INTO t1 VALUES (2);
@@ -54,6 +54,8 @@ DROP TABLE t1;
 --connection node_3
 --source include/start_mysqld.inc
 
+--connection node_1
+--remove_file $MYSQLTEST_VARDIR/tmp/garbd.log
 
 # Workaround for galera#101
 

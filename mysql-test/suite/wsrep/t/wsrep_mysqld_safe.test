@@ -118,3 +118,5 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY);
 
 connection default;
 DROP TABLE t1;
+
+CALL mtr.add_suppression("One can only use the --user switch if running as root");
