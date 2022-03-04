@@ -7464,7 +7464,7 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query) {
         tmp->m_security_ctx->user().str, tmp->m_security_ctx->host().str,
         tmp->m_security_ctx->ip().str);
 #ifdef WITH_WSREP
-    if (wsrep_thd_is_in_to_isolation(tmp, false)) {
+    if (wsrep_thd_is_in_to_isolation(tmp.get(), false)) {
       /* There is nothing special about the use of ER_QUERY_INTERRUPTED,
          I just needed a different error code from ER_KILL_DENIED_ERROR.
 
@@ -7476,7 +7476,7 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query) {
                       .first) &&
                  !is_utility_connection) ||
                 sctx->user_matches(tmp->security_context())) &&
-               !wsrep_thd_is_BF(tmp, true) && !tmp->wsrep_applier) {
+               !wsrep_thd_is_BF(tmp.get(), true) && !tmp->wsrep_applier) {
 #else
     if (((sctx->check_access(SUPER_ACL) ||
           sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN")).first) &&

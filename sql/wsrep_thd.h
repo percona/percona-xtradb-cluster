@@ -30,7 +30,7 @@
 #ifdef HAVE_PSI_THREAD_INTERFACE
 #define wsrep_pfs_register_thread(key)                                  \
   do {                                                                  \
-    struct PSI_thread *psi = PSI_THREAD_CALL(new_thread)(key, NULL, 0); \
+    struct PSI_thread *psi = PSI_THREAD_CALL(new_thread)(key, 0, NULL, 0); \
     PSI_THREAD_CALL(set_thread_os_id)(psi);                             \
     PSI_THREAD_CALL(set_thread)(psi);                                   \
   } while (0)

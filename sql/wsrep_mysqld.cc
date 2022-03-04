@@ -313,19 +313,19 @@ PSI_thread_key key_THREAD_galera_receiver;
 PSI_thread_key key_THREAD_galera_gcommconn;
 
 PSI_thread_info all_galera_threads[] = {
-    {&key_THREAD_galera_service_thd, "THREAD_galera_service_thd", 0, 0,
+    {&key_THREAD_galera_service_thd, "THREAD_galera_service_thd", "galera_srvc",0, 0,
      PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_ist_receiver, "THREAD_galera_ist_receiver", 0, 0,
+    {&key_THREAD_galera_ist_receiver, "THREAD_galera_ist_receiver", "ist_rcv",0, 0,
      PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_ist_async_sender, "THREAD_galera_ist_async_sender", 0,
+    {&key_THREAD_galera_ist_async_sender, "THREAD_galera_ist_async_sender", "ist_sender",0,
      0, PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_writeset_checksum, "THREAD_galera_writeset_checksum", 0,
+    {&key_THREAD_galera_writeset_checksum, "THREAD_galera_writeset_checksum", "wset_check",0,
      0, PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_gcache_removefile, "THREAD_galera_gcache_removefile", 0,
+    {&key_THREAD_galera_gcache_removefile, "THREAD_galera_gcache_removefile", "gcache_rm",0,
      0, PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_receiver, "THREAD_galera_receiver", 0, 0,
+    {&key_THREAD_galera_receiver, "THREAD_galera_receiver", "galera_recv", 0, 0,
      PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_gcommconn, "THREAD_galera_gcommconn", 0, 0,
+    {&key_THREAD_galera_gcommconn, "THREAD_galera_gcommconn", "galera_gcomm", 0, 0,
      PSI_DOCUMENT_ME}};
 
 PSI_file_key key_FILE_galera_recordset;
@@ -2976,7 +2976,7 @@ bool wsrep_is_wsrep_channel_name(const char *channel_name) {
 }
 
 void wsrep_last_committed_id(wsrep_gtid_t *gtid) {
-  wsrep::gtid ret = Wsrep_server_state::instance().last_committed_gtid();
+  wsrep::gtid ret = Wsrep_server_state::instance().provider().last_committed_gtid();
   memcpy(gtid->uuid.data, ret.id().data(), sizeof(gtid->uuid.data));
   gtid->seqno = ret.seqno().get();
 }

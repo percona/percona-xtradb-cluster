@@ -344,8 +344,9 @@ void Wsrep_server_service::log_state_change(
     case Wsrep_server_state::s_synced:
       wsrep_ready = true;
       WSREP_INFO("Synchronized with group, ready for connections");
-      /* fall through */
+      [[fallthrough]];
     case Wsrep_server_state::s_joined:
+      [[fallthrough]];
     case Wsrep_server_state::s_donor:
       wsrep_cluster_status = "Primary";
       break;

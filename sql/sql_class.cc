@@ -1328,7 +1328,6 @@ void THD::release_resources() {
 
   mysql_mutex_unlock(&LOCK_status);
 
-  m_release_resources_done = true;
   m_thd_life_cycle_stage = enum_thd_life_cycle_stages::RESOURCES_RELEASED;
 
 #ifdef WITH_WSREP
