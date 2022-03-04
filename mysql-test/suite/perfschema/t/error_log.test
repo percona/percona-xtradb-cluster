@@ -346,7 +346,7 @@ SELECT COUNT(*)=0
 --echo # verbosity=2
 
 --let LOG_FILE_V2=$MYSQLTEST_VARDIR/tmp/wl13681_v2.err
---let restart_parameters="restart: --log-error=$LOG_FILE_V2 --log-error-verbosity=2 --wsrep-log-min-verbosity=1"
+--let restart_parameters="restart: --log-error=$LOG_FILE_V2 --log-error-verbosity=2 --wsrep-min-log-verbosity=1"
 --replace_result $LOG_FILE_V2 LOG_FILE_V2
 --source include/restart_mysqld.inc
 

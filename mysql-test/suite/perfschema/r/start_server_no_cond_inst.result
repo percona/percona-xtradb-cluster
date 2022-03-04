@@ -115,13 +115,7 @@ show engine PERFORMANCE_SCHEMA status;
 show global status like "performance_schema%";
 show global variables like "performance_schema_max_cond_classes";
 Variable_name	Value
-<<<<<<< HEAD
-performance_schema_max_cond_classes	127
-||||||| merged common ancestors
-performance_schema_max_cond_classes	100
-=======
-performance_schema_max_cond_classes	150
->>>>>>> percona/ps/release-8.0.27-18
+performance_schema_max_cond_classes	177
 select count(*) > 0 from performance_schema.setup_instruments
 where name like "wait/synch/cond/%";
 count(*) > 0
