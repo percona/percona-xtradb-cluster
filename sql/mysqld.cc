@@ -3053,7 +3053,7 @@ static void clean_up_mutexes() {
   mysql_rwlock_destroy(&LOCK_consistent_snapshot);
   mysql_mutex_destroy(&LOCK_admin_tls_ctx_options);
   mysql_mutex_destroy(&LOCK_partial_revokes);
-<<<<<<< HEAD
+  mysql_mutex_destroy(&LOCK_authentication_policy);
 #ifdef WITH_WSREP
   mysql_mutex_destroy(&LOCK_wsrep_ready);
   mysql_cond_destroy(&COND_wsrep_ready);
@@ -3073,10 +3073,6 @@ static void clean_up_mutexes() {
   mysql_mutex_destroy(&LOCK_wsrep_SR_store);
   mysql_mutex_destroy(&LOCK_wsrep_alter_tablespace);
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
-  mysql_mutex_destroy(&LOCK_authentication_policy);
->>>>>>> percona/ps/release-8.0.27-18
 }
 
 /****************************************************************************
@@ -6016,7 +6012,8 @@ static int init_thread_environment() {
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_partial_revokes, &LOCK_partial_revokes,
                    MY_MUTEX_INIT_FAST);
-<<<<<<< HEAD
+  mysql_mutex_init(key_LOCK_authentication_policy, &LOCK_authentication_policy,
+                   MY_MUTEX_INIT_FAST);
 #ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_ready, &LOCK_wsrep_ready, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_ready, &COND_wsrep_ready);
@@ -6045,11 +6042,6 @@ static int init_thread_environment() {
   mysql_mutex_init(key_LOCK_wsrep_alter_tablespace,
                    &LOCK_wsrep_alter_tablespace, MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
-  mysql_mutex_init(key_LOCK_authentication_policy, &LOCK_authentication_policy,
-                   MY_MUTEX_INIT_FAST);
->>>>>>> percona/ps/release-8.0.27-18
   return 0;
 }
 
@@ -8759,7 +8751,16 @@ int mysqld_main(int argc, char **argv)
   //  Start signal handler thread.
   start_signal_handler();
 #endif
-<<<<<<< HEAD
+
+  if (opt_authentication_policy &&
+      validate_authentication_policy(opt_authentication_policy)) {
+    /* --authentication_policy is set to invalid value */
+    LogErr(ERROR_LEVEL, ER_INVALID_AUTHENTICATION_POLICY);
+    return 1;
+  } else {
+    /* update the value */
+    update_authentication_policy();
+  }
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
   /*
@@ -8775,19 +8776,6 @@ int mysqld_main(int argc, char **argv)
   }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
-
-=======
-  if (opt_authentication_policy &&
-      validate_authentication_policy(opt_authentication_policy)) {
-    /* --authentication_policy is set to invalid value */
-    LogErr(ERROR_LEVEL, ER_INVALID_AUTHENTICATION_POLICY);
-    return 1;
-  } else {
-    /* update the value */
-    update_authentication_policy();
-  }
->>>>>>> percona/ps/release-8.0.27-18
   /* set all persistent options */
   if (persisted_variables_cache.set_persist_options(false, true)) {
     LogErr(ERROR_LEVEL, ER_CANT_SET_UP_PERSISTED_VALUES);
@@ -13005,8 +12993,10 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_tls_ctx_options, "LOCK_tls_ctx_options", 0, 0, "A lock to control all of the --ssl-* CTX related command line options for client server connection port"},
   { &key_LOCK_admin_tls_ctx_options, "LOCK_admin_tls_ctx_options", 0, 0, "A lock to control all of the --ssl-* CTX related command line options for administrative connection port"},
   { &key_LOCK_rotate_binlog_master_key, "LOCK_rotate_binlog_master_key", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-<<<<<<< HEAD
-  { &key_monitor_info_run_lock, "Source_IO_monitor::run_lock", 0, 0, PSI_DOCUMENT_ME}
+  { &key_monitor_info_run_lock, "Source_IO_monitor::run_lock", 0, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_delegate_connection_mutex, "LOCK_delegate_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_group_replication_connection_mutex, "LOCK_group_replication_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"}
 #ifdef WITH_WSREP
   ,
   { &key_LOCK_wsrep_ready, "LOCK_wsrep_ready", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
@@ -13029,14 +13019,6 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_thd_queue, "LOCK_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_alter_tablespace, "LOCK_wsrep_alter_tablespace", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  { &key_monitor_info_run_lock, "Source_IO_monitor::run_lock", 0, 0, PSI_DOCUMENT_ME}
-=======
-  { &key_monitor_info_run_lock, "Source_IO_monitor::run_lock", 0, 0, PSI_DOCUMENT_ME},
-  { &key_LOCK_delegate_connection_mutex, "LOCK_delegate_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_LOCK_group_replication_connection_mutex, "LOCK_group_replication_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"}
->>>>>>> percona/ps/release-8.0.27-18
 };
 /* clang-format on */
 
@@ -13164,8 +13146,9 @@ static PSI_cond_info all_server_conds[]=
   { &key_COND_compress_gtid_table, "COND_compress_gtid_table", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_commit_order_manager_cond, "Commit_order_manager::m_workers.cond", 0, 0, PSI_DOCUMENT_ME},
   { &key_cond_slave_worker_hash, "Relay_log_info::replica_worker_hash_cond", 0, 0, PSI_DOCUMENT_ME},
-<<<<<<< HEAD
-  { &key_monitor_info_run_cond, "Source_IO_monitor::run_cond", 0, 0, PSI_DOCUMENT_ME}
+  { &key_monitor_info_run_cond, "Source_IO_monitor::run_cond", 0, 0, PSI_DOCUMENT_ME},
+  { &key_COND_delegate_connection_cond_var, "THD::COND_delegate_connection_cond_var", 0, 0, PSI_DOCUMENT_ME},
+  { &key_COND_group_replication_connection_cond_var, "THD::COND_group_replication_connection_cond_var", 0, 0, PSI_DOCUMENT_ME}
 #ifdef WITH_WSREP
   ,
   { &key_COND_wsrep_ready, "COND_wsrep_ready", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
@@ -13179,14 +13162,6 @@ static PSI_cond_info all_server_conds[]=
 
   { &key_COND_wsrep_thd_queue, "COND_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
   { &key_COND_wsrep_group_commit, "COND_wsrep_group_commit", 0, 0, PSI_DOCUMENT_ME}
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  { &key_monitor_info_run_cond, "Source_IO_monitor::run_cond", 0, 0, PSI_DOCUMENT_ME}
-=======
-  { &key_monitor_info_run_cond, "Source_IO_monitor::run_cond", 0, 0, PSI_DOCUMENT_ME},
-  { &key_COND_delegate_connection_cond_var, "THD::COND_delegate_connection_cond_var", 0, 0, PSI_DOCUMENT_ME},
-  { &key_COND_group_replication_connection_cond_var, "THD::COND_group_replication_connection_cond_var", 0, 0, PSI_DOCUMENT_ME}
->>>>>>> percona/ps/release-8.0.27-18
 };
 /* clang-format on */
 
@@ -13215,33 +13190,6 @@ static PSI_thread_info all_server_threads[]=
   { &key_thread_handle_con_sockets, "con_sockets", "con_sock", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_thread_handle_shutdown_restart, "shutdown_restart", "down_up", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
 #endif /* _WIN32 */
-<<<<<<< HEAD
-  { &key_thread_bootstrap, "bootstrap", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_handle_manager, "manager", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_main, "main", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_one_connection, "one_connection", PSI_FLAG_USER, 0, PSI_DOCUMENT_ME},
-  { &key_thread_signal_hand, "signal_handler", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_compress_gtid_table, "compress_gtid_table", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_parser_service, "parser_service", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_handle_con_admin_sockets, "admin_interface", PSI_FLAG_USER, 0, PSI_DOCUMENT_ME},
-#ifdef WITH_WSREP
-  { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_sst_logger, "THREAD_wsrep_sst_logger", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_THREAD_wsrep_post_rollbacker, "THREAD_wsrep_post_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-  { &key_thread_bootstrap, "bootstrap", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_handle_manager, "manager", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_main, "main", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_one_connection, "one_connection", PSI_FLAG_USER, 0, PSI_DOCUMENT_ME},
-  { &key_thread_signal_hand, "signal_handler", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_compress_gtid_table, "compress_gtid_table", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_parser_service, "parser_service", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-  { &key_thread_handle_con_admin_sockets, "admin_interface", PSI_FLAG_USER, 0, PSI_DOCUMENT_ME},
-=======
   { &key_thread_bootstrap, "bootstrap", "boot", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_thread_handle_manager, "manager", "handle_mgr", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_thread_main, "main", "main", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
@@ -13251,7 +13199,14 @@ PSI_FLAG_USER | PSI_FLAG_NO_SEQNUM, 0, PSI_DOCUMENT_ME},
   { &key_thread_compress_gtid_table, "compress_gtid_table", "gtid_zip", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_thread_parser_service, "parser_service", "parser_srv", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_thread_handle_con_admin_sockets, "admin_interface", "con_admin", PSI_FLAG_USER, 0, PSI_DOCUMENT_ME},
->>>>>>> percona/ps/release-8.0.27-18
+#ifdef WITH_WSREP
+  { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_sst_logger, "THREAD_wsrep_sst_logger", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+  { &key_THREAD_wsrep_post_rollbacker, "THREAD_wsrep_post_rollbacker", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
+#endif /* WITH_WSREP */
 };
 /* clang-format on */
 

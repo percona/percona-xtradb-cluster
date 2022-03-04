@@ -203,13 +203,8 @@ usr/lib/mysql/plugin/debug/openssl_udf.so
 usr/lib/mysql/plugin/debug/thread_pool.so
 usr/lib/mysql/plugin/debug/firewall.so
 usr/lib/mysql/plugin/debug/component_test_page_track_component.so
-<<<<<<< HEAD
-||||||| merged common ancestors
-usr/lib/mysql/plugin/debug/component_keyring_encrypted_file.so
-=======
 usr/lib/mysql/plugin/debug/authentication_fido.so
 usr/lib/mysql/plugin/debug/component_keyring_encrypted_file.so
->>>>>>> percona/ps/release-8.0.27-18
 ")
   ENDIF()
   IF (DEB_AWS_SDK)

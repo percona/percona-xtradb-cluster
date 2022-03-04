@@ -1,10 +1,4 @@
-<<<<<<< HEAD:packaging/deb-in/mysql-packagesource-common-SERIES.dirs.in
-# Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
-||||||| merged common ancestors:build-ps/debian-zenfs/percona-mysql-router-zenfs.mysqlrouter.tmpfile
-# Copyright (c) 2020, Oracle and/or its affiliates.
-=======
 # Copyright (c) 2008, 2021, Oracle and/or its affiliates.
->>>>>>> percona/ps/release-8.0.27-18:storage/ndb/cmake/ndb_downgrade_warnings.cmake
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -26,11 +20,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
-<<<<<<< HEAD:packaging/deb-in/mysql-packagesource-common-SERIES.dirs.in
-etc/mysql/conf.d
-||||||| merged common ancestors:build-ps/debian-zenfs/percona-mysql-router-zenfs.mysqlrouter.tmpfile
-d run 0755 mysqlrouter mysqlrouter  -
-=======
 # Disable specific types of warnings for current directory, and subdirectories,
 # if the compiler supports the flag
 FOREACH(warning
@@ -49,4 +38,3 @@ FOREACH(warning
     STRING_APPEND(CMAKE_C_FLAGS " ${HAS_WARN_FLAG}")
   ENDIF()
 ENDFOREACH()
->>>>>>> percona/ps/release-8.0.27-18:storage/ndb/cmake/ndb_downgrade_warnings.cmake

@@ -61,7 +61,6 @@
 #define PFS_MAX_RWLOCK_CLASS 70
 #endif
 #ifndef PFS_MAX_COND_CLASS
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 /**
    Max value for PXC builds.
@@ -71,15 +70,11 @@
    Let's keep PFS_MAX_COND_CLASS always bigger by this number.
 */
 #define PFS_WSREP_COND_CLASS 27
-#define PFS_MAX_COND_CLASS (100 + PFS_WSREP_COND_CLASS)
+#define PFS_MAX_COND_CLASS (150 + PFS_WSREP_COND_CLASS)
 #else
-#define PFS_MAX_COND_CLASS 100
-#endif /* WITH_WSREP */
-||||||| merged common ancestors
-#define PFS_MAX_COND_CLASS 100
-=======
 #define PFS_MAX_COND_CLASS 150
->>>>>>> percona/ps/release-8.0.27-18
+#endif /* WITH_WSREP */
+
 #endif
 #ifndef PFS_MAX_THREAD_CLASS
 #define PFS_MAX_THREAD_CLASS 100

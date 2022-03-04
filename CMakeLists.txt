@@ -1395,66 +1395,12 @@ FOREACH(BUILD_TYPE RELEASE RELWITHDEBINFO MINSIZEREL)
 ENDFOREACH()
 
 # Add safemutex for debug configurations
-<<<<<<< HEAD
 # PS-enabled SAFE_MUTEX (starting from 5.7.22) but PXC can't enable it.
 # PXC in 5.7 introduced PFS for some of the instruments that in galera
 # library but not for all since tracking of them is big overhead
 # with multiple layer callback involved.
 # SAFE_MUTEX should be enabled for all instrument or none.
 # Since PXC cause is mix-match latter become true for PXC.
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-FOREACH(LANG C CXX)
-  STRING_PREPEND(CMAKE_${LANG}_FLAGS_DEBUG "-DSAFE_MUTEX ")
-ENDFOREACH()
-
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-<<<<<<<<<<< Temporary merge branch 1
-||||||||||| merged common ancestors
-<<<<<<<<<<<<< Temporary merge branch 1
-===========
->>>>>>>>>>> Temporary merge branch 2
-FOREACH(LANG C CXX)
-  STRING_PREPEND(CMAKE_${LANG}_FLAGS_DEBUG "-DSAFE_MUTEX ")
-ENDFOREACH()
-<<<<<<<<<<< Temporary merge branch 1
-||||||||||| 261d32555b5
-IF(NOT WITH_INNODB_MEMCACHED)
-  FOREACH(LANG C CXX)
-      SET(CMAKE_${LANG}_FLAGS_DEBUG
-          "${CMAKE_${LANG}_FLAGS_DEBUG} -DSAFE_MUTEX")
-  ENDFOREACH()
-ENDIF()
-===========
-IF(NOT WITH_INNODB_MEMCACHED)
-  FOREACH(LANG C CXX)
-    STRING_PREPEND(CMAKE_${LANG}_FLAGS_DEBUG "-DSAFE_MUTEX ")
-  ENDFOREACH()
-ENDIF()
->>>>>>>>>>> Temporary merge branch 2
-||||||||||| merged common ancestors
-||||||||||||| 261d32555b5
-IF(NOT WITH_INNODB_MEMCACHED)
-  FOREACH(LANG C CXX)
-      SET(CMAKE_${LANG}_FLAGS_DEBUG
-          "${CMAKE_${LANG}_FLAGS_DEBUG} -DSAFE_MUTEX")
-  ENDFOREACH()
-ENDIF()
-=============
-IF(NOT WITH_INNODB_MEMCACHED)
-  FOREACH(LANG C CXX)
-    STRING_PREPEND(CMAKE_${LANG}_FLAGS_DEBUG "-DSAFE_MUTEX ")
-  ENDFOREACH()
-ENDIF()
->>>>>>>>>>>>> Temporary merge branch 2
-===========
->>>>>>>>>>> Temporary merge branch 2
-
-=========
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> percona/ps/release-8.0.27-18
 # Enable debug sync for debug builds.
 FOREACH(LANG C CXX)
   STRING_PREPEND(CMAKE_${LANG}_FLAGS_DEBUG "-DENABLED_DEBUG_SYNC ")
@@ -1942,7 +1888,6 @@ IF(WITH_PROTOBUF STREQUAL "bundled" OR WITH_FIDO STREQUAL "bundled")
   ENDIF()
 ENDIF()
 
-ADD_SUBDIRECTORY(extra/libkmip)
 
 #
 # Setup maintainer mode options by the end. Platform checks are

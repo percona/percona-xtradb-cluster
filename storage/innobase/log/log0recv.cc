@@ -473,14 +473,7 @@ void recv_sys_close() {
   }
 #endif /* !UNIV_HOTBACKUP */
 
-<<<<<<< HEAD
-  UT_DELETE(recv_sys->dblwr);
-||||||| merged common ancestors
-  UT_DELETE(recv_sys->dblwr);
->>>>>>>>> Temporary merge branch 2
-=======
   ut::delete_(recv_sys->dblwr);
->>>>>>> percona/ps/release-8.0.27-18
 
   call_destructor(&recv_sys->deleted);
   call_destructor(&recv_sys->missing_ids);

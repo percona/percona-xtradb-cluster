@@ -398,17 +398,9 @@ rm -r $(readlink var) var
 %attr(755, root, root) %{_bindir}/my_print_defaults
 
 %dir %{_libdir}/mysql/private
-<<<<<<< HEAD
-%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.6.1
-%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.6.1
-||||||| merged common ancestors
-%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.11.4
-%attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.11.4
-=======
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf-lite.so.3.11.4
 %attr(755, root, root) %{_libdir}/mysql/private/libprotobuf.so.3.11.4
 %attr(755, root, root) %{_libdir}/mysql/private/libfido2.*
->>>>>>> percona/ps/release-8.0.27-18
 
 %dir %{_libdir}/mysql/plugin
 %attr(755, root, root) %{_libdir}/mysql/plugin/adt_null.so
@@ -495,13 +487,8 @@ rm -r $(readlink var) var
 %attr(755, root, root) %{_libdir}/mysql/plugin/thread_pool.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/openssl_udf.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/firewall.so
-<<<<<<< HEAD
-||||||| merged common ancestors
-%attr(755, root, root) %{_libdir}/mysql/plugin/component_keyring_encrypted_file.so
-=======
 %attr(755, root, root) %{_libdir}/mysql/plugin/authentication_fido.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/component_keyring_encrypted_file.so
->>>>>>> percona/ps/release-8.0.27-18
 %if 0%{?aws_sdk}
 %attr(755, root, root) %{_libdir}/mysql/plugin/keyring_aws.so
 %endif # aws_sdk

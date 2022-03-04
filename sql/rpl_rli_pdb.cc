@@ -1624,28 +1624,7 @@ void Slave_worker::do_report(loglevel level, int err_code, const char *msg,
   this->va_report(level, err_code, buff_coord, msg, args);
 }
 
-<<<<<<< HEAD
-void *Slave_worker::operator new(size_t request MY_ATTRIBUTE((unused))) {
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-void* Slave_worker::operator new(size_t request)
-{
-  void* ptr;
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-<<<<<<<<<<< Temporary merge branch 1
-||||||||||| merged common ancestors
-<<<<<<<<<<<<< Temporary merge branch 1
-===========
->>>>>>>>>>> Temporary merge branch 2
-void* Slave_worker::operator new(size_t request)
-{
-  void* ptr;
-=========
-void *Slave_worker::operator new(size_t request MY_ATTRIBUTE((unused))) {
-=======
 void *Slave_worker::operator new(size_t request [[maybe_unused]]) {
->>>>>>> percona/ps/release-8.0.27-18
   void *ptr;
   if (posix_memalign(&ptr, __alignof__(Slave_worker), sizeof(Slave_worker))) {
     throw std::bad_alloc();

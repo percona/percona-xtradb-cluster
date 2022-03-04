@@ -430,7 +430,6 @@ MY_NODISCARD
 trx_t *innobase_get_trx_for_slow_log(void) noexcept;
 
 extern bool innodb_inited;
-<<<<<<< HEAD
 
 #if defined(WITH_WSREP) && !defined(UNIV_INNOCHECKSUM)
 
@@ -444,8 +443,6 @@ int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
 bool wsrep_safe_to_persist_xid(THD *thd);
 #endif /* WITH_WSREP && !UNIV_INNOCHECKSUM */
 
-||||||| merged common ancestors
-=======
 
 /** Return the number of read threads for this session.
 @param[in]      thd       Session instance, or nullptr to query the global
@@ -464,5 +461,4 @@ ulong thd_parallel_read_threads(THD *thd);
 /** @return the number of DDL threads to use (global/session). */
 [[nodiscard]] size_t thd_ddl_threads(THD *thd) noexcept;
 
->>>>>>> percona/ps/release-8.0.27-18
 #endif /* HA_INNODB_PROTOTYPES_H */

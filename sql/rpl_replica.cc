@@ -2048,144 +2048,7 @@ bool start_slave_threads(bool need_lock_slave, bool wait_for_start,
     return true;
   }
 
-<<<<<<< HEAD
-  if (mi->is_auto_position() && (thread_mask & SLAVE_IO) &&
-      global_gtid_mode.get() == Gtid_mode::OFF) {
-    my_error(ER_CANT_USE_AUTO_POSITION_WITH_GTID_MODE_OFF, MYF(0),
-             mi->get_for_channel_str());
-    return true;
-  }
-#ifdef WITH_WSREP
-  if (WSREP_ON && !opt_log_replica_updates) {
-    /*
-       bad configuration, mysql replication would not be forwarded to wsrep
-       cluster which would lead to immediate inconsistency
-    */
-    WSREP_WARN("Cannot start MySQL slave, when log_slave_updates is not set");
-    my_error(ER_SLAVE_CONFIGURATION, MYF(0),
-             "bad configuration no log_slave_updates defined, slave would not"
-             " replicate further to wsrep cluster");
-    return true;
-  }
-#endif /* WITH_WSREP */
-
-  if (global_gtid_mode.get() != Gtid_mode::ON &&
-      mi->is_source_connection_auto_failover()) {
-    my_error(ER_RPL_ASYNC_RECONNECT_GTID_MODE_OFF, MYF(0));
-    return true;
-  }
-
-  if ((mi->rli->m_assign_gtids_to_anonymous_transactions_info.get_type() >
-       Assign_gtids_to_anonymous_transactions_info::enum_type::AGAT_OFF) &&
-      global_gtid_mode.get() != Gtid_mode::ON) {
-    /*
-      This function may be called either during server start (when
-      --skip-start-replica is not used) or during START SLAVE. The error should
-      only be generated during START SLAVE. During server start, an error has
-      already been written to the log for this case (in init_replica).
-    */
-    if (current_thd)
-      my_error(ER_CANT_USE_ANONYMOUS_TO_GTID_WITH_GTID_MODE_NOT_ON, MYF(0),
-               mi->get_for_channel_str());
-    return true;
-  }
-  if (mi->rli->m_assign_gtids_to_anonymous_transactions_info.get_type() >
-      Assign_gtids_to_anonymous_transactions_info::enum_type::AGAT_OFF) {
-    std::string group_name = get_group_replication_group_name();
-    if ((group_name.length() > 0) &&
-        !(group_name.compare(
-            mi->rli->m_assign_gtids_to_anonymous_transactions_info
-                .get_value()))) {
-      my_error(ER_ANONYMOUS_TO_GTID_UUID_SAME_AS_GROUP_NAME, MYF(0),
-               mi->get_channel());
-      return true;
-    }
-    std::string view_change_uuid;
-    if (get_group_replication_view_change_uuid(view_change_uuid)) {
-      /* purecov: begin inspected */
-      my_error(ER_GRP_RPL_VIEW_CHANGE_UUID_FAIL_GET_VARIABLE, MYF(0));
-      return true;
-      /* purecov: end */
-    } else {
-      if (!(view_change_uuid.compare(
-              mi->rli->m_assign_gtids_to_anonymous_transactions_info
-                  .get_value()))) {
-        my_error(ER_ANONYMOUS_TO_GTID_UUID_SAME_AS_VIEW_CHANGE_UUID, MYF(0),
-                 mi->get_channel());
-        return true;
-      }
-    }
-    if (mi->rli->until_condition == Relay_log_info::UNTIL_SQL_BEFORE_GTIDS ||
-        mi->rli->until_condition == Relay_log_info::UNTIL_SQL_AFTER_GTIDS) {
-      my_error(ER_CANT_SET_SQL_AFTER_OR_BEFORE_GTIDS_WITH_ANONYMOUS_TO_GTID,
-               MYF(0));
-      return true;
-    }
-  }
-||||||| merged common ancestors
-  if (mi->is_auto_position() && (thread_mask & SLAVE_IO) &&
-      global_gtid_mode.get() == Gtid_mode::OFF) {
-    my_error(ER_CANT_USE_AUTO_POSITION_WITH_GTID_MODE_OFF, MYF(0),
-             mi->get_for_channel_str());
-    return true;
-  }
-
-  if (global_gtid_mode.get() != Gtid_mode::ON &&
-      mi->is_source_connection_auto_failover()) {
-    my_error(ER_RPL_ASYNC_RECONNECT_GTID_MODE_OFF, MYF(0));
-    return true;
-  }
-
-  if ((mi->rli->m_assign_gtids_to_anonymous_transactions_info.get_type() >
-       Assign_gtids_to_anonymous_transactions_info::enum_type::AGAT_OFF) &&
-      global_gtid_mode.get() != Gtid_mode::ON) {
-    /*
-      This function may be called either during server start (when
-      --skip-start-replica is not used) or during START SLAVE. The error should
-      only be generated during START SLAVE. During server start, an error has
-      already been written to the log for this case (in init_replica).
-    */
-    if (current_thd)
-      my_error(ER_CANT_USE_ANONYMOUS_TO_GTID_WITH_GTID_MODE_NOT_ON, MYF(0),
-               mi->get_for_channel_str());
-    return true;
-  }
-  if (mi->rli->m_assign_gtids_to_anonymous_transactions_info.get_type() >
-      Assign_gtids_to_anonymous_transactions_info::enum_type::AGAT_OFF) {
-    std::string group_name = get_group_replication_group_name();
-    if ((group_name.length() > 0) &&
-        !(group_name.compare(
-            mi->rli->m_assign_gtids_to_anonymous_transactions_info
-                .get_value()))) {
-      my_error(ER_ANONYMOUS_TO_GTID_UUID_SAME_AS_GROUP_NAME, MYF(0),
-               mi->get_channel());
-      return true;
-    }
-    std::string view_change_uuid;
-    if (get_group_replication_view_change_uuid(view_change_uuid)) {
-      /* purecov: begin inspected */
-      my_error(ER_GRP_RPL_VIEW_CHANGE_UUID_FAIL_GET_VARIABLE, MYF(0));
-      return true;
-      /* purecov: end */
-    } else {
-      if (!(view_change_uuid.compare(
-              mi->rli->m_assign_gtids_to_anonymous_transactions_info
-                  .get_value()))) {
-        my_error(ER_ANONYMOUS_TO_GTID_UUID_SAME_AS_VIEW_CHANGE_UUID, MYF(0),
-                 mi->get_channel());
-        return true;
-      }
-    }
-    if (mi->rli->until_condition == Relay_log_info::UNTIL_SQL_BEFORE_GTIDS ||
-        mi->rli->until_condition == Relay_log_info::UNTIL_SQL_AFTER_GTIDS) {
-      my_error(ER_CANT_SET_SQL_AFTER_OR_BEFORE_GTIDS_WITH_ANONYMOUS_TO_GTID,
-               MYF(0));
-      return true;
-    }
-  }
-=======
   if (check_replica_configuration_errors(mi, thread_mask)) return true;
->>>>>>> percona/ps/release-8.0.27-18
 
   /**
     SQL AFTER MTS GAPS has no effect when GTID_MODE=ON and SOURCE_AUTO_POS=1
@@ -5288,7 +5151,6 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
             of init_info()). b) init_relay_log_pos(), because the BEGIN may be
             an older relay log.
           */
-<<<<<<< HEAD
           if (rli->trans_retries < slave_trans_retries) {
             /*
               The transactions has to be rolled back before
@@ -5309,49 +5171,7 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
                We need to figure out if there is a test case that covers
                this part. \Alfranio.
             */
-            if (load_mi_and_rli_from_repositories(rli->mi, false, SLAVE_SQL))
-              LogErr(ERROR_LEVEL,
-                     ER_RPL_SLAVE_FAILED_TO_INIT_MASTER_INFO_STRUCTURE,
-                     rli->get_for_channel_str());
-            else if (applier_reader->open(&errmsg))
-              LogErr(ERROR_LEVEL, ER_RPL_SLAVE_CANT_INIT_RELAY_LOG_POSITION,
-                     rli->get_for_channel_str(), errmsg);
-            else {
-              exec_res = SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK;
-              /* chance for concurrent connection to get more locks */
-              slave_sleep(thd,
-                          min<ulong>(rli->trans_retries, MAX_SLAVE_RETRY_PAUSE),
-                          sql_slave_killed, rli);
-              mysql_mutex_lock(&rli->data_lock);  // because of SHOW STATUS
-              if (!silent) {
-                rli->trans_retries++;
-                if (rli->is_processing_trx()) {
-                  rli->retried_processing(
-                      temp_trans_errno, ER_THD_NONCONST(thd, temp_trans_errno),
-                      rli->trans_retries);
-                }
-||||||| merged common ancestors
-          if (load_mi_and_rli_from_repositories(rli->mi, false, SLAVE_SQL))
-            LogErr(ERROR_LEVEL,
-                   ER_RPL_SLAVE_FAILED_TO_INIT_MASTER_INFO_STRUCTURE,
-                   rli->get_for_channel_str());
-          else if (applier_reader->open(&errmsg))
-            LogErr(ERROR_LEVEL, ER_RPL_SLAVE_CANT_INIT_RELAY_LOG_POSITION,
-                   rli->get_for_channel_str(), errmsg);
-          else {
-            exec_res = SLAVE_APPLY_EVENT_RETRY;
-            /* chance for concurrent connection to get more locks */
-            slave_sleep(thd,
-                        min<ulong>(rli->trans_retries, MAX_SLAVE_RETRY_PAUSE),
-                        sql_slave_killed, rli);
-            mysql_mutex_lock(&rli->data_lock);  // because of SHOW STATUS
-            if (!silent) {
-              rli->trans_retries++;
-              if (rli->is_processing_trx()) {
-                rli->retried_processing(temp_trans_errno,
-                                        ER_THD_NONCONST(thd, temp_trans_errno),
-                                        rli->trans_retries);
-=======
+
           if (load_mi_and_rli_from_repositories(rli->mi, false, SLAVE_SQL,
                                                 false, true))
             LogErr(ERROR_LEVEL,
@@ -5373,9 +5193,8 @@ static int exec_relay_log_event(THD *thd, Relay_log_info *rli,
                 rli->retried_processing(temp_trans_errno,
                                         ER_THD_NONCONST(thd, temp_trans_errno),
                                         rli->trans_retries);
->>>>>>> percona/ps/release-8.0.27-18
               }
-
+            }
               rli->retried_trans++;
               mysql_mutex_unlock(&rli->data_lock);
 #ifndef NDEBUG
@@ -7237,21 +7056,11 @@ wsrep_restart_point :
   else
     rli->current_mts_submode = new Mts_submode_database();
 
-<<<<<<< HEAD
-  if (opt_replica_preserve_commit_order && !rli->is_parallel_exec())
+  // Only use replica preserve commit order if more than 1 worker exists
+  if (opt_replica_preserve_commit_order && !rli->is_parallel_exec() &&
+    rli->opt_replica_parallel_workers > 1)
     commit_order_mngr =
         new Commit_order_manager(rli->opt_replica_parallel_workers);
-||||||| merged common ancestors
-    if (opt_replica_preserve_commit_order && !rli->is_parallel_exec())
-      commit_order_mngr =
-          new Commit_order_manager(rli->opt_replica_parallel_workers);
-=======
-    // Only use replica preserve commit order if more than 1 worker exists
-    if (opt_replica_preserve_commit_order && !rli->is_parallel_exec() &&
-        rli->opt_replica_parallel_workers > 1)
-      commit_order_mngr =
-          new Commit_order_manager(rli->opt_replica_parallel_workers);
->>>>>>> percona/ps/release-8.0.27-18
 
   rli->set_commit_order_manager(commit_order_mngr);
 
@@ -7350,7 +7159,6 @@ wsrep_restart_point :
   */
   rli->abort_slave = false;
 
-<<<<<<< HEAD
   /*
     Reset errors for a clean start (otherwise, if the master is idle, the SQL
     thread may execute no Query_log_event, so the error will remain even
@@ -7361,19 +7169,12 @@ wsrep_restart_point :
     now.
     But the master timestamp is reset by RESET SLAVE & CHANGE MASTER.
   */
-  rli->clear_error();
-  if (rli->workers_array_initialized) {
-    for (size_t i = 0; i < rli->get_worker_count(); i++) {
-      rli->get_worker(i)->clear_error();
-||||||| merged common ancestors
-    if (rli->update_is_transactional()) {
-      mysql_cond_broadcast(&rli->start_cond);
-      mysql_mutex_unlock(&rli->run_lock);
-      rli->report(
-          ERROR_LEVEL, ER_SLAVE_FATAL_ERROR, ER_THD(thd, ER_SLAVE_FATAL_ERROR),
-          "Error checking if the relay log repository is transactional.");
-      goto err;
-=======
+    rli->clear_error();
+    if (rli->workers_array_initialized) {
+      for (size_t i = 0; i < rli->get_worker_count(); i++) {
+        rli->get_worker(i)->clear_error();
+      }
+    }
     if (rli->update_is_transactional() ||
         DBUG_EVALUATE_IF("simulate_update_is_transactional_error", true,
                          false)) {
@@ -7383,9 +7184,7 @@ wsrep_restart_point :
           ERROR_LEVEL, ER_SLAVE_FATAL_ERROR, ER_THD(thd, ER_SLAVE_FATAL_ERROR),
           "Error checking if the relay log repository is transactional.");
       goto err;
->>>>>>> percona/ps/release-8.0.27-18
     }
-  }
 
   if (rli->update_is_transactional()) {
     mysql_cond_broadcast(&rli->start_cond);
@@ -7480,7 +7279,6 @@ wsrep_restart_point :
     }
   }
 
-<<<<<<< HEAD
   /*
     First check until condition - probably there is nothing to execute. We
     do not want to wait for next event in this case.
@@ -7519,35 +7317,10 @@ wsrep_restart_point :
       LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SKIP_COUNTER_EXECUTED,
              (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
              saved_master_log_name, (ulong)saved_master_log_pos,
-||||||| merged common ancestors
-    if (rli->is_privilege_checks_user_null())
-      LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SQL_THREAD_STARTING,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos(), llbuff),
-             rli->get_group_relay_log_name(),
-             llstr(rli->get_group_relay_log_pos(), llbuff1));
-    else
-      LogErr(INFORMATION_LEVEL,
-             ER_RPL_SLAVE_SQL_THREAD_STARTING_WITH_PRIVILEGE_CHECKS,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos(), llbuff),
-=======
-    if (rli->is_privilege_checks_user_null())
-      LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SQL_THREAD_STARTING,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff),
-             rli->get_group_relay_log_name(),
-             llstr(rli->get_group_relay_log_pos(), llbuff1));
-    else
-      LogErr(INFORMATION_LEVEL,
-             ER_RPL_SLAVE_SQL_THREAD_STARTING_WITH_PRIVILEGE_CHECKS,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff),
->>>>>>> percona/ps/release-8.0.27-18
              rli->get_group_relay_log_name(),
              (ulong)rli->get_group_relay_log_pos(),
-             rli->get_group_master_log_name(),
-             (ulong)rli->get_group_master_log_pos());
+             rli->get_group_master_log_name_info(),
+             (ulong)rli->get_group_master_log_pos_info());
       saved_skip = 0;
     }
 
@@ -7575,7 +7348,6 @@ wsrep_restart_point :
             Next iteration reads the same event. */
         break;
 
-<<<<<<< HEAD
       case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR:
         /** fall through */
       case SLAVE_APPLY_EVENT_AND_UPDATE_POS_UPDATE_POS_ERROR:
@@ -7583,39 +7355,6 @@ wsrep_restart_point :
       case SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPEND_JOB_ERROR:
         main_loop_error = true;
         break;
-||||||| merged common ancestors
-    while (!main_loop_error && !sql_slave_killed(thd, rli)) {
-      Log_event *ev = nullptr;
-      THD_STAGE_INFO(thd, stage_reading_event_from_the_relay_log);
-      assert(rli->info_thd == thd);
-      THD_CHECK_SENTRY(thd);
-      if (saved_skip && rli->slave_skip_counter == 0) {
-        LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SKIP_COUNTER_EXECUTED,
-               (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
-               saved_master_log_name, (ulong)saved_master_log_pos,
-               rli->get_group_relay_log_name(),
-               (ulong)rli->get_group_relay_log_pos(),
-               rli->get_group_master_log_name(),
-               (ulong)rli->get_group_master_log_pos());
-        saved_skip = 0;
-      }
-=======
-    while (!main_loop_error && !sql_slave_killed(thd, rli)) {
-      Log_event *ev = nullptr;
-      THD_STAGE_INFO(thd, stage_reading_event_from_the_relay_log);
-      assert(rli->info_thd == thd);
-      THD_CHECK_SENTRY(thd);
-      if (saved_skip && rli->slave_skip_counter == 0) {
-        LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SKIP_COUNTER_EXECUTED,
-               (ulong)saved_skip, saved_log_name, (ulong)saved_log_pos,
-               saved_master_log_name, (ulong)saved_master_log_pos,
-               rli->get_group_relay_log_name(),
-               (ulong)rli->get_group_relay_log_pos(),
-               rli->get_group_master_log_name_info(),
-               (ulong)rli->get_group_master_log_pos_info());
-        saved_skip = 0;
-      }
->>>>>>> percona/ps/release-8.0.27-18
 
       default:
         /* This shall never happen. */
@@ -7638,50 +7377,8 @@ err:
   }
 #endif /* WITH_WSREP */
 
-<<<<<<< HEAD
   if (main_loop_error == true && !sql_slave_killed(thd, rli))
     slave_errno = report_apply_event_error(thd, rli);
-||||||| merged common ancestors
-    // report error
-    if (main_loop_error == true && !sql_slave_killed(thd, rli))
-      slave_errno = report_apply_event_error(thd, rli);
-
-    /* At this point the SQL thread will not try to work anymore. */
-    rli->atomic_is_stopping = true;
-    (void)RUN_HOOK(
-        binlog_relay_io, applier_stop,
-        (thd, rli->mi, rli->is_error() || !rli->sql_thread_kill_accepted));
-
-    slave_stop_workers(rli, &mts_inited);  // stopping worker pool
-    /* Thread stopped. Print the current replication position to the log */
-    if (slave_errno)
-      LogErr(ERROR_LEVEL, slave_errno, rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos(), llbuff));
-    else
-      LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SQL_THREAD_EXITING,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos(), llbuff));
-=======
-    // report error
-    if (main_loop_error == true && !sql_slave_killed(thd, rli))
-      slave_errno = report_apply_event_error(thd, rli);
-
-    /* At this point the SQL thread will not try to work anymore. */
-    rli->atomic_is_stopping = true;
-    (void)RUN_HOOK(
-        binlog_relay_io, applier_stop,
-        (thd, rli->mi, rli->is_error() || !rli->sql_thread_kill_accepted));
-
-    slave_stop_workers(rli, &mts_inited);  // stopping worker pool
-    /* Thread stopped. Print the current replication position to the log */
-    if (slave_errno)
-      LogErr(ERROR_LEVEL, slave_errno, rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff));
-    else
-      LogErr(INFORMATION_LEVEL, ER_RPL_SLAVE_SQL_THREAD_EXITING,
-             rli->get_for_channel_str(), rli->get_rpl_log_name(),
-             llstr(rli->get_group_master_log_pos_info(), llbuff));
->>>>>>> percona/ps/release-8.0.27-18
 
   /* At this point the SQL thread will not try to work anymore. */
   rli->atomic_is_stopping = true;
@@ -11775,6 +11472,20 @@ static void check_replica_configuration_restrictions() {
 */
 static bool check_replica_configuration_errors(Master_info *mi,
                                                int thread_mask) {
+#ifdef WITH_WSREP
+  if (WSREP_ON && !opt_log_replica_updates) {
+    /*
+       bad configuration, mysql replication would not be forwarded to wsrep
+       cluster which would lead to immediate inconsistency
+    */
+    WSREP_WARN("Cannot start MySQL slave, when log_slave_updates is not set");
+    my_error(ER_SLAVE_CONFIGURATION, MYF(0),
+             "bad configuration no log_slave_updates defined, slave would not"
+             " replicate further to wsrep cluster");
+    return true;
+  }
+#endif /* WITH_WSREP */
+
   if (global_gtid_mode.get() != Gtid_mode::ON) {
     if (mi->is_auto_position() && (thread_mask & SLAVE_IO) &&
         global_gtid_mode.get() == Gtid_mode::OFF) {

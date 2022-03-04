@@ -1805,72 +1805,7 @@ void JOIN::cleanup_item_list(const mem_root_deque<Item *> &items) const {
   @returns false if success, true if error
 */
 
-<<<<<<< HEAD
-bool Query_block::optimize(THD *thd) {
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-bool SELECT_LEX::optimize(THD *thd)
-{
-  DBUG_ENTER("SELECT_LEX::optimize");
-
-  assert(master_unit()->cleaned == SELECT_LEX_UNIT::UC_DIRTY);
-  assert(join == NULL);
-  JOIN *const join_local= new JOIN(thd, this);
-  if (!join_local)
-    DBUG_RETURN(true);  /* purecov: inspected */
-
-  set_join(join_local);
-
-  if (join->optimize())
-    DBUG_RETURN(true);
-
-  for (SELECT_LEX_UNIT *unit= first_inner_unit(); unit; unit= unit->next_unit())
-  {
-||||||||| merged common ancestors
-bool SELECT_LEX::optimize(THD *thd)
-{
-  DBUG_ENTER("SELECT_LEX::optimize");
-
-<<<<<<<<<<< Temporary merge branch 1
-<<<<<<<<<<< Temporary merge branch 1
-  DBUG_ASSERT(master_unit()->cleaned == SELECT_LEX_UNIT::UC_DIRTY);
-  DBUG_ASSERT(join == NULL);
-||||||||||| 261d32555b5
-  DBUG_ASSERT(join == NULL);
-===========
-||||||||||| merged common ancestors
-<<<<<<<<<<<<< Temporary merge branch 1
-  DBUG_ASSERT(master_unit()->cleaned == SELECT_LEX_UNIT::UC_DIRTY);
-  DBUG_ASSERT(join == NULL);
-||||||||||||| 261d32555b5
-  DBUG_ASSERT(join == NULL);
-=============
-===========
-  assert(master_unit()->cleaned == SELECT_LEX_UNIT::UC_DIRTY);
->>>>>>>>>>> Temporary merge branch 2
-  assert(join == NULL);
-<<<<<<<<<<< Temporary merge branch 1
->>>>>>>>>>> Temporary merge branch 2
-||||||||||| merged common ancestors
->>>>>>>>>>>>> Temporary merge branch 2
-===========
->>>>>>>>>>> Temporary merge branch 2
-  JOIN *const join_local= new JOIN(thd, this);
-  if (!join_local)
-    DBUG_RETURN(true);  /* purecov: inspected */
-
-  set_join(join_local);
-
-  if (join->optimize())
-    DBUG_RETURN(true);
-
-  for (SELECT_LEX_UNIT *unit= first_inner_unit(); unit; unit= unit->next_unit())
-  {
-=========
-bool Query_block::optimize(THD *thd) {
-=======
 bool Query_block::optimize(THD *thd, bool finalize_access_paths) {
->>>>>>> percona/ps/release-8.0.27-18
   DBUG_TRACE;
 
   assert(master_query_expression()->cleaned == Query_expression::UC_DIRTY);

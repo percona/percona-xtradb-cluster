@@ -55,19 +55,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define INNODB_VERSION_BUGFIX MYSQL_VERSION_PATCH
 
 #ifndef PERCONA_INNODB_VERSION
-<<<<<<< HEAD
-#define PERCONA_INNODB_VERSION 16
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-#define PERCONA_INNODB_VERSION 38
-||||||||| merged common ancestors
-#define PERCONA_INNODB_VERSION 37
-=========
-#define PERCONA_INNODB_VERSION 16
->>>>>>>>> Temporary merge branch 2
-=======
 #define PERCONA_INNODB_VERSION 18
->>>>>>> percona/ps/release-8.0.27-18
 #endif
 
 /* The following is the InnoDB version as shown in
