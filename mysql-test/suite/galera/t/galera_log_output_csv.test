@@ -5,6 +5,14 @@
 --source include/galera_cluster.inc
 
 --connection node_1
+SET @old_log_output = @@global.log_output;
+SET GLOBAL log_output="FILE";
+
+--connection node_2
+SET @old_log_output = @@global.log_output;
+SET GLOBAL log_output="FILE";
+
+--connection node_1
 call mtr.add_suppression("Although a path was specified for the.*");
 
 --connection node_2
@@ -34,6 +42,16 @@ SELECT COUNT(*) = 0 FROM mysql.general_log WHERE argument = 'CREATE TABLE t1 (f1
 
 SELECT 2 = 2 FROM t1;
 SELECT COUNT(*) = 1 FROM mysql.slow_log WHERE sql_text = 'SELECT 2 = 2 FROM t1';
+
+--connection node_1
+SET GLOBAL log_output = @old_log_output;
+TRUNCATE TABLE mysql.general_log;
+TRUNCATE TABLE mysql.slow_log;
+
+--connection node_2
+SET GLOBAL log_output = @old_log_output;
+TRUNCATE TABLE mysql.general_log;
+TRUNCATE TABLE mysql.slow_log;
 
 --connection node_1
 DROP TABLE t1;
