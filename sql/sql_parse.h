@@ -130,6 +130,7 @@ bool show_precheck(THD *thd, LEX *lex, bool lock);
 
 extern uint sql_command_flags[];
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
 #include "service_wsrep.h"
 
@@ -192,6 +193,18 @@ extern uint sql_command_flags[];
 
 #endif /* WITH_WSREP */
 
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+size_t get_command_name_len(void);
+
+// Statement timeout function(s)
+void reset_statement_timer(THD *thd);
+||||||||| merged common ancestors
+// Statement timeout function(s)
+void reset_statement_timer(THD *thd);
+=========
+=======
+>>>>>>> percona/ps/release-8.0.27-18
 /**
   Map from enumeration values of type enum_server_command to
   descriptions of type std::string.

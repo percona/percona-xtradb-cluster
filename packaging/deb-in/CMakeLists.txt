@@ -78,6 +78,13 @@ usr/lib/mysql/plugin/openssl_udf.so
 usr/lib/mysql/plugin/thread_pool.so
 usr/lib/mysql/plugin/firewall.so
 usr/lib/mysql/plugin/component_test_page_track_component.so
+<<<<<<< HEAD
+||||||| merged common ancestors
+usr/lib/mysql/plugin/component_keyring_encrypted_file.so
+=======
+usr/lib/mysql/plugin/authentication_fido.so
+usr/lib/mysql/plugin/component_keyring_encrypted_file.so
+>>>>>>> percona/ps/release-8.0.27-18
 ")
 
   IF (DEB_AWS_SDK)
