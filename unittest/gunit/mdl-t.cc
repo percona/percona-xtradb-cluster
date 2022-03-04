@@ -142,7 +142,12 @@ class MDLTest : public ::testing::Test, public Test_MDL_context_owner {
 
   void notify_shared_lock(MDL_context_owner *in_use,
                           bool needs_thr_lock_abort) override {
+#ifdef WITH_WSREP
+    if (in_use)
+      in_use->notify_shared_lock(nullptr, needs_thr_lock_abort);
+#else
     in_use->notify_shared_lock(nullptr, needs_thr_lock_abort);
+#endif
   }
 
   // A utility member for testing single lock requests.

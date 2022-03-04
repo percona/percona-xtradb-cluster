@@ -710,8 +710,15 @@ TEST_F(TableCacheDoubleCacheDeathTest, ManagerLockAndUnlock) {
 /*
   Coverage for Table_cache_manager::free_table();
 */
-
+#ifdef WITH_WSREP
+/*
+   This test expects assert from table cache.
+   WSREP suppresses this assert. Check Table_cache_manager::free_table()
+*/
+TEST_F(TableCacheDoubleCacheDeathTest, DISABLED_ManagerFreeTable) {
+#else
 TEST_F(TableCacheDoubleCacheDeathTest, ManagerFreeTable) {
+#endif
   THD *thd_1 = get_thd(0);
   THD *thd_2 = get_thd(1);
 
