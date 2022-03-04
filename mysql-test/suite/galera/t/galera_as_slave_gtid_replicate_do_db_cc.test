@@ -171,3 +171,4 @@ CALL mtr.add_suppression("TO isolation failed for");
 CALL mtr.add_suppression("Slave SQL: Error 'Deadlock found when trying to get lock; try restarting transaction' on query");
 CALL mtr.add_suppression("Slave SQL: Error 'WSREP has not yet prepared node for application use' on query");
 CALL mtr.add_suppression("Slave: WSREP has not yet prepared node for application use Error_code: 1047");
+CALL mtr.add_suppression("Worker 1 failed executing transaction");

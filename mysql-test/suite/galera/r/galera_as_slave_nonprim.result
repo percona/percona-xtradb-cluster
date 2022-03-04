@@ -30,4 +30,6 @@ CALL mtr.add_suppression("(Transport endpoint is not connected|Socket is not con
 CALL mtr.add_suppression("Operation not permitted");
 CALL mtr.add_suppression("Slave SQL for channel '': Error in Xid_log_event: Commit could not be completed, 'Deadlock found when trying to get lock; try restarting transaction'");
 CALL mtr.add_suppression("Slave SQL for channel '': Node has dropped from cluster");
+CALL mtr.add_suppression("Worker 1 failed executing transaction");
+CALL mtr.add_suppression("The slave coordinator and worker threads are stopped, possibly leaving data in inconsistent state");
 RESET MASTER;
