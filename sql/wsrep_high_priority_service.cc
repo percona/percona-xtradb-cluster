@@ -978,6 +978,15 @@ int Wsrep_replayer_service::apply_write_set(const wsrep::ws_meta &ws_meta,
   assert(thd->wsrep_trx().active());
   assert(thd->wsrep_trx().state() == wsrep::transaction::s_replaying);
 
+  /* Allow tests to block the applier thread using the DBUG facilities */
+  DBUG_EXECUTE_IF("sync.wsrep_replay_cb", {
+    const char act[] =
+        "now "
+        "SIGNAL sync.wsrep_replay_cb_reached "
+        "WAIT_FOR signal.wsrep_replay_cb";
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+  };);
+
   wsrep_setup_uk_and_fk_checks(thd);
 
   int ret = 0;

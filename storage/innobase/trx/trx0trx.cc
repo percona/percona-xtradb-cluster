@@ -247,9 +247,6 @@ static void trx_init(trx_t *trx) {
 
     trx->in_innodb &= TRX_FORCE_ROLLBACK_MASK;
   }
-#ifdef WITH_WSREP
-  trx->wsrep_UK_scan = false;
-#endif /* WITH_WSREP */
 
   trx->flush_observer = nullptr;
 
@@ -376,10 +373,6 @@ struct TrxFactory {
     ut_ad(!trx->abort);
 
     ut_ad(trx->killed_by == std::thread::id{});
-
-#ifdef WITH_WSREP
-    ut_ad(trx->wsrep_UK_scan == false);
-#endif /* WITH_WSREP */
 
     return (true);
   }
@@ -2858,9 +2851,6 @@ void wsrep_trx_print_locking(
 {
   ibool newline;
   const char *op_info;
-
-  ut_ad(locksys::owns_exclusive_global_latch());
-  ut_ad(UT_LIST_GET_LEN(trx->lock.trx_locks) > 0);
 
   fprintf(f, "TRANSACTION " TRX_ID_FMT, trx->id);
 
