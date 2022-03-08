@@ -1179,10 +1179,6 @@ struct trx_t {
                             mark and the actual async kill because
                             the running thread can change. */
 
-#ifdef WITH_WSREP
-  bool wsrep_UK_scan;
-#endif /* WITH_WSREP */
-
   /* These fields are not protected by any mutex. */
   const char *op_info;   /*!< English text describing the
                          current operation, or an empty

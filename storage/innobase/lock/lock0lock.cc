@@ -491,9 +491,6 @@ static inline ulint lock_rec_get_insert_intention(
 /** Checks if a lock request for a new lock has to wait for request lock2.
  @return true if new lock has to wait for lock2 to be removed */
 static inline bool lock_rec_has_to_wait(
-#ifdef WITH_WSREP
-    ibool for_locking,   /*!< is caller locking or releasing */
-#endif                   /* WITH_WSREP */
     const trx_t *trx,    /*!< in: trx of new lock */
     ulint type_mode,     /*!< in: precise mode of the new lock
                        to set: LOCK_S or LOCK_X, possibly
@@ -516,6 +513,28 @@ request is really for a 'gap' type lock */
   if (trx != lock2->trx &&
       !lock_mode_compatible(static_cast<lock_mode>(LOCK_MODE_MASK & type_mode),
                             lock_get_mode(lock2))) {
+#ifdef WITH_WSREP
+    if (is_hp && trx != lock2->trx && trx_is_high_priority(lock2->trx)) {
+      /* conflicting high priority locks are supposed to be false positives
+         i.e. locks not on actual certified pay load data or GAP locks.
+         these should not block applier execution, hence returning false here */
+      if (wsrep_debug) {
+        ib::info() << "BF-BF lock conflict skipped, \n"
+                   << " trx-1 lock request: " << trx->id
+                   << " trx-2 lock holder: " << lock2->trx->id;
+      }
+      // print additional information if requested
+      if (wsrep_log_conflicts) {
+        ib::info() << "*** Lock requesting TRANSACTION:";
+        wsrep_trx_print_locking(stderr, trx, 3000);
+        ib::info() << "*** Lock holder TRANSACTION:";
+        wsrep_trx_print_locking(stderr, lock2->trx, 3000);
+      }
+      return (false);
+    }
+
+    if (!is_hp && trx_is_high_priority(lock2->trx)) return (true);
+#endif /* WITH_WSREP */
     /* If our trx is High Priority and the existing lock is WAITING and not
         high priority, then we can ignore it. */
     if (is_hp && lock2->is_waiting() && !trx_is_high_priority(lock2->trx)) {
@@ -564,47 +583,6 @@ request is really for a 'gap' type lock */
       return (false);
     }
 
-#ifdef WITH_WSREP
-    /* if BF thread is locking and has conflict with another BF
-    thread, we need to look at trx ordering and lock types */
-    if (wsrep_thd_is_BF(trx->mysql_thd, false) &&
-        wsrep_thd_is_BF(lock2->trx->mysql_thd, true)) {
-      if (wsrep_debug) {
-        fprintf(stderr, "BF-BF lock conflict, locking: %lu\n", for_locking);
-        lock_rec_print(stderr, lock2);
-      }
-
-      if (wsrep_thd_order_before(trx->mysql_thd, lock2->trx->mysql_thd) &&
-          (type_mode & LOCK_MODE_MASK) == LOCK_X &&
-          (lock2->type_mode & LOCK_MODE_MASK) == LOCK_X) {
-        if (for_locking || wsrep_debug) {
-          /* exclusive lock conflicts are not accepted */
-          ib::info() << "BF-BF X lock conflict,"
-                     << "mode: " << type_mode
-                     << " supremum: " << lock_is_on_supremum;
-          ib::info() << "conflicts states: my: "
-                     << wsrep_thd_transaction_state_str(trx->mysql_thd)
-                     << " locked: "
-                     << wsrep_thd_transaction_state_str(lock2->trx->mysql_thd);
-          lock_rec_print(stderr, lock2);
-          if (for_locking) return false;
-        }
-      } else {
-        /* if lock2->index->n_uniq <=
-        lock2->index->n_user_defined_cols
-        operation is on uniq index */
-        if (wsrep_debug) {
-          ib::info() << "BF conflict, modes: " << type_mode << " and "
-                     << lock2->type_mode << "idx: " << lock2->index->name
-                     << " - " << lock2->index->table_name << "n_uniq "
-                     << lock2->index->n_uniq << " n_user "
-                     << lock2->index->n_user_defined_cols;
-        }
-        return false;
-      }
-    }
-#endif /* WITH_WSREP */
-
     return (true);
   }
 
@@ -631,12 +609,8 @@ bool lock_has_to_wait(const lock_t *lock1, /*!< in: waiting lock */
         return (lock_prdt_has_to_wait(lock1->trx, lock1->type_mode,
                                       lock_get_prdt_from_lock(lock1), lock2));
       } else {
-        return (lock_rec_has_to_wait(
-#ifdef WITH_WSREP
-            false,
-#endif /* WITH_WSREP */
-            lock1->trx, lock1->type_mode, lock2,
-            lock1->includes_supremum()));
+        return (lock_rec_has_to_wait(lock1->trx, lock1->type_mode, lock2,
+                                     lock1->includes_supremum()));
       }
     }
 
@@ -929,7 +903,7 @@ static const lock_t *lock_rec_other_has_conflicting(
   const bool is_supremum = rec_id.is_supremum();
 
   return (Lock_iter::for_each(rec_id, [=](const lock_t *lock) {
-    return (!(lock_rec_has_to_wait(false, trx, mode, lock, is_supremum)));
+    return (!(lock_rec_has_to_wait(trx, mode, lock, is_supremum)));
   }));
 }
 
@@ -1455,11 +1429,7 @@ queue is itself waiting roll it back, also do a deadlock check and resolve.
         there was a deadlock, but another transaction was chosen
         as a victim, and we got the lock immediately: no need to
         wait then */
-#ifdef WITH_WSREP
-dberr_t RecLock::add_to_waitq(lock_t *const wait_for, const lock_prdt_t *prdt) {
-#else
 dberr_t RecLock::add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt) {
-#endif /* WITH_WSREP */
   ut_ad(locksys::owns_page_shard(m_rec_id.get_page_id()));
   ut_ad(m_trx == thr_get_trx(m_thr));
 
@@ -1859,13 +1829,8 @@ static dberr_t lock_rec_lock_slow(bool impl, select_mode sel_mode, ulint mode,
     return (DB_SUCCESS);
   }
 
-#ifdef WITH_WSREP
-  lock_t *const wait_for =
-      (lock_t *)lock_rec_other_has_conflicting(mode, block, heap_no, trx);
-#else
   const lock_t *wait_for =
       lock_rec_other_has_conflicting(mode, block, heap_no, trx);
-#endif /* WITH_WSREP */
 
   if (wait_for != nullptr) {
     switch (sel_mode) {
@@ -5600,13 +5565,8 @@ dberr_t lock_rec_insert_check_and_lock(
   if (wsrep_log_conflicts) mutex_enter(&trx_sys->mutex);
 #endif /* WITH_WSREP */
 
-#ifdef WITH_WSREP
-  lock_t *const wait_for =
-      (lock_t *)lock_rec_other_has_conflicting(type_mode, block, heap_no, trx);
-#else
   const lock_t *wait_for =
       lock_rec_other_has_conflicting(type_mode, block, heap_no, trx);
-#endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP
   if (wsrep_log_conflicts) mutex_exit(&trx_sys->mutex);
