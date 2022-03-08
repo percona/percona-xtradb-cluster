@@ -51,7 +51,8 @@
  * It is possible to decouple headers, but it needs changes in PS, which is
  * not needed there, so just to avoid these changes turn it into message now.
  */
-#pragma message("sql_class.h includes handler.h directly or indirectly; it should not.")
+#pragma message( \
+    "sql_class.h includes handler.h directly or indirectly; it should not.")
 #else
 #error "sql_class.h includes handler.h directly or indirectly; it should not."
 #endif

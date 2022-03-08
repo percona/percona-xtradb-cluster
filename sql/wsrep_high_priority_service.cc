@@ -707,8 +707,8 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
                                                    strlen(my_localhost));
     replayer_thd->set_new_thread_id();
 #ifdef HAVE_PSI_THREAD_INTERFACE
-    PSI_thread *psi = PSI_THREAD_CALL(new_thread)(key_nbo_thread, 0, replayer_thd,
-                                                  replayer_thd->thread_id());
+    PSI_thread *psi = PSI_THREAD_CALL(new_thread)(
+        key_nbo_thread, 0, replayer_thd, replayer_thd->thread_id());
     replayer_thd->set_psi(psi);
     PSI_THREAD_CALL(set_thread)(psi);
     PSI_THREAD_CALL(set_thread_os_id)(psi);

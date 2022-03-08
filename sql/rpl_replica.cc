@@ -7058,7 +7058,7 @@ wsrep_restart_point :
 
   // Only use replica preserve commit order if more than 1 worker exists
   if (opt_replica_preserve_commit_order && !rli->is_parallel_exec() &&
-    rli->opt_replica_parallel_workers > 1)
+      rli->opt_replica_parallel_workers > 1)
     commit_order_mngr =
         new Commit_order_manager(rli->opt_replica_parallel_workers);
 
@@ -7169,12 +7169,12 @@ wsrep_restart_point :
     now.
     But the master timestamp is reset by RESET SLAVE & CHANGE MASTER.
   */
-    rli->clear_error();
-    if (rli->workers_array_initialized) {
-      for (size_t i = 0; i < rli->get_worker_count(); i++) {
-        rli->get_worker(i)->clear_error();
-      }
+  rli->clear_error();
+  if (rli->workers_array_initialized) {
+    for (size_t i = 0; i < rli->get_worker_count(); i++) {
+      rli->get_worker(i)->clear_error();
     }
+  }
     if (rli->update_is_transactional() ||
         DBUG_EVALUATE_IF("simulate_update_is_transactional_error", true,
                          false)) {

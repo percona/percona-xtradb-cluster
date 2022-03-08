@@ -6760,7 +6760,7 @@ but do not touch the data dictionary cache.
 @param table_name Table name in MySQL
 @retval true Failure
 @retval false Success
-*/ 
+*/
 [[nodiscard]] static bool innobase_update_foreign_try(
     ha_innobase_inplace_ctx *ctx, trx_t *trx, const char *table_name) {
   ulint foreign_id;

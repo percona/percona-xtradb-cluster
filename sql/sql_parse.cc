@@ -2799,7 +2799,7 @@ done:
 #ifdef WITH_WSREP
   if (do_end_of_statement) {
 #endif /* WITH_WSREP */
-  thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
+    thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
 #ifdef WITH_WSREP
   }
 #endif /* WITH_WSREP */

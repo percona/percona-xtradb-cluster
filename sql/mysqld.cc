@@ -10264,7 +10264,8 @@ static bool have_committing_connections() {
   // Find_thd_committing find_thd_committing();
   Find_wsrep_thd find_thd_committing(COMMITTING);
 
-  THD_ptr tmp = Global_THD_manager::get_instance()->find_thd(&find_thd_committing);
+  THD_ptr tmp =
+      Global_THD_manager::get_instance()->find_thd(&find_thd_committing);
   if (tmp.get()) return true;
   return false;
 }

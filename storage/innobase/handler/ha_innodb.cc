@@ -10640,7 +10640,8 @@ static int wsrep_calc_row_hash(byte *digest, const uchar *row, TABLE *table,
 
     switch (col_type) {
       case DATA_BLOB:
-        ptr = row_mysql_read_blob_ref(&len, ptr, len, false, 0, 0, &prebuilt->compress_heap);
+        ptr = row_mysql_read_blob_ref(&len, ptr, len, false, 0, 0,
+                                      &prebuilt->compress_heap);
         break;
 
       case DATA_VARCHAR:

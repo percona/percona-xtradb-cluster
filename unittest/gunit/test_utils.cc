@@ -144,8 +144,7 @@ void Server_initializer::SetUp() {
 #ifdef WITH_WSREP
   wsrep::gtid gtid;
   Wsrep_server_state::init_once(std::string(), std::string(), std::string(),
-                            std::string(), gtid,
-                            0);
+                                std::string(), gtid, 0);
 #endif
 
   m_thd = new THD(false);
