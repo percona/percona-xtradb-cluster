@@ -497,7 +497,7 @@ request is really for a 'gap' type lock */
       !lock_mode_compatible(static_cast<lock_mode>(LOCK_MODE_MASK & type_mode),
                             lock_get_mode(lock2))) {
 #ifdef WITH_WSREP
-    if (is_hp && trx != lock2->trx && trx_is_high_priority(lock2->trx)) {
+    if (wsrep_on(trx->mysql_thd) && is_hp && trx_is_high_priority(lock2->trx)) {
       /* conflicting high priority locks are supposed to be false positives
          i.e. locks not on actual certified pay load data or GAP locks.
          these should not block applier execution, hence returning false here */
@@ -516,7 +516,10 @@ request is really for a 'gap' type lock */
       return (false);
     }
 
-    if (!is_hp && trx_is_high_priority(lock2->trx)) return (true);
+    if (wsrep_on(trx->mysql_thd) && !is_hp &&
+        trx_is_high_priority(lock2->trx)) {
+      return (true);
+    }
 #endif /* WITH_WSREP */
     /* If our trx is High Priority and the existing lock is WAITING and not
         high priority, then we can ignore it. */
