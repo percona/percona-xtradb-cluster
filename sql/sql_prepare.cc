@@ -2566,8 +2566,6 @@ static void reset_stmt_params(Prepared_statement *stmt)
 void mysqld_stmt_execute(THD *thd, ulong stmt_id, ulong flags, uchar *params,
                          ulong params_length)
 {
-  /* Query text for binary, general or slow log, if any of them is open */
-  String expanded_query;
   Prepared_statement *stmt;
   Protocol *save_protocol= thd->get_protocol();
   bool open_cursor;
@@ -2601,9 +2599,8 @@ void mysqld_stmt_execute(THD *thd, ulong stmt_id, ulong flags, uchar *params,
   thd->set_protocol(&thd->protocol_binary);
 
   MYSQL_EXECUTE_PS(thd->m_statement_psi, stmt->m_prepared_stmt);
-  
-  stmt->execute_loop(&expanded_query, open_cursor, params,
-                    params + params_length);
+
+  stmt->execute_loop(open_cursor, params, params + params_length);
   thd->set_protocol(save_protocol);
 
   sp_cache_enforce_limit(thd->sp_proc_cache, stored_program_cache_size);
@@ -2639,8 +2636,6 @@ void mysql_sql_stmt_execute(THD *thd)
   LEX *lex= thd->lex;
   Prepared_statement *stmt;
   const LEX_CSTRING &name= lex->prepared_stmt_name;
-  /* Query text for binary, general or slow log, if any of them is open */
-  String expanded_query;
   DBUG_ENTER("mysql_sql_stmt_execute");
   DBUG_PRINT("info", ("EXECUTE: %.*s\n", (int) name.length, name.str));
 
@@ -2661,7 +2656,7 @@ void mysql_sql_stmt_execute(THD *thd)
 
   MYSQL_EXECUTE_PS(thd->m_statement_psi, stmt->m_prepared_stmt);
 
-  (void) stmt->execute_loop(&expanded_query, FALSE, NULL, NULL);
+  (void) stmt->execute_loop(FALSE, NULL, NULL);
 
   DBUG_VOID_RETURN;
 }
@@ -3569,13 +3564,14 @@ void wsrep_replay_transaction(THD *thd);
 */
 
 bool
-Prepared_statement::execute_loop(String *expanded_query,
-                                 bool open_cursor,
+Prepared_statement::execute_loop(bool open_cursor,
                                  uchar *packet,
                                  uchar *packet_end)
 {
   Reprepare_observer reprepare_observer;
   bool error;
+  /* Query text for binary, general or slow log, if any of them is open */
+  String expanded_query;
 
   /* Check if we got an error when sending long data */
   if (state == Query_arena::STMT_ERROR)
@@ -3586,7 +3582,7 @@ Prepared_statement::execute_loop(String *expanded_query,
 
   assert(!thd->get_stmt_da()->is_set());
 
-  if (set_parameters(expanded_query, packet, packet_end))
+  if (set_parameters(&expanded_query, packet, packet_end))
     return TRUE;
 
   if (unlikely(thd->security_context()->password_expired() &&
@@ -3620,7 +3616,7 @@ reexecute:
 
   thd->push_reprepare_observer(stmt_reprepare_observer);
 
-  error= execute(expanded_query, open_cursor) || thd->is_error();
+  error= execute(&expanded_query, open_cursor) || thd->is_error();
 
 #ifdef WITH_WSREP
   bool observer_popped = false;
@@ -3955,9 +3951,7 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
                           &cur_db_changed))
   {
     flags&= ~ (uint) IS_IN_USE;
-    mysql_mutex_lock(&thd->LOCK_thd_data);
-    thd->lex= stmt_backup.lex();
-    mysql_mutex_unlock(&thd->LOCK_thd_data);
+    stmt_backup.restore_thd(thd, this);
     return TRUE;
   }
 
@@ -3969,9 +3963,7 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
   {
     my_error(ER_OUTOFMEMORY, MYF(ME_FATALERROR), expanded_query->length());
     flags&= ~ (uint) IS_IN_USE;
-    mysql_mutex_lock(&thd->LOCK_thd_data);
-    thd->lex= stmt_backup.lex();
-    mysql_mutex_unlock(&thd->LOCK_thd_data);
+    stmt_backup.restore_thd(thd, this);
     return TRUE;
   }
 
@@ -4067,14 +4059,18 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
   thd->lex->release_plugins();
 
   /*
-    Expanded query is needed for slow logging, so we want thd->query
-    to point at it even after we restore from backup. This is ok, as
-    expanded query was allocated in thd->mem_root.
+   Note that we cannot call restore_thd() here as that would overwrite
+   the expanded query in THD::m_query_string, which is needed for slow
+   logging. Use alloc_query() to make sure the query is allocated on
+   the correct MEM_ROOT, since otherwise THD::m_query_string could end
+   up as a dangling pointer (i.e. pointer to freed memory) once the PS
+   MEM_ROOT is freed.
   */
   mysql_mutex_lock(&thd->LOCK_thd_data);
   thd->lex= stmt_backup.lex();
 
   mysql_mutex_unlock(&thd->LOCK_thd_data);
+  alloc_query(thd, thd->query().str, thd->query().length);
 
   thd->stmt_arena= old_stmt_arena;
 
