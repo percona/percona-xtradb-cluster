@@ -1,0 +1,26 @@
+set wsrep_sync_wait=0;
+SET GLOBAL innodb_max_dirty_pages_pct=99;
+SET GLOBAL innodb_max_dirty_pages_pct_lwm=99;
+CREATE TABLE t1 (f1 INTEGER, f2 varchar(1024)) Engine=InnoDB;
+CREATE TABLE ten (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
+INSERT INTO t1 (f2) SELECT REPEAT('x', 1024) FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;
+Killing node #3 to free ports for garbd ...
+SET GLOBAL debug = "+d,sync.wsrep_donor_state";
+Starting garbd ...
+SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_donor_state_reached";
+SET GLOBAL innodb_max_dirty_pages_pct_lwm=0;
+SET GLOBAL innodb_max_dirty_pages_pct=0;
+SET SESSION debug_sync = "now SIGNAL signal.wsrep_donor_state";
+SET GLOBAL debug = "";
+SET DEBUG_SYNC='RESET';
+Killing garbd ...
+DROP TABLE t1;
+DROP TABLE ten;
+Restarting node #3 to satisfy MTR's end-of-test checks
+# restart
+SET GLOBAL innodb_max_dirty_pages_pct = 75.000000;
+SET GLOBAL innodb_max_dirty_pages_pct_lwm = 0.000000;
+CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
+CALL mtr.add_suppression("WSREP: Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");

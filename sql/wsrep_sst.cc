@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cctype>
+#include "debug_sync.h"
 
 extern const char wsrep_defaults_file[];
 extern const char wsrep_defaults_group_suffix[];
@@ -853,6 +854,19 @@ static int run_sql_command(THD *thd, const char *query)
   return 0;
 }
 
+static void sst_disallow_writes (THD* thd, bool yes)
+{
+  char query_str[64] = { 0, };
+  ssize_t const query_max = sizeof(query_str) - 1;
+  snprintf (query_str, query_max, "SET GLOBAL innodb_disallow_writes=%d",
+            yes ? 1 : 0);
+
+  if (run_sql_command(thd, query_str))
+  {
+    WSREP_ERROR("Failed to disallow InnoDB writes");
+  }
+}
+
 static int sst_flush_tables(THD* thd)
 {
   WSREP_INFO("Flushing tables for SST...");
@@ -878,6 +892,10 @@ static int sst_flush_tables(THD* thd)
   else
   {
     WSREP_INFO("Tables flushed.");
+
+    /* disable further disk IO */
+    sst_disallow_writes(thd, true);
+
     const char base_name[]= "tables_flushed";
     ssize_t const full_len= strlen(mysql_real_data_home) + strlen(base_name)+2;
     char *real_name = (char*) malloc(full_len);
@@ -909,19 +927,6 @@ static int sst_flush_tables(THD* thd)
   }
 
   return err;
-}
-
-static void sst_disallow_writes (THD* thd, bool yes)
-{
-  char query_str[64] = { 0, };
-  ssize_t const query_max = sizeof(query_str) - 1;
-  snprintf (query_str, query_max, "SET GLOBAL innodb_disallow_writes=%d",
-            yes ? 1 : 0);
-
-  if (run_sql_command(thd, query_str))
-  {
-    WSREP_ERROR("Failed to disallow InnoDB writes");
-  }
 }
 
 static void* sst_donor_thread (void* a)
@@ -968,8 +973,16 @@ wait_signal:
         err= sst_flush_tables (thd.ptr);
         if (!err)
         {
-          sst_disallow_writes (thd.ptr, true);
           locked= true;
+          DBUG_EXECUTE_IF("sync.wsrep_donor_state",
+                  {
+                    const char act[]=
+                      "now "
+                      "SIGNAL sync.wsrep_donor_state_reached "
+                      "WAIT_FOR signal.wsrep_donor_state";
+                    assert(!debug_sync_set_action(thd.ptr,
+                                                  STRING_WITH_LEN(act)));
+                  };);
           goto wait_signal;
         }
       }
@@ -1022,8 +1035,6 @@ wait_signal:
 
   return NULL;
 }
-
-
 
 static int sst_donate_other (const char*   method,
                              const char*   addr,
