@@ -79,12 +79,12 @@ INSERT INTO aliases(name) VALUES
   ('slave_checkpoint_period'), ('slave_checkpoint_group'),
   ('sync_master_info'), ('slave_transaction_retries'),
   ('slave_parallel_workers'), ('slave_pending_jobs_size_max'),
-  ('pseudo_slave_mode'), ('skip_slave_start');
+  ('pseudo_slave_mode'), ('skip_slave_start'), ('wsrep_restart_slave');
 
 # If this count differs, it means a variable has been added or removed.
 # In that case, this testcase needs to be updated accordingly.
 
-# While Percona Server has 117 persisted variables, PXC has 122 persisted
+# While Percona Server has 117 persisted variables, PXC has 123 persisted
 # variables.
 #
 # This is beacause of the following variables.
@@ -93,8 +93,9 @@ INSERT INTO aliases(name) VALUES
 # 3. wsrep_slave_threads
 # 4. wsrep_slave_UK_checks
 # 5. wsrep_replicate_myisam
+# 6. wsrep_restart_replica
 --echo
---let $expected = 122
+--let $expected = 123
 --let $assert_text = Expect $expected variables in the table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM rplvars, count, 1] = $expected
 --source include/assert.inc
@@ -125,8 +126,21 @@ while ( $varid <= $countvars )
   --inc $varid
 }
 
+# While Percona Server has 104 persisted variables, PXC has 113 persisted
+# variables.
+#
+# This is beacause of the following variables.
+# 1. wsrep_slave_UK_checks
+# 2. wsrep_applier_threads
+# 3. wsrep_slave_FK_checks
+# 4. wsrep_restart_replica
+# 5. wsrep_slave_threads
+# 6. wsrep_restart_slave
+# 7. wsrep_replicate_myisam
+# 8. wsrep_applier_UK_checks
+# 9. wsrep_applier_FK_checks
 --echo
---let $expected = 109
+--let $expected = 113
 --let $assert_text = Expect $expected persisted variables in persisted_variables table.
 --let $assert_cond = [SELECT COUNT(*) as count FROM performance_schema.persisted_variables, count, 1] = $expected
 --source include/assert.inc

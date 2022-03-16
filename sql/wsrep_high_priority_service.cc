@@ -673,7 +673,7 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta &ws_meta,
 PSI_thread_key key_nbo_thread;
 
 static PSI_thread_info nbo_threads[] = {
-    {&key_nbo_thread, "NBO update thread", 0, 0, PSI_DOCUMENT_ME}};
+    {&key_nbo_thread, "NBO update thread", "NBO_upd", 0, 0, PSI_DOCUMENT_ME}};
 
 int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
                                            const wsrep::const_buffer &data,
@@ -707,8 +707,8 @@ int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta &ws_meta,
                                                    strlen(my_localhost));
     replayer_thd->set_new_thread_id();
 #ifdef HAVE_PSI_THREAD_INTERFACE
-    PSI_thread *psi = PSI_THREAD_CALL(new_thread)(key_nbo_thread, replayer_thd,
-                                                  replayer_thd->thread_id());
+    PSI_thread *psi = PSI_THREAD_CALL(new_thread)(
+        key_nbo_thread, 0, replayer_thd, replayer_thd->thread_id());
     replayer_thd->set_psi(psi);
     PSI_THREAD_CALL(set_thread)(psi);
     PSI_THREAD_CALL(set_thread_os_id)(psi);
@@ -977,6 +977,15 @@ int Wsrep_replayer_service::apply_write_set(const wsrep::ws_meta &ws_meta,
 
   assert(thd->wsrep_trx().active());
   assert(thd->wsrep_trx().state() == wsrep::transaction::s_replaying);
+
+  /* Allow tests to block the applier thread using the DBUG facilities */
+  DBUG_EXECUTE_IF("sync.wsrep_replay_cb", {
+    const char act[] =
+        "now "
+        "SIGNAL sync.wsrep_replay_cb_reached "
+        "WAIT_FOR signal.wsrep_replay_cb";
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+  };);
 
   wsrep_setup_uk_and_fk_checks(thd);
 

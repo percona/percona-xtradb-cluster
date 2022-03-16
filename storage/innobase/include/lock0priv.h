@@ -725,12 +725,8 @@ class RecLock {
                                 we've managed to jump in front of other waiting
                                 transactions and got the lock granted, so there
                                 is no need to wait. */
-#ifdef WITH_WSREP
-  dberr_t add_to_waitq(lock_t *const wait_for, const lock_prdt_t *prdt = nullptr);
-#else
   dberr_t add_to_waitq(const lock_t *wait_for,
                        const lock_prdt_t *prdt = nullptr);
-#endif /* WITH_WSREP */
 
   /**
   Create a lock for a transaction and initialise it.
@@ -903,11 +899,10 @@ void lock_reset_wait_and_release_thread_if_suspended(lock_t *lock);
 /** Checks if some transaction has an implicit x-lock on a record in a clustered
  index.
  @return transaction id of the transaction which has the x-lock, or 0 */
-static inline trx_id_t lock_clust_rec_some_has_impl(
+[[nodiscard]] static inline trx_id_t lock_clust_rec_some_has_impl(
     const rec_t *rec,          /*!< in: user record */
     const dict_index_t *index, /*!< in: clustered index */
-    const ulint *offsets)      /*!< in: rec_get_offsets(rec, index) */
-    MY_ATTRIBUTE((warn_unused_result));
+    const ulint *offsets);     /*!< in: rec_get_offsets(rec, index) */
 
 /** Gets the first or next record lock on a page.
  @return next lock, NULL if none exists */

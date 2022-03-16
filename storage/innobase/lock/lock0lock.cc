@@ -190,10 +190,9 @@ bool owns_lock_shard(const lock_t *lock) {
 
 /** Validates the record lock queues on a page.
  @return true if ok */
-static bool lock_rec_validate_page(
-    const buf_block_t *block) /*!< in: buffer block */
-    MY_ATTRIBUTE((warn_unused_result));
-#endif /* UNIV_DEBUG */
+[[nodiscard]] static bool lock_rec_validate_page(
+    const buf_block_t *block); /*!< in: buffer block */
+#endif                         /* UNIV_DEBUG */
 
 /* The lock system */
 lock_sys_t *lock_sys = nullptr;
@@ -222,7 +221,7 @@ void lock_report_trx_id_insanity(trx_id_t trx_id, const rec_t *rec,
 #ifdef UNIV_DEBUG
 
 #else
-static MY_ATTRIBUTE((warn_unused_result))
+[[nodiscard]] static
 #endif
 bool lock_check_trx_id_sanity(
     trx_id_t trx_id,           /*!< in: trx id */
@@ -321,7 +320,8 @@ void lock_sys_create(
 
   lock_sys_sz = sizeof(*lock_sys) + srv_max_n_threads * sizeof(srv_slot_t);
 
-  lock_sys = static_cast<lock_sys_t *>(ut_zalloc_nokey(lock_sys_sz));
+  lock_sys = static_cast<lock_sys_t *>(
+      ut::zalloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, lock_sys_sz));
 
   new (lock_sys) lock_sys_t{};
 
@@ -372,10 +372,10 @@ void lock_sys_resize(ulint n_cells) {
     TBD: if buf_resize_thread() were to use create_thd() then should it be
     instrumented (together or instead of os_thread_create instrumentation)? */
     ut_ad(current_thd == nullptr);
-    THD *thd = create_thd(false, true, true, PSI_NOT_INSTRUMENTED);
+    THD *thd = create_internal_thd();
     ut_ad(current_thd == thd);
     CONDITIONAL_SYNC_POINT("after_lock_sys_resize_rec_hash");
-    destroy_thd(thd);
+    destroy_internal_thd(thd);
     ut_ad(current_thd == nullptr);
   });
 
@@ -389,23 +389,6 @@ void lock_sys_resize(ulint n_cells) {
   HASH_MIGRATE(old_hash, lock_sys->prdt_page_hash, lock_t, hash,
                lock_rec_lock_fold);
   hash_table_free(old_hash);
-
-  /* need to update block->lock_hash_val */
-  for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
-    buf_pool_t *buf_pool = buf_pool_from_array(i);
-
-    mutex_enter(&buf_pool->LRU_list_mutex);
-
-    for (auto bpage : buf_pool->LRU) {
-      if (buf_page_get_state(bpage) == BUF_BLOCK_FILE_PAGE) {
-        buf_block_t *block;
-        block = reinterpret_cast<buf_block_t *>(bpage);
-
-        block->lock_hash_val = lock_rec_hash(bpage->id);
-      }
-    }
-    mutex_exit(&buf_pool->LRU_list_mutex);
-  }
 }
 
 /** Closes the lock system at database shutdown. */
@@ -431,13 +414,13 @@ void lock_sys_close(void) {
     }
   }
   for (auto &cached_lock_mode_name : lock_cached_lock_mode_names) {
-    ut_free(const_cast<char *>(cached_lock_mode_name.second));
+    ut::free(const_cast<char *>(cached_lock_mode_name.second));
   }
   lock_cached_lock_mode_names.clear();
 
   lock_sys->~lock_sys_t();
 
-  ut_free(lock_sys);
+  ut::free(lock_sys);
 
   lock_sys = nullptr;
 }
@@ -491,9 +474,6 @@ static inline ulint lock_rec_get_insert_intention(
 /** Checks if a lock request for a new lock has to wait for request lock2.
  @return true if new lock has to wait for lock2 to be removed */
 static inline bool lock_rec_has_to_wait(
-#ifdef WITH_WSREP
-    ibool for_locking,   /*!< is caller locking or releasing */
-#endif                   /* WITH_WSREP */
     const trx_t *trx,    /*!< in: trx of new lock */
     ulint type_mode,     /*!< in: precise mode of the new lock
                        to set: LOCK_S or LOCK_X, possibly
@@ -516,6 +496,31 @@ request is really for a 'gap' type lock */
   if (trx != lock2->trx &&
       !lock_mode_compatible(static_cast<lock_mode>(LOCK_MODE_MASK & type_mode),
                             lock_get_mode(lock2))) {
+#ifdef WITH_WSREP
+    if (wsrep_on(trx->mysql_thd) && is_hp && trx_is_high_priority(lock2->trx)) {
+      /* conflicting high priority locks are supposed to be false positives
+         i.e. locks not on actual certified pay load data or GAP locks.
+         these should not block applier execution, hence returning false here */
+      if (wsrep_debug) {
+        ib::info() << "BF-BF lock conflict skipped, \n"
+                   << " trx-1 lock request: " << trx->id
+                   << " trx-2 lock holder: " << lock2->trx->id;
+      }
+      // print additional information if requested
+      if (wsrep_log_conflicts) {
+        ib::info() << "*** Lock requesting TRANSACTION:";
+        wsrep_trx_print_locking(stderr, trx, 3000);
+        ib::info() << "*** Lock holder TRANSACTION:";
+        wsrep_trx_print_locking(stderr, lock2->trx, 3000);
+      }
+      return (false);
+    }
+
+    if (wsrep_on(trx->mysql_thd) && !is_hp &&
+        trx_is_high_priority(lock2->trx)) {
+      return (true);
+    }
+#endif /* WITH_WSREP */
     /* If our trx is High Priority and the existing lock is WAITING and not
         high priority, then we can ignore it. */
     if (is_hp && lock2->is_waiting() && !trx_is_high_priority(lock2->trx)) {
@@ -564,47 +569,6 @@ request is really for a 'gap' type lock */
       return (false);
     }
 
-#ifdef WITH_WSREP
-    /* if BF thread is locking and has conflict with another BF
-    thread, we need to look at trx ordering and lock types */
-    if (wsrep_thd_is_BF(trx->mysql_thd, false) &&
-        wsrep_thd_is_BF(lock2->trx->mysql_thd, true)) {
-      if (wsrep_debug) {
-        fprintf(stderr, "BF-BF lock conflict, locking: %lu\n", for_locking);
-        lock_rec_print(stderr, lock2);
-      }
-
-      if (wsrep_thd_order_before(trx->mysql_thd, lock2->trx->mysql_thd) &&
-          (type_mode & LOCK_MODE_MASK) == LOCK_X &&
-          (lock2->type_mode & LOCK_MODE_MASK) == LOCK_X) {
-        if (for_locking || wsrep_debug) {
-          /* exclusive lock conflicts are not accepted */
-          ib::info() << "BF-BF X lock conflict,"
-                     << "mode: " << type_mode
-                     << " supremum: " << lock_is_on_supremum;
-          ib::info() << "conflicts states: my: "
-                     << wsrep_thd_transaction_state_str(trx->mysql_thd)
-                     << " locked: "
-                     << wsrep_thd_transaction_state_str(lock2->trx->mysql_thd);
-          lock_rec_print(stderr, lock2);
-          if (for_locking) return false;
-        }
-      } else {
-        /* if lock2->index->n_uniq <=
-        lock2->index->n_user_defined_cols
-        operation is on uniq index */
-        if (wsrep_debug) {
-          ib::info() << "BF conflict, modes: " << type_mode << " and "
-                     << lock2->type_mode << "idx: " << lock2->index->name
-                     << " - " << lock2->index->table_name << "n_uniq "
-                     << lock2->index->n_uniq << " n_user "
-                     << lock2->index->n_user_defined_cols;
-        }
-        return false;
-      }
-    }
-#endif /* WITH_WSREP */
-
     return (true);
   }
 
@@ -631,12 +595,8 @@ bool lock_has_to_wait(const lock_t *lock1, /*!< in: waiting lock */
         return (lock_prdt_has_to_wait(lock1->trx, lock1->type_mode,
                                       lock_get_prdt_from_lock(lock1), lock2));
       } else {
-        return (lock_rec_has_to_wait(
-#ifdef WITH_WSREP
-            false,
-#endif /* WITH_WSREP */
-            lock1->trx, lock1->type_mode, lock2,
-            lock1->includes_supremum()));
+        return (lock_rec_has_to_wait(lock1->trx, lock1->type_mode, lock2,
+                                     lock1->includes_supremum()));
       }
     }
 
@@ -929,7 +889,7 @@ static const lock_t *lock_rec_other_has_conflicting(
   const bool is_supremum = rec_id.is_supremum();
 
   return (Lock_iter::for_each(rec_id, [=](const lock_t *lock) {
-    return (!(lock_rec_has_to_wait(false, trx, mode, lock, is_supremum)));
+    return (!(lock_rec_has_to_wait(trx, mode, lock, is_supremum)));
   }));
 }
 
@@ -1455,11 +1415,7 @@ queue is itself waiting roll it back, also do a deadlock check and resolve.
         there was a deadlock, but another transaction was chosen
         as a victim, and we got the lock immediately: no need to
         wait then */
-#ifdef WITH_WSREP
-dberr_t RecLock::add_to_waitq(lock_t *const wait_for, const lock_prdt_t *prdt) {
-#else
 dberr_t RecLock::add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt) {
-#endif /* WITH_WSREP */
   ut_ad(locksys::owns_page_shard(m_rec_id.get_page_id()));
   ut_ad(m_trx == thr_get_trx(m_thr));
 
@@ -1859,13 +1815,8 @@ static dberr_t lock_rec_lock_slow(bool impl, select_mode sel_mode, ulint mode,
     return (DB_SUCCESS);
   }
 
-#ifdef WITH_WSREP
-  lock_t *const wait_for =
-      (lock_t *)lock_rec_other_has_conflicting(mode, block, heap_no, trx);
-#else
   const lock_t *wait_for =
       lock_rec_other_has_conflicting(mode, block, heap_no, trx);
-#endif /* WITH_WSREP */
 
   if (wait_for != nullptr) {
     switch (sel_mode) {
@@ -5255,57 +5206,63 @@ static void rec_queue_validate_latched(const buf_block_t *block,
 
     trx_id = lock_clust_rec_some_has_impl(rec, index, offsets);
 
-    Trx_shard_latch_guard guard{trx_id, UT_LOCATION_HERE};
+    trx_sys->latch_and_execute_with_active_trx(
+        trx_id,
+        [&](const trx_t *impl_trx) {
+          if (impl_trx != nullptr) {
+            ut_ad(owns_page_shard(block->get_page_id()));
+            /* impl_trx cannot become TRX_STATE_COMMITTED_IN_MEMORY nor removed
+            from active_rw_trxs.by_id until we release Trx_shard's mutex, which
+            means that currently all other threads in the system consider this
+            impl_trx active and thus should respect implicit locks held by
+            impl_trx*/
 
-    const trx_t *impl_trx = trx_rw_is_active_low(trx_id);
-    if (impl_trx != nullptr) {
-      ut_ad(owns_page_shard(block->get_page_id()));
-      /* impl_trx cannot become TRX_STATE_COMMITTED_IN_MEMORY nor removed from
-      rw_trx_set until we release Trx_shard's mutex, which means that currently
-      all other threads in the system consider this impl_trx active and thus
-      should respect implicit locks held by impl_trx*/
+            const lock_t *other_lock = lock_rec_other_has_expl_req(
+                LOCK_S, block, true, heap_no, impl_trx);
 
-      const lock_t *other_lock =
-          lock_rec_other_has_expl_req(LOCK_S, block, true, heap_no, impl_trx);
+            /* The impl_trx is holding an implicit lock on the given 'rec'.
+            So there cannot be another explicit granted lock. Also, there can
+            be another explicit waiting lock only if the impl_trx has an
+            explicit granted lock. */
 
-      /* The impl_trx is holding an implicit lock on the
-      given record 'rec'. So there cannot be another
-      explicit granted lock.  Also, there can be another
-      explicit waiting lock only if the impl_trx has an
-      explicit granted lock. */
-
-      if (other_lock != nullptr) {
+            if (other_lock != nullptr) {
+              ut_a(lock_get_wait(other_lock));
 #ifdef WITH_WSREP
-        if (!lock_get_wait(other_lock)) {
-          ib::info() << "WSREP impl BF lock conflict for my impl lock:\n BF:"
-                     << ((wsrep_thd_is_BF(impl_trx->mysql_thd, false))
-                             ? "BF"
-                             : "normal")
-                     << " exec: "
-                     << wsrep_thd_client_mode_str(impl_trx->mysql_thd)
-                     << " conflict: "
-                     << wsrep_thd_client_state_str(impl_trx->mysql_thd)
-                     << " seqno: " << wsrep_thd_trx_seqno(impl_trx->mysql_thd)
-                     << " SQL: " << wsrep_thd_query(impl_trx->mysql_thd);
-          trx_t *otrx = other_lock->trx;
-          ib::info() << "WSREP other lock:\n BF:"
-                     << ((wsrep_thd_is_BF(otrx->mysql_thd, false)) ? "BF"
-                                                                   : "normal")
-                     << " exec: " << wsrep_thd_client_mode_str(otrx->mysql_thd)
-                     << " conflict: "
-                     << wsrep_thd_client_state_str(otrx->mysql_thd)
-                     << " seqno: " << wsrep_thd_trx_seqno(otrx->mysql_thd)
-                     << " SQL: " << wsrep_thd_query(otrx->mysql_thd);
-        }
-        if (!lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
-                               impl_trx)) {
-          ib::info() << "WSREP impl BF lock conflict";
-        }
-        ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
-                               impl_trx));
+              if (!lock_get_wait(other_lock)) {
+                ib::info()
+                    << "WSREP impl BF lock conflict for my impl lock:\n BF:"
+                    << ((wsrep_thd_is_BF(impl_trx->mysql_thd, false))
+                            ? "BF"
+                            : "normal")
+                    << " exec: "
+                    << wsrep_thd_client_mode_str(impl_trx->mysql_thd)
+                    << " conflict: "
+                    << wsrep_thd_client_state_str(impl_trx->mysql_thd)
+                    << " seqno: " << wsrep_thd_trx_seqno(impl_trx->mysql_thd)
+                    << " SQL: " << wsrep_thd_query(impl_trx->mysql_thd);
+                trx_t *otrx = other_lock->trx;
+                ib::info() << "WSREP other lock:\n BF:"
+                           << ((wsrep_thd_is_BF(otrx->mysql_thd, false))
+                                   ? "BF"
+                                   : "normal")
+                           << " exec: "
+                           << wsrep_thd_client_mode_str(otrx->mysql_thd)
+                           << " conflict: "
+                           << wsrep_thd_client_state_str(otrx->mysql_thd)
+                           << " seqno: " << wsrep_thd_trx_seqno(otrx->mysql_thd)
+                           << " SQL: " << wsrep_thd_query(otrx->mysql_thd);
+              }
+              if (!lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
+                                     impl_trx)) {
+                ib::info() << "WSREP impl BF lock conflict";
+              }
 #endif /* WITH_WSREP */
-      }
-    }
+              ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
+                                     impl_trx));
+            }
+          }
+        },
+        UT_LOCATION_HERE);
   }
 
   Lock_iter::for_each(rec_id, [&](lock_t *lock) {
@@ -5492,7 +5449,7 @@ static void lock_rec_block_validate(const page_id_t &page_id) {
 }
 
 bool lock_validate() {
-  typedef std::set<page_id_t, std::less<page_id_t>, ut_allocator<page_id_t>>
+  typedef std::set<page_id_t, std::less<page_id_t>, ut::allocator<page_id_t>>
       page_addr_set;
 
   page_addr_set pages;
@@ -5600,13 +5557,8 @@ dberr_t lock_rec_insert_check_and_lock(
   if (wsrep_log_conflicts) mutex_enter(&trx_sys->mutex);
 #endif /* WITH_WSREP */
 
-#ifdef WITH_WSREP
-  lock_t *const wait_for =
-      (lock_t *)lock_rec_other_has_conflicting(type_mode, block, heap_no, trx);
-#else
   const lock_t *wait_for =
       lock_rec_other_has_conflicting(type_mode, block, heap_no, trx);
-#endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP
   if (wsrep_log_conflicts) mutex_exit(&trx_sys->mutex);
@@ -5627,7 +5579,7 @@ dberr_t lock_rec_insert_check_and_lock(
   switch (err) {
     case DB_SUCCESS_LOCKED_REC:
       err = DB_SUCCESS;
-      /* fall through */
+      [[fallthrough]];
     case DB_SUCCESS:
       if (!inherit_in || index->is_clustered()) {
         break;
@@ -5760,7 +5712,7 @@ void lock_rec_convert_active_impl_to_expl(const buf_block_t *block,
                                           const rec_t *rec, dict_index_t *index,
                                           const ulint *offsets, trx_t *trx,
                                           ulint heap_no) {
-  trx_reference(trx, true);
+  trx_reference(trx);
   lock_rec_convert_impl_to_expl_for_trx(block, rec, index, offsets, trx,
                                         heap_no);
 }
@@ -5979,10 +5931,10 @@ dberr_t lock_clust_rec_read_check_and_lock(
 
     MONITOR_INC(MONITOR_NUM_RECLOCK_REQ);
   }
+  DEBUG_SYNC_C("after_lock_clust_rec_read_check_and_lock");
 
   ut_d(locksys::rec_queue_latch_and_validate(block, rec, index, offsets));
 
-  DEBUG_SYNC_C("after_lock_clust_rec_read_check_and_lock");
   ut_ad(err == DB_SUCCESS || err == DB_SUCCESS_LOCKED_REC ||
         err == DB_LOCK_WAIT || err == DB_DEADLOCK || err == DB_SKIP_LOCKED ||
         err == DB_LOCK_NOWAIT);
@@ -6213,7 +6165,8 @@ const char *lock_get_mode_str(const lock_t *lock) /*!< in: lock */
     return "UNKNOWN";
   }
   auto name_string = name_stream.str();
-  char *name_buffer = (char *)ut_malloc_nokey(name_string.length() + 1);
+  char *name_buffer = (char *)ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY,
+                                                 name_string.length() + 1);
   strcpy(name_buffer, name_string.c_str());
   lock_cached_lock_mode_names[key] = name_buffer;
   return (name_buffer);
@@ -6751,7 +6704,8 @@ void lock_trx_alloc_locks(trx_t *trx) {
   constructed, but how can we (the lock-sys) "know" about it and why risk? */
   trx_mutex_enter(trx);
   ulint sz = REC_LOCK_SIZE * REC_LOCK_CACHE;
-  byte *ptr = reinterpret_cast<byte *>(ut_malloc_nokey(sz));
+  byte *ptr = reinterpret_cast<byte *>(
+      ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, sz));
 
   /* We allocate one big chunk and then distribute it among
   the rest of the elements. The allocated chunk pointer is always
@@ -6762,7 +6716,8 @@ void lock_trx_alloc_locks(trx_t *trx) {
   }
 
   sz = TABLE_LOCK_SIZE * TABLE_LOCK_CACHE;
-  ptr = reinterpret_cast<byte *>(ut_malloc_nokey(sz));
+  ptr = reinterpret_cast<byte *>(
+      ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, sz));
 
   for (ulint i = 0; i < TABLE_LOCK_CACHE; ++i, ptr += TABLE_LOCK_SIZE) {
     trx->lock.table_pool.push_back(reinterpret_cast<ib_lock_t *>(ptr));
