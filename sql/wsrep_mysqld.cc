@@ -2909,6 +2909,13 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       ret = false;
+    } else if (granted_thd->wsrep_allow_mdl_conflict) {
+      WSREP_DEBUG("Background thread caused BF abort, conf %s",
+                  wsrep_thd_transaction_state_str(granted_thd));
+      ticket->wsrep_report(wsrep_debug);
+      mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
+      wsrep_abort_thd(request_thd, granted_thd, true);
+      ret = false;
     } else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE) {
       WSREP_DEBUG("DROP caused BF abort, conf %s",
                   wsrep_thd_transaction_state_str(granted_thd));

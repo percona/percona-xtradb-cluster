@@ -357,7 +357,11 @@ the auto recalc list and proceeds them, eventually recalculating their
 statistics. */
 void dict_stats_thread() {
   ut_a(!srv_read_only_mode);
+#ifdef WITH_WSREP
+  THD *thd = create_internal_thd(true);
+#else
   THD *thd = create_internal_thd();
+#endif /* WITH_WSREP */
 
   while (!SHUTTING_DOWN()) {
     /* Wake up periodically even if not signaled. This is

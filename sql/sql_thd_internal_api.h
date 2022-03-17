@@ -42,7 +42,11 @@ class THD;
 class partition_info;
 struct fragmentation_stats_t;
 
+#ifdef WITH_WSREP
+THD *create_internal_thd(bool allow_mdl_conflict = false);
+#else
 THD *create_internal_thd();
+#endif /* WITH_WSREP */
 void destroy_internal_thd(THD *thd);
 
 /**

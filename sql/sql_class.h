@@ -2977,6 +2977,7 @@ class THD : public MDL_context_owner,
   bool wsrep_applier;         /* dedicated slave applier thread */
   bool wsrep_applier_closing; /* applier marked to close */
   bool wsrep_client_thread;   /* to identify client threads */
+  bool wsrep_allow_mdl_conflict;
   query_id_t wsrep_last_query_id;
   XID wsrep_xid;
 
