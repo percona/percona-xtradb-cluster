@@ -8550,13 +8550,18 @@ LEX_USER *create_default_definer(THD *thd)
     - On error, return 0.
 */
 
+#ifdef WITH_WSREP
+LEX_USER *get_current_user(THD *thd, LEX_USER *user, bool for_rewrite)
+#else
 LEX_USER *get_current_user(THD *thd, LEX_USER *user)
+#endif
 {
   if (!user->user.str)  // current_user
   {
 
 #ifdef WITH_WSREP
-    if (WSREP(thd) && (thd->lex->sql_command == SQLCOM_ALTER_USER
+    if (WSREP(thd) && !for_rewrite
+                       && (thd->lex->sql_command == SQLCOM_ALTER_USER
                        || thd->lex->sql_command == SQLCOM_CREATE_USER
                        || thd->lex->sql_command == SQLCOM_DROP_USER
                        || thd->lex->sql_command == SQLCOM_RENAME_USER
