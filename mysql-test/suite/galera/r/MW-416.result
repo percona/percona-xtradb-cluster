@@ -135,6 +135,12 @@ REVOKE CREATE ON *.* FROM CURRENT_USER();
 ERROR HY000: Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function for USER operation while operating in cluster mode
 REVOKE ALL ON *.* FROM CURRENT_USER();
 ERROR HY000: Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function for USER operation while operating in cluster mode
+CREATE USER 'test_user'@'localhost' IDENTIFIED BY 'abc';
+GRANT ALL PRIVILEGES ON *.* TO CURRENT_USER() IDENTIFIED BY 'abc';
+ERROR HY000: Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function for USER operation while operating in cluster mode
+GRANT PROXY ON 'test_user'@'localhost' TO CURRENT_USER() IDENTIFIED BY 'abc';
+ERROR HY000: Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function for USER operation while operating in cluster mode
+DROP USER 'test_user'@'localhost';
 #node-2
 call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
 # node-1

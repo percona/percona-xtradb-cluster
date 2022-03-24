@@ -275,7 +275,11 @@ void mysql_rewrite_grant(THD *thd, String *rlb)
   if (proxy_grant)
   {
     tmp_user_name= user_list++;
+#ifdef WITH_WSREP
+    user_name= get_current_user(thd, tmp_user_name, true);
+#else
     user_name= get_current_user(thd, tmp_user_name);
+#endif
     if (user_name)
       append_user_new(thd, rlb, user_name, comma);
   }
@@ -311,7 +315,11 @@ void mysql_rewrite_grant(THD *thd, String *rlb)
   {
     while ((tmp_user_name= user_list++))
     {
+#ifdef WITH_WSREP
+      if ((user_name= get_current_user(thd, tmp_user_name, true)))
+#else
       if ((user_name= get_current_user(thd, tmp_user_name)))
+#endif
       {
         if (opt_log_builtin_as_identified_by_password)
           append_user(thd, rlb, user_name, comma, true);
@@ -385,7 +393,11 @@ void mysql_rewrite_create_alter_user(THD *thd, String *rlb,
 
   while ((tmp_user_name= user_list++))
   {
+#ifdef WITH_WSREP
+    if ((user_name= get_current_user(thd, tmp_user_name, true)))
+#else
     if ((user_name= get_current_user(thd, tmp_user_name)))
+#endif
     {
       if (opt_log_builtin_as_identified_by_password &&
           thd->lex->sql_command != SQLCOM_ALTER_USER)
