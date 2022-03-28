@@ -64,10 +64,17 @@
 struct mysql_cond_t;
 struct mysql_mutex_t;
 
+#ifdef WITH_WSREP
+THD *create_internal_thd(bool allow_mdl_conflict) {
+#else
 THD *create_internal_thd() {
+#endif /* WITH_WSREP */
   /* For internal threads, use enabled_plugins = false. */
   THD *thd = new THD(false);
   thd->system_thread = SYSTEM_THREAD_BACKGROUND;
+#ifdef WITH_WSREP
+  thd->wsrep_allow_mdl_conflict = allow_mdl_conflict;
+#endif /* WITH_WSREP */
   // Skip grants and set the system_user flag in THD.
   thd->security_context()->skip_grants();
   thd->thread_stack = reinterpret_cast<char *>(&thd);

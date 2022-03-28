@@ -484,6 +484,7 @@ THD::THD(bool enable_plugins)
       wsrep_applier(is_applier),
       wsrep_applier_closing(false),
       wsrep_client_thread(false),
+      wsrep_allow_mdl_conflict(false),
       wsrep_last_query_id(0),
       wsrep_xid(),
       wsrep_skip_locking(false),
@@ -1129,6 +1130,7 @@ void THD::cleanup(void) {
     wsrep_cs().cleanup();
   }
   wsrep_client_thread = false;
+  wsrep_allow_mdl_conflict = false;
   wsrep_aborter = 0;
 #endif /* WITH_WSREP */
 
