@@ -263,6 +263,11 @@ get_sources(){
     return
 }
 
+switch_to_vault_repo() {
+    sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-Linux-*
+    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+}
+
 get_system(){
     if [ -f /etc/redhat-release ]; then
         GLIBC_VER_TMP="$(rpm glibc -qa --qf %{VERSION})"
@@ -294,6 +299,9 @@ install_deps() {
     CURPLACE=$(pwd)
 
     if [ "x$OS" = "xrpm" ]; then
+        if [ x"$RHEL" = x8 ]; then
+            switch_to_vault_repo
+        fi
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         yum update -y
@@ -484,6 +492,9 @@ build_srpm(){
         echo "It is not possible to build src rpm here"
         exit 1
     fi
+    if [ x"$RHEL" = x8 ]; then
+        switch_to_vault_repo
+    fi
     cd $WORKDIR || exit
     get_tar "source_tarball"
     rm -fr rpmbuild
@@ -604,6 +615,9 @@ build_rpm(){
     then
         echo "It is not possible to build rpm here"
         exit 1
+    fi
+    if [ x"$RHEL" = x8 ]; then
+        switch_to_vault_repo
     fi
     SRC_RPM=$(basename $(find $WORKDIR/srpm -iname 'percona-xtradb-cluster*.src.rpm' | sort | tail -n1))
     if [ -z $SRC_RPM ]
@@ -839,6 +853,9 @@ build_tarball(){
     then
         echo "Binary tarball will not be created"
         return;
+    fi
+    if [ x"$RHEL" = x8 ]; then
+        switch_to_vault_repo
     fi
     source ${WORKDIR}/pxc-80.properties
     get_tar "source_tarball"
