@@ -2139,7 +2139,9 @@ lock_rec_add_to_queue(
 
 		if (lock != NULL) {
 
-			lock_rec_set_nth_bit(lock, heap_no);
+			if (!lock_rec_get_nth_bit(lock, heap_no)) {
+				lock_rec_set_nth_bit(lock, heap_no);
+			}
 
 			return;
 		}
