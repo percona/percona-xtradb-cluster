@@ -927,6 +927,7 @@ build_tarball(){
         mv usr/bin ./
         mv usr/lib64 ./
         mv lib64 lib
+        mv usr/lib/private lib/
         mv lib/xtrabackup/* lib/
         rm -rf lib/xtrabackup
         rm -rf usr
