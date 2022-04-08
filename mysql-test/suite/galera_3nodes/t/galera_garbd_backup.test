@@ -48,7 +48,7 @@ INSERT INTO t1 (f2) SELECT REPEAT('x', 1024) FROM ten AS a1, ten AS a2, ten AS a
 SET GLOBAL debug = "+d,sync.wsrep_donor_state";
 
 --echo Starting garbd ...
---exec $MTR_GARBD_EXE --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --donor node1 --sst backup --options 'base_port=$NODE_GALERAPORT_3' > $MYSQL_TMP_DIR/garbd.log 2>&1 &
+--exec $MTR_GARBD_EXE --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --donor node1 --sst backup --options 'base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd.log 2>&1 &
 
 SET SESSION DEBUG_SYNC = "now WAIT_FOR sync.wsrep_donor_state_reached";
 
