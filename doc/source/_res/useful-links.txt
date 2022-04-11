@@ -1,0 +1,10 @@
+Useful Links
+=======================
+
+* The `Percona XtraDB Cluster installation instructions <https://www.percona.com/doc/percona-xtradb-cluster/8.0/install/index.html>`__
+
+* The `Percona XtraDB Cluster downloads <https://www.percona.com/downloads/Percona-XtraDB-Cluster-LATEST/#>`__
+
+* The `Percona XtraDB Cluster GitHub location <https://github.com/percona/percona-xtradb-cluster>`__
+
+* To contribute to the documentation, review the `Documentation Contribution Guide <https://github.com/percona/percona-xtradb-cluster/blob/8.0/doc/source/contributing.md>`__

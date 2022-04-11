@@ -8014,20 +8014,24 @@ LEX_USER *create_default_definer(THD *thd) {
     LEX_USER, which contains user information.
     - On error, return 0.
 */
-
+#ifdef WITH_WSREP
+LEX_USER *get_current_user(THD *thd, LEX_USER *user, bool for_rewrite) {
+#else
 LEX_USER *get_current_user(THD *thd, LEX_USER *user) {
+#endif
   if (!user || !user->user.str)  // current_user
   {
     LEX_USER *default_definer = create_default_definer(thd);
     if (default_definer) {
 #ifdef WITH_WSREP
-      if (WSREP(thd) && (thd->lex->sql_command == SQLCOM_ALTER_USER ||
-                         thd->lex->sql_command == SQLCOM_CREATE_USER ||
-                         thd->lex->sql_command == SQLCOM_DROP_USER ||
-                         thd->lex->sql_command == SQLCOM_RENAME_USER ||
-                         thd->lex->sql_command == SQLCOM_REVOKE ||
-                         thd->lex->sql_command == SQLCOM_REVOKE_ALL ||
-                         thd->lex->sql_command == SQLCOM_GRANT)) {
+      if (WSREP(thd) && !for_rewrite &&
+          (thd->lex->sql_command == SQLCOM_ALTER_USER ||
+           thd->lex->sql_command == SQLCOM_CREATE_USER ||
+           thd->lex->sql_command == SQLCOM_DROP_USER ||
+           thd->lex->sql_command == SQLCOM_RENAME_USER ||
+           thd->lex->sql_command == SQLCOM_REVOKE ||
+           thd->lex->sql_command == SQLCOM_REVOKE_ALL ||
+           thd->lex->sql_command == SQLCOM_GRANT)) {
         WSREP_ERROR(
             "Percona XtraDB Cluster doesn't allow use of"
             " CURRENT_USER/USER function for USER operation"

@@ -109,11 +109,10 @@ https://www.percona.com/downloads/proxysql2/, if you cannot use either an apt or
 
           * - Name
             - Description
-          * - proxysql-2.0.XX-Linux-x86_64.glibc2.12.tar.gz
+          * - proxysql-2.X.XX-Linux-x86_64.glibc2.12.tar.gz
             - For every supported operating system but ``xenial``
-
-              For CentOS 7, install OpenSSL 1.1.1, if needed.
-          * - proxysql-2.0.XX-Linux-x86_64.glibc2.23.xenial.tar.gz
+              For CentOS 7, install OpenSSL 1.1.1, if needed. 
+          * - proxysql-2.X.XX-Linux-x86_64.glibc2.23.xenial.tar.gz
             - For Ubuntu 16.04 ``xenial`` only
 
 The password-based file encryption requires OpenSSL 1.1.1, but Ubuntu 16.04 does not support this OpenSSL version. A special statically linked OpenSSL 1.1.1 binary is packaged with the executable. This packaged binary avoids conflicts with the system OpenSSL and any shared libraries. Each new release rebuilds the binary.

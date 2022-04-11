@@ -85,7 +85,11 @@ int prepare_schema_table(THD *thd, LEX *lex, Table_ident *table_ident,
                          enum enum_schema_tables schema_table_idx);
 void get_default_definer(THD *thd, LEX_USER *definer);
 LEX_USER *create_default_definer(THD *thd);
+#ifdef WITH_WSREP
+LEX_USER *get_current_user(THD *thd, LEX_USER *user, bool for_rewrite = false);
+#else
 LEX_USER *get_current_user(THD *thd, LEX_USER *user);
+#endif
 bool check_string_char_length(const LEX_CSTRING &str, const char *err_msg,
                               size_t max_char_length, const CHARSET_INFO *cs,
                               bool no_error);

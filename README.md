@@ -1,4 +1,4 @@
-#Percona XtraDB Cluster
+# Percona XtraDB Cluster
 
 ![PXC logo](doc/source/percona-xtradb-cluster-logo.jpg)
 

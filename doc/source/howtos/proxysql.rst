@@ -16,7 +16,7 @@ configuration can be done at runtime using queries similar to SQL statements in
 the ProxySQL admin interface.  These include runtime parameters, server
 grouping, and traffic-related settings.
 
-.. seealso:: `More information about ProxySQL <https://github.com/sysown/proxysql/tree/master/doc>`_.
+.. seealso:: `ProxySQL Documentation <https://proxysql.com/documentation/>`_
 
 :ref:`ProxySQL v2 <pxc.proxysql.v2>` natively supports Percona XtraDB Cluster. With this version,
 |proxysql-admin| tool does not require any custom scripts to keep track of Percona XtraDB Cluster
@@ -44,9 +44,7 @@ This section describes how to configure ProxySQL with three Percona XtraDB Clust
 +--------+-----------+---------------+
 
 ProxySQL can be configured either using the :file:`/etc/proxysql.cnf` file or
-through the admin interface.  Using the admin interface is preferable, because
-it allows you to change the configuration dynamically without having to restart
-the proxy.
+through the admin interface. The admin interface is recommended because this interface can dynamically change the configuration without restarting the proxy.
 
 To connect to the ProxySQL admin interface, you need a ``mysql`` client.
 You can either connect to the admin interface from Percona XtraDB Cluster nodes
@@ -60,22 +58,23 @@ For this tutorial, install Percona XtraDB Cluster on Node 4:
    of the ``percona-xtradb-cluster-client-8.0`` package. You should install the
    ``proxysql`` package separately.
 
-* On Debian or Ubuntu:
+.. note :: ProxySQL has multiple versions in the version 2 series. 
+
+
+* On Debian or Ubuntu for ProxySQL 2.x:
 
   .. code-block:: bash
 
      root@proxysql:~# apt install percona-xtradb-cluster-client
      root@proxysql:~# apt install proxysql2
 
-* On Red Hat Enterprise Linux or CentOS:
+* On Red Hat Enterprise Linux or CentOS for ProxySQL 2.x: ::
 
-  .. code-block:: bash
+     $ sudo yum install Percona-XtraDB-Cluster-client-80
+     $ sudo yum install proxysql2
 
-     [root@proxysql ~]# yum install Percona-XtraDB-Cluster-client-80
-     [root@proxysql ~]# yum install proxysql2
 
-To connect to the admin interface,
-use the credentials, host name and port specified in the `global variables
+To connect to the admin interface, use the credentials, host name and port specified in the `global variables
 <https://github.com/sysown/proxysql/blob/master/doc/global_variables.md>`_.
 
 .. warning:: Do not use default credentials in production!
@@ -117,7 +116,8 @@ To see the ProxySQL databases and tables use the following commands:
   +-----+---------+-------------------------------+
   4 rows in set (0.00 sec)
 
-.. code-block:: text
+
+::
 
   mysql@proxysql> SHOW TABLES;
   +--------------------------------------+
@@ -144,15 +144,15 @@ see `Admin Tables
 
 .. note::
 
-  ProxySQL has 3 areas where the configuration can reside:
+  The ProxySQL configuration can reside in the following areas:
 
   * MEMORY (your current working place)
   * RUNTIME (the production settings)
   * DISK (durable configuration, saved inside an SQLITE database)
 
   When you change a parameter, you change it in MEMORY area.
-  That is done by design to allow you to test the changes
-  before pushing to production (RUNTIME), or save them to disk.
+  This ability is by design and lets you test the changes
+  before pushing the change to production (RUNTIME), or save the change to disk.
 
 Adding cluster nodes to ProxySQL
 --------------------------------
@@ -164,8 +164,9 @@ insert corresponding records into the ``mysql_servers`` table.
    This enables you to balance the load in a cluster by
    routing different types of traffic to different groups.
    There are many ways you can configure hostgroups
-   (for example source and replicas, read and write load, etc.)
+   (for example, source and replicas, read and write load, etc.)
    and a every node can be a member of multiple hostgroups.
+
 
 This example adds three Percona XtraDB Cluster nodes to the default hostgroup (``0``),
 which receives both write and read traffic:
@@ -176,12 +177,9 @@ which receives both write and read traffic:
    mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.72',3306);
    mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.73',3306);
 
-To see the nodes:
-
-.. code-block:: text
+To see the nodes: ::
 
   mysql@proxysql> SELECT * FROM mysql_servers;
-
   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
   | hostgroup_id | hostname      | port | status | weight | compression | max_connections | max_replication_lag | use_ssl | max_latency_ms | comment |
   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
@@ -225,9 +223,7 @@ issue a ``SAVE`` command.
   mysql@proxysql> SAVE MYSQL VARIABLES TO DISK;
 
 To ensure that monitoring is enabled,
-check the monitoring logs:
-
-.. code-block:: text
+check the monitoring logs: ::
 
   mysql@proxysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start_us DESC LIMIT 6;
   +---------------+------+------------------+----------------------+---------------+
@@ -242,7 +238,7 @@ check the monitoring logs:
   +---------------+------+------------------+----------------------+---------------+
   6 rows in set (0.00 sec)
 
-.. code-block:: text
+:: 
 
   mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start_us DESC LIMIT 6;
   +---------------+------+------------------+-------------------+------------+
@@ -258,11 +254,9 @@ check the monitoring logs:
   6 rows in set (0.00 sec)
 
 The previous examples show that ProxySQL is able to connect
-and ping the nodes you added.
+and ping the nodes you have added.
 
-To enable monitoring of these nodes, load them at runtime:
-
-.. code-block:: text
+To enable monitoring of these nodes, load them at runtime: ::
 
   mysql@proxysql> LOAD MYSQL SERVERS TO RUNTIME;
 
@@ -274,9 +268,7 @@ Creating ProxySQL Client User
 ProxySQL must have users that can access backend nodes
 to manage connections.
 
-To add a user, insert credentials into ``mysql_users`` table:
-
-.. code-block:: text
+To add a user, insert credentials into ``mysql_users`` table: ::
 
    mysql@proxysql> INSERT INTO mysql_users (username,password) VALUES ('sbuser','sbpass');
    Query OK, 1 row affected (0.00 sec)
@@ -286,16 +278,12 @@ To add a user, insert credentials into ``mysql_users`` table:
    ProxySQL currently doesn't encrypt passwords.
 
 Load the user into runtime space and save these changes to disk
-(ensuring that they persist after ProxySQL shuts down):
-
-.. code-block:: text
+(ensuring that they persist after ProxySQL shuts down): ::
 
   mysql@proxysql> LOAD MYSQL USERS TO RUNTIME;
   mysql@proxysql> SAVE MYSQL USERS TO DISK;
 
-To confirm that the user has been set up correctly, you can try to log in:
-
-.. code-block:: bash
+To confirm that the user has been set up correctly, you can try to log in as root: ::
 
   root@proxysql:~# mysql -u sbuser -psbpass -h 127.0.0.1 -P 6033
 
@@ -338,10 +326,10 @@ You can install ``sysbench`` from Percona software repositories:
 
   .. code-block:: bash
 
-     [root@proxysql ~]# yum install sysbench
+     [root@proxysql:~# yum install sysbench
 
 .. note:: ``sysbench`` requires ProxySQL client user credentials
-   that you creted in :ref:`proxysql-client-user`.
+   that you created in :ref:`proxysql-client-user`.
 
 1. Create the database that will be used for testing on one of the Percona XtraDB Cluster nodes:
 
@@ -497,7 +485,7 @@ that enables you to take a node down without adjusting ProxySQL manually.
 The mode is controlled using the :variable:`pxc_maint_mode` variable,
 which is monitored by ProxySQL and can be set to one of the following values:
 
-* ``DISABLED``: This is the default state
+* ``DISABLED``: This value is the default state
   that tells ProxySQL to route traffic to the node as usual.
 
 * ``SHUTDOWN``: This state is set automatically
@@ -510,18 +498,16 @@ which is monitored by ProxySQL and can be set to one of the following values:
   Intead, it changes the state to ``pxc_maint_mode=SHUTDOWN``
   and waits for a predefined period (10 seconds by default).
   When ProxySQL detects that the mode is set to ``SHUTDOWN``,
-  it changes the status of this node to ``OFFLINE_SOFT``,
-  which stops creation of new connections for the node.
-  After the transition period,
-  any long-running transactions that are still active are aborted.
+  it changes the status of this node to ``OFFLINE_SOFT``. This status stops creating new node connections.
+  After the transition period, long-running active transactions are aborted.
 
 * ``MAINTENANCE``: You can change to this state
-  if you need to perform maintenace on a node without shutting it down.
+  if you need to perform maintenance on a node without shutting it down.
 
-  You may need to isolate the node for some time,
+  You may need to isolate the node for a specific time
   so that it does not receive traffic from ProxySQL
   while you resize the buffer pool, truncate the undo log,
-  defragment or check disks, etc.
+  defragment, or check disks, etc.
 
   To do this, manually set ``pxc_maint_mode=MAINTENANCE``.
   Control is not returned to the user for a predefined period
@@ -530,21 +516,21 @@ which is monitored by ProxySQL and can be set to one of the following values:
   it stops routing traffic to the node.
   Once control is returned, you can perform maintenance activity.
 
-  .. note:: Any data changes will still be replicated across the cluster.
+  .. note:: Data changes continue to be replicated across the cluster.
 
   After you finish maintenance, set the mode back to ``DISABLED``.
   When ProxySQL detects this, it starts routing traffic to the node again.
 
 You can increase the transition period
 using the :variable:`pxc_maint_transition_period` variable
-to accomodate for long-running transactions.
+to accommodate long-running transactions.
 If the period is long enough for all transactions to finish,
-there should hardly be any disruption in cluster workload.
+there should be little disruption in the cluster workload.
 
 During the transition period,
 the node continues to receive existing write-set replication traffic,
-ProxySQL avoids openning new connections and starting transactions,
-but the user can still open conenctions to monitor status.
+ProxySQL avoids opening new connections and starting transactions.
+Still, the user can open connections to monitor status.
 
 .. note:: If you increase the transition period,
    the packaging script may determine it as a server stall.

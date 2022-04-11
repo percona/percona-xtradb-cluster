@@ -766,7 +766,11 @@ void Rewriter_user::rewrite_users(LEX *lex, String *str) const {
   LEX_USER *user_name, *tmp_user_name;
   List_iterator<LEX_USER> user_list(lex->users_list);
   while ((tmp_user_name = user_list++)) {
+#ifdef WITH_WSREP
+    if ((user_name = get_current_user(m_thd, tmp_user_name, true))) {
+#else
     if ((user_name = get_current_user(m_thd, tmp_user_name))) {
+#endif
       append_user_auth_info(user_name, comma, str);
       comma = true;
     }
