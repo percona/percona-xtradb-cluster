@@ -39,7 +39,8 @@ Build-Depends: libtool (>= 1.4.2-7),
                libboost-program-options-dev (>= 1.41),
                libwrap0-dev,
                libcurl4-openssl-dev,
-               libldap2-dev
+               libldap2-dev,
+               stunnel
 Standards-Version: 7.0.0
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/
 Vcs-Git: https://github.com/percona/percona-xtradb-cluster
@@ -198,7 +199,8 @@ Depends: percona-xtradb-cluster-client (>= ${binary:Version}),
          lsb-base (>= 3.0-10),
          socat,
          qpress,
-         iproute
+         iproute,
+         stunnel
 Provides: mysql-server,
           virtual-mysql-server, virtual-mysql-server-core,
           mysql-server-8.0, mysql-server-core-8.0, mysql-community-server-core
@@ -311,7 +313,7 @@ Section: database
 Architecture: any
 Depends: percona-xtradb-cluster-server (>= ${binary:Version}), percona-xtradb-cluster-client (>= ${binary:Version}), percona-xtradb-cluster-test (>= ${binary:Version}), percona-xtradb-cluster-dbg (>= ${binary:Version}),  percona-xtradb-cluster-server-debug, percona-xtradb-cluster-garbd (>= ${binary:Version}), ${misc:Depends}, percona-xtradb-cluster-garbd-debug (>= ${binary:Version})
 Description: Percona XtraDB Cluster with Galera
- This is a meta-package providing PXC57 server, client, test and debug packages.
+ This is a meta-package providing PXC80 server, client, test and debug packages.
 
 Package: percona-xtradb-cluster-test
 Architecture: any

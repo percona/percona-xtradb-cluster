@@ -78,10 +78,22 @@ call mtr.add_suppression("Query apply failed");
 call mtr.add_suppression("Inconsistency detected");
 drop table t1;
 
-# Rejoin node #2
+# Kill and start node #2
+# Enable the node_1 to continue running during the split-brain situation that
+# occurs when the node_2 is killed
+--let $wsrep_provider_options_orig = `SELECT @@wsrep_provider_options`
+SET GLOBAL wsrep_provider_options = 'pc.ignore_sb=true';
+
 --connection node_2
 --source include/kill_galera.inc
 --sleep 1
 --echo Starting mysqld
 --source include/start_mysqld.inc
+
+--connection node_1
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig';
+--enable_query_log
+
+
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -34,6 +34,7 @@
 #include "storage/perfschema/pfs_stat.h"
 #include "storage/perfschema/pfs_user.h"
 #include "storage/perfschema/unittest/stub_pfs_global.h"
+#include "storage/perfschema/unittest/stub_pfs_defaults.h"
 #include "storage/perfschema/unittest/stub_pfs_plugin_table.h"
 #include "unittest/mytap/tap.h"
 

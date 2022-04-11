@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -53,7 +53,6 @@ struct Grant_table_aggregate;
 class Security_context {
  public:
   Security_context(THD *thd = nullptr);
-  Security_context(MEM_ROOT *m_mem_root, THD *thd = nullptr);
   ~Security_context();
 
   Security_context(const Security_context &src_sctx);
@@ -82,7 +81,8 @@ class Security_context {
                                          bool cumulative = false);
   bool can_operate_with(const Auth_id &auth_id, const std::string &privilege,
                         bool cumulative = false,
-                        bool ignore_if_nonextant = true);
+                        bool ignore_if_nonextant = true,
+                        bool throw_error = true);
   int activate_role(LEX_CSTRING user, LEX_CSTRING host,
                     bool validate_access = false);
   void clear_active_roles(void);

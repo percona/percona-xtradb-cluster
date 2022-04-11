@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -44,6 +44,7 @@
 
 #include "debug_vars.h"
 #include "event_reader.h"
+#include "my_checksum.h"
 #include "my_io.h"
 
 #if defined(_WIN32)
@@ -127,8 +128,10 @@
    /* type, microseconds */ +1U + 32 * 3 + /* type, user_len, user */         \
    1 + 255 /* host_len, host */ + 1U + 1 /* type, explicit_def..ts*/ + 1U +   \
    8 /* type, xid of DDL */ + 1U +                                            \
-   2 /* type, default_collation_for_utf8mb4_number */ +                       \
-   1 /* sql_require_primary_key */ + 1 /* type, default_table_encryption */)
+   2 /* type, default_collation_for_utf8mb4_number */ + 1U +                  \
+   1 /* type, sql_require_primary_key */ + 1U +                                     \
+   1 /* type, default_table_encryption */ + 1U +                              \
+   1 /* type, binlog_ddl_skip_rewrite */)
 
 /**
    Uninitialized timestamp value (for either last committed or sequence number).
@@ -457,8 +460,7 @@ enum enum_binlog_checksum_alg {
 inline uint32_t checksum_crc32(uint32_t crc, const unsigned char *pos,
                                size_t length) {
   BAPI_ASSERT(length <= UINT_MAX);
-  return static_cast<uint32_t>(crc32(static_cast<unsigned int>(crc), pos,
-                                     static_cast<unsigned int>(length)));
+  return my_checksum(crc, pos, length);
 }
 
 /*
@@ -957,8 +959,8 @@ class Unknown_event : public Binary_log_event {
 
   Unknown_event(const char *buf, const Format_description_event *fde);
 #ifndef HAVE_MYSYS
-  void print_event_info(std::ostream &info);
-  void print_long_info(std::ostream &info);
+  void print_event_info(std::ostream &info) override;
+  void print_long_info(std::ostream &info) override;
 #endif
 };
 }  // end namespace binary_log

@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2019, 2020, Oracle and/or its affiliates.
+  Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -37,7 +37,7 @@ using namespace std::chrono_literals;
 #define MY_WAIT_US_NOASSERT(cond, usec) \
   {                                     \
     int n = 0;                          \
-    int max = usec / 1000;              \
+    int max = (usec) / 1000;            \
     do {                                \
       std::this_thread::sleep_for(1ms); \
       n++;                              \
@@ -94,9 +94,6 @@ class RouterPidfileTest : public RouterComponentTest {
 
   void start_router() {
     router = &ProcessManager::launch_router(router_cmdline);
-    // make sure to get past the setup of the signal handler, otherwise
-    // ProcessManager will complain about the "signal 15"
-    wait_log_contains(*router, "Starting all plugins", 5s);
   }
 
   void stop_router() {
@@ -251,7 +248,8 @@ TEST_F(RouterPidfileOptionTest, PidFileOptionTwiceWithoutValue) {
   router_cmdline.emplace_back("--pid-file");
   router_cmdline.emplace_back("--pid-file");
 
-  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE);
+  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE,
+                                               true, false, -1s);
 
   check_exit_code(router, EXIT_FAILURE, 1s);
 
@@ -270,7 +268,8 @@ TEST_F(RouterPidfileOptionTest, PidFileOptionTwice) {
   router_cmdline.emplace_back("--pid-file=" + pidfile_tmp.str());
   router_cmdline.emplace_back("--pid-file=" + pidfile.str());
 
-  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE);
+  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE,
+                                               true, false, -1s);
 
   check_exit_code(router, EXIT_FAILURE, 1s);
 
@@ -295,7 +294,8 @@ TEST_F(RouterPidfileOptionTest, PidFileOptionCfgTwice) {
                                  "mysqlrouter.conf", extra_params);
   router_cmdline = {"-c", conf_file};
 
-  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE);
+  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE,
+                                               true, false, -1s);
 
   check_exit_code(router, EXIT_FAILURE, 1s);
 
@@ -346,8 +346,8 @@ struct PidFileOptionParams {
   std::string filename;
   bool tmpdir_prefix;
 
-  PidFileOptionParams(const std::string &filename_, bool tmpdir_prefix_)
-      : filename(filename_), tmpdir_prefix(tmpdir_prefix_) {}
+  PidFileOptionParams(std::string filename_, bool tmpdir_prefix_)
+      : filename(std::move(filename_)), tmpdir_prefix(tmpdir_prefix_) {}
 };
 
 class RouterPidfileOptionValueTest
@@ -445,9 +445,8 @@ struct PidFileOptionErrorParams {
   std::string filename;
   std::string pattern;
 
-  PidFileOptionErrorParams(const std::string &filename_,
-                           const std::string &pattern_)
-      : filename(filename_), pattern(pattern_) {}
+  PidFileOptionErrorParams(std::string filename_, std::string pattern_)
+      : filename(std::move(filename_)), pattern(std::move(pattern_)) {}
 };
 
 class RouterPidfileOptionValueTestError
@@ -460,7 +459,8 @@ TEST_P(RouterPidfileOptionValueTestError, PidFileOptionValueTestError) {
   // start router with parameterized value for --pid-file, and expect error
   router_cmdline.emplace_back("--pid-file=" + test_params.filename);
 
-  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE);
+  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE,
+                                               true, false, -1s);
 
   check_exit_code(router, EXIT_FAILURE, 1s);
 
@@ -498,7 +498,8 @@ INSTANTIATE_TEST_SUITE_P(
 struct PidFileOptionCfgParams {
   std::string filename;
 
-  PidFileOptionCfgParams(const std::string &filename_) : filename(filename_) {}
+  PidFileOptionCfgParams(std::string filename_)
+      : filename(std::move(filename_)) {}
 };
 
 class RouterPidfileOptionCfgValueTest
@@ -558,8 +559,8 @@ INSTANTIATE_TEST_SUITE_P(
 struct PidFileOptionCfgErrorParams {
   std::string filename;
 
-  PidFileOptionCfgErrorParams(const std::string &filename_)
-      : filename(filename_) {}
+  PidFileOptionCfgErrorParams(std::string filename_)
+      : filename(std::move(filename_)) {}
 };
 
 class RouterPidfileOptionCfgValueTestError
@@ -577,7 +578,8 @@ TEST_P(RouterPidfileOptionCfgValueTestError, PidFileOptionCfgValueTestError) {
   router_cmdline = {"-c", conf_file};
 
   // start router with config file, and expect error
-  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE);
+  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE,
+                                               true, false, -1s);
 
   check_exit_code(router, EXIT_FAILURE, 1s);
 
@@ -603,8 +605,8 @@ INSTANTIATE_TEST_SUITE_P(PidFileOptionCfgValueTestError,
 struct PidFileOptionEnvErrorParams {
   std::string filename;
 
-  PidFileOptionEnvErrorParams(const std::string &filename_)
-      : filename(filename_) {}
+  PidFileOptionEnvErrorParams(std::string filename_)
+      : filename(std::move(filename_)) {}
 };
 
 class RouterPidfileOptionEnvValueTestError
@@ -618,7 +620,8 @@ TEST_P(RouterPidfileOptionEnvValueTestError, PidFileOptionEnvValueTestError) {
   SetEnvRouterPid(test_params.filename.c_str());
 
   // start router with default config file, and expect error
-  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE);
+  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE,
+                                               true, false, -1s);
 
   check_exit_code(router, EXIT_FAILURE, 1s);
 
@@ -737,9 +740,9 @@ struct PidFileOptionSupremacyCornerCaseParams {
   std::string extra_params;
   std::string pattern;
 
-  PidFileOptionSupremacyCornerCaseParams(const std::string &extra_params_,
-                                         const std::string &pattern_)
-      : extra_params(extra_params_), pattern(pattern_) {}
+  PidFileOptionSupremacyCornerCaseParams(std::string extra_params_,
+                                         std::string pattern_)
+      : extra_params(std::move(extra_params_)), pattern(std::move(pattern_)) {}
 };
 
 class RouterPidfileOptionSupremacyCornerCaseTest
@@ -760,7 +763,8 @@ TEST_P(RouterPidfileOptionSupremacyCornerCaseTest,
 
   router_cmdline = {"-c", conf_file};
 
-  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE);
+  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE,
+                                               true, false, -1s);
 
   check_exit_code(router, EXIT_FAILURE, 1s);
 
@@ -797,9 +801,12 @@ TEST_P(RouterPidfileOptionExistsTest, PidFileOptionExistsTest) {
   // Create an already existing pidfile
   mysql_harness::Path fullpath =
       mysql_harness::Path(runtime_folder.name()).join(pidfile.c_str());
-  std::ofstream alreadyexists(fullpath.c_str());
+  std::ofstream alreadyexists(fullpath.str());
   alreadyexists << "PidFileOptionExistsTest already existing file" << std::endl;
   alreadyexists.close();
+
+  // pid-file still exists
+  ASSERT_TRUE(fullpath.exists()) << fullpath.str();
 
   if (test_params.used & ENV) {
     // set ROUTER_PID and and expect error
@@ -817,12 +824,10 @@ TEST_P(RouterPidfileOptionExistsTest, PidFileOptionExistsTest) {
     router_cmdline.emplace_back("--pid-file=" + pidfile.str());
   }
 
-  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE);
+  auto &router = ProcessManager::launch_router(router_cmdline, EXIT_FAILURE,
+                                               true, false, -1s);
 
   check_exit_code(router, EXIT_FAILURE, 1s);
-
-  // Remove the already existing pidfile
-  remove(fullpath.c_str());
 
   if (test_params.used & ENV) {
     // unset ROUTER_PID env
@@ -832,6 +837,9 @@ TEST_P(RouterPidfileOptionExistsTest, PidFileOptionExistsTest) {
   // expect error
   EXPECT_TRUE(router.expect_output(
       "^Error: PID file .* found. Already running?", true));
+
+  // pid-file still exists
+  EXPECT_TRUE(fullpath.exists()) << fullpath.str();
 }
 
 INSTANTIATE_TEST_SUITE_P(PidFileOptionExistsTest, RouterPidfileOptionExistsTest,

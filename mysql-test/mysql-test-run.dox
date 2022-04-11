@@ -435,7 +435,7 @@
         colon you may add a <b>\@<em>platform</em></b> to have the
         test disabled only on a specific platform. Basic OS names as
         reported by <b>$^O</b> in Perl, or <b>'windows'</b> are
-        supported. Alternatively, <b>@!<em>platform</i></b> will
+        supported. Alternatively, <b>@!<em>platform</em></b> will
         disable the test on all except the named platform.
 
         <b>BUG#<em>nnnnn</em></b> or <b>WL#<em>nnnn</em></b> indicates
@@ -931,8 +931,7 @@
   Test cases which use <b>not_parallel.inc</b> are run at the end with
   a parallel value of <b>1</b> overriding the <b>`--parallel`</b>
   option value. Such test cases will be executed at the end of the test
-  run one at a time. These tests also require
-  <b>`--non-parallel-test`</b> option to be ON.
+  run one at a time.
 */
 
 ###############################################################################
@@ -3811,6 +3810,18 @@
         Users have to make sure this variable is set to the same path
         on all environments, and that this common path is mounted on
         all the environments.
+     <tr>
+      <td><tt>MYSQL_BIN_PATH</tt></td>
+      <td>
+        Path to the directory having mysql binaries.
+      </td>
+    </tr>
+    <tr>
+      <td><tt>MYSQL_CLIENT_BIN_PATH</tt></td>
+      <td>
+        Path to the directory having client binaries.
+      </td>
+    </tr>
     <tr>
       <td><tt>MYSQL_CONFIG_EDITOR</tt></td>
       <td>
@@ -4615,10 +4626,12 @@
       tests are run. An excluded list (<b>excludenoskip.list</b>) is
       maintained to track which tests should continue to be skipped.
       The <b>`--no-skip`</b> option continues to skip the tests that
-      are named in the excluded list. The default value of
-      <b>--no-skip</b> introduced variable is OFF, which implies users
-      are not forced to run all tests unless the <b>--no-skip</b> is
-      explicitly used.
+      are named in the excluded list. In case the test or file invoking
+      the <b>`--skip`</b> command is not present in the excluded list, the
+      outcome of the test will be identified as <b>[ noskip-pass ]</b> or
+      <b>[ noskip-fail ]</b> .The default value of <b>--no-skip</b>
+      introduced variable is OFF, which implies users are not forced to
+      run all tests unless the <b>--no-skip</b> is explicitly used.
 
       @verbatim
   shell> mysql-test-run.pl --suite=innodb --no-skip
@@ -4841,15 +4854,6 @@
       Allow a failed and retried test to fail more than the default 2
       times before giving it up. Setting it to 0 or 1 effectively
       turns off retries
-    </li>
-
-    <li>
-      <tt>`--non-parallel-test`</tt>
-
-      Allow tests marked as "non-parallel" to run. Tests can be thus
-      marked by including the line
-      <b>`--source` include/not_parallel.inc</b>, and they will only
-      be run if this option is enabled.
     </li>
 
     <li>
@@ -5289,9 +5293,12 @@
     </li>
 
     <li>
-      <tt>`--with-ndbcluster-only`</tt>
+      <tt>`--with-ndbcluster-only`, `--with-ndb-only`</tt>
 
-      Run only test cases that have <b>ndb</b> in their name.
+      Run only <b>ndb</b> tests. If no suites are explicitly given, this
+      option also skip all non <b>ndb</b> suites without checking
+      individual test names.
+
     </li>
 
     <li>
@@ -5815,6 +5822,22 @@
   append_file $MYSQL_TMP_DIR/data02 END_OF_FILE;
   line three for the file
   END_OF_FILE
+      @endverbatim
+    </li>
+
+    <li>
+      <tt>assert (<b>expr</b>)</tt>
+
+      Assert that <b>expr</b> is true; otherwise terminate the test program
+      with an error message indicating that <b>expr</b> failed.
+      <b>expr</b> is parsed as it is for <tt>if()</tt> and <tt>while()</tt>,
+      as described at @ref PAGE_MYSQL_TEST_FLOW_CONTROL.
+
+      @verbatim
+        assert(1);
+        assert($x);
+        assert(!$x);
+        assert(`select count(*) from t1`);
       @endverbatim
     </li>
 
@@ -6769,7 +6792,6 @@
       issue, the command can be retried for a <b>retry</b> number
       of times. Each retry happens after an interval of one second.
 
-
       @verbatim
   file_exists /etc/passwd;
   file_exists /etc/passwd 5;
@@ -7001,7 +7023,6 @@
       can be retried for a <b>retry</b> number of times. Each retry
       happens after an interval of one second.
 
-
       @verbatim
   move_file $MYSQL_TMP_DIR/data01 $MYSQL_TMP_DIR/test.out;
   move_file $MYSQL_TMP_DIR/data01 $MYSQL_TMP_DIR/test.out 5;
@@ -7122,6 +7143,29 @@
     </li>
 
     <li>
+      <tt>--let <b>$var</b> = escape(<b>characters</b>,<b>string</b>)</tt>
+
+      Insert a backslash character before every character in
+      <b>string</b> that occurs in <b>characters</b>, and assign the
+      result to <b>$var</b>.
+
+      <b>characters</b> must not contain newline. If it contains a
+      comma, it must be the first character.  All whitespace is
+      significant and preserved in both arguments, so you typically
+      want to omit the space after the comma for this command.
+
+      This can be useful when you need to include <b>string</b> in an
+      SQL string in a query, and <b>string</b> may contain quote
+      characters.
+
+      @verbatim
+      --let <b>$var</b> = escape(\',The 'path separator' in Windows is \.)
+      --echo $var
+      # Prints: The \'path separator\' in Windows is \\.
+      @endverbatim
+    </li>
+
+    <li>
       <tt>reap</tt>
 
       Receive the result of the statement sent with the <b>send</b>
@@ -7216,7 +7260,7 @@
       than <em> -1e10 </em></b> are represented using the
       exponential notation after they are rounded off.
 
-     @verbatim
+      @verbatim
   --replace_numeric_round 6
   SELECT 12379.79459775333;
   12379.794598
@@ -7224,7 +7268,7 @@
   replace_numeric_round 0;
   SELECT 876.87302;
   877
-     @endverbatim
+      @endverbatim
     </li>
 
 
@@ -8151,7 +8195,7 @@
 
   @section SECTION_WRITING_UNIT_TESTS Writing Unit Tests for Google Test
 
-  The Google Test unit test files are located in the
+  Most of The Google Test unit test files are located in the
   <b>unittest/gunit</b> directory. You can look at these files to
   see how tests are written. Here are some examples:
 
@@ -8166,11 +8210,6 @@
   Most MyTAP-based tests are likely easily converted to Google Test.
   However, there might be low-level tests that absolutely must be run
   on every platform, and thus require MyTAP.
-
-  As currently implemented, the Google Test unit-test programs produce
-  TAP output rather than the “plain” alternative. This can be disabled
-  by using the <b>`--disable-tap-output`</b> command-line option
-  when running a test executable.
 
   To see what options are available, run a test executable with the
   <b>`--help`</b> option.

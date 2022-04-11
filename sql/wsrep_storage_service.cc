@@ -73,7 +73,7 @@ Wsrep_storage_service::~Wsrep_storage_service() {
 int Wsrep_storage_service::start_transaction(
     const wsrep::ws_handle &ws_handle) {
   DBUG_ENTER("Wsrep_storage_service::start_transaction");
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_PRINT("info", ("Wsrep_storage_service::start_transcation(%u, %p)",
                       m_thd->thread_id(), m_thd));
   m_thd->set_wsrep_next_trx_id(ws_handle.transaction_id().get());
@@ -85,7 +85,7 @@ int Wsrep_storage_service::start_transaction(
 void Wsrep_storage_service::adopt_transaction(
     const wsrep::transaction &transaction) {
   DBUG_ENTER("Wsrep_Storage_server::adopt_transaction");
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   m_thd->wsrep_cs().adopt_transaction(transaction);
   trans_begin(m_thd, MYSQL_START_TRANS_OPT_READ_WRITE);
   DBUG_VOID_RETURN;
@@ -94,9 +94,10 @@ void Wsrep_storage_service::adopt_transaction(
 int Wsrep_storage_service::append_fragment(const wsrep::id &server_id,
                                            wsrep::transaction_id transaction_id,
                                            int flags,
-                                           const wsrep::const_buffer &data) {
+                                           const wsrep::const_buffer &data,
+                                           const wsrep::xid& xid WSREP_UNUSED) {
   DBUG_ENTER("Wsrep_storage_service::append_fragment");
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_PRINT("info", ("Wsrep_storage_service::append_fragment(%u, %p)",
                       m_thd->thread_id(), m_thd));
   int ret = wsrep_schema->append_fragment(m_thd, server_id, transaction_id,
@@ -106,7 +107,7 @@ int Wsrep_storage_service::append_fragment(const wsrep::id &server_id,
 
 int Wsrep_storage_service::update_fragment_meta(const wsrep::ws_meta &ws_meta) {
   DBUG_ENTER("Wsrep_storage_service::update_fragment_meta");
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_PRINT("info", ("Wsrep_storage_service::update_fragment_meta(%u, %p)",
                       m_thd->thread_id(), m_thd));
   int ret = wsrep_schema->update_fragment_meta(m_thd, ws_meta);
@@ -115,7 +116,7 @@ int Wsrep_storage_service::update_fragment_meta(const wsrep::ws_meta &ws_meta) {
 
 int Wsrep_storage_service::remove_fragments() {
   DBUG_ENTER("Wsrep_storage_service::remove_fragments");
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
 
   int ret = wsrep_schema->remove_fragments(
       m_thd, m_thd->wsrep_trx().server_id(), m_thd->wsrep_trx().id(),
@@ -126,7 +127,7 @@ int Wsrep_storage_service::remove_fragments() {
 int Wsrep_storage_service::commit(const wsrep::ws_handle &ws_handle,
                                   const wsrep::ws_meta &ws_meta) {
   DBUG_ENTER("Wsrep_storage_service::commit");
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_PRINT("info", ("Wsrep_storage_service::commit(%u, %p)",
                       m_thd->thread_id(), m_thd));
   WSREP_DEBUG("Storage service commit: %llu, %lld",
@@ -162,7 +163,7 @@ int Wsrep_storage_service::commit(const wsrep::ws_handle &ws_handle,
 int Wsrep_storage_service::rollback(const wsrep::ws_handle &ws_handle,
                                     const wsrep::ws_meta &ws_meta) {
   DBUG_ENTER("Wsrep_storage_service::rollback");
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_PRINT("info", ("Wsrep_storage_service::rollback(%u, %p)",
                       m_thd->thread_id(), m_thd));
   int ret =

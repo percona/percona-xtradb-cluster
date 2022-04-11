@@ -89,7 +89,7 @@ This will tell the node (and all nodes still connected to its partition)
 that it can become a primary cluster.
 However, this is only safe to do when you are sure there is no other partition
 operating in primary as well,
-or else |PXC| will allow those two partitions to diverge
+or else Percona XtraDB Cluster will allow those two partitions to diverge
 (and you will end up with two databases
 that are impossible to re-merge automatically).  
 

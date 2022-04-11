@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2005, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2005, 2021, Oracle and/or its affiliates.
 Copyright (c) 2012, Facebook Inc.
 
 This program is free software; you can redistribute it and/or modify it under
@@ -109,10 +109,10 @@ static void page_zip_fields_free(
   }
 }
 
-/** Configure the zlib allocator to use the given memory heap. */
-void page_zip_set_alloc(void *stream,     /*!< in/out: zlib stream */
-                        mem_heap_t *heap) /*!< in: memory heap to use */
-{
+/** Configure the zlib allocator to use the given memory heap.
+@param[in,out] stream zlib stream
+@param[in] heap Memory heap to use */
+void page_zip_set_alloc(void *stream, mem_heap_t *heap) {
   z_stream *strm = static_cast<z_stream *>(stream);
 
   strm->zalloc = page_zip_zalloc;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2005, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2005, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -44,13 +44,15 @@
 
 #include "sql/sql_partition.h"
 
-#include <assert.h>
-#include <limits.h>
-#include <string.h>
 #include <algorithm>
+#include <cassert>
+#include <climits>
+#include <cstring>
 
 #include "field_types.h"  // enum_field_types
+#include "m_ctype.h"      // system_charset_info
 #include "m_string.h"
+#include "my_alloc.h"  // operator new
 #include "my_bitmap.h"
 #include "my_byteorder.h"
 #include "my_compiler.h"
@@ -58,6 +60,7 @@
 #include "my_io.h"
 #include "my_sqlcommand.h"
 #include "my_sys.h"
+#include "mysql/components/services/my_io_bits.h"  // File
 #include "mysql/components/services/psi_statement_bits.h"
 #include "mysql/plugin.h"
 #include "mysql/psi/mysql_file.h"
@@ -98,9 +101,8 @@
 #include "sql/system_variables.h"
 #include "sql/table.h"
 #include "sql/thd_raii.h"
+#include "sql/thr_malloc.h"  // sql_calloc
 #include "sql_string.h"
-
-struct MEM_ROOT;
 
 using std::max;
 using std::min;
@@ -207,7 +209,7 @@ static uint32 get_list_array_idx_for_endpoint(partition_info *part_info,
 
 Item *convert_charset_partition_constant(Item *item, const CHARSET_INFO *cs) {
   THD *thd = current_thd;
-  Name_resolution_context *context = &thd->lex->current_select()->context;
+  Name_resolution_context *context = &thd->lex->current_query_block()->context;
   TABLE_LIST *save_list = context->table_list;
   const char *save_where = thd->where;
 
@@ -277,8 +279,8 @@ static bool partition_default_handling(Partition_handler *part_handler,
       if (part_handler->get_num_parts(normalized_path, &num_parts)) {
         return true;
       }
-      DBUG_ASSERT(part_info->num_parts > 0);
-      DBUG_ASSERT((num_parts % part_info->num_parts) == 0);
+      assert(part_info->num_parts > 0);
+      assert((num_parts % part_info->num_parts) == 0);
       part_info->num_subparts = num_parts / part_info->num_parts;
     }
   }
@@ -314,7 +316,7 @@ int get_parts_for_update(const uchar *old_data,
   longlong old_func_value;
   DBUG_TRACE;
 
-  DBUG_ASSERT(new_data == rec0);  // table->record[0]
+  assert(new_data == rec0);  // table->record[0]
   set_field_ptr(part_field_array, old_data, rec0);
   error = part_info->get_partition_id(part_info, old_part_id, &old_func_value);
   set_field_ptr(part_field_array, rec0, old_data);
@@ -447,7 +449,7 @@ static bool set_up_field_array(TABLE *table, bool is_sub_part) {
     /*
       We are using hidden key as partitioning field
     */
-    DBUG_ASSERT(!is_sub_part);
+    assert(!is_sub_part);
     return result;
   }
   size_field_array = (num_fields + 1) * sizeof(Field *);
@@ -466,7 +468,7 @@ static bool set_up_field_array(TABLE *table, bool is_sub_part) {
           List_iterator<char> it(part_info->part_field_list);
           char *field_name;
 
-          DBUG_ASSERT(num_fields == part_info->part_field_list.elements);
+          assert(num_fields == part_info->part_field_list.elements);
           inx = 0;
           do {
             field_name = it++;
@@ -480,7 +482,7 @@ static bool set_up_field_array(TABLE *table, bool is_sub_part) {
               add_column_list_values, handle_list_of_fields,
               check_partition_info etc.
             */
-            DBUG_ASSERT(0);
+            assert(0);
             my_error(ER_FIELD_NOT_FOUND_PART_ERROR, MYF(0));
             result = true;
             continue;
@@ -813,7 +815,7 @@ static int check_signed_flag(partition_info *part_info) {
 
   @param thd      The thread object
   @param table    The table object
-  @param lex      The LEX object, must be initialized and contain select_lex.
+  @param lex      The LEX object, must be initialized and contain query_block.
 
   @returns  false if success, true if error
 
@@ -823,8 +825,8 @@ static int check_signed_flag(partition_info *part_info) {
 */
 
 static bool init_lex_with_single_table(THD *thd, TABLE *table, LEX *lex) {
-  SELECT_LEX *select_lex = lex->select_lex;
-  Name_resolution_context *context = &select_lex->context;
+  Query_block *query_block = lex->query_block;
+  Name_resolution_context *context = &query_block->context;
   /*
     We will call the parser to create a part_info struct based on the
     partition string stored in the frm file.
@@ -839,7 +841,7 @@ static bool init_lex_with_single_table(THD *thd, TABLE *table, LEX *lex) {
   if (table_ident == nullptr) return true;
 
   TABLE_LIST *table_list =
-      select_lex->add_table_to_list(thd, table_ident, nullptr, 0);
+      query_block->add_table_to_list(thd, table_ident, nullptr, 0);
   if (table_list == nullptr) return true;
 
   context->resolve_in_table_list_only(table_list);
@@ -907,6 +909,15 @@ static void end_lex_with_single_table(THD *thd, TABLE *table, LEX *old_lex) {
     calling fix_fields and reset it immediately after.
     The get_fields_in_item_tree activates setting of bit in flags
     on the field object.
+
+    The function must be called with thd->mem_root set to the memory
+    allocator associated with the TABLE object. Thus, any memory allocated
+    during resolving and other actions have the same lifetime as the TABLE.
+
+    Notice that memory allocations made during evaluation calls is NOT
+    supported, thus any item class that performs memory allocations during
+    evaluation calls must be disallowed as partition functions.
+    SEE Bug #21658
 */
 
 static bool fix_fields_part_func(THD *thd, Item *func_expr, TABLE *table,
@@ -916,8 +927,8 @@ static bool fix_fields_part_func(THD *thd, Item *func_expr, TABLE *table,
   int error;
   LEX *old_lex = thd->lex;
   LEX lex;
-  SELECT_LEX_UNIT unit(CTX_NONE);
-  SELECT_LEX select(thd->mem_root, nullptr, nullptr);
+  Query_expression unit(CTX_NONE);
+  Query_block select(thd->mem_root, nullptr, nullptr);
   lex.new_static_query(&unit, &select);
 
   DBUG_TRACE;
@@ -925,39 +936,13 @@ static bool fix_fields_part_func(THD *thd, Item *func_expr, TABLE *table,
   if (init_lex_with_single_table(thd, table, &lex)) goto end;
 
   {
-    Item_ident::Change_context ctx(&lex.select_lex->context);
+    Item_ident::Change_context ctx(&lex.query_block->context);
     func_expr->walk(&Item::change_context_processor, enum_walk::POSTFIX,
                     (uchar *)&ctx);
   }
   thd->where = "partition function";
-  /*
-    In execution we must avoid the use of thd->change_item_tree since
-    we might release memory before statement is completed. We do this
-    by temporarily setting the stmt_arena->mem_root to be the mem_root
-    of the table object, this also ensures that any memory allocated
-    during fix_fields will not be released at end of execution of this
-    statement. Thus the item tree will remain valid also in subsequent
-    executions of this table object. We do however not at the moment
-    support allocations during execution of val_int so any item class
-    that does this during val_int must be disallowed as partition
-    function.
-    SEE Bug #21658
 
-    This is a tricky call to prepare for since it can have a large number
-    of interesting side effects, both desirable and undesirable.
-  */
-  {
-    const bool save_agg_func = thd->lex->current_select()->agg_func_used();
-
-    error = func_expr->fix_fields(thd, &func_expr);
-
-    /*
-      Restore agg_func.
-      fix_fields should not affect the optimizer later, see Bug#46923.
-    */
-    thd->lex->current_select()->set_agg_func_used(save_agg_func);
-  }
-  if (unlikely(error)) {
+  if (unlikely(func_expr->fix_fields(thd, &func_expr))) {
     DBUG_PRINT("info", ("Field in partition function not part of table"));
     clear_field_flag(table);
     goto end;
@@ -990,7 +975,7 @@ static bool fix_fields_part_func(THD *thd, Item *func_expr, TABLE *table,
   result = set_up_field_array(table, is_sub_part);
 end:
   end_lex_with_single_table(thd, table, old_lex);
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
   Item_ident::Change_context nul_ctx(nullptr);
   func_expr->walk(&Item::change_context_processor, enum_walk::POSTFIX,
                   (uchar *)&nul_ctx);
@@ -1150,7 +1135,7 @@ static void check_range_capable_PF(TABLE *) { DBUG_TRACE; }
 static bool set_up_partition_bitmaps(partition_info *part_info) {
   DBUG_TRACE;
 
-  DBUG_ASSERT(!part_info->bitmaps_are_initialized);
+  assert(!part_info->bitmaps_are_initialized);
 
   if (part_info->init_partition_bitmap(&part_info->read_partitions,
                                        &part_info->table->mem_root))
@@ -1312,14 +1297,14 @@ static void set_up_partition_func_pointers(partition_info *part_info) {
   */
   if (part_info->part_charset_field_array) {
     if (part_info->is_sub_partitioned()) {
-      DBUG_ASSERT(part_info->get_part_partition_id);
+      assert(part_info->get_part_partition_id);
       if (!part_info->column_list) {
         part_info->get_part_partition_id_charset =
             part_info->get_part_partition_id;
         part_info->get_part_partition_id = get_part_id_charset_func_part;
       }
     } else {
-      DBUG_ASSERT(part_info->get_partition_id);
+      assert(part_info->get_partition_id);
       if (!part_info->column_list) {
         part_info->get_part_partition_id_charset = part_info->get_partition_id;
         part_info->get_part_partition_id = get_part_id_charset_func_part;
@@ -1327,7 +1312,7 @@ static void set_up_partition_func_pointers(partition_info *part_info) {
     }
   }
   if (part_info->subpart_charset_field_array) {
-    DBUG_ASSERT(part_info->get_subpartition_id);
+    assert(part_info->get_subpartition_id);
     part_info->get_subpartition_id_charset = part_info->get_subpartition_id;
     part_info->get_subpartition_id = get_part_id_charset_func_subpart;
   }
@@ -1495,7 +1480,7 @@ bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind) {
     part_handler = table->file->get_partition_handler();
 
     if (!part_handler) {
-      DBUG_ASSERT(0);
+      assert(0);
       my_error(ER_PARTITION_CLAUSE_ON_NONPARTITIONED, MYF(0));
       return true;
     }
@@ -1506,7 +1491,7 @@ bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind) {
     }
   }
   if (part_info->is_sub_partitioned()) {
-    DBUG_ASSERT(part_info->subpart_type == partition_type::HASH);
+    assert(part_info->subpart_type == partition_type::HASH);
     /*
       Subpartition is defined. We need to verify that subpartitioning
       function is correct.
@@ -1526,7 +1511,7 @@ bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind) {
       }
     }
   }
-  DBUG_ASSERT(part_info->part_type != partition_type::NONE);
+  assert(part_info->part_type != partition_type::NONE);
   /*
     Partition is defined. We need to verify that partitioning
     function is correct.
@@ -1567,7 +1552,7 @@ bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind) {
       error_str = partition_keywords[PKW_LIST].str;
       if (unlikely(part_info->check_list_constants(thd))) goto end;
     } else {
-      DBUG_ASSERT(0);
+      assert(0);
       my_error(ER_INCONSISTENT_PARTITION_INFO_ERROR, MYF(0));
       goto end;
     }
@@ -1620,7 +1605,7 @@ bool fix_partition_func(THD *thd, TABLE *table, bool is_create_table_ind) {
     part_handler->set_part_info(part_info, false);
     result = false;
   } else {
-    DBUG_ASSERT(0);
+    assert(0);
     my_error(ER_PARTITION_MGMT_ON_NONPARTITIONED, MYF(0));
   }
 end:
@@ -1908,7 +1893,7 @@ static int add_keyword_int(File fptr, const char *keyword, longlong num) {
 
 static int add_engine(File fptr, handlerton *engine_type) {
   const char *engine_str = ha_resolve_storage_engine_name(engine_type);
-  DBUG_ASSERT(engine_type != nullptr);
+  assert(engine_type != nullptr);
   DBUG_PRINT("info", ("ENGINE: %s", engine_str));
   int err = add_string(fptr, "ENGINE = ");
   return err + add_string(fptr, engine_str);
@@ -1986,6 +1971,7 @@ static int check_part_field(enum_field_types sql_type, const char *field_name,
       *result_type = STRING_RESULT;
       *need_cs_check = true;
       return false;
+    case MYSQL_TYPE_BOOL:
     case MYSQL_TYPE_NEWDECIMAL:
     case MYSQL_TYPE_DECIMAL:
     case MYSQL_TYPE_TIMESTAMP:
@@ -1997,6 +1983,7 @@ static int check_part_field(enum_field_types sql_type, const char *field_name,
     case MYSQL_TYPE_ENUM:
     case MYSQL_TYPE_SET:
     case MYSQL_TYPE_GEOMETRY:
+    case MYSQL_TYPE_INVALID:
       goto error;
     default:
       goto error;
@@ -2069,7 +2056,7 @@ int expr_to_string(String *val_conv, Item *item_expr, Field *field,
     if (check_part_field(field->real_type(), field->field_name, &result_type,
                          &need_cs_check))
       return 1;
-    DBUG_ASSERT(result_type == field->result_type());
+    assert(result_type == field->result_type());
     if (need_cs_check)
       field_cs = field->charset();
     else
@@ -2119,7 +2106,7 @@ static int add_column_list_values(File fptr, partition_info *part_info,
           The values are not from the parser, but from the
           dd::Partition_values table. See fill_partitioning_from_dd().
         */
-        DBUG_ASSERT(col_val->column_value.value_str);
+        assert(col_val->column_value.value_str);
         err += add_string(fptr, col_val->column_value.value_str);
       } else if (item_expr->null_value) {
         err += add_string(fptr, "NULL");
@@ -2338,7 +2325,7 @@ char *generate_partition_syntax(partition_info *part_info, uint *buf_length,
         err += add_part_key_word(fptr, partition_keywords[PKW_HASH].str);
       break;
     default:
-      DBUG_ASSERT(0);
+      assert(0);
       /* We really shouldn't get here, no use in continuing from here */
       my_error(ER_OUT_OF_RESOURCES, MYF(ME_FATALERROR));
       return nullptr;
@@ -2930,15 +2917,15 @@ static uint32 get_partition_id_cols_list_for_endpoint(partition_info *part_info,
   list_index = max_list_index;
 
   /* Given value must be LESS THAN or EQUAL to the found partition. */
-  DBUG_ASSERT(
+  assert(
       list_index == part_info->num_list_values ||
       (0 >= cmp_rec_and_tuple_prune(list_col_array + list_index * num_columns,
                                     nparts, left_endpoint, include_endpoint)));
   /* Given value must be GREATER THAN the previous partition. */
-  DBUG_ASSERT(list_index == 0 ||
-              (0 < cmp_rec_and_tuple_prune(
-                       list_col_array + (list_index - 1) * num_columns, nparts,
-                       left_endpoint, include_endpoint)));
+  assert(list_index == 0 ||
+         (0 < cmp_rec_and_tuple_prune(
+                  list_col_array + (list_index - 1) * num_columns, nparts,
+                  left_endpoint, include_endpoint)));
 
   /* Include the right endpoint if not already passed end of array. */
   if (!left_endpoint && include_endpoint && cmp == 0 &&
@@ -3027,7 +3014,7 @@ static uint32 get_list_array_idx_for_endpoint(partition_info *part_info,
   }
 
   if (unsigned_flag) part_func_value -= 0x8000000000000000ULL;
-  DBUG_ASSERT(part_info->num_list_values);
+  assert(part_info->num_list_values);
   do {
     list_index = (max_list_index + min_list_index) >> 1;
     list_value = list_array[list_index].list_value;
@@ -3224,10 +3211,9 @@ static uint32 get_partition_id_range_for_endpoint(partition_info *part_info,
   /* Adjust for endpoints */
   part_end_val = range_array[loc_part_id];
   if (left_endpoint) {
-    DBUG_ASSERT(
-        part_func_value > part_end_val
-            ? (loc_part_id == max_partition && !part_info->defined_max_value)
-            : 1);
+    assert(part_func_value > part_end_val
+               ? (loc_part_id == max_partition && !part_info->defined_max_value)
+               : 1);
     /*
       In case of PARTITION p VALUES LESS THAN MAXVALUE
       the maximum value is in the current (last) partition.
@@ -3563,8 +3549,8 @@ bool verify_data_with_partition(TABLE *table, TABLE *part_table,
   uchar *old_rec;
   partition_info *part_info;
   DBUG_TRACE;
-  DBUG_ASSERT(table && table->file && part_table && part_table->part_info &&
-              part_table->file);
+  assert(table && table->file && part_table && part_table->part_info &&
+         part_table->file);
 
   /*
     Verify all table rows.
@@ -3811,11 +3797,11 @@ void get_partition_set(const TABLE *table, uchar *buf, const uint index,
         We know the top partition and need to scan all underlying
         subpartitions. This is a range without holes.
       */
-      DBUG_ASSERT(sub_part == num_parts);
+      assert(sub_part == num_parts);
       part_spec->start_part = part_part * part_info->num_subparts;
       part_spec->end_part = part_spec->start_part + part_info->num_subparts - 1;
     } else {
-      DBUG_ASSERT(sub_part != num_parts);
+      assert(sub_part != num_parts);
       part_spec->start_part = sub_part;
       part_spec->end_part =
           sub_part + (part_info->num_subparts * (part_info->num_parts - 1));
@@ -3898,8 +3884,8 @@ bool mysql_unpack_partition(THD *thd, char *part_buf, uint part_info_len,
       thd->variables.character_set_client;
   LEX *old_lex = thd->lex;
   LEX lex;
-  SELECT_LEX_UNIT unit(CTX_NONE);
-  SELECT_LEX select(thd->mem_root, nullptr, nullptr);
+  Query_expression unit(CTX_NONE);
+  Query_block select(thd->mem_root, nullptr, nullptr);
   lex.new_static_query(&unit, &select);
 
   sql_digest_state *parent_digest = thd->m_digest;
@@ -3981,12 +3967,12 @@ bool mysql_unpack_partition(THD *thd, char *part_buf, uint part_info_len,
   table->part_info = part_info;
   part_info->table = table;
   part_handler = table->file->get_partition_handler();
-  DBUG_ASSERT(part_handler != nullptr);
+  assert(part_handler != nullptr);
   part_handler->set_part_info(part_info, true);
   if (!part_info->default_engine_type)
     part_info->default_engine_type = default_db_type;
-  DBUG_ASSERT(part_info->default_engine_type == default_db_type);
-  DBUG_ASSERT(part_info->default_engine_type->db_type != DB_TYPE_UNKNOWN);
+  assert(part_info->default_engine_type == default_db_type);
+  assert(part_info->default_engine_type->db_type != DB_TYPE_UNKNOWN);
 
   {
     /*
@@ -4067,8 +4053,8 @@ bool get_first_partition_name(THD *thd, Partition_handler *part_handler,
   thd->variables.character_set_client = system_charset_info;
   LEX *old_lex = thd->lex;
   LEX lex;
-  SELECT_LEX_UNIT unit(CTX_NONE);
-  SELECT_LEX select(thd->mem_root, nullptr, nullptr);
+  Query_expression unit(CTX_NONE);
+  Query_block select(thd->mem_root, nullptr, nullptr);
   lex.new_static_query(&unit, &select);
   thd->lex = &lex;
 
@@ -4372,7 +4358,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
                            bool *partition_changed,
                            partition_info **new_part_info) {
   DBUG_TRACE;
-  DBUG_ASSERT(new_part_info);
+  assert(new_part_info);
 
   /* Remove partitioning on a not partitioned table is not possible */
   if (!table->part_info &&
@@ -4386,7 +4372,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
     return true;
 
   /* ALTER_ADMIN_PARTITION is handled in mysql_admin_table */
-  DBUG_ASSERT(!(alter_info->flags & Alter_info::ALTER_ADMIN_PARTITION));
+  assert(!(alter_info->flags & Alter_info::ALTER_ADMIN_PARTITION));
 
   if (alter_info->flags &
       (Alter_info::ALTER_ADD_PARTITION | Alter_info::ALTER_DROP_PARTITION |
@@ -4407,7 +4393,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
       return true;
     }
     if (!part_handler) {
-      DBUG_ASSERT(0);
+      assert(0);
       my_error(ER_PARTITION_MGMT_ON_NONPARTITIONED, MYF(0));
       return true;
     }
@@ -4418,7 +4404,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
       Open it as a copy of the original table, and modify its partition_info
       object to allow in-place ALTER implementation to perform the changes.
     */
-    DBUG_ASSERT(thd->mdl_context.owns_equal_or_stronger_lock(
+    assert(thd->mdl_context.owns_equal_or_stronger_lock(
         MDL_key::TABLE, alter_ctx->db, alter_ctx->table_name,
         MDL_INTENTION_EXCLUSIVE));
 
@@ -4467,7 +4453,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
         if (flags & HA_INPLACE_CHANGE_PARTITION) {
           *new_part_info = tab_part_info;
           /* Force table re-open for consistency with the main case. */
-          table->m_needs_reopen = true;
+          table->invalidate_dict();
         }
 
         thd->work_part_info = tab_part_info;
@@ -4500,7 +4486,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
         must be reopened.
       */
       *new_part_info = tab_part_info;
-      table->m_needs_reopen = true;
+      table->invalidate_dict();
     }
     DBUG_PRINT("info", ("*fast_alter_table flags: 0x%x", flags));
     if ((alter_info->flags & Alter_info::ALTER_ADD_PARTITION) ||
@@ -4523,13 +4509,13 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
             my_error(ER_PARTITION_WRONG_VALUES_ERROR, MYF(0), "RANGE",
                      "LESS THAN");
           } else if (thd->work_part_info->part_type == partition_type::LIST) {
-            DBUG_ASSERT(thd->work_part_info->part_type == partition_type::LIST);
+            assert(thd->work_part_info->part_type == partition_type::LIST);
             my_error(ER_PARTITION_WRONG_VALUES_ERROR, MYF(0), "LIST", "IN");
           } else if (tab_part_info->part_type == partition_type::RANGE) {
             my_error(ER_PARTITION_REQUIRES_VALUES_ERROR, MYF(0), "RANGE",
                      "LESS THAN");
           } else {
-            DBUG_ASSERT(tab_part_info->part_type == partition_type::LIST);
+            assert(tab_part_info->part_type == partition_type::LIST);
             my_error(ER_PARTITION_REQUIRES_VALUES_ERROR, MYF(0), "LIST", "IN");
           }
           goto err;
@@ -4958,7 +4944,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
       alt_part_info->part_type = tab_part_info->part_type;
       alt_part_info->subpart_type = tab_part_info->subpart_type;
       alt_part_info->num_subparts = tab_part_info->num_subparts;
-      DBUG_ASSERT(!alt_part_info->use_default_partitions);
+      assert(!alt_part_info->use_default_partitions);
       /* We specified partitions explicitly so don't use defaults anymore. */
       tab_part_info->use_default_partitions = false;
       if (alt_part_info->set_up_defaults_for_partitioning(part_handler, nullptr,
@@ -5063,7 +5049,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
         tab_part_info->num_parts = check_total_partitions;
       }
     } else {
-      DBUG_ASSERT(false);
+      assert(false);
     }
     *partition_changed = true;
     thd->work_part_info = tab_part_info;
@@ -5179,7 +5165,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
         partitioning information updated by the SE, as InnoDB is doing in
         update_create_info().
       */
-      table->m_needs_reopen = true;
+      table->invalidate_dict();
       if (alter_info->flags & Alter_info::ALTER_REMOVE_PARTITIONING) {
         DBUG_PRINT("info", ("Remove partitioning"));
         if (!(create_info->used_fields & HA_CREATE_USED_ENGINE)) {
@@ -5324,8 +5310,8 @@ void append_row_to_str(String &str, const uchar *row, TABLE *table) {
     rec = row;
 
   /* Create a new array of all read fields. */
-  fields = (Field **)my_malloc(key_memory_handler_errmsgs,
-                               sizeof(void *) * (num_fields + 1), MYF(0));
+  fields = static_cast<Field **>(my_malloc(
+      key_memory_errmsgs_handler, sizeof(void *) * (num_fields + 1), MYF(0)));
   if (!fields) return;
   fields[num_fields] = nullptr;
   for (field_ptr = table->field; *field_ptr; field_ptr++) {
@@ -5383,7 +5369,7 @@ void mem_alloc_error(size_t size) {
 
 bool make_used_partitions_str(partition_info *part_info,
                               List<const char> *parts) {
-  parts->empty();
+  parts->clear();
   partition_element *pe;
   uint partition_id = 0;
   List_iterator<partition_element> it(part_info->partitions);
@@ -5702,15 +5688,15 @@ static uint32 get_partition_id_cols_range_for_endpoint(
   loc_part_id = max_part_id;
 
   /* Given value must be LESS THAN the found partition. */
-  DBUG_ASSERT(loc_part_id == part_info->num_parts ||
-              (0 > cmp_rec_and_tuple_prune(
-                       range_col_array + loc_part_id * num_columns, nparts,
-                       is_left_endpoint, include_endpoint)));
+  assert(loc_part_id == part_info->num_parts ||
+         (0 >
+          cmp_rec_and_tuple_prune(range_col_array + loc_part_id * num_columns,
+                                  nparts, is_left_endpoint, include_endpoint)));
   /* Given value must be GREATER THAN or EQUAL to the previous partition. */
-  DBUG_ASSERT(loc_part_id == 0 ||
-              (0 <= cmp_rec_and_tuple_prune(
-                        range_col_array + (loc_part_id - 1) * num_columns,
-                        nparts, is_left_endpoint, include_endpoint)));
+  assert(loc_part_id == 0 ||
+         (0 <= cmp_rec_and_tuple_prune(
+                   range_col_array + (loc_part_id - 1) * num_columns, nparts,
+                   is_left_endpoint, include_endpoint)));
 
   if (!is_left_endpoint) {
     /* Set the end after this partition if not already after the last. */
@@ -5734,7 +5720,7 @@ static int get_part_iter_for_interval_cols_via_map(
     get_col_endpoint = get_partition_id_cols_list_for_endpoint;
     part_iter->get_next = get_next_partition_id_list;
     part_iter->part_info = part_info;
-    DBUG_ASSERT(part_info->num_list_values);
+    assert(part_info->num_list_values);
   } else {
     assert(0);
     get_col_endpoint = nullptr;
@@ -5755,7 +5741,7 @@ static int get_part_iter_for_interval_cols_via_map(
       part_iter->part_nums.end = part_info->num_parts;
     else /* LIST_PARTITION */
     {
-      DBUG_ASSERT(part_info->part_type == partition_type::LIST);
+      assert(part_info->part_type == partition_type::LIST);
       part_iter->part_nums.end = part_info->num_list_values;
     }
   } else {
@@ -5819,7 +5805,7 @@ static int get_part_iter_for_interval_via_mapping(
   bool check_zero_dates = false;
   bool zero_in_start_date = true;
   DBUG_TRACE;
-  DBUG_ASSERT(!is_subpart);
+  assert(!is_subpart);
   (void)store_length_array;
   (void)min_len;
   (void)max_len;
@@ -5937,10 +5923,10 @@ static int get_part_iter_for_interval_via_mapping(
       */
       DBUG_PRINT("info", ("zero end %u %04d-%02d-%02d", zero_in_end_date,
                           end_date.year, end_date.month, end_date.day));
-      DBUG_ASSERT(!memcmp(((Item_func *)part_info->part_expr)->func_name(),
-                          "to_days", 7) ||
-                  !memcmp(((Item_func *)part_info->part_expr)->func_name(),
-                          "to_seconds", 10));
+      assert(!memcmp(((Item_func *)part_info->part_expr)->func_name(),
+                     "to_days", 7) ||
+             !memcmp(((Item_func *)part_info->part_expr)->func_name(),
+                     "to_seconds", 10));
       if (!zero_in_end_date && start_date.month == end_date.month &&
           start_date.year == end_date.year)
         part_iter->ret_null_part = part_iter->ret_null_part_orig = false;

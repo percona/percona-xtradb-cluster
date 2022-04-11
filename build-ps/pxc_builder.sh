@@ -154,7 +154,21 @@ get_sources(){
     WSREP_REV="$(test -r WSREP-REVISION && cat WSREP-REVISION)"
     REVISION=$(git rev-parse --short HEAD)
     GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
-    source VERSION
+    if [ -z ${GALERA_REVNO} ]; then
+        pushd percona-xtradb-cluster-galera
+           GALERA_REVISION=$(git rev-parse --short HEAD)
+           echo ${GALERA_REVISION} > GALERA-REVISION
+        popd
+        GALERA_REVNO="$(test -r percona-xtradb-cluster-galera/GALERA-REVISION && cat percona-xtradb-cluster-galera/GALERA-REVISION)"
+    fi
+    if [ -f VERSION ]; then
+        source VERSION
+    elif [ -f MYSQL_VERSION ]; then
+        source MYSQL_VERSION
+    else
+        echo "VERSION file does not exist"
+       exit 1
+    fi
     export MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
     export MYSQL_RELEASE="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-//')"
 
@@ -175,22 +189,31 @@ get_sources(){
     if [ -z "${DESTINATION:-}" ]; then
     export DESTINATION=experimental
     fi
-    DESTINATION="UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${BUILD_NUMBER}/${REVISION}"
-    echo "DESTINATION=UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${BUILD_NUMBER}/${REVISION}" >> ${WORKDIR}/pxc-80.properties
+    DESTINATION="UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${REVISION}/${BUILD_NUMBER}"
+    echo "DESTINATION=UPLOAD/${DESTINATION}/BUILDS/${PRODUCT}/${PRODUCT_FULL}/${BRANCH}/${REVISION}/${BUILD_NUMBER}" >> ${WORKDIR}/pxc-80.properties
     echo "GALERA_REVNO=${GALERA_REVNO}" >>${WORKDIR}/pxc-80.properties
     DEST=${DESTINATION}
     echo "DEST=${DEST}" >> ${WORKDIR}/pxc-80.properties
     if [ -f /etc/redhat-release ]; then
       export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
       RHEL=$(rpm --eval %rhel)
-      source /opt/rh/devtoolset-8/enable
+    if [ "x${RHEL}" = "x6" ]; then
+        source /opt/rh/devtoolset-8/enable
+    fi
+    if [ "x${RHEL}" = "x7" ]; then
+        source /opt/rh/devtoolset-10/enable
+    fi
+    if [ "x${RHEL}" = "x8" ]; then
+        source /opt/rh/gcc-toolset-10/enable
+    fi
+
       if [ "x${RHEL}" = "x8" ]; then
-          cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1
+          cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1 -DWITH_ZLIB=bundled
       else
-          cmake3 . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1
+          cmake3 . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1 -DWITH_ZLIB=bundled
       fi
     else
-      cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1
+      cmake . -DDOWNLOAD_BOOST=1 -DWITH_ROCKSDB=0 -DWITH_BOOST=build-ps/boost -DFORCE_INSOURCE_BUILD=1 -DWITH_ZLIB=bundled
     fi
     make dist
     mv *.tar.gz ${WORKDIR}/
@@ -273,23 +296,41 @@ install_deps() {
     if [ "x$OS" = "xrpm" ]; then
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
+        yum update -y
+        yum install -y perl
         yum install -y https://repo.percona.com/yum/percona-release-latest.noarch.rpm
         percona-release enable tools testing
         add_percona_yum_repo
         if [ "x${RHEL}" = "x8" ]; then
-            yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++
+            yum -y install dnf-plugins-core epel-release
+            yum config-manager --set-enabled powertools
+	    yum -y install git
+            yum -y install python2-scons || true
+            yum -y install python2-pip python36-devel
+            yum -y install autoconf automake binutils bison boost-static cmake gcc gcc-c++ make
             yum -y install git gperf glibc glibc-devel jemalloc jemalloc-devel libaio-devel
             yum -y install libstdc++-devel libtirpc-devel make ncurses-devel numactl-devel
-            yum -y install openldap-devel openssl-devel pam-devel perl perl-Data-Dumper
+            yum -y install openldap-devel openssl-devel pam-devel perl-Data-Dumper
             yum -y install perl-Dig perl-Digest perl-Digest-MD5 perl-Env perl-JSON perl-Time-HiRes
-            yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel
-            wget https://rpmfind.net/linux/fedora/linux/releases/29/Everything/x86_64/os/Packages/r/rpcgen-1.4-1.fc29.x86_64.rpm
-            yum -y install rpcgen-1.4-1.fc29.x86_64.rpm
+            yum -y install readline-devel rpm-build rsync tar time unzip wget zlib-devel selinux-policy-devel
+            yum -y install bison boost-devel check-devel cmake gcc-c++ glibc-devel libaio-devel libcurl-devel
+            wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/30/Everything/x86_64/os/Packages/r/rpcgen-1.4-2.fc30.x86_64.rpm
+            wget ftp://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora/linux/releases/29/Everything/x86_64/os/Packages/g/gperf-3.1-6.fc29.x86_64.rpm
+            yum -y install rpcgen-1.4-2.fc30.x86_64.rpm gperf-3.1-6.fc29.x86_64.rpm
+
+            wget https://jenkins.percona.com/yum-repo/percona-dev.repo
+            mv -vf percona-dev.repo /etc/yum.repos.d
+            yum -y clean all
+            yum -y install python2-scons python2-pip python36-devel
+            yum -y install redhat-rpm-config python2-devel
+            /usr/bin/pip3.6 install --user typing pyyaml regex Cheetah3
+            /usr/bin/pip2.7 install --user typing pyyaml regex Cheetah
+            dnf -y module disable mysql
         else
             yum -y install epel-release
             yum -y install git numactl-devel wget rpm-build gcc-c++ gperf ncurses-devel perl readline-devel openssl-devel jemalloc zstd zstd-devel
-            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel
-            yum -y install perl-Time-HiRes libcurl-devel openldap-devel unzip wget libcurl-devel boost-static
+            yum -y install time zlib-devel libaio-devel bison cmake pam-devel libeatmydata autoconf automake jemalloc-devel make
+            yum -y install perl-Time-HiRes openldap-devel unzip wget libcurl-devel boost-static selinux-policy-devel
             yum -y install perl-Env perl-Data-Dumper perl-JSON MySQL-python perl-Digest perl-Digest-MD5 perl-Digest-Perl-MD5 || true
             until yum -y install centos-release-scl; do
                 echo "waiting"
@@ -310,22 +351,60 @@ install_deps() {
 --slave /usr/local/bin/ccmake ccmake /usr/bin/ccmake3 \
 --family cmake
         fi
+        if [ "x${RHEL}" = "x8" ]; then
+            yum -y install centos-release-stream
+            yum -y install git gcc-toolset-10-gcc gcc-toolset-10-gcc-c++ gcc-toolset-10-annobin
+            source /opt/rh/gcc-toolset-10/enable
+        fi
+        if [ "x${RHEL}" = "x7" ]; then
+            yum -y install devtoolset-10
+            source /opt/rh/devtoolset-10/enable
+        fi
+         if [ "x${RHEL}" = "x6" ]; then
+            source /opt/rh/devtoolset-8/enable
+        fi
+        if [ "x$RHEL" = "x6" ]; then
+            rm -f /usr/bin/cmake
+            cp -p /usr/bin/cmake3 /usr/bin/cmake
+            yum -y install Percona-Server-shared-56
+                  yum -y install libevent2-devel
+              else
+            yum -y install libevent-devel
+        fi
+        if [ "x$RHEL" = "x7" ]; then
+            yum -y --enablerepo=centos-sclo-rh-testing install devtoolset-10-gcc-c++ devtoolset-10-binutils devtoolset-10-valgrind devtoolset-10-valgrind-devel devtoolset-10-libatomic-devel
+            yum -y --enablerepo=centos-sclo-rh-testing install devtoolset-10-libasan-devel devtoolset-10-libubsan-devel
+            rm -f /usr/bin/cmake
+            cp -p /usr/bin/cmake3 /usr/bin/cmake
+        fi
+        if [ "x$RHEL" = "x8" ]; then
+            yum -y install centos-release-stream
+            yum -y install gcc-toolset-10-gcc-c++ gcc-toolset-10-binutils
+            yum -y install gcc-toolset-10-valgrind gcc-toolset-10-valgrind-devel gcc-toolset-10-libatomic-devel
+            yum -y install gcc-toolset-10-libasan-devel gcc-toolset-10-libubsan-devel
+            yum -y remove centos-release-stream
+        fi
         yum -y install yum-utils patchelf
+        yum -y install cyrus-sasl-devel cyrus-sasl-scram krb5-devel
     else
+        apt-get -y update
+        DEBIAN_FRONTEND=noninteractive apt-get -y install curl lsb-release wget apt-transport-https software-properties-common
         apt-get -y install dirmngr || true
         apt-get update
         apt-get -y install dirmngr || true
-        apt-get -y install lsb-release wget
         wget https://repo.percona.com/apt/percona-release_latest.$(lsb_release -sc)_all.deb && dpkg -i percona-release_latest.$(lsb_release -sc)_all.deb
         percona-release enable tools testing
+        percona-release enable pxb-80 testing
+        percona-release enable pxb-24 testing
         export DEBIAN_FRONTEND="noninteractive"
         export DIST="$(lsb_release -sc)"
-            until sudo apt-get update; do
+            until apt-get update; do
             sleep 1
             echo "waiting"
         done
         apt-get -y purge eatmydata || true
         apt-get update
+        apt-get -y install git || true
         apt-get -y install psmisc
         apt-get -y install libsasl2-modules:amd64 || apt-get -y install libsasl2-modules
         apt-get -y install dh-systemd || true
@@ -333,10 +412,15 @@ install_deps() {
         apt-get -y install lsb-release libmecab-dev libncurses5-dev libreadline-dev libpam-dev zlib1g-dev libcurl4-gnutls-dev
         apt-get -y install libldap2-dev libnuma-dev libjemalloc-dev libeatmydata libc6-dbg valgrind libjson-perl libsasl2-dev
         apt-get -y install patchelf
-        if [ x"${DIST}" = xfocal ]; then
+        apt-get -y install libsasl2-dev libsasl2-modules-gssapi-mit
+        apt-get -y install stunnel libkrb5-dev
+        if [ x"${DIST}" = xfocal -o x"${DIST}" = xbullseye ]; then
             apt-get -y install python3-mysqldb
         else
             apt-get -y install python-mysqldb
+        fi
+        if [ x"${DIST}" = xbionic ]; then
+            apt-get -y install gcc-8 g++-8
         fi
         apt-get -y install libmecab2 mecab mecab-ipadic
         apt-get -y install build-essential devscripts
@@ -344,8 +428,8 @@ install_deps() {
         apt-get -y install libtool libnuma-dev scons libboost-dev libboost-program-options-dev check
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
-        apt-get -y install --download-only percona-xtrabackup-24=2.4.20-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.13-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-24=2.4.24-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.26-18-1.${DIST}
     fi
     return;
 }
@@ -551,12 +635,30 @@ build_rpm(){
     mkdir -vp rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
     #
     mv *.src.rpm rpmbuild/SRPMS
-    source /opt/rh/devtoolset-8/enable
+    if [ "x${RHEL}" = "x6" ]; then
+        source /opt/rh/devtoolset-8/enable
+    fi
+    if [ "x${RHEL}" = "x7" ]; then
+        source /opt/rh/devtoolset-10/enable
+    fi
+    if [ "x${RHEL}" = "x8" ]; then
+        source /opt/rh/gcc-toolset-10/enable
+    fi
+
     build_mecab_lib
     build_mecab_dict
 
     cd ${WORKDIR}  || exit
-    source /opt/rh/devtoolset-8/enable
+    if [ "x${RHEL}" = "x6" ]; then
+        source /opt/rh/devtoolset-8/enable
+    fi
+    if [ "x${RHEL}" = "x7" ]; then
+        source /opt/rh/devtoolset-10/enable
+    fi
+    if [ "x${RHEL}" = "x8" ]; then
+        source /opt/rh/gcc-toolset-10/enable
+    fi
+
     source ${WORKDIR}/pxc-80.properties
     source ${CURDIR}/srpm/pxc-80.properties
     #
@@ -619,6 +721,7 @@ build_source_deb(){
     sed -i "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" debian/rules
     sed -i "s:@@DEB_RELEASE@@:${DEB_RELEASE}:g" debian/rules
 
+    sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
 
     dch -D UNRELEASED --force-distribution -v "$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE" "Update to new upstream release Percona XtraDB Cluster ${VERSION}-rel${RELEASE}"
     dpkg-buildpackage -S
@@ -700,7 +803,7 @@ build_deb(){
         rm -rf usr *.deb DEBIAN
     cd ../ || exit
 
-    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xbionic" || "x$DEBIAN_VERSION" == "xstretch" || "x$DEBIAN_VERSION" == "xfocal" || "x$DEBIAN_VERSION" == "xbullseye" ]]; then
         sed -i 's/fabi-version=2/fabi-version=2 -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=literal-suffix -Wno-misleading-indentation/' cmake/build_configurations/compiler_options.cmake
         sed -i 's/gnu++11/gnu++11 -Wno-virtual-move-assign/' cmake/build_configurations/compiler_options.cmake
     fi
@@ -710,11 +813,11 @@ build_deb(){
     export MYSQL_BUILD_CFLAGS="$CFLAGS"
     export MYSQL_BUILD_CXXFLAGS="$CXXFLAGS"
 
-    if [[ "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xfocal" ]]; then
+    if [[ "x$DEBIAN_VERSION" == "xfocal" || "x${DEBIAN_VERSION}" == "xbionic" || "x${DEBIAN_VERSION}" == "xbuster" || "x$DEBIAN_VERSION" == "xbullseye" ]]; then
         sed -i "s:iproute:iproute2:g" debian/control
     fi
     sed -i "s:libcurl4-gnutls-dev:libcurl4-openssl-dev:g" debian/control
-    sudo chmod 777 debian/rules
+    chmod 777 debian/rules
     dch -b -m -D "$DEBIAN_VERSION" --force-distribution -v "1:$MYSQL_VERSION-$MYSQL_RELEASE-$DEB_RELEASE.${DEBIAN_VERSION}" 'Update distribution'
     #
     GALERA_REVNO="${GALERA_REVNO}" SCONS_ARGS=' strict_build_flags=0'  MAKE_JFLAG=-j4  dpkg-buildpackage -rfakeroot -uc -us -b
@@ -749,7 +852,16 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
         export OS_RELEASE="centos$(lsb_release -sr | awk -F'.' '{print $1}')"
         RHEL=$(rpm --eval %rhel)
+    if [ "x${RHEL}" = "x6" ]; then
         source /opt/rh/devtoolset-8/enable
+    fi
+    if [ "x${RHEL}" = "x7" ]; then
+        source /opt/rh/devtoolset-10/enable
+    fi
+    if [ "x${RHEL}" = "x8" ]; then
+        source /opt/rh/gcc-toolset-10/enable
+    fi
+
     fi
     #
 
@@ -780,7 +892,7 @@ build_tarball(){
     if [ -f /etc/redhat-release ]; then
         mkdir pxb-2.4
         pushd pxb-2.4
-        yumdownloader percona-xtrabackup-24-2.4.20
+        yumdownloader percona-xtrabackup-24-2.4.24
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib* ./
@@ -793,7 +905,7 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.13
+        yumdownloader percona-xtrabackup-80-8.0.26
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
@@ -805,7 +917,6 @@ build_tarball(){
         popd
         tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        rm -rf pxb-8.0 pxb-2.4
     else
         mkdir pxb-2.4
         mkdir pxb-8.0
@@ -822,11 +933,11 @@ build_tarball(){
         cd ../ || exit
         tar -zcvf  percona-xtrabackup-2.4.tar.gz pxb-2.4
         tar -zcvf  percona-xtrabackup-8.0.tar.gz pxb-8.0
-        rm -rf pxb-8.0 pxb-2.4
     fi
     mkdir -p ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target/pxc_extra/
     cp *.tar.gz ${BUILD_ROOT}/target
+    rm -rf pxb-8.0 pxb-2.4
     cd ${CURDIR} || exit
     rm -rf jemalloc
     wget https://github.com/jemalloc/jemalloc/releases/download/$JVERSION/jemalloc-$JVERSION.tar.bz2
@@ -842,10 +953,18 @@ build_tarball(){
     else
         bash -x ./build-ps/build-binary.sh --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT
     fi
-    mkdir -p ${WORKDIR}/tarball
-    mkdir -p ${CURDIR}/tarball
-    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/tarball
-    cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/tarball
+
+    DIRNAME="tarball"
+    if [[ ${DEBUG} == 1 ]]; then
+        DIRNAME="debug"
+    fi
+    mkdir -p ${WORKDIR}/../${DIRNAME}
+    mkdir -p ${WORKDIR}/${DIRNAME}
+    mkdir -p ${CURDIR}/${DIRNAME}
+    rm -f $BUILD_NUMBER/percona-xtrabackup* || true
+    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/../${DIRNAME}
+    cp  $BUILD_NUMBER/*.tar.gz ${WORKDIR}/${DIRNAME}
+    cp  $BUILD_NUMBER/*.tar.gz ${CURDIR}/${DIRNAME}
 
 }
 
@@ -891,3 +1010,4 @@ build_srpm
 build_source_deb
 build_rpm
 build_deb
+

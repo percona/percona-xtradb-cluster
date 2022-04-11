@@ -4,11 +4,9 @@
 Percona XtraDB Cluster |version| Documentation
 ==============================================
 
-|PXC|_ is a database clustering solution for MySQL.  It ensures high
-availability, prevents downtime and data loss, and provides linear scalability
-for a growing environment.
+`Percona XtraDB Cluster <https://www.percona.com/software/mysql-database/percona-xtradb-cluster>`__ is a database clustering solution for MySQL. It ensures high availability, prevents downtime and data loss, and provides linear scalability for a growing environment.
 
-.. rubric:: Features of |PXC|
+.. rubric:: Features of Percona XtraDB Cluster
 
 .. list-table::
    :header-rows: 1
@@ -29,31 +27,31 @@ for a growing environment.
    * - PXC Strict Mode
      - Avoids the use of tech preview features and unsupported features
    * - Configuration script for ProxySQL
-     - |PXC| includes the ``proxysql-admin`` tool that automatically configures
-       |PXC| nodes using ProxySQL.
+     - Percona XtraDB Cluster includes the ``proxysql-admin`` tool that automatically configures
+       Percona XtraDB Cluster nodes using ProxySQL.
    * - Automatic configuration of SSL encryption
-     - |PXC| includes the ``pxc-encrypt-cluster-traffic`` variable
+     - Percona XtraDB Cluster includes the ``pxc-encrypt-cluster-traffic`` variable
        that enables automatic configuration of SSL encryption
    * - Optimized Performance
-     - |PXC| performance is optimized to scale with a growing production
+     - Percona XtraDB Cluster performance is optimized to scale with a growing production
        workload
 
 
-|PXC| |version| is fully compatible with |MySQL| Server Community Edition
+Percona XtraDB Cluster |version| is fully compatible with MySQL Server Community Edition
 |version| and |ps-last|.
 
 .. seealso::
 
-   Overview of changes in the most recent |pxc| release
+   Overview of changes in the most recent PXC release
       :ref:`upgrade-guide-changed`
 
-   |MySQL| Community Edition
+   MySQL Community Edition
       https://www.mysql.com/products/community/
    |percona-server|
       https://www.percona.com/doc/percona-server/LATEST/index.html
    How We Made Percona XtraDB Cluster Scale
        https://www.percona.com/blog/2017/04/19/how-we-made-percona-xtradb-cluster-scale
-      
+
 Data compatibility
    You can use data created by any MySQL variant.
 Application compatibility
@@ -90,8 +88,10 @@ Features
    :maxdepth: 1
 
    features/highavailability
-   features/multisource-replication
+   features/multi-source-replication
    features/pxc-strict-mode
+   features/online-schema-upgrade
+   features/nbo
 
 PXC Security
 ============
@@ -102,6 +102,8 @@ PXC Security
    security/index
    security/secure-network
    security/encrypt-traffic
+   security/apparmor
+   security/selinux
 
 User\'s Manual
 ================================================================================
@@ -138,13 +140,22 @@ How-tos
    howtos/proxysql-v2
    howtos/virt_sandbox
 
+Release notes
+===================
+
+.. toctree::
+   :maxdepth: 1
+   :glob:
+
+   release-notes/release-notes_index
+
+
 Reference
 =========
 
 .. toctree::
    :maxdepth: 1
 
-   release-notes/release-notes_index
    wsrep-status-index
    wsrep-system-index
    wsrep-provider-index

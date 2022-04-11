@@ -42,7 +42,7 @@ if(WITH_PXB_DEV)
   #Note: requires a different boost version than pxc8.0
   ExternalProject_Add(pxb24
     GIT_REPOSITORY https://github.com/percona/percona-xtrabackup.git
-    GIT_TAG percona-xtrabackup-2.4.20
+    GIT_TAG percona-xtrabackup-2.4.24
     GIT_SHALLOW 1
     UPDATE_COMMAND ""
     INSTALL_DIR "${CMAKE_BINARY_DIR}/scripts/pxc_extra/pxb-2.4/"
@@ -52,13 +52,15 @@ if(WITH_PXB_DEV)
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
     -DMYSQL_MAINTAINER_MODE=OFF
+    -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}
+    -DOPENSSL_LIBRARIES=${OPENSSL_LIBRARIES}
     )
   INSTALL(DIRECTORY "${CMAKE_BINARY_DIR}/scripts/pxc_extra/pxb-2.4/"
     DESTINATION "bin/pxc_extra/pxb-2.4" USE_SOURCE_PERMISSIONS)
 
   ExternalProject_Add(pxb80
     GIT_REPOSITORY https://github.com/percona/percona-xtrabackup.git
-    GIT_TAG percona-xtrabackup-8.0.14
+    GIT_TAG percona-xtrabackup-8.0.26-18
     GIT_SHALLOW 1
     UPDATE_COMMAND ""
     INSTALL_DIR "${CMAKE_BINARY_DIR}/scripts/pxc_extra/pxb-8.0/"
@@ -67,6 +69,8 @@ if(WITH_PXB_DEV)
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
     -DMYSQL_MAINTAINER_MODE=OFF
+    -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}
+    -DOPENSSL_LIBRARIES=${OPENSSL_LIBRARIES}
     )
   INSTALL(DIRECTORY "${CMAKE_BINARY_DIR}/scripts/pxc_extra/pxb-8.0/"
     DESTINATION "bin/pxc_extra/pxb-8.0" USE_SOURCE_PERMISSIONS)

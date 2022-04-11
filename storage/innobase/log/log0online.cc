@@ -50,7 +50,7 @@ associated with it.
 @param[in] type the minilog record type
 @return true if the record has (space; page) in it */
 static constexpr bool log_online_rec_has_page(mlog_id_t type) noexcept {
-  static_assert(MLOG_BIGGEST_TYPE == 65,
+  static_assert(MLOG_BIGGEST_TYPE == 66,
                 "New MTR types must be reviewed for page presence");
   return type != MLOG_MULTI_REC_END && type != MLOG_DUMMY_RECORD &&
          type != MLOG_COMP_PAGE_CREATE_SDI && type != MLOG_PAGE_CREATE_SDI &&
@@ -599,8 +599,8 @@ static void log_online_set_page_bit(space_id_t space, page_no_t page_no) {
 /** Calculate a bitmap block checksum.  Algorithm borrowed from
 log_block_calc_checksum.
 @return checksum */
-UNIV_INLINE
-ulint log_online_calc_checksum(const byte *block) /*!<in: bitmap block */
+static inline ulint log_online_calc_checksum(
+    const byte *block) /*!<in: bitmap block */
     noexcept {
   ulint sum = 1;
   ulint sh = 0;

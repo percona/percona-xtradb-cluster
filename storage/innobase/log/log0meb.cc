@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2018, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2.0,
@@ -59,8 +59,14 @@ namespace meb {
 const std::string logmsgpfx("innodb_redo_log_archive: ");
 constexpr size_t QUEUE_BLOCK_SIZE = 4096;
 constexpr size_t QUEUE_SIZE_MAX = 16384;
+
+#ifdef UNIV_PFS_THREAD
 mysql_pfs_key_t redo_log_archive_consumer_thread_key;
+#endif /* UNIV_PFS_THREAD */
+
+#ifdef UNIV_PFS_IO
 mysql_pfs_key_t redo_log_archive_file_key;
+#endif /* UNIV_PFS_IO */
 
 /** Encapsulates a log block of size QUEUE_BLOCK_SIZE, enqueued by the
     producer, dequeued by the consumer and written into the redo log
@@ -236,7 +242,7 @@ class Queue {
       if (m_waiting_for_dequeue) os_event_set(m_dequeue_event);
       if (m_waiting_for_enqueue) os_event_set(m_enqueue_event);
       mutex_exit(&m_mutex);
-      os_thread_yield();
+      std::this_thread::yield();
       mutex_enter(&m_mutex);
       /* purecov: end */
     }
@@ -474,6 +480,35 @@ static void redo_log_archive_consumer();
 static bool terminate_consumer(bool rapid);
 static void unregister_udfs();
 static bool register_udfs();
+
+/* Function to check conditions. */
+static bool consumer_is_running() { return redo_log_archive_consume_running; }
+static bool consumer_not_running() { return !redo_log_archive_consume_running; }
+static bool consumer_not_flushed() { return !redo_log_archive_consume_flushed; }
+
+/**
+  Timeout function. Checks one of the conditions above.
+  @param[in]    wait_condition  function to return true for continued waiting
+  @return       whether the wait timed out
+  @note This function must be called under the redo_log_archive_admin_mutex!
+*/
+static bool timeout(bool (*wait_condition)()) {
+  float seconds_to_wait{600.0f};
+  DBUG_EXECUTE_IF(
+      "innodb_redo_log_archive_start_timeout",
+      if (wait_condition == &consumer_not_running) seconds_to_wait = 0.125f;);
+  while ((*wait_condition)() && (seconds_to_wait > 0.0f) &&
+         (redo_log_archive_consume_event != nullptr)) {
+    os_event_t consume_event = redo_log_archive_consume_event;
+    mutex_exit(&redo_log_archive_admin_mutex);
+    // Use 0.125 seconds as it can be accurately represented by "float".
+    os_event_wait_time(consume_event, 125000);  // 0.125 second
+    seconds_to_wait -= 0.125f;
+    os_event_reset(consume_event);
+    mutex_enter(&redo_log_archive_admin_mutex);
+  }
+  return (seconds_to_wait <= 0.0f);
+}
 
 bool register_privilege(const char *priv_name) {
   ut_ad(priv_name != nullptr);
@@ -1117,17 +1152,7 @@ static bool terminate_consumer(bool rapid) {
     redo_log_archive_consume_event is set after the final block
     is written into the redo log archive file.
   */
-  float seconds_to_wait = 600.0;
-  while (redo_log_archive_consume_running && (seconds_to_wait > 0.0) &&
-         (redo_log_archive_consume_event != nullptr)) {
-    os_event_t consume_event = redo_log_archive_consume_event;
-    mutex_exit(&redo_log_archive_admin_mutex);
-    os_event_wait_time(consume_event, 100000);  // 0.1 second
-    seconds_to_wait -= 0.1f;
-    os_event_reset(consume_event);
-    mutex_enter(&redo_log_archive_admin_mutex);
-  }
-  if (seconds_to_wait < 0.0) {
+  if (timeout(&consumer_is_running)) {
     /* This would require yet another tricky error injection. */
     /* purecov: begin inspected */
     if (!redo_log_archive_recorded_error.empty()) {
@@ -1291,20 +1316,8 @@ static bool redo_log_archive_start(THD *thd, const char *label,
     Wait for the consumer to start. We do not want to report success
     before the consumer thread has started to work.
   */
-  float seconds_to_wait = 600.0f;
-  DBUG_EXECUTE_IF("innodb_redo_log_archive_start_timeout",
-                  seconds_to_wait = -1.0;);
   mutex_enter(&redo_log_archive_admin_mutex);
-  while (!redo_log_archive_consume_running && (seconds_to_wait > 0.0) &&
-         (redo_log_archive_consume_event != nullptr)) {
-    os_event_t consume_event = redo_log_archive_consume_event;
-    mutex_exit(&redo_log_archive_admin_mutex);
-    os_event_wait_time(consume_event, 100000);  // 0.1 second
-    seconds_to_wait -= 0.1f;
-    os_event_reset(consume_event);
-    mutex_enter(&redo_log_archive_admin_mutex);
-  }
-  if (seconds_to_wait < 0.0f) {
+  if (timeout(&consumer_not_running)) {
     os_event_destroy(redo_log_archive_consume_event);
     redo_log_archive_consume_event = nullptr;
     redo_log_archive_consume_complete = true;
@@ -1321,8 +1334,10 @@ static bool redo_log_archive_start(THD *thd, const char *label,
     redo_log_archive_session = nullptr;
     redo_log_archive_active = false;
     redo_log_archive_queue.deinit();
-    my_error(ER_INNODB_REDO_LOG_ARCHIVE_START_TIMEOUT, MYF(0));
     mutex_exit(&redo_log_archive_admin_mutex);
+    /* Don't leave this with a stray thread. */
+    srv_threads.m_backup_log_archiver.join();
+    my_error(ER_INNODB_REDO_LOG_ARCHIVE_START_TIMEOUT, MYF(0));
     return true;
   }
   mutex_exit(&redo_log_archive_admin_mutex);
@@ -1533,18 +1548,8 @@ static bool redo_log_archive_flush(THD *thd) {
     redo_log_archive_consume_event is set after the flush block
     is written into the redo log archive file.
   */
-  float seconds_to_wait = 600.0;
   mutex_enter(&redo_log_archive_admin_mutex);
-  while (!redo_log_archive_consume_flushed && (seconds_to_wait > 0.0) &&
-         (redo_log_archive_consume_event != nullptr)) {
-    os_event_t consume_event = redo_log_archive_consume_event;
-    mutex_exit(&redo_log_archive_admin_mutex);
-    os_event_wait_time(consume_event, 100000);  // 0.1 second
-    seconds_to_wait -= 0.1f;
-    os_event_reset(consume_event);
-    mutex_enter(&redo_log_archive_admin_mutex);
-  }
-  if (seconds_to_wait < 0.0) {
+  if (timeout(&consumer_not_flushed)) {
     /* This would require yet another tricky error injection. */
     /* purecov: begin inspected */
     if (!redo_log_archive_recorded_error.empty()) {
@@ -1662,6 +1667,29 @@ bool redo_log_archive_is_active() {
   return result;
 }
 
+/* This requires disk full testing */
+/* purecov: begin inspected */
+/**
+  Handle a write error. Record an error message. Stop redo log archiving.
+  @param[in]    file_offset     write offset
+*/
+static void handle_write_error(uint64_t file_offset) {
+  int os_errno = errno;
+  char errbuf[MYSYS_STRERROR_SIZE];
+  my_strerror(errbuf, sizeof(errbuf), os_errno);
+  std::stringstream recorded_error_ss;
+  recorded_error_ss << "Cannot write to file '"
+                    << redo_log_archive_file_pathname << "' at offset "
+                    << file_offset << " (OS errno: " << os_errno << " - "
+                    << errbuf << ")";
+  if (!redo_log_archive_recorded_error.empty()) {
+    redo_log_archive_recorded_error.append("; ");
+  }
+  redo_log_archive_recorded_error.append(recorded_error_ss.str());
+  redo_log_archive_consume_complete = true;
+}
+/* purecov: end */
+
 /**
   Dequeue blocks of size QUEUE_BLOCK_SIZE, enqueued by the producer.
   Write the blocks to the redo log archive file sequentially.
@@ -1670,6 +1698,20 @@ static void redo_log_archive_consumer() {
   DBUG_TRACE;
   /* Synchronize with with other threads while using global objects. */
   mutex_enter(&redo_log_archive_admin_mutex);
+
+  /*
+    On error injection ensure, that the starting session has executed
+    its timeout handling before the consumer sets its running state. But
+    do not hang infinitely.
+  */
+  DBUG_EXECUTE_IF(
+      "innodb_redo_log_archive_start_timeout",
+      for (int count = 600; (count > 0) && !redo_log_archive_consume_complete;
+           count--) {
+        mutex_exit(&redo_log_archive_admin_mutex);
+        my_sleep(100000);  // 0.1s
+        mutex_enter(&redo_log_archive_admin_mutex);
+      });
 
   if (redo_log_archive_consume_running) {
     /* Another consumer thread is still running. */
@@ -1691,8 +1733,6 @@ static void redo_log_archive_consumer() {
     return;
     /* purecov: end */
   }
-  DBUG_EXECUTE_IF("innodb_redo_log_archive_start_timeout",
-                  my_sleep(9000000););  // 9s
 
   /*
     A Guardian sets the 'running' status to true. When leaving the
@@ -1735,15 +1775,73 @@ static void redo_log_archive_consumer() {
     Guardian producer_guardian(&redo_log_archive_produce_blocks, nullptr,
                                &log_sys->writer_mutex);
 
+    /* Prepare an I/O request with potential encryption. */
+    IORequest request(IORequest::LOG | IORequest::WRITE);
+    if (srv_redo_log_encrypt) {
+      /* The page number does not matter much, but it should not be zero. */
+      page_id_t page_id{dict_sys_t::s_log_space_first_id, 128};
+      fil_space_t *space = fil_space_t::s_redo_space;
+      if (space == nullptr) {
+        /*
+          Sometimes fil_space_t::s_redo_space is NULL even though
+          fil_space_get() finds it in the spaces container.
+        */
+        space = fil_space_get(page_id.space());
+      }
+      if (space == nullptr) {
+        /* purecov: begin inspected */
+        std::stringstream recorded_error_ss;
+        recorded_error_ss
+            << "Cannot encrypt archive log: cannot find log space.";
+        if (!redo_log_archive_recorded_error.empty()) {
+          redo_log_archive_recorded_error.append("; ");
+        }
+        redo_log_archive_recorded_error.append(recorded_error_ss.str());
+        LogErr(ERROR_LEVEL, ER_INNODB_ERROR_LOGGER_MSG,
+               (logmsgpfx + recorded_error_ss.str()).c_str());
+        /* Setting this flag prevents from entering the below loop. */
+        redo_log_archive_consume_complete = true;
+        /* purecov: end */
+      } else {
+        fil_io_set_encryption(request, page_id, space);
+      }
+      // Ensure, that the block written has a minimum size.
+      // The encryption is skipped for offsets smaller than
+      // `LOG_FILE_HDR_SIZE` (not only for offsets==0).
+      ut_ad(QUEUE_BLOCK_SIZE >= LOG_FILE_HDR_SIZE);
+    }
+
     /*
       Offset inside the redo log archive file. The offset is incremented
       each time the consumer writes to the redo log archive file.
     */
     uint64_t file_offset{0};
-    IORequest request(IORequest::WRITE);
     Block temp_block;
 
     mutex_enter(&redo_log_archive_admin_mutex);
+    /*
+      Write a log header (dummy) to file_offset zero.
+      Writes to offset zero are not encrypted by os_file_write().
+    */
+    if (redo_log_archive_file_handle.m_file != OS_FILE_CLOSED) {
+      dberr_t err = os_file_write(
+          request, redo_log_archive_file_pathname.c_str(),
+          redo_log_archive_file_handle, temp_block.get_queue_block(),
+          file_offset, QUEUE_BLOCK_SIZE);
+      if (err != DB_SUCCESS) {
+        /* This requires disk full testing */
+        /* purecov: begin inspected */
+        handle_write_error(file_offset);
+        /*
+          handle_write_error() sets redo_log_archive_consume_complete,
+          so that the below loop won't be entered.
+        */
+        /* purecov: end */
+      } else {
+        file_offset += QUEUE_BLOCK_SIZE;
+      }
+    }
+
     while (!redo_log_archive_consume_complete) {
       /* Dequeue a log block from the queue outside of the mutex. */
       mutex_exit(&redo_log_archive_admin_mutex);
@@ -1776,19 +1874,7 @@ static void redo_log_archive_consumer() {
         if (err != DB_SUCCESS) {
           /* This requires disk full testing */
           /* purecov: begin inspected */
-          int os_errno = errno;
-          char errbuf[MYSYS_STRERROR_SIZE];
-          my_strerror(errbuf, sizeof(errbuf), os_errno);
-          std::stringstream recorded_error_ss;
-          recorded_error_ss << "Cannot write to file '"
-                            << redo_log_archive_file_pathname << "' at offset "
-                            << file_offset << " (OS errno: " << os_errno
-                            << " - " << errbuf << ")";
-          if (!redo_log_archive_recorded_error.empty()) {
-            redo_log_archive_recorded_error.append("; ");
-          }
-          redo_log_archive_recorded_error.append(recorded_error_ss.str());
-          redo_log_archive_consume_complete = true;
+          handle_write_error(file_offset);
           break;
           /* purecov: end */
         }

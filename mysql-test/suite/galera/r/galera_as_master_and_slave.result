@@ -1,10 +1,12 @@
 #node-2 (galera-cluster-node acting as slave to an independent master)
 START SLAVE USER='root';
 Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #node-4 (independent slave replicating from galera-node-2)
 START SLAVE USER='root';
 Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #node-1 (independent master)
 use test;
@@ -48,13 +50,22 @@ i	c
 select @@slave_parallel_workers;
 @@slave_parallel_workers
 0
+Warnings:
+Warning	1287	'@@slave_parallel_workers' is deprecated and will be removed in a future release. Please use replica_parallel_workers instead.
 set global slave_parallel_workers=2;
+Warnings:
+Warning	1287	'@@slave_parallel_workers' is deprecated and will be removed in a future release. Please use replica_parallel_workers instead.
 select @@slave_parallel_workers;
 @@slave_parallel_workers
 2
+Warnings:
+Warning	1287	'@@slave_parallel_workers' is deprecated and will be removed in a future release. Please use replica_parallel_workers instead.
 STOP SLAVE;
+Warnings:
+Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
 START SLAVE USER='root';
 Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #node-1 (independent master)
 use test;
@@ -114,13 +125,22 @@ left(@@global.gtid_executed, 36) = '<master_id>'
 select @@slave_parallel_workers;
 @@slave_parallel_workers
 2
+Warnings:
+Warning	1287	'@@slave_parallel_workers' is deprecated and will be removed in a future release. Please use replica_parallel_workers instead.
 set global slave_parallel_workers=0;
+Warnings:
+Warning	1287	'@@slave_parallel_workers' is deprecated and will be removed in a future release. Please use replica_parallel_workers instead.
 select @@slave_parallel_workers;
 @@slave_parallel_workers
 0
+Warnings:
+Warning	1287	'@@slave_parallel_workers' is deprecated and will be removed in a future release. Please use replica_parallel_workers instead.
 STOP SLAVE;
+Warnings:
+Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
 START SLAVE USER='root';
 Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #node-2 (galera-cluster-node acting as slave to an independent master)
 delete from t where i = 2;
@@ -230,14 +250,22 @@ VALID_POS
 DROP TABLE t;
 #node-2 (galera-cluster-node acting as slave to an independent master)
 STOP SLAVE;
+Warnings:
+Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
 RESET SLAVE ALL;
+Warnings:
+Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 #node-1 (independent master)
 set session wsrep_on=off;
 RESET MASTER;
 set session wsrep_on=on;
 #node-4 (independent slave replicating from galera-node-2)
 STOP SLAVE;
+Warnings:
+Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
 RESET SLAVE ALL;
+Warnings:
+Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 #node-3 (galera-cluster-node-2 that act as master to independent slave)
 set session wsrep_on=off;
 RESET MASTER;

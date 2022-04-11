@@ -1,0 +1,66 @@
+--echo #
+--echo # PXC-3777 : Server crashes due to a deadlock detection of mutexes
+--echo #
+
+--source include/galera_cluster.inc
+--source include/wait_wsrep_ready.inc
+--source include/count_sessions.inc
+
+--connection node_1
+CREATE TABLE t1(a INT PRIMARY KEY, b VARCHAR(10));
+INSERT INTO t1 VALUES (1, 'hi');
+
+--connect node_1a, 127.0.0.1, root,,, $NODE_MYPORT_1
+--connection node_1a
+--echo # connection node_1a
+--echo # Lock the record in this session node_1a
+BEGIN;
+SELECT * FROM t1 WHERE a = 1 FOR UPDATE;
+
+--connect node_1b, 127.0.0.1, root,,, $NODE_MYPORT_1
+--connection node_1b
+--echo # connection node_1b
+--echo # This update will be waiting for lock that is
+--echo # acquired by node_1a. When TRUNCATE TABLE DDL
+--echo # arrives, this node_1b or node_1c connection
+--echo # will be victim that is waiting for lock
+SET SESSION innodb_lock_wait_timeout=100;
+--send UPDATE t1 SET b = 'hello' WHERE a = 1
+
+--connect node_1c, 127.0.0.1, root,,, $NODE_MYPORT_1
+--connection node_1c
+--echo # connection node_1c
+--echo # This update will be waiting for lock that is
+--echo # acquired by node_1a. When TRUNCATE TABLE DDL
+--echo # arrives, this node_1b or node_1c connection
+--echo # will be victim that is waiting for lock
+SET SESSION innodb_lock_wait_timeout=100;
+--send UPDATE t1 SET b = 'hello' WHERE a = 1
+
+--echo # connection node_1
+--connection node_1
+--echo # DDL in TOI will try to kill all conflicting trxs
+--echo # i.e all trxs that acquired conflicting MDLs
+--echo # on table t1 (taken by node_1a,1b,1c)
+--echo # 1b and 1c are victims that are in waiting state
+TRUNCATE TABLE t1;
+
+--connection node_1a
+--error ER_LOCK_DEADLOCK
+COMMIT;
+
+--connection node_1b
+--reap
+COMMIT;
+
+--connection node_1c
+--reap
+COMMIT;
+
+--connection node_1
+SELECT * FROM t1;
+DROP TABLE t1;
+--disconnect node_1a
+--disconnect node_1b
+--disconnect node_1c
+--source include/wait_until_count_sessions.inc

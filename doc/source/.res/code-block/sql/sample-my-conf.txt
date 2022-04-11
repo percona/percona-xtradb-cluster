@@ -1,5 +1,5 @@
 
-.. code-block:: guess
+.. code-block:: text
 
    # Template my.cnf for PXC
    # Edit to your requirements.

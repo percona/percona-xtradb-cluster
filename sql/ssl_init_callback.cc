@@ -1,4 +1,4 @@
-/* Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -253,7 +253,7 @@ static bool warn_self_signed_ca_certs(const char *ssl_ca,
   };
 
   if (ssl_ca && ssl_ca[0]) {
-    if (warn_one(ssl_ca)) return 1;
+    if (warn_one(ssl_ca)) return true;
   }
   if (ssl_capath && ssl_capath[0]) {
     /* We have ssl-capath. So search all files in the dir */
@@ -263,7 +263,7 @@ static bool warn_self_signed_ca_certs(const char *ssl_ca,
     char dir_separator[FN_REFLEN];
     size_t dir_path_length;
 
-    init_dynamic_string(&file_path, ssl_capath, FN_REFLEN, FN_REFLEN);
+    init_dynamic_string(&file_path, ssl_capath, FN_REFLEN);
     dir_separator[0] = FN_LIBCHAR;
     dir_separator[1] = 0;
     dynstr_append(&file_path, dir_separator);

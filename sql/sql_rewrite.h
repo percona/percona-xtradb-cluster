@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -48,7 +48,7 @@ enum class Consumer_type {
 */
 class Rewrite_params {
  protected:
-  virtual ~Rewrite_params() {}
+  virtual ~Rewrite_params() = default;
 };
 
 /**
@@ -162,7 +162,7 @@ class Rewriter_user : public I_rewriter {
     Rewrites some of the user specific properties which are common to
     concrete classes.
   */
-  virtual bool rewrite(String &rlb) const;
+  bool rewrite(String &rlb) const override;
   /*
     Abstract method to be implemented by the concrete classes.
     The implementation methos should add the user authID, plugin info and
@@ -242,7 +242,7 @@ class Rewriter_show_create_user final : public Rewriter_user {
 
  protected:
   /* Append the password hash to the output string */
-  virtual void append_auth_str(LEX_USER *lex, String *str) const override;
+  void append_auth_str(LEX_USER *lex, String *str) const override;
 
  private:
   void append_user_auth_info(LEX_USER *user, bool comma,
@@ -284,17 +284,17 @@ class Rewriter_grant final : public I_rewriter {
   Grant_params *grant_params = nullptr;
 };
 
-/** Rewrites the CHANGE MASTER statement. */
-class Rewriter_change_master final : public I_rewriter {
+/** Rewrites the CHANGE REPLICATION SOURCE statement. */
+class Rewriter_change_replication_source final : public I_rewriter {
  public:
-  Rewriter_change_master(THD *thd, Consumer_type);
+  Rewriter_change_replication_source(THD *thd, Consumer_type);
   bool rewrite(String &rlb) const override;
 };
 
-/** Rewrites the START SLAVE statement. */
-class Rewriter_slave_start final : public I_rewriter {
+/** Rewrites the START REPLICA statement. */
+class Rewriter_replica_start final : public I_rewriter {
  public:
-  Rewriter_slave_start(THD *thd, Consumer_type type);
+  Rewriter_replica_start(THD *thd, Consumer_type type);
   bool rewrite(String &rlb) const override;
 };
 /** Base class for SERVER OPTIONS related statement */

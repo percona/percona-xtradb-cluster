@@ -24,9 +24,15 @@ INSERT INTO data_examples (type_name,value_sql) VALUES
   ('BIGINT', '2000000000000000000'),
   ('BIGINT', '-2000000000000000000'),
   ('FLOAT', '-1.23456'),
+  ('FLOAT', '-1e38'),
+  ('FLOAT', '1e38'),
   ('DOUBLE', '-1.23456789012345'),
   ('DOUBLE', '1.23456789012345'),
+  ('DOUBLE', '-1e300'),
+  ('DOUBLE', '1e300'),
   ('DECIMAL(4,2)', '-10.99'),
+  ('DECIMAL(34,4)', '20000000000000000000000000000.0001'),
+  ('DECIMAL(34,4)', '-20000000000000000000000000000.0001'),
   ('BIT(64)', '0xDEADBEEFC0FEBABE'),
   ('BIT(4)', '0b1000'),
   ('YEAR', '2020'),
@@ -59,7 +65,8 @@ CREATE TABLE data_types (
   id INT PRIMARY KEY AUTO_INCREMENT,
   name TEXT
 );
-INSERT INTO data_types (name) SELECT DISTINCT(type_name) FROM data_examples;
+INSERT INTO data_types (name)
+  SELECT type_name FROM data_examples GROUP BY type_name ORDER BY MIN(id);
 
 --let $types_cnt = `SELECT COUNT(1) FROM data_types`
 --let $examples_cnt = `SELECT COUNT(1) FROM data_examples`

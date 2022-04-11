@@ -1,5 +1,7 @@
 DROP TABLE IF EXISTS t1, t2;
 FLUSH HOSTS;
+Warnings:
+Warning	1287	'FLUSH HOSTS' is deprecated and will be removed in a future release. Please use TRUNCATE TABLE performance_schema.host_cache instead
 SET SESSION wsrep_replicate_myisam = TRUE;
 CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
 FLUSH PRIVILEGES;

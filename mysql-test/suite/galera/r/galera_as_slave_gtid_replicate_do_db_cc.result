@@ -7,6 +7,7 @@ RESET MASTER;
 SET SESSION wsrep_on=ON;
 START SLAVE USER='root';
 Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 CREATE SCHEMA test1;
 CREATE SCHEMA test2;
@@ -46,6 +47,8 @@ SET SESSION wsrep_on=ON;
 INSERT INTO test1.t1 (f1) VALUES (6);
 INSERT INTO test2.t1 (f1) VALUES (6);
 START SLAVE;
+Warnings:
+Warning	1287	'START SLAVE' is deprecated and will be removed in a future release. Please use START REPLICA instead
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	125	Previous_gtids	2	156	
@@ -289,7 +292,11 @@ mysqld-bin.000001	7394	Query	1	7461	COMMIT
 DROP SCHEMA test1;
 DROP SCHEMA test2;
 STOP SLAVE;
+Warnings:
+Warning	1287	'STOP SLAVE' is deprecated and will be removed in a future release. Please use STOP REPLICA instead
 RESET SLAVE ALL;
+Warnings:
+Warning	1287	'RESET SLAVE' is deprecated and will be removed in a future release. Please use RESET REPLICA instead
 CALL mtr.add_suppression("GTID replication failed");
 CALL mtr.add_suppression("Slave SQL for channel '': Error in Xid_log_event: Commit could not be completed");
 CALL mtr.add_suppression("Slave SQL for channel '': Node has dropped from cluster");

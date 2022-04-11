@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2011, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -145,15 +145,6 @@ class NDB_SCHEMA_OBJECT {
   static void init(uint32 nodeid);
 
   /**
-     @brief Return list of the schema operation id's for the currently active
-     NDB_SCHEMA_OBJECTS
-     @note Normally there is only one NDB_SCHEMA_OBJECT activa at a time
-
-     @param ids The list to populate
-   */
-  static void get_schema_op_ids(std::vector<uint32> &ids);
-
-  /**
     @brief Get NDB_SCHEMA_OBJECT to be used for communication between Client
            and Coordinator. The Client is usually the one to create an instance
            while the Coordinator simple uses it.
@@ -224,8 +215,10 @@ class NDB_SCHEMA_OBJECT {
      @param participant_node_id The nodeid of the node who reported result
      @param result The result received
      @param message The message describing the result if != 0
+
+     @return true if node was registered as participant, false otherwise
    */
-  void result_received_from_node(uint32 participant_node_id, uint32 result,
+  bool result_received_from_node(uint32 participant_node_id, uint32 result,
                                  const std::string &message) const;
 
   /**

@@ -1,11 +1,11 @@
 #!/bin/sh
-config=/etc/default/garbd
+config=/etc/default/garb
 if [ -e /usr/bin/deb-systemd-helper ]; then
-    deb-systemd-helper unmask garbd.service >/dev/null || true
-    if deb-systemd-helper --quiet was-enabled garbd.service; then
-        deb-systemd-helper enable garbd.service >/dev/null || true
+    deb-systemd-helper unmask garb.service >/dev/null || true
+    if deb-systemd-helper --quiet was-enabled garb.service; then
+        deb-systemd-helper enable garb.service >/dev/null || true
     else
-        deb-systemd-helper update-state garbd.service >/dev/null || true
+        deb-systemd-helper update-state garb.service >/dev/null || true
     fi
     if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
         if [ -x "/etc/init.d/garbd" ]; then

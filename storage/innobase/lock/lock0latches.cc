@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -39,8 +39,10 @@ size_t Latches::Page_shards::get_shard(const page_id_t &page_id) {
   size. The current implementation works, because the size of all three
   hashmaps is always the same. This allows an interface with less arguments.
   */
-  ut_ad(lock_sys->rec_hash->n_cells == lock_sys->prdt_hash->n_cells);
-  ut_ad(lock_sys->rec_hash->n_cells == lock_sys->prdt_page_hash->n_cells);
+  ut_ad(lock_sys->rec_hash->get_n_cells() ==
+        lock_sys->prdt_hash->get_n_cells());
+  ut_ad(lock_sys->rec_hash->get_n_cells() ==
+        lock_sys->prdt_page_hash->get_n_cells());
   return lock_rec_hash(page_id) % SHARDS_COUNT;
 }
 
@@ -75,7 +77,11 @@ Lock_mutex &Latches::Table_shards::get_mutex(const dict_table_t &table) {
 thread_local size_t Latches::Unique_sharded_rw_lock::m_shard_id{NOT_IN_USE};
 
 Latches::Unique_sharded_rw_lock::Unique_sharded_rw_lock() {
-  rw_lock.create(lock_sys_global_rw_lock_key, SYNC_LOCK_SYS_GLOBAL, 64);
+  rw_lock.create(
+#ifdef UNIV_PFS_RWLOCK
+      lock_sys_global_rw_lock_key,
+#endif
+      SYNC_LOCK_SYS_GLOBAL, 64);
 }
 
 Latches::Unique_sharded_rw_lock::~Unique_sharded_rw_lock() { rw_lock.free(); }

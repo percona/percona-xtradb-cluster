@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -35,7 +35,7 @@
 #include "mysql/harness/stdx/expected_ostream.h"
 
 TEST(NetTS_impl_resolver, gethostname_buffer_empty) {
-  std::array<char, 1> name;
+  std::array<char, 1> name{};
   const auto res = net::impl::resolver::gethostname(name.data(), 0);
 
 #if defined(_WIN32)
@@ -80,15 +80,15 @@ TEST(NetTS_impl_resolver, gethostname_buffer_too_short) {
 }
 
 TEST(NetTS_impl_resolver, gethostname) {
-  std::array<char, 255> name;
+  std::array<char, 255> name{};
   const auto res = net::impl::resolver::gethostname(name.data(), name.size());
 
   EXPECT_THAT(res, ::testing::Truly([](auto v) { return bool(v); }));
 }
 
 TEST(NetTS_impl_resolver, getnameinfo) {
-  std::array<char, NI_MAXHOST> name;
-  std::array<char, NI_MAXSERV> serv;
+  std::array<char, NI_MAXHOST> name{};
+  std::array<char, NI_MAXSERV> serv{};
   struct sockaddr_in saddr {};
 
   saddr.sin_family = AF_INET;
@@ -101,8 +101,8 @@ TEST(NetTS_impl_resolver, getnameinfo) {
 }
 
 TEST(NetTS_impl_resolver, getnameinfo_invalid_sockaddr_size) {
-  std::array<char, NI_MAXHOST> name;
-  std::array<char, NI_MAXSERV> serv;
+  std::array<char, NI_MAXHOST> name{};
+  std::array<char, NI_MAXSERV> serv{};
   struct sockaddr_in saddr {};
 
   saddr.sin_family = AF_INET;
@@ -132,8 +132,8 @@ TEST(NetTS_impl_resolver, getnameinfo_invalid_sockaddr_size) {
 // windows doesn't check for bad-flags, but returns ERROR_INSUFFICIENT_BUFFER
 // freebsd, macosx doesn't check for bad-flags, but returns EAI_NONAME
 TEST(NetTS_impl_resolver, getnameinfo_badflags) {
-  std::array<char, NI_MAXHOST> name;
-  std::array<char, NI_MAXSERV> serv;
+  std::array<char, NI_MAXHOST> name{};
+  std::array<char, NI_MAXSERV> serv{};
   struct sockaddr_in saddr {};
 
   saddr.sin_family = AF_INET;
@@ -150,7 +150,7 @@ TEST(NetTS_impl_resolver, getnameinfo_badflags) {
 #endif
 
 TEST(NetTS_impl_resolver, getnameinfo_overflow) {
-  std::array<char, 1> name;
+  std::array<char, 1> name{};  // buffer too small to resolve the address
   struct sockaddr_in saddr {};
 
   saddr.sin_family = AF_INET;
@@ -162,6 +162,7 @@ TEST(NetTS_impl_resolver, getnameinfo_overflow) {
 
   // glibc-2.12 (EL6): ENOSPC
   // glibc-2.27 (U18.04): EAI_OVERFLOW
+  // glibc-2.31 (U20.04): EAI_AGAIN
   // freebsd: EAI_MEMORY
   // macosx: EAI_OVERFLOW
   // solaris: ENOSPC
@@ -175,7 +176,9 @@ TEST(NetTS_impl_resolver, getnameinfo_overflow) {
       ::testing::AnyOf(
           stdx::make_unexpected(make_error_code(std::errc::no_space_on_device)),
           stdx::make_unexpected(
-              make_error_code(net::ip::resolver_errc::out_of_memory))
+              make_error_code(net::ip::resolver_errc::out_of_memory)),
+          stdx::make_unexpected(
+              make_error_code(net::ip::resolver_errc::try_again))
 #if defined(EAI_OVERFLOW)
               ,
           stdx::make_unexpected(
@@ -292,7 +295,7 @@ TEST(NetTS_impl_resolver, inetntop_nospace) {
 
   saddr.sin_family = AF_INET;
 
-  std::array<char, 1> name;
+  std::array<char, 1> name{};
 
   const auto res =
       net::impl::resolver::inetntop(AF_INET, &saddr, name.data(), name.size());
@@ -316,7 +319,7 @@ TEST(NetTS_impl_resolver, inetntop_nospace) {
 TEST(NetTS_impl_resolver, inetntop_ipv4) {
   struct in_addr addr {};
 
-  std::array<char, INET_ADDRSTRLEN> name;
+  std::array<char, INET_ADDRSTRLEN> name{};
 
   const auto res =
       net::impl::resolver::inetntop(AF_INET, &addr, name.data(), name.size());
@@ -328,7 +331,7 @@ TEST(NetTS_impl_resolver, inetntop_ipv4) {
 TEST(NetTS_impl_resolver, inetntop_ipv6) {
   struct in6_addr addr {};
 
-  std::array<char, INET6_ADDRSTRLEN> name;
+  std::array<char, INET6_ADDRSTRLEN> name{};
 
   const auto res =
       net::impl::resolver::inetntop(AF_INET6, &addr, name.data(), name.size());
@@ -340,7 +343,7 @@ TEST(NetTS_impl_resolver, inetntop_ipv6) {
 TEST(NetTS_impl_resolver, inetntop_fail_invalid_protocol) {
   struct in6_addr addr {};
 
-  std::array<char, INET6_ADDRSTRLEN> name;
+  std::array<char, INET6_ADDRSTRLEN> name{};
 
   const auto res =
       net::impl::resolver::inetntop(AF_UNIX, &addr, name.data(), name.size());
@@ -352,7 +355,7 @@ TEST(NetTS_impl_resolver, inetntop_fail_invalid_protocol) {
 TEST(NetTS_impl_resolver, inetntop_fail_empty_buffer) {
   struct in6_addr addr {};
 
-  std::array<char, INET6_ADDRSTRLEN> name;
+  std::array<char, INET6_ADDRSTRLEN> name{};
 
   const auto res =
       net::impl::resolver::inetntop(AF_INET6, &addr, name.data(), 0);

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2013, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2013, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -89,7 +89,7 @@ extern "C" {
 using std::max;
 
 /** Number of connection errors when selecting on the listening port */
-static std::atomic<ulong> connection_errors_select{0};
+static std::atomic<ulong> connection_errors_query_block{0};
 
 /** Number of connection errors when accepting sockets in the listening port. */
 static std::atomic<ulong> connection_errors_accept{0};
@@ -116,7 +116,9 @@ AddrInfoPtr GetAddrInfoPtr(const char *node, const char *service,
 }
 }  // namespace
 
-ulong get_connection_errors_select() { return connection_errors_select.load(); }
+ulong get_connection_errors_query_block() {
+  return connection_errors_query_block.load();
+}
 
 ulong get_connection_errors_accept() { return connection_errors_accept.load(); }
 
@@ -141,7 +143,7 @@ class Channel_info_local_socket : public Channel_info {
   MYSQL_SOCKET m_connect_sock;
 
  protected:
-  virtual Vio *create_and_init_vio() const {
+  Vio *create_and_init_vio() const override {
     Vio *vio =
         mysql_socket_vio_new(m_connect_sock, VIO_TYPE_SOCKET, VIO_LOCALHOST);
 #ifdef USE_PPOLL_IN_VIO
@@ -162,7 +164,7 @@ class Channel_info_local_socket : public Channel_info {
   Channel_info_local_socket(MYSQL_SOCKET connect_socket)
       : m_connect_sock(connect_socket) {}
 
-  virtual THD *create_thd() {
+  THD *create_thd() override {
     THD *thd = Channel_info::create_thd();
 
     if (thd != nullptr) {
@@ -172,8 +174,8 @@ class Channel_info_local_socket : public Channel_info {
     return thd;
   }
 
-  virtual void send_error_and_close_channel(uint errorcode, int error,
-                                            bool senderror) {
+  void send_error_and_close_channel(uint errorcode, int error,
+                                    bool senderror) override {
     Channel_info::send_error_and_close_channel(errorcode, error, senderror);
 
     mysql_socket_shutdown(m_connect_sock, SHUT_RDWR);
@@ -205,7 +207,7 @@ class Channel_info_tcpip_socket : public Channel_info {
 #endif
 
  protected:
-  virtual Vio *create_and_init_vio() const {
+  Vio *create_and_init_vio() const override {
     Vio *vio = mysql_socket_vio_new(m_connect_sock, VIO_TYPE_TCPIP, 0);
 #ifdef USE_PPOLL_IN_VIO
     if (vio != nullptr) {
@@ -234,7 +236,7 @@ class Channel_info_tcpip_socket : public Channel_info {
   Channel_info_tcpip_socket(MYSQL_SOCKET connect_socket, bool is_admin_conn)
       : m_connect_sock(connect_socket), m_is_admin_conn(is_admin_conn) {}
 
-  virtual THD *create_thd() {
+  THD *create_thd() override {
     THD *thd = Channel_info::create_thd();
 
     if (thd != nullptr) {
@@ -244,15 +246,15 @@ class Channel_info_tcpip_socket : public Channel_info {
     return thd;
   }
 
-  virtual void send_error_and_close_channel(uint errorcode, int error,
-                                            bool senderror) {
+  void send_error_and_close_channel(uint errorcode, int error,
+                                    bool senderror) override {
     Channel_info::send_error_and_close_channel(errorcode, error, senderror);
 
     mysql_socket_shutdown(m_connect_sock, SHUT_RDWR);
     mysql_socket_close(m_connect_sock);
   }
 
-  virtual bool is_admin_connection() const { return m_is_admin_conn; }
+  bool is_admin_connection() const override { return m_is_admin_conn; }
 
 #ifdef HAVE_SETNS
   /**
@@ -1093,7 +1095,7 @@ static bool handle_admin_socket(
         There is not much details to report about the client,
         increment the server global status variable.
       */
-      ++connection_errors_select;
+      ++connection_errors_query_block;
       if (!select_errors++ && !connection_events_loop_aborted())
         LogErr(ERROR_LEVEL, ER_CONN_SOCKET_SELECT_FAILED, socket_errno);
     }
@@ -1239,6 +1241,16 @@ static inline bool spawn_admin_thread(MYSQL_SOCKET admin_socket,
   return false;
 }
 
+bool Mysqld_socket_listener::check_and_spawn_admin_connection_handler_thread()
+    const {
+  if (m_use_separate_thread_for_admin) {
+    if (spawn_admin_thread(m_admin_interface_listen_socket,
+                           m_admin_bind_address.network_namespace))
+      return true;
+  }
+  return false;
+}
+
 bool Mysqld_socket_listener::setup_listener() {
   /*
     It's matter to add a socket for admin connection listener firstly,
@@ -1256,11 +1268,7 @@ bool Mysqld_socket_listener::setup_listener() {
 
     m_admin_interface_listen_socket = mysql_socket;
 
-    if (m_use_separate_thread_for_admin) {
-      if (spawn_admin_thread(m_admin_interface_listen_socket,
-                             m_admin_bind_address.network_namespace))
-        return true;
-    } else {
+    if (!m_use_separate_thread_for_admin) {
       m_socket_vector.emplace_back(mysql_socket, Socket_type::TCP_SOCKET,
                                    &m_admin_bind_address.network_namespace,
                                    Socket_interface_type::ADMIN_INTERFACE);
@@ -1356,7 +1364,7 @@ Channel_info *Mysqld_socket_listener::listen_for_connection_event() {
       There is not much details to report about the client,
       increment the server global status variable.
     */
-    ++connection_errors_select;
+    ++connection_errors_query_block;
     if (!select_errors++ && !connection_events_loop_aborted())
       LogErr(ERROR_LEVEL, ER_CONN_SOCKET_SELECT_FAILED, socket_errno);
   }
@@ -1369,7 +1377,7 @@ Channel_info *Mysqld_socket_listener::listen_for_connection_event() {
     When poll/select returns control flow then at least one ready server socket
     must exist. Check that get_ready_socket() returns a valid socket.
   */
-  DBUG_ASSERT(listen_socket != nullptr);
+  assert(listen_socket != nullptr);
   MYSQL_SOCKET connect_sock;
 #ifdef HAVE_SETNS
   /*

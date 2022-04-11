@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2020, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 1995, 2021, Oracle and/or its affiliates.
 Copyright (c) 2008, 2009, Google Inc.
 Copyright (c) 2009, Percona Inc.
 
@@ -203,9 +203,6 @@ struct Srv_threads {
   /** Error monitor thread. */
   IB_thread m_error_monitor;
 
-  /** Redo closer thread. */
-  IB_thread m_log_closer;
-
   /** Redo checkpointer thread. */
   IB_thread m_log_checkpointer;
 
@@ -317,6 +314,9 @@ struct Srv_threads {
 /** Check if given thread is still active. */
 bool srv_thread_is_active(const IB_thread &thread);
 
+/** Check if given thread is cleaned-up and stopped. */
+bool srv_thread_is_stopped(const IB_thread &thread);
+
 /** Delay the thread after it discovered that the shutdown_state
 is greater or equal to SRV_SHUTDOWN_CLEANUP, before it proceeds
 with further clean up. This is used in the tests to see if such
@@ -387,6 +387,12 @@ extern os_event_t srv_checkpoint_completed_event;
 log tracking iteration */
 extern os_event_t srv_redo_log_tracked_event;
 
+/** Enable or disable writing of NULLs while extending a tablespace.
+If this is FALSE, then the server will just allocate the space without
+actually initializing it with NULLs. If the variable is true, the
+server will allocate and initialize the space by writing NULLs in it. */
+extern bool tbsp_extend_and_initialize;
+
 /* If the last data file is auto-extended, we add this many pages to it
 at a time */
 #define SRV_AUTO_EXTEND_INCREMENT (srv_sys_space.get_autoextend_increment())
@@ -409,6 +415,9 @@ extern FILE *srv_misc_tmpfile;
 /* Server parameters which are read from the initfile */
 
 extern char *srv_data_home;
+
+/* Number of threads used for initializing rollback segments */
+extern uint32_t srv_rseg_init_threads;
 
 /** Number of pages per doublewrite thread/segment */
 extern ulong srv_dblwr_pages;
@@ -483,9 +492,6 @@ enum srv_sys_tablespace_encrypt_enum {
 /** Enable this option to encrypt system tablespace at bootstrap. */
 extern ulong srv_sys_tablespace_encrypt;
 
-/** Enable or disable encryption of pages in parallel doublewrite buffer file */
-extern bool srv_parallel_dblwr_encrypt;
-
 /** Whether the redo log tracking is currently enabled. Note that it is
 possible for the log tracker thread to be running and the tracking to be
 disabled */
@@ -494,8 +500,6 @@ extern ulonglong srv_max_bitmap_file_size;
 
 extern ulonglong srv_max_changed_pages;
 
-/** Default size of UNDO tablespace while it is created new. */
-extern const page_no_t SRV_UNDO_TABLESPACE_SIZE_IN_PAGES;
 
 /** Maximum number of recently truncated undo tablespace IDs for
 the same undo number. */
@@ -559,6 +563,9 @@ for total order of dirty pages, when they are added to flush lists.
 The slots are addressed by LSN values modulo number of the slots. */
 extern ulong srv_log_recent_closed_size;
 
+/** Whether to activate/pause the log writer threads. */
+extern bool srv_log_writer_threads;
+
 /** Minimum absolute value of cpu time for which spin-delay is used. */
 extern uint srv_log_spin_cpu_abs_lwm;
 
@@ -617,13 +624,6 @@ extern ulong srv_log_flush_notifier_spin_delay;
 /** Initial timeout used to wait on flush_notifier_event. */
 extern ulong srv_log_flush_notifier_timeout;
 
-/** Number of spin iterations, for which log closerr thread is waiting
-for a reachable untraversed link in recent_closed. */
-extern ulong srv_log_closer_spin_delay;
-
-/** Initial sleep used in log closer after spin delay is finished. */
-extern ulong srv_log_closer_timeout;
-
 /** Whether to generate and require checksums on the redo log pages. */
 extern bool srv_log_checksums;
 
@@ -681,6 +681,8 @@ extern const ulong srv_buf_pool_instances_default;
 extern ulong srv_n_page_hash_locks;
 /** Whether to validate InnoDB tablespace paths on startup */
 extern bool srv_validate_tablespace_paths;
+/** Use fdatasync() instead of fsync(). */
+extern bool srv_use_fdatasync;
 /** Scan depth for LRU flush batch i.e.: number of blocks scanned*/
 extern ulong srv_LRU_scan_depth;
 /** Whether or not to flush neighbors of a block */
@@ -819,7 +821,6 @@ extern bool srv_print_innodb_lock_monitor;
 
 extern ulong srv_n_spin_wait_rounds;
 extern ulong srv_n_free_tickets_to_enter;
-extern ulong srv_thread_sleep_delay;
 extern ulong srv_spin_wait_delay;
 extern ibool srv_priority_boost;
 
@@ -842,7 +843,8 @@ extern bool srv_master_thread_disabled_debug;
 #endif /* UNIV_DEBUG */
 
 extern ulong srv_fatal_semaphore_wait_threshold;
-#define SRV_SEMAPHORE_WAIT_EXTENSION 7200
+extern std::atomic<int> srv_fatal_semaphore_wait_extend;
+
 extern ulint srv_dml_needed_delay;
 
 extern bool srv_encrypt_online_alter_logs;
@@ -943,7 +945,6 @@ extern mysql_pfs_key_t io_log_thread_key;
 extern mysql_pfs_key_t io_read_thread_key;
 extern mysql_pfs_key_t io_write_thread_key;
 extern mysql_pfs_key_t log_writer_thread_key;
-extern mysql_pfs_key_t log_closer_thread_key;
 extern mysql_pfs_key_t log_checkpointer_thread_key;
 extern mysql_pfs_key_t log_flusher_thread_key;
 extern mysql_pfs_key_t log_write_notifier_thread_key;
@@ -959,7 +960,7 @@ extern mysql_pfs_key_t srv_worker_thread_key;
 extern mysql_pfs_key_t trx_recovery_rollback_thread_key;
 extern mysql_pfs_key_t srv_ts_alter_encrypt_thread_key;
 extern mysql_pfs_key_t parallel_read_thread_key;
-extern mysql_pfs_key_t parallel_read_ahead_thread_key;
+extern mysql_pfs_key_t parallel_rseg_init_thread_key;
 extern mysql_pfs_key_t srv_log_tracking_thread_key;
 extern mysql_pfs_key_t log_scrub_thread_key;
 #endif /* UNIV_PFS_THREAD */
@@ -1115,11 +1116,12 @@ enum srv_thread_type {
 void srv_boot(void);
 /** Frees the data structures created in srv_init(). */
 void srv_free(void);
-/** Sets the info describing an i/o thread current state. */
-void srv_set_io_thread_op_info(
-    ulint i,          /*!< in: the 'segment' of the i/o thread */
-    const char *str); /*!< in: constant char string describing the
-                      state */
+
+/** Sets the info describing an i/o thread current state.
+@param[in] i The 'segment' of the i/o thread
+@param[in] str Constant char string describing the state */
+void srv_set_io_thread_op_info(ulint i, const char *str);
+
 /** Resets the info describing an i/o thread current state. */
 void srv_reset_io_thread_op_info();
 /** Tells the purge thread that there has been activity in the database
@@ -1201,13 +1203,10 @@ void srv_purge_coordinator_thread();
 /** Worker thread that reads tasks from the work queue and executes them. */
 void srv_worker_thread();
 
-/** Rotate default master key for UNDO tablespace. */
-void undo_rotate_default_master_key();
-
 /** Set encryption for UNDO tablespace with given space id.
-@param[in] thdthread    handle
-@param[in] space_id     undo tablespace id
-@param[in] mtr          mini-transaction
+@param[in] thd          Thread handle
+@param[in] space_id     Undo tablespace id
+@param[in] mtr          Mini-transaction
 @param[in] is_boot	true if it is called during server start up.
 @return false for success, true otherwise */
 bool set_undo_tablespace_encryption(THD *thd, space_id_t space_id, mtr_t *mtr,
@@ -1216,7 +1215,7 @@ bool set_undo_tablespace_encryption(THD *thd, space_id_t space_id, mtr_t *mtr,
 /** Enable UNDO tablespaces encryption.
 @param[in] is_boot	true if it is called during server start up. In this
                         case, default master key will be used which will be
-                        rotated later with actual master key from kyering.
+                        rotated later with actual master key from keyring.
 @return false for success, true otherwise. */
 bool srv_enable_undo_encryption(THD *thd, bool is_boot);
 
@@ -1248,9 +1247,10 @@ void srv_purge_wakeup(void);
 bool srv_purge_threads_active();
 
 /** Create an undo tablespace with an explicit file name
-@param[in]	space_name	tablespace name
-@param[in]	file_name	file name
-@param[out]	space_id	Tablespace ID chosen
+This is called during CREATE UNDO TABLESPACE.
+@param[in]  space_name  tablespace name
+@param[in]  file_name   file name
+@param[in]  space_id    Tablespace ID
 @return DB_SUCCESS or error code */
 dberr_t srv_undo_tablespace_create(const char *space_name,
                                    const char *file_name, space_id_t space_id);
@@ -1374,7 +1374,7 @@ struct export_var_t {
   ulint innodb_system_rows_deleted;    /*!< srv_n_system_rows_deleted*/
   ulint innodb_sampled_pages_read;
   ulint innodb_sampled_pages_skipped;
-  ulint innodb_num_open_files;            /*!< fil_n_file_opened */
+  ulint innodb_num_open_files;            /*!< fil_n_files_open */
   ulint innodb_truncated_status_writes;   /*!< srv_truncated_status_writes */
   ulint innodb_undo_tablespaces_total;    /*!< total number of undo tablespaces
                                           innoDB is tracking. */
@@ -1492,7 +1492,7 @@ struct srv_slot_t {
 void wsrep_srv_conc_cancel_wait(trx_t *trx);
 #endif /* WITH_WSREP */
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 /** false before InnoDB monitor has been printed at least once, true
 afterwards */
 extern bool srv_debug_monitor_printed;

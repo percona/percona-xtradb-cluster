@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -104,6 +104,7 @@ public:
     int interactive;
     const char* config_filename;
     int mycnf;
+    const char* cluster_config_suffix;
     int config_cache;
     const char* bind_address;
     int no_nodeid_checks;
@@ -120,7 +121,7 @@ public:
   MgmtSrvr(const MgmtSrvr&); // Not implemented
   MgmtSrvr(const MgmtOpts&);
 
-  ~MgmtSrvr();
+  ~MgmtSrvr() override;
 
 private:
   /* Function used from 'init' */
@@ -218,7 +219,10 @@ public:
   /**
    * Backup functionallity
    */
-  int startBackup(Uint32& backupId, int waitCompleted= 2, Uint32 input_backupId= 0, Uint32 backuppoint= 0);
+  int startBackup(Uint32& backupId, int waitCompleted= 2,
+                  Uint32 input_backupId= 0, Uint32 backuppoint= 0,
+                  const char* encryption_password= nullptr,
+                  Uint32 password_length= 0);
   int abortBackup(Uint32 backupId);
   int performBackup(Uint32* backupId);
 
@@ -320,7 +324,7 @@ public:
   const char* getErrorText(int errorCode, char *buf, int buf_sz);
 
 private:
-  void config_changed(NodeId, const Config*);
+  void config_changed(NodeId, const Config*) override;
   void setClusterLog(const Config* conf);
   void configure_eventlogger(const BaseString& logdestination) const;
   /**
@@ -449,7 +453,7 @@ private:
 
   bool m_need_restart;
 
-  struct in_addr m_connect_address[MAX_NODES];
+  struct in6_addr m_connect_address[MAX_NODES];
   const char *get_connect_address(NodeId node_id,
                                   char *addr_buf,
                                   size_t addr_buf_size);
@@ -458,8 +462,8 @@ private:
   /**
    * trp_client interface
    */
-  virtual void trp_deliver_signal(const NdbApiSignal* signal,
-                                  const struct LinearSectionPtr ptr[3]);
+  void trp_deliver_signal(const NdbApiSignal* signal,
+                          const struct LinearSectionPtr ptr[3]) override;
   virtual void trp_node_status(Uint32 nodeId, Uint32 event);
   
   /**
@@ -555,17 +559,28 @@ private:
   int try_alloc_from_list(NodeId& nodeid,
                           ndb_mgm_node_type type,
                           Uint32 timeout_ms,
-                          Vector<PossibleNode>& nodes_info,
+                          const Vector<PossibleNode>& nodes_info,
                           int& error_code,
                           BaseString& error_string);
+  struct ConfigNode
+  {
+    unsigned nodeid;
+    BaseString hostname;
+  };
+  bool build_node_list_from_config(NodeId node_id,
+                                   ndb_mgm_node_type type,
+                                   Vector<ConfigNode>& config_nodes,
+                                   int& error_code,
+                                   BaseString& error_string) const;
   int find_node_type(NodeId nodeid,
                      ndb_mgm_node_type type,
-                     const struct sockaddr* client_addr,
-                     Vector<PossibleNode>& nodes_info,
+                     const sockaddr_in6* client_addr,
+                     const Vector<ConfigNode>& config_nodes,
+                     Vector<PossibleNode>& nodes,
                      int& error_code, BaseString& error_string);
   bool alloc_node_id_impl(NodeId& nodeid,
                           ndb_mgm_node_type type,
-                          const struct sockaddr* client_addr,
+                          const sockaddr_in6* client_addr,
                           int& error_code, BaseString& error_string,
                           Uint32 timeout_s = 20);
 public:
@@ -588,7 +603,7 @@ public:
    */
   bool alloc_node_id(NodeId& nodeid,
                      ndb_mgm_node_type type,
-		     const struct sockaddr* client_addr,
+                     const sockaddr_in6* client_addr,
 		     int& error_code, BaseString& error_string,
                      bool log_event = true,
 		     Uint32 timeout_s = 20);

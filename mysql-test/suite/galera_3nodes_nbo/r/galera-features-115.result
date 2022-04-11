@@ -1,0 +1,29 @@
+SET SESSION wsrep_on=OFF;
+DROP SCHEMA test;
+SET SESSION wsrep_on=OFF;
+CREATE TABLE t1 (f1 INTEGER);
+CREATE TABLE t1 (f1 INTEGER);
+SET SESSION wsrep_sync_wait=0;
+SET SESSION wsrep_sync_wait=0;
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'non-Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+SET SESSION wsrep_sync_wait=0;
+Timeout in wait_condition.inc for SELECT VARIABLE_VALUE = 'non-Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+Killing server ...
+# restart
+Killing server ...
+# restart
+DROP TABLE test.t1;
+CALL mtr.add_suppression("Inconsistent by consensus.");
+CALL mtr.add_suppression("Error_code: 1049");
+CALL mtr.add_suppression("WSREP: Failed to apply trx: source: ");
+CALL mtr.add_suppression("WSREP: Failed to apply app buffer");
+CALL mtr.add_suppression("WSREP: Node consistency compromized, leaving cluster...");
+CALL mtr.add_suppression("Query apply failed");
+CALL mtr.add_suppression("Unknown database");
+CALL mtr.add_suppression("Inconsistent by consensus.");
+CALL mtr.add_suppression("Error_code: 1050");
+CALL mtr.add_suppression("WSREP: Failed to apply trx: source: ");
+CALL mtr.add_suppression("WSREP: Failed to apply app buffer");
+CALL mtr.add_suppression("WSREP: Node consistency compromized, leaving cluster...");
+CALL mtr.add_suppression("Table 't1' already exists");
+CALL mtr.add_suppression("Query apply failed");

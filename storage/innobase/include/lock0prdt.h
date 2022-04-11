@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2014, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -130,16 +130,17 @@ dberr_t lock_prdt_insert_check_and_lock(
     mtr_t *mtr,          /*!< in/out: mini-transaction */
     lock_prdt_t *prdt);  /*!< in: Minimum Bound Rectangle */
 
-/** Append a predicate to the lock */
-void lock_prdt_set_prdt(lock_t *lock,             /*!< in: lock */
-                        const lock_prdt_t *prdt); /*!< in: Predicate */
+/** Append a predicate to the lock
+@param[in] lock Lock
+@param[in] prdt Predicate */
+void lock_prdt_set_prdt(lock_t *lock, const lock_prdt_t *prdt);
 
 #if 0
 
 /*********************************************************************//**
 Get predicate lock's minimum bounding box
 @return the minimum bounding box*/
-UNIV_INLINE
+static inline
 rtr_mbr_t*
 prdt_get_mbr_from_prdt(
 	const lock_prdt_t*	prdt);	/*!< in: the lock predicate */

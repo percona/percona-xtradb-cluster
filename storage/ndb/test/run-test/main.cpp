@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -21,6 +21,8 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 */
+
+#include <time.h>
 
 #ifdef _WIN32
 #define DEFAULT_PREFIX "c:/atrt"
@@ -48,13 +50,15 @@
 
 #define PATH_SEPARATOR DIR_SEPARATOR
 #define TESTCASE_RETRIES_THRESHOLD_WARNING 5
-#define ATRT_VERSION_NUMBER 8
+#define ATRT_VERSION_NUMBER 11
 
 /** Global variables */
 static const char progname[] = "ndb_atrt";
 static const char *g_gather_progname = 0;
 static const char *g_analyze_progname = 0;
 static const char *g_setup_progname = 0;
+static const char *g_analyze_coverage_progname = 0;
+static const char *g_compute_coverage_progname = 0;
 
 static const char *g_log_filename = 0;
 static const char *g_test_case_filename = 0;
@@ -83,13 +87,31 @@ int g_mt = 0;
 int g_mt_rr = 0;
 int g_restart = 0;
 int g_default_max_retries = 0;
-static int g_default_force_cluster_restart = 0;
+bool g_clean_shutdown = false;
+
 FailureMode g_default_behaviour_on_failure = Restart;
 const char *default_behaviour_on_failure[] = {"Restart", "Abort", "Skip",
-                                              "Continue", NullS};
+                                              "Continue", nullptr};
 TYPELIB behaviour_typelib = {array_elements(default_behaviour_on_failure) - 1,
                              "default_behaviour_on_failure",
-                             default_behaviour_on_failure, NULL};
+                             default_behaviour_on_failure, nullptr};
+
+RestartMode g_default_force_cluster_restart = None;
+const char *force_cluster_restart_mode[] = {"none", "before", "after",
+                                            "both", nullptr};
+TYPELIB restart_typelib = {array_elements(force_cluster_restart_mode) -1,
+                           "force_cluster_restart_mode",
+                           force_cluster_restart_mode, nullptr};
+
+coverage::Coverage g_coverage = coverage::Coverage::None;
+const char *coverage_mode[] = {"none", "testcase", "testsuite", nullptr};
+TYPELIB coverage_typelib = {array_elements(coverage_mode) - 1, "coverage_mode",
+                            coverage_mode, nullptr};
+
+CoverageTools g_coverage_tool = Lcov;
+const char *coverage_tools[] = {"lcov", "fastcov", nullptr};
+TYPELIB coverage_tools_typelib = {array_elements(coverage_tools) - 1,
+                                  "coverage_tools", coverage_tools, nullptr};
 
 const char *g_cwd = 0;
 const char *g_basedir = 0;
@@ -97,6 +119,7 @@ const char *g_my_cnf = 0;
 const char *g_prefix = NULL;
 const char *g_prefix0 = NULL;
 const char *g_prefix1 = NULL;
+const char *g_build_dir = NULL;
 const char *g_clusters = 0;
 const char *g_config_type = NULL;  // "cnf" or "ini"
 const char *g_site = NULL;
@@ -106,6 +129,7 @@ const char *save_group_suffix = 0;
 const char *g_dummy;
 char *g_env_path = 0;
 const char *g_mysqld_host = 0;
+
 
 TestExecutionResources g_resources;
 
@@ -119,10 +143,21 @@ static bool find_config_ini_files();
 TestResult run_test_case(ProcessManagement& processManagement,
                          const atrt_testcase& testcase,
                          bool is_last_testcase,
-                         bool next_testcase_forces_restart);
+                         RestartMode next_testcase_forces_restart,
+                         atrt_coverage_config& coverage_config);
 int test_case_init(ProcessManagement &, const atrt_testcase &);
 int test_case_execution_loop(ProcessManagement &, const time_t, const time_t);
 void test_case_results(TestResult *, const atrt_testcase &);
+
+void test_case_coverage_results(TestResult *,
+                                atrt_config &,
+                                atrt_coverage_config &,
+                                int);
+bool gather_coverage_results(atrt_config &,
+                             atrt_coverage_config &,
+                             int test_case = 0);
+int compute_path_level(const char *);
+int compute_test_coverage(atrt_coverage_config &, const char *);
 
 bool do_command(ProcessManagement& processManagement,
                 atrt_config& config);
@@ -140,8 +175,8 @@ bool reset_config(ProcessManagement &processManagement, atrt_config&);
 static struct my_option g_options[] = {
     {"help", '?', "Display this help and exit.", (uchar **)&g_help,
      (uchar **)&g_help, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-    {"version", 'V', "Output version information and exit.", 0, 0, 0,
-     GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+    {"version", 'V', "Output version information and exit.", 0, 0, 0, GET_BOOL,
+     NO_ARG, 0, 0, 0, 0, 0, 0},
     {"site", 256, "Site", (uchar **)&g_site, (uchar **)&g_site, 0, GET_STR,
      REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
     {"clusters", 256, "Cluster", (uchar **)&g_clusters, (uchar **)&g_clusters,
@@ -201,16 +236,33 @@ static struct my_option g_options[] = {
      "the test suite file)",
      (uchar **)&g_default_max_retries, (uchar **)&g_default_max_retries, 0,
      GET_INT, REQUIRED_ARG, g_default_max_retries, 0, 0, 0, 0, 0},
-    {"default-force-cluster-restart", 0,
+    {"default-force-cluster-restart", 256,
      "Force cluster to restart for each testrun (can be overwritten in test "
      "suite file)",
      (uchar **)&g_default_force_cluster_restart,
-     (uchar **)&g_default_force_cluster_restart, 0, GET_BOOL, NO_ARG,
-     g_default_force_cluster_restart, 0, 0, 0, 0, 0},
+     (uchar **)&g_default_force_cluster_restart, &restart_typelib, GET_ENUM,
+     REQUIRED_ARG, g_default_force_cluster_restart, 0, 0, 0, 0, 0},
     {"default-behaviour-on-failure", 256, "default to do when a test fails",
      (uchar **)&g_default_behaviour_on_failure,
      (uchar **)&g_default_behaviour_on_failure, &behaviour_typelib, GET_ENUM,
      REQUIRED_ARG, g_default_behaviour_on_failure, 0, 0, 0, 0, 0},
+    {"clean-shutdown", 0,
+     "Enables clean cluster shutdown when passed as a command line argument",
+     (uchar **)&g_clean_shutdown, (uchar **)&g_clean_shutdown, 0, GET_BOOL,
+     NO_ARG, g_clean_shutdown, 0, 0, 0, 0, 0},
+    {"coverage", 256,
+     "Enables coverage and specifies if coverage is computed, "
+     "per 'testcase' (default) or  per 'testsuite'.",
+     (uchar **)&g_coverage, (uchar **)&g_coverage,
+     &coverage_typelib, GET_ENUM, OPT_ARG, g_coverage, 0, 0, 0, 0, 0},
+    {"build-dir", 256, "Full path to build directory which contains gcno files",
+     (uchar **)&g_build_dir, (uchar **)&g_build_dir, 0, GET_STR, REQUIRED_ARG,
+     0, 0, 0, 0, 0, 0},
+    {"coverage-tool", 256,
+     "Specifies if coverage is computed using 'lcov'(default) or 'fastcov'",
+     (uchar **)&g_coverage_tool, (uchar **)&g_coverage_tool,
+     &coverage_tools_typelib, GET_ENUM, REQUIRED_ARG, g_coverage_tool, 0, 0, 0,
+     0, 0},
     {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}};
 
 static int check_testcase_file_main(int argc, char **argv);
@@ -239,6 +291,33 @@ int main(int argc, char **argv) {
   }
 
   g_logger.info("Starting ATRT version : %s", getAtrtVersion().c_str());
+
+  atrt_coverage_config coverage_config = {0, g_coverage, g_coverage_tool};
+
+  if (coverage_config.m_analysis != coverage::Coverage::None) {
+    if (g_default_force_cluster_restart == Before ||
+        g_default_force_cluster_restart == Both) {
+      g_logger.critical(
+          "Conflicting cluster restart parameter used with coverage parameter");
+      return atrt_exit(ATRT_FAILURE);
+    }
+    g_default_force_cluster_restart = After;
+    g_clean_shutdown = true;
+
+    if (g_build_dir == nullptr) {
+      g_logger.critical(
+          "--build-dir parameter is required for coverage builds");
+      return atrt_exit(ATRT_FAILURE);
+    }
+    struct stat buf;
+    if (lstat(g_build_dir, &buf) != 0) {
+      g_logger.critical(
+          "Build directory does not exist at location specified "
+          "in --build-dir parameter");
+      return atrt_exit(ATRT_FAILURE);
+    }
+    coverage_config.m_prefix_strip = compute_path_level(g_build_dir);
+  }
 
   if (g_mt != 0) {
     g_resources.setRequired(g_resources.NDBMTD);
@@ -284,7 +363,8 @@ int main(int argc, char **argv) {
 
   g_config.m_generated = false;
   g_config.m_replication = g_replicate;
-  if (!setup_config(g_config, g_mysqld_host)) {
+  if (!setup_config(g_config, coverage_config, g_mysqld_host,
+                    g_clean_shutdown)) {
     g_logger.critical("Failed to setup configuration");
     return atrt_exit(ATRT_FAILURE);
   }
@@ -369,6 +449,23 @@ int main(int argc, char **argv) {
     return atrt_exit(ATRT_FAILURE);
   }
 
+  switch(coverage_config.m_analysis) {
+     case coverage::Coverage::Testcase:
+       g_logger.info("Running coverage analysis per test case");
+       break;
+     case coverage::Coverage::Testsuite:
+       g_logger.info("Running coverage analysis per test suite");
+       break;
+     case coverage::Coverage::None:
+       break;
+   }
+
+  if (coverage_config.m_analysis != coverage::Coverage::None) {
+    const char *coverage_tool =
+        (g_coverage_tool == CoverageTools::Lcov) ? "lcov" : "fastcov";
+    g_logger.info("Using %s for coverage analysis", coverage_tool);
+  }
+
   /**
    * Run all tests
    */
@@ -381,17 +478,18 @@ int main(int argc, char **argv) {
     g_logger.info("#%d - %s", testcase.test_no, testcase.m_name.c_str());
 
     TestResult test_result;
+    bool is_last_testcase = (last_testcase_idx == i);
     if (current_failure_mode == FailureMode::Skip) {
       test_result = {0, 0, ERR_TEST_SKIPPED};
     } else {
-      bool is_last_testcase = last_testcase_idx == i;
-      bool next_testcase_forces_restart = false;
+      RestartMode next_testcase_forces_restart = None;
       if (!is_last_testcase) {
         next_testcase_forces_restart = testcases[i+1].m_force_cluster_restart;
       }
       test_result = run_test_case(processManagement, testcase,
                                   is_last_testcase,
-                                  next_testcase_forces_restart);
+                                  next_testcase_forces_restart,
+                                  coverage_config);
       if (test_result.result != ErrorCodes::ERR_OK) {
         current_failure_mode = testcase.m_behaviour_on_failure;
       }
@@ -416,6 +514,20 @@ int main(int argc, char **argv) {
     if (current_failure_mode == FailureMode::Abort) {
       g_logger.info("Aborting the test suite execution!");
       break;
+    }
+  }
+
+  if (coverage_config.m_analysis != coverage::Coverage::None) {
+    if (testcases.empty()) {
+      g_logger.debug("No testcases were run to compute coverage report");
+    } else {
+      if (g_coverage == coverage::Coverage::Testsuite) {
+        gather_coverage_results(g_config, coverage_config);
+      }
+      g_logger.debug("Computing coverage report..");
+      if (compute_test_coverage(coverage_config, g_build_dir) == 0) {
+        g_logger.debug("Coverage report generated for the run!!");
+      }
     }
   }
 
@@ -771,9 +883,9 @@ bool read_test_cases(FILE *file, std::vector<atrt_testcase> *testcases) {
 }
 
 TestResult run_test_case(ProcessManagement &processManagement,
-                         const atrt_testcase &testcase,
-                         bool is_last_testcase,
-                         bool next_testcase_forces_restart) {
+                         const atrt_testcase &testcase, bool is_last_testcase,
+                         RestartMode next_testcase_forces_restart,
+                         atrt_coverage_config &coverage_config) {
   TestResult test_result = {0, 0, 0};
   for (; test_result.testruns <= testcase.m_max_retries;
        test_result.testruns++) {
@@ -807,14 +919,23 @@ TestResult run_test_case(ProcessManagement &processManagement,
     bool restart_on_error = test_result.result != ERR_TEST_SKIPPED &&
                       test_result.result != ERR_OK &&
                       testcase.m_behaviour_on_failure == FailureMode::Restart;
-    bool stop_cluster = is_last_testcase ||
-                        next_testcase_forces_restart ||
-                        configuration_reset ||
+
+    bool current_testcase_requires_restart =
+        testcase.m_force_cluster_restart == RestartMode::After ||
+        testcase.m_force_cluster_restart == RestartMode::Both;
+    bool next_testcase_requires_restart =
+        next_testcase_forces_restart == RestartMode::Before ||
+        next_testcase_forces_restart == RestartMode::Both;
+
+    bool stop_cluster = is_last_testcase || current_testcase_requires_restart ||
+                        next_testcase_requires_restart || configuration_reset ||
                         restart_on_error;
     if (stop_cluster) {
       g_logger.debug("Stopping all cluster processes on condition(s):");
       if (is_last_testcase) g_logger.debug("- Last test case");
-      if (next_testcase_forces_restart)
+      if (current_testcase_requires_restart)
+        g_logger.debug("- Current test case forces restart");
+      if (next_testcase_requires_restart)
         g_logger.debug("- Next test case forces restart");
       if (configuration_reset) g_logger.debug("- Configuration forces reset");
       if (restart_on_error) g_logger.debug("- Restart on test error");
@@ -823,6 +944,11 @@ TestResult run_test_case(ProcessManagement &processManagement,
         g_logger.critical("Failed to stop all processes");
         test_result.result = ERR_CRITICAL;
       }
+    }
+
+    if (coverage_config.m_analysis == coverage::Coverage::Testcase) {
+      test_case_coverage_results(&test_result, g_config, coverage_config,
+                                 testcase.test_no);
     }
   }
 
@@ -916,6 +1042,53 @@ void test_case_results(TestResult *test_result, const atrt_testcase &testcase) {
   g_logger.debug("Finished result gathering");
 }
 
+void test_case_coverage_results(TestResult *test_result, atrt_config &config,
+                                atrt_coverage_config &coverage_config,
+                                int test_number) {
+  g_logger.debug("Gathering coverage files");
+
+  if (!gather_coverage_results(config, coverage_config, test_number)) {
+    g_logger.critical("Failed to gather coverage result after test run");
+    test_result->result = ERR_CRITICAL;
+  }
+  remove_dir("coverage_result", true);
+
+  g_logger.debug("Finished coverage files gathering");
+}
+
+int compute_path_level(const char *g_build_dir) {
+  int path_level = 0;
+  for (unsigned i = 0; g_build_dir[i] != '\0'; i++) {
+    if (g_build_dir[i] == '/' && g_build_dir[i + 1] != '/' &&
+        g_build_dir[i + 1] != '\0') {
+      path_level++;
+    }
+  }
+  return path_level;
+}
+
+int compute_test_coverage(atrt_coverage_config &coverage_config,
+                          const char *build_dir) {
+  BaseString compute_coverage_cmd = g_compute_coverage_progname;
+  compute_coverage_cmd.appfmt(" --results-dir=%s", g_cwd);
+  compute_coverage_cmd.appfmt(" --build-dir=%s", build_dir);
+
+  switch (coverage_config.m_tool) {
+    case CoverageTools::Lcov:
+      compute_coverage_cmd.appfmt(" --coverage-tool=lcov");
+      break;
+    case CoverageTools::Fastcov:
+      compute_coverage_cmd.appfmt(" --coverage-tool=fastcov");
+      break;
+  }
+  const int result = sh(compute_coverage_cmd.c_str());
+  if (result != 0) {
+    g_logger.critical("Failed to compute coverage report");
+    return -1;
+  }
+  return 0;
+}
+
 void update_atrt_result_code(const TestResult &test_result,
                              AtrtExitCodes *return_code) {
   if (*return_code == ATRT_FAILURE) return;
@@ -950,8 +1123,8 @@ int insert(const char *pair, Properties &p) {
  *
  * On success return a positive number with actual lines describing
  * the test case not counting blank lines and comments.
- * On end of file it returns 0.
- * On failure a nehative number is returned.
+ * On end of file, it returns 0.
+ * On failure, ERR_CORRUPT_TESTCASE is returned.
  */
 int read_test_case(FILE *file, int &line, atrt_testcase &tc) {
   Properties p;
@@ -1057,8 +1230,16 @@ int read_test_case(FILE *file, int &line, atrt_testcase &tc) {
   }
 
   tc.m_force_cluster_restart = g_default_force_cluster_restart;
-  if (p.get("force-cluster-restart", &str)) {
-    tc.m_force_cluster_restart = (strcmp(str, "yes") == 0);
+    if (p.get("force-cluster-restart", &str)) {
+    std::map<std::string, RestartMode> restart_mode_values = {
+        {"after", RestartMode::After},
+        {"before", RestartMode::Before},
+        {"both", RestartMode::Both}};
+    if (restart_mode_values.find(str) == restart_mode_values.end()) {
+      g_logger.critical("Invalid Restart Type!!");
+      return ERR_CORRUPT_TESTCASE;
+    }
+    tc.m_force_cluster_restart = restart_mode_values[str];
     used_elements++;
   }
 
@@ -1188,6 +1369,7 @@ bool setup_test_case(ProcessManagement &processManagement, atrt_config &config,
 bool gather_result(atrt_config &config, int *result) {
   BaseString tmp = g_gather_progname;
 
+  tmp.appfmt(" --result");
   for (unsigned i = 0; i < config.m_hosts.size(); i++) {
     if (config.m_hosts[i]->m_hostname.length() == 0) continue;
 
@@ -1233,6 +1415,67 @@ bool setup_hosts(atrt_config &config) {
                         config.m_hosts[i]->m_hostname.c_str());
       return false;
     }
+  }
+  return true;
+}
+
+bool gather_coverage_results(atrt_config &config,
+                             atrt_coverage_config &coverage_config,
+                             int test_number) {
+  BaseString gather_cmd = g_gather_progname;
+  gather_cmd.appfmt(" --coverage");
+
+  BaseString coverage_gather_dir;
+  if (coverage_config.m_analysis == coverage::Coverage::Testsuite) {
+    coverage_gather_dir = g_cwd;
+  }
+
+  for (unsigned i = 0; i < config.m_hosts.size(); i++) {
+    if (config.m_hosts[i]->m_hostname.length() == 0) continue;
+    const char *hostname = config.m_hosts[i]->m_hostname.c_str();
+
+    if (coverage_config.m_analysis == coverage::Coverage::Testcase) {
+      coverage_gather_dir = config.m_hosts[i]->m_basedir.c_str();
+    }
+    gather_cmd.appfmt(" %s:%s/%s/%s", hostname, coverage_gather_dir.c_str(),
+                      "gcov", hostname);
+  }
+
+  g_logger.debug("system(%s)", gather_cmd.c_str());
+  const int r1 = sh(gather_cmd.c_str());
+  if (r1 != 0) {
+    g_logger.critical("Failed to gather coverage files!");
+    return false;
+  }
+
+  BaseString analyze_coverage_cmd = g_analyze_coverage_progname;
+  analyze_coverage_cmd.appfmt(" --results-dir=%s", g_cwd);
+  analyze_coverage_cmd.appfmt(" --build-dir=%s", g_build_dir);
+
+  switch (coverage_config.m_analysis) {
+    case coverage::Coverage::Testcase:
+      analyze_coverage_cmd.appfmt(" --test-case-no=%d", test_number);
+      break;
+    case coverage::Coverage::Testsuite:
+      /* Fall through */
+    case coverage::Coverage::None:
+      break;
+  }
+
+  switch (coverage_config.m_tool) {
+    case CoverageTools::Lcov:
+      analyze_coverage_cmd.appfmt(" --coverage-tool=lcov");
+      break;
+    case CoverageTools::Fastcov:
+      analyze_coverage_cmd.appfmt(" --coverage-tool=fastcov");
+      break;
+  }
+  g_logger.debug("system(%s)", analyze_coverage_cmd.c_str());
+  const int r2 = sh(analyze_coverage_cmd.c_str());
+
+  if (r2 != 0 ) {
+    g_logger.critical("Failed to analyse coverage files!");
+    return false;
   }
   return true;
 }
@@ -1357,17 +1600,24 @@ bool find_scripts(const char *atrt_path) {
   std::vector<struct script_path> scripts = {
       {"atrt-gather-result.sh", &g_gather_progname},
       {"atrt-analyze-result.sh", &g_analyze_progname},
-      {"atrt-setup.sh", &g_setup_progname}};
+      {"atrt-backtrace.sh", nullptr},  // used by atrt-analyze-result.sh
+      {"atrt-setup.sh", &g_setup_progname},
+      {"atrt-analyze-coverage.sh", &g_analyze_coverage_progname},
+      {"atrt-compute-coverage.sh", &g_compute_coverage_progname}};
 
   for (auto &script : scripts) {
     BaseString script_full_path;
     script_full_path.assfmt("%s/%s", atrt_path, script.name);
+
     if (!File_class::exists(script_full_path.c_str())) {
       g_logger.critical("atrt script %s could not be found in %s", script.name,
                         atrt_path);
       return false;
     }
-    *script.path = strdup(script_full_path.c_str());
+
+    if (script.path != nullptr) {
+      *script.path = strdup(script_full_path.c_str());
+    }
   }
   return true;
 }
@@ -1438,16 +1688,17 @@ int check_testcase_file_main(int argc, char **argv) {
       int ntests = 0;
       int num_element_lines;
       while ((num_element_lines = read_test_case(f, line_num, tc_dummy)) > 0) {
+        if (num_element_lines == ERR_CORRUPT_TESTCASE) break;
         ntests++;
       }
-      // If line count does not change that indicates end of file.
-      if (num_element_lines >= 0) {
-        printf("%s: Contains %d tests in %d lines.\n", argv[argi], ntests,
-               line_num);
-      } else {
+      // If line count is 0, it indicates end of file.
+      if (num_element_lines == ERR_CORRUPT_TESTCASE) {
         ok = false;
         g_logger.critical("%s: Error at line %d (error %d)\n", argv[argi],
                           line_num, num_element_lines);
+      } else {
+        printf("%s: Contains %d tests in %d lines.\n", argv[argi], ntests,
+               line_num);
       }
       fclose(f);
     }
@@ -1478,8 +1729,13 @@ void print_testcase_file_syntax() {
       "mysqld   - Arguments that atrt will use when starting mysqld.\n"
       "cmd-type - If 'mysql' change test process type from ndbapi to client.\n"
       "name     - Change name of test.  Default is given by cmd and args.\n"
-      "force-cluster-restart - If 'yes' force restart the cluster before\n"
-      "                        running test.\n"
+      "force-cluster-restart - If 'before', force restart the cluster before\n"
+      "                        running the test case.\n"
+      "                        If 'after', force restart the cluster after\n"
+      "                        running the test case.\n"
+      "                        If 'both', force restart the cluster before\n"
+      "                        and after running the test case.\n"
+      "                        If 'none', no forceful cluster restart.\n"
       "max-retries - Maximum number of retries after test failed.\n"
       ""
       "\n"

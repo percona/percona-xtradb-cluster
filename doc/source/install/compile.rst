@@ -4,7 +4,7 @@
 Compiling and Installing from Source Code
 =========================================
 
-If you want to compile |PXC|, you can find the source code on
+If you want to compile Percona XtraDB Cluster, you can find the source code on
 `GitHub <https://github.com/percona/percona-xtradb-cluster>`_.
 Before you begin, make sure that the following packages are installed:
 
@@ -72,7 +72,7 @@ dependencies:
 
 .. code-block:: bash
 
-   $ sudo apt-get install -y git scons gcc g++ openssl check cmake bison \
+   $ sudo apt install -y git scons gcc g++ openssl check cmake bison \
    libboost-all-dev libasio-dev libaio-dev libncurses5-dev libreadline-dev \
    libpam-dev socat libcurl-dev
    
@@ -84,9 +84,9 @@ dependencies:
    boost-devel asio-devel libaio-devel ncurses-devel readline-devel pam-devel \
    socat libcurl-devel
 
-To compile |PXC| from source code:
+To compile Percona XtraDB Cluster from source code:
 
-1. Clone the |PXC| repository:
+1. Clone the Percona XtraDB Cluster repository:
 
    .. code-block:: bash
 

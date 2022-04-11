@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2018, 2020 Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -80,11 +80,32 @@ class MPMCQueueMS2Lock {
    *
    * @returns if item was enqueued
    * @retval true item got assigned to queue
-   * @retval false queue is full
    */
   bool enqueue(const T &item) {
     Node *node = new Node;
     node->data = item;
+
+    {
+      std::unique_lock<std::mutex> lk(tail_mutex_);
+
+      tail_->next = node;
+      tail_ = node;
+    }
+
+    return true;
+  }
+
+  /**
+   * enqueue an element.
+   *
+   * @param item item to enqueue
+   *
+   * @returns if item was enqueued
+   * @retval true item got assigned to queue
+   */
+  bool enqueue(T &&item) {
+    Node *node = new Node;
+    node->data = std::move(item);
 
     {
       std::unique_lock<std::mutex> lk(tail_mutex_);

@@ -8,7 +8,7 @@ let bugdir= $MYSQLTEST_VARDIR/tmp/log_file;
 
 --source include/shutdown_mysqld.inc
 let SEARCH_FILE = $bugdir/my_restart.err;
-let $args=--defaults-file=$bugdir/my.cnf --loose-console --innodb_dedicated_server=OFF --core-file --log-error-verbosity=3 > $SEARCH_FILE 2>&1 ;
+let $args=--defaults-file=$bugdir/my.cnf --loose-console --innodb_dedicated_server=OFF --core-file --log-error-verbosity=3 --pxc-encrypt-cluster-traffic=OFF > $SEARCH_FILE 2>&1 ;
 
 --echo # Write tmp/log_file/my.cnf
 --write_file $bugdir/my.cnf
@@ -44,6 +44,7 @@ let SEARCH_PATTERN=\[ERROR\] .*MY-\\d+.* File .*ibdata1: 'open' returned OS erro
 --force-rmdir $bugdir/data/mysql
 --list_files $bugdir/data
 --rmdir $bugdir/data/undo_002
+--remove_file $bugdir/data/auto.cnf
 
 --echo # Start mysqld to create tablespaces according to my.cnf
 --exec $MYSQLD $args --initialize-insecure

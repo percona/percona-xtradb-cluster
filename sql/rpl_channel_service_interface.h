@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -93,7 +93,7 @@ struct Channel_creation_info {
   int auto_position;
   int channel_mts_parallel_type;
   int channel_mts_parallel_workers;
-  int channel_mts_checkpoint_group;
+  int channel_mta_checkpoint_group;
   int replicate_same_server_id;
   int thd_tx_priority;  // The applier thread priority
   int sql_delay;
@@ -105,6 +105,10 @@ struct Channel_creation_info {
                              // available
   char *compression_algorithm;
   unsigned int zstd_compression_level;
+  /* to enable async connection failover */
+  int m_source_connection_auto_failover{0};
+  bool m_ignore_write_set_memory_limit;
+  bool m_allow_drop_write_set;
 };
 
 void initialize_channel_creation_info(Channel_creation_info *channel_info);
@@ -422,6 +426,18 @@ bool is_partial_transaction_on_channel_relay_log(const char *channel);
   @retval          false              none of the the channels are running.
 */
 bool is_any_slave_channel_running(int thread_mask);
+
+/**
+  Checks if any running channel uses the same UUID for
+  assign_gtids_to_anonymous_transactions as the group_name
+
+  @param[in]        group_name        the group name
+
+  @retval          true               atleast one channel has the same uuid
+  @retval          false              none of the the channels have the same
+  uuid
+*/
+bool channel_has_same_uuid_as_group_name(const char *group_name);
 
 /**
   Method to get the credentials configured for a channel

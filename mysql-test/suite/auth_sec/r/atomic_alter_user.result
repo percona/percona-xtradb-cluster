@@ -10,6 +10,8 @@ userX
 userY	
 userZ	
 mysql.infoschema	$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED
+mysql.pxc.internal.session	$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED
+mysql.pxc.sst.role	
 mysql.session	$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED
 mysql.sys	$A$005$THISISACOMBINATIONOFINVALIDSALTANDPASSWORDTHATMUSTNEVERBRBEUSED
 root	
@@ -74,6 +76,8 @@ user
 userY
 userZ
 mysql.infoschema
+mysql.pxc.internal.session
+mysql.pxc.sst.role
 mysql.session
 mysql.sys
 root
@@ -130,6 +134,8 @@ SELECT user FROM mysql.user;
 user
 userY
 mysql.infoschema
+mysql.pxc.internal.session
+mysql.pxc.sst.role
 mysql.session
 mysql.sys
 root

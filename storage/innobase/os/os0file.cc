@@ -1,6 +1,6 @@
 /***********************************************************************
 
-Copyright (c) 1995, 2020, Oracle and/or its affiliates.
+Copyright (c) 1995, 2021, Oracle and/or its affiliates.
 Copyright (c) 2009, 2016, Percona Inc.
 
 Portions of this file contain modifications contributed and copyrighted
@@ -97,6 +97,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include <ctime>
 #include <functional>
 #include <new>
+#include <ostream>
 #include <vector>
 
 #ifdef UNIV_HOTBACKUP
@@ -128,7 +129,7 @@ static const size_t MAX_BLOCKS = 128;
 #define BUFFER_BLOCK_SIZE ((ulint)(UNIV_PAGE_SIZE * 1.3))
 
 /** Disk sector size of aligning write buffer for DIRECT_IO */
-ulint os_io_ptr_align = UNIV_SECTOR_SIZE;
+static ulint os_io_ptr_align = UNIV_SECTOR_SIZE;
 
 /** Set to true when default master key is used. This variable
 main purpose is to avoid extra Encryption::get_master_key() when there
@@ -297,6 +298,7 @@ mysql_pfs_key_t innodb_bmp_file_key;
 #endif /* UNIV_PFS_IO */
 
 #endif /* !UNIV_HOTBACKUP */
+
 /** The asynchronous I/O context */
 struct Slot {
   /** Default constructor/assignment etc. are OK */
@@ -401,15 +403,42 @@ struct Slot {
     memset(&control, 0, sizeof(control));
 #endif /* LINUX_NATIVE_AIO */
   }
+
+  /** Serialize the object into JSON format.
+  @return the object in JSON format. */
+  std::string to_json() const noexcept MY_ATTRIBUTE((warn_unused_result));
+
+  /** Print this object into the given output stream.
+  @return the output stream into which object was printed. */
+  std::ostream &print(std::ostream &out) const noexcept;
 };
+
+std::string Slot::to_json() const noexcept {
+  std::ostringstream out;
+  out << "{";
+  out << "\"className\": \"Slot\",";
+  out << "\"objectPtr\": \"" << (void *)this << "\",";
+  out << "\"buf_block\": \"" << (void *)buf_block << "\"";
+  out << "}";
+  return out.str();
+}
+
+std::ostream &Slot::print(std::ostream &out) const noexcept {
+  out << to_json();
+  return (out);
+}
+
+inline std::ostream &operator<<(std::ostream &out, const Slot &obj) noexcept {
+  return (obj.print(out));
+}
 
 /** The asynchronous i/o array structure */
 class AIO {
  public:
   /** Constructor
-  @param[in]	id		Latch ID
-  @param[in]	n		Number of slots to configure
-  @param[in]	segments	Number of segments to configure */
+  @param[in]	id		The latch ID
+  @param[in]	n		Number of AIO slots
+  @param[in]	segments	Number of segments */
   AIO(latch_id_t id, ulint n, ulint segments);
 
   /** Destructor */
@@ -423,21 +452,19 @@ class AIO {
   until not_full-event becomes signaled.
 
   @param[in,out]	type	IO context
-  @param[in,out]	m1	message to be passed along with the AIO
-                          operation
-  @param[in,out]	m2	message to be passed along with the AIO
-                          operation
+  @param[in,out]	m1	message to be passed along with AIO operation
+  @param[in,out]	m2	message to be passed along with AIO operation
   @param[in]	file	file handle
-  @param[in]	name	name of the file or path as a null-terminated
-                          string
+  @param[in]	name	name of the file or path as a null-terminated string
   @param[in,out]	buf	buffer where to read or from which to write
-  @param[in]	offset	file offset, where to read from or start writing
-  @param[in]	len	length of the block to read or write
+  @param[in]	offset	        file offset, where to read from or start writing
+  @param[in]	len	        length of the block to read or write
+  @param[in]	e_block         Encrypted block or nullptr.
   @return pointer to slot */
   Slot *reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
                      pfs_os_file_t file, const char *name, void *buf,
-                     os_offset_t offset, ulint len, space_id_t space_id)
-      MY_ATTRIBUTE((warn_unused_result));
+                     os_offset_t offset, ulint len, const file::Block *e_block,
+                     space_id_t space_id) MY_ATTRIBUTE((warn_unused_result));
 
   /** @return number of reserved slots */
   ulint pending_io_count() const;
@@ -460,12 +487,12 @@ class AIO {
     return (&m_slots[i]);
   }
 
-  /** Frees a slot in the AIO array, assumes caller owns the mutex.
-  @param[in,out]	slot	Slot to release */
+  /** Frees a slot in the aio array. Assumes caller owns the mutex.
+  @param[in,out]	slot		Slot to release */
   void release(Slot *slot);
 
-  /** Frees a slot in the AIO array, assumes caller doesn't own the mutex.
-  @param[in,out]	slot	Slot to release */
+  /** Frees a slot in the AIO array. Assumes caller doesn't own the mutex.
+  @param[in,out]	slot		Slot to release */
   void release_with_mutex(Slot *slot);
 
   /** Prints info about the aio array.
@@ -495,8 +522,8 @@ class AIO {
   /** Release the mutex */
   void release() const { mutex_exit(&m_mutex); }
 
-  /** Write out the state to the file/stream
-  @param[in, out]	file	File to write to */
+  /** Prints all pending IO for the array
+  @param[in,out]	file	file where to print */
   void to_file(FILE *file) const;
 
   /** Submit buffered AIO requests on the given segment to the kernel.
@@ -602,11 +629,14 @@ class AIO {
   }
 #endif /* _WIN32 */
 
-  /** Create an instance using new(std::nothrow)
+  /** Creates an aio wait array. Note that we return NULL in case of failure.
+  We don't care about freeing memory here because we assume that a
+  failure will result in server refusing to start up.
   @param[in]	id		Latch ID
-  @param[in]	n		The number of AIO request slots
-  @param[in]	n_segments	The number of segments
-  @return a new AIO instance */
+  @param[in]	n		maximum number of pending AIO operations
+                                  allowed; n must be divisible by m_n_segments
+  @param[in]	n_segments	number of segments in the AIO array
+  @return own: AIO array, NULL on failure */
   static AIO *create(latch_id_t id, ulint n, ulint n_segments)
       MY_ATTRIBUTE((warn_unused_result));
 
@@ -657,10 +687,8 @@ class AIO {
   static ulint get_segment_no_from_slot(const AIO *array, const Slot *slot)
       MY_ATTRIBUTE((warn_unused_result));
 
-  /** Wakes up a simulated AIO I/O-handler thread if it has something
-  to do.
-  @param[in]	global_segment	the number of the segment in the
-                                  AIO arrays */
+  /** Wakes up a simulated AIO I/O handler thread if it has something to do.
+  @param[in]	global_segment	The number of the segment in the AIO arrays */
   static void wake_simulated_handler_thread(ulint global_segment);
 
   /** Check if it is a read request
@@ -689,19 +717,18 @@ class AIO {
   @return DB_SUCCESS or error code */
   dberr_t init_slots() MY_ATTRIBUTE((warn_unused_result));
 
-  /** Wakes up a simulated AIO I/O-handler thread if it has something
-  to do for a local segment in the AIO array.
-  @param[in]	global_segment	the number of the segment in the
-                                  AIO arrays
-  @param[in]	segment		the local segment in the AIO array */
+  /** Wakes up a simulated AIO I/O-handler thread if it has something to do
+  for a local segment in the AIO array.
+  @param[in]	global_segment	The number of the segment in the AIO arrays
+  @param[in]	segment		The local segment in the AIO array */
   void wake_simulated_handler_thread(ulint global_segment, ulint segment);
 
   /** Prints pending IO requests per segment of an aio array.
   We probably don't need per segment statistics but they can help us
   during development phase to see if the IO requests are being
   distributed as expected.
-  @param[in,out]	file		file where to print
-  @param[in]	segments	pending IO array */
+  @param[in,out]	file		File where to print
+  @param[in]	segments	Pending IO array */
   void print_segment_info(FILE *file, const ulint *segments);
 
 #ifdef LINUX_NATIVE_AIO
@@ -742,6 +769,13 @@ class AIO {
   /** Number of reserved slots in the AIO array outside
   the ibuf segment */
   ulint m_n_reserved;
+
+  /** The index of last slot used to reserve. This is used to balance the
+   incoming requests more evenly throughout the segments.
+   This field is not guarded by any lock.
+   This is only used as a heuristic and any value read or written to it is OK.
+   It is atomic as it is accesses without any latches from multiple threads. */
+  std::atomic_size_t m_last_slot_used;
 
 #ifdef _WIN32
   typedef std::vector<HANDLE, ut_allocator<HANDLE>> Handles;
@@ -803,10 +837,10 @@ AIO *AIO::s_sync;
 
 #if defined(LINUX_NATIVE_AIO)
 /** timeout for each io_getevents() call = 500ms. */
-static const ulint OS_AIO_REAP_TIMEOUT = 500000000UL;
+static constexpr uint64_t OS_AIO_REAP_TIMEOUT = 500000000UL;
 
-/** time to sleep, in microseconds if io_setup() returns EAGAIN. */
-static const ulint OS_AIO_IO_SETUP_RETRY_SLEEP = 500000UL;
+/** time to sleep, in milliseconds if io_setup() returns EAGAIN. */
+static constexpr uint64_t OS_AIO_IO_SETUP_RETRY_SLEEP_MS = 500UL;
 
 /** number of attempts before giving up on io_setup(). */
 static const int OS_AIO_IO_SETUP_RETRY_ATTEMPTS = 5;
@@ -830,9 +864,9 @@ static ulint os_n_file_reads_old = 0;
 static ulint os_n_file_writes_old = 0;
 static ulint os_n_fsyncs_old = 0;
 /** Number of pending write operations */
-ulint os_n_pending_writes = 0;
+std::atomic<ulint> os_n_pending_writes{0};
 /** Number of pending read operations */
-ulint os_n_pending_reads = 0;
+std::atomic<ulint> os_n_pending_reads{0};
 
 static ib_time_monotonic_t os_last_printout;
 bool os_has_said_disk_full = false;
@@ -859,8 +893,7 @@ static bool os_file_handle_error(const char *name, const char *operation);
 @return DB_SUCCESS or error code */
 dberr_t os_file_punch_hole(os_file_t fh, os_offset_t off, os_offset_t len);
 
-/**
-Does error handling when a file operation fails.
+/** Does error handling when a file operation fails.
 @param[in]	name		File name or NULL
 @param[in]	operation	Name of operation e.g., "read", "write"
 @param[in]	on_error_silent	if true then don't print any message to the log.
@@ -981,6 +1014,10 @@ static bool os_file_can_delete(const char *name) {
   return (false);
 }
 
+byte *os_block_get_frame(const file::Block *block) noexcept {
+  return (static_cast<byte *>(ut_align(block->m_ptr, os_io_ptr_align)));
+}
+
 file::Block *os_alloc_block() noexcept {
   size_t pos;
   Blocks &blocks = *block_cache;
@@ -1002,32 +1039,32 @@ file::Block *os_alloc_block() noexcept {
 
       block = new (ptr) file::Block();
       block->m_ptr = static_cast<byte *>(ptr + sizeof(*block));
-      block->m_in_use = 1;
+      block->m_in_use = true;
 
       break;
     }
 
     pos = i++ % size;
 
-    if (TAS(&blocks[pos].m_in_use, 1) == 0) {
+    if (blocks[pos].m_in_use.exchange(true) == false) {
       block = &blocks[pos];
       break;
     }
 
-    os_thread_yield();
+    std::this_thread::yield();
 
     ++retry;
   }
 
-  ut_a(block->m_in_use != 0);
+  ut_a(block->m_in_use);
 
   return (block);
 }
 
 void os_free_block(file::Block *block) noexcept {
-  ut_ad(block->m_in_use == 1);
+  ut_ad(block->m_in_use);
 
-  TAS(&block->m_in_use, 0);
+  block->m_in_use.store(false);
 
   /* When this block is not in the block cache, and it's
   a temporary block, we need to free it directly. */
@@ -1099,8 +1136,7 @@ class AIOHandler {
     const byte *src = slot->buf;
 
     version = mach_read_from_1(src + FIL_PAGE_VERSION);
-
-    ut_a(version == 1);
+    ut_a(Compression::is_valid_page_version(version));
 
     /* Includes the page header size too */
     ulint size = compressed_page_size(slot);
@@ -1179,7 +1215,7 @@ ulint os_file_compressed_page_size(const byte *buf) {
 
   if (type == FIL_PAGE_COMPRESSED) {
     ulint version = mach_read_from_1(buf + FIL_PAGE_VERSION);
-    ut_a(version == 1);
+    ut_a(Compression::is_valid_page_version(version));
     return (mach_read_from_2(buf + FIL_PAGE_COMPRESS_SIZE_V1));
   }
 
@@ -1195,7 +1231,7 @@ ulint os_file_original_page_size(const byte *buf) {
 
   if (type == FIL_PAGE_COMPRESSED) {
     ulint version = mach_read_from_1(buf + FIL_PAGE_VERSION);
-    ut_a(version == 1);
+    ut_a(Compression::is_valid_page_version(version));
 
     return (mach_read_from_2(buf + FIL_PAGE_ORIGINAL_SIZE_V1));
   }
@@ -1295,7 +1331,8 @@ dberr_t AIOHandler::post_io_processing(Slot *slot) {
       }
 
       ut_ad(err == DB_SUCCESS || err == DB_UNSUPPORTED ||
-            err == DB_CORRUPTION || err == DB_IO_DECOMPRESS_FAIL);
+            err == DB_CORRUPTION || err == DB_IO_DECOMPRESS_FAIL ||
+            err == DB_IO_DECRYPT_FAIL);
     } else if (!slot->type.is_log() && slot->type.is_read() &&
                Encryption::can_page_be_keyring_encrypted(slot->buf) &&
                !slot->type.is_encryption_disabled()) {
@@ -1383,6 +1420,8 @@ byte *os_file_compress_page(Compression compression, ulint block_size,
 
   /* Shouldn't compress an already compressed page. */
   ut_ad(page_type != FIL_PAGE_COMPRESSED);
+  ut_ad(page_type != FIL_PAGE_ENCRYPTED);
+  ut_ad(page_type != FIL_PAGE_COMPRESSED_AND_ENCRYPTED);
 
   /* The page must be at least twice as large as the file system
   block size if we are to save any space. Ignore R-Tree pages for now,
@@ -1470,7 +1509,7 @@ byte *os_file_compress_page(Compression compression, ulint block_size,
   /* Add compression control information. Required for decompressing. */
   mach_write_to_2(dst + FIL_PAGE_TYPE, FIL_PAGE_COMPRESSED);
 
-  mach_write_to_1(dst + FIL_PAGE_VERSION, 1);
+  mach_write_to_1(dst + FIL_PAGE_VERSION, Compression::FIL_PAGE_VERSION_2);
 
   mach_write_to_1(dst + FIL_PAGE_ALGORITHM_V1, compression.m_type);
 
@@ -1535,7 +1574,7 @@ static bool os_aio_validate_skip() {
 #define USE_FILE_LOCK
 #if defined(UNIV_HOTBACKUP) || defined(_WIN32)
 /* InnoDB Hot Backup does not lock the data files.
- * On Windows, mandatory locking is used.
+ On Windows, mandatory locking is used.
  */
 #undef USE_FILE_LOCK
 #endif /* UNIV_HOTBACKUP || _WIN32 */
@@ -1568,8 +1607,9 @@ static int os_file_lock(int fd, const char *name) {
 }
 #endif /* USE_FILE_LOCK */
 
-/** Calculates local segment number and aio array from global segment number.
-@param[out]	array		aio wait array
+/** Calculates local segment number and aio array from global
+segment number.
+@param[out]	array		AIO wait array
 @param[in]	segment		global segment number
 @return local segment number within the aio array */
 ulint AIO::get_array_and_local_segment(AIO *&array, ulint segment) {
@@ -1658,26 +1698,20 @@ void AIO::release_with_mutex(Slot *slot) {
 }
 
 #ifndef UNIV_HOTBACKUP
-/** Creates a temporary file.  This function is like tmpfile(3), but
-the temporary file is created in the given parameter path. If the path
-is NULL then it will create the file in the MySQL server configuration
-parameter (--tmpdir).
-@param[in]	path	location for creating temporary file
-@return temporary file handle, or NULL on error */
-FILE *os_file_create_tmpfile(const char *path) {
+FILE *os_file_create_tmpfile() {
   FILE *file = nullptr;
 #ifdef WITH_WSREP
   WAIT_ALLOW_WRITES();
 #endif /* WITH_WSREP */
-  int fd = innobase_mysql_tmpfile(path);
+  int fd = innobase_mysql_tmpfile(mysql_tmpdir);
 
   if (fd >= 0) {
     file = fdopen(fd, "w+b");
   }
 
   if (file == nullptr) {
-    ib::error(ER_IB_MSG_751)
-        << "Unable to create temporary file; errno: " << errno;
+    ib::error(ER_IB_MSG_751) << "Unable to create temporary file inside \""
+                             << mysql_tmpdir << "\"; errno: " << errno;
 
     if (fd >= 0) {
       close(fd);
@@ -1807,8 +1841,8 @@ static bool load_key_needed_for_decryption(const IORequest &type,
 @param[in,out]	scratch		Scratch area for read decompression
 @param[in]	src_len		Length of the buffer before compression
 @param[in]	offset		file offset from the start where to read
-@param[in]	len		Used buffer length for write and output
-                                buf len for read
+@param[in]	len		Compressed buffer length for write and size
+                                of buf len for read
 @return DB_SUCCESS or error code */
 static dberr_t os_file_io_complete(const IORequest &type, os_file_t fh,
                                    byte *buf, byte *scratch, ulint src_len,
@@ -1829,6 +1863,7 @@ static dberr_t os_file_io_complete(const IORequest &type, os_file_t fh,
 
     return (ret);
   } else if (type.is_read()) {
+    ut_ad(!type.is_row_log());
     Encryption encryption(type.encryption_algorithm());
 
     bool is_page_encrypted = type.is_encryption_disabled()
@@ -1905,8 +1940,7 @@ to the last directory separator that the caller has fixed.
 @param[in]	path		path name
 @param[in]	last_slash	last directory separator in the path
 @return true if this path is a drive root, false if not */
-UNIV_INLINE
-bool os_file_is_root(const char *path, const char *last_slash) {
+static inline bool os_file_is_root(const char *path, const char *last_slash) {
   return (
 #ifdef _WIN32
       (last_slash == path + 2 && path[1] == ':') ||
@@ -1973,7 +2007,7 @@ static char *os_file_get_parent_dir(const char *path) {
 
   if (last_slash - path < 0) {
     /* Sanity check, it prevents gcc from trying to handle this case which
-     * results in warnings for some optimized builds */
+    results in warnings for some optimized builds */
     return (nullptr);
   }
 
@@ -2078,18 +2112,29 @@ dberr_t os_file_create_subdirs_if_needed(const char *path) {
   return (success ? DB_SUCCESS : DB_ERROR);
 }
 
-/** Allocate the buffer for IO on a transparently compressed table.
-@param[in]	type		IO flags
-@param[out]	buf		buffer to read or write
-@param[in,out]	n		number of bytes to read/write, starting from
-                                offset
-@return pointer to allocated page, compressed data is written to the offset
-        that is aligned on the disk sector size */
-static file::Block *os_file_compress_page(IORequest &type, void *&buf,
-                                          ulint *n) {
+file::Block *os_file_compress_page(IORequest &type, void *&buf, ulint *n) {
   ut_ad(!type.is_log());
   ut_ad(type.is_write());
   ut_ad(type.is_compressed());
+
+#ifdef UNIV_DEBUG
+  /* Uncompressed length. */
+  const ulint buf_len = *n;
+  {
+    Fil_page_header fph(reinterpret_cast<byte *>(buf));
+    space_id_t space_id = fph.get_space_id();
+    page_no_t page_no = fph.get_page_no();
+    fil_space_t *space = fil_space_get(space_id);
+    if (space != nullptr) {
+      fil_node_t *node = space->get_file_node(&page_no);
+      ut_ad(node->block_size == type.block_size());
+      /* The page size must be a multiple of the OS punch hole size. */
+      ut_ad(!(*n % node->block_size));
+      ut_ad(
+          BlockReporter::is_lsn_valid(reinterpret_cast<byte *>(buf), buf_len));
+    }
+  }
+#endif /* UNIV_DEBUG */
 
   ulint n_alloc = *n * 2;
 
@@ -2133,7 +2178,8 @@ static file::Block *os_file_compress_page(IORequest &type, void *&buf,
     buf = buf_ptr;
     *n = compressed_len;
 
-    if (compressed_len >= old_compressed_len) {
+    if (compressed_len >= old_compressed_len &&
+        !type.is_punch_hole_optimisation_disabled()) {
       ut_ad(old_compressed_len <= UNIV_PAGE_SIZE);
 
       type.clear_punch_hole();
@@ -2143,14 +2189,7 @@ static file::Block *os_file_compress_page(IORequest &type, void *&buf,
   return (block);
 }
 
-/** Encrypt a page content when write it to disk.
-@param[in]	type		IO flags
-@param[out]	buf		buffer to read or write
-@param[in,out]	n		number of bytes to read/write, starting from
-                                offset
-@return pointer to the encrypted page */
-file::Block *os_file_encrypt_page(const IORequest &type, void *&buf,
-                                         ulint *n) {
+file::Block *os_file_encrypt_page(const IORequest &type, void *&buf, ulint *n) {
   byte *encrypted_page;
   ulint encrypted_len = *n;
   byte *buf_ptr;
@@ -2198,14 +2237,14 @@ static file::Block *os_file_encrypt_log(const IORequest &type, void *&buf,
 
   if (*n <= BUFFER_BLOCK_SIZE - os_io_ptr_align) {
     block = os_alloc_block();
-    buf_ptr = block->m_ptr;
+    buf_ptr = static_cast<byte *>(ut_align(block->m_ptr, os_io_ptr_align));
     scratch = nullptr;
   } else {
-    buf_ptr = static_cast<byte *>(ut_malloc_nokey(*n + os_io_ptr_align));
+    buf_ptr = static_cast<byte *>(ut::aligned_alloc(*n, os_io_ptr_align));
     scratch = buf_ptr;
   }
 
-  encrypted_log = static_cast<byte *>(ut_align(buf_ptr, os_io_ptr_align));
+  encrypted_log = buf_ptr;
 
   encrypted_log = encryption.encrypt_log(type, reinterpret_cast<byte *>(buf),
                                          *n, encrypted_log, &encrypted_len);
@@ -2904,7 +2943,8 @@ bool AIO::linux_create_io_ctx(ulint max_events, io_context_t *io_ctx) {
 
           ib::warn(ER_IB_MSG_758) << "io_setup() attempt " << n_retries << ".";
 
-          os_thread_sleep(OS_AIO_IO_SETUP_RETRY_SLEEP);
+          std::this_thread::sleep_for(
+              std::chrono::milliseconds(OS_AIO_IO_SETUP_RETRY_SLEEP_MS));
 
           continue;
         }
@@ -2992,23 +3032,22 @@ bool AIO::is_linux_native_aio_supported() {
 
   memset(&io_event, 0x0, sizeof(io_event));
 
-  byte *buf = static_cast<byte *>(ut_malloc_nokey(UNIV_PAGE_SIZE * 2));
-  byte *ptr = static_cast<byte *>(ut_align(buf, UNIV_PAGE_SIZE));
+  byte *buf =
+      static_cast<byte *>(ut::aligned_zalloc(UNIV_PAGE_SIZE, UNIV_PAGE_SIZE));
 
   struct iocb iocb;
 
   /* Suppress valgrind warning. */
-  memset(buf, 0x00, UNIV_PAGE_SIZE * 2);
   memset(&iocb, 0x0, sizeof(iocb));
 
   struct iocb *p_iocb = &iocb;
 
   if (!srv_read_only_mode) {
-    io_prep_pwrite(p_iocb, fd, ptr, UNIV_PAGE_SIZE, 0);
+    io_prep_pwrite(p_iocb, fd, buf, UNIV_PAGE_SIZE, 0);
 
   } else {
     ut_a(UNIV_PAGE_SIZE >= 512);
-    io_prep_pread(p_iocb, fd, ptr, 512, 0);
+    io_prep_pread(p_iocb, fd, buf, 512, 0);
   }
 
   int err = io_submit(io_ctx, 1, &p_iocb);
@@ -3018,7 +3057,7 @@ bool AIO::is_linux_native_aio_supported() {
     err = io_getevents(io_ctx, 1, 1, &io_event, nullptr);
   }
 
-  ut_free(buf);
+  ut::aligned_free(buf);
   close(fd);
 
   switch (err) {
@@ -3121,9 +3160,10 @@ static ulint os_file_get_last_error_low(bool report_all_errors,
   return (OS_FILE_ERROR_MAX + err);
 }
 
-/** Wrapper to fsync(2) that retries the call on some errors.
+/** Wrapper to fsync(2)/fdatasync(2) that retries the call on some errors.
 Returns the value 0 if successful; otherwise the value -1 is returned and
-the global variable errno is set to indicate the error.
+the global variable errno is set to indicate the error. srv_use_fdatasync
+determines whether fsync or fdatasync will be used. (true -> fdatasync)
 @param[in]	file		open file handle
 @return 0 if success, -1 otherwise */
 static int os_file_fsync_posix(os_file_t file) {
@@ -3141,7 +3181,11 @@ static int os_file_fsync_posix(os_file_t file) {
     meb_mutex.unlock();
 #endif /* UNIV_HOTBACKUP */
 
-    int ret = fsync(file);
+#if defined(HAVE_FDATASYNC) && defined(HAVE_DECL_FDATASYNC)
+    const auto ret = srv_use_fdatasync ? fdatasync(file) : fsync(file);
+#else
+    const auto ret = fsync(file);
+#endif
 
     if (ret == 0) {
       return (ret);
@@ -3159,7 +3203,7 @@ static int os_file_fsync_posix(os_file_t file) {
         }
 
         /* 0.2 sec */
-        os_thread_sleep(200000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
         break;
 
       case EIO: {
@@ -3618,7 +3662,7 @@ pfs_os_file_t os_file_create_func(const char *name, ulint create_mode,
       ib::info(ER_IB_MSG_780) << "Retrying to lock the first data file";
 
       for (int i = 0; i < 100; i++) {
-        os_thread_sleep(1000000);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
 
         if (!os_file_lock(file.m_file, name)) {
           *success = true;
@@ -3798,11 +3842,11 @@ bool os_file_rename_func(const char *oldpath, const char *newpath) {
   return (true);
 }
 
-/** NOTE! Use the corresponding macro os_file_close(), not directly this
-function!
+/** NOTE! Use the corresponding macro os_file_close(), not directly
+this function!
 Closes a file handle. In case of error, error number can be retrieved with
 os_file_get_last_error.
-@param[in]	file		Handle to close
+@param[in]	file		Handle to a file
 @return true if success */
 bool os_file_close_func(os_file_t file) {
   int ret = close(file);
@@ -3849,7 +3893,7 @@ bool os_file_advise(pfs_os_file_t file, os_offset_t offset, os_offset_t len,
 }
 
 /** Gets a file size.
-@param[in]	file		handle to an open file
+@param[in]	file		Handle to a file
 @return file size, or (os_offset_t) -1 on failure */
 os_offset_t os_file_get_size(pfs_os_file_t file) {
   /* Store current position */
@@ -3860,10 +3904,6 @@ os_offset_t os_file_get_size(pfs_os_file_t file) {
   return (file_size);
 }
 
-/** Gets a file size.
-@param[in]	filename	Full path to the filename to check
-@return file size if OK, else set m_total_size to ~0 and m_alloc_size to
-        errno */
 os_file_size_t os_file_get_size(const char *filename) {
   struct stat s;
   os_file_size_t file_size;
@@ -4162,13 +4202,17 @@ static bool os_is_sparse_file_supported_win32(const char *filename) {
         << "Failed to get the volume path name for: " << filename
         << "- OS error number " << GetLastError();
 
-    return (false);
+    return false;
   }
 
   DWORD flags;
 
-  GetVolumeInformation(volname, NULL, MAX_PATH, NULL, NULL, &flags, NULL,
-                       MAX_PATH);
+  result = GetVolumeInformation(volname, NULL, MAX_PATH, NULL, NULL, &flags,
+                                NULL, MAX_PATH);
+
+  if (!result) {
+    return false;
+  }
 
   return (flags & FILE_SUPPORTS_SPARSE_FILES) ? true : false;
 }
@@ -4407,7 +4451,7 @@ A simple function to open or create a file.
                                 string
 @param[in]	create_mode	create mode
 @param[in]	access_type	OS_FILE_READ_ONLY or OS_FILE_READ_WRITE
-@param[in]	read_only	if true read only mode checks are enforced
+@param[in]	read_only	if true, read only checks are enforced
 @param[out]	success		true if succeed, false if error
 @return handle to the file, not defined if error, error number
         can be retrieved with os_file_get_last_error */
@@ -4532,8 +4576,8 @@ the call succeeds, unless the fail_if_exists arguments is true.
 If another error occurs, such as a permission error, this does not crash,
 but reports the error and returns false.
 @param[in]	pathname	directory name as null-terminated string
-@param[in]	fail_if_exists	if true, pre-existing directory is treated
-                                as an error.
+@param[in]	fail_if_exists	if true, pre-existing directory is treated as
+                                an error.
 @return true if call succeeds, false on error */
 bool os_file_create_directory(const char *pathname, bool fail_if_exists) {
   BOOL rcode;
@@ -4855,13 +4899,36 @@ bool os_file_delete_if_exists_func(const char *name, bool *exist) {
     *exist = true;
   }
 
-  ulint count = 0;
+  char name_to_delete[MAX_PATH + 8];
 
+  uint32_t count = 0;
+  /* On Windows, deleting a file may fail if some other process uses it.
+  However, the file might have been opened with FILE_SHARE_DELETE mode, in
+  which case the delete will succeed, but the file will not be deleted,
+  only marked for deletion when all handles are closed. To work around this, we
+  first move the file to new randomized name, which will not collide with a real
+  name. */
+  for (DWORD random_id = GetTickCount(); count < 1000; ++count, ++random_id) {
+    random_id &= 0xFFFF;
+    sprintf(name_to_delete, "%s.%04X.d", name, random_id);
+    if (MoveFile(name, name_to_delete)) break;
+    auto err = GetLastError();
+    /* We have chosen the "random" value that is already being used. Try another
+    one. */
+    if (err == ERROR_ALREADY_EXISTS) continue;
+
+    if (err == ERROR_ACCESS_DENIED) continue;
+
+    /* We just failed to move the file. It may be being used without
+    FILE_SHARE_DELETE mode. We just try to delete the original filename.*/
+    sprintf(name_to_delete, "%s", name);
+
+    break;
+  }
+
+  count = 0;
   for (;;) {
-    /* In Windows, deleting an .ibd file may fail if mysqlbackup
-    is copying it */
-
-    bool ret = DeleteFile((LPCTSTR)name);
+    bool ret = DeleteFile((LPCTSTR)name_to_delete);
 
     if (ret) {
       return (true);
@@ -4880,17 +4947,26 @@ bool os_file_delete_if_exists_func(const char *name, bool *exist) {
 
     ++count;
 
-    if (count > 100 && 0 == (count % 10)) {
+    if (count % 10 == 0) {
       /* Print error information */
       os_file_get_last_error(true);
 
-      ib::warn(ER_IB_MSG_803) << "Delete of file '" << name << "' failed.";
+      if (strcmp(name, name_to_delete) == 0) {
+        ib::warn(ER_IB_MSG_803)
+            << "Failed to delete file '" << name_to_delete
+            << "'. Please check if any other process is using it.";
+      } else {
+        ib::warn(ER_IB_MSG_803)
+            << "Failed to delete file '" << name_to_delete
+            << "', which was renamed from '" << name
+            << "'. Please check if any other process is using it.";
+      }
     }
 
-    /* Sleep for a second */
-    os_thread_sleep(1000000);
+    /* Sleep for a 0.1 second */
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    if (count > 2000) {
+    if (count > 20) {
       return (false);
     }
   }
@@ -4900,46 +4976,13 @@ bool os_file_delete_if_exists_func(const char *name, bool *exist) {
 @param[in]	name		File path as NUL terminated string
 @return true if success */
 bool os_file_delete_func(const char *name) {
-  ulint count = 0;
-
-  for (;;) {
-    /* In Windows, deleting an .ibd file may fail if mysqlbackup
-    is copying it */
-
-    BOOL ret = DeleteFile((LPCTSTR)name);
-
-    if (ret) {
-      return (true);
-    }
-
-    if (GetLastError() == ERROR_FILE_NOT_FOUND) {
-      /* If the file does not exist, we classify this as
-      a 'mild' error and return */
-
-      return (false);
-    }
-
-    ++count;
-
-    if (count > 100 && 0 == (count % 10)) {
-      /* print error information */
-      os_file_get_last_error(true);
-
-      ib::warn(ER_IB_MSG_804)
-          << "Cannot delete file '" << name << "'. Are you running mysqlbackup"
-          << " to back up the file?";
-    }
-
-    /* sleep for a second */
-    os_thread_sleep(1000000);
-
-    if (count > 2000) {
-      return (false);
-    }
+  bool existed;
+  if (os_file_delete_if_exists_func(name, &existed)) {
+    /* File did not exist already, this is an error. */
+    return existed;
+  } else {
+    return false;
   }
-
-  ut_error;
-  return (false);
 }
 
 /** NOTE! Use the corresponding macro os_file_rename(), not directly this
@@ -4974,7 +5017,7 @@ bool os_file_rename_func(const char *oldpath, const char *newpath) {
 this function!
 Closes a file handle. In case of error, error number can be retrieved with
 os_file_get_last_error.
-@param[in,own]	file		Handle to a file
+@param[in]	file		Handle to a file
 @return true if success */
 bool os_file_close_func(os_file_t file) {
   ut_a(file != INVALID_HANDLE_VALUE);
@@ -5003,10 +5046,6 @@ os_offset_t os_file_get_size(pfs_os_file_t file) {
   return (os_offset_t(low | (os_offset_t(high) << 32)));
 }
 
-/** Gets a file size.
-@param[in]	filename	Full path to the filename to check
-@return file size if OK, else set m_total_size to ~0 and m_alloc_size to
-        errno */
 os_file_size_t os_file_get_size(const char *filename) {
   struct __stat64 s;
   os_file_size_t file_size;
@@ -5021,16 +5060,13 @@ os_file_size_t os_file_get_size(const char *filename) {
 
     low_size = GetCompressedFileSize(filename, &high_size);
 
-    if (low_size != INVALID_FILE_SIZE) {
+    if (low_size != INVALID_FILE_SIZE || GetLastError() == NO_ERROR) {
       file_size.m_alloc_size = high_size;
       file_size.m_alloc_size <<= 32;
       file_size.m_alloc_size |= low_size;
-
     } else {
-      ib::error(ER_IB_MSG_805)
-          << "GetCompressedFileSize(" << filename << ", ..) failed.";
-
-      file_size.m_alloc_size = (os_offset_t)-1;
+      file_size.m_total_size = ~0;
+      file_size.m_alloc_size = (os_offset_t)errno;
     }
   } else {
     file_size.m_total_size = ~0;
@@ -5341,11 +5377,9 @@ void Dir_Walker::walk_win32(const Path &basedir, bool recursive, Function &&f) {
       if ((dirent.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && recursive) {
         path.append("\\*");
 
-        using value_type = Stack::value_type;
+        using Value = Stack::value_type;
 
-        value_type dir(path, current.m_depth + 1);
-
-        directories.push(dir);
+        directories.push(Value{path, current.m_depth + 1});
 
       } else {
         f(path, current.m_depth + 1);
@@ -5363,7 +5397,7 @@ void Dir_Walker::walk_win32(const Path &basedir, bool recursive, Function &&f) {
 }
 #endif /* !_WIN32*/
 
-/** Does a syncronous read or write depending upon the type specified
+/** Does a synchronous read or write depending upon the type specified
 In case of partial reads/writes the function tries
 NUM_RETRIES_ON_PARTIAL_IO times to read/write the complete data.
 @param[in]	in_type		IO flags
@@ -5372,10 +5406,11 @@ NUM_RETRIES_ON_PARTIAL_IO times to read/write the complete data.
 @param[in]	offset		file offset from the start where to read
 @param[in]	n		number of bytes to read, starting from offset
 @param[out]	err		DB_SUCCESS or error code
+@param[in]	e_block         encrypted block or nullptr.
 @return number of bytes read/written, -1 if error */
 static MY_ATTRIBUTE((warn_unused_result)) ssize_t
     os_file_io(const IORequest &in_type, os_file_t file, void *buf, ulint n,
-               os_offset_t offset, dberr_t *err) {
+               os_offset_t offset, dberr_t *err, const file::Block *e_block) {
   ulint original_n = n;
   file::Block *block{};
   IORequest type = in_type;
@@ -5385,7 +5420,15 @@ static MY_ATTRIBUTE((warn_unused_result)) ssize_t
   if (type.is_compressed()) {
     /* We don't compress the first page of any file. */
     ut_ad(offset > 0);
-    block = os_file_compress_page(type, buf, &n);
+    ut_ad(!type.is_log());
+    if (e_block == nullptr) {
+      block = os_file_compress_page(type, buf, &n);
+    } else {
+      /* Since e_block is valid, encryption must have already happened. Since we
+      do compression before encryption, we assert here that there is no
+      encryption involved. */
+      ut_ad(!type.is_encrypted());
+    }
   } else {
     block = nullptr;
   }
@@ -5393,7 +5436,7 @@ static MY_ATTRIBUTE((warn_unused_result)) ssize_t
   /* We do encryption after compression, since if we do encryption
   before compression, the encrypted data will cause compression fail
   or low compression rate. */
-  if (type.is_encrypted() && type.is_write() &&
+  if ((type.is_encrypted() || e_block != nullptr) && type.is_write() &&
       (type.encryption_algorithm().get_type() != Encryption::KEYRING ||
        (type.encryption_algorithm().get_key() != NULL &&
         Encryption::can_page_be_keyring_encrypted(
@@ -5403,8 +5446,16 @@ static MY_ATTRIBUTE((warn_unused_result)) ssize_t
       auto compressed_block = block;
       ut_ad(offset > 0);
 
-      ut_ad(type.encryption_algorithm().get_key() != NULL);
-      block = os_file_encrypt_page(type, buf, &n);
+      /* If dblwr is involved, we should not be reaching here, because we
+      encrypt the page at higher layer so that the same encrypted page can be
+      written to the dblwr file and the data file. During importing an
+      encrypted tablespace, we reach here. */
+      if (e_block == nullptr) {
+        ut_ad(type.encryption_algorithm().get_key() != NULL);
+        block = os_file_encrypt_page(type, buf, &n);
+      } else {
+        block = const_cast<file::Block *>(e_block);
+      }
 
       if (compressed_block != nullptr) {
         os_free_block(compressed_block);
@@ -5474,7 +5525,9 @@ static MY_ATTRIBUTE((warn_unused_result)) ssize_t
     ut_free(encrypt_log_buf);
   }
 
-  *err = DB_IO_ERROR;
+  if (*err != DB_IO_DECRYPT_FAIL) {
+    *err = DB_IO_ERROR;
+  }
 
   if (!type.is_partial_io_warning_disabled()) {
     ib::warn(ER_IB_MSG_813)
@@ -5492,10 +5545,12 @@ static MY_ATTRIBUTE((warn_unused_result)) ssize_t
 @param[in]	n		number of bytes to read, starting from offset
 @param[in]	offset		file offset from the start where to read
 @param[out]	err		DB_SUCCESS or error code
+@param[in]	e_block         encrypted block or nullptr.
 @return number of bytes written, -1 if error */
 static MY_ATTRIBUTE((warn_unused_result)) ssize_t
     os_file_pwrite(IORequest &type, os_file_t file, const byte *buf, ulint n,
-                   os_offset_t offset, dberr_t *err) {
+                   os_offset_t offset, dberr_t *err,
+                   const file::Block *e_block) {
 #ifdef UNIV_HOTBACKUP
   static meb::Mutex meb_mutex;
 #endif /* UNIV_HOTBACKUP */
@@ -5510,12 +5565,13 @@ static MY_ATTRIBUTE((warn_unused_result)) ssize_t
   meb_mutex.unlock();
 #endif /* UNIV_HOTBACKUP */
 
-  (void)os_atomic_increment_ulint(&os_n_pending_writes, 1);
+  os_n_pending_writes.fetch_add(1);
   MONITOR_ATOMIC_INC(MONITOR_OS_PENDING_WRITES);
 
-  ssize_t n_bytes = os_file_io(type, file, (void *)buf, n, offset, err);
+  ssize_t n_bytes =
+      os_file_io(type, file, (void *)buf, n, offset, err, e_block);
 
-  (void)os_atomic_decrement_ulint(&os_n_pending_writes, 1);
+  os_n_pending_writes.fetch_sub(1);
   MONITOR_ATOMIC_DEC(MONITOR_OS_PENDING_WRITES);
 
   return (n_bytes);
@@ -5529,11 +5585,13 @@ static MY_ATTRIBUTE((warn_unused_result)) ssize_t
 @param[out]	buf		buffer from which to write
 @param[in]	offset		file offset from the start where to read
 @param[in]	n		number of bytes to read, starting from offset
+@param[in]	e_block         encrypted block or nullptr.
 @return DB_SUCCESS if request was successful, false if fail */
 static MY_ATTRIBUTE((warn_unused_result)) dberr_t
     os_file_write_page(IORequest &type, const char *name, os_file_t file,
-                       const byte *buf, os_offset_t offset, ulint n) {
-  dberr_t err;
+                       const byte *buf, os_offset_t offset, ulint n,
+                       const file::Block *e_block) {
+  dberr_t err(DB_ERROR_UNSET);
 
   ut_ad(type.validate());
   ut_ad(n > 0);
@@ -5541,7 +5599,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
   WAIT_ALLOW_WRITES();
 #endif /* WITH_WSREP */
 
-  ssize_t n_bytes = os_file_pwrite(type, file, buf, n, offset, &err);
+  ssize_t n_bytes = os_file_pwrite(type, file, buf, n, offset, &err, e_block);
 
   if ((ulint)n_bytes != n && !os_has_said_disk_full) {
     ib::error(ER_IB_MSG_814) << "Write to file " << name << " failed at offset "
@@ -5594,14 +5652,14 @@ static MY_ATTRIBUTE((warn_unused_result)) ssize_t
 
   const ib_time_monotonic_us_t start_time = trx_stats::start_io_read(trx, n);
 
-  (void)os_atomic_increment_ulint(&os_n_pending_reads, 1);
+  os_n_pending_reads.fetch_add(1);
   MONITOR_ATOMIC_INC(MONITOR_OS_PENDING_READS);
 
-  ssize_t n_bytes = os_file_io(type, file, buf, n, offset, err);
+  ssize_t n_bytes = os_file_io(type, file, buf, n, offset, err, nullptr);
 
   trx_stats::end_io_read(trx, start_time);
 
-  (void)os_atomic_decrement_ulint(&os_n_pending_reads, 1);
+  os_n_pending_reads.fetch_sub(1);
   MONITOR_ATOMIC_DEC(MONITOR_OS_PENDING_READS);
 
   return (n_bytes);
@@ -5622,6 +5680,8 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
     os_file_read_page(IORequest &type, const char *file_name, os_file_t file,
                       void *buf, os_offset_t offset, ulint n, ulint *o,
                       bool exit_on_err, trx_t *trx) {
+  dberr_t err(DB_ERROR_UNSET);
+
 #ifdef UNIV_HOTBACKUP
   static meb::Mutex meb_mutex;
 
@@ -5635,7 +5695,6 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
   ut_ad(type.validate());
   ut_ad(n > 0);
 
-  dberr_t err;
   for (;;) {
     ssize_t n_bytes;
 
@@ -5645,15 +5704,13 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
       *o = n_bytes;
     }
 
-    if (err != DB_SUCCESS && !exit_on_err) {
-      return (err);
+    if (err == DB_IO_DECRYPT_FAIL) {
+      return err;
+
+    } else if (err != DB_SUCCESS && !exit_on_err) {
+      return err;
 
     } else if ((ulint)n_bytes == n) {
-      /*The page decryption failed - will handled by buf_io_comptelete*/
-      if (err == DB_IO_DECRYPT_FAIL) {
-        return (DB_IO_DECRYPT_FAIL);
-      }
-
       /** The read will succeed but decompress can fail
       for various reasons. */
 
@@ -5706,7 +5763,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 The number should be retrieved before any other OS calls (because they may
 overwrite the error number). If the number is not known to this program,
 the OS error number + 100 is returned.
-@param[in]	report_all_errors	true if we want an error printed
+@param[in]	report_all_errors	true if we want an error message printed
                                         for all errors
 @return error number, or OS error number + 100 */
 ulint os_file_get_last_error(bool report_all_errors) {
@@ -5766,13 +5823,13 @@ static MY_ATTRIBUTE((warn_unused_result)) bool os_file_handle_error_cond_exit(
 
     case OS_FILE_SHARING_VIOLATION:
 
-      os_thread_sleep(10000000); /* 10 sec */
+      std::this_thread::sleep_for(std::chrono::seconds(10));
       return (true);
 
     case OS_FILE_OPERATION_ABORTED:
     case OS_FILE_INSUFFICIENT_RESOURCE:
 
-      os_thread_sleep(100000); /* 100 ms */
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
       return (true);
 
     case OS_FILE_NAME_TOO_LONG:
@@ -5807,8 +5864,8 @@ static MY_ATTRIBUTE((warn_unused_result)) bool os_file_handle_error_cond_exit(
 }
 
 /** Does error handling when a file operation fails.
-@param[in]	name		name of a file or NULL
-@param[in]	operation	operation name that failed
+@param[in]	name		File name or NULL
+@param[in]	operation	Name of operation e.g., "read", "write"
 @return true if we should retry the operation */
 static bool os_file_handle_error(const char *name, const char *operation) {
   /* Exit in case of unknown error */
@@ -5816,8 +5873,8 @@ static bool os_file_handle_error(const char *name, const char *operation) {
 }
 
 /** Does error handling when a file operation fails.
-@param[in]	name		name of a file or NULL
-@param[in]	operation	operation name that failed
+@param[in]	name		File name or NULL
+@param[in]	operation	Name of operation e.g., "read", "write"
 @param[in]	on_error_silent	if true then don't print any message to the log.
 @return true if we should retry the operation */
 static bool os_file_handle_error_no_exit(const char *name,
@@ -5933,14 +5990,7 @@ bool os_file_set_size(const char *name, pfs_os_file_t file, os_offset_t offset,
   buf_size *= UNIV_PAGE_SIZE;
 
   /* Align the buffer for possible raw i/o */
-  byte *buf2;
-
-  buf2 = static_cast<byte *>(ut_malloc_nokey(buf_size + UNIV_PAGE_SIZE));
-
-  byte *buf = static_cast<byte *>(ut_align(buf2, UNIV_PAGE_SIZE));
-
-  /* Write buffer full of zeros */
-  memset(buf, 0, buf_size);
+  byte *buf = static_cast<byte *>(ut::aligned_zalloc(buf_size, UNIV_PAGE_SIZE));
 
   os_offset_t current_size = offset;
 
@@ -5972,7 +6022,7 @@ bool os_file_set_size(const char *name, pfs_os_file_t file, os_offset_t offset,
 #endif /* UNIV_HOTBACKUP */
 
     if (err != DB_SUCCESS) {
-      ut_free(buf2);
+      ut::aligned_free(buf);
       return (false);
     }
 
@@ -5988,7 +6038,7 @@ bool os_file_set_size(const char *name, pfs_os_file_t file, os_offset_t offset,
         bool ret = os_file_flush(file);
 
         if (!ret) {
-          ut_free(buf2);
+          ut::aligned_free(buf);
           return (false);
         }
       }
@@ -6008,7 +6058,7 @@ bool os_file_set_size(const char *name, pfs_os_file_t file, os_offset_t offset,
     current_size += n_bytes;
   }
 
-  ut_free(buf2);
+  ut::aligned_free(buf);
 
   if (flush) {
     return (os_file_flush(file));
@@ -6073,17 +6123,16 @@ bool os_file_seek(const char *pathname, os_file_t file, os_offset_t offset) {
   return (success);
 }
 
-/** NOTE! Use the corresponding macro os_file_read(), not directly this
-function!
-Requests a synchronous positioned read operation.
-@return DB_SUCCESS if request was successful, DB_IO_ERROR on failure
-@param[in]	type		IO flags
+/** NOTE! Use the corresponding macro os_file_read_first_page(), not directly
+this function!
+Requests a synchronous read operation of page 0 of IBD file.
+@param[in]	type		IO request context
 @param[in]  file_name file name
-@param[in]	file		handle to an open file
+@param[in]	file		Open file handle
 @param[out]	buf		buffer where to read
-@param[in]	offset		file offset from the start where to read
-@param[in]	n		number of bytes to read, starting from offset
-@return DB_SUCCESS or error code */
+@param[in]	offset		file offset where to read
+@param[in]	n		number of bytes to read
+@return DB_SUCCESS if request was successful, DB_IO_ERROR on failure */
 dberr_t os_file_read_func(IORequest &type, const char *file_name,
                           os_file_t file, void *buf, os_offset_t offset,
                           ulint n, trx_t *trx) {
@@ -6093,15 +6142,14 @@ dberr_t os_file_read_func(IORequest &type, const char *file_name,
                             true, trx));
 }
 
-/** NOTE! Use the corresponding macro os_file_read_first_page(), not
-directly this function!
-Requests a synchronous positioned read operation of page 0 of IBD file
-@return DB_SUCCESS if request was successful, DB_IO_ERROR on failure
-@param[in]	type		IO flags
+/** NOTE! Use the corresponding macro os_file_read_first_page(),
+not directly this function!
+Requests a synchronous read operation of page 0 of IBD file
+@param[in]	type		IO request context
 @param[in]  file_name file name
-@param[in]	file		handle to an open file
+@param[in]	file		Open file handle
 @param[out]	buf		buffer where to read
-@param[in]	n		number of bytes to read, starting from offset
+@param[in]	n		number of bytes to read
 @param[in]	exit_on_err	if true then exit on error
 @return DB_SUCCESS or error code */
 dberr_t os_file_read_first_page_func(IORequest &type, const char *file_name,
@@ -6141,10 +6189,7 @@ static dberr_t os_file_copy_read_write(os_file_t src_file,
   uint request_size;
   const uint BUF_SIZE = 4 * UNIV_SECTOR_SIZE;
 
-  char buf[BUF_SIZE + UNIV_SECTOR_SIZE];
-  char *buf_ptr;
-
-  buf_ptr = static_cast<char *>(ut_align(buf, UNIV_SECTOR_SIZE));
+  alignas(UNIV_SECTOR_SIZE) char buf[BUF_SIZE];
 
   IORequest read_request(IORequest::READ);
   read_request.disable_compression();
@@ -6161,15 +6206,15 @@ static dberr_t os_file_copy_read_write(os_file_t src_file,
       request_size = size;
     }
 
-    err = os_file_read_func(read_request, nullptr, src_file, buf_ptr,
-                            src_offset, request_size, nullptr);
+    err = os_file_read_func(read_request, nullptr, src_file, &buf, src_offset,
+                            request_size, nullptr);
 
     if (err != DB_SUCCESS) {
       return (err);
     }
     src_offset += request_size;
 
-    err = os_file_write_func(write_request, "file copy", dest_file, buf_ptr,
+    err = os_file_write_func(write_request, "file copy", dest_file, &buf,
                              dest_offset, request_size);
 
     if (err != DB_SUCCESS) {
@@ -6182,7 +6227,8 @@ static dberr_t os_file_copy_read_write(os_file_t src_file,
   return (DB_SUCCESS);
 }
 
-/** copy data from one file to another file.
+/** Copy data from one file to another file. Data is read/written
+at current file offset.
 @param[in]	src_file	file handle to copy from
 @param[in]	src_offset	offset to copy from
 @param[in]	dest_file	file handle to copy to
@@ -6254,14 +6300,14 @@ dberr_t os_file_copy_func(os_file_t src_file, os_offset_t src_offset,
 
 /** NOTE! Use the corresponding macro os_file_read_no_error_handling(),
 not directly this function!
-Requests a synchronous positioned read operation.
-@return DB_SUCCESS if request was successful, DB_IO_ERROR on failure
-@param[in]	type		IO flags
+Requests a synchronous positioned read operation. This function does not do
+any error handling. In case of error it returns FALSE.
+@param[in]	type		IO request context
 @param[in]  file_name file name
-@param[in]	file		handle to an open file
+@param[in]	file		Open file handle
 @param[out]	buf		buffer where to read
-@param[in]	offset		file offset from the start where to read
-@param[in]	n		number of bytes to read, starting from offset
+@param[in]	offset		file offset where to read
+@param[in]	n		number of bytes to read
 @param[out]	o		number of bytes actually read
 @return DB_SUCCESS or error code */
 dberr_t os_file_read_no_error_handling_func(IORequest &type,
@@ -6275,16 +6321,17 @@ dberr_t os_file_read_no_error_handling_func(IORequest &type,
                             nullptr));
 }
 
-/** NOTE! Use the corresponding macro os_file_write(), not directly
+/** NOTE! Use the corresponding macro os_file_write(), not directly this
+function!
 Requests a synchronous write operation.
-@param[in]	type		IO flags
+@param[in,out]	type		IO request context
 @param[in]	name		name of the file or path as a null-terminated
                                 string
-@param[in]	file		handle to an open file
-@param[out]	buf		buffer from which to write
-@param[in]	offset		file offset from the start where to read
-@param[in]	n		number of bytes to read, starting from offset
-@return DB_SUCCESS if request was successful, false if fail */
+@param[in]	file		Open file handle
+@param[out]	buf		buffer where to read
+@param[in]	offset		file offset where to read
+@param[in]	n		number of bytes to read
+@return DB_SUCCESS if request was successful */
 dberr_t os_file_write_func(IORequest &type, const char *name, os_file_t file,
                            const void *buf, os_offset_t offset, ulint n) {
 #ifdef WITH_WSREP
@@ -6302,7 +6349,8 @@ dberr_t os_file_write_func(IORequest &type, const char *name, os_file_t file,
 
   const byte *ptr = reinterpret_cast<const byte *>(buf);
 
-  return (os_file_write_page(type, name, file, ptr, offset, n));
+  return os_file_write_page(type, name, file, ptr, offset, n,
+                            type.get_encrypted_block());
 }
 
 bool os_file_status(const char *path, bool *exists, os_file_type_t *type) {
@@ -6433,9 +6481,7 @@ dberr_t os_file_write_zeros(pfs_os_file_t file, const char *name,
   /* Extend at most 1M at a time */
   ulint n_bytes = ut_min(static_cast<ulint>(1024 * 1024), len);
 
-  byte *ptr = reinterpret_cast<byte *>(ut_zalloc_nokey(n_bytes + page_size));
-
-  byte *buf = reinterpret_cast<byte *>(ut_align(ptr, page_size));
+  byte *buf = reinterpret_cast<byte *>(ut::aligned_zalloc(n_bytes, page_size));
 
   os_offset_t offset = start;
   dberr_t err = DB_SUCCESS;
@@ -6461,17 +6507,17 @@ dberr_t os_file_write_zeros(pfs_os_file_t file, const char *name,
     DBUG_EXECUTE_IF("ib_crash_during_tablespace_extension", DBUG_SUICIDE(););
   }
 
-  ut_free(ptr);
+  ut::aligned_free(buf);
 
   return (err);
 }
 
 /** Waits for an AIO operation to complete. This function is used to wait the
-for completed requests. The aio array of pending requests is divided
+for completed requests. The AIO array of pending requests is divided
 into segments. The thread specifies which segment or slot it wants to wait
-for. NOTE: this function will also take care of freeing the aio slot,
+for. NOTE: this function will also take care of freeing the AIO slot,
 therefore no other thread is allowed to do the freeing!
-@param[in]	segment		The number of the segment in the aio arrays to
+@param[in]	segment		The number of the segment in the AIO arrays to
                                 wait for; segment 0 is the ibuf I/O thread,
                                 segment 1 the log I/O thread, then follow the
                                 non-ibuf read threads, and as the last are the
@@ -6523,7 +6569,8 @@ dberr_t os_aio_handler(ulint segment, fil_node_t **m1, void **m2,
 AIO::AIO(latch_id_t id, ulint n, ulint segments)
     : m_slots(n),
       m_n_segments(segments),
-      m_n_reserved()
+      m_n_reserved(),
+      m_last_slot_used(0)
 #ifdef LINUX_NATIVE_AIO
       ,
       m_aio_ctx(),
@@ -6712,18 +6759,18 @@ AIO::~AIO() {
   m_slots.clear();
 }
 
-/** Initializes the asynchronous io system. Creates one array each for ibuf
-and log i/o. Also creates one array each for read and write where each
-array is divided logically into n_readers and n_writers
+/** Initializes the asynchronous io system. Creates one array each
+for ibuf and log I/O. Also creates one array each for read and write
+where each array is divided logically into n_readers and n_writers
 respectively. The caller must create an i/o handler thread for each
 segment in these arrays. This function also creates the sync array.
-No i/o handler thread needs to be created for that
+No I/O handler thread needs to be created for that
 @param[in]	n_per_seg	maximum number of pending aio
                                 operations allowed per segment
 @param[in]	n_readers	number of reader threads
 @param[in]	n_writers	number of writer threads
 @param[in]	n_slots_sync	number of slots in the sync aio array
-@return true if the AIO sub-system was started successfully */
+@return true if AIO sub-system was started successfully */
 bool AIO::start(ulint n_per_seg, ulint n_readers, ulint n_writers,
                 ulint n_slots_sync) {
 #if defined(LINUX_NATIVE_AIO)
@@ -6861,7 +6908,6 @@ void os_fusionio_get_sector_size() {
     ulint sector_size = UNIV_SECTOR_SIZE;
     char *path = srv_data_home;
     os_file_t check_file;
-    byte *ptr;
     byte *block_ptr;
     char current_dir[3];
     char *dir_end;
@@ -6908,10 +6954,10 @@ void os_fusionio_get_sector_size() {
 
     /* Try to write the file with different sector size
     alignment. */
-    ptr = static_cast<byte *>(ut_zalloc_nokey(2 * MAX_SECTOR_SIZE));
+    alignas(MAX_SECTOR_SIZE) byte data[MAX_SECTOR_SIZE];
 
     while (sector_size <= MAX_SECTOR_SIZE) {
-      block_ptr = static_cast<byte *>(ut_align(ptr, sector_size));
+      block_ptr = static_cast<byte *>(ut_align(&data, sector_size));
       ret = pwrite(check_file, block_ptr, sector_size, 0);
       if (ret > 0 && (ulint)ret == sector_size) {
         break;
@@ -6926,7 +6972,6 @@ void os_fusionio_get_sector_size() {
     unlink(check_file_name);
 
     ut_free(check_file_name);
-    ut_free(ptr);
     errno = 0;
 
     os_io_ptr_align = sector_size;
@@ -6949,11 +6994,11 @@ void os_create_block_cache() {
 
   for (Blocks::iterator it = block_cache->begin(); it != block_cache->end();
        ++it) {
-    ut_a(it->m_in_use == 0);
+    ut_a(!it->m_in_use);
     ut_a(it->m_ptr == nullptr);
 
     /* Allocate double of max page size memory, since
-    compress could generate more bytes than orgininal
+    compress could generate more bytes than original
     data. */
     it->m_ptr = static_cast<byte *>(ut_malloc_nokey(BUFFER_BLOCK_SIZE));
 
@@ -6970,7 +7015,7 @@ void meb_free_block_cache() {
 
   for (Blocks::iterator it = block_cache->begin(); it != block_cache->end();
        ++it) {
-    ut_a(it->m_in_use == 0);
+    ut_a(!it->m_in_use);
     ut_free(it->m_ptr);
   }
 
@@ -7022,7 +7067,7 @@ void os_aio_free() {
 
   for (Blocks::iterator it = block_cache->begin(); it != block_cache->end();
        ++it) {
-    ut_a(it->m_in_use == 0);
+    ut_a(!it->m_in_use);
     ut_free(it->m_ptr);
   }
 
@@ -7071,7 +7116,7 @@ void os_aio_wait_until_no_pending_writes() {
 @param[in]	array		AIO wait array
 @param[in]	slot		slot in this array
 @return segment number (which is the number used by, for example,
-        I/O-handler threads) */
+        I/O handler threads) */
 ulint AIO::get_segment_no_from_slot(const AIO *array, const Slot *slot) {
   ulint segment;
   ulint seg_len;
@@ -7101,24 +7146,10 @@ ulint AIO::get_segment_no_from_slot(const AIO *array, const Slot *slot) {
   return (segment);
 }
 
-/** Requests for a slot in the aio array. If no slot is available, waits until
-not_full-event becomes signaled.
-
-@param[in,out]	type		IO context
-@param[in,out]	m1		message to be passed along with the AIO
-                                operation
-@param[in,out]	m2		message to be passed along with the AIO
-                                operation
-@param[in]	file		file handle
-@param[in]	name		name of the file or path as a NUL-terminated
-                                string
-@param[in,out]	buf		buffer where to read or from which to write
-@param[in]	offset		file offset, where to read from or start writing
-@param[in]	len		length of the block to read or write
-@return pointer to slot */
 Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
                         pfs_os_file_t file, const char *name, void *buf,
-                        os_offset_t offset, ulint len, space_id_t space_id) {
+                        os_offset_t offset, ulint len,
+                        const file::Block *e_block, space_id_t space_id) {
 #ifdef WIN_ASYNC_IO
   ut_a((len & 0xFFFFFFFFUL) == len);
 #endif /* WIN_ASYNC_IO */
@@ -7127,11 +7158,6 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
   ut_ad(type.validate());
 
   const auto slots_per_seg = slots_per_segment();
-
-  /* We attempt to keep adjacent blocks in the same local
-  segment. This can help in merging IO requests when we are
-  doing simulated AIO */
-  ulint local_seg = (offset >> (UNIV_PAGE_SIZE_SHIFT + 6)) % m_n_segments;
 
   for (;;) {
     acquire();
@@ -7152,26 +7178,53 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
     os_event_wait(m_not_full);
   }
 
-  ulint counter = 0;
-  Slot *slot = nullptr;
-
-  /* We start our search for an available slot from our preferred
-  local segment and do a full scan of the array. We are
-  guaranteed to find a slot in full scan. */
-  for (ulint i = local_seg * slots_per_seg; counter < m_slots.size();
-       ++i, ++counter) {
-    i %= m_slots.size();
-
-    slot = at(i);
-
-    if (slot->is_reserved == false) {
-      break;
+  /* We will check first, next(first), next(next(first))... which should be a
+  permutation of values 0,..,m_slots.size()-1.*/
+  auto find_slot = [this](size_t first, auto next) {
+    size_t i = first;
+    for (size_t counter = 0; counter < m_slots.size(); ++counter) {
+      if (!at(i)->is_reserved) {
+        return i;
+      }
+      i = next(i);
     }
+    /* We know that there is a free slot, because m_n_reserved != m_slots.size()
+    was checked under the mutex protection, which we still hold. Additionally
+    the permutation generated by next() should visit all slots. If we checked
+    m_slots.size() elements of the sequence and not found a free slot, then it
+    was not a permutation, or there was no free slot.*/
+    ut_error;
+  };
+  size_t free_index;
+  if (srv_use_native_aio) {
+    /* We assume the m_slots.size() cannot be changed during runtime. */
+    ut_a(m_last_slot_used < m_slots.size());
+    /* We iterate through slots starting with the last used and then trying next
+    ones from consecutive segments to balance the incoming requests evenly
+    between the AIO threads. */
+    free_index = find_slot(m_last_slot_used, [&](size_t i) {
+      i += slots_per_seg;
+      if (i >= m_slots.size()) {
+        /* Start again from the first segment, this time trying next slot in
+        each segment. If we checked the last slot in segment, start with
+        first slot. */
+        i = (i + 1) % slots_per_seg;
+      }
+      return i;
+    });
+    m_last_slot_used = free_index;
+  } else {
+    /* We attempt to keep adjacent blocks in the same local
+    segment. This can help in merging IO requests when we are
+    doing simulated AIO */
+    const size_t local_seg =
+        (offset >> (UNIV_PAGE_SIZE_SHIFT + 6)) % m_n_segments;
+    /* We start our search for an available slot from our preferred
+    local segment and do a full scan of the array. */
+    free_index = find_slot(local_seg * slots_per_seg,
+                           [&](size_t i) { return (i + 1) % m_slots.size(); });
   }
-
-  /* We MUST always be able to get hold of a reserved slot. */
-  ut_a(counter < m_slots.size());
-
+  Slot *const slot = at(free_index);
   ut_a(slot->is_reserved == false);
 
   ++m_n_reserved;
@@ -7206,6 +7259,10 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
   slot->buf_block = nullptr;
   slot->encrypt_log_buf = nullptr;
 
+  if (!srv_use_native_aio) {
+    slot->buf_block = const_cast<file::Block *>(e_block);
+  }
+
   if (srv_use_native_aio && offset > 0 && type.is_write() &&
       type.is_compressed()) {
     ulint compressed_len = len;
@@ -7215,7 +7272,10 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
     release();
 
     void *src_buf = slot->buf;
-    slot->buf_block = os_file_compress_page(type, src_buf, &compressed_len);
+
+    if (e_block == nullptr) {
+      slot->buf_block = os_file_compress_page(type, src_buf, &compressed_len);
+    }
 
     slot->buf = static_cast<byte *>(src_buf);
     slot->ptr = slot->buf;
@@ -7233,7 +7293,7 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
   before compression, the encrypted data will cause compression fail
   or low compression rate. */
   if (srv_use_native_aio && offset > 0 && type.is_write() &&
-      type.is_encrypted() &&
+      (type.is_encrypted() || e_block != nullptr) &&
       (type.encryption_algorithm().get_type() != Encryption::KEYRING ||
        (type.encryption_algorithm().get_key() != NULL &&
         Encryption::can_page_be_keyring_encrypted(slot->buf)))) {
@@ -7245,7 +7305,11 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
 
     void *src_buf = slot->buf;
     if (!type.is_log()) {
-      encrypted_block = os_file_encrypt_page(type, src_buf, &encrypted_len);
+      if (e_block == nullptr) {
+        encrypted_block = os_file_encrypt_page(type, src_buf, &encrypted_len);
+      } else {
+        encrypted_block = const_cast<file::Block *>(e_block);
+      }
 
       if (slot->buf_block != nullptr) {
         os_free_block(slot->buf_block);
@@ -7329,7 +7393,7 @@ Slot *AIO::reserve_slot(IORequest &type, fil_node_t *m1, void *m2,
   return (slot);
 }
 
-/** Wakes up a simulated aio i/o-handler thread if it has something to do.
+/** Wakes up a simulated AIO I/O handler thread if it has something to do.
 @param[in]	global_segment	The number of the segment in the AIO arrays */
 void AIO::wake_simulated_handler_thread(ulint global_segment) {
   ut_ad(!srv_use_native_aio);
@@ -7603,6 +7667,14 @@ dberr_t os_aio_func(IORequest &type, AIO_mode aio_mode, const char *name,
   BOOL ret = TRUE;
 #endif /* WIN_ASYNC_IO */
 
+  const file::Block *e_block = type.get_encrypted_block();
+
+#ifdef UNIV_DEBUG
+  if (type.is_write() && e_block != nullptr) {
+    ut_ad(os_block_get_frame(e_block) == buf);
+  }
+#endif /* UNIV_DEBUG */
+
   ut_ad(n > 0);
   ut_ad((n % OS_FILE_LOG_BLOCK_SIZE) == 0);
   ut_ad((offset % OS_FILE_LOG_BLOCK_SIZE) == 0);
@@ -7644,8 +7716,8 @@ try_again:
 
   auto array = AIO::select_slot_array(type, read_only, aio_mode);
 
-  auto slot =
-      array->reserve_slot(type, m1, m2, file, name, buf, offset, n, space_id);
+  auto slot = array->reserve_slot(type, m1, m2, file, name, buf, offset, n,
+                                  e_block, space_id);
 
   if (type.is_read()) {
     trx_stats::bump_io_read(trx, n);
@@ -7743,7 +7815,6 @@ class SimulatedAIOHandler {
         m_array(array),
         m_n_slots(),
         m_segment(segment),
-        m_ptr(),
         m_buf() {
     ut_ad(m_segment < 100);
 
@@ -7751,11 +7822,7 @@ class SimulatedAIOHandler {
   }
 
   /** Destructor */
-  ~SimulatedAIOHandler() {
-    if (m_ptr != nullptr) {
-      ut_free(m_ptr);
-    }
-  }
+  ~SimulatedAIOHandler() { ut::aligned_free(m_buf); }
 
   /** Reset the state of the handler
   @param[in]	n_slots	Number of pending AIO operations supported */
@@ -7765,10 +7832,8 @@ class SimulatedAIOHandler {
     m_n_slots = n_slots;
     m_lowest_offset = IB_UINT64_MAX;
 
-    if (m_ptr != nullptr) {
-      ut_free(m_ptr);
-      m_ptr = m_buf = nullptr;
-    }
+    ut::aligned_free(m_buf);
+    m_buf = nullptr;
 
     m_slots[0] = nullptr;
   }
@@ -7835,7 +7900,7 @@ class SimulatedAIOHandler {
     ulint len;
     Slot *slot = first_slot();
 
-    ut_ad(m_ptr == nullptr);
+    ut_ad(m_buf == nullptr);
 
     if (slot->type.is_read() && m_n_elems > 1) {
       len = 0;
@@ -7844,10 +7909,7 @@ class SimulatedAIOHandler {
         len += m_slots[i]->len;
       }
 
-      m_ptr = static_cast<byte *>(ut_malloc_nokey(len + UNIV_PAGE_SIZE));
-
-      m_buf = static_cast<byte *>(ut_align(m_ptr, UNIV_PAGE_SIZE));
-
+      m_buf = static_cast<byte *>(ut::aligned_alloc(len, UNIV_PAGE_SIZE));
     } else {
       len = first_slot()->len;
       m_buf = first_slot()->buf;
@@ -8048,7 +8110,6 @@ class SimulatedAIOHandler {
 
   slots_t m_slots;
 
-  byte *m_ptr;
   byte *m_buf;
 };
 
@@ -8085,15 +8146,15 @@ ulint SimulatedAIOHandler::check_pending(ulint global_segment,
 thread.
 
 @param[in]	global_segment	The number of the segment in the aio arrays to
-                                wait for; segment 0 is the ibuf i/o thread,
+                                await for; segment 0 is the ibuf i/o thread,
                                 segment 1 the log i/o thread, then follow the
                                 non-ibuf read threads, and as the last are the
                                 non-ibuf write threads
 @param[out]	m1		the messages passed with the AIO request; note
                                 that also in the case where the AIO operation
                                 failed, these output parameters are valid and
-                                can be used to restart
-                                the operation, for example
+                                can be used to restart the operation, for
+                                example
 @param[out]	m2		Callback argument
 @param[in]	type		IO context
 @return DB_SUCCESS or error code */
@@ -8376,9 +8437,11 @@ void os_aio_print(FILE *file) {
           fil_n_pending_log_flushes, fil_n_pending_tablespace_flushes,
           os_n_file_reads, os_n_file_writes, os_n_fsyncs);
 
-  if (os_n_pending_writes != 0 || os_n_pending_reads != 0) {
+  auto pending_writes = os_n_pending_writes.load();
+  auto pending_reads = os_n_pending_reads.load();
+  if (pending_writes != 0 || pending_reads != 0) {
     fprintf(file, ULINTPF " pending preads, " ULINTPF " pending pwrites\n",
-            os_n_pending_reads, os_n_pending_writes);
+            pending_reads, pending_writes);
   }
 
   if (os_n_file_reads == os_n_file_reads_old) {
@@ -8428,7 +8491,7 @@ bool os_aio_all_slots_free() { return (AIO::total_pending_io_count() == 0); }
 
 #ifdef UNIV_DEBUG
 /** Prints all pending IO for the array
-@param[in]	file	file where to print */
+@param[in,out]	file	file where to print */
 void AIO::to_file(FILE *file) const {
   acquire();
 
@@ -8506,4 +8569,25 @@ bool Dir_Walker::is_directory(const Path &path) {
   ut_ad(type != OS_FILE_TYPE_MISSING);
 
   return (false);
+}
+
+dberr_t os_file_write_retry(IORequest &type, const char *name,
+                            pfs_os_file_t file, const void *buf,
+                            os_offset_t offset, ulint n) {
+  dberr_t err;
+  for (;;) {
+    err = os_file_write(type, name, file, buf, offset, n);
+
+    if (err == DB_SUCCESS || err == DB_TABLESPACE_DELETED) {
+      break;
+    } else if (err == DB_IO_ERROR) {
+      ib::error(ER_INNODB_IO_WRITE_ERROR_RETRYING, name);
+      std::chrono::seconds ten(10);
+      std::this_thread::sleep_for(ten);
+      continue;
+    } else {
+      ib::fatal(ER_INNODB_IO_WRITE_FAILED, name);
+    }
+  }
+  return err;
 }

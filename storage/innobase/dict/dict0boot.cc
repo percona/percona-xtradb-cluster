@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -60,18 +60,15 @@ dict_hdr_t *dict_hdr_get(mtr_t *mtr) /*!< in: mtr */
   return (header);
 }
 
-/** Returns a new table, index, or space id. */
-void dict_hdr_get_new_id(table_id_t *table_id,      /*!< out: table id
-                                                    (not assigned if NULL) */
-                         space_index_t *index_id,   /*!< out: index id
-                                                    (not assigned if NULL) */
-                         space_id_t *space_id,      /*!< out: space id
-                                                    (not assigned if NULL) */
-                         const dict_table_t *table, /*!< in: table */
-                         bool disable_redo)         /*!< in: if true and table
-                                                    object is NULL
-                                                    then disable-redo */
-{
+/** Returns a new table, index, or space id.
+@param[out] table_id Table id (not assigned if null)
+@param[out] index_id Index id (not assigned if null)
+@param[out] space_id Space id (not assigned if null)
+@param[in] table Table
+@param[in] disable_redo If true and table object is null then disable-redo */
+void dict_hdr_get_new_id(table_id_t *table_id, space_index_t *index_id,
+                         space_id_t *space_id, const dict_table_t *table,
+                         bool disable_redo) {
   dict_hdr_t *dict_hdr;
   ib_id_t id;
   mtr_t mtr;
@@ -154,7 +151,7 @@ void dict_hdr_flush_row_id(void) {
   row_id_t id;
   mtr_t mtr;
 
-  ut_ad(mutex_own(&dict_sys->mutex));
+  ut_ad(dict_sys_mutex_own());
 
   id = dict_sys->row_id;
 
@@ -285,9 +282,9 @@ dberr_t dict_boot(void) {
     table->id = DICT_TABLES_ID;
 
     dict_table_add_system_columns(table, heap);
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
     dict_table_add_to_cache(table, FALSE, heap);
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
     dict_sys->sys_tables = table;
     mem_heap_empty(heap);
 
@@ -330,9 +327,9 @@ dberr_t dict_boot(void) {
     table->id = DICT_COLUMNS_ID;
 
     dict_table_add_system_columns(table, heap);
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
     dict_table_add_to_cache(table, FALSE, heap);
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
     dict_sys->sys_columns = table;
     mem_heap_empty(heap);
 
@@ -366,9 +363,9 @@ dberr_t dict_boot(void) {
     table->id = DICT_INDEXES_ID;
 
     dict_table_add_system_columns(table, heap);
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
     dict_table_add_to_cache(table, FALSE, heap);
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
     dict_sys->sys_indexes = table;
     mem_heap_empty(heap);
 
@@ -395,9 +392,9 @@ dberr_t dict_boot(void) {
     table->id = DICT_FIELDS_ID;
 
     dict_table_add_system_columns(table, heap);
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
     dict_table_add_to_cache(table, FALSE, heap);
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
     dict_sys->sys_fields = table;
     mem_heap_free(heap);
 
@@ -414,12 +411,12 @@ dberr_t dict_boot(void) {
         mtr_read_ulint(dict_hdr + DICT_HDR_FIELDS, MLOG_4BYTES, &mtr), FALSE);
     ut_a(err == DB_SUCCESS);
 
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
     dict_load_sys_table(dict_sys->sys_tables);
     dict_load_sys_table(dict_sys->sys_columns);
     dict_load_sys_table(dict_sys->sys_indexes);
     dict_load_sys_table(dict_sys->sys_fields);
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
   }
 
   mtr_commit(&mtr);

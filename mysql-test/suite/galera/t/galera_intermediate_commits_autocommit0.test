@@ -1,0 +1,23 @@
+# ==== Purpose ====
+#
+# Verify that the server properly handles multiple intermediate commits in a
+# query when autocommit=0.
+#
+# === Reference ===
+#
+# PXC-3387: Server exit due to intermediate commits
+
+--source include/galera_cluster.inc
+
+CREATE TABLE t1 (a int, b int);
+
+SET autocommit=0;
+INSERT INTO t1 (a) values (null);
+
+# The below SELECT performs multiple intermediate commits to DD system table.
+--disable_result_log
+SELECT * FROM information_schema.statistics;
+--enable_result_log
+
+SET autocommit=1;
+DROP TABLE t1;

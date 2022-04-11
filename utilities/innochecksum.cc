@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2005, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2005, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -166,7 +166,7 @@ static TYPELIB innochecksum_algorithms_typelib = {
 /** Error logging classes. */
 namespace ib {
 
-logger::~logger() {}
+logger::~logger() = default;
 
 info::~info() {
   std::cerr << "[INFO] innochecksum: " << m_oss.str() << std::endl;
@@ -185,6 +185,11 @@ fatal::~fatal() {
   ut_error;
 }
 }  // namespace ib
+
+/** A dummy implementation.  Actual implementation available in fil0fil.cc */
+std::ostream &Fil_page_header::print(std::ostream &out) const noexcept {
+  return out;
+}
 
 /** Check that a page_size is correct for InnoDB. If correct, set the
 associated page_size_shift which is the power of 2 for this page size.
@@ -353,7 +358,7 @@ static ulong read_file(byte *buf, bool partial_page_read,
 
   size_t physical_page_size = static_cast<size_t>(page_size.physical());
 
-  DBUG_ASSERT(physical_page_size >= UNIV_ZIP_SIZE_MIN);
+  assert(physical_page_size >= UNIV_ZIP_SIZE_MIN);
 
   if (partial_page_read) {
     buf += UNIV_ZIP_SIZE_MIN;
@@ -398,7 +403,7 @@ class InnocheckReporter : public BlockReporter {
 
   /** Print message if page is empty.
   @param[in]	empty		true if page is empty */
-  virtual inline void report_empty_page(bool empty) const {
+  inline void report_empty_page(bool empty) const override {
     if (empty && m_is_log_enabled) {
       fprintf(m_log_file, "Page::%" PRIuMAX " is empty and uncorrupted\n",
               m_page_no);
@@ -409,9 +414,9 @@ class InnocheckReporter : public BlockReporter {
   @param[in]	checksum_field1	Checksum in page header
   @param[in]	checksum_field2	Checksum in page trailer
   @param[in]	crc32		Calculated crc32 checksum */
-  virtual inline void print_strict_crc32(ulint checksum_field1,
-                                         ulint checksum_field2, uint32_t crc32,
-                                         srv_checksum_algorithm_t algo) const {
+  inline void print_strict_crc32(ulint checksum_field1, ulint checksum_field2,
+                                 uint32_t crc32,
+                                 srv_checksum_algorithm_t algo) const override {
     if (algo != SRV_CHECKSUM_ALGORITHM_STRICT_CRC32 || !m_is_log_enabled) {
       return;
     }
@@ -428,8 +433,8 @@ class InnocheckReporter : public BlockReporter {
   /** Print innodb checksum and the checksum fields in page.
   @param[in]	checksum_field1	Checksum in page header
   @param[in]	checksum_field2	Checksum in page trailer */
-  virtual inline void print_strict_innodb(ulint checksum_field1,
-                                          ulint checksum_field2) const {
+  inline void print_strict_innodb(ulint checksum_field1,
+                                  ulint checksum_field2) const override {
     if (!m_is_log_enabled) {
       return;
     }
@@ -451,9 +456,8 @@ class InnocheckReporter : public BlockReporter {
   /** Print none checksum and the checksum fields in page.
   @param[in]	checksum_field1	Checksum in page header
   @param[in]	checksum_field2	Checksum in page trailer */
-  virtual inline void print_strict_none(ulint checksum_field1,
-                                        ulint checksum_field2,
-                                        srv_checksum_algorithm_t algo) const {
+  inline void print_strict_none(ulint checksum_field1, ulint checksum_field2,
+                                srv_checksum_algorithm_t algo) const override {
     if (!m_is_log_enabled || algo != SRV_CHECKSUM_ALGORITHM_STRICT_NONE) {
       return;
     }
@@ -467,7 +471,7 @@ class InnocheckReporter : public BlockReporter {
   }
 
   /** Print a message that none check failed. */
-  virtual inline void print_none_fail() const {
+  inline void print_none_fail() const override {
     fprintf(m_log_file,
             "Fail; page %" PRIuMAX " invalid (fails none checksum)\n",
             m_page_no);
@@ -479,9 +483,9 @@ class InnocheckReporter : public BlockReporter {
   @param[in]	checksum_field1	Checksum in page header
   @param[in]	checksum_field2	Checksum in page trailer
   @param[in]	algo		current checksum algorithm */
-  virtual inline void print_innodb_checksum(
+  inline void print_innodb_checksum(
       ulint old_checksum, ulint new_checksum, ulint checksum_field1,
-      ulint checksum_field2, srv_checksum_algorithm_t algo) const {
+      ulint checksum_field2, srv_checksum_algorithm_t algo) const override {
     if (!m_is_log_enabled) {
       return;
     }
@@ -527,7 +531,7 @@ class InnocheckReporter : public BlockReporter {
 
   /** Print the message that checksum mismatch happened in
   page header. */
-  virtual inline void print_innodb_fail() const {
+  inline void print_innodb_fail() const override {
     if (!m_is_log_enabled) {
       return;
     }
@@ -542,8 +546,8 @@ class InnocheckReporter : public BlockReporter {
   /** Print both new-style, old-style & crc32 checksum values.
   @param[in]	checksum_field1	Checksum in page header
   @param[in]	checksum_field2	Checksum in page trailer */
-  virtual inline void print_crc32_checksum(ulint checksum_field1,
-                                           ulint checksum_field2) const {
+  inline void print_crc32_checksum(ulint checksum_field1,
+                                   ulint checksum_field2) const override {
     if (m_is_log_enabled) {
       fprintf(m_log_file,
               "page::%" PRIuMAX "; old style: calculated = " ULINTPF
@@ -560,7 +564,7 @@ class InnocheckReporter : public BlockReporter {
   }
 
   /** Print a message that crc32 check failed. */
-  virtual inline void print_crc32_fail() const {
+  inline void print_crc32_fail() const override {
     if (!m_is_log_enabled) {
       return;
     }
@@ -573,8 +577,8 @@ class InnocheckReporter : public BlockReporter {
   /** Print checksum values on a compressed page.
   @param[in]	calc	the calculated checksum value
   @param[in]	stored	the stored checksum in header. */
-  virtual inline void print_compressed_checksum(ib_uint32_t calc,
-                                                ib_uint32_t stored) const {
+  inline void print_compressed_checksum(ib_uint32_t calc,
+                                        ib_uint32_t stored) const override {
     if (!m_is_log_enabled) {
       return;
     }
@@ -1227,11 +1231,11 @@ static struct my_option innochecksum_options[] = {
      nullptr, nullptr, GET_NO_ARG, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
     {"verbose", 'v', "Verbose (prints progress every 5 seconds).", &verbose,
      &verbose, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, nullptr},
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     {"debug", '#', "Output debug log. See " REFMAN "dbug-package.html",
      &dbug_setting, &dbug_setting, nullptr, GET_STR, OPT_ARG, 0, 0, 0, nullptr,
      0, nullptr},
-#endif /* !DBUG_OFF */
+#endif /* !NDEBUG */
     {"count", 'c', "Print the count of pages in the file and exits.",
      &just_count, &just_count, nullptr, GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0,
      nullptr},
@@ -1273,11 +1277,11 @@ static struct my_option innochecksum_options[] = {
      0, nullptr, 0, nullptr}};
 
 static void usage(void) {
-#ifdef DBUG_OFF
+#ifdef NDEBUG
   print_version();
 #else
   print_version_debug();
-#endif /* DBUG_OFF */
+#endif /* NDEBUG */
   puts(ORACLE_WELCOME_COPYRIGHT_NOTICE("2000"));
   printf("InnoDB offline file checksum utility.\n");
   printf(
@@ -1295,14 +1299,14 @@ extern "C" bool innochecksum_get_one_option(
     int optid, const struct my_option *opt MY_ATTRIBUTE((unused)),
     char *argument MY_ATTRIBUTE((unused))) {
   switch (optid) {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     case '#':
       dbug_setting = argument ? argument
                               : IF_WIN("d:O,innochecksum.trace",
                                        "d:o,/tmp/innochecksum.trace");
       DBUG_PUSH(dbug_setting);
       break;
-#endif /* !DBUG_OFF */
+#endif /* !NDEBUG */
     case 'e':
       use_end_page = true;
       break;
@@ -1312,11 +1316,11 @@ extern "C" bool innochecksum_get_one_option(
       do_one_page = true;
       break;
     case 'V':
-#ifdef DBUG_OFF
+#ifdef NDEBUG
       print_version();
 #else
       print_version_debug();
-#endif /* DBUG_OFF */
+#endif /* NDEBUG */
       exit(EXIT_SUCCESS);
       break;
     case 'C':

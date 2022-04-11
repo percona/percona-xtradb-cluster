@@ -395,8 +395,6 @@ class redo_log_keys final {
   MY_NODISCARD
   redo_log_key *fetch_or_generate_default_key(THD *thd);
 
-  void unload_old_keys() noexcept;
-
  private:
   /**
   Get KEYRING encryption redo key name
@@ -501,7 +499,7 @@ void fil_space_destroy_crypt_data(fil_space_crypt_t **crypt_data);
 @param[in]  len  Log entry length
 @return position on log buffer */
 byte *fil_parse_write_crypt_data_v1(space_id_t space_id, byte *ptr,
-                                    const byte *end_ptr, ulint len)
+                                    const byte *end_ptr, ulint len, lsn_t lsn)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Parse a MLOG_FILE_WRITE_CRYPT_DATA log entry
@@ -511,7 +509,7 @@ byte *fil_parse_write_crypt_data_v1(space_id_t space_id, byte *ptr,
 @param[in]  len  Log entry length
 @return position on log buffer */
 byte *fil_parse_write_crypt_data_v2(space_id_t space_id, byte *ptr,
-                                    const byte *end_ptr, ulint len)
+                                    const byte *end_ptr, ulint len, lsn_t lsn)
     MY_ATTRIBUTE((warn_unused_result));
 
 /** Parse a MLOG_FILE_WRITE_CRYPT_DATA log entry
@@ -523,7 +521,7 @@ byte *fil_parse_write_crypt_data_v2(space_id_t space_id, byte *ptr,
 @return position on log buffer */
 byte *fil_parse_write_crypt_data_v3(space_id_t space_id, byte *ptr,
                                     const byte *end_ptr, ulint len,
-                                    bool recv_needed_recovery)
+                                    bool recv_needed_recovery, lsn_t lsn)
     MY_ATTRIBUTE((warn_unused_result));
 
 /**

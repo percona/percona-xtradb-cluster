@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -120,6 +120,9 @@ int Rpl_info_table::do_init_info(enum_find_method method, uint instance) {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.
@@ -145,7 +148,7 @@ int Rpl_info_table::do_init_info(enum_find_method method, uint instance) {
       break;
 
     default:
-      DBUG_ASSERT(0);
+      assert(0);
       break;
   }
 
@@ -186,6 +189,9 @@ int Rpl_info_table::do_flush_info(const bool force) {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
   thd->is_operating_substatement_implicitly = true;
 
   /*
@@ -249,12 +255,12 @@ int Rpl_info_table::do_flush_info(const bool force) {
   }
 
 end:
-  DBUG_EXECUTE_IF("mts_debug_concurrent_access", {
+  DBUG_EXECUTE_IF("mta_debug_concurrent_access", {
     while (thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER &&
-           mts_debug_concurrent_access < 2 && mts_debug_concurrent_access > 0) {
+           mta_debug_concurrent_access < 2 && mta_debug_concurrent_access > 0) {
       DBUG_PRINT("mts", ("Waiting while locks are acquired to show "
                          "concurrency in mts: %u %u\n",
-                         mts_debug_concurrent_access, thd->thread_id()));
+                         mta_debug_concurrent_access, thd->thread_id()));
       my_sleep(6000000);
     }
   };);
@@ -286,6 +292,9 @@ int Rpl_info_table::do_clean_info() {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.
@@ -354,6 +363,9 @@ int Rpl_info_table::do_reset_info(uint nparam, const char *param_schema,
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.
@@ -375,7 +387,7 @@ int Rpl_info_table::do_reset_info(uint nparam, const char *param_schema,
       todo: for another table in future, consider to make use of the
       passed parameter to locate the lookup key.
     */
-    DBUG_ASSERT(strcmp(info->str_table.str, "slave_worker_info") == 0);
+    assert(strcmp(info->str_table.str, "slave_worker_info") == 0);
 
     if (info->verify_table_primary_key_fields(table)) {
       error = 1;
@@ -764,6 +776,9 @@ bool Rpl_info_table::do_update_is_transactional() {
   saved_mode = thd->variables.sql_mode;
   ulonglong saved_options = thd->variables.option_bits;
   thd->variables.option_bits &= ~OPTION_BIN_LOG;
+#ifdef WITH_WSREP
+  thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+#endif
 
   /*
     Opens and locks the rpl_info table before accessing it.

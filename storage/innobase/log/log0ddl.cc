@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2017, 2020, Oracle and/or its affiliates.
+Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
 Portions of this file contain modifications contributed and copyrighted by
 Google, Inc. Those modifications are gratefully acknowledged and are described
@@ -230,6 +230,9 @@ std::ostream &DDL_Record::print(std::ostream &out) const {
       break;
     case Log_Type::ALTER_ENCRYPT_TABLESPACE_LOG:
       out << "ALTER ENCRYPT TABLESPACE";
+      break;
+    case Log_Type::ALTER_UNENCRYPT_TABLESPACE_LOG:
+      out << "ALTER UNENCRYPT TABLESPACE";
       break;
     default:
       ut_ad(0);
@@ -1025,7 +1028,7 @@ dberr_t Log_DDL::insert_delete_space_log(trx_t *trx, uint64_t id,
   ut_ad(trx->ddl_operation);
 
   if (dict_locked) {
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
   }
 
   DDL_Record record;
@@ -1041,7 +1044,7 @@ dberr_t Log_DDL::insert_delete_space_log(trx_t *trx, uint64_t id,
   }
 
   if (dict_locked) {
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
   }
 
   if (!has_dd_trx) {
@@ -1119,8 +1122,8 @@ dberr_t Log_DDL::insert_rename_space_log(uint64_t id, ulint thread_id,
   trx_start_internal(trx);
   trx->ddl_operation = true;
 
-  ut_ad(mutex_own(&dict_sys->mutex));
-  mutex_exit(&dict_sys->mutex);
+  ut_ad(dict_sys_mutex_own());
+  dict_sys_mutex_exit();
 
   DDL_Record record;
   record.set_id(id);
@@ -1135,7 +1138,7 @@ dberr_t Log_DDL::insert_rename_space_log(uint64_t id, ulint thread_id,
     error = ddl_log.insert(record);
   }
 
-  mutex_enter(&dict_sys->mutex);
+  dict_sys_mutex_enter();
 
   trx_commit_for_mysql(trx);
   trx_free_for_background(trx);
@@ -1147,7 +1150,20 @@ dberr_t Log_DDL::insert_rename_space_log(uint64_t id, ulint thread_id,
   return (error);
 }
 
-dberr_t Log_DDL::write_alter_encrypt_space_log(space_id_t space_id) {
+DDL_Record *Log_DDL::find_alter_encrypt_record(space_id_t space_id) {
+  if (!ts_encrypt_ddl_records.empty()) {
+    for (const auto it : ts_encrypt_ddl_records) {
+      if (it->get_space_id() == space_id) {
+        return it;
+      }
+    }
+  }
+  return nullptr;
+}
+
+dberr_t Log_DDL::write_alter_encrypt_space_log(space_id_t space_id,
+                                               encryption_op_type type,
+                                               DDL_Record *existing_rec) {
   /* Missing current_thd, it happens during crash recovery */
   if (!current_thd) {
     return (DB_SUCCESS);
@@ -1167,7 +1183,8 @@ dberr_t Log_DDL::write_alter_encrypt_space_log(space_id_t space_id) {
   DBUG_INJECT_CRASH("ddl_log_crash_before_alter_encrypt_space_log",
                     crash_before_alter_encrypt_space_log_counter++);
 
-  dberr_t err = insert_alter_encrypt_space_log(id, thread_id, space_id);
+  dberr_t err = insert_alter_encrypt_space_log(id, thread_id, space_id, type,
+                                               existing_rec);
   if (err != DB_SUCCESS) {
     return err;
   }
@@ -1175,40 +1192,66 @@ dberr_t Log_DDL::write_alter_encrypt_space_log(space_id_t space_id) {
   DBUG_INJECT_CRASH("ddl_log_crash_after_alter_encrypt_space_log",
                     crash_after_alter_encrypt_space_log_counter++);
 
+  DBUG_EXECUTE_IF("DDL_Log_remove_inject_startup_error_1",
+                  srv_inject_too_many_concurrent_trxs = true;);
+
+  /* This record to be removed with main transaction commit */
+  err = delete_by_id(trx, id, false);
+  ut_ad(err == DB_SUCCESS || err == DB_TOO_MANY_CONCURRENT_TRXS);
+
+  DBUG_EXECUTE_IF("DDL_Log_remove_inject_startup_error_1",
+                  srv_inject_too_many_concurrent_trxs = false;);
+
   return (err);
 }
 
 dberr_t Log_DDL::insert_alter_encrypt_space_log(uint64_t id, ulint thread_id,
-                                                space_id_t space_id) {
-  dberr_t error;
+                                                space_id_t space_id,
+                                                encryption_op_type type,
+                                                DDL_Record *existing_rec) {
+  dberr_t err = DB_SUCCESS;
   trx_t *trx = trx_allocate_for_background();
   trx_start_internal(trx);
   trx->ddl_operation = true;
 
-  ut_ad(mutex_own(&dict_sys->mutex));
-  mutex_exit(&dict_sys->mutex);
+  ut_ad(type == ENCRYPTION || type == DECRYPTION);
 
   DDL_Record record;
   record.set_id(id);
   record.set_thread_id(thread_id);
-  record.set_type(Log_Type::ALTER_ENCRYPT_TABLESPACE_LOG);
+  if (type == ENCRYPTION) {
+    record.set_type(Log_Type::ALTER_ENCRYPT_TABLESPACE_LOG);
+  } else if (type == DECRYPTION) {
+    record.set_type(Log_Type::ALTER_UNENCRYPT_TABLESPACE_LOG);
+  } else {
+    ut_ad(false);
+  }
   record.set_space_id(space_id);
 
   {
     DDL_Log_Table ddl_log(trx);
-    error = ddl_log.insert(record);
-  }
+    if (existing_rec != nullptr) {
+      err = ddl_log.remove(existing_rec->get_id());
+      ut_ad(err == DB_SUCCESS || err == DB_TOO_MANY_CONCURRENT_TRXS);
 
-  mutex_enter(&dict_sys->mutex);
+      if (err == DB_TOO_MANY_CONCURRENT_TRXS) {
+        ib::error(ER_IB_MSG_DDL_LOG_DELETE_BY_ID_TMCT);
+      }
+    }
+
+    if (err == DB_SUCCESS) {
+      err = ddl_log.insert(record);
+    }
+  }
 
   trx_commit_for_mysql(trx);
   trx_free_for_background(trx);
 
-  if (error == DB_SUCCESS && srv_print_ddl_logs) {
+  if (err == DB_SUCCESS && srv_print_ddl_logs) {
     ib::info(ER_IB_MSG_1284) << "DDL log insert : " << record;
   }
 
-  return (error);
+  return (err);
 }
 
 dberr_t Log_DDL::write_drop_log(trx_t *trx, const table_id_t table_id) {
@@ -1239,11 +1282,11 @@ dberr_t Log_DDL::write_drop_log(trx_t *trx, const table_id_t table_id) {
 dberr_t Log_DDL::insert_drop_log(trx_t *trx, uint64_t id, ulint thread_id,
                                  const table_id_t table_id) {
   ut_ad(trx->ddl_operation);
-  ut_ad(mutex_own(&dict_sys->mutex));
+  ut_ad(dict_sys_mutex_own());
 
   trx_start_if_not_started(trx, true);
 
-  mutex_exit(&dict_sys->mutex);
+  dict_sys_mutex_exit();
 
   dberr_t error;
   DDL_Record record;
@@ -1257,7 +1300,7 @@ dberr_t Log_DDL::insert_drop_log(trx_t *trx, uint64_t id, ulint thread_id,
     error = ddl_log.insert(record);
   }
 
-  mutex_enter(&dict_sys->mutex);
+  dict_sys_mutex_enter();
 
   if (error == DB_SUCCESS && srv_print_ddl_logs) {
     ib::info(ER_IB_MSG_650) << "DDL log insert : " << record;
@@ -1307,8 +1350,8 @@ dberr_t Log_DDL::insert_rename_table_log(uint64_t id, ulint thread_id,
   trx_start_internal(trx);
   trx->ddl_operation = true;
 
-  ut_ad(mutex_own(&dict_sys->mutex));
-  mutex_exit(&dict_sys->mutex);
+  ut_ad(dict_sys_mutex_own());
+  dict_sys_mutex_exit();
 
   DDL_Record record;
   record.set_id(id);
@@ -1323,7 +1366,7 @@ dberr_t Log_DDL::insert_rename_table_log(uint64_t id, ulint thread_id,
     error = ddl_log.insert(record);
   }
 
-  mutex_enter(&dict_sys->mutex);
+  dict_sys_mutex_enter();
 
   trx_commit_for_mysql(trx);
   trx_free_for_background(trx);
@@ -1403,7 +1446,7 @@ dberr_t Log_DDL::delete_by_id(trx_t *trx, uint64_t id, bool dict_locked) {
   ut_ad(trx->ddl_operation);
 
   if (dict_locked) {
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
   }
 
   {
@@ -1417,7 +1460,7 @@ dberr_t Log_DDL::delete_by_id(trx_t *trx, uint64_t id, bool dict_locked) {
   }
 
   if (dict_locked) {
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
   }
 
   if (srv_print_ddl_logs && err == DB_SUCCESS) {
@@ -1437,14 +1480,14 @@ dberr_t Log_DDL::replay_all() {
   ut_ad(err == DB_SUCCESS);
 
   for (auto record : records) {
-    log_ddl->replay(*record);
-    /* If this is alter tablespace encrypt entry, don't delete it yet.
-    This is to handle crash during resume operation. This entry will be deleted
-    once resume operation is finished. */
-    if (record->get_type() == Log_Type::ALTER_ENCRYPT_TABLESPACE_LOG) {
-      ts_encrypt_ddl_records.push_back(record);
-      record->set_deletable(false);
+    err = log_ddl->replay(*record);
+    if (err != DB_SUCCESS) {
+      break;
     }
+  }
+
+  if (err != DB_SUCCESS) {
+    return err;
   }
 
   err = delete_by_ids(records);
@@ -1467,7 +1510,15 @@ dberr_t Log_DDL::replay_by_thread_id(ulint thread_id) {
   ut_ad(err == DB_SUCCESS);
 
   for (auto record : records) {
-    log_ddl->replay(*record);
+    if (record->get_type() == Log_Type::ALTER_ENCRYPT_TABLESPACE_LOG ||
+        record->get_type() == Log_Type::ALTER_UNENCRYPT_TABLESPACE_LOG) {
+      DDL_Record *rec = find_alter_encrypt_record(record->get_space_id());
+      if (rec != nullptr) {
+        ut_ad(record->get_id() != rec->get_id());
+      }
+    } else {
+      log_ddl->replay(*record);
+    }
   }
 
   err = delete_by_ids(records);
@@ -1559,7 +1610,8 @@ dberr_t Log_DDL::replay(DDL_Record &record) {
       break;
 
     case Log_Type::ALTER_ENCRYPT_TABLESPACE_LOG:
-      replay_alter_encrypt_space_log(record.get_space_id());
+    case Log_Type::ALTER_UNENCRYPT_TABLESPACE_LOG:
+      err = replay_alter_encrypt_space_log(record);
       break;
 
     default:
@@ -1589,7 +1641,7 @@ void Log_DDL::replay_free_tree_log(space_id_t space_id, page_no_t page_no,
   }
 
   /* This is required by dropping hash index afterwards. */
-  mutex_enter(&dict_sys->mutex);
+  dict_sys_mutex_enter();
 
   DEBUG_SYNC_C("replay_free_tree_log");
 
@@ -1600,7 +1652,7 @@ void Log_DDL::replay_free_tree_log(space_id_t space_id, page_no_t page_no,
 
   mtr_commit(&mtr);
 
-  mutex_exit(&dict_sys->mutex);
+  dict_sys_mutex_exit();
 
   DBUG_INJECT_CRASH("ddl_log_crash_after_replay", crash_after_replay_counter++);
 }
@@ -1610,6 +1662,9 @@ void Log_DDL::replay_delete_space_log(space_id_t space_id,
   THD *thd = current_thd;
 
   if (fsp_is_undo_tablespace(space_id)) {
+    /* Serialize this delete with all undo tablespace DDLs. */
+    mutex_enter(&undo::ddl_mutex);
+
     /* If this is called during DROP UNDO TABLESPACE, then the undo_space
     is already gone. But if this is called at startup after a crash, that
     memory object might exist. If the crash occurred just before the file
@@ -1633,9 +1688,9 @@ void Log_DDL::replay_delete_space_log(space_id_t space_id,
     /* For general tablespace, MDL on SDI tables is already
     acquired at innobase_drop_tablespace() and for file_per_table
     tablespace, MDL is acquired at row_drop_table_for_mysql() */
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
     dict_sdi_remove_from_cache(space_id, nullptr, true);
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
   }
 
   /* A master key rotation blocks all DDLs using backup_lock, so it is assured
@@ -1658,6 +1713,8 @@ void Log_DDL::replay_delete_space_log(space_id_t space_id,
     undo::spaces->x_lock();
     undo::unuse_space_id(space_id);
     undo::spaces->x_unlock();
+
+    mutex_exit(&undo::ddl_mutex);
   }
 
   DBUG_INJECT_CRASH("ddl_log_crash_after_replay", crash_after_replay_counter++);
@@ -1691,9 +1748,58 @@ void Log_DDL::replay_rename_space_log(space_id_t space_id,
   DBUG_INJECT_CRASH("ddl_log_crash_after_replay", crash_after_replay_counter++);
 }
 
-void Log_DDL::replay_alter_encrypt_space_log(space_id_t space_id) {
-  /* NOOP */
+static dberr_t replace_and_insert(DDL_Record *record) {
+  dberr_t err = DB_SUCCESS;
+  trx_t *trx = trx_allocate_for_background();
+  trx_start_internal(trx);
+  trx->ddl_operation = true;
+
+  /* update the thread_id for the record */
+  record->set_thread_id(ULINT_MAX);
+
+  {
+    DDL_Log_Table ddl_log(trx);
+    /* Remove old record and insert the new record */
+    err = ddl_log.remove(record->get_id());
+    ut_ad(err == DB_SUCCESS || err == DB_TOO_MANY_CONCURRENT_TRXS);
+
+    if (err == DB_SUCCESS) {
+      /* Insert new record entry */
+      err = ddl_log.insert(*record);
+    }
+  }
+
+  trx_commit_for_mysql(trx);
+  trx_free_for_background(trx);
+
+  return err;
+}
+
+dberr_t Log_DDL::replay_alter_encrypt_space_log(DDL_Record &record) {
+  dberr_t error = DB_SUCCESS;
+  /* Normal operation, we shouldn't come here during post_ddl */
+  ut_ad(is_in_recovery());
+
+  error = replace_and_insert(&record);
+  if (error != DB_SUCCESS) {
+    return error;
+  }
+  ut_ad(record.get_thread_id() == ULINT_MAX);
+
+  /* We could have resume encrypiton execution one by one for each tablespace
+  from here by calling SQL API to run the query. But then it would be blocking
+  server bootstrap. We need to resume ths encryption in BG thread so we need
+  to just make a note of this space and operation here and don't do any real
+  operation. */
+  ts_encrypt_ddl_records.push_back(&record);
+
+  /* Make sure not to delete this record till resume operation finishes.
+  This is to make sure that if there is a crash before that, we can resume
+  encryption in the next restart. */
+  record.set_deletable(false);
+
   DBUG_INJECT_CRASH("ddl_log_crash_after_replay", crash_after_replay_counter++);
+  return error;
 }
 
 void Log_DDL::replay_drop_log(const table_id_t table_id) {
@@ -1789,11 +1895,11 @@ void Log_DDL::replay_remove_cache_log(table_id_t table_id,
   if (table != nullptr) {
     ut_ad(strcmp(table->name.m_name, table_name) == 0);
 
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
     dd_table_close(table, nullptr, nullptr, true);
     btr_drop_ahi_for_table(table);
     dict_table_remove_from_cache(table);
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
   }
 }
 
@@ -1850,20 +1956,6 @@ dberr_t Log_DDL::recover() {
   s_in_recovery = false;
 
   ib::info(ER_IB_MSG_663) << "DDL log recovery : end";
-
-  return (err);
-}
-
-dberr_t Log_DDL::post_ts_encryption(DDL_Records &records) {
-  for (auto record : records) {
-    record->set_deletable(true);
-  }
-
-  dberr_t err = Log_DDL::delete_by_ids(records);
-
-  for (auto record : records) {
-    UT_DELETE(record);
-  }
 
   return (err);
 }

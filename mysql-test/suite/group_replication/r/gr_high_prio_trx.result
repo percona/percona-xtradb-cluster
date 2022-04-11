@@ -17,6 +17,7 @@ UPDATE t1 SET c1=99 WHERE c1=0;
 UPDATE t1 SET c1=1 WHERE c1=0;
 [connection server2]
 SET DEBUG_SYNC='now SIGNAL waiting1';
+SET DEBUG_SYNC='RESET';
 [connection sigcon]
 [connection sigcon]
 COMMIT;

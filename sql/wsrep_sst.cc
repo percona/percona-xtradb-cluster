@@ -25,7 +25,7 @@
 #include "mysql_version.h"
 #include "mysqld.h"
 #include "rpl_msr.h"  // channel_map
-#include "rpl_slave.h"
+#include "rpl_replica.h"
 #include "sql/auth/auth_common.h"
 #include "sql/sql_lex.h"
 #include "sql_base.h"  // TEMP_PREFIX
@@ -56,6 +56,7 @@ extern const char wsrep_defaults_group_suffix[];
 #define WSREP_SST_OPT_PARENT "--parent"
 #define WSREP_SST_OPT_BINLOG "--binlog"
 #define WSREP_SST_OPT_VERSION "--mysqld-version"
+#define WSREP_SST_OPT_DEBUG "--debug"
 
 // mysqldump-specific options
 #define WSREP_SST_OPT_HOST "--host"
@@ -430,7 +431,7 @@ static int sst_scan_uuid_seqno(const char *str, wsrep_uuid_t *uuid,
   freed with my_free().
  */
 static int generate_binlog_opt_val(char **ret) {
-  DBUG_ASSERT(ret);
+  assert(ret);
   *ret = NULL;
   if (opt_bin_log && global_gtid_mode.get() > Gtid_mode::OFF) {
     assert(opt_bin_logname);
@@ -654,6 +655,7 @@ static void *sst_joiner_thread(void *a) {
     /* No binlogging */
     thd->variables.sql_log_bin = 0;
     thd->variables.option_bits &= ~OPTION_BIN_LOG;
+    thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
     /* No general log */
     thd->variables.option_bits |= OPTION_LOG_OFF;
     /* Read committed isolation to avoid gap locking */
@@ -901,7 +903,7 @@ static int run_sql_command(THD *thd, const char *query,
     return -1;
   }
 
-  mysql_parse(thd, &ps, false);
+  dispatch_sql_command(thd, &ps, false);
   if (thd->is_error()) {
     int const err = thd->get_stmt_da()->mysql_errno();
     if (safe_query) {
@@ -1080,6 +1082,8 @@ static uint server_session_execute(MYSQL_SESSION session, std::string query,
                                    bool ignore_error = false) {
   COM_DATA cmd;
   wsp::Sql_resultset rset;
+
+  memset(&cmd, 0, sizeof(cmd));
   cmd.com_query.query = query.c_str();
   cmd.com_query.length = static_cast<unsigned int>(query.length());
   wsp::Sql_service_context_base *ctx = new wsp::Sql_service_context(&rset);
@@ -1123,34 +1127,8 @@ static int wsrep_create_sst_user(bool initialize_thread, const char *password) {
     "CREATE USER 'mysql.pxc.sst.user'@localhost "
     " IDENTIFIED BY '%s' ACCOUNT LOCK;",
     "CREATE USER mysql.pxc.sst.user IDENTIFIED WITH * BY * ACCOUNT LOCK",
-  /*
-    This is the code that uses the mysql.pxc.sst.role
-    However there is a bug in 8.0.15 where the "GRANT CREATE ON DBNAME.*" when
-    used in a role, does not allow the user with the role to create a database.
-    So we have to explicitly grant the privileges.
-  */
-#if 0
     "GRANT 'mysql.pxc.sst.role'@localhost TO 'mysql.pxc.sst.user'@localhost;", nullptr,
     "SET DEFAULT ROLE 'mysql.pxc.sst.role'@localhost to 'mysql.pxc.sst.user'@localhost;", nullptr,
-#else
-    /*
-      Explicit privileges needed to run XtraBackup.  This is only used due
-      to the bug in 8.0.15 described above.
-    */
-    "GRANT BACKUP_ADMIN, LOCK TABLES, PROCESS, RELOAD, REPLICATION CLIENT, "
-    "SUPER ON *.* TO 'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-    "GRANT CREATE, INSERT, SELECT ON PERCONA_SCHEMA.xtrabackup_history TO "
-    "'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-    "GRANT SELECT ON performance_schema.* TO 'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-    "GRANT CREATE USER ON *.* to 'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-    "GRANT CREATE ON PERCONA_SCHEMA.* to 'mysql.pxc.sst.user'@localhost;",
-    nullptr,
-#endif
-
     "ALTER USER 'mysql.pxc.sst.user'@localhost ACCOUNT UNLOCK;",
     nullptr,
     nullptr,
@@ -1440,6 +1418,10 @@ static int sst_donate_other(const char *method, const char *addr,
       wsrep_defaults_group_suffix, MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
       binlog_opt, binlog_opt_val, uuid_oss.str().c_str(), gtid.seqno().get(),
       bypass ? " " WSREP_SST_OPT_BYPASS : "");
+  DBUG_EXECUTE_IF("wsrep_sst_donor_skip", {
+    ret = snprintf(cmd_str() + strlen(cmd_str()), cmd_len - strlen(cmd_str()),
+                   WSREP_SST_OPT_DEBUG " '%s'", "wsrep_sst_donor_skip");
+  });
   my_free(binlog_opt_val);
 
   if (ret < 0 || ret >= cmd_len) {
@@ -1562,6 +1544,6 @@ int wsrep_sst_donate(const std::string &msg, const wsrep::gtid &current_gtid,
   /* Above methods should return 0 in case of success and negative value
    * in case of failure. If we have any positive value here it means that we
    * handle errors in above functions in the wrong way */
-  DBUG_ASSERT(ret <= 0);
+  assert(ret <= 0);
   return (ret >= 0 ? WSREP_CB_SUCCESS : WSREP_CB_FAILURE);
 }

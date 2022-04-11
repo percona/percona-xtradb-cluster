@@ -27,6 +27,7 @@ WSREP_SST_OPT_PLUGINDIR=""
 WSREP_SST_OPT_USER=""
 WSREP_SST_OPT_PSWD=""
 WSREP_SST_OPT_VERSION=""
+WSREP_SST_OPT_DEBUG=""
 
 WSREP_LOG_DEBUG=""
 
@@ -129,6 +130,10 @@ case "$1" in
         WSREP_SST_OPT_BINLOG="$2"
         shift
         ;;
+    '--debug')
+        WSREP_SST_OPT_DEBUG="$2"
+        shift
+        ;;
     *) # must be command
        # usage
        # exit 1
@@ -183,7 +188,7 @@ parse_cnf()
 #
 # Converts an input string into a boolean "on", "off"
 # Converts:
-#   "on", "true", "1" -> "on" (case insensitive)
+#   "on", "true", positive number -> "on" (case insensitive)
 #   "off", "false", "0" -> "off" (case insensitive)
 # All other values : -> default_value
 #
@@ -194,7 +199,7 @@ normalize_boolean()
     local input_value=$1
     local default_value=$2
 
-    [[ "$input_value" == "1" ]]                 && echo "on"    && return 0
+    [[ "$input_value" =~ ^[1-9][0-9]*$ ]]       && echo "on"    && return 0
     [[ "$input_value" =~ ^[Oo][Nn]$ ]]          && echo "on"    && return 0
     [[ "$input_value" =~ ^[Tt][Rr][Uu][Ee]$ ]]  && echo "on"    && return 0
     [[ "$input_value" == "0" ]]                 && echo "off"   && return 0
@@ -992,4 +997,33 @@ function cat_file_to_stderr()
     echo "FIL:${level}:${description}" >&2
     cat $file_path >&2
     echo "EOF:" >&2
+}
+
+
+# Returns the absolute path from a path to a file (with a filename)
+#   If a relative path is given as an argument, the absolute path
+#   is generated from the current path.
+#
+# Globals:
+#   None
+#
+# Parameters:
+#   Argument 1: path to a file
+#
+# Returns 0 if successful (path exists) and the absolute path is output.
+# Returns non-zero otherwise
+#
+function get_absolute_path()
+{
+    local path="$1"
+    local abs_path retvalue
+    local filename
+
+    filename=$(basename "${path}")
+    abs_path=$(cd "$(dirname "${path}")" && pwd)
+    retvalue=$?
+    [[ $retvalue -ne 0 ]] && return $retvalue
+
+    printf "%s/%s" "${abs_path}" "${filename}"
+    return 0
 }

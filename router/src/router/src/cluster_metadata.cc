@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2016, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -287,9 +287,20 @@ static uint32_t register_router_v1(
           "SELECT router_id FROM mysql_innodb_cluster_metadata.routers"
           " WHERE host_id = ? AND router_name = ?");
       query << host_id << router_name << sqlstring::end;
-      std::unique_ptr<MySQLSession::ResultRow> row(mysql->query_one(query));
-      if (row) {
-        return static_cast<uint32_t>(std::stoul((*row)[0]));
+      if (auto row = mysql->query_one(query)) {
+        const std::string router_id_str{(*row)[0]};
+
+        size_t end_pos;
+        const auto router_id =
+            static_cast<uint32_t>(std::stoul(router_id_str, &end_pos));
+
+        if (end_pos != router_id_str.size()) {
+          throw std::invalid_argument(
+              "router_id expected to be a positive integer, but is: " +
+              router_id_str);
+        }
+
+        return router_id;
       }
     }
     throw;
@@ -435,7 +446,8 @@ static bool check_group_replication_online(MySQLSession *mysql) {
   std::string q =
       "SELECT member_state"
       " FROM performance_schema.replication_group_members"
-      " WHERE member_id = @@server_uuid";
+      " WHERE CAST(member_id AS char ascii) = CAST(@@server_uuid AS char "
+      "ascii)";
   std::unique_ptr<MySQLSession::ResultRow> result(
       mysql->query_one(q));  // throws MySQLSession::Error
   if (result && (*result)[0]) {
@@ -541,8 +553,18 @@ ClusterMetadataGR::fetch_cluster_hosts() {
 
     mysql_->query(
         query, [&gr_servers](const std::vector<const char *> &row) -> bool {
-          gr_servers.push_back(
-              std::make_tuple(std::string(row[0]), std::stoul(row[1])));
+          size_t end_pos;
+          const std::string port_str{row[1]};
+          auto port = std::stoul(port_str, &end_pos);
+
+          if (end_pos != port_str.size()) {
+            throw std::runtime_error(
+                "Error querying metadata: expected cluster_host query to "
+                "return a positive integer for member_port, got " +
+                port_str);
+          }
+
+          gr_servers.emplace_back(std::string(row[0]), port);
           return true;  // don't stop
         });
 
@@ -637,7 +659,8 @@ static ClusterInfo query_metadata_servers(MySQLSession *mysql,
         "R.replicaset_id = "
         "(SELECT replicaset_id FROM mysql_innodb_cluster_metadata.instances "
         "WHERE "
-        "mysql_server_uuid = @@server_uuid) "
+        "CAST(mysql_server_uuid AS char ascii) = CAST(@@server_uuid AS char "
+        "ascii)) "
         "AND "
         "I.replicaset_id = R.replicaset_id "
         "AND "
@@ -883,7 +906,7 @@ std::unique_ptr<ClusterMetadata> create_metadata(
 unsigned ClusterMetadataAR::get_view_id() {
   std::string query =
       "select view_id from mysql_innodb_cluster_metadata.v2_ar_members where "
-      "member_id = @@server_uuid";
+      "CAST(member_id AS char ascii) = CAST(@@server_uuid AS char ascii)";
 
   std::unique_ptr<MySQLSession::ResultRow> result(mysql_->query_one(query));
   if (result) {

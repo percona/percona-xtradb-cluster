@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2019, 2020, Oracle and/or its affiliates.
+  Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -223,14 +223,8 @@ TEST_F(RestRouterApiTest, rest_api_section_missing_works) {
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  launch_router({"-c", conf_file}, EXIT_SUCCESS);
 
-  // wait until signal handler is up before we let the teardown of the test
-  // terminate the router and check its exit-code
-  //
-  // should be removed once we have another way to know that the process is
-  // ready to receive a shutdown signal.
-  std::this_thread::sleep_for(100ms);
+  launch_router({"-c", conf_file}, EXIT_SUCCESS);
 }
 
 /**
@@ -244,14 +238,15 @@ TEST_F(RestRouterApiTest, rest_router_section_twice) {
                                             /*request_authentication=*/true);
 
   // force [rest_router] twice in the config
-  config_sections.push_back(ConfigBuilder::build_section("rest_router", {}));
+  config_sections.push_back(
+      mysql_harness::ConfigBuilder::build_section("rest_router", {}));
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  const auto wait_for_process_exit_timeout{10000ms};
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10s);
 
   const std::string router_output = router.get_full_output();
   EXPECT_NE(router_output.find(
@@ -273,16 +268,15 @@ TEST_F(RestRouterApiTest, rest_router_section_has_key) {
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  const auto wait_for_process_exit_timeout{10000ms};
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10s);
 
   const std::string router_output = router.get_full_logfile();
-  EXPECT_THAT(
-      router_output,
-      ::testing::HasSubstr("plugin 'rest_router' init failed: [rest_router] "
-                           "section does not expect a key, found 'A'"))
+  EXPECT_THAT(router_output,
+              ::testing::HasSubstr("  init 'rest_router' failed: [rest_router] "
+                                   "section does not expect a key, found 'A'"))
       << router_output;
 }
 
@@ -298,14 +292,14 @@ TEST_F(RestRouterApiTest, router_api_no_auth) {
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  const auto wait_for_process_exit_timeout{10000ms};
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10s);
 
   const std::string router_output = router.get_full_logfile();
   EXPECT_THAT(router_output, ::testing::HasSubstr(
-                                 "plugin 'rest_router' init failed: option "
+                                 "  init 'rest_router' failed: option "
                                  "require_realm in [rest_router] is required"))
       << router_output;
 }
@@ -321,10 +315,10 @@ TEST_F(RestRouterApiTest, invalid_realm) {
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  const auto wait_for_process_exit_timeout{10000ms};
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10s);
 
   const std::string router_output = router.get_full_logfile();
   EXPECT_THAT(

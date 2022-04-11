@@ -31,12 +31,13 @@
 #include "sql/sql_class.h"
 
 /* MyRocks header files */
+#include "./rdb_global.h"
 #include "./rdb_utils.h"
 #include "rocksdb/db.h"
 
 namespace myrocks {
 
-class Rdb_thread {
+class Rdb_thread : public Ensure_initialized {
  private:
   // Disable Copying
   Rdb_thread(const Rdb_thread &);
@@ -72,7 +73,10 @@ class Rdb_thread {
 
   void signal(const bool stop_thread = false);
 
-  int join() { return my_thread_join(&m_handle, nullptr); }
+  int join() {
+    if (!m_run_once) return EINVAL;
+    return my_thread_join(&m_handle, nullptr);
+  }
 
   void uninit();
 
@@ -145,6 +149,8 @@ class Rdb_manual_compaction_thread : public Rdb_thread {
     rocksdb::Slice *start;
     rocksdb::Slice *limit;
     int concurrency = 0;
+    rocksdb::BottommostLevelCompaction bottommost_level_compaction =
+        rocksdb::BottommostLevelCompaction::kForceOptimized;
   };
 
   int m_latest_mc_id;
@@ -161,9 +167,11 @@ class Rdb_manual_compaction_thread : public Rdb_thread {
   }
 
   virtual void run() override;
-  int request_manual_compaction(std::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                                rocksdb::Slice *start, rocksdb::Slice *limit,
-                                int concurrency = 0);
+  int request_manual_compaction(
+      std::shared_ptr<rocksdb::ColumnFamilyHandle> cf, rocksdb::Slice *start,
+      rocksdb::Slice *limit, int concurrency = 0,
+      rocksdb::BottommostLevelCompaction bottommost_level_compaction =
+          rocksdb::BottommostLevelCompaction::kForceOptimized);
   bool is_manual_compaction_finished(int mc_id);
   void clear_manual_compaction_request(int mc_id, bool init_only = false);
   void clear_all_manual_compaction_requests();

@@ -1,7 +1,7 @@
 #ifndef JSON_DOM_INCLUDED
 #define JSON_DOM_INCLUDED
 
-/* Copyright (c) 2015, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -23,6 +23,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
+#include <assert.h>
 #include <stddef.h>
 #include <iterator>
 #include <map>
@@ -35,7 +36,7 @@
 
 #include "field_types.h"  // enum_field_types
 #include "my_compiler.h"
-#include "my_dbug.h"
+
 #include "my_inttypes.h"
 #include "my_time.h"  // my_time_flags_t
 #include "mysql/mysql_lex_string.h"
@@ -181,7 +182,7 @@ class Json_dom {
   void set_parent(Json_container *parent) { m_parent = parent; }
 
  public:
-  virtual ~Json_dom() {}
+  virtual ~Json_dom() = default;
 
   /**
     Allocate space on the heap for a Json_dom object.
@@ -636,7 +637,7 @@ class Json_array final : public Json_container {
     @return the value at index
   */
   Json_dom *operator[](size_t index) const {
-    DBUG_ASSERT(m_v[index]->parent() == this);
+    assert(m_v[index]->parent() == this);
     return m_v[index].get();
   }
 
@@ -687,10 +688,10 @@ class Json_array final : public Json_container {
 class Json_scalar : public Json_dom {
  public:
 #ifdef MYSQL_SERVER
-  uint32 depth() const final override { return 1; }
+  uint32 depth() const final { return 1; }
 #endif
 
-  bool is_scalar() const final override { return true; }
+  bool is_scalar() const final { return true; }
 };
 
 /**
@@ -733,7 +734,7 @@ class Json_string final : public Json_scalar {
 */
 class Json_number : public Json_scalar {
  public:
-  bool is_number() const final override { return true; }
+  bool is_number() const final { return true; }
 };
 
 /**
@@ -1068,14 +1069,37 @@ class Json_boolean final : public Json_scalar {
 };
 
 /**
-  Function for double-quoting a string and escaping characters
-  to make up a valid EMCA Json text.
+  Perform quoting on a JSON string to make an external representation
+  of it. It wraps double quotes (text quotes) around the string (cptr)
+  and also performs escaping according to the following table:
+  <pre>
+  @verbatim
+  Common name     C-style  Original unescaped     Transformed to
+                  escape   UTF-8 bytes            escape sequence
+                  notation                        in UTF-8 bytes
+  ---------------------------------------------------------------
+  quote           \"       %x22                    %x5C %x22
+  backslash       \\       %x5C                    %x5C %x5C
+  backspace       \b       %x08                    %x5C %x62
+  formfeed        \f       %x0C                    %x5C %x66
+  linefeed        \n       %x0A                    %x5C %x6E
+  carriage-return \r       %x0D                    %x5C %x72
+  tab             \t       %x09                    %x5C %x74
+  unicode         \uXXXX  A hex number in the      %x5C %x75
+                          range of 00-1F,          followed by
+                          except for the ones      4 hex digits
+                          handled above (backspace,
+                          formfeed, linefeed,
+                          carriage-return,
+                          and tab).
+  ---------------------------------------------------------------
+  @endverbatim
+  </pre>
 
-  @param[in]     cptr    the unquoted character string
-  @param[in]     length  its length
-  @param[in,out] buf     the destination buffer
-
-  @return false on success, true on error
+  @param[in] cptr pointer to string data
+  @param[in] length the length of the string
+  @param[in,out] buf the destination buffer
+  @retval true on error
 */
 bool double_quote(const char *cptr, size_t length, String *buf);
 
@@ -1277,7 +1301,7 @@ class Json_wrapper {
     If is_dom() returns false, the result of calling this function is undefined.
   */
   const Json_dom *get_dom() const {
-    DBUG_ASSERT(m_is_dom);
+    assert(m_is_dom);
     return m_dom_value;
   }
 
@@ -1287,7 +1311,7 @@ class Json_wrapper {
     undefined.
   */
   const json_binary::Value &get_binary_value() const {
-    DBUG_ASSERT(!m_is_dom);
+    assert(!m_is_dom);
     return m_value;
   }
 

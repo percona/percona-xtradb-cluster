@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2003, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -33,6 +33,8 @@
 #include <ndb_limits.h>
 #include <ndb_opts.h>
 #include <ndb_version.h>
+#include "my_getopt.h"
+#include "util/ndb_openssl_evp.h" // ndb_openssl_evp::library_init()
 
 #include "../src/ndbapi/NdbDictionaryImpl.hpp"
 #include "consumer_printer.hpp"
@@ -79,6 +81,14 @@ static const char *opt_nodegroup_map_str= 0;
 static unsigned opt_nodegroup_map_len= 0;
 static NODE_GROUP_MAP opt_nodegroup_map[MAX_NODE_GROUP_MAPS];
 #define OPT_NDB_NODEGROUP_MAP 'z'
+
+static bool opt_decrypt = false;
+
+// g_backup_password global, directly accessed in Restore.cpp.
+ndb_password_state g_backup_password_state("backup", nullptr);
+static ndb_password_option opt_backup_password(g_backup_password_state);
+static ndb_password_from_stdin_option opt_backup_password_from_stdin(
+                                           g_backup_password_state);
 
 const char *opt_ndb_database= NULL;
 const char *opt_ndb_table= NULL;
@@ -272,9 +282,19 @@ static struct my_option my_long_options[] =
   { "nodeid", 'n', "Backup files from node with id",
     (uchar**) &ga_nodeId, (uchar**) &ga_nodeId, 0,
     GET_INT, REQUIRED_ARG, 0, 0, 0, 0, 0, 0 },
+  { "backup-password", NDB_OPT_NOSHORT, "Encryption password for backup file",
+    nullptr, nullptr, 0,
+    GET_PASSWORD, OPT_ARG, 0, 0, 0, nullptr, 0, &opt_backup_password},
+  { "backup-password-from-stdin", NDB_OPT_NOSHORT,
+    "Read encryption password for backup file from stdin",
+    &opt_backup_password_from_stdin.opt_value, nullptr, 0,
+    GET_BOOL, NO_ARG, 0, 0, 0, nullptr, 0, &opt_backup_password_from_stdin},
   { "backupid", 'b', "Backup id",
     (uchar**) &ga_backupId, (uchar**) &ga_backupId, 0,
     GET_INT, REQUIRED_ARG, 0, 0, 0, 0, 0, 0 },
+  { "decrypt", NDB_OPT_NOSHORT, "Decrypt file",
+    (uchar**) &opt_decrypt, (uchar**) &opt_decrypt, 0,
+    GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0 },
   { "restore_data", 'r', 
     "Restore table data/logs into NDB Cluster using NDBAPI", 
     (uchar**) &_restore_data, (uchar**) &_restore_data,  0,
@@ -305,8 +325,8 @@ static struct my_option my_long_options[] =
     (uchar**) &_no_restore_disk, (uchar**) &_no_restore_disk,  0,
     GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0 },
   { "restore_epoch", 'e', 
-    "Restore epoch info into the status table. Convenient on a MySQL Cluster "
-    "replication slave, for starting replication. The row in "
+    "Restore epoch info into the status table. Convenient for starting MySQL "
+    "Cluster replication. The row in "
     NDB_REP_DB "." NDB_APPLY_TABLE " with id 0 will be updated/inserted.", 
     (uchar**) &ga_restore_epoch, (uchar**) &ga_restore_epoch,  0,
     GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0 },
@@ -595,21 +615,21 @@ static bool analyse_nodegroup_map(const char *ng_map_str,
   {
     if (!local_str)
     {
-      DBUG_RETURN(TRUE);
+      DBUG_RETURN(true);
     }
     local_str= analyse_one_map(local_str, &source_ng, &dest_ng);
     if (!local_str)
     {
-      DBUG_RETURN(TRUE);
+      DBUG_RETURN(true);
     }
     if (insert_ng_map(ng_map, source_ng, dest_ng))
     {
-      DBUG_RETURN(TRUE);
+      DBUG_RETURN(true);
     }
     if (!(*local_str))
       break;
-  } while (TRUE);
-  DBUG_RETURN(FALSE);
+  } while (true);
+  DBUG_RETURN(false);
 }
 
 static bool parse_remap_option(const BaseString option,
@@ -702,10 +722,9 @@ static void short_usage_sub(void)
 }
 
 static bool
-get_one_option(int optid, const struct my_option *opt MY_ATTRIBUTE((unused)),
-	       char *argument)
+get_one_option(int optid, const struct my_option *opt, char *argument)
 {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   opt_debug= "d:t:O,/tmp/ndb_restore.trace";
 #endif
   ndb_std_get_one_option(optid, opt, argument);
@@ -757,6 +776,8 @@ get_one_option(int optid, const struct my_option *opt MY_ATTRIBUTE((unused)),
     break;
   case OPT_REMAP_COLUMN:
     return (parse_remap_column(argument) ? 0 : 1);
+  case NDB_OPT_NOSHORT:
+    break;
   }
   return 0;
 }
@@ -847,6 +868,37 @@ readArguments(Ndb_opts & opts, char*** pargv)
 
   if (opts.handle_options(get_one_option))
   {
+    exitHandler(NdbToolsProgramExitCode::WRONG_ARGS);
+  }
+  const bool have_password_option =
+                 g_backup_password_state.have_password_option();
+  if (!opt_decrypt)
+  {
+    if (have_password_option)
+    {
+      err << "Password (--backup-password) for decryption given, require "
+             "also --decrypt."
+          << endl;
+      exitHandler(NdbToolsProgramExitCode::WRONG_ARGS);
+    }
+  }
+  else
+  {
+    if (!have_password_option)
+    {
+      err << "Decrypting backup (--decrypt) requires password (--backup-password)." << endl;
+      exitHandler(NdbToolsProgramExitCode::WRONG_ARGS);
+    }
+  }
+
+  bool failed = ndb_option::post_process_options();
+  if (failed)
+  {
+    BaseString err_msg = g_backup_password_state.get_error_message();
+    if (!err_msg.empty())
+    {
+      err << "Error: " << err_msg.c_str() << endl;
+    }
     exitHandler(NdbToolsProgramExitCode::WRONG_ARGS);
   }
   if (ga_nodeId == 0)
@@ -1670,7 +1722,7 @@ private:
     }
   }
 
-  ~OffsetTransform() {}
+  ~OffsetTransform() override {}
 
   static Uint64 readIntoU64(const void* src, Uint32 bits)
   {
@@ -1748,10 +1800,17 @@ private:
     }
   }
       
-  virtual bool apply(const NdbDictionary::Column* col,
+  bool apply(const NdbDictionary::Column* col,
                      const void* src_data,
-                     void** dst_data)
+                     void** dst_data) override
   {
+    if (src_data == NULL)
+    {
+      /* Offset(NULL, *) -> NULL */
+      *dst_data = NULL;
+      return true;
+    }
+
     if (m_sig)
     {
       Int64 src_val = readIntoS64(src_data, m_bits);
@@ -2002,11 +2061,9 @@ free_include_excludes_vector()
 
 static void exitHandler(int code)
 {
+  ndb_openssl_evp::library_end();
   free_include_excludes_vector();
-  if (opt_core)
-    abort();
-  else
-    exit(code);
+  exit(code);
 }
 
 static void init_restore()
@@ -2191,6 +2248,10 @@ int do_restore(RestoreThreadData *thrdata)
   if(_error_insert > 0)
   {
     metaData.error_insert(_error_insert);
+  }
+  for (Uint32 i = 0; i < g_consumers.size(); i++)
+  {
+    g_consumers[i]->error_insert(_error_insert);
   }
 #endif 
   Logger::format_timestamp(time(NULL), timestamp, sizeof(timestamp));
@@ -2664,7 +2725,17 @@ int do_restore(RestoreThreadData *thrdata)
           OutputStream *tmp = ndbout.m_out;
           ndbout.m_out = output;
           for(Uint32 j= 0; j < g_consumers.size(); j++) 
-            g_consumers[j]->tuple(* tuple, fragmentId);
+          {
+            if (!g_consumers[j]->tuple(* tuple, fragmentId))
+            {
+              restoreLogger.log_error(
+                "Restore: error occurred while restoring data. Exiting...");
+              // wait for async transactions to complete
+              for (i= 0; i < g_consumers.size(); i++)
+                g_consumers[i]->endOfTuples();
+              return NdbToolsProgramExitCode::FAILED;
+            }
+          }
           ndbout.m_out =  tmp;
           if (check_progress())
             report_progress("Data file progress: ", dataIter);
@@ -2673,7 +2744,7 @@ int do_restore(RestoreThreadData *thrdata)
         if (res < 0)
         {
           restoreLogger.log_error(
-            "Restore: An error occurred while restoring data. Exiting...");
+            "Restore: An error occurred while reading data. Exiting...");
           return NdbToolsProgramExitCode::FAILED;
         }
         if (!dataIter.validateFragmentFooter())
@@ -2733,7 +2804,14 @@ int do_restore(RestoreThreadData *thrdata)
         if (check_slice_skip_fragment(table, logEntry->m_frag_id))
           continue;
         for(Uint32 j= 0; j < g_consumers.size(); j++)
-          g_consumers[j]->logEntry(* logEntry);
+        {
+          if (!g_consumers[j]->logEntry(* logEntry))
+          {
+            restoreLogger.log_error(
+              "Restore: Error restoring the data log. Exiting...");
+            return NdbToolsProgramExitCode::FAILED;
+          }
+        }
 
         if (check_progress())
           report_progress("Log file progress: ", logIter);
@@ -2741,7 +2819,7 @@ int do_restore(RestoreThreadData *thrdata)
       if (res < 0)
       {
         restoreLogger.log_error(
-          "Restore: An restoring the data log. Exiting... res = %u",
+          "Restore: Error reading the data log. Exiting... res = %d",
           res);
         return NdbToolsProgramExitCode::FAILED;
       }
@@ -3004,6 +3082,7 @@ static void* start_restore_worker(void *data)
 int
 main(int argc, char** argv)
 {
+  ndb_openssl_evp::library_init();
   NDB_INIT(argv[0]);
 
   const char *load_default_groups[]= { "mysql_cluster","ndb_restore",0 };
@@ -3173,7 +3252,7 @@ main(int argc, char** argv)
     for (int part_id=1; part_id<=ga_part_count; part_id++)
     {
       NDB_THREAD_PRIO prio = NDB_THREAD_PRIO_MEAN;
-      uint stack_size = 128*1024;
+      uint stack_size = 128 * 1024;
       char name[20];
       snprintf (name, sizeof(name), "restore%d", part_id);
       RestoreThreadData *data = new RestoreThreadData(part_id, &barrier);
@@ -3221,6 +3300,7 @@ main(int argc, char** argv)
     exitHandler(NdbToolsProgramExitCode::FAILED);
   }
 
+  ndb_openssl_evp::library_end();
   return NdbToolsProgramExitCode::OK;
 }  // main
 

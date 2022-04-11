@@ -1,0 +1,96 @@
+#
+# PXC-3584 : Assertion failure: lock0lock.cc:6588:!(&trx->mutex)->is_owned()
+#
+# When does replaying of trx happen?
+# 1. Two transactions that are not conflicting at certification level but
+#    are conflicting at trx commit can lead to situation where one trx
+#    can be replayed. (See below for example)
+# 2. Trx is replayed only if Victim will have higher seqno than the trx
+#    that initiated the abort
+# 3. During the replay, before replay is initiated, if a new trx holds
+#    locks that will be required by replayed trx, replayed trx will try
+#    to BF Abort the new trx that is open and uncommitted
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
+INSERT INTO t1 VALUES (1, 'a');
+INSERT INTO t1 VALUES (2, 'a');
+# This trx is used to acquire conflicting locks just before
+# replaying of trx is started.
+# Connection node_1b
+START TRANSACTION;
+# Connection node_1
+START TRANSACTION;
+UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
+SELECT * FROM t1 WHERE f1 = 2 FOR UPDATE;
+f1	f2
+2	a
+# Block the applier on node1 and issue a conflicting update on node #2
+# Trx from node2 is replicated and certified first. Will have lower global sequence
+# number
+# Connection node_1a
+SET SESSION wsrep_sync_wait=0;
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+# Connection node_2
+UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
+# Connection node_1a
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+# Block the commit, send the COMMIT and wait until it gets blocked
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_master_enter_sync';
+# Trx from Node 1 Will have higher sequence number and will be a victim because the trx
+# from Node 2 is allowed to proceed first and it will try to BF-Abort
+# the higher global seqno trx from node1 (certified but not committed yet)
+# Connection node_1
+COMMIT;
+# Connection node_1a
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+# Let the conflicting UPDATE (from node 2) proceed and wait until it hits abort_trx_end.
+# The victim transaction(node 1) still sits in commit_monitor_master_sync_point.
+SET GLOBAL wsrep_provider_options = 'dbug=d,abort_trx_end';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+# Let the transactions proceed
+SET GLOBAL wsrep_provider_options = 'dbug=';
+# Node 1 trx will be scheduled for replay and wait just before replaying of trx
+SET GLOBAL wsrep_provider_options = 'dbug=d,start_of_replay_trx';
+SET GLOBAL wsrep_provider_options = 'signal=abort_trx_end';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_master_enter_sync';
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+# Now replaying of trx is paused, at this time, we initiate a trx that acquires
+# conflicting locks required by replay trx
+# Connection node_1b
+UPDATE t1 SET f2 = 'd' WHERE f1 = 1;
+UPDATE t1 SET f2 = 'e' WHERE f1 = 2;
+# Let the replay of trx to proceed. This will BF-Abort the new conflicting and
+# not yet committed trx.
+# Connection node_1a
+SET GLOBAL wsrep_provider_options = 'signal=start_of_replay_trx';
+# Commit succeeds
+# Connection node_1
+# The new conflicting trx started just before the replay of node1 trx has been
+# BF-Aborted, so we get ER_LOCK_DEADLOCK
+# Connection node_1b
+COMMIT;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
+COUNT(*) = 1
+1
+# wsrep_local_replays has increased by 1
+wsrep_local_replays
+1
+# Connection node_2
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
+COUNT(*) = 1
+1
+include/diff_servers.inc [servers=1 2]
+DROP TABLE t1;

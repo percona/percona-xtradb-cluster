@@ -5,4 +5,4 @@
 include/assert.inc [Mysql.ibd should be encrypted]
 # Check Encryption header of mysql.ibd after shutdown
 # Start default MTR instance
-# restart:<hidden args>
+# restart

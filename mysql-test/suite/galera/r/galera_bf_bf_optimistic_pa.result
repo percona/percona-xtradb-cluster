@@ -1,0 +1,68 @@
+SET SESSION wsrep_sync_wait = 0;
+CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
+INSERT INTO p1 VALUES (1,1);
+CREATE TABLE c1 (pk INTEGER PRIMARY KEY, f2 CHAR(30), fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
+INSERT INTO c1 VALUES (1, 'INITIAL VALUE', 1);
+INSERT INTO c1 VALUES (2, 'INITIAL VALUE', 1);
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_master_enter_sync';
+ALTER TABLE p1 ADD f1 INT;
+SET SESSION wsrep_sync_wait=0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+START TRANSACTION;
+UPDATE c1 SET f2 = 'changed from node 1' WHERE pk = 1;
+SELECT * FROM c1 WHERE pk = 2 FOR UPDATE;
+pk	f2	fk
+2	INITIAL VALUE	1
+SET SESSION wsrep_sync_wait = 0;
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+UPDATE c1 SET f2 = 'changed from node 2' WHERE pk = 2;
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_master_enter_sync';
+COMMIT;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_master_enter_sync';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_master_enter_sync';
+SET GLOBAL wsrep_provider_options = 'dbug=';
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+include/assert.inc [node_2 changes should be replicated]
+node_1:
+SELECT * FROM c1;
+pk	f2	fk
+1	INITIAL VALUE	1
+2	changed from node 2	1
+SELECT * FROM p1;
+pk	f2	f1
+1	1	NULL
+SHOW CREATE TABLE p1;
+Table	Create Table
+p1	CREATE TABLE `p1` (
+  `pk` int NOT NULL,
+  `f2` int DEFAULT NULL,
+  `f1` int DEFAULT NULL,
+  PRIMARY KEY (`pk`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+node_2:
+SELECT * FROM c1;
+pk	f2	fk
+1	INITIAL VALUE	1
+2	changed from node 2	1
+SELECT * FROM p1;
+pk	f2	f1
+1	1	NULL
+SHOW CREATE TABLE p1;
+Table	Create Table
+p1	CREATE TABLE `p1` (
+  `pk` int NOT NULL,
+  `f2` int DEFAULT NULL,
+  `f1` int DEFAULT NULL,
+  PRIMARY KEY (`pk`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+DROP TABLE c1;
+DROP TABLE p1;

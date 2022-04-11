@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -38,6 +38,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "mach0data.h"
 #include "mtr0log.h"
 #include "trx0undo.h"
+#include "ut0dbg.h"
 #ifndef UNIV_HOTBACKUP
 #include "dict0dict.h"
 #include "fsp0sysspace.h"
@@ -64,8 +65,7 @@ class Spatial_reference_system;
 
 /** Writes the mtr log entry of the inserted undo log record on the undo log
  page. */
-UNIV_INLINE
-void trx_undof_page_add_undo_rec_log(
+static inline void trx_undof_page_add_undo_rec_log(
     page_t *undo_page, /*!< in: undo log page */
     ulint old_free,    /*!< in: start offset of the inserted entry */
     ulint new_free,    /*!< in: end offset of the entry */
@@ -138,9 +138,8 @@ byte *trx_undo_parse_add_undo_rec(byte *ptr,     /*!< in: buffer */
 #ifndef UNIV_HOTBACKUP
 /** Calculates the free space left for extending an undo log record.
  @return bytes left */
-UNIV_INLINE
-ulint trx_undo_left(const page_t *page, /*!< in: undo log page */
-                    const byte *ptr)    /*!< in: pointer to page */
+static inline ulint trx_undo_left(const page_t *page, /*!< in: undo log page */
+                                  const byte *ptr) /*!< in: pointer to page */
 {
   /* The '- 10' is a safety margin, in case we have some small
   calculation error below */
@@ -1014,7 +1013,7 @@ static const byte *trx_undo_read_blob_update(const byte *undo_ptr,
 @param[in]	update		the update vector containing partial update
                                 information on LOBs.
 @param[in]	fld		the field to which the LOB belongs.
-@param[in]	mtr		the mini transaction context.
+@param[in]	mtr		the mini-transaction context.
 @return the undo record pointer where new data can be written.
 @return nullptr when there is not enough space in undo page. */
 static byte *trx_undo_report_blob_update(page_t *undo_page, dict_index_t *index,
@@ -1769,6 +1768,8 @@ byte *trx_undo_update_rec_get_update(
 
   update = upd_create(n_fields + 2, heap);
 
+  update->table = index->table;
+
   update->info_bits = info_bits;
 
   /* Store first trx id and roll ptr to update vector */
@@ -2105,9 +2106,6 @@ byte *trx_undo_parse_erase_page_end(
     page_t *page,                         /*!< in: page or NULL */
     mtr_t *mtr)                           /*!< in: mtr or NULL */
 {
-  ut_ad(ptr != nullptr);
-  ut_ad(end_ptr != nullptr);
-
   if (page == nullptr) {
     return (ptr);
   }
@@ -2250,11 +2248,9 @@ dberr_t trx_undo_report_row_operation(
   }
 
   page_no = undo->last_page_no;
-
-  undo_block = buf_page_get_gen(
-      page_id_t(undo->space, page_no), undo->page_size, RW_X_LATCH,
-      buf_pool_is_obsolete(undo->withdraw_clock) ? nullptr : undo->guess_block,
-      Page_fetch::NORMAL, __FILE__, __LINE__, &mtr);
+  undo_block = buf_page_get_gen(page_id_t(undo->space, page_no),
+                                undo->page_size, RW_X_LATCH, undo->guess_block,
+                                Page_fetch::NORMAL, __FILE__, __LINE__, &mtr);
 
   buf_block_dbg_add_level(undo_block, SYNC_TRX_UNDO_PAGE);
 
@@ -2316,14 +2312,13 @@ dberr_t trx_undo_report_row_operation(
       mtr_commit(&mtr);
     } else {
       /* Success */
-      undo->withdraw_clock = buf_withdraw_clock;
+      undo->guess_block = undo_block;
       mtr_commit(&mtr);
 
       undo->empty = FALSE;
       undo->top_page_no = page_no;
       undo->top_offset = offset;
       undo->top_undo_no = trx->undo_no;
-      undo->guess_block = undo_block;
 
       trx->undo_no++;
       trx->undo_rseg_space = undo_ptr->rseg->space_id;
@@ -2667,8 +2662,8 @@ bool trx_undo_prev_version_build(
 /** Read virtual column value from undo log
 @param[in]	table		the table
 @param[in]	ptr		undo log pointer
-@param[in,out]	row		the row struct to fill
-@param[in]	in_purge	called by purge thread
+@param[in,out]	row		the dtuple to fill
+@param[in]	in_purge        called by purge thread
 @param[in]	online		true if this is from online DDL log
 @param[in]	col_map		online rebuild column map
 @param[in,out]	heap		memory heap to keep value when necessary */

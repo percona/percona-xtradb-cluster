@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -32,18 +32,12 @@
 #include <future>
 #include <memory>  // shared_ptr
 #include <mutex>
+#include <sstream>
 #include <stdexcept>
+#include <system_error>
 #include <thread>
 
 #include <sys/types.h>  // timeval
-
-#include <event2/buffer.h>
-#include <event2/bufferevent.h>
-#include <event2/bufferevent_ssl.h>
-#include <event2/event.h>
-#include <event2/http.h>
-#include <event2/listener.h>
-#include <event2/util.h>
 
 // Harness interface include files
 #include "common.h"  // rename_thread()
@@ -51,26 +45,24 @@
 #include "mysql/harness/loader.h"
 #include "mysql/harness/logging/logging.h"
 #include "mysql/harness/net_ts/impl/socket_error.h"
+#include "mysql/harness/net_ts/internet.h"
+#include "mysql/harness/net_ts/io_context.h"
+#include "mysql/harness/net_ts/socket.h"
 #include "mysql/harness/plugin.h"
 #include "mysql/harness/utility/string.h"
 
 #include "http_auth.h"
 #include "http_server_plugin.h"
+#include "mysql/harness/tls_server_context.h"
 #include "mysqlrouter/http_auth_realm_component.h"
 #include "mysqlrouter/http_common.h"
 #include "mysqlrouter/http_server_component.h"
 #include "mysqlrouter/plugin_config.h"
-#include "posix_re.h"
-#include "socket_operations.h"
 #include "static_files.h"
-#include "tls_server_context.h"
 
 IMPORT_LOG_FUNCTIONS()
 
 static constexpr const char kSectionName[]{"http_server"};
-
-std::promise<void> stopper;
-std::future<void> stopped = stopper.get_future();
 
 /**
  * request router
@@ -82,8 +74,9 @@ std::future<void> stopped = stopper.get_future();
 void HttpRequestRouter::append(const std::string &url_regex_str,
                                std::unique_ptr<BaseRequestHandler> cb) {
   std::lock_guard<std::mutex> lock(route_mtx_);
-  request_handlers_.emplace_back(
-      RouterData{url_regex_str, PosixRE{url_regex_str}, std::move(cb)});
+  request_handlers_.emplace_back(RouterData{
+      url_regex_str, std::regex{url_regex_str, std::regex_constants::extended},
+      std::move(cb)});
 }
 
 void HttpRequestRouter::remove(const std::string &url_regex_str) {
@@ -161,7 +154,7 @@ void HttpRequestRouter::route(HttpRequest req) {
   }
 
   for (auto &request_handler : request_handlers_) {
-    if (request_handler.url_regex.search(uri.get_path())) {
+    if (std::regex_search(uri.get_path(), request_handler.url_regex)) {
       request_handler.handler->handle_request(req);
       return;
     }
@@ -170,189 +163,169 @@ void HttpRequestRouter::route(HttpRequest req) {
   route_default(req);
 }
 
-void stop_eventloop(evutil_socket_t, short, void *cb_arg) {
-  auto *ev_base = static_cast<event_base *>(cb_arg);
-
-  if (stopped.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-    event_base_loopexit(ev_base, nullptr);
-  }
-}
-
 void HttpRequestThread::accept_socket() {
   // we could replace the callback after accept here, but sadly
   // we don't have access to it easily
-  evhttp_accept_socket_with_handle(ev_http.get(), accept_fd_);
+  event_http_.accept_socket_with_handle(accept_fd_);
 }
 
 void HttpRequestThread::set_request_router(HttpRequestRouter &router) {
-  evhttp_set_gencb(
-      ev_http.get(),
-      [](evhttp_request *req, void *user_data) {
+  event_http_.set_gencb(
+      [](HttpRequest *req, void *user_data) {
         auto *rtr = static_cast<HttpRequestRouter *>(user_data);
-        rtr->route(
-            HttpRequest{std::unique_ptr<evhttp_request,
-                                        std::function<void(evhttp_request *)>>(
-                req, [](evhttp_request *) {})});
+        rtr->route(std::move(*req));
       },
       &router);
 }
 
 void HttpRequestThread::wait_and_dispatch() {
-  struct timeval tv {
-    0, 10 * 1000
-  };
-  event_add(ev_shutdown_timer.get(), &tv);
-  event_base_dispatch(ev_base.get());
+  event_base_.once(-1, {EventFlags::Timeout},
+                   HttpRequestThread::on_event_loop_ready, this, nullptr);
+  event_base_.dispatch();
+
+  // In case when something fails in `ev_base`, while first dispatch, then
+  // there is a possibility that `initialized` was not set by the
+  // `on_event_loop_read`. Next code line is going to ensure that no
+  // thread is going to wait for this worker to become ready.
+  initialization_finished();
+}
+
+void HttpRequestThread::break_dispatching() {
+  // `loopexit` function is thread safe, and can be called
+  // from different thread than the one is handling events
+  // in wait_and_dispatch.
+  //
+  // There is one additional requirement that needs to be
+  // fulfilled, `libevents` locks must be initialized with
+  // `evthread_use_pthreads` or similar function.
+  event_base_.loop_exit(nullptr);
+}
+
+void HttpRequestThread::wait_until_ready() {
+  initialized_.wait([](auto value) -> bool { return value == true; });
+}
+
+void HttpRequestThread::on_event_loop_ready(native_handle_type, short,
+                                            void *ctxt) {
+  auto current = reinterpret_cast<HttpRequestThread *>(ctxt);
+
+  current->initialization_finished();
+}
+
+bool HttpRequestThread::is_initalized() const {
+  bool result;
+
+  initialized_.serialize_with_cv(
+      [&result](auto &initialized, auto &) { result = initialized; });
+
+  return result;
+}
+
+void HttpRequestThread::initialization_finished() {
+  initialized_.serialize_with_cv([](auto &initialized, auto &cv) {
+    initialized = true;
+    cv.notify_one();
+  });
 }
 
 class HttpRequestMainThread : public HttpRequestThread {
  public:
   void bind(const std::string &address, uint16_t port) {
-    int err;
-    struct addrinfo hints, *ainfo;
-
-    auto *sock_ops = mysql_harness::SocketOperations::instance();
-
-    std::memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-
-    err = getaddrinfo(address.c_str(), std::to_string(port).c_str(), &hints,
-                      &ainfo);
-    if (err != 0) {
-      throw std::runtime_error(std::string("getaddrinfo() failed: ") +
-                               gai_strerror(err));
+    net::io_context io_ctx;
+    net::ip::tcp::resolver resolver(io_ctx);
+    auto resolve_res = resolver.resolve(address, std::to_string(port));
+    if (!resolve_res) {
+      throw std::system_error(resolve_res.error(),
+                              "resolving " + address + " failed");
     }
 
-    std::shared_ptr<void> exit_guard(nullptr,
-                                     [&](void *) { freeaddrinfo(ainfo); });
+    for (auto const &resolved : resolve_res.value()) {
+      net::ip::tcp::acceptor sock(io_ctx);
 
-    const auto accept_res = sock_ops->socket(
-        ainfo->ai_family, ainfo->ai_socktype, ainfo->ai_protocol);
-    if (!accept_res) {
-      throw std::system_error(accept_res.error(), "socket() failed");
-    }
+      auto open_res = sock.open(resolved.endpoint().protocol());
+      if (!open_res) {
+        throw std::system_error(open_res.error(), "socket() failed");
+      }
 
-    accept_fd_ = accept_res.value();
-
-    if (evutil_make_socket_nonblocking(accept_fd_) < 0) {
-      const auto ec = net::impl::socket::last_error_code();
-
-      sock_ops->close(accept_fd_);
-
-      throw std::system_error(ec, "evutil_make_socket_nonblocking() failed");
-    }
-
-    if (evutil_make_socket_closeonexec(accept_fd_) < 0) {
-      const auto ec = net::impl::socket::last_error_code();
-
-      sock_ops->close(accept_fd_);
-
-      throw std::system_error(ec, "evutil_make_socket_closeonexec() failed");
-    }
-
-    {
-      int option_value = 1;
-      const auto sockopt_res =
-          sock_ops->setsockopt(accept_fd_, SOL_SOCKET, SO_REUSEADDR,
-                               reinterpret_cast<const char *>(&option_value),
-                               static_cast<socklen_t>(sizeof(int)));
-      if (!sockopt_res) {
-        sock_ops->close(accept_fd_);
-
-        throw std::system_error(sockopt_res.error(),
+      sock.native_non_blocking(true);
+      auto setop_res = sock.set_option(net::socket_base::reuse_address(true));
+      if (!setop_res) {
+        throw std::system_error(setop_res.error(),
                                 "setsockopt(SO_REUSEADDR) failed");
       }
-    }
-
-    {
-      int option_value = 1;
-      const auto sockopt_res =
-          sock_ops->setsockopt(accept_fd_, SOL_SOCKET, SO_KEEPALIVE,
-                               reinterpret_cast<const char *>(&option_value),
-                               static_cast<socklen_t>(sizeof(int)));
-      if (!sockopt_res) {
-        sock_ops->close(accept_fd_);
-
-        throw std::system_error(sockopt_res.error(),
+      setop_res = sock.set_option(net::socket_base::keep_alive(true));
+      if (!setop_res) {
+        throw std::system_error(setop_res.error(),
                                 "setsockopt(SO_KEEPALIVE) failed");
       }
-    }
 
-    {
-      const auto bind_res =
-          sock_ops->bind(accept_fd_, ainfo->ai_addr, ainfo->ai_addrlen);
+      auto bind_res = sock.bind(resolved.endpoint());
       if (!bind_res) {
-        sock_ops->close(accept_fd_);
+        std::ostringstream ss;
+        ss << "bind(" << resolved.endpoint() << ") failed";
 
-        throw std::system_error(
-            bind_res.error(),
-            "bind('0.0.0.0:" + std::to_string(port) + ") failed");
+        throw std::system_error(bind_res.error(), ss.str());
       }
-    }
-
-    {
-      const auto listen_res = sock_ops->listen(accept_fd_, 128);
+      auto listen_res = sock.listen(128);
       if (!listen_res) {
-        sock_ops->close(accept_fd_);
-
-        throw std::system_error(listen_res.error(), "listen() failed");
+        throw std::system_error(setop_res.error(), "listen(128) failed");
       }
+
+      auto sock_release_res = sock.release();
+      if (!sock_release_res) {
+        throw std::system_error(sock_release_res.error(), "release() failed");
+      }
+
+      auto handle =
+          event_http_.accept_socket_with_handle(sock_release_res.value());
+      if (!handle.is_valid()) {
+        const auto ec = net::impl::socket::last_error_code();
+
+        throw std::system_error(ec,
+                                "evhttp_accept_socket_with_handle() failed");
+      }
+
+      return;
     }
 
-    auto handle = evhttp_accept_socket_with_handle(ev_http.get(), accept_fd_);
-
-    if (nullptr == handle) {
-      const auto ec = net::impl::socket::last_error_code();
-
-      sock_ops->close(accept_fd_);
-
-      throw std::system_error(ec, "evhttp_accept_socket_with_handle() failed");
-    }
+    throw std::invalid_argument("resolved to nothing?");
   }
 };
 
-#ifdef EVENT__HAVE_OPENSSL
 class HttpsRequestMainThread : public HttpRequestMainThread {
  public:
-  HttpsRequestMainThread(SSL_CTX *ssl_ctx) {
-    evhttp_set_bevcb(
-        ev_http.get(),
-        [](struct event_base *base, void *arg) {
-          return bufferevent_openssl_socket_new(
-              base, -1, SSL_new(static_cast<SSL_CTX *>(arg)),
-              BUFFEREVENT_SSL_ACCEPTING, BEV_OPT_CLOSE_ON_FREE);
+  HttpsRequestMainThread(TlsServerContext *tls_ctx) {
+    event_http_.set_bevcb(
+        [](EventBase *base, void *arg) {
+          return EventBuffer(base, -1, static_cast<TlsServerContext *>(arg),
+                             EventBuffer::SslState::Accepting,
+                             {EventBufferOptionsFlags::CloseOnFree});
         },
-        ssl_ctx);
+        tls_ctx);
   }
 };
-#endif
 
 class HttpRequestWorkerThread : public HttpRequestThread {
  public:
-  explicit HttpRequestWorkerThread(harness_socket_t accept_fd) {
+  explicit HttpRequestWorkerThread(native_handle_type accept_fd) {
     accept_fd_ = accept_fd;
   }
 };
 
-#ifdef EVENT__HAVE_OPENSSL
 class HttpsRequestWorkerThread : public HttpRequestWorkerThread {
  public:
-  explicit HttpsRequestWorkerThread(harness_socket_t accept_fd,
-                                    SSL_CTX *ssl_ctx)
+  explicit HttpsRequestWorkerThread(native_handle_type accept_fd,
+                                    TlsServerContext *tls_ctx)
       : HttpRequestWorkerThread(accept_fd) {
-    evhttp_set_bevcb(
-        ev_http.get(),
-        [](struct event_base *base, void *arg) {
-          return bufferevent_openssl_socket_new(
-              base, -1, SSL_new(static_cast<SSL_CTX *>(arg)),
-              BUFFEREVENT_SSL_ACCEPTING, BEV_OPT_CLOSE_ON_FREE);
+    event_http_.set_bevcb(
+        [](EventBase *base, void *arg) {
+          return EventBuffer(base, -1, static_cast<TlsServerContext *>(arg),
+                             EventBuffer::SslState::Accepting,
+                             {EventBufferOptionsFlags::CloseOnFree});
         },
-        ssl_ctx);
+        tls_ctx);
   }
 };
-#endif
 
 void HttpServer::join_all() {
   while (!sys_threads_.empty()) {
@@ -360,6 +333,7 @@ void HttpServer::join_all() {
     thr.join();
     sys_threads_.pop_back();
   }
+  thread_contexts_.clear();
 }
 
 void HttpServer::start(size_t max_threads) {
@@ -369,7 +343,8 @@ void HttpServer::start(size_t max_threads) {
     thread_contexts_.emplace_back(std::move(main_thread));
   }
 
-  const harness_socket_t accept_fd = thread_contexts_[0].get_socket_fd();
+  const net::impl::socket::native_handle_type accept_fd =
+      thread_contexts_[0].get_socket_fd();
   for (size_t ndx = 1; ndx < max_threads; ndx++) {
     thread_contexts_.emplace_back(HttpRequestWorkerThread(accept_fd));
   }
@@ -385,9 +360,18 @@ void HttpServer::start(size_t max_threads) {
       thr.wait_and_dispatch();
     });
   }
+
+  for (auto &thr : thread_contexts_) {
+    thr.wait_until_ready();
+  }
 }
 
-#ifdef EVENT__HAVE_OPENSSL
+void HttpServer::stop() {
+  for (auto &worker : thread_contexts_) {
+    worker.break_dispatching();
+  }
+}
+
 class HttpsServer : public HttpServer {
  public:
   HttpsServer(TlsServerContext &&tls_ctx, const std::string &address,
@@ -401,15 +385,16 @@ class HttpsServer : public HttpServer {
 
 void HttpsServer::start(size_t max_threads) {
   {
-    auto main_thread = HttpsRequestMainThread(ssl_ctx_.get());
+    auto main_thread = HttpsRequestMainThread(&ssl_ctx_);
     main_thread.bind(address_, port_);
     thread_contexts_.emplace_back(std::move(main_thread));
   }
 
-  const harness_socket_t accept_fd = thread_contexts_[0].get_socket_fd();
+  const net::impl::socket::native_handle_type accept_fd =
+      thread_contexts_[0].get_socket_fd();
   for (size_t ndx = 1; ndx < max_threads; ndx++) {
     thread_contexts_.emplace_back(
-        HttpsRequestWorkerThread(accept_fd, ssl_ctx_.get()));
+        HttpsRequestWorkerThread(accept_fd, &ssl_ctx_));
   }
 
   for (size_t ndx = 0; ndx < max_threads; ndx++) {
@@ -424,7 +409,6 @@ void HttpsServer::start(size_t max_threads) {
     });
   }
 }
-#endif
 
 void HttpServer::add_route(const std::string &url_regex,
                            std::unique_ptr<BaseRequestHandler> cb) {
@@ -468,7 +452,7 @@ class HttpServerPluginConfig : public mysqlrouter::BasePluginConfig {
         ssl_cipher(get_option_string(section, "ssl_cipher")),
         ssl_dh_params(get_option_string(section, "ssl_dh_param")),
         ssl_curves(get_option_string(section, "ssl_curves")),
-        with_ssl(get_uint_option<bool>(section, "ssl")),
+        with_ssl(get_uint_option<uint8_t>(section, "ssl", 0, 1)),
         srv_port(get_uint_option<uint16_t>(section, "port")) {}
 
   std::string get_default_ciphers() const {
@@ -503,11 +487,24 @@ class HttpServerFactory {
     if (config.with_ssl) {
       // init the TLS Server context according to our config-values
       TlsServerContext tls_ctx;
-      tls_ctx.load_key_and_cert(config.ssl_cert, config.ssl_key);
+
+      {
+        const auto res =
+            tls_ctx.load_key_and_cert(config.ssl_key, config.ssl_cert);
+        if (!res) {
+          throw std::system_error(
+              res.error(), "using SSL private key file '" + config.ssl_key +
+                               "' or SSL certificate file '" + config.ssl_cert +
+                               "' failed");
+        }
+      }
 
       if (!config.ssl_curves.empty()) {
         if (tls_ctx.has_set_curves_list()) {
-          tls_ctx.curves_list(config.ssl_curves);
+          const auto res = tls_ctx.curves_list(config.ssl_curves);
+          if (!res) {
+            throw std::system_error(res.error(), "using ssl-curves failed");
+          }
         } else {
           throw std::invalid_argument(
               "setting ssl-curves is not supported by the ssl library, it "
@@ -515,17 +512,27 @@ class HttpServerFactory {
         }
       }
 
-      tls_ctx.init_tmp_dh(config.ssl_dh_params);
+      {
+        const auto res = tls_ctx.init_tmp_dh(config.ssl_dh_params);
+        if (!res) {
+          throw std::system_error(res.error(), "setting ssl_dh_params failed");
+        }
+      }
 
-      if (!config.ssl_cipher.empty()) tls_ctx.cipher_list(config.ssl_cipher);
+      if (!config.ssl_cipher.empty()) {
+        const auto res = tls_ctx.cipher_list(config.ssl_cipher);
+        if (!res) {
+          throw std::system_error(res.error(), "using ssl-cipher list failed");
+        }
+      }
 
-#ifdef EVENT__HAVE_OPENSSL
-      // tls-context is owned by the HttpsServer
-      return std::make_shared<HttpsServer>(std::move(tls_ctx),
-                                           config.srv_address, config.srv_port);
-#else
-      throw std::invalid_argument("SSL support disabled at compile-time");
-#endif
+      if (Event::has_ssl()) {
+        // tls-context is owned by the HttpsServer
+        return std::make_shared<HttpsServer>(
+            std::move(tls_ctx), config.srv_address, config.srv_port);
+      } else {
+        throw std::invalid_argument("SSL support disabled at compile-time");
+      }
     } else {
       return std::make_shared<HttpServer>(config.srv_address.c_str(),
                                           config.srv_port);
@@ -540,9 +547,6 @@ static void init(mysql_harness::PluginFuncEnv *env) {
   if (nullptr == info->config) {
     return;
   }
-
-  // calls the openssl library initialize code
-  TlsLibraryContext tls_lib_ctx;
 
   // assume there is only one section for us
   try {
@@ -566,6 +570,10 @@ static void init(mysql_harness::PluginFuncEnv *env) {
 
       has_started = true;
 
+      Event::initialize_threads();
+      mysql_harness::ScopeGuard initialization_finished(
+          []() { Event::shutdown(); });
+
       HttpServerPluginConfig config{section};
 
       if (config.with_ssl &&
@@ -585,8 +593,7 @@ static void init(mysql_harness::PluginFuncEnv *env) {
       log_info("listening on %s:%u", config.srv_address.c_str(),
                config.srv_port);
 
-      http_servers.emplace(
-          std::make_pair(section->name, HttpServerFactory::create(config)));
+      http_servers.emplace(section->name, HttpServerFactory::create(config));
 
       auto srv = http_servers.at(section->name);
 
@@ -599,6 +606,8 @@ static void init(mysql_harness::PluginFuncEnv *env) {
         srv->add_route("", std::make_unique<HttpStaticFolderHandler>(
                                config.static_basedir, config.require_realm));
       }
+
+      initialization_finished.dismiss();
     }
   } catch (const std::invalid_argument &exc) {
     set_error(env, mysql_harness::kConfigInvalidArgument, "%s", exc.what());
@@ -608,6 +617,8 @@ static void init(mysql_harness::PluginFuncEnv *env) {
     set_error(env, mysql_harness::kUndefinedError, "Unexpected exception");
   }
 }
+
+static void deinit(mysql_harness::PluginFuncEnv *) { Event::shutdown(); }
 
 static void start(mysql_harness::PluginFuncEnv *env) {
   // - version string
@@ -635,15 +646,14 @@ static void start(mysql_harness::PluginFuncEnv *env) {
   try {
     auto srv = http_servers.at(get_config_section(env)->name);
 
-    // add routes
-
     srv->start(8);
+    mysql_harness::on_service_ready(env);
 
     // wait until we got asked to shutdown.
     //
     // 0 == wait-forever
     wait_for_stop(env, 0);
-    stopper.set_value();
+    srv->stop();
 
     srv->join_all();
   } catch (const std::invalid_argument &exc) {
@@ -655,8 +665,12 @@ static void start(mysql_harness::PluginFuncEnv *env) {
   }
 }
 
-const static std::array<const char *, 1> required = {{
+const static std::array<const char *, 3> required = {{
     "logger",
+    "router_openssl",
+    // as long as this plugin links against http_auth_backend_lib which links
+    // against metadata_cache there is a need to cleanup protobuf
+    "router_protobuf",
 }};
 
 extern "C" {
@@ -670,8 +684,9 @@ mysql_harness::Plugin HTTP_SERVER_EXPORT harness_plugin_http_server = {
     // conflicts
     0, nullptr,
     init,     // init
-    nullptr,  // deinit
+    deinit,   // deinit
     start,    // start
     nullptr,  // stop
+    true,     // declares_readiness
 };
 }

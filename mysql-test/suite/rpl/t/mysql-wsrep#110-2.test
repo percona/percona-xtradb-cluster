@@ -2,7 +2,6 @@
 # codership/mysql-wsrep/110 - Assertion `table_found' failed in unpack_row() with SAVEPOINT, trigger, error handler
 #
 
---source include/have_innodb.inc
 --source include/have_binlog_format_row.inc
 --source include/master-slave.inc
 

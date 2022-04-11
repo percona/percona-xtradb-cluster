@@ -4,7 +4,7 @@
 Configuring Percona XtraDB Cluster on Ubuntu
 ============================================
 
-This tutorial describes how to install and configure three |PXC| nodes
+This tutorial describes how to install and configure three Percona XtraDB Cluster nodes
 on Ubuntu 14 LTS servers, using the packages from Percona repositories.
 
 * Node 1
@@ -30,12 +30,12 @@ The procedure described in this tutorial requires he following:
 * All three nodes have Ubuntu 14 LTS installed.
 * Firewall on all nodes is configured to allow connecting
   to ports 3306, 4444, 4567 and 4568.
-* AppArmor profile for |MySQL| is `disabled <http://www.mysqlperformanceblog.com/2012/12/20/percona-xtradb-cluster-selinux-is-not-always-the-culprit/>`_.
+* AppArmor profile for MySQL is `disabled <http://www.mysqlperformanceblog.com/2012/12/20/percona-xtradb-cluster-selinux-is-not-always-the-culprit/>`_.
 
 Step 1. Installing PXC
 ======================
 
-Install |PXC| on all three nodes as described in :ref:`apt`.
+Install Percona XtraDB Cluster on all three nodes as described in :ref:`apt`.
 
 .. note:: Debian/Ubuntu installation prompts for root password.
    For this tutorial, set it to ``Passw0rd``.
@@ -168,7 +168,7 @@ Step 3. Configuring the second node
     [root@pxc2 ~]# systemctl start mysql
 
 #. After the server has been started,
-   it should receive |SST| automatically.
+   it should receive SST automatically.
    Cluster status can now be checked on both nodes.
    The following is an example of status from the second node (``pxc2``):
 

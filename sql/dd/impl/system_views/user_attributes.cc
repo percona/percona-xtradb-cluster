@@ -1,4 +1,4 @@
-/* Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -38,6 +38,7 @@ User_attributes::User_attributes() {
   m_target_def.add_field(FIELD_METADATA, "`ATTRIBUTE`",
                          "user_attributes->>\"$.metadata\"");
   m_target_def.add_from("mysql.user");
+  m_target_def.add_where("CAN_ACCESS_USER(mysql.user.user,mysql.user.host)");
 }
 
 }  // namespace system_views

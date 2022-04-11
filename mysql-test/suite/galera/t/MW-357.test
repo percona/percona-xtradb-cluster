@@ -1,7 +1,7 @@
 --source include/galera_cluster.inc
 
 --connection node_2
-SET GLOBAL wsrep_slave_threads = 0;
+SET GLOBAL wsrep_applier_threads = 0;
 
 --connection node_1
 CREATE TABLE t1 (f1 INT PRIMARY KEY) Engine=InnoDB;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -59,7 +59,7 @@ bool Sql_cmd_lock_instance::execute(THD *thd) {
   if (check_backup_admin_privilege(thd) ||
       acquire_exclusive_backup_lock(
           thd,
-          DBUG_EVALUATE_IF("stop_slave_dont_release_backup_lock", 5,
+          DBUG_EVALUATE_IF("stop_replica_dont_release_backup_lock", 5,
                            thd->variables.lock_wait_timeout),
           false))
     return true;
@@ -95,7 +95,7 @@ static bool acquire_mdl_for_backup(THD *thd, enum_mdl_type mdl_type,
                                    ulong lock_wait_timeout) {
   MDL_request mdl_request;
 
-  DBUG_ASSERT(mdl_type == MDL_SHARED || mdl_type == MDL_INTENTION_EXCLUSIVE);
+  assert(mdl_type == MDL_SHARED || mdl_type == MDL_INTENTION_EXCLUSIVE);
 
 #ifdef WITH_WSREP
   if (mdl_duration == MDL_EXPLICIT) {
@@ -119,7 +119,7 @@ static bool acquire_mdl_for_backup(THD *thd, enum_mdl_type mdl_type,
 
 class Release_all_backup_locks : public MDL_release_locks_visitor {
  public:
-  virtual bool release(MDL_ticket *ticket) {
+  bool release(MDL_ticket *ticket) override {
     return ticket->get_key()->mdl_namespace() == MDL_key::BACKUP_LOCK;
   }
 };

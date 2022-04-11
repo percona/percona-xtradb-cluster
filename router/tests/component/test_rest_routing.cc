@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2019, 2020, Oracle and/or its affiliates.
+  Copyright (c) 2019, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -137,7 +137,7 @@ TEST_P(RestRoutingApiTest, ensure_openapi) {
     const std::string destinations =
         (route_name == "_") ? "metadata-cache://test/default?role=PRIMARY"
                             : "127.0.0.1:" + std::to_string(mock_port_);
-    config_sections.push_back(ConfigBuilder::build_section(
+    config_sections.push_back(mysql_harness::ConfigBuilder::build_section(
         std::string("routing") + (route_name.empty() ? "" : ":") + route_name,
         {
             {"bind_port", std::to_string(routing_ports_[i])},
@@ -155,7 +155,7 @@ TEST_P(RestRoutingApiTest, ensure_openapi) {
   // create a "dead" metadata-cache referenced by the routing "_" to check
   // route/health isActive == 0
   const std::string keyring_username = "mysql_router1_user";
-  config_sections.push_back(ConfigBuilder::build_section(
+  config_sections.push_back(mysql_harness::ConfigBuilder::build_section(
       "metadata_cache:test",
       {
           {"router_id", "3"},
@@ -175,18 +175,16 @@ TEST_P(RestRoutingApiTest, ensure_openapi) {
       &default_section, "mysqlrouter.conf", "connect_timeout=1")};
 
   SCOPED_TRACE("// starting router");
-  ProcessWrapper &http_server = launch_router({"-c", conf_file});
+  ProcessWrapper &http_server =
+      launch_router({"-c", conf_file}, EXIT_SUCCESS, true, false, -1s);
 
   // doesn't really matter which file we use here, we are not going to do any
   // queries
   const std::string json_stmts = get_data_dir().join("bootstrap_gr.js").str();
 
   SCOPED_TRACE("// launch the server mock");
-  auto &server_mock =
-      launch_mysql_server_mock(json_stmts, mock_port_, EXIT_SUCCESS, false);
+  launch_mysql_server_mock(json_stmts, mock_port_, EXIT_SUCCESS, false);
 
-  SCOPED_TRACE("// checking port is ready");
-  ASSERT_NO_FATAL_FAILURE(check_port_ready(server_mock, mock_port_, 5000ms));
   // wait for route being available if we expect it to be and plan to do some
   // connections to it (which are routes: "ro" and "Aaz")
   for (size_t i = 3; i < kRoutesQty; ++i) {
@@ -217,11 +215,8 @@ TEST_P(RestRoutingApiTest, ensure_openapi) {
     ASSERT_TRUE(wait_for_port_ready(routing_ports_[2], 500ms));
   }
 
-  // wait a bit until the routing plugin really closed the sockets
-  //
-  // the routing plugin has a server-greeting-timeout of 100ms
-  // add a few more on top for our close-and-forget in wait_for_port_ready()
-  std::this_thread::sleep_for(200ms);
+  // wait until we see that the Router has blocked the host
+  EXPECT_TRUE(wait_log_contains(http_server, "blocking client host", 5s));
 
   EXPECT_NO_FATAL_FAILURE(
       fetch_and_validate_schema_and_resource(GetParam(), http_server));
@@ -334,15 +329,15 @@ get_expected_destinations_fields(int expected_destinations_num) {
       };
 
   for (int i = 0; i < expected_destinations_num; ++i) {
-    result.push_back({"/items/0/address", [](const JsonValue *value) {
-                        ASSERT_TRUE(value != nullptr);
-                        ASSERT_TRUE(value->IsString());
-                        ASSERT_STREQ(value->GetString(), "127.0.0.1");
-                      }});
-    result.push_back({"/items/0/port", [](const JsonValue *value) {
-                        ASSERT_NE(value, nullptr);
-                        ASSERT_GT(value->GetInt(), 0);
-                      }});
+    result.emplace_back("/items/0/address", [](const JsonValue *value) {
+      ASSERT_TRUE(value != nullptr);
+      ASSERT_TRUE(value->IsString());
+      ASSERT_STREQ(value->GetString(), "127.0.0.1");
+    });
+    result.emplace_back("/items/0/port", [](const JsonValue *value) {
+      ASSERT_NE(value, nullptr);
+      ASSERT_GT(value->GetInt(), 0);
+    });
   }
 
   return result;
@@ -359,11 +354,11 @@ get_expected_blocked_hosts_fields(const int expected_blocked_hosts) {
               }}};
 
   for (int i = 0; i < expected_blocked_hosts; ++i) {
-    result.push_back(
-        {"/items/" + std::to_string(i), [](const JsonValue *value) {
-           ASSERT_NE(value, nullptr);
-           ASSERT_THAT(value->GetString(), ::testing::StartsWith("127.0.0.1"));
-         }});
+    result.emplace_back(
+        "/items/" + std::to_string(i), [](const JsonValue *value) {
+          ASSERT_NE(value, nullptr);
+          ASSERT_THAT(value->GetString(), ::testing::StartsWith("127.0.0.1"));
+        });
   }
 
   return result;
@@ -385,37 +380,37 @@ get_expected_connections_fields_fields(const int expected_connection_qty) {
               }}};
 
   for (int i = 0; i < expected_connection_qty; ++i) {
-    result.push_back({"/items/" + std::to_string(i) + "/bytesToServer",
-                      [](const JsonValue *value) {
-                        ASSERT_NE(value, nullptr);
-                        ASSERT_GT(value->GetUint64(), 0);
-                      }});
+    result.emplace_back("/items/" + std::to_string(i) + "/bytesToServer",
+                        [](const JsonValue *value) {
+                          ASSERT_NE(value, nullptr);
+                          ASSERT_GT(value->GetUint64(), 0);
+                        });
 
-    result.push_back({"/items/" + std::to_string(i) + "/sourceAddress",
-                      [](const JsonValue *value) {
-                        ASSERT_NE(value, nullptr);
-                        ASSERT_TRUE(value->IsString());
-                        ASSERT_THAT(value->GetString(),
-                                    ::testing::StartsWith("127.0.0.1"));
-                      }});
+    result.emplace_back("/items/" + std::to_string(i) + "/sourceAddress",
+                        [](const JsonValue *value) {
+                          ASSERT_NE(value, nullptr);
+                          ASSERT_TRUE(value->IsString());
+                          ASSERT_THAT(value->GetString(),
+                                      ::testing::StartsWith("127.0.0.1"));
+                        });
 
-    result.push_back({"/items/" + std::to_string(i) + "/destinationAddress",
-                      [](const JsonValue *value) {
-                        ASSERT_NE(value, nullptr);
-                        ASSERT_TRUE(value->IsString());
-                        ASSERT_THAT(value->GetString(),
-                                    ::testing::StartsWith("127.0.0.1"));
-                      }});
+    result.emplace_back("/items/" + std::to_string(i) + "/destinationAddress",
+                        [](const JsonValue *value) {
+                          ASSERT_NE(value, nullptr);
+                          ASSERT_TRUE(value->IsString());
+                          ASSERT_THAT(value->GetString(),
+                                      ::testing::StartsWith("127.0.0.1"));
+                        });
 
-    result.push_back(
-        {"/items/" + std::to_string(i) + "/timeConnectedToServer",
-         [](const JsonValue *value) {
-           ASSERT_NE(value, nullptr);
-           ASSERT_TRUE(value->IsString());
+    result.emplace_back(
+        "/items/" + std::to_string(i) + "/timeConnectedToServer",
+        [](const JsonValue *value) {
+          ASSERT_NE(value, nullptr);
+          ASSERT_TRUE(value->IsString());
 
-           ASSERT_TRUE(pattern_found(value->GetString(), kTimestampPattern))
-               << value->GetString();
-         }});
+          ASSERT_TRUE(pattern_found(value->GetString(), kTimestampPattern))
+              << value->GetString();
+        });
   }
 
   return result;
@@ -942,15 +937,14 @@ TEST_F(RestRoutingApiTest, routing_api_no_auth) {
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  // wait until process failed by itself and check the error-msg
-  const auto wait_for_process_exit_timeout{10000ms};
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10000ms);
 
   const std::string router_output = router.get_full_logfile();
   EXPECT_THAT(router_output, ::testing::HasSubstr(
-                                 "plugin 'rest_routing' init failed: option "
+                                 "  init 'rest_routing' failed: option "
                                  "require_realm in [rest_routing] is required"))
       << router_output;
 }
@@ -967,11 +961,10 @@ TEST_F(RestRoutingApiTest, invalid_realm) {
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  // wait until process failed by itself and check the error-msg
-  const auto wait_for_process_exit_timeout{10000ms};
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10000ms);
 
   const std::string router_output = router.get_full_logfile();
   EXPECT_THAT(
@@ -994,13 +987,6 @@ TEST_F(RestRoutingApiTest, routing_api_no_rest_api_works) {
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
   launch_router({"-c", conf_file}, EXIT_SUCCESS);
-
-  // wait until signal handler is up before we let the teardown of the test
-  // terminate the router and check its exit-code
-  //
-  // should be removed once we have another way to know that the process is
-  // ready to receive a shutdown signal.
-  std::this_thread::sleep_for(100ms);
 }
 
 /**
@@ -1014,15 +1000,15 @@ TEST_F(RestRoutingApiTest, rest_routing_section_twice) {
                                             /*request_authentication=*/true);
 
   // force [rest_routing] twice in the config
-  config_sections.push_back(ConfigBuilder::build_section("rest_routing", {}));
+  config_sections.push_back(
+      mysql_harness::ConfigBuilder::build_section("rest_routing", {}));
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  // wait until process failed by itself and check the error-msg
-  const auto wait_for_process_exit_timeout{10000ms};
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10000ms);
 
   const std::string router_output = router.get_full_output();
   EXPECT_THAT(router_output,
@@ -1043,17 +1029,15 @@ TEST_F(RestRoutingApiTest, rest_routing_section_has_key) {
 
   const std::string conf_file{create_config_file(
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"))};
-  auto &router = launch_router({"-c", conf_file}, EXIT_FAILURE);
+  auto &router =
+      launch_router({"-c", conf_file}, EXIT_FAILURE, true, false, -1s);
 
-  // wait until process failed by itself and check the error-msg
-  const auto wait_for_process_exit_timeout{10000ms};
-  check_exit_code(router, EXIT_FAILURE, wait_for_process_exit_timeout);
+  check_exit_code(router, EXIT_FAILURE, 10000ms);
 
   const std::string router_output = router.get_full_logfile();
-  EXPECT_THAT(
-      router_output,
-      ::testing::HasSubstr("plugin 'rest_routing' init failed: [rest_routing] "
-                           "section does not expect a key, found 'A'"))
+  EXPECT_THAT(router_output, ::testing::HasSubstr(
+                                 "  init 'rest_routing' failed: [rest_routing] "
+                                 "section does not expect a key, found 'A'"))
       << router_output;
 }
 
@@ -1099,11 +1083,11 @@ TEST_P(RestRoutingApiTestCluster, ensure_openapi_cluster) {
     nodes.push_back(&launch_mysql_server_mock(
         json_metadata, node_classic_ports[i], EXIT_SUCCESS, false,
         i == 0 ? first_node_http_port : 0));
-    ASSERT_NO_FATAL_FAILURE(check_port_ready(*nodes[i], node_classic_ports[i]));
   }
 
   ASSERT_TRUE(MockServerRestClient(first_node_http_port)
                   .wait_for_rest_endpoint_ready());
+
   set_mock_metadata(first_node_http_port, "", node_classic_ports);
 
   SCOPED_TRACE("// start the router with rest_routing enabled");
@@ -1121,7 +1105,7 @@ TEST_P(RestRoutingApiTestCluster, ensure_openapi_cluster) {
     const std::string role = (i == 0) ? "PRIMARY" : "SECONDARY";
     const std::string destinations =
         "metadata-cache://test/default?role=" + role;
-    config_sections.push_back(ConfigBuilder::build_section(
+    config_sections.push_back(mysql_harness::ConfigBuilder::build_section(
         "routing:"s + route_name,
         {
             {"bind_port", std::to_string(routing_ports_[i])},
@@ -1137,7 +1121,7 @@ TEST_P(RestRoutingApiTestCluster, ensure_openapi_cluster) {
   }
 
   const std::string keyring_username = "mysql_router1_user";
-  config_sections.push_back(ConfigBuilder::build_section(
+  config_sections.push_back(mysql_harness::ConfigBuilder::build_section(
       "metadata_cache:test", {
                                  {"router_id", "3"},
                                  {"user", keyring_username},
@@ -1153,7 +1137,8 @@ TEST_P(RestRoutingApiTestCluster, ensure_openapi_cluster) {
       conf_dir_.name(), mysql_harness::join(config_sections, "\n"),
       &default_section)};
 
-  ProcessWrapper &http_server = launch_router({"-c", conf_file});
+  ProcessWrapper &http_server =
+      launch_router({"-c", conf_file}, EXIT_SUCCESS, true, false, -1s);
 
   // wait for both (rw and ro) routes being available
   for (size_t i = 0; i < 2; ++i) {

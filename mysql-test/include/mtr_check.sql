@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2020, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2021, Oracle and/or its affiliates.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -65,6 +65,34 @@ BEGIN
   END IF;
 END$$
 
+CREATE DEFINER=root@localhost PROCEDURE check_testcase_ndb()
+BEGIN
+  -- Check NDB only if the ndbcluster plugin is enabled
+  IF ((SELECT count(*) FROM information_schema.engines
+       WHERE engine='ndbcluster' AND support IN ('YES', 'DEFAULT')) = 1) THEN
+
+    -- Check only if connection information is available
+    IF (SELECT LENGTH(VARIABLE_VALUE) > 0
+          FROM performance_schema.global_variables
+             WHERE VARIABLE_NAME='ndb_connectstring') THEN
+
+      -- List dict objects in NDB, skip objects created by ndbcluster plugin
+      -- and HashMap's since those can't be dropped after having been
+      -- created by test
+      SELECT id, indented_name FROM ndbinfo.dict_obj_tree
+        WHERE root_type != 24 AND  -- HashMap
+              root_name NOT IN ( 'mysql/def/ndb_schema',
+                                 'mysql/def/ndb_schema_result',
+                                 'mysql/def/ndb_index_stat_head',
+                                 'mysql/def/ndb_index_stat_sample',
+                                 'mysql/def/ndb_apply_status',
+                                 'mysql/def/ndb_sql_metadata')
+        ORDER BY path;
+
+    END IF;
+  END IF;
+END$$
+
 -- Procedure used to check if server has been properly
 -- restored after testcase has been run
 
@@ -72,6 +100,8 @@ CREATE DEFINER=root@localhost PROCEDURE check_testcase()
 BEGIN
 
   CALL check_testcase_perfschema();
+
+  CALL check_testcase_ndb();
 
   -- Dump all global variables except those that may change.
   -- timestamp changes if time passes. server_uuid changes if server restarts.
@@ -164,7 +194,7 @@ BEGIN
   -- Dump all created compression dictionaries
   SELECT * FROM INFORMATION_SCHEMA.COMPRESSION_DICTIONARY ORDER BY DICT_NAME;
 
-  SHOW GLOBAL STATUS LIKE 'slave_open_temp_tables';
+  SHOW GLOBAL STATUS LIKE 'replica_open_temp_tables';
 
   -- Check for number of active connections before & after the test run.
 
@@ -189,13 +219,25 @@ BEGIN
   -- Show open connections/transactions in wsrep provider
   SHOW STATUS LIKE 'wsrep_open%';
 
--- drop the sst user, as it's a PXC internal
--- check testcase runs on a separate session, 
--- but is affected by the testcase's autocommit setting
-SET autocommit = 1; 
-SET SESSION sql_log_bin = OFF;
-DROP USER IF EXISTS 'mysql.pxc.sst.user'@localhost;
-SET SESSION sql_log_bin = ON;
+  -- Drop the sst user, as it's a PXC internal
+  -- check testcase runs on a separate session,
+  -- but is affected by the testcase's autocommit setting 
+  -- (e.g. galera.galera_var_persist).
+  -- As this SP is called twice - before and after the test we don't want to
+  -- modify 'autocommit' here, as the test might have requested it to be 'off' 
+  -- in opt file. Setting it to 1 and then restoring is not good as well,
+  -- because it will affect variable source visible in PS (tests like
+  -- perfschema.variables_info_autocommit rely on this value).
+  -- Instead we will just commit here. If in autocommit=1 already, it will no do
+  -- any harm, but if autocommit=0 it will cause explicit commit.
+  -- We do not use DROP USER IF EXISTS because some tests are using
+  -- --skip-grant-tables.
+  COMMIT;
+  SET SESSION wsrep_on = OFF;
+  DELETE FROM mysql.user WHERE user = 'mysql.pxc.sst.user';
+  DELETE FROM mysql.global_grants WHERE user = 'mysql.pxc.sst.user';
+  COMMIT;
+  SET SESSION wsrep_on = ON;
 
   -- Checksum system tables to make sure they have been properly
   -- restored after test.
@@ -218,6 +260,10 @@ SET SESSION sql_log_bin = ON;
     mysql.help_topic,
     mysql.procs_priv,
     mysql.proxies_priv,
+    mysql.replication_asynchronous_connection_failover,
+    mysql.replication_asynchronous_connection_failover_managed,
+    mysql.replication_group_configuration_version,
+    mysql.replication_group_member_actions,
     mysql.role_edges,
     mysql.tables_priv,
     mysql.time_zone,
@@ -226,6 +272,10 @@ SET SESSION sql_log_bin = ON;
     mysql.time_zone_transition,
     mysql.time_zone_transition_type,
     mysql.user;
+
+  -- Check that Replica IO Monitor thread state is the same before
+  -- and after the test run, which is not running.
+  SELECT * FROM performance_schema.threads WHERE NAME="thread/sql/replica_monitor";
 
 END$$
 

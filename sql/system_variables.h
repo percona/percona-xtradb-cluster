@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -87,7 +87,11 @@ enum enum_transaction_write_set_hashing_algorithm {
 };
 
 // Values for session_track_gtids sysvar
-enum enum_session_track_gtids { OFF = 0, OWN_GTID = 1, ALL_GTIDS = 2 };
+enum enum_session_track_gtids {
+  SESSION_TRACK_GTIDS_OFF = 0,
+  SESSION_TRACK_GTIDS_OWN_GTID = 1,
+  SESSION_TRACK_GTIDS_ALL_GTIDS = 2
+};
 
 /** Values for use_secondary_engine sysvar. */
 enum use_secondary_engine {
@@ -335,8 +339,9 @@ struct System_variables {
 
   bool sysdate_is_now;
   bool binlog_rows_query_log_events;
+  bool binlog_ddl_skip_rewrite;
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   ulonglong query_exec_time;
   double query_exec_time_double;
 #endif
@@ -346,14 +351,14 @@ struct System_variables {
 
   ulong innodb_io_reads;
   ulonglong innodb_io_read;
-  ulong innodb_io_reads_wait_timer;
-  ulong innodb_lock_que_wait_timer;
-  ulong innodb_innodb_que_wait_timer;
+  uint64_t innodb_io_reads_wait_timer;
+  uint64_t innodb_lock_que_wait_timer;
+  uint64_t innodb_innodb_que_wait_timer;
   ulong innodb_page_access;
 
   double long_query_time_double;
 
-  bool pseudo_slave_mode;
+  bool pseudo_replica_mode;
 
   Gtid_specification gtid_next;
   Gtid_set_or_null gtid_next_list;
@@ -486,12 +491,30 @@ struct System_variables {
     WSREP_BINLOG_ENABLED,
     WSREP_BINLOG_DISABLED
   } wsrep_saved_binlog_state;
+
+  bool wsrep_saved_binlog_internal_off_state;
 #endif /* WITH_WSREP */
 
   /**
     @sa Sys_var_require_row_format
   */
   bool require_row_format;
+  /**
+    @sa Sys_select_into_buffer_size
+  */
+  ulong select_into_buffer_size;
+  /**
+    @sa Sys_select_into_disk_sync
+  */
+  bool select_into_disk_sync;
+  /**
+    @sa Sys_select_disk_sync_delay
+  */
+  uint select_into_disk_sync_delay;
+  /**
+    @sa Sys_terminology_use_previous
+  */
+  ulong terminology_use_previous;
 };
 
 /**
@@ -553,6 +576,8 @@ struct System_status_var {
 
   ulonglong bytes_received;
   ulonglong bytes_sent;
+
+  ulonglong net_buffer_length;
 
   ulonglong max_execution_time_exceeded;
   ulonglong max_execution_time_set;

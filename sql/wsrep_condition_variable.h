@@ -29,7 +29,7 @@ class Wsrep_condition_variable : public wsrep::condition_variable {
   void notify_all() { mysql_cond_broadcast(&m_cond); }
 
   void wait(wsrep::unique_lock<wsrep::mutex> &lock) {
-    mysql_mutex_t *mutex = static_cast<mysql_mutex_t *>(lock.mutex().native());
+    mysql_mutex_t *mutex = static_cast<mysql_mutex_t *>(lock.mutex()->native());
     mysql_cond_wait(&m_cond, mutex);
   }
 

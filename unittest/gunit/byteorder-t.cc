@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2012, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -46,7 +46,7 @@ class FloatingTest {
 
 class Float4Test : public FloatingTest<float>,
                    public ::testing::TestWithParam<float> {
-  virtual void SetUp() {
+  void SetUp() override {
     input = GetParam();
     output = numeric_limits<float>::quiet_NaN();
   }
@@ -74,7 +74,7 @@ TEST_P(Float4Test, PutAndGet) {
 
 class Float8Test : public FloatingTest<double>,
                    public ::testing::TestWithParam<double> {
-  virtual void SetUp() {
+  void SetUp() override {
     input = GetParam();
     output = numeric_limits<double>::quiet_NaN();
   }
@@ -117,7 +117,7 @@ class IntegralTest : public ::testing::Test {
 
   IntegralTest() : input(0), output(0) {}
 
-  virtual void SetUp() {
+  void SetUp() override {
     values.push_back(Limit::min());
     values.push_back(Limit::min() / T(2));
     values.push_back(T(0));

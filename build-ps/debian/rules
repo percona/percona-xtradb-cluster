@@ -83,6 +83,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_FEDERATED_STORAGE_ENGINE=ON \
 		-DWITH_PAM=ON \
 		-DWITH_ROCKSDB=0 \
+		-DWITH_UNIT_TESTS=0 \
 		-DFORCE_INSOURCE_BUILD=1 \
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
@@ -92,6 +93,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
                 -DWITH_ICU=bundled \
                 -DWITH_ZSTD=bundled \
                 -DWITH_LZ4=bundled \
+                -DWITH_ZLIB=bundled \
                 -DWITH_EDITLINE=bundled \
                 -DWITH_LIBEVENT=bundled \
                 -DWITH_NUMA=ON \
@@ -131,6 +133,7 @@ endif
 		-DWITH_FEDERATED_STORAGE_ENGINE=ON \
 		-DWITH_PAM=ON \
 		-DWITH_ROCKSDB=0 \
+		-DWITH_UNIT_TESTS=0 \
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
 		-DWITH_SYSTEM_LIBS=ON \
@@ -139,6 +142,7 @@ endif
                 -DWITH_ICU=bundled \
                 -DWITH_ZSTD=bundled \
                 -DWITH_LZ4=bundled \
+                -DWITH_ZLIB=bundled \
                 -DWITH_EDITLINE=bundled \
                 -DWITH_LIBEVENT=bundled \
                 -DWITH_NUMA=ON \
@@ -199,8 +203,8 @@ override_dh_auto_install:
 	install -m 0644 debian/extra/mysql@.service $(TMP)/lib/systemd/system/
 
 	install -m 0755 $(TMP)/garb/files/garb-systemd $(TMP)/usr/bin/
-	install -m 0644 $(TMP)/garb/files/garb.service $(TMP)/lib/systemd/system/garbd.service
-	sed -i 's/sysconfig\/garb/default\/garbd/' $(TMP)/lib/systemd/system/garbd.service
+	install -m 0644 $(TMP)/garb/files/garb.service $(TMP)/lib/systemd/system/garb.service
+	sed -i 's/sysconfig\/garb/default\/garb/' $(TMP)/lib/systemd/system/garb.service
 
 	mkdir -p $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
 	cp -rp $(TMP)/usr/lib/mysql-test/* $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
@@ -229,7 +233,7 @@ override_dh_auto_install:
         # Add helper functions for maintainer scripts
 	install -m 0644 debian/extra/mysql-helpers debian/tmp/usr/share/mysql/
 
-	install -m 0644 $(TMP)/garb/files/garb.cnf $(TMP)/etc/default/garbd
+	install -m 0644 $(TMP)/garb/files/garb.cnf $(TMP)/etc/default/garb
 
 	# install source tarball for source package
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
@@ -244,7 +248,7 @@ override_dh_strip:
 
 override_dh_installinit:
 	@echo "RULES.$@"
-	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_enable --name=mysql; dh_systemd_enable --name=garbd; fi
+	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_enable --name=mysql; dh_systemd_enable --name=garb; fi
 	# dh_installinit --name=mysql -- defaults 19 21
 	# dh_installinit --name=garbd -- defaults 19 21
 	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_start --restart-after-upgrade; fi

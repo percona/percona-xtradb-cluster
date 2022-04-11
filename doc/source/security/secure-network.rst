@@ -4,21 +4,21 @@
 Securing the Network
 ====================
 
-By default, anyone with access to your network can connect to any |PXC| node
+By default, anyone with access to your network can connect to any Percona XtraDB Cluster node
 either as a client or as another node joining the cluster.
 This could potentially let them query your data or get a complete copy of it.
 
-In general, it is a good idea to disable all remote connections to |PXC| nodes.
+In general, it is a good idea to disable all remote connections to Percona XtraDB Cluster nodes.
 If you require clients or nodes from outside of your network to connect,
 you can set up a VPN (virtual private network) for this purpose.
 
 Firewall Configuration
 ======================
 
-A firewall can let you filter |PXC| traffic
+A firewall can let you filter Percona XtraDB Cluster traffic
 based on the clients and nodes that you trust.
 
-By default, |PXC| nodes use the following ports:
+By default, Percona XtraDB Cluster nodes use the following ports:
 
 * 3306 is used for MySQL client connections
   and :term:`SST` (State Snapshot Transfer) via ``mysqldump``.
@@ -39,11 +39,11 @@ or any other firewall of your choice.
 Using iptables
 --------------
 
-To restrict access to |PXC| ports using ``iptables``,
+To restrict access to Percona XtraDB Cluster ports using ``iptables``,
 you need to append new rules to the ``INPUT`` chain on the filter table.
 In the following example, the trusted range of IP addresses is 192.168.0.1/24.
-It is assumed that only |PXC| nodes and clients will connect from these IPs.
-To enable packet filtering, run the commands as root on each |PXC| node.
+It is assumed that only Percona XtraDB Cluster nodes and clients will connect from these IPs.
+To enable packet filtering, run the commands as root on each Percona XtraDB Cluster node.
 
 .. code-block:: bash
 
@@ -69,7 +69,7 @@ If the trusted IPs are not in sequence,
 you will need to run these commands for each address on each node.
 In this case, you can consider to open all ports between trusted hosts.
 This is a little bit less secure, but reduces the amount of commands.
-For example, if you have three |PXC| nodes,
+For example, if you have three Percona XtraDB Cluster nodes,
 you can run the following commands on each one:
 
 .. code-block:: bash
@@ -82,7 +82,7 @@ you can run the following commands on each one:
        --source 193.125.4.10  --jump ACCEPT
 
 Running the previous commands will allow TCP connections
-from the IP addresses of the other |PXC| nodes.
+from the IP addresses of the other Percona XtraDB Cluster nodes.
 
 .. note:: The changes that you make in ``iptables`` are not persistent
    unless you save the packet filtering state::

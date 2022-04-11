@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2012, 2020, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2012, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -142,13 +142,11 @@ struct os_event {
   reset_sig_count. */
   void wait_low(int64_t reset_sig_count) UNIV_NOTHROW;
 
-  /**
-  Waits for an event object until it is in the signaled state or
+  /** Waits for an event object until it is in the signaled state or
   a timeout is exceeded.
-  @param time_in_usec timeout in microseconds,
-                  or OS_SYNC_INFINITE_TIME
-  @param reset_sig_count zero or the value returned by
-                  previous call of os_event_reset().
+  @param  time_in_usec    Timeout in microseconds, or OS_SYNC_INFINITE_TIME
+  @param  reset_sig_count Zero or the value returned by previous call of
+  os_event_reset().
   @return	0 if success, OS_SYNC_TIME_EXCEEDED if timeout was exceeded */
   ulint wait_time_low(ulint time_in_usec, int64_t reset_sig_count) UNIV_NOTHROW;
 
@@ -398,7 +396,7 @@ struct timespec os_event::get_wait_timelimit(ulint time_in_usec) {
                   strerror(errno_clock_gettime));
 #endif /* !UNIV_NO_ERR_MSGS */
 
-        os_thread_sleep(100000); /* 0.1 sec */
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         errno = errno_clock_gettime;
 
       } else {
@@ -423,7 +421,7 @@ struct timespec os_event::get_wait_timelimit(ulint time_in_usec) {
         ib::error(ER_IB_MSG_1213, strerror(errno_gettimeofday));
 #endif /* !UNIV_NO_ERR_MSGS */
 
-        os_thread_sleep(100000); /* 0.1 sec */
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         errno = errno_gettimeofday;
 
       } else {
@@ -447,12 +445,11 @@ struct timespec os_event::get_wait_timelimit(ulint time_in_usec) {
 
 #endif /* !_WIN32 */
 
-/**
-Waits for an event object until it is in the signaled state or
+/** Waits for an event object until it is in the signaled state or
 a timeout is exceeded.
-@param time_in_usec - timeout in microseconds, or OS_SYNC_INFINITE_TIME
-@param reset_sig_count - zero or the value returned by previous call
-        of os_event_reset().
+@param  time_in_usec    Timeout in microseconds, or OS_SYNC_INFINITE_TIME
+@param  reset_sig_count Zero or the value returned by previous call of
+os_event_reset().
 @return	0 if success, OS_SYNC_TIME_EXCEEDED if timeout was exceeded */
 ulint os_event::wait_time_low(ulint time_in_usec,
                               int64_t reset_sig_count) UNIV_NOTHROW {

@@ -9,7 +9,7 @@ bootstrapping the first node.  The initial node must contain all the data that
 you want to be replicated to other nodes.
 
 Bootstrapping implies starting the first node without any known cluster
-addresses: if the |wsrep_cluster_address| variable is empty, |PXC| assumes that
+addresses: if the wsrep_cluster_address variable is empty, Percona XtraDB Cluster assumes that
 this is the first node and initializes the cluster.
 
 Instead of changing the configuration, start the first node using the following
@@ -26,6 +26,11 @@ with :variable:`wsrep_cluster_conf_id` set to ``1``.
 After you :ref:`add other nodes <add-node>` to the cluster,
 you can then restart this node as normal,
 and it will use standard configuration again.
+
+.. note::
+
+   A service started with ``mysql@bootstrap`` must be stopped using the same name. For example, the ``systemctl stop mysql`` command
+   does not stop an instance started with the ``mysql@bootstrap`` command.
 
 To make sure that the cluster has been initialized, run the following:
 
@@ -56,7 +61,7 @@ it is fully connected and ready for write-set replication.
 
 .. seealso::
 
-   |percona| Blog Post: |PXB| |version| New Feature: wsrep_sst_auth removal
+   Percona Blog Post: Percona XtraBackup |version| New Feature: wsrep_sst_auth removal
       https://www.percona.com/blog/2019/10/03/percona-xtradb-cluster-8-0-new-feature-wsrep_sst_auth-removal/
 
 Next Steps
@@ -64,7 +69,7 @@ Next Steps
 
 After initializing the cluster, you can :ref:`add other nodes <add-node>`.
 
-.. |wsrep_cluster_address| replace:: :variable:`wsrep_cluster_address`
+.. wsrep_cluster_address replace:: :variable:`wsrep_cluster_address`
 
 .. include:: .res/replace.opt.txt
 .. include:: .res/replace.txt

@@ -18,6 +18,8 @@
 
 #include "wsrep_priv.h"
 
+void wsrep_get_single_address(const char *const addr, char *buf,
+                              size_t buf_len);
 unsigned int wsrep_check_ip(const char *addr, bool *is_ipv6);
 size_t wsrep_guess_ip(char *buf, size_t buf_len);
 

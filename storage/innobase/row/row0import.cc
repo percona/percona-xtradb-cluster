@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2012, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2012, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -196,6 +196,14 @@ struct row_import {
   dberr_t match_col_default_values(THD *thd,
                                    const dd::Table *dd_table) UNIV_NOTHROW;
 
+  /** Check if the table schema that was read from the .cfg file matches the
+  in memory table definition.
+  @param[in]	thd		MySQL session variable
+  @param[in]	dd_table	dd::Table
+  @return DB_SUCCESS or error code. */
+  dberr_t match_compression_type_option(THD *thd,
+                                        const dd::Table *dd_table) UNIV_NOTHROW;
+
   /** Check if the table schema that was read from the .cfg file
   matches the in memory table definition.
   @param thd MySQL session variable
@@ -261,6 +269,9 @@ struct row_import {
   bool m_cfp_missing; /*!< true if a .cfp file was
                       found and was readable */
 
+  /** Compression type in the meta-data file */
+  Compression::Type m_compression_type{};
+
   bool m_is_keyring_encrypted;
 };
 
@@ -268,7 +279,7 @@ struct row_import {
 class RecIterator {
  public:
   /** Default constructor */
-  RecIterator() UNIV_NOTHROW {}
+  RecIterator() UNIV_NOTHROW = default;
 
   /** Position the cursor on the first user record. */
   void open(buf_block_t *block) UNIV_NOTHROW {
@@ -325,7 +336,7 @@ class IndexPurge {
   }
 
   /** Descructor */
-  ~IndexPurge() UNIV_NOTHROW {}
+  ~IndexPurge() UNIV_NOTHROW = default;
 
   /** Purge delete marked records.
   @return DB_SUCCESS or error code. */
@@ -383,14 +394,14 @@ class AbstractCallback : public PageCallback {
         m_table_flags(UINT32_UNDEFINED) UNIV_NOTHROW {}
 
   /** Free any extent descriptor instance */
-  virtual ~AbstractCallback() { UT_DELETE_ARRAY(m_xdes); }
+  ~AbstractCallback() override { UT_DELETE_ARRAY(m_xdes); }
 
   /** Determine the page size to use for traversing the tablespace
   @param file_size size of the tablespace file in bytes
   @param block contents of the first page in the tablespace file.
   @retval DB_SUCCESS or error code. */
-  virtual dberr_t init(os_offset_t file_size,
-                       const buf_block_t *block) UNIV_NOTHROW;
+  dberr_t init(os_offset_t file_size,
+               const buf_block_t *block) override UNIV_NOTHROW;
 
   /** @return true if compressed table. */
   bool is_compressed_table() const UNIV_NOTHROW {
@@ -565,7 +576,7 @@ dberr_t AbstractCallback::init(os_offset_t file_size,
 
   m_size = mach_read_from_4(page + FSP_SIZE);
   m_free_limit = mach_read_from_4(page + FSP_FREE_LIMIT);
-  m_space = mach_read_from_4(page + FSP_HEADER_OFFSET + FSP_SPACE_ID);
+  m_space = fsp_header_get_field(page, FSP_SPACE_ID);
   dberr_t err = set_current_xdes(0, page);
 
   return (err);
@@ -592,15 +603,17 @@ struct FetchIndexRootPages : public AbstractCallback {
       : AbstractCallback(trx), m_table(table) UNIV_NOTHROW {}
 
   /** Destructor */
-  virtual ~FetchIndexRootPages() UNIV_NOTHROW {}
+  ~FetchIndexRootPages() UNIV_NOTHROW override = default;
 
   /**
   @retval the space id of the tablespace being iterated over */
-  virtual space_id_t get_space_id() const UNIV_NOTHROW { return (m_space); }
+  space_id_t get_space_id() const UNIV_NOTHROW override { return (m_space); }
 
   /**
   @retval the space flags of the tablespace being iterated over */
-  virtual ulint get_space_flags() const UNIV_NOTHROW { return (m_space_flags); }
+  ulint get_space_flags() const UNIV_NOTHROW override {
+    return (m_space_flags);
+  }
 
   /** Check if the .ibd file row format is the same as the table's.
   @param ibd_table_flags determined from space and page.
@@ -635,12 +648,15 @@ struct FetchIndexRootPages : public AbstractCallback {
     return (err);
   }
 
-  /** Called for each block as it is read from the file.
+  /** Called for each block as it is read from the file. Check index pages to
+  determine the exact row format. We can't get that from the tablespace
+  header flags alone.
+
   @param offset physical offset in the file
   @param block block to convert, it is not from the buffer pool.
   @retval DB_SUCCESS or error code. */
-  virtual dberr_t operator()(os_offset_t offset,
-                             buf_block_t *block) UNIV_NOTHROW;
+  dberr_t operator()(os_offset_t offset,
+                     buf_block_t *block) override UNIV_NOTHROW;
 
   /** Update the import configuration that will be used to import
   the tablespace. */
@@ -796,7 +812,7 @@ class PageConverter : public AbstractCallback {
   @param trx transaction covering the import */
   PageConverter(row_import *cfg, trx_t *trx) UNIV_NOTHROW;
 
-  virtual ~PageConverter() UNIV_NOTHROW {
+  ~PageConverter() UNIV_NOTHROW override {
     if (m_heap != nullptr) {
       mem_heap_free(m_heap);
     }
@@ -804,20 +820,23 @@ class PageConverter : public AbstractCallback {
 
   /**
   @retval the server space id of the tablespace being iterated over */
-  virtual space_id_t get_space_id() const UNIV_NOTHROW {
+  space_id_t get_space_id() const UNIV_NOTHROW override {
     return (m_cfg->m_table->space);
   }
 
   /**
   @retval the space flags of the tablespace being iterated over */
-  virtual ulint get_space_flags() const UNIV_NOTHROW { return (m_space_flags); }
+  ulint get_space_flags() const UNIV_NOTHROW override {
+    return (m_space_flags);
+  }
 
-  /** Called for each block as it is read from the file.
-  @param offset physical offset in the file
-  @param block block to convert, it is not from the buffer pool.
+  /** Called for every page in the tablespace. If the page was not
+  updated then its state must be set to BUF_PAGE_NOT_USED.
+  @param offset physical offset within the file
+  @param block block read from file, note it is not from the buffer pool
   @retval DB_SUCCESS or error code. */
-  virtual dberr_t operator()(os_offset_t offset,
-                             buf_block_t *block) UNIV_NOTHROW;
+  dberr_t operator()(os_offset_t offset,
+                     buf_block_t *block) override UNIV_NOTHROW;
 
  private:
   /** Status returned by PageConverter::validate() */
@@ -888,10 +907,10 @@ class PageConverter : public AbstractCallback {
   dberr_t adjust_cluster_index_blob_ref(rec_t *rec,
                                         const ulint *offsets) UNIV_NOTHROW;
 
-  /** Purge delete-marked records, only if it is possible to do
-  so without re-organising the B+tree.
+  /** Purge delete-marked records, only if it is possible to do so without
+  re-organising the B+tree.
   @param offsets current row offsets.
-  @retval true if purged */
+  @return true if purge succeeded */
   bool purge(const ulint *offsets) UNIV_NOTHROW;
 
   /** Adjust the BLOB references and sys fields for the current record.
@@ -1170,6 +1189,32 @@ dberr_t row_import::match_col_default_values(
 
 /** Check if the table schema that was read from the .cfg file matches the
 in memory table definition.
+@param[in]	thd		MySQL session variable
+@param[in]	dd_table	dd::Table
+@return DB_SUCCESS or error code. */
+dberr_t row_import::match_compression_type_option(
+    THD *thd, const dd::Table *dd_table) UNIV_NOTHROW {
+  dd::String_type compress_option;
+  auto &options = dd_table->options();
+
+  if (options.exists("compress")) {
+    options.get("compress", &compress_option);
+  } else {
+    compress_option = "none";
+  }
+
+  if (innobase_strcasecmp(Compression::to_string(m_compression_type),
+                          compress_option.c_str()) != 0) {
+    ib_errf(thd, IB_LOG_LEVEL_ERROR, ER_TABLE_SCHEMA_MISMATCH,
+            "Compression option does not match");
+    return DB_ERROR;
+  }
+
+  return DB_SUCCESS;
+}
+
+/** Check if the table schema that was read from the .cfg file matches the
+in memory table definition.
 @param thd MySQL session variable
 @return DB_SUCCESS or error code. */
 dberr_t row_import::match_table_columns(THD *thd) UNIV_NOTHROW {
@@ -1304,7 +1349,17 @@ dberr_t row_import::match_schema(THD *thd,
     return (DB_ERROR);
   }
 
-  dberr_t err = match_table_columns(thd);
+  dberr_t err;
+
+  if (m_version >= IB_EXPORT_CFG_VERSION_V6) {
+    err = match_compression_type_option(thd, dd_table);
+
+    if (err != DB_SUCCESS) {
+      return err;
+    }
+  }
+
+  err = match_table_columns(thd);
 
   if (err != DB_SUCCESS) {
     return (err);
@@ -1317,9 +1372,9 @@ dberr_t row_import::match_schema(THD *thd,
   }
 
   /* Check if the SDI index definitions match */
-  const dict_index_t *index;
 
   if (m_has_sdi) {
+    const dict_index_t *index;
     dict_mutex_enter_for_mysql();
 
     index = dict_sdi_get_index(m_table->space);
@@ -1347,8 +1402,7 @@ dberr_t row_import::match_schema(THD *thd,
   }
 
   /* Check if the index definitions match. */
-  for (index = UT_LIST_GET_FIRST(m_table->indexes); index != nullptr;
-       index = UT_LIST_GET_NEXT(indexes, index)) {
+  for (auto index : m_table->indexes) {
     dberr_t index_err;
 
     index_err = match_index_columns(thd, index);
@@ -1450,8 +1504,7 @@ dberr_t row_import::set_root_by_heuristic() UNIV_NOTHROW {
     ++i;
   }
 
-  for (dict_index_t *index = UT_LIST_GET_FIRST(m_table->indexes);
-       index != nullptr; index = UT_LIST_GET_NEXT(indexes, index)) {
+  for (auto index : m_table->indexes) {
     if (index->type & DICT_FTS) {
       dict_set_corrupted(index);
       ib::warn(ER_IB_MSG_940) << "Skipping FTS index: " << index->name;
@@ -1565,9 +1618,9 @@ dberr_t row_import::set_instant_info(THD *thd) UNIV_NOTHROW {
 
   new_size = mem_heap_get_size(m_table->heap);
   if (new_size > old_size) {
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
     dict_sys->size += new_size - old_size;
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
   }
 
   if (error == DB_SUCCESS && instants != m_n_instant_cols) {
@@ -1586,8 +1639,11 @@ dberr_t row_import::set_instant_info(THD *thd) UNIV_NOTHROW {
 
   m_table->set_instant_cols(m_table->get_n_user_cols() - m_n_instant_cols);
   ut_ad(m_table->has_instant_cols());
-  m_table->first_index()->instant_cols = true;
-  m_table->first_index()->n_instant_nullable = m_n_instant_nullable;
+  dict_index_t &first_index = *m_table->first_index();
+  first_index.instant_cols = true;
+  first_index.rec_cache.offsets = nullptr;
+  first_index.rec_cache.nullable_cols = 0;
+  first_index.n_instant_nullable = m_n_instant_nullable;
   /* FIXME: Force to discard the table, in case of any rollback later. */
   //	m_table->discard_after_ddl = true;
 
@@ -1695,7 +1751,7 @@ void IndexPurge::purge_pessimistic_delete() UNIV_NOTHROW {
                              dict_table_is_comp(m_index->table)));
 
   btr_cur_pessimistic_delete(&err, FALSE, btr_pcur_get_btr_cur(&m_pcur), 0,
-                             false, 0, 0, 0, &m_mtr);
+                             false, 0, 0, 0, &m_mtr, &m_pcur, nullptr);
 
   ut_a(err == DB_SUCCESS);
 
@@ -1846,6 +1902,7 @@ bool PageConverter::purge(const ulint *offsets) UNIV_NOTHROW {
 }
 
 /** Adjust the BLOB references and sys fields for the current record.
+@param index the index being converted
 @param rec record to update
 @param offsets column offsets for the record
 @param deleted true if row is delete marked
@@ -2005,8 +2062,7 @@ dberr_t PageConverter::update_header(buf_block_t *block) UNIV_NOTHROW {
   }
 
   /* Write space_id to the tablespace header, page 0. */
-  mach_write_to_4(get_frame(block) + FSP_HEADER_OFFSET + FSP_SPACE_ID,
-                  get_space_id());
+  fsp_header_set_field(get_frame(block), FSP_SPACE_ID, get_space_id());
 
   /* This is on every page in the tablespace. */
   mach_write_to_4(get_frame(block) + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID,
@@ -2017,6 +2073,7 @@ dberr_t PageConverter::update_header(buf_block_t *block) UNIV_NOTHROW {
 
 /** Update the page, set the space id, max trx id and index id.
 @param block block read from file
+@param page_type type of the page
 @retval DB_SUCCESS or error code */
 dberr_t PageConverter::update_page(buf_block_t *block,
                                    ulint &page_type) UNIV_NOTHROW {
@@ -2088,7 +2145,8 @@ dberr_t PageConverter::update_page(buf_block_t *block,
     }
 
     case FIL_PAGE_TYPE_ZLOB_INDEX: {
-      lob::z_index_page_t ipage(block);
+      lob::z_index_page_t ipage(
+          block, const_cast<dict_index_t *>(m_index->m_srv_index));
       ipage.import(m_trx->id);
       byte *ptr = get_frame(block) + FIL_PAGE_SPACE_ID;
       mach_write_to_4(ptr, get_space_id());
@@ -2135,10 +2193,10 @@ dberr_t PageConverter::update_page(buf_block_t *block,
   return (DB_CORRUPTION);
 }
 
-/** Validate the page
+/** Validate the page, check for corruption.
 @param	offset	physical offset within file.
 @param	block	page read from file.
-@return status */
+@return 0 on success, 1 if all zero, 2 if corrupted */
 PageConverter::import_page_status_t PageConverter::validate(
     os_offset_t offset, buf_block_t *block) UNIV_NOTHROW {
   buf_frame_t *page = get_frame(block);
@@ -2267,8 +2325,7 @@ static void row_import_discard_changes(
   However, we need to ensure that the in memory root page numbers
   are reset to "NULL". */
 
-  for (dict_index_t *index = UT_LIST_GET_FIRST(table->indexes);
-       index != nullptr; index = UT_LIST_GET_NEXT(indexes, index)) {
+  for (auto index : table->indexes) {
     index->page = FIL_NULL;
     index->space = FIL_NULL;
   }
@@ -2353,9 +2410,6 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
   index = table->first_index();
 
   n_rows_in_table = cfg.get_n_rows(index->name);
-
-  DBUG_EXECUTE_IF("ib_import_sec_rec_count_mismatch_failure",
-                  n_rows_in_table++;);
 
   /* Adjust the root pages of the secondary indexes only. */
   while ((index = index->next()) != nullptr) {
@@ -2510,14 +2564,14 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t row_import_set_sys_max_row_id(
     /* Update the system row id if the imported index row id is
     greater than the max system row id. */
 
-    mutex_enter(&dict_sys->mutex);
+    dict_sys_mutex_enter();
 
     if (row_id >= dict_sys->row_id) {
       dict_sys->row_id = row_id + 1;
       dict_hdr_flush_row_id();
     }
 
-    mutex_exit(&dict_sys->mutex);
+    dict_sys_mutex_exit();
   }
 
   return (DB_SUCCESS);
@@ -3222,7 +3276,8 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
   return (err);
 }
 
-/** Read tablespace flags from @<tablespace@>.cfg file
+/** Read tablespace flags and compression type info from @<tablespace@>.cfg
+file.
 @param[in]	file	File to read from
 @param[in]	thd	session
 @param[in,out]	cfg	meta data
@@ -3236,14 +3291,31 @@ static MY_ATTRIBUTE((nonnull, warn_unused_result)) dberr_t
     ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_IO_READ_ERROR, errno,
                 strerror(errno), "while reading meta-data tablespace flags.");
 
-    return (DB_IO_ERROR);
+    return DB_IO_ERROR;
   }
 
   ulint space_flags = mach_read_from_4(value);
   ut_ad(space_flags != UINT32_UNDEFINED);
   cfg->m_has_sdi = FSP_FLAGS_HAS_SDI(space_flags);
 
-  return (DB_SUCCESS);
+  if (cfg->m_version >= IB_EXPORT_CFG_VERSION_V6) {
+    /* Read the compression type info. */
+    if (fread(value, 1, sizeof(uint8_t), file) != sizeof(uint8_t)) {
+      ib_senderrf(thd, IB_LOG_LEVEL_ERROR, ER_IO_READ_ERROR, errno,
+                  strerror(errno), "while reading compression type info.");
+
+      return DB_IO_ERROR;
+    }
+
+    auto compression_type =
+        static_cast<Compression::Type>(mach_read_from_1(value));
+
+    ut_ad(Compression::validate(compression_type));
+
+    cfg->m_compression_type = compression_type;
+  }
+
+  return DB_SUCCESS;
 }
 
 /** Read the contents of the @<tablespace@>.cfg file
@@ -3303,6 +3375,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t row_import_read_meta_data(
     case IB_EXPORT_CFG_VERSION_V3:
     case IB_EXPORT_CFG_VERSION_V4:
     case IB_EXPORT_CFG_VERSION_V5:
+    case IB_EXPORT_CFG_VERSION_V6:
       err = row_import_read_v1(file, thd, &cfg);
 
       if (err == DB_SUCCESS) {
@@ -3570,9 +3643,6 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
 
   mutex_exit(&trx->undo_mutex);
 
-  DBUG_EXECUTE_IF("ib_import_undo_assign_failure",
-                  err = DB_TOO_MANY_CONCURRENT_TRXS;);
-
   if (err != DB_SUCCESS) {
     return (row_import_cleanup(prebuilt, trx, err));
 
@@ -3580,6 +3650,8 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
     err = DB_TOO_MANY_CONCURRENT_TRXS;
     return (row_import_cleanup(prebuilt, trx, err));
   }
+
+  ut_a(err == DB_SUCCESS);
 
   prebuilt->trx->op_info = "read meta-data file";
 
@@ -3640,9 +3712,6 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
 
     rw_lock_s_unlock_gen(dict_operation_lock, 0);
 
-    DBUG_EXECUTE_IF("ib_import_set_index_root_failure",
-                    err = DB_TOO_MANY_CONCURRENT_TRXS;);
-
   } else if (cfg.m_missing) {
     rw_lock_s_unlock_gen(dict_operation_lock, 0);
 
@@ -3654,12 +3723,21 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
 
     cfg.m_page_size.copy_from(univ_page_size);
 
+    /* Check and store compression type. */
+    Compression compression;
+
+    err = Compression::check(prebuilt->m_mysql_table->s->compress.str,
+                             &compression);
+
+    ut_a(err == DB_SUCCESS);
+    cfg.m_compression_type = compression.m_type;
+
     FetchIndexRootPages fetchIndexRootPages(table, trx);
 
     err = fil_tablespace_iterate(
         table,
         IO_BUFFER_SIZE(cfg.m_page_size.physical(), cfg.m_page_size.physical()),
-        fetchIndexRootPages);
+        cfg.m_compression_type, fetchIndexRootPages);
 
     if (err == DB_SUCCESS) {
       err = fetchIndexRootPages.build_row_import(&cfg);
@@ -3718,7 +3796,7 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
   err = fil_tablespace_iterate(
       table,
       IO_BUFFER_SIZE(cfg.m_page_size.physical(), cfg.m_page_size.physical()),
-      converter);
+      cfg.m_compression_type, converter);
 
   DBUG_EXECUTE_IF("ib_import_reset_space_and_lsn_failure",
                   err = DB_TOO_MANY_CONCURRENT_TRXS;);
@@ -3785,8 +3863,8 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
   dict_name::convert_to_space(tablespace_name);
 
   err = fil_ibd_open(true, FIL_TYPE_IMPORT, table->space, fsp_flags,
-                     tablespace_name.c_str(), table->name.m_name, filepath,
-                     true, false, keyring_encryption_info);
+                     tablespace_name.c_str(), filepath, true, false,
+                     keyring_encryption_info);
 
   if (err == DB_SUCCESS && cfg.m_is_keyring_encrypted &&
       (!keyring_encryption_info.page0_has_crypt_data ||
@@ -3817,7 +3895,7 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
 
     ut_free(filepath);
 
-    return (row_import_cleanup(prebuilt, trx, err));
+    return row_import_cleanup(prebuilt, trx, err);
   }
 
   /*a For encrypted tablespace, set encryption information. */
@@ -3828,7 +3906,31 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
         table->encryption_key, table->encryption_iv);
   }
 
+  const char *compression_algorithm =
+      Compression::to_string(cfg.m_compression_type);
+
+  if (err == DB_SUCCESS && !Compression::is_none(compression_algorithm)) {
+    err = dict_set_compression(table, compression_algorithm, true);
+  }
+
   row_mysql_unlock_data_dictionary(trx);
+
+  if (err != DB_SUCCESS) {
+    return row_import_cleanup(prebuilt, trx, err);
+  }
+
+  /* Set the autoextend_size attribute. */
+  {
+    auto dc = dd::get_dd_client(trx->mysql_thd);
+    dd::cache::Dictionary_client::Auto_releaser releaser(dc);
+    uint64_t autoextend_size{};
+    if (!dd_get_tablespace_size_option(dc, table->dd_space_id,
+                                       &autoextend_size)) {
+      ut_d(dberr_t ret =)
+          fil_set_autoextend_size(table->space, autoextend_size);
+      ut_ad(ret == DB_SUCCESS);
+    }
+  }
 
   ut_free(filepath);
 
@@ -3955,8 +4057,7 @@ dberr_t row_import_for_mysql(dict_table_t *table, dd::Table *table_def,
 
   page_t *page = buf_block_get_frame(block);
 
-  ulint space_flags_from_disk =
-      mach_read_from_4(page + FSP_HEADER_OFFSET + FSP_SPACE_FLAGS);
+  ulint space_flags_from_disk = fsp_header_get_field(page, FSP_SPACE_FLAGS);
   mtr.commit();
 
   if (!FSP_FLAGS_HAS_SDI(space_flags_from_disk)) {

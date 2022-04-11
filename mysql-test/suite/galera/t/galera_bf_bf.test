@@ -1,0 +1,289 @@
+#
+# Test that ALTER TABLE on parent table is properly ordered with simultaneous
+# transactions that perform DML on child table.
+#
+# UPDATE should fail certification as its certification keys conflict
+# with ALTER TABLE certification keys.
+#
+# Without the fix, UPDATE is certified, then aborted by already replicated TOI
+# transaction which causes its replay. When replaying it conflicts with TOI
+# causing BF-BF conflict.
+#
+# This test checks if child table is included into the certification keys
+# of the writeset related to TOI done on parent table
+# (currently only ALTER TABLE is affected).
+#
+
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+--connect node_1_toi, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1_toi
+SET SESSION wsrep_sync_wait = 0;
+
+CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
+INSERT INTO p1 VALUES (1,1);
+
+CREATE TABLE c1 (pk INTEGER PRIMARY KEY, f2 CHAR(30), fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
+INSERT INTO c1 VALUES (1, 'INITIAL VALUE', 1);
+INSERT INTO c1 VALUES (2, 'INITIAL VALUE', 1);
+
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+
+--send ALTER TABLE p1 ADD f1 INT
+
+--connection node_1
+SET SESSION wsrep_sync_wait=0;
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+######################################################################
+
+--connection node_1
+START TRANSACTION;
+UPDATE c1 SET f2 = 'changed from node 1' WHERE pk = 1;
+SELECT * FROM c1 WHERE pk = 2 FOR UPDATE;
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+SET SESSION wsrep_sync_wait = 0;
+
+# Block the commit, send the COMMIT and wait until it gets blocked
+--let $galera_sync_point = commit_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_1
+--send COMMIT
+
+--connection node_1a
+--let $galera_sync_point = apply_monitor_master_enter_sync commit_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# Let the transactions proceed
+--let $galera_sync_point = commit_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+--reap
+--connection node_1_toi
+--reap
+
+DROP TABLE c1;
+DROP TABLE p1;
+
+
+#
+# Similar to the above, but for CREATE TABLE
+#
+# Test that CREATE TABLE on child table is properly ordered with simultaneous
+# transactions that perform DML on parent table.
+#
+# INSERT should fail certification as its certification keys conflict
+# with CREATE TABLE certification keys.
+#
+# Without the fix, INSERT is certified, then aborted by already replicated TOI
+# transaction which causes its replay. When replaying it conflicts with TOI
+# causing BF-BF conflict.
+#
+# This test checks if parent table is included into the certification keys
+# of the writeset related to TOI done on child table.
+# (CREATE TABLE, DROP TABLE are affected).
+#
+
+
+--connection node_1_toi
+CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
+
+# Replicate CREATE TABLE, but stop just after replicaton, before local execution
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+--send CREATE TABLE c1 (pk INTEGER PRIMARY KEY, fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
+
+--connection node_1
+SET SESSION wsrep_sync_wait=0;
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# Without the fix, INSERT will replicate and the test will stop the execution
+# just after the certification (before the local commit)
+# With the fix, COMMIT will fail certification
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+BEGIN;
+INSERT INTO p1 VALUES (1,1);
+--send COMMIT
+
+--connection node_1a
+# Now unblock CREATE TABLE. Without the fix it will BF-abort already certified
+# INSERT which will cause its replay.
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+
+
+# Without the fix, if INSERT was replicated, let node_1 to continue.
+# As it was replicated, it needs to replay (hp service)
+# It should now trigger BF-BF conflict with CREATE TABLE
+# With the fix, it already failed certification.
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# wait for both to finish
+--connection node_1
+--error ER_LOCK_DEADLOCK
+--reap
+
+--connection node_1_toi
+--reap
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'c1';
+--source include/wait_condition.inc
+
+DROP TABLE c1;
+DROP TABLE p1;
+
+#
+# Similar to the above, but for DROP TABLE
+# Additionally we test multi table drop with temporary tables included.
+#
+
+--connection node_1_toi
+CREATE TABLE p1 (pk INTEGER PRIMARY KEY, f2 INTEGER);
+CREATE TABLE c1 (pk INTEGER PRIMARY KEY, fk INTEGER, FOREIGN KEY (fk) REFERENCES p1(pk));
+CREATE TABLE t1 (pk INTEGER PRIMARY KEY);
+CREATE TEMPORARY TABLE t2 (pk INTEGER PRIMARY KEY);
+
+# Replicate DROP TABLE, but stop just after replicaton, before local execution
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+--send DROP TABLE t1, c1, t2;
+
+--connection node_1
+SET SESSION wsrep_sync_wait=0;
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# Without the fix, INSERT will replicate and the test will stop the execution
+# just after the certification (before the local commit)
+# With the fix, COMMIT will fail certification
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_set_sync_point.inc
+BEGIN;
+INSERT INTO p1 VALUES (1,1);
+--send COMMIT
+
+--connection node_1a
+# Now unblock DROP TABLE. Without the fix it will BF-abort already certified
+# INSERT which will cause its replay.
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+
+
+# Without the fix, if INSERT was replicated, let node_1 to continue.
+# As it was replicated, it needs to replay (hp service)
+# It should now trigger BF-BF conflict with DROP TABLE
+# With the fix, it already failed certification.
+--let $galera_sync_point = apply_monitor_master_enter_sync
+--source include/galera_signal_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+# wait for both to finish
+--connection node_1
+--error ER_LOCK_DEADLOCK
+--reap
+
+--connection node_1_toi
+--reap
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'c1';
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+SHOW TABLES;
+
+DROP TABLE p1;
+
+
+#
+# The fix involves querying Data Dictionary to obtain parent and child foreign
+# keys. We need to acquire table MDL lock to be able to access DD.
+# As we do it before entering into TOI, another thread executing TOI in paralel
+# may abort the current thread.
+# In such a case we rely on wsrep_retry_autocommit functionality.
+#
+--connection node_1
+--let $wsrep_retry_autocommit_saved = `SELECT @@wsrep_retry_autocommit`
+CALL mtr.add_suppression(".*Unable to collect FKs metadata.*");
+
+SET wsrep_retry_autocommit = 1;
+
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET DEBUG_SYNC='wsrep_do_action_for_tables_after_lock SIGNAL reached WAIT_FOR continue';
+--send ALTER TABLE t1 ADD (b INT)
+
+--connection node_1a
+SET DEBUG_SYNC='now WAIT_FOR reached';
+ALTER TABLE t1 ADD (c INT);
+
+--connection node_1
+--reap
+
+SHOW CREATE TABLE t1;
+DROP TABLE t1;
+
+#
+# Now the same, but with wsrep_retry_autocommit = 0
+#
+SET wsrep_retry_autocommit = 0;
+
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET DEBUG_SYNC='wsrep_do_action_for_tables_after_lock SIGNAL reached WAIT_FOR continue';
+--send ALTER TABLE t1 ADD (b INT)
+
+--connection node_1a
+SET DEBUG_SYNC='now WAIT_FOR reached';
+ALTER TABLE t1 ADD (c INT);
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+--reap
+
+SHOW CREATE TABLE t1;
+DROP TABLE t1;
+
+--disable_query_log
+--eval set @@wsrep_retry_autocommit = $wsrep_retry_autocommit_saved
+--enable_query_log
+
+#
+# Simulate permanent MDL lock failure
+#
+SET wsrep_retry_autocommit = 2;
+
+CREATE TABLE t1 (a INT PRIMARY KEY);
+SET GLOBAL debug="+d,wsrep_do_action_for_tables_lock_fail";
+
+--error ER_LOCK_DEADLOCK
+ALTER TABLE t1 ADD (b INT);
+
+SET GLOBAL debug="-d,wsrep_do_action_for_tables_lock_fail";
+
+SHOW CREATE TABLE t1;
+DROP TABLE t1;
+
+
+# cleanup
+--disconnect node_1_toi
+--disconnect node_1a
+--connection node_1
+
+--source include/wait_until_count_sessions.inc

@@ -1,4 +1,4 @@
-/*  Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+/*  Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -43,6 +43,7 @@
 #include "my_psi_config.h"
 #include "my_thread.h"
 #include "my_thread_local.h"  // my_get_thread_local & my_set_thread_local
+#include "mysql/components/services/bits/psi_bits.h"
 #include "mysql/components/services/log_builtins.h"
 #include "mysql/components/services/mysql_mutex_bits.h"
 #include "mysql/components/services/mysql_rwlock_bits.h"
@@ -52,7 +53,6 @@
 #include "mysql/psi/mysql_mutex.h"
 #include "mysql/psi/mysql_rwlock.h"
 #include "mysql/psi/mysql_statement.h"
-#include "mysql/psi/psi_base.h"
 #include "mysql_time.h"
 #include "mysqld_error.h"
 #include "pfs_thread_provider.h"
@@ -60,6 +60,7 @@
 #include "sql/auth/sql_security_ctx.h"
 #include "sql/conn_handler/connection_handler_manager.h"
 #include "sql/current_thd.h"
+#include "sql/debug_sync.h"          // DEBUG_SYNC
 #include "sql/derror.h"              // ER_DEFAULT
 #include "sql/log.h"                 // Query log
 #include "sql/mysqld.h"              // current_thd
@@ -157,7 +158,7 @@ class Thread_to_plugin_map {
       std::map<my_thread_t, const void *>::iterator it =
           collection.find(thread);
       if (it == collection.end()) collection[thread] = plugin;
-    } catch (const std::bad_alloc &e) {
+    } catch (const std::bad_alloc &) {
       return true;
     }
     return false;
@@ -274,7 +275,7 @@ class Mutexed_map_thd_srv_session {
  public:
   class Do_Impl {
    public:
-    virtual ~Do_Impl() {}
+    virtual ~Do_Impl() = default;
     /**
       Work on the session
 
@@ -372,7 +373,7 @@ class Mutexed_map_thd_srv_session {
     rwlock_scoped_lock lock(&LOCK_collection, true, __FILE__, __LINE__);
     try {
       collection[key] = std::make_pair(plugin, session);
-    } catch (const std::bad_alloc &e) {
+    } catch (const std::bad_alloc &) {
       return true;
     }
     return false;
@@ -478,7 +479,7 @@ Srv_session::Session_backup_and_attach::Session_backup_and_attach(
       (old_session = server_session_list.find(c_thd))) {
     old_session->detach();
   } else if (is_plugin) {
-    DBUG_ASSERT(session->is_attached());
+    assert(session->is_attached());
   }
 
   attach_error = session->attach();
@@ -567,6 +568,8 @@ static void err_handle_error(void *ctx, uint err_errno, const char *err_msg,
 
 static void err_shutdown(void *, int) {}
 
+static bool err_alive(void *) { return true; }
+
 const struct st_command_service_cbs error_protocol_callbacks = {
     err_start_result_metadata,
     err_field_metadata,
@@ -586,7 +589,8 @@ const struct st_command_service_cbs error_protocol_callbacks = {
     err_get_string,
     err_handle_ok,
     err_handle_error,
-    err_shutdown};
+    err_shutdown,
+    err_alive};
 
 /**
   Modifies the PSI structures to (de)install a THD
@@ -678,7 +682,7 @@ void Srv_session::deinit_thread() {
 
   THR_srv_session_thread = nullptr;
 
-  DBUG_ASSERT(THR_stack_start_address);
+  assert(THR_stack_start_address);
   THR_stack_start_address = nullptr;
   my_thread_end();
 }
@@ -758,15 +762,15 @@ bool Srv_session::module_deinit() {
     false not valid
 */
 bool Srv_session::is_valid(const Srv_session *session) {
-  DBUG_ASSERT(session != nullptr);
+  assert(session != nullptr);
   const bool is_valid_session = ((session->state > SRV_SESSION_CREATED) &&
                                  (session->state < SRV_SESSION_CLOSED));
   /*
     Make sure valid session exists and invalid sessions doesn't exists in the
     list of opened sessions.
   */
-  DBUG_ASSERT((is_valid_session && server_session_list.find(&session->thd)) ||
-              (!is_valid_session && !server_session_list.find(&session->thd)));
+  assert((is_valid_session && server_session_list.find(&session->thd)) ||
+         (!is_valid_session && !server_session_list.find(&session->thd)));
 
   return is_valid_session;
 }
@@ -801,7 +805,7 @@ bool Srv_session::open() {
   DBUG_TRACE;
 
   DBUG_PRINT("info", ("Session=%p  THD=%p  DA=%p", this, &thd, &da));
-  DBUG_ASSERT(state == SRV_SESSION_CREATED || state == SRV_SESSION_CLOSED);
+  assert(state == SRV_SESSION_CREATED || state == SRV_SESSION_CLOSED);
 
   thd.push_protocol(&protocol_error);
   thd.push_diagnostics_area(&da);
@@ -873,7 +877,7 @@ bool Srv_session::attach() {
   const bool first_attach = (state == SRV_SESSION_OPENED);
   DBUG_TRACE;
   DBUG_PRINT("info", ("current_thd=%p", current_thd));
-  DBUG_ASSERT(state > SRV_SESSION_CREATED && state < SRV_SESSION_CLOSED);
+  assert(state > SRV_SESSION_CREATED && state < SRV_SESSION_CLOSED);
 
   if (is_attached()) {
     if (!my_thread_equal(thd.real_id, my_thread_self())) {
@@ -957,7 +961,7 @@ bool Srv_session::detach() {
   DBUG_PRINT("info",
              ("Session=%p THD=%p current_thd=%p", this, &thd, current_thd));
 
-  DBUG_ASSERT(&thd == current_thd);
+  assert(&thd == current_thd);
   thd.restore_globals();
 
 #ifdef HAVE_PSI_THREAD_INTERFACE
@@ -995,7 +999,7 @@ bool Srv_session::close() {
   DBUG_PRINT("info",
              ("Session=%p THD=%p current_thd=%p", this, &thd, current_thd));
 
-  DBUG_ASSERT(state < SRV_SESSION_CLOSED);
+  assert(state < SRV_SESSION_CLOSED);
 
   /*
     RAII
@@ -1030,13 +1034,20 @@ bool Srv_session::close() {
 #endif /* HAVE_PSI_THREAD_INTERFACE */
 
   thd.security_context()->logout();
-  thd.m_view_ctx_list.empty();
+  thd.m_view_ctx_list.clear();
   close_mysql_tables(&thd);
 
   thd.set_plugin(nullptr);
   thd.pop_diagnostics_area();
 
   thd.get_stmt_da()->reset_diagnostics_area();
+
+  // DEBUG_SYNC control block is released under call to
+  // `thd.release_resource`, thus we can't put this sync
+  // point directly before `pop_protocol`.
+  // Second constrain is that `THD::disconnect` marks
+  // this connection as killed, which disables DEBUG_SYNC.
+  DEBUG_SYNC(&thd, "srv_session_close");
 
   thd.disconnect();
 
@@ -1046,11 +1057,11 @@ bool Srv_session::close() {
 
   thd.release_resources();
 
+  Global_THD_manager::get_instance()->remove_thd(&thd);
+
   mysql_mutex_lock(&thd.LOCK_thd_protocol);
   thd.pop_protocol();
   mysql_mutex_unlock(&thd.LOCK_thd_protocol);
-
-  Global_THD_manager::get_instance()->remove_thd(&thd);
 
   Connection_handler_manager::dec_connection_count();
 
@@ -1099,7 +1110,7 @@ int Srv_session::execute_command(enum enum_server_command command,
     return 1;
   }
 
-  DBUG_ASSERT(thd.get_protocol() == &protocol_error);
+  assert(thd.get_protocol() == &protocol_error);
 
   // RAII:the destructor restores the state
   Srv_session::Session_backup_and_attach backup(this, false);
@@ -1122,12 +1133,12 @@ int Srv_session::execute_command(enum enum_server_command command,
 #endif /* WITH_WSREP */
 
   /*
-    The server does it for COM_QUERY in mysql_parse() but not for
+    The server does it for COM_QUERY in dispatch_sql_command() but not for
     COM_INIT_DB, for example
   */
   if (command != COM_QUERY) thd.reset_for_next_command();
 
-  DBUG_ASSERT(thd.m_statement_psi == nullptr);
+  assert(thd.m_statement_psi == nullptr);
   thd.m_statement_psi = MYSQL_START_STATEMENT(
       &thd.m_statement_state, stmt_info_new_packet.m_key, thd.db().str,
       thd.db().length, thd.charset(), nullptr);
@@ -1141,7 +1152,7 @@ int Srv_session::execute_command(enum enum_server_command command,
 #endif /* WITH_WSREP */
 
   thd.pop_protocol();
-  DBUG_ASSERT(thd.get_protocol() == &protocol_error);
+  assert(thd.get_protocol() == &protocol_error);
   return ret;
 }
 
@@ -1191,7 +1202,7 @@ class Find_thd_by_id_with_callback_set : public Find_THD_Impl {
     When a thread is found the callback function passed to the constructor
     is invoked under THD::Lock_thd_data
   */
-  virtual bool operator()(THD *thd) {
+  bool operator()(THD *thd) override {
     if (thd->thread_id() == thread_id) {
       MUTEX_LOCK(lock, &thd->LOCK_thd_data);
       callback(thd, &input);

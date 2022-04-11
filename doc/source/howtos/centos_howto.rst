@@ -4,7 +4,7 @@
 Configuring Percona XtraDB Cluster on CentOS
 ============================================
 
-This tutorial describes how to install and configure three |PXC| nodes
+This tutorial describes how to install and configure three Percona XtraDB Cluster nodes
 on CentOS 7 servers, using the packages from Percona repositories.
 
 * Node 1
@@ -37,7 +37,7 @@ The procedure described in this tutorial requires the following:
 Step 1. Installing PXC
 ======================
 
-Install |PXC| on all three nodes as described in :ref:`yum`.
+Install Percona XtraDB Cluster on all three nodes as described in :ref:`yum`.
 
 Step 2. Configuring the first node
 ==================================
@@ -86,7 +86,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
    The previous command will start the cluster
    with initial :variable:`wsrep_cluster_address` variable
    set to ``gcomm://``.
-   If the node or |MySQL| are restarted later,
+   If the node or MySQL are restarted later,
    there will be no need to change the configuration file.
 
 #. After the first node has been started,
@@ -127,7 +127,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
 
    Change the password for the superuser account and log out. For example:
 
-   .. code-block:: guess
+   .. code-block:: mysql
 
       mysql> ALTER USER 'root'@'localhost' IDENTIFIED BY 'r00tP@$$';
       Query OK, 0 rows affected (0.00 sec)
@@ -135,7 +135,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
 Step 3. Configuring the second node
 ===================================
 
-1. Make sure that the onfiguration file :file:`/etc/my.cnf`
+1. Make sure that the configuration file :file:`/etc/my.cnf`
    on the second node (``percona2``) contains the following::
 
       [mysqld]
@@ -155,7 +155,7 @@ Step 3. Configuring the second node
       # Using the MyISAM storage engine is not recommended
       default_storage_engine=InnoDB
 
-      # This InnoDB autoincrement locking mode is a requirement for Galera
+      # This InnoDB auto_increment locking mode is a requirement for Galera
       innodb_autoinc_lock_mode=2
 
       # Node 2 address
@@ -174,7 +174,7 @@ Step 3. Configuring the second node
       [root@percona2 ~]# systemctl start mysql
 
 #. After the server has been started,
-   it should receive |SST| automatically.
+   it should receive SST automatically.
    Cluster status can be checked on both nodes.
    The following is an example of status from the second node (``percona2``):
 
@@ -222,7 +222,7 @@ Step 4. Configuring the third node
       # Using the MyISAM storage engine is not recommended
       default_storage_engine=InnoDB
 
-      # This InnoDB autoincrement locking mode is a requirement for Galera
+      # This InnoDB auto_increment locking mode is a requirement for Galera
       innodb_autoinc_lock_mode=2
 
       # Node #3 address

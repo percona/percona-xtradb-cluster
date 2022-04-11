@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -25,6 +25,9 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#ifdef _MSC_VER
+#include <stdint.h>
+#endif
 #include <rpc/rpc.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1473,7 +1476,7 @@ int sender_task(task_arg arg) {
     while (is_connected(&ep->s->con)) {
       int64_t ret;
       assert(!ep->link);
-      if (0 && link_empty(&ep->s->outgoing.data)) {
+      if (false && link_empty(&ep->s->outgoing.data)) {
         TASK_DELAY(0.1 * xcom_drand48());
       }
       /* FWD_ITER(&ep->s->outgoing.data, msg_link, IFDBG(D_NONE, FN;

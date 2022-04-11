@@ -3044,7 +3044,7 @@ connection default;
 --echo #
 --echo # Test that a query failed with ER_NO_SUCH_THREAD causes mysqltest to dump the processlist before dying
 --echo #
---replace_regex /Id[[:space:]]+[0-9]+/Id MASKED/ /Time[[:space:]]+[0-9]+/Time MASKED/
+--replace_regex /Id[[:space:]]+[0-9]+/Id MASKED/ /Time[[:space:]]+[0-9]+/Time MASKED/ /Time_ms[[:space:]]+[0-9]+/Time_ms MASKED/
 --error 1
 --exec echo "KILL QUERY 276447231;" | $MYSQL_TEST 2>&1
 
@@ -3052,7 +3052,7 @@ connection default;
 --exec echo "error ER_NO_SUCH_THREAD; KILL QUERY 276447231;" | $MYSQL_TEST 2>&1
 
 --echo # PROCESSLIST should be dumped if a different error was expected
---replace_regex /Id[[:space:]]+[0-9]+/Id MASKED/ /Time[[:space:]]+[0-9]+/Time MASKED/
+--replace_regex /Id[[:space:]]+[0-9]+/Id MASKED/ /Time[[:space:]]+[0-9]+/Time MASKED/ /Time_ms[[:space:]]+[0-9]+/Time_ms MASKED/
 --error 1
 --exec echo "error ER_PARSE_ERROR; KILL QUERY 276447231;" | $MYSQL_TEST 2>&1
 
@@ -3301,7 +3301,7 @@ SELECT 1 AS res;
 disconnect con1;
 --source include/wait_until_disconnected.inc
 
---error CR_SERVER_GONE_ERROR
+--error CR_SERVER_GONE_ERROR,CR_SERVER_LOST
 SELECT 1 AS res;
 
 connection default;
@@ -3832,12 +3832,12 @@ EOF
 --exec $MYSQL_TEST -x $MYSQLTEST_VARDIR/tmp/abc@.test 2>&1
 --remove_file $MYSQLTEST_VARDIR/tmp/abc@.test
 
---echo # Result file name 'ab#c.result'
+# PXC supports test and result files to have '#' character in it.
+--echo # Test file name 'ab#c.test'
 --write_file $MYSQLTEST_VARDIR/tmp/ab#c.result
 SELECT 100;
 EOF
---error 1
---exec $MYSQL_TEST -R $MYSQLTEST_VARDIR/tmp/ab#c.result 2>&1
+--exec $MYSQL_TEST -x $MYSQLTEST_VARDIR/tmp/ab#c.result 2>&1
 --remove_file $MYSQLTEST_VARDIR/tmp/ab#c.result
 
 --echo # Bug#23280117: 5.7 BUG XXXXX TEST REPLACE NUMBER ROUND+GIS PRECISION
@@ -4011,6 +4011,7 @@ DROP TABLE t1;
 EOF
 
 # Run the test
+--error 63
 --exec $MYSQL_TEST --no-skip -x $MYSQLTEST_VARDIR/tmp/bug26090322.test 2>&1
 
 # Cleanup
@@ -4933,3 +4934,32 @@ EOF
 
 --remove_file $MYSQLTEST_VARDIR/tmp/bug29769715.txt
 --remove_file $MYSQLTEST_VARDIR/tmp/600chars.txt
+
+##
+## Test assert()
+##
+assert(1);
+
+let $x= 1;
+assert($x);
+
+let $y= 0;
+assert(! $y);
+
+CREATE TABLE t1 (i int primary key not null);
+INSERT INTO t1 values(3);
+assert(`select count(*) from t1`);
+assert(! `select count(*) from t1 where i = 4`);
+DROP TABLE t1;
+
+if(1)
+{
+--assert(2)
+}
+
+if(1)
+{
+  assert(3);
+}
+
+--assert(4)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2021, Oracle and/or its affiliates.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.0,
@@ -31,8 +31,8 @@
 
 #include "violite.h"  // NOLINT(build/include_subdir)
 
-#include "plugin/x/ngs/include/ngs/thread.h"
 #include "plugin/x/src/helper/multithread/sync_variable.h"
+#include "plugin/x/src/ngs/thread.h"
 #include "plugin/x/src/server/server_properties.h"
 
 namespace xpl {
@@ -52,7 +52,6 @@ class Listener {
 
   virtual ~Listener() = default;
 
-  virtual void set_state(const State state) = 0;
   virtual const Sync_variable_state &get_state() const = 0;
   virtual void report_properties(On_report_properties on_status) = 0;
   virtual bool report_status() const = 0;

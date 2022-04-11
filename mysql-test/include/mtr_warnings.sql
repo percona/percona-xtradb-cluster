@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2020, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2021, Oracle and/or its affiliates.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License, version 2.0,
@@ -35,9 +35,39 @@ use mtr;
 -- with PXC we keep this table in MyISAM to avoid replication
 -- of suppression added to one node to other nodes of the cluster.
 CREATE TABLE test_suppressions (
-  pattern VARCHAR(255)
+  pattern VARCHAR(255) NOT NULL
 ) engine=MyISAM;
 
+--
+-- Table of full messages (not patterns), suppressed by a test while it
+-- is running.
+-- Primary key is guaranteed to be unique because the prefix includes the
+-- timestamp, which the server guarantees (!) is unique.
+--
+-- with PXC we keep this table in MyISAM to avoid replication
+-- of suppression added to one node to other nodes of the cluster.
+CREATE TABLE asserted_test_suppressions (
+  message TEXT NOT NULL,
+  PRIMARY KEY(message(100))
+) engine=MyISAM;
+
+--
+-- Table of patterns for messages that should be excluded from global
+-- suppressions. These can be added per test, using
+-- include/suppress_messages.inc with
+-- $suppress_mode=IGNORE_GLOBAL_SUPPRESSIONS, and will be reset after
+-- each test.
+--
+-- The patterns in this table do not need to be identical to any
+-- global suppression pattern. Instead, the pattern should match the
+-- error messages for which global suppression should be ignored.
+--
+-- with PXC we keep this table in MyISAM to avoid replication
+-- of suppression added to one node to other nodes of the cluster.
+CREATE TABLE test_ignored_global_suppressions (
+  pattern VARCHAR(255) NOT NULL,
+  PRIMARY KEY(pattern(255))
+) engine=MyISAM;
 
 --
 -- Declare a trigger that makes sure
@@ -75,7 +105,8 @@ SET @@collation_connection = @collation_connection_saved;
 -- Load table with patterns that will be suppressed globally(always)
 --
 CREATE TABLE global_suppressions (
-  pattern VARCHAR(255)
+  pattern VARCHAR(255) NOT NULL,
+  KEY(pattern(255))
 );
 
 
@@ -122,12 +153,32 @@ INSERT INTO global_suppressions VALUES
  ("innodb-page-size has been changed"),
 
  /*
+   TODO(tdidriks) Move most of these to individual test cases.
+   OS error code 1:  Operation not permitted
+   MY-000131 (handler): Command not supported by database
+   MY-000155 (handler): The table does not exist in engine
+   MY-000160 (handler): There's no partition in table for the given value
+   MY-000168 (handler): Unknown (generic) error from engine
+   MY-000180 (handler): Index corrupted
+   MY-000196 (handler): Query interrupted
+   MY-003044 (ER_STD_BAD_ALLOC_ERROR):
+                        Memory allocation error: %-.256s in function %s.
+  */
+ ("Got error 1 when reading table"),
+ ("Got error 131 when reading table"),
+ ("Got error 155 when reading table"),
+ ("Got error 160 when reading table"),
+ ("Got error 168 when reading table"),
+ ("Got error 180 when reading table"),
+ ("Got error 196 when reading table"),
+ ("Got error 3044 when reading table"),
+
+ /*
    Due to timing issues, it might be that this warning
    is printed when the server shuts down and the
    computer is loaded.
  */
 
- ("Got error [0-9]* when reading table"),
  ("Lock wait timeout exceeded"),
  ("Log entry on master is longer than max_allowed_packet"),
  ("unknown option '--loose-"),
@@ -187,7 +238,11 @@ INSERT INTO global_suppressions VALUES
  ("==[0-9]*== Massif"),
  ("==[0-9]*== Helgrind"),
 
-/*
+ /* Suppress warnings caused by foreign clients, see Bug#31893901 */
+
+ ("IP address .* could not be resolved.*"),
+
+ /*
    Transient network failures that cause warnings on reconnect.
    BUG#47743 and BUG#47983.
  */
@@ -247,10 +302,10 @@ INSERT INTO global_suppressions VALUES
  ("\\[GCS\\] The member is already leaving or joining a group."),
  ("\\[GCS\\] The member is leaving a group without being on one."),
  ("\\[GCS\\] Processing new view on handler without a valid group configuration."),
- ("\\[GCS\\] Error on opening a connection to localhost:.* on local port: .*."),
+ ("\\[GCS\\] Error on opening a connection to .*"),
  ("\\[GCS\\] Error pushing message into group communication engine."),
  ("\\[GCS\\] Message cannot be sent because the member does not belong to a group."),
- ("\\[GCS\\] Automatically adding IPv. localhost address to the whitelist. It is mandatory that it is added."),
+ ("\\[GCS\\] Automatically adding IPv. localhost address to the allowlist. It is mandatory that it is added."),
  ("\\[GCS\\] Unable to bind to INADDR_ANY:.*"),
  ("\\[GCS\\] Unable to announce tcp port .*. Port already in use\\?"),
  ("\\[GCS\\] Error joining the group while waiting for the network layer to become ready."),
@@ -366,10 +421,98 @@ INSERT INTO global_suppressions VALUES
  */
  ("Channel mysql_main configured to support TLS"),
 
+ /*
+   systemd debug (when built WITH_SYSTEMD and WITH_SYSTEMD_DEBUG,
+   and systemd logging is not actually available)
+ */
+ ("NOTIFY_SOCKET not set in environment. sd_notify messages will not be sent!"),
+ ("Invalid systemd notify socket, cannot send: "),
+
+ /*
+   Manifest file processing
+ */
+ ("Manifest file '.*' is not read-only. For better security, please make sure that the file is read-only."),
+
+ /* TLS v1.0 and v1.1 deprecated */
+ ("A deprecated TLS version TLSv1 is enabled for channel"),
+ ("A deprecated TLS version TLSv1.1 is enabled for channel"),
+
+ /*
+   Warnings/errors seen while using group replication with Percona XtraDB Cluster
+ */
+ ("Using group replication with Percona XtraDB Cluster is only supported for migration"),
+
+ /*
+   Warnings from Clone plugin
+
+   In PXC, the table mtr.test_suppressions is created as MyISAM to avoid
+   replication of suppression added to one node to other nodes of the cluster.
+ */
+ ("Non innodb table: mtr.test_suppressions is not cloned and is empty."),
+ ("Clone removing all user data for provisioning: Started"),
+ ("Clone removing all user data for provisioning: Finished"),
+ ("\\[Warning\\] .*Non innodb table: .* is not cloned and is empty."),
+ ("\\[ERROR\\] .*MY-\\d+.*clone_check_recovery_crashpoint.*"),
+
+ /*
+   Warnings/errors seen when server is loaded with keyring plugin without
+   enabling pxc_encrypt_cluster_traffic.
+ */
+ ("You have enabled keyring plugin. SST encryption is mandatory."),
+ ("No suitable 'keyring_component_metadata_query' service"),
+
+
  ("THE_LAST_SUPPRESSION");
 
 
 DELIMITER $$
+
+CREATE DEFINER=root@localhost PROCEDURE filter_global_suppressed_warnings()
+BEGIN
+  --
+  -- Protect the mark on lines that match an 'ignore suppression' pattern.
+  --
+  SET GLOBAL regexp_time_limit = 0;
+  UPDATE error_log el, test_ignored_global_suppressions igs
+    SET suspicious = 2 WHERE el.line REGEXP igs.pattern;
+  --
+  -- Remove the mark from lines that are suppressed by global suppressions.
+  --
+  UPDATE error_log el, global_suppressions gs
+    SET suspicious = 0 WHERE el.suspicious = 1 AND el.line REGEXP gs.pattern;
+  --
+  -- Un-protect lines that matched an 'ignore suppression' pattern above.
+  --
+  UPDATE error_log SET suspicious = 1 WHERE suspicious = 2;
+  SET GLOBAL regexp_time_limit = DEFAULT;
+END$$
+
+CREATE DEFINER=root@localhost PROCEDURE filter_test_suppressed_warnings()
+BEGIN
+  --
+  -- Remove mark from lines that are suppressed by test specific suppressions
+  --
+  SET GLOBAL regexp_time_limit = 0;
+  UPDATE error_log el, test_suppressions ts
+    SET suspicious=0
+      WHERE el.suspicious=1 AND el.line REGEXP ts.pattern;
+  SET GLOBAL regexp_time_limit = DEFAULT;
+END$$
+
+CREATE DEFINER=root@localhost PROCEDURE filter_asserted_test_suppressed_warnings()
+BEGIN
+  --
+  -- Remove mark from lines that were expected by assert_error_log.inc
+  -- This check is based on string equality, not regex search, so that
+  -- we catch cases where the same error is generated in some other
+  -- context.
+  --
+  SET GLOBAL regexp_time_limit = 0;
+  UPDATE error_log el, asserted_test_suppressions ats
+    SET suspicious=0
+      WHERE el.suspicious=1 AND el.line = ats.message;
+  SET GLOBAL regexp_time_limit = DEFAULT;
+END$$
 
 --
 -- Procedure that uses the above created tables to check
@@ -377,26 +520,12 @@ DELIMITER $$
 --
 CREATE DEFINER=root@localhost PROCEDURE check_warnings(OUT result INT)
 BEGIN
-  DECLARE `pos` bigint unsigned;
-
   -- Don't write these queries to binlog
   SET SQL_LOG_BIN=0;
 
-  --
-  -- Remove mark from lines that are suppressed by global suppressions
-  --
-  SET GLOBAL regexp_time_limit = 0;
-  UPDATE error_log el, global_suppressions gs
-    SET suspicious=0
-      WHERE el.suspicious=1 AND el.line REGEXP gs.pattern;
-
-  --
-  -- Remove mark from lines that are suppressed by test specific suppressions
-  --
-  UPDATE error_log el, test_suppressions ts
-    SET suspicious=0
-      WHERE el.suspicious=1 AND el.line REGEXP ts.pattern;
-  SET GLOBAL regexp_time_limit = DEFAULT;
+  CALL filter_global_suppressed_warnings();
+  CALL filter_test_suppressed_warnings();
+  CALL filter_asserted_test_suppressed_warnings();
 
   --
   -- Get the number of marked lines and return result
@@ -422,9 +551,13 @@ BEGIN
     -- nodes to be deleted as well
     SET wsrep_on = 0;
     TRUNCATE test_suppressions;
+    TRUNCATE test_ignored_global_suppressions;
+    TRUNCATE asserted_test_suppressions;
     SET wsrep_on = 1;
   ELSE 
     TRUNCATE test_suppressions;
+    TRUNCATE test_ignored_global_suppressions;
+    TRUNCATE asserted_test_suppressions;
   END IF;    
 
   DROP TABLE error_log;

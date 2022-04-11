@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2017, 2020, Oracle and/or its affiliates.
+  Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -103,7 +103,7 @@ class RelopsTest : public ::testing::Test {
     }
   }
 
-  ~RelopsTest() { delete m_srs; }
+  ~RelopsTest() override { delete m_srs; }
 };
 
 typedef ::testing::Types<Cartesian_types, Geographic_types> Types;

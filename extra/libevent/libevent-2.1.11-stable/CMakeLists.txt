@@ -19,7 +19,14 @@
 #       start libevent.sln
 #
 
-cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
+MY_CHECK_CXX_COMPILER_WARNING("-Wmissing-profile" HAS_MISSING_PROFILE)
+IF(HAS_MISSING_PROFILE)
+  STRING_APPEND(CMAKE_C_FLAGS " ${HAS_MISSING_PROFILE}")
+ENDIF()
+
+
+# Don't do this here, it will load policies for an older version of cmake.
+# cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 
 if (POLICY CMP0054)
     cmake_policy(SET CMP0054 NEW)
@@ -433,25 +440,16 @@ CHECK_INCLUDE_FILE(mach/mach_time.h EVENT__HAVE_MACH_MACH_TIME_H)
 CHECK_INCLUDE_FILE(netinet/tcp.h EVENT__HAVE_NETINET_TCP_H)
 CHECK_INCLUDE_FILE(sys/wait.h EVENT__HAVE_SYS_WAIT_H)
 CHECK_INCLUDE_FILE(sys/resource.h EVENT__HAVE_SYS_RESOURCE_H)
-CHECK_INCLUDE_FILE(sys/sysctl.h EVENT__HAVE_SYS_SYSCTL_H)
+
+# Do not use sysctl(), it has been deprecated for a long time,
+# and will actually fail consistently on some platforms.
+# CHECK_INCLUDE_FILE(sys/sysctl.h EVENT__HAVE_SYS_SYSCTL_H)
+UNSET(EVENT__HAVE_SYS_SYSCTL_H)
+UNSET(EVENT__HAVE_SYS_SYSCTL_H CACHE)
+
 CHECK_INCLUDE_FILE(sys/timerfd.h EVENT__HAVE_SYS_TIMERFD_H)
 CHECK_INCLUDE_FILE(errno.h EVENT__HAVE_ERRNO_H)
 
-IF(EVENT__HAVE_SYS_SYSCTL_H)
-  # The <sys/sysctl.h> header is deprecated and will be removed." [-W#warnings]
-  MY_CHECK_C_COMPILER_FLAG("-W#warnings" HAVE_PREPROCESSOR_WARNINGS)
-  IF(HAVE_PREPROCESSOR_WARNINGS)
-    ADD_COMPILE_FLAGS(evutil_rand.c COMPILE_FLAGS "-Wno-cpp")
-  ENDIF()
-  MY_CHECK_C_COMPILER_FLAG("-Wcpp" HAVE_CPP_WARNINGS)
-  IF(HAVE_CPP_WARNINGS)
-    ADD_COMPILE_FLAGS(evutil_rand.c COMPILE_FLAGS "-Wno-cpp")
-  ENDIF()
-  MY_CHECK_C_COMPILER_FLAG("-Wdeprecated-declarations" HAVE_DEPRECATED_DECLARATIONS)
-  IF(HAVE_DEPRECATED_DECLARATIONS)
-    ADD_COMPILE_FLAGS(evutil_rand.c COMPILE_FLAGS "-Wno-deprecated-declarations")
-  ENDIF()
-ENDIF()
 
 CHECK_FUNCTION_EXISTS_EX(epoll_create EVENT__HAVE_EPOLL)
 CHECK_FUNCTION_EXISTS_EX(epoll_ctl EVENT__HAVE_EPOLL_CTL)
@@ -659,8 +657,8 @@ CHECK_TYPE_SIZE("time_t" EVENT__SIZEOF_TIME_T)
 
 # Verify kqueue works with pipes.
 if (EVENT__HAVE_KQUEUE)
-    if ((CMAKE_CROSSCOMPILING OR APPLE) AND NOT EVENT__FORCE_KQUEUE_CHECK)
-        message(WARNING "Cannot check if kqueue works with pipes when running on APPLE or crosscompiling, use EVENT__FORCE_KQUEUE_CHECK to be sure (this requires manually running a test program on the cross compilation target)")
+    if (CMAKE_CROSSCOMPILING AND NOT EVENT__FORCE_KQUEUE_CHECK)
+        message(WARNING "Cannot check if kqueue works with pipes when crosscompiling, use EVENT__FORCE_KQUEUE_CHECK to be sure (this requires manually running a test program on the cross compilation target)")
         set(EVENT__HAVE_WORKING_KQUEUE 1)
     else()
         message(STATUS "Checking if kqueue works with pipes...")

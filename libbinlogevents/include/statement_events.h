@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -426,6 +426,12 @@ const uint64_t INVALID_XID = 0xffffffffffffffffULL;
     <td>2 byte integer</td>
     <td>Value of the config variable default_table_encryption</td>
   </tr>
+  <tr>
+    <td>ddl_skip_rewrite</td>
+    <td>Q_DDL_SKIP_REWRITE</td>
+    <td>2 byte integer</td>
+    <td>Value of the config variable ddl_skip_rewrite</td>
+  </tr>
   </table>
 
   @subsection Query_event_notes_on_previous_versions Notes on Previous Versions
@@ -528,7 +534,12 @@ class Query_event : public Binary_log_event {
     /*
       Replicate default_table_encryption.
     */
-    Q_DEFAULT_TABLE_ENCRYPTION
+    Q_DEFAULT_TABLE_ENCRYPTION,
+
+    /*
+      Replicate ddl_skip_rewrite.
+    */
+    Q_DDL_SKIP_REWRITE
   };
   const char *query;
   const char *db;
@@ -645,6 +656,7 @@ class Query_event : public Binary_log_event {
   uint8_t sql_require_primary_key;
 
   uint8_t default_table_encryption;
+  uint8_t ddl_skip_rewrite;
 
   /**
     The constructor will be used while creating a Query_event, to be
@@ -688,11 +700,11 @@ class Query_event : public Binary_log_event {
     to the log.
   */
   Query_event(Log_event_type type_arg = QUERY_EVENT);
-  virtual ~Query_event() {}
+  ~Query_event() override = default;
 
 #ifndef HAVE_MYSYS
-  void print_event_info(std::ostream &info);
-  void print_long_info(std::ostream &info);
+  void print_event_info(std::ostream &info) override;
+  void print_long_info(std::ostream &info) override;
 #endif
 };
 
@@ -848,7 +860,7 @@ class User_var_event : public Binary_log_event {
     @param fde  An FDE event (see Rotate_event constructor for more info).
   */
   User_var_event(const char *buf, const Format_description_event *fde);
-  virtual ~User_var_event();
+  ~User_var_event() override;
   const char *name;
   unsigned int name_len;
   char *val;
@@ -858,8 +870,8 @@ class User_var_event : public Binary_log_event {
   bool is_null;
   unsigned char flags;
 #ifndef HAVE_MYSYS
-  void print_event_info(std::ostream &info);
-  void print_long_info(std::ostream &info);
+  void print_event_info(std::ostream &info) override;
+  void print_long_info(std::ostream &info) override;
   const char *get_value_type_string(Value_type type_arg) const {
     switch (type_arg) {
       case STRING_RESULT:
@@ -932,6 +944,10 @@ class Intvar_event : public Binary_log_event {
     INVALID_INT_EVENT,
     LAST_INSERT_ID_EVENT,
     INSERT_ID_EVENT
+#ifdef WITH_WSREP
+    ,
+    BINLOG_CONTROL_EVENT
+#endif
   };
 
   /**
@@ -954,6 +970,10 @@ class Intvar_event : public Binary_log_event {
         return "LAST_INSERT_ID";
       case INSERT_ID_EVENT:
         return "INSERT_ID";
+#ifdef WITH_WSREP
+      case BINLOG_CONTROL_EVENT:
+        return "BINLOG_CONTROL";
+#endif
       default: /* impossible */
         return "UNKNOWN";
     }
@@ -983,11 +1003,11 @@ class Intvar_event : public Binary_log_event {
   Intvar_event(uint8_t type_arg, uint64_t val_arg)
       : Binary_log_event(INTVAR_EVENT), type(type_arg), val(val_arg) {}
 
-  ~Intvar_event() {}
+  ~Intvar_event() override = default;
 
 #ifndef HAVE_MYSYS
-  void print_event_info(std::ostream &info);
-  void print_long_info(std::ostream &info);
+  void print_event_info(std::ostream &info) override;
+  void print_long_info(std::ostream &info) override;
 #endif
 };
 
@@ -1063,8 +1083,8 @@ type_code as RAND_EVENT in the header object in Binary_log_event
   */
   Rand_event(const char *buf, const Format_description_event *fde);
 #ifndef HAVE_MYSYS
-  void print_event_info(std::ostream &info);
-  void print_long_info(std::ostream &info);
+  void print_event_info(std::ostream &info) override;
+  void print_long_info(std::ostream &info) override;
 #endif
 };
 }  // end namespace binary_log

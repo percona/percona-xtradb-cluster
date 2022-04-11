@@ -1,4 +1,4 @@
-# Copyright (c) 2017, 2020, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, 2021, Oracle and/or its affiliates.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
@@ -90,7 +90,7 @@ MACRO(FIND_SASL_VERSION)
     SET(SASL_VERSION
       "${SASL_VERSION_MAJOR}.${SASL_VERSION_MINOR}.${SASL_VERSION_STEP}")
     SET(SASL_VERSION "${SASL_VERSION}" CACHE INTERNAL "SASL major.minor.step")
-    MESSAGE(STATUS "SASL_VERSION ${SASL_VERSION}")
+    MESSAGE(STATUS "SASL_VERSION (${WITH_SASL}) is ${SASL_VERSION}")
   ENDIF()
 ENDMACRO()
 

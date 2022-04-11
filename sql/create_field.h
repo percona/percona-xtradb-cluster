@@ -1,7 +1,7 @@
 #ifndef SQL_CREATE_FIELD_INCLUDED
 #define SQL_CREATE_FIELD_INCLUDED
 
-/* Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2018, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -274,22 +274,23 @@ class Create_field {
 
   /// Whether or not the display width was given explicitly by the user.
   bool m_explicit_display_width{false};
-
-  /// The maximum number of bytes a TINYBLOB can hold.
-  static constexpr size_t TINYBLOB_MAX_SIZE_IN_BYTES{255};
-
-  /// The maximum number of bytes a BLOB can hold.
-  static constexpr size_t BLOB_MAX_SIZE_IN_BYTES{65535};
-
-  /// The maximum number of bytes a MEDIUMBLOB can hold.
-  static constexpr size_t MEDIUMBLOB_MAX_SIZE_IN_BYTES{16777215};
-
-  /// The maximum number of bytes a LONGBLOB can hold.
-  static constexpr size_t LONGBLOB_MAX_SIZE_IN_BYTES{4294967295};
 };
 
 /// @returns whether or not this field is a hidden column that represents a
 ///          functional index.
 bool is_field_for_functional_index(const Create_field *create_field);
 
+/**
+  @retval true  If this column is hidden either in the storage engine
+                or SQL layer. Either way, it is completely hidden from
+                the user.
+  @retval false Otherwise.
+*/
+bool is_hidden_by_system(const Create_field *create_field);
+
+/**
+  @retval true  If this column is hidden by the user.
+  @retval false otherwise.
+*/
+bool is_hidden_by_user(const Create_field *create_field);
 #endif

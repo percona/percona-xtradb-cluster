@@ -59,7 +59,7 @@ void Wsrep_client_service::reset_globals() { wsrep_reset_threadvars(m_thd); }
 
 bool Wsrep_client_service::interrupted(
     wsrep::unique_lock<wsrep::mutex> &lock WSREP_UNUSED) const {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   /* Underlying mutex in lock object points to LOCK_wsrep_thd, which
      protects m_thd->wsrep_trx()
   */
@@ -73,7 +73,7 @@ bool Wsrep_client_service::interrupted(
 }
 
 int Wsrep_client_service::prepare_data_for_replication() {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_ENTER("Wsrep_client_service::prepare_data_for_replication");
   size_t data_len = 0;
   IO_CACHE_binlog_cache_storage *cache = wsrep_get_trans_cache(m_thd, true);
@@ -109,7 +109,7 @@ int Wsrep_client_service::prepare_data_for_replication() {
 }
 
 void Wsrep_client_service::cleanup_transaction() {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   if (WSREP_EMULATE_BINLOG(m_thd)) wsrep_thd_binlog_trx_reset(m_thd);
   m_thd->wsrep_affected_rows = 0;
 
@@ -130,6 +130,12 @@ void Wsrep_client_service::cleanup_transaction() {
     } else {
       m_thd->variables.option_bits &= ~OPTION_BIN_LOG;
     }
+    if (m_thd->variables.wsrep_saved_binlog_internal_off_state) {
+      m_thd->variables.option_bits |= OPTION_BIN_LOG_INTERNAL_OFF;
+    } else {
+      m_thd->variables.option_bits &= ~OPTION_BIN_LOG_INTERNAL_OFF;
+    }
+    m_thd->variables.wsrep_saved_binlog_internal_off_state = false;
 
     m_thd->variables.wsrep_saved_binlog_state =
         System_variables::wsrep_binlog_state_t::WSREP_BINLOG_NOTSET;
@@ -138,8 +144,8 @@ void Wsrep_client_service::cleanup_transaction() {
 }
 
 int Wsrep_client_service::prepare_fragment_for_replication(
-    wsrep::mutable_buffer &buffer) {
-  DBUG_ASSERT(m_thd == current_thd);
+    wsrep::mutable_buffer &buffer, size_t& log_position) {
+  assert(m_thd == current_thd);
   THD *thd = m_thd;
   DBUG_ENTER("Wsrep_client_service::prepare_fragment_for_replication");
   IO_CACHE_binlog_cache_storage *cache = wsrep_get_trans_cache(thd, true);
@@ -156,7 +162,7 @@ int Wsrep_client_service::prepare_fragment_for_replication(
   unsigned char *read_pos = NULL;
   my_off_t read_len = 0;
 
-  if (cache->begin(&read_pos, &read_len, thd->wsrep_sr().bytes_certified())) {
+  if (cache->begin(&read_pos, &read_len, thd->wsrep_sr().log_position())) {
     DBUG_RETURN(1);
   }
 
@@ -179,20 +185,48 @@ int Wsrep_client_service::prepare_fragment_for_replication(
       cache->next(&read_pos, &read_len);
     }
   }
-  DBUG_ASSERT(total_length == buffer.size());
+  assert(total_length == buffer.size());
+  log_position = cache->length();
 cleanup:
   if (cache->truncate(saved_pos)) {
     WSREP_WARN("Failed to reinitialize IO cache");
     ret = 1;
   }
+
+  // Prepend it here, as we know thd and we can avoid wsrep-lib modifications
+  if (buffer.size() > 0) {
+    ret = prepend_binlog_control_event(thd);
+  }
+
   DBUG_RETURN(ret);
 }
 
-int Wsrep_client_service::remove_fragments() {
+int Wsrep_client_service::remove_fragments(
+    wsrep::unique_lock<wsrep::mutex> &lock) {
   DBUG_ENTER("Wsrep_client_service::remove_fragments");
-  if (wsrep_schema->remove_fragments(m_thd, Wsrep_server_state::instance().id(),
-                                     m_thd->wsrep_trx().id(),
-                                     m_thd->wsrep_sr().fragments())) {
+
+  mysql_mutex_assert_owner(static_cast<mysql_mutex_t *>(lock.mutex().native()));
+
+  // Here we are going to iterate over SR fragments vector and remove them.
+  // At the same time the SR fragments vector can be modified by wsrep applier
+  // thread. So we need to protect it.
+  // remove_fragments() acquires trx->mutex inside InnoDB (lock_table() =>
+  // lock_table_has()).
+  // At the same time trx->mutex may be already acquired by applier thread
+  // during BF abort of trx (row_mysql_handle_errors() => trx_kill_blocking() =>
+  // lock_make_trx_hit_list()). So local transaction thread blocks. Then applier
+  // thread tries to acquire wsrep_thd_LOCK (wsrep_kill_victim() =>
+  // wsrep_innobase_kill_one_trx()), but it is already acquired by local trx
+  // thread.
+  // The solution is to get the snapshot of SR fragments vector under the lock
+  // and then process fragments removal without lock.
+  std::vector<wsrep::seqno> fragments = m_thd->wsrep_sr().fragments();
+  lock.unlock();
+  int res =
+      wsrep_schema->remove_fragments(m_thd, Wsrep_server_state::instance().id(),
+                                     m_thd->wsrep_trx().id(), fragments);
+  lock.lock();
+  if (res) {
     WSREP_DEBUG(
         "Failed to remove fragments from SR storage for transaction "
         "%u, %llu",
@@ -224,14 +258,24 @@ size_t Wsrep_client_service::bytes_generated() const {
 }
 
 void Wsrep_client_service::will_replay() {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   ++wsrep_replaying;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
 }
 
+void Wsrep_client_service::signal_replayed()
+{
+  assert(m_thd == current_thd);
+  mysql_mutex_lock(&LOCK_wsrep_replaying);
+  --wsrep_replaying;
+  assert(wsrep_replaying >= 0);
+  mysql_cond_broadcast(&COND_wsrep_replaying);
+  mysql_mutex_unlock(&LOCK_wsrep_replaying);
+}
+
 enum wsrep::provider::status Wsrep_client_service::replay() {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_ENTER("Wsrep_client_service::replay");
 
   /*
@@ -244,6 +288,7 @@ enum wsrep::provider::status Wsrep_client_service::replay() {
   replayer_thd->set_time();
   replayer_thd->set_command(COM_SLEEP);
   replayer_thd->reset_for_next_command();
+  replayer_thd->set_new_thread_id();
 
   enum wsrep::provider::status ret;
   {
@@ -256,16 +301,18 @@ enum wsrep::provider::status Wsrep_client_service::replay() {
 
   delete replayer_thd;
 
-  mysql_mutex_lock(&LOCK_wsrep_replaying);
-  --wsrep_replaying;
-  mysql_cond_broadcast(&COND_wsrep_replaying);
-  mysql_mutex_unlock(&LOCK_wsrep_replaying);
   DBUG_RETURN(ret);
+}
+
+enum wsrep::provider::status Wsrep_client_service::replay_unordered()
+{
+  assert(0);
+  return wsrep::provider::error_not_implemented;
 }
 
 void Wsrep_client_service::wait_for_replayers(
     wsrep::unique_lock<wsrep::mutex> &lock) {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   lock.unlock();
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   /* We need to check if the THD is BF aborted during condition wait.
@@ -279,6 +326,12 @@ void Wsrep_client_service::wait_for_replayers(
   }
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
   lock.lock();
+}
+
+enum wsrep::provider::status Wsrep_client_service::commit_by_xid()
+{
+  assert(0);
+  return wsrep::provider::error_not_implemented;
 }
 
 void Wsrep_client_service::debug_sync(const char *sync_point
@@ -296,7 +349,7 @@ void Wsrep_client_service::debug_crash(const char *crash_point
 }
 
 int Wsrep_client_service::bf_rollback() {
-  DBUG_ASSERT(m_thd == current_thd);
+  assert(m_thd == current_thd);
   DBUG_ENTER("Wsrep_client_service::rollback");
 
   /* If local transaction is aborted while it is executing rollback

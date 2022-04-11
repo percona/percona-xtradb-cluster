@@ -57,7 +57,8 @@
    LSN
 
      Log Serial Number. A term used in relation to the :term:`InnoDB` or
-     :term:`XtraDB` storage engines.
+     :term:`XtraDB` storage engines. There are System-level LSNs and Page-level LSNs. The System LSN represents the most recent LSN value assigned to page changes. 
+     Each InnoDB page contains a Page LSN which is the max LSN for that page for changes that reside on the disk. This LSN is updated when the page is flushed to disk.
   
    MariaDB
 
@@ -68,7 +69,9 @@
    MyISAM
 
      A :term:`MySQL` :term:`Storage Engine` that was the default until
-     MySQL 5.5.
+     MySQL 5.5. It
+     doesn't fully support transactions but in some scenarios may be faster
+     than :term:`InnoDB`. Each table is stored on disk in 3 files: :term:`.frm`,i :file:`.MYD`, :file:`.MYI`.
   
    MySQL
 
@@ -111,29 +114,11 @@
      ext3) and a Storage Engine layer allows a database server to access
      tables stored in different engines (e.g. :term:`MyISAM`, InnoDB).
   
-   XtraDB
-
-     Percona's improved version of :term:`InnoDB` providing performance,
-     features and reliability above what is shipped by Oracle in InnoDB.
-  
-   LSN
-
-      Each InnoDB page (usually 16kb in size) contains a log sequence number, or
-      LSN. The LSN is the system version number for the entire database. Each
-      page's LSN shows how recently it was changed.
-  
    InnoDB
 
       Storage engine which provides ACID-compliant transactions and foreign key
       support, among others improvements over :term:`MyISAM`. It is the default
-      engine for |MySQL| as of the 5.5 series.
-  
-   MyISAM
-
-      Previous default storage engine for |MySQL| for versions prior to 5.5. It
-      doesn't fully support transactions but in some scenarios may be faster
-      than :term:`InnoDB`. Each table is stored on disk in 3 files: :term:`.frm`,i
-      :file:`.MYD`, :file:`.MYI`.
+      engine for MySQL as of the 5.5 series.
   
    GTID
 
@@ -169,13 +154,13 @@
       Cluster|: uses the :program:`xtrabackup` program for this
       purpose.  :program:`xtrabackup` does not require :command:`READ
       LOCK` for the entire syncing process - only for syncing the
-      |MySQL| system tables and writing the information about the
+      MySQL system tables and writing the information about the
       binlog, galera and replica information (same as the regular
       |Percona XtraBackup| backup).
 
       The SST method is configured with the :variable:`wsrep_sst_method` variable.
   
-      In |pxc| |version|, the |mysql-upgrade| command is now run
+      In PXC |version|, the |mysql-upgrade| command is now run
       automatically as part of :term:`SST`. You do not have to run it
       manually when upgrading your system from an older version.
 
@@ -226,7 +211,7 @@
   
    XtraBackup
 
-      *Percona XtraBackup* is an open-source hot backup utility for |MySQL| -
+      *Percona XtraBackup* is an open-source hot backup utility for MySQL -
       based servers that doesn't lock your database during the backup.
   
    XtraDB
@@ -273,7 +258,7 @@
    ibdata
 
       Default prefix for tablespace files, e.g. :file:`ibdata1` is a 10MB
-      autoextendable file that |MySQL| creates for the shared tablespace by
+      autoextendable file that MySQL creates for the shared tablespace by
       default.
   
    joiner node
@@ -325,7 +310,7 @@
    mysql.pxc.sst.user
 
       This user (set up on the donor node) is assigned the |pxc-sst-role| and
-      runs the |xtrabackup| to make backups. The password for this is randomly
+      runs the XtraBackup to make backups. The password for this is randomly
       generated for each SST. The password is generated automatically for each
       :term:`SST`.
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2020, Oracle and/or its affiliates.
+/* Copyright (c) 2006, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License, version 2.0,
@@ -25,13 +25,16 @@
 
 #include <stddef.h>
 #include <sys/types.h>
+#include <array>
 
 #include "lex_string.h"
 #include "m_ctype.h"
 #include "my_command.h"
 #include "my_sqlcommand.h"
-#include "mysql_com.h"    // enum_server_command
-#include "sql/handler.h"  // enum_schema_tables
+#include "mysql_com.h"             // enum_server_command
+#include "sql/handler.h"           // enum_schema_tables
+#include "sql/system_variables.h"  // System_variables
+#include "storage/perfschema/terminology_use_previous_enum.h"
 
 struct mysql_rwlock_t;
 template <typename T>
@@ -59,7 +62,7 @@ extern "C" int test_if_data_home_dir(const char *dir);
 
 bool stmt_causes_implicit_commit(const THD *thd, uint mask);
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 extern void turn_parser_debug_on();
 #endif
 
@@ -68,6 +71,7 @@ bool parse_sql(THD *thd, Parser_state *parser_state,
 
 void free_items(Item *item);
 void cleanup_items(Item *item);
+void bind_fields(Item *first);
 
 Comp_creator *comp_eq_creator(bool invert);
 Comp_creator *comp_equal_creator(bool invert);
@@ -81,7 +85,11 @@ int prepare_schema_table(THD *thd, LEX *lex, Table_ident *table_ident,
                          enum enum_schema_tables schema_table_idx);
 void get_default_definer(THD *thd, LEX_USER *definer);
 LEX_USER *create_default_definer(THD *thd);
+#ifdef WITH_WSREP
+LEX_USER *get_current_user(THD *thd, LEX_USER *user, bool for_rewrite = false);
+#else
 LEX_USER *get_current_user(THD *thd, LEX_USER *user);
+#endif
 bool check_string_char_length(const LEX_CSTRING &str, const char *err_msg,
                               size_t max_char_length, const CHARSET_INFO *cs,
                               bool no_error);
@@ -97,9 +105,9 @@ bool is_update_query(enum enum_sql_command command);
 bool is_explainable_query(enum enum_sql_command command);
 bool is_log_table_write_query(enum enum_sql_command command);
 bool alloc_query(THD *thd, const char *packet, size_t packet_length);
-void mysql_parse(THD *thd, Parser_state *parser_state, bool update_userstat);
+void dispatch_sql_command(THD *thd, Parser_state *parser_state,
+                          bool update_userstat);
 void mysql_reset_thd_for_next_command(THD *thd);
-bool create_select_for_variable(Parse_context *pc, const char *var_name);
 void create_table_set_open_action_and_adjust_tables(LEX *lex);
 int mysql_execute_command(THD *thd, bool first_level = false);
 bool do_command(THD *thd);
@@ -125,31 +133,51 @@ bool show_precheck(THD *thd, LEX *lex, bool lock);
 /* Variables */
 
 extern uint sql_command_flags[];
-extern const LEX_CSTRING command_name[];
 
 #ifdef WITH_WSREP
+#include "service_wsrep.h"
 
-// #define WSREP_MYSQL_DB (char *)"mysql"
+#define WSREP_TO_ISOLATION_BEGIN_IF(db_, table_, table_list_)                 \
+  if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
+      wsrep_to_isolation_begin(thd, db_, table_, table_list_))
+
 #define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)                   \
   if (WSREP(thd) && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) \
     goto error;
 
-#define WSREP_TO_ISOLATION_BEGIN_ALTER(db_, table_, table_list_, alter_info_) \
-  if (WSREP(thd) && wsrep_thd_is_local(thd) &&                                \
-      wsrep_to_isolation_begin(thd, db_, table_, table_list_, alter_info_))   \
-    goto error;
+#define WSREP_TO_ISOLATION_BEGIN_ALTER(db_, table_, table_list_, alter_info_, \
+                                       fk_tables_)                            \
+  if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
+      wsrep_thd_is_local(thd) &&                                              \
+      wsrep_to_isolation_begin(thd, db_, table_, table_list_, nullptr,        \
+                               alter_info_, fk_tables_))
 
-#define WSREP_TO_ISOLATION_END                                                 \
-  if ((WSREP(thd) && wsrep_thd_is_local_toi(thd)) || wsrep_thd_is_in_rsu(thd)) \
+#define WSREP_TO_ISOLATION_END                                 \
+  if ((WSREP(thd) && wsrep_thd_is_local_toi(thd)) ||           \
+      wsrep_thd_is_in_rsu(thd) || wsrep_thd_is_local_nbo(thd)) \
     wsrep_to_isolation_end(thd);
+
+#define WSREP_NBO_2ND_PHASE_BEGIN \
+  if (WSREP(thd) && wsrep_NBO_begin_phase_two(thd)) goto error;
+
+#define WSREP_NBO_1ST_PHASE_END \
+  if (WSREP(thd)) wsrep_NBO_end_phase_one(thd);
 
 /* Checks if lex->no_write_to_binlog is set for statements that use
   LOCAL or NO_WRITE_TO_BINLOG
 */
-#define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_) \
-  if (WSREP(thd) && !thd->lex->no_write_to_binlog &&              \
-      wsrep_to_isolation_begin(thd, db_, table_, table_list_))    \
-    goto error;
+#define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)             \
+  if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
+      !thd->lex->no_write_to_binlog &&                                        \
+      wsrep_to_isolation_begin(thd, db_, table_, table_list_))                \
+    goto wsrep_error_label;
+
+#define WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(db_, table_, table_list_,       \
+                                              fk_tables)                      \
+  if (WSREP(thd) && thd->wsrep_cs().state() != wsrep::client_state::s_none && \
+      !thd->lex->no_write_to_binlog &&                                        \
+      wsrep_to_isolation_begin(thd, db_, table_, table_list_, nullptr,        \
+                               nullptr, fk_tables))
 
 #define WSREP_SYNC_WAIT(thd_, before_)                                    \
   {                                                                       \
@@ -159,18 +187,163 @@ extern const LEX_CSTRING command_name[];
 #else
 
 #define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)
+#define WSREP_TO_ISOLATION_BEGIN_ALTER(db_, table_, table_list_, alter_info_)
+#define WSREP_TO_ISOLATION_BEGIN_FK_TABLES_IF(db_, table_, table_list_, \
+                                              fk_tables_)
 #define WSREP_TO_ISOLATION_END
 #define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)
 #define WSREP_SYNC_WAIT(thd_, before_)
 
 #endif /* WITH_WSREP */
 
+/**
+  Map from enumeration values of type enum_server_command to
+  descriptions of type std::string.
+
+  In this context, a "command" is a type code for a remote procedure
+  call in the client-server protocol; for instance, a "connect" or a
+  "ping" or a "query".
+
+  The getter functions use @@terminology_use_previous to
+  decide which version of the name to use, for names that depend on
+  it.
+*/
+class Command_names {
+ private:
+  /**
+    Array indexed by enum_server_command, where each element is a
+    description string.
+  */
+  static const std::array<const std::string, COM_END + 1> m_names;
+  /**
+    Command whose name depends on @@terminology_use_previous.
+
+    Currently, there is only one such command, so we use a single
+    member variable.  In case we ever change any other command name
+    and control the use of the old or new name using
+    @@terminology_use_previous, we need to change the
+    following three members into some collection type, e.g.,
+    std::unordered_set.
+  */
+  static constexpr enum_server_command m_replace_com{COM_REGISTER_SLAVE};
+  /**
+    Name to use when compatibility is enabled.
+  */
+  static const std::string m_replace_str;
+  /**
+    The version when the name was changed.
+  */
+  static constexpr terminology_use_previous::enum_compatibility_version
+      m_replace_version{terminology_use_previous::BEFORE_8_0_26};
+  /**
+    Given a system_variable object, returns the string to use for
+    m_replace_com, according to the setting of
+    terminology_use_previous stored in the object.
+
+    @param sysvars The System_variables object holding the
+    configuration that should be considered when doing the translation.
+
+    @return The instrumentation name that was in use in the configured
+    version, for m_replace_com.
+  */
+  static const std::string &translate(const System_variables &sysvars);
+  /**
+    Cast an integer to enum_server_command, and assert it is in range.
+
+    @param cmd The integer value
+    @return The enum_server_command
+  */
+  static enum_server_command int_to_cmd(int cmd) {
+    assert(cmd >= 0);
+    assert(cmd <= COM_END);
+    return static_cast<enum_server_command>(cmd);
+  }
+
+ public:
+  /**
+    Return a description string for a given enum_server_command.
+
+    This bypasses @@terminology_use_previous and acts as if
+    it was set to NONE.
+
+    @param cmd The enum_server_command
+    @retval The description string
+  */
+  static const std::string &str_notranslate(enum_server_command cmd) {
+    return m_names[cmd];
+  }
+  /**
+    Return a description string for an integer that is the numeric
+    value of an enum_server_command.
+
+    This bypasses @@terminology_use_previous and acts as if
+    it was set to NONE.
+
+    @param cmd The integer value
+    @retval The description string
+  */
+  static const std::string &str_notranslate(int cmd) {
+    return str_notranslate(int_to_cmd(cmd));
+  }
+  /**
+    Return a description string for a given enum_server_command.
+
+    This takes @@session.terminology_use_previous into
+    account, and returns an old name if one has been defined and the
+    option is enabled.
+
+    @param cmd The enum_server_command
+    @retval The description string
+  */
+  static const std::string &str_session(enum_server_command cmd);
+  /**
+    Return a description string for a given enum_server_command.
+
+    This takes @@global.terminology_use_previous into
+    account, and returns an old name if one has been defined and the
+    option is enabled.
+
+    @param cmd The enum_server_command
+    @retval The description string
+  */
+  static const std::string &str_global(enum_server_command cmd);
+  /**
+    Return a description string for an integer that is the numeric
+    value of an enum_server_command.
+
+    This takes @@session.terminology_use_previous into
+    account, and returns an old name if one has been defined and the
+    option is enabled.
+
+    @param cmd The integer value
+    @retval The description string
+  */
+  static const std::string &str_session(int cmd) {
+    return str_session(int_to_cmd(cmd));
+  }
+
+  /**
+   * Return an enum_server_command corresponding to command string description.
+   * The COM_END is returned in case the command is unknown.
+   *
+   * @param cmd_name The description string
+   * @return The enum_server_command corresponding to the description string
+   */
+  static enum_server_command get_index_by_str_name(const std::string cmd_name) {
+    for (size_t i = 0; i < m_names.size(); ++i) {
+      if (m_names[i] == cmd_name) {
+        return static_cast<enum_server_command>(i);
+      }
+    }
+
+    return COM_END;
+  }
+};
+
 bool sqlcom_can_generate_row_events(enum enum_sql_command command);
 
 bool all_tables_not_ok(THD *thd, TABLE_LIST *tables);
 bool some_non_temp_table_to_be_updated(THD *thd, TABLE_LIST *tables);
-
-bool execute_show(THD *thd, TABLE_LIST *all_tables);
 
 // TODO: remove after refactoring of ALTER DATABASE:
 bool set_default_charset(HA_CREATE_INFO *create_info,
@@ -316,7 +489,6 @@ bool set_default_collation(HA_CREATE_INFO *create_info,
   --skip-grant-tables server option.
 */
 #define CF_REQUIRE_ACL_CACHE (1U << 20)
-
 
 /**
   Identifies statements as SHOW commands using INFORMATION_SCHEMA system views.

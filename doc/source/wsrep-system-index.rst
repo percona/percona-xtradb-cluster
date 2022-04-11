@@ -4,7 +4,7 @@
 Index of wsrep system variables
 ===============================
 
-|PXC| introduces a number of MySQL system variables
+Percona XtraDB Cluster introduces a number of MySQL system variables
 related to write-set replication.
 
 .. variable:: pxc_encrypt_cluster_traffic
@@ -16,7 +16,7 @@ related to write-set replication.
    :default: ``ON``
 
 Enables automatic configuration of SSL encryption.
-When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
+When disabled, you need to configure SSL manually to encrypt Percona XtraDB Cluster traffic.
 
 Possible values:
 
@@ -73,7 +73,7 @@ For more information, see :ref:`pxc-maint-mode`.
    :default: ``ENFORCING`` or ``DISABLED``
 
 Controls :ref:`pxc-strict-mode`, which runs validations
-to avoid the use of tech preview features and unsupported features in |PXC|.
+to avoid the use of tech preview features and unsupported features in Percona XtraDB Cluster.
 
 Depending on the actual mode you select,
 upon encountering a failed validation,
@@ -111,8 +111,85 @@ or the node is bootstrapping, then :variable:`pxc_strict_mode` defaults to
    * ``binlog_format=ROW``
    * ``log_output=FILE`` or ``log_output=NONE`` or ``log_output=FILE,NONE``
    * ``tx_isolation=SERIALIZABLE``
+  
+   The ``SERIALIZABLE`` method of isolation is not allowed in ``ENFORCING`` mode.
 
 For more information, see :ref:`pxc-strict-mode`.
+
+.. variable:: wsrep_applier_FK_checks
+
+   :cli: ``--wsrep-applier-FK-checks``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ``ON``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, the ``wsrep_slave_FK_checks`` variable is deprecated in favor of this variable.
+
+Defines whether foreign key checking is done for applier threads.
+This is enabled by default.
+
+.. seealso:: `MySQL wsrep option: wsrep_applier_FK_checks
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-applier-fk-checks>`_
+
+
+.. variable:: wsrep_applier_threads
+
+   :cli: ``--wsrep-applier-threads``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ``1``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, the ``wsrep_slave_threads`` variable is deprecated and may be removed in a later version. Use the ``wsrep_applier_threads`` variable.
+
+Specifies the number of threads
+that can apply replication transactions in parallel.
+Galera supports true parallel replication
+that applies transactions in parallel only when it is safe to do so.
+This variable is dynamic.
+You can increase/decrease it at any time.
+
+.. note:: When you decrease the number of threads,
+   it won't kill the threads immediately,
+   but stop them after they are done applying current transaction
+   (the effect with an increase is immediate though).
+
+If any replication consistency problems are encountered,
+it's recommended to set this back to ``1`` to see if that resolves the issue.
+The default value can be increased for better throughput.
+
+You may want to increase it as suggested
+`in Codership documentation for flow control
+<http://galeracluster.com/documentation-webpages/nodestates.html#flow-control>`_:
+when the node is in ``JOINED`` state,
+increasing the number of replica threads can speed up the catchup to ``SYNCED``.
+
+You can also estimate the optimal value for this from
+:variable:`wsrep_cert_deps_distance` as suggested `on this page
+<http://galeracluster.com/documentation-webpages/monitoringthecluster.html#checking-the-replication-health>`_.
+
+For more configuration tips, see `this document
+<http://galeracluster.com/documentation-webpages/configurationtips.html#setting-parallel-slave-threads>`_.
+
+.. seealso:: `MySQL wsrep option: wsrep_applier_threads
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-applier-threads>`_
+
+.. variable:: wsrep_applier_UK_checks
+
+   :cli: ``--wsrep-applier-UK-checks``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ``OFF``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, the ``wsrep_slave_UK_checks`` variable is deprecated and may be removed in a later version. Use the ``wsrep_applier_UK_checks`` variable.
+
+Defines whether unique key checking is done for applier threads.
+This is disabled by default.
+
+.. seealso:: `MySQL wsrep option: wsrep_applier_UK_checks
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-applier-uk-checks>`_
 
 .. variable:: wsrep_auto_increment_control
 
@@ -188,7 +265,7 @@ OPTIMIZED
 
 .. seealso::
 
-   |galera-cluster| Documentation: |MySQL| wsrep options
+   |galera-cluster| Documentation: MySQL wsrep options
       https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-certification-rules
 
 .. variable:: wsrep_certify_nonPK
@@ -412,6 +489,25 @@ To avoid deadlock errors,
 set the :variable:`wsrep_sync_wait` variable to ``0``
 if you enable ``wsrep_dirty_reads``.
 
+As of Percona XtraDB Cluster 8.0.26-16, you can update the variable with a `set_var hint <https://dev.mysql.com/doc/refman/8.0/en/optimizer-hints.html#optimizer-hints-set-var>`__.
+
+.. code-block:: mysql
+
+   mysql> SELECT @@wsrep_dirty_reads;
+   +-----------------------+
+   | @@wsrep_dirty_reads   |
+   +=======================+
+   | OFF                   |
+   +-----------------------+
+
+   mysql> SELECT /*+ SET_VAR(wsrep_dirty_reads=ON) */ @@wsrep_dirty_reads;
+   +-----------------------+
+   | @@wsrep_dirty_reads   |
+   +=======================+
+   | ON                    |
+   +-----------------------+
+
+
 .. seealso:: `MySQL wsrep option: wsrep_dirty_reads
              <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-dirty-reads>`_
 
@@ -441,7 +537,7 @@ when inserting the ``DEFAULT`` value into an ``AUTO_INCREMENT`` column.
    :default: ``NONE``
 
 Defines a binary log format that will always be effective,
-regardless of the client session |binlog_format|_ variable value.
+regardless of the client session binlog_format_ variable value.
 
 Possible values for this variable are:
 
@@ -449,9 +545,9 @@ Possible values for this variable are:
   * ``STATEMENT``: Force statement-based logging format
   * ``MIXED``: Force mixed logging format
   * ``NONE``: Do not force the binary log format
-    and use whatever is set by the |binlog_format| variable (default)
+    and use whatever is set by the binlog_format variable (default)
 
-.. |binlog_format| replace:: ``binlog_format``
+.. binlog_format replace:: ``binlog_format``
 .. _binlog_format: https://dev.mysql.com/doc/refman/8.0/en/binary-log-setting.html
 
 .. seealso:: `MySQL wsrep option: wsrep_forced_binlog_format
@@ -469,7 +565,7 @@ Defines the rules of wsrep applier behavior on errors. You can change the settin
 
 .. note::
 
-    In |PXC| version 8.0.19-10, the default value has changed from ``7`` to ``0``. If you have been working with an earlier version of the PXC 8.0 series, you may see different behavior when upgrading to this version or later.
+    In Percona XtraDB Cluster version 8.0.19-10, the default value has changed from ``7`` to ``0``. If you have been working with an earlier version of the PXC 8.0 series, you may see different behavior when upgrading to this version or later.
 
 The variable has the following options:
 
@@ -539,7 +635,7 @@ A few examples:
 
    * - log_error_verbosity
      - wsrep_min_log_verbosity
-     - |MySQL| Logs Verbosity
+     - MySQL Logs Verbosity
      - wsrep Logs Verbosity
    * - 2
      - 3
@@ -564,7 +660,7 @@ Note the case where ``log_error_verbosity=3`` and
 
 .. seealso::
 
-   |MySQL| Documentation: log_error_verbosity
+   MySQL Documentation: log_error_verbosity
       https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_log_error_verbosity
    |galera-cluster| Documentation: Database Server Logs
       https://galeracluster.com/library/documentation/log.html
@@ -601,7 +697,7 @@ and whatever gets committed stays committed.
 
 Defines whether the node should log additional information about conflicts.
 By default, this variable is disabled
-and |PXC| uses standard logging features in MySQL.
+and Percona XtraDB Cluster uses standard logging features in MySQL.
 
 If you enable this variable, it will also log table and schema
 where the conflict occurred, as well as the actual values for keys
@@ -945,13 +1041,15 @@ the whole DDL statement is not put under TOI.
     replication. MyISAM tables are created and loaded even if
     :variable:`wsrep_replicate_myisam` is set to **ON**.
 
-.. variable:: wsrep_restart_slave
+.. variable:: wsrep_restart_replica
 
-   :cli: ``--wsrep-restart-slave``
+   :cli: ``--wsrep-restart-replica``
    :conf: Yes
    :scope: Global
    :dyn: Yes
    :default: ``OFF``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, the ``wsrep_restart_slave`` variable is deprecated in favor of this variable.
 
 Defines whether replication replica should be restarted
 when the node joins back to the cluster.
@@ -960,7 +1058,24 @@ is stopped when the node tries to apply the next replication event
 while the node is in non-primary state.
 
 .. seealso:: `MySQL wsrep option: wsrep_restart_slave
-             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-restart-slave>`_
+             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-restart-replica>`_
+
+.. variable:: wsrep_restart_slave
+
+   :cli: ``--wsrep-restart-slave``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ``OFF``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, the ``wsrep_restart_slave`` variable is deprecated and may be removed in later versions. Use ``wsrep_restart_replica``.
+
+Defines whether replication replica should be restarted
+when the node joins back to the cluster.
+Enabling this can be useful because asynchronous replication replica thread
+is stopped when the node tries to apply the next replication event
+while the node is in non-primary state.
+
 
 .. variable:: wsrep_retry_autocommit
 
@@ -1017,11 +1132,10 @@ microseconds. Unit of variable is in micro-secs so set accordingly.
    :dyn: Yes
    :default: ``ON``
 
+As of *Percona XtraDB Cluster* 8.0.26-16, this variable is deprecated and may be removed in a later version. Use the ``wsrep_applier_FK_checks`` variable.
+
 Defines whether foreign key checking is done for applier threads.
 This is enabled by default.
-
-.. seealso:: `MySQL wsrep option: wsrep_slave_FK_checks
-             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-slave-fk-checks>`_
 
 .. variable:: wsrep_slave_threads
 
@@ -1030,6 +1144,8 @@ This is enabled by default.
    :scope: Global
    :dyn: Yes
    :default: ``1``
+
+As of *Percona XtraDB Cluster* 8.0.26-16, this variable is deprecated and may be removed in a later version. Use the ``wsrep_applier_threads`` variable.
 
 Specifies the number of threads
 that can apply replication transactions in parallel.
@@ -1060,9 +1176,6 @@ You can also estimate the optimal value for this from
 For more configuration tips, see `this document
 <http://galeracluster.com/documentation-webpages/configurationtips.html#setting-parallel-slave-threads>`_.
 
-.. seealso:: `MySQL wsrep option: wsrep_slave_threads
-             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-slave-threads>`_
-
 .. variable:: wsrep_slave_UK_checks
 
    :cli: ``--wsrep-slave-UK-checks``
@@ -1071,11 +1184,11 @@ For more configuration tips, see `this document
    :dyn: Yes
    :default: ``OFF``
 
+As of *Percona XtraDB Cluster* 8.0.26-16, this variable is deprecated and may be removed in a later version. Use the ``wsrep_applier_UK_checks`` variable.
+
 Defines whether unique key checking is done for applier threads.
 This is disabled by default.
 
-.. seealso:: `MySQL wsrep option: wsrep_slave_UK_checks
-             <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-slave-uk-checks>`_
 
 .. variable:: wsrep_sst_donor
 
@@ -1205,6 +1318,24 @@ Controls cluster-wide causality checks on certain statements.
 Checks ensure that the statement is executed on a node
 that is fully synced with the cluster.
 
+As of Percona XtraDB Cluster 8.0.26-16, you are able to update the variable with a `set_var hint <https://dev.mysql.com/doc/refman/8.0/en/optimizer-hints.html#optimizer-hints-set-var>`__.
+
+.. code-block:: mysql
+
+   mysql> SELECT @@wsrep_sync_wait;
+   +---------------------+
+   | @@wsrep_sync_wait   |
+   +=====================+
+   | 3                   |
+   +---------------------+
+
+   mysql> SELECT /*+ SET_VAR(wsrep_sync_wait=7) */ @@wsrep_sync_wait;
+   +---------------------+
+   | @@wsrep_sync_wait   |
+   +=====================+
+   | 7                   |
+   +---------------------+
+
 .. note:: Causality checks of any type can result in increased latency.
 
 The type of statements to undergo checks
@@ -1235,6 +1366,105 @@ is determined by bitmask:
 
 .. seealso:: `MySQL wsrep option: wsrep_sync_wait
              <https://galeracluster.com/library/documentation/mysql-wsrep-options.html#wsrep-sync-wait>`_
+
+.. variable:: wsrep_trx_fragment_size
+
+   :cli: ``--wsrep-trx-fragment-size``
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: 0
+
+Defines the the streaming replication fragment size. This variable is measured in the value defined by ``wsrep_trx_fragment_unit``. The minimum value is 0 and the maximum value is 2147483647.
+
+As of *Percona XtraDB Cluster for MySQL* 8.0.26-16, you can update the variable with a `set_var hint <https://dev.mysql.com/doc/refman/8.0/en/optimizer-hints.html#optimizer-hints-set-var>`__.
+
+.. code-block:: mysql
+
+   mysql> SELECT @@@wsrep_trx_fragment_unit; SELECT @@wsrep_trx_fragment_size; 
+   +------------------------------+
+   | @@wsrep_trx_fragment_unit    |
+   +==============================+
+   | statements                   |
+   +------------------------------+
+   | @@wsrep_trx_fragment_size    |
+   +------------------------------+
+   | 3                            |
+   +------------------------------+
+   mysql> SELECT /*+ SET_VAR(wsrep_trx_fragment_size=5) */ @@wsrep_trx_fragment_size;
+   +------------------------------+
+   | @@wsrep_trx_fragment_size    |
+   +==============================+
+   | 5                            |
+   +------------------------------+
+
+You can also use set_var() in a data manipulation language (DML) statement. This ability is useful when streaming large statements within a transaction. 
+
+.. code-block:: mysql
+
+   node1> BEGIN;
+   Query OK, 0 rows affected (0.00 sec)
+
+   node1> INSERT /*+SET_VAR(wsrep_trx_fragment_size = 100)*/ INTO t1 SELECT * FROM t1; 
+   Query OK, 65536 rows affected (15.15 sec)
+   Records: 65536 Duplicates: 0 Warnings: 0
+
+   node1> UPDATE /*+SET_VAR(wsrep_trx_fragment_size = 100)*/ t1 SET i=2;
+   Query OK, 131072 rows affected (1 min 35.93 sec)
+   Rows matched: 131072 Changed: 131072 Warnings: 0
+
+   node2> SET SESSION TRANSACTION_ISOLATION = 'READ-UNCOMMITTED';
+   Query OK, 0 rows affected (0.00 sec)
+
+   node2> SELECT * FROM t1 LIMIT 5;
+   +---+
+   | i |
+   +===+
+   | 2 |
+   +---+
+   | 2 |
+   +---+
+   | 2 |
+   +---+
+   | 2 |
+   +---+
+   | 2 |
+   +---+
+   node1> DELETE  /*+SET_VAR(wsrep_trx_fragment_size = 10000)*/ FROM t1;
+   Query OK, 131072 rows affected (15.09 sec)
+
+.. variable:: wsrep_trx_fragment_unit
+
+   :cli: ``--wsrep-trx-fragment-unit``
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: "bytes"
+
+Defines the type of measure for the ``wsrep_trx_fragment_size``. The possible values are: bytes, rows, statements. 
+
+As of *Percona XtraDB Cluster for MySQL* 8.0.26-16, you can update the variable with a `set_var hint <https://dev.mysql.com/doc/refman/8.0/en/optimizer-hints.html#optimizer-hints-set-var>`__.
+
+.. code-block:: mysql
+
+   mysql> SELECT @@wsrep_trx_fragment_unit; SELECT @@wsrep_trx_fragment_size; 
+   +------------------------------+
+   | @@wsrep_trx_fragment_unit    |
+   +==============================+
+   | statements                   |
+   +------------------------------+
+   | @@wsrep_trx_fragment_size    |
+   +------------------------------+
+   | 3                            |
+   +------------------------------+
+   mysql> SELECT /*+ SET_VAR(wsrep_trx_fragment_unit=rows) */ @@wsrep_trx_fragment_unit;
+   +------------------------------+
+   | @@wsrep_trx_fragment_unit    |
+   +==============================+
+   | rows                         |
+   +------------------------------+
+
+
 
 .. |abbr-mdl| replace:: :abbr:`MDL (Metadata Locking)`
 .. include:: .res/replace.txt

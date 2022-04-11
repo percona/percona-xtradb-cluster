@@ -1,7 +1,7 @@
 !include ../galera_3nodes.cnf
 
 [mysqld]
-wsrep-slave-threads=8
+wsrep-applier-threads=8
 wsrep-ignore-apply-errors=0
 
 [ENV]

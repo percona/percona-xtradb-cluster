@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1997, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1997, 2021, Oracle and/or its affiliates.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License, version 2.0, as published by the
@@ -219,8 +219,7 @@ static ulint ibuf_counts[IBUF_COUNT_N_SPACES][IBUF_COUNT_N_PAGES];
 
 /** Checks that the indexes to ibuf_counts[][] are within limits.
 @param[in]	page_id	page id */
-UNIV_INLINE
-void ibuf_count_check(const page_id_t &page_id) {
+static inline void ibuf_count_check(const page_id_t &page_id) {
   if (page_id.space() < IBUF_COUNT_N_SPACES &&
       page_id.page_no() < IBUF_COUNT_N_PAGES) {
     return;
@@ -236,7 +235,7 @@ void ibuf_count_check(const page_id_t &page_id) {
 #endif
 
 /** @name Offsets to the per-page bits in the insert buffer bitmap */
-/* @{ */
+/** @{ */
 #define IBUF_BITMAP_FREE     \
   0 /*!< Bits indicating the \
     amount of free space */
@@ -248,7 +247,7 @@ void ibuf_count_check(const page_id_t &page_id) {
     the ibuf tree, excluding the   \
     root page, or is in the free   \
     list of the ibuf */
-/* @} */
+/** @} */
 
 #define IBUF_REC_FIELD_SPACE    \
   0 /*!< in the pre-4.1 format, \
@@ -269,7 +268,6 @@ top of this file. */
 /** @name Format of the IBUF_REC_FIELD_METADATA of an insert buffer record
 The fourth column in the MySQL 5.5 format contains an operation
 type, counter, and some flags. */
-/* @{ */
 #define IBUF_REC_INFO_SIZE               \
   4 /*!< Combined size of info fields at \
     the beginning of the fourth field */
@@ -333,8 +331,7 @@ dropped! So, there seems to be no problem. */
 
 /** Sets the flag in the current mini-transaction record indicating we're
  inside an insert buffer routine. */
-UNIV_INLINE
-void ibuf_enter(mtr_t *mtr) /*!< in/out: mini-transaction */
+static inline void ibuf_enter(mtr_t *mtr) /*!< in/out: mini-transaction */
 {
   ut_ad(!mtr->is_inside_ibuf());
   mtr->enter_ibuf();
@@ -342,8 +339,7 @@ void ibuf_enter(mtr_t *mtr) /*!< in/out: mini-transaction */
 
 /** Sets the flag in the current mini-transaction record indicating we're
  exiting an insert buffer routine. */
-UNIV_INLINE
-void ibuf_exit(mtr_t *mtr) /*!< in/out: mini-transaction */
+static inline void ibuf_exit(mtr_t *mtr) /*!< in/out: mini-transaction */
 {
   ut_ad(mtr->is_inside_ibuf());
   mtr->exit_ibuf();
@@ -351,8 +347,7 @@ void ibuf_exit(mtr_t *mtr) /*!< in/out: mini-transaction */
 
 /** Commits an insert buffer mini-transaction and sets the persistent
  cursor latch mode to BTR_NO_LATCHES, that is, detaches the cursor. */
-UNIV_INLINE
-void ibuf_btr_pcur_commit_specify_mtr(
+static inline void ibuf_btr_pcur_commit_specify_mtr(
     btr_pcur_t *pcur, /*!< in/out: persistent cursor */
     mtr_t *mtr)       /*!< in/out: mini-transaction */
 {
@@ -585,9 +580,6 @@ byte *ibuf_parse_bitmap_init(byte *ptr, /*!< in: buffer */
                              buf_block_t *block, /*!< in: block or NULL */
                              mtr_t *mtr)         /*!< in: mtr or NULL */
 {
-  ut_ad(ptr != nullptr);
-  ut_ad(end_ptr != nullptr);
-
   if (block) {
     ibuf_bitmap_page_init(block, mtr);
   }
@@ -597,11 +589,11 @@ byte *ibuf_parse_bitmap_init(byte *ptr, /*!< in: buffer */
 #ifndef UNIV_HOTBACKUP
 #ifdef UNIV_DEBUG
 /** Gets the desired bits for a given page from a bitmap page.
-@param[in]	page		bitmap page
-@param[in]	page_id		page id whose bits to get
-@param[in]	page_size	page id whose bits to get
+@param[in]	page		Bitmap page
+@param[in]	page_id		Page id whose bits to get
+@param[in]	page_size	Page id whose bits to get
 @param[in]	bit		IBUF_BITMAP_FREE, IBUF_BITMAP_BUFFERED, ...
-@param[in,out]	mtr		mini-transaction holding an x-latch on the
+@param[in,out]	mtr		Mini-transaction holding an x-latch on the
 bitmap page
 @return value of bits */
 #define ibuf_bitmap_page_get_bits(page, page_id, page_size, bit, mtr)          \
@@ -609,11 +601,11 @@ bitmap page
                                 mtr, bit)
 #else /* UNIV_DEBUG */
 /** Gets the desired bits for a given page from a bitmap page.
-@param[in]	page		bitmap page
-@param[in]	page_id		page id whose bits to get
-@param[in]	page_size	page id whose bits to get
+@param[in]	page		Bitmap page
+@param[in]	page_id		Page id whose bits to get
+@param[in]	page_size	Page id whose bits to get
 @param[in]	bit		IBUF_BITMAP_FREE, IBUF_BITMAP_BUFFERED, ...
-@param[in,out]	mtr		mini-transaction holding an x-latch on the
+@param[in,out]	mtr		Mini-transaction holding an x-latch on the
 bitmap page
 @return value of bits */
 #define ibuf_bitmap_page_get_bits(page, page_id, page_size, bit, mtr) \
@@ -621,26 +613,25 @@ bitmap page
 #endif /* UNIV_DEBUG */
 
 /** Gets the desired bits for a given page from a bitmap page.
-@param[in]	page		bitmap page
-@param[in]	page_id		page id whose bits to get
-@param[in]	page_size	page size */
+@param[in]	page		Bitmap page
+@param[in]	page_id		Page id whose bits to get
+@param[in]	page_size	Page size */
 #ifdef UNIV_DEBUG
 /**
 @param[in]	latch_type	MTR_MEMO_PAGE_X_FIX, MTR_MEMO_BUF_FIX, ...
-@param[in,out]	mtr		mini-transaction holding latch_type on the
+@param[in,out]	mtr		Mini-transaction holding latch_type on the
 bitmap page */
 #endif /* UNIV_DEBUG */
 /**
 @param[in]	bit		IBUF_BITMAP_FREE, IBUF_BITMAP_BUFFERED, ...
 @return value of bits */
-UNIV_INLINE
-ulint ibuf_bitmap_page_get_bits_low(const page_t *page,
-                                    const page_id_t &page_id,
-                                    const page_size_t &page_size,
+static inline ulint ibuf_bitmap_page_get_bits_low(const page_t *page,
+                                                  const page_id_t &page_id,
+                                                  const page_size_t &page_size,
 #ifdef UNIV_DEBUG
-                                    ulint latch_type, mtr_t *mtr,
+                                                  ulint latch_type, mtr_t *mtr,
 #endif /* UNIV_DEBUG */
-                                    ulint bit) {
+                                                  ulint bit) {
   ulint byte_offset;
   ulint bit_offset;
   ulint map_byte;
@@ -725,9 +716,8 @@ static void ibuf_bitmap_page_set_bits(page_t *page, const page_id_t &page_id,
 @param[in]	page_id		page id
 @param[in]	page_size	page size
 @return the bitmap page id where the file page is mapped */
-UNIV_INLINE
-const page_id_t ibuf_bitmap_page_no_calc(const page_id_t &page_id,
-                                         const page_size_t &page_size) {
+static inline const page_id_t ibuf_bitmap_page_no_calc(
+    const page_id_t &page_id, const page_size_t &page_size) {
   page_no_t bitmap_page_no;
 
   bitmap_page_no = FSP_IBUF_BITMAP_OFFSET +
@@ -738,11 +728,11 @@ const page_id_t ibuf_bitmap_page_no_calc(const page_id_t &page_id,
 
 /** Gets the ibuf bitmap page where the bits describing a given file page are
 stored.
-@param[in]	page_id		page id of the file page
-@param[in]	page_size	page size of the file page
-@param[in]	file		file name
-@param[in]	line		line where called
-@param[in,out]	mtr		mini-transaction
+@param[in]	page_id		Page id of the file page
+@param[in]	page_size	Page size of the file page
+@param[in]	file		File name
+@param[in]	line		Line where called
+@param[in,out]	mtr		Mini-transaction
 @return bitmap page where the file page is mapped, that is, the bitmap
 page containing the descriptor bits for the file page; the bitmap page
 is x-latched */
@@ -763,9 +753,9 @@ static page_t *ibuf_bitmap_get_map_page_func(const page_id_t &page_id,
 
 /** Gets the ibuf bitmap page where the bits describing a given file page are
 stored.
-@param[in]	page_id		page id of the file page
-@param[in]	page_size	page size of the file page
-@param[in,out]	mtr		mini-transaction
+@param[in]	page_id		Page id of the file page
+@param[in]	page_size	Page size of the file page
+@param[in,out]	mtr		Mini-transaction
 @return bitmap page where the file page is mapped, that is, the bitmap
 page containing the descriptor bits for the file page; the bitmap page
 is x-latched */
@@ -776,8 +766,7 @@ is x-latched */
  separate mini-transaction, hence this operation does not restrict further work
  to only ibuf bitmap operations, which would result if the latch to the bitmap
  page were kept. */
-UNIV_INLINE
-void ibuf_set_free_bits_low(
+static inline void ibuf_set_free_bits_low(
     const buf_block_t *block, /*!< in: index page; free bits are set if
                               the index is non-clustered and page
                               level is 0 */
@@ -993,9 +982,8 @@ void ibuf_update_free_bits_for_two_pages_low(
 @param[in]	page_id		page id
 @param[in]	page_size	page size
 @return true if a fixed address ibuf i/o page */
-UNIV_INLINE
-ibool ibuf_fixed_addr_page(const page_id_t &page_id,
-                           const page_size_t &page_size) {
+static inline ibool ibuf_fixed_addr_page(const page_id_t &page_id,
+                                         const page_size_t &page_size) {
   return ((page_id.space() == IBUF_SPACE_ID &&
            page_id.page_no() == IBUF_TREE_ROOT_PAGE_NO) ||
           ibuf_bitmap_page(page_id, page_size));
@@ -1160,18 +1148,18 @@ static space_id_t ibuf_rec_get_space_func(
 /** Get various information about an ibuf record in >= 4.1.x format. */
 #ifdef UNIV_DEBUG
 /**
-@param[in]	mtr		mini-transaction owning rec, or nullptr if this
+@param[in]	mtr		Mini-transaction owning rec, or nullptr if this
                                 is called from ibuf_rec_has_multi_value().
                                 Because it's from page_validate() which doesn't
                                 have mtr at hand */
 #endif /* UNIV_DEBUG */
 /**
-@param[in]	rec		ibuf record
-@param[in,out]	op		operation type, or NULL
-@param[in,out]	comp		compact flag, or NULL
-@param[in,out]	info_len	length of info fields at the start of the
+@param[in]	rec		Ibuf record
+@param[in,out]	op		Operation type, or NULL
+@param[in,out]	comp		Compact flag, or NULL
+@param[in,out]	info_len	Length of info fields at the start of the
                                 fourth field, or NULL
-@param[in]	counter		counter value, or NULL */
+@param[in]	counter		Counter value, or NULL */
 static void ibuf_rec_get_info_func(
 #ifdef UNIV_DEBUG
     mtr_t *mtr,
@@ -1323,20 +1311,22 @@ bool ibuf_rec_has_multi_value(const rec_t *rec) {
 
 /** Add accumulated operation counts to a permanent array. Both arrays must be
  of size IBUF_OP_COUNT. */
-static void ibuf_add_ops(ulint *arr,       /*!< in/out: array to modify */
-                         const ulint *ops) /*!< in: operation counts */
+static void ibuf_add_ops(
+    std::atomic<ulint> *arr, /*!< in/out: array to modify */
+    const ulint *ops)        /*!< in: operation counts */
 
 {
   ulint i;
 
   for (i = 0; i < IBUF_OP_COUNT; i++) {
-    os_atomic_increment_ulint(&arr[i], ops[i]);
+    arr[i].fetch_add(ops[i]);
   }
 }
 
 /** Print operation counts. The array must be of size IBUF_OP_COUNT. */
-static void ibuf_print_ops(const ulint *ops, /*!< in: operation counts */
-                           FILE *file)       /*!< in: file where to print */
+static void ibuf_print_ops(
+    const std::atomic<ulint> *ops, /*!< in: operation counts */
+    FILE *file)                    /*!< in: file where to print */
 {
   static const char *op_names[] = {"insert", "delete mark", "delete"};
   ulint i;
@@ -1344,7 +1334,7 @@ static void ibuf_print_ops(const ulint *ops, /*!< in: operation counts */
   ut_a(UT_ARR_SIZE(op_names) == IBUF_OP_COUNT);
 
   for (i = 0; i < IBUF_OP_COUNT; i++) {
-    fprintf(file, "%s %lu%s", op_names[i], (ulong)ops[i],
+    fprintf(file, "%s %lu%s", op_names[i], (ulong)ops[i].load(),
             (i < (IBUF_OP_COUNT - 1)) ? ", " : "");
   }
 
@@ -1490,12 +1480,12 @@ static dtuple_t *ibuf_build_entry_from_ibuf_rec_func(
 
 /** Get the data size.
  @return size of fields */
-UNIV_INLINE
-ulint ibuf_rec_get_size(const rec_t *rec,  /*!< in: ibuf record */
-                        const byte *types, /*!< in: fields */
-                        ulint n_fields,    /*!< in: number of fields */
-                        ulint comp)        /*!< in: 0=ROW_FORMAT=REDUNDANT,
-                                           nonzero=ROW_FORMAT=COMPACT */
+static inline ulint ibuf_rec_get_size(
+    const rec_t *rec,  /*!< in: ibuf record */
+    const byte *types, /*!< in: fields */
+    ulint n_fields,    /*!< in: number of fields */
+    ulint comp)        /*!< in: 0=ROW_FORMAT=REDUNDANT,
+                       nonzero=ROW_FORMAT=COMPACT */
 {
   ulint i;
   ulint field_offset;
@@ -1592,7 +1582,7 @@ static ulint ibuf_rec_get_volume_func(
 
   data_size = ibuf_rec_get_size(ibuf_rec, types, n_fields, comp);
 
-  return (data_size + rec_get_converted_extra_size(data_size, n_fields, 0) +
+  return (data_size + rec_get_converted_extra_size(data_size, n_fields, false) +
           page_dir_calc_reserved_space(1));
 }
 
@@ -1826,8 +1816,7 @@ static dtuple_t *ibuf_search_tuple_build(
 /** Checks if there are enough pages in the free list of the ibuf tree that we
  dare to start a pessimistic insert to the insert buffer.
  @return true if enough free pages in list */
-UNIV_INLINE
-ibool ibuf_data_enough_free_for_insert(void) {
+static inline ibool ibuf_data_enough_free_for_insert(void) {
   ut_ad(mutex_own(&ibuf_mutex));
 
   /* We want a big margin of free pages, because a B-tree can sometimes
@@ -1842,8 +1831,7 @@ ibool ibuf_data_enough_free_for_insert(void) {
 /** Checks if there are enough pages in the free list of the ibuf tree that we
  should remove them and free to the file space management.
  @return true if enough free pages in list */
-UNIV_INLINE
-ibool ibuf_data_too_much_free(void) {
+static inline ibool ibuf_data_too_much_free(void) {
   ut_ad(mutex_own(&ibuf_mutex));
 
   return (ibuf->free_list_len >= 3 + (ibuf->size / 2) + 3 * ibuf->height);
@@ -2254,7 +2242,7 @@ static ulint ibuf_get_merge_page_nos_func(
  @return current rec or NULL */
 static MY_ATTRIBUTE((warn_unused_result)) const rec_t *ibuf_get_user_rec(
     btr_pcur_t *pcur, /*!< in: the current cursor */
-    mtr_t *mtr)       /*!< in: mini transaction */
+    mtr_t *mtr)       /*!< in: mini-transaction */
 {
   do {
     const rec_t *rec = btr_pcur_get_rec(pcur);
@@ -2277,7 +2265,7 @@ static MY_ATTRIBUTE((warn_unused_result)) ulint
                          page_no_t *pages, /*!< out: pages read */
                          space_id_t *spaces, /*!< out: spaces read */
                          ulint *n_pages,     /*!< out: number of pages read */
-                         mtr_t *mtr)         /*!< in: mini transaction */
+                         mtr_t *mtr)         /*!< in: mini-transaction */
 {
   const rec_t *rec;
   ulint volume = 0;
@@ -2524,8 +2512,7 @@ ulint ibuf_merge_in_background(bool full) {
 }
 
 /** Contract insert buffer trees after insert if they are too big. */
-UNIV_INLINE
-void ibuf_contract_after_insert(
+static inline void ibuf_contract_after_insert(
     ulint entry_size) /*!< in: size of a record which was inserted
                       into an ibuf tree */
 {
@@ -2655,7 +2642,7 @@ static ulint ibuf_get_volume_buffered_count_func(
 
       len = ibuf_rec_get_size(rec, types, n_fields, 0);
 
-      return (len + rec_get_converted_extra_size(len, n_fields, 0) +
+      return (len + rec_get_converted_extra_size(len, n_fields, false) +
               page_dir_calc_reserved_space(1));
     case 1:
       /* This ROW_TYPE=COMPACT record does not include an
@@ -3381,7 +3368,7 @@ ibool ibuf_insert(ibuf_op_t op, const dtuple_t *entry, dict_index_t *index,
   ibool no_counter;
   /* Read the settable global variable ibuf_use only once in
   this function, so that we will have a consistent view of it. */
-  DBUG_ASSERT(innodb_change_buffering <= IBUF_USE_ALL);
+  assert(innodb_change_buffering <= IBUF_USE_ALL);
   ibuf_use_t use = static_cast<ibuf_use_t>(innodb_change_buffering);
 
   DBUG_TRACE;
@@ -4024,7 +4011,7 @@ static MY_ATTRIBUTE((warn_unused_result)) ibool ibuf_delete_rec(
   root = ibuf_tree_root_get(mtr);
 
   btr_cur_pessimistic_delete(&err, TRUE, btr_pcur_get_btr_cur(pcur), 0, false,
-                             0, 0, 0, mtr);
+                             0, 0, 0, mtr, nullptr, nullptr);
   ut_a(err == DB_SUCCESS);
 
 #ifdef UNIV_IBUF_COUNT_DEBUG
@@ -4051,14 +4038,11 @@ function deletes its buffered entries from the insert buffer; there can
 exist entries for such a page if the page belonged to an index which
 subsequently was dropped.
 @param[in,out]	block			if page has been read from disk,
-                                        pointer to the page x-latched, else
-                                        NULL
+pointer to the page x-latched, else NULL
 @param[in]	page_id			page id of the index page
-@param[in]	update_ibuf_bitmap	normally this is set to TRUE, but if
-                                        we have deleted or are deleting the
-                                        tablespace, then we naturally do not
-                                        want to update a non-existent bitmap
-                                        page
+@param[in]	update_ibuf_bitmap	normally this is set to TRUE, but
+if we have deleted or are deleting the tablespace, then we naturally do not
+want to update a non-existent bitmap page
 @param[in]	page_size		page size */
 void ibuf_merge_or_delete_for_page(buf_block_t *block, const page_id_t &page_id,
                                    const page_size_t *page_size,
@@ -4079,8 +4063,7 @@ void ibuf_merge_or_delete_for_page(buf_block_t *block, const page_id_t &page_id,
   ulint dops[IBUF_OP_COUNT];
 
   ut_ad(block == nullptr || page_id == block->page.id);
-  ut_ad(block == nullptr ||
-        buf_block_get_io_fix_unlocked(block) == BUF_IO_READ);
+  ut_ad(block == nullptr || block->page.is_io_fix_read());
 
   if (srv_force_recovery >= SRV_FORCE_NO_IBUF_MERGE ||
       trx_sys_hdr_page(page_id) || fsp_is_system_temporary(page_id.space())) {
@@ -4109,7 +4092,7 @@ void ibuf_merge_or_delete_for_page(buf_block_t *block, const page_id_t &page_id,
       return;
     }
 
-    space = fil_space_acquire(page_id.space());
+    space = fil_space_acquire_silent(page_id.space());
 
     if (space == nullptr) {
       /* Do not try to read the bitmap page from space;
@@ -4367,7 +4350,7 @@ reset_bit:
   btr_pcur_close(&pcur);
   mem_heap_free(heap);
 
-  os_atomic_increment_ulint(&ibuf->n_merges, 1);
+  ibuf->n_merges.fetch_add(1);
   ibuf_add_ops(ibuf->n_merged_ops, mops);
   ibuf_add_ops(ibuf->n_discarded_ops, dops);
 

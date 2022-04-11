@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2011, 2020, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
 Portions of this file contain modifications contributed and copyrighted by
 Google, Inc. Those modifications are gratefully acknowledged and are described
@@ -77,9 +77,9 @@ void srv_conc_force_exit_innodb(trx_t *trx); /*!< in: transaction object
                                              associated with the thread */
 
 /** Get the count of threads waiting inside InnoDB. */
-ulint srv_conc_get_waiting_threads(void);
+int32_t srv_conc_get_waiting_threads(void);
 
 /** Get the count of threads active inside InnoDB. */
-ulint srv_conc_get_active_threads(void);
+int32_t srv_conc_get_active_threads(void);
 
 #endif /* srv_conc_h */

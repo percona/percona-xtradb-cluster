@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2020, 2021, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License, version 2.0,
@@ -145,6 +145,19 @@ stdx::expected<stat_type, std::error_code> fstat(int handle) noexcept {
 #endif
 
   return {st};
+}
+
+stdx::expected<std::size_t, std::error_code> write(
+    file_handle::native_handle_type handle, const char *data,
+    const std::size_t len) {
+#ifdef _WIN32
+  const auto bytes_transferred = ::_write(handle, data, len);
+#else
+  const auto bytes_transferred = ::write(handle, data, len);
+#endif
+  if (bytes_transferred == -1) return stdx::make_unexpected(last_error_code());
+
+  return bytes_transferred;
 }
 
 }  // namespace impl
@@ -301,6 +314,11 @@ stdx::expected<void, std::error_code> file_handle::close() noexcept {
   }
 
   return {};
+}
+
+stdx::expected<std::size_t, std::error_code> file_handle::write(
+    const char *data, const std::size_t len) {
+  return impl::write(handle_, data, len);
 }
 
 stdx::expected<file_handle, std::error_code> file_handle::file(
