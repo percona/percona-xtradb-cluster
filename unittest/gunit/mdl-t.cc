@@ -76,8 +76,7 @@ extern "C" void test_error_handler_hook(uint err, const char *str, myf) {
   Mock away this global function.
   We don't need DEBUG_SYNC functionality in a unit test.
  */
-void debug_sync(THD *, const char *sync_point_name MY_ATTRIBUTE((unused)),
-                size_t) {
+void debug_sync(THD *, const char *sync_point_name [[maybe_unused]], size_t) {
   DBUG_PRINT("debug_sync_point", ("hit: '%s'", sync_point_name));
   FAIL() << "Not yet implemented.";
 }
@@ -143,7 +142,11 @@ class MDLTest : public ::testing::Test, public Test_MDL_context_owner {
 
   void notify_shared_lock(MDL_context_owner *in_use,
                           bool needs_thr_lock_abort) override {
+#ifdef WITH_WSREP
+    if (in_use) in_use->notify_shared_lock(nullptr, needs_thr_lock_abort);
+#else
     in_use->notify_shared_lock(nullptr, needs_thr_lock_abort);
+#endif
   }
 
   // A utility member for testing single lock requests.

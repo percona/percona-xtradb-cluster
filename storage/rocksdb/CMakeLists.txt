@@ -44,7 +44,22 @@ ELSE()
     EXECUTE_PROCESS(WORKING_DIRECTORY "${ROCKSDB_ROOT}" OUTPUT_VARIABLE GIT_DATE COMMAND "${GIT_EXECUTABLE}" log -1 --date=format:"%Y-%m-%d %T" --format="%ad")
     EXECUTE_PROCESS(WORKING_DIRECTORY "${ROCKSDB_ROOT}" OUTPUT_VARIABLE GIT_TAG RESULT_VARIABLE rv COMMAND "${GIT_EXECUTABLE}" symbolic-ref -q --short HEAD OUTPUT_STRIP_TRAILING_WHITESPACE)
     IF (rv AND NOT rv EQUAL 0)
-      EXECUTE_PROCESS(WORKING_DIRECTORY "${ROCKSDB_ROOT}" OUTPUT_VARIABLE GIT_TAG COMMAND "${GIT_EXECUTABLE}" describe --tags --exact-match OUTPUT_STRIP_TRAILING_WHITESPACE)
+      EXECUTE_PROCESS(
+        WORKING_DIRECTORY "${ROCKSDB_ROOT}"
+        OUTPUT_VARIABLE GIT_TAG
+        ERROR_VARIABLE GIT_ERROR
+        RESULT_VARIABLE rv
+        COMMAND "${GIT_EXECUTABLE}" describe --tags --exact-match
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+      IF (rv AND NOT rv EQUAL 0)
+        EXECUTE_PROCESS(
+          WORKING_DIRECTORY "${ROCKSDB_ROOT}"
+          OUTPUT_VARIABLE GIT_TAG
+          COMMAND "${GIT_EXECUTABLE}" for-each-ref --contains HEAD --format=%\(refname:lstrip=-1\) --sort=version:refname --count=1 refs/remotes/*/*.fb
+          OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+      ENDIF()
     ENDIF()
   ELSE()
     SET(GIT_SHA 0)
@@ -78,6 +93,7 @@ ELSE()
     MESSAGE(STATUS "MyRocks: Building RocksDB plugin: ${PLUGIN}")
     FILE(GLOB PLUGINMKFILE "${PLUGIN_ROOT}${PLUGIN}*.mk")
     SET(CURRENT_PLUGIN_SOURCES)
+    SET(CURRENT_PLUGIN_LD)
     IF (NOT EXISTS ${PLUGINMKFILE})
       MESSAGE(SEND_ERROR "Missing RocksDB plugin makefile in ${PLUGIN_ROOT}")
     ELSE()
@@ -89,13 +105,21 @@ ELSE()
         LIST(APPEND CURRENT_PLUGIN_SOURCES "${PLUGIN_ROOT}${MK_FILE}")
       ENDFOREACH()
       STRING(REGEX MATCH "LDFLAGS[ ]*=[ ]*([^\n]*)" FOO ${PLUGINMK})
-      LIST(APPEND PLUGIN_LD ${CMAKE_MATCH_1} )
+      SET(CURRENT_PLUGIN_LD "${CMAKE_MATCH_1}")
     ENDIF()
-    LIST(APPEND PLUGIN_SOURCES ${CURRENT_PLUGIN_SOURCES})
     IF (PLUGIN STREQUAL "zenfs")
+      SET(ZENFS_PLUGIN_ENABLED 1)
       OPTION(WITH_ZENFS_UTILITY "Build with ZenFS utility" OFF)
       SET(ZENFS_PLUGIN_SOURCES ${CURRENT_PLUGIN_SOURCES})
+      STRING(REPLACE "-lzbd" "" CURRENT_PLUGIN_LD ${CURRENT_PLUGIN_LD})
+      STRING(STRIP ${CURRENT_PLUGIN_LD} CURRENT_PLUGIN_LD)
+      EXECUTE_PROCESS(COMMAND "./generate-version.sh" WORKING_DIRECTORY "${PLUGIN_ROOT}" RESULT_VARIABLE GENVER_RESULT)
+      IF (NOT GENVER_RESULT EQUAL 0)
+        MESSAGE(FATAL_ERROR "Cannot generate zenfs version file")
+      ENDIF()
     ENDIF()
+    LIST(APPEND PLUGIN_SOURCES ${CURRENT_PLUGIN_SOURCES})
+    LIST(APPEND PLUGIN_LD ${CURRENT_PLUGIN_LD})
   ENDFOREACH()
 
   # Statically include all RocksDB source
@@ -103,6 +127,12 @@ ELSE()
     ${ROCKSDB_LIB_SOURCES}
     ${PLUGIN_SOURCES}
   )
+ENDIF()
+
+IF (ZENFS_PLUGIN_ENABLED)
+  INCLUDE(zbd)
+  MYSQL_CHECK_ZBD()
+  SET(rocksdb_static_libs ${rocksdb_static_libs} ${ZBD_LIBRARY})
 ENDIF()
 
 # This is a strong requirement coming from RocksDB. No conditional checks here.
@@ -179,6 +209,12 @@ IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-conditional-uninitialized FILES ha_rocksdb.cc rdb_datadic.cc rocksdb/db/db_impl/db_impl.cc rocksdb/db/write_thread.cc rocksdb/env/env_posix.cc rocksdb/env/fs_posix.cc)
 ENDIF()
 
+# Suppress warnings for clang-13 or newer
+IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 13.0)
+  ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-unused-but-set-variable FILES rocksdb/utilities/env_mirror.cc)
+  ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-deprecated-copy FILES rocksdb/options/options_helper.cc rocksdb/options/db_options.cc)
+ENDIF()
+
 # Suppress warnings for clang-10 or newer
 IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 10.0)
   ADD_CXX_COMPILE_FLAGS_TO_FILES(-Wno-range-loop-construct FILES rocksdb/db/db_impl/db_impl_compaction_flush.cc rocksdb/options/options_parser.cc rocksdb/options/options_helper.cc)
@@ -224,7 +260,7 @@ INCLUDE_DIRECTORIES(
 
 IF(BUILD_BUNDLED_ZSTD)
   INCLUDE_DIRECTORIES(BEFORE SYSTEM
-    ${CMAKE_SOURCE_DIR}/extra/zstd/lib/dictBuilder)
+    ${ZSTD_INCLUDE_DIR}/dictBuilder)
 ENDIF()
 
 # add bundled compression code
@@ -241,6 +277,7 @@ SET(ROCKSDB_SOURCES
   logger.h
   rdb_comparator.h
   rdb_datadic.cc rdb_datadic.h
+  rdb_iterator.cc rdb_iterator.h
   rdb_cf_options.cc rdb_cf_options.h
   rdb_cf_manager.cc rdb_cf_manager.h
   rdb_converter.cc rdb_converter.h
@@ -292,8 +329,16 @@ IF (NOT HAVE_EXTERNAL_ROCKSDB)
   TARGET_LINK_LIBRARIES(mysql_ldb ${rocksdb_static_libs})
 
   IF (WITH_ZENFS_UTILITY)
+    FIND_PATH(GFLAGS_INCLUDE_DIR
+      NAMES gflags/gflags.h)
+    FIND_LIBRARY(GFLAGS_SYSTEM_LIBRARY
+      NAMES gflags)
+    IF (NOT GFLAGS_INCLUDE_DIR OR NOT GFLAGS_SYSTEM_LIBRARY)
+      MESSAGE(FATAL_ERROR "Cannot find system gflags library.")
+    ENDIF()
+
     MYSQL_ADD_EXECUTABLE(zenfs ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb_plugins/zenfs/util/zenfs.cc ${ROCKSDB_LIB_SOURCES} ${ZENFS_PLUGIN_SOURCES} ${ZSTD_SOURCES})
-    TARGET_LINK_LIBRARIES(zenfs ${rocksdb_static_libs} "-lgflags")
+    TARGET_LINK_LIBRARIES(zenfs ${rocksdb_static_libs} ${GFLAGS_SYSTEM_LIBRARY})
 
     EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/tmp_gen/rocksdb/plugin")
     EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E create_symlink "${CMAKE_CURRENT_SOURCE_DIR}/rocksdb_plugins/zenfs" "${CMAKE_CURRENT_BINARY_DIR}/tmp_gen/rocksdb/plugin/zenfs")

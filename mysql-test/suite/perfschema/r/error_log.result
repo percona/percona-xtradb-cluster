@@ -118,8 +118,8 @@ Note	MY-013252	InnoDB
 Note	MY-013252	InnoDB
 Note	MY-012910	InnoDB
 Note	MY-011980	InnoDB
-Note	MY-011825	InnoDB
-Note	MY-011825	InnoDB
+Note	MY-013776	InnoDB
+Note	MY-013777	InnoDB
 Note	MY-012923	InnoDB
 Note	MY-012265	InnoDB
 Note	MY-012266	InnoDB
@@ -294,13 +294,7 @@ COUNT(*)=0
 
 
 # verbosity=1
-<<<<<<< HEAD
-# restart: --log-error=LOG_FILE --log-error-verbosity=1 --wsrep-min-log-verbosity=1
-||||||| 35582423e36
-# restart: --log-error=LOG_FILE --log-error-verbosity=1
-=======
-# restart: --log-error=LOG_FILE_V1 --log-error-verbosity=1
->>>>>>> Percona-Server-8.0.25-15
+# restart: --log-error=LOG_FILE_V1 --log-error-verbosity=1 --wsrep-min-log-verbosity=1
 SELECT logged INTO @startup
 FROM performance_schema.error_log
 WHERE error_code="MY-010116"
@@ -314,13 +308,7 @@ COUNT(*)=0
 1
 
 # verbosity=2
-<<<<<<< HEAD
-# restart: --log-error=LOG_FILE --log-error-verbosity=2 --wsrep-min-log-verbosity=1
-||||||| 35582423e36
-# restart: --log-error=LOG_FILE --log-error-verbosity=2
-=======
-# restart: --log-error=LOG_FILE_V2 --log-error-verbosity=2
->>>>>>> Percona-Server-8.0.25-15
+# restart: --log-error=LOG_FILE_V2 --log-error-verbosity=2 --wsrep-min-log-verbosity=1
 SELECT logged INTO @startup
 FROM performance_schema.error_log
 WHERE error_code="MY-010116"
@@ -388,13 +376,7 @@ INSTALL COMPONENT 'file://component_log_sink_json';
 SET PERSIST log_error_verbosity=1;
 SET PERSIST log_error_suppression_list="MY-013595,MY-010069,MY-011810,MY-010116";
 SET PERSIST log_error_services="log_filter_internal; log_sink_json";
-<<<<<<< HEAD
-# restart: --log-error=LOG_FILE --wsrep-min-log-verbosity=1
-||||||| 35582423e36
-# restart: --log-error=LOG_FILE
-=======
-# restart: --log-error=LOG_FILE_PJ
->>>>>>> Percona-Server-8.0.25-15
+# restart: --log-error=LOG_FILE_PJ --wsrep-min-log-verbosity=1
 SELECT logged INTO @startup
 FROM performance_schema.error_log
 WHERE error_code="MY-010116"

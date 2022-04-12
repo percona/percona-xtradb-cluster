@@ -187,8 +187,15 @@ class MDLSyncThread : public Thread {
   Checks that "fast path" lock acquisition correctly handles MDL_lock objects
   which already have been marked as destroyed but still present in MDL_map.
 */
-
+#ifdef WITH_WSREP
+/*
+  WSREP forces slow lock destroy path.
+  Check MDL_context::try_acquire_lock_impl()
+*/
+TEST_F(MDLSyncTest, DISABLED_IsDestroyedFastPath) {
+#else
 TEST_F(MDLSyncTest, IsDestroyedFastPath) {
+#endif
   MDLSyncThread thread1("table", MDL_SHARED,
                         "mdl_remove_random_unused_after_is_destroyed_set "
                         "SIGNAL marked WAIT_FOR resume_removal",

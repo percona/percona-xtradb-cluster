@@ -55,7 +55,7 @@
 #define PFS_AUTOSIZE_VALUE (-1)
 
 #ifndef PFS_MAX_MUTEX_CLASS
-#define PFS_MAX_MUTEX_CLASS 340
+#define PFS_MAX_MUTEX_CLASS 350
 #endif
 #ifndef PFS_MAX_RWLOCK_CLASS
 #define PFS_MAX_RWLOCK_CLASS 70
@@ -70,10 +70,11 @@
    Let's keep PFS_MAX_COND_CLASS always bigger by this number.
 */
 #define PFS_WSREP_COND_CLASS 27
-#define PFS_MAX_COND_CLASS (100 + PFS_WSREP_COND_CLASS)
+#define PFS_MAX_COND_CLASS (150 + PFS_WSREP_COND_CLASS)
 #else
-#define PFS_MAX_COND_CLASS 100
+#define PFS_MAX_COND_CLASS 150
 #endif /* WITH_WSREP */
+
 #endif
 #ifndef PFS_MAX_THREAD_CLASS
 #define PFS_MAX_THREAD_CLASS 100

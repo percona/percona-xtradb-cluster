@@ -367,6 +367,16 @@ class MYSQL_BIN_LOG : public TC_LOG {
   Transaction_dependency_tracker m_dependency_tracker;
 
   /**
+    Find the oldest binary log referenced by the index file
+
+    @param[out] binlog_file_name the file name of oldest log found
+    @param[out] errmsg the error message outputted, which is left untouched
+                if the function returns false
+    @return false on success, true on error.
+  */
+  bool find_first_log(std::string &binlog_file_name, std::string &errmsg);
+
+  /**
     Find the oldest binary log that contains any GTID that
     is not in the given gtid set.
 
@@ -380,7 +390,7 @@ class MYSQL_BIN_LOG : public TC_LOG {
   */
   bool find_first_log_not_in_gtid_set(char *binlog_file_name,
                                       const Gtid_set *gtid_set,
-                                      Gtid *first_gtid, const char **errmsg);
+                                      Gtid *first_gtid, std::string &errmsg);
 
   /**
     Reads the set of all GTIDs in the binary/relay log, and the set
@@ -741,7 +751,7 @@ class MYSQL_BIN_LOG : public TC_LOG {
      Gtid_log_event and BEGIN, COMMIT automatically.
 
      It is aimed to handle cases of "background" logging where a statement is
-     logged indirectly, like "DELETE FROM a_memory_table". So don't use it on
+     logged indirectly, like "TRUNCATE TABLE a_memory_table". So don't use it on
      any normal statement.
 
      @param[in] thd  the THD object of current thread.
@@ -751,8 +761,8 @@ class MYSQL_BIN_LOG : public TC_LOG {
 
      @return Returns false if succeeds, otherwise true is returned.
   */
-  bool write_dml_directly(THD *thd, const char *stmt, size_t stmt_len,
-                          enum enum_sql_command sql_command);
+  bool write_stmt_directly(THD *thd, const char *stmt, size_t stmt_len,
+                           enum enum_sql_command sql_command);
 
   void report_cache_write_error(THD *thd, bool is_transactional);
   bool check_write_error(const THD *thd);
@@ -846,6 +856,7 @@ class MYSQL_BIN_LOG : public TC_LOG {
   const char *get_name() const { return name; }
   inline mysql_mutex_t *get_log_lock() { return &LOCK_log; }
   inline mysql_mutex_t *get_commit_lock() { return &LOCK_commit; }
+  inline mysql_mutex_t *get_sync_lock() { return &LOCK_sync; }
   inline mysql_cond_t *get_log_cond() { return &update_cond; }
   inline Binlog_ofile *get_binlog_file() { return m_binlog_file; }
 
@@ -872,7 +883,7 @@ class MYSQL_BIN_LOG : public TC_LOG {
     @param errmsg                      Pointer to the error message
   */
   void report_missing_purged_gtids(const Gtid_set *slave_executed_gtid_set,
-                                   const char **errmsg);
+                                   std::string &errmsg);
 
   /**
     Function to report the missing GTIDs.
@@ -896,7 +907,7 @@ class MYSQL_BIN_LOG : public TC_LOG {
   */
   void report_missing_gtids(const Gtid_set *previous_gtid_set,
                             const Gtid_set *slave_executed_gtid_set,
-                            const char **errmsg);
+                            std::string &errmsg);
   static const int MAX_RETRIES_FOR_DELETE_RENAME_FAILURE = 5;
   /*
     It is called by the threads (e.g. dump thread, applier thread) which want

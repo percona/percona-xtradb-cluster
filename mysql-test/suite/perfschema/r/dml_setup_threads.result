@@ -9,11 +9,11 @@ thread/galera/THREAD_galera_ist_receiver	YES	YES		0	NULL
 thread/galera/THREAD_galera_receiver	YES	YES		0	NULL
 thread/galera/THREAD_galera_service_thd	YES	YES		0	NULL
 thread/galera/THREAD_galera_writeset_checksum	YES	YES		0	NULL
-thread/innodb/buf_dump_thread	YES	YES		0	NULL
+thread/innodb/buf_dump_thread	YES	YES	singleton	0	NULL
 thread/innodb/buf_lru_manager_thread	YES	YES		0	NULL
-thread/innodb/buf_resize_thread	YES	YES		0	NULL
-thread/innodb/clone_ddl_thread	YES	YES		0	NULL
-thread/innodb/clone_gtid_thread	YES	YES		0	NULL
+thread/innodb/buf_resize_thread	YES	YES	singleton	0	NULL
+thread/innodb/clone_ddl_thread	YES	YES	singleton	0	NULL
+thread/innodb/clone_gtid_thread	YES	YES	singleton	0	NULL
 select * from performance_schema.setup_threads
 where enabled='YES';
 insert into performance_schema.setup_threads

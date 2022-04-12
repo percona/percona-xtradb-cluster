@@ -263,6 +263,11 @@ get_sources(){
     return
 }
 
+switch_to_vault_repo() {
+    sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-Linux-*
+    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+}
+
 get_system(){
     if [ -f /etc/redhat-release ]; then
         GLIBC_VER_TMP="$(rpm glibc -qa --qf %{VERSION})"
@@ -294,6 +299,9 @@ install_deps() {
     CURPLACE=$(pwd)
 
     if [ "x$OS" = "xrpm" ]; then
+        if [ x"$RHEL" = x8 ]; then
+            switch_to_vault_repo
+        fi
         RHEL=$(rpm --eval %rhel)
         ARCH=$(echo $(uname -m) | sed -e 's:i686:i386:g')
         yum update -y
@@ -429,7 +437,7 @@ install_deps() {
         apt-get -y install doxygen doxygen-gui graphviz rsync libcurl4-openssl-dev
         apt-get -y install libcurl4-openssl-dev libre2-dev pkg-config libtirpc-dev libev-dev
         apt-get -y install --download-only percona-xtrabackup-24=2.4.24-1.${DIST}
-        apt-get -y install --download-only percona-xtrabackup-80=8.0.26-18-1.${DIST}
+        apt-get -y install --download-only percona-xtrabackup-80=8.0.27-19-1.${DIST}
     fi
     return;
 }
@@ -483,6 +491,9 @@ build_srpm(){
     then
         echo "It is not possible to build src rpm here"
         exit 1
+    fi
+    if [ x"$RHEL" = x8 ]; then
+        switch_to_vault_repo
     fi
     cd $WORKDIR || exit
     get_tar "source_tarball"
@@ -604,6 +615,9 @@ build_rpm(){
     then
         echo "It is not possible to build rpm here"
         exit 1
+    fi
+    if [ x"$RHEL" = x8 ]; then
+        switch_to_vault_repo
     fi
     SRC_RPM=$(basename $(find $WORKDIR/srpm -iname 'percona-xtradb-cluster*.src.rpm' | sort | tail -n1))
     if [ -z $SRC_RPM ]
@@ -840,6 +854,9 @@ build_tarball(){
         echo "Binary tarball will not be created"
         return;
     fi
+    if [ x"$RHEL" = x8 ]; then
+        switch_to_vault_repo
+    fi
     source ${WORKDIR}/pxc-80.properties
     get_tar "source_tarball"
     cd $WORKDIR || exit
@@ -905,11 +922,12 @@ build_tarball(){
 
         mkdir pxb-8.0
         pushd pxb-8.0
-        yumdownloader percona-xtrabackup-80-8.0.26
+        yumdownloader percona-xtrabackup-80-8.0.27
         rpm2cpio *.rpm | cpio --extract --make-directories --verbose
         mv usr/bin ./
         mv usr/lib64 ./
         mv lib64 lib
+        mv usr/lib/private lib/
         mv lib/xtrabackup/* lib/
         rm -rf lib/xtrabackup
         rm -rf usr
@@ -947,6 +965,9 @@ build_tarball(){
     export SCONS_ARGS=" strict_build_flags=0"
     if [ -f /etc/redhat-release ]; then
         sed -i 's:cmake ../../:/usr/bin/cmake3 ../../:g' ./build-ps/build-binary.sh
+    fi
+    if [ -n "${GALERA_REVNO}" ]; then
+        sed -i "s:GALERA_REVISION=\"0000000\":GALERA_REVISION=\"$GALERA_REVNO\":g" ./build-ps/build-binary.sh
     fi
     if [[ ${DEBUG} == 1 ]]; then
         bash -x ./build-ps/build-binary.sh --debug --with-jemalloc=jemalloc/ -t $BIN_RELEASE $BUILD_ROOT

@@ -49,7 +49,7 @@ i	c
 5	eeeeee
 select @@slave_parallel_workers;
 @@slave_parallel_workers
-0
+4
 Warnings:
 Warning	1287	'@@slave_parallel_workers' is deprecated and will be removed in a future release. Please use replica_parallel_workers instead.
 set global slave_parallel_workers=2;

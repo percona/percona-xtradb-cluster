@@ -313,20 +313,20 @@ PSI_thread_key key_THREAD_galera_receiver;
 PSI_thread_key key_THREAD_galera_gcommconn;
 
 PSI_thread_info all_galera_threads[] = {
-    {&key_THREAD_galera_service_thd, "THREAD_galera_service_thd", 0, 0,
+    {&key_THREAD_galera_service_thd, "THREAD_galera_service_thd", "galera_srvc",
+     0, 0, PSI_DOCUMENT_ME},
+    {&key_THREAD_galera_ist_receiver, "THREAD_galera_ist_receiver", "ist_rcv",
+     0, 0, PSI_DOCUMENT_ME},
+    {&key_THREAD_galera_ist_async_sender, "THREAD_galera_ist_async_sender",
+     "ist_sender", 0, 0, PSI_DOCUMENT_ME},
+    {&key_THREAD_galera_writeset_checksum, "THREAD_galera_writeset_checksum",
+     "wset_check", 0, 0, PSI_DOCUMENT_ME},
+    {&key_THREAD_galera_gcache_removefile, "THREAD_galera_gcache_removefile",
+     "gcache_rm", 0, 0, PSI_DOCUMENT_ME},
+    {&key_THREAD_galera_receiver, "THREAD_galera_receiver", "galera_recv", 0, 0,
      PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_ist_receiver, "THREAD_galera_ist_receiver", 0, 0,
-     PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_ist_async_sender, "THREAD_galera_ist_async_sender", 0,
-     0, PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_writeset_checksum, "THREAD_galera_writeset_checksum", 0,
-     0, PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_gcache_removefile, "THREAD_galera_gcache_removefile", 0,
-     0, PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_receiver, "THREAD_galera_receiver", 0, 0,
-     PSI_DOCUMENT_ME},
-    {&key_THREAD_galera_gcommconn, "THREAD_galera_gcommconn", 0, 0,
-     PSI_DOCUMENT_ME}};
+    {&key_THREAD_galera_gcommconn, "THREAD_galera_gcommconn", "galera_gcomm", 0,
+     0, PSI_DOCUMENT_ME}};
 
 PSI_file_key key_FILE_galera_recordset;
 PSI_file_key key_FILE_galera_ringbuffer;
@@ -2909,6 +2909,13 @@ bool wsrep_handle_mdl_conflict(const MDL_context *requestor_ctx,
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       ret = false;
+    } else if (granted_thd->wsrep_allow_mdl_conflict) {
+      WSREP_DEBUG("Background thread caused BF abort, conf %s",
+                  wsrep_thd_transaction_state_str(granted_thd));
+      ticket->wsrep_report(wsrep_debug);
+      mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
+      wsrep_abort_thd(request_thd, granted_thd, true);
+      ret = false;
     } else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE) {
       WSREP_DEBUG("DROP caused BF abort, conf %s",
                   wsrep_thd_transaction_state_str(granted_thd));
@@ -2976,7 +2983,8 @@ bool wsrep_is_wsrep_channel_name(const char *channel_name) {
 }
 
 void wsrep_last_committed_id(wsrep_gtid_t *gtid) {
-  wsrep::gtid ret = Wsrep_server_state::instance().last_committed_gtid();
+  wsrep::gtid ret =
+      Wsrep_server_state::instance().provider().last_committed_gtid();
   memcpy(gtid->uuid.data, ret.id().data(), sizeof(gtid->uuid.data));
   gtid->seqno = ret.seqno().get();
 }
