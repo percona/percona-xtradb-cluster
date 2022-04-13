@@ -15,7 +15,7 @@
 --echo #node-3 (async slave)
 call mtr.add_suppression("Recovery from master pos");
 --disable_query_log
---eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--eval CHANGE MASTER TO  MASTER_USER= 'root', MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
 --enable_query_log
 START SLAVE USER='root';
 
