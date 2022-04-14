@@ -369,3 +369,5 @@ function get_absolute_path()
 readonly WSREP_SST_DONOR_TIMEOUT=$(parse_cnf sst donor-timeout 10)
 # For backward compatiblitiy: joiner timeout waiting for donor connection
 readonly WSREP_SST_JOINER_TIMEOUT=$(parse_cnf sst joiner-timeout $(parse_cnf sst sst-initial-timeout 60) )
+# if the SST process stuck for this amount of time (no data transfered), it will be interrupted
+readonly WSREP_SST_IDLE_TIMEOUT=$(parse_cnf sst sst-idle-timeout 120)
