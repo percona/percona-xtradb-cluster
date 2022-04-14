@@ -1027,3 +1027,10 @@ function get_absolute_path()
     printf "%s/%s" "${abs_path}" "${filename}"
     return 0
 }
+
+# timeout for donor to connect to joiner (seconds)
+readonly WSREP_SST_DONOR_TIMEOUT=$(parse_cnf sst donor-timeout 10)
+# For backward compatiblitiy: joiner timeout waiting for donor connection
+readonly WSREP_SST_JOINER_TIMEOUT=$(parse_cnf sst joiner-timeout $(parse_cnf sst sst-initial-timeout 100) )
+# if the SST process stuck for this amount of time (no data transfered), it will be interrupted
+readonly WSREP_SST_IDLE_TIMEOUT=$(parse_cnf sst sst-idle-timeout 120)

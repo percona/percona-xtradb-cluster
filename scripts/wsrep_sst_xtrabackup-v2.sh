@@ -517,6 +517,18 @@ get_transfer()
 
         donor_extra=""
         joiner_extra=""
+
+        local socat_donor_connect_timeout=
+        local socat_T=
+        if [[ ${WSREP_SST_DONOR_TIMEOUT} -ne 0 ]]; then
+            wsrep_log_debug "Using donor connect timeout ${WSREP_SST_DONOR_TIMEOUT} sec (for 1 retry)"
+            socat_donor_connect_timeout=",connect-timeout=${WSREP_SST_DONOR_TIMEOUT}"
+        fi
+        if [[ ${WSREP_SST_IDLE_TIMEOUT} -ne 0 ]]; then
+            wsrep_log_debug "Using donor idle timeout ${WSREP_SST_IDLE_TIMEOUT} sec"
+            socat_T=" -T ${WSREP_SST_IDLE_TIMEOUT}"
+        fi
+
         if [[ $encrypt -eq 4 ]]; then
             if ! socat -V | grep -q WITH_OPENSSL; then
                 wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -614,7 +626,7 @@ get_transfer()
                 tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${joiner_extra}${sockopt} stdio"
             else
                 wsrep_log_debug "Encrypting with SSL. CERT: $ssl_cert, KEY: $ssl_key, CA: $ssl_ca"
-                tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${donor_extra}${sockopt}"
+                tcmd="socat ${socat_T} -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${donor_extra}${sockopt}${socat_donor_connect_timeout}"
             fi
 
         else
@@ -627,7 +639,7 @@ get_transfer()
                     tcmd="socat -u TCP-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
                 fi
             else
-                tcmd="socat -u stdio TCP:${REMOTEIP}:${TSST_PORT}${sockopt}"
+                tcmd="socat ${socat_T} -u stdio TCP:${REMOTEIP}:${TSST_PORT}${sockopt}${socat_donor_connect_timeout}"
             fi
         fi
     fi
@@ -725,7 +737,7 @@ read_cnf()
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
-    stimeout=$(parse_cnf sst sst-initial-timeout 100)
+    stimeout=${WSREP_SST_JOINER_TIMEOUT}
     ssyslog=$(parse_cnf sst sst-syslog 0)
     ssystag=$(parse_cnf mysqld_safe syslog-tag "${SST_SYSLOG_TAG:-}")
     ssystag+="-"
@@ -1994,7 +2006,6 @@ then
     ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
     ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
     ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
-    ssttimeout=$(parse_cnf sst sst-idle-timeout 120)
 
     stagemsg="Joiner-Recv"
 
@@ -2171,7 +2182,7 @@ then
                     XB_DONOR_KEYRING_FILE_PATH="${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
                     recv_data_from_donor_to_joiner "${KEYRING_FILE_DIR}" "${stagemsg}-keyring" 0 2 &
                     jpid=$!
-                    monitor_sst_progress "${KEYRING_FILE_DIR}" $jpid $ssttimeout &
+                    monitor_sst_progress "${KEYRING_FILE_DIR}" $jpid ${WSREP_SST_IDLE_TIMEOUT} &
                     wait $jpid
                     keyringapplyopt=" --keyring-file-data=$XB_DONOR_KEYRING_FILE_PATH "
                     wsrep_log_info "donor keyring received at: '${XB_DONOR_KEYRING_FILE_PATH}'"
@@ -2259,7 +2270,7 @@ then
 
         XB_GTID_INFO_FILE_PATH="${DATA}/${XB_GTID_INFO_FILE}"
         wsrep_log_info "............Waiting for SST streaming to complete!"
-        monitor_sst_progress "${JOINER_SST_DIR}" $jpid $ssttimeout &
+        monitor_sst_progress "${JOINER_SST_DIR}" $jpid ${WSREP_SST_IDLE_TIMEOUT} &
         wait $jpid
 
         get_proc
