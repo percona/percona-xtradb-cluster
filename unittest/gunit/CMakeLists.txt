@@ -213,6 +213,7 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/sql
   ${CMAKE_SOURCE_DIR}/sql/auth
   ${CMAKE_SOURCE_DIR}/storage/example
+  ${CMAKE_SOURCE_DIR}/wsrep/src
 )
 
 # main-wrapper libraries (with tap-compatible option).
@@ -397,7 +398,13 @@ IF (MERGE_UNITTESTS)
   FILE(WRITE ${MERGE_LARGE_TESTS} "// Merging large unit tests\n")
   FILE(WRITE ${MERGE_SMALL_TESTS} "// Merging small unit tests\n")
   FOREACH(test ${TESTS})
+    IF(${test} STREQUAL "mdl")
+      FILE(APPEND ${MERGE_SMALL_TESTS} "#ifndef WITH_WSREP\n#define WITH_WSREP\n")
+    ENDIF()
     FILE(APPEND ${MERGE_SMALL_TESTS} "#include \"${test}-t.cc\"\n")
+    IF(${test} STREQUAL "mdl")
+      FILE(APPEND ${MERGE_SMALL_TESTS} "#endif\n")
+    ENDIF()
   ENDFOREACH()
   FOREACH(test ${SERVER_TESTS})
     FILE(APPEND ${MERGE_LARGE_TESTS} "#include \"${test}-t.cc\"\n")
