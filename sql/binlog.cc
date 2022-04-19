@@ -729,6 +729,10 @@ private:
   */
   void compute_statistics()
   {
+#ifdef WITH_WSREP
+    if (wsrep_emulate_bin_log)
+      return;
+#endif /* WITH_WSREP */
     if (!is_binlog_empty())
     {
       (*ptr_binlog_cache_use)++;
