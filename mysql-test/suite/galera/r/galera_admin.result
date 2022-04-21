@@ -38,5 +38,17 @@ COUNT(*) = 10000
 SELECT COUNT(*) = 10 FROM x2;
 COUNT(*) = 10
 1
+SET GLOBAL super_read_only=1;
+ANALYZE TABLE t1;
+ERROR HY000: The MySQL server is running with the --super-read-only option so it cannot execute this statement
+SET GLOBAL super_read_only=0;
+SET GLOBAL read_only=1;
+CREATE USER 'testuser'@'%' IDENTIFIED WITH 'mysql_native_password' BY 'testuser';
+GRANT SELECT, UPDATE, INSERT, DELETE ON *.* to 'testuser'@'%';
+ANALYZE TABLE t1;
+ERROR HY000: The MySQL server is running with the --read-only option so it cannot execute this statement
+SET global read_only = 0;
+SET global super_read_only = 0;
+DROP USER 'testuser'@'%';
 DROP TABLE t1, t2;
 DROP TABLE x1, x2;

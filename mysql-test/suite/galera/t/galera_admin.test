@@ -82,6 +82,34 @@ SELECT COUNT(*) = 10 FROM x1;
 SELECT COUNT(*) = 10000 FROM t2;
 SELECT COUNT(*) = 10 FROM x2;
 
+
+# Check that super_read_only and read_only are handled properly (PXC-3923)
+--connection node_1
+--let super_read_only_saved = `SELECT @@super_read_only`
+--let read_only_saved = `SELECT @@read_only`
+
+# super_read_only
+SET GLOBAL super_read_only=1;
+--error ER_OPTION_PREVENTS_STATEMENT
+ANALYZE TABLE t1;
+
+# read_only
+SET GLOBAL super_read_only=0;
+SET GLOBAL read_only=1;
+
+CREATE USER 'testuser'@'%' IDENTIFIED WITH 'mysql_native_password' BY 'testuser';
+GRANT SELECT, UPDATE, INSERT, DELETE ON *.* to 'testuser'@'%';
+--connect node_1a, 127.0.0.1, testuser, testuser, test, $NODE_MYPORT_1
+--connection node_1a
+--error ER_OPTION_PREVENTS_STATEMENT
+ANALYZE TABLE t1;
+
+--connection node_1
+--eval SET global read_only = $read_only_saved
+--eval SET global super_read_only = $super_read_only_saved
+DROP USER 'testuser'@'%';
+
+
 --connection node_1
 DROP TABLE t1, t2;
 DROP TABLE x1, x2;
