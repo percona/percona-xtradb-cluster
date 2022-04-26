@@ -4,6 +4,25 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 SET SESSION wsrep_osu_method=RSU;
 ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 SET SESSION wsrep_osu_method=TOI;
+<<<<<<< HEAD
 include/assert.inc [General log should have 2 queries for ALTER and CREATE]
 include/assert.inc [General log should have no queries which don't have SELECT]
+||||||| merged common ancestors
+SELECT COUNT(*) = 2 FROM mysql.general_log WHERE argument LIKE 'CREATE%' OR argument LIKE 'ALTER%';
+COUNT(*) = 2
+1
+SELECT COUNT(*) = 0 FROM mysql.general_log WHERE argument NOT LIKE 'SELECT%';
+COUNT(*) = 0
+1
+=======
+SELECT COUNT(*) = 1 FROM mysql.general_log WHERE argument LIKE 'CREATE%' AND command_type != 'Prepare';
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM mysql.general_log WHERE argument LIKE 'ALTER%' AND command_type != 'Prepare';
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 0 FROM mysql.general_log WHERE argument NOT LIKE 'SELECT%';
+COUNT(*) = 0
+1
+>>>>>>> wsrep_5.7.36-25.28
 DROP TABLE t1;

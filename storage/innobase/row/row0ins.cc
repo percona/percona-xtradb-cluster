@@ -1483,12 +1483,19 @@ row_ins_foreign_check_on_constraint(
 		ib::warn() << "WSREP: foreign key append failed: " << err;
 		mtr_commit(mtr);
 	} else
+<<<<<<< HEAD
 	{
 		mtr_commit(mtr);
 		err = row_update_cascade_for_mysql(thr, cascade,
 						   foreign->foreign_table);
 	}
 #else
+||||||| merged common ancestors
+#endif
+=======
+	wsrep_thd_set_PA_unsafe(trx->mysql_thd);
+#endif
+>>>>>>> wsrep_5.7.36-25.28
 	err = row_update_cascade_for_mysql(thr, cascade,
 					foreign->foreign_table);
 #endif /* WITH_WSREP */

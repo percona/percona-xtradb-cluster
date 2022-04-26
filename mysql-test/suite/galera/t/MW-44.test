@@ -20,10 +20,17 @@ SET SESSION wsrep_osu_method=RSU;
 ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 SET SESSION wsrep_osu_method=TOI;
 
+<<<<<<< HEAD
 --let $assert_text= General log should have 2 queries for ALTER and CREATE
 --let $assert_cond= COUNT(*) = 2 FROM mysql.general_log WHERE argument LIKE "CREATE%" OR argument LIKE "ALTER%"
 --let $assert_debug= SELECT * FROM mysql.general_log
 --source include/assert.inc
+||||||| merged common ancestors
+SELECT COUNT(*) = 2 FROM mysql.general_log WHERE argument LIKE 'CREATE%' OR argument LIKE 'ALTER%';
+=======
+SELECT COUNT(*) = 1 FROM mysql.general_log WHERE argument LIKE 'CREATE%' AND command_type != 'Prepare';
+SELECT COUNT(*) = 1 FROM mysql.general_log WHERE argument LIKE 'ALTER%' AND command_type != 'Prepare';
+>>>>>>> wsrep_5.7.36-25.28
 
 --connection node_2
 --let $assert_text= General log should have no queries which don't have SELECT

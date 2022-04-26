@@ -7,7 +7,12 @@ call mtr.add_suppression("Error while loading keyring content. The keyring might
 call mtr.add_suppression("\\[ERROR\\] Plugin keyring_file reported: 'File .*keyring' not found .*");
 call mtr.add_suppression("\\[ERROR\\] Plugin keyring_file reported: 'File 'MYSQL_test_invalid/dir/' not found .*");
 call mtr.add_suppression("\\[ERROR\\] Plugin keyring_file reported: 'Error reading file '/' .*");
+<<<<<<< HEAD
 call mtr.add_suppression("\\[ERROR\\] Plugin keyring_file reported: 'Can't seek in file '/'");
+||||||| merged common ancestors
+=======
+call mtr.add_suppression("\\[ERROR\\] Plugin keyring_file reported: 'Can't seek in file '/' \\(Errcode: 22 - Invalid argument\\)'");
+>>>>>>> wsrep_5.7.36-25.28
 INSTALL PLUGIN keyring_file SONAME 'keyring_file.so';
 SELECT PLUGIN_NAME,PLUGIN_VERSION,PLUGIN_STATUS
 FROM INFORMATION_SCHEMA.PLUGINS WHERE plugin_name='keyring_file';

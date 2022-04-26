@@ -4,6 +4,9 @@ FLUSH HOSTS;
 SET SESSION wsrep_replicate_myisam = TRUE;
 CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
 FLUSH PRIVILEGES;
+SELECT User FROM mysql.user WHERE User = 'user1';
+User
+user1
 DELETE FROM mysql.user WHERE user = 'user1';
 SET SESSION wsrep_replicate_myisam = FALSE;
 FLUSH PRIVILEGES;
