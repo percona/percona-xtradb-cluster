@@ -15,9 +15,9 @@ SET SESSION wsrep_on = 1;
 SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
 SET GLOBAL wsrep_provider_options = 'signal=local_monitor_enter_sync';
 SET GLOBAL wsrep_provider_options = 'dbug=';
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 SELECT * FROM p;
 id	f2
+1	0
 SELECT * FROM c;
 id	p_id
 DROP TABLE c;

@@ -1904,14 +1904,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       mysql_parse(thd, &parser_state, false);
     }
 #else
-<<<<<<< HEAD
     mysql_parse(thd, &parser_state, false);
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-    mysql_parse(thd, &parser_state);
-=======
-    mysql_parse(thd, &parser_state);
->>>>>>> wsrep_5.7.36-25.28
 #endif /* WITH_WSREP */
 
     while (!thd->killed && (parser_state.m_lip.found_semicolon != NULL) &&
@@ -2897,14 +2890,6 @@ err:
   return TRUE;
 }
 
-<<<<<<< HEAD
-#ifdef WITH_WSREP
-static bool wsrep_is_show_query(enum enum_sql_command command)
-{
-  assert(command >= 0 && command <= SQLCOM_END);
-  return (sql_command_flags[command] & CF_STATUS_COMMAND) != 0;
-}
-#endif /* WITH_WSREP */
 /**
   Acquire a global backup lock.
 
@@ -2991,17 +2976,6 @@ bool lock_binlog_for_backup(THD *thd)
   DBUG_RETURN(thd->backup_binlog_lock.acquire(thd));
 }
 
-||||||| merged common ancestors
-#ifdef WITH_WSREP
-static bool wsrep_is_show_query(enum enum_sql_command command)
-{
-  assert(command >= 0 && command <= SQLCOM_END);
-  return (sql_command_flags[command] & CF_STATUS_COMMAND) != 0;
-}
-#endif /* WITH_WSREP */
-
-=======
->>>>>>> wsrep_5.7.36-25.28
 /**
   This is a wrapper for MYSQL_BIN_LOG::gtid_end_transaction. For normal
   statements, the function gtid_end_transaction is called in the commit
@@ -4092,7 +4066,6 @@ case SQLCOM_PREPARE:
         /* in STATEMENT format, we probably have to replicate also temporary
            tables, like mysql replication does
         */
-<<<<<<< HEAD
       if (!thd->is_current_stmt_binlog_format_row() ||
           !(create_info.options & HA_LEX_CREATE_TMP_TABLE))
 
@@ -4108,19 +4081,6 @@ case SQLCOM_PREPARE:
             thd->pop_internal_handler();
           goto error;
         }
-||||||| merged common ancestors
-      if (!thd->is_current_stmt_binlog_format_row() ||
-          !(create_info.options & HA_LEX_CREATE_TMP_TABLE))
-       WSREP_TO_ISOLATION_BEGIN(create_table->db, create_table->table_name,
-                                 NULL)
-=======
-        if (!thd->is_current_stmt_binlog_format_row() ||
-            !(create_info.options & HA_LEX_CREATE_TMP_TABLE))
-        {
-          WSREP_TO_ISOLATION_BEGIN_ALTER(create_table->db, create_table->table_name,
-                                         first_table, &alter_info);
-	}
->>>>>>> wsrep_5.7.36-25.28
 #endif /* WITH_WSREP */
         /* Regular CREATE TABLE */
         res= mysql_create_table(thd, create_table,

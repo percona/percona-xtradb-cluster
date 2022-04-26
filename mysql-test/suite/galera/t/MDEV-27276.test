@@ -33,7 +33,6 @@ CREATE TABLE p (id INTEGER PRIMARY KEY, f2 INTEGER) ENGINE=INNODB;
 
 # Expect certification failure
 --connection node_1
---error ER_LOCK_DEADLOCK
 --reap
 
 --connection node_2

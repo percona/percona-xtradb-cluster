@@ -6149,7 +6149,6 @@ restart:
     }
 
 #ifdef WITH_WSREP
-<<<<<<< HEAD
   bool is_dml_stmt=
     (thd->lex->sql_command== SQLCOM_INSERT         ||
      thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
@@ -6290,46 +6289,13 @@ restart:
   if (is_dml_stmt                                    &&
       thd->variables.wsrep_replicate_myisam          &&
       db_type == DB_TYPE_MYISAM                      &&
+      thd->get_command()!= COM_STMT_PREPARE          &&
       thd->wsrep_exec_mode == LOCAL_STATE)
   {
     WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
   }
 error:
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  if ((thd->lex->sql_command== SQLCOM_INSERT         ||
-       thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
-       thd->lex->sql_command== SQLCOM_REPLACE        ||
-       thd->lex->sql_command== SQLCOM_REPLACE_SELECT ||
-       thd->lex->sql_command== SQLCOM_UPDATE         ||
-       thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
-       thd->lex->sql_command== SQLCOM_LOAD           ||
-       thd->lex->sql_command== SQLCOM_DELETE)        &&
-      wsrep_replicate_myisam                         &&
-      (*start)->table && (*start)->table->file->ht->db_type == DB_TYPE_MYISAM)
-    {
-      WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
-    }
- error:
-#endif
-=======
-  if ((thd->lex->sql_command== SQLCOM_INSERT         ||
-       thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
-       thd->lex->sql_command== SQLCOM_REPLACE        ||
-       thd->lex->sql_command== SQLCOM_REPLACE_SELECT ||
-       thd->lex->sql_command== SQLCOM_UPDATE         ||
-       thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
-       thd->lex->sql_command== SQLCOM_LOAD           ||
-       thd->lex->sql_command== SQLCOM_DELETE)        &&
-      wsrep_replicate_myisam                         &&
-      thd->get_command()!= COM_STMT_PREPARE          &&
-      (*start)->table && (*start)->table->file->ht->db_type == DB_TYPE_MYISAM)
-    {
-      WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
-    }
- error:
-#endif
->>>>>>> wsrep_5.7.36-25.28
 
     /* Set appropriate TABLE::lock_type. */
     if (tbl && tables->lock_type != TL_UNLOCK && 
