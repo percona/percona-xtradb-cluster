@@ -69,7 +69,7 @@ const wsrep::id &wsrep_xid_uuid(const XID &xid) {
 long long wsrep_xid_seqno(const XID *xid) {
   long long ret = wsrep::seqno::undefined().get();
   if (wsrep_is_wsrep_xid(xid)) {
-    memcpy(&ret, xid->get_data() + WSREP_XID_SEQNO_OFFSET, sizeof(ret));
+    int8store(reinterpret_cast<uchar*>(&ret),*reinterpret_cast<const unsigned long long*>(xid->get_data() + WSREP_XID_SEQNO_OFFSET));
   }
   return ret;
 }
