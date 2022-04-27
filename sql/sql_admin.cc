@@ -1737,6 +1737,7 @@ bool Sql_cmd_analyze_table::execute(THD *thd) {
 
 #ifdef WITH_WSREP
   if (pxc_strict_mode_admin_check(thd, first_table)) return res;
+  if (WSREP(thd) && check_readonly(thd, true)) return res;
 
   DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command", {
     sql_print_information("In Sql_cmd_analyze_table::execute()");
