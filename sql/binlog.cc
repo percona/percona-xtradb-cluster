@@ -937,6 +937,9 @@ class binlog_cache_data {
     This function computes binlog cache and disk usage.
   */
   void compute_statistics() {
+#ifdef WITH_WSREP
+    if (wsrep_emulate_bin_log) return;
+#endif /* WITH_WSREP */
     if (!is_binlog_empty()) {
       (*ptr_binlog_cache_use)++;
       if (m_cache.disk_writes() != 0) (*ptr_binlog_cache_disk_use)++;
