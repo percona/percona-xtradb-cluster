@@ -2890,13 +2890,6 @@ err:
   return TRUE;
 }
 
-#ifdef WITH_WSREP
-static bool wsrep_is_show_query(enum enum_sql_command command)
-{
-  assert(command >= 0 && command <= SQLCOM_END);
-  return (sql_command_flags[command] & CF_STATUS_COMMAND) != 0;
-}
-#endif /* WITH_WSREP */
 /**
   Acquire a global backup lock.
 

@@ -1934,6 +1934,10 @@ static bool check_prepared_statement(Prepared_statement *stmt)
     if (open_temporary_tables(thd, tables))
       goto error;
   }
+#ifdef WITH_WSREP
+  if (wsrep_sync_wait(thd, sql_command))
+    goto error;
+#endif
 
   switch (sql_command) {
   case SQLCOM_INSERT:
