@@ -35,6 +35,13 @@ under ``[sst]``.
      on either donor or joiner node, not during ``mysqld`` startup.
 
    * SST options must be specified in the main :file:`my.cnf` file.
+   
+The following options can be added to the [sst] section of the configuration file to control SST timeouts:
+
+* ``sockopt``
+* ``donor-timeout`` - the value of the `connect-timeout` on the donor node. The default valueis 10 seconds.
+* ``joiner-timeout`` - The time the joiner waits for the SST transfer to start. The default value is 60 seconds.
+* ``sst-idle-timeout``
 
 .. option:: streamfmt
 
@@ -163,14 +170,15 @@ if :option:`encrypt` is set to ``1``.
 
 .. option:: sockopt
 
-Used to specify key/value pairs of socket options, separated by commas,
-for example::
+Used to specify key/value pairs of socket options, separated by commas. For example, `retry=`N, then the socat retries the N number of times. If no value is specified, the default is 30. 
+
+An example of the setting::
 
  [sst]
  sockopt="retry=2,interval=3"
 
 The previous example causes socat to try to connect three times
-(initial attempt and two retries with a 3-second interval between attempts).
+(initial attempt and two retries with a 3-second interval between attempts). 
 
 .. note:: For versions of |PXC| before 5.7.17-29.20,
    the value must begin with a comma, for example::
@@ -345,6 +353,9 @@ An example of setting the option:
 
 	[sst]
 	sst-idle-timeout=0
+    
+
+
 .. option:: tmpdir
 
    :Version: Introduced in 5.7.17-29.20
