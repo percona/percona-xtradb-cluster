@@ -1096,9 +1096,12 @@ int wsrep_init() {
 
     char ssl_opts[4096];
     server_main_callback.populate_wsrep_ssl_options(ssl_opts, sizeof(ssl_opts));
+    MY_COMPILER_GCC_DIAGNOSTIC_PUSH();
+    MY_COMPILER_GCC_DIAGNOSTIC_IGNORE("-Wformat-truncation");
     snprintf(buffer, sizeof(buffer), "%s%s%s",
              provider_options ? provider_options : "",
              ((provider_options && *provider_options) ? ";" : ""), ssl_opts);
+    MY_COMPILER_GCC_DIAGNOSTIC_POP();
     provider_options = buffer;
 
 #if 0

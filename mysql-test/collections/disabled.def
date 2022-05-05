@@ -265,7 +265,6 @@ galera.pxc_encrypt_rest_fpt_vault : BUG#0 Vault server availability is unreliabl
 galera.galera_var_notify_cmd : BUG#0 Failing to invoke the external script
 galera.galera_sst_rsync : BUG#0 rsync feature removed
 galera.galera_ist_rsync : BUG#0 rsync feature removed
-galera.galera_truncate : BUG#0 result depends on which node indexing
 
 
 # galera-3nodes
