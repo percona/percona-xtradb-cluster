@@ -43,7 +43,7 @@
 #include "wsrep_xid.h"
 
 extern const char wsrep_defaults_file[];
-extern const char wsrep_defaults_group_suffix[];
+extern const char *wsrep_defaults_group_suffix;
 
 #define WSREP_SST_OPT_ROLE "--role"
 #define WSREP_SST_OPT_ADDR "--address"
@@ -773,6 +773,17 @@ std::string wsrep_sst_prepare() {
   } else if (wsrep_node_address && strlen(wsrep_node_address)) {
     size_t const addr_len = strlen(wsrep_node_address);
     size_t const host_len = wsrep_host_len(wsrep_node_address, addr_len);
+
+    /* ip_buf is 256 bytes, wsrep_node_address is <ip_address>[:port]
+       so for ipv6 host part is at most 45 characters (IPv4-mapped IPv6).
+       Host part will entirely fit into ip_buf leaving space for trailing zero. */
+    if (unlikely(host_len >= ip_max)) {
+      WSREP_ERROR("Could not prepare state transfer request: "
+                  "Host IP does not fit into temporary buffer. "
+                  "wsrep_node_address: %s, host_len: %lu",
+                  wsrep_node_address, host_len);
+      throw wsrep::runtime_error("Could not prepare state transfer request");
+    }
 
     if (host_len < addr_len) {
       strncpy(ip_buf, wsrep_node_address, host_len);
