@@ -105,7 +105,7 @@ static Regex sst_method_allowed_chars_regex;
 
 
 extern const char wsrep_defaults_file[];
-extern const char wsrep_defaults_group_suffix[];
+extern const char *wsrep_defaults_group_suffix;
 
 #define WSREP_SST_OPT_ROLE     "--role"
 #define WSREP_SST_OPT_ADDR     "--address"
@@ -962,6 +962,17 @@ ssize_t wsrep_sst_prepare (void** msg, THD* thd)
 
     if (host_len < addr_len)
     {
+      /* ip_buf is 256 bytes, wsrep_node_address is <ip_address>[:port]
+         so for ipv6 host part is at most 45 characters (IPv4-mapped IPv6).
+         Host part will entirely fit into ip_buf leaving space for trailing zero. */
+      if (unlikely(host_len >= ip_max)) {
+        WSREP_ERROR("Could not prepare state transfer request: "
+                    "Host IP does not fit into temporary buffer. "
+                    "wsrep_node_address: %s, host_len: %lu",
+                    wsrep_node_address, host_len);
+        if (thd) delete thd;
+        unireg_abort(1);
+      }
       strncpy (ip_buf, wsrep_node_address, host_len);
       ip_buf[host_len]= '\0';
       addr_in= ip_buf;
