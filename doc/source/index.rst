@@ -38,8 +38,12 @@ Percona XtraDB Cluster |version| Documentation
 
 
 Percona XtraDB Cluster |version| is fully compatible with MySQL Server Community Edition
-|version| and |ps-last|.
+|version| and |ps-last|. The cluster has the following compatibilities:
 
+* Data - Use the data created by any MySQL variant.
+
+* Application - No changes or minimal application changes are required for an application to use the cluster.
+   
 .. seealso::
 
    Overview of changes in the most recent PXC release
@@ -52,10 +56,7 @@ Percona XtraDB Cluster |version| is fully compatible with MySQL Server Community
    How We Made Percona XtraDB Cluster Scale
        https://www.percona.com/blog/2017/04/19/how-we-made-percona-xtradb-cluster-scale
 
-Data compatibility
-   You can use data created by any MySQL variant.
-Application compatibility
-   There is no or minimal application changes required.
+
 
 Introduction
 ============
