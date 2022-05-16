@@ -2000,10 +2000,14 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
                 lex_user->host.str ? lex_user->host.str : "", new_password);
     thd->set_query(buff, query_length);
 
-    if ((ret = open_grant_tables(thd, tables, &transactional_tables,
-                                 WSREP_MYSQL_DB, "user"))) {
+    if ((ret = open_grant_tables(thd, tables, &transactional_tables))) {
       thd->set_query(query_save);
       return (ret != 1);
+    }
+    // we start TOI only for WSREP threads
+    if (start_toi_after_open_grant_tables(thd, WSREP_MYSQL_DB, "user")) {
+      commit_and_close_mysql_tables(thd);
+      return true;
     }
   } else {
     if ((ret = open_grant_tables(thd, tables, &transactional_tables)))
@@ -2771,6 +2775,14 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
       commit_and_close_mysql_tables(thd);
       return true;
     }
+
+#ifdef WITH_WSREP
+    if (start_toi_after_open_grant_tables(thd)) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
+
     while ((tmp_user_name = user_list++)) {
       if (acl_is_utility_user(tmp_user_name->user.str, tmp_user_name->host.str,
                               nullptr)) {
@@ -3059,7 +3071,6 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
 
   { /* Critical section */
     Acl_cache_lock_guard acl_cache_lock(thd, Acl_cache_lock_mode::WRITE_MODE);
-
     if (!acl_cache_lock.lock()) {
       commit_and_close_mysql_tables(thd);
       return true;
@@ -3069,6 +3080,13 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
       commit_and_close_mysql_tables(thd);
       return true;
     }
+
+#ifdef WITH_WSREP
+    if (start_toi_after_open_grant_tables(thd)) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
 
     get_mandatory_roles(&mandatory_roles);
     while ((user = user_list++) != nullptr) {
@@ -3157,7 +3175,6 @@ bool mysql_drop_user(THD *thd, List<LEX_USER> &list, bool if_exists,
       }
     }
   } /* Critical section */
-
   /* Notify storage engines */
   if (!result) {
     acl_notify_htons(thd, SQLCOM_DROP_USER, &list);
@@ -3264,6 +3281,13 @@ bool mysql_rename_user(THD *thd, List<LEX_USER> &list) {
 #endif /* WITH_WSREP */
       }
       assert(user_to != nullptr); /* Syntax enforces pairs of users. */
+
+#ifdef WITH_WSREP
+      if (start_toi_after_open_grant_tables(thd)) {
+        commit_and_close_mysql_tables(thd);
+        return true;
+      }
+#endif
 
       /*
         If we are renaming to anonymous user, make sure no roles are granted.
@@ -3434,6 +3458,14 @@ bool mysql_alter_user(THD *thd, List<LEX_USER> &list, bool if_exists) {
       commit_and_close_mysql_tables(thd);
       return true;
     }
+
+#ifdef WITH_WSREP
+    if (start_toi_after_open_grant_tables(thd)) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
+
     is_privileged_user = is_privileged_user_for_credential_change(thd);
 
     while ((tmp_user_from = user_list++)) {

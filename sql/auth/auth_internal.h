@@ -204,12 +204,11 @@ int replace_routine_table(THD *thd, GRANT_NAME *grant_name, TABLE *table,
                           const LEX_USER &combo, const char *db,
                           const char *routine_name, bool is_proc, ulong rights,
                           bool revoke_grant);
-#ifdef WITH_WSREP
-int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables,
-                      const char *db = WSREP_MYSQL_DB,
-                      const char *table = NULL);
-#else
 int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables);
+#ifdef WITH_WSREP
+bool start_toi_after_open_grant_tables(THD *thd,
+                                       const char *db = WSREP_MYSQL_DB,
+                                       const char *table = nullptr);
 #endif /* WITH_WSREP */
 void acl_tables_setup_for_read(TABLE_LIST *tables);
 void acl_print_ha_error(int handler_error);

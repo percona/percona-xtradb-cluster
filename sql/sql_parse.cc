@@ -5336,15 +5336,24 @@ int mysql_execute_command(THD *thd, bool first_level) {
       assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
       close_thread_tables(thd);
 
-      if (sp_result != SP_DOES_NOT_EXISTS && sp_automatic_privileges &&
-          !opt_noacl &&
-          sp_revoke_privileges(thd, db, name,
-                               lex->sql_command == SQLCOM_DROP_PROCEDURE)) {
-        push_warning(thd, Sql_condition::SL_WARNING, ER_PROC_AUTO_REVOKE_FAIL,
-                     ER_THD(thd, ER_PROC_AUTO_REVOKE_FAIL));
-        /* If this happens, an error should have been reported. */
-        goto error;
+#ifdef WITH_WSREP
+      // sp_drop_routine() returns SP_INTERNAL_ERROR in case of system user
+      // privileges check failure. In such a case we don't want to proceed with
+      // sp_revoke_privileges which will fail anyway.
+      if (sp_result != SP_INTERNAL_ERROR) {
+#endif
+        if (sp_result != SP_DOES_NOT_EXISTS && sp_automatic_privileges &&
+            !opt_noacl &&
+            sp_revoke_privileges(thd, db, name,
+                                 lex->sql_command == SQLCOM_DROP_PROCEDURE)) {
+          push_warning(thd, Sql_condition::SL_WARNING, ER_PROC_AUTO_REVOKE_FAIL,
+                       ER_THD(thd, ER_PROC_AUTO_REVOKE_FAIL));
+          /* If this happens, an error should have been reported. */
+          goto error;
+        }
+#ifdef WITH_WSREP
       }
+#endif
 
       res = sp_result;
       switch (sp_result) {
@@ -5531,8 +5540,7 @@ int mysql_execute_command(THD *thd, bool first_level) {
         WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
       }
 
-      if (lex->sql_command == SQLCOM_ALTER_USER_DEFAULT_ROLE ||
-          lex->sql_command == SQLCOM_CREATE_SRS ||
+      if (lex->sql_command == SQLCOM_CREATE_SRS ||
           lex->sql_command == SQLCOM_DROP_SRS ||
           lex->sql_command == SQLCOM_INSTALL_COMPONENT ||
           lex->sql_command == SQLCOM_UNINSTALL_COMPONENT) {

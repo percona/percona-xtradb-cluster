@@ -2788,6 +2788,13 @@ int mysql_table_grant(THD *thd, TABLE_LIST *table_list,
       return true;
     }
 
+#ifdef WITH_WSREP
+    if (start_toi_after_open_grant_tables(thd)) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
+
     MEM_ROOT *old_root = thd->mem_root;
     thd->mem_root = &memex;
     grant_version++;
@@ -2993,6 +3000,13 @@ bool mysql_routine_grant(THD *thd, TABLE_LIST *table_list, bool is_proc,
       return true;
     }
 
+#ifdef WITH_WSREP
+    if (start_toi_after_open_grant_tables(thd)) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
+
     MEM_ROOT *old_root = thd->mem_root;
     thd->mem_root = &memex;
 
@@ -3143,6 +3157,13 @@ bool mysql_revoke_role(THD *thd, const List<LEX_USER> *users,
       commit_and_close_mysql_tables(thd);
       return true;
     }
+
+#ifdef WITH_WSREP
+    if (start_toi_after_open_grant_tables(thd)) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
 
     table = tables[ACL_TABLES::TABLE_ROLE_EDGES].table;
 
@@ -3358,6 +3379,13 @@ bool mysql_grant_role(THD *thd, const List<LEX_USER> *users,
       return true;
     }
 
+#ifdef WITH_WSREP
+    if (start_toi_after_open_grant_tables(thd)) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
+
     table = tables[6].table;
 
     while ((lex_user = users_it++) && !errors) {
@@ -3515,6 +3543,13 @@ bool mysql_grant(THD *thd, const char *db, List<LEX_USER> &list, ulong rights,
       commit_and_close_mysql_tables(thd);
       return true;
     }
+
+#ifdef WITH_WSREP
+    if (start_toi_after_open_grant_tables(thd)) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
 
     /* go through users in user_list */
     grant_version++;
@@ -5172,6 +5207,13 @@ bool mysql_revoke_all(THD *thd, List<LEX_USER> &list) {
       return true;
     }
 
+#ifdef WITH_WSREP
+    if (start_toi_after_open_grant_tables(thd)) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
+
     TABLE *dynpriv_table = tables[ACL_TABLES::TABLE_DYNAMIC_PRIV].table;
     LEX_USER *lex_user, *tmp_lex_user;
     List_iterator<LEX_USER> user_list(list);
@@ -5323,6 +5365,13 @@ bool sp_revoke_privileges(THD *thd, const char *sp_db, const char *sp_name,
     commit_and_close_mysql_tables(thd);
     return true;
   }
+
+#ifdef WITH_WSREP
+  if (start_toi_after_open_grant_tables(thd)) {
+    commit_and_close_mysql_tables(thd);
+    return true;
+  }
+#endif
 
   /* Be sure to pop this before exiting this scope! */
   thd->push_internal_handler(&error_handler);
@@ -6466,6 +6515,13 @@ bool mysql_alter_or_clear_default_roles(THD *thd, role_enum role_type,
       commit_and_close_mysql_tables(thd);
       return true;
     }
+
+#ifdef WITH_WSREP
+    if (start_toi_after_open_grant_tables(thd)) {
+      commit_and_close_mysql_tables(thd);
+      return true;
+    }
+#endif
 
     while ((user = users_it++) && !ret) {
       // Check for CURRENT_USER token
