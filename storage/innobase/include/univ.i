@@ -55,7 +55,19 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define INNODB_VERSION_BUGFIX MYSQL_VERSION_PATCH
 
 #ifndef PERCONA_INNODB_VERSION
+<<<<<<< HEAD
 #define PERCONA_INNODB_VERSION 18
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+#define PERCONA_INNODB_VERSION 39
+||||||||| merged common ancestors
+#define PERCONA_INNODB_VERSION 38
+=========
+#define PERCONA_INNODB_VERSION 18
+>>>>>>>>> Temporary merge branch 2
+=======
+#define PERCONA_INNODB_VERSION 19
+>>>>>>> tag/Percona-Server-8.0.28-19
 #endif
 
 /* The following is the InnoDB version as shown in
@@ -680,9 +692,8 @@ constexpr auto to_int(T v) -> typename std::underlying_type<T>::type {
 }
 
 /** If we are doing something that takes longer than this many seconds then
-print an informative message. Type should be return type of ut_time_monotonic().
-*/
-static constexpr ib_time_monotonic_t PRINT_INTERVAL_SECS = 10;
+print an informative message. */
+static constexpr std::chrono::seconds PRINT_INTERVAL{10};
 
 #if defined(UNIV_LIBRARY) && !defined(UNIV_NO_ERR_MSGS)
 

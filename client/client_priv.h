@@ -188,9 +188,14 @@ enum options_client {
   OPT_DELETE_MASTER_LOGS_DEPRECATED,
   OPT_MYSQLDUMP_SLAVE_DATA_DEPRECATED,
   OPT_MYSQLDUMP_INCLUDE_MASTER_HOST_PORT_DEPRECATED,
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   OPT_USE_SET_PASSWORD,
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+=======
+>>>>>>> tag/Percona-Server-8.0.28-19
   /* Add new option above this */
   OPT_MAX_CLIENT_OPTION
 };

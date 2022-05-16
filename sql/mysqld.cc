@@ -928,6 +928,7 @@ MySQL clients support the protocol:
 #include <crtdbg.h>
 #include <process.h>
 #endif
+#include "unicode/putil.h"   // u_setDataDirectory()
 #include "unicode/uclean.h"  // u_cleanup()
 
 #ifdef WITH_WSREP
@@ -1021,6 +1022,7 @@ inline void setup_fpu() {
 }
 
 extern "C" void handle_fatal_signal(int sig);
+void my_server_abort();
 
 /* Constants */
 
@@ -1125,6 +1127,7 @@ static PSI_mutex_key key_LOCK_admin_tls_ctx_options;
 static PSI_mutex_key key_LOCK_rotate_binlog_master_key;
 static PSI_mutex_key key_LOCK_partial_revokes;
 static PSI_mutex_key key_LOCK_authentication_policy;
+static PSI_mutex_key key_LOCK_global_conn_mem_limit;
 #endif /* HAVE_PSI_INTERFACE */
 
 /**
@@ -1375,6 +1378,8 @@ bool table_definition_cache_specified = false;
 ulong locked_account_connection_count = 0;
 
 ulonglong denied_connections = 0;
+ulonglong global_conn_mem_limit = 0;
+ulonglong global_conn_mem_counter = 0;
 
 /**
   This variable holds handle to the object that's responsible
@@ -1674,6 +1679,8 @@ mysql_mutex_t LOCK_rotate_binlog_master_key;
 */
 mysql_mutex_t LOCK_authentication_policy;
 
+mysql_mutex_t LOCK_global_conn_mem_limit;
+
 bool mysqld_server_started = false;
 /**
   Set to true to signal at startup if the process must die.
@@ -1908,6 +1915,19 @@ struct System_status_var *get_thd_status_var(THD *thd, bool *aggregated) {
   return &thd->status_var;
 }
 
+#ifndef NDEBUG
+bool thd_mem_cnt_alloc(THD *thd, size_t size, const char *key_name) {
+  thd->current_key_name = key_name;
+  return thd->mem_cnt->alloc_cnt(size);
+}
+#else
+bool thd_mem_cnt_alloc(THD *thd, size_t size) {
+  return thd->mem_cnt->alloc_cnt(size);
+}
+#endif
+
+void thd_mem_cnt_free(THD *thd, size_t size) { thd->mem_cnt->free_cnt(size); }
+
 static void option_error_reporter(enum loglevel level, uint ecode, ...) {
   va_list args;
   va_start(args, ecode);
@@ -2001,7 +2021,7 @@ static bool pid_file_created = false;
 static void usage(void);
 static void clean_up_mutexes(void);
 static bool create_pid_file();
-static void mysqld_exit(int exit_code) MY_ATTRIBUTE((noreturn));
+[[noreturn]] static void mysqld_exit(int exit_code);
 static void delete_pid_file(myf flags);
 static void clean_up(bool print_message);
 static int handle_early_options();
@@ -3054,6 +3074,7 @@ static void clean_up_mutexes() {
   mysql_mutex_destroy(&LOCK_admin_tls_ctx_options);
   mysql_mutex_destroy(&LOCK_partial_revokes);
   mysql_mutex_destroy(&LOCK_authentication_policy);
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   mysql_mutex_destroy(&LOCK_wsrep_ready);
   mysql_cond_destroy(&COND_wsrep_ready);
@@ -3073,6 +3094,10 @@ static void clean_up_mutexes() {
   mysql_mutex_destroy(&LOCK_wsrep_SR_store);
   mysql_mutex_destroy(&LOCK_wsrep_alter_tablespace);
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+=======
+  mysql_mutex_destroy(&LOCK_global_conn_mem_limit);
+>>>>>>> tag/Percona-Server-8.0.28-19
 }
 
 /****************************************************************************
@@ -6014,6 +6039,7 @@ static int init_thread_environment() {
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_authentication_policy, &LOCK_authentication_policy,
                    MY_MUTEX_INIT_FAST);
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_ready, &LOCK_wsrep_ready, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_ready, &COND_wsrep_ready);
@@ -6042,6 +6068,11 @@ static int init_thread_environment() {
   mysql_mutex_init(key_LOCK_wsrep_alter_tablespace,
                    &LOCK_wsrep_alter_tablespace, MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+=======
+  mysql_mutex_init(key_LOCK_global_conn_mem_limit, &LOCK_global_conn_mem_limit,
+                   MY_MUTEX_INIT_FAST);
+>>>>>>> tag/Percona-Server-8.0.28-19
   return 0;
 }
 
@@ -6597,6 +6628,107 @@ static int setup_error_log_components() {
 
   return 0;
 }
+
+#if defined(MYSQL_ICU_DATADIR)
+
+// For "bundled" ICU:
+// Verify that we can find <directory_path>/icudt69l
+//   and                   <directory_path>/icudt69l/unames.icu
+// or <directory_path>/icudt69b on Sparc
+static bool icu_data_directory_is_valid(const char *directory_path) {
+  MY_STAT stat_info;
+  bool directory_exists = mysql_file_stat(key_file_misc, directory_path,
+                                          &stat_info, MYF(0)) != nullptr;
+  if (directory_exists) {
+    char icudt_path[FN_REFLEN];
+    fn_format(icudt_path, ICUDT_DIR, directory_path, "", 0);
+    bool icudt_dir_exists =
+        mysql_file_stat(key_file_misc, icudt_path, &stat_info, MYF(0));
+    if (icudt_dir_exists) {
+      char icunames_path[FN_REFLEN];
+      fn_format(icunames_path, "unames.icu", icudt_path, "", 0);
+      bool icu_unames_exists =
+          mysql_file_stat(key_file_misc, icunames_path, &stat_info, MYF(0));
+      if (icu_unames_exists) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// For "bundled" ICU:
+// Look for icudt69l.lnk in build directory.
+static char *get_icu_data_directory_in_build_dir(char *to) {
+  char icudt_path[FN_REFLEN];
+  fn_format(icudt_path, ICUDT_DIR, mysql_home, ".lnk", 0);
+  MY_STAT stat_info;
+  bool icudt_lnk_exists =
+      mysql_file_stat(key_file_misc, icudt_path, &stat_info, MYF(0)) != nullptr;
+  if (icudt_lnk_exists) {
+    File file = mysql_file_open(key_file_misc, icudt_path, O_RDONLY, 0);
+    if (file != -1) {
+      char icudt_lnk_contents[FN_REFLEN];
+      size_t num_bytes_read =
+          mysql_file_read(file, reinterpret_cast<uchar *>(icudt_lnk_contents),
+                          sizeof(icudt_lnk_contents), 0);
+      mysql_file_close(file, 0);
+      if (num_bytes_read != MY_FILE_ERROR) {
+        icudt_lnk_contents[num_bytes_read] = '\0';
+        memcpy(to, icudt_lnk_contents, num_bytes_read + 1);
+        return to;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// For "bundled" ICU:
+// Look for MYSQL_ICU_DATADIR which depends on INSTALL_PRIV_LIBDIR
+static char *get_icu_data_directory_in_install_dir(char *to) {
+  char buff[FN_REFLEN];
+  const char *mysql_icu_datadir = get_relative_path(MYSQL_ICU_DATADIR);
+  if (test_if_hard_path(mysql_icu_datadir))
+    strmake(buff, mysql_icu_datadir, sizeof(buff) - 1);
+  else
+    strxnmov(buff, sizeof(buff) - 1, mysql_home, mysql_icu_datadir, NullS);
+  convert_dirname(buff, buff, NullS);
+  memcpy(to, buff, sizeof(buff));
+  return to;
+}
+
+// Where to look for data files for "bundled" ICU:
+// Look in environment ICU_DATA.
+// In a build sandbox we expect cmake to write a .lnk file.
+// In an install directory, we look in MYSQL_ICU_DATADIR.
+static void init_icu_data_directory() {
+  // Use environment variable if available.
+  const char *env_icu_data = getenv("ICU_DATA");
+  if (env_icu_data != nullptr) {
+    if (icu_data_directory_is_valid(env_icu_data)) {
+      return;
+    }
+    LogErr(WARNING_LEVEL, ER_REGEXP_MISSING_ICU_DATADIR, env_icu_data);
+    // Continue, looking for ICU in build or install directory.
+  }
+
+  char build_dir_buffer[FN_REFLEN];
+  const char *in_build = get_icu_data_directory_in_build_dir(build_dir_buffer);
+  if (in_build != nullptr && icu_data_directory_is_valid(in_build)) {
+    u_setDataDirectory(in_build);
+    return;
+  }
+  char install_dir_buffer[FN_REFLEN];
+  const char *in_install =
+      get_icu_data_directory_in_install_dir(install_dir_buffer);
+  if (in_install != nullptr && icu_data_directory_is_valid(in_install)) {
+    u_setDataDirectory(in_install);
+    return;
+  }
+  LogErr(WARNING_LEVEL, ER_REGEXP_MISSING_ICU_DATADIR, install_dir_buffer);
+}
+
+#endif  // MYSQL_ICU_DATADIR
 
 static int init_server_components() {
   DBUG_TRACE;
@@ -7600,6 +7732,7 @@ static int init_server_components() {
     mysql_mutex_unlock(log_lock);
   }
 
+<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* In wsrep_recovery mode, PXC avoid creation of new binlog file for
   the reason mentioned above. In light of the said flow avoid purge
@@ -7630,6 +7763,100 @@ static int init_server_components() {
         LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--expire_logs_days");
       if (binlog_space_limit)
         LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-space-limit");
+||||||| merged common ancestors
+<<<<<<<<< Temporary merge branch 1
+  if (opt_myisam_log)
+    (void) mi_log(1);
+||||||||| merged common ancestors
+<<<<<<<<<<< Temporary merge branch 1
+<<<<<<<<<<< Temporary merge branch 1
+#ifdef HAVE_REPLICATION
+  if (opt_bin_log && expire_logs_days)
+  {
+    time_t purge_time= server_start_time - expire_logs_days*24*60*60;
+    if (purge_time >= 0)
+      mysql_bin_log.purge_logs_before_date(purge_time, true);
+  }
+  if (opt_bin_log && max_binlog_files)
+  {
+    mysql_bin_log.purge_logs_maximum_number(max_binlog_files);
+  }
+  if (opt_bin_log && binlog_space_limit)
+  {
+    mysql_bin_log.purge_logs_by_size(true);
+  }
+#endif
+
+||||||||||| 261d32555b5
+#ifdef HAVE_REPLICATION
+  if (opt_bin_log && expire_logs_days)
+  {
+    time_t purge_time= server_start_time - expire_logs_days*24*60*60;
+    if (purge_time >= 0)
+      mysql_bin_log.purge_logs_before_date(purge_time, true);
+  }
+#endif
+
+===========
+>>>>>>>>>>> Temporary merge branch 2
+||||||||||| merged common ancestors
+<<<<<<<<<<<<< Temporary merge branch 1
+#ifdef HAVE_REPLICATION
+  if (opt_bin_log && expire_logs_days)
+  {
+    time_t purge_time= server_start_time - expire_logs_days*24*60*60;
+    if (purge_time >= 0)
+      mysql_bin_log.purge_logs_before_date(purge_time, true);
+  }
+  if (opt_bin_log && max_binlog_files)
+  {
+    mysql_bin_log.purge_logs_maximum_number(max_binlog_files);
+  }
+  if (opt_bin_log && binlog_space_limit)
+  {
+    mysql_bin_log.purge_logs_by_size(true);
+  }
+#endif
+
+||||||||||||| 261d32555b5
+#ifdef HAVE_REPLICATION
+  if (opt_bin_log && expire_logs_days)
+  {
+    time_t purge_time= server_start_time - expire_logs_days*24*60*60;
+    if (purge_time >= 0)
+      mysql_bin_log.purge_logs_before_date(purge_time, true);
+  }
+#endif
+
+=============
+>>>>>>>>>>>>> Temporary merge branch 2
+===========
+>>>>>>>>>>> Temporary merge branch 2
+  if (opt_myisam_log)
+    (void) mi_log(1);
+=========
+  /*
+    When we pass non-zero values for both expire_logs_days and
+    binlog_expire_logs_seconds at the server start-up, the value of
+    expire_logs_days will be ignored and only binlog_expire_logs_seconds
+    will be used.
+  */
+  if (binlog_expire_logs_seconds_supplied && expire_logs_days_supplied) {
+    if (binlog_expire_logs_seconds != 0 && expire_logs_days != 0) {
+      LogErr(WARNING_LEVEL, ER_EXPIRE_LOGS_DAYS_IGNORED);
+      expire_logs_days = 0;
+=======
+  /*
+    When we pass non-zero values for both expire_logs_days and
+    binlog_expire_logs_seconds at the server start-up, the value of
+    expire_logs_days will be ignored and only binlog_expire_logs_seconds
+    will be used.
+  */
+  if (binlog_expire_logs_seconds_supplied && expire_logs_days_supplied) {
+    if (binlog_expire_logs_seconds != 0 && expire_logs_days != 0) {
+      LogErr(WARNING_LEVEL, ER_EXPIRE_LOGS_DAYS_IGNORED);
+      expire_logs_days = 0;
+>>>>>>> tag/Percona-Server-8.0.28-19
     }
 #ifdef WITH_WSREP
   }
@@ -7671,6 +7898,11 @@ static int init_server_components() {
   init_global_user_stats();
   init_global_client_stats();
   init_global_thread_stats();
+
+#if defined(MYSQL_ICU_DATADIR)
+  init_icu_data_directory();
+#endif  // MYSQL_ICU_DATADIR
+
   return 0;
 }
 
@@ -8190,6 +8422,12 @@ int mysqld_main(int argc, char **argv)
   }
 
   keyring_lockable_init();
+
+  /*
+    Install server's my_abort routine to assure my_aborts prints signal info
+    sequentially without sudden termination.
+  */
+  set_my_abort(my_server_abort);
 
   size_t guardize = 0;
 #ifndef _WIN32
@@ -10490,6 +10728,14 @@ static int show_prepared_stmt_count(THD *, SHOW_VAR *var, char *buff) {
   return 0;
 }
 
+static int show_global_mem_counter(THD *, SHOW_VAR *var, char *buff) {
+  var->type = SHOW_LONGLONG;
+  var->value = buff;
+  MUTEX_LOCK(lock, &LOCK_global_conn_mem_limit);
+  *((longlong *)buff) = (longlong)global_conn_mem_counter;
+  return 0;
+}
+
 static int show_table_definitions(THD *, SHOW_VAR *var, char *buff) {
   var->type = SHOW_LONG;
   var->value = buff;
@@ -10738,6 +10984,8 @@ SHOW_VAR status_vars[] = {
     {"Error_log_latest_write", (char *)&log_sink_pfs_latest_timestamp,
      SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
     {"Flush_commands", (char *)&refresh_version, SHOW_LONG_NOFLUSH,
+     SHOW_SCOPE_GLOBAL},
+    {"Global_connection_memory", (char *)&show_global_mem_counter, SHOW_FUNC,
      SHOW_SCOPE_GLOBAL},
     {"Handler_commit", (char *)offsetof(System_status_var, ha_commit_count),
      SHOW_LONGLONG_STATUS, SHOW_SCOPE_ALL},
@@ -11485,12 +11733,18 @@ bool mysqld_get_one_option(int optid,
     case OPT_TLS_CIPHERSUITES:
     case OPT_SSL_CRL:
     case OPT_SSL_CRLPATH:
-    case OPT_TLS_VERSION:
       /*
         Enable use of SSL if we are using any ssl option.
         One can disable SSL later by using --skip-ssl or --ssl=0.
       */
       opt_use_ssl = true;
+      break;
+    case OPT_TLS_VERSION:
+      opt_use_ssl = true;
+      if (validate_tls_version(argument)) {
+        LogErr(ERROR_LEVEL, ER_INVALID_TLS_VERSION, argument);
+        return true;
+      }
       break;
     case OPT_USE_ADMIN_SSL:
       if (opt_use_admin_ssl)
@@ -11513,13 +11767,20 @@ bool mysqld_get_one_option(int optid,
     case OPT_ADMIN_TLS_CIPHERSUITES:
     case OPT_ADMIN_SSL_CRL:
     case OPT_ADMIN_SSL_CRLPATH:
-    case OPT_ADMIN_TLS_VERSION:
       /*
         Enable use of SSL if we are using any ssl option.
         One can disable SSL later by using --skip-admin-ssl or --admin-ssl=0.
       */
       g_admin_ssl_configured = true;
       opt_use_admin_ssl = true;
+      break;
+    case OPT_ADMIN_TLS_VERSION:
+      g_admin_ssl_configured = true;
+      opt_use_admin_ssl = true;
+      if (validate_tls_version(argument)) {
+        LogErr(ERROR_LEVEL, ER_INVALID_TLS_VERSION, argument);
+        return true;
+      }
       break;
     case 'V':
       print_server_version();
@@ -12836,6 +13097,7 @@ PSI_mutex_key key_LOCK_error_log;
 PSI_mutex_key key_LOCK_thd_data;
 PSI_mutex_key key_LOCK_thd_sysvar;
 PSI_mutex_key key_LOCK_thd_protocol;
+PSI_mutex_key key_LOCK_thd_security_ctx;
 PSI_mutex_key key_LOG_LOCK_log;
 PSI_mutex_key key_source_info_data_lock;
 PSI_mutex_key key_source_info_run_lock;
@@ -12953,6 +13215,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_thd_query, "THD::LOCK_thd_query", 0, PSI_VOLATILITY_SESSION, PSI_DOCUMENT_ME},
   { &key_LOCK_thd_sysvar, "THD::LOCK_thd_sysvar", 0, PSI_VOLATILITY_SESSION, PSI_DOCUMENT_ME},
   { &key_LOCK_thd_protocol, "THD::LOCK_thd_protocol", 0, PSI_VOLATILITY_SESSION, PSI_DOCUMENT_ME},
+  { &key_LOCK_thd_security_ctx, "THD::LOCK_thd_security_ctx", 0, PSI_VOLATILITY_SESSION, "A lock to control access to a THD's security context"},
   { &key_LOCK_user_conn, "LOCK_user_conn", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_uuid_generator, "LOCK_uuid_generator", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_sql_rand, "LOCK_sql_rand", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
@@ -12997,6 +13260,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_monitor_info_run_lock, "Source_IO_monitor::run_lock", 0, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_delegate_connection_mutex, "LOCK_delegate_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_group_replication_connection_mutex, "LOCK_group_replication_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
+<<<<<<< HEAD
   { &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"}
 #ifdef WITH_WSREP
   ,
@@ -13020,6 +13284,12 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_thd_queue, "LOCK_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_alter_tablespace, "LOCK_wsrep_alter_tablespace", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
+||||||| merged common ancestors
+  { &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"}
+=======
+{ &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"},
+  { &key_LOCK_global_conn_mem_limit, "LOCK_global_conn_mem_limit", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
+>>>>>>> tag/Percona-Server-8.0.28-19
 };
 /* clang-format on */
 

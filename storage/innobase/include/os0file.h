@@ -103,6 +103,9 @@ struct Block {
 
   /** Pointer to the memory block. */
   byte *m_ptr;
+  /** Size of the data in memory block. This may be not UNIV_PAGE_SIZE if the
+  data was compressed before encryption. */
+  size_t m_size;
   /** This padding is needed to avoid false sharing. TBD: of what exactly? We
   can't use alignas because std::vector<Block> uses std::allocator which in
   C++14 doesn't have to handle overaligned types. (see 20.7.9.1.5 of N4140
@@ -286,6 +289,8 @@ static const ulint OS_FILE_AIO_INTERRUPTED = 79;
 static const ulint OS_FILE_OPERATION_ABORTED = 80;
 static const ulint OS_FILE_ACCESS_VIOLATION = 81;
 static const ulint OS_FILE_NAME_TOO_LONG = 82;
+static const ulint OS_FILE_TOO_MANY_OPENED = 83;
+
 static const ulint OS_FILE_ERROR_MAX = 100;
 /** @} */
 
@@ -471,6 +476,14 @@ class IORequest {
   @param[in] block_size		Block size to set */
   void block_size(ulint block_size) {
     m_block_size = static_cast<uint32_t>(block_size);
+  }
+
+  /** Returns original size of the IO to make. If one was not specified, then 0
+  is returned. */
+  uint32_t get_original_size() const { return m_original_size; }
+
+  void set_original_size(uint32_t original_size) {
+    m_original_size = original_size;
   }
 
   /** Clear all compression related flags */
@@ -707,6 +720,900 @@ class IORequest {
   bool m_is_page_zip_compressed;
 
   ulint m_zip_page_physical_size;
+<<<<<<< HEAD
+||||||| merged common ancestors
+>>>>>>>>> Temporary merge branch 2
+};
+
+<<<<<<<<< Temporary merge branch 1
+/**
+The IO Context that is passed down to the low level IO code */
+class IORequest {
+public:
+	/** Flags passed in the request, they can be ORred together. */
+	enum {
+		READ = 1,
+		WRITE = 2,
+
+		/** Double write buffer recovery. */
+		DBLWR_RECOVER = 4,
+
+		/** Enumarations below can be ORed to READ/WRITE above*/
+
+		/** Data file */
+		DATA_FILE = 8,
+
+		/** Log file request*/
+		LOG = 16,
+
+		/** Disable partial read warnings */
+		DISABLE_PARTIAL_IO_WARNINGS = 32,
+
+		/** Do not to wake i/o-handler threads, but the caller will do
+		the waking explicitly later, in this way the caller can post
+		several requests in a batch; NOTE that the batch must not be
+		so big that it exhausts the slots in AIO arrays! NOTE that
+		a simulated batch may introduce hidden chances of deadlocks,
+		because I/Os are not actually handled until all
+		have been posted: use with great caution! */
+		DO_NOT_WAKE = 64,
+
+		/** Ignore failed reads of non-existent pages */
+		IGNORE_MISSING = 128,
+
+		/** Use punch hole if available, only makes sense if
+		compression algorithm != NONE. Ignored if not set */
+		PUNCH_HOLE = 256,
+
+		/** Force raw read, do not try to compress/decompress.
+		This can be used to force a read and write without any
+		compression e.g., for redo log, merge sort temporary files
+		and the truncate redo log. */
+		NO_COMPRESSION = 512,
+
+		/** Row log used in online DDL */
+		ROW_LOG = 1024,
+
+		/** Force write of decrypted pages in encrypted tablespace. */
+		NO_ENCRYPTION = 2048
+	};
+
+	/** Default constructor */
+	IORequest()
+		:
+		m_block_size(UNIV_SECTOR_SIZE),
+		m_type(READ),
+		m_compression(),
+		m_encryption(),
+                m_is_page_zip_compressed(false),
+                m_zip_page_physical_size(0)
+	{
+		/* No op */
+	}
+
+	/**
+	@param[in]	type		Request type, can be a value that is
+					ORed from the above enum */
+	explicit IORequest(ulint type)
+		:
+		m_block_size(UNIV_SECTOR_SIZE),
+		m_type(static_cast<uint16_t>(type)),
+		m_compression(),
+		m_encryption(),
+                m_is_page_zip_compressed(false),
+                m_zip_page_physical_size(0)
+	{
+		if (is_log() || is_row_log()) {
+			disable_compression();
+		}
+
+		if (!is_punch_hole_supported()) {
+			clear_punch_hole();
+		}
+	}
+
+	/** Destructor */
+	~IORequest() { }
+
+	/** @return true if ignore missing flag is set */
+	static bool ignore_missing(ulint type)
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((type & IGNORE_MISSING) == IGNORE_MISSING);
+	}
+
+	/** @return true if it is a read request */
+	bool is_read() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & READ) == READ);
+	}
+
+	/** @return true if it is a write request */
+	bool is_write() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & WRITE) == WRITE);
+	}
+
+	/** @return true if it is a redo log write */
+	bool is_log() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & LOG) == LOG);
+	}
+
+	/** @return true if it is a row log entry used in online DDL */
+	bool is_row_log() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & ROW_LOG) == ROW_LOG);
+	}
+
+	/** @return true if the simulated AIO thread should be woken up */
+	bool is_wake() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & DO_NOT_WAKE) == 0);
+	}
+
+	/** @return true if partial read warning disabled */
+	bool is_partial_io_warning_disabled() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & DISABLE_PARTIAL_IO_WARNINGS)
+		       == DISABLE_PARTIAL_IO_WARNINGS);
+	}
+
+	/** Disable partial read warnings */
+	void disable_partial_io_warnings()
+	{
+		m_type |= DISABLE_PARTIAL_IO_WARNINGS;
+	}
+
+	/** @return true if missing files should be ignored */
+	bool ignore_missing() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(ignore_missing(m_type));
+	}
+
+	/** @return true if punch hole should be used */
+	bool punch_hole() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & PUNCH_HOLE) == PUNCH_HOLE);
+	}
+
+	/** @return true if the read should be validated */
+	bool validate() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		ut_a(is_read() ^ is_write());
+
+		return(!is_read() || !punch_hole());
+	}
+
+	/** Set the punch hole flag */
+	void set_punch_hole()
+	{
+		if (is_punch_hole_supported()) {
+			m_type |= PUNCH_HOLE;
+		}
+	}
+
+	/** Clear the do not wake flag */
+	void clear_do_not_wake()
+	{
+		m_type &= ~DO_NOT_WAKE;
+	}
+
+	/** Clear the punch hole flag */
+	void clear_punch_hole()
+	{
+		m_type &= ~PUNCH_HOLE;
+	}
+
+	/** @return the block size to use for IO */
+	ulint block_size() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(m_block_size);
+	}
+
+	/** Set the block size for IO
+	@param[in] block_size		Block size to set */
+	void block_size(ulint block_size)
+	{
+		m_block_size = static_cast<uint32_t>(block_size);
+	}
+
+	/** Clear all compression related flags */
+	void clear_compressed()
+	{
+		clear_punch_hole();
+
+		m_compression.m_type  = Compression::NONE;
+	}
+
+	/** Compare two requests
+	@reutrn true if the are equal */
+	bool operator==(const IORequest& rhs) const
+	{
+		return(m_type == rhs.m_type);
+	}
+
+	/** Set compression algorithm
+	@param[in] compression	The compression algorithm to use */
+	void compression_algorithm(Compression::Type type)
+	{
+		if (type == Compression::NONE) {
+			return;
+		}
+
+		set_punch_hole();
+
+		m_compression.m_type = type;
+	}
+
+	/** Get the compression algorithm.
+	@return the compression algorithm */
+	Compression compression_algorithm() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(m_compression);
+	}
+
+	/** @return true if the page should be compressed */
+	bool is_compressed() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(compression_algorithm().m_type != Compression::NONE);
+	}
+
+        void mark_page_zip_compressed()
+        {
+          m_is_page_zip_compressed = true;
+        }
+
+        bool is_page_zip_compressed() const
+                MY_ATTRIBUTE((warn_unused_result))
+        {
+           return m_is_page_zip_compressed; 
+        }
+        
+        ulint get_zip_page_physical_size() const
+        {
+          return m_zip_page_physical_size;
+        }
+
+        void set_zip_page_physical_size(ulint zip_page_physical_size)
+        {
+          m_zip_page_physical_size = zip_page_physical_size;
+        }
+
+	/** @return true if the page read should not be transformed. */
+	bool is_compression_enabled() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & NO_COMPRESSION) == 0);
+	}
+
+	/** @return true if the page write should not be encrypted */
+	bool is_encryption_disabled() const MY_NODISCARD
+	{
+		return((m_type & NO_ENCRYPTION) != 0);
+	}
+
+	/** Disable transformations. */
+	void disable_compression()
+	{
+		m_type |= NO_COMPRESSION;
+	}
+
+	/** Disable encryption of a page in encrypted tablespace */
+	void disable_encryption()
+        {
+		m_type |= NO_ENCRYPTION;
+	}
+
+	/** Set encryption algorithm
+	@param[in] type		The encryption algorithm to use */
+	void encryption_algorithm(Encryption::Type type)
+	{
+		if (type == Encryption::NONE) {
+			return;
+		}
+
+		m_encryption.m_type = type;
+	}
+
+	/** Set encryption key and iv
+	@param[in] key		The encryption key to use
+	@param[in] key_len	length of the encryption key
+	@param[in] iv		The encryption iv to use */
+	void encryption_key(byte* key,
+			    ulint key_len,
+			    bool key_allocated,
+			    byte* iv,
+                            uint key_version,
+                            uint key_id,
+                            byte *tablespace_iv,
+                            byte *tablespace_key)
+	{
+                //ut_ad(m_encryption.m_key == NULL); //TODO:Robert need to make sure I am not overriding memory here
+		m_encryption.set_key(key, key_len, key_allocated);
+		m_encryption.m_iv = iv;
+                m_encryption.m_key_version = key_version;
+                m_encryption.m_key_id = key_id;
+                m_encryption.m_tablespace_iv = tablespace_iv;
+                m_encryption.m_tablespace_key = tablespace_key;
+	}
+
+        void encryption_rotation(Encryption::Encryption_rotation encryption_rotation)
+        {
+          m_encryption.m_encryption_rotation = encryption_rotation;
+        }
+
+	/** Get the encryption algorithm.
+	@return the encryption algorithm */
+	Encryption encryption_algorithm() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(m_encryption);
+	}
+
+	/** @return true if the page should be encrypted. */
+	bool is_encrypted() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(m_encryption.m_type != Encryption::NONE);
+	}
+
+	/** Clear all encryption related flags */
+	void clear_encrypted()
+	{
+		m_encryption.set_key(NULL, 0, false);
+		m_encryption.m_iv = NULL;
+		m_encryption.m_type = Encryption::NONE;
+                m_encryption.m_encryption_rotation = Encryption::NO_ROTATION;
+                m_encryption.m_tablespace_iv = NULL;
+                m_encryption.m_key_id = 0;
+                m_encryption.m_tablespace_key = NULL;
+	}
+
+        //bool was_page_encrypted_when_read() const
+        //{
+               //return m_encryption.m_was_page_encrypted_when_read;
+        //}
+
+        //void set_that_page_was_encrypted_when_read() const
+        //{
+               //m_encryption.m_was_page_encrypted_when_read = true;
+        //}
+
+	/** Note that the IO is for double write recovery. */
+	void dblwr_recover()
+	{
+		m_type |= DBLWR_RECOVER;
+	}
+
+	/** @return true if the request is from the dblwr recovery */
+	bool is_dblwr_recover() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & DBLWR_RECOVER) == DBLWR_RECOVER);
+	}
+
+	/** @return true if punch hole is supported */
+	static bool is_punch_hole_supported()
+	{
+
+		/* In this debugging mode, we act as if punch hole is supported,
+		and then skip any calls to actually punch a hole here.
+		In this way, Transparent Page Compression is still being tested. */
+		DBUG_EXECUTE_IF("ignore_punch_hole",
+			return(true);
+		);
+
+#if defined(HAVE_FALLOC_PUNCH_HOLE_AND_KEEP_SIZE) || defined(_WIN32)
+		return(true);
+#else
+		return(false);
+#endif /* HAVE_FALLOC_PUNCH_HOLE_AND_KEEP_SIZE || _WIN32 */
+	}
+
+        //bool will_encrypt_page()
+        //{
+          //return m_encryption.key != NULL;
+        //}
+
+private:
+	/* File system best block size */
+	uint32_t		m_block_size;
+
+	/** Request type bit flags */
+	uint16_t		m_type;
+
+	/** Compression algorithm */
+	Compression		m_compression;
+
+	/** Encryption algorithm */
+	Encryption		m_encryption;
+
+        bool m_is_page_zip_compressed;
+
+        ulint m_zip_page_physical_size;
+};
+
+/* @} */
+||||||||| merged common ancestors
+<<<<<<<<<<< Temporary merge branch 1
+||||||||||| 261d32555b5
+
+===========
+>>>>>>>>>>> Temporary merge branch 2
+||||||||||| merged common ancestors
+||||||||||||| 261d32555b5
+
+=============
+>>>>>>>>>>>>> Temporary merge branch 2
+===========
+>>>>>>>>>>> Temporary merge branch 2
+/**
+The IO Context that is passed down to the low level IO code */
+class IORequest {
+public:
+	/** Flags passed in the request, they can be ORred together. */
+	enum {
+		READ = 1,
+		WRITE = 2,
+
+		/** Double write buffer recovery. */
+		DBLWR_RECOVER = 4,
+
+		/** Enumarations below can be ORed to READ/WRITE above*/
+
+		/** Data file */
+		DATA_FILE = 8,
+
+		/** Log file request*/
+		LOG = 16,
+
+		/** Disable partial read warnings */
+		DISABLE_PARTIAL_IO_WARNINGS = 32,
+
+		/** Do not to wake i/o-handler threads, but the caller will do
+		the waking explicitly later, in this way the caller can post
+		several requests in a batch; NOTE that the batch must not be
+		so big that it exhausts the slots in AIO arrays! NOTE that
+		a simulated batch may introduce hidden chances of deadlocks,
+		because I/Os are not actually handled until all
+		have been posted: use with great caution! */
+		DO_NOT_WAKE = 64,
+
+		/** Ignore failed reads of non-existent pages */
+		IGNORE_MISSING = 128,
+
+		/** Use punch hole if available, only makes sense if
+		compression algorithm != NONE. Ignored if not set */
+		PUNCH_HOLE = 256,
+
+		/** Force raw read, do not try to compress/decompress.
+		This can be used to force a read and write without any
+		compression e.g., for redo log, merge sort temporary files
+		and the truncate redo log. */
+<<<<<<<<<<< Temporary merge branch 1
+<<<<<<<<<<< Temporary merge branch 1
+		NO_COMPRESSION = 512,
+
+		/** Force write of decrypted pages in encrypted tablespace. */
+		NO_ENCRYPTION = 1024
+||||||||||| 261d32555b5
+		NO_COMPRESSION = 512
+===========
+||||||||||| merged common ancestors
+<<<<<<<<<<<<< Temporary merge branch 1
+		NO_COMPRESSION = 512,
+
+		/** Force write of decrypted pages in encrypted tablespace. */
+		NO_ENCRYPTION = 1024
+||||||||||||| 261d32555b5
+		NO_COMPRESSION = 512
+=============
+===========
+>>>>>>>>>>> Temporary merge branch 2
+		NO_COMPRESSION = 512,
+
+		/** Row log used in online DDL */
+<<<<<<<<<<< Temporary merge branch 1
+		ROW_LOG = 1024
+>>>>>>>>>>> Temporary merge branch 2
+||||||||||| merged common ancestors
+		ROW_LOG = 1024
+>>>>>>>>>>>>> Temporary merge branch 2
+===========
+		ROW_LOG = 1024,
+
+		/** Force write of decrypted pages in encrypted tablespace. */
+		NO_ENCRYPTION = 2048
+>>>>>>>>>>> Temporary merge branch 2
+	};
+
+	/** Default constructor */
+	IORequest()
+		:
+		m_block_size(UNIV_SECTOR_SIZE),
+		m_type(READ),
+		m_compression(),
+		m_encryption(),
+                m_is_page_zip_compressed(false),
+                m_zip_page_physical_size(0)
+	{
+		/* No op */
+	}
+
+	/**
+	@param[in]	type		Request type, can be a value that is
+					ORed from the above enum */
+	explicit IORequest(ulint type)
+		:
+		m_block_size(UNIV_SECTOR_SIZE),
+		m_type(static_cast<uint16_t>(type)),
+		m_compression(),
+		m_encryption(),
+                m_is_page_zip_compressed(false),
+                m_zip_page_physical_size(0)
+	{
+		if (is_log() || is_row_log()) {
+			disable_compression();
+		}
+
+		if (!is_punch_hole_supported()) {
+			clear_punch_hole();
+		}
+	}
+
+	/** Destructor */
+	~IORequest() { }
+
+	/** @return true if ignore missing flag is set */
+	static bool ignore_missing(ulint type)
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((type & IGNORE_MISSING) == IGNORE_MISSING);
+	}
+
+	/** @return true if it is a read request */
+	bool is_read() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & READ) == READ);
+	}
+
+	/** @return true if it is a write request */
+	bool is_write() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & WRITE) == WRITE);
+	}
+
+	/** @return true if it is a redo log write */
+	bool is_log() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & LOG) == LOG);
+	}
+
+	/** @return true if it is a row log entry used in online DDL */
+	bool is_row_log() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & ROW_LOG) == ROW_LOG);
+	}
+
+	/** @return true if the simulated AIO thread should be woken up */
+	bool is_wake() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & DO_NOT_WAKE) == 0);
+	}
+
+	/** @return true if partial read warning disabled */
+	bool is_partial_io_warning_disabled() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & DISABLE_PARTIAL_IO_WARNINGS)
+		       == DISABLE_PARTIAL_IO_WARNINGS);
+	}
+
+	/** Disable partial read warnings */
+	void disable_partial_io_warnings()
+	{
+		m_type |= DISABLE_PARTIAL_IO_WARNINGS;
+	}
+
+	/** @return true if missing files should be ignored */
+	bool ignore_missing() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(ignore_missing(m_type));
+	}
+
+	/** @return true if punch hole should be used */
+	bool punch_hole() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & PUNCH_HOLE) == PUNCH_HOLE);
+	}
+
+	/** @return true if the read should be validated */
+	bool validate() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		ut_a(is_read() ^ is_write());
+
+		return(!is_read() || !punch_hole());
+	}
+
+	/** Set the punch hole flag */
+	void set_punch_hole()
+	{
+		if (is_punch_hole_supported()) {
+			m_type |= PUNCH_HOLE;
+		}
+	}
+
+	/** Clear the do not wake flag */
+	void clear_do_not_wake()
+	{
+		m_type &= ~DO_NOT_WAKE;
+	}
+
+	/** Clear the punch hole flag */
+	void clear_punch_hole()
+	{
+		m_type &= ~PUNCH_HOLE;
+	}
+
+	/** @return the block size to use for IO */
+	ulint block_size() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(m_block_size);
+	}
+
+	/** Set the block size for IO
+	@param[in] block_size		Block size to set */
+	void block_size(ulint block_size)
+	{
+		m_block_size = static_cast<uint32_t>(block_size);
+	}
+
+	/** Clear all compression related flags */
+	void clear_compressed()
+	{
+		clear_punch_hole();
+
+		m_compression.m_type  = Compression::NONE;
+	}
+
+	/** Compare two requests
+	@reutrn true if the are equal */
+	bool operator==(const IORequest& rhs) const
+	{
+		return(m_type == rhs.m_type);
+	}
+
+	/** Set compression algorithm
+	@param[in] compression	The compression algorithm to use */
+	void compression_algorithm(Compression::Type type)
+	{
+		if (type == Compression::NONE) {
+			return;
+		}
+
+		set_punch_hole();
+
+		m_compression.m_type = type;
+	}
+
+	/** Get the compression algorithm.
+	@return the compression algorithm */
+	Compression compression_algorithm() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(m_compression);
+	}
+
+	/** @return true if the page should be compressed */
+	bool is_compressed() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(compression_algorithm().m_type != Compression::NONE);
+	}
+
+        void mark_page_zip_compressed()
+        {
+          m_is_page_zip_compressed = true;
+        }
+
+        bool is_page_zip_compressed() const
+                MY_ATTRIBUTE((warn_unused_result))
+        {
+           return m_is_page_zip_compressed; 
+        }
+        
+        ulint get_zip_page_physical_size() const
+        {
+          return m_zip_page_physical_size;
+        }
+
+        void set_zip_page_physical_size(ulint zip_page_physical_size)
+        {
+          m_zip_page_physical_size = zip_page_physical_size;
+        }
+
+	/** @return true if the page read should not be transformed. */
+	bool is_compression_enabled() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & NO_COMPRESSION) == 0);
+	}
+
+	/** @return true if the page write should not be encrypted */
+	bool is_encryption_disabled() const MY_NODISCARD
+	{
+		return((m_type & NO_ENCRYPTION) != 0);
+	}
+
+	/** Disable transformations. */
+	void disable_compression()
+	{
+		m_type |= NO_COMPRESSION;
+	}
+
+	/** Disable encryption of a page in encrypted tablespace */
+	void disable_encryption()
+        {
+		m_type |= NO_ENCRYPTION;
+	}
+
+	/** Set encryption algorithm
+	@param[in] type		The encryption algorithm to use */
+	void encryption_algorithm(Encryption::Type type)
+	{
+		if (type == Encryption::NONE) {
+			return;
+		}
+
+		m_encryption.m_type = type;
+	}
+
+	/** Set encryption key and iv
+	@param[in] key		The encryption key to use
+	@param[in] key_len	length of the encryption key
+	@param[in] iv		The encryption iv to use */
+	void encryption_key(byte* key,
+			    ulint key_len,
+			    bool key_allocated,
+			    byte* iv,
+                            uint key_version,
+                            uint key_id,
+                            byte *tablespace_iv,
+                            byte *tablespace_key)
+	{
+                //ut_ad(m_encryption.m_key == NULL); //TODO:Robert need to make sure I am not overriding memory here
+		m_encryption.set_key(key, key_len, key_allocated);
+		m_encryption.m_iv = iv;
+                m_encryption.m_key_version = key_version;
+                m_encryption.m_key_id = key_id;
+                m_encryption.m_tablespace_iv = tablespace_iv;
+                m_encryption.m_tablespace_key = tablespace_key;
+	}
+
+        void encryption_rotation(Encryption::Encryption_rotation encryption_rotation)
+        {
+          m_encryption.m_encryption_rotation = encryption_rotation;
+        }
+
+	/** Get the encryption algorithm.
+	@return the encryption algorithm */
+	Encryption encryption_algorithm() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(m_encryption);
+	}
+
+	/** @return true if the page should be encrypted. */
+	bool is_encrypted() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return(m_encryption.m_type != Encryption::NONE);
+	}
+
+	/** Clear all encryption related flags */
+	void clear_encrypted()
+	{
+		m_encryption.set_key(NULL, 0, false);
+		m_encryption.m_iv = NULL;
+		m_encryption.m_type = Encryption::NONE;
+                m_encryption.m_encryption_rotation = Encryption::NO_ROTATION;
+                m_encryption.m_tablespace_iv = NULL;
+                m_encryption.m_key_id = 0;
+                m_encryption.m_tablespace_key = NULL;
+	}
+
+        //bool was_page_encrypted_when_read() const
+        //{
+               //return m_encryption.m_was_page_encrypted_when_read;
+        //}
+
+        //void set_that_page_was_encrypted_when_read() const
+        //{
+               //m_encryption.m_was_page_encrypted_when_read = true;
+        //}
+
+	/** Note that the IO is for double write recovery. */
+	void dblwr_recover()
+	{
+		m_type |= DBLWR_RECOVER;
+	}
+
+	/** @return true if the request is from the dblwr recovery */
+	bool is_dblwr_recover() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & DBLWR_RECOVER) == DBLWR_RECOVER);
+	}
+
+	/** @return true if punch hole is supported */
+	static bool is_punch_hole_supported()
+	{
+
+		/* In this debugging mode, we act as if punch hole is supported,
+		and then skip any calls to actually punch a hole here.
+		In this way, Transparent Page Compression is still being tested. */
+		DBUG_EXECUTE_IF("ignore_punch_hole",
+			return(true);
+		);
+
+#if defined(HAVE_FALLOC_PUNCH_HOLE_AND_KEEP_SIZE) || defined(_WIN32)
+		return(true);
+#else
+		return(false);
+#endif /* HAVE_FALLOC_PUNCH_HOLE_AND_KEEP_SIZE || _WIN32 */
+	}
+
+        //bool will_encrypt_page()
+        //{
+          //return m_encryption.key != NULL;
+        //}
+
+private:
+	/* File system best block size */
+	uint32_t		m_block_size;
+
+	/** Request type bit flags */
+	uint16_t		m_type;
+
+	/** Compression algorithm */
+	Compression		m_compression;
+
+	/** Encryption algorithm */
+	Encryption		m_encryption;
+
+        bool m_is_page_zip_compressed;
+
+        ulint m_zip_page_physical_size;
+=======
+
+  /** Length of the original IO size.
+  For reads it is an expected uncompressed length.
+  For writes it is a length up to which the write is to be extended with a punch
+  hole, if supported. */
+  uint32_t m_original_size{};
+>>>>>>> tag/Percona-Server-8.0.28-19
 };
 
 /** @} */
@@ -1321,7 +2228,8 @@ an asynchronous I/O operation.
 @param[in]	file		Open file handle
 @param[out]	buf		buffer where to read
 @param[in]	offset		file offset where to read
-@param[in]	n		number of bytes to read
+@param[in]	n		how many bytes to read or write; this
+must not cross a file boundary; in AIO this must be a block size multiple
 @param[in]	read_only	if true read only mode checks are enforced
 @param[in,out]	m1		Message for the AIO handler, (can be used to
                                 identify a completed AIO operation); ignored
@@ -1832,24 +2740,21 @@ Requests an asynchronous i/o operation.
 @param[in]	type		IO request context
 @param[in]	aio_mode	IO mode
 @param[in]	name		Name of the file or path as NUL terminated
-                                string
+string
 @param[in]	file		Open file handle
 @param[out]	buf		buffer where to read
 @param[in]	offset		file offset where to read
-@param[in]	n		number of bytes to read
+@param[in]	n		how many bytes to read or write; this
+must not cross a file boundary; in AIO this must be a block size multiple
 @param[in]	read_only	if true read only mode checks are enforced
 @param[in,out]	m1		Message for the AIO handler, (can be used to
-                                identify a completed AIO operation); ignored
-                                if mode is OS_AIO_SYNC
+identify a completed AIO operation); ignored if mode is OS_AIO_SYNC
 @param[in,out]	m2		message for the AIO handler (can be used to
-                                identify a completed AIO operation); ignored
-                                if mode is OS_AIO_SYNC
+identify a completed AIO operation); ignored if mode is OS_AIO_SYNC
 @param[in]	should_buffer	Whether to buffer an aio request.
-                                AIO read ahead uses this. If you plan to
-                                use this parameter, make sure you remember to
-                                call os_aio_dispatch_read_array_submit()
-                                when you're ready to commit all your
-                                requests.
+AIO read ahead uses this. If you plan to use this parameter,
+make sure you remember to call os_aio_dispatch_read_array_submit()
+when you're ready to commit all your requests.
 @return DB_SUCCESS or error code */
 dberr_t os_aio_func(IORequest &type, AIO_mode aio_mode, const char *name,
                     pfs_os_file_t file, void *buf, os_offset_t offset, ulint n,
@@ -2102,10 +3007,10 @@ inline void file::Block::free(file::Block *obj) noexcept { os_free_block(obj); }
 /** Encrypt a page content when write it to disk.
 @param[in]	type		IO flags
 @param[out]	buf		buffer to read or write
-@param[in,out]	n		number of bytes to read/write, starting from
+@param[in]	n		number of bytes to read/write, starting from
                                 offset
 @return pointer to the encrypted page */
-file::Block *os_file_encrypt_page(const IORequest &type, void *&buf, ulint *n);
+file::Block *os_file_encrypt_page(const IORequest &type, void *&buf, ulint n);
 
 /** Allocate the buffer for IO on a transparently compressed table.
 @param[in]	type		IO flags
