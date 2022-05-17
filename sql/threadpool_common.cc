@@ -282,6 +282,17 @@ int threadpool_process_request(THD *thd)
   }
 
 end:
+
+#ifdef WITH_WSREP
+    /* Set the thd->wsrep_query_state back to the QUERY_IDLE state. */
+    if (WSREP_ON)
+    {
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      wsrep_thd_set_query_state(thd, QUERY_IDLE);
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    }
+#endif /* WITH_WSREP */
+
   if (!retval && !thd->m_server_idle) {
     MYSQL_SOCKET_SET_STATE(thd->get_protocol_classic()->get_vio()
                            ->mysql_socket, PSI_SOCKET_STATE_IDLE);
