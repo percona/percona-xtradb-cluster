@@ -769,10 +769,10 @@ int wsrep_show_ready(THD *, SHOW_VAR *var, char *buff) {
 void wsrep_ready_wait() {
   if (mysql_mutex_lock(&LOCK_wsrep_ready)) abort();
   while (!wsrep_ready) {
-    WSREP_INFO("Waiting to reach ready state");
+    WSREP_DEBUG("Waiting to reach ready state");
     mysql_cond_wait(&COND_wsrep_ready, &LOCK_wsrep_ready);
   }
-  WSREP_INFO("Ready state reached");
+  WSREP_DEBUG("Ready state reached");
   mysql_mutex_unlock(&LOCK_wsrep_ready);
 }
 
