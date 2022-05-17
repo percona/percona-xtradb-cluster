@@ -900,10 +900,6 @@ IF(MY_COMPILER_IS_GNU_OR_CLANG)
       ${CMAKE_CURRENT_BINARY_DIR}/sql_hints.yy.cc
       COMPILE_FLAGS "-Wno-free-nonheap-object")
   ENDIF()
-<<<<<<< HEAD
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
 ENDIF()
 
 IF(WIN32)
@@ -913,7 +909,6 @@ IF(WIN32)
   # conversion from 'uint' to 'Item *' of greater size
   ADD_COMPILE_FLAGS(range_optimizer/range_analysis.cc
     COMPILE_FLAGS "/wd4312")
->>>>>>> tag/Percona-Server-8.0.28-19
 ENDIF()
 
 MY_CHECK_CXX_COMPILER_FLAG("-fno-builtin-memcmp" HAVE_NO_BUILTIN_MEMCMP)

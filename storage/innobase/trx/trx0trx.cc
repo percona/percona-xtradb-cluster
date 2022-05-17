@@ -2862,12 +2862,16 @@ void wsrep_trx_print_locking(
       fputs(", FORCED ROLLBACK", f);
       goto state_ok;
     case TRX_STATE_ACTIVE:
-      fprintf(f, ", ACTIVE %lu sec",
-              (ulong)difftime(time(NULL), trx->start_time));
+      fprintf(f, ", ACTIVE %ld sec",
+              std::chrono::duration_cast<std::chrono::seconds>(
+                  std::chrono::system_clock::now() - trx->start_time.load())
+                  .count());
       goto state_ok;
     case TRX_STATE_PREPARED:
-      fprintf(f, ", ACTIVE (PREPARED) %lu sec",
-              (ulong)difftime(time(NULL), trx->start_time));
+      fprintf(f, ", ACTIVE (PREPARED) %ld sec",
+              std::chrono::duration_cast<std::chrono::seconds>(
+                  std::chrono::system_clock::now() - trx->start_time.load())
+                  .count());
       goto state_ok;
     case TRX_STATE_COMMITTED_IN_MEMORY:
       fputs(", COMMITTED IN MEMORY", f);

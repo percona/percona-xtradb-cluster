@@ -441,11 +441,6 @@ INSERT INTO global_suppressions VALUES
  */
  ("Manifest file '.*' is not read-only. For better security, please make sure that the file is read-only."),
 
-<<<<<<< HEAD
- /* TLS v1.0 and v1.1 deprecated */
- ("A deprecated TLS version TLSv1 is enabled for channel"),
- ("A deprecated TLS version TLSv1.1 is enabled for channel"),
-
  /*
    Warnings/errors seen while using group replication with Percona XtraDB Cluster
  */
@@ -471,13 +466,6 @@ INSERT INTO global_suppressions VALUES
  ("No suitable 'keyring_component_metadata_query' service"),
 
 
-||||||| merged common ancestors
- /* TLS v1.0 and v1.1 deprecated */
- ("A deprecated TLS version TLSv1 is enabled for channel"),
- ("A deprecated TLS version TLSv1.1 is enabled for channel"),
-
-=======
->>>>>>> tag/Percona-Server-8.0.28-19
  ("THE_LAST_SUPPRESSION");
 
 

@@ -1446,50 +1446,12 @@ void Query_logger::cleanup() {
   file_log_handler = nullptr;
 }
 
-<<<<<<< HEAD
-bool Query_logger::slow_log_write(
-    THD *thd, const char *query, size_t query_length,
-    struct System_status_var *query_start_status) {
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
 
-bool Query_logger::slow_log_write(THD *thd, const char *query,
-                                  size_t query_length)
-{
-||||||||| merged common ancestors
-
-bool Query_logger::slow_log_write(THD *thd, const char *query,
-                                  size_t query_length)
-{
-<<<<<<<<<<< Temporary merge branch 1
-<<<<<<<<<<< Temporary merge branch 1
-  DBUG_ASSERT(thd->enable_slow_log);
-||||||||||| 261d32555b5
-  DBUG_ASSERT(thd->enable_slow_log && opt_slow_log);
-===========
-  assert(thd->enable_slow_log && opt_slow_log);
->>>>>>>>>>> Temporary merge branch 2
-||||||||||| merged common ancestors
-<<<<<<<<<<<<< Temporary merge branch 1
-  DBUG_ASSERT(thd->enable_slow_log);
-||||||||||||| 261d32555b5
-  DBUG_ASSERT(thd->enable_slow_log && opt_slow_log);
-=============
-  assert(thd->enable_slow_log && opt_slow_log);
->>>>>>>>>>>>> Temporary merge branch 2
-===========
-=========
-bool Query_logger::slow_log_write(
-    THD *thd, const char *query, size_t query_length,
-    struct System_status_var *query_start_status) {
->>>>>>>>> Temporary merge branch 2
-=======
 bool Query_logger::slow_log_write(THD *thd, const char *query,
                                   size_t query_length,
                                   struct System_status_var *query_start_status,
                                   bool aggregate, ulonglong lock_usec,
                                   ulonglong exec_usec) {
->>>>>>> tag/Percona-Server-8.0.28-19
   assert(thd->enable_slow_log);
 
   if (!(*slow_log_handler_list)) return false;

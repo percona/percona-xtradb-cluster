@@ -763,12 +763,8 @@ ENDIF()
 INCLUDE(CMakePushCheckState)
 
 # Add macros
-<<<<<<< HEAD
 INCLUDE(wsrep-lib)
-||||||| merged common ancestors
-=======
 INCLUDE(add_custom_target)
->>>>>>> tag/Percona-Server-8.0.28-19
 INCLUDE(pkg-config)
 INCLUDE(character_sets)
 INCLUDE(cmake_parse_arguments)
@@ -1408,66 +1404,12 @@ FOREACH(BUILD_TYPE RELEASE RELWITHDEBINFO MINSIZEREL)
 ENDFOREACH()
 
 # Add safemutex for debug configurations
-<<<<<<< HEAD
 # PS-enabled SAFE_MUTEX (starting from 5.7.22) but PXC can't enable it.
 # PXC in 5.7 introduced PFS for some of the instruments that in galera
 # library but not for all since tracking of them is big overhead
 # with multiple layer callback involved.
 # SAFE_MUTEX should be enabled for all instrument or none.
 # Since PXC cause is mix-match latter become true for PXC.
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-FOREACH(LANG C CXX)
-  STRING_PREPEND(CMAKE_${LANG}_FLAGS_DEBUG "-DSAFE_MUTEX ")
-ENDFOREACH()
-
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-<<<<<<<<<<< Temporary merge branch 1
-||||||||||| merged common ancestors
-<<<<<<<<<<<<< Temporary merge branch 1
-===========
->>>>>>>>>>> Temporary merge branch 2
-FOREACH(LANG C CXX)
-  STRING_PREPEND(CMAKE_${LANG}_FLAGS_DEBUG "-DSAFE_MUTEX ")
-ENDFOREACH()
-<<<<<<<<<<< Temporary merge branch 1
-||||||||||| 261d32555b5
-IF(NOT WITH_INNODB_MEMCACHED)
-  FOREACH(LANG C CXX)
-      SET(CMAKE_${LANG}_FLAGS_DEBUG
-          "${CMAKE_${LANG}_FLAGS_DEBUG} -DSAFE_MUTEX")
-  ENDFOREACH()
-ENDIF()
-===========
-IF(NOT WITH_INNODB_MEMCACHED)
-  FOREACH(LANG C CXX)
-    STRING_PREPEND(CMAKE_${LANG}_FLAGS_DEBUG "-DSAFE_MUTEX ")
-  ENDFOREACH()
-ENDIF()
->>>>>>>>>>> Temporary merge branch 2
-||||||||||| merged common ancestors
-||||||||||||| 261d32555b5
-IF(NOT WITH_INNODB_MEMCACHED)
-  FOREACH(LANG C CXX)
-      SET(CMAKE_${LANG}_FLAGS_DEBUG
-          "${CMAKE_${LANG}_FLAGS_DEBUG} -DSAFE_MUTEX")
-  ENDFOREACH()
-ENDIF()
-=============
-IF(NOT WITH_INNODB_MEMCACHED)
-  FOREACH(LANG C CXX)
-    STRING_PREPEND(CMAKE_${LANG}_FLAGS_DEBUG "-DSAFE_MUTEX ")
-  ENDFOREACH()
-ENDIF()
->>>>>>>>>>>>> Temporary merge branch 2
-===========
->>>>>>>>>>> Temporary merge branch 2
-
-=========
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> tag/Percona-Server-8.0.28-19
 # Enable debug sync for debug builds.
 FOREACH(LANG C CXX)
   STRING_PREPEND(CMAKE_${LANG}_FLAGS_DEBUG "-DENABLED_DEBUG_SYNC ")
@@ -2038,14 +1980,10 @@ ADD_SUBDIRECTORY(mysys)
 ADD_SUBDIRECTORY(libmysql)
 ADD_SUBDIRECTORY(libbinlogevents)
 ADD_SUBDIRECTORY(libbinlogstandalone)
-<<<<<<< HEAD
 IF(WITH_WSREP)
    ADD_SUBDIRECTORY(wsrep-lib)
 ENDIF()
-||||||| merged common ancestors
-=======
 ADD_SUBDIRECTORY(libchangestreams)
->>>>>>> tag/Percona-Server-8.0.28-19
 
 IF(NOT WITHOUT_SERVER)
   IF(WITH_UNIT_TESTS)

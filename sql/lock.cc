@@ -1089,12 +1089,7 @@ bool Global_read_lock::lock_global_read_lock(THD *thd) {
 #else
     MDL_REQUEST_INIT(&mdl_request, MDL_key::GLOBAL, "", "", MDL_SHARED,
                      MDL_EXPLICIT);
-<<<<<<< HEAD
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-=======
->>>>>>> tag/Percona-Server-8.0.28-19
 
     /* Increment static variable first to signal innodb memcached server
        to release mdl locks held by it */

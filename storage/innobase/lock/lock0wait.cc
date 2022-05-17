@@ -458,9 +458,9 @@ void lock_wait_suspend_thread(que_thr_t *thr) /*!< in: query thread associated
     return;
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
-  if (lock_wait_timeout < 100000000 && wait_time > (double)lock_wait_timeout) {
+  if (lock_wait_timeout < std::chrono::seconds(100000000) &&
+      wait_time > lock_wait_timeout) {
     if (!wsrep_on(trx->mysql_thd) ||
         (!wsrep_is_BF_lock_timeout(trx) && trx->error_state != DB_DEADLOCK)) {
       trx->error_state = DB_LOCK_WAIT_TIMEOUT;
@@ -471,15 +471,8 @@ void lock_wait_suspend_thread(que_thr_t *thr) /*!< in: query thread associated
     }
   }
 #else
-  if (lock_wait_timeout < 100000000 && wait_time > (double)lock_wait_timeout &&
-      !trx_is_high_priority(trx)) {
-||||||| merged common ancestors
-  if (lock_wait_timeout < 100000000 && wait_time > (double)lock_wait_timeout &&
-      !trx_is_high_priority(trx)) {
-=======
   if (lock_wait_timeout < std::chrono::seconds(100000000) &&
       wait_time > lock_wait_timeout && !trx_is_high_priority(trx)) {
->>>>>>> tag/Percona-Server-8.0.28-19
     trx->error_state = DB_LOCK_WAIT_TIMEOUT;
     if (srv_print_lock_wait_timeout_info)
       print_lock_wait_timeout(*trx, blocking, blocking_count);

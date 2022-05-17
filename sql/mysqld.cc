@@ -3074,7 +3074,7 @@ static void clean_up_mutexes() {
   mysql_mutex_destroy(&LOCK_admin_tls_ctx_options);
   mysql_mutex_destroy(&LOCK_partial_revokes);
   mysql_mutex_destroy(&LOCK_authentication_policy);
-<<<<<<< HEAD
+  mysql_mutex_destroy(&LOCK_global_conn_mem_limit);
 #ifdef WITH_WSREP
   mysql_mutex_destroy(&LOCK_wsrep_ready);
   mysql_cond_destroy(&COND_wsrep_ready);
@@ -3094,10 +3094,6 @@ static void clean_up_mutexes() {
   mysql_mutex_destroy(&LOCK_wsrep_SR_store);
   mysql_mutex_destroy(&LOCK_wsrep_alter_tablespace);
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
-  mysql_mutex_destroy(&LOCK_global_conn_mem_limit);
->>>>>>> tag/Percona-Server-8.0.28-19
 }
 
 /****************************************************************************
@@ -6039,7 +6035,8 @@ static int init_thread_environment() {
                    MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_authentication_policy, &LOCK_authentication_policy,
                    MY_MUTEX_INIT_FAST);
-<<<<<<< HEAD
+  mysql_mutex_init(key_LOCK_global_conn_mem_limit, &LOCK_global_conn_mem_limit,
+                   MY_MUTEX_INIT_FAST);
 #ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_ready, &LOCK_wsrep_ready, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_ready, &COND_wsrep_ready);
@@ -6068,11 +6065,6 @@ static int init_thread_environment() {
   mysql_mutex_init(key_LOCK_wsrep_alter_tablespace,
                    &LOCK_wsrep_alter_tablespace, MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-=======
-  mysql_mutex_init(key_LOCK_global_conn_mem_limit, &LOCK_global_conn_mem_limit,
-                   MY_MUTEX_INIT_FAST);
->>>>>>> tag/Percona-Server-8.0.28-19
   return 0;
 }
 
@@ -7732,7 +7724,6 @@ static int init_server_components() {
     mysql_mutex_unlock(log_lock);
   }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
   /* In wsrep_recovery mode, PXC avoid creation of new binlog file for
   the reason mentioned above. In light of the said flow avoid purge
@@ -7763,100 +7754,6 @@ static int init_server_components() {
         LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--expire_logs_days");
       if (binlog_space_limit)
         LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-space-limit");
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-  if (opt_myisam_log)
-    (void) mi_log(1);
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-<<<<<<<<<<< Temporary merge branch 1
-#ifdef HAVE_REPLICATION
-  if (opt_bin_log && expire_logs_days)
-  {
-    time_t purge_time= server_start_time - expire_logs_days*24*60*60;
-    if (purge_time >= 0)
-      mysql_bin_log.purge_logs_before_date(purge_time, true);
-  }
-  if (opt_bin_log && max_binlog_files)
-  {
-    mysql_bin_log.purge_logs_maximum_number(max_binlog_files);
-  }
-  if (opt_bin_log && binlog_space_limit)
-  {
-    mysql_bin_log.purge_logs_by_size(true);
-  }
-#endif
-
-||||||||||| 261d32555b5
-#ifdef HAVE_REPLICATION
-  if (opt_bin_log && expire_logs_days)
-  {
-    time_t purge_time= server_start_time - expire_logs_days*24*60*60;
-    if (purge_time >= 0)
-      mysql_bin_log.purge_logs_before_date(purge_time, true);
-  }
-#endif
-
-===========
->>>>>>>>>>> Temporary merge branch 2
-||||||||||| merged common ancestors
-<<<<<<<<<<<<< Temporary merge branch 1
-#ifdef HAVE_REPLICATION
-  if (opt_bin_log && expire_logs_days)
-  {
-    time_t purge_time= server_start_time - expire_logs_days*24*60*60;
-    if (purge_time >= 0)
-      mysql_bin_log.purge_logs_before_date(purge_time, true);
-  }
-  if (opt_bin_log && max_binlog_files)
-  {
-    mysql_bin_log.purge_logs_maximum_number(max_binlog_files);
-  }
-  if (opt_bin_log && binlog_space_limit)
-  {
-    mysql_bin_log.purge_logs_by_size(true);
-  }
-#endif
-
-||||||||||||| 261d32555b5
-#ifdef HAVE_REPLICATION
-  if (opt_bin_log && expire_logs_days)
-  {
-    time_t purge_time= server_start_time - expire_logs_days*24*60*60;
-    if (purge_time >= 0)
-      mysql_bin_log.purge_logs_before_date(purge_time, true);
-  }
-#endif
-
-=============
->>>>>>>>>>>>> Temporary merge branch 2
-===========
->>>>>>>>>>> Temporary merge branch 2
-  if (opt_myisam_log)
-    (void) mi_log(1);
-=========
-  /*
-    When we pass non-zero values for both expire_logs_days and
-    binlog_expire_logs_seconds at the server start-up, the value of
-    expire_logs_days will be ignored and only binlog_expire_logs_seconds
-    will be used.
-  */
-  if (binlog_expire_logs_seconds_supplied && expire_logs_days_supplied) {
-    if (binlog_expire_logs_seconds != 0 && expire_logs_days != 0) {
-      LogErr(WARNING_LEVEL, ER_EXPIRE_LOGS_DAYS_IGNORED);
-      expire_logs_days = 0;
-=======
-  /*
-    When we pass non-zero values for both expire_logs_days and
-    binlog_expire_logs_seconds at the server start-up, the value of
-    expire_logs_days will be ignored and only binlog_expire_logs_seconds
-    will be used.
-  */
-  if (binlog_expire_logs_seconds_supplied && expire_logs_days_supplied) {
-    if (binlog_expire_logs_seconds != 0 && expire_logs_days != 0) {
-      LogErr(WARNING_LEVEL, ER_EXPIRE_LOGS_DAYS_IGNORED);
-      expire_logs_days = 0;
->>>>>>> tag/Percona-Server-8.0.28-19
     }
 #ifdef WITH_WSREP
   }
@@ -13260,8 +13157,8 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_monitor_info_run_lock, "Source_IO_monitor::run_lock", 0, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_delegate_connection_mutex, "LOCK_delegate_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_group_replication_connection_mutex, "LOCK_group_replication_connection_mutex", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
-<<<<<<< HEAD
-  { &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"}
+  { &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"},
+  { &key_LOCK_global_conn_mem_limit, "LOCK_global_conn_mem_limit", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
 #ifdef WITH_WSREP
   ,
   { &key_LOCK_wsrep_ready, "LOCK_wsrep_ready", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
@@ -13284,12 +13181,6 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_thd_queue, "LOCK_wsrep_thd_queue", 0, 0, PSI_DOCUMENT_ME},
   { &key_LOCK_wsrep_alter_tablespace, "LOCK_wsrep_alter_tablespace", 0, 0, PSI_DOCUMENT_ME}
 #endif /* WITH_WSREP */
-||||||| merged common ancestors
-  { &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"}
-=======
-{ &key_LOCK_authentication_policy, "LOCK_authentication_policy", PSI_FLAG_SINGLETON, 0, "A lock to ensure execution of CREATE USER or ALTER USER sql and SET @@global.authentication_policy variable are serialized"},
-  { &key_LOCK_global_conn_mem_limit, "LOCK_global_conn_mem_limit", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}
->>>>>>> tag/Percona-Server-8.0.28-19
 };
 /* clang-format on */
 

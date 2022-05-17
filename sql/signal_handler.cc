@@ -81,22 +81,10 @@ static std::atomic<bool> s_fatal_info_printed{false};
   It may be called as part of the signal handler. This fact limits library calls
   that we can perform and much more, @see handle_fatal_signal
 
-<<<<<<< HEAD
-/*
-  The wsrep subsystem has their its own actions
-  which need be performed before exiting:
-*/
-#ifdef WITH_WSREP
-  wsrep_handle_fatal_signal(sig);
-#endif /* WITH_WSREP */
-
-||||||| merged common ancestors
-=======
   @param sig Signal number
 */
 void print_fatal_signal(int sig) {
   s_fatal_info_printed = true;
->>>>>>> tag/Percona-Server-8.0.28-19
 #ifdef _WIN32
   SYSTEMTIME utc_time;
   GetSystemTime(&utc_time);
@@ -218,6 +206,14 @@ extern "C" void handle_fatal_signal(int sig) {
   }
 
   s_handler_being_processed = true;
+
+/*
+  The wsrep subsystem has their its own actions
+  which need be performed before exiting:
+*/
+#ifdef WITH_WSREP
+  wsrep_handle_fatal_signal(sig);
+#endif /* WITH_WSREP */
 
   if (!s_fatal_info_printed) {
     print_fatal_signal(sig);

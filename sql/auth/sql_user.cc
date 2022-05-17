@@ -2151,7 +2151,6 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
     List<LEX_USER> user_list;
     user_list.push_back(lex_user);
     acl_notify_htons(thd, SQLCOM_SET_PASSWORD, &user_list, &users);
-<<<<<<< HEAD
   }
 
 #ifdef WITH_WSREP
@@ -2161,97 +2160,6 @@ bool change_password(THD *thd, LEX_USER *lex_user, const char *new_password,
   }
 #endif /* WITH_WSREP */
 
-||||||| merged common ancestors
->>>>>>>>> Temporary merge branch 2
-  }
-
-<<<<<<<<< Temporary merge branch 1
-  assert(acl_user->plugin.length != 0);
-  
-  if (!(combo=(LEX_USER*) thd->alloc(sizeof(st_lex_user))))
-    DBUG_RETURN(1);
-
-  combo->user.str= user;
-  combo->host.str= host;
-  combo->user.length= strlen(user);
-  combo->host.length= strlen(host);
-
-  thd->make_lex_string(&combo->user,
-                       combo->user.str, strlen(combo->user.str), 0);
-  thd->make_lex_string(&combo->host,
-                       combo->host.str, strlen(combo->host.str), 0);
-
-  combo->plugin= EMPTY_CSTR;
-  combo->auth.str= new_password;
-  combo->auth.length= new_password_len;
-  combo->uses_identified_by_clause= true;
-  combo->uses_identified_with_clause= false;
-  combo->uses_identified_by_password_clause= false;
-  combo->uses_authentication_string_clause= false;
-  /* set default values */
-  thd->lex->ssl_type= SSL_TYPE_NOT_SPECIFIED;
-  memset(&(thd->lex->mqh), 0, sizeof(thd->lex->mqh));
-  thd->lex->alter_password.update_password_expired_column= false;
-  thd->lex->alter_password.use_default_password_lifetime= true;
-  thd->lex->alter_password.expire_after_days= 0;
-  thd->lex->alter_password.update_account_locked_column= false;
-  thd->lex->alter_password.account_locked= false;
-  thd->lex->alter_password.update_password_expired_fields= false;
-||||||||| merged common ancestors
-<<<<<<<<<<< Temporary merge branch 1
-  DBUG_ASSERT(acl_user->plugin.length != 0);
-||||||||||| 261d32555b5
-  DBUG_ASSERT(acl_user->plugin.length != 0);
-===========
-||||||||||| merged common ancestors
-  DBUG_ASSERT(acl_user->plugin.length != 0);
-||||||||||||| 261d32555b5
-  DBUG_ASSERT(acl_user->plugin.length != 0);
-=============
-===========
->>>>>>>>>>> Temporary merge branch 2
-  assert(acl_user->plugin.length != 0);
-<<<<<<<<<<< Temporary merge branch 1
->>>>>>>>>>> Temporary merge branch 2
-||||||||||| merged common ancestors
->>>>>>>>>>>>> Temporary merge branch 2
-===========
->>>>>>>>>>> Temporary merge branch 2
-  
-  if (!(combo=(LEX_USER*) thd->alloc(sizeof(st_lex_user))))
-    DBUG_RETURN(1);
-
-  combo->user.str= user;
-  combo->host.str= host;
-  combo->user.length= strlen(user);
-  combo->host.length= strlen(host);
-
-  thd->make_lex_string(&combo->user,
-                       combo->user.str, strlen(combo->user.str), 0);
-  thd->make_lex_string(&combo->host,
-                       combo->host.str, strlen(combo->host.str), 0);
-
-  combo->plugin= EMPTY_CSTR;
-  combo->auth.str= new_password;
-  combo->auth.length= new_password_len;
-  combo->uses_identified_by_clause= true;
-  combo->uses_identified_with_clause= false;
-  combo->uses_identified_by_password_clause= false;
-  combo->uses_authentication_string_clause= false;
-  /* set default values */
-  thd->lex->ssl_type= SSL_TYPE_NOT_SPECIFIED;
-  memset(&(thd->lex->mqh), 0, sizeof(thd->lex->mqh));
-  thd->lex->alter_password.update_password_expired_column= false;
-  thd->lex->alter_password.use_default_password_lifetime= true;
-  thd->lex->alter_password.expire_after_days= 0;
-  thd->lex->alter_password.update_account_locked_column= false;
-  thd->lex->alter_password.account_locked= false;
-  thd->lex->alter_password.update_password_expired_fields= false;
-=========
-=======
-  }
-
->>>>>>> tag/Percona-Server-8.0.28-19
   return result || commit_result;
 }
 

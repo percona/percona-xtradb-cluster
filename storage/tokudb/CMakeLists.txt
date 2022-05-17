@@ -27,7 +27,7 @@ SET (WITH_TOKUDB 0)
 
 IF (NOT WITH_TOKUDB)
 #  MESSAGE (STATUS "Not building with TokuDB storage engine, you must specify -DWITH_TOKUDB=1|ON|FORCE to cmake in order to build with TokuDB.")
-#  RETURN ()
+  RETURN ()
 ELSE ()
   MESSAGE (STATUS "Building with TokuDB storage engine = " ${WITH_TOKUDB})
   IF (WITH_TOKUDB STREQUAL "FORCE")

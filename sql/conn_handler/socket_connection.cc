@@ -1463,8 +1463,7 @@ void Mysqld_socket_listener::close_listener() {
     being listened is not included in the m_socket_map. Instead, this socket
     referenced by the data member m_admin_interface_listen_socket.
   */
-<<<<<<< HEAD
-
+#ifdef WITH_WSREP
   /*
     See the logic in setup_listener()
     Thread was spawned only if both --admin-address is specified
@@ -1472,12 +1471,10 @@ void Mysqld_socket_listener::close_listener() {
    */
   if (!m_admin_bind_address.address.empty() &&
       m_use_separate_thread_for_admin) {
-||||||| merged common ancestors
+#else
   if (m_use_separate_thread_for_admin) {
-=======
-  if (m_use_separate_thread_for_admin) {
+#endif /* WITH_WSREP */
     if (admin_socket_thread_id != my_thread_handle{}) {
->>>>>>> tag/Percona-Server-8.0.28-19
 #ifdef _WIN32
       /*
         For Windows, first close the socket referenced by the data member
