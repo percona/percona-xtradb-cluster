@@ -341,7 +341,7 @@ allows restarting the node to rejoin by using :term:`IST`.
    Percona Database Performance Blog:
       - `All You Need to Know About GCache (Galera-Cache) <https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/>`_
       - `Want IST Not SST for Node Rejoins? We Have a Solution! <https://www.percona.com/blog/2018/02/13/no-sst-node-rejoins/>`_
-   
+
 The :variable:`gcache.freeze_purge_at_seqno` variable takes three values:
 
 -1 (default)
@@ -354,7 +354,7 @@ A valid seqno in gcache
    The freeze purge of write-sets is no less than the smallest seqno currently
    in gcache. Using this value results in freezing the gcache-purge instantly.
    Use this value if selecting a valid seqno in gcache is difficult.
-   
+
 .. variable:: gcache.keep_pages_count
 
    :cli: Yes
@@ -432,10 +432,28 @@ size of the disk. Pages are prefixed by gcache.page.
 
 .. seealso::
 
-   |galera| Documentation: gcache.page_size
+   Galera Documentation: gcache.page_size
       https://galeracluster.com/library/documentation/galera-parameters.html#gcache-page-size
-   |percona| Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
+   Percona Database Performance Blog: All You Need to Know About GCache (Galera-Cache)
       https://www.percona.com/blog/2016/11/16/all-you-need-to-know-about-gcache-galera-cache/
+
+.. variable:: gcache.recover
+
+   :cli: No
+   :conf: Yes
+   :scope: Global
+   :dyn: No
+   :default: No
+
+Attempts to recover a node's gcache file to a usable state on startup. If the node can successfully
+recover the gcache file, the node can provide IST to the remaining nodes. This ability can 
+reduce the time needed to bring up the cluster. 
+
+An example of setting the value to yes in the configuration file:
+
+.. code-block:: text
+
+   wsrep_provider_options="gcache.recover=yes"
 
 
 .. variable:: gcache.size
@@ -450,6 +468,47 @@ Size of the transaction cache for Galera replication. This defines the size of
 the :file:`galera.cache` file which is used as source for |IST|. The bigger the
 value of this variable, the better are chances that the re-joining node will
 get IST instead of |SST|.
+
+.. variable:: gcomm.thread_prio
+
+Raises the gcomm thread priority to a higher level. Use this variable when the gcomm thread does not receive enough CPU time due to other competing threads. For example, if the gcomm threads are not frequently run, a node may drop from the cluster because of the timeout.
+
+The format for this variable is: <policy>:<priority>. The policy value supports the following options: ``other``, ``fifo``, and ``rr``. The priority value is an
+integer. 
+
+.. note::
+
+   Setting a priority value of 99 is not recommended. This value blocks system threads. 
+
+An example of the variable:
+
+.. sourcecode:: text
+
+   wsrep_provider_options="gcomm.thread_prio=fifo:3"
+
+The description of the ``policy`` parameter follows:
+
+.. list-table::
+   :widths: 15 60
+   :header-rows: 1
+
+   * - Option
+     - Description
+   * - other
+     - This policy is the default Linux time-sharing scheduling. Threads run until one of the following events occur:
+
+         * Thread exit
+
+         * I/O request blocks the thread 
+
+         * Higher priority thread preempts the thread
+   * - fifo
+     - The policy uses a First-in First-out (FIFO) scheduling. These threads always immediately preempt any currently running other, batch or idle threads. The threads are run in a FIFO manner until completion, unless a higher priority thread preempts or blocks them. This policy does not use time slicing.
+   * - rr
+     -    The threads use round-robin scheduling. This thread always preempts a currently running other, batch or idle thread. The scheduler runs threads with the same priority for a fixed time in a round-robin style. When this time period is exceeded, the scheduler stops the thread and moves it to the end of the list, and runs another round-robin thread with the same priority.
+
+.. seealso:: For information, see the `Galera Cluster documentation <https://galeracluster.com/library/documentation/galera-parameters.html#gcomm-thread-prio>`__
+
 
 .. variable:: gcs.fc_debug
 
@@ -476,7 +535,7 @@ the replica queue drops below :variable:`gcs.fc_factor` *
 
 .. variable:: gcs.fc_limit
 
-   :version: :rn:`5.7.17-29.20`: Default value changed from ``16`` to ``100`` 
+   :version: :rn:`5.7.17-29.20`: Default value changed from ``16`` to ``100``
    :cli: Yes
    :conf: Yes
    :scope: Global

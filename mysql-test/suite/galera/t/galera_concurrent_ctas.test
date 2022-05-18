@@ -1,0 +1,39 @@
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+SET SESSION wsrep_sync_wait = 0;
+
+# sync point for first transaction
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_2
+CREATE TABLE t1 as SELECT SLEEP(0.1);
+
+# wait for first transaction to reach sync point
+--connection node_1a
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+--connection node_1
+--send CREATE TABLE t1 as SELECT SLEEP(0.2);
+
+--sleep 5
+
+# release first transaction
+--connection node_1a
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_signal_sync_point.inc
+--source include/galera_clear_sync_point.inc
+
+--connection node_1
+--error ER_LOCK_DEADLOCK
+--reap
+
+
+DROP TABLE t1;
+
+

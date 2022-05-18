@@ -8905,6 +8905,13 @@ int handler::ha_update_row(const uchar *old_data, uchar *new_data)
   if (unlikely((error= binlog_log_row(table, old_data, new_data, log_func))))
     DBUG_RETURN(error);
   rows_changed++;
+#ifdef WITH_WSREP
+  THD* thd = table->in_use;
+  if (WSREP(thd) && table->s->primary_key == MAX_KEY)
+    {
+      thd->wsrep_PA_safe= false;
+    }
+#endif /* WITH_WSREP */
   DBUG_RETURN(0);
 }
 
@@ -8939,6 +8946,13 @@ int handler::ha_delete_row(const uchar *buf)
   if (unlikely((error= binlog_log_row(table, buf, 0, log_func))))
     return error;
   rows_changed++;
+#ifdef WITH_WSREP
+  THD* thd = table->in_use;
+  if (WSREP(thd) && table->s->primary_key == MAX_KEY)
+    {
+      thd->wsrep_PA_safe= false;
+    }
+#endif /* WITH_WSREP */
   return 0;
 }
 

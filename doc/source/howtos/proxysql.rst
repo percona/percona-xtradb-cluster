@@ -67,7 +67,7 @@ For this tutorial, install |PXC| on Node 4:
 
   .. code-block:: bash
 
-     root@proxysql:~# apt-get install percona-xtradb-cluster-client-5.7
+     root@proxysql:~# apt install percona-xtradb-cluster-client-5.7
 
 * On Red Hat Enterprise Linux or CentOS:
 
@@ -462,7 +462,7 @@ You can install ``sysbench`` from Percona software repositories:
 
   .. code-block:: bash
 
-     root@proxysql:~# apt-get install sysbench
+     root@proxysql:~# apt install sysbench
 
 * For Red Hat Enterprise Linux or CentOS
 

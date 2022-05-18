@@ -17,7 +17,7 @@ software, run the corresponding command:
 
 .. code-block:: bash
 
-   $ sudo apt-get install proxysql
+   $ sudo apt install proxysql
 
 * On Red Hat Enterprise Linux or CentOS:
 

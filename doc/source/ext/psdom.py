@@ -61,7 +61,7 @@ class PSschemaObject(ObjectDescription):
         #         modname=None, classname=None)
         #     pnode = tnode
         #     signode += pnode
-        
+
         if len(ws) > 2:
             dbname, tablename, columnname = ws
             name = columnname
@@ -74,7 +74,7 @@ class PSschemaObject(ObjectDescription):
                 signode['table'] = tablename
                 signode += addnodes.desc_addname(dbname, dbname)
                 signode += addnodes.desc_name(tablename, tablename)
-                # fullname = dbname + "." + tablename 
+                # fullname = dbname + "." + tablename
                 fullname = tablename
             if ot == 'column':
                 tablename, columnname = ws
@@ -142,7 +142,7 @@ class PSschemaObject(ObjectDescription):
 
         indextext = self.get_index_text(name)
         if indextext:
-            self.indexnode['entries'].append(('single', indextext, name, '', None))
+            self.indexnode['entries'].append(('single', indextext, name, '',None))
 
 
 class PSconfigObject(ObjectDescription):
@@ -173,8 +173,6 @@ class PSconfigObject(ObjectDescription):
             return _('%s (option)') % name
         elif self.objtype == 'variable':
             return _('%s (variable)') % name
-        elif self.objtype == 'command':
-            return _('%s (command)') % name
         else:
             return ''
 
@@ -326,7 +324,6 @@ class PerconaServerDomain(Domain):
         'column':    ObjType(l_('column'),   'column'),
         'option':    ObjType(l_('option'),   'option'),
         'variable':  ObjType(l_('variable'), 'data'),
-        'command':  ObjType(l_('command'), 'command'),
     }
 
     directives = {
@@ -335,7 +332,6 @@ class PerconaServerDomain(Domain):
         'column':   PSColumn,
         'option':   PSVariable,
         'variable': PSVariable,
-        'command':  PSVariable,
         'rn':       PSReleaseNotes
     }
     roles = {
@@ -344,7 +340,6 @@ class PerconaServerDomain(Domain):
         'column':   PSXRefRole(),
         'option':   PSXRefRole(),
         'variable': PSXRefRole(),
-        'command':  PSXRefRole(),
         'rn': PSXRefRole(),
     }
     initial_data = {

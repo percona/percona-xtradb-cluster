@@ -61,8 +61,8 @@ To upgrade the cluster, follow these steps for each node:
 
      .. code-block:: bash
 
-        $ sudo apt-get remove percona-xtrabackup* percona-xtradb-cluster*
-        $ sudo apt-get install percona-xtradb-cluster-57
+        $ sudo apt remove percona-xtrabackup* percona-xtradb-cluster*
+        $ sudo apt install percona-xtradb-cluster-57
 
 #. In case of Debian or Ubuntu,
    the ``mysql`` service starts automatically after install.
@@ -180,7 +180,7 @@ To upgrade the cluster, follow these steps for each node:
 
      .. code-block:: bash
 
-        $ sudo apt-get install --only-upgrade percona-xtradb-cluster-57
+        $ sudo apt install --only-upgrade percona-xtradb-cluster-57
 
 #. In case of Debian or Ubuntu,
    the ``mysql`` service starts automatically after install.

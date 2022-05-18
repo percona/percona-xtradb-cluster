@@ -33,7 +33,7 @@ Installation
 
 .. code-block:: bash
 
-  root@ubuntu:~# apt-get install percona-xtradb-cluster-garbd-5.7
+  root@ubuntu:~# apt install percona-xtradb-cluster-garbd-5.7
 
 on Debian/Ubuntu distributions, or:
 

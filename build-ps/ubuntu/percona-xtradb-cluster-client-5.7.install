@@ -9,3 +9,5 @@ usr/bin/mysqlimport
 usr/bin/mysqlpump
 usr/bin/mysqlshow
 usr/bin/mysqlslap
+usr/bin/mysql_config_editor
+usr/share/man/man1/mysql_config_editor.1
