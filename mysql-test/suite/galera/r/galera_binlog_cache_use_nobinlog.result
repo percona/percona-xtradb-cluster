@@ -1,0 +1,16 @@
+CREATE TABLE `t1` (
+`i` int NOT NULL AUTO_INCREMENT,
+`s` TEXT DEFAULT NULL,
+PRIMARY KEY (`i`)
+) ENGINE=InnoDB;
+INSERT INTO `t1` (s) VALUES (REPEAT('a',40000));
+INSERT INTO `t1` (s) VALUES (REPEAT('b',40000));
+include/assert.inc [Binlog_cache_use should be 0]
+include/assert.inc [Binlog_cache_disk_use should be 0]
+SHOW GLOBAL STATUS LIKE '%binlog%cache%';
+Variable_name	Value
+Binlog_cache_disk_use	0
+Binlog_cache_use	0
+Binlog_stmt_cache_disk_use	0
+Binlog_stmt_cache_use	0
+DROP TABLE t1;

@@ -178,6 +178,7 @@ FILTER=(-f '- /lost+found'
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
 
+    RSYNC_CONN_TIMEOUT="--contimeout $WSREP_SST_DONOR_TIMEOUT"
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
 
@@ -221,10 +222,13 @@ then
         fi
 
         wsrep_log_info "Starting rsync of data-dir............"
+        COMMON_RSYNC_OPTS="--owner --group --perms --links --specials\
+                           --ignore-times --inplace --delete --quiet \
+                           $RSYNC_CONN_TIMEOUT"
+
         # first, the normal directories, so that we can detect incompatible protocol
         RC=0
-        rsync --owner --group --perms --links --specials \
-              --ignore-times --inplace --dirs --delete --quiet \
+        rsync $COMMON_RSYNC_OPTS --dirs \
               $WHOLE_FILE_OPT "${FILTER[@]}" "$WSREP_SST_OPT_DATA/" \
               rsync://$WSREP_SST_OPT_ADDR >&2 || RC=$?
 
@@ -248,8 +252,7 @@ then
         fi
 
         # second, we transfer InnoDB log files
-        rsync --owner --group --perms --links --specials \
-              --ignore-times --inplace --dirs --delete --quiet \
+        rsync $COMMON_RSYNC_OPTS --dirs \
               $WHOLE_FILE_OPT -f '+ /ib_logfile[0-9]*' -f '- **' "$WSREP_LOG_DIR/" \
               rsync://$WSREP_SST_OPT_ADDR-log_dir >&2 || RC=$?
 
@@ -284,8 +287,7 @@ then
 
         find . -maxdepth 1 -mindepth 1 -type d -not -name "lost+found" \
              -print0 | xargs -I{} -0 -P $count \
-             rsync --owner --group --perms --links --specials \
-             --ignore-times --inplace --recursive --delete --quiet \
+             rsync $COMMON_RSYNC_OPTS --recursive \
              $WHOLE_FILE_OPT --exclude '*/ib_logfile*' "$WSREP_SST_OPT_DATA"/{}/ \
              rsync://$WSREP_SST_OPT_ADDR/{} >&2 || RC=$?
 
@@ -349,7 +351,7 @@ cat << EOF > "$RSYNC_CONF"
 pid file = $RSYNC_PID
 use chroot = no
 read only = no
-timeout = 300
+timeout = $WSREP_SST_JOINER_TIMEOUT
 transfer logging = true
 log file = $RSYNC_LOG_FILE
 log format = %o %a file:%f %l

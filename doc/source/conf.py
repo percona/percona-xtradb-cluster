@@ -281,13 +281,13 @@ htmlhelp_basename = 'PerconaXtraDBClusterDoc'
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
   ('index', 'PerconaXtraDBCluster-5.7.tex', u'Percona XtraDB Cluster Documentation',
-   u'Percona LLC and/or its affiliates 2009-2021', 'manual'),
+   u'Percona LLC and/or its affiliates 2009-2022', 'manual'),
   ]
 
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
-latex_logo = 'percona-logo.jpg'
+latex_logo = 'percona-logo-color.png'
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
@@ -316,7 +316,7 @@ latex_toplevel_sectioning = 'part'
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'perconaxtradbcluster', u'Percona XtraDB Cluster Documentation',
-     [u'Percona LLC and/or its affiliates 2009-2021'], 1)
+     [u'Percona LLC and/or its affiliates 2009-2022'], 1)
     ]
 
 
