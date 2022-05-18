@@ -106,3 +106,11 @@ The following limitations apply to |PXC|:
 
   * A DML on the same table from another session
 
+Do not use one or more dot characters (.) when defining the values for the following variables:
+
+* `log_bin <https://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#option_mysqld_log-bin>`__  
+
+* `log_bin_index <https://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log html#option_mysqld_log-bin-index>`__
+
+MySQL and **XtraBackup** handles the value in different ways and this difference causes unpredictable behavior.
+
