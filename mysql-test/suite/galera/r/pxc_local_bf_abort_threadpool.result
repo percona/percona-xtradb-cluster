@@ -1,0 +1,16 @@
+SELECT @@thread_handling;
+@@thread_handling
+pool-of-threads
+CREATE TABLE t1(i INT PRIMARY KEY);
+INSERT INTO t1 VALUES (1),(2),(3);
+BEGIN;
+SELECT * FROM t1 FOR UPDATE;
+i
+1
+2
+3
+TRUNCATE TABLE t1;
+SELECT * FROM t1;
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+include/assert.inc [wsrep_local_bf_aborts has been incremented once]
+DROP TABLE t1;

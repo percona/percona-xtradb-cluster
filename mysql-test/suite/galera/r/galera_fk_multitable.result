@@ -1,17 +1,23 @@
 CREATE TABLE t0 (
 f0 INT PRIMARY KEY
-);
+) engine=innodb;
 CREATE TABLE t1 (
 f1 INT PRIMARY KEY,
 f0 INTEGER,
 FOREIGN KEY (f0)
 REFERENCES t0(f0)
 ON DELETE CASCADE
-);
+) engine=innodb;
 INSERT INTO t0 VALUES (0), (1);
 INSERT INTO t1 VALUES (0, 0);
 INSERT INTO t1 VALUES (1, 0);
-DELETE t0.*, t1.* FROM t0, t1 WHERE t0.f0 = 0 AND t1.f1 = 0;
+DELETE t0.*, t1.* FROM t0, t1 WHERE (t0.f0 = 0 AND t1.f1 = 0);
+SELECT COUNT(*) = 1 FROM t0;
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 0 FROM t1;
+COUNT(*) = 0
+1
 SELECT COUNT(*) = 1 FROM t0;
 COUNT(*) = 1
 1
@@ -20,3 +26,5 @@ COUNT(*) = 0
 1
 DROP TABLE t1;
 DROP TABLE t0;
+call mtr.add_suppression("Ignoring error 'Can't find record in 't1''");
+call mtr.add_suppression("Slave SQL: Could not execute Delete_rows event on table test.t1; Can't find record in 't1'");

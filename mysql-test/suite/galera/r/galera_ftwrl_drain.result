@@ -13,7 +13,7 @@ SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
 SET SESSION lock_wait_timeout = 1;
 SET SESSION innodb_lock_wait_timeout=1;
 SET SESSION wait_timeout=1;
-INSERT INTO t2 VALUES (2);
+INSERT INTO t1 VALUES (2);
 ERROR HY000: Lock wait timeout exceeded; try restarting transaction
 UNLOCK TABLES;
 SELECT COUNT(*) = 1 FROM t1;

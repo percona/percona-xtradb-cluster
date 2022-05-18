@@ -172,6 +172,14 @@ REVOKE CREATE ON *.* FROM CURRENT_USER();
 --error ER_UNKNOWN_ERROR
 REVOKE ALL ON *.* FROM CURRENT_USER();
 
+#
+CREATE USER 'test_user'@'localhost' IDENTIFIED BY 'abc';
+--error ER_UNKNOWN_ERROR
+GRANT ALL PRIVILEGES ON *.* TO CURRENT_USER() IDENTIFIED BY 'abc';
+--error ER_UNKNOWN_ERROR
+GRANT PROXY ON 'test_user'@'localhost' TO CURRENT_USER() IDENTIFIED BY 'abc';
+DROP USER 'test_user'@'localhost';
+
 --connection node_2
 --echo #node-2
 call mtr.add_suppression("Percona XtraDB Cluster doesn't allow use of CURRENT_USER/USER function");
