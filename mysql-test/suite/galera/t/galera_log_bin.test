@@ -38,14 +38,18 @@ FLUSH LOGS;
 
 # Use pos 124 in order to skip the header that contains the MySQL version number.
 # Otherwise, version number changes will cause the test to break
---replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 124;
+--let $binlog_file = mysqld-bin.000002
+--let $binlog_start = 124
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 
 --connection node_2
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1';
 
---replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 
 DROP TABLE t1;
 DROP TABLE t2;
@@ -87,8 +91,10 @@ INSERT INTO t2 VALUES (12);
 COMMIT;
 
 # we expect only t2 operations to be logged
---replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 
 # Check node_2
 --connection node_2
@@ -104,8 +110,10 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 --source include/wait_condition.inc
 
 # # we expect only t2 operations to be logged
---replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 
 DROP TABLE t1;
 DROP TABLE t2;
@@ -146,8 +154,10 @@ INSERT INTO t2 VALUES (3);
 COMMIT;
 
 # we expect only t2 operations to be logged
---replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 
 # Check node_2
 --connection node_2
@@ -163,8 +173,10 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 --source include/wait_condition.inc
 
 # we expect only t2 operations to be logged
---replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 
 DROP TABLE t1;
 DROP TABLE t2;
@@ -192,8 +204,10 @@ CREATE TABLE t2 (a int primary key);
 INSERT INTO t2 VALUES (1);
 
 # we expect only t2 operations to be logged
---replace_regex /table_id: [0-9]+/table_id: #/ /xid=[0-9]+/xid=#/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 
 # Check node_2
 --connection node_2
@@ -215,7 +229,10 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
 --source include/assert.inc
 
 # we expect nothing in binlog
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 125;
+--let $binlog_file = mysqld-bin.000001
+--let $binlog_start = 125
+--let $keep_gtid_events = 1
+--source include/show_binlog_events.inc
 
 DROP TABLE t1;
 DROP TABLE t2;
