@@ -16,7 +16,6 @@ SELECT * FROM mysql.global_grants ORDER BY USER, PRIV, WITH_GRANT_OPTION;
 USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
-<<<<<<< HEAD
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
@@ -50,10 +49,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
-||||||| merged common ancestors
-=======
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
->>>>>>> tag/Percona-Server-8.0.28-19
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -108,7 +104,6 @@ SELECT * FROM mysql.global_grants ORDER BY USER, PRIV, WITH_GRANT_OPTION;
 USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
-<<<<<<< HEAD
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
@@ -142,10 +137,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
-||||||| merged common ancestors
-=======
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
->>>>>>> tag/Percona-Server-8.0.28-19
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -199,7 +191,6 @@ SELECT * FROM mysql.global_grants ORDER BY USER, PRIV, WITH_GRANT_OPTION;
 USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
-<<<<<<< HEAD
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
@@ -233,10 +224,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
-||||||| merged common ancestors
-=======
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
->>>>>>> tag/Percona-Server-8.0.28-19
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -303,7 +291,6 @@ SELECT * FROM mysql.global_grants ORDER BY USER, PRIV, WITH_GRANT_OPTION;
 USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
-<<<<<<< HEAD
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
@@ -337,10 +324,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
-||||||| merged common ancestors
-=======
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
->>>>>>> tag/Percona-Server-8.0.28-19
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -399,7 +383,6 @@ SELECT * FROM mysql.global_grants ORDER BY USER, PRIV, WITH_GRANT_OPTION;
 USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
-<<<<<<< HEAD
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
@@ -433,10 +416,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
-||||||| merged common ancestors
-=======
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
->>>>>>> tag/Percona-Server-8.0.28-19
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -490,7 +470,6 @@ SELECT * FROM mysql.global_grants ORDER BY USER, PRIV, WITH_GRANT_OPTION;
 USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
-<<<<<<< HEAD
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
@@ -524,10 +503,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
-||||||| merged common ancestors
-=======
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
->>>>>>> tag/Percona-Server-8.0.28-19
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -604,7 +580,6 @@ SELECT * FROM mysql.global_grants ORDER BY USER, PRIV, WITH_GRANT_OPTION;
 USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
-<<<<<<< HEAD
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
@@ -638,10 +613,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
-||||||| merged common ancestors
-=======
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
->>>>>>> tag/Percona-Server-8.0.28-19
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -709,7 +681,6 @@ SELECT * FROM mysql.global_grants ORDER BY USER, PRIV, WITH_GRANT_OPTION;
 USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
-<<<<<<< HEAD
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
@@ -743,10 +714,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
-||||||| merged common ancestors
-=======
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
->>>>>>> tag/Percona-Server-8.0.28-19
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
@@ -822,7 +790,6 @@ SELECT * FROM mysql.global_grants ORDER BY USER, PRIV, WITH_GRANT_OPTION;
 USER	HOST	PRIV	WITH_GRANT_OPTION
 mysql.infoschema	localhost	AUDIT_ABORT_EXEMPT	N
 mysql.infoschema	localhost	SYSTEM_USER	N
-<<<<<<< HEAD
 mysql.pxc.internal.session	localhost	APPLICATION_PASSWORD_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUDIT_ADMIN	Y
 mysql.pxc.internal.session	localhost	AUTHENTICATION_POLICY_ADMIN	Y
@@ -856,10 +823,7 @@ mysql.pxc.internal.session	localhost	SYSTEM_VARIABLES_ADMIN	Y
 mysql.pxc.internal.session	localhost	TABLE_ENCRYPTION_ADMIN	Y
 mysql.pxc.internal.session	localhost	XA_RECOVER_ADMIN	Y
 mysql.pxc.sst.role	localhost	BACKUP_ADMIN	N
-||||||| merged common ancestors
-=======
 mysql.session	localhost	AUDIT_ABORT_EXEMPT	N
->>>>>>> tag/Percona-Server-8.0.28-19
 mysql.session	localhost	BACKUP_ADMIN	N
 mysql.session	localhost	CLONE_ADMIN	N
 mysql.session	localhost	CONNECTION_ADMIN	N
