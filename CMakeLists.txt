@@ -1084,6 +1084,7 @@ IF(WITH_ASAN)
       MESSAGE(FATAL_ERROR "Do not know how to enable address sanitizer")
     ENDIF()
   ENDIF()
+  ADD_DEFINITIONS(-DUSE_ASAN)
 ENDIF()
 
 OPTION(WITH_LSAN "Enable leak sanitizer" OFF)
