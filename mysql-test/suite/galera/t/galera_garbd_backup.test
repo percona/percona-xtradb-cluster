@@ -40,12 +40,12 @@ SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME 
 
 # Error: incorrect receiver script
 --error 2
---exec `dirname $WSREP_PROVIDER`/../bin/garbd --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --recv-script="nonexistent-script" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd2.log 2>&1 
+--exec `dirname $WSREP_PROVIDER`/../bin/garbd --sst="xtrabackup-v2:127.0.0.1:9997/xtrabackup_sst//1" --recv-script="nonexistent-script" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3' > $MYSQLTEST_VARDIR/tmp/garbd2.log 2>&1 
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
 # Simulate two connection error 
 --let $command = "`dirname $WSREP_PROVIDER`/../bin/garbd"
---let $command_opt = --sst="xtrabackup-v2:127.0.0.1:9999/xtrabackup_sst//1" --donor node1 --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9999" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3'
+--let $command_opt = --sst="xtrabackup-v2:127.0.0.1:9996/xtrabackup_sst//1" --donor node1 --recv-script="$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh 9996" --address "gcomm://127.0.0.1:$NODE_GALERAPORT_1" --group my_wsrep_cluster --options 'evs.inactive_timeout=PT6S;base_port=$NODE_GALERAPORT_3'
 --let $output_file = $MYSQLTEST_VARDIR/tmp/garbd3.log
 --let $pid_file = $MYSQLTEST_VARDIR/tmp/garbd3.pid
 --source include/start_proc_in_background.inc

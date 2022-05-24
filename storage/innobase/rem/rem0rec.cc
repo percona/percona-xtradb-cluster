@@ -763,7 +763,6 @@ static inline bool rec_convert_dtuple_to_rec_comp(
         break;
       default:
         ut_error;
-        return (instant);
     }
   }
 
@@ -1169,7 +1168,6 @@ rec_t *rec_copy_prefix_to_buf(const rec_t *rec, const dict_index_t *index,
       /* infimum or supremum record: no sense to copy anything */
     default:
       ut_error;
-      return (nullptr);
   }
 
   ut_d(uint16_t non_default_fields =)
