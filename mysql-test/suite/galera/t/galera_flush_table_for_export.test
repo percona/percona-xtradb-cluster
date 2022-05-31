@@ -1,0 +1,42 @@
+# ==== Purpose ===
+#
+# This test verifies that server performs proper cleanup when the session was
+# disconnected/killed while there is an active FLUSH TABLE FOR EXPORT in
+# effect.
+#
+# === References ===
+#
+# PXC-3739: FLUSH TABLES FOR EXPORT lock not released when session ends
+
+--source include/galera_cluster.inc
+--source include/count_sessions.inc
+
+# Create auxiliary connections for the test, which will be disconnected later.
+--connect(con1,localhost,root,,test, $NODE_MYPORT_1)
+--connect(con2,localhost,root,,test, $NODE_MYPORT_1)
+CREATE TABLE t1 (i INT PRIMARY KEY);
+
+# Test-1: Execute FLUSH TABLE for EXPORT and disconnect the connection.
+FLUSH TABLE t1 FOR EXPORT;
+--disconnect con2
+
+# Test that INSERT works.
+--connection node_1
+INSERT INTO t1 VALUES(1);
+
+# Test-2: Execute FLUSH TABLE for EXPORT and kill the session from another session.
+--connection con1
+--let $conn_id = `SELECT CONNECTION_ID();`
+FLUSH TABLE t1 FOR EXPORT;
+
+--connection node_1
+--replace_result $conn_id CONN_ID
+--eval KILL $conn_id
+--disconnect con1
+
+# Test that INSERT works.
+INSERT INTO t1 VALUES(2);
+SELECT * FROM t1;
+DROP TABLE t1;
+
+--source include/wait_until_count_sessions.inc
