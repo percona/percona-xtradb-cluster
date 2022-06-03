@@ -15,6 +15,10 @@ CALL mtr.add_suppression("WSREP-SST.*");
 CALL mtr.add_suppression("SST preparation failed");
 CALL mtr.add_suppression("SST failed");
 CALL mtr.add_suppression("Invalid sst_request");
+# Socat streaming might fail with the port 9997 test. This will result in xbstream errors in the log. That's ok.
+CALL mtr.add_suppression("Xtrabackup");
+# Random xtrabackup diagnostic, shouldn't be an issue
+CALL mtr.add_suppression("Allocated tablespace ID");
 
 --connection node_2
 CALL mtr.add_suppression("Protocol violation\. JOIN message sender 1\.0 \(.*\) is not in state transfer \(SYNCED\)");
@@ -25,6 +29,10 @@ CALL mtr.add_suppression("WSREP-SST.*");
 CALL mtr.add_suppression("SST preparation failed");
 CALL mtr.add_suppression("SST failed");
 CALL mtr.add_suppression("Invalid sst_request");
+# Socat streaming might fail with the port 9997 test. This will result in xbstream errors in the log. That's ok.
+CALL mtr.add_suppression("Xtrabackup");
+# Random xtrabackup diagnostic, shouldn't be an issue
+CALL mtr.add_suppression("Allocated tablespace ID");
 
 --exec `chmod +x "$MYSQLTEST_VARDIR/std_data/sst_garbd_test.sh"`
 

@@ -12,7 +12,8 @@ function handle_sigint() {
   fi
 }
 
-trap 'handle_sigint' 2
+trap 'handle_sigint' SIGINT
+trap 'handle_sigint' SIGTERM
 
 echo 1
 
@@ -26,5 +27,9 @@ socat_pid=
 echo 2
 socat TCP-LISTEN:$1,reuseaddr - > /dev/null
 echo 3
+
+sleep 5
+
+echo 4
 
 exit 0
