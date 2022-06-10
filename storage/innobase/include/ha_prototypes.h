@@ -256,9 +256,8 @@ int wsrep_innobase_kill_one_trx(
 	trx_t*		victim_trx,
 	ibool		signal);
 
-my_bool wsrep_thd_set_PA_safe(
-	void*		thd_ptr,
-	my_bool		safe);
+my_bool wsrep_thd_set_PA_unsafe(
+	void*		thd_ptr);
 
 int wsrep_thd_conflict_state(
 	void*		thd_ptr,

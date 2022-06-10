@@ -1484,6 +1484,7 @@ row_ins_foreign_check_on_constraint(
 		mtr_commit(mtr);
 	} else
 	{
+		wsrep_thd_set_PA_unsafe(trx->mysql_thd);
 		mtr_commit(mtr);
 		err = row_update_cascade_for_mysql(thr, cascade,
 						   foreign->foreign_table);
