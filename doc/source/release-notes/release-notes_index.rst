@@ -7,7 +7,7 @@
 
    Percona-XtraDB-Cluster-5.7.37-31.57
    
-   Percona-XtraDB-Cluster-5.7.36-31.55 (2022-02-16) <Percona-XtraDB-Cluster-5.7.36-31.55>
+   Percona XtraDB Cluster 5.7.36-31.55 (2022-02-16) <Percona-XtraDB-Cluster-5.7.36-31.55>
 
    Percona XtraDB Cluster 5.7.35-31.53 (2021-11-18) <Percona-XtraDB-Cluster-5.7.35-31.53>
 
@@ -66,4 +66,4 @@
    Percona XtraDB Cluster 5.7.12-5rc1-26.16 (2016-08-09) <Percona-XtraDB-Cluster-5.7.12-5rc1-26.16>
 
    Percona XtraDB Cluster 5.7.11-4beta-25.14.2 (2016-06-09) <Percona-XtraDB-Cluster-5.7.11-4beta-25.14.2>
-
+   
