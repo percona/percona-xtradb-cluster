@@ -1,5 +1,5 @@
 ============================================
-*Percona XtraDB Cluster* 5.7 Release notes
+ *Percona XtraDB Cluster* 5.7 Release notes
 ============================================
 
 .. toctree::
@@ -66,3 +66,4 @@
    Percona XtraDB Cluster 5.7.12-5rc1-26.16 (2016-08-09) <Percona-XtraDB-Cluster-5.7.12-5rc1-26.16>
 
    Percona XtraDB Cluster 5.7.11-4beta-25.14.2 (2016-06-09) <Percona-XtraDB-Cluster-5.7.11-4beta-25.14.2>
+   

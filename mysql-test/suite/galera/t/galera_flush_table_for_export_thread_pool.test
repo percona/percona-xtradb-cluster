@@ -1,0 +1,11 @@
+# ==== Purpose ===
+#
+# This test verifies that server performs proper cleanup when the session was
+# disconnected/killed while there is an active FLUSH TABLE FOR EXPORT in
+# effect when threadpool is used.
+#
+# === References ===
+#
+# PXC-3739: FLUSH TABLES FOR EXPORT lock not released when session ends
+
+--source galera_flush_table_for_export.test
