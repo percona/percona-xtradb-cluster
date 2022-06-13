@@ -23,7 +23,6 @@ WSREP_SST_OPT_BINLOG=""
 WSREP_SST_OPT_CONF_SUFFIX=""
 WSREP_SST_OPT_DATA=""
 WSREP_SST_OPT_BASEDIR=""
-WSREP_SST_OPT_PLUGINDIR=""
 WSREP_SST_OPT_USER=""
 WSREP_SST_OPT_PSWD=""
 WSREP_SST_OPT_VERSION=""
@@ -96,10 +95,6 @@ case "$1" in
         ;;
     '--password')
         # Ignore (read value from stdin)
-        shift
-        ;;
-    '--plugindir')
-        readonly WSREP_SST_OPT_PLUGINDIR="$2"
         shift
         ;;
     '--port')
@@ -535,7 +530,6 @@ EOF
 #   WSREP_SST_OPT_CONF
 #   WSREP_SST_OPT_CONF_SUFFIX
 #   WSREP_SST_OPT_BASEDIR
-#   WSREP_SST_OPT_PLUGINDIR
 #   MYSQL_UPGRADE_TMPDIR    (This path will be deleted on exit)
 #
 # Arguments
@@ -803,10 +797,6 @@ function run_post_processing_steps()
 
     if [[ -n $WSREP_SST_OPT_BASEDIR ]]; then
         mysqld_cmdline+=" --basedir=${WSREP_SST_OPT_BASEDIR}"
-    fi
-
-    if [[ -n $WSREP_SST_OPT_PLUGINDIR ]]; then
-        mysqld_cmdline+=" --plugin-dir=${WSREP_SST_OPT_PLUGINDIR}"
     fi
 
     # Generate a new random password to be used by the JOINER
