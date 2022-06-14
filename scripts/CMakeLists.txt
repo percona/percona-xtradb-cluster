@@ -448,6 +448,9 @@ ELSE()
       )
   ENDIF()
   IF(WITH_WSREP)
+    # Configure wsrep_sst_backup script for testing, but do not install it.
+    CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/wsrep_sst_backup.sh
+      ${CMAKE_CURRENT_BINARY_DIR}/wsrep_sst_backup ESCAPE_QUOTES @ONLY)
     SET(BIN_SCRIPTS
       ${BIN_SCRIPTS}
       wsrep_sst_common
