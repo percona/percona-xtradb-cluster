@@ -29,7 +29,6 @@
 #include "wsrep_xid.h"
 #include <cstdio>
 #include <cstdlib>
-<<<<<<< HEAD
 #include "log_event.h"
 #include <rpl_slave.h>
 #include "sql_base.h"           // TEMP_PREFIX
@@ -37,6 +36,7 @@
 #include <functional>
 #include <sstream>
 #include <string>
+#include "debug_sync.h"
 
 /* We don't need PSI instrumentation for regex mutex, however
    Regex class has its constructor compiled conditionally.
@@ -104,12 +104,6 @@ static const char *sst_method_allowed_chars_regex_pattern=
     "^[[:alnum:]:/._<>-]+$";
 static Regex sst_method_allowed_chars_regex;
 
-||||||| merged common ancestors
-#include <cctype>
-=======
-#include <cctype>
-#include "debug_sync.h"
->>>>>>> wsrep_5.7.37-25.29
 
 extern const char wsrep_defaults_file[];
 extern const char wsrep_defaults_group_suffix[];
@@ -1231,17 +1225,11 @@ static int sst_flush_tables(THD* thd)
   }
   else
   {
-<<<<<<< HEAD
     WSREP_INFO("Table flushing completed.");
-||||||| merged common ancestors
-    WSREP_INFO("Tables flushed.");
-=======
-    WSREP_INFO("Tables flushed.");
 
     /* disable further disk IO */
     sst_disallow_writes(thd, true);
 
->>>>>>> wsrep_5.7.37-25.29
     const char base_name[]= "tables_flushed";
     ssize_t const full_len= strlen(mysql_real_data_home) + strlen(base_name)+2;
     char *real_name= static_cast<char *>(alloca(full_len));
