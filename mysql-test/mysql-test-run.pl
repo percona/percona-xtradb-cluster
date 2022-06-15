@@ -4015,7 +4015,13 @@ sub check_wsrep_support() {
       my $garbd_file = dirname($ENV{'WSREP_PROVIDER'})."/garb/garbd";
       my $mtr_garbd_exe = mtr_file_exists($garbd_file);
       if ($mtr_garbd_exe ne "") {
-        $ENV{'MTR_GARBD_EXE'} = $mtr_garbd_exe
+        $ENV{'MTR_GARBD_EXE'} = $mtr_garbd_exe;
+      } else {
+        $garbd_file = dirname($ENV{'WSREP_PROVIDER'})."/../bin/garbd";
+        $mtr_garbd_exe = mtr_file_exists($garbd_file);
+        if ($mtr_garbd_exe ne "") {
+          $ENV{'MTR_GARBD_EXE'} = $mtr_garbd_exe;
+        }
       }
     }
     # Garbd not defined by caller or not found from WSREP_PROVIDER

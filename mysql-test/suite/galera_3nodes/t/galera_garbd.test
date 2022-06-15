@@ -58,7 +58,7 @@ DROP TABLE t1;
 --source include/start_mysqld.inc
 
 --connection node_1
---remove_file $MYSQLTEST_VARDIR/tmp/garbd.log
+--remove_file $MYSQL_TMP_DIR/garbd.log
 
 # Workaround for galera#101
 
