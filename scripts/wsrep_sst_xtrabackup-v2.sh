@@ -947,12 +947,8 @@ read_cnf()
         done
     fi
 
-    if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-      # only add retry to joiners
-      # donor uses a custom retry logic to avoid a socat bug with retry+timeout on localhost
-      if [[ ! "$sockopt" =~ retry= ]]; then
-       sockopt+=",retry=30"
-      fi
+    if [[ ! "$sockopt" =~ retry= ]]; then
+        sockopt+=",retry=30"
     fi
 
     xbstream_opts=$(parse_cnf sst xbstream-opts "")
@@ -1486,8 +1482,11 @@ send_data_from_donor_to_joiner()
     local rc=1
     local counter=1
 
+    # remove the retry parameter from the command
+    local ltcmd=$(echo $tcmd | sed s/,retry=[0-9]*//)
+
     while [[ $rc -ne 0 && counter -le 30 ]]; do
-        timeit "$msg" "$strmcmd | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+        timeit "$msg" "$strmcmd | $ltcmd; RC=( "\${PIPESTATUS[@]}" )"
         # Retry if socat/nc returns an error
         rc=${RC[1]}
         counter=$((counter+1))
@@ -1496,6 +1495,7 @@ send_data_from_donor_to_joiner()
 
     set -e
     popd 1>/dev/null
+
 
     for ecode in "${RC[@]}";do
         if [[ $ecode -ne 0 ]]; then
