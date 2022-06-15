@@ -18,7 +18,7 @@ These include runtime parameters, server grouping, and traffic-related settings.
 .. note::
 
    For more information about ProxySQL, see `ProxySQL documentation
-   <https://github.com/sysown/proxysql/tree/master/doc>`_.
+   <https://proxysql.com/documentation/>`_.
 
 ProxySQL is available from the Percona software repositories in two
 versions. ProxySQL v1 does not natively support |PXC| and requires
