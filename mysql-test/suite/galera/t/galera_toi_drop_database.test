@@ -1,6 +1,11 @@
 #
 # Test the operation of DDLs that affect multiple database objects
 #
+# The test starts transactions for tables database1.t1 and
+# database1.t2 on node_1 and runs DROP DATABASE database1 on
+# node_2. It is expected that both transactions fail with
+# deadlock error on COMMIT.
+#
 
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
