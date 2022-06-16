@@ -68,7 +68,7 @@ EOF
 --let $assert_text= Checking node_2 error was due to stale SST
 --let $assert_file= $MYSQLTEST_VARDIR/tmp/test_error_log.err
 --let $assert_select= Killing SST \([0-9]*\) with SIGKILL after stalling for [0-9]* seconds
---let $assert_only_after=CURRENT_TEST: galera.galera_sst_failure2
+--let $assert_only_after=CURRENT_TEST: galera.galera_sst_failure
 --let $assert_count=1
 --source include/assert_grep.inc
 
