@@ -296,7 +296,7 @@ monitor_sst_progress() {
       break;
     fi
 
-    current_size=$(du --max-depth=1 ${tmpsstdir} | tail -n 1 | awk '{print $1}')
+    current_size=$(du -b -s ${tmpsstdir} | awk '{print $1}')
     if [[ ${current_size} -eq  ${previous_size} ]]; then
       current_timeout=$((current_timeout + 1))
       sleep=1
