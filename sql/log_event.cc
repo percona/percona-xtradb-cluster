@@ -60,9 +60,6 @@
 #include "sql_class.h"
 #include "mysql/psi/mysql_transaction.h"
 #include "sql_plugin.h" // plugin_foreach
-#ifdef WITH_WSREP
-#include "wsrep_mysqld.h"
-#endif
 #define window_size Log_throttle::LOG_THROTTLE_WINDOW_SIZE
 Error_log_throttle
 slave_ignored_err_throttle(window_size,
@@ -13917,7 +13914,16 @@ Gtid_log_event::Gtid_log_event(const char *buffer, uint event_len,
   spec.gtid.sidno= gtid_info_struct.rpl_gtid_sidno;
   //GNO sanity check
   if (spec.type == GTID_GROUP) {
+#if defined(WITH_WSREP) && defined(MYSQL_SERVER)
+  // In PXC, writesets are replicated with GNo=0 to other nodes as the actual
+  // seqno/GTID is assigned from the group at a later stage (galera_pre_commit).
+  // So, it is expected that galera writesets to have GNo=0. So, don't
+  // consider it as an error when WSREP is loaded.
+    if ((!WSREP_ON && gtid_info_struct.rpl_gtid_gno <= 0) ||
+         gtid_info_struct.rpl_gtid_gno >= GNO_END)
+#else
     if (gtid_info_struct.rpl_gtid_gno <= 0 || gtid_info_struct.rpl_gtid_gno >= GNO_END)
+#endif /* WITH_WSREP && MYSQL_SERVER */
       goto err;
   } else { //ANONYMOUS_GTID_LOG_EVENT
     if (gtid_info_struct.rpl_gtid_gno != 0)
