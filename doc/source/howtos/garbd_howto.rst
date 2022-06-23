@@ -51,7 +51,7 @@ When starting from the shell, you can set the parameters from the command line o
 
   $ garbd --group=my_ubuntu_cluster \
   --address="gcomm://192.168.70.61:4567, 192.168.70.62:4567, 192.168.70.63:4567" \
-  --option="socket.ssl_key=/etc/ssl/mysql/server-key.pem; \
+  --option="socket.ssl=YES; socket.ssl_key=/etc/ssl/mysql/server-key.pem; \
   socket.ssl_cert=/etc/ssl/mysql/server-cert.pem; \
   socket.ssl_ca=/etc/ssl/mysql/ca.pem; \
   socket.ssl_cipher=AES128-SHA256"
